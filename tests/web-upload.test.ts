@@ -30,6 +30,16 @@ function imageForm(name: string, data: Blob = new Blob([PNG], { type: 'image/png
 	return form
 }
 
+test('static assets are served', async () => {
+	const base = `http://127.0.0.1:${web.state.port}`
+	const page = await fetch(`${base}/`)
+	expect(page.status).toBe(200)
+	expect(await page.text()).toContain('stylesheet')
+	const css = await fetch(`${base}/styles.css`)
+	expect(css.status).toBe(200)
+	expect(css.headers.get('content-type')).toContain('text/css')
+})
+
 test('upload requires a valid web token', async () => {
 	const response = await fetch(uploadUrl('wrong-token'), { method: 'POST', body: imageForm('shot.png') })
 	expect(response.status).toBe(401)
