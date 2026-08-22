@@ -726,13 +726,16 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				if (terminalErrorEntry) historyEntries.push(terminalErrorEntry)
 				let emptyResponseMessage = ''
 				if (!thinkingText && !assistantText && serverToolHistory.length === 0 && !terminalErrorEntry) {
+					// An empty provider reply is a failed turn, not a completed one: that way the
+					// prompt shows the retry affordance and a bare Enter re-runs the turn.
 					emptyResponseMessage = 'Provider returned an empty response. Please retry.'
-					historyEntries.push({ type: 'log', text: emptyResponseMessage, ts })
+					hadTerminalError = true
+					historyEntries.push(errorHistoryEntry(emptyResponseMessage, undefined, ts))
 				}
 				if (historyEntries.length > 0) {
 					await sessions.appendHistory(sessionId, historyEntries)
 				}
-				if (emptyResponseMessage) emitInfo(sessionId, emptyResponseMessage)
+				if (emptyResponseMessage) emitEvent(sessionId, { type: 'response', text: emptyResponseMessage, isError: true })
 
 				if (historyEntries.length > 0) {
 					sessions.clearLive(sessionId)

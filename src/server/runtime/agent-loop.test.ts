@@ -7,6 +7,7 @@ import { provider as providerLoader } from '../providers/provider.ts'
 import { ipc } from '../file-ipc.ts'
 import { sessions } from '../sessions.ts'
 import { blob } from '../session/blob.ts'
+import { continuation } from '../session/continuation.ts'
 import { apiMessages } from '../session/api-messages.ts'
 import { tokenCalibration } from '../token-calibration.ts'
 import { toolRegistry } from '../tools/tool.ts'
@@ -471,6 +472,7 @@ test('logs an empty completed provider response so the user can retry', async ()
 	const sessionId = `test-empty-response-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	await sessions.appendHistory(sessionId, [{ type: 'user', parts: [{ type: 'text', text: 'answer me' }] }])
 
 	const events: any[] = []
 	const origGetProvider = providerLoader.getProvider
@@ -492,16 +494,18 @@ test('logs an empty completed provider response so the user can retry', async ()
 			systemPrompt: 'test prompt',
 			messages: [{ role: 'user', content: 'answer me' }],
 		})
-		expect(result).toBe('completed')
+		expect(result).toBe('failed')
 		expect(events).toContainEqual(expect.objectContaining({
-			type: 'info',
+			type: 'response',
+			isError: true,
 			text: 'Provider returned an empty response. Please retry.',
 		}))
 		expect(sessions.loadHistory(sessionId)).toContainEqual(expect.objectContaining({
-			type: 'log',
+			type: 'error',
 			text: 'Provider returned an empty response. Please retry.',
 		}))
-		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'completed' })
+		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'failed' })
+		expect(continuation.actionForHistory(sessions.loadHistory(sessionId))).toBe('retry')
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent
@@ -734,6 +738,7 @@ test('displaced generation cannot clear newer working request state', async () =
 			}
 			secondStarted.resolve()
 			await finishSecond.promise
+			yield { type: 'text', text: 'second done' }
 			yield { type: 'done' }
 		},
 	})
