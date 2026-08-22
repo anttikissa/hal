@@ -303,9 +303,9 @@ function sanitizeName(text: string): string {
 
 async function summarizeDigest(model: string, digest: string): Promise<SummaryResult> {
 	const slash = model.indexOf('/')
-	const providerName = slash >= 0 ? model.slice(0, slash) : 'stub'
-	const modelId = slash >= 0 ? model.slice(slash + 1) : model
-	const provider = await providerLoader.getProvider(providerName)
+	if (slash < 0) throw new Error(`Model not found: ${model}`)
+	const provider = await providerLoader.getProvider(model.slice(0, slash))
+	const modelId = model.slice(slash + 1)
 	const messages: Message[] = [{ role: 'user', content: userPrompt(digest) }]
 	let text = ''
 	for await (const event of provider.generate({ messages, model: modelId, systemPrompt: whatSummary.systemPrompt(), tools: [], stateless: true })) {

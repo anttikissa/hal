@@ -1092,3 +1092,23 @@ test('abort during rate-limit backoff stops immediately', async () => {
 		ipc.appendEvent = origAppendEvent
 	}
 })
+
+
+test('a model id with no provider fails with a model-not-found message, not an internal provider name', async () => {
+	const sessionId = `test-no-provider-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	// 'glm-5.3' matches no alias and no models.dev entry, so it never gained a provider prefix.
+	const error = await agentLoop.runAgentLoop({
+		sessionId,
+		model: 'glm-5.3',
+		cwd: process.cwd(),
+		systemPrompt: 'test prompt',
+		messages: [{ role: 'user', content: 'hi' }],
+	}).then(() => null, (err: any) => err)
+
+	expect(error?.message).toContain('Model not found: glm-5.3')
+	expect(error?.message).not.toContain('stub')
+	expect(error?.message).not.toContain('BASE_URL')
+})

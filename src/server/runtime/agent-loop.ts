@@ -383,10 +383,13 @@ async function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
 async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 	const { sessionId, model, systemPrompt, messages, signal } = ctx
 
-	// Parse "provider/model-id" — e.g. "anthropic/claude-opus-4-6"
+	// Parse "provider/model-id" — e.g. "anthropic/claude-opus-4-6". A bare name that
+	// resolveModel could not expand is a model Hal has never heard of, so say that
+	// rather than inventing a provider name and failing inside the provider loader.
 	const slashIdx = model.indexOf('/')
-	const providerName = slashIdx >= 0 ? model.slice(0, slashIdx) : 'stub'
-	const modelId = slashIdx >= 0 ? model.slice(slashIdx + 1) : model
+	if (slashIdx < 0) throw new Error(`Model not found: ${model}. Run /model to list models, or /check to refresh Hal's model metadata.`)
+	const providerName = model.slice(0, slashIdx)
+	const modelId = model.slice(slashIdx + 1)
 	const providerPromise = providerLoader.getProvider(providerName)
 
 	// Abort any existing generation for this session. This prevents two

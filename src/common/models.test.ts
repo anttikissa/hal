@@ -143,6 +143,19 @@ test('any openrouter model from models.dev resolves, completes, and is listed by
 	})
 })
 
+test('a bare openrouter model name resolves to its vendor id', () => {
+	models.hydrate({}, ['z-ai/glm-5.3', 'z-ai/glm-5.2', 'stealth/ox-alpha', 'qwen/qwen3.8-max'])
+
+	expect(models.resolveModel('glm-5.3')).toBe('openrouter/z-ai/glm-5.3')
+	expect(models.resolveModel('ox-alpha')).toBe('openrouter/stealth/ox-alpha')
+	// Catalog aliases still win over a bare models.dev name.
+	expect(models.resolveModel('glm')).toBe('openrouter/z-ai/glm-5.2')
+	// A name no vendor offers stays untouched, so the caller can report it as missing.
+	expect(models.resolveModel('glm-9.9')).toBe('glm-9.9')
+
+	expect(models.modelCompletionNames()).toContain('glm-5.3')
+})
+
 test('an aliased openrouter model is listed once, under its alias', () => {
 	models.hydrate({}, ['qwen/qwen3.8-max', 'qwen/qwen3-max', 'qwen/qwen3-coder'])
 	const qwen = models.listModelChoices().filter((item) => item.path.join('/') === 'openrouter/qwen')
