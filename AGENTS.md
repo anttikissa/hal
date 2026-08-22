@@ -155,6 +155,10 @@ fullscreen flag. Violating them causes visual corruption.
 Before editing web or SolidJS code, read `docs/web.md`; its prerelease Solid 2
 rules override remembered Solid 1 and React patterns.
 
+Before designing or restyling web UI, read `docs/frontend-design.md` (Anthropic's
+frontend-design skill). Plan tokens (palette, type roles, one signature element)
+before writing CSS, and avoid the templated "AI slop" looks it describes.
+
 # Terminal width
 
 ALL terminal width calculations MUST use `visLen()` from `src/utils/strings.ts`.
