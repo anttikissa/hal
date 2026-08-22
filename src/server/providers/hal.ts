@@ -16,18 +16,53 @@ const config = {
 	wordsPerSecond: 4,
 }
 
-let script = `Hello. This is HAL 9001, a friendly agent harness.<pause for="1s"/>
+// Single-token lines fill the viewport quickly at the default streaming rate.
+function fillerBlock(count: number): string {
+	const lines: string[] = []
+	for (let i = 1; i <= count; i++) lines.push(`Line-${String(i).padStart(2, '0')}`)
+	return lines.join('\n')
+}
+
+const scripts: Record<string, string> = {
+	intro: `Hello. This is HAL 9001, a friendly agent harness.<pause for="1s"/>
 
 Press enter to continue.<pause until="enter"/><config key="renderStatus.tabsOpacity" value="1"/>Those are your session tabs. Each one is an independent conversation.<pause for="1s"/>
 
 Press enter to continue.<pause until="enter"/><config key="renderStatus.statusOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Below them are the status and help bars: session, directory, model, context, and the keys you can press right now.<pause for="1s"/>
 
-Press enter to continue.<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="models.default" value="gpt"/>That is your prompt.<pause for="0.5s"/> Choose a real model with \`/model\`, then tell HAL what you would like to do.`
+Press enter to continue.<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="models.default" value="gpt"/>That is your prompt.<pause for="0.5s"/> Choose a real model with \`/model\`, then tell HAL what you would like to do.`,
+
+	// Reproduces the streamed-Markdown scroll corruption fixed in d97b2dc: fill the
+	// viewport so the frame is fullscreen, then deliver a code fence one backtick at
+	// a time. Each pause forces its own stream delta, which is what made the partial
+	// fence briefly render as text and shift rows that were already in scrollback.
+	scroll: `Streaming scroll-duplication check. Raise halProvider.wordsPerSecond to run it faster.<pause for="0.5s"/>
+
+${fillerBlock(60)}
+
+That makes **peer** particularly appropriate. A peer is not merely a local client—it is an equal participant in the local process group and may be promoted.
+
+The version-mismatch suffix remains natural:
+
+\`<pause for="0.25s"/>\`<pause for="0.25s"/>\`
+host
+peer
+client
+\`<pause for="0.25s"/>\`<pause for="0.25s"/>\`
+
+Scroll up: every Line-NN and every sentence above must appear exactly once.`,
+}
 
 // Deliberately not a general XML parser. Unrecognized markup is intro text.
 const CONTROL_RE = /<pause for="(\d+(?:\.\d+)?)s"\s*\/>|<pause until="enter"\s*\/>|<config key="([^"]+)" value="([^"]*)"\s*\/>/g
 
-function pages(source = halProvider.script): ScriptPage[] {
+// An explicit halProvider.script overrides the per-model script, which keeps
+// scripted scenarios reproducible from tests and eval.
+function scriptFor(model: string): string {
+	return halProvider.script || halProvider.scripts[model] || halProvider.scripts.intro!
+}
+
+function pages(source = scriptFor('intro')): ScriptPage[] {
 	const result: ScriptPage[] = []
 	let steps: ScriptStep[] = []
 	let offset = 0
@@ -105,7 +140,7 @@ async function* streamText(text: string, req: ProviderRequest): AsyncGenerator<P
 }
 
 async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
-	const available = pages()
+	const available = pages(scriptFor(req.model))
 	const page = available[nextPage(req.messages, available)]
 	if (!page) {
 		yield { type: 'done' }
@@ -123,4 +158,5 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 
 const provider: Provider = { generate }
 
-export const halProvider = { config, script, provider, pages, nextPage, wordChunks, sleep, streamText }
+// script stays empty unless a caller pins one scenario for every model.
+export const halProvider = { config, script: '', scripts, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText }

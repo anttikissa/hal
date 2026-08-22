@@ -21,6 +21,7 @@ interface CatalogEntry {
 
 const CATALOG: CatalogEntry[] = [
 	{ group: 'HAL', alias: 'intro', fullId: 'hal/intro', fallbackContext: 1_000_000 },
+	{ group: 'HAL', alias: 'scroll', fullId: 'hal/scroll', fallbackContext: 1_000_000 },
 	{ group: 'Anthropic', alias: 'opus', aliases: ['anthropic', 'claude'], fullId: 'anthropic/claude-opus-5', fallbackContext: 1_000_000, pricing: { input: 5, output: 25 }, track: 'opus' },
 	{ group: 'Anthropic', alias: 'sonnet', fullId: 'anthropic/claude-sonnet-5', fallbackContext: 1_000_000, pricing: { input: 3, output: 15 }, track: 'sonnet' },
 	{ group: 'Anthropic', alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5', fallbackContext: 200_000, pricing: { input: 1, output: 5 }, track: 'haiku' },
@@ -96,6 +97,7 @@ function displayTitleSuffix(text: string): string {
 
 const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	[/^intro$/, () => 'Intro'],
+	[/^scroll$/, () => 'Scroll Test'],
 	// claude-haiku-4-5-20251001 → Haiku 4.5
 	[
 		/^claude-(opus|sonnet|haiku|fable)-(\d+)-(\d+)-\d{8,}$/,

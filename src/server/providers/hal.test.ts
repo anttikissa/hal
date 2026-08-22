@@ -12,11 +12,11 @@ afterEach(() => {
 	halProvider.sleep = originalSleep
 })
 
-async function collect(messages: Message[]): Promise<any[]> {
+async function collect(messages: Message[], model = 'intro'): Promise<any[]> {
 	const events: any[] = []
 	for await (const event of halProvider.provider.generate({
 		messages,
-		model: 'intro',
+		model,
 		systemPrompt: 'secret system prompt',
 		tools: [],
 	})) events.push(event)
@@ -70,4 +70,22 @@ test('unrecognized markup remains ordinary intro text', () => {
 			pause: false,
 		},
 	])
+})
+
+test('each HAL model streams its own script and an explicit script overrides them', async () => {
+	halProvider.sleep = async () => {}
+
+	const scroll = (await collect([], 'scroll')).map((event) => event.text ?? '').join('')
+	expect(scroll).toContain('Line-01')
+	expect(scroll).toContain('Line-60')
+	expect(scroll).toContain('That makes **peer** particularly appropriate.')
+	// The delimiter must arrive one backtick at a time: that is the streamed shape
+	// that used to freeze duplicate rows into terminal scrollback.
+	expect(halProvider.scriptFor('scroll').split('<pause for="0.25s"/>')).toHaveLength(5)
+	expect(scroll).not.toContain('Hello. This is HAL 9001')
+
+	expect((await collect([], 'intro')).map((event) => event.text ?? '').join('')).toContain('Hello. This is HAL 9001')
+
+	halProvider.script = 'Pinned.'
+	expect(await collect([], 'scroll')).toEqual([{ type: 'text', text: 'Pinned.' }, { type: 'done' }])
 })
