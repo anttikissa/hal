@@ -77,17 +77,10 @@ function resolveModel(input: string): string {
 	for (const [re, replacement] of PATTERNS) {
 		if (re.test(input)) return input.replace(re, replacement)
 	}
-	return cachedNativeFullId(input) ?? openrouterIdEndingIn(input) ?? input
-}
-
-// "glm-5.3" → "openrouter/z-ai/glm-5.3". OpenRouter model names are unique enough
-// in practice that the vendor prefix is noise; openrouterIds is newest-first, so
-// the first match is the most recent vendor to ship a model by that name.
-function openrouterIdEndingIn(name: string): string | null {
-	for (const id of state.openrouterIds) {
-		if (id.slice(id.indexOf('/') + 1) === name) return `openrouter/${id}`
-	}
-	return null
+	// "glm-5.3" → "openrouter/z-ai/glm-5.3". Vendor prefixes are noise when the model
+	// name is unambiguous; openrouterIds is newest-first, so the first match wins.
+	const bare = state.openrouterIds.find((id) => id.endsWith(`/${input}`))
+	return cachedNativeFullId(input) ?? (bare ? `openrouter/${bare}` : input)
 }
 
 // ── Display names ──
