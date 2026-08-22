@@ -44,15 +44,21 @@ function parseInboxMessage(raw: unknown): InboxMessage | null {
 	}
 }
 
+function isOpen(sessionId: string): boolean {
+	return ipc.readState().sessions.some((session) => session.id === sessionId)
+}
+
 /** Process any pending .ason files in a session's inbox directory. */
 function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessage): void {
 	try {
 		const files = readdirSync(sessionDir)
 			.filter((f) => f.endsWith('.ason'))
 			.sort()
+		const openIds = new Set(ipc.readState().sessions.map((session) => session.id))
 		for (const file of files) {
 			const path = `${sessionDir}/${file}`
 			try {
+				if (!openIds.has(sessionId)) return
 				const content = readFileSync(path, 'utf-8')
 				const msg = parseInboxMessage(ason.parse(content))
 				if (msg?.text) onMessage(sessionId, msg.text, msg.from, msg.queue, msg.sourceTab)
@@ -133,4 +139,4 @@ function queueMessage(sessionId: string, text: string, from?: string, queue?: bo
 	Bun.write(path, ason.stringify(msg) + '\n')
 }
 
-export const inbox = { config, startWatching, queueMessage, scanAll }
+export const inbox = { config, startWatching, queueMessage, scanAll, isOpen, inboxDir: () => INBOX_DIR }

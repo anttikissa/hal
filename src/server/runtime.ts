@@ -984,8 +984,10 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	})()
 	void import('./runtime/inbox.ts')
 		.then(({ inbox }) => {
+			// Check openness at call time: a session may be opened (restored)
+			// after its message was queued; an older snapshot would drop it.
 			inbox.startWatching(signal, (sessionId, text, source, queue, sourceTab) => {
-				if (!state.openSessionIds.includes(sessionId)) return
+				if (!inbox.isOpen(sessionId)) return
 				queuePromptCommand(sessionId, text, source, queue, sourceTab)
 			})
 		})
