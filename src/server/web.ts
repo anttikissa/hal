@@ -32,17 +32,47 @@ function pageHtml(): Promise<string> {
 // Anything else is a real crash and just exits.
 const UPDATE_EXIT_CODE = 42
 
+function gitProc(args: string[]): Bun.Subprocess<"ignore", "pipe", "ignore"> {
+	return Bun.spawn(['git', ...args], {
+		cwd: `${import.meta.dir}/../..`,
+		stdout: 'pipe',
+		stderr: 'ignore',
+		// A deploy-time git must never sit waiting for credentials it cannot enter.
+		env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+	})
+}
+
+async function runGit(args: string[]): Promise<number> {
+	return await gitProc(args).exited
+}
+
+async function gitOut(args: string[]): Promise<string | null> {
+	const proc = gitProc(args)
+	const stdout = await new Response(proc.stdout).text()
+	return (await proc.exited) === 0 ? stdout.trim() : null
+}
+
 /**
  * Self-update hook: CI calls this after tests pass. Exiting makes the wrapper
  * pull and relaunch us. With no UPDATE_TOKEN configured (the normal local case)
  * every request is rejected, so the endpoint only exists where it was armed.
  */
-function handleUpdateRequest(request: Request): Response {
+async function handleUpdateRequest(request: Request): Promise<Response> {
 	if (request.method !== 'POST') return new Response('Not found', { status: 404 })
 	const expected = process.env.UPDATE_TOKEN
 	if (!expected || request.headers.get('authorization') !== `Bearer ${expected}`) {
 		return new Response('Unauthorized', { status: 401 })
 	}
+	// Restarting drops live sessions for a moment, so only do it when origin
+	// actually has something new: editing and pushing from the server itself
+	// must not restart a hal that already runs the newest commit. Dispatch
+	// through `web` so tests (and eval) can stub the git helpers.
+	if ((await web.runGit(['fetch', 'origin', '--quiet'])) !== 0) {
+		return new Response('git fetch failed; keeping current process\n', { status: 500 })
+	}
+	const head = await web.gitOut(['rev-parse', 'HEAD'])
+	const upstream = await web.gitOut(['rev-parse', '@{u}'])
+	if (head !== null && head === upstream) return new Response('Already up to date\n')
 	setTimeout(() => process.exit(UPDATE_EXIT_CODE), 100)
 	return new Response('Updating\n')
 }
@@ -357,6 +387,8 @@ export const web = {
 	parseCommand,
 	parseClientMessage,
 	isSnapshotBoundary,
+	runGit,
+	gitOut,
 	handleUpdateRequest,
 	encode,
 	publishSnapshot,
