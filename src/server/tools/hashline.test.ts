@@ -110,6 +110,9 @@ describe('edit via hashline', () => {
 		rmSync(dir, { recursive: true, force: true })
 	}
 
+	// Spawns real tsc and oxlint subprocesses. Well under a second locally, but a
+	// slow shared CI runner can blow past the default 5s per-test timeout, which
+	// killed the spawn mid-run and produced an empty result rather than a verdict.
 	test('does not apply Hal lint rules to an unconfigured TypeScript edit', async () => {
 		setup('console.log("before")\n')
 		file = join(dir, 'test.ts')
@@ -123,7 +126,7 @@ describe('edit via hashline', () => {
 
 		expect(result).not.toContain('Oxlint check failed')
 		cleanup()
-	})
+	}, 30_000)
 
 	test('replace a single line', async () => {
 		setup('alpha\nbeta\ngamma\n')

@@ -34,6 +34,9 @@ afterEach(() => {
 	for (const directory of directories.splice(0)) rmSync(directory, { force: true, recursive: true })
 })
 
+// Spawns a real tsc: fast locally, but the first spawn also warms Bun's module
+// cache and can exceed the default 5s per-test timeout on a slow shared CI
+// runner. The test asserts on tsc's diagnostics, not on how fast the box is.
 test('uses the nearest configured project but reports only the edited file', () => {
 	const project = makeProject()
 	mkdirSync(join(project, 'config'))
@@ -63,7 +66,7 @@ test('uses the nearest configured project but reports only the edited file', () 
 	expect(result.output).not.toContain('unrelated.ts')
 	expect(result.output).not.toContain("Cannot find name 'configuredGlobal'")
 	expect(result.output).not.toContain("Cannot find module '@app/value'")
-})
+}, 30_000)
 
 test('checks a file without a tsconfig using TypeScript defaults', () => {
 	const project = makeProject()
