@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test'
 import { oklch } from './oklch.ts'
+import { termCaps } from './term-caps.ts'
 
 test('black', () => {
 	expect(oklch.oklchToRgb(0, 0, 0)).toEqual([0, 0, 0])
@@ -73,4 +74,17 @@ test('mixFg interpolates foreground escapes', () => {
 	expect(oklch.mixFg(start, end, 0.5)).toMatch(/^\x1b\[38;2;\d+;\d+;\d+m$/)
 	expect(oklch.mixFg(start, end, 0)).toBe(start)
 	expect(oklch.mixFg(start, end, 1)).toBe(end)
+})
+
+test('falls back to 256-color escapes when the terminal has no truecolor', () => {
+	termCaps.config.truecolor = false
+	try {
+		expect(oklch.toFg(0.5, 0, 0)).toMatch(/^\x1b\[38;5;\d+m$/)
+		expect(oklch.toBg(0.5, 0, 0)).toMatch(/^\x1b\[48;5;\d+m$/)
+		// Pure black and pure white land on the ends of the xterm palette.
+		expect(oklch.toFg(0, 0, 0)).toBe('\x1b[38;5;16m')
+		expect(oklch.toFg(1, 0, 0)).toBe('\x1b[38;5;231m')
+	} finally {
+		termCaps.config.truecolor = true
+	}
 })

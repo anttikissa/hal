@@ -17,6 +17,7 @@ import { liveFiles } from './utils/live-file.ts'
 import { config } from './config.ts'
 import { builtins } from './server/tools/builtins.ts'
 import { colors } from './client/terminal/colors.ts'
+import { termCaps } from './utils/term-caps.ts'
 import { openaiUsage } from './server/openai-usage.ts'
 import { anthropicUsage } from './server/anthropic-usage.ts'
 import { resolve } from 'path'
@@ -76,6 +77,7 @@ if (parsedArgs.remoteUrl !== undefined) {
 	}
 	const remoteAbort = new AbortController()
 	config.init()
+	termCaps.detect()
 	colors.init()
 	draft.state.enabled = false
 	blockData.state.blobLoadingEnabled = false
@@ -105,6 +107,7 @@ config.init()
 perf.mark('Config initialized')
 serverModels.init()
 perf.mark('Model metadata initialized')
+termCaps.detect()
 colors.init()
 perf.mark('Colors initialized')
 openaiUsage.init()

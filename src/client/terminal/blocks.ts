@@ -13,6 +13,7 @@ import { terminalSubscriptionUsage } from './subscription-usage.ts'
 import { colors } from './colors.ts'
 import { md, type MdColors } from './md.ts'
 import { blockText } from './block-text.ts'
+import { termCaps } from '../../utils/term-caps.ts'
 import { toolSpecs } from './tool-specs.ts'
 // Sizing/limits live in ../block-config.ts so block-data.ts and tool-specs.ts
 // can read them without importing this renderer. Local alias keeps the many
@@ -175,10 +176,17 @@ function blockContent(block: Block, cols: number): string[] {
 	return lines
 }
 
+// `\x1b[K` paints the active background only on terminals with back-color-erase.
+// GNU screen has none, so there we pad the rest of the row with real spaces.
+function bgFill(used: number, cols: number): string {
+	if (termCaps.config.bce) return '\x1b[K'
+	return ' '.repeat(Math.max(0, cols - used))
+}
+
 function bgLine(content: string, cols: number, bg: string): string {
 	if (!content.includes('\t'))
-		return visLen(content) >= cols ? `${bg}${content}${RESET_BG}` : `${bg}${content}\x1b[K${RESET_BG}`
-	return `${bg}\x1b[K\r${content}${RESET_BG}`
+		return visLen(content) >= cols ? `${bg}${content}${RESET_BG}` : `${bg}${content}${bgFill(visLen(content), cols)}${RESET_BG}`
+	return `${bg}${bgFill(0, cols)}\r${content}${RESET_BG}`
 }
 
 const fixedNoticeColors = { warning: colors.warning, error: colors.error, fork: colors.fork }
@@ -215,7 +223,8 @@ function padBlockLine(line: string): string {
 
 function bodyLine(line: string, fg: string, bg: string, cols: number, fullWidth = visLen(line) > cols - 2): string {
 	if (!fullWidth) return bgLine(`${fg}${padBlockLine(line)}`, cols, bg)
-	return `${bg}${fg}${line}\x1b[K${RESET_BG}`
+	// Over-width lines soft-wrap, so only the final physical row needs filling.
+	return `${bg}${fg}${line}${bgFill(visLen(line) % cols, cols)}${RESET_BG}`
 }
 
 function padBlock(lines: string[], fg: string, bg: string, bgIsBlack: boolean | undefined, cols: number): void {
@@ -346,11 +355,16 @@ function cursorGlyph(block: Block, visible: boolean): string {
 
 function withInlineCursor(line: string, block: Block, cols: number, visible: boolean): string[] {
 	const glyph = cursorGlyph(block, visible)
+	// Without back-color-erase, bgFill() ended the row with padding spaces
+	// instead of `\x1b[K`. Overwrite the first of those spaces so the cursor
+	// lands right after the text and the row keeps its width.
 	const eraseIndex = line.lastIndexOf('\x1b[K')
-	if (eraseIndex >= 0) {
-		const beforeErase = line.slice(0, eraseIndex)
-		const afterErase = line.slice(eraseIndex)
-		if (visLen(beforeErase) < cols - 1) return [beforeErase + glyph + afterErase]
+	const padding = eraseIndex >= 0 ? null : line.match(/ +\x1b\[49m$/)
+	const fillIndex = eraseIndex >= 0 ? eraseIndex : (padding?.index ?? -1)
+	if (fillIndex >= 0) {
+		const beforeFill = line.slice(0, fillIndex)
+		const afterFill = padding ? line.slice(fillIndex + 1) : line.slice(fillIndex)
+		if (visLen(beforeFill) < cols - 1) return [beforeFill + glyph + afterFill]
 	}
 
 	// Keep the final terminal column unused. Filling it enters delayed-autowrap

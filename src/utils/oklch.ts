@@ -1,3 +1,4 @@
+import { termCaps } from './term-caps.ts'
 // OKLCH → sRGB conversion.
 //
 // OKLCH is a perceptual color space:
@@ -45,16 +46,47 @@ function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
 	return [gamma(rl), gamma(gl), gamma(bl)]
 }
 
-// ANSI true-color escape: foreground
-function toFg(L: number, C: number, H: number): string {
-	const [r, g, b] = oklchToRgb(L, C, H)
-	return `\x1b[38;2;${r};${g};${b}m`
+// Nearest xterm-256 palette index, for terminals without truecolor.
+// The 6x6x6 cube (16-231) uses unevenly spaced levels, and the gray ramp
+// (232-255) is often the closer match for our dark tinted backgrounds, so just
+// search both by squared distance instead of quantizing per channel.
+const CUBE_LEVELS = [0, 95, 135, 175, 215, 255]
+
+function toXterm256(r: number, g: number, b: number): number {
+	let best = 16
+	let bestDistance = Infinity
+	for (let i = 16; i < 256; i++) {
+		let cr, cg, cb
+		if (i < 232) {
+			const n = i - 16
+			cr = CUBE_LEVELS[Math.floor(n / 36)]!
+			cg = CUBE_LEVELS[Math.floor(n / 6) % 6]!
+			cb = CUBE_LEVELS[n % 6]!
+		} else {
+			cr = cg = cb = 8 + (i - 232) * 10
+		}
+		const distance = (cr - r) ** 2 + (cg - g) ** 2 + (cb - b) ** 2
+		if (distance < bestDistance) {
+			bestDistance = distance
+			best = i
+		}
+	}
+	return best
 }
 
-// ANSI true-color escape: background
-function toBg(L: number, C: number, H: number): string {
+// ANSI color escape: `ground` is 38 for foreground, 48 for background.
+function toAnsi(ground: number, L: number, C: number, H: number): string {
 	const [r, g, b] = oklchToRgb(L, C, H)
-	return `\x1b[48;2;${r};${g};${b}m`
+	if (!termCaps.config.truecolor) return `\x1b[${ground};5;${toXterm256(r, g, b)}m`
+	return `\x1b[${ground};2;${r};${g};${b}m`
+}
+
+function toFg(L: number, C: number, H: number): string {
+	return toAnsi(38, L, C, H)
+}
+
+function toBg(L: number, C: number, H: number): string {
+	return toAnsi(48, L, C, H)
 }
 
 function isBlack(L: number, C: number): boolean {

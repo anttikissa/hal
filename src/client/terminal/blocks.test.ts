@@ -4,6 +4,8 @@ import { blockData } from '../block-data.ts'
 import { colors } from './colors.ts'
 import { subscriptionUsage } from '../../common/subscription-usage.ts'
 import { blockText } from './block-text.ts'
+import { termCaps } from '../../utils/term-caps.ts'
+import { visLen } from '../../utils/strings.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
@@ -567,3 +569,14 @@ test('tool block header uses padded text without horizontal rules', () => {
 	expect(lines.join('\n')).not.toContain('\n ./test\n')
 })
 
+
+test('pads backgrounds with spaces instead of erase-to-end when the terminal has no back-color-erase', () => {
+	termCaps.config.bce = false
+	try {
+		const lines = blocks.renderBlock({ type: 'user', text: 'hello' }, 40)
+		expect(lines.join('\n')).not.toContain('\x1b[K')
+		for (const line of lines) expect(visLen(line)).toBe(40)
+	} finally {
+		termCaps.config.bce = true
+	}
+})
