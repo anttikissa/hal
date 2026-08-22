@@ -1,6 +1,7 @@
 import { createMemo, createSignal, onSettled, Show } from 'solid-js'
 import { render } from '@solidjs/web'
 import type { SharedState } from '../common/ipc.ts'
+import type { Command } from '../common/protocol.ts'
 import type { ClientSessionSnapshot } from '../common/snapshots.ts'
 import { webProtocol, type WebServerMessage } from '../common/web.ts'
 import { AuthGate } from './components/AuthGate.tsx'
@@ -50,12 +51,23 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 		if (sessionId !== selected()) selectSession(sessionId)
 	}
 
+	function sendCommand(command: Command): boolean {
+		if (socket?.readyState !== WebSocket.OPEN) return false
+		socket.send(webProtocol.encode({ type: 'command', command }))
+		return true
+	}
+
 	function submitPrompt(text: string): Promise<boolean> {
 		const sessionId = selected()
-		if (!sessionId || socket?.readyState !== WebSocket.OPEN) return Promise.resolve(false)
-		socket.send(webProtocol.encode({ type: 'command', command: { type: 'prompt', sessionId, text } }))
-		return Promise.resolve(true)
+		if (!sessionId) return Promise.resolve(false)
+		return Promise.resolve(sendCommand({ type: 'prompt', sessionId, text, source: 'web' }))
 	}
+	// Tab commands arrive loosely typed from SessionTabs; the server's
+	// parseCommand is the real validator, so the cast is safe.
+	function onTabCommand(command: Record<string, unknown>): void {
+		sendCommand(command as unknown as Command)
+	}
+
 
 	onSettled(() => {
 		const connection = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`)
@@ -102,8 +114,13 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	})
 
 	return <>
-		<SessionTabs sessions={sharedState().sessions} selected={selected()} onSelect={selectSession} />
-		<Transcript items={transcript()} />
+		<SessionTabs
+			sessions={sharedState().sessions}
+			selected={selected()}
+			working={sharedState().working}
+			onSelect={selectSession}
+			onCommand={onTabCommand}
+		/>
 		<PromptComposer onSubmit={submitPrompt} />
 	</>
 }
