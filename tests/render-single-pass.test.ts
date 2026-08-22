@@ -106,20 +106,29 @@ describe('render single pass', () => {
 		}
 	})
 
-	test('cached 1,000-entry history leaves prompt redraw responsive', () => {
+	// A wall-clock budget here failed on loaded CI runners (10.15ms against a 10ms
+	// limit) while testing nothing the call count does not: "responsive" means the
+	// prompt redraw reuses the cache instead of re-rendering 1,000 blocks.
+	test('cached 1,000-entry history is not re-rendered on a prompt redraw', () => {
 		const tab = client.currentTab()!
 		const body = 'x'.repeat(80)
 		for (let i = 0; i < 1000; i++) tab.history.push({ type: 'info', text: `${body}\n${body}\n${body}\n${body}\n${body}\n${body}\n${body}\n${body}\n${body}\n${body}` })
+		const origRenderBlock = blockRenderer.renderBlock
 		const originalWrite = process.stdout.write.bind(process.stdout)
 		;(process.stdout as any).write = () => true
 		try {
-			render.draw() // Populate the per-block cache outside the measurement.
+			render.draw() // Populate the per-block cache before counting.
+			let calls = 0
+			blockRenderer.renderBlock = (block, cols) => {
+				calls++
+				return origRenderBlock(block, cols)
+			}
 			prompt.setText('x')
-			const started = performance.now()
 			render.draw()
-			expect(performance.now() - started).toBeLessThan(10)
+			expect(calls).toBe(0)
 		} finally {
 			;(process.stdout as any).write = originalWrite
+			blockRenderer.renderBlock = origRenderBlock
 		}
 	})
 })

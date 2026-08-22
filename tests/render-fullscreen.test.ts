@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { render } from '../src/client/terminal/render.ts'
 import { client } from '../src/client/app.ts'
 import { prompt } from '../src/client/terminal/prompt.ts'
 import { popup } from '../src/client/terminal/popup.ts'
+import { cursor } from '../src/client/terminal/cursor.ts'
 
 function captureOutput(fn: () => void): string {
 	const writes: string[] = []
@@ -51,6 +52,20 @@ function terminalLines(output: string, rows: number, state = { screen: Array<str
 function physicalLines(state: ReturnType<typeof terminalLines>): string[] {
 	return [...state.scrollback, ...state.screen]
 }
+
+// The HAL cursor blinks on a 250ms wall-clock phase, so a render taken before a
+// phase boundary and one taken after legitimately differ by the cursor line.
+// These tests compare an incremental paint against a fresh canonical paint, so
+// any flip between the two turns into a spurious one-line offset — rare locally,
+// common on a loaded CI runner. Pin the phase for the duration of each test.
+let originalTick: typeof cursor.tick
+beforeEach(() => {
+	originalTick = cursor.tick
+	cursor.tick = () => 0
+})
+afterEach(() => {
+	cursor.tick = originalTick
+})
 
 beforeEach(() => {
 	render.resetRenderer()
