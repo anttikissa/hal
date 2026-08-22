@@ -737,6 +737,20 @@ test('/model is quiet when the resolved model is unchanged', async () => {
 })
 
 
+// A session whose stored model is a bare alias would otherwise stay unresolved forever:
+// the quiet-no-op branch compares resolved ids, so /model opus never rewrote it and every
+// generation failed with "Model not found: opus".
+test('/model canonicalizes a stored bare alias even when the resolved model is unchanged', async () => {
+	const session = makeSession()
+	session.model = 'opus'
+	const result = await commands.executeCommand('/model opus', session)
+
+	expect(result.handled).toBe(true)
+	expect(session.model).toBe('anthropic/claude-opus-5')
+	expect(result.output).toBeUndefined()
+})
+
+
 test('/model accepts an unknown provider/model id without validation', async () => {
 	const session = makeSession()
 	session.model = 'openai/gpt-5.6-terra'

@@ -367,8 +367,10 @@ handlers['model'] = (args, session) => {
 	const oldModel = models.resolveModel(session.model ?? models.defaultModel())
 	// No validation: arbitrary provider/model IDs pass through so new models work before /check refreshes metadata
 	const newModel = models.resolveModel(args)
-	if (newModel === oldModel) return { handled: true }
+	// Always store the canonical id: a session may hold a stale bare alias (e.g. "opus"),
+	// which the provider loader cannot route. Only the notice is suppressed for a no-op.
 	session.model = newModel
+	if (newModel === oldModel) return { handled: true }
 	const oldDisplay = models.displayModel(oldModel)
 	const newDisplay = models.displayModel(newModel)
 	return {
