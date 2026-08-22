@@ -88,6 +88,12 @@ The single highest-leverage feature. Three layers, ship in this order:
 Acceptance: an agent blocked on a bash approval is resolvable from a locked
 phone in ≤15 seconds without typing.
 
+Safety and hygiene (Claude Code Remote Control's stance, validated in their
+enterprise rollout): never offer permission-bypass from the phone; unanswered
+approvals expire back to the terminal default (~5 min); notify only when input
+is genuinely needed, dedupe repeats, and put the opt-out button in the first
+notification itself (GitHub Mobile Live Activities pattern).
+
 ### 2. Session board as home screen
 
 Tabs answer "which session am I in"; phones need "which session needs me".
@@ -133,6 +139,11 @@ through this lens.
 - On `visibilitychange → visible`, force an immediate reconnect attempt if the
   socket is dead (iOS suspends timers in background; the backoff timer may be
   frozen — the visibility handler is the reliable wake-up).
+
+- If the composer ever fights the iOS keyboard (fixed elements floating above
+  it), fall back to visualViewport offset math; `interactive-widget=
+  resizes-content` (now in index.html) handles Android. Re-check after adding
+  any fixed overlay.
 - Surface host liveness: `SharedHostInfo` has pid/startedAt; show "host down /
   Mac asleep" state when the socket cannot connect, plus the `hal` resume hint
   instead of silent retry forever.
@@ -194,6 +205,16 @@ J. **Trust posture page**: token auth is already the credential; document +
    display expiry/revocation (`/web revoke` exists), warn when serving on
    non-localhost bind. Cheap trust win, aligns with E2EE expectations set by
    competitors.
+
+## Open decisions
+
+1. Phone reachability gates push: document LAN/Tailscale access first (the
+   server binds 127.0.0.1; `/web` URLs already carry tokens), or add an
+   optional relay. Pure-LAN cannot wake a phone on the internet; a relay makes
+   push delivery trivial. Decide before building §1b.
+2. Push mechanism: self-hosted ntfy-style webhook (user-configured endpoint,
+   cheapest, matches OSS ethos) vs VAPID Web Push (needs installed PWA on iOS)
+   vs both.
 
 ## Non-goals (deliberate)
 
