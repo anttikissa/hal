@@ -9,6 +9,7 @@ import { PromptComposer } from './components/PromptComposer.tsx'
 import { SessionTabs } from './components/SessionTabs.tsx'
 import { Transcript } from './components/Transcript.tsx'
 import { webTranscript } from './utils/transcript.ts'
+import { sessionSelection } from './utils/session-selection.ts'
 
 const tokenStorageKey = 'hal-web-auth'
 
@@ -35,6 +36,9 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	const [snapshot, setSnapshot] = createSignal<ClientSessionSnapshot | null>(null)
 	const transcript = createMemo(() => webTranscript.items(snapshot()))
 	const snapshots = new Map<string, ClientSessionSnapshot>()
+	// Session ids from the previous broadcast, so an "open tab" command can
+	// spot the session that appears for the first time and select it.
+	let previousIds = new Set<string>()
 	let socket: WebSocket | undefined
 	let unauthorized = false
 
@@ -45,8 +49,8 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	}
 
 	function applyState(state: SharedState): void {
-		let sessionId = selected()
-		if (!state.sessions.some((session) => session.id === sessionId)) sessionId = state.sessions[0]?.id ?? ''
+		const sessionId = sessionSelection.nextSelection(state, selected(), previousIds, sessionSelection.isOpenRequestPending())
+		previousIds = new Set(state.sessions.map((session) => session.id))
 		setSharedState(state)
 		if (sessionId !== selected()) selectSession(sessionId)
 	}
@@ -65,6 +69,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	// Tab commands arrive loosely typed from SessionTabs; the server's
 	// parseCommand is the real validator, so the cast is safe.
 	function onTabCommand(command: Record<string, unknown>): void {
+		if (command.type === 'open') sessionSelection.markOpenRequest()
 		sendCommand(command as unknown as Command)
 	}
 
