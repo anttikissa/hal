@@ -4,7 +4,9 @@ import { sessionLabel } from '../../common/session-label.ts'
 
 async function execute(_input: unknown, ctx: ToolContext): Promise<string> {
 	const active = agentLoop.runningSubagents(ctx.sessionId)
-	if (active.length === 0) return 'Waiting for the next subagent. But there are none; the model probably issued this tool call accidentally. Send a message to continue.'
+	// The model reads this mid-turn: an empty wait no longer parks the turn, so
+	// this text is what steers it back on track.
+	if (active.length === 0) return 'No subagents running. Either you didn\'t spawn them or they finished. Act accordingly.'
 	return `Waiting for the next subagent. Active: ${active.map(sessionLabel.format).join(', ')}`
 }
 

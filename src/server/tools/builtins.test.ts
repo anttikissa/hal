@@ -15,7 +15,7 @@ test('builtins.init registers tools lazily and only once', async () => {
 	const wait = toolRegistry.getTool('wait')
 	if (!wait) throw new Error('expected wait tool to be registered')
 	expect(wait.description).toBe('Wait for the next subagent to finish. Ends the current turn; the subagent’s inbox message will start a new turn when it arrives.')
-	expect(await wait.execute({}, { sessionId: 'test', cwd: '/tmp' })).toBe('Waiting for the next subagent. But there are none; the model probably issued this tool call accidentally. Send a message to continue.')
+	expect(await wait.execute({}, { sessionId: 'test', cwd: '/tmp' })).toBe('No subagents running. Either you didn\'t spawn them or they finished. Act accordingly.')
 
 	builtins.init()
 	expect(toolRegistry.allTools()).toHaveLength(firstCount)

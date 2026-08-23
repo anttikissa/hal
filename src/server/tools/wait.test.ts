@@ -27,7 +27,7 @@ test('wait warns when no subagents are active', async () => {
 	;(agentLoop as any).runningSubagents = () => []
 
 	try {
-		expect(await wait.execute({}, { sessionId: 'parent', cwd: '/tmp' })).toBe('Waiting for the next subagent. But there are none; the model probably issued this tool call accidentally. Send a message to continue.')
+		expect(await wait.execute({}, { sessionId: 'parent', cwd: '/tmp' })).toBe('No subagents running. Either you didn\'t spawn them or they finished. Act accordingly.')
 	} finally {
 		;(agentLoop as any).runningSubagents = original
 	}

@@ -221,7 +221,7 @@ test('an empty wait keeps generating instead of parking the turn forever', async
 	})
 	// No subagents exist, so nothing could ever deliver a message to wake this turn.
 	agentLoop.runningSubagents = () => []
-	toolRegistry.dispatch = async () => 'Waiting for the next subagent. But there are none; the model probably issued this tool call accidentally. Send a message to continue.'
+	toolRegistry.dispatch = async () => 'No subagents running. Either you didn\'t spawn them or they finished. Act accordingly.'
 
 	try {
 		const result = await agentLoop.runAgentLoop({
