@@ -1,8 +1,13 @@
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-/* The app fills the viewport exactly and never scrolls as a whole: the tab bar
-   and composer are fixed rows and only the transcript scrolls between them. */
-body { margin: 0; font: 15px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #111; color: #eee; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; overscroll-behavior-y: none; }
+body { margin: 0; font: 15px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #111; color: #eee; overscroll-behavior-y: none; }
+/* #app is the element main.tsx renders into, so the rows (tab strip, transcript,
+   composer) are its direct flex children. The flex column must live here and not
+   on body: a wrapper between the column and the rows makes them ordinary blocks,
+   and then the transcript's flex/min-height/overflow rules do nothing and nothing
+   scrolls at all. The app fills the viewport exactly and never scrolls as a whole:
+   the tab bar and composer are fixed rows and only the transcript scrolls between. */
+#app { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
 button { touch-action: manipulation; }
 
 .SessionTabs > button, .SessionTabs-row > button, .PromptComposer > button, .PromptComposer > input { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
