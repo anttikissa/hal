@@ -1,6 +1,8 @@
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; font: 15px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #111; color: #eee; min-height: 100dvh; display: flex; flex-direction: column; overscroll-behavior-y: none; }
+/* The app fills the viewport exactly and never scrolls as a whole: the tab bar
+   and composer are fixed rows and only the transcript scrolls between them. */
+body { margin: 0; font: 15px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #111; color: #eee; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; overscroll-behavior-y: none; }
 button { touch-action: manipulation; }
 
 .SessionTabs > button, .SessionTabs-row > button, .PromptComposer > button, .PromptComposer > input { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
@@ -27,14 +29,12 @@ button { touch-action: manipulation; }
 }
 .AuthGate > form > button { cursor: pointer; }
 
-/* Tab strip sticks to the top and wraps onto extra rows so every tab stays
-   visible without horizontal panning (which fights browser swipe gestures).
+/* Tab strip is a fixed row at the top and wraps onto extra rows so every tab
+   stays visible without horizontal panning (which fights browser swipe gestures).
    On phones the individual tabs hide and only ☰ remains; its sheet lists
    everything with close and new-tab actions. */
 .SessionTabs {
-	position: sticky;
-	top: 0;
-	z-index: 1;
+	flex: none;
 	display: flex;
 	align-items: flex-start;
 	gap: 8px;
@@ -91,7 +91,14 @@ button { touch-action: manipulation; }
 	color: #c66;
 }
 
+/* The only scrolling region. min-height:0 lets a flex child shrink below its
+   content height, which is what allows it to scroll instead of pushing the
+   composer off-screen. */
 .Transcript {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
 	width: min(100%, 900px);
 	margin: 0 auto;
 	padding: 12px;
@@ -105,9 +112,7 @@ button { touch-action: manipulation; }
 .TranscriptItem > label { font-size: 12px; color: #aaa; }
 
 .PromptComposer {
-	position: sticky;
-	bottom: 0;
-	z-index: 1;
+	flex: none;
 	width: min(100%, 900px);
 	margin: 0 auto;
 	display: flex;

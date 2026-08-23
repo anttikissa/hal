@@ -8,23 +8,23 @@ type TranscriptProps = {
 }
 
 export function Transcript(props: TranscriptProps) {
+	let element: HTMLElement | undefined
 	let autoFollow = true
-	// The render grows the document before the effect runs, so retain the user's last
+	// The render grows the transcript before the effect runs, so retain the user's last
 	// scroll intent instead of measuring the newly enlarged gap in the effect.
 	function updateAutoFollow(): void {
-		autoFollow = webScroll.isNearBottom()
+		if (element) autoFollow = webScroll.isNearBottom(element)
 	}
 	onSettled(() => {
-		window.addEventListener('scroll', updateAutoFollow, { passive: true })
-		return () => window.removeEventListener('scroll', updateAutoFollow)
+		if (element) webScroll.toBottom(element)
 	})
 	createEffect(
 		() => props.items,
 		() => {
-			if (autoFollow) webScroll.toBottom()
+			if (element && autoFollow) webScroll.toBottom(element)
 		},
 	)
-	return <main class="Transcript">
+	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateAutoFollow}>
 		<For each={props.items}>{(item) => <TranscriptItem item={item} />}</For>
 	</main>
 }

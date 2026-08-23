@@ -1,37 +1,21 @@
 import { expect, test } from 'bun:test'
 import { webScroll } from './scroll.ts'
 
-test('scrolls the document viewport to its bottom', () => {
-	const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window')
-	const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document')
-	const calls: ScrollToOptions[] = []
-	Object.defineProperty(globalThis, 'window', { configurable: true, value: { scrollTo: (options: ScrollToOptions) => calls.push(options) } })
-	Object.defineProperty(globalThis, 'document', { configurable: true, value: { documentElement: { scrollHeight: 1_234 } } })
-	try {
-		webScroll.toBottom()
-		expect(calls).toEqual([{ top: 1_234 }])
-	} finally {
-		if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor)
-		else delete (globalThis as { window?: unknown }).window
-		if (documentDescriptor) Object.defineProperty(globalThis, 'document', documentDescriptor)
-		else delete (globalThis as { document?: unknown }).document
-	}
+// The transcript is its own scroll container, so these helpers work on that
+// element rather than on the document viewport.
+function fakeScroller(values: { scrollHeight: number; clientHeight: number; scrollTop: number }): HTMLElement {
+	return values as unknown as HTMLElement
+}
+
+test('scrolls the transcript to its bottom', () => {
+	const element = fakeScroller({ scrollHeight: 1_234, clientHeight: 400, scrollTop: 0 })
+	webScroll.toBottom(element)
+	expect(element.scrollTop).toBe(1_234)
 })
 
-test('recognizes a viewport within 25 pixels of the bottom', () => {
-	const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window')
-	const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document')
-	const browser = { innerHeight: 1_000, scrollTo: () => {}, scrollY: 210 }
-	Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
-	Object.defineProperty(globalThis, 'document', { configurable: true, value: { documentElement: { scrollHeight: 1_234 } } })
-	try {
-		expect(webScroll.isNearBottom()).toBe(true)
-		browser.scrollY = 209
-		expect(webScroll.isNearBottom()).toBe(false)
-	} finally {
-		if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor)
-		else delete (globalThis as { window?: unknown }).window
-		if (documentDescriptor) Object.defineProperty(globalThis, 'document', documentDescriptor)
-		else delete (globalThis as { document?: unknown }).document
-	}
+test('recognizes a scroller within 25 pixels of the bottom', () => {
+	const element = fakeScroller({ scrollHeight: 1_234, clientHeight: 1_000, scrollTop: 210 })
+	expect(webScroll.isNearBottom(element)).toBe(true)
+	element.scrollTop = 209
+	expect(webScroll.isNearBottom(element)).toBe(false)
 })
