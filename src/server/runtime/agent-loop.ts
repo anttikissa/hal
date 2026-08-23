@@ -847,7 +847,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			if (subagentNotice) messages.push({ role: 'user', content: subagentNotice })
 
 			await ctx.onStatus?.(true)
-			if (toolCalls.some((call) => call.name === 'wait')) {
+			// Only park the turn if a subagent is actually running. An empty wait has
+			// nothing that could ever deliver a message to wake it, so parking would
+			// strand the session; keep generating and let the model recover instead.
+			if (toolCalls.some((call) => call.name === 'wait') && agentLoop.runningSubagents(sessionId).length > 0) {
 				const est = context.estimateContext(messages, model, overheadBytes)
 				emitEvent(sessionId, {
 					type: 'stream-end',

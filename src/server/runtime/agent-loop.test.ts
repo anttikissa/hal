@@ -167,6 +167,7 @@ test('wait tool completes the turn without another model request', async () => {
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
 	const origGetProvider = providerLoader.getProvider
 	const origDispatch = toolRegistry.dispatch
+	const origRunningSubagents = agentLoop.runningSubagents
 	let generations = 0
 	providerLoader.getProvider = async () => ({
 		async *generate() {
@@ -175,7 +176,9 @@ test('wait tool completes the turn without another model request', async () => {
 			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})
-	toolRegistry.dispatch = async () => 'Waiting for the next subagent.'
+	// A subagent is running, so the wait has something that can wake it.
+	agentLoop.runningSubagents = () => [{ id: 'child-1', cwd: '/tmp' }]
+	toolRegistry.dispatch = async () => 'Waiting for the next subagent. Active: child-1'
 
 	try {
 		const result = await agentLoop.runAgentLoop({
@@ -195,6 +198,46 @@ test('wait tool completes the turn without another model request', async () => {
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		toolRegistry.dispatch = origDispatch
+		agentLoop.runningSubagents = origRunningSubagents
+	}
+})
+
+test('an empty wait keeps generating instead of parking the turn forever', async () => {
+	const sessionId = `test-wait-empty-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const origGetProvider = providerLoader.getProvider
+	const origDispatch = toolRegistry.dispatch
+	const origRunningSubagents = agentLoop.runningSubagents
+	let generations = 0
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			generations++
+			// Only the first turn calls wait; afterwards the model answers normally.
+			if (generations === 1) yield { type: 'tool_call', id: 'wait-1', name: 'wait', input: {} }
+			else yield { type: 'text', text: 'carrying on' }
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	// No subagents exist, so nothing could ever deliver a message to wake this turn.
+	agentLoop.runningSubagents = () => []
+	toolRegistry.dispatch = async () => 'Waiting for the next subagent. But there are none; the model probably issued this tool call accidentally. Send a message to continue.'
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'wait by accident' }],
+		})
+		// Parking here would strand the session: no subagent can ever wake it.
+		expect(result).toBe('completed')
+		expect(generations).toBe(2)
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		toolRegistry.dispatch = origDispatch
+		agentLoop.runningSubagents = origRunningSubagents
 	}
 })
 
