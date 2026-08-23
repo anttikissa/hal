@@ -201,18 +201,32 @@ function handleStdinClosed(): void {
 	exitCli(0)
 }
 
+// Request ID of the confirmation popup currently on screen, so a resolution
+// answered in another client (peer, remote or web) closes exactly this popup.
+let openToolConfirmRequestId = ''
+
 function openToolConfirm(event: any): void {
 	const body = Array.isArray(event.body) ? event.body.map(String) : ['This tool call looks risky.']
+	openToolConfirmRequestId = String(event.requestId)
 	popup.openConfirm(
 		event.title ?? 'Risky tool call',
 		body,
 		['Yes', 'No'],
 		(choice) => {
+			openToolConfirmRequestId = ''
 			client.clearToolConfirmPending(event.sessionId)
 			clientTransport.io.appendCommand({ type: 'tool-confirm', sessionId: event.sessionId, requestId: String(event.requestId), approved: choice === 'Yes' })
 			draw()
 		},
 	)
+	draw()
+}
+
+// Another client answered the confirmation: drop our popup without re-answering.
+function closeToolConfirm(event: any): void {
+	if (!openToolConfirmRequestId || openToolConfirmRequestId !== String(event.requestId)) return
+	openToolConfirmRequestId = ''
+	popup.close()
 	draw()
 }
 
@@ -719,6 +733,7 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 	// Wire state changes to repaint.
 	client.setOnChange(draw)
 	client.setOnToolConfirmRequest(openToolConfirm)
+	client.setOnToolConfirmResolved(closeToolConfirm)
 	client.setOnRebaseStart(handleRebaseStart)
 	client.setOnRebaseResult(handleRebaseResult)
 	colors.onChange(() => {
@@ -834,6 +849,8 @@ export const cli = {
 	startCli,
 	forTests: {
 		handleAppKey,
+		openToolConfirm,
+		closeToolConfirm,
 		handleCompletionKey,
 		kittyOnSequence: () => KITTY_ON,
 		installPromptTabSwitchHandler,

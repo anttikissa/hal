@@ -83,7 +83,7 @@ function runningSubagentNotice(parentSessionId: string): string {
 	return `<meta>Subagents running: ${active.map(sessionLabel.format).join(', ')}</meta>`
 }
 
-const pendingToolConfirmations = new Map<string, { resolve: (approved: boolean) => void }>()
+const pendingToolConfirmations = new Map<string, { sessionId: string; resolve: (approved: boolean) => void }>()
 
 const DEFAULT_ABORT_TEXT = '[paused]'
 
@@ -206,6 +206,9 @@ function resolveToolConfirmation(requestId: string, approved: boolean): boolean 
 	const pending = pendingToolConfirmations.get(requestId)
 	if (!pending) return false
 	pendingToolConfirmations.delete(requestId)
+	// Every client shows the same popup, so tell them all that this one is answered.
+	// Not a history event: it only dismisses live UI, so it never reaches the projection.
+	ipc.appendEvent({ type: 'tool-confirm-resolved', sessionId: pending.sessionId, requestId })
 	pending.resolve(approved)
 	return true
 }
@@ -239,10 +242,10 @@ async function confirmToolCall(sessionId: string, call: ToolCall, signal: AbortS
 			resolve(value)
 		}
 		function onAbort(): void {
-			pendingToolConfirmations.delete(requestId)
-			done(false)
+			// Go through resolveToolConfirmation so clients hear the popup is gone.
+			if (!resolveToolConfirmation(requestId, false)) done(false)
 		}
-		pendingToolConfirmations.set(requestId, { resolve: done })
+		pendingToolConfirmations.set(requestId, { sessionId, resolve: done })
 		signal.addEventListener('abort', onAbort, { once: true })
 	})
 	return { allowed: approved, approvedRisk: approved }

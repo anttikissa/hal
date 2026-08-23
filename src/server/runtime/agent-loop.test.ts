@@ -87,6 +87,52 @@ test('confirmation body colors the exact offending fragment', () => {
 	expect(agentLoop.toolConfirmationBody('s1', call, findings)).toContain('cd /tmp\n\x1b[93mgit checkout -- . 2>/dev/null\x1b[39m; true')
 })
 
+test('announces a resolved tool confirmation so other clients can close their popup', async () => {
+	const sessionId = `test-confirm-resolved-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const events: any[] = []
+	const origAppendEvent = ipc.appendEvent
+	const origDispatch = toolRegistry.dispatch
+	ipc.appendEvent = (event: any) => { events.push(event) }
+	toolRegistry.dispatch = async () => 'ran'
+	try {
+		const batch = agentLoop.executeToolBatch(sessionId, [
+			{ id: 'tool-a', name: 'bash', input: { command: 'git checkout -- .' } },
+		], process.cwd(), new AbortController().signal)
+		// The request event is emitted synchronously before the confirmation promise awaits.
+		const request = events.find((event) => event.type === 'tool-confirm-request')
+		expect(typeof request?.requestId).toBe('string')
+		expect(agentLoop.resolveToolConfirmation(request.requestId, true)).toBe(true)
+		await batch
+		expect(events.filter((event) => event.type === 'tool-confirm-resolved').map((event) => event.requestId)).toEqual([request.requestId])
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		toolRegistry.dispatch = origDispatch
+	}
+})
+
+test('announces a confirmation dismissed by an abort', async () => {
+	const sessionId = `test-confirm-aborted-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const events: any[] = []
+	const origAppendEvent = ipc.appendEvent
+	const ac = new AbortController()
+	ipc.appendEvent = (event: any) => { events.push(event) }
+	try {
+		const batch = agentLoop.executeToolBatch(sessionId, [
+			{ id: 'tool-a', name: 'bash', input: { command: 'git checkout -- .' } },
+		], process.cwd(), ac.signal)
+		const request = events.find((event) => event.type === 'tool-confirm-request')
+		ac.abort()
+		await batch
+		expect(events.filter((event) => event.type === 'tool-confirm-resolved').map((event) => event.requestId)).toEqual([request.requestId])
+	} finally {
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
 	test('settles unstarted tool calls when a batch is aborted', async () => {
 		const sessionId = `test-aborted-tools-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 		createdSessions.push(sessionId)

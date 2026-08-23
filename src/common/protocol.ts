@@ -22,6 +22,7 @@ export type EventType =
 	| 'tool-call'
 	| 'tool-result'
 	| 'tool-confirm-request'
+	| 'tool-confirm-resolved'
 	| 'rebase-start'
 	| 'rebase-result'
 	| 'history-rebased'

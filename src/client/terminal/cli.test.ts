@@ -943,3 +943,25 @@ test('enter on empty normal tab does not send continue', () => {
 		client.state.focusedTabIndex = origFocusedTab
 	}
 })
+
+test('a confirmation answered in another client closes the local popup', () => {
+	withPatched(render, 'draw', (() => {}) as typeof render.draw, () => {
+		withOneTab(makeTab(), () => {
+			cli.forTests.openToolConfirm({ sessionId: 's1', requestId: 'r1', body: ['risky'] })
+			expect(popup.state.active).toBe(true)
+
+			cli.forTests.closeToolConfirm({ sessionId: 's1', requestId: 'r1' })
+			expect(popup.state.active).toBe(false)
+		})
+	})
+})
+
+test('an unrelated confirmation resolution leaves the local popup open', () => {
+	withPatched(render, 'draw', (() => {}) as typeof render.draw, () => {
+		withOneTab(makeTab(), () => {
+			cli.forTests.openToolConfirm({ sessionId: 's1', requestId: 'r1', body: ['risky'] })
+			cli.forTests.closeToolConfirm({ sessionId: 's1', requestId: 'other' })
+			expect(popup.state.active).toBe(true)
+		})
+	})
+})

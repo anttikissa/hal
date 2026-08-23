@@ -124,6 +124,7 @@ const state = {
 let pendingEntries: Block[] = []
 let onChange: (force: boolean) => void = () => {}
 let onToolConfirmRequest: ((event: any) => void) | null = null
+let onToolConfirmResolved: ((event: any) => void) | null = null
 let onRebaseStart: ((event: any) => void) | null = null
 let onRebaseResult: ((event: any) => void) | null = null
 
@@ -166,6 +167,10 @@ function setOnChange(fn: (force: boolean) => void): void {
 
 function setOnToolConfirmRequest(fn: (event: any) => void): void {
 	onToolConfirmRequest = fn
+}
+
+function setOnToolConfirmResolved(fn: (event: any) => void): void {
+	onToolConfirmResolved = fn
 }
 
 function setOnRebaseStart(fn: (event: any) => void): void {
@@ -617,6 +622,7 @@ function handleEvent(event: any): void {
 		touchTab,
 		reloadTabFromDisk,
 		onToolConfirmRequest: (item: any) => onToolConfirmRequest?.(item),
+		onToolConfirmResolved: (item: any) => onToolConfirmResolved?.(item),
 		markToolConfirmPending,
 		clearToolConfirmPending,
 		setSummarizing,
@@ -696,6 +702,7 @@ function resetForTests(): void {
 	onTabSwitch = null
 	onDraftArrived = null
 	onToolConfirmRequest = null
+	onToolConfirmResolved = null
 	onRebaseStart = null
 	onRebaseResult = null
 	clearRestoreTabHint()
@@ -736,6 +743,7 @@ export const client = {
 	setOnChange,
 	requestRender,
 	setOnToolConfirmRequest,
+	setOnToolConfirmResolved,
 	setOnRebaseStart,
 	setOnRebaseResult,
 	setOnTabSwitch,
