@@ -87,6 +87,20 @@ function historyToBlocks(
 			case 'tool_call':
 				result.push({ type: 'tool', name: entry.name, input: entry.input, blobId: entry.blobId, sessionId: blobOwner, toolId: entry.toolId, ts, dimmed, canceled: entry.canceled })
 				break
+			case 'tool_result': {
+				// Remote clients cannot read blob sidecars, so the server hydrates the
+				// output onto the history entry. Locally output is absent and the blob
+				// loader fills it in instead.
+				if (typeof entry.output !== 'string') break
+				for (let j = result.length - 1; j >= 0; j--) {
+					const block = result[j]!
+					if (block.type !== 'tool' || block.toolId !== entry.toolId) continue
+					block.output = entry.output
+					block.blobLoaded = true
+					break
+				}
+				break
+			}
 			case 'pending_tools':
 				if (!entry.canceled) result.push({ type: 'log', text: '[paused before local tools]', ts, dimmed })
 				break

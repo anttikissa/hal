@@ -85,3 +85,13 @@ test('historyToBlocks keeps rebase lineage out of the transcript', () => {
 
 	expect(result).toEqual([expect.objectContaining({ type: 'user', text: 'hello' })])
 })
+
+
+test('historyToBlocks attaches hydrated tool_result output to its tool block', () => {
+	const result = blockData.historyToBlocks([
+		{ type: 'tool_call', toolId: 't1', name: 'edit', input: { operation: 'replace' }, blobId: 'b1' },
+		{ type: 'tool_result', toolId: 't1', blobId: 'b1', output: '--- before\n1:aaa x\n\n+++ after\n1:bbb y' },
+	] as any, 's1')
+
+	expect(result).toEqual([expect.objectContaining({ type: 'tool', name: 'edit', output: '--- before\n1:aaa x\n\n+++ after\n1:bbb y', blobLoaded: true })])
+})
