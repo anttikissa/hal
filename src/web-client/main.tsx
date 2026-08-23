@@ -10,6 +10,7 @@ import { SessionTabs } from './components/SessionTabs.tsx'
 import { Transcript } from './components/Transcript.tsx'
 import { webTranscript } from './utils/transcript.ts'
 import { sessionSelection } from './utils/session-selection.ts'
+import { webViewport } from './utils/viewport.ts'
 
 const tokenStorageKey = 'hal-web-auth'
 
@@ -159,4 +160,5 @@ function App(props: { token: string }) {
 
 const root = document.querySelector('#app')
 if (!root) throw new Error('Missing app root')
+webViewport.sync(window.visualViewport ?? undefined, document.documentElement.style)
 render(() => <App token={initialToken()} />, root)

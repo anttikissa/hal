@@ -7,7 +7,12 @@ body { margin: 0; font: 15px ui-monospace, SFMono-Regular, Menlo, Monaco, Consol
    and then the transcript's flex/min-height/overflow rules do nothing and nothing
    scrolls at all. The app fills the viewport exactly and never scrolls as a whole:
    the tab bar and composer are fixed rows and only the transcript scrolls between. */
-#app { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+/* Height and offset come from utils/viewport.ts, which mirrors window.visualViewport
+   because iOS Safari ignores interactive-widget=resizes-content and keeps the layout
+   viewport (so 100dvh) at full height when the keyboard opens. 100dvh is the fallback
+   before the first sync and where visualViewport is missing. position:fixed with an
+   explicit top keeps the box glued to the visible area instead of the scrolled page. */
+#app { position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-height, 100dvh); overflow: hidden; display: flex; flex-direction: column; }
 button { touch-action: manipulation; }
 
 .SessionTabs > button, .SessionTabs-row > button, .PromptComposer > button, .PromptComposer > input { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
