@@ -15,7 +15,7 @@ body { margin: 0; font: 15px ui-monospace, SFMono-Regular, Menlo, Monaco, Consol
 #app { position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-height, 100dvh); overflow: hidden; display: flex; flex-direction: column; }
 button { touch-action: manipulation; }
 
-.SessionTabs > button, .SessionTabs-row > button, .PromptComposer > button, .PromptComposer > input { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
+.SessionTabs > button, .SessionTabs-row > button, .PromptComposer > button, .PromptComposer > textarea { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
 .SessionTabs > button, .SessionTabs-row > button, .PromptComposer > button { cursor: pointer; }
 
 .AuthGate {
@@ -86,20 +86,59 @@ button { touch-action: manipulation; }
 	justify-content: center;
 	padding: calc(24px + env(safe-area-inset-top)) 12px 12px;
 }
-.SessionTabs-sheet > .SessionTabs-panel { width: min(100%, 32rem); max-height: 80dvh; overflow-y: auto; overscroll-behavior: contain; }
-.SessionTabs-panel > div { display: flex; gap: 6px; margin-bottom: 6px; }
-.SessionTabs-panel > div.selected > .SessionTabs-open { background: #456; }
-.SessionTabs-open {
+.SessionTabs-sheet > .SessionTabs-panel {
+	width: min(100%, 32rem);
+	max-height: 80dvh;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding: 8px;
+	background: #161616;
+	border: 1px solid #444;
+	border-radius: 12px;
+}
+/* A sheet row is one control with a separate hit target for closing. Both
+   buttons inherit the same row surface, so neither browser-default pills nor
+   floating close boxes compete with the selected state. */
+.SessionTabs-panel > div {
+	display: flex;
+	min-height: 48px;
+	margin-bottom: 6px;
+	background: #222;
+	border: 1px solid #555;
+	border-radius: 8px;
+	overflow: hidden;
+}
+.SessionTabs-panel > div.selected { background: #29465e; border-color: #6b9fc6; }
+.SessionTabs-panel button {
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+}
+.SessionTabs-panel > div > .SessionTabs-open {
 	flex: 1;
-	min-height: 44px;
+	min-width: 0;
+	padding: 0 12px;
 	text-align: left;
 }
 .SessionTabs-panel > div > .SessionTabs-close {
 	flex: none;
-	width: 44px;
-	min-height: 44px;
-	color: #c66;
+	width: 48px;
+	color: #d47a7a;
+	border-left: 1px solid #555;
 }
+.SessionTabs-panel > div.selected > .SessionTabs-close { border-color: #6b9fc6; }
+.SessionTabs-panel > .SessionTabs-new {
+	width: 100%;
+	min-height: 48px;
+	padding: 0 12px;
+	text-align: left;
+	background: #222;
+	border: 1px dashed #555;
+	border-radius: 8px;
+}
+.SessionTabs-panel button:focus-visible { outline: 2px solid #8fc5ed; outline-offset: -2px; }
 
 /* The only scrolling region. min-height:0 lets a flex child shrink below its
    content height, which is what allows it to scroll instead of pushing the
@@ -132,4 +171,14 @@ button { touch-action: manipulation; }
 	background: #111;
 	border-top: 1px solid #444;
 }
-.PromptComposer > input { flex: 1; min-width: 0; font-size: 16px; }
+.PromptComposer > textarea {
+	flex: 1;
+	min-width: 0;
+	min-height: 44px;
+	max-height: 192px;
+	resize: none;
+	line-height: 24px;
+	font-size: 16px; /* iOS must not auto-zoom a focused input. */
+}
+.PromptComposer > button { min-width: 44px; min-height: 44px; }
+.PromptComposer > .PromptComposer-attach { font-size: 20px; }

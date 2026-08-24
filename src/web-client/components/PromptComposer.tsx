@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { enterAction } from '../utils/composer.ts'
 
 type PromptComposerProps = {
 	onSubmit: (text: string) => Promise<boolean>
@@ -12,27 +13,48 @@ function appendRef(value: string, path: string): string {
 	return `${value}${spacer}[${path}] `
 }
 
+function hasCoarsePointer(): boolean {
+	return window.matchMedia('(pointer: coarse)').matches
+}
+
 export function PromptComposer(props: PromptComposerProps) {
-	let input: HTMLInputElement | undefined
+	let input: HTMLTextAreaElement | undefined
 	let fileInput: HTMLInputElement | undefined
 	const [attaching, setAttaching] = createSignal(false)
 
-	async function submit(event: SubmitEvent): Promise<void> {
-		event.preventDefault()
+	// Grow with content up to a sane cap; past the cap the textarea scrolls.
+	function autosize(): void {
+		if (!input) return
+		input.style.height = 'auto'
+		input.style.height = `${Math.min(input.scrollHeight, 8 * 24)}px`
+	}
+
+	async function submit(): Promise<void> {
 		const text = input?.value.trim() ?? ''
 		if (!text || !input) return
-		if (await props.onSubmit(text)) input.value = ''
+		if (await props.onSubmit(text)) {
+			input.value = ''
+			autosize()
+		}
+	}
+
+	function onKeyDown(event: KeyboardEvent): void {
+		const action = enterAction(event.key, { shift: event.shiftKey, coarse: hasCoarsePointer() })
+		if (action === 'submit') {
+			event.preventDefault()
+			void submit()
+		}
 	}
 
 	async function attach(): Promise<void> {
 		const file = fileInput?.files?.[0]
-		if (!file || !input) return
-		if (!fileInput) return
+		if (!file || !input || !fileInput) return
 		fileInput.value = '' // allow re-picking the same file
 		setAttaching(true)
 		try {
 			const path = await props.onAttach(file)
 			input.value = appendRef(input.value, path)
+			autosize()
 			input.focus()
 		} catch (error) {
 			alert(`Upload failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -41,10 +63,17 @@ export function PromptComposer(props: PromptComposerProps) {
 		}
 	}
 
-	return <form class="PromptComposer" onSubmit={submit}>
-		<input ref={(element) => { input = element }} autocomplete="off" placeholder="Message" autofocus />
+	return <form class="PromptComposer" onSubmit={(event: SubmitEvent) => { event.preventDefault(); void submit() }}>
+		<textarea
+			ref={(element) => { input = element }}
+			rows={1}
+			autocomplete="off"
+			placeholder="Message"
+			onInput={autosize}
+			onKeyDown={onKeyDown}
+		/>
 		<input ref={(element) => { fileInput = element }} type="file" accept="image/*" style="display: none" onChange={attach} />
-		<button type="button" disabled={attaching()} title="Attach image" onClick={() => fileInput?.click()}>📎</button>
-		<button disabled={attaching()}>Send</button>
+		<button type="button" class="PromptComposer-attach" disabled={attaching()} title="Attach image" onClick={() => fileInput?.click()}>📎</button>
+		<button type="submit" disabled={attaching()}>Send</button>
 	</form>
 }
