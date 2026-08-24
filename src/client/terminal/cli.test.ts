@@ -36,6 +36,23 @@ test('prompt key handling uses rendered prompt content width', () => {
 	}
 })
 
+test('prompt editing that shrinks the frame forces a canonical repaint', () => {
+	const originalMaxPromptLines = prompt.config.maxPromptLines
+	const forces: boolean[] = []
+	prompt.config.maxPromptLines = 2
+	prompt.setText('one\ntwo\nthree\nfour')
+	prompt.state.promptLineLimit = 4
+	try {
+		withPatched(render, 'draw', ((force = false) => { forces.push(force) }) as typeof render.draw, () => {
+			expect(cli.forTests.handlePromptKey(key('-', { ctrl: true }))).toBe(true)
+		})
+		expect(forces).toEqual([true])
+	} finally {
+		prompt.config.maxPromptLines = originalMaxPromptLines
+		prompt.clear()
+	}
+})
+
 test('failed slash completion consumes only a plain unselected tab', () => {
 	completion.dismiss()
 	try {

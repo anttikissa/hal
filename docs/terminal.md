@@ -254,10 +254,13 @@ independently addressable OSC 8 rows, just as popup layout does. Ordinary render
 still leave completed standalone URLs native-wrapped for copy/paste; the recovery is the
 exceptional safe rewrite.
 
-This rule also covers popup open/close, which changes the URL layout. Only an
-explicit full rebuild — Ctrl-L, tab switch, or terminal resize — may use the
-fullscreen force-repaint path. Never invoke that path from prompt, streaming,
-tool, animation, or popup updates.
+This rule also covers popup open/close, which changes the URL layout. An explicit
+full rebuild — Ctrl-L, tab switch, terminal resize, or an editing key that reduces
+the prompt's physical height — may use the fullscreen force-repaint path. The
+prompt-shrink exception is necessary: bottom-anchoring a shorter prompt moves old
+history rows across the immutable scrollback boundary, and a visible-screen repaint
+would duplicate exactly those rows. Never invoke the force path from automatic
+prompt clearing, streaming, tool, animation, or popup updates.
 
 Fullscreen growth is straightforward only for a pure append. If an existing
 logical line also changes, use the same clamped relative move to the physical

@@ -589,6 +589,19 @@ function promptInputWidth(): number {
 	return renderStatus.promptContentWidth(process.stdout.columns || 80)
 }
 
+function handlePromptKey(k: KeyEvent): boolean {
+	const width = promptInputWidth()
+	const previousRows = prompt.buildPrompt(width).lines.length
+	if (!prompt.handleKey(k, width)) return false
+	client.clearRestoreTabHint()
+	clientBackend.subscriptions.noteActivity()
+	// Moving a shorter prompt to the bottom crosses immutable scrollback rows into
+	// the viewport. Only a canonical repaint can avoid duplicating those rows.
+	const promptShrunk = prompt.buildPrompt(width).lines.length < previousRows
+	draw(promptShrunk)
+	return true
+}
+
 function clearSavedPromptState(): void {
 	const tab = client.currentTab()
 	if (tab) promptStates.delete(tab.sessionId)
@@ -833,11 +846,7 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 			// App keybindings
 			if (handleAppKey(k)) continue
 			// Then prompt editing
-			if (prompt.handleKey(k, promptInputWidth())) {
-				client.clearRestoreTabHint()
-				clientBackend.subscriptions.noteActivity()
-				draw()
-			}
+			if (handlePromptKey(k)) continue
 		}
 	})
 	process.stdin.on('end', handleStdinClosed)
@@ -849,6 +858,7 @@ export const cli = {
 	startCli,
 	forTests: {
 		handleAppKey,
+		handlePromptKey,
 		openToolConfirm,
 		closeToolConfirm,
 		handleCompletionKey,
