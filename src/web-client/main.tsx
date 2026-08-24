@@ -8,6 +8,7 @@ import { AuthGate } from './components/AuthGate.tsx'
 import { PromptComposer } from './components/PromptComposer.tsx'
 import { SessionTabs } from './components/SessionTabs.tsx'
 import { Transcript } from './components/Transcript.tsx'
+import { webStatus } from './utils/status.ts'
 import { webTranscript } from './utils/transcript.ts'
 import { sessionSelection } from './utils/session-selection.ts'
 import { webViewport } from './utils/viewport.ts'
@@ -36,6 +37,9 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	const [sharedState, setSharedState] = createSignal<SharedState>({ sessions: [], working: {}, updatedAt: '' })
 	const [snapshot, setSnapshot] = createSignal<ClientSessionSnapshot | null>(null)
 	const transcript = createMemo(() => webTranscript.items(snapshot()))
+	// Shared state keeps cwd/model current; the selected snapshot supplies the
+	// context usage that the host persists after each completed turn.
+	const status = createMemo(() => webStatus.text(sharedState().sessions.find((session) => session.id === selected()), snapshot()?.meta))
 	const snapshots = new Map<string, ClientSessionSnapshot>()
 	// Session ids from the previous broadcast, so an "open tab" command can
 	// spot the session that appears for the first time and select it.
@@ -62,10 +66,12 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 		return true
 	}
 
-	function submitPrompt(text: string): Promise<boolean> {
+	// `queue` is the same flag the terminal's /queue uses: the host parks the
+	// prompt and runs it when the current turn finishes instead of interrupting.
+	function submitPrompt(text: string, queue: boolean): Promise<boolean> {
 		const sessionId = selected()
 		if (!sessionId) return Promise.resolve(false)
-		return Promise.resolve(sendCommand({ type: 'prompt', sessionId, text, source: 'web' }))
+		return Promise.resolve(sendCommand({ type: 'prompt', sessionId, text, source: 'web', queue }))
 	}
 	// Tab commands arrive loosely typed from SessionTabs; the server's
 	// parseCommand is the real validator, so the cast is safe.
@@ -134,12 +140,13 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 		<SessionTabs
 			sessions={sharedState().sessions}
 			selected={selected()}
+			status={status()}
 			working={sharedState().working}
 			onSelect={selectSession}
 			onCommand={onTabCommand}
 		/>
 		<Transcript items={transcript()} />
-		<PromptComposer onSubmit={submitPrompt} onAttach={attachImage} />
+		<PromptComposer working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
 	</>
 }
 

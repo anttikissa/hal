@@ -4,6 +4,7 @@ import type { SharedSessionInfo } from '../../common/ipc.ts'
 type SessionTabsProps = {
 	sessions: SharedSessionInfo[]
 	selected: string
+	status: string
 	working?: Record<string, boolean>
 	onSelect: (sessionId: string) => void
 	onCommand: (command: Record<string, unknown>) => void
@@ -31,7 +32,7 @@ export function SessionTabs(props: SessionTabsProps) {
 
 	return <header class="SessionTabs">
 	<button class="SessionTabs-menu" onClick={() => setMenuOpen(!menuOpen())} aria-label="Sessions">☰</button>
-		<span class="SessionTabs-title">{props.sessions.find((session) => session.id === props.selected)?.name ?? ''}</span>
+		<span class="SessionTabs-title">{props.status}</span>
 		<div class="SessionTabs-row">
 			<For each={props.sessions}>
 				{(session) => <button class={{ selected: session.id === props.selected }} onClick={() => select(session.id)}>

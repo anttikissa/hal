@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { enterAction } from './composer.ts'
+import { enterAction, sendLabel } from './composer.ts'
 
 describe('enterAction', () => {
 	test('desktop: Enter submits, Shift+Enter newlines', () => {
@@ -14,5 +14,12 @@ describe('enterAction', () => {
 
 	test('other keys do nothing', () => {
 		expect(enterAction('a', {})).toBe('none')
+	})
+})
+
+describe('sendLabel', () => {
+	test('names what the button will actually do', () => {
+		expect(sendLabel(false)).toBe('Send')
+		expect(sendLabel(true)).toBe('Steer')
 	})
 })

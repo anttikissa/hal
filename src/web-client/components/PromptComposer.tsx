@@ -1,8 +1,9 @@
-import { createSignal } from 'solid-js'
-import { enterAction } from '../utils/composer.ts'
+import { createSignal, Show } from 'solid-js'
+import { enterAction, sendLabel } from '../utils/composer.ts'
 
 type PromptComposerProps = {
-	onSubmit: (text: string) => Promise<boolean>
+	working?: boolean
+	onSubmit: (text: string, queue: boolean) => Promise<boolean>
 	onAttach: (file: File) => Promise<string>
 }
 
@@ -29,10 +30,10 @@ export function PromptComposer(props: PromptComposerProps) {
 		input.style.height = `${Math.min(input.scrollHeight, 8 * 24)}px`
 	}
 
-	async function submit(): Promise<void> {
+	async function submit(queue = false): Promise<void> {
 		const text = input?.value.trim() ?? ''
 		if (!text || !input) return
-		if (await props.onSubmit(text)) {
+		if (await props.onSubmit(text, queue)) {
 			input.value = ''
 			autosize()
 		}
@@ -74,6 +75,11 @@ export function PromptComposer(props: PromptComposerProps) {
 		/>
 		<input ref={(element) => { fileInput = element }} type="file" accept="image/*" style="display: none" onChange={attach} />
 		<button type="button" class="PromptComposer-attach" disabled={attaching()} title="Attach image" onClick={() => fileInput?.click()}>📎</button>
-		<button type="submit" disabled={attaching()}>Send</button>
+		{/* Queue only exists while a turn runs: idle, sending already starts the
+		    prompt immediately and a queue button would mean the same thing. */}
+		<Show when={props.working}>
+			<button type="button" disabled={attaching()} title="Run after the current turn" onClick={() => void submit(true)}>Queue</button>
+		</Show>
+		<button type="submit" disabled={attaching()}>{sendLabel(!!props.working)}</button>
 	</form>
 }

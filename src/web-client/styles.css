@@ -1,6 +1,9 @@
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; font: 15px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #111; color: #eee; overscroll-behavior-y: none; }
+/* Small type is deliberate: a phone screen holds far more transcript this way,
+   and monospace stays legible down here. The composer opts back up to 16px
+   because iOS auto-zooms any focused input below that. */
+body { margin: 0; font: 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #111; color: #eee; overscroll-behavior-y: none; }
 /* #app is the element main.tsx renders into, so the rows (tab strip, transcript,
    composer) are its direct flex children. The flex column must live here and not
    on body: a wrapper between the column and the rows makes them ordinary blocks,
@@ -53,6 +56,8 @@ button { touch-action: manipulation; }
 	border-bottom: 1px solid #444;
 }
 .SessionTabs > .SessionTabs-menu { flex: none; min-width: 44px; min-height: 44px; }
+/* On a phone the status replaces tabs in the one available row. Desktop keeps
+   its tab strip and puts the same terminal-style status directly below it. */
 .SessionTabs > .SessionTabs-title { display: none; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: center; color: #ccc; }
 .SessionTabs > .SessionTabs-row {
 	display: flex;
@@ -72,7 +77,10 @@ button { touch-action: manipulation; }
 	.SessionTabs > .SessionTabs-title { display: block; }
 }
 @media (min-width: 48.01em) {
+	.SessionTabs { flex-wrap: wrap; }
 	.SessionTabs > .SessionTabs-menu { display: none; }
+	.SessionTabs > .SessionTabs-row { flex: 1; order: 1; }
+	.SessionTabs > .SessionTabs-title { display: block; flex-basis: 100%; order: 2; }
 }
 
 /* Full-screen session sheet, opened from ☰ on narrow screens. */
@@ -158,7 +166,7 @@ button { touch-action: manipulation; }
 .TranscriptItem.user { color: #9cf; }
 .TranscriptItem.assistant { color: #eee; }
 .TranscriptItem.log, .TranscriptItem.info { color: #aaa; }
-.TranscriptItem > label { font-size: 12px; color: #aaa; }
+.TranscriptItem > label { font-size: .9em; color: #aaa; }
 
 .PromptComposer {
 	flex: none;

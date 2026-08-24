@@ -9,5 +9,11 @@ function enterAction(key: string, opts: { shift?: boolean; coarse?: boolean }): 
 	return 'submit'
 }
 
-export { enterAction }
+// While a turn runs, sending interrupts it — the terminal calls that steering.
+// Naming the button for what it does keeps the queue button's purpose obvious.
+function sendLabel(working: boolean): string {
+	return working ? 'Steer' : 'Send'
+}
+
+export { enterAction, sendLabel }
 export type { EnterAction }
