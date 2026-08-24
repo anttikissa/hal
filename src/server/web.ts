@@ -277,7 +277,9 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 					const url = new URL(request.url)
 					if (url.pathname === '/api/update') return handleUpdateRequest(request)
 					if (url.pathname === '/upload') return webUpload.handleUploadRequest(request, server.requestIP(request)?.address ?? 'unknown')
-					if (url.pathname === '/') return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } })
+					// `/` and `/<sessionId>` are both the browser app: the client
+					// reads the session out of the path so a tab can be linked.
+					if (url.pathname === '/' || webProtocol.isSessionPath(url.pathname)) return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } })
 					if (url.pathname === '/styles.css') return new Response(await web.styleCss(), { headers: { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'no-store' } })
 					if (url.pathname === '/main.js') {
 						try { return new Response(await web.bundleClient(), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } }) }

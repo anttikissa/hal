@@ -195,3 +195,23 @@ test('update endpoint with the right token answers, then exits the process', asy
 		else process.env.UPDATE_TOKEN = originalToken
 	}
 })
+
+test('session urls serve the browser app so a tab is shareable as a link', async () => {
+	const controller = new AbortController()
+	ensureStateDir()
+	web.start(0, controller.signal)
+	try {
+		const base = `http://127.0.0.1:${web.state.port}`
+		const page = await Bun.file(`${import.meta.dir}/../web-client/index.html`).text()
+		const session = await fetch(`${base}/05-wan`)
+		expect(session.status).toBe(200)
+		expect(await session.text()).toBe(page)
+		// Unknown paths must still 404 rather than rendering the app.
+		expect((await fetch(`${base}/nope`)).status).toBe(404)
+		expect((await fetch(`${base}/05-wan/extra`)).status).toBe(404)
+		// Real endpoints keep their own handling.
+		expect((await fetch(`${base}/styles.css`)).headers.get('content-type')).toContain('text/css')
+	} finally {
+		controller.abort()
+	}
+})

@@ -22,10 +22,37 @@ of truth; re-read it after upgrades.
 - Set `jsxImportSource` to `@solidjs/web`.
 - Import core and stores from `solid-js`; import DOM APIs and JSX types from
   `@solidjs/web`. `solid-js/web` and `solid-js/store` are gone.
-- The client-only app has no router. Our URLs are a path plus a hash
-  (`/112-bad#0083pn-l13` selects a session and a message), which `location`,
-  `popstate`, and `history.pushState` cover. Add a router only if nested layouts,
-  typed params, or preloading ever justify one.
+- The client-only app has no router dependency; see "Routing" below.
+
+## Routing
+
+`src/web-client/router.ts` is a ~70-line router, not a dependency. The whole
+URL surface is `/<sessionId>` (`hal.kissa.dev/05-wan`), so a tab is a
+shareable link and Back/Forward move between tabs.
+
+- `src/common/web.ts` owns `isSessionPath()`. The server serves the app for
+  those paths and the client parses the session out of the same shape, so the
+  two can never disagree about what a session URL is.
+- The router is the single source of truth for the selected session: `main.tsx`
+  derives `selected` from `router.sessionId()` rather than keeping its own
+  signal. `popstate` therefore needs no special case.
+- `navigate(id, { replace })`: user actions push, app reconciliation replaces.
+  Landing on a tab you did not ask for must not add history entries.
+- `href`/`write` are indirections over `location`/`history` so tests drive the
+  router without a DOM and eval can hot-patch navigation.
+
+### Why not Solid Router or TanStack Router
+
+Both are good, and both solve problems we do not have. Their value is nested
+layouts, route-tree config, loaders/preloading with caching, and typed path
+builders — TanStack's headline feature is inferred types and route codegen,
+which is an explicit non-goal here. We have one flat route, no nesting, and a
+WebSocket that already pushes our data, so a route loader has nothing to load.
+
+Adopt one when we actually grow nested layouts, several route families, or
+route-owned data loading. Until then the dependency costs more than the
+`if`-statement it replaces. Note Solid Router 2 is itself prerelease and its
+v2 docs are still thin, which is another reason not to bet the client on it.
 
 ## Components, files, and CSS
 

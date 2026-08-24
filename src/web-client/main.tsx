@@ -1,4 +1,4 @@
-import { createMemo, createSignal, onSettled, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, onSettled, Show } from 'solid-js'
 import { render } from '@solidjs/web'
 import type { SharedState } from '../common/ipc.ts'
 import type { Command } from '../common/protocol.ts'
@@ -12,16 +12,14 @@ import { webStatus } from './utils/status.ts'
 import { webTranscript } from './utils/transcript.ts'
 import { sessionSelection } from './utils/session-selection.ts'
 import { webViewport } from './utils/viewport.ts'
+import { router } from './router.ts'
 
 const tokenStorageKey = 'hal-web-auth'
 
 function initialToken(): string {
-	const url = new URL(location.href)
-	const token = url.searchParams.get('auth')
+	const token = router.takeSearchParam('auth')
 	if (token) {
 		localStorage.setItem(tokenStorageKey, token)
-		url.searchParams.delete('auth')
-		history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
 		return token
 	}
 	return localStorage.getItem(tokenStorageKey) ?? ''
@@ -33,7 +31,9 @@ type AuthenticatedAppProps = {
 }
 
 function AuthenticatedApp(props: AuthenticatedAppProps) {
-	const [selected, setSelected] = createSignal('')
+	// The URL owns the selected session, so a tab is shareable as
+	// hal.kissa.dev/05-wan and Back/Forward move between tabs.
+	const selected = router.sessionId
 	const [sharedState, setSharedState] = createSignal<SharedState>({ sessions: [], working: {}, updatedAt: '' })
 	const [snapshot, setSnapshot] = createSignal<ClientSessionSnapshot | null>(null)
 	const transcript = createMemo(() => webTranscript.items(snapshot()))
@@ -47,17 +47,27 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	let socket: WebSocket | undefined
 	let unauthorized = false
 
-	function selectSession(sessionId: string): void {
+	// `replace` is for selections the user did not ask for (the initial landing
+	// tab, or a tab closing under us): those should not add history entries.
+	function selectSession(sessionId: string, replace = false): void {
 		if (!sessionId) return
-		setSelected(sessionId)
-		setSnapshot(snapshots.get(sessionId) ?? null)
+		router.navigate(sessionId, { replace })
 	}
 
+	// The cached snapshot follows the route, so Back/Forward and tab clicks are
+	// the same code path. Live events and fresh snapshots update it separately.
+	createEffect(selected, (sessionId) => { setSnapshot(snapshots.get(sessionId) ?? null) })
+
 	function applyState(state: SharedState): void {
-		const sessionId = sessionSelection.nextSelection(state, selected(), previousIds, sessionSelection.isOpenRequestPending())
+		const pending = sessionSelection.isOpenRequestPending()
+		const sessionId = sessionSelection.nextSelection(state, selected(), previousIds, pending)
+		// Landing on the tab our own "+ New tab" click created is a real
+		// navigation, so it gets a history entry and Back returns to the tab we
+		// came from. Everything else here is the app reconciling, not the user.
+		const opened = pending && !previousIds.has(sessionId)
 		previousIds = new Set(state.sessions.map((session) => session.id))
 		setSharedState(state)
-		if (sessionId !== selected()) selectSession(sessionId)
+		if (sessionId !== selected()) selectSession(sessionId, !opened)
 	}
 
 	function sendCommand(command: Command): boolean {
@@ -92,6 +102,9 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 		return body.path
 	}
 
+	// Adopt the URL the page was opened with and follow Back/Forward from here on.
+	onSettled(() => router.start())
+
 	onSettled(() => {
 		const connection = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`)
 		socket = connection
@@ -107,8 +120,9 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			}
 			if (message.type === 'authenticated') {
 				for (const item of message.bootstrap.snapshots) snapshots.set(item.session.id, item)
+				// applyState keeps a valid session from the URL and otherwise
+				// falls back to the first tab, correcting the address bar.
 				applyState(message.bootstrap.state)
-				if (!selected()) selectSession(message.bootstrap.state.sessions[0]?.id ?? '')
 				return
 			}
 			if (message.type === 'state') {

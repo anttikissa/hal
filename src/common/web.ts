@@ -46,4 +46,14 @@ function applySessionMessage(snapshot: ClientSessionSnapshot | null, message: We
 	return { ...snapshot, live: result.blocks }
 }
 
-export const webProtocol = { encode, decode, applySessionMessage }
+// Session ids look like `05-wan` or `112-bad`: digits, a dash, then letters.
+// The browser app owns `/<sessionId>` so a tab is shareable as a URL; the
+// server serves the app for those paths and the client picks the session out
+// of the same shape. Anything else stays a real endpoint or a 404.
+const sessionPathPattern = /^\/\d+-[a-z]+$/
+
+function isSessionPath(pathname: string): boolean {
+	return sessionPathPattern.test(pathname)
+}
+
+export const webProtocol = { encode, decode, applySessionMessage, isSessionPath }
