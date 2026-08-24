@@ -6,8 +6,8 @@ interface LiveTab {
 }
 
 function sameMergeTs(a?: number, b?: number): boolean {
-	// Persisted history and live.ason often agree on timestamps, but some callers
-	// only have one side. Missing ts should not block dedupe.
+	// Persisted history and the live transcript tail often agree on timestamps,
+	// but some callers only have one side. Missing ts should not block dedupe.
 	return a == null || b == null || a === b
 }
 

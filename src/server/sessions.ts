@@ -19,6 +19,16 @@ export type { EntryIdentity, HistoryEntry, UserPart } from '../common/history.ts
 export type { SessionMeta } from '../common/session.ts'
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'
+/**
+ * live.ason is each session's replace-in-place snapshot of the uncommitted
+ * transcript tail. The server creates and rewrites it as provider/tool events
+ * arrive; local clients read it through this session store, and web clients get
+ * the same blocks in session snapshots. It lets reconnecting clients render an
+ * in-progress turn. Unlike append-only history.asonl, it is derived working
+ * state: blocks may temporarily overlap newly committed history and are cleared
+ * when the turn is committed, canceled, or rebased.
+ */
+const LIVE_FILE = 'live.ason'
 const liveSessionMetas = new Map<string, SessionMeta>()
 const liveSessionState = new Map<string, SessionLive>()
 
@@ -154,13 +164,13 @@ function fixLive(live: SessionLive | null | undefined): SessionLive {
 }
 
 function readLiveFromDisk(sessionId: string): SessionLive {
-	return readAson(sessionFile(sessionId, 'live.ason'), defaultLive(), (text) =>
+	return readAson(sessionFile(sessionId, LIVE_FILE), defaultLive(), (text) =>
 		fixLive(ason.parse(text) as unknown as SessionLive),
 	)
 }
 
 function activateLive(sessionId: string): SessionLive {
-	return activateFile(liveSessionState, sessionId, 'live.ason', defaultLive(), fixLive)!
+	return activateFile(liveSessionState, sessionId, LIVE_FILE, defaultLive(), fixLive)!
 }
 
 function loadLive(sessionId: string): SessionLive {
