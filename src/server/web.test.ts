@@ -130,10 +130,12 @@ test('websocket is an authenticated ASON command bus', async () => {
 	}
 })
 
-test('websocket snapshots refresh at persisted-history boundaries', () => {
+test('websocket snapshots replace persisted prompt events', () => {
 	expect(web.isSnapshotBoundary({ type: 'stream-end' })).toBe(true)
 	expect(web.isSnapshotBoundary({ type: 'history-rebased' })).toBe(true)
 	expect(web.isSnapshotBoundary({ type: 'stream-delta' })).toBe(false)
+	expect(web.isSnapshotOnlyEvent({ type: 'prompt' })).toBe(true)
+	expect(web.isSnapshotOnlyEvent({ type: 'stream-delta' })).toBe(false)
 })
 
 test('update endpoint is inert without a token and rejects wrong credentials', async () => {
