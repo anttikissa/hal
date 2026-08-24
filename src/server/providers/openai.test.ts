@@ -837,3 +837,37 @@ test('openai websocket continuation sends previous_response_id and only new tool
 	expect(sent[1].previous_response_id).toBe('resp_1')
 	expect(sent[1].input).toEqual([{ type: 'function_call_output', call_id: 'call_1', output: 'hi' }])
 })
+
+
+test('response.failed error body carries only the error, not the echoed request', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+
+	const failed = {
+		type: 'response.failed',
+		response: {
+			id: 'resp_1',
+			status: 'failed',
+			instructions: 'HUGE SYSTEM PROMPT '.repeat(100),
+			error: { code: 'server_is_overloaded', message: 'Our servers are currently overloaded. Please try again later.' },
+		},
+	}
+	installFetchMock(async () => new Response([`data: ${JSON.stringify(failed)}`, ''].join('\n'), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.3-codex',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) events.push(event)
+
+	const error = events.find((event) => event.type === 'error')
+	expect(error.message).toBe('Our servers are currently overloaded. Please try again later.')
+	expect(error.body).toBe(JSON.stringify(failed.response.error))
+})

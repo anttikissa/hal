@@ -321,7 +321,12 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 		return events
 	}
 	if (type === 'error') return [{ type: 'error', message: event.error?.message ?? event.message ?? 'Unknown error', body: JSON.stringify(event.error ?? event) }]
-	if (type === 'response.failed') return [{ type: 'error', message: event.error?.message ?? 'Response failed', body: JSON.stringify(event) }]
+	if (type === 'response.failed') {
+		// The failed response echoes the entire request back (instructions, input, tools).
+		// Keep only the error object so we don't dump the whole system prompt into the UI.
+		const error = event.response?.error ?? event.error
+		return [{ type: 'error', message: error?.message ?? 'Response failed', body: JSON.stringify(error ?? { status: event.response?.status ?? 'failed' }) }]
+	}
 	return []
 }
 

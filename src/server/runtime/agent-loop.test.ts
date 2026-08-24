@@ -1206,3 +1206,43 @@ test('a model id with no provider fails with a model-not-found message, not an i
 	expect(error?.message).not.toContain('stub')
 	expect(error?.message).not.toContain('BASE_URL')
 })
+
+
+test('huge provider error payloads are truncated in the UI but kept whole in the blob', async () => {
+	const sessionId = `test-error-truncate-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	const payload = { instructions: Array.from({ length: 200 }, (_, i) => `line ${i}`) }
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'error', message: 'Boom', status: 400, body: JSON.stringify(payload) }
+			yield { type: 'done' }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+		})
+		const responseEvent = events.find((event) => event.type === 'response' && event.isError)
+		const lines = responseEvent.text.split('\n')
+		expect(lines.length).toBeLessThanOrEqual(agentLoop.config.maxErrorDetailLines + 2)
+		expect(responseEvent.text).toContain('read_blob')
+		expect(blob.readBlob(sessionId, responseEvent.blobId)).toMatchObject({ payload })
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+	}
+})

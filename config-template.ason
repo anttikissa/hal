@@ -72,7 +72,9 @@
 		// Maximum total retry time for one provider request.
 		retryMaxTotalMs: 7200000,
 		// HTTP statuses treated as transient provider errors.
-		retryableStatuses: [429, 500, 503, 529]
+		retryableStatuses: [429, 500, 503, 529],
+		// Max lines of a provider error payload printed in the UI; the rest stays in the blob.
+		maxErrorDetailLines: 20
 	},
 	inbox: {
 		// How often to rescan session inboxes even if no filesystem event arrived.

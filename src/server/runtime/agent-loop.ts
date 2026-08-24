@@ -39,6 +39,8 @@ const config = {
 	retryBaseDelayMs: 5_000,
 	retryMaxTotalMs: 2 * 60 * 60 * 1000, // 2 hours
 	retryableStatuses: [429, 500, 503, 529],
+	/** Max lines of provider error payload shown in the UI; the rest stays in the blob. */
+	maxErrorDetailLines: 20,
 }
 type SettledRequest = {
 	promise: Promise<void>
@@ -349,12 +351,21 @@ function isRetryableStatus(status: number | undefined): boolean {
 	return status != null && config.retryableStatuses.includes(status)
 }
 
-/** Build the complete user-visible API error below the status/endpoint header. */
-function formatErrorDetails(event: ProviderStreamEvent): string {
+/**
+ * Build the user-visible API error below the status/endpoint header.
+ *
+ * Some providers echo the whole request back in their error payload (OpenAI's
+ * failed responses include the system prompt), so cap what we print. The full
+ * payload always stays in the error blob.
+ */
+function formatErrorDetails(event: ProviderStreamEvent, blobRef: string): string {
 	const payload = parseErrorPayload(event.body)
-	if (payload && typeof payload === 'object') return ason.stringify(payload)
-	if (typeof event.message === 'string' && event.message.trim()) return event.message.trim()
-	return 'Unknown error'
+	let text = 'Unknown error'
+	if (payload && typeof payload === 'object') text = ason.stringify(payload)
+	else if (typeof event.message === 'string' && event.message.trim()) text = event.message.trim()
+	const lines = text.split('\n')
+	if (lines.length <= config.maxErrorDetailLines) return text
+	return [...lines.slice(0, config.maxErrorDetailLines), `[… ${lines.length - config.maxErrorDetailLines} more lines — read_blob ${blobRef}]`].join('\n')
 }
 
 /**
@@ -584,7 +595,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 						const header = status ? `${status}:` : 'Error:'
 						const endpoint = event.endpoint ? ` (${event.endpoint})` : ''
-						const errorText = `${header}${endpoint}\n${formatErrorDetails(event)}`
+						const errorText = `${header}${endpoint}\n${formatErrorDetails(event, `${sessionId}/${blobId}`)}`
 						emitEvent(sessionId, {
 							type: 'response',
 							text: errorText,
