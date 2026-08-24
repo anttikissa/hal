@@ -23,3 +23,4 @@ Random ideas, in no particular order
 - The OPUS context usage warning must go. It's not that bad anymore. Instead, think of a generic "this session isn't hitting cache any more" hint in UI
 - Fix popup rendering so all underlying frame rows are rendered normally behind the popup; the popup should be a true overlay rather than replacing or omitting the obscured rows.
 - Opencode Go support
+- /login should support adding API keys too
