@@ -38,6 +38,7 @@ function decode(text: string): unknown {
 function applySessionMessage(snapshot: ClientSessionSnapshot | null, message: WebServerMessage): ClientSessionSnapshot | null {
 	if (message.type === 'snapshot') return message.snapshot
 	if (message.type !== 'event' || !snapshot || message.event?.sessionId !== snapshot.session.id) return snapshot
+	if (message.event?.type === 'prompt' && message.event.id && snapshot.history.some((entry) => entry.id === message.event.id)) return snapshot
 	const result = liveEventBlocks.reduce(snapshot.live, message.event, {
 		sessionId: snapshot.session.id,
 		defaultModel: snapshot.session.model,

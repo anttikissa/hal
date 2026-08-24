@@ -388,6 +388,7 @@ test('steering prompt status survives history reload', async () => {
 	const sessionId = '04-steering-status'
 	const meta: SessionMeta = { id: sessionId, workingDir: '/work', createdAt: '2026-05-21T10:00:00.000Z', model: 'openai/gpt-5.5' }
 	const history: any[] = []
+	const events: any[] = []
 	const origOwnsHostLock = ipc.ownsHostLock
 	const origAppendEvent = ipc.appendEvent
 	const origAppendHistory = sessions.appendHistory
@@ -395,14 +396,15 @@ test('steering prompt status survives history reload', async () => {
 	const origRunAgentLoop = agentLoop.runAgentLoop
 	try {
 		ipc.ownsHostLock = () => true
-		ipc.appendEvent = () => {}
+		ipc.appendEvent = (event) => { events.push(event) }
 		sessions.loadSessionMeta = (id) => id === sessionId ? meta : null
 		sessions.appendHistory = async (_id, entries) => { history.push(...entries) }
 		agentLoop.runAgentLoop = async () => 'completed'
 
-		await runtime.handlePrompt(sessionId, 'continue this', 'steering')
+		await runtime.handlePrompt(sessionId, 'continue this', 'steering', undefined, undefined, { id: '000001-abc', controller: new AbortController(), task: Promise.resolve() })
 
-		expect(history).toContainEqual(expect.objectContaining({ type: 'user', parts: [{ type: 'text', text: 'continue this' }], status: 'steering' }))
+		expect(history).toContainEqual(expect.objectContaining({ id: '000001-abc', type: 'user', parts: [{ type: 'text', text: 'continue this' }], status: 'steering' }))
+		expect(events).toContainEqual(expect.objectContaining({ id: '000001-abc', type: 'prompt' }))
 	} finally {
 		ipc.ownsHostLock = origOwnsHostLock
 		ipc.appendEvent = origAppendEvent

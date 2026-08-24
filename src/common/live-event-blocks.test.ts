@@ -31,6 +31,12 @@ test('projects prompt events as user blocks', () => {
 	}])
 })
 
+test('server prompt replaces its optimistic block by ID', () => {
+	const optimistic: LiveBlock[] = [{ id: 'prompt-1', type: 'user', text: 'local' }]
+	const result = liveEventBlocks.reduce(optimistic, { type: 'prompt', id: 'prompt-1', text: 'server' })
+	expect(result.blocks).toEqual([{ id: 'prompt-1', type: 'user', text: 'server' }])
+})
+
 describe('live event block projection', () => {
 	test('projects the same event sequence deterministically', () => {
 		const events: LiveEvent[] = [

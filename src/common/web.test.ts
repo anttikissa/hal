@@ -16,6 +16,12 @@ test('web protocol uses ASON directly', () => {
 	expect(webProtocol.decode(text)).toEqual(authenticated)
 })
 
+test('prompt event already present in snapshot history is not projected twice', () => {
+	const snapshot: any = { session: { id: 's1' }, history: [{ type: 'user', id: 'prompt-1', parts: [] }], live: [] }
+	const result = webProtocol.applySessionMessage(snapshot, { type: 'event', event: { type: 'prompt', id: 'prompt-1', sessionId: 's1', text: 'hello' } })
+	expect(result).toBe(snapshot)
+})
+
 test('web protocol rejects malformed ASON', () => {
 	expect(webProtocol.decode('{ nope')).toBeNull()
 })

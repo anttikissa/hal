@@ -4,6 +4,7 @@ import { models } from './models.ts'
 // clients can enrich or render these blocks independently, but they share this
 // projection so a snapshot and a live event stream always converge.
 export interface LiveBlockBase {
+	id?: string
 	ts?: number
 	canceled?: boolean
 	usageBars?: true
@@ -181,7 +182,11 @@ function timestamp(event: LiveEventBase): number | undefined {
 }
 
 function appendBlock(blocks: readonly LiveBlock[], block: LiveBlock): LiveProjectionResult {
-	return { blocks: [...blocks, block], changed: true }
+	const index = block.id ? blocks.findIndex((item) => item.id === block.id) : -1
+	if (index < 0) return { blocks: [...blocks, block], changed: true }
+	const next = blocks.slice()
+	next[index] = block
+	return { blocks: next, changed: true }
 }
 
 
@@ -192,6 +197,7 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 	if (event.type === 'prompt') {
 		const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
 		const block: LiveUserBlock = { type: 'user', text: event.text }
+		if (event.id) block.id = event.id
 		if (event.actualText) block.actualText = event.actualText
 		if (event.source) block.source = event.source
 		if (event.sourceTab !== undefined) block.sourceTab = event.sourceTab

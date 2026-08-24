@@ -512,6 +512,10 @@ function sendCommand(type: ClientCommandType, text?: string, displayText?: strin
 	const isPromptTurn = type === 'prompt' || type === 'prompt-amend'
 	if (isPromptTurn && tab && text && !text.trimStart().startsWith('/') && (type === 'prompt-amend' || !queue || !isWorking())) {
 		state.pendingPromptTexts.set(tab.sessionId, text)
+		if (!queue && command.type === 'prompt') {
+			applyLiveEventToTab(tab, { type: 'prompt', id: command.id, text: displayText ?? text, actualText: displayText ? text : undefined, createdAt: new Date().toISOString() })
+			onChange(false)
+		}
 	}
 	// Hide the retry/continue affordance immediately; the shared working state
 	// arrives on the next IPC update, but this client already queued the turn.
@@ -781,7 +785,7 @@ export const client = {
 function addBlockToTab(sessionId: string | null, block: Block): void {
 	const tab = tabForSession(sessionId)
 	if (!tab) return
-	tab.history.push(block)
+	tab.history = liveEventBlocks.appendBlock(tab.history, block).blocks
 	touchTab(tab)
 	onChange(false)
 }

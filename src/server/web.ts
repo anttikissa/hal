@@ -5,6 +5,7 @@ import type { Command } from '../common/protocol.ts'
 import type { ClientBootstrap, ClientSessionSnapshot } from '../common/snapshots.ts'
 import type { WebClientMessage, WebServerMessage } from '../common/web.ts'
 import { webProtocol } from '../common/web.ts'
+import { historyIds } from '../common/history-ids.ts'
 import { blob } from './session/blob.ts'
 import { ipc } from './file-ipc.ts'
 import { runtime } from './runtime.ts'
@@ -133,7 +134,7 @@ function parseCommand(value: unknown): Command | null {
 	const request = typeof value.requestId === 'string' && value.requestId.length <= 1_000
 	switch (value.type) {
 		case 'prompt':
-			return text && optionalString(value.displayText) && optionalString(value.source) && (value.queue === undefined || typeof value.queue === 'boolean') && (value.sourceTab === undefined || Number.isInteger(value.sourceTab)) ? value as Command : null
+			return text && historyIds.isValid(value.id) && optionalString(value.displayText) && optionalString(value.source) && (value.queue === undefined || typeof value.queue === 'boolean') && (value.sourceTab === undefined || Number.isInteger(value.sourceTab)) ? value as Command : null
 		case 'prompt-amend':
 			return text && optionalString(value.displayText) && optionalString(value.source) ? value as Command : null
 		case 'continue':
@@ -352,9 +353,8 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 	void (async () => {
 		for await (const event of ipc.tailEvents(signal)) {
 			const sessionId = event && typeof event.sessionId === 'string' ? event.sessionId : ''
-			const snapshotOnly = web.isSnapshotOnlyEvent(event)
-			if (sessionId && (snapshotOnly || web.isSnapshotBoundary(event)) && openIds.has(sessionId)) web.publishSnapshot(server, sessionId)
-			if (!snapshotOnly) server.publish('web', web.encode({ type: 'event', event }))
+			if (sessionId && web.isSnapshotBoundary(event) && openIds.has(sessionId)) web.publishSnapshot(server, sessionId)
+			server.publish('web', web.encode({ type: 'event', event }))
 		}
 	})()
 	signal.addEventListener('abort', () => {
@@ -369,12 +369,6 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 		}
 	}, { once: true })
 	web.announce(announcementSessionId, state.port)
-}
-
-// Prompts are already persisted before the runtime emits their event. Replace the
-// event with a snapshot so browser clients receive that message exactly once.
-function isSnapshotOnlyEvent(event: unknown): boolean {
-	return isObject(event) && event.type === 'prompt'
 }
 
 function isSnapshotBoundary(event: unknown): boolean {
@@ -402,7 +396,6 @@ export const web = {
 	saveUpload: (name: string, type: string, data: ArrayBuffer) => webUpload.saveUpload(name, type, data),
 	handleUploadRequest: (request: Request, ip: string) => webUpload.handleUploadRequest(request, ip),
 	isSnapshotBoundary,
-	isSnapshotOnlyEvent,
 	runGit,
 	gitOut,
 	handleUpdateRequest,

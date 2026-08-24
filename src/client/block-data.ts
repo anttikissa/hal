@@ -56,6 +56,7 @@ function historyToBlocks(
 				const editText = isSystem && actualText.startsWith('[system] ') ? actualText.slice(9) : actualText
 				result.push({
 					type: 'user',
+					id: entry.id,
 					text: displayText,
 					actualText: editText === displayText ? undefined : editText,
 					source: isSystem ? 'system' : entry.source ?? undefined,

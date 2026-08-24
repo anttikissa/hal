@@ -92,6 +92,8 @@ test('websocket parser accepts ASON authentication and ordinary commands', () =>
 	expect(web.parseClientMessage("{ type: 'authenticate', token: 'aBcDeFgHiJkL' }")).toEqual({ type: 'authenticate', token: 'aBcDeFgHiJkL' })
 	expect(web.parseClientMessage("{ type: 'command', command: { type: 'abort', sessionId: '04-work' } }")).toEqual({ type: 'command', command: { type: 'abort', sessionId: '04-work' } })
 	expect(web.parseClientMessage("{ type: 'command', command: { type: 'prompt', text: 42 } }")).toBeNull()
+	expect(web.parseClientMessage("{ type: 'command', command: { type: 'prompt', id: 'bad', text: 'hello' } }")).toBeNull()
+	expect(web.parseClientMessage("{ type: 'command', command: { type: 'prompt', id: '000001-abc', text: 'hello' } }")).not.toBeNull()
 })
 
 test('websocket is an authenticated ASON command bus', async () => {
@@ -130,12 +132,10 @@ test('websocket is an authenticated ASON command bus', async () => {
 	}
 })
 
-test('websocket snapshots replace persisted prompt events', () => {
+test('websocket snapshots refresh history boundaries', () => {
 	expect(web.isSnapshotBoundary({ type: 'stream-end' })).toBe(true)
 	expect(web.isSnapshotBoundary({ type: 'history-rebased' })).toBe(true)
 	expect(web.isSnapshotBoundary({ type: 'stream-delta' })).toBe(false)
-	expect(web.isSnapshotOnlyEvent({ type: 'prompt' })).toBe(true)
-	expect(web.isSnapshotOnlyEvent({ type: 'stream-delta' })).toBe(false)
 })
 
 test('update endpoint is inert without a token and rejects wrong credentials', async () => {

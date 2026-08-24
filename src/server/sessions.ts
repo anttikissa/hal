@@ -2,8 +2,8 @@
 // sessions are read straight from disk until the runtime resumes them.
 
 import { readFileSync, existsSync, readdirSync, rmSync, appendFileSync, writeFileSync, renameSync } from 'fs'
-import { randomBytes } from 'crypto'
 import type { SharedSessionInfo } from '../common/ipc.ts'
+import { historyIds } from '../common/history-ids.ts'
 import { STATE_DIR, ensureDir } from './state.ts'
 import { ipc } from './file-ipc.ts'
 import { ason } from '../utils/ason.ts'
@@ -88,18 +88,6 @@ function fixMeta(meta: SessionMeta, sessionId: string): SessionMeta {
 	return meta
 }
 
-function makeEntryId(used = new Set<string>()): string {
-	for (;;) {
-		const head = Math.max(0, Date.now()).toString(36).slice(-6).padStart(6, '0')
-		const bytes = randomBytes(3)
-		const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
-		let tail = ''
-		for (let i = 0; i < 3; i++) tail += alphabet[bytes[i]! % alphabet.length]
-		const id = `${head}-${tail}`
-		if (!used.has(id)) return id
-	}
-}
-
 // Whitelist of history fields that survive to disk. cleanHistoryEntry() drops
 // everything else, so adding a field to HistoryEntry is not enough: without an
 // entry here it is written, read back as undefined, and the loss is silent.
@@ -146,7 +134,7 @@ function usedHistoryIds(sessionId: string, logName?: string): Set<string> {
 
 function ensureEntryIds(entries: HistoryEntry[], used = new Set<string>()): HistoryEntry[] {
 	for (const entry of entries) {
-		const id = typeof entry.id === 'string' && !used.has(entry.id) ? entry.id : makeEntryId(used)
+		const id = typeof entry.id === 'string' && !used.has(entry.id) ? entry.id : historyIds.make(used)
 		Object.defineProperty(entry, 'id', { value: id, enumerable: true, writable: true, configurable: true })
 		used.add(id)
 	}

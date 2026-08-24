@@ -1,4 +1,5 @@
 import type { Command, CommandType } from '../common/protocol.ts'
+import { historyIds } from '../common/history-ids.ts'
 
 export type ClientCommandType = Exclude<CommandType, 'client-exit' | 'client-status' | 'compact' | 'draft-saved' | 'focus' | 'reset' | 'spawn' | 'tool-confirm'>
 
@@ -16,7 +17,7 @@ function pendingTabActionForPrompt(text: string): PendingTabAction {
 function makeCommand(type: ClientCommandType, sessionId: string | undefined, text?: string, displayText?: string, queue?: boolean): Command {
 	switch (type) {
 		case 'prompt':
-			return { type, sessionId, text: text ?? '', displayText, queue }
+			return { type, id: historyIds.make(), sessionId, text: text ?? '', displayText, queue }
 		case 'prompt-amend':
 			return { type, sessionId, text: text ?? '', displayText }
 		case 'open':

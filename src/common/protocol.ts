@@ -47,6 +47,7 @@ export interface CommandBase {
 
 export interface PromptCommand extends CommandBase {
 	type: 'prompt'
+	id?: string
 	text: string
 	displayText?: string
 	queue?: boolean

@@ -4,6 +4,8 @@ import type { SharedState } from '../common/ipc.ts'
 import type { Command } from '../common/protocol.ts'
 import type { ClientSessionSnapshot } from '../common/snapshots.ts'
 import { webProtocol, type WebServerMessage } from '../common/web.ts'
+import { historyIds } from '../common/history-ids.ts'
+import { liveEventBlocks } from '../common/live-event-blocks.ts'
 import { AuthGate } from './components/AuthGate.tsx'
 import { PromptComposer } from './components/PromptComposer.tsx'
 import { SessionTabs } from './components/SessionTabs.tsx'
@@ -80,8 +82,16 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	// prompt and runs it when the current turn finishes instead of interrupting.
 	function submitPrompt(text: string, queue: boolean): Promise<boolean> {
 		const sessionId = selected()
-		if (!sessionId) return Promise.resolve(false)
-		return Promise.resolve(sendCommand({ type: 'prompt', sessionId, text, source: 'web', queue }))
+		const current = snapshot()
+		if (!sessionId || !current) return Promise.resolve(false)
+		const id = historyIds.make()
+		if (!sendCommand({ type: 'prompt', id, sessionId, text, source: 'web', queue })) return Promise.resolve(false)
+		if (!queue && !text.trimStart().startsWith('/')) {
+			const next = { ...current, live: liveEventBlocks.reduce(current.live, { type: 'prompt', id, text, createdAt: new Date().toISOString() }).blocks }
+			snapshots.set(sessionId, next)
+			setSnapshot(next)
+		}
+		return Promise.resolve(true)
 	}
 	// Tab commands arrive loosely typed from SessionTabs; the server's
 	// parseCommand is the real validator, so the cast is safe.

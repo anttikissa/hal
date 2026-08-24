@@ -35,6 +35,7 @@ type PendingContinuation = { canceled: boolean }
 type PendingPrompt = {
 	controller: AbortController
 	task: Promise<void>
+	id?: string
 }
 const state = {
 	openSessionIds: [] as string[],
@@ -334,9 +335,10 @@ async function dispatchPromptCommand(sessionId: string, text: string, source: st
 	}
 }
 
-function trackPendingPrompt(sessionId: string, run: (pending: PendingPrompt, previous?: PendingPrompt) => Promise<void>): Promise<void> {
+function trackPendingPrompt(sessionId: string, run: (pending: PendingPrompt, previous?: PendingPrompt) => Promise<void>, id?: string): Promise<void> {
 	const previous = state.pendingPrompts.get(sessionId)
 	const pending: PendingPrompt = { controller: new AbortController(), task: Promise.resolve() }
+	if (id) pending.id = id
 	state.pendingPrompts.set(sessionId, pending)
 	pending.task = run(pending, previous)
 	function clear(): void {
@@ -346,8 +348,8 @@ function trackPendingPrompt(sessionId: string, run: (pending: PendingPrompt, pre
 	return pending.task
 }
 
-function startPromptCommand(sessionId: string, text: string, source?: string, displayText?: string, label?: 'queued', sourceTab?: number): Promise<void> {
-	return trackPendingPrompt(sessionId, (pending, previous) => dispatchPromptCommand(sessionId, text, source, displayText, pending, previous, label, sourceTab))
+function startPromptCommand(sessionId: string, text: string, source?: string, displayText?: string, label?: 'queued', sourceTab?: number, id?: string): Promise<void> {
+	return trackPendingPrompt(sessionId, (pending, previous) => dispatchPromptCommand(sessionId, text, source, displayText, pending, previous, label, sourceTab), id)
 }
 
 function startPromptAmendCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
@@ -426,6 +428,7 @@ async function amendLastPrompt(sessionId: string, text: string, source?: string,
 		if (entry?.type !== 'user') continue
 		entries[i] = {
 			type: 'user',
+			id: entry.id,
 			parts: await resolvePromptParts(sessionId, text, displayText),
 			source,
 			ts: entry.ts ?? new Date().toISOString(),
@@ -527,19 +530,22 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		let sourceName: string | undefined
 		if (source) sourceName = sessionStore.loadSessionMeta(source)?.name
 		const createdAt = new Date().toISOString()
-		sessionStore.appendHistory(sessionId, [{
+		const entry: HistoryEntry = {
 			type: 'user',
+			id: pending?.id,
 			parts,
 			source,
 			sourceTab,
 			sourceName,
 			status: label,
 			ts: createdAt,
-		}])
+		}
+		sessionStore.appendHistory(sessionId, [entry])
 		// Persist before publishing so snapshots taken in response to this event
 		// always include the prompt that caused it.
 		ipc.appendEvent({
 			type: 'prompt',
+			id: entry.id,
 			text: displayText ?? text,
 			actualText: displayText && displayText !== text ? text : undefined,
 			label,
@@ -703,7 +709,7 @@ function handleCommand(cmd: Command): void {
 		case 'prompt': {
 			if (!sessionId) return
 			if (cmd.queue) void queueRunner.enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText, cmd.sourceTab)
-			else startPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText, undefined, cmd.sourceTab)
+			else startPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText, undefined, cmd.sourceTab, cmd.id)
 			break
 		}
 		case 'prompt-amend': {

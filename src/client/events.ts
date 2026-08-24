@@ -32,6 +32,7 @@ function handlePrompt(event: any, ctx: any): void {
 	else ctx.flushDelayedPaused(event.sessionId ?? null)
 	ctx.addBlockToTab(event.sessionId, {
 		type: 'user',
+		id: typeof event.id === 'string' ? event.id : undefined,
 		text: event.text,
 		actualText: typeof event.actualText === 'string' ? event.actualText : undefined,
 		source: typeof event.source === 'string' ? event.source : undefined,
