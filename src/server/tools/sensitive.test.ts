@@ -1,12 +1,13 @@
 import { afterEach, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { HAL_DIR } from '../state.ts'
+import { HAL_DIR, STATE_DIR } from '../state.ts'
 import { bash } from './bash.ts'
 import { evalTool } from './eval.ts'
 import { glob } from './glob.ts'
 import { grep } from './grep.ts'
 import { read } from './read.ts'
+import { sensitive } from './sensitive.ts'
 import { write } from './write.ts'
 
 const TEST_DIR = '/tmp/hal-test-sensitive-tools'
@@ -14,6 +15,11 @@ const protectedPath = join(HAL_DIR, 'auth.ason')
 
 afterEach(() => {
 	if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true, force: true })
+})
+
+test('combined server key store is protected by exact path and basename', () => {
+	expect(sensitive.isProtectedPath(join(STATE_DIR, 'server-keys.ason'))).toBe(true)
+	expect(sensitive.isProtectedBasename('/somewhere/server-keys.ason')).toBe(true)
 })
 
 test('read refuses the protected auth file without reading it', async () => {

@@ -10,7 +10,7 @@ import { blob } from './session/blob.ts'
 import { ipc } from './file-ipc.ts'
 import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
-import { webTokens, type WebToken } from './web-tokens.ts'
+import { serverKeys, type WebToken } from './server-keys.ts'
 import { webUpload } from './web-upload.ts'
 
 type SocketData = {
@@ -219,28 +219,28 @@ function nextPort(previousPort: number, tries: number, random = Math.random): nu
 
 function announce(sessionId: string | undefined, port: number): void {
 	if (!sessionId) return
-	runtime.emitInfo(sessionId, `Web interface available at ${web.urlForToken(webTokens.ensureLocalToken(), port)}`)
+	runtime.emitInfo(sessionId, `Web interface available at ${web.urlForToken(serverKeys.ensureLocalToken(), port)}`)
 }
 
 function command(args: string): { output?: string; error?: string } {
 	const [action = '', ...rest] = args.trim().split(/\s+/)
 	if (!action) {
-		let tokens = webTokens.list()
-		if (tokens.length === 0) tokens = [webTokens.ensureLocalToken()]
+		let tokens = serverKeys.list()
+		if (tokens.length === 0) tokens = [serverKeys.ensureLocalToken()]
 		const lines = ['Web interface:']
 		for (const [index, token] of tokens.entries()) lines.push(`  ${index + 1}. ${web.urlForToken(token)}  · ${token.purpose}`)
 		return { output: lines.join('\n') }
 	}
 	if (action === 'auth') {
 		try {
-			const token = webTokens.mint(rest.join(' ') || 'web token')
+			const token = serverKeys.mint(rest.join(' ') || 'web token')
 			return { output: `Web token created (${token.purpose}):\n${web.urlForToken(token)}` }
 		} catch (error) {
 			return { error: String(error) }
 		}
 	}
 	if (action === 'revoke' && rest.length === 1 && /^\d+$/.test(rest[0]!)) {
-		const token = webTokens.revoke(Number(rest[0]))
+		const token = serverKeys.revoke(Number(rest[0]))
 		return token ? { output: `Revoked web token ${rest[0]} (${token.purpose}).` } : { error: `No web token ${rest[0]}.` }
 	}
 	return { error: 'Usage: /web | /web auth [purpose…] | /web revoke <number>' }
@@ -263,9 +263,9 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 		web.announce(announcementSessionId, state.port)
 		return
 	}
-	webTokens.init()
+	serverKeys.init()
 	const sockets = new Map<string, Set<Bun.ServerWebSocket<SocketData>>>()
-	const unsubscribeRevocation = webTokens.onRevoke((token) => {
+	const unsubscribeRevocation = serverKeys.onRevoke((token) => {
 		for (const socket of sockets.get(token.token) ?? []) socket.close(4001, 'Web token revoked')
 	})
 	let server: Bun.Server<SocketData>
@@ -304,7 +304,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 								ws.close()
 								return
 							}
-							if (!webTokens.authenticate(message.token, ws.data.ip)) {
+							if (!serverKeys.authenticate(message.token, ws.data.ip)) {
 								ws.send(web.encode({ type: 'error', message: 'Invalid authentication token' }))
 								ws.close()
 								return

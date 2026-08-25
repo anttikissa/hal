@@ -2,6 +2,32 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 import { auth } from './auth.ts'
 import { authLogin } from './auth-login.ts'
 
+const originalFetch = globalThis.fetch
+
+test('finishes Claude login after a restart using the verifier returned in code state', async () => {
+	auth._setStoreForTest({})
+	const verifier = 'A'.repeat(43)
+	const requests: Array<{ url: string; init?: RequestInit }> = []
+	globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
+		const url = String(input)
+		requests.push({ url, init })
+		if (url.includes('/oauth/token')) return new Response(JSON.stringify({ access_token: 'access', refresh_token: 'refresh', expires_in: 3600 }))
+		return new Response(JSON.stringify({ account: { email: 'restart@example.com' } }))
+	}, { preconnect: () => {} }) as typeof fetch
+	try {
+		expect(await authLogin.finishAnthropic(`authorization-code#${verifier}`)).toEqual({ email: 'restart@example.com' })
+		const body = JSON.parse(String(requests[0]?.init?.body))
+		expect(body).toMatchObject({ code: 'authorization-code', state: verifier, code_verifier: verifier })
+		expect(auth.store().anthropic).toMatchObject({ accessToken: 'access', refreshToken: 'refresh', email: 'restart@example.com' })
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+})
+
+test('rejects malformed returned Claude state before token exchange', async () => {
+	await expect(authLogin.finishAnthropic('authorization-code#short')).rejects.toThrow(/Invalid Claude login code/)
+})
+
 describe('authLogin.saveAuth', () => {
 	beforeEach(() => {
 		auth._setStoreForTest({})

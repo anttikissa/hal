@@ -323,41 +323,26 @@ test('/status hints /login when a provider has no credentials', async () => {
 })
 
 test('/login claude returns auth URL on the first call', async () => {
-	const { authLogin } = await import('../auth-login.ts')
 	const result = await commands.executeCommand('/login claude', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.output).toContain('claude.ai/oauth/authorize')
 	expect(result.output).toContain('/login claude <code#state>')
-	expect(authLogin.state.anthropicPending).not.toBeNull()
-	authLogin.state.anthropicPending = null
 })
 
 // The provider names are what users see in Anthropic's and OpenAI's own
 // branding; the old company names keep working for anyone with muscle memory.
 test('/login accepts anthropic and openai as aliases', async () => {
-	const { authLogin } = await import('../auth-login.ts')
 	const result = await commands.executeCommand('/login anthropic', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.output).toContain('claude.ai/oauth/authorize')
-	authLogin.state.anthropicPending = null
 })
 
 test('/login with no provider rejects', async () => {
 	const result = await commands.executeCommand('/login', makeSession())
 	expect(result.error).toContain('Usage:')
 })
-
-test('/login claude <code> without a pending session errors out', async () => {
-	const { authLogin } = await import('../auth-login.ts')
-	authLogin.state.anthropicPending = null
-	const result = await commands.executeCommand('/login claude abc#xyz', makeSession())
-	expect(result.error).toContain('No pending Claude login')
-})
-
-
-
 
 test('/mem shows current rss and thresholds', async () => {
 	memory.io.readRss = () => 1_234_000_000

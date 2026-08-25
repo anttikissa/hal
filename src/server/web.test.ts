@@ -7,7 +7,7 @@ import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 import { ensureStateDir } from './state.ts'
 import { web } from './web.ts'
-import { webTokens } from './web-tokens.ts'
+import { serverKeys } from './server-keys.ts'
 
 test('web fallback port advances by a randomized exponential step', () => {
 	expect(web.nextPort(9001, 1, () => 0)).toBe(9002)
@@ -103,7 +103,7 @@ test('websocket is an authenticated ASON command bus', async () => {
 	ensureStateDir()
 	web.start(0, controller.signal)
 	try {
-		const token = webTokens.list()[0]!
+		const token = serverKeys.list()[0]!
 		const socket = new WebSocket(`ws://127.0.0.1:${web.state.port}/ws`)
 		await new Promise<void>((resolve, reject) => {
 			socket.onerror = () => reject(new Error('socket failed'))

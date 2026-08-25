@@ -12,7 +12,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { blob } from './session/blob.ts'
 import { STATE_DIR } from './state.ts'
-import { webTokens } from './web-tokens.ts'
+import { serverKeys } from './server-keys.ts'
 
 const IMAGE_UPLOAD_TYPES: Record<string, string> = {
 	'image/png': 'png',
@@ -63,7 +63,7 @@ function saveUpload(name: string, type: string, data: ArrayBuffer): { status: nu
 async function handleUploadRequest(request: Request, ip: string): Promise<Response> {
 	// Same constant-time token check as the WebSocket handshake.
 	const url = new URL(request.url)
-	if (!webTokens.authenticate(url.searchParams.get('auth') ?? '', ip)) {
+	if (!serverKeys.authenticate(url.searchParams.get('auth') ?? '', ip)) {
 		return new Response('Unauthorized', { status: 401 })
 	}
 	let form: FormData

@@ -1,10 +1,8 @@
 // OAuth login flows for Anthropic (Claude) and OpenAI (ChatGPT).
 //
-// Anthropic: PKCE → user opens URL → pastes code from redirect.
-//   Two-step: startAnthropic() returns URL; finishAnthropic(code) exchanges and saves.
-//   The PKCE verifier is held in module state between the two calls.
-// OpenAI: PKCE → user opens URL → localhost:1455 callback catches code automatically.
-//   Single-step: loginOpenai() resolves once tokens are saved or it times out.
+// Anthropic: PKCE → user opens URL → pastes the returned code#state. The
+// verifier is the returned state, so finishing survives a process restart.
+// OpenAI: PKCE → localhost:1455 callback catches the code automatically.
 
 import { createServer } from 'http'
 import { auth } from './auth.ts'
@@ -22,12 +20,6 @@ const OPENAI_AUTHORIZE = 'https://auth.openai.com/oauth/authorize'
 const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token'
 const OPENAI_REDIRECT = 'http://localhost:1455/auth/callback'
 const OPENAI_CALLBACK_PORT = 1455
-
-// Pending Claude flow: holds PKCE verifier between /login claude (start)
-// and /login claude <code> (finish).
-const state: { anthropicPending: { verifier: string } | null } = {
-	anthropicPending: null,
-}
 
 // Random base64url string of given byte length.
 function randomB64Url(byteLen: number): string {
@@ -51,7 +43,6 @@ async function startAnthropic(): Promise<{ url: string }> {
 	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 	const verifier = Array.from(bytes).map((b) => alphabet[b % 62]).join('')
 	const challenge = await sha256B64Url(verifier)
-	state.anthropicPending = { verifier }
 
 	const url = new URL(ANTHROPIC_AUTHORIZE)
 	url.searchParams.set('code', 'true')
@@ -67,18 +58,19 @@ async function startAnthropic(): Promise<{ url: string }> {
 }
 
 async function finishAnthropic(rawCode: string): Promise<{ email?: string }> {
-	if (!state.anthropicPending) {
-		throw new Error('No pending Claude login. Run /login claude first.')
-	}
-	const verifier = state.anthropicPending.verifier
-	const [authCode, returnedState] = rawCode.trim().split('#')
+	const value = rawCode.trim()
+	const separator = value.indexOf('#')
+	if (separator <= 0 || separator !== value.lastIndexOf('#')) throw new Error('Invalid Claude login code. Paste the returned code#state value.')
+	const authCode = value.slice(0, separator)
+	const verifier = value.slice(separator + 1)
+	if (!/^[A-Za-z0-9]{43}$/.test(verifier)) throw new Error('Invalid Claude login code. Paste the returned code#state value.')
 
 	const res = await fetch(ANTHROPIC_TOKEN_URL, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({
 			code: authCode,
-			state: returnedState,
+			state: verifier,
 			grant_type: 'authorization_code',
 			client_id: ANTHROPIC_CLIENT_ID,
 			redirect_uri: ANTHROPIC_REDIRECT,
@@ -89,7 +81,6 @@ async function finishAnthropic(rawCode: string): Promise<{ email?: string }> {
 		throw new Error(`Token exchange failed: ${res.status} ${await res.text().catch(() => '')}`)
 	}
 	const { access_token, refresh_token, expires_in } = await res.json() as any
-	state.anthropicPending = null
 
 	// Fetch profile so we can store email alongside tokens for /status display.
 	const email = await fetchAnthropicEmail(access_token)
@@ -257,7 +248,6 @@ function saveAuth(provider: 'anthropic' | 'openai', entry: Record<string, any>):
 }
 
 export const authLogin = {
-	state,
 	startAnthropic,
 	finishAnthropic,
 	loginOpenai,

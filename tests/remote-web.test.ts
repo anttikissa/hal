@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { webConnection } from '../src/client/web-connection.ts'
 import { ensureStateDir } from '../src/server/state.ts'
 import { web } from '../src/server/web.ts'
-import { webTokens } from '../src/server/web-tokens.ts'
+import { serverKeys } from '../src/server/server-keys.ts'
 
 test('remote client reports the server authentication error', async () => {
 	const controller = new AbortController()
@@ -22,7 +22,7 @@ test('remote client reconnects after the host restarts', async () => {
 	const first = new AbortController()
 	web.start(0, first.signal)
 	const port = web.state.port
-	const url = `http://127.0.0.1:${port}/?auth=${webTokens.ensureLocalToken().token}`
+	const url = `http://127.0.0.1:${port}/?auth=${serverKeys.ensureLocalToken().token}`
 	const clientAbort = new AbortController()
 	try {
 		await webConnection.connect(url, clientAbort.signal)

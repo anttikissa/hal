@@ -3,7 +3,7 @@ import { basename } from 'path'
 import { existsSync, readFileSync } from 'fs'
 import { ensureStateDir } from '../src/server/state.ts'
 import { web } from '../src/server/web.ts'
-import { webTokens } from '../src/server/web-tokens.ts'
+import { serverKeys } from '../src/server/server-keys.ts'
 
 // 1x1 red PNG, same fixture the attachments tests use.
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgIAdUe+WQAAAABJRU5ErkJggg==', 'base64')
@@ -15,7 +15,7 @@ beforeAll(() => {
 	ensureStateDir()
 	controller = new AbortController()
 	web.start(0, controller.signal)
-	token = webTokens.ensureLocalToken().token
+	token = serverKeys.ensureLocalToken().token
 })
 
 afterAll(() => controller.abort())
