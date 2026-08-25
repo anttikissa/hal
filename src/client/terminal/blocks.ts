@@ -199,7 +199,7 @@ function formatBlockTimeRange(first?: number, last?: number): string {
 }
 
 function buildHeader(title: string, time: string, blobRef: string, cols: number): string {
-	const prefix = time ? ` ${time} ` : ' '
+	const prefix = `${' '.repeat(blocks.outputPad)}${time ? `${time} ` : ''}`
 	const right = blobRef ? ` (${blobRef}) ` : ''
 	// Stop one column short of the edge so headers keep the same right margin as
 	// block bodies. bgLine still paints the background across the full row.
@@ -213,7 +213,7 @@ function padBlockLine(line: string): string {
 	return ' '.repeat(blocks.outputPad) + line
 }
 
-function bodyLine(line: string, fg: string, bg: string, cols: number, fullWidth = visLen(line) > cols - 2): string {
+function bodyLine(line: string, fg: string, bg: string, cols: number, fullWidth = visLen(line) > cols - 1 - blocks.outputPad): string {
 	if (!fullWidth) return bgLine(`${fg}${padBlockLine(line)}`, cols, bg)
 	return `${bg}${fg}${line}\x1b[K${RESET_BG}`
 }
@@ -312,7 +312,7 @@ function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | '
 	const header = buildHeader(label, formatBlockTimeRange(first.ts, last.ts), '', cols)
 	const { fg, bg, bgIsBlack } = blockColors(first)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
-	const contentCols = Math.max(1, cols - 2)
+	const contentCols = Math.max(1, cols - 1 - blocks.outputPad)
 	let hasContent = false
 	for (const block of group) {
 		const content = blockText.hyperlinkUrls(renderMarkdownLines(block, contentCols), contentCols)
@@ -380,7 +380,7 @@ function renderBlock(block: Block, cols: number, cursorVisible = false, sessionL
 	const plainNotice = block.type === 'info' || (block.type === 'log' && !block.text.startsWith('Prompt queued'))
 	const lines: string[] = []
 	if (!plainNotice || blockTime) lines.push(bgLine(`${fg}${header}`, cols, bg))
-	const contentCols = Math.max(1, cols - 2)
+	const contentCols = Math.max(1, cols - 1 - blocks.outputPad)
 	const content = blockText.hyperlinkUrls(blockContent(block, contentCols), contentCols)
 	if (content.length > 0 && !plainNotice) lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {

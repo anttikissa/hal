@@ -41,8 +41,8 @@ deliberate exception: it has no horizontal margins and may exceed `cols`, so the
 terminal soft-wraps and copies it as one logical line. Backgrounds still paint
 every physical row, including the final wrapped row's unused columns.
 
-Ctrl-G toggles the left padding on transcript body rows for clean terminal
-selection. It intentionally leaves their wrap width and right margin unchanged.
+Ctrl-G toggles the left padding on transcript rows for clean terminal selection.
+Removing it gives content the freed column while leaving the right margin unchanged.
 
 Two painters implement this, and they are deliberately not shared:
 
