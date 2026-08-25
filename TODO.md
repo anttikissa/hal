@@ -27,3 +27,4 @@ Random ideas, in no particular order
   questions should remain in history and reappear when the session is resumed.
 - Opencode Go support
 - /login should support adding API keys too
+- When Hal streams tables, sometimes a growing table suddently gets rendered smaller than in previous frame, producing a trembling effect; should make it so that streaming assistant block only grows
