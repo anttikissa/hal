@@ -26,23 +26,25 @@ Chrome = tab bar + prompt box + status + help bar.
 
 ### Horizontal box model
 
-Every ordinary section — history blocks, prompt, status, help — uses the same one
-column of padding on each side. For a terminal of `cols` columns:
+Transcript blocks and chrome normally have one blank column on each side. For a
+terminal of `cols` columns:
 
 ```
-col 0          left padding (always blank)
-col 1..cols-2  content — text starts and ends here
-col cols-1     right padding (always blank)
+col 0          left padding (normally blank)
+col 1..cols-2  content
+col cols-1     right padding (normally blank)
 ```
 
-Ordinary content width is `cols - 2`, and ordinary text must not occupy the last
-column. An over-width source line containing only a plain HTTP(S) URL is the
-deliberate exception: it has no horizontal margins and may exceed `cols`, so the
-terminal soft-wraps and copies it as one logical line. Backgrounds still paint
-every physical row, including the final wrapped row's unused columns.
+Ctrl-G toggles copy-friendly output padding. With padding off, transcript rows
+remove only their left blank and gain that content column; their unobtrusive
+right parking column remains. The tab, status, and help rows remove both outer
+blanks, allowing their right-aligned text to reach the edge. The editable prompt
+keeps its inset on both sides.
 
-Ctrl-G toggles the left padding on transcript rows for clean terminal selection.
-Removing it gives content the freed column while leaving the right margin unchanged.
+An over-width source line containing only a plain HTTP(S) URL is the deliberate
+exception: it has no horizontal margins and may exceed `cols`, so the terminal
+soft-wraps and copies it as one logical line. Backgrounds still paint every
+physical row, including the final wrapped row's unused columns.
 
 Two painters implement this, and they are deliberately not shared:
 

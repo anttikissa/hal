@@ -63,7 +63,7 @@ function sections(): ShortcutSection[] {
 				row('alt-1', 'jump to tab 1 (use 2 … 9 for other tabs)'),
 				row('alt-0', 'jump to tab 10'),
 				row('ctrl-m / alt-m', 'model picker'),
-				row('ctrl-g', 'toggle transcript gutter'),
+				row('ctrl-g', 'toggle output padding'),
 				row('esc', 'stop current generation'),
 				row('ctrl-l', 'redraw'),
 				row('ctrl-c', 'quit'),

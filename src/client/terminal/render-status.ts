@@ -20,6 +20,7 @@ import { cursor } from './cursor.ts'
 import { promptEdit } from '../prompt-edit.ts'
 import { completionHints } from './completion-hints.ts'
 import type { Tab } from '../app.ts'
+import { blocks } from './blocks.ts'
 
 const RESET = '\x1b[0m'
 
@@ -241,6 +242,8 @@ function buildTabBarLines(cols: number): string[] {
 	return [renderStatus.paddedLine(content, cols)]
 }
 
+// Appends one full-width logical row, without a newline. For example, at 12
+// columns with padding enabled: [] → [" Tabs: [1]  "] (ANSI omitted).
 function renderTabBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	if (renderStatus.config.tabsOpacity <= 0) {
@@ -266,16 +269,15 @@ function statusHighlightColor(): string {
 	return colors.status.highlight || colors.tab.activeFg
 }
 
-function contentWidth(cols: number): number {
-	return Math.max(0, cols - 2)
+function contentWidth(cols: number, pad = blocks.outputPad): number {
+	return Math.max(0, cols - pad * 2)
 }
 
-function paddedLine(content: string, cols: number): string {
-	if (cols <= 0) return ''
-	if (cols === 1) return ' '
-	const width = renderStatus.contentWidth(cols)
+function paddedLine(content: string, cols: number, pad = blocks.outputPad): string {
+	if (cols <= pad * 2) return ' '.repeat(Math.max(0, cols))
+	const width = renderStatus.contentWidth(cols, pad)
 	const clipped = visLen(content) > width ? clipVisual(content, width) : content
-	return ` ${clipped}${' '.repeat(Math.max(0, width - visLen(clipped)))} `
+	return `${' '.repeat(pad)}${clipped}${' '.repeat(Math.max(0, width - visLen(clipped)))}${' '.repeat(pad)}`
 }
 
 function colorText(text: string, color: string, base: string): string {
@@ -373,6 +375,8 @@ function subscriptionStatusLabel(provider: string, base: string): string {
 	return `Sub${slot}: ${windows.join(', ')}`
 }
 
+// Appends one full-width logical row, right-aligning its final segment. At 12
+// columns an example is: [] → [" 04 host 42%"] (ANSI omitted).
 function renderStatusLine(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	if (renderStatus.config.statusOpacity <= 0) {
@@ -443,6 +447,8 @@ function renderStatusLine(lines: string[]): void {
 	lines.push(`${base}${renderStatus.paddedLine(inner, cols)}${RESET}`)
 }
 
+// Appends one full-width logical row, even when there are no hints. At 12
+// columns an example is: [] → [" esc: abort "] (ANSI omitted).
 function renderHelpBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	if (renderStatus.config.helpOpacity <= 0) {
@@ -499,7 +505,7 @@ function renderHelpBar(lines: string[]): void {
 }
 
 function promptContentWidth(cols: number): number {
-	return renderStatus.contentWidth(cols)
+	return renderStatus.contentWidth(cols, 1)
 }
 
 function promptEditActivityStatusLabel(tab: Tab): string {
@@ -587,14 +593,16 @@ function promptRule(cols: number, indicator = '', status = ''): string {
 }
 
 function paddedPromptLine(line: string, cols: number): string {
-	return `${renderStatus.inputStyle()}${renderStatus.paddedLine(line, cols)}${RESET}`
+	return `${renderStatus.inputStyle()}${renderStatus.paddedLine(line, cols, 1)}${RESET}`
 }
 
+// Appends rules plus every prompt body row, each exactly full width and without
+// newlines. At 12 columns, "hello" adds ["────────────", " hello      ", "────────────"] (ANSI omitted).
 function renderPrompt(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const p = prompt.buildPrompt(renderStatus.promptContentWidth(cols))
 	if (renderStatus.config.promptOpacity <= 0) {
-		for (let i = 0; i < p.lines.length + 2; i++) lines.push(renderStatus.paddedLine('', cols))
+		for (let i = 0; i < p.lines.length + 2; i++) lines.push(renderStatus.paddedLine('', cols, 1))
 		return
 	}
 	const above = p.fold.above > 0 ? `↑${p.fold.above}` : ''

@@ -6,6 +6,7 @@ import { promptEdit } from '../prompt-edit.ts'
 import { visLen } from '../../utils/strings.ts'
 import { blockText } from './block-text.ts'
 import { cursor } from './cursor.ts'
+import { blocks } from './blocks.ts'
 
 
 function tab(overrides: any = {}): any {
@@ -215,6 +216,18 @@ test('zero opacity hides chrome content without changing its row count', () => {
 		renderStatus.config.promptOpacity = original.prompt
 		renderStatus.config.statusOpacity = original.status
 		renderStatus.config.helpOpacity = original.help
+	}
+})
+
+test('output padding toggle expands non-prompt chrome while preserving the prompt inset', () => {
+	blocks.outputPad = 0
+	try {
+		expect(renderStatus.contentWidth(12)).toBe(12)
+		expect(renderStatus.paddedLine('hello', 12)).toBe('hello       ')
+		expect(renderStatus.promptContentWidth(12)).toBe(10)
+		expect(blockText.stripAnsiSequences(renderStatus.paddedPromptLine('hello', 12))).toBe(' hello      ')
+	} finally {
+		blocks.outputPad = 1
 	}
 })
 
