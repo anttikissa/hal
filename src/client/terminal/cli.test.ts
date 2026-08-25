@@ -10,6 +10,7 @@ import { promptEdit } from '../prompt-edit.ts'
 import { draft } from '../draft.ts'
 import { completion } from './completion.ts'
 import { blocks } from './blocks.ts'
+import { terminalQuestions } from './questions.ts'
 
 function key(key: string, mods: any = {}): any {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
@@ -35,6 +36,19 @@ test('ctrl-g toggles the transcript gutter', () => {
 			expect(blocks.outputPad).toBe(0)
 		})
 	} finally { blocks.outputPad = 1 }
+})
+
+test('native tab shortcuts take priority over an active question', () => {
+	const switched: string[] = []
+	withPatched(terminalQuestions, 'activeQuestion', (() => ({ id: 'q1' })) as typeof terminalQuestions.activeQuestion, () => {
+		withPatched(client, 'nextTab', (() => { switched.push('next') }) as typeof client.nextTab, () => {
+			withPatched(client, 'prevTab', (() => { switched.push('previous') }) as typeof client.prevTab, () => {
+				expect(cli.forTests.handleQuestionKey(key('n', { ctrl: true }))).toBe(true)
+				expect(cli.forTests.handleQuestionKey(key('p', { ctrl: true }))).toBe(true)
+			})
+		})
+	})
+	expect(switched).toEqual(['next', 'previous'])
 })
 
 test('prompt key handling uses rendered prompt content width', () => {

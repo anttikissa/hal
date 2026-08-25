@@ -162,12 +162,11 @@ test('authoritative reload of the same active question preserves its editor stat
 	expect(terminalQuestions.text()).toBe('a')
 }))
 
-test('Escape aborts, while explicit Ctrl-M remains available to the model picker', () => withQuestion(question({ kind: 'text' }), () => {
+test('Escape aborts the active question', () => withQuestion(question({ kind: 'text' }), () => {
 	const commands: any[] = []
 	const append = clientTransport.io.appendCommand
 	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	try {
-		expect(terminalQuestions.handleKey(key('m', { ctrl: true }))).toBe(false)
 		expect(terminalQuestions.handleKey(key('escape'))).toBe(true)
 		expect(commands).toEqual([{ type: 'abort', sessionId: 's1' }])
 	} finally {

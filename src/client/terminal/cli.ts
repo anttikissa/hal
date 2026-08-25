@@ -716,6 +716,14 @@ function handleAppKey(k: KeyEvent): boolean {
 	return false
 }
 
+function handleQuestionKey(k: KeyEvent): boolean {
+	if (!terminalQuestions.activeQuestion()) return false
+	// Existing app shortcuts retain priority; only prompt-specific Alt-Enter stays
+	// with the inline editor. Unhandled input is then contained by the question.
+	if ((k.ctrl || k.alt || k.cmd) && !(k.key === 'enter' && k.alt) && handleAppKey(k)) return true
+	return terminalQuestions.handleKey(k)
+}
+
 function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; openCwd?: string } = {}): void {
 	// Wire state changes to repaint.
 	client.setOnChange(draw)
@@ -809,9 +817,9 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 				draw()
 				continue
 			}
-			// The selected tab's active question owns all input except explicit Ctrl-M,
-			// which remains a local, user-opened model picker.
-			if (terminalQuestions.handleKey(k)) {
+			// Active questions contain ordinary input, while existing app shortcuts
+			// such as Ctrl-N/P still run through their native handler.
+			if (handleQuestionKey(k)) {
 				clientBackend.subscriptions.noteActivity()
 				draw()
 				continue
@@ -839,7 +847,7 @@ export const cli = {
 		handleAppKey,
 		handlePromptKey,
 		handleCompletionKey,
-		handleQuestionKey: terminalQuestions.handleKey,
+		handleQuestionKey,
 		kittyOnSequence: () => KITTY_ON,
 		installPromptTabSwitchHandler,
 		restorePromptForCurrentTab,

@@ -111,9 +111,6 @@ function submitSecret(question: QuestionBlock, editor: QuestionEditorState): voi
 	})
 }
 
-function isModelPickerKey(key: KeyEvent): boolean {
-	return key.key === 'm' && !key.cmd && ((key.ctrl && !key.alt) || (key.alt && !key.ctrl))
-}
 
 function handleChoiceKey(question: QuestionBlock, key: KeyEvent): void {
 	if (question.input.kind !== 'choice') return
@@ -171,7 +168,7 @@ function handleSecretKey(question: QuestionBlock, key: KeyEvent): void {
 
 function handleKey(key: KeyEvent): boolean {
 	const question = activeQuestion()
-	if (!question || isModelPickerKey(key)) return false
+	if (!question) return false
 	if (key.key === 'escape') {
 		client.sendCommand('abort')
 		return true
@@ -179,8 +176,7 @@ function handleKey(key: KeyEvent): boolean {
 	if (question.input.kind === 'choice') handleChoiceKey(question, key)
 	else if (question.input.kind === 'text') handleTextKey(question, key)
 	else handleSecretKey(question, key)
-	// An active question owns every non-model-picker key, even if its editor does not
-	// assign a meaning to it. This prevents accidental prompt/app shortcut leakage.
+	// Unassigned input must not leak into the frozen ordinary prompt.
 	return true
 }
 
