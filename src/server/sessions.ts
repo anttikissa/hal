@@ -159,7 +159,7 @@ function newHistoryIds(sessionId: string, count: number): string[] {
 	const used = usedHistoryIds(sessionId)
 	const ids: string[] = []
 	for (let i = 0; i < count; i++) {
-		const id = makeEntryId(used)
+		const id = historyIds.make(used)
 		used.add(id)
 		ids.push(id)
 	}

@@ -175,7 +175,7 @@ function timestamp(event: LiveEventBase): number | undefined {
 	return event.createdAt ? Date.parse(event.createdAt) : undefined
 }
 
-function appendBlock(blocks: readonly LiveBlock[], block: LiveBlock): LiveProjectionResult {
+function appendBlock<T extends { id?: string }>(blocks: readonly T[], block: T): { blocks: T[]; changed: true } {
 	const index = block.id ? blocks.findIndex((item) => item.id === block.id) : -1
 	if (index < 0) return { blocks: [...blocks, block], changed: true }
 	const next = blocks.slice()
