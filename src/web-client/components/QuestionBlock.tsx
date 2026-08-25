@@ -41,6 +41,7 @@ export function QuestionBlock(props: QuestionBlockProps) {
 		sending = true
 		setSubmitting(true)
 		setError('')
+		let sent = false
 		try {
 			const answer = await webQuestion.prepareAnswer(props.question, props.sessionId, value)
 			// Once encrypted, do not retain secret plaintext while the ciphertext is sent.
@@ -48,12 +49,17 @@ export function QuestionBlock(props: QuestionBlockProps) {
 				editor.value = ''
 				setSecretBytes(0)
 			}
-			if (!await props.onAnswer(props.question.id, answer)) setError('Connection unavailable. Try again.')
+			sent = await props.onAnswer(props.question.id, answer)
+			if (!sent) setError('Connection unavailable. Try again.')
 		} catch (cause) {
 			setError(cause instanceof Error ? cause.message : 'Could not send the answer. Try again.')
 		} finally {
-			sending = false
-			setSubmitting(false)
+			// A successful submission stays disabled until the authoritative snapshot
+			// replaces this question. This prevents double-clicks from racing answers.
+			if (!sent) {
+				sending = false
+				setSubmitting(false)
+			}
 		}
 	}
 

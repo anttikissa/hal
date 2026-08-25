@@ -8,9 +8,9 @@ shape a decision).
 
 ## Where we are
 
-The web client is a minimal chat surface: tab strip, raw-text transcript,
-single-line composer. It renders `SharedState` + per-session snapshots over one
-WebSocket. What just landed (commit `b0d07b3`):
+The web client is a compact supervision surface: tab strip, structured transcript,
+multiline composer, and inline durable question blocks. It renders `SharedState` +
+per-session snapshots over one WebSocket. Recent work includes:
 
 - Tab strip no longer scrolls sideways (horizontal panning collides with
   browser back/forward swipe gestures). Tabs wrap into rows on desktop.
@@ -26,21 +26,16 @@ WebSocket. What just landed (commit `b0d07b3`):
 
 What is still broken or missing, roughly in order of pain:
 
-1. No notifications. An agent that finishes, stalls, or waits on a tool
-   confirmation is invisible until you open the page. Field research is
-   unanimous: missed approvals are the #1 reason people abandon phone-based
-   agent control (Omnara Play Store reviews; Happy HN threads).
-2. Tool confirmations are not rendered at all in web. `live-event-blocks`
-   produces `tool-confirm-request` blocks; the transcript ignores them. From a
-   phone this is the worst possible gap: the agent silently waits forever.
-3. Output is raw `pre-wrap` text: no markdown, no code blocks, no collapsing
-   of tool noise, no copy button, no diff rendering. Unreadable on a phone.
-4. Connection lifecycle is `location.reload()` after 1s on close. Backgrounded
+1. No notifications. An agent that finishes, stalls, or waits on a durable
+   question is invisible until you open the page. Field research is unanimous:
+   missed approvals are the #1 reason people abandon phone-based agent control.
+2. Output is mostly raw `pre-wrap` text: no markdown, code blocks, collapsing of
+   tool noise, copy button, or diff rendering. It remains hard to read on a phone.
+3. Connection lifecycle is `location.reload()` after 1s on close. Backgrounded
    iOS Safari kills sockets constantly; reload loses scroll position and feels
-   broken. No offline/connecting indicator.
-5. Composer is a bare `<input>`: no multiline, no abort, no queue visibility,
-   no autocomplete, keyboard covers nothing yet because the layout is simple —
-   but every added feature will fight the keyboard without a plan.
+   broken. There is no offline/connecting indicator.
+4. The composer has multiline and queue controls, but still lacks abort,
+   autocomplete, and a plan for increasingly complex mobile keyboard behavior.
 
 ## What the evidence says mobile is *for*
 
@@ -64,35 +59,29 @@ enough context.
 
 ## Top 5 priorities
 
-### 1. Approvals end-to-end (render → act → notify)
+### 1. Question notifications
 
-The single highest-leverage feature. Three layers, ship in this order:
+Inline durable questions now cover risky-tool approval end-to-end in terminal and
+web clients: exact tool context, ordered No/Yes choices, history-backed restart,
+and frozen ordinary composers. The remaining high-leverage work is notification:
 
-- **Render**: show `tool-confirm-request` blocks in the transcript with the
-  tool name, target/input summary, and Approve / Deny buttons wired to the
-  existing `tool-confirm` command (`{ type: 'tool-confirm', requestId,
-  approved }`; already whitelisted in `web.parseCommand`). While a request is
-  pending, pin a banner above the composer — scrolling transcripts bury the
-  ask. Effort M, impact H.
 - **Notify**: Web Push. Server gains VAPID keys + subscription storage
   (`web-push` semantics hand-rolled with `crypto.subtle` in Bun; payload is
-  just "session X needs approval", URL deep-links `/112-bad#session`). Push on:
-  tool-confirm requests, turn completion, errors. Client registers a service
-  worker (`/sw.js` served from `web.ts`); clicking the notification focuses the
-  tab and selects the session. Requires PWA installability on iOS (see §6
-  side quest A) — installed-PWA Web Push works since iOS 16.4.
+  just "session X needs an answer", URL deep-links to the session). Push on
+  active questions, turn completion, and errors. Client registers a service
+  worker; clicking the notification focuses the tab and selects the session.
+  This requires PWA installability on iOS; installed-PWA Web Push works since
+  iOS 16.4.
 - **Context in the notification**: include command/edit summary text so the
   decision can be made from the lock screen; tapping opens straight to the
-  approval banner. This is the difference between used and ignored.
+  question block. This is the difference between used and ignored.
 
 Acceptance: an agent blocked on a bash approval is resolvable from a locked
 phone in ≤15 seconds without typing.
 
-Safety and hygiene (Claude Code Remote Control's stance, validated in their
-enterprise rollout): never offer permission-bypass from the phone; unanswered
-approvals expire back to the terminal default (~5 min); notify only when input
-is genuinely needed, dedupe repeats, and put the opt-out button in the first
-notification itself (GitHub Mobile Live Activities pattern).
+Safety: never offer permission bypass from the phone. Unanswered questions are
+durable and have no automatic timeout; notify only when input is genuinely
+needed and put notification opt-out in the first useful settings surface.
 
 ### 2. Session board as home screen
 
