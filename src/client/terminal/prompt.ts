@@ -780,6 +780,48 @@ function restoreState(saved: PromptEditorState): void {
 	state.promptScrollTop = saved.promptScrollTop ?? 0
 }
 
+function emptyEditorState(): PromptEditorState {
+	const ordinary = prompt.snapshotState()
+	prompt.clear()
+	prompt.setHistory([])
+	const empty = { ...prompt.snapshotState(), promptLineLimit: 0, promptScrollTop: 0 }
+	prompt.restoreState(ordinary)
+	return empty
+}
+
+function handleEditorState(saved: PromptEditorState, key: KeyEvent, contentWidth: number): { state: PromptEditorState; handled: boolean } {
+	const ordinary = prompt.snapshotState()
+	prompt.restoreState(saved)
+	try {
+		const handled = prompt.handleKey(key, contentWidth)
+		return { state: prompt.snapshotState(), handled }
+	} finally {
+		prompt.restoreState(ordinary)
+	}
+}
+
+function buildEditorState(saved: PromptEditorState, contentWidth: number): { state: PromptEditorState; render: PromptRender } {
+	const ordinary = prompt.snapshotState()
+	prompt.restoreState(saved)
+	try {
+		const render = prompt.buildPrompt(contentWidth)
+		return { state: prompt.snapshotState(), render }
+	} finally {
+		prompt.restoreState(ordinary)
+	}
+}
+
+function editorStateText(saved: PromptEditorState, submitted = false): string {
+	const ordinary = prompt.snapshotState()
+	prompt.restoreState(saved)
+	try {
+		if (submitted) return prompt.submitText()
+		return prompt.text()
+	} finally {
+		prompt.restoreState(ordinary)
+	}
+}
+
 // The user's own composition text — NOT the history entry they may be
 // browsing with up-arrow. This is what gets persisted as a draft.
 function draftText(): string {
@@ -841,6 +883,10 @@ export const prompt = {
 	isBrowsingHistory,
 	snapshotState,
 	restoreState,
+	emptyEditorState,
+	handleEditorState,
+	buildEditorState,
+	editorStateText,
 	submitText,
 	cursorPos,
 	setText,

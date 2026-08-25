@@ -46,8 +46,14 @@ function halCursorColor(): string {
 	return colors.assistant.cursor ?? colors.assistant.fg
 }
 
+function activeQuestion(tab = client.currentTab()): Extract<Tab['history'][number], { type: 'question' }> | undefined {
+	return tab?.history.find((block): block is Extract<Tab['history'][number], { type: 'question' }> => block.type === 'question' && block.active)
+}
+
 function inputStyle(): string {
-	return `${colors.user.bg || colors.input.bg}${colors.user.fg || colors.info.fg}`
+	const background = colors.user.bg || colors.input.bg
+	if (renderStatus.activeQuestion()) return `${background}${colors.status.fg || colors.tab.inactiveFg}`
+	return `${background}${colors.user.fg || colors.info.fg}`
 }
 
 function cursorShapeSequence(shape = renderStatus.config.promptCursorShape): string {
@@ -69,6 +75,7 @@ function promptCursorColorSequence(color = colors.input.cursor || colors.user.fg
 function tabIndicator(tab: Tab): TabIndicator {
 	const working = client.state.working.get(tab.sessionId) ?? false
 
+	if (renderStatus.activeQuestion(tab)) return { char: '!', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
 	if (working && tab.attention === 'new') return { char: '◆', color: colors.tab.warningFg || colors.warning.fg, blinks: true }
 	if (working) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
 	// Explicit warnings beat turn status, but retry/continue comes only from the
@@ -451,6 +458,14 @@ function renderHelpBar(lines: string[]): void {
 		description: desc,
 		separator: desc,
 	}
+	const question = renderStatus.activeQuestion()
+	if (question) {
+		let hint = 'enter: submit, esc: abort'
+		if (question.input.kind === 'choice') hint = '↑/↓/tab: choose, 1-9/y/n: answer, enter: submit, esc: abort'
+		if (question.input.kind === 'text') hint = 'enter: submit, shift-enter: newline, esc: abort'
+		lines.push(`${renderStatus.paddedLine(`${style.key}${hint}`, cols)}${RESET}`)
+		return
+	}
 	const editHint = promptEdit.hint(client.currentTab()?.sessionId)
 	if (editHint) {
 		const warning = colors.warning.fg || colors.help.description || colors.status.fg
@@ -500,6 +515,7 @@ function promptEditActivityStatusLabel(tab: Tab): string {
 }
 
 function turnActivityStatusLabel(tab: Tab): string {
+	if (renderStatus.activeQuestion(tab)) return 'waiting for answer'
 	const editStatus = renderStatus.promptEditActivityStatusLabel(tab)
 	if (editStatus) return editStatus
 	if (!client.state.working.get(tab.sessionId)) {
@@ -606,6 +622,7 @@ export const renderStatus = {
 	renderPrompt,
 	// Internal helpers, exposed on the namespace for hot-patching via eval.
 	inputStyle,
+	activeQuestion,
 	contentWidth,
 	paddedLine,
 	halCursorColor,

@@ -19,6 +19,7 @@ import { toolSpecs } from './tool-specs.ts'
 // `blockConfig.x` call sites unchanged; it is the same mutable object, so
 // config reloads and eval patches still apply.
 import { blockConfig as clientBlockConfig } from '../block-config.ts'
+import { terminalQuestions } from './questions.ts'
 
 const blockConfig = clientBlockConfig.config
 
@@ -29,7 +30,7 @@ import type { Block } from '../block-data.ts'
 
 export type SessionLabel = (sessionId: string) => string
 
-function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'fork' }>): string {
+function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'fork' | 'question' }>): string {
 	if (block.usageBars) {
 		// Sanitize account labels before turning server-authored semantic markers into
 		// terminal escape sequences. The server never needs to know about ANSI.
@@ -188,6 +189,7 @@ function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolea
 	if (block.type === 'thinking') return colors.thinking
 	if (block.type === 'user') return colors.user
 	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return colors.warning
+	if (block.type === 'question') return block.active ? colors.warning : { ...colors.log, bg: '' }
 	if (block.type === 'log' && block.usageBars) return colors.log
 	if (block.type === 'log' || block.type === 'info') return { ...colors.log, bg: '' }
 	if (block.type === 'tool') return colors.tool(block.name)
@@ -263,6 +265,7 @@ function blockLabel(block: Block, sessionLabel?: SessionLabel): string {
 		const title = toolSpecs.getToolSpec(block.name).title?.(block.input, block.output, sessionLabel) ?? toolSpecs.humanizeName(block.name)
 		return block.canceled ? `${title} (canceled)` : title
 	}
+	if (block.type === 'question') return 'Question'
 	return fixedLabels[block.type]
 }
 
@@ -365,6 +368,109 @@ function addInlineCursor(lines: string[], block: Block, cols: number, visible: b
 	lines.splice(lines.length - 1, 1, ...withInlineCursor(last, block, cols, visible))
 }
 
+export interface RenderedBlock {
+	lines: string[]
+	cursor?: { row: number; col: number }
+}
+
+function questionAnswer(block: Extract<Block, { type: 'question' }>): string {
+	const answer = block.answer
+	if (!answer) return ''
+	if (answer.kind === 'choice') {
+		if (block.input.kind !== 'choice') return 'Answered'
+		const choice = block.input.choices.find((item) => item.id === answer.choiceId)
+		return choice?.label ?? 'Answered'
+	}
+	if (answer.kind === 'text') return blockText.sanitizeTerminalText(answer.text).replace(/\s+/g, ' ').trim() || '(empty)'
+	if (answer.kind === 'secret') return 'Secret provided'
+	return 'Aborted'
+}
+
+function questionLabel(block: Extract<Block, { type: 'question' }>): string {
+	const parts: string[] = []
+	if (block.progress) parts.push(`Approval ${block.progress.index} of ${block.progress.total}`)
+	else parts.push('Question')
+	if (block.tool) {
+		const title = toolSpecs.getToolSpec(block.tool.name).title?.(block.tool.input, undefined) ?? toolSpecs.humanizeName(block.tool.name)
+		parts.push(title)
+	}
+	const answer = questionAnswer(block)
+	if (answer) parts.push(answer)
+	const text = blockText.sanitizeTerminalText(block.text).replace(/\s+/g, ' ').trim()
+	if (!block.active && text) parts.push(text)
+	return parts.join(' · ')
+}
+
+function renderQuestionBlock(block: Extract<Block, { type: 'question' }>, cols: number): RenderedBlock {
+	const { fg, bg, bgIsBlack } = blockColors(block)
+	const header = buildHeader(questionLabel(block), time.formatTimestamp(block.ts), '', cols)
+	const lines = [bgLine(`${fg}${header}`, cols, bg)]
+	if (!block.active) {
+		lines[lines.length - 1]! += FG_OFF
+		return { lines }
+	}
+
+	const contentCols = Math.max(1, cols - 1 - blocks.outputPad)
+	lines.push(bgLine(`${fg} `, cols, bg))
+	for (const line of wordWrap(expandTabs(blockText.sanitizeTerminalText(block.text), blockConfig.tabWidth), contentCols)) lines.push(bodyLine(line, fg, bg, cols))
+	if (block.tool) {
+		const details = blockContent({ type: 'tool', name: block.tool.name, input: block.tool.input }, contentCols)
+		if (details.length > 0) lines.push(bgLine(`${fg} `, cols, bg))
+		for (const line of details) lines.push(bodyLine(line, fg, bg, cols))
+	}
+	lines.push(bgLine(`${fg} `, cols, bg))
+
+	let cursorTarget: { row: number; col: number } | undefined
+	if (block.input.kind === 'choice') {
+		const selected = terminalQuestions.choiceIndex(block)
+		for (let index = 0; index < block.input.choices.length; index++) {
+			const choice = block.input.choices[index]!
+			let description = ''
+			if (choice.description) description = ` — ${choice.description}`
+			let marker = '○'
+			if (index === selected) marker = '●'
+			const text = `${marker} ${index + 1}. ${choice.label}${description}`
+			const wrapped = wordWrap(expandTabs(blockText.sanitizeTerminalText(text), blockConfig.tabWidth), contentCols)
+			if (index === selected) cursorTarget = { row: lines.length, col: blocks.outputPad + 1 }
+			for (const line of wrapped) lines.push(bodyLine(line, fg, bg, cols))
+		}
+	} else if (block.input.kind === 'text') {
+		const built = terminalQuestions.textRender(block, Math.max(1, contentCols - 2))
+		if (built) {
+			const empty = terminalQuestions.text(block) === ''
+			for (let index = 0; index < built.lines.length; index++) {
+				const prefix = index === 0 ? '> ' : '  '
+				let line = built.lines[index]!
+				if (empty && index === 0 && block.input.placeholder) line = clipVisual(expandTabs(blockText.sanitizeTerminalText(block.input.placeholder), blockConfig.tabWidth), Math.max(1, contentCols - 2))
+				lines.push(bodyLine(prefix + line, fg, bg, cols))
+			}
+			cursorTarget = { row: lines.length - built.lines.length + built.cursor.rowOffset, col: blocks.outputPad + 3 + built.cursor.col }
+		}
+	} else {
+		const masked = terminalQuestions.secretDisplay(block)
+		const max = Math.max(1, contentCols - 2)
+		const cursor = terminalQuestions.secretCursor(block)
+		const start = Math.max(0, cursor - max)
+		let shown = masked.slice(start, start + max)
+		if (!shown && block.input.placeholder) shown = clipVisual(expandTabs(blockText.sanitizeTerminalText(block.input.placeholder), blockConfig.tabWidth), max)
+		lines.push(bodyLine(`> ${shown}`, fg, bg, cols))
+		cursorTarget = { row: lines.length - 1, col: blocks.outputPad + 3 + cursor - start }
+	}
+	const error = terminalQuestions.error(block)
+	if (error) lines.push(bodyLine(error, fg, bg, cols))
+
+	const beforePad = lines.length
+	padBlock(lines, fg, bg, bgIsBlack, cols)
+	if (cursorTarget && lines.length > beforePad) cursorTarget.row++
+	lines[lines.length - 1]! += FG_OFF
+	return { lines, cursor: cursorTarget }
+}
+
+function renderBlockDetailed(block: Block, cols: number, cursorVisible = false, sessionLabel?: SessionLabel): RenderedBlock {
+	if (block.type === 'question') return renderQuestionBlock(block, cols)
+	return { lines: blocks.renderBlock(block, cols, cursorVisible, sessionLabel) }
+}
+
 function renderBlock(block: Block, cols: number, cursorVisible = false, sessionLabel?: SessionLabel): string[] {
 	const inlineNotice = renderInlineNoticeBlock(block, cols)
 	if (inlineNotice) return inlineNotice
@@ -400,6 +506,7 @@ export const blocks = {
 	config: blockConfig,
 	outputPad: 1,
 	renderBlock,
+	renderBlockDetailed,
 	cursorColor,
 	idleCursorColor,
 	renderBlockGroup,

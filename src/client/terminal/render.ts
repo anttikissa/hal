@@ -24,6 +24,7 @@ import { renderStatus } from './render-status.ts'
 import { cursor } from './cursor.ts'
 import { terminalOutput } from './terminal-output.ts'
 import { visLen, wordWrap } from '../../utils/strings.ts'
+import { terminalQuestions } from './questions.ts'
 
 const config = {
 	halCursorFadeFrameMs: 67,
@@ -48,7 +49,7 @@ type Frame = {
 	lineTops: number[]
 	height: number
 	cols: number
-	cursor: { row: number; col: number }
+	cursor: { row: number; col: number; question?: true }
 }
 
 // A frame's strings are compared repeatedly. Reuse row heights for its unchanged
@@ -175,14 +176,16 @@ function applyPopupOverlay(lines: string[]): { row: number; col: number } | null
 function buildFrame(): Frame {
 	const rows = process.stdout.rows || 24
 	const cols = process.stdout.columns || 80
+	terminalQuestions.activeQuestion()
 	const chrome = renderStatus.chromeLines()
 	const tab = client.currentTab()
 	const lines: string[] = []
 
 	// 1. History — all entries, all lines, NEVER sliced. See terminal.md rule 3.
-	if (tab) renderHistory.renderLines(lines, tab, cols, historyContext())
+	const historyRender = tab ? renderHistory.renderLines(lines, tab, cols, historyContext()) : undefined
 	let tops = lineTops(lines, cols, prevFrame)
 	const historyHeight = tops[tops.length - 1]!
+	const questionCursor = historyRender?.cursor ? { row: tops[historyRender.cursor.row]!, col: historyRender.cursor.col, question: true as const } : undefined
 
 	// Update peak lazily: the focused tab now, other tabs on switch.
 	if (historyHeight > client.state.peak) {
@@ -213,6 +216,7 @@ function buildFrame(): Frame {
 		tops = lineTops(lines, cols, prevFrame)
 		return { lines, lineTops: tops, height: tops[tops.length - 1]!, cols, cursor: popupCursor }
 	}
+	if (questionCursor) return { lines, lineTops: tops, height: tops[tops.length - 1]!, cols, cursor: questionCursor }
 
 	const p = prompt.buildPrompt(renderStatus.promptContentWidth(cols))
 	// Prompt sits between two rule rows, immediately above status + help.
@@ -230,11 +234,11 @@ function moveCursor(from: number, to: number): string {
 
 // Move cursor to target and update cursorRow/cursorCol. This is the ONLY
 // function that should set these (besides resetRenderer and clearFrame).
-function positionCursor(from: number, target: { row: number; col: number }): string {
+function positionCursor(from: number, target: { row: number; col: number; question?: true }): string {
 	cursorRow = target.row
 	cursorCol = target.col
 	let visibility = `${CSI}?25l`
-	if (renderStatus.config.promptOpacity > 0) visibility = `${CSI}?25h`
+	if (target.question || renderStatus.config.promptOpacity > 0) visibility = `${CSI}?25h`
 	return moveCursor(from, target.row) + `\r${renderStatus.promptCursorColorSequence()}${renderStatus.cursorShapeSequence()}${CSI}${target.col}G${visibility}`
 }
 

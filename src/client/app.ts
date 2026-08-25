@@ -9,7 +9,7 @@ import { clientBackend } from './backend.ts'
 import { historyProjection } from '../common/history-projection.ts'
 import { draft as draftModule, type DraftPromptEdit } from './draft.ts'
 import { perf } from './perf.ts'
-import { liveEventBlocks, type LiveEvent } from '../common/live-event-blocks.ts'
+import { liveEventBlocks, type LiveBlock, type LiveEvent } from '../common/live-event-blocks.ts'
 import { sessionLoader } from './session-loader.ts'
 import { clientTabs } from './tabs.ts'
 import { clientCommands, type ClientCommandType } from './commands.ts'
@@ -279,7 +279,7 @@ function sessionLabel(sessionId: string): string {
 }
 
 function applyLiveEventToTab(tab: Tab, event: LiveEvent) {
-	const result = liveEventBlocks.reduce(tab.history, event, {
+	const result = liveEventBlocks.reduce(tab.history as LiveBlock[], event, {
 		sessionId: tab.sessionId,
 		defaultModel: tab.model,
 	})

@@ -88,6 +88,15 @@ test('tabIndicator uses the server continuation action instead of error blocks',
 	expect(renderStatus.tabIndicator(failed).char).toBe('✗')
 })
 
+
+test('an active question derives a nonblinking attention marker on background tabs', () => {
+	const questionTab = tab({ history: [{ type: 'question', id: 'q1', text: 'Proceed?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }] }, source: { type: 'intro' }, active: true }] })
+	const indicator = renderStatus.tabIndicator(questionTab)
+
+	expect(indicator.char).toBe('!')
+	expect(indicator.blinks).toBe(false)
+})
+
 test('activityStatusLabel names visible working phases', () => {
 	const origWorking = client.state.working
 	client.state.working = new Map([['04-new', true]])

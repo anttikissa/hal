@@ -4,6 +4,7 @@ import { blockData } from '../block-data.ts'
 import { colors } from './colors.ts'
 import { subscriptionUsage } from '../../common/subscription-usage.ts'
 import { blockText } from './block-text.ts'
+import { visLen } from '../../utils/strings.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
@@ -70,6 +71,13 @@ test('block headers keep a right margin', () => {
 test('streaming cursor leaves the terminal last column unused', () => {
 	const lines = blocks.renderBlock({ type: 'thinking', text: '1234567', streaming: true }, 9, true)
 	for (const line of lines) expect(stripAnsi(line).length).toBeLessThanOrEqual(8)
+})
+
+
+test('question controls honor wide-character widths', () => {
+	const question: any = { type: 'question', id: 'q1', text: '選択してください', input: { kind: 'choice', choices: [{ id: 'no', label: 'No', description: '非常に長い説明です' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'intro' }, active: true }
+	const rendered = blocks.renderBlockDetailed(question, 20)
+	for (const line of rendered.lines) expect(visLen(line)).toBeLessThanOrEqual(20)
 })
 
 test('body blocks render a blank line after the header', () => {

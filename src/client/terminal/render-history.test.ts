@@ -134,3 +134,31 @@ test('unchanged history is not re-derived on every draw', () => {
 	expect(second).toEqual(first)
 	expect(rendered).toBe(0)
 })
+
+
+test('active question renders controls with explicit cursor metadata and no HAL cursor', () => {
+	colors.load()
+	const lines: string[] = []
+	const result = renderHistory.renderLines(lines, tab([
+		{ type: 'question', id: 'q1', text: 'Proceed?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'intro' }, active: true },
+	] as any), 40, context()) as any
+	const clean = lines.map(stripAnsi).join('\n')
+
+	expect(clean).toContain('Proceed?')
+	expect(clean).toContain('1. No')
+	expect(clean).not.toContain('█')
+	expect(result.cursor).toEqual(expect.objectContaining({ row: expect.any(Number), col: expect.any(Number) }))
+})
+
+test('answered question is compact and displays its answer', () => {
+	colors.load()
+	const lines: string[] = []
+	renderHistory.renderLines(lines, tab([
+		{ type: 'question', id: 'q1', text: 'Proceed?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'intro' }, active: false, answer: { kind: 'choice', choiceId: 'no' } },
+	] as any), 40, context())
+	const nonempty = lines.map(stripAnsi).filter(Boolean)
+
+	expect(nonempty.some((line) => line.includes('No'))).toBe(true)
+	expect(nonempty.some((line) => line.includes('Proceed?'))).toBe(true)
+	expect(nonempty.length).toBeLessThanOrEqual(2)
+})

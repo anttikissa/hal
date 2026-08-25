@@ -4,7 +4,7 @@
 import { lineEditor } from './line-editor.ts'
 import { colors } from './colors.ts'
 import { models } from '../../common/models.ts'
-import { clipVisual, expandTabs, hardWrap, visLen } from '../../utils/strings.ts'
+import { clipVisual, visLen } from '../../utils/strings.ts'
 import type { KeyEvent } from './keys.ts'
 
 interface PopupItem {
@@ -37,9 +37,8 @@ const editor = lineEditor.create()
 
 const state = {
 	active: false,
-	kind: null as 'model' | 'confirm' | null,
+	kind: null as 'model' | null,
 	title: '',
-	body: [] as string[],
 	items: [] as PopupItem[],
 	selectedIndex: 0,
 	onChoose: null as ((value: string) => void) | null,
@@ -55,7 +54,6 @@ function close(): void {
 	state.active = false
 	state.kind = null
 	state.title = ''
-	state.body = []
 	state.items = []
 	state.selectedIndex = 0
 	state.onChoose = null
@@ -203,15 +201,6 @@ function openModelPicker(onChoose: (value: string) => void, currentModel?: strin
 	if (currentModel) selectModelValue(models.resolveModel(currentModel))
 }
 
-function openConfirm(title: string, body: string[], choices: string[], onChoose: (value: string) => void): void {
-	close()
-	state.active = true
-	state.kind = 'confirm'
-	state.title = title
-	state.body = body
-	state.items = choices.map((choice) => ({ value: choice, label: choice, kind: 'model' }))
-	state.onChoose = onChoose
-}
 
 function cycle(dir: 1 | -1): void {
 	if (state.items.length === 0) return
@@ -285,28 +274,20 @@ function handleKey(k: KeyEvent): boolean {
 		cycle(-1)
 		return true
 	}
-	if (state.kind === 'model' && k.key === 'right' && setSelectedCategoryOpen(true)) {
-		return true
-	}
-	if (state.kind === 'model' && k.key === 'left' && (setSelectedCategoryOpen(false) || closeContainingCategory())) {
-		return true
-	}
-	if (state.kind === 'model' && editor.handleKey(k)) {
+	if (k.key === 'right' && setSelectedCategoryOpen(true)) return true
+	if (k.key === 'left' && (setSelectedCategoryOpen(false) || closeContainingCategory())) return true
+	if (editor.handleKey(k)) {
 		refreshModelItems()
 		return true
 	}
 	return false
 }
 
-// Confirms are always risky actions, so they use the danger color; the model
-// picker is informational and stays neutral.
 function toneColor(): string {
-	if (state.kind === 'confirm') return colors.popup.dangerFg || colors.warning.fg
 	return colors.popup.neutralFg || colors.status.fg
 }
 
-function rowText(item: PopupItem, active: boolean): string {
-	if (state.kind !== 'model') return active ? `[${item.label}]` : ` ${item.label}`
+function rowText(item: PopupItem): string {
 	return `${item.isCurrent ? '*' : ' '}${item.label}`
 }
 
@@ -357,96 +338,37 @@ interface PopupRow {
 	current?: boolean
 }
 
-function wrapRows(rows: PopupRow[], width: number): PopupRow[] {
-	const out: PopupRow[] = []
-	for (const row of rows) {
-		for (const text of hardWrap(row.text, width)) out.push({ text, active: row.active, current: row.current })
-	}
-	return out
-}
-
-function clipBodyRows(bodyRows: PopupRow[], tailRows: PopupRow[], maxRows: number): PopupRow[] {
-	if (bodyRows.length + tailRows.length <= maxRows) return [...bodyRows, ...tailRows]
-	const availableBodyRows = maxRows - tailRows.length
-	if (availableBodyRows <= 0) return tailRows.slice(0, maxRows)
-	if (availableBodyRows === 1) return [{ text: `[+ ${bodyRows.length} lines]`, active: false }, ...tailRows]
-
-	const keepRows = availableBodyRows - 1
-	const headRows = Math.max(1, Math.ceil(keepRows / 2))
-	const bottomRows = Math.max(0, keepRows - headRows)
-	const hiddenRows = bodyRows.length - headRows - bottomRows
-	if (hiddenRows <= 0) return [...bodyRows, ...tailRows]
-
-	return [
-		...bodyRows.slice(0, headRows),
-		{ text: `[+ ${hiddenRows} lines]`, active: false },
-		...bodyRows.slice(bodyRows.length - bottomRows),
-		...tailRows,
-	]
-}
-
 function buildOverlay(cols: number, rows: number): Overlay | null {
 	if (!state.active || cols < 12 || rows < 6) return null
-	const bodyContent: PopupRow[] = []
-	const tailContent: PopupRow[] = []
-	let inputCursor: { row: number; col: number } | null = null
-	if (state.kind === 'model') {
-		const built = editor.buildLine()
-		inputCursor = { row: bodyContent.length + 1, col: 4 + built.cursor }
-		bodyContent.push({ text: `> ${built.line}`, active: false })
-		bodyContent.push({ text: '', active: false })
+	const content: PopupRow[] = []
+	const built = editor.buildLine()
+	let inputCursor: { row: number; col: number } = { row: 1, col: 4 + built.cursor }
+	content.push({ text: `> ${built.line}`, active: false }, { text: '', active: false })
+	for (let index = 0; index < state.items.length; index++) {
+		const item = state.items[index]!
+		content.push({ text: rowText(item), active: index === state.selectedIndex, current: item.isCurrent })
 	}
-	if (state.kind === 'confirm' && state.body.length > 0) bodyContent.push({ text: '', active: false })
-	// Split on embedded newlines so multi-line bash commands (e.g. heredocs) render
-	// inside the popup box instead of breaking the border at column 1.
-	// Expand tabs first: a tab's width depends on the column it starts at, and rows
-	// are measured in isolation but drawn inset, which would desync the right border.
-	for (const line of state.body) {
-		for (const sub of expandTabs(String(line)).split('\n')) bodyContent.push({ text: sub, active: false })
-	}
-	if (state.body.length > 0 && state.items.length > 0) tailContent.push({ text: '', active: false })
-	for (let i = 0; i < state.items.length; i++) tailContent.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex, current: state.items[i]!.isCurrent })
-	if (state.kind === 'confirm' && state.items.length > 0) tailContent.push({ text: '', active: false })
-	if (bodyContent.length === 0 && tailContent.length === 0) bodyContent.push({ text: '', active: false })
-	const content = [...bodyContent, ...tailContent]
-	const hint = state.kind === 'model' ? modelHint() : ''
 
+	const hint = modelHint()
 	// Keep a safety margin away from the terminal's last column and last row.
 	// Touching those edges can trigger wrap-pending weirdness in some terminals.
 	const rightSlack = cols > 12 ? 1 : 0
 	const bottomSlack = rows > 6 ? 1 : 0
-	const xMargin = state.kind === 'confirm' ? 1 : 0
-	const rawWidth = Math.max(visLen(state.title) + 2, visLen(hint) + 2, ...content.map((line) => visLen(line.text) + xMargin * 2))
+	const rawWidth = Math.max(visLen(state.title) + 2, visLen(hint) + 2, ...content.map((line) => visLen(line.text)))
 	const maxInnerWidth = Math.max(18, cols - rightSlack - 2)
-	// The model picker keeps a fixed width and clips long rows: its content width
-	// swings wildly while filtering, and a jumping popup border is worse than '…'.
+	// Filtering changes row contents dramatically; keeping a fixed picker width
+	// avoids a distracting jumping border.
 	const preferredWidth = state.preferredInnerWidth ?? rawWidth
 	const innerWidth = Math.max(18, Math.min(maxInnerWidth, preferredWidth))
-	const contentWidth = Math.max(0, innerWidth - xMargin * 2)
-	// For confirm popups, hard-wrap each row to the inner content width so long
-	// bash commands and ason-formatted tool inputs stay inside the popup instead
-	// of being truncated with '…'. If the wrapped body is taller than the terminal,
-	// keep the top and bottom context and use the same "[+ X lines]" wording as
-	// tool output renderers for omitted rows.
-	let displayContent: PopupRow[]
-	if (state.kind === 'confirm') {
-		const maxContentRows = Math.max(1, rows - bottomSlack - 2)
-		displayContent = clipBodyRows(wrapRows(bodyContent, contentWidth), wrapRows(tailContent, contentWidth), maxContentRows)
-	} else {
-		displayContent = content
-	}
-	const paddedDisplay = withOuterPadding(displayContent)
-	if (inputCursor && paddedDisplay.topAdded) inputCursor.row++
-	displayContent = paddedDisplay.rows
+	const displayContent = withOuterPadding(content)
+	if (displayContent.topAdded) inputCursor.row++
 	const title = clipVisual(` ${state.title} `, Math.max(0, innerWidth - 2))
 	const titleWidth = visLen(title)
 	const top = `┌${title}${'─'.repeat(Math.max(0, innerWidth - titleWidth))}┐`
 	const lines = [top]
-	for (const line of displayContent) {
-		const clipped = clipVisual(line.text, contentWidth)
-		const paddedContent = pad(clipped, contentWidth)
-		const padded = `${' '.repeat(xMargin)}${paddedContent}${' '.repeat(xMargin)}`
-		lines.push(`│${styleRow(padded, line)}│`)
+	for (const line of displayContent.rows) {
+		const clipped = clipVisual(line.text, innerWidth)
+		lines.push(`│${styleRow(pad(clipped, innerWidth), line)}│`)
 	}
 	lines.push(bottomBorder(innerWidth, hint))
 	const totalWidth = innerWidth + 2
@@ -463,8 +385,8 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 		x,
 		y,
 		lines: colored,
-		cursor: inputCursor ? { row: y + inputCursor.row, col: x + inputCursor.col } : null,
+		cursor: { row: y + inputCursor.row, col: x + inputCursor.col },
 	}
 }
 
-export const popup = { state, close, openModelPicker, openConfirm, handleKey, buildOverlay }
+export const popup = { state, close, openModelPicker, handleKey, buildOverlay }

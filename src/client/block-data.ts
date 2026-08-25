@@ -7,6 +7,7 @@
 import { ason } from '../utils/ason.ts'
 import { models } from '../common/models.ts'
 import type { LiveBlock } from '../common/live-event-blocks.ts'
+import type { ProjectedQuestion } from '../common/history-projection.ts'
 import type { HistoryEntry } from '../common/history.ts'
 import { historyProjection } from '../common/history-projection.ts'
 import { clientBackend } from './backend.ts'
@@ -19,7 +20,8 @@ interface PresentationBlock {
 	blobLoaded?: boolean
 }
 
-export type Block = LiveBlock & PresentationBlock
+export type QuestionBlock = Omit<ProjectedQuestion, 'ts'> & PresentationBlock & { type: 'question'; ts?: number }
+export type Block = (LiveBlock & PresentationBlock) | QuestionBlock
 
 function touch(block: Block): void {
 	block.renderVersion = (block.renderVersion ?? 0) + 1
@@ -41,6 +43,7 @@ function historyToBlocks(
 	initialModel?: string,
 ): Block[] {
 	const result: Block[] = []
+	const projectedQuestions = new Map(historyProjection.questions(history, parentEntryCount).map((question) => [question.id, question]))
 	for (let i = 0; i < history.length; i++) {
 		const entry = history[i]!
 		const ts = parseTs(entry.ts)
@@ -101,6 +104,13 @@ function historyToBlocks(
 				}
 				break
 			}
+			case 'question': {
+				const question = projectedQuestions.get(entry.id)
+				if (question) result.push({ ...question, ts, dimmed })
+				break
+			}
+			case 'answer':
+				break
 			case 'pending_tools':
 				if (!entry.canceled) result.push({ type: 'log', text: '[paused before local tools]', ts, dimmed })
 				break

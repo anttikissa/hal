@@ -95,3 +95,20 @@ test('historyToBlocks attaches hydrated tool_result output to its tool block', (
 
 	expect(result).toEqual([expect.objectContaining({ type: 'tool', name: 'edit', output: '--- before\n1:aaa x\n\n+++ after\n1:bbb y', blobLoaded: true })])
 })
+
+
+test('historyToBlocks projects answered and only first active questions as semantic blocks', () => {
+	const result = blockData.historyToBlocks([
+		{ type: 'tool_call', toolId: 't1', name: 'bash', input: { command: 'rm file' } },
+		{ type: 'pending_tools', id: 'pending-1' },
+		{ type: 'question', id: 'q1', text: 'Run this command?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'tool', pendingId: 'pending-1', toolId: 't1' } },
+		{ type: 'answer', questionId: 'q1', value: { kind: 'choice', choiceId: 'no' } },
+		{ type: 'question', id: 'q2', text: 'Why?', input: { kind: 'text' }, source: { type: 'intro' } },
+		{ type: 'question', id: 'q3', text: 'Hidden', input: { kind: 'text' }, source: { type: 'intro' } },
+	] as any, 's1')
+
+	const questions = result.filter((block) => block.type === 'question') as any[]
+	expect(questions).toHaveLength(2)
+	expect(questions[0]).toMatchObject({ id: 'q1', active: false, answer: { kind: 'choice', choiceId: 'no' }, progress: { index: 1, total: 1 }, tool: { name: 'bash', input: { command: 'rm file' } } })
+	expect(questions[1]).toMatchObject({ id: 'q2', active: true, input: { kind: 'text' } })
+})

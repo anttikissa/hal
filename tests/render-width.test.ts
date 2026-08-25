@@ -63,3 +63,28 @@ test('status and help bar are clipped to terminal width', () => {
 		Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 	}
 })
+
+
+test('active question stays rendered with a long folded frozen prompt and owns the hardware cursor', () => {
+	const originalCols = process.stdout.columns
+	const originalRows = process.stdout.rows
+	Object.defineProperty(process.stdout, 'columns', { value: 40, configurable: true })
+	Object.defineProperty(process.stdout, 'rows', { value: 16, configurable: true })
+	const tab = client.currentTab()!
+	tab.history = [{ type: 'question', id: 'q1', text: 'Choose now', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'intro' }, active: true }] as any
+	tab.historyVersion++
+	prompt.setText(Array.from({ length: 50 }, (_, index) => `draft row ${index}`).join('\n'))
+	prompt.buildPrompt(38)
+	const ordinary = prompt.snapshotState()
+	try {
+		const output = captureOutput(() => render.draw(true))
+		const clean = stripAnsi(output)
+		expect(clean).toContain('Choose now')
+		expect(clean).toContain('1. No')
+		expect(output).toContain('\x1b[?25h')
+		expect(prompt.snapshotState()).toEqual(ordinary)
+	} finally {
+		Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+	}
+})

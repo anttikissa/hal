@@ -24,6 +24,7 @@ import { terminalOutput } from './terminal-output.ts'
 import { promptEdit } from '../prompt-edit.ts'
 import type { DraftPromptEdit } from '../draft.ts'
 import { termCaps } from '../../utils/term-caps.ts'
+import { terminalQuestions } from './questions.ts'
 
 const RESTART_CODE = 100
 
@@ -808,6 +809,13 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 				draw()
 				continue
 			}
+			// The selected tab's active question owns all input except explicit Ctrl-M,
+			// which remains a local, user-opened model picker.
+			if (terminalQuestions.handleKey(k)) {
+				clientBackend.subscriptions.noteActivity()
+				draw()
+				continue
+			}
 			// Completion keys next (tab, arrows in popup, etc.)
 			if (handleCompletionKey(k)) {
 				clientBackend.subscriptions.noteActivity()
@@ -831,6 +839,7 @@ export const cli = {
 		handleAppKey,
 		handlePromptKey,
 		handleCompletionKey,
+		handleQuestionKey: terminalQuestions.handleKey,
 		kittyOnSequence: () => KITTY_ON,
 		installPromptTabSwitchHandler,
 		restorePromptForCurrentTab,
