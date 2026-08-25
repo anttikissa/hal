@@ -167,6 +167,70 @@ button { touch-action: manipulation; }
 .TranscriptItem.assistant { color: #eee; }
 .TranscriptItem.log, .TranscriptItem.info { color: #aaa; }
 .TranscriptItem > label { font-size: .9em; color: #aaa; }
+/* A waiting question is an inline gate in the transcript, not a modal. The blue
+   left rail is the one deliberate signature: it keeps approval in the timeline
+   while making the single actionable row unmistakable. */
+.QuestionBlock {
+	margin: 8px 0;
+	padding: 9px 10px;
+	background: #181818;
+	border: 1px solid #3d3d3d;
+	border-left: 3px solid #66737c;
+	border-radius: 4px;
+	white-space: normal;
+}
+.QuestionBlock.active { padding: 12px; background: #182027; border-color: #52758e; border-left-color: #8fc5ed; }
+.QuestionBlock > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.QuestionBlock > header > strong { font-size: 1.05em; }
+.QuestionBlock > header > span { flex: none; color: #9eb8ca; font-size: .9em; }
+.QuestionBlock > details { margin-top: 8px; color: #bbb; }
+.QuestionBlock > details > summary { cursor: pointer; color: #9eb8ca; }
+.QuestionBlock > details > pre { max-height: 12rem; margin: 7px 0 0; padding: 8px; overflow: auto; background: #111; border: 1px solid #333; white-space: pre-wrap; overflow-wrap: anywhere; }
+.QuestionBlock > fieldset { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; border: 0; }
+.QuestionBlock > fieldset > legend { margin-bottom: 8px; color: #aaa; }
+.QuestionBlock > fieldset > button {
+	min-height: 44px;
+	padding: 8px 10px;
+	font: inherit;
+	text-align: left;
+	color: inherit;
+	background: #222b31;
+	border: 1px solid #596d79;
+	border-radius: 4px;
+	cursor: pointer;
+}
+.QuestionBlock > fieldset > button:first-of-type { border-color: #8a9a7a; background: #222a20; }
+.QuestionBlock > fieldset > button > span { display: block; margin-top: 3px; color: #aaa; font-size: .9em; }
+.QuestionBlock > form { display: grid; grid-template-columns: 1fr auto; gap: 7px; margin-top: 12px; }
+.QuestionBlock > form > label { grid-column: 1 / -1; color: #aaa; }
+.QuestionBlock > form > textarea, .QuestionBlock > form > input {
+	min-width: 0;
+	padding: 9px;
+	font: inherit;
+	font-size: 16px;
+	line-height: 1.4;
+	color: inherit;
+	background: #111;
+	border: 1px solid #596d79;
+	border-radius: 4px;
+}
+.QuestionBlock > form > textarea { grid-column: 1 / -1; resize: vertical; }
+.QuestionBlock > form > button {
+	min-width: 7rem;
+	padding: 9px;
+	font: inherit;
+	color: inherit;
+	background: #29465e;
+	border: 1px solid #6b9fc6;
+	border-radius: 4px;
+	cursor: pointer;
+}
+.QuestionBlock > form > small { align-self: center; color: #999; }
+.QuestionBlock > form > small.exceeded, .QuestionBlock-error { color: #e78d8d; }
+.QuestionBlock-answer { margin: 6px 0 0; overflow: hidden; color: #aaa; text-overflow: ellipsis; white-space: nowrap; }
+.QuestionBlock-error { margin: 8px 0 0; }
+.QuestionBlock button:focus-visible, .QuestionBlock input:focus-visible, .QuestionBlock textarea:focus-visible, .QuestionBlock summary:focus-visible { outline: 2px solid #8fc5ed; outline-offset: 2px; }
+.QuestionBlock button:disabled, .QuestionBlock input:disabled, .QuestionBlock textarea:disabled { cursor: default; opacity: .55; }
 
 .PromptComposer {
 	flex: none;
@@ -190,3 +254,5 @@ button { touch-action: manipulation; }
 }
 .PromptComposer > button { min-width: 44px; min-height: 44px; }
 .PromptComposer > .PromptComposer-attach { font-size: 20px; }
+.PromptComposer.disabled { opacity: .42; filter: grayscale(.75); }
+.PromptComposer.disabled > textarea { color: #aaa; }

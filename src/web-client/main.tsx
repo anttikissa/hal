@@ -1,5 +1,7 @@
 import { createEffect, createMemo, createSignal, onSettled, Show } from 'solid-js'
 import { render } from '@solidjs/web'
+import type { AnswerValue } from '../common/history.ts'
+import { historyProjection } from '../common/history-projection.ts'
 import type { SharedState } from '../common/ipc.ts'
 import type { Command } from '../common/protocol.ts'
 import type { ClientSessionSnapshot } from '../common/snapshots.ts'
@@ -38,7 +40,16 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	const selected = router.sessionId
 	const [sharedState, setSharedState] = createSignal<SharedState>({ sessions: [], working: {}, updatedAt: '' })
 	const [snapshot, setSnapshot] = createSignal<ClientSessionSnapshot | null>(null)
-	const transcript = createMemo(() => webTranscript.items(snapshot()))
+	const transcript = createMemo(() => {
+		const current = snapshot()
+		if (!current || current.session.id !== selected()) return []
+		return webTranscript.items(current)
+	})
+	const activeQuestion = createMemo(() => {
+		const current = snapshot()
+		if (!current || current.session.id !== selected()) return undefined
+		return historyProjection.activeQuestion(current.history, current.parentCount)
+	})
 	// Shared state keeps cwd/model current; the selected snapshot supplies the
 	// context usage that the host persists after each completed turn.
 	const status = createMemo(() => webStatus.text(sharedState().sessions.find((session) => session.id === selected()), snapshot()?.meta))
@@ -92,6 +103,12 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			setSnapshot(next)
 		}
 		return Promise.resolve(true)
+	}
+
+	function submitAnswer(questionId: string, value: AnswerValue): Promise<boolean> {
+		const sessionId = snapshot()?.session.id
+		if (!sessionId || sessionId !== selected()) return Promise.resolve(false)
+		return Promise.resolve(sendCommand({ type: 'answer', sessionId, questionId, value }))
 	}
 	// Tab commands arrive loosely typed from SessionTabs; the server's
 	// parseCommand is the real validator, so the cast is safe.
@@ -169,8 +186,8 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			onSelect={selectSession}
 			onCommand={onTabCommand}
 		/>
-		<Transcript items={transcript()} />
-		<PromptComposer working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
+		<Transcript items={transcript()} sessionId={snapshot()?.session.id ?? ''} onAnswer={submitAnswer} />
+		<PromptComposer disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
 	</>
 }
 

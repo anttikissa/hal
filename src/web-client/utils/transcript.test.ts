@@ -39,3 +39,53 @@ test('status markers render as prose in history and live notices', () => {
 
 	expect(result.map((item) => item.text)).toEqual(['Restarted', 'Paused before local tools'])
 })
+
+test('question rows keep shared projection data and hide queued questions', () => {
+	const history: HistoryEntry[] = [
+		{ type: 'tool_call', toolId: 'tool-1', name: 'bash', input: { command: 'rm one' } },
+		{ type: 'tool_call', toolId: 'tool-2', name: 'edit', input: { path: 'two' } },
+		{ type: 'pending_tools', id: 'pending-1', toolIds: ['tool-1', 'tool-2'], cwd: '/tmp', reason: 'questions' },
+		{ type: 'question', id: 'question-1', text: 'Allow one?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'tool', pendingId: 'pending-1', toolId: 'tool-1' } },
+		{ type: 'question', id: 'question-2', text: 'Allow two?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'tool', pendingId: 'pending-1', toolId: 'tool-2' } },
+		{ type: 'question', id: 'question-3', text: 'Later?', input: { kind: 'text' }, source: { type: 'intro' } },
+		{ type: 'answer', questionId: 'question-1', value: { kind: 'choice', choiceId: 'no' } },
+	]
+
+	const questions = webTranscript.items({
+		session: { id: 's1', cwd: '/tmp' },
+		meta: { id: 's1', createdAt: '' },
+		parentCount: 0,
+		history,
+		live: [],
+	}).filter((item) => item.entry.type === 'question')
+
+	expect(questions).toHaveLength(2)
+	expect(questions[0]!.entry).toEqual(expect.objectContaining({
+		id: 'question-1',
+		active: false,
+		answer: { kind: 'choice', choiceId: 'no' },
+		progress: { index: 1, total: 2 },
+		tool: { name: 'bash', input: { command: 'rm one' } },
+	}))
+	expect(questions[1]!.entry).toEqual(expect.objectContaining({ id: 'question-2', active: true }))
+})
+
+test('a replacement snapshot settles the active question into compact history', () => {
+	const question: HistoryEntry = { type: 'question', id: 'question-1', text: 'Continue?', input: { kind: 'choice', choices: [{ id: 'continue', label: 'Continue' }] }, source: { type: 'intro' } }
+	function snapshot(history: HistoryEntry[]) {
+		return webTranscript.items({
+			session: { id: 's1', cwd: '/tmp' },
+			meta: { id: 's1', createdAt: '' },
+			parentCount: 0,
+			history,
+			live: [],
+		})
+	}
+
+	expect(snapshot([question])[0]!.entry).toEqual(expect.objectContaining({ id: 'question-1', active: true }))
+	expect(snapshot([question, { type: 'answer', questionId: 'question-1', value: { kind: 'choice', choiceId: 'continue' } }])[0]!.entry).toEqual(expect.objectContaining({
+		id: 'question-1',
+		active: false,
+		answer: { kind: 'choice', choiceId: 'continue' },
+	}))
+})

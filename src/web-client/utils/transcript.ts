@@ -1,9 +1,9 @@
 import type { HistoryEntry } from '../../common/history.ts'
-import { historyProjection } from '../../common/history-projection.ts'
+import { historyProjection, type ProjectedQuestion } from '../../common/history-projection.ts'
 import type { LiveBlock, LiveToolBlock } from '../../common/live-event-blocks.ts'
 import type { ClientSessionSnapshot } from '../../common/snapshots.ts'
 
-type TranscriptEntry = HistoryEntry | LiveBlock
+export type TranscriptEntry = HistoryEntry | LiveBlock | ProjectedQuestion
 
 type ToolLike = {
 	type?: string
@@ -37,10 +37,18 @@ function toolText(item: ToolLike): string {
 	return call || output
 }
 
-function historyItems(history: readonly HistoryEntry[]): TranscriptEntry[] {
+function historyItems(history: readonly HistoryEntry[], parentCount = 0): TranscriptEntry[] {
 	const items: TranscriptEntry[] = []
 	const tools = new Map<string, LiveToolBlock>()
+	const projectedQuestions = new Map<string, ProjectedQuestion>()
+	for (const question of historyProjection.questions([...history], parentCount)) projectedQuestions.set(question.id, question)
 	for (const entry of history) {
+		if (entry.type === 'question') {
+			const question = projectedQuestions.get(entry.id)
+			if (question) items.push(question)
+			continue
+		}
+		if (entry.type === 'answer') continue
 		if (entry.type === 'tool_call') {
 			const tool: LiveToolBlock = {
 				type: 'tool',
@@ -72,6 +80,7 @@ function historyItems(history: readonly HistoryEntry[]): TranscriptEntry[] {
 }
 
 function entryText(entry: TranscriptEntry): string {
+	if (entry.type === 'question') return entry.text
 	if (entry.type === 'user') {
 		if (!('parts' in entry)) return entry.text
 		const parts: string[] = []
@@ -90,7 +99,7 @@ function entryText(entry: TranscriptEntry): string {
 function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[] {
 	if (!snapshot) return []
 	const result: RenderedTranscriptItem[] = []
-	for (const entry of historyItems(snapshot.history)) {
+	for (const entry of historyItems(snapshot.history, snapshot.parentCount)) {
 		const text = entryText(entry)
 		if (text) result.push({ entry, text })
 	}

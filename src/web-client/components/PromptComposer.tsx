@@ -3,6 +3,7 @@ import { enterAction, sendLabel } from '../utils/composer.ts'
 
 type PromptComposerProps = {
 	working?: boolean
+	disabled?: boolean
 	onSubmit: (text: string, queue: boolean) => Promise<boolean>
 	onAttach: (file: File) => Promise<string>
 }
@@ -31,6 +32,7 @@ export function PromptComposer(props: PromptComposerProps) {
 	}
 
 	async function submit(queue = false): Promise<void> {
+		if (props.disabled) return
 		const text = input?.value.trim() ?? ''
 		if (!text || !input) return
 		if (await props.onSubmit(text, queue)) {
@@ -48,6 +50,7 @@ export function PromptComposer(props: PromptComposerProps) {
 	}
 
 	async function attach(): Promise<void> {
+		if (props.disabled) return
 		const file = fileInput?.files?.[0]
 		if (!file || !input || !fileInput) return
 		fileInput.value = '' // allow re-picking the same file
@@ -64,22 +67,23 @@ export function PromptComposer(props: PromptComposerProps) {
 		}
 	}
 
-	return <form class="PromptComposer" onSubmit={(event: SubmitEvent) => { event.preventDefault(); void submit() }}>
+	return <form class={['PromptComposer', props.disabled && 'disabled']} aria-disabled={props.disabled ? 'true' : undefined} onSubmit={(event: SubmitEvent) => { event.preventDefault(); void submit() }}>
 		<textarea
 			ref={(element) => { input = element }}
 			rows={1}
 			autocomplete="off"
 			placeholder="Message"
+			disabled={props.disabled}
 			onInput={autosize}
 			onKeyDown={onKeyDown}
 		/>
-		<input ref={(element) => { fileInput = element }} type="file" accept="image/*" style="display: none" onChange={attach} />
-		<button type="button" class="PromptComposer-attach" disabled={attaching()} title="Attach image" onClick={() => fileInput?.click()}>📎</button>
+		<input ref={(element) => { fileInput = element }} type="file" accept="image/*" style="display: none" disabled={props.disabled} onChange={attach} />
+		<button type="button" class="PromptComposer-attach" disabled={attaching() || props.disabled} title="Attach image" onClick={() => fileInput?.click()}>📎</button>
 		{/* Queue only exists while a turn runs: idle, sending already starts the
 		    prompt immediately and a queue button would mean the same thing. */}
 		<Show when={props.working}>
-			<button type="button" disabled={attaching()} title="Run after the current turn" onClick={() => void submit(true)}>Queue</button>
+			<button type="button" disabled={attaching() || props.disabled} title="Run after the current turn" onClick={() => void submit(true)}>Queue</button>
 		</Show>
-		<button type="submit" disabled={attaching()}>{sendLabel(!!props.working)}</button>
+		<button type="submit" disabled={attaching() || props.disabled}>{sendLabel(!!props.working)}</button>
 	</form>
 }
