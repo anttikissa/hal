@@ -41,6 +41,9 @@ deliberate exception: it has no horizontal margins and may exceed `cols`, so the
 terminal soft-wraps and copies it as one logical line. Backgrounds still paint
 every physical row, including the final wrapped row's unused columns.
 
+Ctrl-G toggles the left padding on transcript body rows for clean terminal
+selection. It intentionally leaves their wrap width and right margin unchanged.
+
 Two painters implement this, and they are deliberately not shared:
 
 - `bgLine()` in `src/client/terminal/blocks.ts` fills the rest of the row with `CSI K`

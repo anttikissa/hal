@@ -210,7 +210,7 @@ function buildHeader(title: string, time: string, blobRef: string, cols: number)
 }
 
 function padBlockLine(line: string): string {
-	return ` ${line}`
+	return ' '.repeat(blocks.outputPad) + line
 }
 
 function bodyLine(line: string, fg: string, bg: string, cols: number, fullWidth = visLen(line) > cols - 2): string {
@@ -398,6 +398,7 @@ function renderBlock(block: Block, cols: number, cursorVisible = false, sessionL
 
 export const blocks = {
 	config: blockConfig,
+	outputPad: 1,
 	renderBlock,
 	cursorColor,
 	idleCursorColor,

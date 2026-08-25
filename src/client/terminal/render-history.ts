@@ -124,7 +124,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 	// Streaming mutates the last block in place and bumps renderVersion without touching
 	// historyVersion, so the tail's identity has to be part of the key.
 	const tail = tab.history.at(-1)
-	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${working}:${context.sessionLabelVersion}:${tab.history.length}:${tail?.renderVersion ?? 0}`
+	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${blockRenderer.outputPad}:${working}:${context.sessionLabelVersion}:${tab.history.length}:${tail?.renderVersion ?? 0}`
 	let body = bodyCache.get(tab)
 	if (!body || body.key !== key || (working && body.streaming)) {
 		const history = visibleHistory(tab.history)

@@ -9,6 +9,7 @@ import { popup } from './popup.ts'
 import { promptEdit } from '../prompt-edit.ts'
 import { draft } from '../draft.ts'
 import { completion } from './completion.ts'
+import { blocks } from './blocks.ts'
 
 function key(key: string, mods: any = {}): any {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
@@ -24,6 +25,16 @@ test('kitty keyboard mode does not request key release events', () => {
 	// Ghostty sends Cmd-C-in-scrollback as only a key-release event when report
 	// events is enabled; that pty input snaps scrollback to the bottom.
 	expect(cli.forTests.kittyOnSequence()).toBe('\x1b[>17u')
+})
+
+test('ctrl-g toggles the transcript gutter', () => {
+	blocks.outputPad = 1
+	try {
+		withPatched(render, 'draw', (() => {}) as typeof render.draw, () => {
+			expect(cli.forTests.handleAppKey(key('g', { ctrl: true }))).toBe(true)
+			expect(blocks.outputPad).toBe(0)
+		})
+	} finally { blocks.outputPad = 1 }
 })
 
 test('prompt key handling uses rendered prompt content width', () => {

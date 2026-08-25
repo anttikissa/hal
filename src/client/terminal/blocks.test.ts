@@ -32,6 +32,12 @@ test('block body keeps left and right margins when wrapping', () => {
 	expect(contentLines(blocks.renderBlock({ type: 'user', text: 'foo bar' }, 8))).toEqual([' foo', ' bar'])
 })
 
+test('block left padding can be disabled', () => {
+	blocks.outputPad = 0
+	try { expect(contentLines(blocks.renderBlock({ type: 'user', text: 'foo' }, 9))).toEqual(['foo']) }
+	finally { blocks.outputPad = 1 }
+})
+
 test('standalone plain URLs use one full-width logical line for terminal soft wrapping', () => {
 	const url = 'https://example.com/abcdefghijklmnopqrstuvwxyz'
 	const rendered = blocks.renderBlock({ type: 'info', text: `Open this URL:\n\n${url}` }, 20)

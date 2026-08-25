@@ -676,6 +676,7 @@ function handleAppKey(k: KeyEvent): boolean {
 			draw(true)
 			return true
 		}
+		if (k.key === 'g') { blocks.outputPad = +!blocks.outputPad; render.invalidateHistoryCache(); draw(); return true }
 		// Ctrl-T: new tab. Ctrl-Shift-T restores the most recently closed tab,
 		// matching Chrome, so plain Ctrl-T must require no shift.
 		if (k.key === 't') {
