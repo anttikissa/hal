@@ -132,6 +132,7 @@ function parseCommand(value: unknown): Command | null {
 	if (!isObject(value) || typeof value.type !== 'string' || !validBaseCommand(value)) return null
 	const text = typeof value.text === 'string' && value.text.length <= 100_000
 	const request = typeof value.requestId === 'string' && value.requestId.length <= 1_000
+	const question = typeof value.questionId === 'string' && value.questionId.length <= 1_000
 	switch (value.type) {
 		case 'prompt':
 			return text && historyIds.isValid(value.id) && optionalString(value.displayText) && optionalString(value.source) && (value.queue === undefined || typeof value.queue === 'boolean') && (value.sourceTab === undefined || Number.isInteger(value.sourceTab)) ? value as Command : null
@@ -156,8 +157,15 @@ function parseCommand(value: unknown): Command | null {
 			return Number.isInteger(value.position) ? value as Command : null
 		case 'what':
 			return optionalString(value.target) ? value as Command : null
-		case 'tool-confirm':
-			return request && typeof value.approved === 'boolean' ? value as Command : null
+		case 'answer': {
+			const answer = value.value
+			if (!question || !isObject(answer) || typeof answer.kind !== 'string') return null
+			if (answer.kind === 'aborted') return value as Command
+			if (answer.kind === 'choice' && typeof answer.choiceId === 'string' && answer.choiceId.length <= 1_000) return value as Command
+			if (answer.kind === 'text' && typeof answer.text === 'string' && answer.text.length <= 100_000) return value as Command
+			if (answer.kind === 'secret' && typeof answer.ciphertext === 'string' && answer.ciphertext.length <= 5_586) return value as Command
+			return null
+		}
 		case 'rebase-start':
 			return request && Number.isInteger(value.clientPid) ? value as Command : null
 		case 'rebase-apply':
@@ -373,7 +381,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 
 function isSnapshotBoundary(event: unknown): boolean {
 	if (!isObject(event)) return false
-	return event.type === 'stream-end' || event.type === 'history-rebased'
+	return event.type === 'stream-end' || event.type === 'history-rebased' || event.type === 'history-updated'
 }
 
 export const web = {

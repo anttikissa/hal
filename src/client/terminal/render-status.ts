@@ -68,7 +68,6 @@ function promptCursorColorSequence(color = colors.input.cursor || colors.user.fg
 
 function tabIndicator(tab: Tab): TabIndicator {
 	const working = client.state.working.get(tab.sessionId) ?? false
-	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
 
 	if (working && tab.attention === 'new') return { char: '◆', color: colors.tab.warningFg || colors.warning.fg, blinks: true }
 	if (working) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
@@ -503,7 +502,6 @@ function promptEditActivityStatusLabel(tab: Tab): string {
 function turnActivityStatusLabel(tab: Tab): string {
 	const editStatus = renderStatus.promptEditActivityStatusLabel(tab)
 	if (editStatus) return editStatus
-	if (client.state.toolConfirmPending.has(tab.sessionId)) return 'waiting for approval'
 	if (!client.state.working.get(tab.sessionId)) {
 		if (client.continueActionForTab(tab) === 'continue') return 'paused'
 		return ''

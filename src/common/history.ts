@@ -8,6 +8,23 @@ export type UserPart =
 
 export type EntryIdentity = { id?: string; canceled?: true }
 
+
+export type QuestionInput =
+	| { kind: 'choice'; choices: { id: string; label: string; description?: string }[] }
+	| { kind: 'text'; placeholder?: string; allowEmpty?: true }
+	| { kind: 'secret'; placeholder?: string; publicKey: string; maxBytes: 4096 }
+
+export type QuestionSource =
+	| { type: 'tool'; pendingId: string; toolId: string }
+	| { type: 'intro' }
+	| { type: 'login'; provider: 'claude' }
+
+export type AnswerValue =
+	| { kind: 'choice'; choiceId: string }
+	| { kind: 'text'; text: string }
+	| { kind: 'secret'; ciphertext: string }
+	| { kind: 'aborted' }
+
 export type HistoryEntry = EntryIdentity & (
 	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; sourceTab?: number; sourceName?: string; status?: string; ts?: string }
 	| {
@@ -31,7 +48,9 @@ export type HistoryEntry = EntryIdentity & (
 		}
 	| { type: 'tool_call'; toolId: string; name: string; input?: any; blobId?: string; visibility?: 'ui'; ts?: string }
 	| { type: 'tool_result'; toolId: string; output?: any; blobId?: string; isError?: boolean; visibility?: 'ui'; ts?: string }
-	| { type: 'pending_tools'; toolIds: string[]; cwd: string; model?: string; usage?: PartialTokenUsage; reason?: 'soft-pause'; ts?: string }
+	| { type: 'pending_tools'; toolIds: string[]; cwd: string; model?: string; usage?: PartialTokenUsage; reason?: 'soft-pause' | 'questions'; ts?: string }
+	| { type: 'question'; id: string; text: string; input: QuestionInput; source: QuestionSource; ts?: string }
+	| { type: 'answer'; questionId: string; value: AnswerValue; ts?: string }
 	| ({ type: 'turn_end'; ts?: string } & TurnEndMeta)
 	| { type: 'log'; text: string; level?: 'info' | 'warning' | 'error'; usageBars?: true; visibility?: 'ui' | 'next-user'; ts?: string }
 	| { type: 'info'; text: string; level?: 'info' | 'warning' | 'error'; usageBars?: true; visibility?: 'ui' | 'next-user'; ui?: 'notice'; ts?: string }

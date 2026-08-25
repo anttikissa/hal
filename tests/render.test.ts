@@ -47,7 +47,6 @@ beforeEach(() => {
 	client.state.peak = 0
 	client.state.peakCols = 0
 	client.state.working = new Map()
-	client.state.toolConfirmPending = new Set()
 	client.state.restoreTabHint = false
 	prompt.clear()
 	prompt.config.maxPromptLines = 10
@@ -676,26 +675,6 @@ describe('render', () => {
 		}
 	})
 
-	test('pending risky tool confirmation uses the configured warning alert instead of working minicursor', () => {
-		const tab = client.currentTab()!
-		client.state.working.set(tab.sessionId, true)
-
-		client.handleEvent({
-			type: 'tool-confirm-request',
-			sessionId: tab.sessionId,
-			requestId: 'risk-1',
-			body: ['risky'],
-			createdAt: new Date(0).toISOString(),
-		})
-
-		const output = captureOutput(() => render.draw())
-		const clean = stripAnsi(output)
-		const tabBar = clean.split('\n').find((line) => line.includes('[1!'))
-		expect(tabBar).toBeDefined()
-		expect(tabBar).toContain('[1!]')
-		expect(tabBar).not.toContain('[1▪]')
-		expect(output).toContain(`${colors.tab.warningFg}!`)
-	})
 
 	test('paused tab alert uses the configured bright foreground', () => {
 		colors.load()

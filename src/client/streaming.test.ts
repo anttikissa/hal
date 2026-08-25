@@ -27,21 +27,6 @@ describe('client streaming blocks', () => {
 		client.state.focusedTabIndex = 0
 	})
 
-	test('tool confirmation requests call the TUI hook', () => {
-		let seen: any = null
-		client.setOnToolConfirmRequest((event) => { seen = event })
-		client.handleEvent({ type: 'tool-confirm-request', sessionId: 's1', requestId: 'r1', body: ['risky'] })
-		expect(seen?.requestId).toBe('r1')
-	})
-
-	test('tool confirmation resolutions call the TUI hook', () => {
-		let seen: any = null
-		client.setOnToolConfirmResolved((event) => { seen = event })
-		client.state.toolConfirmPending.add('s1')
-		client.handleEvent({ type: 'tool-confirm-resolved', sessionId: 's1', requestId: 'r1' })
-		expect(seen?.requestId).toBe('r1')
-		expect(client.state.toolConfirmPending.has('s1')).toBe(false)
-	})
 
 
 	test('paused info waits briefly before rendering', async () => {

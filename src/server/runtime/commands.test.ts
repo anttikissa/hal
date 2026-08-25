@@ -322,12 +322,12 @@ test('/status hints /login when a provider has no credentials', async () => {
 	expect(result.output).not.toContain('/login chatgpt')
 })
 
-test('/login claude returns auth URL on the first call', async () => {
+test('/login claude returns an auth URL and secret question', async () => {
 	const result = await commands.executeCommand('/login claude', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.output).toContain('claude.ai/oauth/authorize')
-	expect(result.output).toContain('/login claude <code#state>')
+	expect(result.question).toMatchObject({ input: { kind: 'secret', maxBytes: 4096, publicKey: expect.any(String) }, source: { type: 'login', provider: 'claude' } })
 })
 
 // The provider names are what users see in Anthropic's and OpenAI's own

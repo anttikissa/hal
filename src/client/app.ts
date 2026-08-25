@@ -113,8 +113,6 @@ const state = {
 	// Background /what summaries. Separate from normal working state so prompts still behave as idle.
 	summarizing: new Set<string>(),
 	whatDoneUnseen: new Set<string>(),
-	// Sessions waiting for the user to answer a risky tool confirmation popup.
-	toolConfirmPending: new Set<string>(),
 	// Most-recently viewed tab order. Used as a fallback when session-list changes
 	// do not close the focused tab, such as cross-client closes or startup recovery.
 	recentTabs: [] as string[],
@@ -123,8 +121,6 @@ const state = {
 
 let pendingEntries: Block[] = []
 let onChange: (force: boolean) => void = () => {}
-let onToolConfirmRequest: ((event: any) => void) | null = null
-let onToolConfirmResolved: ((event: any) => void) | null = null
 let onRebaseStart: ((event: any) => void) | null = null
 let onRebaseResult: ((event: any) => void) | null = null
 
@@ -165,13 +161,6 @@ function setOnChange(fn: (force: boolean) => void): void {
 	onChange = fn
 }
 
-function setOnToolConfirmRequest(fn: (event: any) => void): void {
-	onToolConfirmRequest = fn
-}
-
-function setOnToolConfirmResolved(fn: (event: any) => void): void {
-	onToolConfirmResolved = fn
-}
 
 function setOnRebaseStart(fn: (event: any) => void): void {
 	onRebaseStart = fn
@@ -319,13 +308,6 @@ function markWhatDone(sessionId: string): void {
 }
 
 
-function markToolConfirmPending(sessionId: string): void {
-	state.toolConfirmPending.add(sessionId)
-}
-
-function clearToolConfirmPending(sessionId: string): void {
-	state.toolConfirmPending.delete(sessionId)
-}
 
 // onTabSwitch callback — called when focused tab changes, with the outgoing
 // session ID. The CLI uses this to save the outgoing draft and restore the
@@ -593,9 +575,6 @@ function applySharedStatus(shared: SharedState): void {
 	}
 	state.working = nextWorking
 	state.summarizing = new Set(Object.keys(shared.summarizing ?? {}))
-	for (const sessionId of state.toolConfirmPending) {
-		if (!nextWorking.get(sessionId)) state.toolConfirmPending.delete(sessionId)
-	}
 	if (changedDoneUnseen) saveClientState()
 	state.hostVersionStatus = shared.host?.versionStatus ?? 'idle'
 	state.hostVersion = shared.host?.version ?? ''
@@ -625,10 +604,6 @@ function handleEvent(event: any): void {
 		repaintIfActive,
 		touchTab,
 		reloadTabFromDisk,
-		onToolConfirmRequest: (item: any) => onToolConfirmRequest?.(item),
-		onToolConfirmResolved: (item: any) => onToolConfirmResolved?.(item),
-		markToolConfirmPending,
-		clearToolConfirmPending,
 		setSummarizing,
 		markWhatDone,
 		onDraftArrived: (text: string, promptEdit?: DraftPromptEdit) => onDraftArrived?.(text, promptEdit),
@@ -705,8 +680,6 @@ function resetForTests(): void {
 	onChange = () => {}
 	onTabSwitch = null
 	onDraftArrived = null
-	onToolConfirmRequest = null
-	onToolConfirmResolved = null
 	onRebaseStart = null
 	onRebaseResult = null
 	clearRestoreTabHint()
@@ -720,7 +693,6 @@ function resetForTests(): void {
 	state.localVersion = ''
 	state.localVersionError = ''
 	state.remoteUrl = null
-	state.toolConfirmPending.clear()
 	state.summarizing.clear()
 	state.whatDoneUnseen.clear()
 }
@@ -746,8 +718,6 @@ export const client = {
 	state,
 	setOnChange,
 	requestRender,
-	setOnToolConfirmRequest,
-	setOnToolConfirmResolved,
 	setOnRebaseStart,
 	setOnRebaseResult,
 	setOnTabSwitch,
@@ -755,8 +725,6 @@ export const client = {
 	currentTab,
 	sessionLabel,
 	isWorking,
-	markToolConfirmPending,
-	clearToolConfirmPending,
 	canContinueCurrentTurn,
 	continueActionForCurrentTurn,
 	continueActionForTab,

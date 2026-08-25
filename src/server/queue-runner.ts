@@ -6,6 +6,7 @@ import { agentLoop, type AgentLoopResult } from './runtime/agent-loop.ts'
 import { promptQueue, type QueuedPrompt } from './runtime/prompt-queue.ts'
 import { sessions } from './sessions.ts'
 import { transcriptTitles } from '../common/transcript-titles.ts'
+import { historyProjection } from '../common/history-projection.ts'
 // Circular import with runtime.ts is safe: we only access runtime.* at call time
 // (module convention — all cross-module calls go through namespace objects).
 import { runtime } from './runtime.ts'
@@ -34,8 +35,17 @@ function queueEntry(text: string, source?: string, displayText?: string, sourceT
 	}
 }
 
+
+function isQuestionParked(sessionId: string): boolean {
+	return !!historyProjection.activeQuestion(sessions.loadHistory(sessionId))
+}
+
 async function enqueuePrompt(sessionId: string, text: string, source?: string, displayText?: string, sourceTab?: number): Promise<void> {
 	if (!text.trim()) return
+	if (isQuestionParked(sessionId)) {
+		runtime.emitInfo(sessionId, 'Waiting for an answer')
+		return
+	}
 	if (!agentLoop.isWorking(sessionId) && !promptQueue.isHeld(sessionId)) {
 		await runtime.startPromptCommand(sessionId, text, source, displayText, undefined, sourceTab)
 		return
@@ -69,6 +79,10 @@ function shouldDrainQueuedPrompt(sessionId: string, result: AgentLoopResult): bo
 }
 
 async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boolean> {
+	if (isQuestionParked(sessionId)) {
+		runtime.emitInfo(sessionId, 'Waiting for an answer')
+		return false
+	}
 	const next = promptQueue.pop(sessionId)
 	if (!next) {
 		if (!quiet) runtime.emitInfo(sessionId, 'Queue is empty')

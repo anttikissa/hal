@@ -294,3 +294,14 @@ test('repairToolPairing drops tool_result blocks with no matching tool_use', () 
 		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'ok' }] },
 	])
 })
+
+
+test('questions and answers never enter provider messages', () => {
+	const messages = apiMessages.toProviderMessages('s1', [
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
+		{ type: 'question', id: '000001-aaa', text: 'Secret?', input: { kind: 'secret', publicKey: 'public', maxBytes: 4096 }, source: { type: 'login', provider: 'claude' } },
+		{ type: 'answer', questionId: '000001-aaa', value: { kind: 'secret', ciphertext: 'ciphertext' } },
+		{ type: 'assistant', text: 'world' },
+	], { prune: false })
+	expect(messages).toEqual([{ role: 'user', content: 'hello' }, { role: 'assistant', content: [{ type: 'text', text: 'world' }] }])
+})

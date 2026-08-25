@@ -90,9 +90,7 @@ test('tabIndicator uses the server continuation action instead of error blocks',
 
 test('activityStatusLabel names visible working phases', () => {
 	const origWorking = client.state.working
-	const origToolConfirm = client.state.toolConfirmPending
 	client.state.working = new Map([['04-new', true]])
-	client.state.toolConfirmPending = new Set()
 	try {
 		expect(renderStatus.activityStatusLabel(tab())).toBe('processing')
 		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'thinking', text: 'reasoning', streaming: true }] }))).toBe('thinking')
@@ -102,11 +100,8 @@ test('activityStatusLabel names visible working phases', () => {
 			{ type: 'tool', name: 'bash', output: 'first line', running: true },
 			{ type: 'tool', name: 'eval', output: 'second line', running: true },
 		] }))).toBe('running 2 tools')
-		client.state.toolConfirmPending.add('04-new')
-		expect(renderStatus.activityStatusLabel(tab())).toBe('waiting for approval')
 	} finally {
 		client.state.working = origWorking
-		client.state.toolConfirmPending = origToolConfirm
 	}
 })
 

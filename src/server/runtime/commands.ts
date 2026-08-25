@@ -27,6 +27,8 @@ import { HAL_DIR } from '../state.ts'
 import { authLogin } from '../auth-login.ts'
 import { isPidAlive } from '../../utils/is-pid-alive.ts'
 import type { SharedClientInfo } from '../../common/ipc.ts'
+import type { QuestionInput, QuestionSource } from '../../common/history.ts'
+import { serverKeys } from '../server-keys.ts'
 import { modelRefresh } from '../model-refresh.ts'
 import { paths } from '../paths.ts'
 
@@ -43,9 +45,14 @@ export interface CommandResult {
 	usageBars?: true
 	/** Render output as a persisted synthetic assistant message. */
 	syntheticKind?: string
+	/** Durable question appended after command output. */
+	question?: CommandQuestion
 	/** Whether the command was recognized and handled. */
 	handled: boolean
 }
+
+
+export type CommandQuestion = { text: string; input: QuestionInput; source: QuestionSource }
 
 export interface CommandHooks {
 	/** Emit a user-visible progress/info notice while a command is still running. */
@@ -587,8 +594,8 @@ handlers['status'] = async (_args, _session, hooks) => {
 	}
 }
 
-// /login <provider> [code] — OAuth login for Claude or ChatGPT.
-// Claude is two-step (paste code); ChatGPT is one-step (localhost callback).
+// /login <provider> — Claude returns its code through a durable secret question;
+// ChatGPT receives its code through the existing localhost callback.
 //
 // Users subscribe to Claude and ChatGPT, not to "Anthropic" and "OpenAI", so the
 // product names are what we ask for. The company names stay as hidden aliases:
@@ -600,24 +607,15 @@ handlers['login'] = async (args, _session, hooks) => {
 	const codeArg = parts.slice(1).join(' ')
 
 	if (provider === 'claude' || provider === 'anthropic') {
-		if (codeArg) {
-			try {
-				const { email } = await authLogin.finishAnthropic(codeArg)
-				return { output: `Logged in to Claude${email ? ` as ${email}` : ''}. Run /status to see usage.`, handled: true }
-			} catch (err: any) {
-				return { error: `Login failed: ${err?.message ?? err}`, handled: true }
-			}
-		}
+		if (codeArg) return { error: 'Usage: /login claude', handled: true }
 		const { url } = await authLogin.startAnthropic()
 		return {
-			output: [
-				'Open this URL to log in to Claude:',
-				'',
-				url,
-				'',
-				'Then copy the code shown on the redirect page and run:',
-				'  /login claude <code#state>',
-			].join('\n'),
+			output: ['Open this URL to log in to Claude:', '', url].join('\n'),
+			question: {
+				text: 'Paste the code#state value from the Claude redirect page.',
+				input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 4096 },
+				source: { type: 'login', provider: 'claude' },
+			},
 			handled: true,
 		}
 	}
@@ -632,7 +630,7 @@ handlers['login'] = async (args, _session, hooks) => {
 		}
 	}
 
-	return { error: 'Usage: /login <claude|chatgpt> [code]', handled: true }
+	return { error: 'Usage: /login <claude|chatgpt>', handled: true }
 }
 
 

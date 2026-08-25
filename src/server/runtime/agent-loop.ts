@@ -85,7 +85,6 @@ function runningSubagentNotice(parentSessionId: string): string {
 	return `<meta>Subagents running: ${active.map(sessionLabel.format).join(', ')}</meta>`
 }
 
-const pendingToolConfirmations = new Map<string, { sessionId: string; resolve: (approved: boolean) => void }>()
 
 const DEFAULT_ABORT_TEXT = '[paused]'
 
@@ -204,53 +203,18 @@ function sanitizeToolCallInput(name: string, input: any, cwd: string): any {
 	return { ...input, command, cwd }
 }
 
-function resolveToolConfirmation(requestId: string, approved: boolean): boolean {
-	const pending = pendingToolConfirmations.get(requestId)
-	if (!pending) return false
-	pendingToolConfirmations.delete(requestId)
-	// Every client shows the same popup, so tell them all that this one is answered.
-	// Not a history event: it only dismisses live UI, so it never reaches the projection.
-	ipc.appendEvent({ type: 'tool-confirm-resolved', sessionId: pending.sessionId, requestId })
-	pending.resolve(approved)
-	return true
+function toolQuestionText(call: ToolCall, findings: RiskFinding[]): string {
+	const reasons = findings.map((finding) => finding.reason).join('; ')
+	return `Allow risky ${call.name} tool call? ${reasons}`
 }
 
-
-function toolConfirmationBody(sessionId: string, call: ToolCall, findings: RiskFinding[]): string[] {
-	// Render with ason so multi-line strings stay readable (real newlines, not "\n").
-	// JSON.stringify is forbidden in this codebase for human-facing output.
-	let text = call.name === 'bash' ? String(call.input?.command ?? '') : ason.stringify(call.input ?? {})
-	// Paint the exact fragment that tripped the check bright yellow; popup width math is ANSI-aware.
-	for (const finding of findings) text = text.replaceAll(finding.match, `\x1b[93m${finding.match}\x1b[39m`)
-	const tab = ipc.readState().sessions.find((item) => item.id === sessionId)?.tab
-	const lines = [`Session ${sessionId}${tab ? ` (tab ${tab})` : ''} wants to do this:`, '', `${call.name}:`, text, '', "I'm asking because:"]
-	for (const finding of findings) lines.push(`- ${finding.reason}`)
-	lines.push('', 'Continue?')
-	return lines
-}
-
-async function confirmToolCall(sessionId: string, call: ToolCall, signal: AbortSignal): Promise<{ allowed: boolean; approvedRisk: boolean }> {
-	const findings = risk.analyzeToolCall(call.name, call.input)
-	if (findings.length === 0) return { allowed: true, approvedRisk: false }
-	const requestId = protocol.eventId()
-	emitEvent(sessionId, {
-		type: 'tool-confirm-request',
-		requestId,
-		body: toolConfirmationBody(sessionId, call, findings),
-	})
-	const approved = await new Promise<boolean>((resolve) => {
-		function done(value: boolean): void {
-			signal.removeEventListener('abort', onAbort)
-			resolve(value)
-		}
-		function onAbort(): void {
-			// Go through resolveToolConfirmation so clients hear the popup is gone.
-			if (!resolveToolConfirmation(requestId, false)) done(false)
-		}
-		pendingToolConfirmations.set(requestId, { sessionId, resolve: done })
-		signal.addEventListener('abort', onAbort, { once: true })
-	})
-	return { allowed: approved, approvedRisk: approved }
+function riskyToolCalls(toolCalls: ToolCall[]): Array<{ call: ToolCall; findings: RiskFinding[] }> {
+	const risky: Array<{ call: ToolCall; findings: RiskFinding[] }> = []
+	for (const call of toolCalls) {
+		const findings = risk.analyzeToolCall(call.name, call.input)
+		if (findings.length > 0) risky.push({ call, findings })
+	}
+	return risky
 }
 
 function parseErrorPayload(body: string | undefined): unknown {
@@ -740,6 +704,16 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					if (hasUsage(totalUsage)) assistantEntry.usage = totalUsage
 					historyEntries.push(assistantEntry)
 				}
+				if (providerPaused && model === 'hal/intro') {
+					historyEntries.push({
+						type: 'question',
+						id: sessions.newHistoryIds(sessionId, 1)[0]!,
+						text: 'Continue?',
+						input: { kind: 'choice', choices: [{ id: 'continue', label: 'Continue' }] },
+						source: { type: 'intro' },
+						ts,
+					})
+				}
 				if (terminalErrorEntry) historyEntries.push(terminalErrorEntry)
 				let emptyResponseMessage = ''
 				if (!thinkingText && !assistantText && serverToolHistory.length === 0 && !terminalErrorEntry) {
@@ -752,6 +726,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				if (historyEntries.length > 0) {
 					await sessions.appendHistory(sessionId, historyEntries)
 				}
+				if (providerPaused && model === 'hal/intro') ipc.appendEvent({ type: 'history-updated', sessionId })
 				if (emptyResponseMessage) emitEvent(sessionId, { type: 'response', text: emptyResponseMessage, isError: true })
 
 				if (historyEntries.length > 0) {
@@ -813,28 +788,40 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				historyEntries.push({ type: 'tool_call', toolId: tc.id, name: tc.name, input: tc.input, blobId, ts })
 			}
 			const pauseBeforeTools = hasPauseBeforeTools(sessionId)
-			if (pauseBeforeTools) {
-				// Provider streams cannot be reconstructed after a crash. We only call this
-				// a durable pause after the complete local tool-call batch is saved, and
-				// before any local tool starts. The batch is all-or-nothing: once a tool
-				// starts, this feature must not claim a clean pause before tools.
+			const riskyCalls = riskyToolCalls(toolCalls)
+			const parked = pauseBeforeTools || riskyCalls.length > 0
+			if (parked) {
+				const ids = sessions.newHistoryIds(sessionId, riskyCalls.length + 1)
+				const pendingId = ids[0]!
 				historyEntries.push({
 					type: 'pending_tools',
+					id: pendingId,
 					toolIds: toolCalls.map((call) => call.id),
 					cwd: ctx.cwd,
 					model,
 					usage: usageOrUndefined(totalUsage),
-					reason: 'soft-pause',
+					reason: riskyCalls.length > 0 ? 'questions' : 'soft-pause',
 					ts,
 				})
+				for (let i = 0; i < riskyCalls.length; i++) {
+					const item = riskyCalls[i]!
+					historyEntries.push({
+						type: 'question',
+						id: ids[i + 1]!,
+						text: toolQuestionText(item.call, item.findings),
+						input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] },
+						source: { type: 'tool', pendingId, toolId: item.call.id },
+						ts,
+					})
+				}
 			}
 			await sessions.appendHistory(sessionId, historyEntries)
-
 			sessions.clearLive(sessionId)
 
-			if (pauseBeforeTools) {
+			if (parked) {
 				clearPauseBeforeTools(sessionId)
-				emitInfo(sessionId, '[paused before local tools]')
+				if (riskyCalls.length > 0) ipc.appendEvent({ type: 'history-updated', sessionId })
+				else emitInfo(sessionId, '[paused before local tools]')
 				const est = context.estimateContext(messages, model, overheadBytes)
 				emitEvent(sessionId, {
 					type: 'stream-end',
@@ -930,11 +917,11 @@ async function executeToolsConcurrently(
 	sessionId?: string,
 	onOutput?: (call: ToolCall, output: string) => void,
 	onDone?: (call: ToolCall, result: ToolOutput) => Promise<void>,
+	policy: { approvedRisk?: ReadonlySet<string>; rejected?: ReadonlySet<string> } = {},
 ): Promise<{ call: ToolCall; result: ToolOutput }[]> {
 	const results: { call: ToolCall; result: ToolOutput }[] = []
 	const context = { sessionId: sessionId ?? 'unknown', cwd: cwd ?? process.cwd(), signal }
 
-	// Process in batches of maxToolConcurrency
 	for (let i = 0; i < toolCalls.length; i += config.maxToolConcurrency) {
 		if (signal.aborted) {
 			for (const call of toolCalls.slice(i)) {
@@ -952,13 +939,11 @@ async function executeToolsConcurrently(
 					return { call, result }
 				}
 				if (signal.aborted) return finish('[interrupted]')
+				if (policy.rejected?.has(call.id)) return finish('error: user rejected risky tool call')
 				try {
-					const approval = await confirmToolCall(context.sessionId, call, signal)
-					if (signal.aborted) return finish('[interrupted]')
-					if (!approval.allowed) return finish('error: user rejected risky tool call')
 					const result = await toolRegistry.dispatch(call.name, call.input, {
 						...context,
-						approvedRisk: approval.approvedRisk,
+						approvedRisk: policy.approvedRisk?.has(call.id) || undefined,
 						onOutput: (output) => onOutput?.(call, output),
 					})
 					return finish(result)
@@ -979,6 +964,7 @@ async function executeToolBatch(
 	cwd: string,
 	signal: AbortSignal,
 	toolBlobMap?: Map<string, string>,
+	policy: { approvedRisk?: ReadonlySet<string>; rejected?: ReadonlySet<string> } = {},
 ): Promise<{ call: ToolCall; result: ToolOutput; blobId: string }[]> {
 	const blobs = toolBlobMap ?? new Map<string, string>()
 	for (const call of toolCalls) {
@@ -989,7 +975,6 @@ async function executeToolBatch(
 		const existing = blob.readBlob(sessionId, blobId) ?? { call: { name: call.name, input: call.input } }
 		existing.result = { content: result, status: 'done' }
 		await blob.writeBlob(sessionId, blobId, existing)
-		await sessions.appendHistory(sessionId, [{ type: 'tool_result', toolId: call.id, blobId, ts: new Date().toISOString() }])
 		emitEvent(sessionId, {
 			type: 'tool-result',
 			toolId: call.id,
@@ -1009,7 +994,8 @@ async function executeToolBatch(
 			blobId: blobs.get(call.id),
 			phase: 'running',
 		})
-	}, saveCompletedTool)
+	}, saveCompletedTool, policy)
+	await sessions.appendHistory(sessionId, results.map(({ call }) => ({ type: 'tool_result', toolId: call.id, blobId: blobs.get(call.id)!, ts: new Date().toISOString() })))
 	const saved: { call: ToolCall; result: ToolOutput; blobId: string }[] = []
 	for (const { call, result } of results) {
 		saved.push({ call, result, blobId: blobs.get(call.id)! })
@@ -1064,7 +1050,6 @@ export const agentLoop = {
 	runAgentLoop,
 	abort,
 	abortAndWait,
-	resolveToolConfirmation,
 	isWorking,
 	requestPauseBeforeTools,
 	clearPauseBeforeTools,
@@ -1073,5 +1058,6 @@ export const agentLoop = {
 	sanitizeToolCallInput,
 	runningSubagentNotice,
 	runningSubagents,
-	toolConfirmationBody,
+	toolQuestionText,
+	riskyToolCalls,
 }

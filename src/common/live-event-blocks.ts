@@ -144,13 +144,7 @@ export interface ResponseEvent extends LiveEventBase {
 	blobId?: string
 }
 
-export interface ToolConfirmRequestEvent extends LiveEventBase {
-	type: 'tool-confirm-request'
-	requestId: string
-	body: string[]
-}
-
-export type LiveEvent = PromptEvent | StreamStartEvent | StreamDeltaEvent | StreamEndEvent | ToolCallEvent | ToolResultEvent | ToolConfirmRequestEvent | InfoEvent | ResponseEvent
+export type LiveEvent = PromptEvent | StreamStartEvent | StreamDeltaEvent | StreamEndEvent | ToolCallEvent | ToolResultEvent | InfoEvent | ResponseEvent
 
 export interface LiveProjectionOptions {
 	sessionId?: string

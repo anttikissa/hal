@@ -1,7 +1,7 @@
 import type { Command, CommandType } from '../common/protocol.ts'
 import { historyIds } from '../common/history-ids.ts'
 
-export type ClientCommandType = Exclude<CommandType, 'client-exit' | 'client-status' | 'compact' | 'draft-saved' | 'focus' | 'reset' | 'spawn' | 'tool-confirm'>
+export type ClientCommandType = Exclude<CommandType, 'answer' | 'client-exit' | 'client-status' | 'compact' | 'draft-saved' | 'focus' | 'reset' | 'spawn'>
 
 type PendingTabAction = 'open' | 'fork' | 'resume' | false
 

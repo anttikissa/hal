@@ -53,6 +53,9 @@ export interface PendingToolsState {
 	cwd: string
 	model?: string
 	usage?: PartialTokenUsage
+	questions: Array<{ id: string; toolId: string; answer?: Extract<HistoryEntry, { type: 'answer' }>['value'] }>
+	allAnswered: boolean
+	aborted: boolean
 }
 
 export interface SessionLive {
@@ -107,7 +110,7 @@ const historyTopLevelKeys = new Set([
 	'blobId', 'signature', 'model', 'thinkingEffort',
 	'usage', 'abortText', 'synthetic', 'syntheticKind',
 	'toolId', 'toolIds', 'name', 'input', 'output', 'isError', 'cwd', 'reason',
-	'level', 'visibility', 'ui', 'usageBars', 'parent', 'child', 'log', 'from', 'to',
+	'questionId', 'value', 'level', 'visibility', 'ui', 'usageBars', 'parent', 'child', 'log', 'from', 'to',
 ])
 
 function stripUndefined(value: unknown): unknown {
@@ -149,6 +152,18 @@ function ensureEntryIds(entries: HistoryEntry[], used = new Set<string>()): Hist
 		used.add(id)
 	}
 	return entries
+}
+
+
+function newHistoryIds(sessionId: string, count: number): string[] {
+	const used = usedHistoryIds(sessionId)
+	const ids: string[] = []
+	for (let i = 0; i < count; i++) {
+		const id = makeEntryId(used)
+		used.add(id)
+		ids.push(id)
+	}
+	return ids
 }
 
 function stringifyHistoryEntry(entry: HistoryEntry): string {
@@ -282,6 +297,8 @@ function loadAllHistoryWithOrigin(sessionId: string): {
 	return { entries: [...before, first, ...entries.slice(1)], parentCount: before.length, parentId: first.parent }
 }
 
+
+
 function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, index?: number): SharedSessionInfo {
 	return {
 		id: meta.id,
@@ -410,7 +427,26 @@ function findPendingTools(sessionId: string): PendingToolsState | null {
 		const call = toolCalls.get(toolId)
 		if (call) calls.push(call)
 	}
-	return { id: pending.id, toolIds: pending.toolIds, toolCalls: calls, cwd: pending.cwd, model: pending.model, usage: pending.usage }
+	const answers = new Map<string, Extract<HistoryEntry, { type: 'answer' }>['value']>()
+	for (const entry of entries) {
+		if (entry.type === 'answer' && !entry.canceled && !answers.has(entry.questionId)) answers.set(entry.questionId, entry.value)
+	}
+	const questions: PendingToolsState['questions'] = []
+	for (const entry of entries) {
+		if (entry.type !== 'question' || entry.canceled || entry.source.type !== 'tool' || entry.source.pendingId !== pending.id) continue
+		questions.push({ id: entry.id, toolId: entry.source.toolId, answer: answers.get(entry.id) })
+	}
+	return {
+		id: pending.id,
+		toolIds: pending.toolIds,
+		toolCalls: calls,
+		cwd: pending.cwd,
+		model: pending.model,
+		usage: pending.usage,
+		questions,
+		allAnswered: questions.every((question) => question.answer !== undefined),
+		aborted: questions.some((question) => question.answer?.kind === 'aborted'),
+	}
 }
 
 function resolvePendingTools(sessionId: string, pendingId: string): boolean {
@@ -545,6 +581,7 @@ function tailTurnState(entries: HistoryEntry[]): { interrupted: boolean; interru
 }
 
 export const sessions = {
+	newHistoryIds,
 	loadSessionMetas,
 	loadAllSessionMetas,
 	loadSessionList,

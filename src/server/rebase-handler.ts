@@ -13,6 +13,7 @@ import { openai } from './providers/openai.ts'
 // Circular import is safe: we only access queueRunner.* at call time
 // (module convention — all cross-module calls go through namespace objects).
 import { queueRunner } from './queue-runner.ts'
+import { historyProjection } from '../common/history-projection.ts'
 
 const snapshots = new Map<string, { sessionId: string; clientPid: number; baseLog: string; baseHash: string; snapshot: RebaseSnapshot }>()
 
@@ -30,6 +31,10 @@ function emitRebaseResult(clientPid: number, requestId: string, sessionId: strin
 }
 
 function runRebaseStart(sessionId: string, requestId: string, clientPid: number): void {
+	if (historyProjection.activeQuestion(sessionStore.loadHistory(sessionId))) {
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Waiting for an answer'] })
+		return
+	}
 	if (agentLoop.isWorking(sessionId)) {
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Session is working'] })
 		return
@@ -46,6 +51,10 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 	const saved = snapshots.get(requestId)
 	if (!saved || saved.sessionId !== sessionId) {
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Rebase request expired'] })
+		return
+	}
+	if (historyProjection.activeQuestion(sessionStore.loadHistory(sessionId))) {
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Waiting for an answer'] })
 		return
 	}
 	if (agentLoop.isWorking(sessionId)) {

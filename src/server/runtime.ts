@@ -30,6 +30,10 @@ import { paths } from './paths.ts'
 import { openingSummary } from './session/opening-summary.ts'
 import { blob } from './session/blob.ts'
 import { whatSummary } from './session/what.ts'
+import type { AnswerValue } from '../common/history.ts'
+import { historyProjection } from '../common/history-projection.ts'
+import { serverKeys } from './server-keys.ts'
+import { authLogin } from './auth-login.ts'
 
 type PendingContinuation = { canceled: boolean }
 type PendingPrompt = {
@@ -134,6 +138,92 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 	})
 }
 
+
+function emitHistoryUpdated(sessionId: string): void {
+	ipc.appendEvent({ type: 'history-updated', sessionId })
+}
+
+function activeQuestion(sessionId: string): Extract<HistoryEntry, { type: 'question' }> | undefined {
+	return historyProjection.activeQuestion(sessionStore.loadHistory(sessionId))
+}
+
+function acceptsAnswer(question: Extract<HistoryEntry, { type: 'question' }>, value: AnswerValue): boolean {
+	if (value.kind === 'aborted') return true
+	if (value.kind !== question.input.kind) return false
+	if (value.kind === 'choice' && question.input.kind === 'choice') return question.input.choices.some((choice) => choice.id === value.choiceId)
+	if (value.kind === 'text' && question.input.kind === 'text') return question.input.allowEmpty === true || value.text.length > 0
+	return value.kind === 'secret' && question.input.kind === 'secret' && value.ciphertext.length > 0
+}
+
+function appendQuestion(
+	sessionId: string,
+	question: {
+		text: string
+		input: Extract<HistoryEntry, { type: 'question' }>['input']
+		source: Extract<HistoryEntry, { type: 'question' }>['source']
+	},
+): string {
+	const id = sessionStore.newHistoryIds(sessionId, 1)[0]!
+	sessionStore.appendHistorySync(sessionId, [{ type: 'question', id, ...question, ts: new Date().toISOString() }])
+	emitHistoryUpdated(sessionId)
+	return id
+}
+
+async function handleAnswer(sessionId: string, questionId: string, value: AnswerValue): Promise<void> {
+	let question = activeQuestion(sessionId)
+	if (!question || question.id !== questionId || !acceptsAnswer(question, value)) return
+	let email: string | undefined
+	if (value.kind === 'secret') {
+		try {
+			const plaintext = await serverKeys.decryptSecret(value.ciphertext, sessionId, questionId)
+			question = activeQuestion(sessionId)
+			if (!question || question.id !== questionId || !acceptsAnswer(question, value)) return
+			if (question.source.type === 'login') ({ email } = await authLogin.finishAnthropic(plaintext))
+		} catch (err) {
+			emitInfo(sessionId, `Login failed: ${errorMessage(err)}`, 'error')
+			return
+		}
+		// Decryption and OAuth are asynchronous. Disk is authoritative, so another
+		// client may have won while they ran; only a still-current answer is appended.
+		question = activeQuestion(sessionId)
+		if (!question || question.id !== questionId || !acceptsAnswer(question, value)) return
+	}
+	sessionStore.appendHistorySync(sessionId, [{ type: 'answer', questionId, value, ts: new Date().toISOString() }])
+	emitHistoryUpdated(sessionId)
+	if (question.source.type === 'login') {
+		emitInfo(sessionId, `Logged in to Claude${email ? ` as ${email}` : ''}. Run /status to see usage.`)
+		return
+	}
+	if (question.source.type === 'tool') {
+		const pending = sessionStore.findPendingTools(sessionId)
+		if (pending?.allAnswered) requestContinue(sessionId)
+		return
+	}
+	if (value.kind !== 'aborted') requestContinue(sessionId)
+}
+
+
+function abortParkedQuestions(sessionId: string): boolean {
+	const question = activeQuestion(sessionId)
+	if (!question) return false
+	const ts = new Date().toISOString()
+	if (question.source.type === 'tool') {
+		const pending = sessionStore.findPendingTools(sessionId)
+		if (!pending) return false
+		const answers: HistoryEntry[] = []
+		for (const item of pending.questions) {
+			if (!item.answer) answers.push({ type: 'answer', questionId: item.id, value: { kind: 'aborted' }, ts })
+		}
+		sessionStore.appendHistorySync(sessionId, answers)
+		emitHistoryUpdated(sessionId)
+		requestContinue(sessionId)
+		return true
+	}
+	sessionStore.appendHistorySync(sessionId, [{ type: 'answer', questionId: question.id, value: { kind: 'aborted' }, ts }])
+	emitHistoryUpdated(sessionId)
+	return true
+}
+
 function shouldCloseSessionAfterGeneration(meta: { spawnKind?: SpawnKind } | null | undefined, result: AgentLoopResult): boolean {
 	// 'waiting' is a parked turn (the model called wait); it is not a finished
 	// generation, so a waiting subagent must not be auto-closed.
@@ -148,6 +238,18 @@ function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 		const entry = entries[i]!
 		if (entry.type === 'turn_end') return false
 		if (entry.type === 'log' && entry.text === RESTARTED_TEXT) return continuation.actionForHistory(entries.slice(0, i + 1)) !== false
+	}
+	return false
+}
+
+
+function answeredIntroNeedsContinue(entries: HistoryEntry[]): boolean {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i]!
+		if (entry.type !== 'question' || entry.source.type !== 'intro') continue
+		const answered = entries.slice(i + 1).some((item) => item.type === 'answer' && item.questionId === entry.id && item.value.kind !== 'aborted' && !item.canceled)
+		const continued = entries.slice(i + 1).some((item) => item.type === 'assistant' && !item.canceled)
+		return answered && !continued
 	}
 	return false
 }
@@ -244,8 +346,30 @@ function restartPromptWatch(): void {
 	)
 }
 
+function cancelSessionWork(sessionId: string, text: string): boolean {
+	let canceled = false
+	const continuation = state.continuingTurns.get(sessionId)
+	if (continuation) {
+		continuation.canceled = true
+		state.continuingTurns.delete(sessionId)
+		canceled = true
+	}
+	const pending = state.pendingPrompts.get(sessionId)
+	if (pending) {
+		pending.controller.abort(text)
+		canceled = true
+	}
+	const toolRun = state.pendingToolRuns.get(sessionId)
+	if (toolRun) {
+		toolRun.abort()
+		canceled = true
+	}
+	if (agentLoop.abort(sessionId, text)) canceled = true
+	return canceled
+}
+
 function recordTabClosed(sessionId: string): void {
-	if (!agentLoop.abort(sessionId, TAB_CLOSED_TEXT)) emitInfo(sessionId, TAB_CLOSED_TEXT)
+	if (!cancelSessionWork(sessionId, TAB_CLOSED_TEXT) && !activeQuestion(sessionId)) emitInfo(sessionId, TAB_CLOSED_TEXT)
 }
 
 // Handled slash commands never become user entries, so persist the typed text
@@ -271,6 +395,10 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
+	if (activeQuestion(sessionId)) {
+		emitInfo(sessionId, 'Waiting for an answer')
+		return
+	}
 	if (await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText)) {
 		persistCommandInput(sessionId, text, source)
 		return
@@ -302,6 +430,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 			}
 		}
 		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error')
+		if (cmdResult.question) appendQuestion(sessionId, cmdResult.question)
 		if (label === 'steering' && (/^\/cd(?:\s|$)/.test(text.trimStart()) || (!cmdResult.error && /^\/model\b/.test(text.trimStart())))) void runGeneration(sessionId, '', source)
 		return
 	}
@@ -391,20 +520,24 @@ function hasLiveTurnContent(sessionId: string): boolean {
 }
 
 async function continueTurn(sessionId: string, continuation: PendingContinuation): Promise<void> {
-	const pending = abortPendingPrompt(sessionId, '')
-	if (pending) await pending
+	const pendingPrompt = abortPendingPrompt(sessionId, '')
+	if (pendingPrompt) await pendingPrompt
 	if (agentLoop.isWorking(sessionId)) {
 		if (agentLoop.hasPauseBeforeTools(sessionId)) return
 		const settled = agentLoop.abortAndWait(sessionId, '')
 		if (settled) await settled
 	}
 	if (continuation.canceled) return
-	// Continuing resumes the paused turn that held the queue. If it completes,
-	// queued prompts should drain immediately instead of staying stuck behind
-	// the paused-turn safety hold.
+	const pendingTools = sessionStore.findPendingTools(sessionId)
+	if (pendingTools && !pendingTools.allAnswered) return
 	promptQueue.setHeld(sessionId, false)
 	await continuePendingTools(sessionId)
-	if (continuation.canceled) return
+	if (continuation.canceled || sessionStore.findPendingTools(sessionId)) return
+	if (pendingTools?.aborted) {
+		sessionStore.appendHistorySync(sessionId, [{ type: 'turn_end', status: 'aborted', abortText: USER_PAUSED_TEXT, ts: new Date().toISOString() }])
+		emitHistoryUpdated(sessionId)
+		return
+	}
 	void runGeneration(sessionId, '')
 }
 
@@ -475,10 +608,9 @@ async function handlePromptAmendCommand(sessionId: string, text: string, source:
 async function continuePendingTools(sessionId: string): Promise<boolean> {
 	const pending = sessionStore.findPendingTools(sessionId)
 	if (!pending) return false
-	// Pending tools must run before provider-message rebuild; otherwise
-	// repairToolPairing() would correctly treat the missing tool results as an
-	// interruption and inject synthetic [interrupted] results.
+	if (!pending.allAnswered) return true
 	const ac = new AbortController()
+	if (pending.aborted) ac.abort()
 	state.pendingToolRuns.set(sessionId, ac)
 	ipc.updateState((shared) => updateSharedTurnStatus(shared, sessionId, true))
 	try {
@@ -488,8 +620,15 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 			const input = call.input === undefined && call.blobId ? blob.readBlob(sessionId, call.blobId)?.call?.input : call.input
 			return { id: call.id, name: call.name, input }
 		})
-		await agentLoop.executeToolBatch(sessionId, calls, pending.cwd, ac.signal, blobMap)
+		const approvedRisk = new Set<string>()
+		const rejected = new Set<string>()
+		for (const question of pending.questions) {
+			if (question.answer?.kind === 'choice' && question.answer.choiceId === 'yes') approvedRisk.add(question.toolId)
+			else if (question.answer?.kind !== 'aborted') rejected.add(question.toolId)
+		}
+		await agentLoop.executeToolBatch(sessionId, calls, pending.cwd, ac.signal, blobMap, { approvedRisk, rejected })
 		sessionStore.resolvePendingTools(sessionId, pending.id)
+		emitHistoryUpdated(sessionId)
 		return true
 	} finally {
 		if (state.pendingToolRuns.get(sessionId) === ac) state.pendingToolRuns.delete(sessionId)
@@ -507,6 +646,10 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
+	if (activeQuestion(sessionId)) {
+		emitInfo(sessionId, 'Waiting for an answer')
+		return
+	}
 	const model = meta.model ?? models.defaultModel()
 	const introStart = !text && isIntroStart(model, sessionStore.loadAllHistory(sessionId))
 	let continueAction: ContinuationAction | false = false
@@ -524,8 +667,6 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 	const cwd = meta.workingDir ?? process.cwd()
 	const promptResult = context.buildSystemPrompt({ model, cwd, sessionId })
 	if (text) {
-		const pendingTools = sessionStore.findPendingTools(sessionId)
-		if (pendingTools) sessionStore.resolvePendingTools(sessionId, pendingTools.id)
 		const parts = await resolvePromptParts(sessionId, text, displayText)
 		let sourceName: string | undefined
 		if (source) sourceName = sessionStore.loadSessionMeta(source)?.name
@@ -626,6 +767,10 @@ function resetProviderConversation(sessionId: string): void {
 
 function runReset(sessionId: string): void {
 	if (!ipc.ownsHostLock()) return
+	if (activeQuestion(sessionId)) {
+		emitInfo(sessionId, 'Waiting for an answer')
+		return
+	}
 	if (agentLoop.isWorking(sessionId)) {
 		emitInfo(sessionId, 'Session is working')
 		return
@@ -643,6 +788,10 @@ function runReset(sessionId: string): void {
 
 function runCompact(sessionId: string): void {
 	if (!ipc.ownsHostLock()) return
+	if (activeQuestion(sessionId)) {
+		emitInfo(sessionId, 'Waiting for an answer')
+		return
+	}
 	if (agentLoop.isWorking(sessionId)) {
 		emitInfo(sessionId, 'Session is working')
 		return
@@ -686,6 +835,12 @@ function removeClient(pid: number): void {
 		shared.clients = (shared.clients ?? []).filter((item) => item.pid !== pid)
 	})
 }
+
+
+function questionBlocksCommand(type: Command['type']): boolean {
+	return type === 'prompt' || type === 'prompt-amend' || type === 'continue' || type === 'run-next-from-queue'
+		|| type === 'reset' || type === 'compact' || type === 'rebase-start' || type === 'rebase-apply'
+}
 function handleCommand(cmd: Command): void {
 	const sessionId = cmd.sessionId ?? state.openSessionIds[0]
 	if (cmd.type === 'client-status') {
@@ -703,6 +858,10 @@ function handleCommand(cmd: Command): void {
 	tabs.focusSession(cmd.sessionId)
 	if (cmd.type === 'focus') {
 		broadcastSessions()
+		return
+	}
+	if (sessionId && questionBlocksCommand(cmd.type) && activeQuestion(sessionId)) {
+		emitInfo(sessionId, 'Waiting for an answer')
 		return
 	}
 	switch (cmd.type) {
@@ -734,19 +893,16 @@ function handleCommand(cmd: Command): void {
 			else void queueRunner.runNextQueuedPrompt(sessionId, false)
 			break
 		}
+		case 'answer': {
+			if (!cmd.sessionId) return
+			void handleAnswer(cmd.sessionId, cmd.questionId, cmd.value)
+			break
+		}
 		case 'abort': {
 			if (!cmd.sessionId) return
-			const continuation = state.continuingTurns.get(cmd.sessionId)
-			if (continuation) {
-				continuation.canceled = true
-				state.continuingTurns.delete(cmd.sessionId)
-			}
+			if (abortParkedQuestions(cmd.sessionId)) break
 			const abortText = cmd.abortText ?? (promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)
-			const pending = abortPendingPrompt(cmd.sessionId, abortText)
-			const toolRun = state.pendingToolRuns.get(cmd.sessionId)
-			toolRun?.abort()
-			const working = agentLoop.abort(cmd.sessionId, abortText)
-			if (!pending && !toolRun && !working && abortText !== '' && !continuation) emitInfo(cmd.sessionId, 'No working turn to pause')
+			if (!cancelSessionWork(cmd.sessionId, abortText) && abortText !== '') emitInfo(cmd.sessionId, 'No working turn to pause')
 			break
 		}
 		case 'reset': {
@@ -863,10 +1019,6 @@ function handleCommand(cmd: Command): void {
 			void startSpawnedSession(parent, child, spec)
 			break
 		}
-		case 'tool-confirm': {
-			agentLoop.resolveToolConfirmation(cmd.requestId, cmd.approved)
-			break
-		}
 		case 'resume': {
 			const selector = (cmd.selector ?? '').trim()
 			const resumeId = sessionStore.resolveResumeTarget(sessionStore.loadAllSessionMetas(), new Set(state.openSessionIds), selector)
@@ -966,6 +1118,16 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		for (const sessionId of state.openSessionIds) {
 			if (signal.aborted || state.activeRuntimePid !== process.pid || !ipc.ownsHostLock()) return
 			const entries = sessionStore.loadAllHistory(sessionId)
+			const pendingTools = sessionStore.findPendingTools(sessionId)
+			if (pendingTools) {
+				if (pendingTools.allAnswered) requestContinue(sessionId)
+				continue
+			}
+			if (activeQuestion(sessionId)) continue
+			if (answeredIntroNeedsContinue(sessionStore.loadHistory(sessionId))) {
+				requestContinue(sessionId)
+				continue
+			}
 			if (!shouldAutoContinue(entries)) continue
 			const tail = sessionStore.tailTurnState(entries)
 			for (const tool of tail.interruptedTools) {
@@ -1007,6 +1169,14 @@ export const runtime = {
 	state,
 	startRuntime,
 	emitInfo,
+	emitHistoryUpdated,
+	activeQuestion,
+	acceptsAnswer,
+	appendQuestion,
+	handleAnswer,
+	abortParkedQuestions,
+	cancelSessionWork,
+	answeredIntroNeedsContinue,
 	shouldAutoContinue,
 	isIntroStart,
 	shouldCloseSessionAfterGeneration,

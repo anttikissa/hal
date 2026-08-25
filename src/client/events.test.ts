@@ -17,6 +17,18 @@ test('history-rebased reloads exactly the rebased log prefix', () => {
 })
 
 
+test('history-updated reloads the authoritative current history', () => {
+	const tab = { sessionId: 's1' }
+	const calls: any[] = []
+	clientEvents.handle({ type: 'history-updated', sessionId: 's1' }, {
+		tabForSession: () => tab,
+		reloadTabFromDisk: (...args: any[]) => calls.push(['reload', ...args]),
+		onChange: (force: boolean) => calls.push(['change', force]),
+	})
+	expect(calls).toEqual([['reload', tab], ['change', true]])
+})
+
+
 test('prompt event keeps actual text behind display text', () => {
 	let block: any = null
 	const cleared: string[] = []

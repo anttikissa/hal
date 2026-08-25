@@ -45,3 +45,22 @@ test('remote bootstrap installs the same state and session ports as file IPC', (
 	expect(clientBackend.sessions.loadSessionMeta('04-work')?.workingDir).toBe('/srv/work')
 	expect(clientBackend.sessions.loadAllHistoryWithOrigin('04-work').entries).toHaveLength(1)
 })
+
+
+test('remote history-updated observes the snapshot that arrived immediately before it', () => {
+	webConnection.reset()
+	webConnection.install()
+	webConnection.applyMessage({
+		type: 'snapshot',
+		snapshot: {
+			session: { id: '04-work', cwd: '/srv/work' },
+			meta: { id: '04-work', createdAt: 'then', workingDir: '/srv/work' },
+			history: [{ type: 'question', id: 'q1', text: 'Continue?', input: { kind: 'choice', choices: [{ id: 'yes', label: 'Yes' }] }, source: { type: 'intro' } }],
+			parentCount: 0,
+			live: [],
+		},
+	})
+	webConnection.applyMessage({ type: 'event', event: { type: 'history-updated', sessionId: '04-work' } })
+	expect(clientBackend.sessions.loadAllHistoryWithOrigin('04-work').entries[0]).toMatchObject({ type: 'question', id: 'q1' })
+	expect(webConnection.state.events).toEqual([{ type: 'history-updated', sessionId: '04-work' }])
+})

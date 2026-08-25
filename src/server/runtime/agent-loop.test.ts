@@ -81,57 +81,6 @@ test('reports only running subagents belonging to the parent', () => {
 	}
 })
 
-test('confirmation body colors the exact offending fragment', () => {
-	const call = { id: 't1', name: 'bash', input: { command: 'cd /tmp\ngit checkout -- . 2>/dev/null; true' } }
-	const findings = [{ severity: 'danger' as const, reason: 'DESTRUCTIVE GIT CHECKOUT/RESTORE PATH', match: 'git checkout -- . 2>/dev/null' }]
-	expect(agentLoop.toolConfirmationBody('s1', call, findings)).toContain('cd /tmp\n\x1b[93mgit checkout -- . 2>/dev/null\x1b[39m; true')
-})
-
-test('announces a resolved tool confirmation so other clients can close their popup', async () => {
-	const sessionId = `test-confirm-resolved-${Date.now().toString(36)}`
-	createdSessions.push(sessionId)
-	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
-	const events: any[] = []
-	const origAppendEvent = ipc.appendEvent
-	const origDispatch = toolRegistry.dispatch
-	ipc.appendEvent = (event: any) => { events.push(event) }
-	toolRegistry.dispatch = async () => 'ran'
-	try {
-		const batch = agentLoop.executeToolBatch(sessionId, [
-			{ id: 'tool-a', name: 'bash', input: { command: 'git checkout -- .' } },
-		], process.cwd(), new AbortController().signal)
-		// The request event is emitted synchronously before the confirmation promise awaits.
-		const request = events.find((event) => event.type === 'tool-confirm-request')
-		expect(typeof request?.requestId).toBe('string')
-		expect(agentLoop.resolveToolConfirmation(request.requestId, true)).toBe(true)
-		await batch
-		expect(events.filter((event) => event.type === 'tool-confirm-resolved').map((event) => event.requestId)).toEqual([request.requestId])
-	} finally {
-		ipc.appendEvent = origAppendEvent
-		toolRegistry.dispatch = origDispatch
-	}
-})
-
-test('announces a confirmation dismissed by an abort', async () => {
-	const sessionId = `test-confirm-aborted-${Date.now().toString(36)}`
-	createdSessions.push(sessionId)
-	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
-	const events: any[] = []
-	const origAppendEvent = ipc.appendEvent
-	const ac = new AbortController()
-	ipc.appendEvent = (event: any) => { events.push(event) }
-	try {
-		const batch = agentLoop.executeToolBatch(sessionId, [
-			{ id: 'tool-a', name: 'bash', input: { command: 'git checkout -- .' } },
-		], process.cwd(), ac.signal)
-		const request = events.find((event) => event.type === 'tool-confirm-request')
-		ac.abort()
-		await batch
-		expect(events.filter((event) => event.type === 'tool-confirm-resolved').map((event) => event.requestId)).toEqual([request.requestId])
-	} finally {
-		ipc.appendEvent = origAppendEvent
-	}
-})
 
 	test('settles unstarted tool calls when a batch is aborted', async () => {
 		const sessionId = `test-aborted-tools-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -170,9 +119,8 @@ test('abort before tool dispatch keeps the tool from starting', async () => {
 		return 'ran'
 	}
 	try {
-		const batch = agentLoop.executeToolBatch(sessionId, [{ id: 'tool-a', name: 'read', input: { path: 'x' } }], process.cwd(), ac.signal)
 		ac.abort()
-		const results = await batch
+		const results = await agentLoop.executeToolBatch(sessionId, [{ id: 'tool-a', name: 'read', input: { path: 'x' } }], process.cwd(), ac.signal)
 		expect(dispatches).toBe(0)
 		expect(results[0]?.result).toBe('[interrupted]')
 	} finally {
@@ -317,6 +265,7 @@ test('provider pause preserves streamed output as an Enter-continuable turn', as
 		expect(result).toBe('paused')
 		expect(sessions.loadHistory(sessionId)).toEqual([
 			expect.objectContaining({ type: 'assistant', text: 'Press enter to continue.', model: 'hal/intro' }),
+			expect.objectContaining({ type: 'question', text: 'Continue?', input: { kind: 'choice', choices: [{ id: 'continue', label: 'Continue' }] }, source: { type: 'intro' } }),
 		])
 		expect(configChanges).toEqual([['renderStatus.tabsOpacity', '1']])
 		expect(events).toContainEqual(expect.objectContaining({ type: 'stream-end', phase: 'done' }))
@@ -1008,6 +957,39 @@ test('pause before all tools in batch persists pending marker without executing 
 		ipc.appendEvent = origAppendEvent
 		toolRegistry.dispatch = origDispatch
 		agentLoop.clearPauseBeforeTools(sessionId)
+	}
+})
+
+
+test('risky batch persists every call and question before dispatching any tool', async () => {
+	const sessionId = `test-risk-questions-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const origGetProvider = providerLoader.getProvider
+	const origDispatch = toolRegistry.dispatch
+	let dispatches = 0
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'tool_call', id: 'safe', name: 'read', input: { path: 'README.md' } }
+			yield { type: 'tool_call', id: 'risky-a', name: 'bash', input: { command: 'git checkout -- .' } }
+			yield { type: 'tool_call', id: 'risky-b', name: 'bash', input: { command: 'git reset --hard' } }
+			yield { type: 'done' }
+		},
+	})
+	toolRegistry.dispatch = async () => { dispatches++; return 'ran' }
+	try {
+		expect(await agentLoop.runAgentLoop({ sessionId, model: 'openai/gpt-5.4', cwd: process.cwd(), systemPrompt: 'test', messages: [{ role: 'user', content: 'tools' }] })).toBe('paused')
+		const history = sessions.loadHistory(sessionId)
+		const marker = history.find((entry) => entry.type === 'pending_tools')
+		expect(dispatches).toBe(0)
+		expect(marker).toMatchObject({ id: expect.any(String), toolIds: ['safe', 'risky-a', 'risky-b'], reason: 'questions' })
+		expect(history.filter((entry) => entry.type === 'question')).toMatchObject([
+			{ source: { type: 'tool', pendingId: marker?.id, toolId: 'risky-a' }, input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] } },
+			{ source: { type: 'tool', pendingId: marker?.id, toolId: 'risky-b' } },
+		])
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		toolRegistry.dispatch = origDispatch
 	}
 })
 

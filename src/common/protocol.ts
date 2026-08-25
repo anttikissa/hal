@@ -1,4 +1,5 @@
 // IPC protocol types — commands, events, shared types.
+import type { AnswerValue } from './history.ts'
 //
 // Defines the contract between client and server. Commands flow client→server,
 // events flow server→client. Both are serialized to ASONL files via ipc.ts.
@@ -21,8 +22,7 @@ export type EventType =
 	| 'stream-end'
 	| 'tool-call'
 	| 'tool-result'
-	| 'tool-confirm-request'
-	| 'tool-confirm-resolved'
+	| 'history-updated'
 	| 'rebase-start'
 	| 'rebase-result'
 	| 'history-rebased'
@@ -31,7 +31,7 @@ export type EventType =
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'prompt-amend' | 'continue' | 'run-next-from-queue' | 'pause-before-tools' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'tool-confirm' | 'focus' | 'what' | 'draft-saved' | 'client-status' | 'client-exit'
+export type CommandType = 'prompt' | 'prompt-amend' | 'continue' | 'run-next-from-queue' | 'pause-before-tools' | 'open' | 'close' | 'resume' | 'abort' | 'answer' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'focus' | 'what' | 'draft-saved' | 'client-status' | 'client-exit'
 
 export type SpawnMode = 'fork' | 'fresh'
 export type SpawnKind = 'subagent' | 'subagent-leave-open' | 'interactive'
@@ -152,10 +152,10 @@ export interface SpawnCommand extends CommandBase {
 	spawn: SpawnCommandData
 }
 
-export interface ToolConfirmCommand extends CommandBase {
-	type: 'tool-confirm'
-	requestId: string
-	approved: boolean
+export interface AnswerCommand extends CommandBase {
+	type: 'answer'
+	questionId: string
+	value: AnswerValue
 }
 
 export interface FocusCommand extends CommandBase {
@@ -206,7 +206,7 @@ export type Command =
 	| RebaseApplyCommand
 	| MoveCommand
 	| SpawnCommand
-	| ToolConfirmCommand
+	| AnswerCommand
 	| FocusCommand
 	| WhatCommand
 	| DraftSavedCommand

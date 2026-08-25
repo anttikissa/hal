@@ -20,6 +20,9 @@ import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { openai } from './providers/openai.ts'
+import { questionCrypto } from '../common/question-crypto.ts'
+import { serverKeys } from './server-keys.ts'
+import { authLogin } from './auth-login.ts'
 
 test('runtime exposes in-memory focused sessions for eval helpers', () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
@@ -1298,6 +1301,196 @@ test('abort reaches resumed pending-tool batches and stops later tools', async (
 		agentLoop.config.maxToolConcurrency = origConcurrency
 		sessions.deleteSession(sessionId)
 	}
+})
+
+
+test('pending risky tools wait for every answer and apply exact per-call approval', async () => {
+	const sessionId = `test-question-tools-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: '/tmp' })
+	const origDispatch = toolRegistry.dispatch
+	const dispatched: Array<{ name: string; approvedRisk?: boolean }> = []
+	toolRegistry.dispatch = async (name, _input, ctx) => {
+		dispatched.push({ name, approvedRisk: ctx.approvedRisk })
+		return `ran ${name}`
+	}
+	try {
+		await sessions.appendHistory(sessionId, [
+			{ type: 'tool_call', toolId: 'safe', name: 'read', input: { path: 'README.md' } },
+			{ type: 'tool_call', toolId: 'deny', name: 'bash', input: { command: 'git reset --hard' } },
+			{ type: 'tool_call', toolId: 'allow', name: 'bash', input: { command: 'git checkout -- .' } },
+			{ type: 'pending_tools', id: '000001-aaa', toolIds: ['safe', 'deny', 'allow'], cwd: '/tmp', reason: 'questions' },
+			{ type: 'question', id: '000002-bbb', text: 'Deny?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'tool', pendingId: '000001-aaa', toolId: 'deny' } },
+			{ type: 'question', id: '000003-ccc', text: 'Allow?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'tool', pendingId: '000001-aaa', toolId: 'allow' } },
+			{ type: 'answer', questionId: '000002-bbb', value: { kind: 'choice', choiceId: 'no' } },
+		])
+		expect(await runtime.continuePendingTools(sessionId)).toBe(true)
+		expect(dispatched).toEqual([])
+		expect(sessions.findPendingTools(sessionId)).not.toBeNull()
+
+		await sessions.appendHistory(sessionId, [{ type: 'answer', questionId: '000003-ccc', value: { kind: 'choice', choiceId: 'yes' } }])
+		expect(await runtime.continuePendingTools(sessionId)).toBe(true)
+		expect(dispatched).toEqual([{ name: 'read', approvedRisk: undefined }, { name: 'bash', approvedRisk: true }])
+		const results = sessions.loadHistory(sessionId).filter((entry) => entry.type === 'tool_result')
+		expect(results.map((entry) => entry.toolId)).toEqual(['safe', 'deny', 'allow'])
+	} finally {
+		toolRegistry.dispatch = origDispatch
+		sessions.deleteSession(sessionId)
+	}
+})
+
+
+test('answers validate session, active head and first-valid-wins', async () => {
+	const firstSession = `test-answer-a-${Date.now().toString(36)}`
+	const secondSession = `test-answer-b-${Date.now().toString(36)}`
+	await sessions.createSession(firstSession, { id: firstSession, createdAt: new Date().toISOString() })
+	await sessions.createSession(secondSession, { id: secondSession, createdAt: new Date().toISOString() })
+	const input = { kind: 'choice' as const, choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }
+	try {
+		await sessions.appendHistory(firstSession, [
+			{ type: 'question', id: '000001-aaa', text: 'First?', input, source: { type: 'login', provider: 'claude' } },
+			{ type: 'question', id: '000002-bbb', text: 'Second?', input, source: { type: 'login', provider: 'claude' } },
+		])
+		await sessions.appendHistory(secondSession, [{ type: 'question', id: '000003-ccc', text: 'Other?', input, source: { type: 'login', provider: 'claude' } }])
+		await runtime.handleAnswer(firstSession, '000002-bbb', { kind: 'choice', choiceId: 'yes' })
+		await runtime.handleAnswer(firstSession, '000003-ccc', { kind: 'choice', choiceId: 'yes' })
+		await runtime.handleAnswer(firstSession, '000001-aaa', { kind: 'text', text: 'yes' })
+		expect(sessions.loadHistory(firstSession).filter((entry) => entry.type === 'answer')).toEqual([])
+
+		await runtime.handleAnswer(firstSession, '000001-aaa', { kind: 'choice', choiceId: 'yes' })
+		await runtime.handleAnswer(firstSession, '000001-aaa', { kind: 'choice', choiceId: 'no' })
+		expect(sessions.loadHistory(firstSession).filter((entry) => entry.type === 'answer')).toEqual([
+			expect.objectContaining({ questionId: '000001-aaa', value: { kind: 'choice', choiceId: 'yes' } }),
+		])
+		expect(runtime.activeQuestion(firstSession)?.id).toBe('000002-bbb')
+	} finally {
+		sessions.deleteSession(firstSession)
+		sessions.deleteSession(secondSession)
+	}
+})
+
+
+test('Claude secret answer retries after failure and persists only ciphertext on success', async () => {
+	const sessionId = `test-secret-answer-${Date.now().toString(36)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString() })
+	const questionId = '000001-aaa'
+	const ciphertext = await questionCrypto.encryptSecret(serverKeys.publicKey(), sessionId, questionId, 'code#state')
+	const origFinish = authLogin.finishAnthropic
+	let fail = true
+	authLogin.finishAnthropic = async (plaintext) => {
+		expect(plaintext).toBe('code#state')
+		if (fail) throw new Error('exchange failed')
+		return { email: 'person@example.com' }
+	}
+	try {
+		await sessions.appendHistory(sessionId, [{ type: 'question', id: questionId, text: 'Code?', input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 4096 }, source: { type: 'login', provider: 'claude' } }])
+		await runtime.handleAnswer(sessionId, questionId, { kind: 'secret', ciphertext })
+		expect(runtime.activeQuestion(sessionId)?.id).toBe(questionId)
+		fail = false
+		await runtime.handleAnswer(sessionId, questionId, { kind: 'secret', ciphertext })
+		const persisted = sessions.loadHistory(sessionId)
+		expect(persisted.filter((entry) => entry.type === 'answer')).toEqual([expect.objectContaining({ value: { kind: 'secret', ciphertext } })])
+		expect(await Bun.file(`${sessions.sessionDir(sessionId)}/history.asonl`).text()).not.toContain('code#state')
+	} finally {
+		authLogin.finishAnthropic = origFinish
+		sessions.deleteSession(sessionId)
+	}
+})
+
+test('secret answer reloads before action when another client wins decryption race', async () => {
+	const sessionId = `test-secret-race-${Date.now().toString(36)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString() })
+	const questionId = '000001-aaa'
+	const origDecrypt = serverKeys.decryptSecret
+	const origFinish = authLogin.finishAnthropic
+	let finished = false
+	serverKeys.decryptSecret = async () => {
+		await sessions.appendHistory(sessionId, [{ type: 'answer', questionId, value: { kind: 'aborted' } }])
+		return 'code#state'
+	}
+	authLogin.finishAnthropic = async () => { finished = true; return {} }
+	try {
+		await sessions.appendHistory(sessionId, [{ type: 'question', id: questionId, text: 'Code?', input: { kind: 'secret', publicKey: 'public', maxBytes: 4096 }, source: { type: 'login', provider: 'claude' } }])
+		await runtime.handleAnswer(sessionId, questionId, { kind: 'secret', ciphertext: 'packet' })
+		expect(finished).toBe(false)
+		expect(sessions.loadHistory(sessionId).filter((entry) => entry.type === 'answer')).toHaveLength(1)
+	} finally {
+		serverKeys.decryptSecret = origDecrypt
+		authLogin.finishAnthropic = origFinish
+		sessions.deleteSession(sessionId)
+	}
+})
+
+
+test('aborting a parked risky batch records aborted answers and interrupted results without dispatch', async () => {
+	const sessionId = `test-question-abort-${Date.now().toString(36)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: '/tmp' })
+	const origDispatch = toolRegistry.dispatch
+	let dispatches = 0
+	toolRegistry.dispatch = async () => { dispatches++; return 'ran' }
+	try {
+		await sessions.appendHistory(sessionId, [
+			{ type: 'tool_call', toolId: 'safe', name: 'read', input: { path: 'README.md' } },
+			{ type: 'tool_call', toolId: 'risk', name: 'bash', input: { command: 'git reset --hard' } },
+			{ type: 'pending_tools', id: '000001-aaa', toolIds: ['safe', 'risk'], cwd: '/tmp', reason: 'questions' },
+			{ type: 'question', id: '000002-bbb', text: 'Risk?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'tool', pendingId: '000001-aaa', toolId: 'risk' } },
+		])
+		expect(runtime.abortParkedQuestions(sessionId)).toBe(true)
+		while (runtime.state.continuingTurns.has(sessionId)) await Bun.sleep(1)
+		expect(dispatches).toBe(0)
+		expect(sessions.findPendingTools(sessionId)).toBeNull()
+		const history = sessions.loadHistory(sessionId)
+		expect(history).toContainEqual(expect.objectContaining({ type: 'answer', questionId: '000002-bbb', value: { kind: 'aborted' } }))
+		expect(history.filter((entry) => entry.type === 'tool_result').map((entry) => entry.toolId)).toEqual(['safe', 'risk'])
+		expect(history.at(-1)).toMatchObject({ type: 'turn_end', status: 'aborted' })
+	} finally {
+		toolRegistry.dispatch = origDispatch
+		sessions.deleteSession(sessionId)
+	}
+})
+
+
+test('parked question guards prompt, continue, queue execution, reset, compact and rebase', async () => {
+	const sessionId = `test-question-guards-${Date.now().toString(36)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString() })
+	try {
+		await sessions.appendHistory(sessionId, [{ type: 'question', id: '000001-aaa', text: 'Wait?', input: { kind: 'text' }, source: { type: 'intro' } }])
+		promptQueue.append(sessionId, { text: 'queued', createdAt: new Date().toISOString() })
+		runtime.handleCommand({ type: 'prompt', sessionId, text: 'bypass' })
+		runtime.handleCommand({ type: 'continue', sessionId })
+		runtime.handleCommand({ type: 'run-next-from-queue', sessionId })
+		runtime.handleCommand({ type: 'reset', sessionId })
+		runtime.handleCommand({ type: 'compact', sessionId })
+		runtime.handleCommand({ type: 'rebase-start', sessionId, requestId: 'request', clientPid: 1 })
+		await Bun.sleep(0)
+		const history = sessions.loadHistory(sessionId)
+		expect(runtime.activeQuestion(sessionId)?.id).toBe('000001-aaa')
+		expect(history.some((entry) => entry.type === 'user' || entry.type === 'reset' || entry.type === 'compact')).toBe(false)
+		expect(history.filter((entry) => entry.type === 'log' && entry.text === 'Waiting for an answer')).toHaveLength(6)
+		expect(promptQueue.load(sessionId).map((entry) => entry.text)).toEqual(['queued'])
+	} finally {
+		promptQueue.clear(sessionId)
+		sessions.deleteSession(sessionId)
+	}
+})
+
+test('closing an idle parked question does not mutate its history', async () => {
+	const sessionId = `test-question-close-${Date.now().toString(36)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString() })
+	try {
+		await sessions.appendHistory(sessionId, [{ type: 'question', id: '000001-aaa', text: 'Wait?', input: { kind: 'text' }, source: { type: 'intro' } }])
+		const before = sessions.loadHistory(sessionId)
+		runtime.recordTabClosed(sessionId)
+		expect(sessions.loadHistory(sessionId)).toEqual(before)
+	} finally {
+		sessions.deleteSession(sessionId)
+	}
+})
+
+test('startup intro projection resumes only a non-aborted answered page', () => {
+	const question: any = { type: 'question', id: 'q1', text: 'Continue?', input: { kind: 'choice', choices: [{ id: 'continue', label: 'Continue' }] }, source: { type: 'intro' } }
+	expect(runtime.answeredIntroNeedsContinue([{ type: 'assistant', text: 'page' }, question, { type: 'answer', questionId: 'q1', value: { kind: 'choice', choiceId: 'continue' } }] as any)).toBe(true)
+	expect(runtime.answeredIntroNeedsContinue([{ type: 'assistant', text: 'page' }, question, { type: 'answer', questionId: 'q1', value: { kind: 'aborted' } }] as any)).toBe(false)
+	expect(runtime.answeredIntroNeedsContinue([{ type: 'assistant', text: 'page' }, question, { type: 'answer', questionId: 'q1', value: { kind: 'choice', choiceId: 'continue' } }, { type: 'assistant', text: 'next' }] as any)).toBe(false)
 })
 
 test('empty abort is silent when no turn is working', () => {

@@ -17,8 +17,7 @@ function handle(event: any, ctx: any): void {
 	if (event.type === 'response') return handleResponse(event, ctx)
 	if (event.type === 'info') return handleInfo(event, ctx)
 	if (event.type === 'tool-call' && event.sessionId) return handleToolCall(event, ctx)
-	if (event.type === 'tool-confirm-request' && event.sessionId) return handleToolConfirmRequest(event, ctx)
-	if (event.type === 'tool-confirm-resolved' && event.sessionId) return handleToolConfirmResolved(event, ctx)
+	if (event.type === 'history-updated' && event.sessionId) return handleHistoryUpdated(event, ctx)
 	if (event.type === 'tool-result' && event.sessionId) return handleToolResult(event, ctx)
 	if (event.type === 'draft_saved' && event.sessionId) return handleDraftSaved(event, ctx)
 	if (event.type === 'rebase-start') return handleRebaseStart(event, ctx)
@@ -101,22 +100,9 @@ function handleToolCall(event: any, ctx: any): void {
 	ctx.onChange(false)
 }
 
-function handleToolConfirmRequest(event: any, ctx: any): void {
-	ctx.flushDelayedPaused(event.sessionId)
-	ctx.markToolConfirmPending(event.sessionId)
-	ctx.onToolConfirmRequest(event)
-	ctx.onChange(false)
-}
-
-function handleToolConfirmResolved(event: any, ctx: any): void {
-	ctx.clearToolConfirmPending(event.sessionId)
-	ctx.onToolConfirmResolved(event)
-	ctx.onChange(false)
-}
 
 function handleToolResult(event: any, ctx: any): void {
 	ctx.flushDelayedPaused(event.sessionId)
-	ctx.clearToolConfirmPending(event.sessionId)
 	const tab = ctx.tabForSession(event.sessionId)
 	const toolBlock = tab ? ctx.applyLiveEventToTab(tab, event).toolBlock : null
 	if (!tab || !toolBlock) return
@@ -154,6 +140,14 @@ function handleRebaseStart(event: any, ctx: any): void {
 function handleRebaseResult(event: any, ctx: any): void {
 	if (!isTargetedHere(event, ctx)) return
 	ctx.onRebaseResult(event)
+}
+
+
+function handleHistoryUpdated(event: any, ctx: any): void {
+	const tab = ctx.tabForSession(event.sessionId)
+	if (!tab) return
+	ctx.reloadTabFromDisk(tab)
+	ctx.onChange(true)
 }
 
 function handleHistoryRebased(event: any, ctx: any): void {

@@ -104,6 +104,23 @@ test('pending tools marker persists and resolves across reload-style reads', asy
 })
 
 
+test('questions and encrypted answers persist and project onto pending tools', async () => {
+	const id = await makeSession()
+	await sessions.appendHistory(id, [
+		{ type: 'tool_call', toolId: 'tool-1', name: 'bash', input: { command: 'git reset --hard' } },
+		{ type: 'pending_tools', id: '000001-aaa', toolIds: ['tool-1'], cwd: '/tmp', reason: 'questions' },
+		{ type: 'question', id: '000002-bbb', text: 'Allow?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'tool', pendingId: '000001-aaa', toolId: 'tool-1' } },
+		{ type: 'answer', questionId: '000002-bbb', value: { kind: 'choice', choiceId: 'yes' } },
+	])
+
+	expect(sessions.loadHistory(id).slice(-2)).toEqual([
+		expect.objectContaining({ type: 'question', id: '000002-bbb', source: { type: 'tool', pendingId: '000001-aaa', toolId: 'tool-1' } }),
+		expect.objectContaining({ type: 'answer', questionId: '000002-bbb', value: { kind: 'choice', choiceId: 'yes' } }),
+	])
+	expect(sessions.findPendingTools(id)).toMatchObject({ allAnswered: true, aborted: false, questions: [{ id: '000002-bbb', toolId: 'tool-1', answer: { kind: 'choice', choiceId: 'yes' } }] })
+})
+
+
 test('cancelTailTurn marks last prompt and partial output canceled in current history', async () => {
 	const id = await makeSession()
 	await sessions.appendHistory(id, [

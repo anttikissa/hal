@@ -94,6 +94,8 @@ test('websocket parser accepts ASON authentication and ordinary commands', () =>
 	expect(web.parseClientMessage("{ type: 'command', command: { type: 'prompt', text: 42 } }")).toBeNull()
 	expect(web.parseClientMessage("{ type: 'command', command: { type: 'prompt', id: 'bad', text: 'hello' } }")).toBeNull()
 	expect(web.parseClientMessage("{ type: 'command', command: { type: 'prompt', id: '000001-abc', text: 'hello' } }")).not.toBeNull()
+	expect(web.parseCommand({ type: 'answer', sessionId: '04-work', questionId: 'q1', value: { kind: 'choice', choiceId: 'yes' } })).toMatchObject({ type: 'answer', questionId: 'q1' })
+	expect(web.parseCommand({ type: 'answer', sessionId: '04-work', questionId: 'q1', value: { kind: 'secret', ciphertext: 'x'.repeat(5587) } })).toBeNull()
 })
 
 test('websocket is an authenticated ASON command bus', async () => {
@@ -135,6 +137,7 @@ test('websocket is an authenticated ASON command bus', async () => {
 test('websocket snapshots refresh history boundaries', () => {
 	expect(web.isSnapshotBoundary({ type: 'stream-end' })).toBe(true)
 	expect(web.isSnapshotBoundary({ type: 'history-rebased' })).toBe(true)
+	expect(web.isSnapshotBoundary({ type: 'history-updated' })).toBe(true)
 	expect(web.isSnapshotBoundary({ type: 'stream-delta' })).toBe(false)
 })
 
