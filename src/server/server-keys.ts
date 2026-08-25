@@ -4,9 +4,7 @@
 // use still requires HTTPS, which authenticates the server public key.
 
 import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, timingSafeEqual } from 'crypto'
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'fs'
-import { dirname } from 'path'
-import { ason } from '../utils/ason.ts'
+import { liveFiles } from '../utils/live-file.ts'
 import { STATE_DIR } from './state.ts'
 
 export type WebToken = {
@@ -24,7 +22,7 @@ type QuestionKey = {
 
 type ServerKeyStore = {
 	tokens: WebToken[]
-	questionKey: QuestionKey
+	questionKey?: QuestionKey
 }
 
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -33,76 +31,19 @@ const MAX_PACKET_LENGTH = Math.ceil(MAX_PACKET_BYTES * 4 / 3)
 
 const config = {
 	path: `${STATE_DIR}/server-keys.ason`,
-	legacyPath: `${STATE_DIR}/auth-tokens.ason`,
 }
 
-const state = {
+const state: { initialized: boolean; store: ServerKeyStore | null } = {
 	initialized: false,
+	store: null,
 }
 
-let store: ServerKeyStore | null = null
 const revokeListeners = new Set<(token: WebToken) => void>()
 
-function invalidState(): never {
-	throw new Error(`Invalid server key state: ${config.path}`)
-}
-
-function decodeBase64Url(value: unknown): Buffer {
-	if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value)) return invalidState()
-	const bytes = Buffer.from(value, 'base64url')
-	if (bytes.toString('base64url') !== value) return invalidState()
-	return bytes
-}
-
 function publicKeyFromPrivate(privateKey: string): Buffer {
-	const privateDer = decodeBase64Url(privateKey)
-	const key = createPrivateKey({ key: privateDer, format: 'der', type: 'pkcs8' })
-	if (key.asymmetricKeyType !== 'ec' || key.asymmetricKeyDetails?.namedCurve !== 'prime256v1') return invalidState()
+	const key = createPrivateKey({ key: Buffer.from(privateKey, 'base64url'), format: 'der', type: 'pkcs8' })
 	const jwk = createPublicKey(key).export({ format: 'jwk' })
-	const x = decodeBase64Url(jwk.x)
-	const y = decodeBase64Url(jwk.y)
-	if (x.byteLength !== 32 || y.byteLength !== 32) return invalidState()
-	return Buffer.concat([Buffer.of(4), x, y])
-}
-
-function parseTokens(value: unknown): WebToken[] {
-	if (!Array.isArray(value)) return invalidState()
-	const tokens: WebToken[] = []
-	for (const entry of value) {
-		if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return invalidState()
-		const token = entry as Record<string, unknown>
-		if (typeof token.token !== 'string' || !/^[A-Za-z0-9]{12}$/.test(token.token) || typeof token.purpose !== 'string' || typeof token.createdAt !== 'string') return invalidState()
-		if (token.lastUsedAt !== undefined && typeof token.lastUsedAt !== 'string') return invalidState()
-		if (token.lastUsedIp !== undefined && typeof token.lastUsedIp !== 'string') return invalidState()
-		tokens.push({ token: token.token, purpose: token.purpose, createdAt: token.createdAt, lastUsedAt: token.lastUsedAt as string | undefined, lastUsedIp: token.lastUsedIp as string | undefined })
-	}
-	return tokens
-}
-
-function parseStore(value: unknown): ServerKeyStore {
-	if (!value || typeof value !== 'object' || Array.isArray(value)) return invalidState()
-	const data = value as Record<string, unknown>
-	const tokens = parseTokens(data.tokens)
-	if (!data.questionKey || typeof data.questionKey !== 'object' || Array.isArray(data.questionKey)) return invalidState()
-	const questionKey = data.questionKey as Record<string, unknown>
-	const publicKey = decodeBase64Url(questionKey.publicKey)
-	if (publicKey.byteLength !== 65 || publicKey[0] !== 4 || typeof questionKey.privateKey !== 'string') return invalidState()
-	let derived: Buffer
-	try {
-		derived = publicKeyFromPrivate(questionKey.privateKey)
-	} catch {
-		return invalidState()
-	}
-	if (!timingSafeEqual(publicKey, derived)) return invalidState()
-	return { tokens, questionKey: { publicKey: publicKey.toString('base64url'), privateKey: questionKey.privateKey } }
-}
-
-function readAson(path: string): unknown {
-	try {
-		return ason.parse(readFileSync(path, 'utf8'))
-	} catch {
-		return invalidState()
-	}
+	return Buffer.concat([Buffer.of(4), Buffer.from(jwk.x!, 'base64url'), Buffer.from(jwk.y!, 'base64url')])
 }
 
 function generateQuestionKey(): QuestionKey {
@@ -124,41 +65,22 @@ function generateToken(): string {
 	return token
 }
 
-function save(next: ServerKeyStore): void {
-	const tmp = `${config.path}.${process.pid}.tmp`
-	mkdirSync(dirname(config.path), { recursive: true })
-	writeFileSync(tmp, ason.stringify(next) + '\n', { mode: 0o600 })
-	// writeFileSync ignores mode when a stale temp file already exists.
-	chmodSync(tmp, 0o600)
-	renameSync(tmp, config.path)
+function save(data: ServerKeyStore): void {
+	liveFiles.save(data)
 }
 
 function init(): void {
 	if (state.initialized) return
-	let next: ServerKeyStore
-	if (existsSync(config.path)) {
-		next = parseStore(readAson(config.path))
-		chmodSync(config.path, 0o600)
-	} else if (existsSync(config.legacyPath)) {
-		const legacy = readAson(config.legacyPath)
-		if (!legacy || typeof legacy !== 'object' || Array.isArray(legacy)) return invalidState()
-		next = { tokens: parseTokens((legacy as Record<string, unknown>).tokens), questionKey: generateQuestionKey() }
-		save(next)
-		unlinkSync(config.legacyPath)
-	} else {
-		next = {
-			tokens: [{ token: generateToken(), purpose: 'local web token', createdAt: new Date().toISOString() }],
-			questionKey: generateQuestionKey(),
-		}
-		save(next)
-	}
-	store = next
+	state.store = liveFiles.liveFile(config.path, {
+		tokens: [{ token: generateToken(), purpose: 'local web token', createdAt: new Date().toISOString() }],
+	}, { watch: false, mode: 0o600 })
+	state.store.questionKey ??= generateQuestionKey()
 	state.initialized = true
 }
 
-function current(): ServerKeyStore {
+function current(): ServerKeyStore & { questionKey: QuestionKey } {
 	init()
-	return store!
+	return state.store as ServerKeyStore & { questionKey: QuestionKey }
 }
 
 function copyToken(token: WebToken): WebToken {
@@ -174,7 +96,7 @@ function mint(purpose = 'web token'): WebToken {
 	if (!trimmed || trimmed.length > 120) throw new Error('Token purpose must be 1–120 characters.')
 	const token = { token: generateToken(), purpose: trimmed, createdAt: new Date().toISOString() }
 	const data = current()
-	data.tokens.push(token)
+	data.tokens = [...data.tokens, token]
 	save(data)
 	return copyToken(token)
 }
@@ -198,6 +120,7 @@ function authenticate(token: string, ip: string): WebToken | null {
 	if (!found) return null
 	found.lastUsedAt = new Date().toISOString()
 	found.lastUsedIp = ip
+	data.tokens = [...data.tokens]
 	save(data)
 	return copyToken(found)
 }
@@ -207,6 +130,7 @@ function revoke(position: number): WebToken | null {
 	const data = current()
 	const [token] = data.tokens.splice(position - 1, 1)
 	if (!token) return null
+	data.tokens = [...data.tokens]
 	save(data)
 	const copy = copyToken(token)
 	for (const listener of revokeListeners) listener(copy)

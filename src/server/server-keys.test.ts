@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { questionCrypto } from '../common/question-crypto.ts'
@@ -7,29 +7,30 @@ import { ason } from '../utils/ason.ts'
 import { serverKeys } from './server-keys.ts'
 
 const originalPath = serverKeys.config.path
-const originalLegacyPath = serverKeys.config.legacyPath
 const originalInitialized = serverKeys.state.initialized
+const originalStore = serverKeys.state.store
 const dirs: string[] = []
 
-function useKeyFiles(): { path: string; legacyPath: string } {
+function useKeyFile(): string {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-server-keys-'))
 	dirs.push(dir)
 	serverKeys.config.path = join(dir, 'server-keys.ason')
-	serverKeys.config.legacyPath = join(dir, 'auth-tokens.ason')
 	serverKeys.state.initialized = false
-	return { path: serverKeys.config.path, legacyPath: serverKeys.config.legacyPath }
+	serverKeys.state.store = null
+	return serverKeys.config.path
 }
 
 afterEach(() => {
 	serverKeys.config.path = originalPath
-	serverKeys.config.legacyPath = originalLegacyPath
 	serverKeys.state.initialized = originalInitialized
+	serverKeys.state.store = originalStore
 	for (const dir of dirs.splice(0)) rmSync(dir, { force: true, recursive: true })
 })
 
-test('provisions one local web token and a persistent P-256 key pair', () => {
-	const { path } = useKeyFiles()
+test('provisions one local web token and persists one P-256 key pair through the live file', async () => {
+	const path = useKeyFile()
 	serverKeys.init()
+	await Promise.resolve()
 	const publicKey = serverKeys.publicKey()
 	const original = readFileSync(path, 'utf8')
 	const [token] = serverKeys.list()
@@ -39,51 +40,26 @@ test('provisions one local web token and a persistent P-256 key pair', () => {
 	expect(Buffer.from(publicKey, 'base64url')).toHaveLength(65)
 	expect(statSync(path).mode & 0o777).toBe(0o600)
 
-	chmodSync(path, 0o644)
 	serverKeys.state.initialized = false
+	serverKeys.state.store = null
 	serverKeys.init()
 	expect(serverKeys.publicKey()).toBe(publicKey)
 	expect(readFileSync(path, 'utf8')).toBe(original)
-	expect(statSync(path).mode & 0o777).toBe(0o600)
 })
 
-test('migrates the old token file once without changing bearer tokens', () => {
-	const { path, legacyPath } = useKeyFiles()
-	const tokens = [{ token: 'AbCdEf123456', purpose: 'existing browser', createdAt: '2026-08-25T00:00:00.000Z' }]
-	writeFileSync(legacyPath, ason.stringify({ tokens }) + '\n')
+test('a malformed file falls back to fresh live-file defaults', async () => {
+	const path = useKeyFile()
+	writeFileSync(path, '{ broken ASON')
 
 	serverKeys.init()
+	await Promise.resolve()
 
-	expect(serverKeys.list()).toEqual(tokens)
-	expect(existsSync(path)).toBe(true)
-	expect(existsSync(legacyPath)).toBe(false)
-	expect(statSync(path).mode & 0o777).toBe(0o600)
-	expect((ason.parse(readFileSync(path, 'utf8')) as any).questionKey.privateKey).toBeString()
-})
-
-test('malformed ASON, old tokens, or current keys fail loudly without overwrite', () => {
-	let files = useKeyFiles()
-	writeFileSync(files.legacyPath, "{ tokens: ['secret-token'] }\n")
-	const malformedLegacy = readFileSync(files.legacyPath, 'utf8')
-	expect(() => serverKeys.init()).toThrow(/Invalid server key state/)
-	expect(existsSync(files.path)).toBe(false)
-	expect(readFileSync(files.legacyPath, 'utf8')).toBe(malformedLegacy)
-
-	files = useKeyFiles()
-	writeFileSync(files.path, "{ tokens: [], questionKey: { publicKey: 'bad', privateKey: 'also-bad' } }\n")
-	const malformedCurrent = readFileSync(files.path, 'utf8')
-	expect(() => serverKeys.init()).toThrow(/Invalid server key state/)
-	expect(readFileSync(files.path, 'utf8')).toBe(malformedCurrent)
-
-	files = useKeyFiles()
-	writeFileSync(files.path, '{ definitely not valid ASON')
-	const malformedAson = readFileSync(files.path, 'utf8')
-	expect(() => serverKeys.init()).toThrow(/Invalid server key state/)
-	expect(readFileSync(files.path, 'utf8')).toBe(malformedAson)
+	expect(Buffer.from(serverKeys.publicKey(), 'base64url')).toHaveLength(65)
+	expect(serverKeys.list()[0]?.purpose).toBe('local web token')
 })
 
 test('decrypts scoped question secrets and rejects tampering or wrong AAD', async () => {
-	const { path } = useKeyFiles()
+	const path = useKeyFile()
 	const plaintext = 'påssword 🔑'
 	const ciphertext = await questionCrypto.encryptSecret(serverKeys.publicKey(), 'session-1', 'question-1', plaintext)
 
@@ -98,7 +74,7 @@ test('decrypts scoped question secrets and rejects tampering or wrong AAD', asyn
 })
 
 test('web token operations keep their existing behavior in the combined store', () => {
-	const { path } = useKeyFiles()
+	const path = useKeyFile()
 	serverKeys.init()
 	const token = serverKeys.mint('laptop browser')
 	expect(serverKeys.authenticate(token.token, '127.0.0.1')?.lastUsedIp).toBe('127.0.0.1')
