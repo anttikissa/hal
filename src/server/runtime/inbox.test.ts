@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from 'bun:test'
 import { inbox } from './inbox.ts'
 import { ipc } from '../file-ipc.ts'
+import { mkdirSync, writeFileSync } from 'fs'
+import { ason } from '../../utils/ason.ts'
 
 const origPollInterval = inbox.config.pollIntervalMs
 const origReadState = ipc.readState
@@ -17,6 +19,22 @@ async function waitFor(check: () => boolean, timeoutMs = 10_000): Promise<void> 
 		await new Promise((resolve) => setTimeout(resolve, 10))
 	}
 }
+test('a scan reloads shared state once for all inboxes', () => {
+	const sessionId = `scan-state-${Date.now()}`
+	const emptySessionId = `${sessionId}-empty`
+	mkdirSync(`${inbox.inboxDir()}/${sessionId}`, { recursive: true })
+	mkdirSync(`${inbox.inboxDir()}/${emptySessionId}`, { recursive: true })
+	writeFileSync(`${inbox.inboxDir()}/${sessionId}/message.ason`, ason.stringify({ sessionId, text: 'hello' }))
+	let reads = 0
+	ipc.readState = () => {
+		reads++
+		return { sessions: [{ id: sessionId, tab: 1, cwd: '/tmp' }], working: {}, updatedAt: new Date().toISOString() }
+	}
+
+	inbox.scanAll(() => {})
+
+	expect(reads).toBe(1)
+})
 
 // Regression: on macOS a brand-new session inbox directory is reported by the
 // recursive watcher as a bare directory name with no "<dir>/<file>" event for

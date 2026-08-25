@@ -49,12 +49,11 @@ function isOpen(sessionId: string): boolean {
 }
 
 /** Process any pending .ason files in a session's inbox directory. */
-function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessage): void {
+function processInbox(sessionDir: string, sessionId: string, openIds: Set<string>, onMessage: OnMessage): void {
 	try {
 		const files = readdirSync(sessionDir)
 			.filter((f) => f.endsWith('.ason'))
 			.sort()
-		const openIds = new Set(ipc.readState().sessions.map((session) => session.id))
 		for (const file of files) {
 			const path = `${sessionDir}/${file}`
 			try {
@@ -79,8 +78,11 @@ function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessag
 /** Process pending messages in every session inbox directory. */
 function scanAll(onMessage: OnMessage): void {
 	try {
+		// Recursive fs.watch can rescan while unrelated inbox directories change. Reloading
+		// state once per directory serialized the whole tab list hundreds of times a second.
+		const openIds = new Set(ipc.readState().sessions.map((session) => session.id))
 		for (const sessionId of readdirSync(INBOX_DIR)) {
-			processInbox(`${INBOX_DIR}/${sessionId}`, sessionId, onMessage)
+			processInbox(`${INBOX_DIR}/${sessionId}`, sessionId, openIds, onMessage)
 		}
 	} catch {}
 }
