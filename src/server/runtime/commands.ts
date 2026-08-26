@@ -613,7 +613,7 @@ handlers['login'] = async (args, _session, hooks) => {
 			output: ['Open this URL to log in to Claude:', '', url].join('\n'),
 			question: {
 				text: 'Paste the code#state value from the Claude redirect page.',
-				input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 4096 },
+				input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 190 },
 				source: { type: 'login', provider: 'claude' },
 			},
 			handled: true,

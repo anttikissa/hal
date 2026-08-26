@@ -175,7 +175,7 @@ async function handleAnswer(sessionId: string, questionId: string, value: Answer
 	let email: string | undefined
 	if (value.kind === 'secret') {
 		try {
-			const plaintext = await serverKeys.decryptSecret(value.ciphertext, sessionId, questionId)
+			const plaintext = await serverKeys.decryptSecret(value.ciphertext)
 			question = activeQuestion(sessionId)
 			if (!question || question.id !== questionId || !acceptsAnswer(question, value)) return
 			if (question.source.type === 'login') ({ email } = await authLogin.finishAnthropic(plaintext))

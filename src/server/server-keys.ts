@@ -3,7 +3,8 @@
 // against same-user arbitrary code or theft of the whole state directory. Remote
 // use still requires HTTPS, which authenticates the server public key.
 
-import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, timingSafeEqual } from 'crypto'
+import { generateKeyPairSync, privateDecrypt, randomBytes, timingSafeEqual } from 'crypto'
+import { existsSync } from 'fs'
 import { liveFiles } from '../utils/live-file.ts'
 import { STATE_DIR } from './state.ts'
 
@@ -22,12 +23,10 @@ type QuestionKey = {
 
 type ServerKeyStore = {
 	tokens: WebToken[]
-	questionKey?: QuestionKey
+	questionKey: QuestionKey
 }
 
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-const MAX_PACKET_BYTES = 65 + 12 + 4_096 + 16
-const MAX_PACKET_LENGTH = Math.ceil(MAX_PACKET_BYTES * 4 / 3)
 
 const config = {
 	path: `${STATE_DIR}/server-keys.ason`,
@@ -40,17 +39,14 @@ const state: { initialized: boolean; store: ServerKeyStore | null } = {
 
 const revokeListeners = new Set<(token: WebToken) => void>()
 
-function publicKeyFromPrivate(privateKey: string): Buffer {
-	const key = createPrivateKey({ key: Buffer.from(privateKey, 'base64url'), format: 'der', type: 'pkcs8' })
-	const jwk = createPublicKey(key).export({ format: 'jwk' })
-	return Buffer.concat([Buffer.of(4), Buffer.from(jwk.x!, 'base64url'), Buffer.from(jwk.y!, 'base64url')])
-}
-
+// RSA-OAEP is the shortest old-Safari-compatible option but always stores 256
+// ciphertext bytes. ECDH plus AES-GCM would be smaller if secret questions become common.
 function generateQuestionKey(): QuestionKey {
-	const pair = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
-	const privateKey = pair.privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64url')
-	const publicKey = publicKeyFromPrivate(privateKey).toString('base64url')
-	return { publicKey, privateKey }
+	const pair = generateKeyPairSync('rsa', { modulusLength: 2_048 })
+	return {
+		publicKey: pair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64'),
+		privateKey: pair.privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
+	}
 }
 
 function generateToken(): string {
@@ -71,16 +67,19 @@ function save(data: ServerKeyStore): void {
 
 function init(): void {
 	if (state.initialized) return
-	state.store = liveFiles.liveFile(config.path, {
-		tokens: [{ token: generateToken(), purpose: 'local web token', createdAt: new Date().toISOString() }],
-	}, { watch: false, mode: 0o600 })
-	state.store.questionKey ??= generateQuestionKey()
+	const exists = existsSync(config.path)
+	state.store = liveFiles.liveFile(config.path, {} as ServerKeyStore, { watch: false, mode: 0o600 })
+	if (!exists) {
+		state.store.tokens = [{ token: generateToken(), purpose: 'local web token', createdAt: new Date().toISOString() }]
+		state.store.questionKey = generateQuestionKey()
+		save(state.store)
+	}
 	state.initialized = true
 }
 
-function current(): ServerKeyStore & { questionKey: QuestionKey } {
+function current(): ServerKeyStore {
 	init()
-	return state.store as ServerKeyStore & { questionKey: QuestionKey }
+	return state.store!
 }
 
 function copyToken(token: WebToken): WebToken {
@@ -146,27 +145,15 @@ function publicKey(): string {
 	return current().questionKey.publicKey
 }
 
-function additionalData(sessionId: string, questionId: string): Uint8Array<ArrayBuffer> {
-	if (!sessionId || !questionId || sessionId.includes('\0') || questionId.includes('\0')) throw new Error()
-	return new TextEncoder().encode(`hal-question\0${sessionId}\0${questionId}`)
-}
-
-async function decryptSecret(packet: string, sessionId: string, questionId: string): Promise<string> {
-	const privateKey = current().questionKey.privateKey
+async function decryptSecret(ciphertext: string): Promise<string> {
 	try {
-		if (typeof packet !== 'string' || packet.length > MAX_PACKET_LENGTH || !/^[A-Za-z0-9_-]+$/.test(packet)) throw new Error()
-		const bytes = Buffer.from(packet, 'base64url')
-		if (bytes.toString('base64url') !== packet || bytes.byteLength < 65 + 12 + 16 || bytes.byteLength > MAX_PACKET_BYTES) throw new Error()
-		const ephemeralBytes = new Uint8Array(bytes.subarray(0, 65))
-		if (ephemeralBytes[0] !== 4) throw new Error()
-		const iv = new Uint8Array(bytes.subarray(65, 77))
-		const ciphertext = new Uint8Array(bytes.subarray(77))
-		const privateBytes = new Uint8Array(Buffer.from(privateKey, 'base64url'))
-		const privateCryptoKey = await crypto.subtle.importKey('pkcs8', privateBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits'])
-		const ephemeralKey = await crypto.subtle.importKey('raw', ephemeralBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, [])
-		const sharedSecret = await crypto.subtle.deriveBits({ name: 'ECDH', public: ephemeralKey }, privateCryptoKey, 256)
-		const aesKey = await crypto.subtle.importKey('raw', sharedSecret, 'AES-GCM', false, ['decrypt'])
-		const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: additionalData(sessionId, questionId), tagLength: 128 }, aesKey, ciphertext)
+		if (typeof ciphertext !== 'string' || ciphertext.length > 400) throw new Error()
+		const encrypted = Buffer.from(ciphertext, 'base64')
+		if (encrypted.byteLength !== 256) throw new Error()
+		const plaintext = privateDecrypt({
+			key: current().questionKey.privateKey,
+			oaepHash: 'sha256',
+		}, encrypted)
 		return new TextDecoder('utf-8', { fatal: true }).decode(plaintext)
 	} catch {
 		throw new Error('Invalid encrypted question answer.')

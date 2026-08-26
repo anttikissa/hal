@@ -12,7 +12,7 @@ export type EntryIdentity = { id?: string; canceled?: true }
 export type QuestionInput =
 	| { kind: 'choice'; choices: { id: string; label: string; description?: string }[] }
 	| { kind: 'text'; placeholder?: string; allowEmpty?: true }
-	| { kind: 'secret'; placeholder?: string; publicKey: string; maxBytes: 4096 }
+	| { kind: 'secret'; placeholder?: string; publicKey: string; maxBytes: 190 }
 
 export type QuestionSource =
 	| { type: 'tool'; pendingId: string; toolId: string }

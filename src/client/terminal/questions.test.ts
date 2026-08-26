@@ -96,7 +96,7 @@ test('text question uses multiline prompt editing without changing the ordinary 
 }))
 
 test('secret masks, clears before encryption settles, and sends only ciphertext', async () => {
-	await withQuestion(question({ kind: 'secret', publicKey: 'key', maxBytes: 4096 }), async () => {
+	await withQuestion(question({ kind: 'secret', publicKey: 'key', maxBytes: 190 }), async () => {
 		const commands: any[] = []
 		const append = clientTransport.io.appendCommand
 		const encrypt = questionCrypto.encryptSecret
@@ -120,22 +120,22 @@ test('secret masks, clears before encryption settles, and sends only ciphertext'
 })
 
 
-test('secret enforces the UTF-8 byte bound before encryption', () => withQuestion(question({ kind: 'secret', publicKey: 'key', maxBytes: 4096 }), () => {
+test('secret enforces the UTF-8 byte bound before encryption', () => withQuestion(question({ kind: 'secret', publicKey: 'key', maxBytes: 190 }), () => {
 	const commands: any[] = []
 	const append = clientTransport.io.appendCommand
 	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	try {
-		terminalQuestions.handleKey(key('paste', { char: 'é'.repeat(2049) }))
+		terminalQuestions.handleKey(key('paste', { char: 'é'.repeat(96) }))
 		terminalQuestions.handleKey(key('enter'))
 		expect(commands).toEqual([])
-		expect(terminalQuestions.error(terminalQuestions.activeQuestion()!)).toContain('4096')
+		expect(terminalQuestions.error(terminalQuestions.activeQuestion()!)).toContain('190')
 	} finally {
 		clientTransport.io.appendCommand = append
 	}
 }))
 
 
-test('background tabs never steal focus and secret input survives tab switches but clears on resolution', () => withQuestion(question({ kind: 'secret', publicKey: 'key', maxBytes: 4096 }), () => {
+test('background tabs never steal focus and secret input survives tab switches but clears on resolution', () => withQuestion(question({ kind: 'secret', publicKey: 'key', maxBytes: 190 }), () => {
 	terminalQuestions.handleKey(key('paste', { char: 'private' }))
 	const questionTab = client.currentTab()!
 	const background = { ...questionTab, sessionId: 's2', history: [], inputHistory: [], inputDraft: '' }
@@ -147,7 +147,7 @@ test('background tabs never steal focus and secret input survives tab switches b
 		expect(terminalQuestions.secretDisplay()).toBe('*******')
 		questionTab.history = []
 		terminalQuestions.activeQuestion()
-		questionTab.history = [question({ kind: 'secret', publicKey: 'key', maxBytes: 4096 })]
+		questionTab.history = [question({ kind: 'secret', publicKey: 'key', maxBytes: 190 })]
 		expect(terminalQuestions.secretDisplay()).toBe('')
 	} finally {
 		client.state.tabs.pop()

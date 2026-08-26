@@ -1373,7 +1373,7 @@ test('Claude secret answer retries after failure and persists only ciphertext on
 	const sessionId = `test-secret-answer-${Date.now().toString(36)}`
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString() })
 	const questionId = '000001-aaa'
-	const ciphertext = await questionCrypto.encryptSecret(serverKeys.publicKey(), sessionId, questionId, 'code#state')
+	const ciphertext = await questionCrypto.encryptSecret(serverKeys.publicKey(), 'code#state')
 	const origFinish = authLogin.finishAnthropic
 	let fail = true
 	authLogin.finishAnthropic = async (plaintext) => {
@@ -1382,7 +1382,7 @@ test('Claude secret answer retries after failure and persists only ciphertext on
 		return { email: 'person@example.com' }
 	}
 	try {
-		await sessions.appendHistory(sessionId, [{ type: 'question', id: questionId, text: 'Code?', input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 4096 }, source: { type: 'login', provider: 'claude' } }])
+		await sessions.appendHistory(sessionId, [{ type: 'question', id: questionId, text: 'Code?', input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 190 }, source: { type: 'login', provider: 'claude' } }])
 		await runtime.handleAnswer(sessionId, questionId, { kind: 'secret', ciphertext })
 		expect(runtime.activeQuestion(sessionId)?.id).toBe(questionId)
 		fail = false
@@ -1409,7 +1409,7 @@ test('secret answer reloads before action when another client wins decryption ra
 	}
 	authLogin.finishAnthropic = async () => { finished = true; return {} }
 	try {
-		await sessions.appendHistory(sessionId, [{ type: 'question', id: questionId, text: 'Code?', input: { kind: 'secret', publicKey: 'public', maxBytes: 4096 }, source: { type: 'login', provider: 'claude' } }])
+		await sessions.appendHistory(sessionId, [{ type: 'question', id: questionId, text: 'Code?', input: { kind: 'secret', publicKey: 'public', maxBytes: 190 }, source: { type: 'login', provider: 'claude' } }])
 		await runtime.handleAnswer(sessionId, questionId, { kind: 'secret', ciphertext: 'packet' })
 		expect(finished).toBe(false)
 		expect(sessions.loadHistory(sessionId).filter((entry) => entry.type === 'answer')).toHaveLength(1)

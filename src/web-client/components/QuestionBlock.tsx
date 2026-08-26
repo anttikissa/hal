@@ -6,7 +6,6 @@ import { webTranscript } from '../utils/transcript.ts'
 
 type QuestionBlockProps = {
 	question: ProjectedQuestion
-	sessionId: string
 	onAnswer: (questionId: string, value: AnswerValue) => Promise<boolean>
 }
 
@@ -43,7 +42,7 @@ export function QuestionBlock(props: QuestionBlockProps) {
 		setError('')
 		let sent = false
 		try {
-			const answer = await webQuestion.prepareAnswer(props.question, props.sessionId, value)
+			const answer = await webQuestion.prepareAnswer(props.question, value)
 			// Once encrypted, do not retain secret plaintext while the ciphertext is sent.
 			if (props.question.input.kind === 'secret' && editor) {
 				editor.value = ''

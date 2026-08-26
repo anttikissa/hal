@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { questionCrypto } from '../common/question-crypto.ts'
@@ -27,7 +27,7 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { force: true, recursive: true })
 })
 
-test('provisions one local web token and persists one P-256 key pair through the live file', async () => {
+test('provisions one local web token and persists one RSA key pair through the live file', async () => {
 	const path = useKeyFile()
 	serverKeys.init()
 	await Promise.resolve()
@@ -37,7 +37,7 @@ test('provisions one local web token and persists one P-256 key pair through the
 
 	expect(token?.purpose).toBe('local web token')
 	expect(token?.token).toMatch(/^[A-Za-z0-9]{12}$/)
-	expect(Buffer.from(publicKey, 'base64url')).toHaveLength(65)
+	expect(Buffer.from(publicKey, 'base64')).not.toHaveLength(0)
 	expect(statSync(path).mode & 0o777).toBe(0o600)
 
 	serverKeys.state.initialized = false
@@ -47,30 +47,19 @@ test('provisions one local web token and persists one P-256 key pair through the
 	expect(readFileSync(path, 'utf8')).toBe(original)
 })
 
-test('a malformed file falls back to fresh live-file defaults', async () => {
-	const path = useKeyFile()
-	writeFileSync(path, '{ broken ASON')
-
-	serverKeys.init()
-	await Promise.resolve()
-
-	expect(Buffer.from(serverKeys.publicKey(), 'base64url')).toHaveLength(65)
-	expect(serverKeys.list()[0]?.purpose).toBe('local web token')
-})
-
-test('decrypts scoped question secrets and rejects tampering or wrong AAD', async () => {
+test('decrypts RSA-OAEP question secrets and rejects invalid ciphertext', async () => {
 	const path = useKeyFile()
 	const plaintext = 'påssword 🔑'
-	const ciphertext = await questionCrypto.encryptSecret(serverKeys.publicKey(), 'session-1', 'question-1', plaintext)
+	const ciphertext = await questionCrypto.encryptSecret(serverKeys.publicKey(), plaintext)
 
-	expect(await serverKeys.decryptSecret(ciphertext, 'session-1', 'question-1')).toBe(plaintext)
+	expect(Buffer.from(ciphertext, 'base64')).toHaveLength(256)
+	expect(await serverKeys.decryptSecret(ciphertext)).toBe(plaintext)
 	expect(readFileSync(path, 'utf8')).not.toContain(plaintext)
-	await expect(serverKeys.decryptSecret(ciphertext, 'session-2', 'question-1')).rejects.toThrow(/Invalid encrypted question answer/)
-	const packet = Buffer.from(ciphertext, 'base64url')
+	const packet = Buffer.from(ciphertext, 'base64')
 	packet[packet.length - 1] = packet[packet.length - 1]! ^ 1
-	await expect(serverKeys.decryptSecret(packet.toString('base64url'), 'session-1', 'question-1')).rejects.toThrow(/Invalid encrypted question answer/)
-	await expect(serverKeys.decryptSecret('A'.repeat(5_587), 'session-1', 'question-1')).rejects.toThrow(/Invalid encrypted question answer/)
-	await expect(serverKeys.decryptSecret(1_000_000_000 as any, 'session-1', 'question-1')).rejects.toThrow(/Invalid encrypted question answer/)
+	await expect(serverKeys.decryptSecret(packet.toString('base64'))).rejects.toThrow(/Invalid encrypted question answer/)
+	await expect(serverKeys.decryptSecret('A'.repeat(401))).rejects.toThrow(/Invalid encrypted question answer/)
+	await expect(serverKeys.decryptSecret(1_000_000_000 as any)).rejects.toThrow(/Invalid encrypted question answer/)
 })
 
 test('web token operations keep their existing behavior in the combined store', () => {

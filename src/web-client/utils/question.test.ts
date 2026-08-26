@@ -16,17 +16,17 @@ function question(input: ProjectedQuestion['input']): ProjectedQuestion {
 
 test('prepares only choices offered by the authoritative question', async () => {
 	const item = question({ kind: 'choice', choices: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }] })
-	expect(await webQuestion.prepareAnswer(item, 'session-1', 'no')).toEqual({ kind: 'choice', choiceId: 'no' })
-	expect(webQuestion.prepareAnswer(item, 'session-1', 'maybe')).rejects.toThrow()
+	expect(await webQuestion.prepareAnswer(item, 'no')).toEqual({ kind: 'choice', choiceId: 'no' })
+	expect(webQuestion.prepareAnswer(item, 'maybe')).rejects.toThrow()
 })
 
 test('text answers preserve multiline content and enforce empty policy', async () => {
-	expect(await webQuestion.prepareAnswer(question({ kind: 'text' }), 'session-1', 'one\ntwo')).toEqual({ kind: 'text', text: 'one\ntwo' })
-	expect(webQuestion.prepareAnswer(question({ kind: 'text' }), 'session-1', '')).rejects.toThrow()
-	expect(await webQuestion.prepareAnswer(question({ kind: 'text', allowEmpty: true }), 'session-1', '')).toEqual({ kind: 'text', text: '' })
+	expect(await webQuestion.prepareAnswer(question({ kind: 'text' }), 'one\ntwo')).toEqual({ kind: 'text', text: 'one\ntwo' })
+	expect(webQuestion.prepareAnswer(question({ kind: 'text' }), '')).rejects.toThrow()
+	expect(await webQuestion.prepareAnswer(question({ kind: 'text', allowEmpty: true }), '')).toEqual({ kind: 'text', text: '' })
 })
 
-test('secret answers enforce UTF-8 bytes and encrypt with question scope', async () => {
+test('secret answers enforce UTF-8 bytes and encrypt with the public key', async () => {
 	const original = questionCrypto.encryptSecret
 	const calls: unknown[][] = []
 	questionCrypto.encryptSecret = async (...args) => {
@@ -34,11 +34,11 @@ test('secret answers enforce UTF-8 bytes and encrypt with question scope', async
 		return 'ciphertext'
 	}
 	try {
-		const item = question({ kind: 'secret', publicKey: 'public-key', maxBytes: 4096 })
-		expect(await webQuestion.prepareAnswer(item, 'session-1', '秘密')).toEqual({ kind: 'secret', ciphertext: 'ciphertext' })
-		expect(calls).toEqual([['public-key', 'session-1', 'question-1', '秘密']])
-		expect(webQuestion.prepareAnswer(item, 'session-1', '')).rejects.toThrow()
-		expect(webQuestion.prepareAnswer(item, 'session-1', 'é'.repeat(2049))).rejects.toThrow()
+		const item = question({ kind: 'secret', publicKey: 'public-key', maxBytes: 190 })
+		expect(await webQuestion.prepareAnswer(item, '秘密')).toEqual({ kind: 'secret', ciphertext: 'ciphertext' })
+		expect(calls).toEqual([['public-key', '秘密']])
+		expect(webQuestion.prepareAnswer(item, '')).rejects.toThrow()
+		expect(webQuestion.prepareAnswer(item, 'é'.repeat(96))).rejects.toThrow()
 		expect(calls).toHaveLength(1)
 	} finally {
 		questionCrypto.encryptSecret = original

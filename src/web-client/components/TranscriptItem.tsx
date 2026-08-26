@@ -7,7 +7,6 @@ import { QuestionBlock } from './QuestionBlock.tsx'
 
 type TranscriptItemProps = {
 	item: RenderedTranscriptItem
-	sessionId: string
 	onAnswer: (questionId: string, value: AnswerValue) => Promise<boolean>
 }
 
@@ -19,6 +18,6 @@ export function TranscriptItem(props: TranscriptItemProps) {
 			<div>{props.item.text}</div>
 		</article>}
 	>
-		{(question) => <QuestionBlock question={question()} sessionId={props.sessionId} onAnswer={props.onAnswer} />}
+		{(question) => <QuestionBlock question={question()} onAnswer={props.onAnswer} />}
 	</Show>
 }

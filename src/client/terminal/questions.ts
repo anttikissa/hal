@@ -89,7 +89,7 @@ function submitSecret(question: QuestionBlock, editor: QuestionEditorState): voi
 	if (question.input.kind !== 'secret' || !editor.secret || editor.submitting) return
 	const plaintext = editor.secret.text()
 	const bytes = new TextEncoder().encode(plaintext).byteLength
-	const maxBytes = Math.min(4096, question.input.maxBytes)
+	const maxBytes = question.input.maxBytes
 	if (bytes > maxBytes) {
 		editor.error = `Secret is limited to ${maxBytes} UTF-8 bytes.`
 		touch()
@@ -101,7 +101,7 @@ function submitSecret(question: QuestionBlock, editor: QuestionEditorState): voi
 	editor.submitting = true
 	editor.error = undefined
 	touch()
-	void questionCrypto.encryptSecret(question.input.publicKey, sessionId, question.id, plaintext).then((ciphertext) => {
+	void questionCrypto.encryptSecret(question.input.publicKey, plaintext).then((ciphertext) => {
 		clientTransport.io.appendCommand({ type: 'answer', sessionId, questionId: question.id, value: { kind: 'secret', ciphertext } })
 	}).catch(() => {
 		editor.submitting = false

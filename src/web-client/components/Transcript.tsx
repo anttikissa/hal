@@ -6,7 +6,6 @@ import { TranscriptItem } from './TranscriptItem.tsx'
 
 type TranscriptProps = {
 	items: RenderedTranscriptItem[]
-	sessionId: string
 	onAnswer: (questionId: string, value: AnswerValue) => Promise<boolean>
 }
 
@@ -28,6 +27,6 @@ export function Transcript(props: TranscriptProps) {
 		},
 	)
 	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateAutoFollow}>
-		<For each={props.items}>{(item) => <TranscriptItem item={item} sessionId={props.sessionId} onAnswer={props.onAnswer} />}</For>
+		<For each={props.items}>{(item) => <TranscriptItem item={item} onAnswer={props.onAnswer} />}</For>
 	</main>
 }
