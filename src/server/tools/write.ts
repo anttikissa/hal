@@ -22,7 +22,6 @@ const TRUNCATED_SUFFIX = '\n[… truncated]'
 const REPO_ROOT = resolve(import.meta.dir, '../../..')
 const TSC_FILE_SCRIPT = resolve(REPO_ROOT, 'scripts/tsc-file.ts')
 const OXLINT_FILE_SCRIPT = resolve(REPO_ROOT, 'scripts/oxlint-file.ts')
-const textDecoder = new TextDecoder()
 
 function ensureParent(path: string): void {
 	ensureDir(dirname(path))
@@ -55,45 +54,33 @@ function shouldTypecheckEditedPath(path: string): boolean {
 	return ext === '.ts' || ext === '.tsx'
 }
 
-function decodeOutput(bytes: Uint8Array<ArrayBufferLike> | null | undefined): string {
-	if (!bytes) return ''
-	return textDecoder.decode(bytes)
-}
-
-function runTypecheckForEdit(path: string): string | null {
+async function runCheckForEdit(path: string, script: string, name: string): Promise<string | null> {
 	if (!shouldTypecheckEditedPath(path)) return null
 
-	const proc = Bun.spawnSync(['bun', TSC_FILE_SCRIPT, path], {
+	const proc = Bun.spawn(['bun', script, path], {
 		cwd: REPO_ROOT,
 		stdin: 'ignore',
 		stdout: 'pipe',
 		stderr: 'pipe',
 	})
-	if ((proc.exitCode ?? 1) === 0) return null
+	const [stdout, stderr, exitCode] = await Promise.all([
+		new Response(proc.stdout).text(),
+		new Response(proc.stderr).text(),
+		proc.exited,
+	])
+	if (exitCode === 0) return null
 
-	const stdout = decodeOutput(proc.stdout).trim()
-	const stderr = decodeOutput(proc.stderr).trim()
-	const details = [stdout, stderr].filter(Boolean).join('\n')
-	const fallback = `bun scripts/tsc-file.ts exited ${proc.exitCode ?? 1}`
+	const details = [stdout.trim(), stderr.trim()].filter(Boolean).join('\n')
+	const fallback = `bun scripts/${name} exited ${exitCode}`
 	return truncateUtf8(details || fallback, MAX_OUTPUT_BYTES)
 }
 
-function runLintForEdit(path: string): string | null {
-	if (!shouldTypecheckEditedPath(path)) return null
+function runTypecheckForEdit(path: string): Promise<string | null> {
+	return runCheckForEdit(path, TSC_FILE_SCRIPT, 'tsc-file.ts')
+}
 
-	const proc = Bun.spawnSync(['bun', OXLINT_FILE_SCRIPT, path], {
-		cwd: REPO_ROOT,
-		stdin: 'ignore',
-		stdout: 'pipe',
-		stderr: 'pipe',
-	})
-	if ((proc.exitCode ?? 1) === 0) return null
-
-	const stdout = decodeOutput(proc.stdout).trim()
-	const stderr = decodeOutput(proc.stderr).trim()
-	const details = [stdout, stderr].filter(Boolean).join('\n')
-	const fallback = `bun scripts/oxlint-file.ts exited ${proc.exitCode ?? 1}`
-	return truncateUtf8(details || fallback, MAX_OUTPUT_BYTES)
+function runLintForEdit(path: string): Promise<string | null> {
+	return runCheckForEdit(path, OXLINT_FILE_SCRIPT, 'oxlint-file.ts')
 }
 
 // ── Write tool ──
@@ -164,9 +151,8 @@ async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 		editRemap.applyTrackerUpdate(ctx.sessionId, path, prepared.trackerUpdate)
 
 		const parts = [editRemap.buildResult(prepared)]
-		const typecheckError = runTypecheckForEdit(path)
+		const [typecheckError, lintError] = await Promise.all([runTypecheckForEdit(path), runLintForEdit(path)])
 		if (typecheckError) parts.push(`TypeScript check failed for ${path}:\n${typecheckError}`)
-		const lintError = runLintForEdit(path)
 		if (lintError) parts.push(`Oxlint check failed for ${path}:\n${lintError}`)
 		return truncateUtf8(parts.join('\n\n'), MAX_OUTPUT_BYTES)
 	})

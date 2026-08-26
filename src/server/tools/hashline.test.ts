@@ -293,13 +293,15 @@ describe('edit via hashline', () => {
 		cleanup()
 	})
 
-	test('returns type errors after editing a broken .ts file', async () => {
+	test('returns type errors without blocking the event loop', async () => {
 		const repoRoot = process.cwd()
 		const file = join(repoRoot, `.tmp-hashline-${process.pid}-${Date.now()}.ts`)
 		writeFileSync(file, 'export const value: number = 1\n')
 		ctx.cwd = repoRoot
 		try {
 			const ref = `1:${hashLine('export const value: number = 1')}`
+			let timerFired = false
+			const timer = setTimeout(() => { timerFired = true }, 100)
 			const result = await executeEdit(
 				{
 					path: file,
@@ -310,6 +312,8 @@ describe('edit via hashline', () => {
 				},
 				ctx,
 			)
+			clearTimeout(timer)
+			expect(timerFired).toBe(true)
 			expect(result).toContain('TypeScript check failed')
 			expect(result).toContain("Type 'string' is not assignable to type 'number'.")
 			expect(readFileSync(file, 'utf-8')).toBe("export const value: number = 'oops'\n")
