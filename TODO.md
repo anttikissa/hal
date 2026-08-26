@@ -30,3 +30,4 @@ Random ideas, in no particular order
 - When Hal streams tables, sometimes a growing table suddently gets rendered smaller than in previous frame, producing a trembling effect; should make it so that streaming assistant block only grows
 - Ctrl-G does not work for content in scrollback- should redraw everything in current tab
 - Also Ctrl-G and streaming does not exactly work perfectly
+- Fix intro sequence after question refactoring is done
