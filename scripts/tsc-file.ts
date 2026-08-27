@@ -1,8 +1,25 @@
 #!/usr/bin/env bun
-// Type-check an edited file in its complete configured project, but ask
-// TypeScript 7 to calculate diagnostics only for that file. The full Program
-// preserves globals, augmentations, aliases, and inherited configuration
-// without paying for semantic diagnostics in every unrelated source file.
+// Type-check one edited TypeScript file using the semantics of its nearest
+// tsconfig.json. Usage: bun scripts/tsc-file.ts <file>
+//
+// Why this is not simply `tsc <file>`:
+// - passing a file directly makes tsc ignore tsconfig.json;
+// - narrowing `files`/`include` loses project-wide globals and augmentations;
+// - running `tsc -p` preserves that context, but checks every included source.
+//
+// TypeScript 7's diagnostics API gives us the useful middle ground. We load the
+// complete configured Program, then request syntax, binding, and semantic
+// diagnostics only for the edited file. All configured roots are still present,
+// so globals, module augmentations, aliases, references, inherited options, and
+// imported types behave as they do in the real project. Unrelated files are not
+// semantically checked, and reverse dependents of the edited file are outside
+// this fast check; the project's full typecheck remains authoritative for them.
+//
+// Compiler selection and compatibility:
+// - prefer the target project's TypeScript, matching its CI/build semantics;
+// - use Hal's TypeScript only when the project has no local installation;
+// - fall back to the full-project CLI path when the TypeScript 7 unstable API is
+//   unavailable or changes incompatibly. The fallback is slower but correct.
 
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { dirname, join, relative, resolve } from 'path'
@@ -31,6 +48,13 @@ function findConfig(filePath: string): string | null {
 	}
 }
 
+// The temporary config lives beside the real config, so every relative path has
+// exactly the same base directory. It retains the original root set and adds the
+// edited file, which may be a new draft not yet matched by `include`.
+//
+// TypeScript's implicit `include: ["**/*"]` applies only while both `files` and
+// `include` are absent. Materialize that default before adding `files`, otherwise
+// an ordinary config such as `{}` would accidentally lose every existing root.
 function makeConfig(configPath: string, filePath: string): string {
 	const directory = dirname(configPath)
 	const tempPath = join(directory, `.hal-tsc-file-${process.pid}-${Date.now()}.json`)
@@ -46,6 +70,9 @@ function makeConfig(configPath: string, filePath: string): string {
 	return tempPath
 }
 
+// Resolve both entry points from one package. The unstable JavaScript client
+// starts its matching native TypeScript server, so mixing API and compiler
+// versions would risk protocol and diagnostic differences.
 function resolveTypeScript(directory: string): TypeScript | null {
 	try {
 		const packagePath = Bun.resolveSync('typescript/package.json', directory)
@@ -73,6 +100,10 @@ function diagnosticFile(line: string): string | null {
 	return match?.[1] ?? null
 }
 
+// Older compilers expose only the CLI, whose project mode emits diagnostics for
+// the whole Program. Keep edited-file diagnostics, their continuation lines,
+// and config/global diagnostics that have no source path; discard pre-existing
+// errors from unrelated files.
 function filterDiagnostics(output: string, filePath: string, configPaths: string[], cwd: string): string {
 	const lines: string[] = []
 	let keep = false
@@ -109,6 +140,13 @@ function runConfiguredTsc(tscPath: string, tempPath: string, filePath: string, c
 	return filterDiagnostics(output, filePath, [configPath, tempPath], cwd)
 }
 
+// Loading a snapshot constructs the complete Program. The file arguments on the
+// last three calls constrain the actual parse/bind/type diagnostics to the edit.
+// Config-file and Program diagnostics are retained because invalid options or an
+// invalid root set can make any per-file result misleading. We intentionally do
+// not request project-wide global diagnostics, suggestions, or declaration emit
+// diagnostics: they are either expensive, non-failing editor advice, or
+// irrelevant to this no-emit check.
 async function runApi(apiPath: string, configPath: string, filePath: string, cwd: string): Promise<Diagnostic[]> {
 	const module = (await import(apiPath)) as typeof import('typescript/unstable/async')
 	const api = new module.API({ cwd })
@@ -138,6 +176,10 @@ function messageText(diagnostic: Diagnostic, indentation = ''): string {
 	return text
 }
 
+// Match tsc's non-pretty location format so the edit tool and humans receive
+// familiar output. Diagnostics against the generated config are attributed to
+// the real tsconfig, and related information is preserved even when it points
+// into a dependency because it often explains the edited-file error.
 function formatDiagnostic(diagnostic: Diagnostic, cwd: string, configPath: string, tempPath: string): string {
 	const categories = ['warning', 'error', 'suggestion', 'message']
 	const category = categories[diagnostic.category] ?? 'error'
@@ -172,6 +214,9 @@ function formatApiErrors(diagnostics: Diagnostic[], cwd: string, configPath: str
 	return output.join('\n')
 }
 
+// Keep the script's contract identical to tsc: diagnostics go to stderr and any
+// reported error produces exit code 1. Without a config, direct CLI checking is
+// the correct fallback because there is no configured Program to preserve.
 async function main(): Promise<void> {
 	const arg = process.argv[2]
 	if (!arg) fail('usage: bun scripts/tsc-file.ts <file>')
