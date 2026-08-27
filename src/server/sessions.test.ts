@@ -205,6 +205,17 @@ test('forkSession names child as a lowercase fork of a named parent', async () =
 })
 
 
+test('forkSession names child after an unnamed parent id', async () => {
+	const parentId = await makeSession()
+	const childId = uniqueId()
+	createdIds.push(childId)
+
+	const child = sessions.forkSession(parentId, childId)
+
+	expect(child.name).toBe(`Fork of ${parentId}`)
+})
+
+
 test('updateMeta writes closed session metadata', async () => {
 	const id = await makeSession()
 	sessions.deactivateSession(id)
