@@ -90,6 +90,16 @@ describe('render', () => {
 		expect(output).not.toContain('\x1b[3J')
 	})
 
+	test('explicit fullscreen mode permanently clears scrollback on canonical repaints', () => {
+		captureOutput(() => render.draw())
+		render.enterFullscreen()
+
+		const first = captureOutput(() => render.draw(true))
+		const second = captureOutput(() => render.draw(true))
+		expect(first).toContain('\x1b[3J')
+		expect(second).toContain('\x1b[3J')
+	})
+
 	test('writes ALL lines on force repaint', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: 'hello' })

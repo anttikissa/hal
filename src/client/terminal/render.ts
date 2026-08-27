@@ -142,6 +142,12 @@ function resetRenderer(): void {
 	fadeTimer = null
 }
 
+function enterFullscreen(): void {
+	// Tab workflows must be able to replace history that has already become native
+	// scrollback. This mode is intentionally one-way for the renderer's lifetime.
+	fullscreen = true
+}
+
 function invalidateHistoryCache(): void {
 	blockCache = new WeakMap<Block, BlockRenderCache>()
 }
@@ -444,4 +450,4 @@ function hasAnimatedIndicators(): boolean {
 	return renderStatus.hasAnimatedIndicators() || renderHistory.hasAnimatedCursor(client.currentTab())
 }
 
-export const render = { config, draw, resetRenderer, invalidateHistoryCache, clearFrame, hasAnimatedIndicators, physicalRows, physicalHeight }
+export const render = { config, draw, resetRenderer, enterFullscreen, invalidateHistoryCache, clearFrame, hasAnimatedIndicators, physicalRows, physicalHeight }

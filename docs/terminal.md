@@ -97,8 +97,10 @@ on history blocks or URL lines. This keeps the prompt stable across tabs.
 
 ### Tab switching
 
-Always uses force repaint — the diff engine can't reach lines that have
-scrolled into the terminal's scrollback buffer.
+The first actual tab focus transition permanently enters full mode before its
+canonical force repaint. This deliberately gives ordinary single-tab REPL use
+normal shell scrollback, but makes every tab-switch repaint authoritative: it
+clears native scrollback and rebuilds the focused tab's complete frame.
 
 ## Rendering: differential
 
@@ -135,11 +137,11 @@ a normal REPL.
 
 ### Full mode (`fullscreen = true`)
 
-The frame has exceeded the terminal height at some point in the past.
-Our content is now in the terminal's scrollback buffer, which is immutable
-(see below). We MUST clear scrollback (`CSI 3J`) before rewriting, or
-the user will see stale content from a previous tab interleaved with
-the current one.
+The frame has exceeded the terminal height at some point in the past, or the
+user has switched tabs. Our content may now be in the terminal's scrollback
+buffer, which is immutable (see below), or belong to another tab. We MUST clear
+scrollback (`CSI 3J`) before canonical force repaints, or the user will see
+stale content interleaved with the current tab.
 
 **This flag is one-way.** Once `fullscreen` flips true, it stays true
 forever. There's no going back — old content is stuck in scrollback and
@@ -360,8 +362,9 @@ way to selectively clear parts of it.
 - **Force repaint in grow mode**: frame fits on screen. Move up, clear down,
   rewrite. Scrollback untouched.
 
-- **Force repaint in full mode**: frame has exceeded terminal height at some
-  point. Must `CSI 3J` to clear scrollback, then rewrite ALL lines.
+- **Force repaint in full mode**: the frame has exceeded terminal height or the
+  user has switched tabs. Must `CSI 3J` to clear scrollback, then rewrite ALL
+  lines.
 
-- **Tab switches**: always force repaint. The mode determines whether
-  scrollback is cleared.
+- **Tab switches**: enter full mode permanently, then always force repaint. This
+  discards native scrollback so stale rows from another tab cannot survive.

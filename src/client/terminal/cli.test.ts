@@ -292,6 +292,24 @@ test('tab switching preserves the full prompt editor state', () => {
 		prompt.clear()
 	}
 })
+
+test('tab switching enters renderer fullscreen mode', () => {
+	let fullscreenEntries = 0
+	withOneTab(makeTab(), () => {
+		client.state.tabs.push(makeTab({ sessionId: 's2' }))
+		withPatched(client, 'saveDraft', (() => {}) as typeof client.saveDraft, () => {
+			withPatched(render, 'draw', (() => {}) as typeof render.draw, () => {
+				withPatched(render, 'enterFullscreen', (() => { fullscreenEntries++ }) as typeof render.enterFullscreen, () => {
+					cli.forTests.installPromptTabSwitchHandler()
+					client.switchTab(1)
+				})
+			})
+		})
+	})
+	client.setOnTabSwitch(() => {})
+	cli.forTests.resetPromptStates()
+	expect(fullscreenEntries).toBe(1)
+})
 test('idle up uses normal prompt history without edit mode hint', () => {
 	const tab = makeTab({ inputHistory: ['old prompt'] })
 	client.state.working.clear()

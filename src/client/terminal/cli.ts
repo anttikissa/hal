@@ -609,6 +609,7 @@ function restorePromptForCurrentTab(): void {
 
 function installPromptTabSwitchHandler(): void {
 	client.setOnTabSwitch((fromSession, _toSession) => {
+		render.enterFullscreen()
 		promptStates.set(fromSession, prompt.snapshotState())
 		saveCurrentPromptDraft(fromSession)
 		restorePromptForCurrentTab()
