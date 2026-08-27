@@ -74,7 +74,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	if (state.pendingOpen === 'resume' && grew) ctx.clearRestoreTabHint()
 	if (grew && openedSessionId) state.pendingOpen = false
 	if (previousSession !== newSession) ctx.onTabSwitch(previousSession, newSession)
-	ctx.onChange(false)
+	ctx.onChange(previousTabs.length > 0 && previousSession !== newSession)
 }
 
 function loadOpenedBackground(openedTabs: Tab[], focused: Tab | undefined, ctx: any): void {

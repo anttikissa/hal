@@ -112,6 +112,25 @@ test('focused newly opened tab clears new attention marker', () => {
 	expect(model.tabs[1]?.attention).toBeUndefined()
 })
 
+test('focusing a newly opened tab forces a canonical repaint', () => {
+	sessionTabs.reset()
+	sessionTabs.state.pendingOpen = 'open'
+	const model = {
+		tabs: [tab('left')],
+		focusedTabIndex: 0,
+		recentTabs: ['left'],
+	}
+	const repaints: boolean[] = []
+
+	sessionTabs.apply([{ id: 'left' } as any, { id: 'new' } as any], 'left', ctx({
+		model,
+		onChange: (force: boolean) => { repaints.push(force) },
+	}))
+
+	expect(model.focusedTabIndex).toBe(1)
+	expect(repaints).toEqual([true])
+})
+
 test('pending open survives unrelated session refresh until the new tab arrives', () => {
 	sessionTabs.reset()
 	sessionTabs.state.pendingOpen = 'open'
