@@ -72,20 +72,36 @@ test('unrecognized markup remains ordinary intro text', () => {
 	])
 })
 
-test('each HAL model streams its own script and an explicit script overrides them', async () => {
-	halProvider.sleep = async () => {}
+test('scroll model emits two concurrent tool calls whose upper result finishes last', async () => {
+	const events = await collect([], 'scroll')
+	expect(events).toEqual([
+		{
+			type: 'tool_call',
+			id: 'hal-scroll-slow',
+			name: 'bash',
+			input: { command: 'sleep 1; for i in {1..20}; do echo "TOP-$i"; done' },
+		},
+		{
+			type: 'tool_call',
+			id: 'hal-scroll-fast',
+			name: 'bash',
+			input: { command: 'for i in {1..20}; do echo "BOTTOM-$i"; done' },
+		},
+		{ type: 'done' },
+	])
+})
 
-	const scroll = (await collect([], 'scroll')).map((event) => event.text ?? '').join('')
-	expect(scroll).toContain('Line-01')
-	expect(scroll).toContain('Line-60')
-	expect(scroll).toContain('That makes **peer** particularly appropriate.')
-	// The delimiter must arrive one backtick at a time: that is the streamed shape
-	// that used to freeze duplicate rows into terminal scrollback.
-	expect(halProvider.scriptFor('scroll').split('<pause for="0.25s"/>')).toHaveLength(5)
-	expect(scroll).not.toContain('Hello. This is HAL 9001')
+test('scroll model finishes after its tool results instead of repeating them', async () => {
+	const events = await collect([
+		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'hal-scroll-fast', content: 'BOTTOM-1' }] },
+	], 'scroll')
+	expect(events).toEqual([
+		{ type: 'text', text: 'Done. Scroll up and look for duplicated TOP or BOTTOM lines.' },
+		{ type: 'done' },
+	])
+})
 
-	expect((await collect([], 'intro')).map((event) => event.text ?? '').join('')).toContain('Hello. This is HAL 9001')
-
+test('explicit script still overrides built-in HAL models', async () => {
 	halProvider.script = 'Pinned.'
 	expect(await collect([], 'scroll')).toEqual([{ type: 'text', text: 'Pinned.' }, { type: 'done' }])
 })

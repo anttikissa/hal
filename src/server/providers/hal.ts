@@ -16,13 +16,6 @@ const config = {
 	wordsPerSecond: 4,
 }
 
-// Single-token lines fill the viewport quickly at the default streaming rate.
-function fillerBlock(count: number): string {
-	const lines: string[] = []
-	for (let i = 1; i <= count; i++) lines.push(`Line-${String(i).padStart(2, '0')}`)
-	return lines.join('\n')
-}
-
 const scripts: Record<string, string> = {
 	intro: `Hello. This is HAL 9001, a friendly agent harness.<pause for="1s"/>
 
@@ -31,26 +24,6 @@ Press enter to continue.<pause until="enter"/><config key="renderStatus.tabsOpac
 Press enter to continue.<pause until="enter"/><config key="renderStatus.statusOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Below them are the status and help bars: session, directory, model, context, and the keys you can press right now.<pause for="1s"/>
 
 Press enter to continue.<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="models.default" value="gpt"/>That is your prompt.<pause for="0.5s"/> Choose a real model with \`/model\`, then tell HAL what you would like to do.`,
-
-	// Reproduces the streamed-Markdown scroll corruption fixed in d97b2dc: fill the
-	// viewport so the frame is fullscreen, then deliver a code fence one backtick at
-	// a time. Each pause forces its own stream delta, which is what made the partial
-	// fence briefly render as text and shift rows that were already in scrollback.
-	scroll: `Streaming scroll-duplication check. Raise halProvider.wordsPerSecond to run it faster.<pause for="0.5s"/>
-
-${fillerBlock(60)}
-
-That makes **peer** particularly appropriate. A peer is not merely a local client—it is an equal participant in the local process group and may be promoted.
-
-The version-mismatch suffix remains natural:
-
-\`<pause for="0.25s"/>\`<pause for="0.25s"/>\`
-host
-peer
-client
-\`<pause for="0.25s"/>\`<pause for="0.25s"/>\`
-
-Scroll up: every Line-NN and every sentence above must appear exactly once.`,
 }
 
 // Deliberately not a general XML parser. Unrecognized markup is intro text.
@@ -139,7 +112,40 @@ async function* streamText(text: string, req: ProviderRequest): AsyncGenerator<P
 	}
 }
 
+function hasToolResult(messages: Message[]): boolean {
+	for (const message of messages) {
+		if (!Array.isArray(message.content)) continue
+		if (message.content.some((block) => block.type === 'tool_result')) return true
+	}
+	return false
+}
+
+async function* scrollRepro(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
+	if (hasToolResult(req.messages)) {
+		yield { type: 'text', text: 'Done. Scroll up and look for duplicated TOP or BOTTOM lines.' }
+		yield { type: 'done' }
+		return
+	}
+	yield {
+		type: 'tool_call',
+		id: 'hal-scroll-slow',
+		name: 'bash',
+		input: { command: 'sleep 1; for i in {1..20}; do echo "TOP-$i"; done' },
+	}
+	yield {
+		type: 'tool_call',
+		id: 'hal-scroll-fast',
+		name: 'bash',
+		input: { command: 'for i in {1..20}; do echo "BOTTOM-$i"; done' },
+	}
+	yield { type: 'done' }
+}
+
 async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
+	if (req.model === 'scroll' && !halProvider.script) {
+		yield* scrollRepro(req)
+		return
+	}
 	const available = pages(scriptFor(req.model))
 	const page = available[nextPage(req.messages, available)]
 	if (!page) {
@@ -159,4 +165,4 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 const provider: Provider = { generate }
 
 // script stays empty unless a caller pins one scenario for every model.
-export const halProvider = { config, script: '', scripts, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText }
+export const halProvider = { config, script: '', scripts, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, hasToolResult, scrollRepro }
