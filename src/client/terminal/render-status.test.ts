@@ -191,6 +191,23 @@ test('buildTabBarLines switches to compact mode when even the bare tab numbers o
 	}
 })
 
+test('clipped compact tab bar closes its active underline', () => {
+	const origTabs = client.state.tabs.slice()
+	const origFocused = client.state.focusedTabIndex
+	client.state.tabs.length = 0
+	client.state.tabs.push(tab({ sessionId: 'a' }), tab({ sessionId: 'b' }), tab({ sessionId: 'c' }))
+	client.state.focusedTabIndex = 1
+	try {
+		const [line] = renderStatus.buildTabBarLines(5)
+		expect(visLen(line!)).toBeLessThanOrEqual(5)
+		expect(line!.slice(line!.lastIndexOf('\x1b[4m'))).toContain('\x1b[0m')
+	} finally {
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.focusedTabIndex = origFocused
+	}
+})
+
 
 test('zero opacity hides chrome content without changing its row count', () => {
 	const original = {

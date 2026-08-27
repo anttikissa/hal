@@ -239,7 +239,9 @@ function buildTabBarLines(cols: number): string[] {
 	if (visLen(tabText) > width) {
 		content = renderStatus.buildTabText(true)
 	}
-	return [renderStatus.paddedLine(content, cols)]
+	// `paddedLine()` may clip through a compact active tab's underline-on escape.
+	// Terminate the row explicitly so that style cannot affect the prompt below it.
+	return [`${renderStatus.paddedLine(content, cols)}${RESET}`]
 }
 
 // Appends one full-width logical row, without a newline. For example, at 12
