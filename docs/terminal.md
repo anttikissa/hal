@@ -86,9 +86,10 @@ them.
 “Safe to modify” means cursor-addressable without forcing a snap or scroll.
 Before a writable-screen row is pushed across the boundary into scrollback, it
 must be canonical and final. Scrollback rows cannot be selectively rewritten and
-must remain immutable between canonical rebuilds. A fullscreen rebuild may
-replace Hal-owned scrollback only when snapping the viewport is known to be
-acceptable; pre-fullscreen terminal contents must never be destroyed.
+must remain immutable between canonical rebuilds. Before fullscreen begins, Hal
+must preserve the terminal contents that predate Hal. Once fullscreen begins, a
+canonical rebuild may clear the entire scrollback buffer, including those pre-Hal
+contents, when snapping the viewport is known to be acceptable.
 
 ### Horizontal box model
 
@@ -112,21 +113,22 @@ exception: it has no horizontal margins and may exceed `cols`, so the terminal
 soft-wraps and copies it as one logical line. Backgrounds still paint every
 physical row, including the final wrapped row's unused columns.
 
-Two painters implement this, and they are deliberately not shared:
+Two painters deliberately use different background-fill strategies:
 
-- `bgLine()` in `src/client/terminal/blocks.ts` fills the rest of the row with `CSI K`
-  (erase to end of line) while the background color is active. History is
-  append-only and fully rewritten by the diff engine on every paint, so this
-  is far cheaper than emitting explicit spaces.
-- `paddedLine()` in `src/client/terminal/render-status.ts` pads with real spaces,
-  because chrome rows compose segments with different backgrounds and `CSI K`
-  would flood the row with whichever background happened to be active.
-- `bodyLine()` in `src/client/terminal/blocks.ts` handles the standalone-URL
-  exception: one OSC 8 link stays open across native wraps, then `CSI K` paints
-  the remainder of its final physical row before the background is reset.
+- `bgLine()` in `src/client/terminal/blocks.ts` fills the rest of a transcript
+  row with `CSI K` (erase to end of line) while the background color is active.
+  This is far cheaper than emitting explicit spaces.
+- `paddedLine()` in `src/client/terminal/render-status.ts` pads chrome rows with
+  real spaces because those rows compose segments with different backgrounds;
+  `CSI K` would flood the row with whichever background happened to be active.
 
-Do not "unify" these into one helper with a mode flag: it adds code and slows
-down the hottest repaint path. Do keep their widths in agreement.
+`bodyLine()` in `src/client/terminal/blocks.ts` handles the standalone-URL
+exception: one OSC 8 link stays open across native wraps, then it delegates to
+`bgLine()` to paint the remainder of the final physical row before resetting the
+background.
+
+Do not unify the two painters behind a mode flag: it adds code and slows the
+hottest repaint path. Do keep their widths in agreement.
 
 ## Tabs
 
@@ -234,7 +236,8 @@ lines for the active tab. Not "the last N that fit on screen." Not "starting
 from some clever offset." ALL of them. Every. Single. One.
 
 The diff engine exists so that writing all lines is cheap (only changed lines
-get rewritten). Force repaint clears scrollback and writes everything fresh.
+get rewritten). A full-mode force repaint clears scrollback and writes everything
+fresh; a grow-mode force repaint preserves scrollback.
 
 If you slice history to viewport size, lines that don't fit are never written
 to the terminal. They vanish from scrollback. The user scrolls up and sees
@@ -280,9 +283,9 @@ show after.
 
 ### 6. `cursorRow` must always reflect physical cursor position
 
-`cursorRow` tracks which frame line the terminal cursor sits on. Every code
-path that moves the cursor — force repaint, diff repaint, cursor-only
-repositioning — MUST update `cursorRow` to the final position.
+`cursorRow` tracks the physical row on which the terminal cursor sits. Every code
+path that moves the cursor — force repaint, diff repaint, or cursor-only
+repositioning — MUST update `cursorRow` to the final physical row.
 
 The diff engine uses `cursorRow` to compute how far to move the cursor on
 the next paint. If `cursorRow` is stale (e.g. you moved the cursor up for a
@@ -302,44 +305,46 @@ audit.
 ### 8. Append vs rewrite in the diff engine
 
 When the frame grows, appended logical lines may be beyond `prevLines.length`.
-You CANNOT use `CSI B` past the bottom of the visible screen because the terminal
+You CANNOT use `CSI B` past the bottom of the writable screen because the terminal
 clamps it. Move to the last existing **physical** row, then use `\r\n` to append
 and scroll naturally.
 
 For non-fullscreen frame shrink, compare physical heights. After writing new
 content, use `CR`, `CSI 1B`, then `CSI J` to erase leftover rows. Do not use
-`\r\n` there: at the viewport bottom it scrolls and creates a stray blank row.
+`\r\n` there: at the writable-screen bottom it scrolls and creates a stray blank
+row.
 
 ### 9. Automatic fullscreen recovery must preserve inspected scrollback
 
-A fullscreen shrink changes the scrollback/visible boundary. An automatic repaint
+A fullscreen shrink changes the scrollback/writable boundary. An automatic repaint
 must **never** call the fullscreen force-repaint path: it emits `CSI 2J` and
 `CSI 3J`, and Ghostty snaps a user who is reading scrollback to the live bottom
 (`CSI 3J` also destroys that scrollback). This bit us again when prompt clearing
 on submit shrank a fullscreen frame.
 
-Instead, derive the visible physical rows, return to column one, and use a relative
-cursor-up move by the terminal height (which clamps at the physical viewport top),
-then rewrite each row with `CSI 2K`; do not append a final CRLF. Do **not** use
-`CSI H`: Ghostty follows cursor-home by returning an inspected viewport to live
-output too. The recovery temporarily hard-wraps a native-wrapped URL into
-independently addressable OSC 8 rows, just as popup layout does. Ordinary rendering must
-still leave completed standalone URLs native-wrapped for copy/paste; the recovery is the
-exceptional safe rewrite.
+Instead, derive the writable-screen physical rows, return to column one, and use a
+relative cursor-up move by the terminal height (which clamps at the writable-
+screen top), then rewrite each row with `CSI 2K`; do not append a final CRLF. Do
+**not** use `CSI H`: Ghostty follows cursor-home by returning an inspected
+viewport to live output too. The recovery temporarily hard-wraps a native-wrapped
+URL into independently addressable OSC 8 rows, just as popup layout does.
+Ordinary rendering must still leave completed standalone URLs native-wrapped for
+copy/paste; the recovery is the exceptional safe rewrite.
 
 This rule also covers popup open/close, which changes the URL layout. An explicit
 full rebuild — Ctrl-L, tab switch, terminal resize, or an editing key that reduces
 the prompt's physical height — may use the fullscreen force-repaint path. The
 prompt-shrink exception is necessary: bottom-anchoring a shorter prompt moves old
-history rows across the immutable scrollback boundary, and a visible-screen repaint
-would duplicate exactly those rows. Never invoke the force path from automatic
-prompt clearing, streaming, tool, animation, or popup updates.
+history rows across the immutable scrollback boundary, and a writable-screen
+repaint would duplicate exactly those rows. Never invoke the force path from
+automatic prompt clearing, streaming, tool, animation, or popup updates.
 
 Fullscreen growth is straightforward only for a pure append. If an existing
-logical line also changes, use the same clamped relative move to the physical
-viewport top, repaint independently addressable logical lines, then append the
-suffix with `\r\n`. If a soft-wrapped URL begins above the viewport, leave its
-unchanged visible tail alone and start at the next complete logical line.
+logical line also changes, use the same clamped relative move to the writable-
+screen top, repaint independently addressable logical lines, then append the
+suffix with `\r\n`. If a soft-wrapped URL begins above the writable screen, leave
+its unchanged writable-screen tail alone and start at the next complete logical
+line.
 
 Streaming Markdown must not paint one- or two-backtick fragments of a code-fence
 delimiter. The completed third backtick removes that transient logical row; if the
@@ -366,9 +371,10 @@ the event loop is saturated with frame builds + stdout writes, and stdin
 events (keypresses) **never fire**. The user cannot type, abort, or even
 Ctrl-C while the assistant is generating.
 
-**Fix**: `draw()` in `src/client/terminal/cli.ts` uses a trailing-edge throttle. Non-force draws
-are coalesced to at most one per 16ms (~60 fps). Force draws (tab switch,
-resize, Ctrl-L) execute immediately.
+**Fix**: `draw()` in `src/client/terminal/cli.ts` uses a leading-edge throttle with
+trailing coalescing. The first non-force draw paints immediately; further requests
+within 16ms are combined into one trailing paint. Force draws (tab switch, resize,
+Ctrl-L) execute immediately.
 
 **NEVER remove this throttle.** If you think a draw needs to be synchronous,
 you are wrong — use `draw(true)` for a force paint, which already bypasses
@@ -394,22 +400,22 @@ scrollback multiple times. Read it. Understand it. Refer back to it.
 ### Scrollback is immutable
 
 When output exceeds the terminal height, lines scroll off the top of the
-visible screen into the **scrollback buffer**. Once there, they are frozen.
+**writable screen** into the **scrollback buffer**. Once there, they are frozen.
 You cannot modify them. Period.
 
-`CSI nA` (cursor up) is **clamped at row 1 of the visible screen**. It will
+`CSI nA` (cursor up) is **clamped at row 1 of the writable screen**. It will
 never move the cursor into the scrollback buffer. If you try `CSI 49A` when
-the cursor is 25 rows from the top of the visible screen, it moves up 25
+the cursor is 25 rows from the top of the writable screen, it moves up 25
 rows — not 49. The remaining 24 rows of movement are silently discarded.
 
 This means: if you wrote 50 lines and 24 scrolled into scrollback, you can
-only overwrite the 26 lines still on the visible screen. The 24 in scrollback
+only overwrite the 26 lines still on the writable screen. The 24 in scrollback
 are permanent until explicitly cleared.
 
 Verified experimentally — write 50 lines then try `CSI 49A` and rewrite
 them all:
-- **Tall terminal** (all 50 lines visible): all 50 rewritten. Works.
-- **Short terminal** (24 lines in scrollback): only the visible 26 are
+- **Tall terminal** (all 50 lines on the writable screen): all 50 rewritten.
+- **Short terminal** (24 lines in scrollback): only the writable 26 are
   rewritten. The 24 in scrollback show the original content.
 
 ### Clearing scrollback
