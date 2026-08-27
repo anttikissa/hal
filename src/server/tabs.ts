@@ -37,7 +37,13 @@ function focusSession(sessionId: string | null | undefined): void {
 	if (!sessionId) return
 	if (!runtime.state.openSessionIds.includes(sessionId)) return
 	runtime.state.currentSessionId = sessionId
+	const meta = sessionStore.loadSessionMeta(sessionId)
+	if (!meta?.attention) return
 	sessionStore.updateMeta(sessionId, { attention: undefined })
+	ipc.updateState((shared) => {
+		const info = shared.sessions.find((item) => item.id === sessionId)
+		if (info) info.attention = undefined
+	})
 }
 
 function focusedSessionId(): string | null {

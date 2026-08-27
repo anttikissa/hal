@@ -856,10 +856,7 @@ function handleCommand(cmd: Command): void {
 		return
 	}
 	tabs.focusSession(cmd.sessionId)
-	if (cmd.type === 'focus') {
-		broadcastSessions()
-		return
-	}
+	if (cmd.type === 'focus') return
 	if (sessionId && questionBlocksCommand(cmd.type) && activeQuestion(sessionId)) {
 		emitInfo(sessionId, 'Waiting for an answer')
 		return

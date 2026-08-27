@@ -755,7 +755,7 @@ function addBlockToTab(sessionId: string | null, block: Block): void {
 	if (!tab) return
 	tab.history = liveEventBlocks.appendBlock(tab.history, block).blocks
 	touchTab(tab)
-	onChange(false)
+	repaintIfActive(tab)
 }
 
 function addEntry(text: string, type: 'log' | 'info' | 'warning' | 'error' = 'log'): void {

@@ -119,6 +119,32 @@ test('draft-saved commands become server-produced events', () => {
 })
 
 
+test('focus commands do not rebuild sessions or prompt watchers', () => {
+	const originalFocusSession = tabs.focusSession
+	const originalSyncSharedState = tabs.syncSharedState
+	const originalWatchPromptFiles = context.watchPromptFiles
+	let focused = ''
+	let sessionSyncs = 0
+	let promptWatches = 0
+	tabs.focusSession = (sessionId) => { focused = sessionId ?? '' }
+	tabs.syncSharedState = () => { sessionSyncs++ }
+	context.watchPromptFiles = (() => {
+		promptWatches++
+		return () => {}
+	}) as typeof context.watchPromptFiles
+	try {
+		runtime.handleCommand({ type: 'focus', sessionId: '04-two' })
+		expect(focused).toBe('04-two')
+		expect(sessionSyncs).toBe(0)
+		expect(promptWatches).toBe(0)
+	} finally {
+		tabs.focusSession = originalFocusSession
+		tabs.syncSharedState = originalSyncSharedState
+		context.watchPromptFiles = originalWatchPromptFiles
+	}
+})
+
+
 test('/what stores summarizing in shared state and skips duplicate targets', async () => {
 	const origUpdateState = ipc.updateState
 	const origReadState = ipc.readState

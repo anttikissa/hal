@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { tabs } from './tabs.ts'
 import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
+import { ipc } from './file-ipc.ts'
 
 test('findOpenSessionForCwd returns the first matching open tab', () => {
 	const openSessions = [
@@ -11,6 +12,57 @@ test('findOpenSessionForCwd returns the first matching open tab', () => {
 	]
 
 	expect(tabs.findOpenSessionForCwd(openSessions, '/work/project')).toBe('04-first')
+})
+
+
+test('focusing an ordinary tab avoids metadata and shared-state writes', () => {
+	const originalOpenSessionIds = runtime.state.openSessionIds
+	const originalCurrentSessionId = runtime.state.currentSessionId
+	const originalLoadSessionMeta = sessions.loadSessionMeta
+	const originalUpdateMeta = sessions.updateMeta
+	const originalUpdateState = ipc.updateState
+	let metaWrites = 0
+	let stateWrites = 0
+	runtime.state.openSessionIds = ['04-one']
+	sessions.loadSessionMeta = (() => ({ id: '04-one', createdAt: '2026-08-27T00:00:00.000Z' })) as typeof sessions.loadSessionMeta
+	sessions.updateMeta = (() => { metaWrites++ }) as typeof sessions.updateMeta
+	ipc.updateState = (() => { stateWrites++ }) as unknown as typeof ipc.updateState
+	try {
+		tabs.focusSession('04-one')
+		expect(runtime.state.currentSessionId).toBe('04-one')
+		expect(metaWrites).toBe(0)
+		expect(stateWrites).toBe(0)
+	} finally {
+		runtime.state.openSessionIds = originalOpenSessionIds
+		runtime.state.currentSessionId = originalCurrentSessionId
+		sessions.loadSessionMeta = originalLoadSessionMeta
+		sessions.updateMeta = originalUpdateMeta
+		ipc.updateState = originalUpdateState
+	}
+})
+
+
+test('focusing a new tab clears only its attention marker', () => {
+	const originalOpenSessionIds = runtime.state.openSessionIds
+	const originalLoadSessionMeta = sessions.loadSessionMeta
+	const originalUpdateMeta = sessions.updateMeta
+	const originalUpdateState = ipc.updateState
+	const shared: any = { sessions: [{ id: '04-one', attention: 'new' }, { id: '04-two', attention: 'new' }] }
+	let metaUpdate: any
+	runtime.state.openSessionIds = ['04-one', '04-two']
+	sessions.loadSessionMeta = (() => ({ id: '04-one', createdAt: '2026-08-27T00:00:00.000Z', attention: 'new' })) as typeof sessions.loadSessionMeta
+	sessions.updateMeta = ((sessionId, patch) => { metaUpdate = { sessionId, patch } }) as typeof sessions.updateMeta
+	ipc.updateState = ((mutator) => { mutator(shared); return shared }) as typeof ipc.updateState
+	try {
+		tabs.focusSession('04-one')
+		expect(metaUpdate).toEqual({ sessionId: '04-one', patch: { attention: undefined } })
+		expect(shared.sessions).toEqual([{ id: '04-one', attention: undefined }, { id: '04-two', attention: 'new' }])
+	} finally {
+		runtime.state.openSessionIds = originalOpenSessionIds
+		sessions.loadSessionMeta = originalLoadSessionMeta
+		sessions.updateMeta = originalUpdateMeta
+		ipc.updateState = originalUpdateState
+	}
 })
 
 test('openSessionForCwd creates instead of resuming a dormant session', () => {

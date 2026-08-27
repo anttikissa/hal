@@ -108,6 +108,19 @@ describe('client streaming blocks', () => {
 		expect(repaints).toBe(0)
 	})
 
+	test('background lifecycle events do not repaint the focused tab', () => {
+		client.state.tabs.push(makeTab('s2'))
+		let repaints = 0
+		client.setOnChange(() => { repaints++ })
+		client.handleEvent({ type: 'prompt', sessionId: 's2', text: 'work', createdAt: '2026-08-27T00:00:00.000Z' })
+		client.handleEvent({ type: 'info', sessionId: 's2', text: 'background info', createdAt: '2026-08-27T00:00:01.000Z' })
+		client.handleEvent({ type: 'tool-call', sessionId: 's2', toolId: 'tool-1', name: 'bash', input: { command: 'echo hi' }, createdAt: '2026-08-27T00:00:02.000Z' })
+		client.handleEvent({ type: 'tool-result', sessionId: 's2', toolId: 'tool-1', output: 'hi', phase: 'done', createdAt: '2026-08-27T00:00:03.000Z' })
+		client.handleEvent({ type: 'response', sessionId: 's2', text: 'done', createdAt: '2026-08-27T00:00:04.000Z' })
+		expect(repaints).toBe(0)
+		expect(client.state.tabs[1]!.history.length).toBeGreaterThan(0)
+	})
+
 
 
 	test('info during assistant streaming preserves both chunks in event order', () => {

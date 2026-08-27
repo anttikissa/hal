@@ -75,7 +75,7 @@ function handleResponse(event: any, ctx: any): void {
 	ctx.flushDelayedPaused(event.sessionId ?? null)
 	const tab = ctx.tabForSession(event.sessionId ?? null)
 	if (!tab) return
-	if (ctx.applyLiveEventToTab(tab, event).changed) ctx.onChange(false)
+	if (ctx.applyLiveEventToTab(tab, event).changed) ctx.repaintIfActive(tab)
 }
 
 function handleInfo(event: any, ctx: any): void {
@@ -89,7 +89,7 @@ function handleInfo(event: any, ctx: any): void {
 	ctx.flushDelayedPaused(sessionId)
 	if (!tab) return
 	ctx.applyLiveEventToTab(tab, event)
-	ctx.onChange(false)
+	ctx.repaintIfActive(tab)
 }
 
 function handleToolCall(event: any, ctx: any): void {
@@ -97,7 +97,7 @@ function handleToolCall(event: any, ctx: any): void {
 	const tab = ctx.tabForSession(event.sessionId)
 	if (!tab) return
 	ctx.applyLiveEventToTab(tab, event)
-	ctx.onChange(false)
+	ctx.repaintIfActive(tab)
 }
 
 
@@ -107,14 +107,14 @@ function handleToolResult(event: any, ctx: any): void {
 	const toolBlock = tab ? ctx.applyLiveEventToTab(tab, event).toolBlock : null
 	if (!tab || !toolBlock) return
 	delete toolBlock.blobLoaded
-	ctx.onChange(false)
+	ctx.repaintIfActive(tab)
 	if (event.phase === 'running') return
 	if (!toolBlock.blobId) return
 	void (async () => {
 		const loaded = await blockData.loadBlobs([toolBlock])
 		if (loaded <= 0) return
 		ctx.touchTab(tab)
-		ctx.onChange(false)
+		ctx.repaintIfActive(tab)
 	})()
 }
 
