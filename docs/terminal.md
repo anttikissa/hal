@@ -24,6 +24,72 @@ Bottom-anchored sections:
 
 Chrome = tab bar + prompt box + status + help bar.
 
+### Terminal buffer, writable screen, scrollback buffer, and viewport
+
+Terminal terminology is not perfectly standardized. In this document, the
+**terminal buffer** means the complete ordered sequence of physical rows that
+Hal has put in the terminal. It comprises:
+
+- the **scrollback buffer**: older rows above the cursor-addressable screen; and
+- the **writable screen**: the final `process.stdout.rows` rows, which cursor
+  movement can address.
+
+The **viewport** is only the window the user is currently looking through. It
+usually shows the writable screen, but moves over the terminal buffer when the
+user scrolls. Moving the viewport does not move the scrollback/writable boundary.
+
+This example has 25 rows in the terminal buffer and a 10-row-tall terminal. The
+user has scrolled 5 rows up, so the viewport shows rows 11 through 20 instead of
+the live-bottom rows 16 through 25:
+
+```
+       TERMINAL BUFFER: all 25 stored physical rows
+
+       scrollback buffer
+ 01 | older history        MUST STAY IMMUTABLE
+ 02 | older history        MUST STAY IMMUTABLE
+ 03 | older history        MUST STAY IMMUTABLE
+ 04 | older history        MUST STAY IMMUTABLE
+ 05 | older history        MUST STAY IMMUTABLE
+ 06 | older history        MUST STAY IMMUTABLE
+ 07 | older history        MUST STAY IMMUTABLE
+ 08 | older history        MUST STAY IMMUTABLE
+ 09 | older history        MUST STAY IMMUTABLE
+ 10 | older history        MUST STAY IMMUTABLE
+     +----- viewport starts: user scrolled 5 rows up -----+
+ 11 | history              MUST STAY IMMUTABLE             | viewport row 01
+ 12 | history              MUST STAY IMMUTABLE             | viewport row 02
+ 13 | history              MUST STAY IMMUTABLE             | viewport row 03
+ 14 | history              MUST STAY IMMUTABLE             | viewport row 04
+ 15 | history              MUST STAY IMMUTABLE             | viewport row 05
+-----+--------- scrollback / writable boundary ------------+-------------
+       writable screen: bottom 10 rows of the terminal buffer
+ 16 | tool output          SAFE TO MODIFY                  | viewport row 06
+ 17 | tool output          SAFE TO MODIFY                  | viewport row 07
+ 18 | tool output          SAFE TO MODIFY                  | viewport row 08
+ 19 | tab bar              SAFE TO MODIFY                  | viewport row 09
+ 20 | prompt top           SAFE TO MODIFY                  | viewport row 10
+     +----- viewport ends ----------------------------------+
+ 21 | prompt               SAFE TO MODIFY
+ 22 | prompt continuation  SAFE TO MODIFY
+ 23 | prompt bottom        SAFE TO MODIFY
+ 24 | status               SAFE TO MODIFY
+ 25 | help                 SAFE TO MODIFY
+```
+
+It does **not** matter whether the user has scrolled up. What matters is which
+rows are in the bottom `process.stdout.rows` rows of the terminal buffer. In the
+example, rows 16-25 remain writable even though the viewport currently shows
+only rows 16-20 of them; rows 11-15 remain immutable even though the user can see
+them.
+
+“Safe to modify” means cursor-addressable without forcing a snap or scroll.
+Before a writable-screen row is pushed across the boundary into scrollback, it
+must be canonical and final. Scrollback rows cannot be selectively rewritten and
+must remain immutable between canonical rebuilds. A fullscreen rebuild may
+replace Hal-owned scrollback only when snapping the viewport is known to be
+acceptable; pre-fullscreen terminal contents must never be destroyed.
+
 ### Horizontal box model
 
 Transcript blocks and chrome normally have one blank column on each side. For a
