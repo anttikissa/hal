@@ -115,6 +115,26 @@ test('refreshAll caches all accounts and status text marks the current one', asy
 	expect(text).not.toContain('\x1b[')
 })
 
+test('status table identifies every account whose token expired', async () => {
+	auth.ensureFresh = async () => {}
+	auth.listCredentials = () => [makeCredential(0, 'expired@test.com'), makeCredential(1, 'valid@test.com')]
+	globalThis.fetch = Object.assign(async (_input: any, init?: RequestInit) => {
+		const token = new Headers(init?.headers).get('authorization')
+		if (token?.includes('tok_0')) return new Response(JSON.stringify({ error: { code: 'token_expired' } }), { status: 401 }) as any
+		return new Response(JSON.stringify({
+			email: 'valid@test.com',
+			plan_type: 'plus',
+			rate_limit: { primary_window: { used_percent: 20, limit_window_seconds: 18_000, reset_at: Math.floor(Date.now() / 1000) + 1800 } },
+		}), { status: 200 }) as any
+	}, { preconnect: () => {} }) as typeof fetch
+
+	await openaiUsage.refreshAll(true)
+	const text = openaiUsage.formatStatusText()
+
+	expect(text).toContain('| 1/2 * | expired@test.com<br>Token expired — sign in again with /login chatgpt | ? |')
+	expect(text).toContain('| 2/2 | valid@test.com (plus) |')
+})
+
 test('refreshAll drops cached rows for old credential keys', async () => {
 	auth.ensureFresh = async () => {}
 	auth.listCredentials = () => [

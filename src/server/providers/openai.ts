@@ -62,6 +62,21 @@ function resolveOpenAITransport(credential: Credential): OpenAITransport {
 	}
 }
 
+function tokenExpired(body: string): boolean {
+	try {
+		return JSON.parse(body)?.error?.code === 'token_expired'
+	} catch {
+		return false
+	}
+}
+
+function expiredTokenMessage(credential: Credential, next: Credential | undefined, fast: boolean): string {
+	const slot = credential.total && credential.index != null ? ` (account ${credential.index + 1}/${credential.total})` : ''
+	const label = providerShared.formatAccountLabel(credential)
+	if (fast && next) return `OpenAI token expired for ${label}${slot}. Trying ${providerShared.formatAccountLabel(next)} next.`
+	return `OpenAI token expired for ${label}${slot}. Sign in to this account again with /login chatgpt.`
+}
+
 function parseResetsInSeconds(body: string | undefined): number | undefined {
 	if (!body) return
 	try {
@@ -712,6 +727,20 @@ async function* generateOpenAIHttp(req: ProviderRequest, credential: Credential,
 	if (!res.ok) {
 		const text = await readErrorBody(res)
 		const retryAfterMs = providerShared.parseRetryDelay(res, text)
+		if (credential.type === 'token' && res.status === 401 && tokenExpired(text)) {
+			auth.markCooldown(credential, 10 * 60_000)
+			const fast = auth.hasAvailableCredential('openai')
+			const nextCredential = auth.getCredential('openai')
+			yield* yieldErrorAndDone({
+				type: 'error',
+				message: expiredTokenMessage(credential, nextCredential, fast),
+				status: res.status,
+				body: text,
+				endpoint: transport.apiUrl,
+				retryAfterMs: fast ? 1_000 : 10 * 60_000,
+			})
+			return
+		}
 		if (res.status === 429) {
 			const cooldownMs = parseResetsInSeconds(text) ?? retryAfterMs ?? 10 * 60_000
 			auth.markCooldown(credential, cooldownMs)

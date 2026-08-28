@@ -385,6 +385,36 @@ test('openai 429 shows failed and next account when another account is available
 	expect(events.at(-1)?.type).toBe('error')
 })
 
+test('openai names and rotates a token-expired account', async () => {
+	const credential: Credential = { value: makeJwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct_123' } }), type: 'token', email: 'expired@test.com', _key: 'openai:0', index: 0, total: 3 }
+	const next: Credential = { ...credential, value: makeJwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct_456' } }), email: 'next@test.com', _key: 'openai:1', index: 1 }
+	let cooldownCred: Credential | undefined
+	let getCount = 0
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => (++getCount === 1 ? credential : next)
+	auth.getEntry = () => ({})
+	auth.markCooldown = (cred: Credential) => { cooldownCred = cred }
+	auth.hasAvailableCredential = () => true
+	installFetchMock(async () => new Response(JSON.stringify({ error: { code: 'token_expired', message: 'Provided authentication token is expired.' } }), { status: 401 }) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.3-codex',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_expired',
+	})) events.push(event)
+
+	expect(cooldownCred).toBe(credential)
+	expect(events[0]).toMatchObject({
+		type: 'error',
+		message: 'OpenAI token expired for expired@test.com (account 1/3). Trying next@test.com next.',
+		status: 401,
+		retryAfterMs: 1_000,
+	})
+})
+
 test('openai 429 waits for reset when all accounts are on cooldown', async () => {
 	const credential: Credential = { value: 'sk-test', type: 'api-key', email: 'burned@test.com', _key: 'openai:0', index: 0, total: 3 }
 	const next: Credential = { value: 'sk-next', type: 'api-key', email: 'next@test.com', _key: 'openai:1', index: 1, total: 3 }

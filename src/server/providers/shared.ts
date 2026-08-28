@@ -190,6 +190,7 @@ export const providerShared = {
 	readWithTimeout,
 	iterateJsonSse,
 	parseToolInput,
+	formatAccountLabel,
 	formatRotationMessage,
 	formatNetworkError,
 }

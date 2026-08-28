@@ -25,6 +25,8 @@ export interface AccountUsage {
 	primary?: UsageWindow
 	secondary?: UsageWindow
 	pendingTokens: number
+	// Present when OpenAI rejected this account's bearer token during refresh.
+	error?: string
 }
 
 interface UsageState {
@@ -168,7 +170,7 @@ function displayAccount(account: AccountUsage): string {
 	const raw = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)
 	const who = subscriptionUsage.config.censorEmails && account.email ? subscriptionUsage.censorEmail(account.email) : raw
 	const plan = account.planType ? ` (${account.planType})` : ''
-	return `${who}${plan}`
+	return `${who}${plan}${account.error ? `<br>${account.error}` : ''}`
 }
 
 function displaySlot(account: AccountUsage): string {
@@ -241,6 +243,18 @@ function formatStatusText(): string {
 	return lines.join('\n')
 }
 
+function expiredAccount(credential: Credential): AccountUsage {
+	return {
+		key: keyOf(credential),
+		email: credential.email,
+		index: credential.index,
+		total: credential.total,
+		fetchedAt: new Date().toISOString(),
+		pendingTokens: 0,
+		error: 'Token expired — sign in again with /login chatgpt',
+	}
+}
+
 async function fetchUsage(credential: Credential): Promise<AccountUsage> {
 	await auth.ensureFresh('openai')
 	const res = await fetch(USAGE_URL, {
@@ -249,6 +263,11 @@ async function fetchUsage(credential: Credential): Promise<AccountUsage> {
 	})
 	if (!res.ok) {
 		const text = await res.text().catch(() => '')
+		if (res.status === 401) {
+			try {
+				if (JSON.parse(text)?.error?.code === 'token_expired') return expiredAccount(credential)
+			} catch {}
+		}
 		throw new Error(`/wham/usage ${res.status}: ${text.slice(0, 200)}`)
 	}
 	return parsePayload(credential, await res.json())
