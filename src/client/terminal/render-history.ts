@@ -42,17 +42,16 @@ const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
 let workingSeen = new Set<string>()
 let fadeStart = new Map<string, number>()
 let nextToolRevealAt = 0
-const bodyCache = new WeakMap<Tab, { key: string; lines: string[]; streaming: boolean; animatedTools: boolean; nextToolRevealAt: number; cursor?: { row: number; col: number } }>()
+const bodyCache = new WeakMap<Tab, { key: string; lines: string[]; streaming: boolean; nextToolRevealAt: number; cursor?: { row: number; col: number } }>()
 
 function hasInlineHalCursor(block: Block | undefined): boolean {
 	return (block?.type === 'assistant' || block?.type === 'thinking') && !!block.streaming
 }
 
 
-function toolSpinnerFrame(_block: Block, clockFrame: number): number {
-	// The source is deliberately replaceable: an output-driven mode can return a
-	// produced-line counter without changing tool-card rendering or geometry.
-	return clockFrame
+function toolSpinnerFrame(block: Block): number {
+	if (block.type !== 'tool') return 0
+	return block.outputUpdates ?? 0
 }
 
 function renderEntry(block: Block, cols: number, context: HistoryRenderContext, activeStreamingBlock: Block | undefined): RenderedBlock {
@@ -143,7 +142,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 	const tail = tab.history.at(-1)
 	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${blockRenderer.outputPad}:${working}:${context.sessionLabelVersion}:${tab.history.length}:${tail?.renderVersion ?? 0}:${terminalQuestions.state.version}`
 	let body = bodyCache.get(tab)
-	if (!body || body.key !== key || (working && (body.streaming || body.animatedTools))) {
+	if (!body || body.key !== key || (working && body.streaming)) {
 		const history = visibleHistory(tab.history)
 		const last = history.at(-1)
 		let activeStreamingBlock: Block | undefined
@@ -153,7 +152,6 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		let toolOffset = 0
 		let toolStart: number | undefined
 		let fullTools = Infinity
-		let animatedTools = false
 		nextToolRevealAt = 0
 		for (let i = 0; i < history.length; ) {
 			let block = history[i]!
@@ -173,10 +171,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 					i++
 					continue
 				}
-				if (block.running) {
-					animatedTools = true
-					block = { ...block, toolActivityFrame: renderHistory.toolSpinnerFrame(block, context.cursorTick) }
-				}
+				if (block.running) block = { ...block, toolActivityFrame: renderHistory.toolSpinnerFrame(block) }
 				if (summary) block = { ...block, toolSummary: true }
 			} else {
 				toolOffset = 0
@@ -194,7 +189,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 			built.push(...rendered.lines)
 			i += group.length
 		}
-		body = { key, lines: built, streaming: !!activeStreamingBlock, animatedTools, nextToolRevealAt, cursor: questionCursor }
+		body = { key, lines: built, streaming: !!activeStreamingBlock, nextToolRevealAt, cursor: questionCursor }
 		bodyCache.set(tab, body)
 	}
 	nextToolRevealAt = body.nextToolRevealAt

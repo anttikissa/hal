@@ -394,10 +394,10 @@ out of the writable screen. A tall terminal can therefore stream several cards a
 and finishing an earlier tool frees room for another. Tool cards never exceed ten rows.
 
 Every tool header reserves one fixed-width status cell immediately before its title.
-A revealed running tool cycles `◐ ◓ ◑ ◒`; when it finishes, the same cell becomes
-`✓`. The history renderer supplies the phase rather than deriving time inside the
-block renderer, keeping card geometry constant and allowing a future output-driven
-mode to advance the spinner once per produced line.
+A revealed running tool advances through `◐ ◓ ◑ ◒` whenever that specific tool
+publishes a running output event; when it finishes, the same cell becomes `✓`. Silent
+tools remain at `◐`, which still marks them busy without causing animation-only paints.
+The phase is an event counter, not an inference from the truncated output preview.
 
 This was discovered the hard way: without throttling, keypresses were
 completely unresponsive during assistant output.
