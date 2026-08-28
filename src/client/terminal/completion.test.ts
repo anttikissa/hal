@@ -113,11 +113,15 @@ test('/go completes all sessions and /resume completes closed sessions', () => {
 })
 
 
-test('/login completes provider names', () => {
-	const result = completion.complete('/login c', '/login c'.length)
+test('/login completes provider names and aliases', () => {
+	const all = completion.complete('/login ', '/login '.length)
+	const openai = completion.complete('/login o', '/login o'.length)
+	const anthropic = completion.complete('/login a', '/login a'.length)
 
-	expect(result).not.toBeNull()
-	expect(result!.items).toEqual(['/login claude', '/login chatgpt'])
+	expect(all).not.toBeNull()
+	expect(all!.items).toEqual(['/login anthropic', '/login chatgpt', '/login claude', '/login openai'])
+	expect(openai!.items).toEqual(['/login openai'])
+	expect(anthropic!.items).toEqual(['/login anthropic'])
 })
 
 
