@@ -7,9 +7,9 @@ const originalFetch = globalThis.fetch
 
 test('uses the configured public DNS hostname for the ChatGPT callback', () => {
 	const originalHostname = webUpload.config.hostname
-	webUpload.config.hostname = 'hal.kissa.dev'
+	webUpload.config.hostname = 'example.test'
 	try {
-		expect(authLogin.openaiRedirectUri()).toBe('https://hal.kissa.dev/auth/callback')
+		expect(authLogin.openaiRedirectUri()).toBe('https://example.test/auth/callback')
 	} finally {
 		webUpload.config.hostname = originalHostname
 	}
@@ -17,7 +17,7 @@ test('uses the configured public DNS hostname for the ChatGPT callback', () => {
 
 test('rejects a non-hostname ChatGPT callback setting', () => {
 	const originalHostname = webUpload.config.hostname
-	webUpload.config.hostname = 'https://hal.kissa.dev/auth/callback'
+	webUpload.config.hostname = 'https://example.test/auth/callback'
 	try {
 		expect(() => authLogin.openaiRedirectUri()).toThrow(/web.hostname/)
 	} finally {

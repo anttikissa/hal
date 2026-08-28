@@ -19,15 +19,3 @@ jobs:
       - run: bun install --frozen-lockfile
       # ./test runs the typechecker, oxlint, and the test suite in parallel.
       - run: ./test
-
-  deploy:
-    # kissa.dev pulls and relaunches itself when pinged (POST /api/update).
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Ask the server to pull and restart
-        run: |
-          curl -fsS --max-time 30 -X POST \
-            -H "Authorization: Bearer ${{ secrets.UPDATE_TOKEN }}" \
-            https://hal.kissa.dev/api/update

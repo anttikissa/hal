@@ -36,7 +36,7 @@ type AuthenticatedAppProps = {
 
 function AuthenticatedApp(props: AuthenticatedAppProps) {
 	// The URL owns the selected session, so a tab is shareable as
-	// hal.kissa.dev/05-wan and Back/Forward move between tabs.
+	// example.test/05-wan and Back/Forward move between tabs.
 	const selected = router.sessionId
 	const [sharedState, setSharedState] = createSignal<SharedState>({ sessions: [], working: {}, updatedAt: '' })
 	const [snapshot, setSnapshot] = createSignal<ClientSessionSnapshot | null>(null)

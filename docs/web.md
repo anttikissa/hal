@@ -28,7 +28,7 @@ of truth; re-read it after upgrades.
 ## Routing
 
 `src/web-client/router.ts` is a ~70-line router, not a dependency. The whole
-URL surface is `/<sessionId>` (`hal.kissa.dev/05-wan`), so a tab is a
+URL surface is `/<sessionId>` (`example.test/05-wan`), so a tab is a
 shareable link and Back/Forward move between tabs.
 
 - `src/common/web.ts` owns `isSessionPath()`. The server serves the app for

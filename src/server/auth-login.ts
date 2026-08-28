@@ -34,7 +34,7 @@ function openaiRedirectUri(): string {
 	// OAuth redirects are credentials-bearing URLs. Accept only a hostname so a
 	// malformed setting cannot turn it into an arbitrary URL or inject a path.
 	if (!/^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(hostname)) {
-		throw new Error('Set web.hostname to this host’s public DNS name, for example hal.kissa.dev')
+		throw new Error('Set web.hostname to this host’s public DNS name')
 	}
 	return `https://${hostname}/auth/callback`
 }
