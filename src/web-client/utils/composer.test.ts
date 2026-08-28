@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { enterAction, pastedImage, sendLabel } from './composer.ts'
+import { enterAction, pastedImage, sendLabel, submissionCommand } from './composer.ts'
 
 describe('enterAction', () => {
 	test('desktop: Enter submits, Shift+Enter newlines', () => {
@@ -30,5 +30,17 @@ describe('sendLabel', () => {
 	test('names what the button will actually do', () => {
 		expect(sendLabel(false)).toBe('Send')
 		expect(sendLabel(true)).toBe('Steer')
+	})
+})
+
+describe('submissionCommand', () => {
+	test('sends /what through its non-interrupting command channel', () => {
+		expect(submissionCommand('/what', '04-work', '000001-abc', false)).toEqual({ type: 'what', sessionId: '04-work', target: '' })
+		expect(submissionCommand('/what 2-4', '04-work', '000001-abc', true)).toEqual({ type: 'what', sessionId: '04-work', target: '2-4' })
+	})
+
+	test('leaves ordinary prompts and longer slash-command names alone', () => {
+		expect(submissionCommand('hello', '04-work', '000001-abc', true)).toEqual({ type: 'prompt', id: '000001-abc', sessionId: '04-work', text: 'hello', source: 'web', queue: true })
+		expect(submissionCommand('/whatever', '04-work', '000001-abc', false)).toMatchObject({ type: 'prompt', text: '/whatever' })
 	})
 })

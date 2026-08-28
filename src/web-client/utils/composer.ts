@@ -1,3 +1,5 @@
+import type { Command } from '../../common/protocol.ts'
+
 type EnterAction = 'submit' | 'newline' | 'none'
 
 // Desktop chat convention: Enter sends, Shift+Enter inserts a newline. On touch
@@ -24,5 +26,14 @@ function pastedImage<T extends { type: string }>(items: Iterable<{ type: string;
 	return null
 }
 
-export { enterAction, pastedImage, sendLabel }
+// /what is a client command, not an agent prompt. Route it through the same
+// non-interrupting protocol command as the terminal; other slash commands stay
+// prompts so the server's command parser remains their source of truth.
+function submissionCommand(text: string, sessionId: string, id: string, queue: boolean): Command {
+	const what = /^\/what(?:\s+(.*))?$/s.exec(text.trim())
+	if (what) return { type: 'what', sessionId, target: what[1]?.trim() ?? '' }
+	return { type: 'prompt', id, sessionId, text, source: 'web', queue }
+}
+
+export { enterAction, pastedImage, sendLabel, submissionCommand }
 export type { EnterAction }

@@ -12,6 +12,7 @@ import { AuthGate } from './components/AuthGate.tsx'
 import { PromptComposer } from './components/PromptComposer.tsx'
 import { SessionTabs } from './components/SessionTabs.tsx'
 import { Transcript } from './components/Transcript.tsx'
+import { submissionCommand } from './utils/composer.ts'
 import { webStatus } from './utils/status.ts'
 import { webTranscript } from './utils/transcript.ts'
 import { sessionSelection } from './utils/session-selection.ts'
@@ -98,8 +99,9 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 		const current = snapshot()
 		if (!sessionId || !current) return Promise.resolve(false)
 		const id = historyIds.make()
-		if (!sendCommand({ type: 'prompt', id, sessionId, text, source: 'web', queue })) return Promise.resolve(false)
-		if (!queue && !text.trimStart().startsWith('/')) {
+		const command = submissionCommand(text, sessionId, id, queue)
+		if (!sendCommand(command)) return Promise.resolve(false)
+		if (command.type === 'prompt' && !queue && !text.trimStart().startsWith('/')) {
 			const next = { ...current, live: liveEventBlocks.reduce(current.live, { type: 'prompt', id, text, createdAt: new Date().toISOString() }).blocks }
 			snapshots.set(sessionId, next)
 			setSnapshot(next)
