@@ -314,38 +314,43 @@ content, use `CR`, `CSI 1B`, then `CSI J` to erase leftover rows. Do not use
 `\r\n` there: at the writable-screen bottom it scrolls and creates a stray blank
 row.
 
-### 9. Automatic fullscreen recovery preserves inspected scrollback when possible
+### 9. Fullscreen recovery respects the immutable boundary
 
-A fullscreen shrink changes the scrollback/writable boundary. If every changed old
-row is still on the writable screen, automatic repaint must avoid the fullscreen
-force path: `CSI 3J` destroys scrollback and snaps a user who is inspecting it to
-the live bottom. Derive the writable-screen physical rows, return to column one,
-and use a relative cursor-up move by the terminal height (which clamps at the
-writable-screen top), then rewrite each row with `CSI 2K`; do not append a final
-CRLF. Do **not** use `CSI H`, which also makes Ghostty follow live output.
+A fullscreen physical shrink moves the scrollback/writable-screen boundary upward.
+The row newly exposed by that move is already in immutable scrollback, so repainting
+the shorter writable-screen suffix would duplicate it. **Every fullscreen physical
+shrink MUST use the canonical fullscreen repaint:** clear screen and scrollback, then
+rewrite the complete frame. This may snap an inspecting user to the live bottom, but
+no in-place escape sequence can both shorten the terminal buffer and preserve its
+canonical contents.
 
-If the first changed physical row has already entered immutable scrollback, a
-correct in-place repaint is impossible. In that case correctness wins: clear the
-screen and scrollback with the canonical fullscreen repaint and rewrite the
-complete frame. The visible snap and lost inspected scrollback are preferable to
-leaving duplicated or interleaved transcript rows.
+When frame height is stable and every changed old row remains on the writable screen,
+automatic repaint should avoid the canonical force path: `CSI 3J` destroys scrollback
+and snaps a user who is inspecting it to the live bottom. Derive the writable-screen
+physical rows, return to column one, and use a relative cursor-up move by the terminal
+height (which clamps at the writable-screen top), then rewrite each row with `CSI 2K`;
+do not append a final CRLF. Do **not** use `CSI H`, which also makes Ghostty follow live
+output.
 
-The writable-screen recovery temporarily hard-wraps a native-wrapped URL into
-independently addressable OSC 8 rows, just as popup layout does. Ordinary rendering
-must still leave completed standalone URLs native-wrapped for copy/paste.
+If the first changed physical row has already entered immutable scrollback, a correct
+in-place repaint is likewise impossible. Clear the screen and scrollback with the
+canonical fullscreen repaint and rewrite the complete frame. The visible snap and
+lost inspected scrollback are preferable to duplicated or interleaved transcript rows.
 
-This rule also covers popup open/close, which changes the URL layout. Explicit full
-rebuilds—Ctrl-L, tab switch, terminal resize, or an editing key that reduces the
-prompt's physical height—may always use the canonical path. Automatic prompt
-clearing, streaming, tool, animation, and popup updates use writable-screen
-recovery unless their first changed row is already immutable.
+Writable-screen recovery temporarily hard-wraps a native-wrapped URL into independently
+addressable OSC 8 rows, just as popup layout does. Ordinary rendering must still leave
+completed standalone URLs native-wrapped for copy/paste.
 
-Fullscreen growth is straightforward only for a pure append. If an existing
-logical line also changes, use the same clamped relative move to the writable-
-screen top, repaint independently addressable logical lines, then append the
-suffix with `\r\n`. If a soft-wrapped URL begins above the writable screen, leave
-its unchanged writable-screen tail alone and start at the next complete logical
-line.
+Explicit full rebuilds—Ctrl-L, tab switch, or terminal resize—may always use the
+canonical path. Automatic prompt, streaming, tool, animation, and popup updates may
+use writable-screen recovery only while frame height does not shrink and their first
+changed row remains writable.
+
+Fullscreen growth is straightforward only for a pure append. If an existing logical
+line also changes, use the same clamped relative move to the writable-screen top,
+repaint independently addressable logical lines, then append the suffix with `\r\n`.
+If a soft-wrapped URL begins above the writable screen, leave its unchanged writable-
+screen tail alone and start at the next complete logical line.
 
 Streaming Markdown must not paint one- or two-backtick fragments of a code-fence
 delimiter. The completed third backtick removes that transient logical row; if the
@@ -436,17 +441,15 @@ way to selectively clear parts of it.
 
 ### Implications for our renderer
 
-- **Normal diff path**: works fine. New lines are appended via `\r\n` and
-  scroll naturally. The diff engine only touches lines on the visible screen
-  (recently changed lines near the prompt). Lines in scrollback are old
-  history that doesn't need updating.
+- **Normal diff path**: only changed writable rows are rewritten. Growth may append
+  with `\r\n` and push canonical rows into scrollback. A changed immutable row or any
+  physical shrink requires a canonical fullscreen repaint.
 
 - **Force repaint in grow mode**: frame fits on screen. Move up, clear down,
   rewrite. Scrollback untouched.
 
-- **Force repaint in full mode**: the frame has exceeded terminal height or the
-  user has switched tabs. Must `CSI 3J` to clear scrollback, then rewrite ALL
-  lines.
+- **Canonical repaint in full mode**: emit `CSI 3J` to clear scrollback, then rewrite
+  the complete frame. Use this when correctness cannot be preserved in place.
 
-- **Tab switches**: enter full mode permanently, then always force repaint. This
+- **Tab switches**: enter full mode permanently, then always repaint canonically. This
   discards native scrollback so stale rows from another tab cannot survive.

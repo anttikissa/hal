@@ -989,29 +989,6 @@ describe('render', () => {
 		}
 	})
 
-	test('fullscreen prompt shrink does not erase an inspected viewport', () => {
-		const tab = client.currentTab()!
-		const originalRows = process.stdout.rows
-		const originalCols = process.stdout.columns
-		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
-		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
-		try {
-			for (let i = 0; i < 20; i++) tab.history.push({ type: 'log', text: `old-${i}` })
-			prompt.setText('one line\nanother line')
-			captureOutput(() => render.draw())
-
-			prompt.setText('one line')
-			const output = captureOutput(() => render.draw())
-
-			expect(output).not.toMatch(/\x1b\[[0-9;?]*J/)
-			expect(stripAnsi(output)).toContain('one line')
-		} finally {
-			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
-			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
-		}
-	})
-
-
 	test('popup overlay targets the visible viewport in fullscreen', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows

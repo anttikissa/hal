@@ -169,7 +169,7 @@ describe('render fullscreen growth', () => {
 		}
 	})
 
-	test('keeps cursor coordinates valid after a fullscreen prompt shrink', () => {
+	test('canonically rebuilds after a fullscreen prompt shrink and keeps cursor coordinates valid', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -182,15 +182,15 @@ describe('render fullscreen growth', () => {
 
 			prompt.setText('one line')
 			const shrink = captureOutput(() => render.draw())
-			expect(shrink).not.toContain('\x1b[H')
-			expect(shrink).toContain('\r\x1b[8A')
+			expect(shrink).toContain('\x1b[H')
+			expect(shrink).toContain('\x1b[3J')
 			terminalLines(shrink, 8, state)
 			prompt.setText('one line!')
 			terminalLines(captureOutput(() => render.draw()), 8, state)
 
 			render.resetRenderer()
 			const canonical = terminalLines(captureOutput(() => render.draw(true)), 8)
-			expect(state.screen).toEqual(canonical.screen)
+			expect(physicalLines(state)).toEqual(physicalLines(canonical))
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

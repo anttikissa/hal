@@ -405,10 +405,11 @@ function draw(force = false): void {
 		repaintCanonicalFullscreen(frame)
 		return
 	}
-	// A shrink moves the scrollback/viewport boundary. Repaint physical rows in
-	// place; CSI J would pull an inspected Ghostty viewport back to the bottom.
+	// A shrink moves the scrollback/writable-screen boundary upward, but native
+	// scrollback cannot be pulled back onto the writable screen. Repainting the
+	// shorter suffix in place would duplicate the newly exposed scrollback row.
 	if (fullscreen && frameShrunk && first !== -1) {
-		repaintVisibleScreen(frame, rows)
+		repaintCanonicalFullscreen(frame)
 		return
 	}
 	if (fullscreen && frameGrew && nextHeight > rows && first >= 0 && first < prevFrame.lines.length) {
