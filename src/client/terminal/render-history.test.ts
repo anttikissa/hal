@@ -145,7 +145,7 @@ test('parallel tool cards are revealed 100ms apart without delaying execution', 
 		expect(first.map(stripAnsi).join('\n')).not.toContain('Grep "second"')
 
 		Date.now = () => 1100
-		renderHistory.advanceToolReveal()
+		t.historyVersion++
 		const second: string[] = []
 		renderHistory.renderLines(second, t, 80, active)
 		expect(second.map(stripAnsi).join('\n')).toContain('Grep "second"')

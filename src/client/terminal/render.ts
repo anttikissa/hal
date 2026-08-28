@@ -137,7 +137,7 @@ function scheduleToolReveal(): void {
 	if (toolRevealTimer) return
 	toolRevealTimer = setTimeout(() => {
 		toolRevealTimer = null
-		renderHistory.advanceToolReveal()
+		for (const tab of client.state.tabs) tab.historyVersion++
 		draw()
 	}, delay)
 }
