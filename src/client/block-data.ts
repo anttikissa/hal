@@ -19,6 +19,9 @@ interface PresentationBlock {
 	renderVersion?: number
 	blobLoaded?: boolean
 	toolSummary?: boolean
+	// The renderer supplies the phase. Keeping it separate from the clock lets a
+	// future mode advance once per produced output line instead.
+	toolActivityFrame?: number
 }
 
 export type QuestionBlock = Omit<ProjectedQuestion, 'ts'> & PresentationBlock & { type: 'question'; ts?: number }

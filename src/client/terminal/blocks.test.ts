@@ -142,6 +142,19 @@ test('tool summaries contain only their call-time header', () => {
 	expect(clean.join('\n')).not.toContain('late output')
 })
 
+
+test('busy tool spinner has a fixed reserved header position', () => {
+	colors.load()
+	const first = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'sleep 1' }, running: true, toolActivityFrame: 0 }, 50).map(stripAnsi)
+	const second = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'sleep 1' }, running: true, toolActivityFrame: 1 }, 50).map(stripAnsi)
+	const done = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'sleep 1' } }, 50).map(stripAnsi)
+
+	expect(first[1]).toContain('◐')
+	expect(second[1]).toContain('◓')
+	expect(done.join('\n')).not.toMatch(/[◐◓◑◒]/)
+	expect(visLen(first[1]!)).toBe(visLen(second[1]!))
+})
+
 test('short status notices share one unlabelled transparent style without marker brackets', () => {
 	colors.load()
 	const block = { type: 'log', text: '[paused]', ts: new Date('2026-01-01T17:38:00Z').getTime() } as const

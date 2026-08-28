@@ -128,6 +128,53 @@ test('parallel tools expand only through the first running call', () => {
 })
 
 
+test('every running tool spins and finished tools stop', () => {
+	colors.load()
+	const active = context()
+	active.workingSessions = new Map([['test', true]])
+	active.cursorTick = 0
+	const t = tab([
+		{ type: 'tool', name: 'bash', input: { command: 'first' }, running: true, ts: 1 },
+		{ type: 'tool', name: 'bash', input: { command: 'second' }, running: true, ts: 1 },
+		{ type: 'tool', name: 'bash', input: { command: 'done' }, ts: 1 },
+	])
+	const first: string[] = []
+	renderHistory.renderLines(first, t, 80, active)
+	expect(first.map(stripAnsi).join('\n').match(/◐/g)).toHaveLength(2)
+
+	active.cursorTick = 1
+	const second: string[] = []
+	renderHistory.renderLines(second, t, 80, active)
+	expect(second.map(stripAnsi).join('\n').match(/◓/g)).toHaveLength(2)
+
+	;(t.history[0] as any).running = false
+	t.historyVersion++
+	const stopped: string[] = []
+	renderHistory.renderLines(stopped, t, 80, active)
+	expect(stopped.map(stripAnsi).join('\n').match(/◓/g)).toHaveLength(1)
+})
+
+
+test('tool spinner phase source can be replaced by output activity', () => {
+	colors.load()
+	const original = renderHistory.toolSpinnerFrame
+	const active = context()
+	active.workingSessions = new Map([['test', true]])
+	const t = tab([{ type: 'tool', name: 'bash', input: { command: 'counter' }, output: 'one\ntwo\nthree', running: true, ts: 1 }])
+	try {
+		renderHistory.toolSpinnerFrame = function outputLineFrame(block) {
+			if (block.type !== 'tool') return 0
+			return block.output?.split('\n').length ?? 0
+		}
+		const lines: string[] = []
+		renderHistory.renderLines(lines, t, 80, active)
+		expect(lines.map(stripAnsi).join('\n')).toContain('◒')
+	} finally {
+		renderHistory.toolSpinnerFrame = original
+	}
+})
+
+
 test('parallel tool cards are revealed 100ms apart without delaying execution', () => {
 	colors.load()
 	const originalNow = Date.now

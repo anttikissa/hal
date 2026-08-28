@@ -394,6 +394,12 @@ Every tool card is contained after wrapping to eight text rows (header included)
 its top and bottom padding. This keeps the mutable suffix small without serializing
 actual tool execution.
 
+Every revealed running tool has a fixed-width four-frame spinner in its header. The
+history renderer supplies the phase rather than deriving time inside the block
+renderer; this keeps the card geometry constant and allows a future output-driven
+mode to advance the same spinner once per produced line. A finished tool receives no
+phase and therefore stops spinning immediately.
+
 This was discovered the hard way: without throttling, keypresses were
 completely unresponsive during assistant output.
 
