@@ -18,3 +18,6 @@ state/
 /config.ason
 auth.ason
 hal.js
+
+# Local deployment and provider environment overrides (may contain secrets).
+.env*
