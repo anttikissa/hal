@@ -595,8 +595,7 @@ handlers['status'] = async (_args, _session, hooks) => {
 }
 
 // /login <provider> — Claude returns its code through a durable secret question;
-// ChatGPT receives its code through the existing localhost callback.
-//
+// ChatGPT uses OpenAI's device-code flow, which works on remote and headless hosts.
 // Users subscribe to Claude and ChatGPT, not to "Anthropic" and "OpenAI", so the
 // product names are what we ask for. The company names stay as hidden aliases:
 // they name the provider prefixes in model IDs and the API key env vars, so
@@ -621,7 +620,7 @@ handlers['login'] = async (args, _session, hooks) => {
 	}
 
 	if (provider === 'chatgpt' || provider === 'openai') {
-		hooks.info?.('Opening browser for ChatGPT login (10min timeout)...')
+		hooks.info?.('Starting ChatGPT device-code login (15min timeout)...')
 		try {
 			await authLogin.loginOpenai((msg) => hooks.info?.(msg))
 			return { output: 'Logged in to ChatGPT. Run /status to see usage.', handled: true }

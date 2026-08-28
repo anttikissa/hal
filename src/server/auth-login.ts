@@ -2,9 +2,8 @@
 //
 // Anthropic: PKCE → user opens URL → pastes the returned code#state. The
 // verifier is the returned state, so finishing survives a process restart.
-// OpenAI: PKCE → localhost:1455 callback catches the code automatically.
+// OpenAI: device authorization is the supported login flow for remote and headless hosts.
 
-import { createServer } from 'http'
 import { auth } from './auth.ts'
 import { liveFiles } from '../utils/live-file.ts'
 
@@ -16,17 +15,10 @@ const ANTHROPIC_PROFILE = 'https://api.anthropic.com/api/oauth/profile'
 const ANTHROPIC_SCOPE = 'org:create_api_key user:profile user:inference'
 
 const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
-const OPENAI_AUTHORIZE = 'https://auth.openai.com/oauth/authorize'
 const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token'
-const OPENAI_REDIRECT = 'http://localhost:1455/auth/callback'
-const OPENAI_CALLBACK_PORT = 1455
+const OPENAI_DEVICE_AUTH_URL = 'https://auth.openai.com/api/accounts/deviceauth'
+const OPENAI_DEVICE_CALLBACK = 'https://auth.openai.com/deviceauth/callback'
 
-// Random base64url string of given byte length.
-function randomB64Url(byteLen: number): string {
-	const bytes = crypto.getRandomValues(new Uint8Array(byteLen))
-	return btoa(String.fromCharCode(...bytes))
-		.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
 
 async function sha256B64Url(input: string): Promise<string> {
 	const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
@@ -111,31 +103,63 @@ async function fetchAnthropicEmail(accessToken: string): Promise<string | undefi
 
 // ── OpenAI ──
 
+type OpenaiDeviceCode = {
+	deviceAuthId: string
+	userCode: string
+	intervalMs: number
+	verificationUrl: string
+}
+
+type OpenaiAuthorizationCode = {
+	code: string
+	verifier: string
+}
+
+async function requestOpenaiDeviceCode(): Promise<OpenaiDeviceCode> {
+	const response = await fetch(`${OPENAI_DEVICE_AUTH_URL}/usercode`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ client_id: OPENAI_CLIENT_ID }),
+	})
+	if (!response.ok) {
+		if (response.status === 404) throw new Error('ChatGPT device-code login is unavailable. Enable device-code login in your ChatGPT security or workspace settings.')
+		throw new Error(`ChatGPT device-code request failed: ${response.status}`)
+	}
+	const data = await response.json() as any
+	if (typeof data.device_auth_id !== 'string' || typeof data.user_code !== 'string') throw new Error('ChatGPT device-code response missing required fields')
+	const interval = Number(data.interval)
+	return {
+		deviceAuthId: data.device_auth_id,
+		userCode: data.user_code,
+		intervalMs: Math.max(0, Number.isFinite(interval) ? interval * 1_000 : 5_000),
+		verificationUrl: 'https://auth.openai.com/codex/device',
+	}
+}
+
+async function pollOpenaiDeviceCode(deviceCode: OpenaiDeviceCode): Promise<OpenaiAuthorizationCode> {
+	const deadline = Date.now() + 15 * 60_000
+	for (;;) {
+		const response = await fetch(`${OPENAI_DEVICE_AUTH_URL}/token`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ device_auth_id: deviceCode.deviceAuthId, user_code: deviceCode.userCode }),
+		})
+		if (response.ok) {
+			const data = await response.json() as any
+			if (typeof data.authorization_code !== 'string' || typeof data.code_challenge !== 'string' || typeof data.code_verifier !== 'string') throw new Error('ChatGPT device-code response missing required fields')
+			return { code: data.authorization_code, verifier: data.code_verifier }
+		}
+		if (response.status !== 403 && response.status !== 404) throw new Error(`ChatGPT device-code login failed: ${response.status}`)
+		if (Date.now() >= deadline) throw new Error('ChatGPT device-code login timed out after 15 minutes')
+		await Bun.sleep(deviceCode.intervalMs)
+	}
+}
+
 async function loginOpenai(onProgress?: (msg: string) => void): Promise<{ accountId?: string }> {
-	const verifier = randomB64Url(32)
-	const challenge = await sha256B64Url(verifier)
-	const flowState = randomB64Url(16)
-
-	const authUrl = new URL(OPENAI_AUTHORIZE)
-	authUrl.searchParams.set('response_type', 'code')
-	authUrl.searchParams.set('client_id', OPENAI_CLIENT_ID)
-	authUrl.searchParams.set('redirect_uri', OPENAI_REDIRECT)
-	authUrl.searchParams.set('scope', process.env.OPENAI_OAUTH_SCOPE ?? 'openid profile email offline_access')
-	authUrl.searchParams.set('code_challenge', challenge)
-	authUrl.searchParams.set('code_challenge_method', 'S256')
-	authUrl.searchParams.set('state', flowState)
-	authUrl.searchParams.set('id_token_add_organizations', 'true')
-	authUrl.searchParams.set('codex_cli_simplified_flow', 'true')
-	// Identify ourselves rather than borrowing another client's name. The authorize endpoint
-	// accepts any value here (probed); the client_id is what actually selects the OAuth app.
-	authUrl.searchParams.set('originator', process.env.OPENAI_ORIGINATOR ?? 'hal')
-
-	onProgress?.(`Open this URL to log in:\n${authUrl}\n\nWaiting for callback on ${OPENAI_REDIRECT}...`)
-
-	// Try to open browser automatically. If this fails the user can still copy the URL.
-	tryOpenBrowser(authUrl.toString())
-
-	const code = await awaitOpenaiCallback(flowState)
+	const deviceCode = await requestOpenaiDeviceCode()
+	onProgress?.(`Open this URL to log in to ChatGPT:\n${deviceCode.verificationUrl}\n\nEnter this one-time code (expires in 15 minutes):\n${deviceCode.userCode}\n\nOnly continue if you started this login in Hal.`)
+	authLogin.tryOpenBrowser(deviceCode.verificationUrl)
+	const authorization = await pollOpenaiDeviceCode(deviceCode)
 
 	const tokenRes = await fetch(OPENAI_TOKEN_URL, {
 		method: 'POST',
@@ -143,9 +167,9 @@ async function loginOpenai(onProgress?: (msg: string) => void): Promise<{ accoun
 		body: new URLSearchParams({
 			grant_type: 'authorization_code',
 			client_id: OPENAI_CLIENT_ID,
-			code,
-			code_verifier: verifier,
-			redirect_uri: OPENAI_REDIRECT,
+			code: authorization.code,
+			code_verifier: authorization.verifier,
+			redirect_uri: OPENAI_DEVICE_CALLBACK,
 		}),
 	})
 	if (!tokenRes.ok) {
@@ -163,47 +187,6 @@ async function loginOpenai(onProgress?: (msg: string) => void): Promise<{ accoun
 		...(accountId ? { accountId } : {}),
 	})
 	return { accountId }
-}
-
-function awaitOpenaiCallback(expectedState: string): Promise<string> {
-	return new Promise<string>((resolve, reject) => {
-		const server = createServer((req, res) => {
-			try {
-				const reqUrl = new URL(req.url || '', 'http://localhost')
-				if (reqUrl.pathname !== '/auth/callback') {
-					res.statusCode = 404; res.end('Not found'); return
-				}
-				if (reqUrl.searchParams.get('state') !== expectedState) {
-					res.statusCode = 400; res.end('State mismatch'); return
-				}
-				const oauthError = reqUrl.searchParams.get('error')
-				if (oauthError) {
-					const desc = reqUrl.searchParams.get('error_description') || ''
-					res.statusCode = 400; res.end(`OAuth error: ${oauthError}`)
-					server.close()
-					reject(new Error(`OAuth error: ${oauthError}${desc ? ` (${desc})` : ''}`))
-					return
-				}
-				const code = reqUrl.searchParams.get('code')
-				if (!code) { res.statusCode = 400; res.end('Missing authorization code'); return }
-				res.statusCode = 200
-				res.setHeader('Content-Type', 'text/html')
-				res.end('<html><body><p>Authentication successful! You can close this tab.</p></body></html>')
-				server.close()
-				resolve(code)
-			} catch (e: any) {
-				res.statusCode = 500; res.end('Internal error')
-				reject(e)
-			}
-		})
-		server.listen(OPENAI_CALLBACK_PORT, '127.0.0.1')
-		server.on('error', (err: any) => {
-			if (err.code === 'EADDRINUSE') reject(new Error(`Port ${OPENAI_CALLBACK_PORT} already in use`))
-			else reject(err)
-		})
-		// 10 minute window for the user to complete the browser flow.
-		setTimeout(() => { server.close(); reject(new Error('Login timed out (10min)')) }, 600_000)
-	})
 }
 
 function decodeJwt(token: string): any {
@@ -250,6 +233,9 @@ function saveAuth(provider: 'anthropic' | 'openai', entry: Record<string, any>):
 export const authLogin = {
 	startAnthropic,
 	finishAnthropic,
+	requestOpenaiDeviceCode,
+	pollOpenaiDeviceCode,
 	loginOpenai,
+	tryOpenBrowser,
 	saveAuth,
 }

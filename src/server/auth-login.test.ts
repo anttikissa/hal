@@ -4,6 +4,32 @@ import { authLogin } from './auth-login.ts'
 
 const originalFetch = globalThis.fetch
 
+test('uses OpenAI device authorization for ChatGPT login', async () => {
+	auth._setStoreForTest({})
+	const requests: Array<{ url: string; init?: RequestInit }> = []
+	const originalTryOpenBrowser = authLogin.tryOpenBrowser
+	globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
+		const url = String(input)
+		requests.push({ url, init })
+		if (url.endsWith('/deviceauth/usercode')) return new Response(JSON.stringify({ device_auth_id: 'device-auth-id', user_code: 'ABCD-EFGH', interval: '0' }))
+		if (url.endsWith('/deviceauth/token')) return new Response(JSON.stringify({ authorization_code: 'authorization-code', code_challenge: 'challenge', code_verifier: 'verifier' }))
+		return new Response(JSON.stringify({ access_token: 'access-token', refresh_token: 'refresh-token', expires_in: 3600 }))
+	}, { preconnect: () => {} }) as typeof fetch
+	authLogin.tryOpenBrowser = () => {}
+	try {
+		await authLogin.loginOpenai()
+		const userCode = JSON.parse(String(requests[0]?.init?.body))
+		const tokenPoll = JSON.parse(String(requests[1]?.init?.body))
+		const tokenExchange = new URLSearchParams(String(requests[2]?.init?.body))
+		expect(userCode).toEqual({ client_id: 'app_EMoamEEZ73f0CkXaXp7hrann' })
+		expect(tokenPoll).toEqual({ device_auth_id: 'device-auth-id', user_code: 'ABCD-EFGH' })
+		expect(Object.fromEntries(tokenExchange)).toMatchObject({ grant_type: 'authorization_code', code: 'authorization-code', code_verifier: 'verifier', redirect_uri: 'https://auth.openai.com/deviceauth/callback' })
+		expect(auth.store().openai).toMatchObject({ accessToken: 'access-token', refreshToken: 'refresh-token' })
+	} finally {
+		globalThis.fetch = originalFetch
+		authLogin.tryOpenBrowser = originalTryOpenBrowser
+	}
+})
 test('finishes Claude login after a restart using the verifier returned in code state', async () => {
 	auth._setStoreForTest({})
 	const verifier = 'A'.repeat(43)
