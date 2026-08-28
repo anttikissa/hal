@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { enterAction, sendLabel } from './composer.ts'
+import { enterAction, pastedImage, sendLabel } from './composer.ts'
 
 describe('enterAction', () => {
 	test('desktop: Enter submits, Shift+Enter newlines', () => {
@@ -14,6 +14,15 @@ describe('enterAction', () => {
 
 	test('other keys do nothing', () => {
 		expect(enterAction('a', {})).toBe('none')
+	})
+})
+
+describe('pastedImage', () => {
+	test('returns the first pasted image and leaves ordinary text alone', () => {
+		const image = { type: 'image/png', value: 'image' }
+		const text = { type: 'text/plain', value: 'text' }
+		expect(pastedImage([{ type: text.type, getAsFile: () => text }, { type: image.type, getAsFile: () => image }])).toBe(image)
+		expect(pastedImage([{ type: text.type, getAsFile: () => text }])).toBeNull()
 	})
 })
 

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { prompt } from './prompt.ts'
 import type { KeyEvent } from './keys.ts'
+import { clipboard } from './clipboard.ts'
 
 function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
@@ -11,7 +12,30 @@ function select(text: string, anchor: number, cursor: number): void {
 	prompt.restoreState({ ...prompt.snapshotState(), selAnchor: anchor })
 }
 
+async function settle(): Promise<void> {
+	await Promise.resolve()
+	await Promise.resolve()
+}
+
 describe('prompt editor', () => {
+	test('waits for a pasted image upload before it can submit', async () => {
+		const originalPaste = clipboard.pasteFromClipboard
+		let resolve: (text: string) => void = () => {}
+		try {
+			clipboard.pasteFromClipboard = () => new Promise<string>((done) => { resolve = done })
+			prompt.setText('inspect ')
+			prompt.handleKey(key('v', { cmd: true }), 80)
+			expect(prompt.isPasting()).toBe(true)
+			expect(prompt.text()).toContain('uploading image')
+			resolve('[/srv/hal/state/uploads/clipboard.png]')
+			await settle()
+			expect(prompt.isPasting()).toBe(false)
+			expect(prompt.text()).toBe('inspect [/srv/hal/state/uploads/clipboard.png]')
+		} finally {
+			clipboard.pasteFromClipboard = originalPaste
+			prompt.clear()
+		}
+	})
 	test('ctrl-= and ctrl-- resize the prompt editor height', () => {
 		prompt.setText('one\ntwo')
 		prompt.config.maxPromptLines = 10

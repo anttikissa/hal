@@ -4,6 +4,7 @@
 import { dlopen, FFIType, ptr, toArrayBuffer } from 'bun:ffi'
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
+import { clientTransport } from '../transport.ts'
 
 const IMAGE_DIR = '/tmp/hal/images'
 const PASTE_DIR = '/tmp/hal/paste'
@@ -150,16 +151,23 @@ function readClipboardText(): string {
 	}
 }
 
-// Read clipboard. Returns text to insert directly (image -> "[path]").
-function pasteFromClipboard(): string {
-	const text = readClipboardText()
-	if (text) return text
-	const image = getClipboardImage()
-	if (!image) return ''
+// A remote terminal gives its image bytes to the server that owns the session;
+// same-machine terminals keep the existing local temp-file path.
+function pasteImage(image: Buffer): string | Promise<string> {
+	const upload = clientTransport.io.uploadImage
+	if (upload) return upload(image).then((path) => `[${path}]`)
 	mkdirSync(IMAGE_DIR, { recursive: true })
 	const path = `${IMAGE_DIR}/${Math.random().toString(36).slice(2, 8)}.png`
 	writeFileSync(path, image)
 	return `[${path}]`
+}
+
+function pasteFromClipboard(): string | Promise<string> {
+	const text = readClipboardText()
+	if (text) return text
+	const image = getClipboardImage()
+	if (!image) return ''
+	return clipboard.pasteImage(image)
 }
 
 function saveMultilinePaste(text: string): string {
@@ -200,4 +208,4 @@ function cleanPaste(raw: string): string {
 	return text
 }
 
-export const clipboard = { config, pasteFromClipboard, cleanPaste, saveMultilinePaste, shouldSaveMultilinePaste }
+export const clipboard = { config, pasteImage, pasteFromClipboard, cleanPaste, saveMultilinePaste, shouldSaveMultilinePaste }

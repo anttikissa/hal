@@ -9,6 +9,7 @@ import { clientTransport } from './transport.ts'
 type ParsedRemoteUrl = {
 	webSocketUrl: string
 	baseUrl: string
+	uploadUrl: string
 	token: string
 }
 
@@ -22,6 +23,7 @@ const state = {
 	wakeEvent: null as (() => void) | null,
 	stateListener: null as ((shared: SharedState) => void) | null,
 	reconnecting: false,
+	remote: null as ParsedRemoteUrl | null,
 }
 
 function parseUrl(input: string): ParsedRemoteUrl {
@@ -29,13 +31,14 @@ function parseUrl(input: string): ParsedRemoteUrl {
 	const url = new URL(input)
 	const token = url.searchParams.get('auth') ?? ''
 	if (!token) throw new Error('Remote URL must contain ?auth=<token>')
+	const baseUrl = url.origin
+	const upload = new URL('/upload', url)
+	upload.searchParams.set('auth', token)
 	url.search = ''
 	url.hash = ''
-	url.pathname = url.pathname.replace(/\/$/, '')
-	const baseUrl = url.toString().replace(/\/$/, '')
 	url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
 	url.pathname = '/ws'
-	return { webSocketUrl: url.toString(), baseUrl, token }
+	return { webSocketUrl: url.toString(), baseUrl, uploadUrl: upload.toString(), token }
 }
 
 function applySnapshot(snapshot: ClientSessionSnapshot): void {
@@ -105,6 +108,7 @@ function install(): void {
 		notifyDraftSaved: () => {},
 		readState: () => state.shared,
 		watchState: (callback) => { state.stateListener = callback },
+		uploadImage: (data) => webConnection.uploadImage(data),
 		tailEvents: (signal) => webConnection.tailEvents(signal),
 	})
 }
@@ -112,6 +116,19 @@ function install(): void {
 function sendCommand(command: Command): void {
 	if (state.socket?.readyState !== WebSocket.OPEN) throw new Error('Remote HAL connection is closed')
 	state.socket.send(webProtocol.encode({ type: 'command', command }))
+}
+
+async function uploadImage(data: Uint8Array): Promise<string> {
+	const remote = state.remote
+	if (!remote) throw new Error('Remote HAL connection is closed')
+	const form = new FormData()
+	form.append('file', new Blob([new Uint8Array(data).buffer], { type: 'image/png' }), 'clipboard.png')
+	const response = await webConnection.fetch(remote.uploadUrl, { method: 'POST', body: form })
+	const body = await response.json().catch(() => null) as { path?: unknown; error?: unknown } | null
+	if (!response.ok || !body || typeof body.path !== 'string') {
+		throw new Error(body && typeof body.error === 'string' ? body.error : `HTTP ${response.status}`)
+	}
+	return body.path
 }
 
 async function* tailEvents(signal?: AbortSignal): AsyncGenerator<any> {
@@ -189,7 +206,9 @@ async function reconnect(parsed: ParsedRemoteUrl, signal: AbortSignal): Promise<
 }
 
 function connect(input: string, signal: AbortSignal): Promise<void> {
-	return webConnection.openSocket(webConnection.parseUrl(input), signal, false)
+	const parsed = webConnection.parseUrl(input)
+	state.remote = parsed
+	return webConnection.openSocket(parsed, signal, false)
 }
 
 function reset(): void {
@@ -202,6 +221,7 @@ function reset(): void {
 	state.wakeEvent = null
 	state.stateListener = null
 	state.reconnecting = false
+	state.remote = null
 }
 
 export const webConnection = {
@@ -216,6 +236,8 @@ export const webConnection = {
 	applyMessage,
 	install,
 	sendCommand,
+	uploadImage,
+	fetch: globalThis.fetch as (url: string, init?: RequestInit) => Promise<Response>,
 	tailEvents,
 	openSocket,
 	reconnect,

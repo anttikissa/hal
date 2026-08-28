@@ -15,5 +15,14 @@ function sendLabel(working: boolean): string {
 	return working ? 'Steer' : 'Send'
 }
 
-export { enterAction, sendLabel }
+function pastedImage<T extends { type: string }>(items: Iterable<{ type: string; getAsFile: () => T | null }>): T | null {
+	for (const item of items) {
+		if (!item.type.startsWith('image/')) continue
+		const file = item.getAsFile()
+		if (file) return file
+	}
+	return null
+}
+
+export { enterAction, pastedImage, sendLabel }
 export type { EnterAction }

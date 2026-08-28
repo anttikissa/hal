@@ -134,6 +134,7 @@ clientBackend.install({
 clientTransport.install({
 	appendCommand: (command) => ipc.appendCommand(command),
 	notifyDraftSaved: (sessionId) => ipc.appendCommand({ type: 'draft-saved', sessionId }),
+	uploadImage: null,
 	readState: () => ipc.readState(),
 	watchState: (callback) => {
 		const shared = liveFiles.liveFile(`${STATE_DIR}/ipc/state.ason`, ipc.readState()) as ReturnType<typeof ipc.readState>

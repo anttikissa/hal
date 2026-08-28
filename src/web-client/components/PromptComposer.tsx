@@ -1,5 +1,5 @@
 import { createSignal, Show } from 'solid-js'
-import { enterAction, sendLabel } from '../utils/composer.ts'
+import { enterAction, pastedImage, sendLabel } from '../utils/composer.ts'
 
 type PromptComposerProps = {
 	location?: string
@@ -33,7 +33,7 @@ export function PromptComposer(props: PromptComposerProps) {
 	}
 
 	async function submit(queue = false): Promise<void> {
-		if (props.disabled) return
+		if (props.disabled || attaching()) return
 		const text = input?.value.trim() ?? ''
 		if (!text || !input) return
 		if (await props.onSubmit(text, queue)) {
@@ -50,11 +50,8 @@ export function PromptComposer(props: PromptComposerProps) {
 		}
 	}
 
-	async function attach(): Promise<void> {
-		if (props.disabled) return
-		const file = fileInput?.files?.[0]
-		if (!file || !input || !fileInput) return
-		fileInput.value = '' // allow re-picking the same file
+	async function attach(file: File): Promise<void> {
+		if (props.disabled || !input || attaching()) return
 		setAttaching(true)
 		try {
 			const path = await props.onAttach(file)
@@ -66,6 +63,19 @@ export function PromptComposer(props: PromptComposerProps) {
 		} finally {
 			setAttaching(false)
 		}
+	}
+
+	function attachPickedFile(): void {
+		const file = fileInput?.files?.[0]
+		if (fileInput) fileInput.value = '' // allow re-picking the same file
+		if (file) void attach(file)
+	}
+
+	function onPaste(event: ClipboardEvent): void {
+		const file = pastedImage(event.clipboardData?.items ?? [])
+		if (!file) return
+		event.preventDefault()
+		void attach(file)
 	}
 
 	// Directory and model sit with the composer rather than in the header: they
@@ -81,8 +91,9 @@ export function PromptComposer(props: PromptComposerProps) {
 			disabled={props.disabled}
 			onInput={autosize}
 			onKeyDown={onKeyDown}
+			onPaste={onPaste}
 		/>
-		<input ref={(element) => { fileInput = element }} type="file" accept="image/*" style="display: none" disabled={props.disabled} onChange={attach} />
+		<input ref={(element) => { fileInput = element }} type="file" accept="image/*" style="display: none" disabled={props.disabled} onChange={attachPickedFile} />
 		<button type="button" class="PromptComposer-attach" disabled={attaching() || props.disabled} title="Attach image" onClick={() => fileInput?.click()}>📎</button>
 		{/* Queue only exists while a turn runs: idle, sending already starts the
 		    prompt immediately and a queue button would mean the same thing. */}

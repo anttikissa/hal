@@ -18,6 +18,7 @@ const state = {
 	// live viewport height for composing unusually long prompts.
 	promptLineLimit: 0,
 	promptScrollTop: 0,
+	pasting: 0,
 }
 
 
@@ -500,8 +501,24 @@ function resolvePlaceholder(placeholder: string, replacement: string): void {
 }
 
 function doPaste(): void {
-	const t = clipboard.cleanPaste(clipboard.pasteFromClipboard())
-	if (t) replaceSelectionWithPastedText(t)
+	const pasted = clipboard.pasteFromClipboard()
+	if (typeof pasted === 'string') {
+		const text = clipboard.cleanPaste(pasted)
+		if (text) replaceSelectionWithPastedText(text)
+		return
+	}
+	const placeholder = `[uploading image ${Math.random().toString(36).slice(2, 8)}]`
+	replaceSelection(placeholder)
+	state.pasting++
+	void pasted.then((text) => {
+		resolvePlaceholder(placeholder, clipboard.cleanPaste(text))
+	}).catch((error) => {
+		const message = error instanceof Error ? error.message : String(error)
+		resolvePlaceholder(placeholder, `image upload failed: ${message}`)
+	}).finally(() => {
+		state.pasting--
+		renderCallback?.()
+	})
 }
 
 // ── Key handling ─────────────────────────────────────────────────────────────
@@ -836,6 +853,11 @@ function isBrowsingHistory(): boolean {
 function text(): string {
 	return buf
 }
+
+function isPasting(): boolean {
+	return state.pasting > 0
+}
+
 function cursorPos(): number {
 	return cursor
 }
@@ -879,6 +901,7 @@ export const prompt = {
 	config,
 	state,
 	text,
+	isPasting,
 	draftText,
 	isBrowsingHistory,
 	snapshotState,

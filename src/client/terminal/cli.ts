@@ -443,6 +443,7 @@ function handleLocalCommand(text: string): boolean {
 }
 
 function submit(override?: string, queue?: boolean, amend?: boolean): void {
+	if (prompt.isPasting()) return
 	const text = (override ?? prompt.submitText()).trim()
 	const displayText = override === undefined ? prompt.text().trim() : undefined
 	if (!text) return

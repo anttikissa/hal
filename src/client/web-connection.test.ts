@@ -7,6 +7,7 @@ test('remote connection accepts the URL copied from /web', () => {
 	expect(webConnection.parseUrl('http://localhost:9001/?auth=aBcDeFgHiJkL')).toEqual({
 		webSocketUrl: 'ws://localhost:9001/ws',
 		baseUrl: 'http://localhost:9001',
+		uploadUrl: 'http://localhost:9001/upload?auth=aBcDeFgHiJkL',
 		token: 'aBcDeFgHiJkL',
 	})
 })
@@ -14,6 +15,26 @@ test('remote connection accepts the URL copied from /web', () => {
 test('remote connection requires HTTP and the copied authentication token', () => {
 	expect(() => webConnection.parseUrl('localhost:9001')).toThrow('Remote URL must start with http:// or https://')
 	expect(() => webConnection.parseUrl('http://localhost:9001')).toThrow('Remote URL must contain ?auth=<token>')
+})
+
+test('remote image uploads use the authenticated server endpoint', async () => {
+	const originalFetch = webConnection.fetch
+	webConnection.state.remote = webConnection.parseUrl('https://hal.example/04-work?auth=secret')
+	try {
+		webConnection.fetch = async (url, init) => {
+			expect(url).toBe('https://hal.example/upload?auth=secret')
+			expect(init?.method).toBe('POST')
+			const form = init?.body as FormData
+			const file = form.get('file') as File
+			expect(file.name).toBe('clipboard.png')
+			expect(await file.arrayBuffer()).toEqual(new Uint8Array([1, 2, 3]).buffer)
+			return new Response(JSON.stringify({ path: '/srv/hal/state/uploads/image.png' }))
+		}
+		expect(await webConnection.uploadImage(new Uint8Array([1, 2, 3]))).toBe('/srv/hal/state/uploads/image.png')
+	} finally {
+		webConnection.fetch = originalFetch
+		webConnection.state.remote = null
+	}
 })
 
 
