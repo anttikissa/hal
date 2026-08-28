@@ -29,7 +29,27 @@ test('send result includes target tab when the session is open', async () => {
 
 		expect(result).toBe('Message sent to tab 3 · 04-target')
 		expect(queued).toEqual([{ sessionId: '04-target', text: 'hello', from: '04-parent', queue: false }])
+})
+
+test('send resolves a tab number to its session ID', async () => {
+	const queued: any[] = []
+	inbox.queueMessage = (sessionId, text, from, queue) => {
+		queued.push({ sessionId, text, from, queue })
+	}
+	ipc.readState = () => ({
+		sessions: [
+			{ id: '04-parent', tab: 1, cwd: '/tmp/parent' },
+			{ id: '04-target', tab: 13, cwd: '/tmp/target' },
+		],
+		working: {},
+		updatedAt: new Date().toISOString(),
 	})
+
+	const result = await send.execute({ sessionId: '13', text: 'hello' }, { sessionId: '04-parent', cwd: '/tmp/parent' })
+
+	expect(result).toBe('Message sent to tab 13 · 04-target')
+	expect(queued).toEqual([{ sessionId: '04-target', text: 'hello', from: '04-parent', queue: false }])
+})
 
 	test('send result says queued when deferred delivery was requested', async () => {
 		inbox.queueMessage = () => {}

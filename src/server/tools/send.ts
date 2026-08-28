@@ -29,6 +29,7 @@ function targetTab(sessionId: string): number | undefined {
 	return Math.floor(tab as number)
 }
 
+
 function resultText(targetId: string, queued: boolean): string {
 	const tab = targetTab(targetId)
 	const action = queued ? 'Message queued for' : 'Message sent to'
@@ -38,7 +39,7 @@ function resultText(targetId: string, queued: boolean): string {
 
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalizeInput(input)
-	const targetId = spec.sessionId ?? ''
+	const targetId = /^\d+$/.test(spec.sessionId ?? '') ? ipc.readState().sessions.find((item) => item.tab === parseInt(spec.sessionId!, 10))?.id ?? spec.sessionId! : spec.sessionId ?? ''
 	const text = spec.text ?? ''
 
 	if (!targetId) return 'error: sessionId is required'
@@ -58,7 +59,7 @@ const sendTool: Tool = {
 	description:
 		'Send a message to another session. By default this behaves like a prompt and steers if the target is working; set queue=true to run it after the current turn.',
 	parameters: {
-		sessionId: { type: 'string', description: 'Target session ID (or "all" for broadcast)' },
+		sessionId: { type: 'string', description: 'Target session ID or tab number' },
 		text: { type: 'string', description: 'Message text' },
 		queue: { type: 'boolean', description: 'Queue instead of steering if the target session is working' },
 	},
