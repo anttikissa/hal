@@ -27,6 +27,7 @@ export type HistoryRenderContext = {
 	blockCache: WeakMap<Block, BlockRenderCache>
 	cursorTick: number
 	workingSessions: ReadonlyMap<string, boolean>
+	toolRows: number
 	sessionLabel: (sessionId: string) => string
 	sessionLabelVersion: number
 }
@@ -151,7 +152,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		let questionCursor: { row: number; col: number } | undefined
 		let toolOffset = 0
 		let toolStart: number | undefined
-		let blocked = false
+		let fullTools = Infinity
 		let animatedTools = false
 		nextToolRevealAt = 0
 		for (let i = 0; i < history.length; ) {
@@ -159,8 +160,13 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 			if (working && block.type === 'tool') {
 				if (toolOffset === 0) toolStart = block.ts
 				const revealAt = toolStart === undefined ? 0 : toolStart + toolOffset * Math.max(0, config.toolRevealDelayMs)
-				const summary = blocked
-				if (block.running) blocked = true
+				if (block.running && fullTools === Infinity) {
+					let pending = 1
+					while (history[i + pending]?.type === 'tool') pending++
+					// A summary plus separator uses four rows; expansion adds the remaining text rows.
+					fullTools = Math.max(1, Math.floor((context.toolRows - 4 * pending + 1) / Math.max(1, blockRenderer.config.maxToolTextRows - 1)))
+				}
+				const summary = fullTools !== Infinity && fullTools-- <= 0
 				toolOffset++
 				if (revealAt > Date.now()) {
 					if (nextToolRevealAt === 0 || revealAt < nextToolRevealAt) nextToolRevealAt = revealAt
@@ -174,7 +180,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 				if (summary) block = { ...block, toolSummary: true }
 			} else {
 				toolOffset = 0
-				blocked = false
+				fullTools = Infinity
 			}
 			const group = [block]
 			const groupKey = logGroupKey(group[0]!)

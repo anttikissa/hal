@@ -386,13 +386,12 @@ Background-tab `stream-delta` / `stream-end` updates should also skip repaint
 entirely. Their history is invisible until tab switch, so redrawing the active
 tab is wasted work.
 
-Parallel tools execute independently and immediately, but their cards are revealed in
-call order at 100ms intervals. Only cards through the first still-running tool may
-expand; later calls stay as call-time header summaries even if their hidden output
-changes. When the expanded tool becomes immutable, the next running card may expand.
-Every tool card is contained after wrapping to eight text rows (header included), plus
-its top and bottom padding. This keeps the mutable suffix small without serializing
-actual tool execution.
+Parallel tools all start immediately, and their cards appear in call order 100ms apart.
+Hal shows as many full cards as the terminal can safely hold; later cards stay as
+one-line summaries. It reserves the full ten rows for every full card even while the
+card is still short. That way one card can grow without pushing an earlier running card
+out of the writable screen. A tall terminal can therefore stream several cards at once,
+and finishing an earlier tool frees room for another. Tool cards never exceed ten rows.
 
 Every tool header reserves one fixed-width status cell immediately before its title.
 A revealed running tool cycles `◐ ◓ ◑ ◒`; when it finishes, the same cell becomes

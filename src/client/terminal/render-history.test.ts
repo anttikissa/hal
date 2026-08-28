@@ -14,6 +14,7 @@ function context(): HistoryRenderContext {
 		cursorTick: 0,
 		workingSessions: new Map(),
 		sessionLabel: (sessionId) => sessionId,
+		toolRows: 20,
 		sessionLabelVersion: 0,
 	}
 }
@@ -125,6 +126,22 @@ test('parallel tools expand only through the first running call', () => {
 	const second: string[] = []
 	renderHistory.renderLines(second, t, 80, active)
 	expect(second.map(stripAnsi).join('\n')).toContain('SECOND OUTPUT')
+})
+
+
+test('a tall terminal lets more parallel tools expand safely', () => {
+	colors.load()
+	const active = context()
+	active.workingSessions = new Map([['test', true]])
+	active.toolRows = 40
+	const lines: string[] = []
+	renderHistory.renderLines(lines, tab([
+		{ type: 'tool', name: 'bash', input: { command: 'first' }, output: 'FIRST OUTPUT', running: true, ts: 1 },
+		{ type: 'tool', name: 'bash', input: { command: 'second' }, output: 'SECOND OUTPUT', running: true, ts: 1 },
+	]), 80, active)
+	const clean = lines.map(stripAnsi).join('\n')
+	expect(clean).toContain('FIRST OUTPUT')
+	expect(clean).toContain('SECOND OUTPUT')
 })
 
 

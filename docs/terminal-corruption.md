@@ -378,9 +378,9 @@ Costs:
 ## Adopted staged approach
 
 Phase one is implemented: unsafe reflow clears scrollback and canonically rebuilds.
-Tool cards reduce how often this is necessary by staying within eight wrapped text
-rows and expanding in call order; a later card remains a header summary until every
-earlier expanded card is immutable. Tool execution itself remains concurrent.
+Tool cards reduce how often this is necessary by never exceeding ten rows. Hal reserves
+all ten rows before allowing a card to expand, so several cards may stream together when
+the writable screen is tall enough without one card's growth pushing another off-screen.
 
 The fallback is intentionally a safety net, not an invisible heuristic. If the bounded
 tool presentation is still taller than the writable screen, correctness explicitly
@@ -388,9 +388,8 @@ wins over preserving the user's inspected scrollback position.
 
 A bounded mutable live-turn region remains a possible phase two. If pursued, its open
 questions are its height, tail/head/paging policy, final commit boundary, and treatment
-of streaming tables. The current call-order tool frontier already establishes the
-important commit rule: never expand a later mutable card while an earlier expanded
-card can still grow.
+of streaming tables. The current rule already preserves the important invariant: the
+full reserved size of mutable cards must fit on the writable screen.
 
 ## Proof and regression criteria
 

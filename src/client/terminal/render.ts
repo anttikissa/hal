@@ -107,11 +107,12 @@ let blockCache = new WeakMap<Block, BlockRenderCache>()
 let fadeTimer: ReturnType<typeof setTimeout> | null = null
 let toolRevealTimer: ReturnType<typeof setTimeout> | null = null
 
-function historyContext(): HistoryRenderContext {
+function historyContext(toolRows: number): HistoryRenderContext {
 	return {
 		blockCache,
 		cursorTick: cursor.tick(),
 		workingSessions: client.state.working,
+		toolRows,
 		sessionLabel: client.sessionLabel,
 		sessionLabelVersion: client.state.sessionLabelVersion,
 	}
@@ -207,7 +208,7 @@ function buildFrame(): Frame {
 	const lines: string[] = []
 
 	// 1. History — all entries, all lines, NEVER sliced. See terminal.md rule 3.
-	const historyRender = tab ? renderHistory.renderLines(lines, tab, cols, historyContext()) : undefined
+	const historyRender = tab ? renderHistory.renderLines(lines, tab, cols, historyContext(rows - chrome - 3)) : undefined
 	let tops = lineTops(lines, cols, prevFrame)
 	const historyHeight = tops[tops.length - 1]!
 	const questionCursor = historyRender?.cursor ? { row: tops[historyRender.cursor.row]!, col: historyRender.cursor.col, question: true as const } : undefined
