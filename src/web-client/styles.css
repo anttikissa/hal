@@ -234,6 +234,7 @@ button { touch-action: manipulation; }
 
 .PromptComposer {
 	flex: none;
+	flex-wrap: wrap;
 	width: min(100%, 900px);
 	margin: 0 auto;
 	display: flex;
@@ -243,6 +244,10 @@ button { touch-action: manipulation; }
 	background: #111;
 	border-top: 1px solid #444;
 }
+/* Full-width line above the input row: the path is the one status field that
+   must stay readable in full, so it gets its own line instead of an ellipsis
+   in the header. */
+.PromptComposer > .PromptComposer-cwd { flex-basis: 100%; overflow: hidden; color: #9eb8ca; text-overflow: ellipsis; white-space: nowrap; }
 .PromptComposer > textarea {
 	flex: 1;
 	min-width: 0;

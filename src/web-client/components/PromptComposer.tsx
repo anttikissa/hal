@@ -2,6 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import { enterAction, sendLabel } from '../utils/composer.ts'
 
 type PromptComposerProps = {
+	cwd?: string
 	working?: boolean
 	disabled?: boolean
 	onSubmit: (text: string, queue: boolean) => Promise<boolean>
@@ -67,7 +68,11 @@ export function PromptComposer(props: PromptComposerProps) {
 		}
 	}
 
+	// The working directory sits with the composer rather than in the header:
+	// it answers "where will this prompt run" right where the prompt is typed,
+	// and the header has no room left for a full path on a phone.
 	return <form class={['PromptComposer', props.disabled && 'disabled']} aria-disabled={props.disabled ? 'true' : undefined} onSubmit={(event: SubmitEvent) => { event.preventDefault(); void submit() }}>
+		<span class="PromptComposer-cwd">{props.cwd}</span>
 		<textarea
 			ref={(element) => { input = element }}
 			rows={1}

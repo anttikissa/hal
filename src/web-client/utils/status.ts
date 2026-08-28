@@ -3,16 +3,10 @@ import { models } from '../../common/models.ts'
 import type { SessionMeta } from '../../common/session.ts'
 
 // The phone version of the terminal status line. A phone header has room for
-// roughly one line, so this keeps only what the terminal shows on the left:
-// who am I, where am I, which model, how full is the context.
-
-// Only the last path segment fits on a phone, and it is the part that
-// identifies the project. "/" has no segment, so show it as-is.
-function shortCwd(cwd: string): string {
-	if (!cwd) return ''
-	const name = cwd.split('/').filter(Boolean).at(-1)
-	return name ?? '/'
-}
+// roughly one line, so this keeps only who am I, which model and how full is
+// the context. The working directory lives above the composer instead: it is
+// the one part that must stay readable in full, and truncating it to a single
+// segment left the app looking like it had no idea where it was.
 
 function contextText(meta: SessionMeta | undefined): string {
 	const context = meta?.context
@@ -31,11 +25,10 @@ function text(session: SharedSessionInfo | undefined, meta: SessionMeta | undefi
 	if (!session) return ''
 	const parts = [
 		sessionText(session),
-		shortCwd(session.cwd),
 		models.displayModel(session.model),
 		contextText(meta),
 	]
 	return parts.filter(Boolean).join(' · ')
 }
 
-export const webStatus = { text, shortCwd, contextText, sessionText }
+export const webStatus = { text, contextText, sessionText }

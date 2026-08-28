@@ -52,7 +52,8 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	})
 	// Shared state keeps cwd/model current; the selected snapshot supplies the
 	// context usage that the host persists after each completed turn.
-	const status = createMemo(() => webStatus.text(sharedState().sessions.find((session) => session.id === selected()), snapshot()?.meta))
+	const session = createMemo(() => sharedState().sessions.find((item) => item.id === selected()))
+	const status = createMemo(() => webStatus.text(session(), snapshot()?.meta))
 	const snapshots = new Map<string, ClientSessionSnapshot>()
 	// Session ids from the previous broadcast, so an "open tab" command can
 	// spot the session that appears for the first time and select it.
@@ -187,7 +188,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			onCommand={onTabCommand}
 		/>
 		<Transcript items={transcript()} onAnswer={submitAnswer} />
-		<PromptComposer disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
+		<PromptComposer cwd={session()?.cwd} disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
 	</>
 }
 
