@@ -72,7 +72,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	// the same code path. Live events and fresh snapshots update it separately.
 	createEffect(selected, (sessionId) => { setSnapshot(snapshots.get(sessionId) ?? null) })
 
-	function applyState(state: SharedState): void {
+	function applyState(state: SharedState): string {
 		const pending = sessionSelection.isOpenRequestPending()
 		const sessionId = sessionSelection.nextSelection(state, selected(), previousIds, pending)
 		// Landing on the tab our own "+ New tab" click created is a real
@@ -82,6 +82,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 		previousIds = new Set(state.sessions.map((session) => session.id))
 		setSharedState(state)
 		if (sessionId !== selected()) selectSession(sessionId, !opened)
+		return sessionId
 	}
 
 	function sendCommand(command: Command): boolean {
@@ -148,9 +149,11 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			}
 			if (message.type === 'authenticated') {
 				for (const item of message.bootstrap.snapshots) snapshots.set(item.session.id, item)
-				// applyState keeps a valid session from the URL and otherwise
-				// falls back to the first tab, correcting the address bar.
-				applyState(message.bootstrap.state)
+				// A deep-linked route may already be selected, so its selection effect
+				// ran before authentication filled this non-reactive Map. Synchronize
+				// directly from the bootstrap instead of waiting for another route change.
+				const sessionId = applyState(message.bootstrap.state)
+				setSnapshot(sessionSelection.snapshotFor(sessionId, message.bootstrap.snapshots))
 				return
 			}
 			if (message.type === 'state') {

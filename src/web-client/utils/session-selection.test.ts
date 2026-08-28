@@ -1,6 +1,11 @@
 import { expect, test, beforeEach } from 'bun:test'
 import type { SharedState } from '../../common/ipc.ts'
+import type { ClientSessionSnapshot } from '../../common/snapshots.ts'
 import { sessionSelection } from './session-selection.ts'
+
+function snapshotOf(id: string): ClientSessionSnapshot {
+	return { session: { id, cwd: '/' }, meta: { id, createdAt: '' }, history: [], parentCount: 0, live: [] }
+}
 
 function stateOf(...ids: string[]): SharedState {
 	return { sessions: ids.map((id) => ({ id, cwd: '/' })), working: {}, updatedAt: '' }
@@ -45,4 +50,9 @@ test('an open request expires so a failed open cannot hijack a later tab', () =>
 	sessionSelection.markOpenRequest()
 	sessionSelection.state.requestedAt -= sessionSelection.config.openRequestTtlMs + 1
 	expect(sessionSelection.isOpenRequestPending()).toBe(false)
+})
+
+test('finds the bootstrap snapshot for a deep-linked session', () => {
+	const selected = sessionSelection.snapshotFor('05-pay', [snapshotOf('05-pay'), snapshotOf('11-sad')])
+	expect(selected?.session.id).toBe('05-pay')
 })

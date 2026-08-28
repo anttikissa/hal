@@ -2,6 +2,7 @@
 // session should be selected after a broadcast. Kept free of Solid imports so
 // it can be unit tested deterministically.
 import type { SharedState } from '../../common/ipc.ts'
+import type { ClientSessionSnapshot } from '../../common/snapshots.ts'
 
 // How long an "open tab" request stays eligible to grab the next unseen
 // session. Bounds the damage of a failed open (e.g. tab limit reached):
@@ -41,4 +42,10 @@ function nextSelection(shared: SharedState, current: string, previousIds: Set<st
 	return shared.sessions[0]?.id ?? ''
 }
 
-export const sessionSelection = { config, state, markOpenRequest, isOpenRequestPending, consumeOpenRequest, nextSelection }
+// The route can be selected before authentication fills the snapshot cache.
+// Resolve it from the bootstrap itself so a valid deep link renders immediately.
+function snapshotFor(sessionId: string, snapshots: readonly ClientSessionSnapshot[]): ClientSessionSnapshot | null {
+	return snapshots.find((snapshot) => snapshot.session.id === sessionId) ?? null
+}
+
+export const sessionSelection = { config, state, markOpenRequest, isOpenRequestPending, consumeOpenRequest, nextSelection, snapshotFor }
