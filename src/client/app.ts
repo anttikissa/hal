@@ -225,10 +225,11 @@ function touchTab(tab: Tab): void {
 	tab.historyVersion++
 }
 
-function repaintIfActive(tab: Tab): void {
-	// Background-tab stream updates are invisible until the user switches tabs.
-	// Skip the redraw and let tab switch render the latest history lazily.
-	if (tab === currentTab()) onChange(false)
+function repaintIfActive(tab: Tab, force = false): void {
+	// Background-tab updates are invisible until the user switches tabs. In
+	// particular, reconnect refreshes every tab and must not repaint the same
+	// large active history once per background tab.
+	if (tab === currentTab()) onChange(force)
 }
 
 function queueLocalBlock(block: Block): void {

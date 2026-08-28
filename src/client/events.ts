@@ -155,7 +155,7 @@ function handleHistoryRebased(event: any, ctx: any): void {
 	const tab = ctx.tabForSession(event.sessionId)
 	if (!tab) return
 	ctx.reloadTabFromDisk(tab, { logName: event.newLog, entryLimit: event.entryCount })
-	ctx.onChange(true)
+	ctx.repaintIfActive(tab, true)
 }
 
 function handleBackgroundActivity(event: any, ctx: any): void {

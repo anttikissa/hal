@@ -9,7 +9,7 @@ test('history-rebased reloads exactly the rebased log prefix', () => {
 	clientEvents.handle({ type: 'history-rebased', sessionId: 's1', newLog: 'history8.asonl', entryCount: 6 }, {
 		tabForSession: (sessionId: string) => sessionId === 's1' ? tab : null,
 		reloadTabFromDisk: (receivedTab: any, opts: any) => { reload = { tab: receivedTab, opts } },
-		onChange: (value: boolean) => { force = value },
+		repaintIfActive: (_tab: any, value: boolean) => { force = value },
 	})
 
 	expect(reload).toEqual({ tab, opts: { logName: 'history8.asonl', entryLimit: 6 } })
@@ -26,6 +26,25 @@ test('history-updated reloads the authoritative current history', () => {
 		onChange: (force: boolean) => calls.push(['change', force]),
 	})
 	expect(calls).toEqual([['reload', tab], ['change', true]])
+})
+
+
+test('reconnect refreshes every tab but repaints only the active tab', () => {
+	const tabs = Array.from({ length: 5 }, (_, index) => ({ sessionId: `s${index + 1}` }))
+	const reloads: string[] = []
+	const repaints: Array<{ sessionId: string; force: boolean }> = []
+	const ctx = {
+		tabForSession: (sessionId: string) => tabs.find((tab) => tab.sessionId === sessionId),
+		reloadTabFromDisk: (tab: any) => reloads.push(tab.sessionId),
+		repaintIfActive: (tab: any, force: boolean) => {
+			if (tab === tabs[0]) repaints.push({ sessionId: tab.sessionId, force })
+		},
+	}
+
+	for (const tab of tabs) clientEvents.handle({ type: 'history-rebased', sessionId: tab.sessionId }, ctx)
+
+	expect(reloads).toEqual(['s1', 's2', 's3', 's4', 's5'])
+	expect(repaints).toEqual([{ sessionId: 's1', force: true }])
 })
 
 
