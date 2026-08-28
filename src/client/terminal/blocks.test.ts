@@ -80,12 +80,11 @@ test('question controls honor wide-character widths', () => {
 	for (const line of rendered.lines) expect(visLen(line)).toBeLessThanOrEqual(20)
 })
 
-test('body blocks render a blank line after the header', () => {
+test('non-tool body blocks render a blank line after the header', () => {
 	const samples: Block[] = [
 		{ type: 'user', text: 'hello' },
 		{ type: 'assistant', text: 'hello' },
 		{ type: 'thinking', text: 'hello' },
-		{ type: 'tool', name: 'bash', input: { command: 'echo hello' }, output: 'hello' },
 	]
 
 	for (const block of samples) {
@@ -110,45 +109,37 @@ test('tool output wraps long lines instead of clipping them', () => {
 })
 
 
-test('tool output truncation keeps four head lines and the tail by default', () => {
-	const oldMax = blocks.config.maxToolOutputLines
-	blocks.config.maxToolOutputLines = 2
-	try {
-		const output = Array.from({ length: 8 }, (_, index) => `line ${index + 1}`).join('\n')
-		const clean = blocks.renderBlock({ type: 'tool', name: 'bash', output }, 80).map(stripAnsi)
-		expect(clean.some((line) => line.trim() === 'line 1')).toBe(true)
-		expect(clean.some((line) => line.trim() === '[+ 2 lines]')).toBe(true)
-		expect(clean.some((line) => line.trim() === 'line 5')).toBe(false)
-		expect(clean.some((line) => line.trim() === 'line 7')).toBe(true)
-	} finally {
-		blocks.config.maxToolOutputLines = oldMax
-	}
-})
-
-
-test('default tool output shows all lines when protected head and tail overlap', () => {
-	const output = Array.from({ length: 17 }, (_, index) => `line ${index + 1}`).join('\n')
+test('tool cards fit within their physical text-row budget', () => {
+	colors.load()
+	const output = Array.from({ length: 20 }, (_, index) => `line ${index + 1}`).join('\n')
 	const clean = blocks.renderBlock({ type: 'tool', name: 'bash', output }, 80).map(stripAnsi)
-	expect(clean.some((line) => line.trim().startsWith('[+ '))).toBe(false)
+
+	expect(clean).toHaveLength(10)
 	expect(clean.some((line) => line.trim() === 'line 1')).toBe(true)
-	expect(clean.some((line) => line.trim() === 'line 17')).toBe(true)
+	expect(clean.some((line) => line.trim() === 'line 10')).toBe(false)
+	expect(clean.some((line) => line.trim() === 'line 20')).toBe(true)
+	expect(clean.some((line) => line.trim().startsWith('[+ '))).toBe(true)
 })
 
 
-test('search tool output truncation keeps head', () => {
-	const oldMax = blocks.config.maxToolOutputLines
-	blocks.config.maxToolOutputLines = 2
-	try {
-		for (const name of ['google', 'web_search']) {
-			const clean = blocks.renderBlock({ type: 'tool', name, output: 'one\ntwo\nthree\nfour' }, 80).map(stripAnsi)
-			expect(clean.some((line) => line.trim() === 'one')).toBe(true)
-			expect(clean.some((line) => line.trim() === 'two')).toBe(true)
-			expect(clean.some((line) => line.trim() === 'four')).toBe(false)
-			expect(clean.findIndex((line) => line.trim() === '[+ 2 lines]')).toBeGreaterThan(clean.findIndex((line) => line.trim() === 'two'))
-		}
-	} finally {
-		blocks.config.maxToolOutputLines = oldMax
-	}
+test('search tool containment keeps the head', () => {
+	colors.load()
+	const output = Array.from({ length: 20 }, (_, index) => `result ${index + 1}`).join('\n')
+	const clean = blocks.renderBlock({ type: 'tool', name: 'google', output }, 80).map(stripAnsi)
+
+	expect(clean).toHaveLength(10)
+	expect(clean.some((line) => line.trim() === 'result 1')).toBe(true)
+	expect(clean.some((line) => line.trim() === 'result 20')).toBe(false)
+})
+
+
+test('tool summaries contain only their call-time header', () => {
+	colors.load()
+	const clean = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'git status' }, output: 'late output', toolSummary: true }, 80).map(stripAnsi)
+
+	expect(clean).toHaveLength(3)
+	expect(clean.join('\n')).toContain('Bash: git status')
+	expect(clean.join('\n')).not.toContain('late output')
 })
 
 test('short status notices share one unlabelled transparent style without marker brackets', () => {
@@ -578,9 +569,8 @@ test('tool block header uses padded text without horizontal rules', () => {
 	expect(lines[0]).toBe(' ')
 	expect(lines[1]).toBe(' 1 Jan 17:38 Bash: ./test                                 (11-ok3/000123-bash) ')
 	expect(lines[1]).not.toContain('─')
-	expect(lines[2]).toBe(' ')
-	expect(lines[3]).toBe(' done')
-	expect(lines[4]).toBe(' ')
+	expect(lines[2]).toBe(' done')
+	expect(lines[3]).toBe(' ')
 	expect(lines.join('\n')).not.toContain('\n ./test\n')
 })
 

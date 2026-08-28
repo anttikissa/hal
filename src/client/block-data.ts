@@ -18,6 +18,7 @@ interface PresentationBlock {
 	dimmed?: boolean
 	renderVersion?: number
 	blobLoaded?: boolean
+	toolSummary?: boolean
 }
 
 export type QuestionBlock = Omit<ProjectedQuestion, 'ts'> & PresentationBlock & { type: 'question'; ts?: number }

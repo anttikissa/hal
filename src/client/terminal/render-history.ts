@@ -34,30 +34,34 @@ export type HistoryRenderContext = {
 const config = {
 	forkHistoryDimFactor: 0.82,
 	halCursorFadeMs: 5000,
+	toolRevealDelayMs: 100,
 }
 
 const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
 let workingSeen = new Set<string>()
 let fadeStart = new Map<string, number>()
-const bodyCache = new WeakMap<Tab, { key: string; lines: string[]; streaming: boolean; cursor?: { row: number; col: number } }>()
+let toolRevealVersion = 0
+let nextToolRevealAt = 0
+const bodyCache = new WeakMap<Tab, { key: string; lines: string[]; streaming: boolean; nextToolRevealAt: number; cursor?: { row: number; col: number } }>()
 
 function hasInlineHalCursor(block: Block | undefined): boolean {
 	return (block?.type === 'assistant' || block?.type === 'thinking') && !!block.streaming
 }
 
-function renderEntry(block: Block, cols: number, context: HistoryRenderContext, activeStreamingBlock: Block | undefined): RenderedBlock {
+function renderEntry(block: Block, cols: number, context: HistoryRenderContext, activeStreamingBlock: Block | undefined, summary = false): RenderedBlock {
 	// Only the current active stream includes the blinking HAL cursor. Do not cache
 	// it across blink phases, even when the streamed text did not change.
 	const streamingCursor = block === activeStreamingBlock
 	let renderedBlock = block
+	if (summary && block.type === 'tool') renderedBlock = { ...block, toolSummary: true }
 	if ((block.type === 'assistant' || block.type === 'thinking') && block.streaming && !streamingCursor) renderedBlock = { ...block, streaming: false }
-	const cached = streamingCursor || block.type === 'question' ? undefined : context.blockCache.get(block)
+	const cached = streamingCursor || summary || block.type === 'question' ? undefined : context.blockCache.get(block)
 	const version = block.renderVersion ?? 0
 	if (cached && cached.version === version && cached.cols === cols && cached.sessionLabelVersion === context.sessionLabelVersion) return { lines: cached.lines }
 	const fastCursorVisible = cursor.isFastVisible(context.cursorTick)
 	const rendered = blockRenderer.renderBlockDetailed(renderedBlock, cols, streamingCursor && fastCursorVisible, context.sessionLabel)
 	const lines = block.dimmed ? rendered.lines.map((line) => oklch.dimAnsi(line, config.forkHistoryDimFactor)) : rendered.lines
-	if (!streamingCursor && block.type !== 'question') context.blockCache.set(block, { version, cols, lines, sessionLabelVersion: context.sessionLabelVersion })
+	if (!streamingCursor && !summary && block.type !== 'question') context.blockCache.set(block, { version, cols, lines, sessionLabelVersion: context.sessionLabelVersion })
 	return { lines, cursor: rendered.cursor }
 }
 
@@ -69,12 +73,41 @@ function logGroupKey(block: Block): string | null {
 	return 'log'
 }
 
-function renderGroup(group: Block[], cols: number, context: HistoryRenderContext, activeStreamingBlock: Block | undefined): RenderedBlock {
-	if (group.length === 1) return renderEntry(group[0]!, cols, context, activeStreamingBlock)
+function renderGroup(group: Block[], cols: number, context: HistoryRenderContext, activeStreamingBlock: Block | undefined, summary = false): RenderedBlock {
+	if (group.length === 1) return renderEntry(group[0]!, cols, context, activeStreamingBlock, summary)
 	let lines = blockRenderer.renderBlockGroup(group as Array<{ type: 'log' | 'warning' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols, context.sessionLabel)
 	// Dim grouped blocks if any block in the group is dimmed (groups are same-type, so all or none)
 	if (group[0]?.dimmed) lines = lines.map((line) => oklch.dimAnsi(line, config.forkHistoryDimFactor))
 	return { lines }
+}
+
+
+type ToolPresentation = 'full' | 'summary' | 'hidden'
+
+function toolPresentation(history: Block[], index: number, working: boolean): ToolPresentation {
+	if (!working || history[index]?.type !== 'tool') return 'full'
+	let start = index
+	while (start > 0 && history[start - 1]?.type === 'tool') start--
+	let end = index
+	while (end + 1 < history.length && history[end + 1]?.type === 'tool') end++
+	const offset = index - start
+	const firstTs = history[start]?.ts
+	if (offset > 0 && firstTs !== undefined) {
+		const revealAt = firstTs + offset * Math.max(0, config.toolRevealDelayMs)
+		if (Date.now() < revealAt) {
+			if (nextToolRevealAt === 0 || revealAt < nextToolRevealAt) nextToolRevealAt = revealAt
+			return 'hidden'
+		}
+	}
+	let frontier = end
+	for (let i = start; i <= end; i++) {
+		const block = history[i]
+		if (block?.type === 'tool' && block.running) {
+			frontier = i
+			break
+		}
+	}
+	return index > frontier ? 'summary' : 'full'
 }
 
 function shouldHideBlock(history: Block[], index: number): boolean {
@@ -130,7 +163,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 	// Streaming mutates the last block in place and bumps renderVersion without touching
 	// historyVersion, so the tail's identity has to be part of the key.
 	const tail = tab.history.at(-1)
-	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${blockRenderer.outputPad}:${working}:${context.sessionLabelVersion}:${tab.history.length}:${tail?.renderVersion ?? 0}:${terminalQuestions.state.version}`
+	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${blockRenderer.outputPad}:${working}:${context.sessionLabelVersion}:${tab.history.length}:${tail?.renderVersion ?? 0}:${terminalQuestions.state.version}:${toolRevealVersion}`
 	let body = bodyCache.get(tab)
 	if (!body || body.key !== key || (working && body.streaming)) {
 		const history = visibleHistory(tab.history)
@@ -139,7 +172,13 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		if (working && hasInlineHalCursor(last)) activeStreamingBlock = last
 		const built: string[] = []
 		let questionCursor: { row: number; col: number } | undefined
+		nextToolRevealAt = 0
 		for (let i = 0; i < history.length; ) {
+			const presentation = toolPresentation(history, i, working)
+			if (presentation === 'hidden') {
+				i++
+				continue
+			}
 			const group = [history[i]!]
 			const groupKey = logGroupKey(group[0]!)
 			if (groupKey) {
@@ -147,14 +186,15 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 			}
 			if (built.length > 0 && history[i - 1]?.type === 'assistant' && group[0]?.type === 'assistant') built.push('', `${colors.assistant.fg}${'─'.repeat(Math.max(0, cols))}\x1b[39m`, '')
 			else if (built.length > 0) built.push('')
-			const rendered = renderGroup(group, cols, context, activeStreamingBlock)
+			const rendered = renderGroup(group, cols, context, activeStreamingBlock, presentation === 'summary')
 			if (rendered.cursor) questionCursor = { row: built.length + rendered.cursor.row, col: rendered.cursor.col }
 			built.push(...rendered.lines)
 			i += group.length
 		}
-		body = { key, lines: built, streaming: !!activeStreamingBlock, cursor: questionCursor }
+		body = { key, lines: built, streaming: !!activeStreamingBlock, nextToolRevealAt, cursor: questionCursor }
 		bodyCache.set(tab, body)
 	}
+	nextToolRevealAt = body.nextToolRevealAt
 	lines.push(...body.lines)
 	const questionCursor = body.cursor ? { row: start + body.cursor.row, col: body.cursor.col } : undefined
 
@@ -180,10 +220,25 @@ function hasFadingCursor(tab: Tab | null | undefined): boolean {
 function resetAnimation(): void {
 	workingSeen = new Set()
 	fadeStart = new Map()
+	toolRevealVersion++
+	nextToolRevealAt = 0
 }
+
+
+function advanceToolReveal(): void {
+	toolRevealVersion++
+}
+
+
+function toolRevealDelay(): number | null {
+	if (nextToolRevealAt === 0) return null
+	return Math.max(0, nextToolRevealAt - Date.now())
+}
+
 
 function hasAnimatedCursor(tab: Tab | null | undefined): boolean {
 	return !!tab
 }
 
-export const renderHistory = { config, renderLines, hasAnimatedCursor, hasFadingCursor, resetAnimation }
+
+export const renderHistory = { config, renderLines, hasAnimatedCursor, hasFadingCursor, resetAnimation, advanceToolReveal, toolRevealDelay }

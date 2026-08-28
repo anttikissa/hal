@@ -105,6 +105,54 @@ test('session labels refresh when tab metadata changes', () => {
 	renderHistory.renderLines(refreshed, tab(history), 80, updated)
 	expect(refreshed.map(stripAnsi).join('\n')).toContain('110-gmt (Architecture revamp, tab 2)')
 })
+
+
+test('parallel tools expand only through the first running call', () => {
+	colors.load()
+	const active = context()
+	active.workingSessions = new Map([['test', true]])
+	const t = tab([
+		{ type: 'tool', name: 'bash', input: { command: 'first' }, output: 'FIRST OUTPUT', running: true, ts: 1 },
+		{ type: 'tool', name: 'bash', input: { command: 'second' }, output: 'SECOND OUTPUT', running: true, ts: 1 },
+	])
+	const first: string[] = []
+	renderHistory.renderLines(first, t, 80, active)
+	expect(first.map(stripAnsi).join('\n')).toContain('FIRST OUTPUT')
+	expect(first.map(stripAnsi).join('\n')).not.toContain('SECOND OUTPUT')
+
+	;(t.history[0] as any).running = false
+	t.historyVersion++
+	const second: string[] = []
+	renderHistory.renderLines(second, t, 80, active)
+	expect(second.map(stripAnsi).join('\n')).toContain('SECOND OUTPUT')
+})
+
+
+test('parallel tool cards are revealed 100ms apart without delaying execution', () => {
+	colors.load()
+	const originalNow = Date.now
+	const active = context()
+	active.workingSessions = new Map([['test', true]])
+	const t = tab([
+		{ type: 'tool', name: 'bash', input: { command: 'first' }, running: true, ts: 1000 },
+		{ type: 'tool', name: 'grep', input: { pattern: 'second', path: '.' }, running: true, ts: 1000 },
+	])
+	try {
+		Date.now = () => 1000
+		const first: string[] = []
+		renderHistory.renderLines(first, t, 80, active)
+		expect(first.map(stripAnsi).join('\n')).toContain('Bash: first')
+		expect(first.map(stripAnsi).join('\n')).not.toContain('Grep "second"')
+
+		Date.now = () => 1100
+		renderHistory.advanceToolReveal()
+		const second: string[] = []
+		renderHistory.renderLines(second, t, 80, active)
+		expect(second.map(stripAnsi).join('\n')).toContain('Grep "second"')
+	} finally {
+		Date.now = originalNow
+	}
+})
 test('unchanged history is not re-derived on every draw', () => {
 	colors.load()
 	const ctx = context()

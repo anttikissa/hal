@@ -1,12 +1,10 @@
 # Terminal scrollback corruption: findings and decision record
 
-Status: reproduced, root mechanism understood, architectural fix not yet chosen.
-
-This document records what was learned during the August 2026 investigation of
-occasional duplicated, interleaved, or missing terminal transcript rows. The main
-purpose is to preserve the decision that remains: which user-visible compromise
-Hal should make when live content changes above rows that have already entered
-native terminal scrollback.
+Status: reproduced, root mechanism understood, correctness fallback and bounded tool
+presentation implemented. Mutable tool geometry is reduced by eight-text-row cards,
+call-order expansion, and 100ms card reveals. If a changed row has nevertheless entered
+native scrollback, Hal deliberately clears scrollback and canonically rebuilds instead
+of leaving corruption. A bounded live-turn region remains a possible future refinement.
 
 ## Executive summary
 
@@ -377,46 +375,22 @@ Costs:
 - contradicts Hal's established preference for ordinary terminal scrollback;
 - alternate-screen behavior is not currently desired.
 
-## Recommended staged approach
+## Adopted staged approach
 
-If correctness must be restored incrementally:
+Phase one is implemented: unsafe reflow clears scrollback and canonically rebuilds.
+Tool cards reduce how often this is necessary by staying within eight wrapped text
+rows and expanding in call order; a later card remains a header summary until every
+earlier expanded card is immutable. Tool execution itself remains concurrent.
 
-1. **Install an unsafe-reflow fallback.** When a changed live block precedes rows that
-   may have crossed into scrollback, do a canonical clear-and-rebuild. This trades
-   inspected scrollback for correctness rather than silently corrupting output.
-2. **Build the bounded live-turn region.** Keep all mutable rows inside a known visible
-   area and let parallel tools update normally there.
-3. **Commit once stable.** Append the canonical final turn to ordinary transcript
-   history once, with no temporary duplicate left behind.
-4. **Retain the fallback.** Unknown renderer paths should still rebuild rather than
-   corrupt if they violate the live-region invariant.
+The fallback is intentionally a safety net, not an invisible heuristic. If the bounded
+tool presentation is still taller than the writable screen, correctness explicitly
+wins over preserving the user's inspected scrollback position.
 
-The fallback is not the final UX; it is a safety net and a way to make violations
-observable.
-
-## Decisions still required
-
-The next session should ask the user to choose or refine these policies before
-implementation:
-
-1. Is temporary loss of inspected scrollback acceptable as an immediate correctness
-   fallback?
-2. During an unfinished turn taller than the live region, should Hal show the tail,
-   the beginning, or a user-scrollable application-owned window?
-3. How tall should the live region be: all available rows, a capped fraction, or
-   dynamic space above the chrome?
-4. What is the commit boundary: each stabilized tool card, the entire provider
-   iteration, or the entire user turn? Committing a lower card while an earlier card
-   can still grow recreates the same contradiction.
-5. While the user is inspecting old native scrollback, should live-region updates be
-   paused visually, continue without moving the viewport, or show only an activity
-   indicator until the user returns to the bottom?
-6. Should streaming tables use frozen column widths within the live region to remove
-   trembling even though the region itself is safe to repaint?
-
-The commit boundary is particularly important. "Tool finished" does not necessarily
-mean "safe to commit" if an earlier tool or thinking block can still insert rows
-above it.
+A bounded mutable live-turn region remains a possible phase two. If pursued, its open
+questions are its height, tail/head/paging policy, final commit boundary, and treatment
+of streaming tables. The current call-order tool frontier already establishes the
+important commit rule: never expand a later mutable card while an earlier expanded
+card can still grow.
 
 ## Proof and regression criteria
 

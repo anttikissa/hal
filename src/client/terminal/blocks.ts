@@ -130,6 +130,19 @@ function wrapToolLine(line: string, cols: number): string[] {
 	return wordWrap(expanded, cols)
 }
 
+
+function containToolLines(lines: string[], cols: number, overflow: 'head' | 'tail' | undefined, hiddenIndicator?: string): string[] {
+	const max = Math.max(0, blockConfig.maxToolTextRows - 1)
+	if (lines.length <= max) return lines
+	if (max === 0) return []
+	const indicator = clipVisual(hiddenIndicator ?? `[+ ${lines.length - max + 1} rows]`, cols)
+	if (max === 1) return [indicator]
+	if (overflow === 'head') return [...lines.slice(0, max - 1), indicator]
+	const head = Math.min(2, max - 1)
+	const tail = max - head - 1
+	return [...lines.slice(0, head), indicator, ...lines.slice(lines.length - tail)]
+}
+
 function blockContent(block: Block, cols: number): string[] {
 	if (
 		block.type === 'assistant' ||
@@ -142,32 +155,24 @@ function blockContent(block: Block, cols: number): string[] {
 		return renderMarkdownLines(block, cols)
 	}
 	if (block.type === 'tool') {
+		if (block.toolSummary) return []
 		const lines: string[] = []
 		const spec = toolSpecs.getToolSpec(block.name)
 		const command = spec.command?.(block.input, block.output)
 		if (command) lines.push(...formatToolCommand(command, cols, spec.shellContinuations?.(block.input, block.output) ?? block.name === 'bash'))
 		const details = spec.details?.(block.input, block.output)
 		if (details) pushWrapped(lines, details, cols)
-		if (!block.output) return lines
-		const output = blockText.sanitizeTerminalText(blockText.stripAnsiSequences(block.output))
-		const format = spec.format?.(output, cols, block.input) ?? { bodyLines: [] }
-		for (const line of format.bodyLines) lines.push(...wrapToolLine(line, cols))
-		if (format.suppressOutput) return lines
-		const outputLines = output.trimEnd().split('\n')
-		if (outputLines.length > blockConfig.maxToolOutputLines) {
-			if (spec.overflow === 'head') {
-				for (const line of outputLines.slice(0, blockConfig.maxToolOutputLines)) lines.push(...wrapToolLine(line, cols))
-				lines.push(format.hiddenIndicator ?? `[+ ${outputLines.length - blockConfig.maxToolOutputLines} lines]`)
-			} else {
-				const tailStart = Math.max(4, outputLines.length - blockConfig.maxToolOutputLines)
-				for (const line of outputLines.slice(0, 4)) lines.push(...wrapToolLine(line, cols))
-				if (tailStart > 4) lines.push(format.hiddenIndicator ?? `[+ ${tailStart - 4} lines]`)
-				for (const line of outputLines.slice(tailStart)) lines.push(...wrapToolLine(line, cols))
+		let hiddenIndicator: string | undefined
+		if (block.output) {
+			const output = blockText.sanitizeTerminalText(blockText.stripAnsiSequences(block.output))
+			const format = spec.format?.(output, cols, block.input) ?? { bodyLines: [] }
+			for (const line of format.bodyLines) lines.push(...wrapToolLine(line, cols))
+			hiddenIndicator = format.hiddenIndicator
+			if (!format.suppressOutput) {
+				for (const line of output.trimEnd().split('\n')) lines.push(...wrapToolLine(line, cols))
 			}
-			return lines
 		}
-		for (const line of outputLines) lines.push(...wrapToolLine(line, cols))
-		return lines
+		return containToolLines(lines, cols, spec.overflow, hiddenIndicator)
 	}
 	const lines: string[] = []
 	for (const raw of expandTabs(blockText.sanitizeTerminalText(block.text), blockConfig.tabWidth).split('\n')) {
@@ -262,8 +267,9 @@ function blockLabel(block: Block, sessionLabel?: SessionLabel): string {
 		return block.canceled ? 'Thinking (canceled)' : 'Thinking'
 	}
 	if (block.type === 'tool') {
-		const title = toolSpecs.getToolSpec(block.name).title?.(block.input, block.output, sessionLabel) ?? toolSpecs.humanizeName(block.name)
-		return block.canceled ? `${title} (canceled)` : title
+		const output = block.toolSummary ? undefined : block.output
+		const title = toolSpecs.getToolSpec(block.name).title?.(block.input, output, sessionLabel) ?? toolSpecs.humanizeName(block.name)
+		return block.canceled && !block.toolSummary ? `${title} (canceled)` : title
 	}
 	if (block.type === 'question') return 'Question'
 	return fixedLabels[block.type]
@@ -488,7 +494,7 @@ function renderBlock(block: Block, cols: number, cursorVisible = false, sessionL
 	if (!plainNotice || blockTime) lines.push(bgLine(`${fg}${header}`, cols, bg))
 	const contentCols = Math.max(1, cols - 1 - blocks.outputPad)
 	const content = blockText.hyperlinkUrls(blockContent(block, contentCols), contentCols)
-	if (content.length > 0 && !plainNotice) lines.push(bgLine(`${fg} `, cols, bg))
+	if (content.length > 0 && !plainNotice && block.type !== 'tool') lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {
 		const fullWidth = visLen(line) > contentCols
 		const text = block.canceled ? `${STRIKE}${line}${STRIKE_OFF}` : line

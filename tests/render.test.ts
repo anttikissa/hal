@@ -923,7 +923,7 @@ describe('render', () => {
 		expect(withText.length).toBe(empty.length)
 	})
 
-	test('fullscreen growth with non-append changes does not clear scrollback', () => {
+	test('fullscreen growth rebuilds when its first change is immutable', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -937,15 +937,15 @@ describe('render', () => {
 			tab.history.unshift({ type: 'log', text: 'zero' })
 			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
-			expect(output).not.toContain('\x1b[3J')
-			expect(output).not.toContain('\x1b[2J\x1b[H')
+			expect(output).toContain('\x1b[3J')
+			expect(output).toContain('\x1b[2J\x1b[H')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}
 	})
 
-	test('fullscreen ignores changes entirely above the live viewport', () => {
+	test('fullscreen rebuilds when a changed block is entirely immutable', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -958,17 +958,17 @@ describe('render', () => {
 			captureOutput(() => render.draw())
 			captureOutput(() => render.draw())
 
-			;(tab.history[0] as any).text = 'changed offscreen'
+			tab.history[0] = { type: 'assistant', text: 'changed offscreen', ts: 0 }
 			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
-			expect(output).toBe('')
+			expect(output).toContain('\x1b[3J')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}
 	})
 
-	test('fullscreen shrink repaints without erasing scrollback', () => {
+	test('fullscreen shrink rebuilds when removed rows are immutable', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -981,7 +981,7 @@ describe('render', () => {
 			tab.history.splice(0, tab.history.length, { type: 'log', text: 'new' })
 			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
-			expect(output).not.toMatch(/\x1b\[[0-9;?]*J/)
+			expect(output).toContain('\x1b[3J')
 			expect(stripAnsi(output)).toContain('new')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })

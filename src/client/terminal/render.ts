@@ -105,6 +105,7 @@ let fullscreen = false
 let paintedPopupActive = false
 let blockCache = new WeakMap<Block, BlockRenderCache>()
 let fadeTimer: ReturnType<typeof setTimeout> | null = null
+let toolRevealTimer: ReturnType<typeof setTimeout> | null = null
 
 function historyContext(): HistoryRenderContext {
 	return {
@@ -125,6 +126,22 @@ function scheduleFade(): void {
 	}, delay)
 }
 
+
+function scheduleToolReveal(): void {
+	const delay = renderHistory.toolRevealDelay()
+	if (delay === null) {
+		if (toolRevealTimer) clearTimeout(toolRevealTimer)
+		toolRevealTimer = null
+		return
+	}
+	if (toolRevealTimer) return
+	toolRevealTimer = setTimeout(() => {
+		toolRevealTimer = null
+		renderHistory.advanceToolReveal()
+		draw()
+	}, delay)
+}
+
 function writeTerminal(s: string): void {
 	if (!terminalOutput.write(s)) return
 	scheduleFade()
@@ -139,7 +156,9 @@ function resetRenderer(): void {
 	blockCache = new WeakMap<Block, BlockRenderCache>()
 	renderHistory.resetAnimation()
 	if (fadeTimer) clearTimeout(fadeTimer)
+	if (toolRevealTimer) clearTimeout(toolRevealTimer)
 	fadeTimer = null
+	toolRevealTimer = null
 }
 
 function enterFullscreen(): void {
@@ -299,10 +318,23 @@ function repaintVisibleScreen(frame: Frame, rows: number): void {
 	prevFrame = frame
 	writeTerminal(out.join(''))
 }
+
+
+function repaintCanonicalFullscreen(frame: Frame): void {
+	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `${CSI}2J${CSI}H${CSI}3J`]
+	for (let i = 0; i < frame.lines.length; i++) {
+		if (i > 0) out.push('\r\n')
+		out.push(frame.lines[i]!)
+	}
+	out.push(positionCursor(frame.height - 1, frame.cursor), `${CSI}?2026l`)
+	prevFrame = frame
+	writeTerminal(out.join(''))
+}
 function draw(force = false): void {
 	if (terminalOutput.isExternalEditorOpen()) return
 	const rows = process.stdout.rows || 24
 	const frame = buildFrame()
+	scheduleToolReveal()
 	const lines = frame.lines
 	const cursor = frame.cursor
 	// Popup frames hard-wrap soft URLs, so never diff across the two layouts.
@@ -316,27 +348,24 @@ function draw(force = false): void {
 	}
 	// ── Force repaint ──
 	if (force) {
-		const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
-		if (!fullscreen) {
-			// Grow mode: move to top of our content, clear downward.
-			// Scrollback (shell history above our content) is preserved.
-			const up = Math.min(cursorRow, rows - 1)
-			out.push('\r')
-			if (up > 0) out.push(`${CSI}${up}A`)
-			out.push(`${CSI}J`)
-		} else {
-			// Full mode: nuke everything. Scrollback has stale content
-			// from other tabs that we can't selectively update.
-			out.push(`${CSI}2J${CSI}H${CSI}3J`)
+		if (fullscreen) {
+			repaintCanonicalFullscreen(frame)
+			return
 		}
+		const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
+		// Grow mode: move to top of our content, clear downward. Scrollback from
+		// before Hal started is preserved while the complete frame still fits.
+		const up = Math.min(cursorRow, rows - 1)
+		out.push('\r')
+		if (up > 0) out.push(`${CSI}${up}A`)
+		out.push(`${CSI}J`)
 		for (let i = 0; i < lines.length; i++) {
 			if (i > 0) out.push('\r\n')
 			out.push(lines[i]!)
 		}
 		// After writing all lines, cursor is on the last frame line.
 		// positionCursor moves it to the prompt cursor position.
-		out.push(positionCursor(frame.height - 1, cursor))
-		out.push(`${CSI}?2026l`)
+		out.push(positionCursor(frame.height - 1, cursor), `${CSI}?2026l`)
 		prevFrame = frame
 		writeTerminal(out.join(''))
 		return
@@ -367,6 +396,14 @@ function draw(force = false): void {
 	const viewportTop = visibleLineStart(prevFrame, rows).index
 	const frameShrunk = nextHeight < prevHeight
 	const frameGrew = nextHeight > prevHeight
+	const writableTop = Math.max(0, prevHeight - rows)
+	const firstChangedTop = first >= 0 && first < prevFrame.lineTops.length ? prevFrame.lineTops[first]! : prevHeight
+	if (fullscreen && first >= 0 && firstChangedTop < writableTop) {
+		// The old cells are immutable native scrollback. Prefer an explicit snap and
+		// canonical rebuild over leaving a mixture of the old and new tool layouts.
+		repaintCanonicalFullscreen(frame)
+		return
+	}
 	// A shrink moves the scrollback/viewport boundary. Repaint physical rows in
 	// place; CSI J would pull an inspected Ghostty viewport back to the bottom.
 	if (fullscreen && frameShrunk && first !== -1) {

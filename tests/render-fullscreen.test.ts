@@ -96,7 +96,7 @@ beforeEach(() => {
 })
 
 describe('render fullscreen growth', () => {
-	test('rewrites visible rows without clearing scrollback when growth changes existing rows', () => {
+	test('canonically rebuilds when a changed row is already in scrollback', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -110,9 +110,8 @@ describe('render fullscreen growth', () => {
 			tab.history.unshift({ type: 'info', text: 'zero' })
 			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
-			expect(output).not.toContain('\x1b[3J')
-			expect(output).not.toContain('\x1b[H')
-			expect(output).toContain('\r\x1b[6A')
+			expect(output).toContain('\x1b[3J')
+			expect(output).toContain('\x1b[H')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
@@ -158,6 +157,7 @@ describe('render fullscreen growth', () => {
 			// physical cursor without changing the renderer's logical cursorRow.
 			state.row = Math.min(9, state.row + 1)
 			tab.history[tab.history.length - 1] = { type: 'thinking', text: 'first\n\nsecond\n\nthird\n\nfourth', streaming: true }
+			tab.historyVersion++
 			terminalLines(captureOutput(() => render.draw()), 10, state)
 
 			render.resetRenderer()

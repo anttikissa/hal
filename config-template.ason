@@ -18,8 +18,8 @@
 		tabWidth: 4,
 		// Number of blob sidecar files to hydrate in one batch while rendering history.
 		blobBatchSize: 64,
-		// Maximum lines shown from a tool output before collapsing it.
-		maxToolOutputLines: 16,
+		// Maximum rendered text rows per tool card, including its header.
+		maxToolTextRows: 8,
 		// Maximum diff lines shown inline for edit tool results.
 		maxEditDiffLines: 3
 	},
@@ -35,7 +35,9 @@
 		// Brightness multiplier for inherited fork history; lower values look dimmer.
 		forkHistoryDimFactor: 0.82,
 		// Duration of HAL cursor fade from working to idle after generation ends.
-		halCursorFadeMs: 5000
+		halCursorFadeMs: 5000,
+		// Delay between revealing adjacent parallel tool cards.
+		toolRevealDelayMs: 100
 	},
 	renderStatus: {
 		// 04-uki

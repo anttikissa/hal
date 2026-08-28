@@ -314,30 +314,31 @@ content, use `CR`, `CSI 1B`, then `CSI J` to erase leftover rows. Do not use
 `\r\n` there: at the writable-screen bottom it scrolls and creates a stray blank
 row.
 
-### 9. Automatic fullscreen recovery must preserve inspected scrollback
+### 9. Automatic fullscreen recovery preserves inspected scrollback when possible
 
-A fullscreen shrink changes the scrollback/writable boundary. An automatic repaint
-must **never** call the fullscreen force-repaint path: it emits `CSI 2J` and
-`CSI 3J`, and Ghostty snaps a user who is reading scrollback to the live bottom
-(`CSI 3J` also destroys that scrollback). This bit us again when prompt clearing
-on submit shrank a fullscreen frame.
+A fullscreen shrink changes the scrollback/writable boundary. If every changed old
+row is still on the writable screen, automatic repaint must avoid the fullscreen
+force path: `CSI 3J` destroys scrollback and snaps a user who is inspecting it to
+the live bottom. Derive the writable-screen physical rows, return to column one,
+and use a relative cursor-up move by the terminal height (which clamps at the
+writable-screen top), then rewrite each row with `CSI 2K`; do not append a final
+CRLF. Do **not** use `CSI H`, which also makes Ghostty follow live output.
 
-Instead, derive the writable-screen physical rows, return to column one, and use a
-relative cursor-up move by the terminal height (which clamps at the writable-
-screen top), then rewrite each row with `CSI 2K`; do not append a final CRLF. Do
-**not** use `CSI H`: Ghostty follows cursor-home by returning an inspected
-viewport to live output too. The recovery temporarily hard-wraps a native-wrapped
-URL into independently addressable OSC 8 rows, just as popup layout does.
-Ordinary rendering must still leave completed standalone URLs native-wrapped for
-copy/paste; the recovery is the exceptional safe rewrite.
+If the first changed physical row has already entered immutable scrollback, a
+correct in-place repaint is impossible. In that case correctness wins: clear the
+screen and scrollback with the canonical fullscreen repaint and rewrite the
+complete frame. The visible snap and lost inspected scrollback are preferable to
+leaving duplicated or interleaved transcript rows.
 
-This rule also covers popup open/close, which changes the URL layout. An explicit
-full rebuild — Ctrl-L, tab switch, terminal resize, or an editing key that reduces
-the prompt's physical height — may use the fullscreen force-repaint path. The
-prompt-shrink exception is necessary: bottom-anchoring a shorter prompt moves old
-history rows across the immutable scrollback boundary, and a writable-screen
-repaint would duplicate exactly those rows. Never invoke the force path from
-automatic prompt clearing, streaming, tool, animation, or popup updates.
+The writable-screen recovery temporarily hard-wraps a native-wrapped URL into
+independently addressable OSC 8 rows, just as popup layout does. Ordinary rendering
+must still leave completed standalone URLs native-wrapped for copy/paste.
+
+This rule also covers popup open/close, which changes the URL layout. Explicit full
+rebuilds—Ctrl-L, tab switch, terminal resize, or an editing key that reduces the
+prompt's physical height—may always use the canonical path. Automatic prompt
+clearing, streaming, tool, animation, and popup updates use writable-screen
+recovery unless their first changed row is already immutable.
 
 Fullscreen growth is straightforward only for a pure append. If an existing
 logical line also changes, use the same clamped relative move to the writable-
@@ -385,9 +386,13 @@ Background-tab `stream-delta` / `stream-end` updates should also skip repaint
 entirely. Their history is invisible until tab switch, so redrawing the active
 tab is wasted work.
 
-Parallel tool cards must update independently as their output arrives. Never serialize
-one card's preview or result behind an earlier tool to work around repaint corruption;
-that changes required UI behavior instead of fixing the renderer.
+Parallel tools execute independently and immediately, but their cards are revealed in
+call order at 100ms intervals. Only cards through the first still-running tool may
+expand; later calls stay as call-time header summaries even if their hidden output
+changes. When the expanded tool becomes immutable, the next running card may expand.
+Every tool card is contained after wrapping to eight text rows (header included), plus
+its top and bottom padding. This keeps the mutable suffix small without serializing
+actual tool execution.
 
 This was discovered the hard way: without throttling, keypresses were
 completely unresponsive during assistant output.

@@ -6,7 +6,7 @@
 const config = {
 	tabWidth: 4,
 	blobBatchSize: 64,
-	maxToolOutputLines: 16,
+	maxToolTextRows: 8,
 	maxEditDiffLines: 3,
 }
 
