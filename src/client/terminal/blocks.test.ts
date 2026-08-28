@@ -143,16 +143,17 @@ test('tool summaries contain only their call-time header', () => {
 })
 
 
-test('busy tool spinner has a fixed reserved header position', () => {
+test('tool activity indicator precedes the title and becomes a checkmark when done', () => {
 	colors.load()
 	const first = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'sleep 1' }, running: true, toolActivityFrame: 0 }, 50).map(stripAnsi)
 	const second = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'sleep 1' }, running: true, toolActivityFrame: 1 }, 50).map(stripAnsi)
 	const done = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'sleep 1' } }, 50).map(stripAnsi)
 
-	expect(first[1]).toContain('◐')
-	expect(second[1]).toContain('◓')
+	expect(first[1]).toContain('◐ Bash: sleep 1')
+	expect(second[1]).toContain('◓ Bash: sleep 1')
+	expect(done[1]).toContain('✓ Bash: sleep 1')
 	expect(done.join('\n')).not.toMatch(/[◐◓◑◒]/)
-	expect(visLen(first[1]!)).toBe(visLen(second[1]!))
+	expect(visLen(first[1]!)).toBe(visLen(done[1]!))
 })
 
 test('short status notices share one unlabelled transparent style without marker brackets', () => {
@@ -580,7 +581,7 @@ test('tool block header uses padded text without horizontal rules', () => {
 
 	expect(rendered[0]?.startsWith(colors.tool('bash').bg)).toBe(true)
 	expect(lines[0]).toBe(' ')
-	expect(lines[1]).toBe(' 1 Jan 17:38 Bash: ./test                                 (11-ok3/000123-bash) ')
+	expect(lines[1]).toBe(' 1 Jan 17:38 ✓ Bash: ./test                               (11-ok3/000123-bash) ')
 	expect(lines[1]).not.toContain('─')
 	expect(lines[2]).toBe(' done')
 	expect(lines[3]).toBe(' ')

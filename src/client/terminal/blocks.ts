@@ -206,8 +206,9 @@ function formatBlockTimeRange(first?: number, last?: number): string {
 }
 
 function buildHeader(title: string, time: string, blobRef: string, cols: number, activity = ''): string {
-	const prefix = `${' '.repeat(blocks.outputPad)}${time ? `${time} ` : ''}`
-	const right = `${activity ? ` ${activity}` : ''}${blobRef ? ` (${blobRef})` : ''} `
+	let prefix = `${' '.repeat(blocks.outputPad)}${time ? `${time} ` : ''}`
+	if (activity) prefix += `${activity} `
+	const right = blobRef ? ` (${blobRef}) ` : ''
 	// Stop one column short of the edge so headers keep the same right margin as
 	// block bodies. bgLine still paints the background across the full row.
 	const width = Math.max(1, cols - 1)
@@ -221,6 +222,13 @@ function toolSpinner(frame: number | undefined): string {
 	if (frame === undefined) return ''
 	const frames = ['◐', '◓', '◑', '◒']
 	return frames[((frame % frames.length) + frames.length) % frames.length]!
+}
+
+
+function toolActivity(block: Block): string {
+	if (block.type !== 'tool') return ''
+	if (!block.running) return '✓'
+	return blocks.toolSpinner(block.toolActivityFrame ?? 0)
 }
 
 function padBlockLine(line: string): string {
@@ -495,7 +503,7 @@ function renderBlock(block: Block, cols: number, cursorVisible = false, sessionL
 	const { fg, bg, bgIsBlack } = blockColors(block)
 	const label = blockLabel(block, sessionLabel)
 	const blockTime = time.formatTimestamp(block.ts)
-	const header = buildHeader(label, blockTime, blobRef, cols, block.type === 'tool' ? blocks.toolSpinner(block.toolActivityFrame) : '')
+	const header = buildHeader(label, blockTime, blobRef, cols, blocks.toolActivity(block))
 	const plainNotice = block.type === 'info' || (block.type === 'log' && !block.text.startsWith('Prompt queued'))
 	const lines: string[] = []
 	if (!plainNotice || blockTime) lines.push(bgLine(`${fg}${header}`, cols, bg))
@@ -524,4 +532,5 @@ export const blocks = {
 	idleCursorColor,
 	renderBlockGroup,
 	toolSpinner,
+	toolActivity,
 }

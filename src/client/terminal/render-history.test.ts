@@ -152,6 +152,7 @@ test('every running tool spins and finished tools stop', () => {
 	const stopped: string[] = []
 	renderHistory.renderLines(stopped, t, 80, active)
 	expect(stopped.map(stripAnsi).join('\n').match(/◓/g)).toHaveLength(1)
+	expect(stopped.map(stripAnsi).join('\n').match(/✓/g)).toHaveLength(2)
 })
 
 
