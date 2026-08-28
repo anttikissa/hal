@@ -188,7 +188,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			onCommand={onTabCommand}
 		/>
 		<Transcript items={transcript()} onAnswer={submitAnswer} />
-		<PromptComposer cwd={session()?.cwd} disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
+		<PromptComposer location={webStatus.location(session())} disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
 	</>
 }
 

@@ -2,11 +2,10 @@ import type { SharedSessionInfo } from '../../common/ipc.ts'
 import { models } from '../../common/models.ts'
 import type { SessionMeta } from '../../common/session.ts'
 
-// The phone version of the terminal status line. A phone header has room for
-// roughly one line, so this keeps only who am I, which model and how full is
-// the context. The working directory lives above the composer instead: it is
-// the one part that must stay readable in full, and truncating it to a single
-// segment left the app looking like it had no idea where it was.
+// The phone version of the terminal status line, split over two rows because a
+// phone header only has room for one. `text` is the header: who am I and how
+// full is the context. `location` sits above the composer and answers where and
+// with what this prompt will run, keeping the terminal's cwd-then-model pairing.
 
 function contextText(meta: SessionMeta | undefined): string {
 	const context = meta?.context
@@ -21,14 +20,18 @@ function sessionText(session: SharedSessionInfo): string {
 	return `${session.id}: ${session.name}`
 }
 
+function location(session: SharedSessionInfo | undefined): string {
+	if (!session) return ''
+	return [session.cwd, models.displayModel(session.model)].filter(Boolean).join(' · ')
+}
+
 function text(session: SharedSessionInfo | undefined, meta: SessionMeta | undefined): string {
 	if (!session) return ''
 	const parts = [
 		sessionText(session),
-		models.displayModel(session.model),
 		contextText(meta),
 	]
 	return parts.filter(Boolean).join(' · ')
 }
 
-export const webStatus = { text, contextText, sessionText }
+export const webStatus = { text, location, contextText, sessionText }
