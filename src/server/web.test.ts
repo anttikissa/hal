@@ -8,7 +8,6 @@ import { sessions } from './sessions.ts'
 import { ensureStateDir } from './state.ts'
 import { web } from './web.ts'
 import { serverKeys } from './server-keys.ts'
-import { authLogin } from './auth-login.ts'
 
 test('web fallback port advances by a randomized exponential step', () => {
 	expect(web.nextPort(9001, 1, () => 0)).toBe(9002)
@@ -17,7 +16,6 @@ test('web fallback port advances by a randomized exponential step', () => {
 })
 
 test('web announcement is opt-in and includes an authenticated local URL', () => {
-	ensureStateDir()
 	const originalEmitInfo = runtime.emitInfo
 	const calls: Array<[string, string]> = []
 	runtime.emitInfo = (sessionId: string, text: string) => { calls.push([sessionId, text]) }
@@ -35,23 +33,6 @@ test('web serves and compiles the browser client', async () => {
 	expect(await web.pageHtml()).toBe(await Bun.file(`${import.meta.dir}/../web-client/index.html`).text())
 	expect(await web.styleCss()).toBe(await Bun.file(`${import.meta.dir}/../web-client/styles.css`).text())
 	expect((await web.bundleClient()).length).toBeGreaterThan(1_000)
-})
-
-test('web server receives the ChatGPT OAuth callback', async () => {
-	const controller = new AbortController()
-	ensureStateDir()
-	const callback = authLogin.awaitOpenaiCallback('expected-state')
-	web.start(0, controller.signal)
-	try {
-		const mismatch = await fetch(`http://127.0.0.1:${web.state.port}/auth/callback?state=wrong-state&code=authorization-code`)
-		expect(mismatch.status).toBe(400)
-		const response = await fetch(`http://127.0.0.1:${web.state.port}/auth/callback?state=expected-state&code=authorization-code`)
-		expect(response.status).toBe(200)
-		expect(response.headers.get('cache-control')).toBe('no-store')
-		expect(await callback).toBe('authorization-code')
-	} finally {
-		controller.abort()
-	}
 })
 
 test('session snapshot exposes complete client bootstrap data', () => {

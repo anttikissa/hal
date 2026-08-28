@@ -30,11 +30,8 @@ const EXT_TO_TYPE: Record<string, string> = {
 	webp: 'image/webp',
 }
 
-// Web settings share this lightweight module so config.ts can register them without
-// importing web.ts, which would pull the runtime back into the config import graph.
+// Upload limits are read at request time so eval and /config can tune them live.
 const config = {
-	// Public DNS hostname, without a scheme or path, used for OAuth callbacks.
-	hostname: '',
 	maxUploadBytes: 8 * 1024 * 1024,
 }
 

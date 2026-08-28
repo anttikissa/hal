@@ -1,29 +1,8 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { auth } from './auth.ts'
 import { authLogin } from './auth-login.ts'
-import { webUpload } from './web-upload.ts'
 
 const originalFetch = globalThis.fetch
-
-test('uses the configured public DNS hostname for the ChatGPT callback', () => {
-	const originalHostname = webUpload.config.hostname
-	webUpload.config.hostname = 'example.test'
-	try {
-		expect(authLogin.openaiRedirectUri()).toBe('https://example.test/auth/callback')
-	} finally {
-		webUpload.config.hostname = originalHostname
-	}
-})
-
-test('rejects a non-hostname ChatGPT callback setting', () => {
-	const originalHostname = webUpload.config.hostname
-	webUpload.config.hostname = 'https://example.test/auth/callback'
-	try {
-		expect(() => authLogin.openaiRedirectUri()).toThrow(/web.hostname/)
-	} finally {
-		webUpload.config.hostname = originalHostname
-	}
-})
 
 test('finishes Claude login after a restart using the verifier returned in code state', async () => {
 	auth._setStoreForTest({})
