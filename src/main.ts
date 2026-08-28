@@ -230,9 +230,9 @@ function becomeHost(kind: 'start' | 'promote'): void {
 		web.start(parsedArgs.ok && parsedArgs.webPort ? parsedArgs.webPort : 9001, ac.signal)
 		return web.command(args)
 	}
-	// Ctrl-R exits and `./run` creates a new host; that deserves a fresh URL announcement.
-	// A client promoted after host loss does not: it is only taking over an existing service.
-	const announceWeb = kind === 'start'
+	// The web server is always available for OAuth callbacks. Explicit --web asks
+	// us to announce its bearer-token URL; normal terminal launches stay quiet.
+	const announceWeb = kind === 'start' && parsedArgs.ok && !!parsedArgs.webPort
 	syncHostVersionState()
 	const started = runtime.startRuntime(ac.signal, { targetCwd: startupCwd })
 	if (!started.ok) failStartup(started.reason)
@@ -241,12 +241,10 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	// left. Prefer it while it still serves this cwd; otherwise keep the cwd's tab.
 	const remembered = tabs.rememberedTabForCwd(clientPersistence.load(), ipc.readState().sessions, startupCwd)
 	startupTarget.preferredSessionId = remembered ?? started.sessionId
-	if (parsedArgs.ok && parsedArgs.webPort) {
-		const port = parsedArgs.webPort
-		void import('./server/web.ts')
-			.then(({ web }) => web.start(port, ac.signal, announceWeb ? startupTarget.preferredSessionId : undefined))
-			.catch((error) => log.error('web client startup failed', { error: String(error) }))
-	}
+	const port = parsedArgs.ok && parsedArgs.webPort ? parsedArgs.webPort : 9001
+	void import('./server/web.ts')
+		.then(({ web }) => web.start(port, ac.signal, announceWeb ? startupTarget.preferredSessionId : undefined))
+		.catch((error) => log.error('web client startup failed', { error: String(error) }))
 	ipc.appendEvent({
 		type: 'runtime-start',
 		pid: process.pid,

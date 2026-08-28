@@ -156,6 +156,8 @@
 		multilinePasteFileLineLimit: 7
 	},
 	web: {
+		// Public DNS hostname for the web server and ChatGPT OAuth callback, without a scheme or path. Leave empty for local-only use.
+		hostname: '',
 		// Maximum size accepted for images uploaded through the web client's attach button.
 		maxUploadBytes: 8388608
 	}

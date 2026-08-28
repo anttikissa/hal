@@ -12,6 +12,7 @@ import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 import { serverKeys, type WebToken } from './server-keys.ts'
 import { webUpload } from './web-upload.ts'
+import { authLogin } from './auth-login.ts'
 
 type SocketData = {
 	ip: string
@@ -285,6 +286,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 				fetch: async (request, server) => {
 					const url = new URL(request.url)
 					if (url.pathname === '/api/update') return handleUpdateRequest(request)
+					if (url.pathname === '/auth/callback') return authLogin.handleOpenaiCallback(request)
 					if (url.pathname === '/upload') return webUpload.handleUploadRequest(request, server.requestIP(request)?.address ?? 'unknown')
 					// `/` and `/<sessionId>` are both the browser app: the client
 					// reads the session out of the path so a tab can be linked.

@@ -9,9 +9,10 @@ of truth; re-read it after upgrades.
 - `src/web-client/` — the browser app: `main.tsx`, `components/`, `utils/`, `index.html`,
   `styles.css`. It may import `src/common/` and `src/utils/`, never `src/server/` or
   `src/client/`.
-- `src/server/web.ts` — HTTP and WebSocket transport, started only for `hal --web`. It serves
-  the page, bundles the browser code lazily on first request, sends a `ClientSessionSnapshot`
-  on subscribe, and streams live events after that.
+- `src/server/web.ts` — HTTP and WebSocket transport, always started by a host for OAuth callbacks.
+  `hal --web[=<port>]` selects its port and announces an authenticated browser URL. It serves the
+  page, bundles the browser code lazily on first request, sends a `ClientSessionSnapshot` on
+  subscribe, and streams live events after that.
 - `src/common/web.ts` — the wire message contract plus `webMessages.applySessionMessage`, which
   folds snapshots and events into one session state. Presentation belongs in `web-client`;
   event-to-block projection belongs in `src/common/live-event-blocks.ts`.

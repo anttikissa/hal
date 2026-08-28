@@ -2,12 +2,11 @@
 //
 // Anthropic: PKCE → user opens URL → pastes the returned code#state. The
 // verifier is the returned state, so finishing survives a process restart.
-// OpenAI: PKCE → localhost:1455 callback catches the code automatically.
+// OpenAI: PKCE → the regular web server callback catches the code automatically.
 
-import { createServer } from 'http'
 import { auth } from './auth.ts'
 import { liveFiles } from '../utils/live-file.ts'
-
+import { webUpload } from './web-upload.ts'
 const ANTHROPIC_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 const ANTHROPIC_REDIRECT = 'https://console.anthropic.com/oauth/code/callback'
 const ANTHROPIC_TOKEN_URL = 'https://console.anthropic.com/v1/oauth/token'
@@ -18,8 +17,27 @@ const ANTHROPIC_SCOPE = 'org:create_api_key user:profile user:inference'
 const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
 const OPENAI_AUTHORIZE = 'https://auth.openai.com/oauth/authorize'
 const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token'
-const OPENAI_REDIRECT = 'http://localhost:1455/auth/callback'
-const OPENAI_CALLBACK_PORT = 1455
+
+type OpenaiCallback = {
+	state: string
+	resolve: (code: string) => void
+	reject: (error: Error) => void
+	timeout: ReturnType<typeof setTimeout>
+}
+
+const state: { openaiCallback: OpenaiCallback | null } = {
+	openaiCallback: null,
+}
+
+function openaiRedirectUri(): string {
+	const hostname = webUpload.config.hostname.trim()
+	// OAuth redirects are credentials-bearing URLs. Accept only a hostname so a
+	// malformed setting cannot turn it into an arbitrary URL or inject a path.
+	if (!/^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(hostname)) {
+		throw new Error('Set web.hostname to this host’s public DNS name, for example hal.kissa.dev')
+	}
+	return `https://${hostname}/auth/callback`
+}
 
 // Random base64url string of given byte length.
 function randomB64Url(byteLen: number): string {
@@ -115,11 +133,12 @@ async function loginOpenai(onProgress?: (msg: string) => void): Promise<{ accoun
 	const verifier = randomB64Url(32)
 	const challenge = await sha256B64Url(verifier)
 	const flowState = randomB64Url(16)
+	const redirectUri = openaiRedirectUri()
 
 	const authUrl = new URL(OPENAI_AUTHORIZE)
 	authUrl.searchParams.set('response_type', 'code')
 	authUrl.searchParams.set('client_id', OPENAI_CLIENT_ID)
-	authUrl.searchParams.set('redirect_uri', OPENAI_REDIRECT)
+	authUrl.searchParams.set('redirect_uri', redirectUri)
 	authUrl.searchParams.set('scope', process.env.OPENAI_OAUTH_SCOPE ?? 'openid profile email offline_access')
 	authUrl.searchParams.set('code_challenge', challenge)
 	authUrl.searchParams.set('code_challenge_method', 'S256')
@@ -130,12 +149,15 @@ async function loginOpenai(onProgress?: (msg: string) => void): Promise<{ accoun
 	// accepts any value here (probed); the client_id is what actually selects the OAuth app.
 	authUrl.searchParams.set('originator', process.env.OPENAI_ORIGINATOR ?? 'hal')
 
-	onProgress?.(`Open this URL to log in:\n${authUrl}\n\nWaiting for callback on ${OPENAI_REDIRECT}...`)
+	// Register before exposing the authorization URL: a fast browser redirect must not
+	// arrive before there is a flow state for the web server to correlate it with.
+	const callback = awaitOpenaiCallback(flowState)
+	onProgress?.(`Open this URL to log in:\n${authUrl}\n\nWaiting for callback on ${redirectUri}...`)
 
 	// Try to open browser automatically. If this fails the user can still copy the URL.
 	tryOpenBrowser(authUrl.toString())
 
-	const code = await awaitOpenaiCallback(flowState)
+	const code = await callback
 
 	const tokenRes = await fetch(OPENAI_TOKEN_URL, {
 		method: 'POST',
@@ -145,7 +167,7 @@ async function loginOpenai(onProgress?: (msg: string) => void): Promise<{ accoun
 			client_id: OPENAI_CLIENT_ID,
 			code,
 			code_verifier: verifier,
-			redirect_uri: OPENAI_REDIRECT,
+			redirect_uri: redirectUri,
 		}),
 	})
 	if (!tokenRes.ok) {
@@ -165,45 +187,57 @@ async function loginOpenai(onProgress?: (msg: string) => void): Promise<{ accoun
 	return { accountId }
 }
 
+function completeOpenaiCallback(callback: OpenaiCallback, result: { code?: string; error?: Error }): void {
+	if (state.openaiCallback !== callback) return
+	clearTimeout(callback.timeout)
+	state.openaiCallback = null
+	if (result.error) callback.reject(result.error)
+	else callback.resolve(result.code!)
+}
+
 function awaitOpenaiCallback(expectedState: string): Promise<string> {
+	if (state.openaiCallback) return Promise.reject(new Error('ChatGPT login is already in progress'))
 	return new Promise<string>((resolve, reject) => {
-		const server = createServer((req, res) => {
-			try {
-				const reqUrl = new URL(req.url || '', 'http://localhost')
-				if (reqUrl.pathname !== '/auth/callback') {
-					res.statusCode = 404; res.end('Not found'); return
-				}
-				if (reqUrl.searchParams.get('state') !== expectedState) {
-					res.statusCode = 400; res.end('State mismatch'); return
-				}
-				const oauthError = reqUrl.searchParams.get('error')
-				if (oauthError) {
-					const desc = reqUrl.searchParams.get('error_description') || ''
-					res.statusCode = 400; res.end(`OAuth error: ${oauthError}`)
-					server.close()
-					reject(new Error(`OAuth error: ${oauthError}${desc ? ` (${desc})` : ''}`))
-					return
-				}
-				const code = reqUrl.searchParams.get('code')
-				if (!code) { res.statusCode = 400; res.end('Missing authorization code'); return }
-				res.statusCode = 200
-				res.setHeader('Content-Type', 'text/html')
-				res.end('<html><body><p>Authentication successful! You can close this tab.</p></body></html>')
-				server.close()
-				resolve(code)
-			} catch (e: any) {
-				res.statusCode = 500; res.end('Internal error')
-				reject(e)
-			}
-		})
-		server.listen(OPENAI_CALLBACK_PORT, '127.0.0.1')
-		server.on('error', (err: any) => {
-			if (err.code === 'EADDRINUSE') reject(new Error(`Port ${OPENAI_CALLBACK_PORT} already in use`))
-			else reject(err)
-		})
-		// 10 minute window for the user to complete the browser flow.
-		setTimeout(() => { server.close(); reject(new Error('Login timed out (10min)')) }, 600_000)
+		const callback = {
+			state: expectedState,
+			resolve,
+			reject,
+			timeout: setTimeout(() => {
+				completeOpenaiCallback(callback, { error: new Error('Login timed out (10min)') })
+			}, 600_000),
+		}
+		state.openaiCallback = callback
 	})
+}
+
+function callbackResponse(body: string, status: number): Response {
+	return new Response(body, {
+		status,
+		headers: {
+			'content-type': 'text/html; charset=utf-8',
+			'cache-control': 'no-store',
+			'referrer-policy': 'no-referrer',
+		},
+	})
+}
+
+function handleOpenaiCallback(request: Request): Response {
+	const callback = state.openaiCallback
+	const url = new URL(request.url)
+	if (!callback || url.searchParams.get('state') !== callback.state) return callbackResponse('State mismatch', 400)
+
+	const oauthError = url.searchParams.get('error')
+	if (oauthError) {
+		const description = url.searchParams.get('error_description')
+		const detail = description ? ` (${description})` : ''
+		completeOpenaiCallback(callback, { error: new Error(`OAuth error: ${oauthError}${detail}`) })
+		return callbackResponse('OAuth login failed. You can close this tab.', 400)
+	}
+
+	const code = url.searchParams.get('code')
+	if (!code) return callbackResponse('Missing authorization code', 400)
+	completeOpenaiCallback(callback, { code })
+	return callbackResponse('<html><body><p>Authentication successful! You can close this tab.</p></body></html>', 200)
 }
 
 function decodeJwt(token: string): any {
@@ -248,8 +282,12 @@ function saveAuth(provider: 'anthropic' | 'openai', entry: Record<string, any>):
 }
 
 export const authLogin = {
+	state,
 	startAnthropic,
 	finishAnthropic,
+	openaiRedirectUri,
 	loginOpenai,
+	awaitOpenaiCallback,
+	handleOpenaiCallback,
 	saveAuth,
 }
