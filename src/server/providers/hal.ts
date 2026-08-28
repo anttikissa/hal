@@ -112,32 +112,47 @@ async function* streamText(text: string, req: ProviderRequest): AsyncGenerator<P
 	}
 }
 
-function hasToolResult(messages: Message[]): boolean {
+function toolResultIds(messages: Message[]): Set<string> {
+	const ids = new Set<string>()
 	for (const message of messages) {
 		if (!Array.isArray(message.content)) continue
-		if (message.content.some((block) => block.type === 'tool_result')) return true
+		for (const block of message.content) {
+			if (block.type === 'tool_result' && block.tool_use_id) ids.add(block.tool_use_id)
+		}
 	}
-	return false
+	return ids
 }
 
+function scrollCalls(phase: 'a' | 'b'): ProviderStreamEvent[] {
+	const delays = phase === 'a' ? [4, 6, 8, 10, 12] : [12, 1, 2, 3, 4]
+	const calls: ProviderStreamEvent[] = []
+	for (let index = 0; index < delays.length; index++) {
+		const number = index + 1
+		let command = `sleep ${delays[index]}; seq -f B${number}-%g 1 20`
+		if (phase === 'a' || index === 0) {
+			const ticks = delays[index]! * 2
+			command = `for i in {1..${ticks}};do echo ${phase.toUpperCase()}${number}-$i;sleep .5;done`
+		}
+		calls.push({ type: 'tool_call', id: `hal-scroll-${phase}${number}`, name: 'bash', input: { command } })
+	}
+	return calls
+}
+
+
 async function* scrollRepro(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
-	if (hasToolResult(req.messages)) {
-		yield { type: 'text', text: 'Done. Scroll up and look for duplicated TOP or BOTTOM lines.' }
+	const results = toolResultIds(req.messages)
+	if (results.has('hal-scroll-b1')) {
+		yield { type: 'text', text: 'SCROLL TEST COMPLETE — inspect both batches for duplicate, missing, or interleaved A/B rows. Every card should be at most 10 physical rows. A short terminal may have snapped to the live bottom, but its final transcript must be canonical.' }
 		yield { type: 'done' }
 		return
 	}
-	yield {
-		type: 'tool_call',
-		id: 'hal-scroll-slow',
-		name: 'bash',
-		input: { command: 'sleep 1; for i in {1..20}; do echo "TOP-$i"; done' },
+	const phase = results.has('hal-scroll-a1') ? 'b' : 'a'
+	if (phase === 'a') {
+		yield { type: 'text', text: 'PHASE A — FRONTIER HANDOFF. Five Bash tools start concurrently. Cards should appear in call order at 100ms intervals. A1 streams first while A2–A5 stay as header-only summaries; then A2, A3, A4, and A5 expand in turn as each earlier tool finishes.' }
+	} else {
+		yield { type: 'text', text: 'PHASE B — SLOW LEADER. B1 streams for about 12 seconds while B2–B5 finish early and remain header-only summaries. In a tall terminal this should remain writable without snapping. In a short terminal, an unsafe B1 update may deliberately snap and rebuild, but must never leave duplicate or interleaved rows.' }
 	}
-	yield {
-		type: 'tool_call',
-		id: 'hal-scroll-fast',
-		name: 'bash',
-		input: { command: 'for i in {1..20}; do echo "BOTTOM-$i"; done' },
-	}
+	for (const call of scrollCalls(phase)) yield call
 	yield { type: 'done' }
 }
 
@@ -165,4 +180,4 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 const provider: Provider = { generate }
 
 // script stays empty unless a caller pins one scenario for every model.
-export const halProvider = { config, script: '', scripts, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, hasToolResult, scrollRepro }
+export const halProvider = { config, script: '', scripts, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, toolResultIds, scrollCalls, scrollRepro }

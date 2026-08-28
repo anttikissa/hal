@@ -72,33 +72,51 @@ test('unrecognized markup remains ordinary intro text', () => {
 	])
 })
 
-test('scroll model emits two concurrent tool calls whose upper result finishes last', async () => {
+test('scroll model emits five concurrent frontier tools in call order', async () => {
 	const events = await collect([], 'scroll')
-	expect(events).toEqual([
-		{
-			type: 'tool_call',
-			id: 'hal-scroll-slow',
-			name: 'bash',
-			input: { command: 'sleep 1; for i in {1..20}; do echo "TOP-$i"; done' },
-		},
-		{
-			type: 'tool_call',
-			id: 'hal-scroll-fast',
-			name: 'bash',
-			input: { command: 'for i in {1..20}; do echo "BOTTOM-$i"; done' },
-		},
-		{ type: 'done' },
+	const calls = events.filter((event) => event.type === 'tool_call')
+
+	expect(events[0]?.text).toContain('PHASE A')
+	expect(calls.map((event) => event.id)).toEqual([
+		'hal-scroll-a1',
+		'hal-scroll-a2',
+		'hal-scroll-a3',
+		'hal-scroll-a4',
+		'hal-scroll-a5',
 	])
+	expect(calls[0]?.input.command).toContain('echo A1-$i')
+	expect(calls[4]?.input.command).toContain('{1..24}')
+	expect(events.at(-1)).toEqual({ type: 'done' })
 })
 
-test('scroll model finishes after its tool results instead of repeating them', async () => {
+
+test('scroll model follows with a slow-leader batch after phase A results', async () => {
 	const events = await collect([
-		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'hal-scroll-fast', content: 'BOTTOM-1' }] },
+		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'hal-scroll-a1', content: 'A1-1' }] },
 	], 'scroll')
-	expect(events).toEqual([
-		{ type: 'text', text: 'Done. Scroll up and look for duplicated TOP or BOTTOM lines.' },
-		{ type: 'done' },
+	const calls = events.filter((event) => event.type === 'tool_call')
+
+	expect(events[0]?.text).toContain('PHASE B')
+	expect(calls.map((event) => event.id)).toEqual([
+		'hal-scroll-b1',
+		'hal-scroll-b2',
+		'hal-scroll-b3',
+		'hal-scroll-b4',
+		'hal-scroll-b5',
 	])
+	expect(calls[0]?.input.command).toContain('echo B1-$i')
+	expect(calls[1]?.input.command).toContain('sleep 1')
+	expect(events.at(-1)).toEqual({ type: 'done' })
+})
+
+
+test('scroll model finishes after phase B tool results', async () => {
+	const events = await collect([
+		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'hal-scroll-b1', content: 'B1-1' }] },
+	], 'scroll')
+
+	expect(events[0]?.text).toContain('SCROLL TEST COMPLETE')
+	expect(events.at(-1)).toEqual({ type: 'done' })
 })
 
 test('explicit script still overrides built-in HAL models', async () => {
