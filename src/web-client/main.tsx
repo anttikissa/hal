@@ -189,6 +189,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			selected={selected()}
 			status={status()}
 			working={sharedState().working}
+			summarizing={sharedState().summarizing}
 			onSelect={selectSession}
 			onCommand={onTabCommand}
 		/>

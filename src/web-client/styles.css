@@ -18,8 +18,8 @@ body { margin: 0; font: 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consol
 #app { position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-height, 100dvh); overflow: hidden; display: flex; flex-direction: column; }
 button { touch-action: manipulation; }
 
-.SessionTabs > button, .SessionTabs-row > button, .PromptComposer > button, .PromptComposer > textarea { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
-.SessionTabs > button, .SessionTabs-row > button, .PromptComposer > button { cursor: pointer; }
+.SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer > button, .PromptComposer > textarea { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
+.SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer > button { cursor: pointer; }
 
 .AuthGate {
 	max-width: 36rem;
@@ -42,10 +42,9 @@ button { touch-action: manipulation; }
 }
 .AuthGate > form > button { cursor: pointer; }
 
-/* Tab strip is a fixed row at the top and wraps onto extra rows so every tab
-   stays visible without horizontal panning (which fights browser swipe gestures).
-   On phones the individual tabs hide and only ☰ remains; its sheet lists
-   everything with close and new-tab actions. */
+/* The header is a tab map, not just a menu. Desktop keeps full wrapping tabs;
+   phone shows compact 44px switches in the same space, expanding only the
+   selected one to reveal its name. All open sessions and activity stay visible. */
 .SessionTabs {
 	flex: none;
 	display: flex;
@@ -56,25 +55,32 @@ button { touch-action: manipulation; }
 	border-bottom: 1px solid #444;
 }
 .SessionTabs > .SessionTabs-menu { flex: none; min-width: 44px; min-height: 44px; }
-/* On a phone the status replaces tabs in the one available row. Desktop keeps
-   its tab strip and puts the same terminal-style status directly below it. */
 .SessionTabs > .SessionTabs-title { display: none; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: center; color: #ccc; }
-.SessionTabs > .SessionTabs-row {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	min-width: 0;
-}
+.SessionTabs > .SessionTabs-rail { display: none; }
+.SessionTabs > .SessionTabs-row { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .SessionTabs-row > button { display: inline-flex; gap: 6px; align-items: baseline; text-align: left; max-width: 100%; }
 .SessionTabs-row > button.selected { background: #456; }
-.SessionTabs-dot { width: 8px; height: 8px; border-radius: 50%; background: #7c7; align-self: center; animation: SessionTabs-pulse 1.2s ease-in-out infinite; }
-@keyframes SessionTabs-pulse { 50% { opacity: .3; } }
+.SessionTabs-activity { display: inline-flex; align-items: center; gap: 2px; }
+.SessionTabs-activity:empty { display: none; }
+.SessionTabs-marker { line-height: 1; }
+.SessionTabs-marker.running { color: #ffa156; }
+.SessionTabs-marker.background { color: #8fc5ed; }
+.SessionTabs-marker.attention { color: #e7bf6a; }
+.SessionTabs-marker.error { color: #e58282; }
+.SessionTabs-marker.animated { animation: SessionTabs-pulse 1.2s ease-in-out infinite; }
+@keyframes SessionTabs-pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .SessionTabs-marker.animated { animation: none; } }
 .SessionTabs-close { color: #99a; padding: 0 2px; }
 .SessionTabs-new { min-width: 44px; min-height: 44px; }
 
 @media (max-width: 48em) {
-	.SessionTabs > .SessionTabs-row { display: none; }
-	.SessionTabs > .SessionTabs-title { display: block; }
+	.SessionTabs > .SessionTabs-row, .SessionTabs > .SessionTabs-title { display: none; }
+	.SessionTabs > .SessionTabs-rail { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+	.SessionTabs-rail > button { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; }
+	.SessionTabs-rail > button.selected { max-width: min(14rem, calc(100vw - 76px)); background: #29465e; border-color: #6b9fc6; }
+	.SessionTabs-rail > button:not(.selected) > .SessionTabs-railName { display: none; }
+	.SessionTabs-number { font-variant-numeric: tabular-nums; }
+	.SessionTabs-railName { max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 @media (min-width: 48.01em) {
 	.SessionTabs { flex-wrap: wrap; }
