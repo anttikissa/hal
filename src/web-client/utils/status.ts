@@ -25,13 +25,9 @@ function location(session: SharedSessionInfo | undefined): string {
 	return [session.cwd, models.displayModel(session.model)].filter(Boolean).join(' · ')
 }
 
-function text(session: SharedSessionInfo | undefined, meta: SessionMeta | undefined): string {
+function text(session: SharedSessionInfo | undefined): string {
 	if (!session) return ''
-	const parts = [
-		sessionText(session),
-		contextText(meta),
-	]
-	return parts.filter(Boolean).join(' · ')
+	return webStatus.sessionText(session)
 }
 
 export const webStatus = { text, location, contextText, sessionText }

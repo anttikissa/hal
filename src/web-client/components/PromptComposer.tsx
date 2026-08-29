@@ -3,6 +3,7 @@ import { enterAction, pastedImage, sendLabel } from '../utils/composer.ts'
 
 type PromptComposerProps = {
 	location?: string
+	context?: string
 	working?: boolean
 	disabled?: boolean
 	onSubmit: (text: string, queue: boolean) => Promise<boolean>
@@ -78,11 +79,14 @@ export function PromptComposer(props: PromptComposerProps) {
 		void attach(file)
 	}
 
-	// Directory and model sit with the composer rather than in the header: they
-	// answer "where and with what will this prompt run" right where the prompt
-	// is typed, and the header has no room for a full path on a phone.
+	// The execution details live beside the composer: the directory and model answer
+	// "where and with what will this prompt run", while context remains visible even
+	// when a long path has to truncate on a phone.
 	return <form class={['PromptComposer', props.disabled && 'disabled']} aria-disabled={props.disabled ? 'true' : undefined} onSubmit={(event: SubmitEvent) => { event.preventDefault(); void submit() }}>
-		<span class="PromptComposer-location">{props.location}</span>
+		<div class="PromptComposer-status">
+			<span class="PromptComposer-location">{props.location}</span>
+			<Show when={props.context}><span class="PromptComposer-context">{props.context}</span></Show>
+		</div>
 		<textarea
 			ref={(element) => { input = element }}
 			rows={1}

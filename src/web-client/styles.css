@@ -296,10 +296,11 @@ button { touch-action: manipulation; }
 	background: #111;
 	border-top: 1px solid #444;
 }
-/* Full-width line above the input row: the path is the one status field that
-   must stay readable in full, so it gets its own line instead of an ellipsis
-   in the header. */
-.PromptComposer > .PromptComposer-location { flex-basis: 100%; overflow: hidden; color: #9eb8ca; text-overflow: ellipsis; white-space: nowrap; }
+/* Execution details get their own row above the input. The context is kept at
+   the trailing edge so it remains visible while an unusually long path truncates. */
+.PromptComposer > .PromptComposer-status { display: flex; flex: 1 0 100%; gap: 8px; min-width: 0; }
+.PromptComposer-status > .PromptComposer-location { flex: 1; min-width: 0; overflow: hidden; color: #9eb8ca; text-overflow: ellipsis; white-space: nowrap; }
+.PromptComposer-status > .PromptComposer-context { flex: none; color: #d6c08a; white-space: nowrap; }
 .PromptComposer > textarea {
 	flex: 1;
 	min-width: 0;
