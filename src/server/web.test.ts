@@ -35,6 +35,36 @@ test('web serves and compiles the browser client', async () => {
 	expect((await web.bundleClient()).length).toBeGreaterThan(1_000)
 })
 
+test('web declares a standalone home-screen app with install icons', async () => {
+	const html = await web.pageHtml()
+	expect(html).toContain('name="mobile-web-app-capable" content="yes"')
+	expect(html).toContain('name="apple-mobile-web-app-title" content="HAL"')
+	expect(html).toContain('rel="manifest" href="/manifest.webmanifest"')
+	expect(html).toContain('rel="apple-touch-icon" href="/icons/icon-180.png"')
+
+	const manifestResponse = web.appAsset('/manifest.webmanifest')
+	expect(manifestResponse?.headers.get('content-type')).toBe('application/manifest+json; charset=utf-8')
+	expect(await manifestResponse?.json()).toEqual({
+		name: 'HAL',
+		short_name: 'HAL',
+		start_url: '/',
+		scope: '/',
+		display: 'standalone',
+		background_color: '#111111',
+		theme_color: '#111111',
+		icons: [
+			{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+			{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+		],
+	})
+
+	for (const path of ['/icon.svg', '/icons/icon-180.png', '/icons/icon-192.png', '/icons/icon-512.png']) {
+		const response = web.appAsset(path)
+		expect(response?.status).toBe(200)
+		expect((await response?.arrayBuffer())?.byteLength).toBeGreaterThan(0)
+	}
+})
+
 test('session snapshot exposes complete client bootstrap data', () => {
 	const originalReadState = ipc.readState
 	const originalLoadMeta = sessions.loadSessionMeta

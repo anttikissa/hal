@@ -83,6 +83,20 @@ function styleCss(): Promise<string> {
 	return Bun.file(`${import.meta.dir}/../web-client/styles.css`).text()
 }
 
+const appAssets: Record<string, [file: string, type: string]> = {
+	'/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
+	'/icon.svg': ['icon.svg', 'image/svg+xml'],
+	'/icons/icon-180.png': ['icons/icon-180.png', 'image/png'],
+	'/icons/icon-192.png': ['icons/icon-192.png', 'image/png'],
+	'/icons/icon-512.png': ['icons/icon-512.png', 'image/png'],
+}
+
+function appAsset(pathname: string): Response | null {
+	const asset = web.appAssets[pathname]
+	if (!asset) return null
+	return new Response(Bun.file(`${import.meta.dir}/../web-client/${asset[0]}`), { headers: { 'content-type': asset[1], 'cache-control': 'no-store' } })
+}
+
 function sessionSnapshot(sessionId: string): ClientSessionSnapshot | null {
 	const session = ipc.readState().sessions.find((item) => item.id === sessionId)
 	const meta = sessions.loadSessionMeta(sessionId)
@@ -286,6 +300,8 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 					const url = new URL(request.url)
 					if (url.pathname === '/api/update') return handleUpdateRequest(request)
 					if (url.pathname === '/upload') return webUpload.handleUploadRequest(request, server.requestIP(request)?.address ?? 'unknown')
+					const asset = web.appAsset(url.pathname)
+					if (asset) return asset
 					// `/` and `/<sessionId>` are both the browser app: the client
 					// reads the session out of the path so a tab can be linked.
 					if (url.pathname === '/' || webProtocol.isSessionPath(url.pathname)) return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } })
@@ -393,6 +409,8 @@ export const web = {
 	announce,
 	pageHtml,
 	styleCss,
+	appAssets,
+	appAsset,
 	bundleClient,
 	hydrateHistory,
 	sessionSnapshot,
