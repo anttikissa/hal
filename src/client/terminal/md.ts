@@ -19,6 +19,8 @@ import {
 	M_ITALIC,
 	M_ITALIC_OFF,
 } from '../../utils/strings.ts'
+import { markdown, mdSpans } from '../../common/markdown.ts'
+export type { MdSpan } from '../../common/markdown.ts'
 
 // ── ANSI style pairs ─────────────────────────────────────────────────────────
 
@@ -36,139 +38,19 @@ const DEFAULT_COLORS: MdColors = {
 	link: [M_BOLD, M_BOLD_OFF],
 }
 
-// ── Block-level: split into spans ────────────────────────────────────────────
-
-export type MdSpan =
-	| { type: 'text'; lines: string[] }
-	| { type: 'code'; lang: string; lines: string[] }
-	| { type: 'table'; lines: string[] }
-
-/** Split markdown text into typed spans (text, code fences, tables). */
-function mdSpans(text: string): MdSpan[] {
-	const spans: MdSpan[] = []
-	let buf: string[] = []
-	let inCode = false
-	let codeLang = ''
-
-	const flushText = () => {
-		if (buf.length) {
-			spans.push({ type: 'text', lines: buf })
-			buf = []
-		}
-	}
-
-	for (const line of text.split('\n')) {
-		// Opening or closing code fence: ```lang or ```
-		if (line.startsWith('```')) {
-			if (inCode) {
-				// Closing fence
-				spans.push({ type: 'code', lang: codeLang, lines: buf })
-				buf = []
-				inCode = false
-				codeLang = ''
-			} else {
-				// Opening fence — flush any preceding text
-				flushText()
-				codeLang = line.slice(3).trim()
-				inCode = true
-			}
-			continue
-		}
-
-		if (inCode) {
-			buf.push(line)
-			continue
-		}
-
-		// Table row: starts and ends with |
-		if (/^\|.+\|$/.test(line.trim())) {
-			flushText()
-			const last = spans[spans.length - 1]
-			if (last?.type === 'table') {
-				last.lines.push(line)
-			} else {
-				spans.push({ type: 'table', lines: [line] })
-			}
-			continue
-		}
-
-		buf.push(line)
-	}
-
-	// Flush remaining. Unclosed code fence stays as code.
-	if (buf.length) {
-		spans.push({ type: inCode ? 'code' : 'text', ...(inCode ? { lang: codeLang } : {}), lines: buf } as MdSpan)
-	}
-
-	return spans
-}
 
 // ── Inline formatting ────────────────────────────────────────────────────────
 
 /** Apply inline markdown: **bold**, *italic*, `code`, # headers, links.
  *  Supports backslash-escaped literal markdown markers like \* and \`. */
 function mdInline(line: string, colors?: MdColors): string {
-	const c = colors ?? DEFAULT_COLORS
-	const escaped: string[] = []
-	const ph = (i: number) => `\x00E${i}\x00`
-
-	// Code spans come first because Markdown treats backslashes in them literally.
-	line = line.replace(/`[^`\n]+`|\\([\\`*#\[\]()])/g, (match, marker) => {
-		if (!marker) return match
-		const i = escaped.length
-		escaped.push(marker)
-		return ph(i)
-	})
-
-	// Headers: # through ######
-	const hm = line.match(/^(#{1,6})\s+(.*)/)
-	const rendered = hm ? `${c.bold[0]}${inlineSpans(hm[2]!, c)}${c.bold[1]}` : inlineSpans(line, c)
-	return rendered.replace(/\x00E(\d+)\x00/g, (_, i) => escaped[+i]!)
-}
-
-function emphasis(s: string, c: MdColors): string {
-	s = s.replace(/\*\*(.+?)\*\*/g, `${c.bold[0]}$1${c.bold[1]}`)
-	return s.replace(/(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)/g, `${c.italic[0]}$1${c.italic[1]}`)
-}
-
-function inlineSpans(s: string, c: MdColors): string {
-	// Extract code and links before emphasis so markdown-looking characters in
-	// their contents cannot affect surrounding text.
-	const codes: string[] = []
-	const codePh = (i: number) => `\x00C${i}\x00`
-
-	// **`bold code`** → bold only (no dim code style)
-	s = s.replace(/\*\*`([^`]+)`\*\*/g, (_, g) => {
-		const i = codes.length
-		codes.push(`${c.bold[0]}${g}${c.bold[1]}`)
-		return codePh(i)
-	})
-
-	// `inline code`
-	s = s.replace(/`([^`\n]+)`/g, (_, g) => {
-		const i = codes.length
-		codes.push(`${c.code[0]}${g}${c.code[1]}`)
-		return codePh(i)
-	})
-
-	const links: Array<{ label: string; url: string }> = []
-	const linkPh = (i: number) => `\x00L${i}\x00`
-	s = s.replace(/(?<!!)\[([^\]\n]+)\]\((https?:\/\/[^\s)\x00-\x1f]+)\)/g, (_, label, url) => {
-		const i = links.length
-		links.push({ label, url })
-		return linkPh(i)
-	})
-
-	s = emphasis(s, c)
-	const linkStyle = c.link ?? [M_BOLD, M_BOLD_OFF]
-
-	// Labels can contain emphasis and code placeholders. Restore links first so
-	// the final code pass also reaches placeholders inside labels.
-	s = s.replace(/\x00L(\d+)\x00/g, (_, rawIndex) => {
-		const link = links[+rawIndex]!
-		return `\x1b]8;;${link.url}\x07${linkStyle[0]}${emphasis(link.label, c)}${linkStyle[1]}\x1b]8;;\x07`
-	})
-	return s.replace(/\x00C(\d+)\x00/g, (_, i) => codes[+i]!)
+	const styles = colors ?? DEFAULT_COLORS
+	return markdown.inline(
+		line,
+		styles,
+		(url, label) => `\x1b]8;;${url}\x07${label}\x1b]8;;\x07`,
+		(text) => text,
+	)
 }
 
 // ── Table formatting ─────────────────────────────────────────────────────────
