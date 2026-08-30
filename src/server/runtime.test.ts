@@ -1050,6 +1050,46 @@ test('held queue does not drain after unrelated completed prompt', () => {
 })
 
 
+test('completed prompt drains its queue without waiting on itself', async () => {
+	const sessionId = `test-drain-self-${Date.now().toString(36)}`
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	const origOwnsHostLock = ipc.ownsHostLock
+	try {
+		ipc.ownsHostLock = () => true
+		agentLoop.runAgentLoop = async () => 'completed'
+		sessions.createSession(sessionId, {
+			id: sessionId,
+			createdAt: '2026-05-20T00:00:00.000Z',
+			workingDir: '/tmp',
+			model: 'openai/gpt-5.6-sol',
+		})
+		promptQueue.append(sessionId, { text: 'second prompt', createdAt: '2026-05-20T00:00:01.000Z' })
+
+		const result = await Promise.race([
+			runtime.startPromptCommand(sessionId, 'first prompt').then(() => 'completed'),
+			Bun.sleep(100).then(() => 'timeout'),
+		])
+
+		expect(result).toBe('completed')
+		promptQueue.append(sessionId, { text: 'third prompt', createdAt: '2026-05-20T00:00:02.000Z' })
+		const slashResult = await Promise.race([
+			runtime.startPromptCommand(sessionId, '/queue next').then(() => 'completed'),
+			Bun.sleep(100).then(() => 'timeout'),
+		])
+		expect(slashResult).toBe('completed')
+		const prompts = sessions.loadHistory(sessionId).filter((entry) => entry.type === 'user')
+		expect(prompts.map((entry) => entry.type === 'user' && entry.parts[0]?.type === 'text' ? entry.parts[0].text : '')).toEqual(['first prompt', 'second prompt', 'third prompt'])
+		expect(runtime.state.pendingPrompts.has(sessionId)).toBe(false)
+	} finally {
+		agentLoop.runAgentLoop = origRunAgentLoop
+		ipc.ownsHostLock = origOwnsHostLock
+		runtime.state.pendingPrompts.get(sessionId)?.controller.abort()
+		runtime.state.pendingPrompts.delete(sessionId)
+		sessions.deleteSession(sessionId)
+	}
+})
+
+
 test('continue releases a held queue so completion drains it', async () => {
 	const sessionId = `test-continue-held-${Date.now().toString(36)}`
 	const calls: any[] = []

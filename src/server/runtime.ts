@@ -36,7 +36,7 @@ import { serverKeys } from './server-keys.ts'
 import { authLogin } from './auth-login.ts'
 
 type PendingContinuation = { canceled: boolean }
-type PendingPrompt = {
+export type PendingPrompt = {
 	controller: AbortController
 	task: Promise<void>
 	id?: string
@@ -399,7 +399,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 		emitInfo(sessionId, 'Waiting for an answer')
 		return
 	}
-	if (await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText)) {
+	if (await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText, false, pending)) {
 		persistCommandInput(sessionId, text, source)
 		return
 	}
@@ -731,7 +731,9 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		return
 	}
 	if (result !== 'completed' && result !== 'waiting' && !state.contextSwitching.has(sessionId)) queueRunner.emitQueuePausedNotice(sessionId)
-	if (!agentLoop.isWorking(sessionId) && queueRunner.shouldDrainQueuedPrompt(sessionId, result)) await queueRunner.runNextQueuedPrompt(sessionId)
+	if (!agentLoop.isWorking(sessionId) && queueRunner.shouldDrainQueuedPrompt(sessionId, result)) {
+		await queueRunner.runNextQueuedPrompt(sessionId, true, pending)
+	}
 }
 
 function publishContextEstimate(sessionId: string): { used: number; max: number } | null {

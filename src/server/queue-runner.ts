@@ -9,7 +9,7 @@ import { transcriptTitles } from '../common/transcript-titles.ts'
 import { historyProjection } from '../common/history-projection.ts'
 // Circular import with runtime.ts is safe: we only access runtime.* at call time
 // (module convention — all cross-module calls go through namespace objects).
-import { runtime } from './runtime.ts'
+import { runtime, type PendingPrompt } from './runtime.ts'
 
 function queuePreviewResult(text: string, max = 80): { text: string; truncated: boolean } {
 	let first = text.split('\n')[0]!.trim()
@@ -78,7 +78,7 @@ function shouldDrainQueuedPrompt(sessionId: string, result: AgentLoopResult): bo
 	return result === 'completed' && !sessions.findPendingTools(sessionId) && !promptQueue.isHeld(sessionId) && promptQueue.load(sessionId).length > 0
 }
 
-async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boolean> {
+async function runNextQueuedPrompt(sessionId: string, quiet = true, current?: PendingPrompt): Promise<boolean> {
 	if (isQuestionParked(sessionId)) {
 		runtime.emitInfo(sessionId, 'Waiting for an answer')
 		return false
@@ -89,11 +89,15 @@ async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boo
 		return false
 	}
 	promptQueue.setHeld(sessionId, false)
+	// A queue drain can run inside the prompt task that is still registered as
+	// pending. Release that exact task before starting its successor, otherwise
+	// each task awaits the other. Identity keeps unrelated preprocessing serialized.
+	if (current && runtime.state.pendingPrompts.get(sessionId) === current) runtime.state.pendingPrompts.delete(sessionId)
 	await runtime.startPromptCommand(sessionId, next.text, next.source, next.displayText ?? next.text, undefined, next.sourceTab)
 	return true
 }
 
-async function handleQueueSlashCommand(sessionId: string, text: string, source?: string, displayText?: string, working = false): Promise<boolean> {
+async function handleQueueSlashCommand(sessionId: string, text: string, source?: string, displayText?: string, working = false, current?: PendingPrompt): Promise<boolean> {
 	const match = text.trimStart().match(/^\/queue(?:\s+([\s\S]*))?$/)
 	if (!match) return false
 	const args = (match[1] ?? '').trim()
@@ -105,7 +109,7 @@ async function handleQueueSlashCommand(sessionId: string, text: string, source?:
 	}
 	if (args === 'next') {
 		if (working) runtime.emitInfo(sessionId, 'Session is working')
-		else await queueRunner.runNextQueuedPrompt(sessionId, false)
+		else await queueRunner.runNextQueuedPrompt(sessionId, false, current)
 		return true
 	}
 	if (args === 'clear') {
