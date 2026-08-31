@@ -26,6 +26,7 @@ export type BlockRenderCache = {
 export type HistoryRenderContext = {
 	blockCache: WeakMap<Block, BlockRenderCache>
 	cursorTick: number
+	toolSpinnerTick: number
 	workingSessions: ReadonlyMap<string, boolean>
 	toolRows: number
 	sessionLabel: (sessionId: string) => string
@@ -42,6 +43,7 @@ const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
 let workingSeen = new Set<string>()
 let fadeStart = new Map<string, number>()
 let nextToolRevealAt = 0
+let toolSpinnersActive = false
 const bodyCache = new WeakMap<Tab, { key: string; lines: string[]; streaming: boolean; animatedTools: boolean; nextToolRevealAt: number; cursor?: { row: number; col: number } }>()
 
 function hasInlineHalCursor(block: Block | undefined): boolean {
@@ -139,9 +141,9 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 	// Streaming mutates the last block in place and bumps renderVersion without touching
 	// historyVersion, so the tail's identity has to be part of the key.
 	const tail = tab.history.at(-1)
-	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${blockRenderer.outputPad}:${working}:${context.sessionLabelVersion}:${tab.history.length}:${tail?.renderVersion ?? 0}:${terminalQuestions.state.version}`
+	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${blockRenderer.outputPad}:${working}:${context.sessionLabelVersion}:${tab.history.length}:${tail?.renderVersion ?? 0}:${terminalQuestions.state.version}:${context.toolSpinnerTick}`
 	let body = bodyCache.get(tab)
-	if (!body || body.key !== key || (working && (body.streaming || body.animatedTools))) {
+	if (!body || body.key !== key || (working && body.streaming)) {
 		const history = visibleHistory(tab.history)
 		const last = history.at(-1)
 		let activeStreamingBlock: Block | undefined
@@ -173,7 +175,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 				}
 				if (block.running) {
 					animatedTools = true
-					block = { ...block, toolActivityFrame: renderHistory.toolSpinnerFrame(block, context.cursorTick) }
+					block = { ...block, toolActivityFrame: renderHistory.toolSpinnerFrame(block, context.toolSpinnerTick) }
 				}
 				if (summary) block = { ...block, toolSummary: true }
 			} else {
@@ -196,6 +198,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		bodyCache.set(tab, body)
 	}
 	nextToolRevealAt = body.nextToolRevealAt
+	toolSpinnersActive = body.animatedTools
 	lines.push(...body.lines)
 	const questionCursor = body.cursor ? { row: start + body.cursor.row, col: body.cursor.col } : undefined
 
@@ -222,6 +225,7 @@ function resetAnimation(): void {
 	workingSeen = new Set()
 	fadeStart = new Map()
 	nextToolRevealAt = 0
+	toolSpinnersActive = false
 }
 
 
@@ -235,5 +239,9 @@ function hasAnimatedCursor(tab: Tab | null | undefined): boolean {
 	return !!tab
 }
 
+function hasActiveToolSpinners(): boolean {
+	return toolSpinnersActive
+}
 
-export const renderHistory = { config, renderLines, hasAnimatedCursor, hasFadingCursor, resetAnimation, toolRevealDelay, toolSpinnerFrame }
+
+export const renderHistory = { config, renderLines, hasAnimatedCursor, hasActiveToolSpinners, hasFadingCursor, resetAnimation, toolRevealDelay, toolSpinnerFrame }

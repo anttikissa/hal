@@ -29,7 +29,9 @@
 	},
 	render: {
 		// Delay between fade animation frames; 67ms is about 15fps.
-		halCursorFadeFrameMs: 67
+		halCursorFadeFrameMs: 67,
+		// Tool spinner frame interval; 167ms is about ten frames on a 60Hz display.
+		toolSpinnerFrameMs: 167
 	},
 	renderHistory: {
 		// Brightness multiplier for inherited fork history; lower values look dimmer.

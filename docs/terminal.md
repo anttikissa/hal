@@ -399,9 +399,10 @@ out of the writable screen. A tall terminal can therefore stream several cards a
 and finishing an earlier tool frees room for another. Tool cards never exceed ten rows.
 
 Every tool header reserves one fixed-width status cell immediately before its title.
-A revealed running tool advances through `◐ ◓ ◑ ◒` on the shared 250ms animation
-clock; when it finishes, the same cell becomes `✓`. The clock makes silent and bursty
-tools visibly active, while the fixed-width cell keeps card geometry constant.
+A revealed running tool advances through `◐ ◓ ◑ ◒` on a dedicated 167ms animation
+clock (about ten 60Hz display frames); when it finishes, the same cell becomes `✓`.
+The timer runs only while a revealed tool is busy, and the fixed-width cell keeps card
+geometry constant. Cursor blinking remains on its independent 250ms clock.
 
 This was discovered the hard way: without throttling, keypresses were
 completely unresponsive during assistant output.

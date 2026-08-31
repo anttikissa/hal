@@ -12,6 +12,7 @@ function context(): HistoryRenderContext {
 	return {
 		blockCache: new WeakMap(),
 		cursorTick: 0,
+		toolSpinnerTick: 0,
 		workingSessions: new Map(),
 		sessionLabel: (sessionId) => sessionId,
 		toolRows: 20,
@@ -145,11 +146,12 @@ test('a tall terminal lets more parallel tools expand safely', () => {
 })
 
 
-test('every running tool spins on the shared 250ms clock and finished tools stop', () => {
+test('every running tool spins on its faster clock and finished tools stop', () => {
 	colors.load()
 	const active = context()
 	active.workingSessions = new Map([['test', true]])
 	active.cursorTick = 0
+	active.toolSpinnerTick = 0
 	const t = tab([
 		{ type: 'tool', name: 'bash', input: { command: 'first' }, running: true, ts: 1 },
 		{ type: 'tool', name: 'bash', input: { command: 'second' }, running: true, ts: 1 },
@@ -160,6 +162,11 @@ test('every running tool spins on the shared 250ms clock and finished tools stop
 	expect(first.map(stripAnsi).join('\n').match(/◐/g)).toHaveLength(2)
 
 	active.cursorTick = 1
+	const cursorOnly: string[] = []
+	renderHistory.renderLines(cursorOnly, t, 80, active)
+	expect(cursorOnly.map(stripAnsi).join('\n').match(/◐/g)).toHaveLength(2)
+
+	active.toolSpinnerTick = 1
 	const second: string[] = []
 	renderHistory.renderLines(second, t, 80, active)
 	expect(second.map(stripAnsi).join('\n').match(/◓/g)).toHaveLength(2)
