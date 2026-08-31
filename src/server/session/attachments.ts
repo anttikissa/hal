@@ -4,6 +4,7 @@
 import { existsSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { blob } from './blob.ts'
+import { STATE_DIR } from '../state.ts'
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp'])
 
@@ -20,6 +21,15 @@ const ATTACHMENT_RE = /\[([^\]]+\.(png|jpg|jpeg|gif|webp|txt|md|json))\]/gi
 export interface ResolvedAttachment {
 	apiContent: string | any[]
 	logParts: Array<{ type: 'text'; text: string } | { type: 'image'; blobId: string; originalFile?: string }>
+}
+
+// Queued prompts can outlive /tmp; mobile uploads keep the same basename in state.
+function readPath(filePath: string): string {
+	if (existsSync(filePath)) return filePath
+	const shortUpload = /^\/tmp\/hal\/i\/([a-z0-9]{6}\.(?:png|jpg|jpeg|gif|webp))$/i.exec(filePath)
+	if (!shortUpload) return filePath
+	const persisted = `${STATE_DIR}/uploads/${shortUpload[1]}`
+	return existsSync(persisted) ? persisted : filePath
 }
 
 async function resolve(sessionId: string, input: string): Promise<ResolvedAttachment> {
@@ -39,6 +49,7 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 	for (const match of valid) {
 		const filePath = match[1]!.startsWith('~') ? match[1]!.replace('~', homedir()) : match[1]!
 		const ext = match[2]!.toLowerCase()
+		const source = readPath(filePath)
 		const before = input.slice(lastIndex, match.index)
 
 		if (before.trim()) {
@@ -46,12 +57,12 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 			logParts.push({ type: 'text', text: before })
 		}
 
-		if (!existsSync(filePath)) {
+		if (!existsSync(source)) {
 			apiBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
 			logParts.push({ type: 'text', text: `[file not found: ${filePath}]` })
 		} else if (IMAGE_EXTS.has(ext)) {
 			try {
-				const data = readFileSync(filePath)
+				const data = readFileSync(source)
 				const mediaType = MEDIA_TYPES[ext] ?? 'image/png'
 				const b64 = data.toString('base64')
 				const blobId = blob.makeBlobId(sessionId)
@@ -64,7 +75,7 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 			}
 		} else {
 			try {
-				const text = readFileSync(filePath, 'utf-8')
+				const text = readFileSync(source, 'utf-8')
 				apiBlocks.push({ type: 'text', text })
 				logParts.push({ type: 'text', text: `[${filePath}]` })
 			} catch {
@@ -85,4 +96,4 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 	return { apiContent: apiBlocks, logParts }
 }
 
-export const attachments = { resolve }
+export const attachments = { readPath, resolve }

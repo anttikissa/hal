@@ -28,6 +28,29 @@ test('history tool results merge into their call block', () => {
 	}])
 })
 
+test('persisted user messages keep every uploaded image reference visible', () => {
+	const result = webTranscript.items({
+		session: { id: 's1', cwd: '/tmp' },
+		meta: { id: 's1', createdAt: '' },
+		parentCount: 0,
+		history: [{
+			type: 'user',
+			parts: [
+				{ type: 'image', blobId: 'blob-1', originalFile: '/tmp/hal/i/first.jpg' },
+				{ type: 'text', text: 'compare ' },
+				{ type: 'image', blobId: 'blob-2', originalFile: '/tmp/hal/i/second.jpg' },
+				{ type: 'text', text: ' and ' },
+				{ type: 'image', blobId: 'blob-3', originalFile: '/tmp/hal/i/third.jpg' },
+			],
+		}],
+		live: [],
+	})
+
+	expect(result.map((item) => item.text)).toEqual([
+		'[/tmp/hal/i/first.jpg]compare [/tmp/hal/i/second.jpg] and [/tmp/hal/i/third.jpg]',
+	])
+})
+
 test('status markers render as prose in history and live notices', () => {
 	const result = webTranscript.items({
 		session: { id: 's1', cwd: '/tmp' },

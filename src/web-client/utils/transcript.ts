@@ -83,11 +83,7 @@ function entryText(entry: TranscriptEntry): string {
 	if (entry.type === 'question') return entry.text
 	if (entry.type === 'user') {
 		if (!('parts' in entry)) return entry.text
-		const parts: string[] = []
-		for (const part of entry.parts) {
-			if (part.type === 'text') parts.push(part.displayText ?? part.text)
-		}
-		return parts.join('\n')
+		return historyProjection.userText(entry, { images: 'path-or-image', display: 'ui' })
 	}
 	if (entry.type === 'thinking') return entry.text ?? ''
 	if (entry.type === 'tool' || entry.type === 'tool_call' || entry.type === 'tool_result') return toolText(entry)

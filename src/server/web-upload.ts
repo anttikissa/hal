@@ -2,15 +2,13 @@
 // can register its settings without dragging the whole server runtime into the
 // import graph (config -> web -> runtime -> config would be a cycle).
 //
-// Screenshots and other images are stored under state/uploads/ and referenced
-// in prompts as [path]; the attachment resolver turns those markers into image
-// blocks for the model. Blob ids are reused for names because they are unique
-// per session timeline; 'uploads' is not a real session id, so makeBlobId just
-// falls back to now().
+// Prompts use short, installation-neutral paths under /tmp/hal/i. A second copy
+// under state/uploads preserves the upload until prompt attachment resolution
+// stores it in the session's blob directory.
 
-import { mkdirSync, writeFileSync } from 'fs'
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'fs'
+import { randomBytes } from 'crypto'
 import { join } from 'path'
-import { blob } from './session/blob.ts'
 import { STATE_DIR } from './state.ts'
 import { serverKeys } from './server-keys.ts'
 
@@ -39,6 +37,10 @@ function uploadDir(): string {
 	return `${STATE_DIR}/uploads`
 }
 
+function tempUploadDir(): string {
+	return '/tmp/hal/i'
+}
+
 function saveUpload(name: string, type: string, data: ArrayBuffer): { status: number; body: unknown } {
 	if (!IMAGE_UPLOAD_TYPES[type]) {
 		const dot = name.lastIndexOf('.')
@@ -50,13 +52,17 @@ function saveUpload(name: string, type: string, data: ArrayBuffer): { status: nu
 	const max = config.maxUploadBytes
 	if (data.byteLength > max) return { status: 413, body: { error: `Image exceeds the ${max / 1024 / 1024}MB upload limit` } }
 
-	// Splitting on both slash types beats basename() here: Windows-style input
-	// would keep directory segments, and '..' must never survive as a name.
-	let base = name.split(/[\\/]/).pop() ?? ''
-	if (!base || base === '.' || base === '..') base = 'image'
 	mkdirSync(uploadDir(), { recursive: true })
-	const path = join(uploadDir(), `${blob.makeBlobId('uploads')}-${base}`)
-	writeFileSync(path, Buffer.from(data), { mode: 0o600 })
+	mkdirSync(tempUploadDir(), { recursive: true, mode: 0o700 })
+	chmodSync(tempUploadDir(), 0o700)
+	let filename: string
+	do {
+		filename = `${randomBytes(3).toString('hex')}.${ext}`
+	} while (existsSync(join(uploadDir(), filename)) || existsSync(join(tempUploadDir(), filename)))
+	const bytes = Buffer.from(data)
+	const path = join(tempUploadDir(), filename)
+	writeFileSync(join(uploadDir(), filename), bytes, { mode: 0o600 })
+	writeFileSync(path, bytes, { mode: 0o600 })
 	return { status: 200, body: { path } }
 }
 
@@ -81,4 +87,4 @@ async function handleUploadRequest(request: Request, ip: string): Promise<Respon
 	})
 }
 
-export const webUpload = { config, uploadDir, saveUpload, handleUploadRequest }
+export const webUpload = { config, uploadDir, tempUploadDir, saveUpload, handleUploadRequest }

@@ -1,8 +1,10 @@
 import { test, expect, describe, beforeEach, afterEach } from 'bun:test'
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs'
+import { randomBytes } from 'crypto'
 import { attachments } from './attachments.ts'
 import { blob } from './blob.ts'
 import { sessions } from '../sessions.ts'
+import { STATE_DIR } from '../state.ts'
 
 // We need a real session dir for blob storage. Use a temp location.
 const TEST_SESSION = 'test-attach'
@@ -51,6 +53,27 @@ describe('attachments.resolve', () => {
 		// Log history should have a blob reference, not raw base64
 		expect(Array.isArray(result.logParts)).toBe(true)
 		expect(result.logParts.some((b: any) => b.type === 'image' && b.blobId)).toBe(true)
+	})
+
+	test('short temp reference falls back to its durable upload copy', async () => {
+		let ref = ''
+		let persisted = ''
+		do {
+			const filename = `${randomBytes(3).toString('hex')}.png`
+			ref = `/tmp/hal/i/${filename}`
+			persisted = `${STATE_DIR}/uploads/${filename}`
+		} while (existsSync(ref) || existsSync(persisted))
+		mkdirSync(`${STATE_DIR}/uploads`, { recursive: true })
+		writeFileSync(persisted, Buffer.from('durable png'))
+		try {
+			const result = await attachments.resolve(TEST_SESSION, `inspect [${ref}]`)
+			expect(result.apiContent).toEqual(expect.arrayContaining([
+				expect.objectContaining({ type: 'image' }),
+			]))
+			expect(result.logParts).toContainEqual(expect.objectContaining({ type: 'image', originalFile: ref }))
+		} finally {
+			rmSync(persisted, { force: true })
+		}
 	})
 
 	test('missing file produces error text block', async () => {

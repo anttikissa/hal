@@ -1,6 +1,6 @@
 import { expect, test, beforeAll, afterAll } from 'bun:test'
 import { basename } from 'path'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, rmSync } from 'fs'
 import { ensureStateDir } from '../src/server/state.ts'
 import { web } from '../src/server/web.ts'
 import { serverKeys } from '../src/server/server-keys.ts'
@@ -10,6 +10,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
 let controller: AbortController
 let token: string
+let uploadedPaths: string[] = []
 
 beforeAll(() => {
 	ensureStateDir()
@@ -18,7 +19,13 @@ beforeAll(() => {
 	token = serverKeys.ensureLocalToken().token
 })
 
-afterAll(() => controller.abort())
+afterAll(() => {
+	controller.abort()
+	for (const path of uploadedPaths) {
+		rmSync(path, { force: true })
+		rmSync(`${web.uploadDir()}/${basename(path)}`, { force: true })
+	}
+})
 
 function uploadUrl(auth: string): string {
 	return `http://127.0.0.1:${web.state.port}/upload?auth=${auth}`
@@ -45,23 +52,28 @@ test('upload requires a valid web token', async () => {
 	expect(response.status).toBe(401)
 })
 
-test('upload stores the image and returns its absolute path', async () => {
+test('upload returns a short temp path while keeping a state copy', async () => {
 	const response = await fetch(uploadUrl(token), { method: 'POST', body: imageForm('shot.png') })
 	expect(response.status).toBe(200)
 	const body = await response.json() as { path?: unknown }
 	expect(typeof body.path).toBe('string')
 	const path = body.path as string
-	expect(path.startsWith(web.uploadDir())).toBe(true)
-	expect(path.endsWith('.png')).toBe(true)
+	uploadedPaths.push(path)
+	expect(path).toMatch(/^\/tmp\/hal\/i\/[a-z0-9]{6}\.png$/)
 	expect(existsSync(path)).toBe(true)
 	expect(readFileSync(path).equals(PNG)).toBe(true)
+	const stateCopy = `${web.uploadDir()}/${basename(path)}`
+	expect(existsSync(stateCopy)).toBe(true)
+	expect(readFileSync(stateCopy).equals(PNG)).toBe(true)
 })
 
-test('upload keeps only the basename of the client-supplied filename', async () => {
-	const response = await fetch(uploadUrl(token), { method: 'POST', body: imageForm('../../evil.png') })
+test('upload does not expose the client-supplied filename', async () => {
+	const response = await fetch(uploadUrl(token), { method: 'POST', body: imageForm('../../private-screenshot.png') })
 	expect(response.status).toBe(200)
 	const body = await response.json() as { path?: unknown }
-	expect(basename(body.path as string)).not.toContain('..')
+	const path = body.path as string
+	uploadedPaths.push(path)
+	expect(basename(path)).not.toContain('private-screenshot')
 })
 
 test('upload rejects non-image files', async () => {
@@ -76,6 +88,8 @@ test('upload falls back to filename extension when Content-Type is missing', asy
 	form.append('file', new Blob([PNG]), 'shot.png')
 	const response = await fetch(uploadUrl(token), { method: 'POST', body: form })
 	expect(response.status).toBe(200)
+	const body = await response.json() as { path: string }
+	uploadedPaths.push(body.path)
 })
 
 test('upload rejects oversized images', async () => {
