@@ -40,6 +40,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const stderrPromise = processOutput.readLimited(proc.stderr, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX)
 	const [stdout] = await Promise.all([stdoutPromise, stderrPromise])
 	await proc.exited
+	if (stdout.truncated) stdout.text = processOutput.completeLines(stdout.text, TRUNCATED_SUFFIX)
 
 	const result = ctx.approvedRisk ? stdout.text.trim() : sensitive.filterPathList(stdout.text.trim())
 	if (!result) return 'No files found.'

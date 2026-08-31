@@ -15,7 +15,9 @@ test('glob truncates large result sets well below 1MB', async () => {
 		writeFileSync(`${TEST_DIR}/file-${String(i).padStart(4, '0')}.json`, '')
 	}
 	const out = await glob.execute({ pattern: '*.json', path: TEST_DIR }, { sessionId: 's', cwd: TEST_DIR })
+	const records = out.split('\n').slice(0, -1)
 	expect(out.endsWith('[… truncated]')).toBe(true)
+	expect(records.every((path) => existsSync(path))).toBe(true)
 	expect(Buffer.byteLength(out, 'utf8')).toBeLessThanOrEqual(20_000)
 })
 
@@ -25,7 +27,9 @@ test('grep truncates large match sets well below 1MB', async () => {
 	for (let i = 0; i < 4000; i++) lines.push(`needle line ${i} ${'x'.repeat(80)}`)
 	writeFileSync(`${TEST_DIR}/big.txt`, lines.join('\n') + '\n')
 	const out = await grep.execute({ pattern: 'needle', path: TEST_DIR, maxResults: 4000 }, { sessionId: 's', cwd: TEST_DIR })
+	const records = out.split('\n').slice(0, -1)
 	expect(out.endsWith('[… truncated]')).toBe(true)
+	expect(records.every((line) => /big\.txt:\d+:needle line \d+ x{80}$/.test(line))).toBe(true)
 	expect(Buffer.byteLength(out, 'utf8')).toBeLessThanOrEqual(40_000)
 })
 

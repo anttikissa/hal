@@ -1,6 +1,13 @@
 import { expect, test } from 'bun:test'
 import { processOutput } from './process-output.ts'
 
+test('completeLines drops only a partial final record', () => {
+	const suffix = '\n[… truncated]'
+	expect(processOutput.completeLines(`one\ntwo part${suffix}`, suffix)).toBe(`one${suffix}`)
+	expect(processOutput.completeLines(`one\ntwo\n${suffix}`, suffix)).toBe(`one\ntwo${suffix}`)
+	expect(processOutput.completeLines(`partial${suffix}`, suffix)).toBe(suffix)
+})
+
 test('readLimited keeps small streams unchanged', async () => {
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {

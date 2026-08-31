@@ -71,6 +71,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const stdoutPromise = processOutput.readLimited(proc.stdout, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX, () => kill(proc))
 	const stderrPromise = processOutput.readLimited(proc.stderr, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX)
 	const [stdout, stderr, code] = await Promise.all([stdoutPromise, stderrPromise, proc.exited])
+	if (stdout.truncated) stdout.text = processOutput.completeLines(stdout.text, TRUNCATED_SUFFIX)
 
 	const result = ctx.approvedRisk ? stdout.text.trim() : sensitive.filterPathList(stdout.text.trim())
 	if (!result) {

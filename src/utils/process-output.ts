@@ -5,6 +5,15 @@ interface LimitedRead {
 	truncated: boolean
 }
 
+/** Drop the final partial record after byte truncation while preserving a line that ended exactly at the boundary. */
+function completeLines(text: string, suffix: string): string {
+	const content = text.slice(0, -suffix.length)
+	let end = content.lastIndexOf('\n')
+	if (content.endsWith('\n')) end = content.length - 1
+	if (end < 0) return suffix
+	return content.slice(0, end) + suffix
+}
+
 async function readLimited(stream: ReadableStream<Uint8Array> | null | undefined, limitBytes: number, suffix: string, onLimit?: () => void, onOutput?: (text: string) => void): Promise<LimitedRead> {
 	if (!stream) return { text: '', truncated: false }
 
@@ -52,4 +61,4 @@ async function readLimited(stream: ReadableStream<Uint8Array> | null | undefined
 	return { text: helpers.truncateUtf8(text + suffix, limitBytes, suffix), truncated }
 }
 
-export const processOutput = { readLimited }
+export const processOutput = { readLimited, completeLines }
