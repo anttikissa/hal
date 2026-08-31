@@ -28,7 +28,6 @@ import { terminalQuestions } from './questions.ts'
 
 const config = {
 	halCursorFadeFrameMs: 67,
-	toolSpinnerFrameMs: 167,
 }
 
 const CSI = '\x1b['
@@ -107,14 +106,12 @@ let paintedPopupActive = false
 let blockCache = new WeakMap<Block, BlockRenderCache>()
 let fadeTimer: ReturnType<typeof setTimeout> | null = null
 let toolRevealTimer: ReturnType<typeof setTimeout> | null = null
-let toolSpinnerTimer: ReturnType<typeof setTimeout> | null = null
-let toolSpinnerTick = 0
 
 function historyContext(toolRows: number): HistoryRenderContext {
 	return {
 		blockCache,
 		cursorTick: cursor.tick(),
-		toolSpinnerTick,
+		toolSpinnerTick: cursor.toolTick(),
 		workingSessions: client.state.working,
 		toolRows,
 		sessionLabel: client.sessionLabel,
@@ -147,19 +144,6 @@ function scheduleToolReveal(): void {
 	}, delay)
 }
 
-function scheduleToolSpinner(): void {
-	if (!renderHistory.hasActiveToolSpinners()) {
-		if (toolSpinnerTimer) clearTimeout(toolSpinnerTimer)
-		toolSpinnerTimer = null
-		return
-	}
-	if (toolSpinnerTimer) return
-	toolSpinnerTimer = setTimeout(() => {
-		toolSpinnerTimer = null
-		toolSpinnerTick++
-		draw()
-	}, Math.max(1, config.toolSpinnerFrameMs))
-}
 
 function writeTerminal(s: string): void {
 	if (!terminalOutput.write(s)) return
@@ -176,11 +160,8 @@ function resetRenderer(): void {
 	renderHistory.resetAnimation()
 	if (fadeTimer) clearTimeout(fadeTimer)
 	if (toolRevealTimer) clearTimeout(toolRevealTimer)
-	if (toolSpinnerTimer) clearTimeout(toolSpinnerTimer)
 	fadeTimer = null
 	toolRevealTimer = null
-	toolSpinnerTimer = null
-	toolSpinnerTick = 0
 }
 
 function enterFullscreen(): void {
@@ -357,7 +338,6 @@ function draw(force = false): void {
 	const rows = process.stdout.rows || 24
 	const frame = buildFrame()
 	scheduleToolReveal()
-	scheduleToolSpinner()
 	const lines = frame.lines
 	const cursor = frame.cursor
 	// Popup frames hard-wrap soft URLs, so never diff across the two layouts.
@@ -507,7 +487,9 @@ function clearFrame(): void {
 	cursorRow = 0
 }
 
-function hasAnimatedIndicators(): boolean {
+function hasAnimatedIndicators(cursorFrame = true, toolFrame = true): boolean {
+	if (toolFrame && client.currentTab()?.history.some((block) => block.type === 'tool' && block.running)) return true
+	if (!cursorFrame) return false
 	return renderStatus.hasAnimatedIndicators() || renderHistory.hasAnimatedCursor(client.currentTab())
 }
 

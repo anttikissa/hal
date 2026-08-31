@@ -399,10 +399,11 @@ out of the writable screen. A tall terminal can therefore stream several cards a
 and finishing an earlier tool frees room for another. Tool cards never exceed ten rows.
 
 Every tool header reserves one fixed-width status cell immediately before its title.
-A revealed running tool advances through `◐ ◓ ◑ ◒` on a dedicated 167ms animation
-clock (about ten 60Hz display frames); when it finishes, the same cell becomes `✓`.
-The timer runs only while a revealed tool is busy, and the fixed-width cell keeps card
-geometry constant. Cursor blinking remains on its independent 250ms clock.
+A single wall-clock heartbeat runs every five nominal 60Hz display frames. Tool spinners
+advance every second heartbeat (10 frames, about 167ms), while cursor phases advance
+every third heartbeat (15 frames, 250ms). Their phases overlap every sixth heartbeat,
+which produces one combined paint. Finished tools replace the spinner with `✓`; the
+fixed-width cell keeps card geometry constant.
 
 This was discovered the hard way: without throttling, keypresses were
 completely unresponsive during assistant output.

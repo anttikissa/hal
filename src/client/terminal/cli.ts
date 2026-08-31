@@ -239,8 +239,8 @@ async function runExternalEditor(path: string): Promise<number> {
 		} else {
 			process.stdin.resume()
 		}
-		cursor.start(() => {
-			if (!render.hasAnimatedIndicators()) return
+		cursor.start((cursorFrame, toolFrame) => {
+			if (!render.hasAnimatedIndicators(cursorFrame, toolFrame)) return
 			draw()
 		})
 		draw(true)
@@ -769,10 +769,9 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 	process.on('exit', cleanupTerminal)
 	process.on('SIGCONT', onSigcont)
 
-	// Keep pulsing indicators in sync with the shared 500ms clock. We only redraw
-	// when some tab actually has an animated indicator, so idle terminals stay quiet.
-	cursor.start(() => {
-		if (!render.hasAnimatedIndicators()) return
+	// A shared heartbeat combines overlapping tool-spinner and cursor paints.
+	cursor.start((cursorFrame, toolFrame) => {
+		if (!render.hasAnimatedIndicators(cursorFrame, toolFrame)) return
 		draw()
 	})
 
