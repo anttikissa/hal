@@ -22,6 +22,7 @@ import { continuation } from './session/continuation.ts'
 import type { ContinuationAction, SharedState } from '../common/ipc.ts'
 import { replay } from './session/replay.ts'
 import { openaiUsage } from './openai-usage.ts'
+import { anthropicUsage } from './anthropic-usage.ts'
 import { toolRegistry } from './tools/tool.ts'
 import { log } from '../utils/log.ts'
 import { promptQueue } from './runtime/prompt-queue.ts'
@@ -1114,6 +1115,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	if (state.openSessionIds.length > 0) tabs.syncSharedState()
 	void modelNotices.refreshModelMetadata()
 	openaiUsage.start(signal)
+	anthropicUsage.start(signal)
 	if (createdStartupSession && startupSessionId && sessionStore.loadSessionMeta(startupSessionId)?.model === 'hal/intro') {
 		setTimeout(() => {
 			if (!signal.aborted && state.activeRuntimePid === process.pid) void runGeneration(startupSessionId!, '')

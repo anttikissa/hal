@@ -372,7 +372,10 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 	}
 
 	try {
-		yield* parseStream(res.body!, { sessionId: req.sessionId, model: req.model })
+		for await (const event of parseStream(res.body!, { sessionId: req.sessionId, model: req.model })) {
+			if (event.type === 'done' && event.usage) anthropicUsage.recordUsage(cred, event.usage)
+			yield event
+		}
 	} catch (err) {
 		if (req.signal?.aborted) throw err
 		yield { type: 'error', message: providerShared.formatNetworkError(err), endpoint: url }

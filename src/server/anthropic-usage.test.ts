@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { auth, type Credential } from './auth.ts'
+import { ipc } from './file-ipc.ts'
 import { anthropicUsage } from './anthropic-usage.ts'
 import { subscriptionUsage } from '../common/subscription-usage.ts'
 
 const origFetch = globalThis.fetch
 const origListCredentials = auth.listCredentials
 const origEnsureFresh = auth.ensureFresh
+const origOwnsHostLock = ipc.ownsHostLock
 
 function makeCredential(index: number, email: string): Credential {
 	return {
@@ -26,6 +28,7 @@ afterEach(() => {
 	globalThis.fetch = origFetch
 	auth.listCredentials = origListCredentials
 	auth.ensureFresh = origEnsureFresh
+	ipc.ownsHostLock = origOwnsHostLock
 	anthropicUsage.state.currentKey = ''
 	anthropicUsage.state.accounts = {}
 	subscriptionUsage.config.censorEmails = false
@@ -155,4 +158,30 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 	expect(text).toContain('a\\*\\*\\*@l\\*\\*\\*.fi')
 	expect(text).toContain('a\\*\\*\\*@g\\*\\*\\*\\*.com')
 	expect(text).toContain(`| 1/2 * | a\\*\\*\\*@l\\*\\*\\*.fi | ${subscriptionUsage.usageBarMarker(68, 14)}`)
+})
+
+
+test('refreshes an active Claude subscription after a response', async () => {
+	auth.ensureFresh = async () => {}
+	auth.listCredentials = () => [makeCredential(0, 'a@test.com')]
+	ipc.ownsHostLock = () => true
+	anthropicUsage.state.currentKey = 'anthropic:0'
+	anthropicUsage.state.lastActiveAt = new Date().toISOString()
+	anthropicUsage.state.accounts = {
+		'anthropic:0': {
+			key: 'anthropic:0',
+			pendingTokens: 0,
+			fetchedAt: new Date(Date.now() - 11 * 60_000).toISOString(),
+			fiveHour: { usedPercent: 3 },
+		},
+	}
+	globalThis.fetch = Object.assign(async () => new Response(JSON.stringify({
+		five_hour: { utilization: 0.69 },
+		seven_day: { utilization: 0.20 },
+	}), { status: 200 }) as any, { preconnect: () => {} }) as typeof fetch
+
+	anthropicUsage.recordUsage(makeCredential(0, 'a@test.com'), { input: 1, output: 1 })
+	await new Promise((resolve) => setTimeout(resolve, 0))
+
+	expect(anthropicUsage.current()?.fiveHour?.usedPercent).toBe(69)
 })
