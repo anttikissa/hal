@@ -21,6 +21,14 @@ test('falls back to the first session when the selection was closed elsewhere', 
 	expect(sessionSelection.nextSelection(stateOf('b', 'c'), 'a', new Set(['a', 'b']), false)).toBe('b')
 })
 
+test('restores the remembered tab when the app reopens at the root', () => {
+	expect(sessionSelection.nextSelection(stateOf('a', 'b'), '', new Set(), false, 'b')).toBe('b')
+})
+
+test('ignores a remembered tab that is no longer open', () => {
+	expect(sessionSelection.nextSelection(stateOf('a', 'b'), '', new Set(), false, 'closed')).toBe('a')
+})
+
 test('an open command lands on the freshly created session', () => {
 	expect(sessionSelection.nextSelection(stateOf('a', 'b', 'c'), 'b', new Set(['a', 'b']), true)).toBe('c')
 })

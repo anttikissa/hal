@@ -16,10 +16,12 @@ import { submissionCommand } from './utils/composer.ts'
 import { webStatus } from './utils/status.ts'
 import { webTranscript } from './utils/transcript.ts'
 import { sessionSelection } from './utils/session-selection.ts'
+import { reconnect } from './utils/reconnect.ts'
 import { webViewport } from './utils/viewport.ts'
 import { router } from './router.ts'
 
 const tokenStorageKey = 'hal-web-auth'
+const sessionStorageKey = 'hal-web-session'
 
 function initialToken(): string {
 	const token = router.takeSearchParam('auth')
@@ -41,6 +43,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	const selected = router.sessionId
 	const [sharedState, setSharedState] = createSignal<SharedState>({ sessions: [], working: {}, updatedAt: '' })
 	const [snapshot, setSnapshot] = createSignal<ClientSessionSnapshot | null>(null)
+	const [reconnecting, setReconnecting] = createSignal(false)
 	const transcript = createMemo(() => {
 		const current = snapshot()
 		if (!current || current.session.id !== selected()) return []
@@ -54,7 +57,10 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	// Shared state keeps cwd/model current; the selected snapshot supplies the
 	// context usage that the host persists after each completed turn.
 	const session = createMemo(() => sharedState().sessions.find((item) => item.id === selected()))
-	const status = createMemo(() => webStatus.text(session()))
+	const status = createMemo(() => {
+		if (reconnecting()) return 'Reconnecting…'
+		return webStatus.text(session())
+	})
 	const snapshots = new Map<string, ClientSessionSnapshot>()
 	// Session ids from the previous broadcast, so an "open tab" command can
 	// spot the session that appears for the first time and select it.
@@ -66,6 +72,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	// tab, or a tab closing under us): those should not add history entries.
 	function selectSession(sessionId: string, replace = false): void {
 		if (!sessionId) return
+		localStorage.setItem(sessionStorageKey, sessionId)
 		router.navigate(sessionId, { replace })
 	}
 
@@ -75,7 +82,14 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 
 	function applyState(state: SharedState): string {
 		const pending = sessionSelection.isOpenRequestPending()
-		const sessionId = sessionSelection.nextSelection(state, selected(), previousIds, pending)
+		const sessionId = sessionSelection.nextSelection(
+			state,
+			selected(),
+			previousIds,
+			pending,
+			localStorage.getItem(sessionStorageKey) ?? '',
+		)
+		if (sessionId) localStorage.setItem(sessionStorageKey, sessionId)
 		// Landing on the tab our own "+ New tab" click created is a real
 		// navigation, so it gets a history entry and Back returns to the tab we
 		// came from. Everything else here is the app reconciling, not the user.
@@ -137,6 +151,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	onSettled(() => router.start())
 
 	onSettled(() => {
+		let disposed = false
 		const connection = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`)
 		socket = connection
 		connection.onopen = () => connection.send(webProtocol.encode({ type: 'authenticate', token: props.token }))
@@ -178,9 +193,20 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 				props.onUnauthorized()
 				return
 			}
-			if (!unauthorized) setTimeout(() => location.reload(), 1_000)
+			if (unauthorized || disposed) return
+			setReconnecting(true)
+			void reconnect.waitForServer(
+				async () => (await fetch(location.href, { cache: 'no-store' })).ok,
+				reconnect.pause,
+				() => disposed,
+			).then((reachable) => {
+				if (reachable && !disposed) location.reload()
+			})
 		}
-		return () => connection.close()
+		return () => {
+			disposed = true
+			connection.close()
+		}
 	})
 
 	return <>

@@ -40,6 +40,8 @@ shareable link and Back/Forward move between tabs.
   Landing on a tab you did not ask for must not add history entries.
 - `href`/`write` are indirections over `location`/`history` so tests drive the
   router without a DOM and eval can hot-patch navigation.
+- The installed app starts at `/`, so remember the last selected open session locally and use it only
+  when the URL has no valid session; an explicit/deep-linked route still wins.
 
 ### Why not Solid Router or TanStack Router
 
@@ -119,6 +121,8 @@ crash here means the idiom changed, not that the code is subtly broken:
   first when the reload should read as pending.
 - `action` bodies are generators: `yield` promises to stay in the transaction,
   never `flush()` inside one, and call them from handlers, not components.
+- A server restart must leave the current DOM alive: show reconnecting state, probe until HTTP is
+  reachable, then reload. A fixed-delay reload can strand an installed iOS app on a blank navigation.
 
 ## Solid 1 traps
 

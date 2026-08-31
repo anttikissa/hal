@@ -23,7 +23,7 @@ function consumeOpenRequest(): void {
 	state.requestedAt = 0
 }
 
-function nextSelection(shared: SharedState, current: string, previousIds: Set<string>, openPending: boolean): string {
+function nextSelection(shared: SharedState, current: string, previousIds: Set<string>, openPending: boolean, preferred = ''): string {
 	// Our own "open tab" command: select the session this broadcast created.
 	// Broadcasts can arrive before the server finishes creating the session,
 	// so only redirect once a session we have not seen before shows up.
@@ -38,6 +38,7 @@ function nextSelection(shared: SharedState, current: string, previousIds: Set<st
 	}
 	const exists = current && shared.sessions.some((session) => session.id === current)
 	if (exists) return current
+	if (!current && preferred && shared.sessions.some((session) => session.id === preferred)) return preferred
 	// Current session was closed elsewhere; land on the first remaining one.
 	return shared.sessions[0]?.id ?? ''
 }
