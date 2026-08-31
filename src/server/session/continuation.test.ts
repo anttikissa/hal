@@ -48,12 +48,17 @@ test('pending tools are continuable without visible turn content', () => {
 })
 
 
-test('bridges an assistant tail with a transient user message', () => {
+test('prepares continuation messages for interrupted and failed turns', () => {
 	const messages: any[] = [{ role: 'user', content: 'prompt' }, { role: 'assistant', content: 'partial' }]
-	continuation.bridgeAssistantTail(messages)
+	continuation.prepareMessages(messages, 'continue')
 	expect(messages.at(-1)).toMatchObject({ role: 'user' })
 
 	const userTail: any[] = [{ role: 'user', content: 'prompt' }]
-	continuation.bridgeAssistantTail(userTail)
+	continuation.prepareMessages(userTail, 'continue')
 	expect(userTail).toHaveLength(1)
+
+	const retry: any[] = [{ role: 'user', content: 'prompt' }]
+	continuation.prepareMessages(retry, 'retry')
+	expect(retry.at(-1)).toMatchObject({ role: 'user' })
+	expect(retry.at(-1).content).toContain('previous attempt failed')
 })

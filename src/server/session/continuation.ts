@@ -24,9 +24,12 @@ function actionForHistory(entries: HistoryEntry[]): ContinuationAction | false {
 	return 'continue'
 }
 
-function bridgeAssistantTail(messages: Message[]): void {
-	if (messages.at(-1)?.role !== 'assistant') return
-	messages.push({ role: 'user', content: '<meta>The previous response was interrupted. Continue without repeating completed work.</meta>' })
+function prepareMessages(messages: Message[], action: ContinuationAction): void {
+	if (messages.at(-1)?.role === 'assistant') {
+		messages.push({ role: 'user', content: '<meta>The previous response was interrupted. Continue without repeating completed work.</meta>' })
+		return
+	}
+	if (action === 'retry') messages.push({ role: 'user', content: '<meta>The previous attempt failed before producing a usable response. Retry the last user request.</meta>' })
 }
 
-export const continuation = { actionForHistory, bridgeAssistantTail }
+export const continuation = { actionForHistory, prepareMessages }

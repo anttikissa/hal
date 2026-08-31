@@ -268,6 +268,7 @@ class ResponsesWebSocketApiError extends ResponsesWebSocketFallback {
 interface ResponsesStreamState {
 	itemMap: Map<number, { type: 'reasoning' } | { type: 'function_call'; id?: string; name?: string }>
 	toolInputs: Map<number, string>
+	outputTexts: Map<number, string>
 }
 
 function responsesDoneStatus(rawStatus: string): TurnEndStatus {
@@ -292,7 +293,12 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 	}
 	if (type === 'response.reasoning_summary_text.delta') return [{ type: 'thinking', text: event.delta ?? '' }]
 	if (type === 'response.reasoning_summary_part.done') return [{ type: 'thinking', text: '\n\n' }]
-	if (type === 'response.output_text.delta' || type === 'response.refusal.delta') return [{ type: 'text', text: event.delta ?? '' }]
+	if (type === 'response.output_text.delta' || type === 'response.refusal.delta') {
+		const outputIndex = event.output_index ?? 0
+		const text = event.delta ?? ''
+		state.outputTexts.set(outputIndex, (state.outputTexts.get(outputIndex) ?? '') + text)
+		return [{ type: 'text', text }]
+	}
 	if (type === 'response.function_call_arguments.delta') {
 		const outputIndex = event.output_index ?? 0
 		state.toolInputs.set(outputIndex, (state.toolInputs.get(outputIndex) ?? '') + (event.delta ?? ''))
@@ -306,13 +312,20 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 	if (type === 'response.output_item.done') {
 		const outputIndex = event.output_index ?? 0
 		const info = state.itemMap.get(outputIndex)
-		if (info?.type === 'reasoning') {
+		if (event.item?.type === 'message') {
+			let text = ''
+			for (const part of event.item.content ?? []) text += part.text ?? part.refusal ?? ''
+			const streamed = state.outputTexts.get(outputIndex) ?? ''
+			if (text.startsWith(streamed) && text.length > streamed.length) return [{ type: 'text', text: text.slice(streamed.length) }]
+			return []
+		}
+		if (info?.type === 'reasoning' || event.item?.type === 'reasoning') {
 			const signature = reasoningSignature.minimize(event.item)
 			return signature ? [{ type: 'thinking_signature', signature }] : []
 		}
-		if (info?.type === 'function_call') {
+		if (info?.type === 'function_call' || event.item?.type === 'function_call') {
 			const parsed = providerShared.parseToolInput(state.toolInputs.get(outputIndex) ?? event.item?.arguments ?? '{}')
-			return [{ type: 'tool_call', id: info.id ?? `call_${outputIndex}`, name: info.name ?? '', input: parsed.input, ...(parsed.parseError ? { parseError: parsed.parseError } : {}) }]
+			return [{ type: 'tool_call', id: info?.id ?? event.item?.call_id ?? `call_${outputIndex}`, name: info?.name ?? event.item?.name ?? '', input: parsed.input, ...(parsed.parseError ? { parseError: parsed.parseError } : {}) }]
 		}
 		return []
 	}
@@ -346,7 +359,7 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 }
 
 async function* parseResponsesStream(body: ReadableStream<Uint8Array>): AsyncGenerator<ProviderStreamEvent> {
-	const state: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map() }
+	const state: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map(), outputTexts: new Map() }
 	for await (const event of providerShared.iterateJsonSse(body)) {
 		for (const parsed of parseResponsesEvent(state, event)) yield parsed
 	}
@@ -411,9 +424,8 @@ function responsesTransportMode(): ResponsesTransportMode {
 	return 'http'
 }
 
-function buildResponsesBody(req: ProviderRequest, transport: OpenAITransport, input: any[], streaming: boolean): any {
-	const body: any = { model: req.model, store: false, input }
-	if (streaming) body.stream = true
+function buildResponsesBody(req: ProviderRequest, transport: OpenAITransport, input: any[]): any {
+	const body: any = { model: req.model, store: false, stream: true, input }
 	if (req.systemPrompt) body.instructions = req.systemPrompt
 	if (transport.usesCodexBackend) {
 		body.text = { verbosity: 'high' }
@@ -439,11 +451,12 @@ function responsesHeaders(credential: Credential, transport: OpenAITransport, op
 	if (streaming) {
 		headers['Content-Type'] = 'application/json'
 		headers.accept = 'text/event-stream'
+	} else {
+		headers['OpenAI-Beta'] = 'responses_websockets=2026-02-06'
 	}
 	if (transport.usesCodexBackend) {
 		const accountId = transport.accountId || openaiEntry.accountId || ''
 		if (!accountId) return { error: 'OpenAI token missing chatgpt_account_id' }
-		headers['OpenAI-Beta'] = 'responses=experimental'
 		// The Codex backend uses `originator` to identify the calling client. Codex CLI sends
 		// `codex_cli_rs`; we send `hal` so the traffic is attributable to what it actually is.
 		// Probed against the live endpoint: unknown originator values are not rejected, so this
@@ -597,7 +610,7 @@ async function* streamResponsesWebSocket(chain: ResponsesWebSocketChain, body: a
 	if (chain.working) throw new ResponsesWebSocketFallback('OpenAI Responses WebSocket already has an in-flight request')
 	chain.working = true
 	const pending: any[] = []
-	const streamState: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map() }
+	const streamState: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map(), outputTexts: new Map() }
 	let done = false
 	let failed: Error | null = null
 	let responseId = ''
@@ -687,7 +700,7 @@ async function* generateOpenAIWebSocket(req: ProviderRequest, credential: Creden
 	const chain = getResponsesWebSocket(sessionId, key, transport.wsUrl, headerResult.headers, req.signal)
 	const deltaInput = incrementalInput(chain, req.messages)
 	const input = deltaInput ?? convertResponsesMessages(req.messages)
-	const body = buildResponsesBody(req, transport, input, false)
+	const body = buildResponsesBody(req, transport, input)
 	body.type = 'response.create'
 	if (deltaInput && chain.previousResponseId) body.previous_response_id = chain.previousResponseId
 
@@ -705,7 +718,7 @@ async function* generateOpenAIWebSocket(req: ProviderRequest, credential: Creden
 
 async function* generateOpenAIHttp(req: ProviderRequest, credential: Credential, transport: OpenAITransport, openaiEntry: Record<string, any>): AsyncGenerator<ProviderStreamEvent> {
 	if (req.sessionId) closeResponsesWebSocket(req.sessionId)
-	const body = buildResponsesBody(req, transport, convertResponsesMessages(req.messages), true)
+	const body = buildResponsesBody(req, transport, convertResponsesMessages(req.messages))
 	const headerResult = responsesHeaders(credential, transport, openaiEntry, true)
 	if (headerResult.error || !headerResult.headers) {
 		yield* yieldErrorAndDone({ type: 'error', message: headerResult.error ?? 'OpenAI headers unavailable' })

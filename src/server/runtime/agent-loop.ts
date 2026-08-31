@@ -654,6 +654,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 			// If we need to retry, go back to the top of the loop
 			if (shouldRetry) continue
+			if (!thinkingText.trim()) thinkingText = ''
+			if (!assistantText.trim()) assistantText = ''
 
 			if (!iterationDone && !hadTerminalError) {
 				const ts = new Date().toISOString()

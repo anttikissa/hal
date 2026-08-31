@@ -171,7 +171,7 @@ test('openai provider routes ChatGPT OAuth tokens to the Codex backend', async (
 
 	const headers = new Headers(calls[0]!.init?.headers)
 	expect(headers.get('authorization')).toBe(`Bearer ${token}`)
-	expect(headers.get('openai-beta')).toBe('responses=experimental')
+	expect(headers.has('openai-beta')).toBe(false)
 	expect(headers.get('originator')).toBe('hal')
 	expect(headers.get('chatgpt-account-id')).toBe('acct_from_token')
 
@@ -227,6 +227,87 @@ test('openai provider treats raw cancelled status as failed', async () => {
 	expect(calls).toHaveLength(1)
 	expect(events).toContainEqual(expect.objectContaining({ type: 'error', message: 'Response cancelled' }))
 	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'failed' }))
+})
+
+test('openai provider reads assistant text from response.output_item.done', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+	installFetchMock(async () => new Response([
+		'data: {"type":"response.output_item.done","output_index":0,"item":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hello"}]}}',
+		'data: {"type":"response.completed","response":{"id":"resp_1","status":"completed"}}',
+		'',
+	].join('\n'), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.6-sol',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) events.push(event)
+
+	expect(events).toContainEqual({ type: 'text', text: 'hello' })
+})
+
+test('openai provider does not repeat assistant text from response.output_item.done', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+	installFetchMock(async () => new Response([
+		'data: {"type":"response.output_text.delta","output_index":0,"delta":"hello"}',
+		'data: {"type":"response.output_item.done","output_index":0,"item":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hello"}]}}',
+		'data: {"type":"response.completed","response":{"id":"resp_1","status":"completed"}}',
+		'',
+	].join('\n'), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.6-sol',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) events.push(event)
+
+	expect(events.filter((event) => event.type === 'text')).toEqual([{ type: 'text', text: 'hello' }])
+})
+
+test('openai provider reads a function call from response.output_item.done', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+	installFetchMock(async () => new Response([
+		'data: {"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","call_id":"call_1","name":"read","arguments":"{\\"path\\":\\"README.md\\"}"}}',
+		'data: {"type":"response.completed","response":{"id":"resp_1","status":"completed"}}',
+		'',
+	].join('\n'), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'read it' }],
+		model: 'gpt-5.6-sol',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) events.push(event)
+
+	expect(events).toContainEqual({
+		type: 'tool_call',
+		id: 'call_1',
+		name: 'read',
+		input: { path: 'README.md' },
+	})
 })
 
 test('compat providers stay on chat completions endpoints', async () => {
@@ -698,8 +779,9 @@ test('openai websocket transport uses wss endpoint and response.create', async (
 	const ws = FakeWebSocket.instances[0]!
 	expect(ws.url).toBe('wss://chatgpt.com/backend-api/codex/responses')
 	expect(ws.options.headers['chatgpt-account-id']).toBe('acct_ws')
+	expect(ws.options.headers['OpenAI-Beta']).toBe('responses_websockets=2026-02-06')
 	expect(ws.sent[0]).toMatchObject({ type: 'response.create', model: 'gpt-5.5', store: false, instructions: 'system' })
-	expect(ws.sent[0].stream).toBeUndefined()
+	expect(ws.sent[0].stream).toBe(true)
 	expect(events).toContainEqual({ type: 'text', text: 'text1' })
 	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 1, output: 2, cacheRead: 0, cacheCreation: 0 } }))
 })

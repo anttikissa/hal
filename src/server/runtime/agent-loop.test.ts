@@ -511,7 +511,7 @@ test('tool iterations do not re-emit streamed assistant text as responses', asyn
 	}
 })
 
-test('logs an empty completed provider response so the user can retry', async () => {
+test('logs a whitespace-only completed provider response so the user can retry', async () => {
 	const sessionId = `test-empty-response-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
@@ -522,6 +522,7 @@ test('logs an empty completed provider response so the user can retry', async ()
 	const origAppendEvent = ipc.appendEvent
 	providerLoader.getProvider = async () => ({
 		async *generate() {
+			yield { type: 'text', text: '\n\n' }
 			yield { type: 'done', usage: { input: 1, output: 4, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})

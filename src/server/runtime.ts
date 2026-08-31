@@ -705,7 +705,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		})
 	}
 	const messages = apiMessages.toProviderMessages(sessionId)
-	if (continueAction) continuation.bridgeAssistantTail(messages)
+	if (continueAction) continuation.prepareMessages(messages, continueAction)
 	ipc.appendEvent({ type: 'stream-start', sessionId, createdAt: new Date().toISOString() })
 	let result: AgentLoopResult = 'failed'
 	try {
