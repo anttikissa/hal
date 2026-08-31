@@ -16,6 +16,7 @@ import { submissionCommand } from './utils/composer.ts'
 import { webStatus } from './utils/status.ts'
 import { webTranscript } from './utils/transcript.ts'
 import { sessionSelection } from './utils/session-selection.ts'
+import { palette } from './utils/palette.ts'
 import { reconnect } from './utils/reconnect.ts'
 import { webViewport } from './utils/viewport.ts'
 import { router } from './router.ts'
@@ -149,6 +150,19 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 
 	// Adopt the URL the page was opened with and follow Back/Forward from here on.
 	onSettled(() => router.start())
+
+	// Tool colors live in colors.ason, which the terminal watches and reloads.
+	// The browser polls the same file so editing it restyles both at once.
+	onSettled(() => {
+		const style = document.createElement('style')
+		document.head.append(style)
+		let disposed = false
+		void palette.sync((css) => { style.textContent = css }, () => disposed)
+		return () => {
+			disposed = true
+			style.remove()
+		}
+	})
 
 	onSettled(() => {
 		let disposed = false

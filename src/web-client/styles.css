@@ -176,26 +176,27 @@ button { touch-action: manipulation; }
 
 /* Tool cards are tiny command tickets, not log panes. Their colored left edge
    identifies the kind of operation at a glance; the payload is sampled above,
-   so even a noisy grep cannot turn a phone transcript into a five-page scroll. */
+   so even a noisy grep cannot turn a phone transcript into a five-page scroll.
+   --tool-fg/--tool-bg come from colors.ason via utils/palette.ts, so a card is
+   tinted with the same oklch values the terminal paints its block with. The
+   fallbacks here only matter before the first poll answers. */
 .ToolCard {
-	--tool-color: #d2ad62;
+	--tool-fg: oklch(0.8 0.15 250);
+	--tool-bg: oklch(0.25 0.04 250);
 	margin: 8px 0;
 	padding: 8px 9px 7px;
-	background: #181a1d;
-	border: 1px solid #343940;
-	border-left: 3px solid var(--tool-color);
+	background: var(--tool-bg);
+	border: 1px solid color-mix(in oklch, var(--tool-fg) 25%, transparent);
+	border-left: 3px solid var(--tool-fg);
 	border-radius: 6px;
 	color: #e5e9ed;
 	white-space: normal;
 	box-shadow: 0 1px 0 rgb(0 0 0 / .35);
 }
-.ToolCard-read, .ToolCard-read_blob, .ToolCard-read_url { --tool-color: #64b6d7; }
-.ToolCard-edit, .ToolCard-write { --tool-color: #71bf8c; }
-.ToolCard-grep, .ToolCard-glob, .ToolCard-ls, .ToolCard-google, .ToolCard-web_search { --tool-color: #b694dc; }
 .ToolCard > header { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .ToolCard > header > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ToolCard > header > span { flex: none; margin-left: auto; color: #8d969f; font-size: .9em; }
-.ToolCard.running > header > span { color: var(--tool-color); }
+.ToolCard.running > header > span { color: var(--tool-fg); }
 .ToolCard > p, .ToolCard > small { display: block; margin: 5px 0 0; color: #aeb7c1; }
 .ToolCard > pre {
 	max-height: 8.4em;

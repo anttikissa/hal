@@ -79,11 +79,12 @@ async function handleUpdateRequest(request: Request): Promise<Response> {
 	return new Response('Updating\n')
 }
 
-function styleCss(): Promise<string> {
-	return Bun.file(`${import.meta.dir}/../web-client/styles.css`).text()
-}
-
+// Static files served verbatim. colors.ason lives at the Hal root and is the
+// terminal's palette too: the browser polls it and builds its own CSS, so both
+// clients follow one file and the server needs no color code at all.
 const appAssets: Record<string, [file: string, type: string]> = {
+	'/styles.css': ['styles.css', 'text/css; charset=utf-8'],
+	'/colors.ason': ['../../colors.ason', 'text/plain; charset=utf-8'],
 	'/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
 	'/icon.svg': ['icon.svg', 'image/svg+xml'],
 	'/icons/icon-180.png': ['icons/icon-180.png', 'image/png'],
@@ -305,7 +306,6 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 					// `/` and `/<sessionId>` are both the browser app: the client
 					// reads the session out of the path so a tab can be linked.
 					if (url.pathname === '/' || webProtocol.isSessionPath(url.pathname)) return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } })
-					if (url.pathname === '/styles.css') return new Response(await web.styleCss(), { headers: { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'no-store' } })
 					if (url.pathname === '/main.js') {
 						try { return new Response(await web.bundleClient(), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } }) }
 						catch (error) { return new Response(`Web client build failed: ${String(error)}`, { status: 500 }) }
@@ -408,7 +408,6 @@ export const web = {
 	urlForToken,
 	announce,
 	pageHtml,
-	styleCss,
 	appAssets,
 	appAsset,
 	bundleClient,
