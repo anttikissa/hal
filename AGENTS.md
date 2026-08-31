@@ -14,7 +14,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Never kill live Hal; only kill isolated processes you spawned.
 - Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, or flags that won't be used by feature at hand.
 - Hal is a simple developer tool, not a nuclear reactor: cover realistic failure cases, but keep solutions and tests proportionate rather than engineering away every remote race.
-- Run `bun cloc` to check line count — our budget for core code is 21 thousand lines. If you added many, see if you can do the same with less.
+- Run `bun cloc` to check line count — our budget for core code is 21 thousand lines. If you added many, see if you can do the same with less. Keep modules under ~400 lines; see "Why the line budget exists" below.
 - Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.
 - Tabs, not spaces (except for package.json)
 - Thinking of using JSON? Don't, use ASON instead. Use .ason or .asonl for internal state files, ason.stringify() to format data for reading ('short' if oneline result is needed)
@@ -35,6 +35,39 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - `utils/` — generic utilities that could live outside Hal.
 
 `client/`, `server/`, and `web-client/` may import `common/` and `utils/`, never each other. `common/` may import `utils/`. `tests/import-boundaries.test.ts` enforces this.
+
+# Why the line budget exists (measured 2026-08-31)
+
+The budget protects *editability*, not startup speed. Startup was measured on the
+dev box (Hetzner CAX21: 4 shared Ampere Neoverse-N1 vCPU, 8 GB RAM, NVMe, ~€10/mo
+list) by generating realistic Hal-like modules — real bodies copied from real
+files, renamed symbols, cross-imports, each registering into a global map so
+nothing could be tree-shaken — then restarting the process 5× per size:
+
+| Core lines | Modules | Restart (median wall) |
+|---|---|---|
+| 22.6k (today) | 158 | 104 ms |
+| ~48k | +146 | 153 ms |
+| ~73k | +292 | 215 ms |
+| ~123k | +582 | 288 ms |
+
+Cost is **linear at ~1.9 ms per 1000 lines**, no cliff from graph depth. A 200 ms
+restart budget therefore permits **~70k lines**, so at 22.6k the machine has about
+3× headroom. Startup does not justify the 21k limit.
+
+What the limit actually buys is the ability to edit this codebase: a change should
+touch 1–3 modules an agent can locate by name and read whole. That depends on
+per-module size, not the total — so **keep modules under ~400 lines** (today:
+median 99, p90 402, max 1195 in `runtime.ts`). One big file hurts more than many
+small ones.
+
+Caveats on the figures: warm FS cache, and the generated code is import-heavy but
+does little at module scope — which is exactly what the `init()` rule enforces and
+why the linearity holds. Breaking that rule is what would make startup scale badly.
+
+Keep the budget as a ratchet against accretion (adding always looks like progress
+and never breaks a test), but raise it deliberately if the module size
+distribution stays healthy, rather than defending it as a magic number.
 
 # Code style
 
