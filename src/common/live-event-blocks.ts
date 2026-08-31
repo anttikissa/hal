@@ -49,7 +49,6 @@ export interface LiveToolBlock extends LiveBlockBase {
 	sessionId?: string
 	toolId?: string
 	running?: boolean
-	outputUpdates?: number
 }
 
 export interface LiveNoticeBlock extends LiveBlockBase {
@@ -264,12 +263,8 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 		if (existing?.type !== 'tool') return { blocks: blocks as LiveBlock[], changed: false }
 		const toolBlock: LiveToolBlock = { ...existing }
 		if (event.output !== undefined) toolBlock.output = event.output
-		if (event.phase === 'running') {
-			toolBlock.running = true
-			toolBlock.outputUpdates = (existing.outputUpdates ?? 0) + 1
-		} else {
-			delete toolBlock.running
-		}
+		if (event.phase === 'running') toolBlock.running = true
+		else delete toolBlock.running
 		if (event.blobId) toolBlock.blobId = event.blobId
 		const next = blocks.slice()
 		next[index] = toolBlock

@@ -19,7 +19,7 @@ interface PresentationBlock {
 	renderVersion?: number
 	blobLoaded?: boolean
 	toolSummary?: boolean
-	// Transient render-only phase, derived from semantic outputUpdates.
+	// Transient render-only phase supplied by the shared animation clock.
 	toolActivityFrame?: number
 }
 

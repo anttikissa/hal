@@ -106,17 +106,6 @@ describe('live event block projection', () => {
 		expect(result.blocks[0]).toBe(result.toolBlock)
 	})
 
-	test('counts running output events independently for each tool', () => {
-		const initial: LiveBlock[] = [
-			{ type: 'tool', name: 'bash', toolId: 'one', running: true },
-			{ type: 'tool', name: 'bash', toolId: 'two', running: true, outputUpdates: 3 },
-		]
-		const first = liveEventBlocks.reduce(initial, { type: 'tool-result', toolId: 'one', output: 'line 1', phase: 'running' })
-		const second = liveEventBlocks.reduce(first.blocks, { type: 'tool-result', toolId: 'one', output: 'line 1\nline 2', phase: 'running' })
-
-		expect(second.blocks[0]).toEqual({ type: 'tool', name: 'bash', toolId: 'one', output: 'line 1\nline 2', outputUpdates: 2, running: true })
-		expect(second.blocks[1]).toEqual(initial[1])
-	})
 
 
 	test('finishes running tools when their stream ends', () => {

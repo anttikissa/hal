@@ -145,36 +145,30 @@ test('a tall terminal lets more parallel tools expand safely', () => {
 })
 
 
-test('running tool spinners advance only on their own output events', () => {
+test('every running tool spins on the shared 250ms clock and finished tools stop', () => {
 	colors.load()
 	const active = context()
 	active.workingSessions = new Map([['test', true]])
+	active.cursorTick = 0
 	const t = tab([
-		{ type: 'tool', name: 'bash', input: { command: 'first' }, outputUpdates: 0, running: true, ts: 1 },
-		{ type: 'tool', name: 'bash', input: { command: 'second' }, outputUpdates: 2, running: true, ts: 1 },
+		{ type: 'tool', name: 'bash', input: { command: 'first' }, running: true, ts: 1 },
+		{ type: 'tool', name: 'bash', input: { command: 'second' }, running: true, ts: 1 },
 		{ type: 'tool', name: 'bash', input: { command: 'done' }, ts: 1 },
 	])
 	const first: string[] = []
 	renderHistory.renderLines(first, t, 80, active)
-	expect(first.map(stripAnsi).join('\n').match(/◐/g)).toHaveLength(1)
-	expect(first.map(stripAnsi).join('\n').match(/◑/g)).toHaveLength(1)
+	expect(first.map(stripAnsi).join('\n').match(/◐/g)).toHaveLength(2)
 
-	active.cursorTick++
-	const clockOnly: string[] = []
-	renderHistory.renderLines(clockOnly, t, 80, active)
-	expect(clockOnly).toEqual(first)
-
-	t.history[0] = { ...t.history[0]!, outputUpdates: 1 } as any
-	t.historyVersion++
-	const outputEvent: string[] = []
-	renderHistory.renderLines(outputEvent, t, 80, active)
-	expect(outputEvent.map(stripAnsi).join('\n').match(/◓/g)).toHaveLength(1)
-	expect(outputEvent.map(stripAnsi).join('\n').match(/◑/g)).toHaveLength(1)
+	active.cursorTick = 1
+	const second: string[] = []
+	renderHistory.renderLines(second, t, 80, active)
+	expect(second.map(stripAnsi).join('\n').match(/◓/g)).toHaveLength(2)
 
 	;(t.history[0] as any).running = false
 	t.historyVersion++
 	const stopped: string[] = []
 	renderHistory.renderLines(stopped, t, 80, active)
+	expect(stopped.map(stripAnsi).join('\n').match(/◓/g)).toHaveLength(1)
 	expect(stopped.map(stripAnsi).join('\n').match(/✓/g)).toHaveLength(2)
 })
 
