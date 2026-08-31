@@ -268,7 +268,6 @@ class ResponsesWebSocketApiError extends ResponsesWebSocketFallback {
 interface ResponsesStreamState {
 	itemMap: Map<number, { type: 'reasoning' } | { type: 'function_call'; id?: string; name?: string }>
 	toolInputs: Map<number, string>
-	outputTexts: Map<number, string>
 }
 
 function responsesDoneStatus(rawStatus: string): TurnEndStatus {
@@ -293,12 +292,7 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 	}
 	if (type === 'response.reasoning_summary_text.delta') return [{ type: 'thinking', text: event.delta ?? '' }]
 	if (type === 'response.reasoning_summary_part.done') return [{ type: 'thinking', text: '\n\n' }]
-	if (type === 'response.output_text.delta' || type === 'response.refusal.delta') {
-		const outputIndex = event.output_index ?? 0
-		const text = event.delta ?? ''
-		state.outputTexts.set(outputIndex, (state.outputTexts.get(outputIndex) ?? '') + text)
-		return [{ type: 'text', text }]
-	}
+	if (type === 'response.output_text.delta' || type === 'response.refusal.delta') return [{ type: 'text', text: event.delta ?? '' }]
 	if (type === 'response.function_call_arguments.delta') {
 		const outputIndex = event.output_index ?? 0
 		state.toolInputs.set(outputIndex, (state.toolInputs.get(outputIndex) ?? '') + (event.delta ?? ''))
@@ -312,20 +306,13 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 	if (type === 'response.output_item.done') {
 		const outputIndex = event.output_index ?? 0
 		const info = state.itemMap.get(outputIndex)
-		if (event.item?.type === 'message') {
-			let text = ''
-			for (const part of event.item.content ?? []) text += part.text ?? part.refusal ?? ''
-			const streamed = state.outputTexts.get(outputIndex) ?? ''
-			if (text.startsWith(streamed) && text.length > streamed.length) return [{ type: 'text', text: text.slice(streamed.length) }]
-			return []
-		}
-		if (info?.type === 'reasoning' || event.item?.type === 'reasoning') {
+		if (info?.type === 'reasoning') {
 			const signature = reasoningSignature.minimize(event.item)
 			return signature ? [{ type: 'thinking_signature', signature }] : []
 		}
-		if (info?.type === 'function_call' || event.item?.type === 'function_call') {
+		if (info?.type === 'function_call') {
 			const parsed = providerShared.parseToolInput(state.toolInputs.get(outputIndex) ?? event.item?.arguments ?? '{}')
-			return [{ type: 'tool_call', id: info?.id ?? event.item?.call_id ?? `call_${outputIndex}`, name: info?.name ?? event.item?.name ?? '', input: parsed.input, ...(parsed.parseError ? { parseError: parsed.parseError } : {}) }]
+			return [{ type: 'tool_call', id: info.id ?? `call_${outputIndex}`, name: info.name ?? '', input: parsed.input, ...(parsed.parseError ? { parseError: parsed.parseError } : {}) }]
 		}
 		return []
 	}
@@ -359,7 +346,7 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 }
 
 async function* parseResponsesStream(body: ReadableStream<Uint8Array>): AsyncGenerator<ProviderStreamEvent> {
-	const state: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map(), outputTexts: new Map() }
+	const state: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map() }
 	for await (const event of providerShared.iterateJsonSse(body)) {
 		for (const parsed of parseResponsesEvent(state, event)) yield parsed
 	}
@@ -444,14 +431,16 @@ function buildResponsesBody(req: ProviderRequest, transport: OpenAITransport, in
 	return body
 }
 
-function responsesHeaders(credential: Credential, transport: OpenAITransport, openaiEntry: Record<string, any>, streaming: boolean): { headers?: Record<string, string>; error?: string } {
+function responsesHeaders(credential: Credential, transport: OpenAITransport, openaiEntry: Record<string, any>, overHttp: boolean): { headers?: Record<string, string>; error?: string } {
 	const headers: Record<string, string> = {
 		Authorization: `Bearer ${credential.value}`,
 	}
-	if (streaming) {
+	if (overHttp) {
 		headers['Content-Type'] = 'application/json'
 		headers.accept = 'text/event-stream'
 	} else {
+		// The WebSocket transport is gated behind this beta header; the value is the one the
+		// official Codex CLI sends. Both requests stream, so the split here is transport, not mode.
 		headers['OpenAI-Beta'] = 'responses_websockets=2026-02-06'
 	}
 	if (transport.usesCodexBackend) {
@@ -610,7 +599,7 @@ async function* streamResponsesWebSocket(chain: ResponsesWebSocketChain, body: a
 	if (chain.working) throw new ResponsesWebSocketFallback('OpenAI Responses WebSocket already has an in-flight request')
 	chain.working = true
 	const pending: any[] = []
-	const streamState: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map(), outputTexts: new Map() }
+	const streamState: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map() }
 	let done = false
 	let failed: Error | null = null
 	let responseId = ''
