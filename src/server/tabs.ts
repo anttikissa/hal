@@ -192,7 +192,14 @@ function syncSharedState(): void {
 	const openMetas = openSessionMetas()
 	const openIds = new Set(openMetas.map((meta) => meta.id))
 	ipc.updateState((shared) => {
-		shared.sessions = openMetas.map(sessionStore.sessionOpenInfo)
+		shared.sessions = []
+		for (const meta of openMetas) {
+			const info = sessionStore.sessionOpenInfo(meta)
+			// A live turn is not paused: session metadata broadcasts must preserve
+			// the same continuation invariant as the working-status publisher.
+			if (shared.working[meta.id]) info.continuation = undefined
+			shared.sessions.push(info)
+		}
 		for (const sessionId of Object.keys(shared.working)) {
 			if (!openIds.has(sessionId)) delete shared.working[sessionId]
 		}

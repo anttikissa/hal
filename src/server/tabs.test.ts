@@ -65,6 +65,29 @@ test('focusing a new tab clears only its attention marker', () => {
 	}
 })
 
+
+test('shared session status omits continuation while its turn is working', () => {
+	const originalOpenSessionIds = runtime.state.openSessionIds
+	const originalLoadSessionMeta = sessions.loadSessionMeta
+	const originalSessionOpenInfo = sessions.sessionOpenInfo
+	const originalUpdateState = ipc.updateState
+	const shared: any = { sessions: [], working: { '04-working': true } }
+	runtime.state.openSessionIds = ['04-working']
+	sessions.loadSessionMeta = (() => ({ id: '04-working', createdAt: '2026-08-27T00:00:00.000Z' })) as typeof sessions.loadSessionMeta
+	sessions.sessionOpenInfo = (() => ({ id: '04-working', cwd: '/work', continuation: 'continue' })) as typeof sessions.sessionOpenInfo
+	ipc.updateState = ((mutator) => { mutator(shared); return shared }) as typeof ipc.updateState
+	try {
+		tabs.syncSharedState()
+		expect(shared.sessions).toHaveLength(1)
+		expect(shared.sessions[0].continuation).toBeUndefined()
+	} finally {
+		runtime.state.openSessionIds = originalOpenSessionIds
+		sessions.loadSessionMeta = originalLoadSessionMeta
+		sessions.sessionOpenInfo = originalSessionOpenInfo
+		ipc.updateState = originalUpdateState
+	}
+})
+
 test('openSessionForCwd creates instead of resuming a dormant session', () => {
 	const originalOpenSessionMetas = tabs.openSessionMetas
 	const originalCreateSessionTab = tabs.createSessionTab
