@@ -130,7 +130,6 @@ function wrapToolLine(line: string, cols: number): string[] {
 	return wordWrap(expanded, cols)
 }
 
-
 function containToolLines(lines: string[], cols: number, overflow: 'head' | 'tail' | undefined, hiddenIndicator?: string): string[] {
 	const max = Math.max(0, blockConfig.maxToolTextRows - 1)
 	if (lines.length <= max) return lines
@@ -201,10 +200,6 @@ function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolea
 	return fixedNoticeColors[block.type]
 }
 
-function formatBlockTimeRange(first?: number, last?: number): string {
-	return time.formatTimestampRange(first, last)
-}
-
 function buildHeader(title: string, time: string, blobRef: string, cols: number, activity = ''): string {
 	let prefix = `${' '.repeat(blocks.outputPad)}${time ? `${time} ` : ''}`
 	if (activity) prefix += `${activity} `
@@ -217,13 +212,11 @@ function buildHeader(title: string, time: string, blobRef: string, cols: number,
 	return `${left}${' '.repeat(Math.max(0, width - visLen(left) - visLen(right)))}${right}`
 }
 
-
 function toolSpinner(frame: number | undefined): string {
 	if (frame === undefined) return ''
 	const frames = ['◐', '◓', '◑', '◒']
 	return frames[((frame % frames.length) + frames.length) % frames.length]!
 }
-
 
 function toolActivity(block: Block): string {
 	if (block.type !== 'tool') return ''
@@ -238,6 +231,20 @@ function padBlockLine(line: string): string {
 function bodyLine(line: string, fg: string, bg: string, cols: number, fullWidth = visLen(line) > cols - 1 - blocks.outputPad): string {
 	if (!fullWidth) return bgLine(`${fg}${padBlockLine(line)}`, cols, bg)
 	return `${bg}${fg}${line}\x1b[K${RESET_BG}`
+}
+
+function noticeContent(block: Block, cols: number): string[] {
+	const timestamp = time.formatTimestamp(block.ts)
+	const prefix = timestamp ? `${timestamp} ` : ''
+	const content = blockContent(block, Math.max(1, cols - visLen(prefix)))
+	if (!prefix || content.length === 0) return content
+	const indent = ' '.repeat(visLen(prefix))
+	for (let i = 0; i < content.length; i++) {
+		const line = content[i]!
+		if (i === 0) content[i] = prefix + line
+		else if (line && !blockText.standaloneHyperlink(blockText.stripAnsiSequences(line))) content[i] = indent + line
+	}
+	return content
 }
 
 function padBlock(lines: string[], fg: string, bg: string, bgIsBlack: boolean | undefined, cols: number): void {
@@ -288,67 +295,6 @@ function blockLabel(block: Block, sessionLabel?: SessionLabel): string {
 	}
 	if (block.type === 'question') return 'Question'
 	return fixedLabels[block.type]
-}
-
-function inlineNoticeText(block: Block): string | undefined {
-	if (block.type !== 'log' && block.type !== 'info') return undefined
-	if (block.usageBars) return undefined
-	const text = expandTabs(blockText.sanitizeTerminalText(blockText.stripAnsiSequences(block.text)), blockConfig.tabWidth).trim()
-	if (!text || text.includes('\n')) return undefined
-	if (text.includes('`')) return undefined
-	if (visLen(text) > 50) return undefined
-	return historyProjection.noticeText(text)
-}
-
-function renderInlineNoticeBlock(block: Block, cols: number): string[] | undefined {
-	const text = inlineNoticeText(block)
-	if (!text) return undefined
-	const blobRef = 'blobId' in block && 'sessionId' in block && block.blobId && block.sessionId ? `${block.sessionId}/${block.blobId}` : ''
-	if (blobRef) return undefined
-	const { fg, bg } = blockColors(block)
-	const header = buildHeader(text, time.formatTimestamp(block.ts), '', cols)
-	return [`${bgLine(`${fg}${header}`, cols, bg)}${FG_OFF}`]
-}
-
-function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | 'warning' | 'error' }>>, cols: number, sessionLabel?: SessionLabel): string[] {
-	if (group.length === 0) return []
-	if (group.some((block) => block.type === 'log' && block.text.startsWith('Prompt queued'))) {
-		const lines: string[] = []
-		for (const block of group) lines.push(...renderBlock(block, cols, false, sessionLabel))
-		return lines
-	}
-	if (group.length === 1) return renderBlock(group[0]!, cols, false, sessionLabel)
-	const inlineLines: string[] = []
-	let allInline = true
-	for (const block of group) {
-		const rendered = renderInlineNoticeBlock(block, cols)
-		if (!rendered) {
-			allInline = false
-			break
-		}
-		inlineLines.push(...rendered)
-	}
-	if (allInline) return inlineLines
-
-	const first = group[0]!
-	const last = group[group.length - 1]!
-	const label = fixedLabels[first.type]
-	const header = buildHeader(label, formatBlockTimeRange(first.ts, last.ts), '', cols)
-	const { fg, bg, bgIsBlack } = blockColors(first)
-	const lines = [bgLine(`${fg}${header}`, cols, bg)]
-	const contentCols = Math.max(1, cols - 1 - blocks.outputPad)
-	let hasContent = false
-	for (const block of group) {
-		const content = blockText.hyperlinkUrls(renderMarkdownLines(block, contentCols), contentCols)
-		if (content.length > 0 && !hasContent) {
-			lines.push(bgLine(`${fg} `, cols, bg))
-			hasContent = true
-		}
-		for (const line of content) lines.push(bodyLine(line, fg, bg, cols))
-	}
-	padBlock(lines, fg, bg, bgIsBlack, cols)
-	lines[lines.length - 1]! += FG_OFF
-	return lines
 }
 
 function hasStreamingHalCursor(block: Block): boolean {
@@ -493,8 +439,6 @@ function renderBlockDetailed(block: Block, cols: number, cursorVisible = false, 
 }
 
 function renderBlock(block: Block, cols: number, cursorVisible = false, sessionLabel?: SessionLabel): string[] {
-	const inlineNotice = renderInlineNoticeBlock(block, cols)
-	if (inlineNotice) return inlineNotice
 
 	const blobRef =
 		'blobId' in block && 'sessionId' in block && block.blobId && block.sessionId
@@ -506,9 +450,10 @@ function renderBlock(block: Block, cols: number, cursorVisible = false, sessionL
 	const header = buildHeader(label, blockTime, blobRef, cols, blocks.toolActivity(block))
 	const plainNotice = block.type === 'info' || (block.type === 'log' && !block.text.startsWith('Prompt queued'))
 	const lines: string[] = []
-	if (!plainNotice || blockTime) lines.push(bgLine(`${fg}${header}`, cols, bg))
+	if (!plainNotice) lines.push(bgLine(`${fg}${header}`, cols, bg))
 	const contentCols = Math.max(1, cols - 1 - blocks.outputPad)
-	const content = blockText.hyperlinkUrls(blockContent(block, contentCols), contentCols)
+	const rawContent = plainNotice ? noticeContent(block, contentCols) : blockContent(block, contentCols)
+	const content = blockText.hyperlinkUrls(rawContent, contentCols)
 	if (content.length > 0 && !plainNotice && block.type !== 'tool') lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {
 		const fullWidth = visLen(line) > contentCols
@@ -530,7 +475,6 @@ export const blocks = {
 	renderBlockDetailed,
 	cursorColor,
 	idleCursorColor,
-	renderBlockGroup,
 	toolSpinner,
 	toolActivity,
 }

@@ -47,18 +47,6 @@ function formatTimestamp(ts?: number, now = Date.now()): string {
 	return monthDayClock(date)
 }
 
-function formatTimestampRange(first?: number, last?: number, now = Date.now()): string {
-	const start = first ? new Date(first) : null
-	const end = last ? new Date(last) : null
-	if (!start) return ''
-	if (!end || first === last) return formatTimestamp(first, now)
-	if (!sameLocalDay(start, end)) return `${monthDayClock(start)} - ${monthDayClock(end)}`
-	const startText = formatTimestamp(first, now)
-	const endText = clock(end)
-	if (startText === endText) return startText
-	return `${startText} - ${endText}`
-}
-
 function formatDateTime(ts: number): string {
 	const date = new Date(ts)
 	return `${monthDay(date)} ${date.getFullYear()}, ${clock(date)}`
@@ -111,7 +99,6 @@ function formatFutureDistance(targetMs: number, nowMs = Date.now()): string {
 
 export const time = {
 	formatTimestamp,
-	formatTimestampRange,
 	formatDateTime,
 	formatLocalDateTime,
 	formatAge,

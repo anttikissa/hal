@@ -327,7 +327,7 @@ test('/login claude returns an auth URL and secret question', async () => {
 
 	expect(result.handled).toBe(true)
 	expect(result.output).toContain('claude.ai/oauth/authorize')
-	expect(result.question).toMatchObject({ input: { kind: 'secret', maxBytes: 190, publicKey: expect.any(String) }, source: { type: 'login', provider: 'claude' } })
+	expect(result.question).toMatchObject({ input: { kind: 'secret', maxBytes: 190, publicKey: expect.any(String) }, source: { type: 'login', provider: 'anthropic' } })
 })
 
 // The provider names are what users see in Anthropic's and OpenAI's own

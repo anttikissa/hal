@@ -48,6 +48,25 @@ test('pending tools are continuable without visible turn content', () => {
 })
 
 
+test('login retries only the unresolved 401 from the same provider', () => {
+	const user: HistoryEntry = { type: 'user', parts: [{ type: 'text', text: 'try this' }] }
+	const failed = (provider: string, httpStatus: number): HistoryEntry[] => [
+		user,
+		{ type: 'error', text: `${httpStatus} provider error` },
+		{ type: 'turn_end', status: 'failed', provider, httpStatus },
+	]
+
+	expect(continuation.shouldRetryAfterLogin(failed('future-provider', 401), 'future-provider')).toBe(true)
+	expect(continuation.shouldRetryAfterLogin(failed('future-provider', 401), 'other-provider')).toBe(false)
+	expect(continuation.shouldRetryAfterLogin(failed('future-provider', 403), 'future-provider')).toBe(false)
+	expect(continuation.shouldRetryAfterLogin(failed('future-provider', 429), 'future-provider')).toBe(false)
+	expect(continuation.shouldRetryAfterLogin([
+		...failed('future-provider', 401),
+		{ type: 'assistant', text: 'recovered' },
+		{ type: 'turn_end', status: 'completed' },
+	], 'future-provider')).toBe(false)
+})
+
 test('prepares continuation messages for interrupted and failed turns', () => {
 	const messages: any[] = [{ role: 'user', content: 'prompt' }, { role: 'assistant', content: 'partial' }]
 	continuation.prepareMessages(messages, 'continue')

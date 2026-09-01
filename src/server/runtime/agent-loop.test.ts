@@ -674,7 +674,7 @@ test('provider errors show their full ASON payload and save it in a blob', async
 			type: 'error',
 			text: `404: (https://api.anthropic.com/v1/messages?beta=true)\n${ason.stringify(payload)}`,
 		})
-		expect(history.at(-1)).toMatchObject({ type: 'turn_end', status: 'failed' })
+		expect(history.at(-1)).toMatchObject({ type: 'turn_end', status: 'failed', provider: 'openai', httpStatus: 404 })
 		expect(sessions.loadLive(sessionId).blocks).toEqual([])
 	} finally {
 		providerLoader.getProvider = origGetProvider

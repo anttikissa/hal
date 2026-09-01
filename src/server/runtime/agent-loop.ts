@@ -412,6 +412,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		let retryAttempt = 0
 		let retryStartedAt = 0
 		let hadTerminalError = false
+		let terminalErrorStatus: number | undefined
 
 		async function finishAborted(): Promise<void> {
 			const signalText = typeof loopSignal.reason === 'string' ? loopSignal.reason : DEFAULT_ABORT_TEXT
@@ -592,6 +593,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 						}
 						if (!canRetry) {
 							hadTerminalError = true
+							terminalErrorStatus = status
 							terminalErrorEntry = errorHistoryEntry(errorText, blobId)
 						}
 						break
@@ -745,7 +747,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				// Persist context so it survives restarts
 				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
 				if (providerPaused) return 'paused'
-				if (hadTerminalError) appendTurnEnd(sessionId, { status: 'failed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
+				if (hadTerminalError) {
+					const failure = terminalErrorEntry ? { provider: providerName, httpStatus: terminalErrorStatus } : {}
+					appendTurnEnd(sessionId, { status: 'failed', usage: hasUsage(totalUsage) ? totalUsage : undefined, ...failure })
+				}
 				else appendTurnEnd(sessionId, lastDoneMeta ?? { status: 'completed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 				return hadTerminalError ? 'failed' : 'completed'
 			}

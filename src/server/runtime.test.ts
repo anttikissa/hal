@@ -325,7 +325,7 @@ test('fork command persists one child notice without duplicating bare session id
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origForkSession = sessions.forkSession
 	const origUpdateMeta = sessions.updateMeta
-	const origAppendHistorySync = sessions.appendHistorySync
+	const origAppendHistory = sessions.appendHistory
 	const origSessionOpenInfo = sessions.sessionOpenInfo
 	const origWatchPromptFiles = context.watchPromptFiles
 
@@ -346,7 +346,7 @@ test('fork command persists one child notice without duplicating bare session id
 			metas[id] = { ...metas[id]!, ...patch }
 			return metas[id]!
 		}
-		sessions.appendHistorySync = (id, entries) => {
+		sessions.appendHistory = (id, entries) => {
 			history[id] ??= []
 			history[id]!.push(...entries)
 		}
@@ -365,7 +365,7 @@ test('fork command persists one child notice without duplicating bare session id
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.forkSession = origForkSession
 		sessions.updateMeta = origUpdateMeta
-		sessions.appendHistorySync = origAppendHistorySync
+		sessions.appendHistory = origAppendHistory
 		sessions.sessionOpenInfo = origSessionOpenInfo
 		context.watchPromptFiles = origWatchPromptFiles
 	}
@@ -381,13 +381,13 @@ test('a missing /cd path emits a synthetic creation suggestion', async () => {
 	const origOwnsHostLock = ipc.ownsHostLock
 	const origAppendEvent = ipc.appendEvent
 	const origLoadSessionMeta = sessions.loadSessionMeta
-	const origAppendHistorySync = sessions.appendHistorySync
+	const origAppendHistory = sessions.appendHistory
 
 	try {
 		ipc.ownsHostLock = () => true
 		ipc.appendEvent = (event: any) => { events.push(event) }
 		sessions.loadSessionMeta = (id) => id === sessionId ? meta : null
-		sessions.appendHistorySync = (_id, entries) => { history.push(...entries) }
+		sessions.appendHistory = (_id, entries) => { history.push(...entries) }
 
 		await runtime.handlePrompt(sessionId, `/cd ${target}`)
 		expect(meta.workingDir).toBe('/work')
@@ -409,7 +409,7 @@ test('a missing /cd path emits a synthetic creation suggestion', async () => {
 		ipc.ownsHostLock = origOwnsHostLock
 		ipc.appendEvent = origAppendEvent
 		sessions.loadSessionMeta = origLoadSessionMeta
-		sessions.appendHistorySync = origAppendHistorySync
+		sessions.appendHistory = origAppendHistory
 	}
 })
 
@@ -453,7 +453,7 @@ test('slash command state changes are persisted as structural history entries', 
 	const origAppendEvent = ipc.appendEvent
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origUpdateMeta = sessions.updateMeta
-	const origAppendHistorySync = sessions.appendHistorySync
+	const origAppendHistory = sessions.appendHistory
 	const origIsWorking = agentLoop.isWorking
 	const origIsHeld = promptQueue.isHeld
 
@@ -465,7 +465,7 @@ test('slash command state changes are persisted as structural history entries', 
 			Object.assign(meta, patch)
 			return meta
 		}
-		sessions.appendHistorySync = (_id, entries) => { history.push(...entries) }
+		sessions.appendHistory = (_id, entries) => { history.push(...entries) }
 		agentLoop.isWorking = () => false
 		promptQueue.isHeld = () => false
 
@@ -483,7 +483,7 @@ test('slash command state changes are persisted as structural history entries', 
 		ipc.appendEvent = origAppendEvent
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.updateMeta = origUpdateMeta
-		sessions.appendHistorySync = origAppendHistorySync
+		sessions.appendHistory = origAppendHistory
 		agentLoop.isWorking = origIsWorking
 		promptQueue.isHeld = origIsHeld
 	}
@@ -1160,7 +1160,7 @@ test('continue waits for an in-flight abort and coalesces duplicate requests', a
 			model: 'openai/gpt-5.5',
 		})
 		// A paused turn is what makes continue reach the provider at all.
-		sessions.appendHistorySync(sessionId, [
+		sessions.appendHistory(sessionId, [
 			{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-20T00:00:01.000Z' },
 			{ type: 'turn_end', status: 'aborted', abortText: '[paused]', ts: '2026-05-20T00:00:02.000Z' },
 		])
@@ -1441,22 +1441,42 @@ test('Claude secret answer retries after failure and persists only ciphertext on
 	const questionId = '000001-aaa'
 	const ciphertext = await questionCrypto.encryptSecret(serverKeys.publicKey(), 'code#state')
 	const origFinish = authLogin.finishAnthropic
+	const origAppendEvent = ipc.appendEvent
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	const origOwnsHostLock = ipc.ownsHostLock
+	let retries = 0
+	const events: any[] = []
 	let fail = true
 	authLogin.finishAnthropic = async (plaintext) => {
 		expect(plaintext).toBe('code#state')
 		if (fail) throw new Error('exchange failed')
 		return { email: 'person@example.com' }
 	}
+	ipc.appendEvent = (event) => { events.push(event) }
+	agentLoop.runAgentLoop = async () => { retries++; return 'completed' }
+	ipc.ownsHostLock = () => true
 	try {
-		await sessions.appendHistory(sessionId, [{ type: 'question', id: questionId, text: 'Code?', input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 190 }, source: { type: 'login', provider: 'claude' } }])
+		await sessions.appendHistory(sessionId, [
+			{ type: 'user', parts: [{ type: 'text', text: 'Retry after login' }] },
+			{ type: 'error', text: '401 provider error' },
+			{ type: 'turn_end', status: 'failed', provider: 'anthropic', httpStatus: 401 },
+			{ type: 'question', id: questionId, text: 'Code?', input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 190 }, source: { type: 'login', provider: 'anthropic' } },
+		])
 		await runtime.handleAnswer(sessionId, questionId, { kind: 'secret', ciphertext })
 		expect(runtime.activeQuestion(sessionId)?.id).toBe(questionId)
 		fail = false
+		events.length = 0
 		await runtime.handleAnswer(sessionId, questionId, { kind: 'secret', ciphertext })
+		for (let i = 0; i < 100 && retries === 0; i++) await Bun.sleep(1)
 		const persisted = sessions.loadHistory(sessionId)
 		expect(persisted.filter((entry) => entry.type === 'answer')).toEqual([expect.objectContaining({ value: { kind: 'secret', ciphertext } })])
 		expect(await Bun.file(`${sessions.sessionDir(sessionId)}/history.asonl`).text()).not.toContain('code#state')
+		expect(events.slice(0, 2).map((event) => event.type)).toEqual(['info', 'history-updated'])
+		expect(retries).toBe(1)
 	} finally {
+		ipc.appendEvent = origAppendEvent
+		agentLoop.runAgentLoop = origRunAgentLoop
+		ipc.ownsHostLock = origOwnsHostLock
 		authLogin.finishAnthropic = origFinish
 		sessions.deleteSession(sessionId)
 	}
@@ -1621,7 +1641,7 @@ test('runCompact emits context estimate for live status line', () => {
 			model: 'openai/gpt-5',
 			context: { used: 999_999, max: 999_999 },
 		})
-		sessions.appendHistorySync(sessionId, [
+		sessions.appendHistory(sessionId, [
 			{ type: 'user', parts: [{ type: 'text', text: 'before compact' }], ts: '2026-05-20T12:00:01.000Z' },
 			{ type: 'assistant', text: 'reply', ts: '2026-05-20T12:00:02.000Z' },
 		])
@@ -1972,7 +1992,7 @@ test('continuing a session whose last turn completed does not call the provider'
 			workingDir: '/tmp',
 			model: 'openai/gpt-5.5',
 		})
-		sessions.appendHistorySync(sessionId, [
+		sessions.appendHistory(sessionId, [
 			{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-20T00:00:01.000Z' },
 			{ type: 'assistant', text: 'hi', ts: '2026-05-20T00:00:02.000Z' },
 			{ type: 'turn_end', status: 'completed', ts: '2026-05-20T00:00:03.000Z' },
@@ -1987,7 +2007,7 @@ test('continuing a session whose last turn completed does not call the provider'
 		expect(sessions.loadAllHistory(sessionId).at(-1)).toMatchObject({ type: 'log', text: 'Nothing to continue' })
 
 		// An aborted turn left work behind, so continue must still reach the provider.
-		sessions.appendHistorySync(sessionId, [
+		sessions.appendHistory(sessionId, [
 			{ type: 'user', parts: [{ type: 'text', text: 'again' }], ts: '2026-05-20T00:00:05.000Z' },
 			{ type: 'turn_end', status: 'aborted', abortText: '[paused]', ts: '2026-05-20T00:00:06.000Z' },
 		])

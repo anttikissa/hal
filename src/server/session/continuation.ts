@@ -24,6 +24,16 @@ function actionForHistory(entries: HistoryEntry[]): ContinuationAction | false {
 	return 'continue'
 }
 
+function shouldRetryAfterLogin(entries: HistoryEntry[], provider: string): boolean {
+	if (continuation.actionForHistory(entries) !== 'retry') return false
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i]!
+		if (entry.canceled || entry.type !== 'turn_end') continue
+		return entry.status === 'failed' && entry.httpStatus === 401 && entry.provider === provider
+	}
+	return false
+}
+
 function prepareMessages(messages: Message[], action: ContinuationAction): void {
 	if (messages.at(-1)?.role === 'assistant') {
 		messages.push({ role: 'user', content: '<meta>The previous response was interrupted. Continue without repeating completed work.</meta>' })
@@ -32,4 +42,4 @@ function prepareMessages(messages: Message[], action: ContinuationAction): void 
 	if (action === 'retry') messages.push({ role: 'user', content: '<meta>The previous attempt failed before producing a usable response. Retry the last user request.</meta>' })
 }
 
-export const continuation = { actionForHistory, prepareMessages }
+export const continuation = { actionForHistory, shouldRetryAfterLogin, prepareMessages }

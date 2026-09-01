@@ -133,7 +133,7 @@ function openSessionForCwd(cwd: string): { ok: true; sessionId: string } | { ok:
 }
 
 function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'notice'): void {
-	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }])
+	sessionStore.appendHistory(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }])
 }
 
 function recordOpeningSummary(meta: SessionMeta): void {

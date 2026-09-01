@@ -26,7 +26,7 @@ function emitFocusedInfo(text: string): void {
 
 function emitSyntheticAssistant(sessionId: string, text: string, syntheticKind: string, model: string): void {
 	const ts = new Date().toISOString()
-	sessionStore.appendHistorySync(sessionId, [{ type: 'assistant', text, model, synthetic: true, syntheticKind, ts }])
+	sessionStore.appendHistory(sessionId, [{ type: 'assistant', text, model, synthetic: true, syntheticKind, ts }])
 	ipc.appendEvent({
 		id: protocol.eventId(),
 		type: 'response',

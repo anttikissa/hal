@@ -337,7 +337,7 @@ function whatMetaText(targetIds: string[]): string {
 
 function persistResult(sessionId: string, targetIds: string[], text: string): void {
 	const ts = new Date().toISOString()
-	sessions.appendHistorySync(sessionId, [
+	sessions.appendHistory(sessionId, [
 		{ type: 'assistant', text, synthetic: true, syntheticKind: 'what-summary', visibility: 'ui', ts },
 		{ type: 'info', text: whatMetaText(targetIds), visibility: 'next-user', ts },
 	])

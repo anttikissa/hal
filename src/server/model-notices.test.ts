@@ -57,7 +57,7 @@ test('model metadata refresh notice goes only to focused session', async () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origCurrentSessionId = runtime.state.currentSessionId
 	const origRefreshModels = serverModels.refreshModels
-	const origAppendHistorySync = sessions.appendHistorySync
+	const origAppendHistory = sessions.appendHistory
 	const origAppendEvent = ipc.appendEvent
 	const origHasConfiguredDirectSource = serverModels.hasConfiguredDirectSource
 	const origSuggestModelDiscoveries = modelNotices.suggestModelDiscoveries
@@ -75,7 +75,7 @@ test('model metadata refresh notice goes only to focused session', async () => {
 		previous: { 'claude-opus-4-8': 1_000_000 },
 		next: { 'claude-opus-4-8': 1_000_000, 'claude-opus-4-9': 1_000_000 },
 	})
-	sessions.appendHistorySync = (sessionId: string, entries: any[]) => {
+	sessions.appendHistory = (sessionId: string, entries: any[]) => {
 		histories.push({ sessionId, entries })
 	}
 	ipc.appendEvent = (event: any) => {
@@ -92,7 +92,7 @@ test('model metadata refresh notice goes only to focused session', async () => {
 		runtime.state.openSessionIds = origOpenSessionIds
 		runtime.state.currentSessionId = origCurrentSessionId
 		serverModels.refreshModels = origRefreshModels
-		sessions.appendHistorySync = origAppendHistorySync
+		sessions.appendHistory = origAppendHistory
 		ipc.appendEvent = origAppendEvent
 		serverModels.hasConfiguredDirectSource = origHasConfiguredDirectSource
 		modelNotices.suggestModelDiscoveries = origSuggestModelDiscoveries
@@ -129,7 +129,7 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origCurrentSessionId = runtime.state.currentSessionId
 	const origLoadSessionMeta = sessions.loadSessionMeta
-	const origAppendHistorySync = sessions.appendHistorySync
+	const origAppendHistory = sessions.appendHistory
 	const origAppendEvent = ipc.appendEvent
 	const origHasConfiguredDirectSource = serverModels.hasConfiguredDirectSource
 	const origCreateSessionTab = tabs.createSessionTab
@@ -144,7 +144,7 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 		const cwd = sessionId === '04-hal' ? HAL_DIR : '/work/project'
 		return { id: sessionId, createdAt: '2026-05-20T10:00:00.000Z', workingDir: cwd, model: 'openai/gpt-5.5' }
 	}
-	sessions.appendHistorySync = (sessionId: string, entries: any[]) => {
+	sessions.appendHistory = (sessionId: string, entries: any[]) => {
 		histories.push({ sessionId, entries })
 	}
 	ipc.appendEvent = (event: any) => {
@@ -185,7 +185,7 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 		runtime.state.openSessionIds = origOpenSessionIds
 		runtime.state.currentSessionId = origCurrentSessionId
 		sessions.loadSessionMeta = origLoadSessionMeta
-		sessions.appendHistorySync = origAppendHistorySync
+		sessions.appendHistory = origAppendHistory
 		ipc.appendEvent = origAppendEvent
 		serverModels.hasConfiguredDirectSource = origHasConfiguredDirectSource
 		tabs.createSessionTab = origCreateSessionTab
@@ -219,6 +219,11 @@ test('suggestModelDiscoveries opens an unfocused new tab even from an idle sessi
 	runtime.state.openSessionIds = ['04-busy']
 	runtime.state.currentSessionId = '04-busy'
 	runtime.state.stopPromptWatch = null
+	agentLoop.isWorking = () => false
+	sessions.appendHistory('04-busy', [
+		{ type: 'user', parts: [{ type: 'text', text: 'keep going' }], ts: '2026-05-20T10:00:01.000Z' },
+		{ type: 'log', text: '[restarted]', ts: '2026-05-20T10:00:02.000Z' },
+	])
 	ipc.appendEvent = (event: any) => { events.push(event) }
 	ipc.updateState = ((mutator: (state: any) => void) => {
 		mutator(shared)

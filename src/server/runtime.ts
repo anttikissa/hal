@@ -122,12 +122,16 @@ function updateSharedTurnStatus(shared: SharedState, sessionId: string, working:
 	if (!working) info.continuation = continueActionForSession(sessionId) || undefined
 }
 
+function retryAfterLogin(sessionId: string, provider: string): void {
+	if (continuation.shouldRetryAfterLogin(sessionStore.loadAllHistory(sessionId), provider)) requestContinue(sessionId)
+}
+
 function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice', usageBars?: true): void {
 	const createdAt = new Date().toISOString()
 	const entry: HistoryEntry = ui === 'notice'
 		? { type: 'info', text, ts: createdAt, ui, ...(usageBars ? { usageBars } : {}) }
 		: { type: 'log', text, ts: createdAt, ...(level === 'error' ? { level: 'error' as const } : {}), ...(usageBars ? { usageBars } : {}) }
-	sessionStore.appendHistorySync(sessionId, [entry])
+	sessionStore.appendHistory(sessionId, [entry])
 	ipc.appendEvent({
 		id: protocol.eventId(),
 		type: 'info',
@@ -139,7 +143,6 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 		createdAt,
 	})
 }
-
 
 function emitHistoryUpdated(sessionId: string): void {
 	ipc.appendEvent({ type: 'history-updated', sessionId })
@@ -166,7 +169,7 @@ function appendQuestion(
 	},
 ): string {
 	const id = sessionStore.newHistoryIds(sessionId, 1)[0]!
-	sessionStore.appendHistorySync(sessionId, [{ type: 'question', id, ...question, ts: new Date().toISOString() }])
+	sessionStore.appendHistory(sessionId, [{ type: 'question', id, ...question, ts: new Date().toISOString() }])
 	emitHistoryUpdated(sessionId)
 	return id
 }
@@ -190,12 +193,14 @@ async function handleAnswer(sessionId: string, questionId: string, value: Answer
 		question = activeQuestion(sessionId)
 		if (!question || question.id !== questionId || !acceptsAnswer(question, value)) return
 	}
-	sessionStore.appendHistorySync(sessionId, [{ type: 'answer', questionId, value, ts: new Date().toISOString() }])
-	emitHistoryUpdated(sessionId)
+	sessionStore.appendHistory(sessionId, [{ type: 'answer', questionId, value, ts: new Date().toISOString() }])
 	if (question.source.type === 'login') {
 		emitInfo(sessionId, `Logged in to Claude${email ? ` as ${email}` : ''}. Run /status to see usage.`)
+		emitHistoryUpdated(sessionId)
+		retryAfterLogin(sessionId, question.source.provider)
 		return
 	}
+	emitHistoryUpdated(sessionId)
 	if (question.source.type === 'tool') {
 		const pending = sessionStore.findPendingTools(sessionId)
 		if (pending?.allAnswered) requestContinue(sessionId)
@@ -203,7 +208,6 @@ async function handleAnswer(sessionId: string, questionId: string, value: Answer
 	}
 	if (value.kind !== 'aborted') requestContinue(sessionId)
 }
-
 
 function abortParkedQuestions(sessionId: string): boolean {
 	const question = activeQuestion(sessionId)
@@ -216,12 +220,12 @@ function abortParkedQuestions(sessionId: string): boolean {
 		for (const item of pending.questions) {
 			if (!item.answer) answers.push({ type: 'answer', questionId: item.id, value: { kind: 'aborted' }, ts })
 		}
-		sessionStore.appendHistorySync(sessionId, answers)
+		sessionStore.appendHistory(sessionId, answers)
 		emitHistoryUpdated(sessionId)
 		requestContinue(sessionId)
 		return true
 	}
-	sessionStore.appendHistorySync(sessionId, [{ type: 'answer', questionId: question.id, value: { kind: 'aborted' }, ts }])
+	sessionStore.appendHistory(sessionId, [{ type: 'answer', questionId: question.id, value: { kind: 'aborted' }, ts }])
 	emitHistoryUpdated(sessionId)
 	return true
 }
@@ -244,7 +248,6 @@ function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 	return false
 }
 
-
 function answeredIntroNeedsContinue(entries: HistoryEntry[]): boolean {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i]!
@@ -264,7 +267,7 @@ function recordSessionStateChanges(sessionId: string, prevCwd: string, nextCwd: 
 	const fromModel = stateModel(prevModel)
 	const toModel = stateModel(nextModel)
 	if (fromModel !== toModel) entries.push({ type: 'model', from: fromModel, to: toModel, visibility: 'next-user', ts })
-	if (entries.length > 0) sessionStore.appendHistorySync(sessionId, entries)
+	if (entries.length > 0) sessionStore.appendHistory(sessionId, entries)
 }
 
 function buildSpawnPrompt(parentId: string, task: string, kind: SpawnKind, budget = 0): string {
@@ -337,7 +340,7 @@ async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec
 	// event. Clients learn about the new tab from the session list and build it
 	// from history, so a prompt event would race the tab creation and render the
 	// same message a second time.
-	sessionStore.appendHistorySync(child.id, [
+	sessionStore.appendHistory(child.id, [
 		{ type: 'input_history', text, ts },
 		{ type: 'user', parts: await resolvePromptParts(child.id, text), source: parent.id, ts },
 	])
@@ -385,7 +388,7 @@ function recordTabClosed(sessionId: string): void {
 // subagents or the inbox carry a source and are not human keystrokes.
 function persistCommandInput(sessionId: string, text: string, source?: string): void {
 	if (source) return
-	sessionStore.appendHistorySync(sessionId, [{ type: 'input_history', text, ts: new Date().toISOString() }])
+	sessionStore.appendHistory(sessionId, [{ type: 'input_history', text, ts: new Date().toISOString() }])
 }
 
 function buildSessionState(meta: SessionMeta): SessionState {
@@ -439,6 +442,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 		}
 		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error')
 		if (cmdResult.question) appendQuestion(sessionId, cmdResult.question)
+		if (cmdResult.loginProvider) retryAfterLogin(sessionId, cmdResult.loginProvider)
 		if (label === 'steering' && (/^\/cd(?:\s|$)/.test(text.trimStart()) || (!cmdResult.error && /^\/model\b/.test(text.trimStart())))) void runGeneration(sessionId, '', source)
 		return
 	}
@@ -542,7 +546,7 @@ async function continueTurn(sessionId: string, continuation: PendingContinuation
 	await continuePendingTools(sessionId)
 	if (continuation.canceled || sessionStore.findPendingTools(sessionId)) return
 	if (pendingTools?.aborted) {
-		sessionStore.appendHistorySync(sessionId, [{ type: 'turn_end', status: 'aborted', abortText: USER_PAUSED_TEXT, ts: new Date().toISOString() }])
+		sessionStore.appendHistory(sessionId, [{ type: 'turn_end', status: 'aborted', abortText: USER_PAUSED_TEXT, ts: new Date().toISOString() }])
 		emitHistoryUpdated(sessionId)
 		return
 	}
@@ -559,7 +563,6 @@ function requestContinue(sessionId: string): void {
 		() => { if (state.continuingTurns.get(sessionId) === continuation) state.continuingTurns.delete(sessionId) },
 	)
 }
-
 
 async function amendLastPrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<boolean> {
 	const entries = sessionStore.loadHistory(sessionId)
@@ -648,7 +651,6 @@ function isIntroStart(model: string, entries: HistoryEntry[]): boolean {
 	if (model !== 'hal/intro') return false
 	return !entries.some((entry) => entry.type === 'user' || entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result')
 }
-
 
 async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string, pending?: PendingPrompt, sourceTab?: number, label?: 'steering' | 'queued'): Promise<void> {
 	if (!ipc.ownsHostLock()) return
@@ -845,7 +847,6 @@ function removeClient(pid: number): void {
 		shared.clients = (shared.clients ?? []).filter((item) => item.pid !== pid)
 	})
 }
-
 
 function questionBlocksCommand(type: Command['type']): boolean {
 	return type === 'prompt' || type === 'prompt-amend' || type === 'continue' || type === 'run-next-from-queue'
@@ -1104,7 +1105,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		const ts = new Date().toISOString()
 		for (const sessionId of state.openSessionIds) {
 			if (!agentLoop.isWorking(sessionId)) continue
-			sessionStore.appendHistorySync(sessionId, [{ type: 'log', text: RESTARTED_TEXT, ts }])
+			sessionStore.appendHistory(sessionId, [{ type: 'log', text: RESTARTED_TEXT, ts }])
 			agentLoop.abort(sessionId, '')
 		}
 	}, { once: true })

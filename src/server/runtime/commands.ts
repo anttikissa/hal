@@ -47,6 +47,8 @@ export interface CommandResult {
 	syntheticKind?: string
 	/** Durable question appended after command output. */
 	question?: CommandQuestion
+	/** Canonical provider ID after a successful subscription login. */
+	loginProvider?: string
 	/** Whether the command was recognized and handled. */
 	handled: boolean
 }
@@ -613,7 +615,7 @@ handlers['login'] = async (args, _session, hooks) => {
 			question: {
 				text: 'Paste the code#state value from the Claude redirect page.',
 				input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 190 },
-				source: { type: 'login', provider: 'claude' },
+				source: { type: 'login', provider: 'anthropic' },
 			},
 			handled: true,
 		}
@@ -623,7 +625,7 @@ handlers['login'] = async (args, _session, hooks) => {
 		hooks.info?.('Starting ChatGPT device-code login (15min timeout)...')
 		try {
 			await authLogin.loginOpenai((msg) => hooks.info?.(msg))
-			return { output: 'Logged in to ChatGPT. Run /status to see usage.', handled: true }
+			return { output: 'Logged in to ChatGPT. Run /status to see usage.', loginProvider: 'openai', handled: true }
 		} catch (err: any) {
 			return { error: `Login failed: ${err?.message ?? err}`, handled: true }
 		}

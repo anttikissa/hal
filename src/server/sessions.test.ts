@@ -287,7 +287,7 @@ test('sessionOpenInfo includes tab number and effective model', () => {
 
 test('sessionOpenInfo publishes the canonical continuation action', async () => {
 	const id = await makeSession()
-	sessions.appendHistorySync(id, [
+	sessions.appendHistory(id, [
 		{ type: 'user', parts: [{ type: 'text', text: 'try this' }] },
 		{ type: 'turn_end', status: 'failed' },
 	])

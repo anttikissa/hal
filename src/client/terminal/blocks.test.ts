@@ -55,6 +55,18 @@ test('standalone plain URLs use one full-width logical line for terminal soft wr
 	expect(streaming.filter((line) => line.includes('example.com')).length).toBeGreaterThan(1)
 })
 
+test('ordinary notices put the timestamp on their first content line', () => {
+	const ts = new Date(2026, 0, 1, 17, 38).getTime()
+	const short = blocks.renderBlock({ type: 'log', text: 'Logged in successfully.', ts }, 80).map(stripAnsi)
+	const long = blocks.renderBlock({ type: 'info', text: 'A notice long enough that the old renderer put its timestamp on an empty-looking header row.', ts }, 44).map(stripAnsi)
+	const multiline = blocks.renderBlock({ type: 'log', text: 'Open this URL:\n\nhttps://example.com/login', ts }, 80).map(stripAnsi)
+
+	expect(short.filter((line) => line.trim())).toEqual([expect.stringContaining('17:38 Logged in successfully.')])
+	expect(long.find((line) => line.includes('17:38'))).toContain('A notice')
+	expect(multiline.find((line) => line.includes('17:38'))).toContain('Open this URL:')
+	expect(multiline.find((line) => line.includes('example.com'))).not.toContain('17:38')
+})
+
 test('block headers keep a right margin', () => {
 	// Header text (title on the left, blob ref on the right) must stop one column
 	// short of the terminal edge, matching the body margin.
@@ -67,12 +79,10 @@ test('block headers keep a right margin', () => {
 	expect(stripAnsi(withBlobRef[0]!).length).toBe(39)
 })
 
-
 test('streaming cursor leaves the terminal last column unused', () => {
 	const lines = blocks.renderBlock({ type: 'thinking', text: '1234567', streaming: true }, 9, true)
 	for (const line of lines) expect(stripAnsi(line).length).toBeLessThanOrEqual(8)
 })
-
 
 test('question controls honor wide-character widths', () => {
 	const question: any = { type: 'question', id: 'q1', text: '選択してください', input: { kind: 'choice', choices: [{ id: 'no', label: 'No', description: '非常に長い説明です' }, { id: 'yes', label: 'Yes' }] }, source: { type: 'intro' }, active: true }
@@ -98,7 +108,6 @@ test('bodyless tool blocks do not add a separator row', () => {
 	expect(lines.filter((line) => line.trim())).toHaveLength(1)
 })
 
-
 test('tool output wraps long lines instead of clipping them', () => {
 	const output = 'Waiting for the next subagent. Active: 118-mar (Wait display smoke test A, tab 15), 118-der (Wait display smoke test B, tab 14)'
 	const content = contentLines(blocks.renderBlock({ type: 'tool', name: 'wait', output }, 42)).map((line) => line.trim())
@@ -107,7 +116,6 @@ test('tool output wraps long lines instead of clipping them', () => {
 	expect(content.join(' ')).toBe(output)
 	expect(content.join('\n')).not.toContain('…')
 })
-
 
 test('tool cards fit within their physical text-row budget', () => {
 	colors.load()
@@ -121,7 +129,6 @@ test('tool cards fit within their physical text-row budget', () => {
 	expect(clean.some((line) => line.trim().startsWith('[+ '))).toBe(true)
 })
 
-
 test('search tool containment keeps the head', () => {
 	colors.load()
 	const output = Array.from({ length: 20 }, (_, index) => `result ${index + 1}`).join('\n')
@@ -132,7 +139,6 @@ test('search tool containment keeps the head', () => {
 	expect(clean.some((line) => line.trim() === 'result 20')).toBe(false)
 })
 
-
 test('tool summaries contain only their call-time header', () => {
 	colors.load()
 	const clean = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'git status' }, output: 'late output', toolSummary: true }, 80).map(stripAnsi)
@@ -141,7 +147,6 @@ test('tool summaries contain only their call-time header', () => {
 	expect(clean.join('\n')).toContain('Bash: git status')
 	expect(clean.join('\n')).not.toContain('late output')
 })
-
 
 test('tool activity indicator precedes the title and becomes a checkmark when done', () => {
 	colors.load()
@@ -181,11 +186,11 @@ test('multiword status notices also drop marker brackets', () => {
 	expect(lines[0]).not.toContain('[paused before local tools]')
 })
 
-test('status markers lose brackets inside mixed log groups', () => {
-	const lines = blocks.renderBlockGroup([
-		{ type: 'log', text: '[restarted]' },
-		{ type: 'log', text: 'Nothing to continue' },
-	], 80).map(stripAnsi)
+test('status markers lose brackets alongside regular notices', () => {
+	const lines = [
+		...blocks.renderBlock({ type: 'log', text: '[restarted]' }, 80),
+		...blocks.renderBlock({ type: 'log', text: 'Nothing to continue' }, 80),
+	].map(stripAnsi)
 
 	expect(lines.join('\n')).toContain('Restarted')
 	expect(lines.join('\n')).not.toContain('[restarted]')
@@ -242,7 +247,6 @@ test('user blocks use user colors', () => {
 	expect(rendered).not.toContain(colors.info.bg)
 })
 
-
 test('queued prompts use the warning card regardless of source', () => {
 	colors.load()
 	const queued = [
@@ -258,7 +262,6 @@ test('queued prompts use the warning card regardless of source', () => {
 		expect(rendered).toContain(colors.warning.bg)
 	}
 })
-
 
 test('thinking block renders markdown and trims trailing blank lines', () => {
 	const block: Block = {
@@ -293,7 +296,6 @@ test('assistant header includes display model', () => {
 	const header = headerLine(blocks.renderBlock(block, 80))
 	expect(header).toContain('Hal (GPT 5.4)')
 })
-
 
 test('canceled user and assistant headers show canceled marker', () => {
 	const userHeader = headerLine(blocks.renderBlock({ type: 'user', text: 'old prompt', canceled: true }, 80))

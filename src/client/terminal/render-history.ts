@@ -39,7 +39,6 @@ const config = {
 	toolRevealDelayMs: 100,
 }
 
-const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
 let workingSeen = new Set<string>()
 let fadeStart = new Map<string, number>()
 let nextToolRevealAt = 0
@@ -48,7 +47,6 @@ const bodyCache = new WeakMap<Tab, { key: string; lines: string[]; streaming: bo
 function hasInlineHalCursor(block: Block | undefined): boolean {
 	return (block?.type === 'assistant' || block?.type === 'thinking') && !!block.streaming
 }
-
 
 function toolSpinnerFrame(_block: Block, clockFrame: number): number {
 	return clockFrame
@@ -70,22 +68,9 @@ function renderEntry(block: Block, cols: number, context: HistoryRenderContext, 
 	return { lines, cursor: rendered.cursor }
 }
 
-function logGroupKey(block: Block): string | null {
-	// Coalesce consecutive one-line log blocks, even across days. Multiline
-	// output such as `/config` stays as a normal block so its line breaks survive.
-	if (block.type !== 'log' || block.text.includes('\n')) return null
-	if (block.text.startsWith(LAST_ACTIVE_NOTICE_PREFIX)) return null
-	return 'log'
+function isPlainNotice(block: Block | undefined): boolean {
+	return block?.type === 'info' || (block?.type === 'log' && !block.text.startsWith('Prompt queued'))
 }
-
-function renderGroup(group: Block[], cols: number, context: HistoryRenderContext, activeStreamingBlock: Block | undefined): RenderedBlock {
-	if (group.length === 1) return renderEntry(group[0]!, cols, context, activeStreamingBlock)
-	let lines = blockRenderer.renderBlockGroup(group as Array<{ type: 'log' | 'warning' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols, context.sessionLabel)
-	// Dim grouped blocks if any block in the group is dimmed (groups are same-type, so all or none)
-	if (group[0]?.dimmed) lines = lines.map((line) => oklch.dimAnsi(line, config.forkHistoryDimFactor))
-	return { lines }
-}
-
 
 function shouldHideBlock(history: Block[], index: number): boolean {
 	const block = history[index]
@@ -177,17 +162,13 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 				toolOffset = 0
 				fullTools = Infinity
 			}
-			const group = [block]
-			const groupKey = logGroupKey(group[0]!)
-			if (groupKey) {
-				for (let j = i + 1; j < history.length && logGroupKey(history[j]!) === groupKey; j++) group.push(history[j]!)
-			}
-			if (built.length > 0 && history[i - 1]?.type === 'assistant' && group[0]?.type === 'assistant') built.push('', `${colors.assistant.fg}${'─'.repeat(Math.max(0, cols))}\x1b[39m`, '')
-			else if (built.length > 0) built.push('')
-			const rendered = renderGroup(group, cols, context, activeStreamingBlock)
+			const previous = history[i - 1]
+			if (built.length > 0 && previous?.type === 'assistant' && block.type === 'assistant') built.push('', `${colors.assistant.fg}${'─'.repeat(Math.max(0, cols))}\x1b[39m`, '')
+			else if (built.length > 0 && !(isPlainNotice(previous) && isPlainNotice(block))) built.push('')
+			const rendered = renderEntry(block, cols, context, activeStreamingBlock)
 			if (rendered.cursor) questionCursor = { row: built.length + rendered.cursor.row, col: rendered.cursor.col }
 			built.push(...rendered.lines)
-			i += group.length
+			i++
 		}
 		body = { key, lines: built, streaming: !!activeStreamingBlock, nextToolRevealAt, cursor: questionCursor }
 		bodyCache.set(tab, body)
@@ -221,17 +202,13 @@ function resetAnimation(): void {
 	nextToolRevealAt = 0
 }
 
-
 function toolRevealDelay(): number | null {
 	if (nextToolRevealAt === 0) return null
 	return Math.max(0, nextToolRevealAt - Date.now())
 }
 
-
 function hasAnimatedCursor(tab: Tab | null | undefined): boolean {
 	return !!tab
 }
-
-
 
 export const renderHistory = { config, renderLines, hasAnimatedCursor, hasFadingCursor, resetAnimation, toolRevealDelay, toolSpinnerFrame }

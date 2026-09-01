@@ -290,6 +290,9 @@ export interface TurnEndMeta {
 	status: TurnEndStatus
 	usage?: PartialTokenUsage
 	abortText?: string
+	/** Provider failure provenance used to resume a 401 after login. */
+	provider?: string
+	httpStatus?: number
 }
 
 // ── Tool definitions (sent to providers) ──

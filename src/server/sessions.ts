@@ -108,7 +108,7 @@ function fixMeta(meta: SessionMeta, sessionId: string): SessionMeta {
 const historyTopLevelKeys = new Set([
 	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled',
 	'blobId', 'signature', 'model', 'thinkingEffort',
-	'usage', 'abortText', 'synthetic', 'syntheticKind',
+	'usage', 'abortText', 'provider', 'httpStatus', 'synthetic', 'syntheticKind',
 	'toolId', 'toolIds', 'name', 'input', 'output', 'isError', 'cwd', 'reason',
 	'questionId', 'value', 'level', 'visibility', 'ui', 'usageBars', 'parent', 'child', 'log', 'from', 'to',
 ])
@@ -596,7 +596,6 @@ export const sessions = {
 	deactivateAllSessions,
 	createSession,
 	appendHistory,
-	appendHistorySync: appendHistory,
 	updateMeta,
 	forkSession,
 	deleteSession,

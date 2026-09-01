@@ -17,7 +17,7 @@ export type QuestionInput =
 export type QuestionSource =
 	| { type: 'tool'; pendingId: string; toolId: string }
 	| { type: 'intro' }
-	| { type: 'login'; provider: 'claude' }
+	| { type: 'login'; provider: string }
 
 export type AnswerValue =
 	| { kind: 'choice'; choiceId: string }
