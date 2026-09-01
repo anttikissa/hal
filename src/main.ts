@@ -127,10 +127,6 @@ clientBackend.install({
 	subscriptions: {
 		isApiKey: (provider) => auth.isApiKey(provider),
 		current: subscriptionStatus,
-		noteActivity: () => {
-			openaiUsage.noteActivity()
-			anthropicUsage.noteActivity()
-		},
 		onChange: (callback) => {
 			openaiUsage.onChange(callback)
 			anthropicUsage.onChange(callback)

@@ -586,7 +586,7 @@ async function* generateCompat(providerName: string, baseUrl: string, req: Provi
 	}
 	try {
 		for await (const event of parseChatCompletionsStream(res.body!)) {
-			if (event.type === 'done' && event.usage && credential.type === 'token') openaiUsage.recordUsage(credential, event.usage)
+			if (event.type === 'done' && credential.type === 'token') await openaiUsage.refreshAll().catch(() => {})
 			yield event
 		}
 	} catch (err) {
@@ -696,7 +696,7 @@ async function* generateOpenAIWebSocket(req: ProviderRequest, credential: Creden
 	let completedResponseId = ''
 	for await (const item of streamResponsesWebSocket(chain, body, req.signal)) {
 		if (item.responseId) completedResponseId = item.responseId
-		if (item.event.type === 'done' && item.event.usage) openaiUsage.recordUsage(credential, item.event.usage)
+		if (item.event.type === 'done' && credential.type === 'token') await openaiUsage.refreshAll().catch(() => {})
 		yield item.event
 	}
 	if (completedResponseId) {
@@ -763,7 +763,7 @@ async function* generateOpenAIHttp(req: ProviderRequest, credential: Credential,
 	}
 	try {
 		for await (const event of parseResponsesStream(res.body!)) {
-			if (event.type === 'done' && event.usage) openaiUsage.recordUsage(credential, event.usage)
+			if (event.type === 'done' && credential.type === 'token') await openaiUsage.refreshAll().catch(() => {})
 			yield event
 		}
 	} catch (err) {

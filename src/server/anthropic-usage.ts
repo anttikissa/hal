@@ -1,7 +1,6 @@
 // Anthropic Claude subscription usage via api.anthropic.com/api/oauth/usage.
 
 import { auth, type Credential } from './auth.ts'
-import { ipc } from './file-ipc.ts'
 import { STATE_DIR } from './state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { subscriptionUsage } from '../common/subscription-usage.ts'
@@ -25,23 +24,16 @@ export interface AccountUsage {
 	fiveHour?: UsageWindow
 	sevenDay?: UsageWindow
 	modelWeek?: UsageWindow & { label: string }
-	pendingTokens: number
 }
 
 const config = {
-	// Automatic refreshes should be quiet. /status bypasses this floor.
 	minAutoRefreshMs: 60_000,
-	activeWindowMs: 5 * 60_000,
-	activeRefreshMs: 10 * 60_000,
-	tokenRefreshThreshold: 100_000,
-	activityWriteThrottleMs: 60_000,
 	fetchTimeoutMs: 5_000,
 	progressBarWidth: 14,
 }
 
 interface UsageState {
 	currentKey: string
-	lastActiveAt: string
 	updatedAt: string
 	accounts: Record<string, AccountUsage>
 }
@@ -51,7 +43,7 @@ const runtime = {
 }
 
 function defaultState(): UsageState {
-	return { currentKey: '', lastActiveAt: '', updatedAt: '', accounts: {} }
+	return { currentKey: '', updatedAt: '', accounts: {} }
 }
 
 let state = defaultState()
@@ -66,7 +58,6 @@ function init(): void {
 function fix(): void {
 	if (typeof anthropicUsage.state.currentKey !== 'string') anthropicUsage.state.currentKey = ''
 	if (typeof anthropicUsage.state.updatedAt !== 'string') anthropicUsage.state.updatedAt = ''
-	if (typeof anthropicUsage.state.lastActiveAt !== 'string') anthropicUsage.state.lastActiveAt = ''
 	if (!anthropicUsage.state.accounts || typeof anthropicUsage.state.accounts !== 'object') anthropicUsage.state.accounts = {}
 	for (const [key, account] of Object.entries(anthropicUsage.state.accounts)) {
 		if (!account || typeof account !== 'object') {
@@ -74,7 +65,6 @@ function fix(): void {
 			continue
 		}
 		if (typeof account.key !== 'string') account.key = key
-		if (typeof account.pendingTokens !== 'number') account.pendingTokens = 0
 	}
 }
 
@@ -140,7 +130,6 @@ function parsePayload(credential: Credential, raw: any): AccountUsage {
 		fiveHour: parseWindow(raw?.five_hour),
 		sevenDay: parseWindow(raw?.seven_day),
 		modelWeek: sonnet ? { ...sonnet, label: 'Sonnet' } : opus ? { ...opus, label: 'Opus' } : undefined,
-		pendingTokens: 0,
 	}
 }
 
@@ -180,13 +169,6 @@ function setCurrentCredential(credential: Credential | undefined): void {
 	const key = keyOf(credential)
 	if (anthropicUsage.state.currentKey === key) return
 	anthropicUsage.state.currentKey = key
-	save()
-}
-function noteActivity(now = Date.now()): void {
-	anthropicUsage.init()
-	const last = anthropicUsage.state.lastActiveAt ? Date.parse(anthropicUsage.state.lastActiveAt) : 0
-	if (last && now - last < config.activityWriteThrottleMs) return
-	anthropicUsage.state.lastActiveAt = new Date(now).toISOString()
 	save()
 }
 
@@ -301,59 +283,6 @@ async function refreshAll(force = false): Promise<AccountUsage[]> {
 	for (const credential of creds) await refreshCredential(credential, force)
 	return all()
 }
-function recordUsage(credential: Credential | undefined, usage: { input: number; output: number } | undefined): void {
-	anthropicUsage.init()
-	if (!credential || credential.type !== 'token' || !usage) return
-	const key = keyOf(credential)
-	const account = anthropicUsage.state.accounts[key] ?? {
-		key,
-		email: credential.email,
-		index: credential.index,
-		total: credential.total,
-		pendingTokens: 0,
-	}
-	account.pendingTokens += (usage.input ?? 0) + (usage.output ?? 0)
-	anthropicUsage.state.accounts[key] = account
-	save()
-	void maybeRefreshCurrent()
-}
-
-async function maybeRefreshCurrent(): Promise<void> {
-	anthropicUsage.init()
-	if (!ipc.ownsHostLock() || !anthropicUsage.state.currentKey) return
-	const credential = credentials().find((item) => keyOf(item) === anthropicUsage.state.currentKey)
-	if (!credential) return
-	const account = anthropicUsage.state.accounts[anthropicUsage.state.currentKey] ?? null
-	const now = Date.now()
-	const lastFetch = account?.fetchedAt ? Date.parse(account.fetchedAt) : 0
-	const lastActive = anthropicUsage.state.lastActiveAt ? Date.parse(anthropicUsage.state.lastActiveAt) : 0
-	const byTokens = !!account && account.pendingTokens >= config.tokenRefreshThreshold && (!lastFetch || now - lastFetch >= config.minAutoRefreshMs)
-	const byActivity = !account?.fetchedAt || !Number.isFinite(lastFetch)
-		? true
-		: !!lastActive && now - lastActive <= config.activeWindowMs && now - lastFetch >= config.activeRefreshMs
-	if (!byTokens && !byActivity) return
-	try {
-		await refreshCredential(credential)
-	} catch {}
-}
-
-let timer: ReturnType<typeof setInterval> | null = null
-
-function start(signal?: AbortSignal): void {
-	anthropicUsage.init()
-	if (timer) return
-	const credential = auth.getCredential('anthropic')
-	if (credential?.type === 'token') setCurrentCredential(credential)
-	timer = setInterval(() => {
-		void maybeRefreshCurrent()
-	}, config.minAutoRefreshMs)
-	void maybeRefreshCurrent()
-	signal?.addEventListener('abort', () => {
-		if (!timer) return
-		clearInterval(timer)
-		timer = null
-	}, { once: true })
-}
 
 async function renderStatus(force = true): Promise<string> {
 	if (credentials().length === 0) return 'No Anthropic Claude subscriptions configured.'
@@ -376,11 +305,7 @@ export const anthropicUsage = {
 	hasCredentials,
 	all,
 	current,
-	noteActivity,
 	setCurrentCredential,
-	recordUsage,
-	maybeRefreshCurrent,
-	start,
 	refreshAll,
 	formatResetAt,
 	formatStatusText,

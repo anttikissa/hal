@@ -14,13 +14,13 @@ test('openaiUsage.init loads lazily and only once', () => {
 	liveFiles.liveFile = ((path: string, defaults: Record<string, any>) => {
 		liveFileCalls++
 		expect(path.endsWith('/openai-usage.ason')).toBe(true)
-		expect(defaults).toMatchObject({ currentKey: '', lastActiveAt: '', updatedAt: '', accounts: {} })
-		return { currentKey: '', lastActiveAt: '', updatedAt: '', accounts: {} } as any
+		expect(defaults).toMatchObject({ currentKey: '', updatedAt: '', accounts: {} })
+		return { currentKey: '', updatedAt: '', accounts: {} } as any
 	}) as typeof liveFiles.liveFile
 
 	try {
 		runtime.initialized = false
-		openaiUsage.state = { currentKey: '', lastActiveAt: '', updatedAt: '', accounts: {} }
+		openaiUsage.state = { currentKey: '', updatedAt: '', accounts: {} }
 		expect(liveFileCalls).toBe(0)
 
 		openaiUsage.init()

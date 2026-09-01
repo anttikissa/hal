@@ -1,5 +1,6 @@
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { auth, type Credential } from '../auth.ts'
+import { openaiUsage } from '../openai-usage.ts'
 import { createCompatProvider, openai, openaiProvider } from './openai.ts'
 import { providerShared } from './shared.ts'
 
@@ -18,6 +19,11 @@ const origMarkCooldown = auth.markCooldown
 const origHasAvailableCredential = auth.hasAvailableCredential
 const origStreamTimeoutMs = providerShared.config.streamTimeoutMs
 const origResponsesConnectTimeoutMs = openai.config.responsesConnectTimeoutMs
+const origRefreshUsage = openaiUsage.refreshAll
+
+beforeEach(() => {
+	openaiUsage.refreshAll = async () => []
+})
 
 afterEach(() => {
 	globalThis.fetch = origFetch
@@ -32,6 +38,7 @@ afterEach(() => {
 	if (origTransportEnv == null) delete process.env.HAL_OPENAI_RESPONSES_TRANSPORT
 	else process.env.HAL_OPENAI_RESPONSES_TRANSPORT = origTransportEnv
 	openai.resetResponsesWebSocketsForTests()
+	openaiUsage.refreshAll = origRefreshUsage
 })
 
 test('responses sends image tool results as native output content', () => {
@@ -159,6 +166,11 @@ async function collect(provider: { generate: typeof openaiProvider.generate }, p
 }
 
 test('openai provider routes ChatGPT OAuth tokens to the Codex backend', async () => {
+	let refreshes = 0
+	openaiUsage.refreshAll = async () => {
+		refreshes++
+		return []
+	}
 	const token = makeJwt({
 		scp: ['openid', 'profile', 'email', 'offline_access'],
 		'https://api.openai.com/auth': { chatgpt_account_id: 'acct_from_token' },
@@ -177,6 +189,7 @@ test('openai provider routes ChatGPT OAuth tokens to the Codex backend', async (
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
 	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
+	expect(refreshes).toBe(1)
 })
 
 test('openai provider routes API keys to the public Responses API', async () => {

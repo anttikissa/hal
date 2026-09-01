@@ -107,14 +107,6 @@
 	anthropicUsage: {
 		// Minimum delay between automatic usage refreshes.
 		minAutoRefreshMs: 60000,
-		// Recently-active window for Claude usage refresh decisions.
-		activeWindowMs: 300000,
-		// Refresh cadence while Claude usage is active.
-		activeRefreshMs: 600000,
-		// Refresh after this many new Claude tokens are observed.
-		tokenRefreshThreshold: 100000,
-		// Minimum delay between activity writes.
-		activityWriteThrottleMs: 60000,
 		// HTTP timeout for Anthropic usage requests.
 		fetchTimeoutMs: 5000,
 		// Width of the usage progress bar in status output.
@@ -123,14 +115,6 @@
 	openaiUsage: {
 		// Minimum delay between automatic usage refreshes.
 		minAutoRefreshMs: 60000,
-		// Recently-active window for OpenAI usage refresh decisions.
-		activeWindowMs: 300000,
-		// Refresh cadence while OpenAI usage is active.
-		activeRefreshMs: 600000,
-		// Refresh after this many new OpenAI tokens are observed.
-		tokenRefreshThreshold: 100000,
-		// Minimum delay between activity writes.
-		activityWriteThrottleMs: 60000,
 		// HTTP timeout for OpenAI usage requests.
 		fetchTimeoutMs: 10000,
 		// Width of the usage progress bar in status output.

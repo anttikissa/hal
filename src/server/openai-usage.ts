@@ -1,7 +1,6 @@
 // OpenAI ChatGPT subscription usage via chatgpt.com/backend-api/wham/usage.
 
 import { auth, type Credential } from './auth.ts'
-import { ipc } from './file-ipc.ts'
 import { STATE_DIR } from './state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { subscriptionUsage } from '../common/subscription-usage.ts'
@@ -24,25 +23,18 @@ export interface AccountUsage {
 	fetchedAt?: string
 	primary?: UsageWindow
 	secondary?: UsageWindow
-	pendingTokens: number
 	// Present when OpenAI rejected this account's bearer token during refresh.
 	error?: string
 }
 
 interface UsageState {
 	currentKey: string
-	lastActiveAt: string
 	updatedAt: string
 	accounts: Record<string, AccountUsage>
 }
 
 const config = {
-	// Automatic refreshes should be quiet. /status bypasses this floor.
 	minAutoRefreshMs: 60_000,
-	activeWindowMs: 5 * 60_000,
-	activeRefreshMs: 10 * 60_000,
-	tokenRefreshThreshold: 100_000,
-	activityWriteThrottleMs: 60_000,
 	fetchTimeoutMs: 10_000,
 	progressBarWidth: 14,
 }
@@ -52,19 +44,13 @@ const runtime = {
 }
 
 function defaultState(): UsageState {
-	return {
-		currentKey: '',
-		lastActiveAt: '',
-		updatedAt: '',
-		accounts: {},
-	}
+	return { currentKey: '', updatedAt: '', accounts: {} }
 }
 
 let state: UsageState = defaultState()
 
 function fix(): void {
 	if (typeof openaiUsage.state.currentKey !== 'string') openaiUsage.state.currentKey = ''
-	if (typeof openaiUsage.state.lastActiveAt !== 'string') openaiUsage.state.lastActiveAt = ''
 	if (typeof openaiUsage.state.updatedAt !== 'string') openaiUsage.state.updatedAt = ''
 	if (!openaiUsage.state.accounts || typeof openaiUsage.state.accounts !== 'object') openaiUsage.state.accounts = {}
 	for (const [key, account] of Object.entries(openaiUsage.state.accounts)) {
@@ -73,7 +59,6 @@ function fix(): void {
 			continue
 		}
 		if (typeof account.key !== 'string') account.key = key
-		if (typeof account.pendingTokens !== 'number') account.pendingTokens = 0
 	}
 }
 
@@ -129,7 +114,6 @@ function parsePayload(credential: Credential, raw: any): AccountUsage {
 		fetchedAt: new Date().toISOString(),
 		primary: parseWindow(raw?.rate_limit?.primary_window),
 		secondary: parseWindow(raw?.rate_limit?.secondary_window),
-		pendingTokens: 0,
 	}
 }
 
@@ -151,14 +135,6 @@ function setCurrentCredential(credential: Credential | undefined): void {
 	const key = keyOf(credential)
 	if (openaiUsage.state.currentKey === key) return
 	openaiUsage.state.currentKey = key
-	save()
-}
-
-function noteActivity(now = Date.now()): void {
-	openaiUsage.init()
-	const last = openaiUsage.state.lastActiveAt ? Date.parse(openaiUsage.state.lastActiveAt) : 0
-	if (last && now - last < config.activityWriteThrottleMs) return
-	openaiUsage.state.lastActiveAt = new Date(now).toISOString()
 	save()
 }
 
@@ -259,7 +235,6 @@ function expiredAccount(credential: Credential): AccountUsage {
 		index: credential.index,
 		total: credential.total,
 		fetchedAt: new Date().toISOString(),
-		pendingTokens: 0,
 		error: 'Token expired — sign in again with /login chatgpt',
 	}
 }
@@ -322,60 +297,6 @@ async function refreshAll(force = false): Promise<AccountUsage[]> {
 	return all()
 }
 
-function recordUsage(credential: Credential | undefined, usage: { input: number; output: number } | undefined): void {
-	openaiUsage.init()
-	if (!credential || credential.type !== 'token' || !usage) return
-	const key = keyOf(credential)
-	const account = openaiUsage.state.accounts[key] ?? {
-		key,
-		email: credential.email,
-		index: credential.index,
-		total: credential.total,
-		pendingTokens: 0,
-	}
-	account.pendingTokens += (usage.input ?? 0) + (usage.output ?? 0)
-	openaiUsage.state.accounts[key] = account
-	save()
-	void maybeRefreshCurrent()
-}
-
-async function maybeRefreshCurrent(): Promise<void> {
-	openaiUsage.init()
-	if (!ipc.ownsHostLock() || !openaiUsage.state.currentKey) return
-	const credential = credentials().find((item) => keyOf(item) === openaiUsage.state.currentKey)
-	if (!credential) return
-	const account = openaiUsage.state.accounts[openaiUsage.state.currentKey] ?? null
-	const now = Date.now()
-	const lastFetch = account?.fetchedAt ? Date.parse(account.fetchedAt) : 0
-	const lastActive = openaiUsage.state.lastActiveAt ? Date.parse(openaiUsage.state.lastActiveAt) : 0
-	const byTokens = !!account && account.pendingTokens >= config.tokenRefreshThreshold && (!lastFetch || now - lastFetch >= config.minAutoRefreshMs)
-	const byActivity = !account?.fetchedAt || !Number.isFinite(lastFetch)
-		? true
-		: !!lastActive && now - lastActive <= config.activeWindowMs && now - lastFetch >= config.activeRefreshMs
-	if (!byTokens && !byActivity) return
-	try {
-		await refreshCredential(credential)
-	} catch {}
-}
-
-let timer: ReturnType<typeof setInterval> | null = null
-
-function start(signal?: AbortSignal): void {
-	openaiUsage.init()
-	if (timer) return
-	const credential = auth.getCredential('openai')
-	if (credential?.type === 'token') setCurrentCredential(credential)
-	timer = setInterval(() => {
-		void maybeRefreshCurrent()
-	}, config.minAutoRefreshMs)
-	void maybeRefreshCurrent()
-	signal?.addEventListener('abort', () => {
-		if (!timer) return
-		clearInterval(timer)
-		timer = null
-	}, { once: true })
-}
-
 async function renderStatus(force = true): Promise<string> {
 	openaiUsage.init()
 	if (credentials().length === 0) return 'No OpenAI ChatGPT subscriptions configured.'
@@ -398,15 +319,11 @@ export const openaiUsage = {
 	hasCredentials,
 	all,
 	current,
-	noteActivity,
 	setCurrentCredential,
-	recordUsage,
 	refreshAll,
-	maybeRefreshCurrent,
 	formatResetAt,
 	formatStatusText,
 	displayWindows,
 	renderStatus,
 	parsePayload,
-	start,
 }

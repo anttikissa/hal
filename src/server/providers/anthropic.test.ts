@@ -1,5 +1,6 @@
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { auth, type Credential } from '../auth.ts'
+import { anthropicUsage } from '../anthropic-usage.ts'
 import { anthropicProvider } from './anthropic.ts'
 import { version } from '../version.ts'
 
@@ -8,8 +9,13 @@ const origGetCredential = auth.getCredential
 const origEnsureFresh = auth.ensureFresh
 const origMarkCooldown = auth.markCooldown
 const origHasAvailableCredential = auth.hasAvailableCredential
+const origRefreshUsage = anthropicUsage.refreshAll
 
 const origCombined = version.state.combined
+
+beforeEach(() => {
+	anthropicUsage.refreshAll = async () => []
+})
 
 afterEach(() => {
 	globalThis.fetch = origFetch
@@ -18,6 +24,7 @@ afterEach(() => {
 	auth.ensureFresh = origEnsureFresh
 	auth.markCooldown = origMarkCooldown
 	auth.hasAvailableCredential = origHasAvailableCredential
+	anthropicUsage.refreshAll = origRefreshUsage
 })
 
 function installFetchMock(fn: (input: any, init?: RequestInit) => Promise<Response>): void {
@@ -67,6 +74,21 @@ test('anthropic provider streams text while rotating accounts', async () => {
 
 	expect(events[0]).toEqual({ type: 'text', text: 'hello' })
 	expect(events.at(-1)).toMatchObject({ type: 'done', doneStatus: 'completed', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
+})
+
+
+test('completed Anthropic responses refresh the existing usage cache', async () => {
+	let refreshes = 0
+	anthropicUsage.refreshAll = async () => {
+		refreshes++
+		return []
+	}
+	installFetchMock(async () => new Response(anthropicSse(), { status: 200 }) as any)
+
+	await collect({ value: 'tok-test', type: 'token' })
+	await Promise.resolve()
+
+	expect(refreshes).toBe(1)
 })
 
 

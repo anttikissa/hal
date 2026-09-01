@@ -1,13 +1,11 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { auth, type Credential } from './auth.ts'
-import { ipc } from './file-ipc.ts'
 import { anthropicUsage } from './anthropic-usage.ts'
 import { subscriptionUsage } from '../common/subscription-usage.ts'
 
 const origFetch = globalThis.fetch
 const origListCredentials = auth.listCredentials
 const origEnsureFresh = auth.ensureFresh
-const origOwnsHostLock = ipc.ownsHostLock
 
 function makeCredential(index: number, email: string): Credential {
 	return {
@@ -28,7 +26,6 @@ afterEach(() => {
 	globalThis.fetch = origFetch
 	auth.listCredentials = origListCredentials
 	auth.ensureFresh = origEnsureFresh
-	ipc.ownsHostLock = origOwnsHostLock
 	anthropicUsage.state.currentKey = ''
 	anthropicUsage.state.accounts = {}
 	subscriptionUsage.config.censorEmails = false
@@ -101,7 +98,6 @@ test('refreshAll prunes cached accounts whose credentials are gone', async () =>
 			email: 'a@test.com',
 			index: 0,
 			total: 2,
-			pendingTokens: 0,
 			fiveHour: { usedPercent: 10 },
 		},
 		'anthropic:1': {
@@ -109,7 +105,6 @@ test('refreshAll prunes cached accounts whose credentials are gone', async () =>
 			email: 'b@test.com',
 			index: 1,
 			total: 2,
-			pendingTokens: 0,
 			fiveHour: { usedPercent: 20 },
 		},
 	}
@@ -139,7 +134,6 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 			email: 'antti@lippukiska.fi',
 			index: 0,
 			total: 2,
-			pendingTokens: 0,
 			fiveHour: { usedPercent: 68, resetAt: Date.parse('2026-01-07T05:00:00Z') },
 			modelWeek: { label: 'Sonnet', usedPercent: 25 },
 		},
@@ -148,7 +142,6 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 			email: 'antti.kissaniemi@gmail.com',
 			index: 1,
 			total: 2,
-			pendingTokens: 0,
 			sevenDay: { usedPercent: 30, resetAt: Date.parse('2026-01-08T05:00:00Z') },
 		},
 	}
@@ -158,30 +151,4 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 	expect(text).toContain('a\\*\\*\\*@l\\*\\*\\*.fi')
 	expect(text).toContain('a\\*\\*\\*@g\\*\\*\\*\\*.com')
 	expect(text).toContain(`| 1/2 * | a\\*\\*\\*@l\\*\\*\\*.fi | ${subscriptionUsage.usageBarMarker(68, 14)}`)
-})
-
-
-test('refreshes an active Claude subscription after a response', async () => {
-	auth.ensureFresh = async () => {}
-	auth.listCredentials = () => [makeCredential(0, 'a@test.com')]
-	ipc.ownsHostLock = () => true
-	anthropicUsage.state.currentKey = 'anthropic:0'
-	anthropicUsage.state.lastActiveAt = new Date().toISOString()
-	anthropicUsage.state.accounts = {
-		'anthropic:0': {
-			key: 'anthropic:0',
-			pendingTokens: 0,
-			fetchedAt: new Date(Date.now() - 11 * 60_000).toISOString(),
-			fiveHour: { usedPercent: 3 },
-		},
-	}
-	globalThis.fetch = Object.assign(async () => new Response(JSON.stringify({
-		five_hour: { utilization: 0.69 },
-		seven_day: { utilization: 0.20 },
-	}), { status: 200 }) as any, { preconnect: () => {} }) as typeof fetch
-
-	anthropicUsage.recordUsage(makeCredential(0, 'a@test.com'), { input: 1, output: 1 })
-	await new Promise((resolve) => setTimeout(resolve, 0))
-
-	expect(anthropicUsage.current()?.fiveHour?.usedPercent).toBe(69)
 })

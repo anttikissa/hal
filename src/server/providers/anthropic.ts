@@ -373,7 +373,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 
 	try {
 		for await (const event of parseStream(res.body!, { sessionId: req.sessionId, model: req.model })) {
-			if (event.type === 'done' && event.usage) anthropicUsage.recordUsage(cred, event.usage)
+			if (event.type === 'done' && cred.type === 'token') await anthropicUsage.refreshAll().catch(() => {})
 			yield event
 		}
 	} catch (err) {

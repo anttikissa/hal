@@ -23,7 +23,6 @@ afterEach(() => {
 	auth.listCredentials = origListCredentials
 	auth.ensureFresh = origEnsureFresh
 	openaiUsage.state.currentKey = ''
-	openaiUsage.state.lastActiveAt = ''
 	openaiUsage.state.accounts = {}
 	subscriptionUsage.config.censorEmails = false
 	openaiUsage.config.progressBarWidth = 14
@@ -52,7 +51,6 @@ test('parsePayload maps the ChatGPT rate-limit payload', () => {
 	expect(snapshot.planType).toBe('plus')
 	expect(snapshot.primary).toEqual({ usedPercent: 23, windowMinutes: 300, resetAt: 1_775_836_198 })
 	expect(snapshot.secondary).toEqual({ usedPercent: 61, windowMinutes: 10_080, resetAt: 1_776_368_540 })
-	expect(snapshot.pendingTokens).toBe(0)
 })
 
 test('formatStatusText labels OpenAI windows from their returned duration', () => {
@@ -64,7 +62,6 @@ test('formatStatusText labels OpenAI windows from their returned duration', () =
 			index: 0,
 			total: 1,
 			planType: 'plus',
-			pendingTokens: 0,
 			primary: { usedPercent: 24, windowMinutes: 10_080, resetAt: 1_775_836_198 },
 		},
 	}
@@ -167,7 +164,6 @@ test('refreshAll drops cached rows for old credential keys', async () => {
 			key: 'openai:1',
 			index: 1,
 			total: 2,
-			pendingTokens: 0,
 			primary: { usedPercent: 23, windowMinutes: 300, resetAt: 1 },
 		},
 	}
@@ -237,7 +233,6 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 			index: 0,
 			total: 3,
 			planType: 'plus',
-			pendingTokens: 0,
 			primary: { usedPercent: 68, windowMinutes: 300, resetAt: 1_775_836_198 },
 		},
 		'openai:1': {
@@ -246,7 +241,6 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 			index: 1,
 			total: 3,
 			planType: 'plus',
-			pendingTokens: 0,
 			primary: { usedPercent: 0, windowMinutes: 300, resetAt: 1_775_836_198 },
 		},
 		'openai:2': {
@@ -255,7 +249,6 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 			index: 2,
 			total: 3,
 			planType: 'plus',
-			pendingTokens: 0,
 			primary: { usedPercent: 0, windowMinutes: 300, resetAt: 1_775_836_198 },
 		},
 	}

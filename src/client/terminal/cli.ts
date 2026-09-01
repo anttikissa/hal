@@ -555,7 +555,6 @@ function chooseModelWithoutClearingDraft(model: string): void {
 		return
 	}
 	client.sendCommand('prompt', `/model ${model}`)
-	clientBackend.subscriptions.noteActivity()
 	draw()
 }
 
@@ -568,7 +567,6 @@ function handlePromptKey(k: KeyEvent): boolean {
 	const previousRows = prompt.buildPrompt(width).lines.length
 	if (!prompt.handleKey(k, width)) return false
 	client.clearRestoreTabHint()
-	clientBackend.subscriptions.noteActivity()
 	// Moving a shorter prompt to the bottom crosses immutable scrollback rows into
 	// the viewport. Only a canonical repaint can avoid duplicating those rows.
 	const promptShrunk = prompt.buildPrompt(width).lines.length < previousRows
@@ -614,8 +612,7 @@ function installPromptTabSwitchHandler(): void {
 		promptStates.set(fromSession, prompt.snapshotState())
 		saveCurrentPromptDraft(fromSession)
 		restorePromptForCurrentTab()
-		clientBackend.subscriptions.noteActivity()
-	})
+		})
 }
 
 // App-level keybindings (not handled by prompt)
@@ -738,8 +735,7 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 
 	// Wire prompt to trigger repaint on async paste resolve.
 	prompt.setRenderCallback(() => {
-		clientBackend.subscriptions.noteActivity()
-		draw()
+			draw()
 	})
 
 	client.startClient(signal, { ...opts, viewportCols: process.stdout.columns || 80 })
@@ -801,8 +797,7 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 			const tab = client.currentTab()
 			if (tab) tab.inputDraftEdit = savedEdit
 			if (tab) restorePromptEditForTab(tab)
-			clientBackend.subscriptions.noteActivity()
-			draw()
+					draw()
 		}
 	})
 
@@ -814,21 +809,18 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 		for (const k of keys.parseKeys(text)) {
 			// Popup keys first — an active modal owns the keyboard.
 			if (popup.state.active && popup.handleKey(k)) {
-				clientBackend.subscriptions.noteActivity()
-				draw()
+							draw()
 				continue
 			}
 			// Active questions contain ordinary input, while existing app shortcuts
 			// such as Ctrl-N/P still run through their native handler.
 			if (handleQuestionKey(k)) {
-				clientBackend.subscriptions.noteActivity()
-				draw()
+							draw()
 				continue
 			}
 			// Completion keys next (tab, arrows in popup, etc.)
 			if (handleCompletionKey(k)) {
-				clientBackend.subscriptions.noteActivity()
-				draw()
+							draw()
 				continue
 			}
 			// App keybindings
