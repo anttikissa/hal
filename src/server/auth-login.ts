@@ -178,13 +178,19 @@ async function loginOpenai(onProgress?: (msg: string) => void): Promise<{ accoun
 	const { access_token, refresh_token, expires_in } = await tokenRes.json() as any
 	if (!access_token || !refresh_token) throw new Error('Token response missing required fields')
 
-	const accountId = decodeJwt(access_token)?.['https://api.openai.com/auth']?.chatgpt_account_id ?? null
+	const claims = decodeJwt(access_token)
+	const accountId = claims?.['https://api.openai.com/auth']?.chatgpt_account_id ?? null
+	// Store the email too: /status and the "all accounts rate limited" message name
+	// accounts by email, and an accountId UUID tells the user nothing about which
+	// login to go fix.
+	const email = claims?.['https://api.openai.com/profile']?.email ?? null
 
 	saveAuth('openai', {
 		accessToken: access_token,
 		refreshToken: refresh_token,
 		expires: Date.now() + (expires_in ?? 3600) * 1000,
 		...(accountId ? { accountId } : {}),
+		...(email ? { email } : {}),
 	})
 	return { accountId }
 }
