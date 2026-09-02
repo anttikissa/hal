@@ -9,6 +9,11 @@ function reset(): void {
 	state.pendingOpen = false
 	state.returnToBySession.clear()
 }
+// An opener is only useful while the new tab remains continuously focused.
+// Keeping it longer creates hidden navigation history that can override neighbors.
+function expireReturnTo(sessionId: string): void {
+	state.returnToBySession.delete(sessionId)
+}
 
 function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): void {
 	const model = ctx.model
@@ -73,7 +78,10 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	if (shrank) ctx.showRestoreTabHint()
 	if (state.pendingOpen === 'resume' && grew) ctx.clearRestoreTabHint()
 	if (grew && openedSessionId) state.pendingOpen = false
-	if (previousSession !== newSession) ctx.onTabSwitch(previousSession, newSession)
+	if (previousSession !== newSession) {
+		expireReturnTo(previousSession)
+		ctx.onTabSwitch(previousSession, newSession)
+	}
 	ctx.onChange(previousTabs.length > 0 && previousSession !== newSession)
 }
 
@@ -92,4 +100,4 @@ function copyForkDraft(isFork: boolean, grew: boolean, previousSession: string, 
 	if (prevTab?.inputDraft && newTab) newTab.inputDraft = prevTab.inputDraft
 }
 
-export const sessionTabs = { state, reset, apply }
+export const sessionTabs = { state, reset, expireReturnTo, apply }

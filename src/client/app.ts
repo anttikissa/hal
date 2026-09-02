@@ -332,6 +332,7 @@ function switchTab(index: number): void {
 	if (index >= 0 && index < state.tabs.length && index !== state.focusedTabIndex) {
 		clearRestoreTabHint()
 		const fromSession = state.tabs[state.focusedTabIndex]?.sessionId ?? ''
+		sessionTabs.expireReturnTo(fromSession)
 		state.focusedTabIndex = index
 		const tab = state.tabs[index]!
 		// Clear "done unseen" flag — user is now looking at this tab

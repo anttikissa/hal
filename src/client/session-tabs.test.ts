@@ -153,3 +153,35 @@ test('pending open survives unrelated session refresh until the new tab arrives'
 	expect(model.tabs[1]?.sessionId).toBe('new')
 	expect(sessionTabs.state.pendingOpen).toBeFalsy()
 })
+test('an immediately closed newly opened tab returns to its opener', () => {
+	sessionTabs.reset()
+	sessionTabs.state.pendingOpen = 'open'
+	const model = {
+		tabs: [tab('parent'), tab('right')],
+		focusedTabIndex: 0,
+		recentTabs: ['parent'],
+	}
+	const c = ctx({ model })
+
+	sessionTabs.apply([{ id: 'parent' } as any, { id: 'child' } as any, { id: 'right' } as any], '', c)
+	sessionTabs.apply([{ id: 'parent' } as any, { id: 'right' } as any], '', c)
+
+	expect(model.tabs[model.focusedTabIndex]?.sessionId).toBe('parent')
+})
+
+test('leaving a newly opened tab restores ordinary nearest-right close behavior', () => {
+	sessionTabs.reset()
+	sessionTabs.state.pendingOpen = 'open'
+	const model = {
+		tabs: [tab('parent'), tab('right')],
+		focusedTabIndex: 0,
+		recentTabs: ['parent'],
+	}
+	const c = ctx({ model })
+
+	sessionTabs.apply([{ id: 'parent' } as any, { id: 'child' } as any, { id: 'right' } as any], '', c)
+	sessionTabs.expireReturnTo('child')
+	sessionTabs.apply([{ id: 'parent' } as any, { id: 'right' } as any], '', c)
+
+	expect(model.tabs[model.focusedTabIndex]?.sessionId).toBe('right')
+})
