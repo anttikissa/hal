@@ -34,6 +34,7 @@ import type { AnswerValue } from '../common/history.ts'
 import { historyProjection } from '../common/history-projection.ts'
 import { serverKeys } from './server-keys.ts'
 import { authLogin } from './auth-login.ts'
+import { spawnAgent } from './tools/spawn_agent.ts'
 
 type PendingContinuation = { canceled: boolean }
 export type PendingPrompt = {
@@ -265,9 +266,10 @@ function recordSessionStateChanges(sessionId: string, prevCwd: string, nextCwd: 
 	if (entries.length > 0) sessionStore.appendHistorySync(sessionId, entries)
 }
 
-function buildSpawnPrompt(parentId: string, task: string, kind: SpawnKind): string {
+function buildSpawnPrompt(parentId: string, task: string, kind: SpawnKind, budget = 0): string {
 	return [
 		`You are a subagent working for parent session ${parentId}.`,
+		`You may spawn at most ${budget} additional subagent${budget === 1 ? '' : 's'}.`,
 		'',
 		'Task:',
 		task,
@@ -282,6 +284,9 @@ function buildSpawnPrompt(parentId: string, task: string, kind: SpawnKind): stri
 function queuePromptCommand(sessionId: string, text: string, source?: string, queue?: boolean, sourceTab?: number): void { ipc.appendCommand({ type: 'prompt', sessionId, text, source, queue, sourceTab, createdAt: new Date().toISOString() }) }
 
 function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
+	const storedParent = sessionStore.loadSessionMeta(parent.id) ?? parent
+	const allocation = spawnAgent.allocate(storedParent.subagentBudget, spec.subagentLimit)
+	if ('error' in allocation) throw new Error(allocation.error)
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
 	// Resolve model/cwd before creating the tab so the opening summary banner
 	// (written during creation) reports the spawned model, not the default.
@@ -297,6 +302,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 				focus: false,
 			},
 	)
+	sessionStore.updateMeta(parent.id, { subagentBudget: allocation.parentBudget })
 	const workingDir = spec.cwd || child.workingDir || process.cwd()
 	const name = spec.name || child.name
 	sessionStore.updateMeta(child.id, {
@@ -305,6 +311,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 		name,
 		spawnKind: spec.kind,
 		parentSessionId: parent.id,
+		subagentBudget: allocation.childBudget,
 	})
 	if (mode === 'fresh' || spec.cwd || spec.model) publishContextEstimate(child.id)
 	if (spec.kind === 'subagent') {
@@ -314,7 +321,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 }
 
 async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec: SpawnSpec): Promise<void> {
-	const text = spec.kind === 'interactive' ? spec.task : buildSpawnPrompt(parent.id, spec.task, spec.kind)
+	const text = spec.kind === 'interactive' ? spec.task : buildSpawnPrompt(parent.id, spec.task, spec.kind, child.subagentBudget)
 	// Blank interactive tab: nothing to inject, just publish it.
 	if (!text.trim()) {
 		broadcastSessions()
@@ -1007,15 +1014,20 @@ function handleCommand(cmd: Command): void {
 				model: cmd.spawn.model,
 				cwd: cmd.spawn.cwd,
 				name: cmd.spawn.name,
+				subagentLimit: cmd.spawn.subagentLimit,
 				childSessionId:
 					typeof cmd.spawn.childSessionId === 'string' && cmd.spawn.childSessionId.trim()
 						? cmd.spawn.childSessionId.trim()
 						: undefined,
 			}
-			const child = spawnSession(parent, spec)
-			// No broadcast here: startSpawnedSession publishes the session list once
-			// the initial prompt is in history, so clients render it exactly once.
-			void startSpawnedSession(parent, child, spec)
+			try {
+				const child = spawnSession(parent, spec)
+				// No broadcast here: startSpawnedSession publishes the session list once
+				// the initial prompt is in history, so clients render it exactly once.
+				void startSpawnedSession(parent, child, spec)
+			} catch (error) {
+				emitInfo(sessionId, errorMessage(error), 'error')
+			}
 			break
 		}
 		case 'resume': {

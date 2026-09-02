@@ -26,6 +26,7 @@ import { log } from './utils/log.ts'
 import { ipc } from './server/file-ipc.ts'
 import { webUpload } from './server/web-upload.ts'
 import { HAL_DIR } from './server/state.ts'
+import { spawnAgent } from './server/tools/spawn_agent.ts'
 
 // Module name → config object. Add new modules here as they gain configs.
 const modules: Record<string, Record<string, any>> = {
@@ -50,6 +51,7 @@ const modules: Record<string, Record<string, any>> = {
 	log: log.config,
 	ipc: ipc.config,
 	web: webUpload.config,
+	spawnAgent: spawnAgent.config,
 }
 
 // config.ason lives at the Hal root — it's user-facing config.

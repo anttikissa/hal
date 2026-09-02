@@ -143,6 +143,10 @@
 		// Hard cap for any tool result sent back to the model.
 		maxOutputBytes: 65536
 	},
+	spawnAgent: {
+		// Spawn slots available to each user-created session; recursive limits transfer these slots.
+		initialLimit: 5
+	},
 	ipc: {
 		// Truncate the IPC event/command bus once it exceeds this size (bytes).
 		maxLogBytes: 10000000

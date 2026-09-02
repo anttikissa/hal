@@ -24,6 +24,15 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Put one-off scripts in `/tmp`
 - Avoid backwards compatibility code by default. Hal is under heavy development and breaking changes are expected. Keep the code minimal and free of legacy clutter
 
+# Subagents
+
+- Work directly by default. Use a subagent only when an isolated, focused task clearly benefits from separate context.
+- Prefer one fresh subagent on the cheapest model capable of the task. Keep its scope narrow and its deliverable explicit.
+- Ask the user before spawning two or more subagents for one request. Explain why parallel delegation is worth the extra cost and coordination. Never spawn more than three unless the user explicitly requests a larger number.
+- A subagent must not spawn another agent unless the parent deliberately grants it a recursion budget. Recursive delegation is otherwise prohibited.
+- Do not use interactive sessions or `send` as a way around subagent limits.
+- The parent owns the result: monitor delegated work, stop agents that are no longer useful, and report how many were used. Delegation never transfers responsibility.
+
 # Source layout
 
 - `main.ts` — composition root and startup order.

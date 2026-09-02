@@ -3,6 +3,22 @@ import type { SpawnCommandData, SpawnKind } from '../../common/protocol.ts'
 import { sessionIds } from '../session/ids.ts'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 import { models } from '../../common/models.ts'
+import { sessions } from '../sessions.ts'
+
+const config = { initialLimit: 5 }
+
+function allocate(remaining: number | undefined, requested: number | undefined) {
+	if (requested !== undefined && (!Number.isInteger(requested) || requested < 0)) {
+		return { error: 'limit must be a non-negative integer' }
+	}
+	const parentBudget = remaining ?? config.initialLimit
+	const childBudget = requested ?? 0
+	const needed = childBudget + 1
+	if (needed > parentBudget) {
+		return { error: `subagent limit ${childBudget} needs ${needed} slots, but only ${parentBudget} remain` }
+	}
+	return { parentBudget: parentBudget - needed, childBudget }
+}
 
 function normalize(input: unknown, ctx: ToolContext): SpawnCommandData {
 	const raw = toolRegistry.inputObject(input)
@@ -15,6 +31,7 @@ function normalize(input: unknown, ctx: ToolContext): SpawnCommandData {
 		model: raw.model ? String(raw.model) : undefined,
 		cwd: raw.cwd ? String(raw.cwd) : ctx.cwd,
 		name: raw.name ? String(raw.name) : undefined,
+		subagentLimit: raw.limit === undefined ? undefined : Number(raw.limit),
 	}
 }
 
@@ -42,6 +59,8 @@ function spawnResult(childSessionId: string, parentSessionId: string, kind: Spaw
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalize(input, ctx)
 	if (spec.kind !== 'interactive' && !spec.task) return 'error: task is required unless kind is interactive'
+	const allocation = allocate(sessions.loadSessionMeta(ctx.sessionId)?.subagentBudget, spec.subagentLimit)
+	if ('error' in allocation) return `error: ${allocation.error}`
 	if (spec.model && !models.modelCompletionNames().includes(models.resolveModel(spec.model))) {
 		return `error: Unknown model: ${spec.model}`
 	}
@@ -66,6 +85,7 @@ const spawnAgentTool: Tool = {
 		model: { type: 'string', description: 'Optional model override for the child session.' },
 		cwd: { type: 'string', description: 'Optional working directory override for the child session.' },
 		name: { type: 'string', description: 'Optional session name for the child, brief but descriptive, e.g. "Review rendering regression".' },
+		limit: { type: 'integer', description: 'Spawn slots to transfer to the child for recursive delegation. Defaults to 0.' },
 	},
 	execute,
 }
@@ -74,4 +94,4 @@ function init(): void {
 	toolRegistry.registerTool(spawnAgentTool)
 }
 
-export const spawnAgent = { execute, init, plannedChildTab, spawnResult }
+export const spawnAgent = { config, allocate, execute, init, plannedChildTab, spawnResult }

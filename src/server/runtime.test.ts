@@ -1668,15 +1668,15 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 	const { sessions } = await import('./sessions.ts')
 
 	try {
-		await sessions.createSession('04-parent', {
-			id: '04-parent',
+		await sessions.createSession('04-budget-parent', {
+			id: '04-budget-parent',
 			workingDir: '/work/parent',
 			createdAt: '2026-04-14T12:00:00.000Z',
 			model: 'anthropic/claude-sonnet-4.5',
 		})
 		tokenCalibration.save(100, 100, 'openai/gpt-5')
 		const parent: SessionMeta = {
-			id: '04-parent',
+			id: '04-budget-parent',
 			name: 'parent',
 			workingDir: '/work/parent',
 			model: 'anthropic/claude-sonnet-4.5',
@@ -1699,7 +1699,12 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 		expect(meta?.workingDir).toBe('/work/child')
 		expect(meta?.model).toBe('openai/gpt-5')
 		expect(meta?.name).toBe('Child tab')
-		expect(meta?.parentSessionId).toBe('04-parent')
+		expect(meta?.parentSessionId).toBe('04-budget-parent')
+		expect(meta?.subagentBudget).toBe(0)
+		expect(sessions.loadSessionMeta(parent.id)?.subagentBudget).toBe(4)
+		expect(() => runtime.spawnSession(meta!, { task: 'Recurse', kind: 'subagent', mode: 'fresh' })).toThrow(
+			'subagent limit 0 needs 1 slots, but only 0 remain',
+		)
 		expect(meta?.attention).toBe('new')
 		const prompt = context.buildSystemPrompt({ model: 'openai/gpt-5', cwd: '/work/child', sessionId: child.id })
 		const overheadBytes = prompt.text.length + JSON.stringify(toolRegistry.toToolDefs()).length
@@ -1870,14 +1875,14 @@ test('startSpawnedSession writes the child prompt to history without a prompt ev
 
 		ipc.ownsHostLock = () => true
 		agentLoop.runAgentLoop = async () => 'completed'
-		await sessions.createSession('04-parent', {
-			id: '04-parent',
+		await sessions.createSession('04-prompt-parent', {
+			id: '04-prompt-parent',
 			workingDir: '/work/parent',
 			createdAt: '2026-04-14T12:00:00.000Z',
 			model: 'anthropic/claude-sonnet-4.5',
 		})
 		const parent: SessionMeta = {
-			id: '04-parent',
+			id: '04-prompt-parent',
 			name: 'parent',
 			workingDir: '/work/parent',
 			model: 'anthropic/claude-sonnet-4.5',
@@ -1899,6 +1904,7 @@ test('startSpawnedSession writes the child prompt to history without a prompt ev
 		// tab from history, so an extra broadcast prompt event would render twice.
 		expect(history.filter((entry) => entry.type === 'user')).toHaveLength(1)
 		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(true)
+		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('at most 0 additional subagents'))).toBe(true)
 		expect(history.find((entry) => entry.type === 'input_history')).toMatchObject({
 			type: 'input_history',
 			text: expect.stringContaining('Task:\nDo the thing'),
@@ -1934,6 +1940,7 @@ test('startSpawnedSession writes the child prompt to history without a prompt ev
 		})
 		expect(emitted.filter((event) => event.type === 'prompt' && event.sessionId === promptedInteractiveChild.id)).toHaveLength(0)
 		expect(queued).toHaveLength(0)
+		expect(sessions.loadSessionMeta(parent.id)?.subagentBudget).toBe(2)
 	} finally {
 		ipc.appendCommand = origAppendCommand
 		ipc.appendEvent = origAppendEvent

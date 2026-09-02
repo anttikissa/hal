@@ -187,7 +187,7 @@ function parseCommand(value: unknown): Command | null {
 			return request && Number.isInteger(value.clientPid) && typeof value.todo === 'string' && (value.edits === undefined || isObject(value.edits)) ? value as Command : null
 		case 'spawn': {
 			const spawn = value.spawn
-			return isObject(spawn) && typeof spawn.task === 'string' && ['subagent', 'subagent-leave-open', 'interactive'].includes(spawn.kind) && ['fork', 'fresh'].includes(spawn.mode) && optionalString(spawn.model) && optionalString(spawn.cwd) && optionalString(spawn.name) && optionalString(spawn.childSessionId) ? value as Command : null
+			return isObject(spawn) && typeof spawn.task === 'string' && ['subagent', 'subagent-leave-open', 'interactive'].includes(spawn.kind) && ['fork', 'fresh'].includes(spawn.mode) && optionalString(spawn.model) && optionalString(spawn.cwd) && optionalString(spawn.name) && optionalString(spawn.childSessionId) && (spawn.subagentLimit === undefined || Number.isInteger(spawn.subagentLimit)) ? value as Command : null
 		}
 		case 'client-status':
 			return Number.isInteger(value.pid) && typeof value.startedAt === 'string' && typeof value.updatedAt === 'string' && typeof value.versionStatus === 'string' && optionalString(value.cwd) && optionalString(value.version) && optionalString(value.error) ? value as Command : null

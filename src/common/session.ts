@@ -17,6 +17,8 @@ export interface SessionMeta {
 	// restores back where the tab was instead of appending at the end.
 	closedTabPosition?: number
 	parentSessionId?: string
+	/** Remaining spawn slots; recursive capacity is transferred, never copied. */
+	subagentBudget?: number
 	// Last known context window usage, persisted so it survives restarts.
 	context?: { used: number; max: number }
 }

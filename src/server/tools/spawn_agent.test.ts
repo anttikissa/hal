@@ -25,6 +25,13 @@ afterEach(() => {
 	tempStateDir = null
 })
 
+test('subagent budgets transfer recursive capacity instead of copying it', () => {
+	expect(spawnAgent.allocate(undefined, undefined)).toEqual({ parentBudget: 4, childBudget: 0 })
+	expect(spawnAgent.allocate(4, 2)).toEqual({ parentBudget: 1, childBudget: 2 })
+	expect(spawnAgent.allocate(2, 2)).toEqual({ error: 'subagent limit 2 needs 3 slots, but only 2 remain' })
+	expect(spawnAgent.allocate(1, -1)).toEqual({ error: 'limit must be a non-negative integer' })
+})
+
 test('spawn_agent reserves a child session ID and queues it in the spawn command', async () => {
 	const stateDir = useTempStateDir()
 	const appended: any[] = []
@@ -73,7 +80,7 @@ test('spawn_agent passes through fresh mode and subagent-leave-open kind', async
 	}
 
 	const result = await spawnAgent.execute(
-		{ task: 'Research bar', kind: 'subagent-leave-open', mode: 'fresh', model: 'openai/gpt-5.4', cwd: '/work', name: 'Bar scout' },
+		{ task: 'Research bar', kind: 'subagent-leave-open', mode: 'fresh', model: 'openai/gpt-5.4', cwd: '/work', name: 'Bar scout', limit: 2 },
 		{ sessionId: '04-parent', cwd: '/tmp/project' },
 	)
 	const spawn = appended[0]?.spawn
@@ -91,6 +98,7 @@ test('spawn_agent passes through fresh mode and subagent-leave-open kind', async
 		model: 'openai/gpt-5.4',
 		cwd: '/work',
 		name: 'Bar scout',
+		subagentLimit: 2,
 	})
 })
 

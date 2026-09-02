@@ -145,6 +145,7 @@ export interface SpawnCommandData {
 	cwd?: string
 	name?: string
 	childSessionId?: string
+	subagentLimit?: number
 }
 
 export interface SpawnCommand extends CommandBase {
