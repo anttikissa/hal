@@ -196,11 +196,28 @@ function windowLabel(window: UsageWindow): string {
 	return time.formatQuotaWindow(window.windowMinutes)
 }
 
-function displayWindows(account: AccountUsage): { label: string; window: UsageWindow }[] {
+function accountWindows(account: AccountUsage): { label: string; window: UsageWindow }[] {
 	const result: { label: string; window: UsageWindow }[] = []
 	if (account.primary) result.push({ label: windowLabel(account.primary), window: account.primary })
 	if (account.secondary) result.push({ label: windowLabel(account.secondary), window: account.secondary })
 	result.sort((a, b) => a.window.windowMinutes - b.window.windowMinutes)
+	return result
+}
+
+/** A shorter window cannot make an account usable while a longer one is exhausted. */
+function displayWindows(account: AccountUsage): { label: string; window: UsageWindow }[] {
+	const windows = accountWindows(account)
+	const result: { label: string; window: UsageWindow }[] = []
+	for (let index = 0; index < windows.length; index++) {
+		let blocked = false
+		for (let later = index + 1; later < windows.length; later++) {
+			if (windows[later]!.window.usedPercent >= 100) {
+				blocked = true
+				break
+			}
+		}
+		if (!blocked) result.push(windows[index]!)
+	}
 	return result
 }
 
@@ -223,6 +240,13 @@ function windowForLabel(account: AccountUsage, label: string): UsageWindow | und
 	}
 }
 
+function hasWindowLabel(account: AccountUsage, label: string): boolean {
+	for (const item of accountWindows(account)) {
+		if (item.label === label) return true
+	}
+	return false
+}
+
 function formatStatusText(): string {
 	const accounts = all()
 	if (accounts.length === 0) return 'No cached OpenAI subscription usage. Run /status again after logging in with ChatGPT.'
@@ -237,7 +261,12 @@ function formatStatusText(): string {
 	]
 	for (const account of accounts) {
 		const cells = [displaySlot(account), displayAccount(account)]
-		for (const column of columns) cells.push(formatWindowCell(windowForLabel(account, column)))
+		for (const column of columns) {
+			const window = windowForLabel(account, column)
+			if (window) cells.push(formatWindowCell(window))
+			else if (hasWindowLabel(account, column)) cells.push('')
+			else cells.push(formatWindowCell(undefined))
+		}
 		lines.push(`| ${cells.join(' | ')} |`)
 	}
 	return lines.join('\n')

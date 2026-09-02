@@ -76,6 +76,27 @@ test('formatStatusText labels OpenAI windows from their returned duration', () =
 	expect(text).not.toContain('| ? |')
 	expect(text).toContain('<br>24% used')
 })
+test('hides a shorter window behind an exhausted longer window', () => {
+	openaiUsage.state.currentKey = 'openai:0'
+	openaiUsage.state.accounts = {
+		'openai:0': {
+			key: 'openai:0',
+			email: 'a@test.com',
+			index: 0,
+			total: 1,
+			pendingTokens: 0,
+			primary: { usedPercent: 0, windowMinutes: 300, resetAt: 1_775_836_198 },
+			secondary: { usedPercent: 100, windowMinutes: 10_080, resetAt: 1_776_368_540 },
+		},
+	}
+
+	const text = openaiUsage.formatStatusText()
+
+	expect(text).toContain('| Slot | Account | 7d |')
+	expect(text).not.toContain('5h')
+	expect(text).not.toContain('<br>0% used')
+	expect(text).toContain('100% used')
+})
 
 test('refreshAll caches all accounts and status text marks the current one', async () => {
 	auth.ensureFresh = async () => {}

@@ -191,14 +191,15 @@ test('status markers lose brackets inside mixed log groups', () => {
 	expect(lines.join('\n')).not.toContain('[restarted]')
 })
 
-test('usage bar markers gain terminal color only when marked trusted', () => {
+test('usage bar markers gain terminal color but no background when marked trusted', () => {
 	const bar = subscriptionUsage.usageBarMarker(50, 2)
 	expect(bar).not.toContain('\x1b[')
 	const trusted = blocks.renderBlock({ type: 'log', text: bar, usageBars: true }, 80).join('\n')
 	const untrusted = blocks.renderBlock({ type: 'log', text: bar }, 80).join('\n')
 
-	expect(trusted).toContain('\x1b[48;2;61;61;61m')
-	expect(untrusted).not.toContain('\x1b[48;2;61;61;61m')
+	expect(trusted).toContain('\x1b[38;2;')
+	expect(trusted).not.toContain('\x1b[48;2;61;61;61m')
+	expect(untrusted).toContain(bar)
 	const unsafe = blocks.renderBlock({ type: 'log', text: `${bar}\x1b[2J`, usageBars: true }, 80).join('\n')
 	expect(unsafe).not.toContain('\x1b[2J')
 })
