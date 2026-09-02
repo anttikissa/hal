@@ -41,7 +41,14 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	}
 	if (url.protocol !== 'http:' && url.protocol !== 'https:') return 'error: invalid url'
 
-	const raw = await fetch(url, { signal: ctx.signal }).then((r) => r.text())
+	const response = await fetch(url, { signal: ctx.signal })
+	const raw = await response.text()
+	const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+	if (contentType === 'text/markdown') {
+		if (raw.length <= MAX_OUTPUT) return raw || 'error: no readable content found'
+		return raw.slice(0, MAX_OUTPUT) + '\n[… truncated]'
+	}
+
 	let html = raw
 	for (const tag of ['main', 'article']) {
 		const m = raw.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'))

@@ -35,6 +35,15 @@ test('extracts readable text from simple html', async () => {
 	expect(out).not.toContain('ignore me')
 })
 
+test('returns Markdown responses without HTML extraction', async () => {
+	globalThis.fetch = (async () => new Response('# API\n\nUseful documentation.\n', {
+		headers: { 'content-type': 'text/markdown; charset=utf-8' },
+	})) as unknown as typeof fetch
+
+	const out = await readUrl.execute({ url: 'https://example.com/api.md' }, { sessionId: 's', cwd: process.cwd() })
+	expect(out).toBe('# API\n\nUseful documentation.\n')
+})
+
 test('rejects invalid urls', async () => {
 	const out = await readUrl.execute({ url: 'nope' }, { sessionId: 's', cwd: process.cwd() })
 	expect(out).toBe('error: invalid url')
