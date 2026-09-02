@@ -25,7 +25,7 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'Anthropic', alias: 'opus', aliases: ['anthropic', 'claude'], fullId: 'anthropic/claude-opus-5', fallbackContext: 1_000_000, pricing: { input: 5, output: 25 }, track: 'opus' },
 	{ group: 'Anthropic', alias: 'sonnet', fullId: 'anthropic/claude-sonnet-5', fallbackContext: 1_000_000, pricing: { input: 3, output: 15 }, track: 'sonnet' },
 	{ group: 'Anthropic', alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5', fallbackContext: 200_000, pricing: { input: 1, output: 5 }, track: 'haiku' },
-	{ group: 'Anthropic', alias: 'fable', fullId: 'anthropic/claude-fable-5', fallbackContext: 1_000_000, pricing: { input: 10, output: 50 }, track: 'fable' },
+	{ group: 'Anthropic', alias: 'fable', fullId: 'anthropic/claude-fable-5-1', fallbackContext: 1_000_000, pricing: { input: 10, output: 50 }, track: 'fable' },
 	// GPT tiers since 5.6: sol = flagship, terra = everyday/default, luna = fast+cheap.
 	// The plain-numbered gpt-X.Y line ended at 5.5; "gpt" tracks the terra tier.
 	{ group: 'OpenAI', alias: 'gpt', aliases: ['openai', 'terra'], fullId: 'openai/gpt-5.6-terra', fallbackContext: 1_050_000, pricing: { input: 2.5, output: 15 }, track: 'terra' },

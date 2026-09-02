@@ -151,8 +151,8 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 			{ 'claude-opus-4-7': 1_000_000 },
 			{
 				'claude-opus-4-7': 1_000_000,
-				'claude-fable-5': 1_000_000,
-				'anthropic/claude-fable-5': 1_000_000,
+				'claude-fable-5-1': 1_000_000,
+				'anthropic/claude-fable-5-1': 1_000_000,
 				'openai/gpt-5.5-instant': 400_000,
 				'claude-mythos-5': 1_000_000,
 			},

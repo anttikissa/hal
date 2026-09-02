@@ -67,13 +67,13 @@ test('Fable and gpt-instant have picker entries, fallback context, and prices', 
 	process.env.HAL_STATE_DIR = dir
 	models.state.cache = null
 	try {
-		expect(models.displayModel('anthropic/claude-fable-5')).toBe('Fable 5')
+		expect(models.displayModel('anthropic/claude-fable-5-1')).toBe('Fable 5.1')
 		expect(models.displayModel('openai/gpt-5.5-instant')).toBe('GPT 5.5 Instant')
-		expect(serverModels.contextWindow('anthropic/claude-fable-5')).toBe(1_000_000)
+		expect(serverModels.contextWindow('anthropic/claude-fable-5-1')).toBe(1_000_000)
 		expect(serverModels.contextWindow('openai/gpt-5.5-instant')).toBe(400_000)
-		expect(models.computeCost('anthropic/claude-fable-5', { input: 1000, output: 1000, cacheRead: 0, cacheCreation: 0 })).toBe(0.06)
+		expect(models.computeCost('anthropic/claude-fable-5-1', { input: 1000, output: 1000, cacheRead: 0, cacheCreation: 0 })).toBe(0.06)
 		expect(models.computeCost('openai/gpt-5.5-instant', { input: 1000, output: 1000, cacheRead: 0, cacheCreation: 0 })).toBe(0.035)
-		expect(models.listModelChoices().find((item) => item.value === 'fable')).toMatchObject({ search: expect.stringContaining('anthropic/claude-fable-5') })
+		expect(models.listModelChoices().find((item) => item.value === 'fable')).toMatchObject({ search: expect.stringContaining('anthropic/claude-fable-5-1') })
 		expect(models.listModelChoices().find((item) => item.value === 'gpt-instant')).toMatchObject({ leafLabel: 'gpt-instant', search: expect.stringContaining('openai/gpt-5.5-instant') })
 	} finally {
 		rmSync(dir, { recursive: true, force: true })

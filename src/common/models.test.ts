@@ -250,8 +250,9 @@ test('model completions include aliases, full ids, and bare ids', () => {
 
 
 test('Fable and gpt-instant aliases resolve to provider model ids', () => {
-	expect(models.resolveModel('fable')).toBe('anthropic/claude-fable-5')
+	expect(models.resolveModel('fable')).toBe('anthropic/claude-fable-5-1')
 	expect(models.resolveModel('fable-5')).toBe('anthropic/claude-fable-5')
+	expect(models.resolveModel('fable-5-1')).toBe('anthropic/claude-fable-5-1')
 	expect(models.resolveModel('gpt-instant')).toBe('openai/gpt-5.5-instant')
 	expect(models.resolveModel('instant')).toBe('instant')
 	expect(models.resolveModel('gpt-5.5-instant')).toBe('openai/gpt-5.5-instant')
