@@ -124,6 +124,10 @@ crash here means the idiom changed, not that the code is subtly broken:
 - A server restart must leave the current DOM alive: show reconnecting state, probe until HTTP is
   reachable, then reload. A fixed-delay reload can strand an installed iOS app on a blank navigation.
 
+## Drafts are sacred
+
+User-written composer text must survive tab switches, page reloads, iOS eviction, and server restarts. Persist the exact value synchronously on every input event, keyed by session. Never clear it until a send succeeds, and then only if it is still byte-for-byte the value that was sent. Any code path that reloads the page must first verify that pending draft writes are durable.
+
 ## Solid 1 traps
 
 - `Errored` replaces `ErrorBoundary`; `Reveal` replaces `SuspenseList`. See

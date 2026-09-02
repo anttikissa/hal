@@ -308,6 +308,7 @@ button { touch-action: manipulation; }
 .PromptComposer > .PromptComposer-status { display: flex; flex: 1 0 100%; gap: 8px; min-width: 0; }
 .PromptComposer-status > .PromptComposer-location { flex: 1; min-width: 0; overflow: hidden; color: #9eb8ca; text-overflow: ellipsis; white-space: nowrap; }
 .PromptComposer-status > .PromptComposer-context { flex: none; color: #d6c08a; white-space: nowrap; }
+.PromptComposer-status > .PromptComposer-draft-warning { flex: none; color: #ff9b8f; font-weight: 700; }
 .PromptComposer > textarea {
 	flex: 1;
 	min-width: 0;

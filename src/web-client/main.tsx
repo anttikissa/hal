@@ -18,6 +18,7 @@ import { webTranscript } from './utils/transcript.ts'
 import { sessionSelection } from './utils/session-selection.ts'
 import { palette } from './utils/palette.ts'
 import { reconnect } from './utils/reconnect.ts'
+import { webDraft } from './utils/draft.ts'
 import { webViewport } from './utils/viewport.ts'
 import { router } from './router.ts'
 
@@ -213,8 +214,12 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 				async () => (await fetch(location.href, { cache: 'no-store' })).ok,
 				reconnect.pause,
 				() => disposed,
-			).then((reachable) => {
-				if (reachable && !disposed) location.reload()
+			).then(async (reachable) => {
+				if (!reachable || disposed) return
+				// iOS may reload or evict this page during a server restart. Never
+				// navigate until every pending keystroke is durable in browser storage.
+				while (!disposed && !webDraft.flush()) await reconnect.pause()
+				if (!disposed) location.reload()
 			})
 		}
 		return () => {
@@ -234,7 +239,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			onCommand={onTabCommand}
 		/>
 		<Transcript items={transcript()} onAnswer={submitAnswer} />
-		<PromptComposer location={webStatus.location(session())} context={webStatus.contextText(snapshot()?.meta)} disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
+		<PromptComposer sessionId={selected()} location={webStatus.location(session())} context={webStatus.contextText(snapshot()?.meta)} disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
 	</>
 }
 

@@ -1,7 +1,9 @@
-import { createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, onSettled, Show } from 'solid-js'
 import { enterAction, pastedImage, sendLabel } from '../utils/composer.ts'
+import { webDraft } from '../utils/draft.ts'
 
 type PromptComposerProps = {
+	sessionId: string
 	location?: string
 	context?: string
 	working?: boolean
@@ -25,6 +27,7 @@ export function PromptComposer(props: PromptComposerProps) {
 	let input: HTMLTextAreaElement | undefined
 	let fileInput: HTMLInputElement | undefined
 	const [attaching, setAttaching] = createSignal(false)
+	const [draftDurable, setDraftDurable] = createSignal(true)
 
 	// Grow with content up to a sane cap; past the cap the textarea scrolls.
 	function autosize(): void {
@@ -33,11 +36,44 @@ export function PromptComposer(props: PromptComposerProps) {
 		input.style.height = `${Math.min(input.scrollHeight, 8 * 24)}px`
 	}
 
+	function saveDraft(): void {
+		if (!input || !props.sessionId) return
+		setDraftDurable(webDraft.save(props.sessionId, input.value))
+		autosize()
+	}
+
+	// A route change swaps editors without unmounting the composer. Restore the
+	// selected session here; a full reload follows the exact same path.
+	createEffect(() => props.sessionId, (sessionId) => {
+		if (!input) return
+		input.value = sessionId ? webDraft.load(sessionId) : ''
+		setDraftDurable(webDraft.isDurable())
+		autosize()
+	})
+
+	// iOS can freeze or evict a backgrounded app without beforeunload. Input events
+	// are the primary write path; these lifecycle events are the final safety net.
+	onSettled(() => {
+		const preserve = () => saveDraft()
+		addEventListener('pagehide', preserve)
+		document.addEventListener('visibilitychange', preserve)
+		return () => {
+			removeEventListener('pagehide', preserve)
+			document.removeEventListener('visibilitychange', preserve)
+		}
+	})
+
 	async function submit(queue = false): Promise<void> {
-		if (props.disabled || attaching()) return
-		const text = input?.value.trim() ?? ''
-		if (!text || !input) return
-		if (await props.onSubmit(text, queue)) {
+		if (props.disabled || attaching() || !input) return
+		const sessionId = props.sessionId
+		const draft = input.value
+		const text = draft.trim()
+		if (!text || !sessionId) return
+		if (!await props.onSubmit(text, queue)) return
+
+		const cleared = webDraft.clearIfUnchanged(sessionId, draft)
+		setDraftDurable(webDraft.isDurable())
+		if (cleared && props.sessionId === sessionId && input.value === draft) {
 			input.value = ''
 			autosize()
 		}
@@ -57,7 +93,7 @@ export function PromptComposer(props: PromptComposerProps) {
 		try {
 			const path = await props.onAttach(file)
 			input.value = appendRef(input.value, path)
-			autosize()
+			saveDraft()
 			input.focus()
 		} catch (error) {
 			alert(`Upload failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -86,6 +122,7 @@ export function PromptComposer(props: PromptComposerProps) {
 		<div class="PromptComposer-status">
 			<span class="PromptComposer-location">{props.location}</span>
 			<Show when={props.context}><span class="PromptComposer-context">{props.context}</span></Show>
+			<Show when={!draftDurable()}><span class="PromptComposer-draft-warning" role="status">Draft not saved — keep this page open</span></Show>
 		</div>
 		<textarea
 			ref={(element) => { input = element }}
@@ -93,7 +130,7 @@ export function PromptComposer(props: PromptComposerProps) {
 			autocomplete="off"
 			placeholder="Message"
 			disabled={props.disabled}
-			onInput={autosize}
+			onInput={saveDraft}
 			onKeyDown={onKeyDown}
 			onPaste={onPaste}
 		/>
