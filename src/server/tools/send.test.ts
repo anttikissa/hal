@@ -25,10 +25,13 @@ test('send result includes target tab when the session is open', async () => {
 		updatedAt: new Date().toISOString(),
 	})
 
-	const result = await send.execute({ sessionId: '04-target', text: 'hello' }, { sessionId: '04-parent', cwd: '/tmp/parent' })
+	const result = await send.execute(
+		{ sessionId: '04-target', text: 'hello' },
+		{ sessionId: '04-parent', cwd: '/tmp/parent' },
+	)
 
-		expect(result).toBe('Message sent to tab 3 · 04-target')
-		expect(queued).toEqual([{ sessionId: '04-target', text: 'hello', from: '04-parent', queue: false }])
+	expect(result).toBe('Message sent to tab 3 · 04-target')
+	expect(queued).toEqual([{ sessionId: '04-target', text: 'hello', from: '04-parent', queue: false }])
 })
 
 test('send resolves a tab number to its session ID', async () => {
@@ -45,17 +48,31 @@ test('send resolves a tab number to its session ID', async () => {
 		updatedAt: new Date().toISOString(),
 	})
 
-	const result = await send.execute({ sessionId: '13', text: 'hello' }, { sessionId: '04-parent', cwd: '/tmp/parent' })
+	const result = await send.execute(
+		{ sessionId: '13', text: 'hello' },
+		{ sessionId: '04-parent', cwd: '/tmp/parent' },
+	)
 
 	expect(result).toBe('Message sent to tab 13 · 04-target')
 	expect(queued).toEqual([{ sessionId: '04-target', text: 'hello', from: '04-parent', queue: false }])
 })
 
-	test('send result says queued when deferred delivery was requested', async () => {
-		inbox.queueMessage = () => {}
-		ipc.readState = () => ({ sessions: [], working: {}, updatedAt: new Date().toISOString() })
+test('send rejects an unknown session instead of creating an undeliverable inbox', async () => {
+	const queued: any[] = []
+	inbox.queueMessage = (sessionId, text, from, queue) => {
+		queued.push({ sessionId, text, from, queue })
+	}
+	ipc.readState = () => ({
+		sessions: [{ id: '04-parent', tab: 1, cwd: '/tmp/parent' }],
+		working: {},
+		updatedAt: new Date().toISOString(),
+	})
 
-		const result = await send.execute({ sessionId: '04-target', text: 'hello', queue: true }, { sessionId: '04-parent', cwd: '/tmp/parent' })
+	const result = await send.execute(
+		{ sessionId: 'web', text: 'hello', queue: true },
+		{ sessionId: '04-parent', cwd: '/tmp/parent' },
+	)
 
-		expect(result).toBe('Message queued for 04-target')
+	expect(result).toBe('error: unknown session or tab: web')
+	expect(queued).toEqual([])
 })

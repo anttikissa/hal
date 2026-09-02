@@ -29,7 +29,6 @@ function targetTab(sessionId: string): number | undefined {
 	return Math.floor(tab as number)
 }
 
-
 function resultText(targetId: string, queued: boolean): string {
 	const tab = targetTab(targetId)
 	const action = queued ? 'Message queued for' : 'Message sent to'
@@ -39,12 +38,17 @@ function resultText(targetId: string, queued: boolean): string {
 
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalizeInput(input)
-	const targetId = /^\d+$/.test(spec.sessionId ?? '') ? ipc.readState().sessions.find((item) => item.tab === parseInt(spec.sessionId!, 10))?.id ?? spec.sessionId! : spec.sessionId ?? ''
+	const targetId = /^\d+$/.test(spec.sessionId ?? '')
+		? (ipc.readState().sessions.find((item) => item.tab === parseInt(spec.sessionId!, 10))?.id ?? spec.sessionId!)
+		: (spec.sessionId ?? '')
 	const text = spec.text ?? ''
 
 	if (!targetId) return 'error: sessionId is required'
 	if (!text) return 'error: text is required'
 	if (targetId === ctx.sessionId) return 'error: cannot send to own session'
+	if (!ipc.readState().sessions.some((session) => session.id === targetId)) {
+		return `error: unknown session or tab: ${spec.sessionId}`
+	}
 
 	try {
 		inbox.queueMessage(targetId, text, ctx.sessionId, spec.queue)
