@@ -6,13 +6,13 @@ import { modelNotices } from './model-notices.ts'
 import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 import { ipc } from './file-ipc.ts'
-import { agentLoop } from './runtime/agent-loop.ts'
 import { context } from './runtime/system-prompt.ts'
 import { models } from '../common/models.ts'
 import { serverModels } from './models.ts'
 import { modelRefresh } from './model-refresh.ts'
 import { config } from '../config.ts'
 import { HAL_DIR } from './state.ts'
+import { tabs } from './tabs.ts'
 
 test('formatModelRefreshMessage summarizes models.dev changes for the user', () => {
 	const msg = modelRefresh.formatModelRefreshMessage([
@@ -60,6 +60,7 @@ test('model metadata refresh notice goes only to focused session', async () => {
 	const origAppendHistorySync = sessions.appendHistorySync
 	const origAppendEvent = ipc.appendEvent
 	const origHasConfiguredDirectSource = serverModels.hasConfiguredDirectSource
+	const origSuggestModelDiscoveries = modelNotices.suggestModelDiscoveries
 	serverModels.hasConfiguredDirectSource = () => true
 	const histories: any[] = []
 	const events: any[] = []
@@ -80,6 +81,7 @@ test('model metadata refresh notice goes only to focused session', async () => {
 	ipc.appendEvent = (event: any) => {
 		events.push(event)
 	}
+	modelNotices.suggestModelDiscoveries = () => {}
 
 	try {
 		await modelNotices.refreshModelMetadata()
@@ -93,6 +95,7 @@ test('model metadata refresh notice goes only to focused session', async () => {
 		sessions.appendHistorySync = origAppendHistorySync
 		ipc.appendEvent = origAppendEvent
 		serverModels.hasConfiguredDirectSource = origHasConfiguredDirectSource
+		modelNotices.suggestModelDiscoveries = origSuggestModelDiscoveries
 	}
 })
 
@@ -129,6 +132,8 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 	const origAppendHistorySync = sessions.appendHistorySync
 	const origAppendEvent = ipc.appendEvent
 	const origHasConfiguredDirectSource = serverModels.hasConfiguredDirectSource
+	const origCreateSessionTab = tabs.createSessionTab
+	const origBroadcastSessions = runtime.broadcastSessions
 	serverModels.hasConfiguredDirectSource = (model) => model !== 'claude-mythos-5'
 	const histories: any[] = []
 	const events: any[] = []
@@ -145,6 +150,12 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 	ipc.appendEvent = (event: any) => {
 		events.push(event)
 	}
+	const created: any[] = []
+	tabs.createSessionTab = ((opts) => {
+		created.push(opts)
+		return { id: '04-models', createdAt: '2026-05-20T10:00:00.000Z', workingDir: HAL_DIR, model: 'openai/gpt-5.5' }
+	}) as typeof tabs.createSessionTab
+	runtime.broadcastSessions = () => {}
 
 	try {
 		modelNotices.suggestModelDiscoveries(
@@ -157,10 +168,11 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 				'claude-mythos-5': 1_000_000,
 			},
 		)
+		expect(created).toEqual([{ openerId: '04-work', afterId: '04-work', workingDir: HAL_DIR, focus: false }])
 		expect(histories).toHaveLength(1)
 		expect(events).toHaveLength(1)
-		expect(histories[0].sessionId).toBe('04-work')
-		expect(events[0]).toMatchObject({ type: 'response', sessionId: '04-work', synthetic: true })
+		expect(histories[0].sessionId).toBe('04-models')
+		expect(events[0]).toMatchObject({ type: 'response', sessionId: '04-models', synthetic: true })
 		expect(events[0].text).toContain('Model updates available through your configured accounts.')
 		expect(events[0].text).toContain('`fable`')
 		expect(events[0].text).toContain('OpenAI gpt-5.5-instant')
@@ -176,17 +188,18 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 		sessions.appendHistorySync = origAppendHistorySync
 		ipc.appendEvent = origAppendEvent
 		serverModels.hasConfiguredDirectSource = origHasConfiguredDirectSource
+		tabs.createSessionTab = origCreateSessionTab
+		runtime.broadcastSessions = origBroadcastSessions
 	}
 })
 
 
-test('suggestModelDiscoveries opens a new Hal tab when focused session will resume after restart', () => {
+test('suggestModelDiscoveries opens an unfocused new tab even from an idle session', () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-model-discovery-'))
 	const prevState = process.env.HAL_STATE_DIR
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origCurrentSessionId = runtime.state.currentSessionId
 	const origStopPromptWatch = runtime.state.stopPromptWatch
-	const origIsWorking = agentLoop.isWorking
 	const origAppendEvent = ipc.appendEvent
 	const origUpdateState = ipc.updateState
 	const origWatchPromptFiles = context.watchPromptFiles
@@ -206,11 +219,6 @@ test('suggestModelDiscoveries opens a new Hal tab when focused session will resu
 	runtime.state.openSessionIds = ['04-busy']
 	runtime.state.currentSessionId = '04-busy'
 	runtime.state.stopPromptWatch = null
-	agentLoop.isWorking = () => false
-	sessions.appendHistorySync('04-busy', [
-		{ type: 'user', parts: [{ type: 'text', text: 'keep going' }], ts: '2026-05-20T10:00:01.000Z' },
-		{ type: 'log', text: '[restarted]', ts: '2026-05-20T10:00:02.000Z' },
-	])
 	ipc.appendEvent = (event: any) => { events.push(event) }
 	ipc.updateState = ((mutator: (state: any) => void) => {
 		mutator(shared)
@@ -226,7 +234,7 @@ test('suggestModelDiscoveries opens a new Hal tab when focused session will resu
 		expect(runtime.state.currentSessionId).toBe('04-busy')
 		const child = sessions.loadSessionMeta(childId!)
 		expect(child?.workingDir).toBe(HAL_DIR)
-		expect(child?.name).toBe('new models')
+		expect(child?.name).toBe('model updates')
 		expect(child?.attention).toBe('new')
 		expect(events[0]).toMatchObject({ type: 'response', sessionId: childId, synthetic: true })
 		expect(events[0].text).toContain('Anthropic claude-fable-5')
@@ -237,7 +245,6 @@ test('suggestModelDiscoveries opens a new Hal tab when focused session will resu
 		const stopPromptWatch = runtime.state.stopPromptWatch as (() => void) | null
 		if (stopPromptWatch) stopPromptWatch()
 		runtime.state.stopPromptWatch = origStopPromptWatch
-		agentLoop.isWorking = origIsWorking
 		ipc.appendEvent = origAppendEvent
 		ipc.updateState = origUpdateState
 		context.watchPromptFiles = origWatchPromptFiles

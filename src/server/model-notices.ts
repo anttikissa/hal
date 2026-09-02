@@ -5,7 +5,6 @@ import { ipc } from './file-ipc.ts'
 import { protocol } from '../common/protocol.ts'
 import { models } from '../common/models.ts'
 import { sessions as sessionStore, type SessionMeta } from './sessions.ts'
-import { agentLoop } from './runtime/agent-loop.ts'
 import { HAL_DIR } from './state.ts'
 import { log } from '../utils/log.ts'
 import { modelRefresh } from './model-refresh.ts'
@@ -40,21 +39,13 @@ function emitSyntheticAssistant(sessionId: string, text: string, syntheticKind: 
 }
 
 
-function sessionWillProduceOutput(sessionId: string): boolean {
-	if (agentLoop.isWorking(sessionId)) return true
-	return runtime.shouldAutoContinue(sessionStore.loadAllHistory(sessionId))
-}
-
 function modelDiscoveryTarget(): SessionMeta | null {
-	const focused = tabs.focusedSessionId()
-	if (focused && sessionWillProduceOutput(focused)) {
-		const child = tabs.createSessionTab({ openerId: focused, afterId: focused, workingDir: HAL_DIR, focus: false })
-		sessionStore.updateMeta(child.id, { name: 'new models' })
-		runtime.broadcastSessions()
-		return sessionStore.loadSessionMeta(child.id) ?? child
-	}
-	const metas = tabs.openSessionMetas()
-	return metas.find((item) => item.id === focused) ?? metas[0] ?? null
+	const openerId = tabs.focusedSessionId() ?? tabs.openSessionMetas()[0]?.id
+	if (!openerId) return null
+	const child = tabs.createSessionTab({ openerId, afterId: openerId, workingDir: HAL_DIR, focus: false })
+	sessionStore.updateMeta(child.id, { name: 'model updates' })
+	runtime.broadcastSessions()
+	return sessionStore.loadSessionMeta(child.id) ?? child
 }
 
 function suggestModelDiscoveries(previous: Record<string, number>, next: Record<string, number>): void {
