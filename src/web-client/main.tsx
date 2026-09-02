@@ -192,15 +192,11 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 				applyState(message.state)
 				return
 			}
-			if (message.type === 'snapshot') {
-				snapshots.set(message.snapshot.session.id, message.snapshot)
-				if (message.snapshot.session.id === selected()) setSnapshot(message.snapshot)
-				return
-			}
-			if (message.event?.sessionId !== selected()) return
-			const current = snapshot()
-			const next = webProtocol.applySessionMessage(current, message)
-			if (next !== current) setSnapshot(next)
+			// Keep every open session current, not only the visible one. Otherwise opening
+			// a background stream mid-response starts at the next delta and shows only a
+			// suffix until the authoritative stream-end snapshot arrives.
+			const next = webProtocol.applyMessageToSnapshots(snapshots, message)
+			if (next?.session.id === selected() && next !== snapshot()) setSnapshot(next)
 		}
 		connection.onclose = (event) => {
 			if (event.code === 4001) {

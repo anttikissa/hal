@@ -47,6 +47,16 @@ function applySessionMessage(snapshot: ClientSessionSnapshot | null, message: We
 	return { ...snapshot, live: result.blocks }
 }
 
+function applyMessageToSnapshots(snapshots: Map<string, ClientSessionSnapshot>, message: WebServerMessage): ClientSessionSnapshot | null {
+	let sessionId = ''
+	if (message.type === 'snapshot') sessionId = message.snapshot.session.id
+	if (message.type === 'event' && typeof message.event?.sessionId === 'string') sessionId = message.event.sessionId
+	if (!sessionId) return null
+	const next = webProtocol.applySessionMessage(snapshots.get(sessionId) ?? null, message)
+	if (next) snapshots.set(sessionId, next)
+	return next
+}
+
 // Session ids look like `05-wan` or `112-bad`: digits, a dash, then letters.
 // The browser app owns `/<sessionId>` so a tab is shareable as a URL; the
 // server serves the app for those paths and the client picks the session out
@@ -57,4 +67,4 @@ function isSessionPath(pathname: string): boolean {
 	return sessionPathPattern.test(pathname)
 }
 
-export const webProtocol = { encode, decode, applySessionMessage, isSessionPath }
+export const webProtocol = { encode, decode, applySessionMessage, applyMessageToSnapshots, isSessionPath }

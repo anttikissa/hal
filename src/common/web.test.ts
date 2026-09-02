@@ -22,6 +22,19 @@ test('prompt event already present in snapshot history is not projected twice', 
 	expect(result).toBe(snapshot)
 })
 
+test('background stream deltas stay in the snapshot cache before tab selection', () => {
+	const snapshots = new Map<string, any>([
+		['s1', { session: { id: 's1' }, history: [], live: [] }],
+		['s2', { session: { id: 's2' }, history: [], live: [] }],
+	])
+
+	webProtocol.applyMessageToSnapshots(snapshots, { type: 'event', event: { type: 'stream-delta', sessionId: 's2', channel: 'assistant', text: 'early ' } })
+	webProtocol.applyMessageToSnapshots(snapshots, { type: 'event', event: { type: 'stream-delta', sessionId: 's2', channel: 'assistant', text: 'late' } })
+
+	expect(snapshots.get('s2')?.live).toEqual([{ type: 'assistant', text: 'early late', streaming: true }])
+	expect(snapshots.get('s1')?.live).toEqual([])
+})
+
 test('web protocol rejects malformed ASON', () => {
 	expect(webProtocol.decode('{ nope')).toBeNull()
 })
