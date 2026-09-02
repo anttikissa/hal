@@ -70,24 +70,32 @@ function makeConfig(configPath: string, filePath: string): string {
 	return tempPath
 }
 
-// Resolve both entry points from one package. The unstable JavaScript client
-// starts its matching native TypeScript server, so mixing API and compiler
-// versions would risk protocol and diagnostic differences.
+// Bun.resolveSync falls back to Bun's global package cache when a temporary
+// project has no TypeScript installation. That cache entry cannot resolve TS7's
+// sibling native platform package. Walk node_modules ourselves so "not local"
+// really means not local, then findTypeScript can deliberately use Hal's install.
 function resolveTypeScript(directory: string): TypeScript | null {
-	try {
-		const packagePath = Bun.resolveSync('typescript/package.json', directory)
-		const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'))
-		const bin = typeof packageJson.bin === 'string' ? packageJson.bin : packageJson.bin?.tsc
-		const tscPath = typeof bin === 'string' ? resolve(dirname(packagePath), bin) : ''
-		if (!existsSync(tscPath)) return null
+	let current = resolve(directory)
+	while (true) {
+		const packagePath = join(current, 'node_modules', 'typescript', 'package.json')
+		if (existsSync(packagePath)) {
+			try {
+				const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'))
+				const bin = typeof packageJson.bin === 'string' ? packageJson.bin : packageJson.bin?.tsc
+				const tscPath = typeof bin === 'string' ? resolve(dirname(packagePath), bin) : ''
+				if (!existsSync(tscPath)) return null
 
-		let apiPath: string | null = null
-		try {
-			apiPath = Bun.resolveSync('typescript/unstable/async', directory)
-		} catch {}
-		return { tscPath, apiPath }
-	} catch {
-		return null
+				const apiEntry = packageJson.exports?.['./unstable/async']
+				const apiPath = typeof apiEntry === 'string' ? resolve(dirname(packagePath), apiEntry) : null
+				return { tscPath, apiPath: apiPath && existsSync(apiPath) ? apiPath : null }
+			} catch {
+				return null
+			}
+		}
+
+		const parent = dirname(current)
+		if (parent === current) return null
+		current = parent
 	}
 }
 
