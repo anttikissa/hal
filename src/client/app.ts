@@ -261,7 +261,7 @@ function showServerRestart(pid: number, startedAt?: string): void {
 function showServerPromotion(pid: number, startedAt?: string): void {
 	queueLocalBlock({
 		type: 'info',
-		text: `Client promoted to server (pid ${pid})`,
+		text: `Peer promoted to server (pid ${pid})`,
 		ts: startedAt ? Date.parse(startedAt) : Date.now(),
 	})
 }
