@@ -317,7 +317,7 @@ test('anthropic OAuth user-agent discloses hal and its git version', async () =>
 	version.state.combined = 'abcd1234+ef567890'
 
 	await collect({ value: 'tok-test', type: 'token' })
-	expect(seenUserAgent).toBe('claude-cli/2.1.233 (external, hal/abcd1234+ef567890)')
+	expect(seenUserAgent).toBe('claude-cli/2.1.259 (external, hal/abcd1234+ef567890)')
 })
 
 test('anthropic OAuth user-agent omits the version until it is known', async () => {
@@ -329,5 +329,5 @@ test('anthropic OAuth user-agent omits the version until it is known', async () 
 	version.state.combined = ''
 
 	await collect({ value: 'tok-test', type: 'token' })
-	expect(seenUserAgent).toBe('claude-cli/2.1.233 (external, hal)')
+	expect(seenUserAgent).toBe('claude-cli/2.1.259 (external, hal)')
 })
