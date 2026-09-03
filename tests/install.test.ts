@@ -24,6 +24,8 @@ test('run delegates incomplete local setup to install, with -l preserved for the
 	expect(run).toContain('-l)')
 	expect(run).toContain('"$hal_dir/install" -l')
 	expect(run).toContain('"$hal_dir/install"')
+	expect(run).not.toContain('"$HOME/.local/bin/hal"')
+	expect(run).not.toContain('grep -qx "$HOME/.local/bin"')
 })
 
 test('installer local mode leaves the global command and PATH alone', async () => {

@@ -52,15 +52,11 @@ while [ "$#" -gt 0 ]; do
 	esac
 done
 
-# `./run` is the normal new-user entry point. It delegates setup decisions to
-# the installer instead of duplicating them; -l is a private second-checkout
-# shortcut that asks the installer to leave the global Hal command alone.
+# `./run` is an explicit checkout-local invocation. It only delegates missing
+# local prerequisites to the installer; -l keeps that setup local too.
 needs_install() {
 	if ! command -v bun >/dev/null 2>&1; then return 0; fi
 	if [ ! -d "$hal_dir/node_modules" ] || [ ! -f "$hal_dir/config.ason" ]; then return 0; fi
-	if [ "$local_install" = true ]; then return 1; fi
-	if [ ! -L "$HOME/.local/bin/hal" ] || [ "$(readlink -f "$HOME/.local/bin/hal")" != "$hal_dir/run" ]; then return 0; fi
-	if ! echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin"; then return 0; fi
 	return 1
 }
 
