@@ -30,6 +30,7 @@ test('installer local mode leaves the global command and PATH alone', async () =
 	let install = await Bun.file(`${halDir}/install`).text()
 
 	expect(install).toContain('-l) local_only=1')
+	expect(install).toContain('Local setup (--local): files outside this directory will not be modified.')
 	expect(install).toContain('if [ -z "$local_only" ] && [ -n "$need_symlink" ]; then')
 	expect(install).toContain('if [ -z "$local_only" ] && [ -n "$need_path" ]; then')
 })

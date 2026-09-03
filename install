@@ -56,6 +56,7 @@ fi
 
 log
 log "Analyzing..."
+if [ -n "$local_only" ]; then log "Local setup (--local): files outside this directory will not be modified."; fi
 log
 
 need_git=""
@@ -109,14 +110,18 @@ else
 	log "[ ] local config.ason"
 fi
 
-if [ -L "$bin_dir/hal" ] && [ "$(readlink -f "$bin_dir/hal")" = "$hal_dir/run" ]; then
+if [ -n "$local_only" ]; then
+	log "[-] global hal executable (local setup)"
+elif [ -L "$bin_dir/hal" ] && [ "$(readlink -f "$bin_dir/hal")" = "$hal_dir/run" ]; then
 	log "[x] hal executable symlinked to $(prettify "$bin_dir")/"
 else
 	need_symlink=1
 	log "[ ] hal executable symlinked to $(prettify "$bin_dir")/"
 fi
 
-if echo "$path_to_check" | tr ':' '\n' | grep -qx "$bin_dir"; then
+if [ -n "$local_only" ]; then
+	log "[-] global PATH setup (local setup)"
+elif echo "$path_to_check" | tr ':' '\n' | grep -qx "$bin_dir"; then
 	log "[x] $(prettify "$bin_dir") in PATH"
 else
 	need_path=1
