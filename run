@@ -65,13 +65,11 @@ if needs_install; then
 		echo "Looks like you need to run ./install -l first."
 		echo
 		echo "Running ./install -l..."
-		echo
 		"$hal_dir/install" -l
 	else
 		echo "Looks like you need to run ./install first."
 		echo
 		echo "Running ./install..."
-		echo
 		"$hal_dir/install"
 	fi
 	install_code=$?
