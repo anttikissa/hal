@@ -4,6 +4,12 @@ set -uo pipefail
 # Resolve symlinks to find the real .hal directory.
 hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
+# A checkout made with git clone has no config.ason because it is user-local and
+# ignored. Let ./run be sufficient for a new user; never replace an existing config.
+if [ ! -f "$hal_dir/config.ason" ]; then
+	cp "$hal_dir/config-template.ason" "$hal_dir/config.ason"
+fi
+
 args=()
 web=false
 remote=false

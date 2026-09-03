@@ -18,6 +18,13 @@ test('installer creates local config from tracked template', async () => {
 	expect(install).toContain('cp "$hal_dir/config-template.ason" "$hal_dir/config.ason"')
 })
 
+test('run creates local config from the tracked template when it is missing', async () => {
+	let run = await Bun.file(`${halDir}/run`).text()
+
+	expect(run).toContain('[ ! -f "$hal_dir/config.ason" ]')
+	expect(run).toContain('cp "$hal_dir/config-template.ason" "$hal_dir/config.ason"')
+})
+
 // Skipped secretly - we rarely modify the install script. Enable test temporarily if you must test
 describe.skip('install script', () => {
 	test('exists and is executable', async () => {
