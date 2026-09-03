@@ -22,8 +22,8 @@ test('run delegates incomplete local setup to install, with -l preserved for the
 	let run = await Bun.file(`${halDir}/run`).text()
 
 	expect(run).toContain('-l)')
-	expect(run).toContain('install_args+=("-l")')
-	expect(run).toContain('"$hal_dir/install" "${install_args[@]}"')
+	expect(run).toContain('"$hal_dir/install" -l')
+	expect(run).toContain('"$hal_dir/install"')
 })
 
 test('installer local mode leaves the global command and PATH alone', async () => {

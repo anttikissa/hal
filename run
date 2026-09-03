@@ -65,9 +65,9 @@ needs_install() {
 }
 
 if needs_install; then
-	install_args=()
-	if [ "$local_install" = true ]; then install_args+=("-l"); fi
-	"$hal_dir/install" "${install_args[@]}"
+	if [ "$local_install" = true ]; then "$hal_dir/install" -l
+	else "$hal_dir/install"
+	fi
 	if needs_install; then
 		echo "hal: setup was not completed; rerun ./run when ready." >&2
 		exit 1
