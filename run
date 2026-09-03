@@ -61,13 +61,31 @@ needs_install() {
 }
 
 if needs_install; then
-	if [ "$local_install" = true ]; then "$hal_dir/install" -l
-	else "$hal_dir/install"
+	if [ "$local_install" = true ]; then
+		echo "Looks like you need to run ./install -l first."
+		echo
+		echo "Running ./install -l..."
+		echo
+		"$hal_dir/install" -l
+	else
+		echo "Looks like you need to run ./install first."
+		echo
+		echo "Running ./install..."
+		echo
+		"$hal_dir/install"
+	fi
+	install_code=$?
+	if [ "$install_code" -ne 0 ]; then
+		echo "hal: install failed." >&2
+		exit "$install_code"
 	fi
 	if needs_install; then
 		echo "hal: setup was not completed; rerun ./run when ready." >&2
 		exit 1
 	fi
+	echo
+	echo "Install script finished successfully. Starting Hal..."
+	echo
 fi
 
 # The local browser client is part of the normal `./run` experience. Direct
