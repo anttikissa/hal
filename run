@@ -4,21 +4,20 @@ set -uo pipefail
 # Resolve symlinks to find the real .hal directory.
 hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
-# A checkout made with git clone has no config.ason because it is user-local and
-# ignored. Let ./run be sufficient for a new user; never replace an existing config.
-if [ ! -f "$hal_dir/config.ason" ]; then
-	cp "$hal_dir/config-template.ason" "$hal_dir/config.ason"
-fi
-
 args=()
 web=false
 remote=false
+local_install=false
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		-f|--fresh)
 			# Fresh state means this invocation is intentionally isolated: no other
 			# terminal can join it, and it cannot join the normal host.
 			export HAL_STATE_DIR="$(mktemp -d /tmp/hal-state-XXXXXX)"
+			shift
+			;;
+		-l)
+			local_install=true
 			shift
 			;;
 		--state-dir)
@@ -52,6 +51,28 @@ while [ "$#" -gt 0 ]; do
 			;;
 	esac
 done
+
+# `./run` is the normal new-user entry point. It delegates setup decisions to
+# the installer instead of duplicating them; -l is a private second-checkout
+# shortcut that asks the installer to leave the global Hal command alone.
+needs_install() {
+	if ! command -v bun >/dev/null 2>&1; then return 0; fi
+	if [ ! -d "$hal_dir/node_modules" ] || [ ! -f "$hal_dir/config.ason" ]; then return 0; fi
+	if [ "$local_install" = true ]; then return 1; fi
+	if [ ! -L "$HOME/.local/bin/hal" ] || [ "$(readlink -f "$HOME/.local/bin/hal")" != "$hal_dir/run" ]; then return 0; fi
+	if ! echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin"; then return 0; fi
+	return 1
+}
+
+if needs_install; then
+	install_args=()
+	if [ "$local_install" = true ]; then install_args+=("-l"); fi
+	"$hal_dir/install" "${install_args[@]}"
+	if needs_install; then
+		echo "hal: setup was not completed; rerun ./run when ready." >&2
+		exit 1
+	fi
+fi
 
 # The local browser client is part of the normal `./run` experience. Direct
 # `bun src/main.ts` remains useful for tests and starts without it.

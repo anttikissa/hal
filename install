@@ -8,11 +8,13 @@ hal_dir="$(cd "$(dirname "$0")" && pwd)"
 bin_dir="$HOME/.local/bin"
 dry_run="${HAL_DRY_RUN:-}"
 auto_yes=""
+local_only=""
 
 # Parse flags
 for arg in "$@"; do
 	case "$arg" in
 		-y) auto_yes=1 ;;
+		-l) local_only=1 ;;
 		*) echo "unknown option: $arg"; exit 1 ;;
 	esac
 done
@@ -119,6 +121,20 @@ if echo "$path_to_check" | tr ':' '\n' | grep -qx "$bin_dir"; then
 else
 	need_path=1
 	log "[ ] $(prettify "$bin_dir") in PATH"
+fi
+
+# Local setup exists for a second checkout: it must never take over the global
+# executable or install machine-wide prerequisites. It fails if Bun is absent,
+# because Bun is required to install this checkout's dependencies.
+if [ -n "$local_only" ]; then
+	if [ -n "$need_bun" ]; then
+		log "Bun is required for local setup. Install Bun first, or run ./install without -l."
+		exit 1
+	fi
+	need_git=""
+	need_rg=""
+	need_symlink=""
+	need_path=""
 fi
 
 need_any="${need_git}${need_rg}${need_bun}${need_deps}${need_config}${need_symlink}${need_path}"
@@ -251,7 +267,7 @@ fi
 
 # --- symlink ---
 
-if [ -n "$need_symlink" ]; then
+if [ -z "$local_only" ] && [ -n "$need_symlink" ]; then
 	run mkdir -p "$bin_dir"
 	log "Linking $(prettify "$bin_dir")/hal -> $(prettify "$hal_dir")/run"
 	run ln -sf "$hal_dir/run" "$bin_dir/hal"
@@ -259,7 +275,7 @@ fi
 
 # --- PATH ---
 
-if [ -n "$need_path" ]; then
+if [ -z "$local_only" ] && [ -n "$need_path" ]; then
 	shell_name="$(basename "${SHELL:-/bin/sh}")"
 	case "$shell_name" in
 		zsh)

@@ -18,11 +18,20 @@ test('installer creates local config from tracked template', async () => {
 	expect(install).toContain('cp "$hal_dir/config-template.ason" "$hal_dir/config.ason"')
 })
 
-test('run creates local config from the tracked template when it is missing', async () => {
+test('run delegates incomplete local setup to install, with -l preserved for the installer', async () => {
 	let run = await Bun.file(`${halDir}/run`).text()
 
-	expect(run).toContain('[ ! -f "$hal_dir/config.ason" ]')
-	expect(run).toContain('cp "$hal_dir/config-template.ason" "$hal_dir/config.ason"')
+	expect(run).toContain('-l)')
+	expect(run).toContain('install_args+=("-l")')
+	expect(run).toContain('"$hal_dir/install" "${install_args[@]}"')
+})
+
+test('installer local mode leaves the global command and PATH alone', async () => {
+	let install = await Bun.file(`${halDir}/install`).text()
+
+	expect(install).toContain('-l) local_only=1')
+	expect(install).toContain('if [ -z "$local_only" ] && [ -n "$need_symlink" ]; then')
+	expect(install).toContain('if [ -z "$local_only" ] && [ -n "$need_path" ]; then')
 })
 
 // Skipped secretly - we rarely modify the install script. Enable test temporarily if you must test
