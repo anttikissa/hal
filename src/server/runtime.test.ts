@@ -35,10 +35,12 @@ test('runtime exposes in-memory focused sessions for eval helpers', () => {
 })
 
 
-test('fresh HAL intro sessions may generate without a user prompt', () => {
-	expect(runtime.isIntroStart('hal/intro', [])).toBe(true)
-	expect(runtime.isIntroStart('hal/intro', [{ type: 'assistant', text: 'started' } as any])).toBe(false)
-	expect(runtime.isIntroStart('openai/gpt-5.6-terra', [])).toBe(false)
+test('fresh models that require an initial turn may generate without a user prompt', () => {
+	expect(models.requiresInitialTurn('hal/intro')).toBe(true)
+	expect(runtime.isInitialTurn('hal/intro', [])).toBe(true)
+	expect(runtime.isInitialTurn('hal/intro', [{ type: 'assistant', text: 'started' } as any])).toBe(false)
+	expect(models.requiresInitialTurn('openai/gpt-5.6-terra')).toBe(false)
+	expect(runtime.isInitialTurn('openai/gpt-5.6-terra', [])).toBe(false)
 })
 
 test('discarding an amended prompt clears its paused continuation', () => {

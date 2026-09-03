@@ -562,6 +562,13 @@ function requestContinue(sessionId: string): void {
 	)
 }
 
+function requestInitialTurn(sessionId: string): void {
+	const meta = sessionStore.loadSessionMeta(sessionId)
+	if (!meta) return
+	if (!isInitialTurn(meta.model ?? models.defaultModel(), sessionStore.loadAllHistory(sessionId))) return
+	requestContinue(sessionId)
+}
+
 async function amendLastPrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<boolean> {
 	const entries = sessionStore.loadHistory(sessionId)
 	if (entries.length === 0 || hasTurnContentAfterLastUser(entries) || hasLiveTurnContent(sessionId)) return false
@@ -645,8 +652,8 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 	}
 }
 
-function isIntroStart(model: string, entries: HistoryEntry[]): boolean {
-	if (model !== 'hal/intro') return false
+function isInitialTurn(model: string, entries: HistoryEntry[]): boolean {
+	if (!models.requiresInitialTurn(model)) return false
 	return !entries.some((entry) => entry.type === 'user' || entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result')
 }
 
@@ -659,10 +666,10 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		return
 	}
 	const model = meta.model ?? models.defaultModel()
-	const introStart = !text && isIntroStart(model, sessionStore.loadAllHistory(sessionId))
+	const initialTurn = !text && isInitialTurn(model, sessionStore.loadAllHistory(sessionId))
 	let continueAction: ContinuationAction | false = false
-	if (!text && !introStart) continueAction = continueActionForSession(sessionId)
-	if (!text && !introStart && !continueAction) {
+	if (!text && !initialTurn) continueAction = continueActionForSession(sessionId)
+	if (!text && !initialTurn && !continueAction) {
 		// Continue with no unfinished turn: the only remaining work is a queued
 		// prompt that the paused turn was holding back.
 		if (queueRunner.shouldDrainQueuedPrompt(sessionId, 'completed')) await queueRunner.runNextQueuedPrompt(sessionId)
@@ -1086,14 +1093,12 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	state.pendingToolRuns.clear()
 	state.contextSwitching.clear()
 	let startupSessionId: string | undefined
-	let createdStartupSession = false
 	if (opts.targetCwd) {
 		const target = tabs.openSessionForCwd(opts.targetCwd)
 		if (!target.ok) return target
 		startupSessionId = target.sessionId
 	} else if (state.openSessionIds.length === 0) {
 		startupSessionId = tabs.createSessionTab({}).id
-		createdStartupSession = true
 		if (!signal.aborted && state.activeRuntimePid === process.pid) broadcastSessions()
 	}
 	restartPromptWatch()
@@ -1113,11 +1118,6 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	})
 	if (state.openSessionIds.length > 0) tabs.syncSharedState()
 	void modelNotices.refreshModelMetadata()
-	if (createdStartupSession && startupSessionId && sessionStore.loadSessionMeta(startupSessionId)?.model === 'hal/intro') {
-		setTimeout(() => {
-			if (!signal.aborted && state.activeRuntimePid === process.pid) void runGeneration(startupSessionId!, '')
-		}, 0)
-	}
 	if (metas.length > 0) {
 		setTimeout(() => {
 			if (signal.aborted || state.activeRuntimePid !== process.pid) return
@@ -1134,6 +1134,10 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 				continue
 			}
 			if (activeQuestion(sessionId)) continue
+			if (isInitialTurn(sessionStore.loadSessionMeta(sessionId)?.model ?? models.defaultModel(), entries)) {
+				requestInitialTurn(sessionId)
+				continue
+			}
 			if (answeredIntroNeedsContinue(sessionStore.loadHistory(sessionId))) {
 				requestContinue(sessionId)
 				continue
@@ -1188,7 +1192,7 @@ export const runtime = {
 	cancelSessionWork,
 	answeredIntroNeedsContinue,
 	shouldAutoContinue,
-	isIntroStart,
+	isInitialTurn,
 	shouldCloseSessionAfterGeneration,
 	recordTabClosed,
 	spawnSession,
@@ -1199,6 +1203,7 @@ export const runtime = {
 	handleCommand,
 	cancelAmendedPrompt,
 	continuePendingTools,
+	requestInitialTurn,
 	startPromptCommand,
 	// Used by sibling server modules (tabs, model-notices) at call time.
 	broadcastSessions,

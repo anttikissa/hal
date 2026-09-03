@@ -175,7 +175,10 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 	if (text) recordSessionInfo(sessionId, text, meta.createdAt, 'notice')
 	if (opts.sourceId && sourceMeta?.context && !overridesForkCwd) sessionStore.updateMeta(sessionId, { context: sourceMeta.context })
 	else runtime.publishContextEstimate(sessionId)
-	return sessionStore.loadSessionMeta(sessionId) ?? meta
+	const result = sessionStore.loadSessionMeta(sessionId) ?? meta
+	// Let creation commit before the first assistant event can publish to this tab.
+	queueMicrotask(() => runtime.requestInitialTurn(result.id))
+	return result
 }
 
 function closeSession(sessionId: string, openReplacement = false): void {

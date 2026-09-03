@@ -17,10 +17,11 @@ interface CatalogEntry {
 	fallbackContext?: number
 	pricing?: { input: number; output: number }
 	track?: TrackFamily
+	initialTurn?: boolean
 }
 
 const CATALOG: CatalogEntry[] = [
-	{ group: 'HAL', alias: 'intro', fullId: 'hal/intro', fallbackContext: 1_000_000 },
+	{ group: 'HAL', alias: 'intro', fullId: 'hal/intro', fallbackContext: 1_000_000, initialTurn: true },
 	{ group: 'HAL', alias: 'scroll', fullId: 'hal/scroll', fallbackContext: 1_000_000 },
 	{ group: 'Anthropic', alias: 'opus', aliases: ['anthropic', 'claude'], fullId: 'anthropic/claude-opus-5', fallbackContext: 1_000_000, pricing: { input: 5, output: 25 }, track: 'opus' },
 	{ group: 'Anthropic', alias: 'sonnet', fullId: 'anthropic/claude-sonnet-5', fallbackContext: 1_000_000, pricing: { input: 3, output: 15 }, track: 'sonnet' },
@@ -83,6 +84,14 @@ function resolveModel(input: string): string {
 	// name is unambiguous; openrouterIds is newest-first, so the first match wins.
 	const bare = state.openrouterIds.find((id) => id.endsWith(`/${input}`))
 	return cachedNativeFullId(input) ?? (bare ? `openrouter/${bare}` : input)
+}
+
+function requiresInitialTurn(model: string): boolean {
+	const fullId = resolveModel(model)
+	for (const entry of CATALOG) {
+		if (entry.fullId === fullId && entry.initialTurn) return true
+	}
+	return false
 }
 
 // ── Display names ──
@@ -773,6 +782,7 @@ export const models = {
 	config,
 	hydrate,
 	resolveModel,
+	requiresInitialTurn,
 	displayModel,
 	reasoningEffort,
 	fallbackContextWindow,
