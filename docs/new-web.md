@@ -65,19 +65,18 @@ Inline durable questions now cover risky-tool approval end-to-end in terminal an
 web clients: exact tool context, ordered No/Yes choices, history-backed restart,
 and frozen ordinary composers. The remaining high-leverage work is notification:
 
-- **Notify**: Web Push. Server gains VAPID keys + subscription storage
-  (`web-push` semantics hand-rolled with `crypto.subtle` in Bun; payload is
-  just "session X needs an answer", URL deep-links to the session). Push on
-  active questions, turn completion, and errors. Client registers a service
-  worker; clicking the notification focuses the tab and selects the session.
-  This requires PWA installability on iOS; installed-PWA Web Push works since
-  iOS 16.4.
-- **Context in the notification**: include command/edit summary text so the
-  decision can be made from the lock screen; tapping opens straight to the
-  question block. This is the difference between used and ignored.
+- **Notify later**: plain, short, session-specific notifications that deep-link
+  to the right session: `Hal: session 119-mac finished.`, `Hal: session
+  119-mac wants approval.`, `Hal: session 119-mac rate limited.`, or `Hal:
+  session 119-mac: error 5xx server overloaded.` Send only the relevant one.
+  Tapping opens the session's question or latest event; notifications do not
+  contain approvals or other action controls.
+- **Delivery choices, deferred**: Web Push for installed iOS Home-Screen apps
+  is HTTPS-only. An optional ntfy bridge can serve standalone/local-host users
+  who install its companion app. Add neither implementation until the core
+  mobile supervision UI is solid.
 
-Acceptance: an agent blocked on a bash approval is resolvable from a locked
-phone in ≤15 seconds without typing.
+Acceptance: a relevant notification opens its matching session directly.
 
 Safety: never offer permission bypass from the phone. Unanswered questions are
 durable and have no automatic timeout; notify only when input is genuinely
@@ -162,9 +161,9 @@ Effort M. Impact M-H (this is how people actually use phones: short nudges).
 
 ## Side quests (next 5–10, unordered)
 
-A. **PWA installability**: manifest (name, theme_color #111, display standalone,
-   maskable icon), apple-touch-icon, standalone display. Prerequisite for iOS
-   push; also removes Safari chrome. ~30 lines + two icon files.
+A. **PWA installability**: manifest, icons, standalone display. Needed before
+   iOS Web Push; this feature is HTTPS-only. Keep it small until notifications
+   move from roadmap to implementation.
 B. **Diff viewer for edits**: when a tool call is edit-like, render stacked
    +/- lines with syntax tinting instead of JSON dump. Tap-to-expand full file
    comes later; landscape hint even later. (GitHub-Mobile lesson: reuse a good
@@ -195,16 +194,6 @@ J. **Trust posture page**: token auth is already the credential; document +
    non-localhost bind. Cheap trust win, aligns with E2EE expectations set by
    competitors.
 
-## Open decisions
-
-1. Phone reachability gates push: document LAN/Tailscale access first (the
-   server binds 127.0.0.1; `/web` URLs already carry tokens), or add an
-   optional relay. Pure-LAN cannot wake a phone on the internet; a relay makes
-   push delivery trivial. Decide before building §1b.
-2. Push mechanism: self-hosted ntfy-style webhook (user-configured endpoint,
-   cheapest, matches OSS ethos) vs VAPID Web Push (needs installed PWA on iOS)
-   vs both.
-
 ## Non-goals (deliberate)
 
 - Native apps / APNs / FCM: Web Push + installed PWA covers it; revisit only
@@ -220,7 +209,7 @@ J. **Trust posture page**: token auth is already the credential; document +
 1. §1a approvals rendered + banner (unblocks the core loop; no infra).
 2. §4 connection lifecycle + §5 composer basics (textarea/abort/optimistic).
 3. §3 markdown/collapse/streaming pills.
-4. Side quest A (manifest/SW) then §1b-c Web Push.
+4. Revisit PWA/Web Push or optional ntfy only after the core loop proves useful.
 5. §2 session board polish; then side quests by itch.
 
 Each step keeps `./test` green; UI-only steps need no new tests beyond
