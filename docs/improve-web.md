@@ -1,6 +1,6 @@
-# Making Hal actually work on mobile and web
+# Improving Hal web and mobile experience
 
-Status quo and plan for the web client (`src/web-client/`). Written 2026-08-22
+Incremental improvement plan for the existing web client (`src/web-client/`); this is not a rewrite. Written 2026-08-22
 after fixing the tab bar; research input from field scans of Happy, Omnara,
 Claude Code Remote Control, Codex iOS, GitHub Mobile, Moshi, Tactic Remote,
 Termius/Blink/tmux workflows, and their user reviews (sources inline where they
@@ -85,7 +85,7 @@ needed and put notification opt-out in the first useful settings surface.
 ### 2. Session board as home screen
 
 Tabs answer "which session am I in"; phones need "which session needs me".
-Evolve the ☰ sheet into the default mobile landing view:
+Improve the existing ☰ sheet into a better mobile session board:
 
 - Rows sorted: needs-attention first, then working, then idle; each row shows
   name, cwd tail, model, pulsing dot / bell, last activity time.
@@ -200,9 +200,9 @@ J. **Trust posture page**: token auth is already the credential; document +
   if interactive notification buttons prove decisive.
 - IDE-in-the-browser (code-server path): consistently reviewed as unusable on
   phones; we are a supervision surface with a terminal escape hatch, not an IDE.
-- Mirroring the TUI: rebuild as chat/cards; the terminal stays canonical on
-  desktop. Honest framing: web is a *window into the real session*, and the
-  server owns all state — which we already have.
+- Rewriting or mirroring the TUI. Improve the existing focused web surface
+  incrementally; the terminal stays canonical on desktop and the server remains
+  the owner of all session state.
 
 ## Sequencing
 
