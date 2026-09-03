@@ -123,7 +123,7 @@ test('prompt watcher reports AGENTS.md edits', async () => {
 		await wait(100)
 		writeFileSync(join(tempDir, 'repo', 'AGENTS.md'), 'updated\n')
 		const deadline = Date.now() + 1500
-		while (Date.now() < deadline && seen.length === 0) await wait(25)
+		while (Date.now() < deadline && !seen.includes('s1:AGENTS.md')) await wait(25)
 		expect(seen).toContain('s1:AGENTS.md')
 	} finally {
 		stop()

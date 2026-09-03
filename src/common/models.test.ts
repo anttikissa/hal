@@ -95,6 +95,10 @@ test('model picker lists updated frontier aliases', () => {
 		value: 'sonnet',
 		search: expect.stringContaining('anthropic/claude-sonnet-5'),
 	})
+	expect(models.listModelChoices().find((item) => item.value === 'fable')).toMatchObject({
+		value: 'fable',
+		search: expect.stringContaining('anthropic/claude-fable-5-1'),
+	})
 	expect(models.listModelChoices().find((item) => item.value === 'gemini')).toMatchObject({
 		value: 'gemini',
 		search: expect.stringContaining('google/gemini-3.8-flash'),
@@ -263,9 +267,8 @@ test('model completions include aliases, full ids, and bare ids', () => {
 })
 
 
-test('Fable and gpt-instant aliases resolve to provider model ids', () => {
+test('Fable 5.1 and gpt-instant aliases resolve to provider model ids', () => {
 	expect(models.resolveModel('fable')).toBe('anthropic/claude-fable-5-1')
-	expect(models.resolveModel('fable-5')).toBe('anthropic/claude-fable-5')
 	expect(models.resolveModel('fable-5-1')).toBe('anthropic/claude-fable-5-1')
 	expect(models.resolveModel('gpt-instant')).toBe('openai/gpt-5.5-instant')
 	expect(models.resolveModel('instant')).toBe('instant')
