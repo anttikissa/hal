@@ -77,6 +77,44 @@ function pushCodeWrapped(lines: string[], text: string, cols: number, mdColors: 
 	}
 }
 
+// A streamed table row is often temporarily missing its final pipe. Without this
+// normalization it alternates between a table and ordinary text after every word:
+// mdSpans() sees `| name | value` as text, then sees a table again when the final
+// pipe arrives. Keep an established table intact, and hide its unfinished separator.
+function stabilizeStreamingTable(source: string): string {
+	const start = source.lastIndexOf('\n') + 1
+	const line = source.slice(start)
+	const prefix = source.slice(0, start)
+	if (!/^\s*\|/.test(line)) return source
+
+	const hasTable = /(?:^|\n)\s*\|.+\|\s*(?:\n|$)/.test(prefix) || (line.match(/\|/g)?.length ?? 0) >= 2
+	if (hasTable && /^\s*\|\s*$/.test(line)) return prefix
+	if (/\|\s*$/.test(line) || !hasTable) return source
+	if (/^\s*\|[\s:|-]*$/.test(line)) return prefix
+	return `${prefix}${line.trimEnd()} |`
+}
+
+// Markdown tables can still reflow their rows as column widths are negotiated. The
+// transcript renderer must never pull the prompt upward during a live stream, so
+// retain this block's greatest rendered height with card-colored spacer rows.
+const streamingHeights = new WeakMap<Block, { cols: number, height: number }>()
+
+function preserveStreamingHeight(block: Block, lines: string[], fg: string, bg: string, bgIsBlack: boolean | undefined, cols: number): void {
+	if (!hasStreamingHalCursor(block)) {
+		streamingHeights.delete(block)
+		return
+	}
+	const previous = streamingHeights.get(block)
+	if (!previous || previous.cols !== cols || lines.length >= previous.height) {
+		streamingHeights.set(block, { cols, height: lines.length })
+		return
+	}
+
+	const spacer = bg && !bgIsBlack ? bgLine(`${fg} `, cols, bg) : ''
+	const at = bg && !bgIsBlack ? lines.length - 1 : lines.length
+	for (let i = lines.length; i < previous.height; i++) lines.splice(at, 0, spacer)
+}
+
 function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinking' | 'log' | 'info' | 'warning' | 'error' }>, cols: number): string[] {
 	const lines: string[] = []
 	const mdColors = markdownColors(block)
@@ -84,7 +122,10 @@ function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinki
 	let source = markdownSourceText(block)
 	// Do not paint a partial code-fence delimiter as transcript content: the third
 	// backtick would remove that row after it may already be frozen in scrollback.
-	if (!finished) source = source.replace(/(^|\n)`{1,2}$/, '$1')
+	if (!finished) {
+		source = source.replace(/(^|\n)`{1,2}$/, '$1')
+		source = stabilizeStreamingTable(source)
+	}
 	for (const span of md.mdSpans(source)) {
 		if (span.type === 'code') {
 			for (const raw of span.lines) pushCodeWrapped(lines, raw, cols, mdColors, isTextCodeLang(span.lang))
@@ -194,7 +235,6 @@ function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolea
 	if (block.type === 'user') return colors.user
 	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return colors.warning
 	if (block.type === 'question') return block.active ? colors.warning : { ...colors.log, bg: '' }
-	if (block.type === 'log' && block.usageBars) return colors.log
 	if (block.type === 'log' || block.type === 'info') return { ...colors.log, bg: '' }
 	if (block.type === 'tool') return colors.tool(block.name)
 	return fixedNoticeColors[block.type]
@@ -464,6 +504,7 @@ function renderBlock(block: Block, cols: number, cursorVisible = false, sessionL
 	// without adding a separate rendering clock.
 	if (hasStreamingHalCursor(block)) addInlineCursor(lines, block, cols, cursorVisible)
 	padBlock(lines, fg, bg, bgIsBlack, cols)
+	preserveStreamingHeight(block, lines, fg, bg, bgIsBlack, cols)
 	lines[lines.length - 1]! += FG_OFF
 	return lines
 }

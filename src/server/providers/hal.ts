@@ -24,6 +24,17 @@ Press enter to continue.<pause until="enter"/><config key="renderStatus.tabsOpac
 Press enter to continue.<pause until="enter"/><config key="renderStatus.statusOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Below them are the status and help bars: session, directory, model, context, and the keys you can press right now.<pause for="1s"/>
 
 Press enter to continue.<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="models.default" value="gpt"/>That is your prompt.<pause for="0.5s"/> Choose a real model with \`/model\`, then tell HAL what you would like to do.`,
+
+	table: `This is the streaming table reproduction. Its incomplete rows deliberately switch between partial cells and complete Markdown rows while every word arrives separately.
+
+| Session | Last activity | Topic / last prompt |
+| --- | --- | --- |
+| 133-pod (current; working) | 20:54 | Show recently active open tabs, then keep the prompt stable while the stream continues. |
+| 133-zen | 19:29 | Private Hal marketing and launch plan with a description long enough to wrap across several table rows. |
+| 133-huh | 19:25 | Autostash autorebase investigation, including the exact recovery path and the final status. |
+| 133-foo | 19:10 | Add Model Context Protocol support without destabilizing the terminal transcript. |
+
+The table reproduction is complete.`,
 }
 
 // Deliberately not a general XML parser. Unrecognized markup is intro text.
