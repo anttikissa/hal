@@ -48,16 +48,9 @@
 		cursor: [0.82, 0.11, 220],
 	},
 
-	// System notices — Hal-produced operational messages, muted and warm.
-	system: {
-		fg: [0.74, 0.06, 55],
-		bg: [0.22, 0.025, 55],
-	},
-
-	// Log — neutral, moderately dim, with a subtle grey card
+	// Log — neutral, moderately dim.
 	log: {
 		fg: [0.66, 0, 0],
-		bg: [0.23, 0, 0],
 		code: [0.78, 0, 0],
 		linkBg: [0.30, 0, 0],
 	},

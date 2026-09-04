@@ -16,6 +16,7 @@ const COLORS_PATH = `${HAL_DIR}/colors.ason`
 // ── Public color objects — mutated in place by load() ────────────────────────
 
 type BlockColors = { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string; linkFg?: string; linkBg?: string; cursor?: string; cursorIdle?: string }
+type LogColors = Omit<BlockColors, 'bg' | 'bgIsBlack'>
 type MdColors = BlockColors & { bold: string; code: string }
 type StatusColors = { fg: string; highlight: string }
 type HelpColors = { key: string; description: string }
@@ -27,7 +28,7 @@ const assistant: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const user: BlockColors = { fg: '', bg: '' }
 const input = { bg: '', cursor: '', cursorDim: '' }
-const logColors: BlockColors = { fg: '', bg: '' }
+const logColors: LogColors = { fg: '' }
 const info: BlockColors = { fg: '', bg: '' }
 const warning: BlockColors = { fg: '', bg: '' }
 const error: BlockColors = { fg: '', bg: '' }
@@ -91,9 +92,9 @@ function load(): void {
 
 	// Helper: resolve a block definition { fg: [...], bg: [...] }.
 	// Markdown-rendered blocks may also define brighter inline/fenced code colors.
-	function resolveBlock(def: any, target: BlockColors): void {
+	function resolveBlock(def: any, target: BlockColors | LogColors): void {
 		if (def?.fg) target.fg = fg(def.fg, vars)
-		if (def?.bg) {
+		if (def?.bg && 'bg' in target) {
 			const triple = resolveTriple(def.bg, vars)
 			target.bg = oklch.toAnsi(48, ...triple as [number, number, number])
 			target.bgIsBlack = oklch.isBlack(triple[0], triple[1])

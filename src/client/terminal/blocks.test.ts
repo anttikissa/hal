@@ -174,7 +174,7 @@ test('short status notices share one unlabelled transparent style without marker
 	expect(lines[0]).not.toContain('[paused]')
 	expect(info).toEqual(rendered)
 	expect(rendered.join('\n')).toContain(colors.log.fg)
-	expect(rendered.join('\n')).not.toContain(colors.log.bg)
+	expect(rendered.join('\n')).not.toContain('\x1b[48;')
 	expect(stripAnsi(rendered.join('\n'))).not.toContain('System')
 })
 
@@ -196,14 +196,16 @@ test('status markers lose brackets alongside regular notices', () => {
 	expect(lines.join('\n')).not.toContain('[restarted]')
 })
 
-test('usage bar markers gain terminal color but no background when marked trusted', () => {
+test('usage bars retain their empty track without a status-card background', () => {
 	const bar = subscriptionUsage.usageBarMarker(50, 2)
+	const emptyBar = subscriptionUsage.usageBarMarker(0, 2)
 	expect(bar).not.toContain('\x1b[')
 	const trusted = blocks.renderBlock({ type: 'log', text: bar, usageBars: true }, 80).join('\n')
+	const empty = blocks.renderBlock({ type: 'log', text: emptyBar, usageBars: true }, 80).join('\n')
 	const untrusted = blocks.renderBlock({ type: 'log', text: bar }, 80).join('\n')
 
 	expect(trusted).toContain('\x1b[38;2;')
-	expect(trusted).not.toContain('\x1b[48;2;61;61;61m')
+	expect(empty).toContain('\x1b[48;2;61;61;61m  ')
 	expect(untrusted).toContain(bar)
 	const unsafe = blocks.renderBlock({ type: 'log', text: `${bar}\x1b[2J`, usageBars: true }, 80).join('\n')
 	expect(unsafe).not.toContain('\x1b[2J')
