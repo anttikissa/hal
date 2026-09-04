@@ -13,6 +13,7 @@ import { modelRefresh } from './model-refresh.ts'
 import { config } from '../config.ts'
 import { HAL_DIR } from './state.ts'
 import { tabs } from './tabs.ts'
+import { agentLoop } from './runtime/agent-loop.ts'
 
 test('formatModelRefreshMessage summarizes models.dev changes for the user', () => {
 	const msg = modelRefresh.formatModelRefreshMessage([
@@ -204,6 +205,7 @@ test('suggestModelDiscoveries opens an unfocused new tab even from an idle sessi
 	const origUpdateState = ipc.updateState
 	const origWatchPromptFiles = context.watchPromptFiles
 	const origHasConfiguredDirectSource = serverModels.hasConfiguredDirectSource
+	const origIsWorking = agentLoop.isWorking
 	serverModels.hasConfiguredDirectSource = () => true
 	const events: any[] = []
 	const shared: any = { sessions: [], working: {}, updatedAt: '' }
@@ -254,6 +256,7 @@ test('suggestModelDiscoveries opens an unfocused new tab even from an idle sessi
 		ipc.updateState = origUpdateState
 		context.watchPromptFiles = origWatchPromptFiles
 		serverModels.hasConfiguredDirectSource = origHasConfiguredDirectSource
+		agentLoop.isWorking = origIsWorking
 		sessions.deactivateAllSessions()
 		rmSync(base, { recursive: true, force: true })
 		if (prevState === undefined) delete process.env.HAL_STATE_DIR
