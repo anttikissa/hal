@@ -4,7 +4,7 @@ type ParseEnv = {
 }
 
 type ParseResult =
-	| { ok: true; help: boolean; targetCwd: string; stateDir?: string; webPort?: number; remoteUrl?: string | null }
+	| { ok: true; help: boolean; targetCwd: string; stateDir?: string; remoteUrl?: string | null }
 	| { ok: false; error: string }
 
 function helpText(): string {
@@ -17,7 +17,6 @@ function helpText(): string {
 		'  -r [url]         Connect to a HAL web server; reuse the last URL when omitted.',
 		'  -h, -?, --help   Show this help and exit.',
 		'      --state-dir <dir>  Use an existing state directory (or create it).',
-		'      --web[=<port>]    Serve the local web client (default port: 9001).',
 		'',
 		'No positional arguments are accepted yet.',
 	].join('\n')
@@ -27,7 +26,6 @@ function parse(args: string[], env: ParseEnv): ParseResult {
 	let self = false
 	let help = false
 	let stateDir: string | undefined
-	let webPort: number | undefined
 	let remoteUrl: string | null | undefined
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i]!
@@ -54,12 +52,6 @@ function parse(args: string[], env: ParseEnv): ParseResult {
 			if (!stateDir) return { ok: false, error: '--state-dir requires a directory' }
 			continue
 		}
-		if (arg === '--web' || arg.startsWith('--web=')) {
-			const value = arg === '--web' ? '9001' : arg.slice('--web='.length)
-			webPort = Number(value)
-			if (!Number.isInteger(webPort) || webPort < 1 || webPort > 65535) return { ok: false, error: '--web port must be a number from 1 to 65535' }
-			continue
-		}
 		// The shell wrapper consumes fresh-state options before main.ts starts.
 		// Accept them here too so direct `bun src/main.ts --fresh` has the same
 		// command-line surface as `./run --fresh`.
@@ -68,9 +60,8 @@ function parse(args: string[], env: ParseEnv): ParseResult {
 		return { ok: false, error: `Unexpected argument: ${arg}` }
 	}
 
-	const result: { ok: true; help: boolean; targetCwd: string; stateDir?: string; webPort?: number; remoteUrl?: string | null } = { ok: true, help, targetCwd: self ? env.halDir : env.cwd }
+	const result: { ok: true; help: boolean; targetCwd: string; stateDir?: string; remoteUrl?: string | null } = { ok: true, help, targetCwd: self ? env.halDir : env.cwd }
 	if (stateDir) result.stateDir = stateDir
-	if (webPort) result.webPort = webPort
 	if (remoteUrl !== undefined) result.remoteUrl = remoteUrl
 	return result
 }

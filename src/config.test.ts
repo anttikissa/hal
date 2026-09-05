@@ -24,6 +24,12 @@ test('config-template.ason matches module config defaults', () => {
 		expect(template.renderStatus[key]).toBe(0)
 		template.renderStatus[key] = defaults.renderStatus[key]
 	}
+	// The intro turns both back on when it ends: neither may interrupt its stream
+	// with a status line.
+	expect(template.models.refresh).toBe(false)
+	expect(template.web.enabled).toBe(false)
+	template.models.refresh = defaults.models.refresh
+	template.web.enabled = defaults.web.enabled
 
 	expect(template).toEqual(defaults)
 })

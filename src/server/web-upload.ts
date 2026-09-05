@@ -28,8 +28,12 @@ const EXT_TO_TYPE: Record<string, string> = {
 	webp: 'image/webp',
 }
 
-// Upload limits are read at request time so eval and /config can tune them live.
+// Web settings live here rather than in web.ts to keep config.ts out of the
+// import cycle (config -> web -> runtime -> config). Read at request time so
+// eval and /config can tune them live.
 const config = {
+	enabled: true,
+	port: 9001,
 	maxUploadBytes: 8 * 1024 * 1024,
 }
 

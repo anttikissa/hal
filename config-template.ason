@@ -96,7 +96,10 @@
 	models: {
 		// New installations start with HAL's guided intro. The intro changes this to
 		// 'gpt' after it has revealed the interface.
-		default: 'intro'
+		default: 'intro',
+		// Fetch fresh model metadata from models.dev at startup. The intro turns this
+		// on when it ends, so its stream is not interrupted by a status line.
+		refresh: false
 	},
 	subscriptionUsage: {
 		// Mask account email addresses in usage and status output.
@@ -127,7 +130,7 @@
 	},
 	halProvider: {
 		// Number of words streamed per second by HAL's built-in scripted models.
-		wordsPerSecond: 4
+		wordsPerSecond: 10
 	},
 	toolRegistry: {
 		// Hard cap for any tool result sent back to the model.
@@ -150,6 +153,11 @@
 		multilinePasteFileLineLimit: 7
 	},
 	web: {
+		// Serve the local browser client. The intro turns this on when it ends, so its
+		// stream is not interrupted by the announcement.
+		enabled: false,
+		// Port for the local browser client.
+		port: 9001,
 		// Maximum size accepted for images uploaded through the web client's attach button.
 		maxUploadBytes: 8388608
 	}

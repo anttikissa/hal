@@ -61,6 +61,7 @@ function suggestModelDiscoveries(previous: Record<string, number>, next: Record<
 }
 
 async function refreshModelMetadata(): Promise<void> {
+	if (!models.config.refresh) return
 	try {
 		const checked = await modelRefresh.checkModels()
 		const result = checked.result

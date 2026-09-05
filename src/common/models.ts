@@ -534,6 +534,8 @@ const config = {
 	// Default model alias or full ID. Set via config.ason under "models".
 	// 'gpt' tracks the newest GPT everyday tier (currently openai/gpt-5.6-terra).
 	default: 'gpt',
+	// Fetch fresh model metadata from models.dev at startup.
+	refresh: true,
 }
 
 function defaultModel(): string {

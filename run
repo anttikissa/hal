@@ -5,8 +5,6 @@ set -uo pipefail
 hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
 args=()
-web=false
-remote=false
 local_install=false
 while [ "$#" -gt 0 ]; do
 	case "$1" in
@@ -31,13 +29,7 @@ while [ "$#" -gt 0 ]; do
 			export HAL_STATE_DIR="$state_dir"
 			shift
 			;;
-		--web|--web=*)
-			web=true
-			args+=("$1")
-			shift
-			;;
 		-r)
-			remote=true
 			args+=("$1")
 			shift
 			if [ "$#" -gt 0 ] && [[ "$1" != -* ]]; then
@@ -84,12 +76,6 @@ if needs_install; then
 	echo
 	echo "Install script finished successfully. Starting Hal..."
 	echo
-fi
-
-# The local browser client is part of the normal `./run` experience. Direct
-# `bun src/main.ts` remains useful for tests and starts without it.
-if [ "$web" = false ] && [ "$remote" = false ]; then
-	args+=("--web")
 fi
 
 while true; do

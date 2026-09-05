@@ -16,6 +16,7 @@ import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { config } from './config.ts'
+import { webUpload } from './server/web-upload.ts'
 import { builtins } from './server/tools/builtins.ts'
 import { colors } from './client/terminal/colors.ts'
 import { termCaps } from './utils/term-caps.ts'
@@ -231,7 +232,7 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	client.state.localCommandHandler = (command) => { runtime.handleCommand(command) }
 	commands.state.web = async (args) => {
 		const { web } = await import('./server/web.ts')
-		web.start(parsedArgs.ok && parsedArgs.webPort ? parsedArgs.webPort : 9001, ac.signal)
+		web.start(webUpload.config.port, ac.signal)
 		return web.command(args)
 	}
 	// Ctrl-R exits and `./run` creates a new host; that deserves a fresh URL announcement.
@@ -245,8 +246,8 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	// left. Prefer it while it still serves this cwd; otherwise keep the cwd's tab.
 	const remembered = tabs.rememberedTabForCwd(clientPersistence.load(), ipc.readState().sessions, startupCwd)
 	startupTarget.preferredSessionId = remembered ?? started.sessionId
-	if (parsedArgs.ok && parsedArgs.webPort) {
-		const port = parsedArgs.webPort
+	if (webUpload.config.enabled) {
+		const port = webUpload.config.port
 		void import('./server/web.ts')
 			.then(({ web }) => web.start(port, ac.signal, announceWeb ? startupTarget.preferredSessionId : undefined))
 			.catch((error) => log.error('web client startup failed', { error: String(error) }))

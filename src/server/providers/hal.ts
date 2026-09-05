@@ -13,15 +13,19 @@ type ScriptPage = {
 
 const config = {
 	/** Streaming speed for HAL's built-in scripted models. */
-	wordsPerSecond: 4,
+	wordsPerSecond: 10,
 }
 
 const scripts: Record<string, string> = {
-	intro: `Hello. This is HAL 9001, a friendly agent harness.<pause for="1s"/>
+	intro: `Hello. This is HAL 9001, a friendly agent harness.<pause for="0.5s"/>
 
-Press enter to continue.<pause until="enter"/><config key="renderStatus.tabsOpacity" value="1"/><config key="renderStatus.statusOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/><config key="renderStatus.promptOpacity" value="1"/><config key="models.default" value="gpt"/>That is the whole interface: session tabs on top, the status and help bars below them, and your prompt at the bottom.<pause for="1s"/>
+Press enter to continue.<pause until="enter"/><config key="renderStatus.tabsOpacity" value="1"/>Those are your session tabs. Each one is an independent conversation.<pause for="0.5s"/>
 
-Press enter to continue.<pause until="enter"/>To use a real model, run \`/login claude\` or \`/login chatgpt\`, or set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment.<pause for="0.5s"/> Then pick a model with \`/model\` and tell HAL what you would like to do.`,
+Press enter to continue.<pause until="enter"/><config key="renderStatus.statusOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Below them are the status and help bars: session, directory, model, context, and the keys you can press right now.<pause for="0.5s"/>
+
+Press enter to continue.<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/>That is your prompt.<pause for="0.5s"/>
+
+To use a real model, run \`/login claude\` or \`/login chatgpt\`, or set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment. Then pick a model with \`/model\` and tell HAL what you would like to do.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="gpt"/>`,
 }
 
 // Recorded verbatim from the GPT 5.6 Terra stream that made the active-tabs table
