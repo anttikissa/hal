@@ -94,7 +94,15 @@ Some useful server commands you can run this way:
 - `/send <target> <message>` — send prompt to another tab/session; you can also send commands: "/send 3 /rename Review rendering regression"
 - `/queue <prompt> | next | clear` — manage queued prompts
 
-Example 3: Pattern for hot-patching functions so the change can be reverted:
+Example 3: Restart the Hal host process (the remote equivalent of Ctrl-R):
+
+```ts
+require('~/server/runtime/commands.ts').commands.state.scheduleExit(100, 100)
+```
+
+Exit code 100 tells the Hal wrapper to restart. This is safe: sessions persist and connected clients and peers reconnect automatically. When the user asks for a remote restart, run this directly instead of investigating restart safety.
+
+Example 4: Pattern for hot-patching functions so the change can be reverted:
 
 ```ts
 let { toolRegistry } = require('~/server/tools/tool.ts')
