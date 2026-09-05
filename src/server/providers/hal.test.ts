@@ -62,6 +62,15 @@ test('HAL provider interprets timed pauses, persistent config controls, and Ente
 	])
 })
 
+test('paged script advances when earlier pages merged into one assistant message', () => {
+	// Consecutive intro pages have no user turn between them, so api-messages
+	// concatenates them into a single assistant message.
+	const pages = halProvider.pages('One.<pause until="enter"/>Two.<pause until="enter"/>Three.')
+	const merged = [{ role: 'assistant' as const, content: 'One.Two.' }]
+
+	expect(halProvider.nextPage(merged, pages)).toBe(2)
+})
+
 test('unrecognized markup remains ordinary intro text', () => {
 	expect(halProvider.pages('Hello <something/> world.')).toEqual([
 		{

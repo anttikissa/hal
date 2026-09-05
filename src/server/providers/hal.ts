@@ -19,23 +19,16 @@ const config = {
 const scripts: Record<string, string> = {
 	intro: `Hello. This is HAL 9001, a friendly agent harness.<pause for="1s"/>
 
-Press enter to continue.<pause until="enter"/><config key="renderStatus.tabsOpacity" value="1"/>Those are your session tabs. Each one is an independent conversation.<pause for="1s"/>
+Press enter to continue.<pause until="enter"/><config key="renderStatus.tabsOpacity" value="1"/><config key="renderStatus.statusOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/><config key="renderStatus.promptOpacity" value="1"/><config key="models.default" value="gpt"/>That is the whole interface: session tabs on top, the status and help bars below them, and your prompt at the bottom.<pause for="1s"/>
 
-Press enter to continue.<pause until="enter"/><config key="renderStatus.statusOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Below them are the status and help bars: session, directory, model, context, and the keys you can press right now.<pause for="1s"/>
-
-Press enter to continue.<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="models.default" value="gpt"/>That is your prompt.<pause for="0.5s"/> Choose a real model with \`/model\`, then tell HAL what you would like to do.`,
-
-	table: `This is the streaming table reproduction. Its incomplete rows deliberately switch between partial cells and complete Markdown rows while every word arrives separately.
-
-| Session | Last activity | Topic / last prompt |
-| --- | --- | --- |
-| 133-pod (current; working) | 20:54 | Show recently active open tabs, then keep the prompt stable while the stream continues. |
-| 133-zen | 19:29 | Private Hal marketing and launch plan with a description long enough to wrap across several table rows. |
-| 133-huh | 19:25 | Autostash autorebase investigation, including the exact recovery path and the final status. |
-| 133-foo | 19:10 | Add Model Context Protocol support without destabilizing the terminal transcript. |
-
-The table reproduction is complete.`,
+Press enter to continue.<pause until="enter"/>To use a real model, run \`/login claude\` or \`/login chatgpt\`, or set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment.<pause for="0.5s"/> Then pick a model with \`/model\` and tell HAL what you would like to do.`,
 }
+
+// Recorded verbatim from the GPT 5.6 Terra stream that made the active-tabs table
+// flicker. U+001F is a safe chunk delimiter: it is not valid ordinary model text.
+// Replaying real token boundaries is essential—the renderer's layout changes depend
+// on a pipe, Markdown marker, or word fragment arriving independently.
+const tableChunks = "##\u001f Recently\u001f active\u001f open\u001f tabs\u001f\n\n\u001f|\u001f Session\u001f |\u001f Last\u001f activity\u001f*\u001f |\u001f Topic\u001f /\u001f last\u001f prompt\u001f |\n\u001f|\u001f---\u001f|\u001f---\u001f:\u001f|\u001f---\u001f|\n\u001f|\u001f **\u001f133\u001f-p\u001fod\u001f**\u001f *(\u001fcurrent\u001f;\u001f working\u001f)*\u001f |\u001f \u001f20\u001f:\u001f54\u001f |\u001f “\u001fShow\u001f recently\u001f active\u001f tabs\u001f”\u001f |\n\u001f|\u001f **\u001f133\u001f-\u001fzen\u001f**\u001f |\u001f \u001f19\u001f:\u001f29\u001f |\u001f Private\u001f Hal\u001f marketing\u001f /\u001f launch\u001f plan\u001f |\n\u001f|\u001f **\u001f133\u001f-h\u001fuh\u001f**\u001f |\u001f \u001f19\u001f:\u001f25\u001f |\u001f “\u001faut\u001fost\u001fash\u001f autore\u001fbase\u001f”\u001f |\n\u001f|\u001f **\u001f133\u001f-\u001ffoo\u001f**\u001f |\u001f \u001f19\u001f:\u001f10\u001f |\u001f “\u001fwith\u001f mc\u001fporter\u001f”\u001f |\n\u001f|\u001f **\u001f133\u001f-web\u001f**\u001f |\u001f \u001f19\u001f:\u001f09\u001f |\u001f No\u001f user\u001f prompt\u001f recorded\u001f |\n\u001f|\u001f **\u001f119\u001f-m\u001fac\u001f**\u001f |\u001f \u001f15\u001f:\u001f52\u001f |\u001f Web\u001f mobile\u001f improvements\u001f plan\u001f |\n\u001f|\u001f **\u001f119\u001f-\u001fgnu\u001f**\u001f |\u001f \u001f15\u001f:\u001f41\u001f |\u001f Build\u001f synthetic\u001f intro\u001f provider\u001f |\n\u001f|\u001f **\u001f115\u001f-\u001faug\u001f**\u001f |\u001f \u001f13\u001f:\u001f18\u001f |\u001f Su\u001funn\u001fit\u001ftele\u001f per\u001fint\u001fä\u001fkir\u001fje\u001fiden\u001f maks\u001fut\u001f ja\u001f tark\u001fist\u001fukset\u001f |\n\n\u001f\\\u001f*\u001fTimes\u001f are\u001f local\u001f (\u001fE\u001fEST\u001f),\u001f based\u001f on\u001f the\u001f latest\u001f history\u001f activity\u001f.\u001f There\u001f are\u001f **\u001f26\u001f open\u001f tabs\u001f**\u001f in\u001f total\u001f;\u001f the\u001f first\u001f five\u001f above\u001f are\u001f today\u001f’s\u001f most\u001f recent\u001f.".split('\x1f')
 
 // Deliberately not a general XML parser. Unrecognized markup is intro text.
 const CONTROL_RE = /<pause for="(\d+(?:\.\d+)?)s"\s*\/>|<pause until="enter"\s*\/>|<config key="([^"]+)" value="([^"]*)"\s*\/>/g
@@ -82,11 +75,18 @@ function messageText(message: Message): string {
 	return text
 }
 
+// Streamed pages are matched by consuming them from the front of the assistant
+// text: consecutive intro pages have no user turn between them, so api-messages
+// concatenates several pages into a single assistant message.
 function nextPage(messages: Message[], available: ScriptPage[]): number {
 	let page = 0
 	for (const message of messages) {
-		if (message.role !== 'assistant' || page >= available.length) continue
-		if (messageText(message) === available[page]!.text) page++
+		if (message.role !== 'assistant') continue
+		let text = messageText(message)
+		while (page < available.length && text.startsWith(available[page]!.text)) {
+			text = text.slice(available[page]!.text.length)
+			page++
+		}
 	}
 	return page
 }

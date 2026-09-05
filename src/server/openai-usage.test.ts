@@ -81,7 +81,6 @@ test('hides a shorter window behind an exhausted longer window', () => {
 			email: 'a@test.com',
 			index: 0,
 			total: 1,
-			pendingTokens: 0,
 			primary: { usedPercent: 0, windowMinutes: 300, resetAt: 1_775_836_198 },
 			secondary: { usedPercent: 100, windowMinutes: 10_080, resetAt: 1_776_368_540 },
 		},
