@@ -25,9 +25,12 @@ Random ideas, in no particular order
 - Closing a tab/session must abort its active provider and tool processes before deactivation; currently
   `tabs.closeSession()` only archives it, so a process can keep running after close. Durable pending
   questions should remain in history and reappear when the session is resumed.
-- Opencode Go support
+- OpenCode Go support
 - /login should support adding API keys too
-- When Hal streams tables, sometimes a growing table suddently gets rendered smaller than in previous frame, producing a trembling effect; should make it so that streaming assistant block only grows
+- When Hal streams tables, sometimes a growing table suddenly gets rendered smaller than in previous frame, producing a trembling effect; should make it so that streaming assistant block only grows
 - Ctrl-G does not work for content in scrollback- should redraw everything in current tab
 - Also Ctrl-G and streaming does not exactly work perfectly
 - Fix intro sequence after question refactoring is done
+- `tests/stdin-close.test.ts` is flaky under the full parallel suite (times out waiting for exit)
+  but passes reliably on its own and under manual 5x concurrency. Skipped for now; find the real
+  contention (likely process startup under load) and unskip.

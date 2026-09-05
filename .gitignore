@@ -21,3 +21,6 @@ hal.js
 
 # Local deployment and provider environment overrides (may contain secrets).
 .env*
+
+# Local developer specialities
+/docs/local/
