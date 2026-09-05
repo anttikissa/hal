@@ -337,7 +337,9 @@ button { touch-action: manipulation; }
    Reset both control types so flex stretch aligns the visible border boxes too. */
 .PromptComposer > textarea, .PromptComposer-controls > button { appearance: none; margin: 0; border-radius: 0; box-shadow: none; }
 .PromptComposer > .PromptComposer-controls { display: flex; align-items: stretch; gap: 8px; }
-.PromptComposer-controls > button { min-width: 44px; min-height: 44px; }
+/* Apple Color Emoji's normal line box can exceed the short input's 44px.
+   Bound the line box, not the button height: tall drafts must still stretch it. */
+.PromptComposer-controls > button { min-width: 44px; min-height: 44px; line-height: 21px; }
 .PromptComposer-controls > .PromptComposer-attach { font-size: 20px; }
 .PromptComposer.disabled { opacity: .42; filter: grayscale(.75); }
 .PromptComposer.disabled > textarea { color: #aaa; }

@@ -140,6 +140,14 @@ test('composer controls use CSS borders rather than native control decoration', 
 	expect(declaration('.PromptComposer > .PromptComposer-controls', 'align-items')).toBe('stretch')
 })
 
+test('short composer buttons fit within the same 44px minimum as the textarea', () => {
+	const buttons = '.PromptComposer-controls > button'
+	expect(declaration(buttons, 'min-height')).toBe(declaration('.PromptComposer > textarea', 'min-height'))
+	// An explicit line box prevents Apple Color Emoji metrics from making the
+	// attachment button taller than the input: 21 + 2*8 padding + 2*1 border < 44.
+	expect(declaration(buttons, 'line-height')).toBe('21px')
+})
+
 test('phone tabs stay in one compact scrollable row', () => {
 	const media = '@media (max-width: 48em)'
 	const rail = '.SessionTabs > .SessionTabs-rail'
