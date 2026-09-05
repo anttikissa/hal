@@ -717,13 +717,13 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				}
 				if (historyEntries.length > 0) {
 					await sessions.appendHistory(sessionId, historyEntries)
+					// Clearing the live tail before any reload event: history-updated makes
+					// the client reload from disk, and a stale live tail would then render
+					// the same page a second time.
+					sessions.clearLive(sessionId)
 				}
 				if (providerPaused && model === 'hal/intro') ipc.appendEvent({ type: 'history-updated', sessionId })
 				if (emptyResponseMessage) emitEvent(sessionId, { type: 'response', text: emptyResponseMessage, isError: true })
-
-				if (historyEntries.length > 0) {
-					sessions.clearLive(sessionId)
-				}
 				const est = context.estimateContext(messages, model, overheadBytes)
 				emitEvent(sessionId, {
 					type: 'stream-end',

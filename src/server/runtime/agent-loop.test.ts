@@ -274,7 +274,11 @@ test('provider pause preserves streamed output as an Enter-continuable turn', as
 			yield { type: 'pause' }
 		},
 	})
-	ipc.appendEvent = (event: any) => { events.push(event) }
+	let liveAtHistoryUpdated: any[] | undefined
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+		if (event.type === 'history-updated') liveAtHistoryUpdated = sessions.loadLive(sessionId).blocks
+	}
 
 	try {
 		const result = await agentLoop.runAgentLoop({
@@ -292,6 +296,9 @@ test('provider pause preserves streamed output as an Enter-continuable turn', as
 		])
 		expect(configChanges).toEqual([['renderStatus.tabsOpacity', '1']])
 		expect(events).toContainEqual(expect.objectContaining({ type: 'stream-end', phase: 'done' }))
+		// history-updated tells the client to reload from disk. The live tail must
+		// already be cleared, or the client renders the persisted page twice.
+		expect(liveAtHistoryUpdated).toEqual([])
 	} finally {
 		providerLoader.getProvider = originalGetProvider
 		ipc.appendEvent = originalAppendEvent

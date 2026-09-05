@@ -112,3 +112,12 @@ test('historyToBlocks projects answered and only first active questions as seman
 	expect(questions[0]).toMatchObject({ id: 'q1', active: false, answer: { kind: 'choice', choiceId: 'no' }, progress: { index: 1, total: 1 }, tool: { name: 'bash', input: { command: 'rm file' } } })
 	expect(questions[1]).toMatchObject({ id: 'q2', active: true, input: { kind: 'text' } })
 })
+
+test('answering a single-choice question logs that Enter was pressed', () => {
+	const result = blockData.historyToBlocks([
+		{ type: 'question', id: 'q1', text: 'Continue?', input: { kind: 'choice', choices: [{ id: 'continue', label: 'Continue' }] }, source: { type: 'intro' } },
+		{ type: 'answer', questionId: 'q1', value: { kind: 'choice', choiceId: 'continue' }, ts: '2026-09-05T08:13:51.996Z' },
+	] as any, 's1')
+
+	expect(result).toContainEqual(expect.objectContaining({ type: 'log', text: 'Enter pressed' }))
+})
