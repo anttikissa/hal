@@ -19,7 +19,7 @@ export function TranscriptItem(props: TranscriptItemProps) {
 			when={props.item.entry.type === 'tool' ? props.item.entry : undefined}
 			fallback={<article class={['TranscriptItem', props.item.entry.type]}>
 				<label>{transcriptTitles.label(props.item.entry)}</label>
-				<div class="Markdown" innerHTML={webMarkdown.html(props.item.text)} />
+				<div class="Markdown" innerHTML={webMarkdown.html(props.item.text, 'usageBars' in props.item.entry && props.item.entry.usageBars === true)} />
 			</article>}
 		>
 			{(tool) => <ToolCard tool={tool()} />}
