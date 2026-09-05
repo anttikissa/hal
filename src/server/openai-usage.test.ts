@@ -1,11 +1,18 @@
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { auth, type Credential } from './auth.ts'
 import { openaiUsage } from './openai-usage.ts'
+import { subscriptionLog } from './subscription-log.ts'
 import { subscriptionUsage } from '../common/subscription-usage.ts'
+import { ason } from '../utils/ason.ts'
 
 const origFetch = globalThis.fetch
 const origListCredentials = auth.listCredentials
 const origEnsureFresh = auth.ensureFresh
+const origSubscriptionAppend = subscriptionLog.io.append
+
+beforeEach(() => {
+	subscriptionLog.io.append = () => {}
+})
 
 function makeCredential(index: number, email: string): Credential {
 	return {
@@ -22,6 +29,7 @@ afterEach(() => {
 	globalThis.fetch = origFetch
 	auth.listCredentials = origListCredentials
 	auth.ensureFresh = origEnsureFresh
+	subscriptionLog.io.append = origSubscriptionAppend
 	openaiUsage.state.currentKey = ''
 	openaiUsage.state.accounts = {}
 	subscriptionUsage.config.censorEmails = false
@@ -260,4 +268,51 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 	expect(text).toContain(`| 1/3 * | a\\*\\*\\*@l\\*\\*\\*.fi (plus) | ${subscriptionUsage.usageBarMarker(68, 14)}`)
 	expect(text).toContain('<br>68% used (resets ')
 	expect(text).not.toContain('\x1b[')
+})
+
+test('records only changed fresh OpenAI quota observations', async () => {
+	auth.ensureFresh = async () => {}
+	const credential = { ...makeCredential(0, 'private@test.com'), _key: 'openai:private@test.com' }
+	auth.listCredentials = () => [credential]
+	openaiUsage.state.accounts[credential._key!] = {
+		key: credential._key!,
+		fetchedAt: '2026-09-01T00:00:00.000Z',
+		primary: { usedPercent: 10, windowMinutes: 300, resetAt: 1_788_600_000 },
+	}
+	const writes: string[] = []
+	subscriptionLog.io.append = (_path, text) => writes.push(text)
+	let fetches = 0
+	let expired = false
+	globalThis.fetch = Object.assign(async () => {
+		fetches++
+		if (expired) return new Response(JSON.stringify({ error: { code: 'token_expired' } }), { status: 401 }) as any
+		return new Response(JSON.stringify({
+			email: 'private@test.com',
+			rate_limit: {
+				primary_window: {
+					used_percent: 25,
+					limit_window_seconds: 18_000,
+					reset_at: 1_788_600_000,
+				},
+			},
+		}), { status: 200 }) as any
+	}, { preconnect: () => {} }) as typeof fetch
+
+	await openaiUsage.refreshAll(true)
+	await openaiUsage.refreshAll(false)
+	await openaiUsage.refreshAll(true)
+	expired = true
+	await openaiUsage.refreshAll(true)
+
+	expect(fetches).toBe(3)
+	expect(writes).toHaveLength(1)
+	const entry = ason.parse(writes[0]!) as any
+	expect(entry.provider).toBe('openai')
+	expect(entry.account).toBe(subscriptionLog.accountPseudonym('openai', credential._key!))
+	expect(entry.windows).toEqual([{
+		label: '5h',
+		durationMinutes: 300,
+		usedPercent: 25,
+		resetAt: 1_788_600_000_000,
+	}])
 })

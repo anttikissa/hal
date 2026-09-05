@@ -6,6 +6,7 @@ import { sessions, type HistoryEntry, type SessionMeta } from '../sessions.ts'
 import { ason } from '../../utils/ason.ts'
 import { paths } from '../paths.ts'
 import { sessionEntry } from './entry.ts'
+import { accounting } from './accounting.ts'
 
 interface ResolvedTargets {
 	ok: true
@@ -301,16 +302,23 @@ function sanitizeName(text: string): string {
 }
 
 
-async function summarizeDigest(model: string, digest: string): Promise<SummaryResult> {
+async function summarizeDigest(model: string, digest: string, sessionId: string): Promise<SummaryResult> {
 	const slash = model.indexOf('/')
 	if (slash < 0) throw new Error(`Model not found: ${model}`)
 	const provider = await providerLoader.getProvider(model.slice(0, slash))
 	const modelId = model.slice(slash + 1)
 	const messages: Message[] = [{ role: 'user', content: userPrompt(digest) }]
 	let text = ''
-	for await (const event of provider.generate({ messages, model: modelId, systemPrompt: whatSummary.systemPrompt(), tools: [], stateless: true })) {
-		if (event.type === 'text') text += event.text ?? ''
-		if (event.type === 'error') throw new Error(event.message ?? 'summary generation failed')
+	const meter = accounting.start(model, 'summary')
+	meter.requests++
+	try {
+		for await (const event of provider.generate({ messages, model: modelId, systemPrompt: whatSummary.systemPrompt(), tools: [], stateless: true })) {
+			if (event.type === 'done' && event.usage) accounting.add(meter, event.usage)
+			if (event.type === 'text') text += event.text ?? ''
+			if (event.type === 'error') throw new Error(event.message ?? 'summary generation failed')
+		}
+	} finally {
+		accounting.save(sessionId, meter)
 	}
 	return whatSummary.parseSummary(text)
 }
@@ -375,7 +383,7 @@ async function run(opts: RunWhatOpts): Promise<{ renamed: boolean; targetIds: st
 	for (const sessionId of targetIds) {
 		try {
 			const digest = whatSummary.buildDigest(sessionId, opts.openSessionIds, shared.working ?? {})
-			const summary = await whatSummary.summarizeDigest(model, digest)
+			const summary = await whatSummary.summarizeDigest(model, digest, sessionId)
 			const previousName = sessions.loadSessionMeta(sessionId)?.name
 			const nameChanged = whatSummary.maybeNameSession(sessionId, summary.name)
 			if (nameChanged) renamed = true

@@ -5,6 +5,7 @@ import { STATE_DIR } from './state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { subscriptionUsage } from '../common/subscription-usage.ts'
 import { time } from '../utils/time.ts'
+import { subscriptionLog, type SubscriptionWindow } from './subscription-log.ts'
 
 const CACHE_PATH = `${STATE_DIR}/anthropic-usage.ason`
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
@@ -133,6 +134,26 @@ function parsePayload(credential: Credential, raw: any): AccountUsage {
 	}
 }
 
+function observationWindows(account: AccountUsage): SubscriptionWindow[] {
+	const values = [
+		{ label: '5h', durationMinutes: 300, window: account.fiveHour },
+		{ label: '7d', durationMinutes: 10_080, window: account.sevenDay },
+		{ label: `${account.modelWeek?.label ?? ''} 7d`.trim(), durationMinutes: 10_080, window: account.modelWeek },
+	]
+	const windows: SubscriptionWindow[] = []
+	for (const value of values) {
+		if (!value.window) continue
+		const window: SubscriptionWindow = {
+			label: value.label,
+			durationMinutes: value.durationMinutes,
+			usedPercent: value.window.usedPercent,
+		}
+		if (value.window.resetAt != null) window.resetAt = value.window.resetAt
+		windows.push(window)
+	}
+	return windows
+}
+
 /** Fetch account email from the OAuth profile endpoint. */
 async function fetchProfileEmail(credential: Credential): Promise<string | undefined> {
 	try {
@@ -257,6 +278,12 @@ async function refreshCredential(credential: Credential, force = false): Promise
 	if (!account.email) {
 		account.email = existing?.email || await fetchProfileEmail(credential)
 	}
+	subscriptionLog.observe(
+		'anthropic',
+		key,
+		anthropicUsage.observationWindows(account),
+		existing ? anthropicUsage.observationWindows(existing) : undefined,
+	)
 	anthropicUsage.state.accounts[key] = account
 	if (!anthropicUsage.state.currentKey) anthropicUsage.state.currentKey = key
 	save()
@@ -309,6 +336,7 @@ export const anthropicUsage = {
 	refreshAll,
 	formatResetAt,
 	formatStatusText,
+	observationWindows,
 	renderStatus,
 	parsePayload,
 }

@@ -1,5 +1,19 @@
 import type { PartialTokenUsage, TurnEndMeta } from './protocol.ts'
 
+// One aggregate per stopped generation loop (including pauses), never per tool.
+// `incomplete` means one or more provider calls did not report usage.
+export interface UsageReceipt {
+	type: 'usage'
+	model: string
+	purpose: 'turn' | 'summary'
+	requests: number
+	usage: PartialTokenUsage
+	apiUsd?: number
+	incomplete?: true
+	durationMs: number
+	ts: string
+}
+
 // Browser-safe persisted history contract. Server persistence owns how entries
 // are stored; clients and deterministic projections only depend on this shape.
 export type UserPart =
@@ -26,6 +40,7 @@ export type AnswerValue =
 	| { kind: 'aborted' }
 
 export type HistoryEntry = EntryIdentity & (
+	| UsageReceipt
 	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; sourceTab?: number; sourceName?: string; status?: string; ts?: string }
 	| {
 			type: 'thinking'

@@ -19,6 +19,7 @@ import { toolRegistry, type ToolOutput } from '../tools/tool.ts'
 import { bash } from '../tools/bash.ts'
 import { risk, type RiskFinding } from '../tools/risk.ts'
 import { sessions } from '../sessions.ts'
+import { accounting } from '../session/accounting.ts'
 import { blob } from '../session/blob.ts'
 import { log } from '../../utils/log.ts'
 import { ason } from '../../utils/ason.ts'
@@ -259,22 +260,13 @@ function usageOrUndefined(usage: TokenUsage): TokenUsage | undefined {
 }
 
 function appendTurnEnd(sessionId: string, meta: TurnEndMeta): void {
-	const entry: any = { type: 'turn_end', ts: new Date().toISOString(), ...meta }
-	if (!entry.usage) delete entry.usage
-	sessions.appendHistory(sessionId, [entry])
+	sessions.appendHistory(sessionId, [{ type: 'turn_end', ts: new Date().toISOString(), ...meta }])
 }
 
 function errorHistoryEntry(text: string, blobId?: string, ts = new Date().toISOString()): any {
 	const entry: any = { type: 'error', text, ts }
 	if (blobId) entry.blobId = blobId
 	return entry
-}
-
-function doneMeta(event: ProviderStreamEvent): TurnEndMeta {
-	return {
-		status: event.doneStatus ?? 'completed',
-		usage: event.usage,
-	}
 }
 
 function requestBytes(messages: Message[], overheadBytes: number): number {
@@ -405,9 +397,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 	const overheadBytes = systemPrompt.length + JSON.stringify(tools).length
 	await ctx.onStatus?.(true)
 
+	const meter = accounting.start(model, 'turn')
 	try {
 		const provider = await providerPromise
-		const totalUsage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
+		const totalUsage = meter.usage
 		let lastDoneMeta: TurnEndMeta | null = null
 		let retryAttempt = 0
 		let retryStartedAt = 0
@@ -428,7 +421,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			})
 			// Persist context so it survives restarts.
 			void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
-			appendTurnEnd(sessionId, { status: 'aborted', abortText, usage: hasUsage(totalUsage) ? totalUsage : undefined })
+			appendTurnEnd(sessionId, { status: 'aborted', abortText })
 		}
 
 		// Outer loop: each iteration is one generate call.
@@ -436,7 +429,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		for (let iteration = 0; iteration < config.maxIterations; iteration++) {
 			if (loopSignal.aborted) break
 
-			// Call the provider's streaming generator
+			// Count logical provider calls, including retries whose usage may be unknown.
+			meter.requests++
 			const gen = provider.generate({
 				messages,
 				model: modelId,
@@ -618,14 +612,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 							// Accumulate usage. Keep cache-read and cache-creation separate from
 							// uncached input so the UI and cost math can weight them correctly.
 							if (event.usage) {
-								totalUsage.input += event.usage.input
-								totalUsage.output += event.usage.output
-								totalUsage.cacheRead += event.usage.cacheRead ?? 0
-								totalUsage.cacheCreation += event.usage.cacheCreation ?? 0
+								accounting.add(meter, event.usage)
 								calibrateInputTokens(model, messages, overheadBytes, event.usage)
 							}
 							iterationDone = true
-							lastDoneMeta = doneMeta(event)
+							lastDoneMeta = { status: event.doneStatus ?? 'completed' }
 							break
 						}
 					}
@@ -644,7 +635,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 						sessions.appendHistory(sessionId, [errorHistoryEntry(message)])
 						sessions.clearLive(sessionId)
 					}
-					appendTurnEnd(sessionId, { status: 'failed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
+					appendTurnEnd(sessionId, { status: 'failed' })
 					return 'failed'
 				}
 			}
@@ -681,7 +672,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				emitEvent(sessionId, { type: 'response', text: message, isError: true })
 				emitEvent(sessionId, { type: 'stream-end', phase: 'failed', message })
 				sessions.clearLive(sessionId)
-				appendTurnEnd(sessionId, { status: 'failed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
+				appendTurnEnd(sessionId, { status: 'failed' })
 				return 'failed'
 			}
 
@@ -703,11 +694,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					})
 				}
 				for (const entry of serverToolHistory) historyEntries.push(entry)
-				if (assistantText) {
-					const assistantEntry: any = { type: 'assistant', text: assistantText, model, ts }
-					if (hasUsage(totalUsage)) assistantEntry.usage = totalUsage
-					historyEntries.push(assistantEntry)
-				}
+				if (assistantText) historyEntries.push({ type: 'assistant', text: assistantText, model, ts })
 				if (providerPaused && model === 'hal/intro') {
 					historyEntries.push({
 						type: 'question',
@@ -749,9 +736,9 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				if (providerPaused) return 'paused'
 				if (hadTerminalError) {
 					const failure = terminalErrorEntry ? { provider: providerName, httpStatus: terminalErrorStatus } : {}
-					appendTurnEnd(sessionId, { status: 'failed', usage: hasUsage(totalUsage) ? totalUsage : undefined, ...failure })
+					appendTurnEnd(sessionId, { status: 'failed', ...failure })
 				}
-				else appendTurnEnd(sessionId, lastDoneMeta ?? { status: 'completed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
+				else appendTurnEnd(sessionId, lastDoneMeta ?? { status: 'completed' })
 				return hadTerminalError ? 'failed' : 'completed'
 			}
 
@@ -868,7 +855,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					contextMax: est.max,
 				})
 				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
-				appendTurnEnd(sessionId, { status: 'completed', usage: usageOrUndefined(totalUsage) })
+				appendTurnEnd(sessionId, { status: 'completed' })
 				return 'waiting'
 			}
 
@@ -899,6 +886,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 		return 'paused'
 	} finally {
+		try {
+			accounting.save(sessionId, meter)
+		} catch (error) {
+			log.error('Failed to persist usage receipt', { sessionId, error })
+		}
 		// A new prompt can deliberately displace this turn before this
 		// async function has fully unwound. Only remove the working controller if
 		// it is still ours; otherwise the older request would make the newer

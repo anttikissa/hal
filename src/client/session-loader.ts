@@ -71,7 +71,7 @@ function load(info: SharedSessionInfo, opts: { logName?: string; entryLimit?: nu
 	const { entries: history, parentCount, parentId } = loaded
 	const usage = emptyUsage()
 	for (const entry of history) {
-		if (entry.type !== 'assistant' || !entry.usage) continue
+		if ((entry.type !== 'assistant' && entry.type !== 'usage') || !entry.usage) continue
 		usage.input += entry.usage.input ?? 0
 		usage.output += entry.usage.output ?? 0
 		usage.cacheRead += entry.usage.cacheRead ?? 0

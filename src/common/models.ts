@@ -504,11 +504,15 @@ function fallbackContextWindow(fullId: string): number {
 	return DEFAULT_CONTEXT
 }
 
+function pricing(fullId: string): CatalogEntry['pricing'] {
+	return CATALOG.find((entry) => entry.fullId === fullId)?.pricing
+}
+
 function computeCost(
 	fullId: string,
 	usage: PartialTokenUsage,
 ): number {
-	const p = CATALOG.find((entry) => entry.fullId === fullId)?.pricing
+	const p = models.pricing(fullId)
 	if (!p) return 0
 	const cacheReadCost = (usage.cacheRead ?? 0) * p.input * CACHE_READ_MULTIPLIER
 	const cacheWriteCost = (usage.cacheCreation ?? 0) * p.input * CACHE_WRITE_MULTIPLIER
@@ -789,6 +793,7 @@ export const models = {
 	reasoningEffort,
 	fallbackContextWindow,
 	aliasesForModel,
+	pricing,
 	computeCost,
 	formatCost,
 	formatTokenCount,

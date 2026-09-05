@@ -5,6 +5,7 @@ import { STATE_DIR } from './state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { subscriptionUsage } from '../common/subscription-usage.ts'
 import { time } from '../utils/time.ts'
+import { subscriptionLog, type SubscriptionWindow } from './subscription-log.ts'
 
 const CACHE_PATH = `${STATE_DIR}/openai-usage.ason`
 const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
@@ -262,6 +263,20 @@ function hasRemainingQuota(account: AccountUsage): boolean {
 	return windows.length > 0 && windows.every((window) => window.usedPercent < 100)
 }
 
+function observationWindows(account: AccountUsage): SubscriptionWindow[] {
+	const windows: SubscriptionWindow[] = []
+	for (const window of [account.primary, account.secondary]) {
+		if (!window) continue
+		windows.push({
+			label: time.formatQuotaWindow(window.windowMinutes),
+			durationMinutes: window.windowMinutes,
+			usedPercent: window.usedPercent,
+			resetAt: window.resetAt * 1000,
+		})
+	}
+	return windows
+}
+
 function pruneUnconfiguredAccounts(items: Credential[]): void {
 	if (items.length === 0) return
 	const keys = new Set<string>()
@@ -282,6 +297,12 @@ async function refreshCredential(credential: Credential, force = false): Promise
 	const lastFetch = existing?.fetchedAt ? Date.parse(existing.fetchedAt) : 0
 	if (!force && existing && lastFetch && Date.now() - lastFetch < config.minAutoRefreshMs) return existing
 	const account = await fetchUsage(credential)
+	subscriptionLog.observe(
+		'openai',
+		key,
+		openaiUsage.observationWindows(account),
+		existing ? openaiUsage.observationWindows(existing) : undefined,
+	)
 	openaiUsage.state.accounts[key] = account
 	if (hasRemainingQuota(account)) auth.clearCooldown(credential)
 	if (!openaiUsage.state.currentKey) openaiUsage.state.currentKey = key
@@ -324,6 +345,7 @@ export const openaiUsage = {
 	formatResetAt,
 	formatStatusText,
 	displayWindows,
+	observationWindows,
 	renderStatus,
 	parsePayload,
 }

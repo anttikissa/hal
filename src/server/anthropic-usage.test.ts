@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { auth, type Credential } from './auth.ts'
 import { anthropicUsage } from './anthropic-usage.ts'
+import { subscriptionLog } from './subscription-log.ts'
 import { subscriptionUsage } from '../common/subscription-usage.ts'
+import { ason } from '../utils/ason.ts'
 
 const origFetch = globalThis.fetch
 const origListCredentials = auth.listCredentials
 const origEnsureFresh = auth.ensureFresh
+const origSubscriptionAppend = subscriptionLog.io.append
 
 function makeCredential(index: number, email: string): Credential {
 	return {
@@ -20,12 +23,14 @@ function makeCredential(index: number, email: string): Credential {
 
 beforeEach(() => {
 	anthropicUsage.init()
+	subscriptionLog.io.append = () => {}
 })
 
 afterEach(() => {
 	globalThis.fetch = origFetch
 	auth.listCredentials = origListCredentials
 	auth.ensureFresh = origEnsureFresh
+	subscriptionLog.io.append = origSubscriptionAppend
 	anthropicUsage.state.currentKey = ''
 	anthropicUsage.state.accounts = {}
 	subscriptionUsage.config.censorEmails = false
@@ -151,4 +156,41 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 	expect(text).toContain('a\\*\\*\\*@l\\*\\*\\*.fi')
 	expect(text).toContain('a\\*\\*\\*@g\\*\\*\\*\\*.com')
 	expect(text).toContain(`| 1/2 * | a\\*\\*\\*@l\\*\\*\\*.fi | ${subscriptionUsage.usageBarMarker(68, 14)}`)
+})
+
+test('records only changed fresh Anthropic quota observations', async () => {
+	auth.ensureFresh = async () => {}
+	const credential = { ...makeCredential(0, 'private@test.com'), _key: 'anthropic:private@test.com' }
+	auth.listCredentials = () => [credential]
+	anthropicUsage.state.accounts[credential._key!] = {
+		key: credential._key!,
+		fetchedAt: '2026-09-01T00:00:00.000Z',
+		fiveHour: { usedPercent: 10, resetAt: Date.parse('2026-09-05T10:00:00Z') },
+	}
+	const writes: string[] = []
+	subscriptionLog.io.append = (_path, text) => writes.push(text)
+	let fetches = 0
+	globalThis.fetch = Object.assign(async () => {
+		fetches++
+		return new Response(JSON.stringify({
+			five_hour: { utilization: 0.25, resets_at: '2026-09-05T10:00:00Z' },
+			seven_day: { utilization: 0.60, resets_at: '2026-09-12T10:00:00Z' },
+			seven_day_sonnet: { utilization: 0.15 },
+		}), { status: 200 }) as any
+	}, { preconnect: () => {} }) as typeof fetch
+
+	await anthropicUsage.refreshAll(true)
+	await anthropicUsage.refreshAll(false)
+	await anthropicUsage.refreshAll(true)
+
+	expect(fetches).toBe(2)
+	expect(writes).toHaveLength(1)
+	const entry = ason.parse(writes[0]!) as any
+	expect(entry.provider).toBe('anthropic')
+	expect(entry.account).toBe(subscriptionLog.accountPseudonym('anthropic', credential._key!))
+	expect(entry.windows).toEqual([
+		{ label: '5h', durationMinutes: 300, usedPercent: 25, resetAt: Date.parse('2026-09-05T10:00:00Z') },
+		{ label: '7d', durationMinutes: 10_080, usedPercent: 60, resetAt: Date.parse('2026-09-12T10:00:00Z') },
+		{ label: 'Sonnet 7d', durationMinutes: 10_080, usedPercent: 15 },
+	])
 })

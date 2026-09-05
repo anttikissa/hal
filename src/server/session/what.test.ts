@@ -72,6 +72,7 @@ test('run writes ui-only summary to target and fills empty target name', async (
 	expect(sessions.loadSessionMeta(target)?.name).toBe('plan bug fix')
 	expect(sessions.loadHistory(requester).some((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')).toBe(false)
 	const targetHistory = sessions.loadHistory(target)
+	expect(targetHistory.filter((entry) => entry.type === 'usage')).toMatchObject([{ purpose: 'summary', requests: 1, usage: { input: 1, output: 1 } }])
 	expect(targetHistory).toContainEqual(expect.objectContaining({ type: 'assistant', synthetic: true, syntheticKind: 'what-summary', visibility: 'ui' }))
 	const summary = targetHistory.find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
 	const summaryText = summary?.type === 'assistant' ? summary.text : ''

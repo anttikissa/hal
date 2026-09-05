@@ -188,7 +188,7 @@ test('wait tool completes the turn without another model request', async () => {
 		expect(result).toBe('waiting')
 		expect(generations).toBe(1)
 		expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'waiting')).toBe(false)
-		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'completed' })
+		expect(sessions.loadHistory(sessionId).findLast((entry) => entry.type === 'turn_end')).toMatchObject({ type: 'turn_end', status: 'completed' })
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		toolRegistry.dispatch = origDispatch
@@ -504,6 +504,10 @@ test('tool iterations do not re-emit streamed assistant text as responses', asyn
 		expect(result).toBe('completed')
 		expect(events.filter((event) => event.type === 'stream-delta' && event.channel === 'assistant').map((event) => event.text)).toEqual(['marker 1', 'marker 2', 'complete'])
 		expect(events.filter((event) => event.type === 'response' && !event.isError)).toEqual([])
+		const receipts = sessions.loadHistory(sessionId).filter((entry) => entry.type === 'usage')
+		expect(receipts).toHaveLength(1)
+		expect(receipts[0]).toMatchObject({ model: 'openai/gpt-5.4', purpose: 'turn', requests: 3, usage: { input: 3, output: 3, cacheRead: 0, cacheCreation: 0 } })
+		expect(receipts[0]?.incomplete).toBeUndefined()
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent
@@ -548,7 +552,7 @@ test('logs a whitespace-only completed provider response so the user can retry',
 			type: 'error',
 			text: 'Provider returned an empty response. Please retry.',
 		}))
-		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'failed' })
+		expect(sessions.loadHistory(sessionId).findLast((entry) => entry.type === 'turn_end')).toMatchObject({ type: 'turn_end', status: 'failed' })
 		expect(continuation.actionForHistory(sessions.loadHistory(sessionId))).toBe('retry')
 	} finally {
 		providerLoader.getProvider = origGetProvider
@@ -606,7 +610,7 @@ test('writes thinking blobs while streaming and replays them into API history', 
 		expect(thinkingEntry && 'signature' in thinkingEntry ? (thinkingEntry as any).signature : undefined).toBeUndefined()
 		expect(thinkingEntry && 'text' in thinkingEntry ? (thinkingEntry as any).text : undefined).toBeUndefined()
 		expect(history.find((item) => item.type === 'assistant')?.text).toBe('done')
-		expect(history.find((item) => item.type === 'turn_end')).toMatchObject({ type: 'turn_end', status: 'completed', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } })
+		expect(history.find((item) => item.type === 'turn_end')).toMatchObject({ type: 'turn_end', status: 'completed' })
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent
@@ -670,11 +674,13 @@ test('provider errors show their full ASON payload and save it in a blob', async
 			payload,
 		})
 		const history = sessions.loadHistory(sessionId)
-		expect(history.at(-2)).toMatchObject({
+		expect(history.findLast((entry) => entry.type === 'error')).toMatchObject({
 			type: 'error',
 			text: `404: (https://api.anthropic.com/v1/messages?beta=true)\n${ason.stringify(payload)}`,
 		})
-		expect(history.at(-1)).toMatchObject({ type: 'turn_end', status: 'failed', provider: 'openai', httpStatus: 404 })
+		expect(history.findLast((entry) => entry.type === 'turn_end')).toMatchObject({
+			type: 'turn_end', status: 'failed', provider: 'openai', httpStatus: 404,
+		})
 		expect(sessions.loadLive(sessionId).blocks).toEqual([])
 	} finally {
 		providerLoader.getProvider = origGetProvider
@@ -949,6 +955,7 @@ test('pause before all tools in batch persists pending marker without executing 
 			{ type: 'assistant', text: 'checking' },
 			{ type: 'tool_call', toolId: 'tool-1', name: 'read' },
 			{ type: 'pending_tools', toolIds: ['tool-1'], reason: 'soft-pause', usage: { input: 2, output: 3, cacheRead: 0, cacheCreation: 0 } },
+			{ type: 'usage', model: 'openai/gpt-5.4', purpose: 'turn', requests: 1, usage: { input: 2, output: 3, cacheRead: 0, cacheCreation: 0 } },
 		])
 		expect(history.some((entry) => entry.type === 'tool_result')).toBe(false)
 		expect(history.some((entry) => entry.type === 'turn_end')).toBe(false)
@@ -1028,7 +1035,7 @@ test('max iterations persists a continuable error without ending the turn', asyn
 		expect(result).toBe('paused')
 		expect(events).toContainEqual(expect.objectContaining({ type: 'info', text: 'Hit max iterations (1). Stopping.', level: 'error' }))
 		expect(events).toContainEqual(expect.objectContaining({ type: 'stream-end', phase: 'done' }))
-		expect(history.at(-1)).toMatchObject({ type: 'error', text: 'Hit max iterations (1). Stopping.' })
+		expect(history.findLast((entry) => entry.type === 'error')).toMatchObject({ type: 'error', text: 'Hit max iterations (1). Stopping.' })
 		expect(history.some((entry) => entry.type === 'turn_end')).toBe(false)
 	} finally {
 		providerLoader.getProvider = origGetProvider
@@ -1072,8 +1079,11 @@ test('custom abort text is persisted', async () => {
 			messages: [],
 		})
 		expect(events.some((event) => event.type === 'info' && event.text === 'Tab closed')).toBe(true)
+		expect(sessions.loadHistory(sessionId).filter((entry) => entry.type === 'usage')).toMatchObject([
+			{ purpose: 'turn', requests: 1, incomplete: true },
+		])
 		expect(events.some((event) => event.type === 'info' && event.text === '[paused]')).toBe(false)
-		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'aborted', abortText: 'Tab closed' })
+		expect(sessions.loadHistory(sessionId).findLast((entry) => entry.type === 'turn_end')).toMatchObject({ type: 'turn_end', status: 'aborted', abortText: 'Tab closed' })
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent
@@ -1117,7 +1127,7 @@ test('empty abort text stops generation without adding an info block', async () 
 		expect(events.some((event) => event.type === 'info' && (event.text === '[paused]' || event.text === '' || event.text === '[restarted]'))).toBe(false)
 		const streamEnd = events.find((event) => event.type === 'stream-end')
 		expect(streamEnd).toBeTruthy()
-		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'aborted', abortText: '' })
+		expect(sessions.loadHistory(sessionId).findLast((entry) => entry.type === 'turn_end')).toMatchObject({ type: 'turn_end', status: 'aborted', abortText: '' })
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent
