@@ -20,9 +20,8 @@ function ActivityMarkers(props: { description: ReturnType<typeof sessionActivity
 	</span>
 }
 
-// Desktop shows full tabs. A phone keeps them in one horizontal rail so a large
-// session set cannot crowd out the transcript; the selected tab expands to show
-// its name, and the menu keeps close and new-tab actions out of that compact row.
+// Small sets keep direct tab access. Larger sets show the current session title
+// and move navigation into the selector on both phone and desktop.
 export function SessionTabs(props: SessionTabsProps) {
 	const [menuOpen, setMenuOpen] = createSignal(false)
 
@@ -46,7 +45,7 @@ export function SessionTabs(props: SessionTabsProps) {
 		if (event.key === 'Escape') setMenuOpen(false)
 	}
 
-	return <header class="SessionTabs">
+	return <header class={['SessionTabs', props.sessions.length > 4 && 'compact']}>
 		<button
 			class="SessionTabs-menu"
 			onClick={() => setMenuOpen(!menuOpen())}
@@ -55,7 +54,7 @@ export function SessionTabs(props: SessionTabsProps) {
 			aria-haspopup="dialog"
 			aria-controls="SessionTabs-panel"
 		>☰</button>
-		<span class="SessionTabs-title">{props.status}</span>
+		<span class="SessionTabs-title" title={props.status}>{props.status}</span>
 		<nav class="SessionTabs-rail" aria-label="Open sessions">
 			<For each={props.sessions}>
 				{(session, index) => {

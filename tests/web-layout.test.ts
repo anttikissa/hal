@@ -148,3 +148,12 @@ test('the focused phone composer takes over the keyboard-visible viewport', () =
 	expect(declarationInside(media, textarea, 'height')).toBe('100% !important')
 	expect(declarationInside(media, textarea, 'max-height')).toBe('none')
 })
+
+test('crowded session headers show the current title and selector on all screen sizes', () => {
+	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
+	expect(source).toContain("props.sessions.length > 4 && 'compact'")
+	expect(declaration('.SessionTabs.compact > .SessionTabs-row, .SessionTabs.compact > .SessionTabs-rail', 'display')).toBe('none')
+	expect(declaration('.SessionTabs.compact > .SessionTabs-menu', 'display')).toBe('block')
+	expect(declaration('.SessionTabs.compact > .SessionTabs-title', 'display')).toBe('block')
+	expect(declaration('.SessionTabs.compact > .SessionTabs-title', 'flex')).toBe('1')
+})

@@ -111,7 +111,14 @@ button { touch-action: manipulation; }
 	.SessionTabs > .SessionTabs-title { display: block; flex-basis: 100%; order: 2; }
 }
 
-/* Full-screen session sheet, opened from ☰ on narrow screens. */
+/* A crowded tab strip tells less than the current identity. Keep the same
+   compact header at every viewport size; navigation stays in the selector. */
+.SessionTabs.compact { flex-wrap: nowrap; align-items: center; }
+.SessionTabs.compact > .SessionTabs-row, .SessionTabs.compact > .SessionTabs-rail { display: none; }
+.SessionTabs.compact > .SessionTabs-menu { display: block; }
+.SessionTabs.compact > .SessionTabs-title { display: block; flex: 1; order: 0; color: #eee; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+
+/* Full-screen session sheet, opened from ☰. */
 .SessionTabs-sheet {
 	position: fixed;
 	inset: 0;
