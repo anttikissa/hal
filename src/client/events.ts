@@ -146,7 +146,9 @@ function handleRebaseResult(event: any, ctx: any): void {
 function handleHistoryUpdated(event: any, ctx: any): void {
 	const tab = ctx.tabForSession(event.sessionId)
 	if (!tab) return
-	ctx.reloadTabFromDisk(tab)
+	// This event is an ordered persisted-history boundary. Reading live.ason here
+	// can peek past the event into a generation whose stream-start is still queued.
+	ctx.reloadTabFromDisk(tab, { includeLive: false })
 	ctx.onChange(true)
 }
 

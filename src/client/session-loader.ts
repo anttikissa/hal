@@ -54,7 +54,7 @@ function addLastActiveNotice(tab: any): void {
 	tab.history.push({ type: 'log', text: time.formatLastActiveNotice(lastTs), ts: Date.now() })
 }
 
-function load(info: SharedSessionInfo, opts: { logName?: string; entryLimit?: number } = {}) {
+function load(info: SharedSessionInfo, opts: { logName?: string; entryLimit?: number; includeLive?: boolean } = {}) {
 	const meta = clientBackend.sessions.loadSessionMeta(info.id)
 	let loaded: { entries: HistoryEntry[]; parentCount: number; parentId?: string }
 	if (opts.logName || opts.entryLimit !== undefined) {
@@ -77,10 +77,12 @@ function load(info: SharedSessionInfo, opts: { logName?: string; entryLimit?: nu
 		usage.cacheRead += entry.usage.cacheRead ?? 0
 		usage.cacheCreation += entry.usage.cacheCreation ?? 0
 	}
+	let liveHistory: Block[] = []
+	if (opts.includeLive !== false) liveHistory = clientBackend.sessions.loadLive(info.id).blocks as Block[]
 	return {
 		id: info.id, name: meta?.name ?? info.name ?? info.id, cwd: info.cwd || meta?.workingDir, model: info.model || meta?.model,
 		currentLog: meta?.currentLog ?? info.currentLog ?? 'history.asonl',
-		history, parentEntryCount: parentCount, liveHistory: clientBackend.sessions.loadLive(info.id).blocks as Block[], usage,
+		history, parentEntryCount: parentCount, liveHistory, usage,
 		contextUsed: meta?.context?.used ?? 0, contextMax: meta?.context?.max ?? 0, forkedFrom: meta?.forkedFrom ?? parentId, lastActiveTs: lastActiveTs(history),
 	}
 }

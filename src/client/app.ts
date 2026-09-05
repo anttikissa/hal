@@ -368,7 +368,7 @@ function ensureTabLoaded(tab: Tab): void {
 	touchTab(tab)
 }
 
-function reloadTabFromDisk(tab: Tab, opts: { logName?: string; entryLimit?: number } = {}): void {
+function reloadTabFromDisk(tab: Tab, opts: { logName?: string; entryLimit?: number; includeLive?: boolean } = {}): void {
 	const snapshot = sessionLoader.load({ id: tab.sessionId, name: tab.name, cwd: tab.cwd, model: tab.model }, opts)
 	tab.rawHistory = snapshot.history
 	tab.parentEntryCount = snapshot.parentEntryCount

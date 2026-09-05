@@ -17,7 +17,7 @@ test('history-rebased reloads exactly the rebased log prefix', () => {
 })
 
 
-test('history-updated reloads the authoritative current history', () => {
+test('history-updated reloads persisted history without peeking into a later live turn', () => {
 	const tab = { sessionId: 's1' }
 	const calls: any[] = []
 	clientEvents.handle({ type: 'history-updated', sessionId: 's1' }, {
@@ -25,7 +25,7 @@ test('history-updated reloads the authoritative current history', () => {
 		reloadTabFromDisk: (...args: any[]) => calls.push(['reload', ...args]),
 		onChange: (force: boolean) => calls.push(['change', force]),
 	})
-	expect(calls).toEqual([['reload', tab], ['change', true]])
+	expect(calls).toEqual([['reload', tab, { includeLive: false }], ['change', true]])
 })
 
 
