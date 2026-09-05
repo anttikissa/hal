@@ -29,11 +29,11 @@ export function PromptComposer(props: PromptComposerProps) {
 	const [attaching, setAttaching] = createSignal(false)
 	const [draftDurable, setDraftDurable] = createSignal(true)
 
-	// Grow with content up to a sane cap; past the cap the textarea scrolls.
+	// Grow with content up to eight compact lines; past the cap the textarea scrolls.
 	function autosize(): void {
 		if (!input) return
 		input.style.height = 'auto'
-		input.style.height = `${Math.min(input.scrollHeight, 8 * 24)}px`
+		input.style.height = `${Math.min(input.scrollHeight, 8 * 21)}px`
 	}
 
 	function saveDraft(): void {
@@ -135,12 +135,14 @@ export function PromptComposer(props: PromptComposerProps) {
 			onPaste={onPaste}
 		/>
 		<input ref={(element) => { fileInput = element }} type="file" accept="image/*" style="display: none" disabled={props.disabled} onChange={attachPickedFile} />
-		<button type="button" class="PromptComposer-attach" disabled={attaching() || props.disabled} title="Attach image" onClick={() => fileInput?.click()}>📎</button>
-		{/* Queue only exists while a turn runs: idle, sending already starts the
-		    prompt immediately and a queue button would mean the same thing. */}
-		<Show when={props.working}>
-			<button type="button" disabled={attaching() || props.disabled} title="Run after the current turn" onClick={() => void submit(true)}>Queue</button>
-		</Show>
-		<button type="submit" disabled={attaching() || props.disabled}>{sendLabel(!!props.working)}</button>
+		<div class="PromptComposer-controls">
+			<button type="button" class="PromptComposer-attach" disabled={attaching() || props.disabled} title="Attach image" onClick={() => fileInput?.click()}>📎</button>
+			{/* Queue only exists while a turn runs: idle, sending already starts the
+			    prompt immediately and a queue button would mean the same thing. */}
+			<Show when={props.working}>
+				<button type="button" disabled={attaching() || props.disabled} title="Run after the current turn" onClick={() => void submit(true)}>Queue</button>
+			</Show>
+			<button type="submit" disabled={attaching() || props.disabled}>{sendLabel(!!props.working)}</button>
+		</div>
 	</form>
 }

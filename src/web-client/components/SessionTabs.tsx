@@ -20,9 +20,9 @@ function ActivityMarkers(props: { description: ReturnType<typeof sessionActivity
 	</span>
 }
 
-// Desktop shows full tabs. On a phone the same space becomes a wrapping rail:
-// every session remains visible and directly selectable, while the selected tab
-// expands to show its name. The menu remains for close and new-tab actions.
+// Desktop shows full tabs. A phone keeps them in one horizontal rail so a large
+// session set cannot crowd out the transcript; the selected tab expands to show
+// its name, and the menu keeps close and new-tab actions out of that compact row.
 export function SessionTabs(props: SessionTabsProps) {
 	const [menuOpen, setMenuOpen] = createSignal(false)
 

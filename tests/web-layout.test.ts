@@ -58,6 +58,25 @@ function declaration(selector: string, property: string): string | undefined {
 	return undefined
 }
 
+function rulesInside(atRule: string): CssRule[] {
+	const css = readFileSync(resolve(webDir, 'styles.css'), 'utf8')
+	const start = css.indexOf(atRule)
+	if (start < 0) return []
+	const open = css.indexOf('{', start)
+	let depth = 1
+	let cursor = open + 1
+	while (cursor < css.length && depth > 0) {
+		if (css[cursor] === '{') depth++
+		if (css[cursor] === '}') depth--
+		cursor++
+	}
+	return parseTopLevelRules(css.slice(open + 1, cursor - 1))
+}
+
+function declarationInside(atRule: string, selector: string, property: string): string | undefined {
+	return rulesInside(atRule).find((rule) => rule.selector === selector)?.decls.get(property)
+}
+
 // The selector main.tsx renders into, which index.html must provide.
 function mountSelector(): string {
 	const main = readFileSync(resolve(webDir, 'main.tsx'), 'utf8')
@@ -103,4 +122,29 @@ test('the transcript is the only scrolling row', () => {
 	expect(declaration('.Transcript', 'overflow-y')).toBe('auto')
 	expect(declaration('.SessionTabs', 'flex')).toBe('none')
 	expect(declaration('.PromptComposer', 'flex')).toBe('none')
+})
+
+test('prompt type is compact without triggering iOS focus zoom', () => {
+	expect(declaration('.PromptComposer > textarea', 'font-size')).toBe('16px')
+	expect(declaration('.PromptComposer > textarea', 'font-size-adjust')).toBe('.48')
+	expect(declaration('.PromptComposer > textarea', 'line-height')).toBe('21px')
+})
+
+test('phone tabs stay in one compact scrollable row', () => {
+	const media = '@media (max-width: 48em)'
+	const rail = '.SessionTabs > .SessionTabs-rail'
+	expect(declarationInside(media, rail, 'flex-wrap')).toBe('nowrap')
+	expect(declarationInside(media, rail, 'overflow-x')).toBe('auto')
+})
+
+test('the focused phone composer takes over the keyboard-visible viewport', () => {
+	const media = '@media (max-width: 48em)'
+	const obscured = '#app:has(> .PromptComposer > textarea:focus) > .SessionTabs, #app:has(> .PromptComposer > textarea:focus) > .Transcript'
+	const composer = '#app:has(> .PromptComposer > textarea:focus) > .PromptComposer'
+	const textarea = `${composer} > textarea`
+	expect(declarationInside(media, obscured, 'display')).toBe('none')
+	expect(declarationInside(media, composer, 'flex')).toBe('1')
+	expect(declarationInside(media, composer, 'display')).toBe('grid')
+	expect(declarationInside(media, textarea, 'height')).toBe('100% !important')
+	expect(declarationInside(media, textarea, 'max-height')).toBe('none')
 })

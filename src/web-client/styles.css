@@ -18,8 +18,8 @@ body { margin: 0; font: 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consol
 #app { position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-height, 100dvh); overflow: hidden; display: flex; flex-direction: column; }
 button { touch-action: manipulation; }
 
-.SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer > button, .PromptComposer > textarea { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
-.SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer > button { cursor: pointer; }
+.SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer-controls > button, .PromptComposer > textarea { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
+.SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer-controls > button { cursor: pointer; }
 
 .AuthGate {
 	max-width: 36rem;
@@ -43,8 +43,8 @@ button { touch-action: manipulation; }
 .AuthGate > form > button { cursor: pointer; }
 
 /* The header is a tab map, not just a menu. Desktop keeps full wrapping tabs;
-   phone shows compact 44px switches in the same space, expanding only the
-   selected one to reveal its name. All open sessions and activity stay visible. */
+   phone uses a single horizontally scrollable rail, expanding the selected one
+   to reveal its name without letting a large session set consume the screen. */
 .SessionTabs {
 	flex: none;
 	display: flex;
@@ -75,12 +75,34 @@ button { touch-action: manipulation; }
 
 @media (max-width: 48em) {
 	.SessionTabs > .SessionTabs-row, .SessionTabs > .SessionTabs-title { display: none; }
-	.SessionTabs > .SessionTabs-rail { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
-	.SessionTabs-rail > button { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; }
+	.SessionTabs > .SessionTabs-rail { flex: 1; min-width: 0; display: flex; flex-wrap: nowrap; gap: 4px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+	.SessionTabs-rail::-webkit-scrollbar { display: none; }
+	.SessionTabs-rail > button { flex: none; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; }
 	.SessionTabs-rail > button.selected { max-width: min(14rem, calc(100vw - 76px)); background: #29465e; border-color: #6b9fc6; }
 	.SessionTabs-rail > button:not(.selected) > .SessionTabs-railName { display: none; }
 	.SessionTabs-number { font-variant-numeric: tabular-nums; }
 	.SessionTabs-railName { max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+	/* Editing is the phone's primary task once the keyboard is open. The visual
+	   viewport already excludes that keyboard, so let the composer own all of it. */
+	#app:has(> .PromptComposer > textarea:focus) > .SessionTabs, #app:has(> .PromptComposer > textarea:focus) > .Transcript { display: none; }
+	#app:has(> .PromptComposer > textarea:focus) > .PromptComposer {
+		flex: 1;
+		min-height: 0;
+		width: 100%;
+		display: grid;
+		grid-template-rows: auto minmax(0, 1fr) auto;
+		padding-top: calc(8px + env(safe-area-inset-top));
+	}
+	#app:has(> .PromptComposer > textarea:focus) > .PromptComposer > .PromptComposer-status { grid-row: 1; }
+	#app:has(> .PromptComposer > textarea:focus) > .PromptComposer > textarea {
+		grid-row: 2;
+		width: 100%;
+		height: 100% !important;
+		min-height: 0;
+		max-height: none;
+	}
+	#app:has(> .PromptComposer > textarea:focus) > .PromptComposer > .PromptComposer-controls { grid-row: 3; justify-content: flex-end; }
 }
 @media (min-width: 48.01em) {
 	.SessionTabs { flex-wrap: wrap; }
@@ -313,12 +335,14 @@ button { touch-action: manipulation; }
 	flex: 1;
 	min-width: 0;
 	min-height: 44px;
-	max-height: 192px;
+	max-height: 168px;
 	resize: none;
-	line-height: 24px;
-	font-size: 16px; /* iOS must not auto-zoom a focused input. */
+	line-height: 21px;
+	font-size: 16px; /* This declared minimum prevents iOS from zooming the page. */
+	font-size-adjust: .48; /* Reduce the visible x-height without crossing that minimum. */
 }
-.PromptComposer > button { min-width: 44px; min-height: 44px; }
-.PromptComposer > .PromptComposer-attach { font-size: 20px; }
+.PromptComposer > .PromptComposer-controls { display: flex; gap: 8px; }
+.PromptComposer-controls > button { min-width: 44px; min-height: 44px; }
+.PromptComposer-controls > .PromptComposer-attach { font-size: 20px; }
 .PromptComposer.disabled { opacity: .42; filter: grayscale(.75); }
 .PromptComposer.disabled > textarea { color: #aaa; }
