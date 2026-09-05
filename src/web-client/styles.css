@@ -330,6 +330,8 @@ button { touch-action: manipulation; }
 	max-height: 168px;
 	resize: none;
 	line-height: 21px;
+	/* Center one line in 44px: (height - two borders - line-height) / 2. */
+	padding-block: 10.5px;
 	font-size: 16px; /* This declared minimum prevents iOS from zooming the page. */
 	font-size-adjust: .48; /* Reduce the visible x-height without crossing that minimum. */
 }

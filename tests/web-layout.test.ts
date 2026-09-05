@@ -148,6 +148,15 @@ test('short composer buttons fit within the same 44px minimum as the textarea', 
 	expect(declaration(buttons, 'line-height')).toBe('21px')
 })
 
+test('single-line prompt text has equal space above and below its line box', () => {
+	const textarea = '.PromptComposer > textarea'
+	const height = parseFloat(declaration(textarea, 'min-height')!)
+	const line = parseFloat(declaration(textarea, 'line-height')!)
+	const padding = parseFloat(declaration(textarea, 'padding-block')!)
+	// Both 1px borders are inside the shared border-box height.
+	expect(line + 2 * padding + 2).toBe(height)
+})
+
 test('phone tabs stay in one compact scrollable row', () => {
 	const media = '@media (max-width: 48em)'
 	const rail = '.SessionTabs > .SessionTabs-rail'
