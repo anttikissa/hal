@@ -265,6 +265,21 @@ test('active question renders controls with explicit cursor metadata and no HAL 
 	expect(result.cursor).toEqual(expect.objectContaining({ row: expect.any(Number), col: expect.any(Number) }))
 })
 
+test('single-choice question is hidden and leaves the idle HAL cursor blinking', () => {
+	colors.load()
+	const lines: string[] = []
+	const result = renderHistory.renderLines(lines, tab([
+		{ type: 'assistant', text: 'Press enter to continue.', model: 'hal/intro' },
+		{ type: 'question', id: 'q1', text: 'Continue?', input: { kind: 'choice', choices: [{ id: 'continue', label: 'Continue' }] }, source: { type: 'intro' }, active: true },
+	] as any), 40, context()) as any
+	const clean = lines.map(stripAnsi).join('\n')
+
+	expect(clean).toContain('Press enter to continue.')
+	expect(clean).not.toContain('Continue?')
+	expect(clean).toContain('█')
+	expect(result.cursor).toBeUndefined()
+})
+
 test('answered question is compact and displays its answer', () => {
 	colors.load()
 	const lines: string[] = []

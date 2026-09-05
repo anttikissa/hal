@@ -78,6 +78,12 @@ function shouldHideBlock(history: Block[], index: number): boolean {
 	const block = history[index]
 	if (!block) return false
 
+	// A single-choice question has nothing to choose: the text before it already
+	// asked, and Enter still answers it. Hiding it keeps the idle HAL cursor
+	// blinking under that text like an old terminal prompt, and leaves no
+	// redundant answered row behind.
+	if (block.type === 'question' && block.input.kind === 'choice' && block.input.choices.length === 1) return true
+
 	// Steering already tells the user why generation stopped. Hiding the
 	// immediately preceding [paused] notice keeps the history focused on the
 	// steering prompt instead of showing a redundant status block right before it.
