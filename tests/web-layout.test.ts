@@ -170,3 +170,14 @@ test('crowded session headers show the current title and selector on all screen 
 	expect(declaration('.SessionTabs.compact > .SessionTabs-title', 'display')).toBe('block')
 	expect(declaration('.SessionTabs.compact > .SessionTabs-title', 'flex')).toBe('1')
 })
+
+test('session menu reveals the current tab and keeps actions outside the scrolling list', () => {
+	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
+	expect(source).toContain('dialog.showModal()')
+	expect(source).toContain("'[aria-current=\"page\"]'")
+	expect(source).toContain("current?.scrollIntoView({ block: 'center' })")
+	expect(source).toContain('<Show when={appActions.isInstalled()}>')
+	expect(declaration('.SessionTabs-list', 'overflow-y')).toBe('auto')
+	expect(declaration('.SessionTabs-actions', 'flex')).toBe('none')
+	expect(declaration('.SessionTabs-list > div.selected', 'background')).toBe('#29465e')
+})
