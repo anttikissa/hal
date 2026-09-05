@@ -15,7 +15,13 @@ function inline(source: string): string {
 // Only /status opts in: recognize its line breaks without allowing source HTML.
 function usageCell(source: string): string {
 	if (source === '?') return 'Unavailable'
-	const rendered = source.split('<br>').map(inline).join('<br>')
+	const parts: string[] = []
+	for (const line of source.split('<br>')) {
+		const usage = line.match(/^(\d+% used) \(resets (.+)\)$/)
+		if (usage) parts.push(`<strong>${inline(usage[1]!)}</strong><small>Resets ${inline(usage[2]!)}</small>`)
+		else parts.push(inline(line))
+	}
+	const rendered = parts.join('<br>')
 	return subscriptionUsage.replaceUsageBarMarkers(rendered, (eighths, width) => {
 		if (!Number.isFinite(eighths) || !Number.isFinite(width) || width <= 0) return ''
 		const percent = Math.round(Math.max(0, Math.min(100, eighths / (width * 8) * 100)))
@@ -33,7 +39,7 @@ function usageAccounts(head: string[], rows: string[][]): string {
 			if (!value) continue // The server suppresses windows overridden by an exhausted longer quota.
 			windows.push(`<div><dt>${inline(head[index]!)}</dt><dd>${webMarkdown.usageCell(value)}</dd></div>`)
 		}
-		accounts.push(`<article><header><small>Slot ${inline(slot)}</small><strong>${webMarkdown.usageCell(cells[1] ?? '')}</strong></header><dl>${windows.join('')}</dl></article>`)
+		accounts.push(`<article><header><strong>${webMarkdown.usageCell(cells[1] ?? '')}</strong><small>Slot ${inline(slot)}</small></header><dl>${windows.join('')}</dl></article>`)
 	}
 	return `<div class="UsageAccounts">${accounts.join('')}</div>`
 }
