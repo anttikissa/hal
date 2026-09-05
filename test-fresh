@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
 # Recreate ~/.hal-fresh as a brand-new-user checkout of this repo, so the intro
 # and installer can be tried exactly as a newcomer would see them.
+#
+# The target is hardcoded and takes no arguments: this script runs `rm -rf` on
+# it, so the path you delete must be the path you can read right here.
+fresh_dir="$HOME/.hal-fresh"
+
 hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-fresh_dir="${1:-$HOME/.hal-fresh}"
 
-if [ "$fresh_dir" = "$hal_dir" ]; then
-	echo "test-fresh: refusing to wipe the working checkout ($hal_dir)" >&2
-	exit 2
-fi
-
-rm -rf "$fresh_dir"
-git clone --quiet "$hal_dir" "$fresh_dir" || exit 1
+rm -rf "$HOME/.hal-fresh"
+git clone --quiet "$hal_dir" "$fresh_dir"
 
 echo "Fresh checkout at $fresh_dir ($(git -C "$fresh_dir" log --oneline -1))"
 echo
