@@ -94,6 +94,21 @@ test('working session renders a cursor only on the current streaming block', () 
 })
 
 
+test('multi-line notices are separated from adjacent notices by a blank line', () => {
+	colors.load()
+	const lines: string[] = []
+	renderHistory.renderLines(lines, tab([
+		{ type: 'info', text: 'Session opened\n\nUsing a model.' },
+		{ type: 'info', text: 'Fetching usage...' },
+		{ type: 'info', text: 'Fetching more...' },
+	]), 40, context())
+	const clean = lines.map(stripAnsi)
+	const fetching = clean.findIndex((l) => l.includes('Fetching usage'))
+	expect(clean[fetching - 1]).toBe('')
+	expect(clean[fetching + 1]).toContain('Fetching more')
+})
+
+
 test('session labels refresh when tab metadata changes', () => {
 	const history = [{ type: 'user', text: 'hello', source: '110-gmt' }] as Tab['history']
 	const first = { ...context(), sessionLabel: () => '110-gmt (Architecture revamp, tab 3)' }
