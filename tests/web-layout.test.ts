@@ -130,6 +130,16 @@ test('prompt type is compact without triggering iOS focus zoom', () => {
 	expect(declaration('.PromptComposer > textarea', 'line-height')).toBe('21px')
 })
 
+test('composer controls use CSS borders rather than native control decoration', () => {
+	const controls = '.PromptComposer > textarea, .PromptComposer-controls > button'
+	expect(declaration(controls, 'appearance')).toBe('none')
+	expect(declaration(controls, 'margin')).toBe('0')
+	expect(declaration(controls, 'border-radius')).toBe('0')
+	expect(declaration(controls, 'box-shadow')).toBe('none')
+	expect(declaration('.PromptComposer', 'align-items')).toBe('stretch')
+	expect(declaration('.PromptComposer > .PromptComposer-controls', 'align-items')).toBe('stretch')
+})
+
 test('phone tabs stay in one compact scrollable row', () => {
 	const media = '@media (max-width: 48em)'
 	const rail = '.SessionTabs > .SessionTabs-rail'

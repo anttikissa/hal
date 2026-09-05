@@ -327,6 +327,7 @@ button { touch-action: manipulation; }
 	width: min(100%, 900px);
 	margin: 0 auto;
 	display: flex;
+	align-items: stretch;
 	gap: 8px;
 	padding: 12px;
 	padding-bottom: calc(12px + env(safe-area-inset-bottom));
@@ -349,7 +350,10 @@ button { touch-action: manipulation; }
 	font-size: 16px; /* This declared minimum prevents iOS from zooming the page. */
 	font-size-adjust: .48; /* Reduce the visible x-height without crossing that minimum. */
 }
-.PromptComposer > .PromptComposer-controls { display: flex; gap: 8px; }
+/* Native iOS textarea decoration can paint an inset edge even with our border.
+   Reset both control types so flex stretch aligns the visible border boxes too. */
+.PromptComposer > textarea, .PromptComposer-controls > button { appearance: none; margin: 0; border-radius: 0; box-shadow: none; }
+.PromptComposer > .PromptComposer-controls { display: flex; align-items: stretch; gap: 8px; }
 .PromptComposer-controls > button { min-width: 44px; min-height: 44px; }
 .PromptComposer-controls > .PromptComposer-attach { font-size: 20px; }
 .PromptComposer.disabled { opacity: .42; filter: grayscale(.75); }
