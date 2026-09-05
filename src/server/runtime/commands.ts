@@ -31,6 +31,7 @@ import type { QuestionInput, QuestionSource } from '../../common/history.ts'
 import { serverKeys } from '../server-keys.ts'
 import { modelRefresh } from '../model-refresh.ts'
 import { paths } from '../paths.ts'
+import { processControl } from '../process-control.ts'
 
 // ── Types ──
 
@@ -62,9 +63,6 @@ export interface CommandHooks {
 }
 
 let state = {
-	scheduleExit(code: number, delayMs: number): void {
-		setTimeout(() => process.exit(code), delayMs)
-	},
 	web: async (_args: string): Promise<{ output?: string; error?: string }> => ({ error: 'Web server is unavailable.' }),
 }
 
@@ -804,10 +802,9 @@ handlers['web'] = async (args) => ({ ...await state.web(args), handled: true })
 
 
 
-// /quit — quit
+// /quit — quit after the runtime persists this command's response.
 function quitCommand(): CommandResult {
-	// Give cleanup and IPC tails a brief moment to flush before exiting.
-	state.scheduleExit(0, 100)
+	processControl.requestExit(0)
 	return { output: 'Goodbye.', handled: true }
 }
 

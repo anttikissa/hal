@@ -1,27 +1,28 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { memory } from './memory.ts'
+import { processControl } from './process-control.ts'
 
 const origConfig = { ...memory.config }
 const origReadRss = memory.io.readRss
 const origAddEntry = memory.io.addEntry
-const origScheduleExit = memory.io.scheduleExit
+const origRequestExit = processControl.requestExit
 const origWriteDiagnostic = memory.io.writeDiagnostic
 
 let entries: Array<{ text: string; type: string | undefined }>
-let exitDelays: number[]
+let exitCodes: number[]
 let diagnostics: Array<{ reason: string; rss: number }>
 
 beforeEach(() => {
 	entries = []
-	exitDelays = []
+	exitCodes = []
 	diagnostics = []
 	Object.assign(memory.config, origConfig)
 	memory.io.readRss = () => 0
 	memory.io.addEntry = (text, type) => {
 		entries.push({ text, type })
 	}
-	memory.io.scheduleExit = (delayMs) => {
-		exitDelays.push(delayMs)
+	processControl.requestExit = (code) => {
+		exitCodes.push(code)
 	}
 	memory.io.writeDiagnostic = (reason, rss) => {
 		diagnostics.push({ reason, rss })
@@ -33,7 +34,7 @@ afterEach(() => {
 	Object.assign(memory.config, origConfig)
 	memory.io.readRss = origReadRss
 	memory.io.addEntry = origAddEntry
-	memory.io.scheduleExit = origScheduleExit
+	processControl.requestExit = origRequestExit
 	memory.io.writeDiagnostic = origWriteDiagnostic
 	memory.reset()
 })
@@ -55,17 +56,16 @@ describe('memory', () => {
 		expect(diagnostics).toEqual([{ reason: 'warning', rss: 1_500_000_000 }])
 	})
 
-	test('kill threshold comes from config', () => {
+	test('kill threshold requests exit after recording the warning and diagnostic', () => {
 		memory.config.warnBytes = 0
 		memory.config.killBytes = 1_800_000_000
-		memory.config.exitDelayMs = 250
 		memory.tick(1_799_999_999)
 		expect(entries).toHaveLength(0)
-		expect(exitDelays).toEqual([])
+		expect(exitCodes).toEqual([])
 		memory.tick(1_800_000_000)
 		expect(entries).toHaveLength(1)
 		expect(entries[0]?.text).toContain('Memory limit exceeded: 1.80 GB RSS. Quitting.')
-		expect(exitDelays).toEqual([250])
+		expect(exitCodes).toEqual([0])
 		expect(diagnostics).toEqual([{ reason: 'limit-exceeded', rss: 1_800_000_000 }])
 	})
 
@@ -83,6 +83,6 @@ describe('memory', () => {
 		memory.config.killBytes = 0
 		memory.tick(9_999_000_000)
 		expect(entries).toEqual([])
-		expect(exitDelays).toEqual([])
+		expect(exitCodes).toEqual([])
 	})
 })

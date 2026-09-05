@@ -97,10 +97,10 @@ Some useful server commands you can run this way:
 Example 3: Restart the Hal host process (the remote equivalent of Ctrl-R):
 
 ```ts
-require('~/server/runtime/commands.ts').commands.state.scheduleExit(100, 100)
+require('~/server/process-control.ts').processControl.requestRestart()
 ```
 
-Exit code 100 tells the Hal wrapper to restart. This is safe: sessions persist and connected clients and peers reconnect automatically. When the user asks for a remote restart, run this directly instead of investigating restart safety.
+The request is flushed only after the eval tool result is durably recorded; do not add a delay or call `process.exit()` yourself. Exit code 100 tells the Hal wrapper to restart. This is safe: sessions persist and connected clients and peers reconnect automatically. When the user asks for a remote restart, run this directly instead of investigating restart safety.
 
 Example 4: Pattern for hot-patching functions so the change can be reverted:
 

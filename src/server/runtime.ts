@@ -34,6 +34,7 @@ import { historyProjection } from '../common/history-projection.ts'
 import { serverKeys } from './server-keys.ts'
 import { authLogin } from './auth-login.ts'
 import { spawnAgent } from './tools/spawn_agent.ts'
+import { processControl } from './process-control.ts'
 
 type PendingContinuation = { canceled: boolean }
 export type PendingPrompt = {
@@ -441,6 +442,8 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error')
 		if (cmdResult.question) appendQuestion(sessionId, cmdResult.question)
 		if (cmdResult.loginProvider) retryAfterLogin(sessionId, cmdResult.loginProvider)
+		// Command output and state are durable now; /quit may safely terminate.
+		processControl.exitIfRequested()
 		if (label === 'steering' && (/^\/cd(?:\s|$)/.test(text.trimStart()) || (!cmdResult.error && /^\/model\b/.test(text.trimStart())))) void runGeneration(sessionId, '', source)
 		return
 	}

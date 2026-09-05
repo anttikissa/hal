@@ -12,6 +12,7 @@ import { ipc } from '../file-ipc.ts'
 import { version } from '../version.ts'
 import { sessions as sessionStore } from '../sessions.ts'
 import { paths } from '../paths.ts'
+import { processControl } from '../process-control.ts'
 
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -31,7 +32,7 @@ const origMemoryConfig = { ...memory.config }
 const origReadRss = memory.io.readRss
 const origDefaultModel = models.config.default
 const origVersionState = { ...version.state }
-const origScheduleExit = commands.state.scheduleExit
+const origRequestExit = processControl.requestExit
 const origReadState = ipc.readState
 const origWeb = commands.state.web
 const origOwnsHostLock = ipc.ownsHostLock
@@ -80,7 +81,7 @@ afterEach(() => {
 	models.config.default = origDefaultModel
 	ipc.appendCommand = origAppendCommand
 	Object.assign(version.state, origVersionState)
-	commands.state.scheduleExit = origScheduleExit
+	processControl.requestExit = origRequestExit
 	ipc.readState = origReadState
 	commands.state.web = origWeb
 	ipc.ownsHostLock = origOwnsHostLock
@@ -606,10 +607,10 @@ test('/rebase runtime handler points users to the interactive client', async () 
 	expect(result.error).toBe('Run /rebase from an interactive client terminal.')
 })
 
-test('/quit quits and /exit is an alias', async () => {
-	const exits: Array<{ code: number; delayMs: number }> = []
-	commands.state.scheduleExit = (code, delayMs) => {
-		exits.push({ code, delayMs })
+test('/quit and /exit request a clean exit', async () => {
+	const exitCodes: number[] = []
+	processControl.requestExit = (code) => {
+		exitCodes.push(code)
 	}
 
 	const quit = await commands.executeCommand('/quit', makeSession())
@@ -619,7 +620,7 @@ test('/quit quits and /exit is an alias', async () => {
 	expect(exit).toMatchObject({ handled: true, output: 'Goodbye.' })
 	expect(commands.commandNames()).toContain('quit')
 	expect(commands.commandNames()).toContain('exit')
-	expect(exits).toEqual([{ code: 0, delayMs: 100 }, { code: 0, delayMs: 100 }])
+	expect(exitCodes).toEqual([0, 0])
 })
 
 test('/keys is not listed as a runtime command', async () => {

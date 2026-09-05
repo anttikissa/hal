@@ -12,6 +12,7 @@ import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 import { serverKeys, type WebToken } from './server-keys.ts'
 import { webUpload } from './web-upload.ts'
+import { processControl } from './process-control.ts'
 
 type SocketData = {
 	ip: string
@@ -75,7 +76,8 @@ async function handleUpdateRequest(request: Request): Promise<Response> {
 	const head = await web.gitOut(['rev-parse', 'HEAD'])
 	const upstream = await web.gitOut(['rev-parse', '@{u}'])
 	if (head !== null && head === upstream) return new Response('Already up to date\n')
-	setTimeout(() => process.exit(UPDATE_EXIT_CODE), 100)
+	processControl.requestExit(UPDATE_EXIT_CODE)
+	processControl.exitOnNextTurn()
 	return new Response('Updating\n')
 }
 

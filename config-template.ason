@@ -91,9 +91,7 @@
 		// RSS threshold for exiting before memory grows without bound; set to 0 to disable exits.
 		killBytes: 5000000000,
 		// How often to check RSS.
-		checkIntervalMs: 1000,
-		// Delay between warning that Hal will exit and actually exiting.
-		exitDelayMs: 500
+		checkIntervalMs: 1000
 	},
 	models: {
 		// New installations start with HAL's guided intro. The intro changes this to

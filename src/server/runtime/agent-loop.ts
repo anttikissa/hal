@@ -25,6 +25,7 @@ import { log } from '../../utils/log.ts'
 import { ason } from '../../utils/ason.ts'
 import { helpers } from '../../utils/helpers.ts'
 import { tokenCalibration } from '../token-calibration.ts'
+import { processControl } from '../process-control.ts'
 // Built-in tool registration now happens via explicit startup init.
 // Anthropic also has its own server-side web_search tool
 // (type: 'web_search_20250305'). That's separate from our local google tool.
@@ -995,6 +996,8 @@ async function executeToolBatch(
 		})
 	}, saveCompletedTool, policy)
 	await sessions.appendHistory(sessionId, results.map(({ call }) => ({ type: 'tool_result', toolId: call.id, blobId: blobs.get(call.id)!, ts: new Date().toISOString() })))
+	// In particular, an eval-requested restart must wait until its tool result exists.
+	processControl.exitIfRequested()
 	const saved: { call: ToolCall; result: ToolOutput; blobId: string }[] = []
 	for (const { call, result } of results) {
 		saved.push({ call, result, blobId: blobs.get(call.id)! })

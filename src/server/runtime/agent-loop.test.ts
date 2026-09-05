@@ -13,6 +13,7 @@ import { apiMessages } from '../session/api-messages.ts'
 import { tokenCalibration } from '../token-calibration.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { ason } from '../../utils/ason.ts'
+import { processControl } from '../process-control.ts'
 
 const createdSessions: string[] = []
 
@@ -125,6 +126,28 @@ test('abort before tool dispatch keeps the tool from starting', async () => {
 		expect(results[0]?.result).toBe('[interrupted]')
 	} finally {
 		toolRegistry.dispatch = origDispatch
+	}
+})
+
+
+test('flushes a requested exit only after the tool result is durable', async () => {
+	const sessionId = `test-exit-boundary-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const originalDispatch = toolRegistry.dispatch
+	const originalExitIfRequested = processControl.exitIfRequested
+	let durableAtExit = false
+	toolRegistry.dispatch = async () => 'done'
+	processControl.exitIfRequested = () => {
+		durableAtExit = sessions.loadAllHistory(sessionId).some((entry) => entry.type === 'tool_result')
+	}
+
+	try {
+		await agentLoop.executeToolBatch(sessionId, [{ id: 'restart-1', name: 'eval', input: { code: 'restart' } }], process.cwd(), new AbortController().signal)
+		expect(durableAtExit).toBe(true)
+	} finally {
+		toolRegistry.dispatch = originalDispatch
+		processControl.exitIfRequested = originalExitIfRequested
 	}
 })
 

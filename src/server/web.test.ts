@@ -8,6 +8,7 @@ import { sessions } from './sessions.ts'
 import { ensureStateDir } from './state.ts'
 import { web } from './web.ts'
 import { serverKeys } from './server-keys.ts'
+import { processControl } from './process-control.ts'
 
 test('web fallback port advances by a randomized exponential step', () => {
 	expect(web.nextPort(9001, 1, () => 0)).toBe(9002)
@@ -196,14 +197,14 @@ function stubUpdateGit(fetchExit: number, head: string | null, upstream: string 
 
 test('update endpoint with the right token answers, then exits the process', async () => {
 	const originalToken = process.env.UPDATE_TOKEN
-	const originalExit = process.exit
+	const originalExit = processControl.io.exit
 	const originalRunGit = web.runGit
 	const originalGitOut = web.gitOut
 	process.env.UPDATE_TOKEN = 'secret-token'
 	let exitCode: number | undefined
-	process.exit = ((code?: number) => {
+	processControl.io.exit = (code) => {
 		exitCode = code
-	}) as typeof process.exit
+	}
 	try {
 		// Up to date (edited and pushed on the server): answer but do not restart.
 		stubUpdateGit(0, 'aaaa', 'aaaa')
@@ -217,14 +218,16 @@ test('update endpoint with the right token answers, then exits the process', asy
 		expect(response.status).toBe(500)
 		expect(exitCode).toBeUndefined()
 
-		// New commits on origin: answer, then the deferred exit asks for a pull.
+		// New commits on origin: return the response before exiting on the next turn.
 		stubUpdateGit(0, 'aaaa', 'bbbb')
 		response = await web.handleUpdateRequest(new Request('https://hal.local/api/update', { method: 'POST', headers: { authorization: 'Bearer secret-token' } }))
 		expect(await response.text()).toBe('Updating\n')
-		await Bun.sleep(200)
+		expect(exitCode).toBeUndefined()
+		await new Promise<void>((resolve) => setImmediate(resolve))
 		expect(exitCode).toBe(42)
 	} finally {
-		process.exit = originalExit
+		processControl.io.exit = originalExit
+		processControl.state.exitCode = null
 		web.runGit = originalRunGit
 		web.gitOut = originalGitOut
 		if (originalToken === undefined) delete process.env.UPDATE_TOKEN

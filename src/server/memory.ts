@@ -4,6 +4,7 @@
 
 import { appendFileSync, mkdirSync } from 'fs'
 import { STATE_DIR } from './state.ts'
+import { processControl } from './process-control.ts'
 import { ason } from '../utils/ason.ts'
 import { log } from '../utils/log.ts'
 
@@ -11,7 +12,6 @@ const config = {
 	warnBytes: 1_500_000_000,
 	killBytes: 5_000_000_000,
 	checkIntervalMs: 1_000,
-	exitDelayMs: 500,
 }
 
 const state = {
@@ -26,9 +26,6 @@ const DIAGNOSTIC_PATH = `${STATE_DIR}/oom.asonl`
 const io = {
 	readRss: (): number => process.memoryUsage().rss,
 	addEntry: (_text: string, _type: 'log' | 'info' | 'warning' | 'error' = 'log'): void => {},
-	scheduleExit: (delayMs: number): void => {
-		setTimeout(() => process.exit(0), delayMs)
-	},
 	writeDiagnostic: (reason: DiagnosticReason, rss: number, error?: unknown): void => {
 		writeDiagnostic(reason, rss, error)
 	},
@@ -114,7 +111,7 @@ function tick(rss = io.readRss()): void {
 	state.exitingForMemory = true
 	io.addEntry(`Memory limit exceeded: ${formatMemory(rss)}. Quitting.`, 'error')
 	io.writeDiagnostic('limit-exceeded', rss)
-	io.scheduleExit(config.exitDelayMs)
+	processControl.requestExit(0)
 }
 
 export const memory = {

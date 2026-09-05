@@ -10,6 +10,7 @@ import { clientPersistence } from './client/persistence.ts'
 import { clientBackend, type SubscriptionStatus } from './client/backend.ts'
 import { clientTransport } from './client/transport.ts'
 import { memory } from './server/memory.ts'
+import { processControl } from './server/process-control.ts'
 import { version } from './server/version.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
@@ -263,6 +264,8 @@ function queueMemoryCheck(): void {
 	if (cleaned) return
 	memoryTimer = setTimeout(() => {
 		memory.tick()
+		// tick() records its warning and diagnostic synchronously before requesting exit.
+		processControl.exitIfRequested()
 		queueMemoryCheck()
 	}, memory.config.checkIntervalMs)
 }
