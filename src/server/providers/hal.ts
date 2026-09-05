@@ -19,6 +19,8 @@ const config = {
 const scripts: Record<string, string> = {
 	intro: `Hello. This is HAL 9001, a friendly agent harness.<pause for="0.5s"/>
 
+Just call me Hal.<pause for="0.2s"/>
+
 Press enter to continue.<pause until="enter"/><config key="renderStatus.tabsOpacity" value="1"/>Those are your session tabs. Each one is an independent conversation.<pause for="0.5s"/>
 
 Press enter to continue.<pause until="enter"/><config key="renderStatus.statusOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Below them are the status and help bars: session, directory, model, context, and the keys you can press right now.<pause for="0.5s"/>
