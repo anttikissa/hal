@@ -28,6 +28,7 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'Anthropic', alias: 'fable', fullId: 'anthropic/claude-fable-5-1', fallbackContext: 1_000_000, pricing: { input: 10, output: 50 }, track: 'fable' },
 	// GPT tiers since 5.6: sol = flagship, terra = everyday/default, luna = fast+cheap.
 	// The plain-numbered gpt-X.Y line ended at 5.5; "gpt" tracks the terra tier.
+	{ group: 'OpenAI', alias: 'astra', fullId: 'openai/gpt-6-astra', fallbackContext: 1_050_000, pricing: { input: 10, output: 50 } },
 	{ group: 'OpenAI', alias: 'gpt', aliases: ['openai', 'terra'], fullId: 'openai/gpt-5.6-terra', fallbackContext: 1_050_000, pricing: { input: 2.5, output: 15 }, track: 'terra' },
 	{ group: 'OpenAI', alias: 'sol', fullId: 'openai/gpt-5.6-sol', fallbackContext: 1_050_000, pricing: { input: 5, output: 30 }, track: 'sol' },
 	{ group: 'OpenAI', alias: 'luna', fullId: 'openai/gpt-5.6-luna', fallbackContext: 1_050_000, pricing: { input: 1, output: 6 }, track: 'luna' },
@@ -57,7 +58,7 @@ const PATTERNS: [RegExp, string][] = [
 	[/^sonnet-(.+)$/, 'anthropic/claude-sonnet-$1'],
 	[/^haiku-(.+)$/, 'anthropic/claude-haiku-$1'],
 	[/^fable-(.+)$/, 'anthropic/claude-fable-$1'],
-	[/^gpt-?(\d+\.\d+(?:-[a-z0-9.-]+)?)$/, 'openai/gpt-$1'],
+	[/^gpt-?(\d+(?:\.\d+)?(?:-[a-z0-9.-]+)?)$/, 'openai/gpt-$1'],
 	[/^gemini-(.+)$/, 'google/gemini-$1'],
 	[/^grok-(.+)$/, 'openrouter/x-ai/grok-$1'],
 ]
@@ -132,10 +133,10 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	],
 	// gpt-5.3-codex → Codex 5.3
 	[/^gpt-(\d+\.\d+)-codex$/, (m) => `Codex ${m[1]}`],
-	// gpt-5.5-instant → GPT 5.5 Instant
-	[/^gpt-(\d+\.\d+)-([a-z0-9.-]+)$/, (m) => `GPT ${m[1]} ${displayTitleSuffix(m[2]!)}`],
+	// gpt-6-astra → GPT 6 Astra
+	[/^gpt-(\d+(?:\.\d+)?)-([a-z0-9.-]+)$/, (m) => `GPT ${m[1]} ${displayTitleSuffix(m[2]!)}`],
 	// gpt-5.4 → GPT 5.4
-	[/^gpt-(\d+\.\d+)$/, (m) => `GPT ${m[1]}`],
+	[/^gpt-(\d+(?:\.\d+)?)$/, (m) => `GPT ${m[1]}`],
 	// x-ai/grok-4.6 → Grok 4.6
 	[/^(?:x-ai\/)?grok-((?:\d+\.)*\d+)$/, (m) => `Grok ${m[1]}`],
 ]
@@ -154,7 +155,7 @@ function reasoningEffort(fullId: string | undefined): string {
 	if (!fullId) return ''
 	const modelId = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
 	if (modelId.includes('codex')) return 'xhigh'
-	if (/^o\d/.test(modelId) || /^gpt-5\./.test(modelId)) return 'high'
+	if (/^o\d/.test(modelId) || /^gpt-5\./.test(modelId) || modelId.startsWith('gpt-6-astra')) return 'high'
 	return ''
 }
 
@@ -651,6 +652,8 @@ function addAnthropicChoices(items: ModelChoice[]): void {
 }
 
 function addOpenAiChoices(items: ModelChoice[]): void {
+	const astra = catalogEntryForAlias('astra')!
+	addModelChoice(items, astra.alias, astra.fullId, ['openai', 'gpt'], '6-astra')
 	const choices: Array<{ candidate: ModelCandidate; suffix: string; value: string; fullId: string }> = []
 	for (const candidate of curatedCandidates(parseGptCandidate, 5)) {
 		const fullId = `openai/${candidate.canonical}`

@@ -62,7 +62,7 @@ test('gpt-5.5 subscription route uses Codex input cap', () => {
 		rmSync(dir, { recursive: true, force: true })
 	}
 })
-test('Fable and gpt-instant have picker entries, fallback context, and prices', () => {
+test('Fable, Astra, and gpt-instant have picker entries, fallback context, and prices', () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
 	process.env.HAL_STATE_DIR = dir
 	models.state.cache = null
@@ -70,10 +70,12 @@ test('Fable and gpt-instant have picker entries, fallback context, and prices', 
 		expect(models.displayModel('anthropic/claude-fable-5-1')).toBe('Fable 5.1')
 		expect(models.displayModel('openai/gpt-5.5-instant')).toBe('GPT 5.5 Instant')
 		expect(serverModels.contextWindow('anthropic/claude-fable-5-1')).toBe(1_000_000)
+		expect(serverModels.contextWindow('openai/gpt-6-astra')).toBe(1_050_000)
 		expect(serverModels.contextWindow('openai/gpt-5.5-instant')).toBe(400_000)
 		expect(models.computeCost('anthropic/claude-fable-5-1', { input: 1000, output: 1000, cacheRead: 0, cacheCreation: 0 })).toBe(0.06)
 		expect(models.computeCost('openai/gpt-5.5-instant', { input: 1000, output: 1000, cacheRead: 0, cacheCreation: 0 })).toBe(0.035)
 		expect(models.listModelChoices().find((item) => item.value === 'fable')).toMatchObject({ search: expect.stringContaining('anthropic/claude-fable-5-1') })
+		expect(models.listModelChoices().find((item) => item.value === 'astra')).toMatchObject({ search: expect.stringContaining('openai/gpt-6-astra') })
 		expect(models.listModelChoices().find((item) => item.value === 'gpt-instant')).toMatchObject({ leafLabel: 'gpt-instant', search: expect.stringContaining('openai/gpt-5.5-instant') })
 	} finally {
 		rmSync(dir, { recursive: true, force: true })

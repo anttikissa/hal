@@ -22,6 +22,20 @@ test('sol, terra, and luna aliases resolve to gpt-5.6 tier models', () => {
 })
 
 
+test('Astra resolves, displays, prices, and appears in the OpenAI picker', () => {
+	expect(models.resolveModel('astra')).toBe('openai/gpt-6-astra')
+	expect(models.resolveModel('gpt-6-astra')).toBe('openai/gpt-6-astra')
+	expect(models.displayModel('openai/gpt-6-astra')).toBe('GPT 6 Astra')
+	expect(models.reasoningEffort('openai/gpt-6-astra')).toBe('high')
+	expect(models.computeCost('openai/gpt-6-astra', { input: 1000, output: 1000, cacheRead: 0, cacheCreation: 0 })).toBe(0.06)
+	expect(models.listModelChoices().find((item) => item.value === 'astra')).toMatchObject({
+		fullId: 'openai/gpt-6-astra',
+		path: ['openai', 'gpt'],
+		leafLabel: '6-astra',
+	})
+})
+
+
 test('intro alias resolves to the local synthetic model and appears in the picker', () => {
 	expect(models.resolveModel('intro')).toBe('hal/intro')
 	expect(models.modelCompletionNames()).toContain('hal/intro')
