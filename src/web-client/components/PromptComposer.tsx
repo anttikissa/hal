@@ -29,11 +29,12 @@ export function PromptComposer(props: PromptComposerProps) {
 	const [attaching, setAttaching] = createSignal(false)
 	const [draftDurable, setDraftDurable] = createSignal(true)
 
-	// Grow with content up to eight compact lines; past the cap the textarea scrolls.
+	// Measure the whole draft. CSS caps desktop height; focused phone editing
+	// can use the remaining viewport before the textarea needs to scroll.
 	function autosize(): void {
 		if (!input) return
 		input.style.height = 'auto'
-		input.style.height = `${Math.min(input.scrollHeight, 8 * 21)}px`
+		input.style.height = `${input.scrollHeight}px`
 	}
 
 	function saveDraft(): void {
@@ -131,6 +132,8 @@ export function PromptComposer(props: PromptComposerProps) {
 			placeholder="Message"
 			disabled={props.disabled}
 			onInput={saveDraft}
+			onFocus={autosize}
+			onBlur={autosize}
 			onKeyDown={onKeyDown}
 			onPaste={onPaste}
 		/>

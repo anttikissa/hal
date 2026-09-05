@@ -137,16 +137,19 @@ test('phone tabs stay in one compact scrollable row', () => {
 	expect(declarationInside(media, rail, 'overflow-x')).toBe('auto')
 })
 
-test('the focused phone composer takes over the keyboard-visible viewport', () => {
+test('phone editing grows the draft while retaining context and avoiding the bottom inset', () => {
 	const media = '@media (max-width: 48em)'
-	const obscured = '#app:has(> .PromptComposer > textarea:focus) > .SessionTabs, #app:has(> .PromptComposer > textarea:focus) > .Transcript'
-	const composer = '#app:has(> .PromptComposer > textarea:focus) > .PromptComposer'
-	const textarea = `${composer} > textarea`
-	expect(declarationInside(media, obscured, 'display')).toBe('none')
-	expect(declarationInside(media, composer, 'flex')).toBe('1')
-	expect(declarationInside(media, composer, 'display')).toBe('grid')
-	expect(declarationInside(media, textarea, 'height')).toBe('100% !important')
-	expect(declarationInside(media, textarea, 'max-height')).toBe('none')
+	const focused = '#app:has(> .PromptComposer > textarea:focus)'
+	const composer = `${focused} > .PromptComposer`
+	expect(declarationInside(media, `${focused} > .Transcript`, 'min-height')).toBe('min(64px, 15%)')
+	expect(declarationInside(media, composer, 'flex')).toBe('0 1 auto')
+	expect(declarationInside(media, composer, 'flex-direction')).toBe('column')
+	expect(declarationInside(media, composer, 'padding-bottom')).toBe('8px')
+	expect(declarationInside(media, `${composer} > textarea`, 'max-height')).toBe('none')
+	// CSS keeps the desktop cap; JS must measure the whole draft, not eight lines.
+	const source = readFileSync(resolve(webDir, 'components/PromptComposer.tsx'), 'utf8')
+	expect(source).toContain('`${input.scrollHeight}px`')
+	expect(declaration('.PromptComposer > textarea', 'max-height')).toBe('168px')
 })
 
 test('crowded session headers show the current title and selector on all screen sizes', () => {

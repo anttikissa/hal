@@ -18,7 +18,15 @@ export function Transcript(props: TranscriptProps) {
 		if (element) autoFollow = webScroll.isNearBottom(element)
 	}
 	onSettled(() => {
-		if (element) webScroll.toBottom(element)
+		if (!element) return
+		webScroll.toBottom(element)
+		// Keyboard and draft growth resize this same pane without changing items.
+		// Follow its bottom only while the reader has not scrolled back.
+		const observer = new ResizeObserver(() => {
+			if (element && autoFollow) webScroll.toBottom(element)
+		})
+		observer.observe(element)
+		return () => observer.disconnect()
 	})
 	createEffect(
 		() => props.items,
