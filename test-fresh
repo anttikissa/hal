@@ -10,7 +10,9 @@ fresh_dir="$HOME/.hal-fresh"
 
 hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
-rm -rf "$HOME/.hal-fresh"
+if [ -d "$HOME/.hal-fresh" ]; then
+	rm -rf "$HOME/.hal-fresh"
+fi
 git clone --quiet "$hal_dir" "$fresh_dir"
 
 echo "Fresh checkout at $fresh_dir ($(git -C "$fresh_dir" log --oneline -1))"
