@@ -24,6 +24,8 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Put one-off scripts in `/tmp`
 - Avoid backwards compatibility code by default. Hal is under heavy development and breaking changes are expected. Keep the code minimal and free of legacy clutter
 
+- Keep model aliases current across routine minor-version updates. Ask before making a substantially more expensive model the default.
+
 # Subagents
 
 - Work directly by default. Use a subagent only when an isolated, focused task clearly benefits from separate context.
