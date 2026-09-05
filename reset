@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Return this checkout to the state of a fresh `git clone`, so the installer and
+# intro can be tried again from the top:
+#
+#   ./reset && git pull && ./run -l
+#
+# `git clean -xd` removes every ignored and untracked file, which is exactly the
+# difference between a clone and a used checkout: state/, config.ason, auth.ason,
+# node_modules, logs. Tracked files are left alone, so uncommitted edits survive.
+checkout_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+
+# Your real Hal directory holds actual sessions and logins, and its untracked
+# files are not disposable. Only scratch clones may be reset.
+if [ "$checkout_dir" = "$HOME/.hal" ]; then
+	echo "reset: refusing to wipe your main checkout ($HOME/.hal)" >&2
+	echo "reset: run this in a scratch clone, e.g. ~/.hal-fresh" >&2
+	exit 2
+fi
+
+# `kill -0` sends no signal; it only tests whether the pid exists. Cleaning the
+# state directory under a running host would leave it writing to deleted files.
+lock="$checkout_dir/state/ipc/host.lock"
+if [ -f "$lock" ]; then
+	pid="$(sed -n 's/.*pid: \([0-9]*\).*/\1/p' "$lock")"
+	if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+		echo "reset: Hal is running here (pid $pid); quit it first" >&2
+		exit 1
+	fi
+fi
+
+git -C "$checkout_dir" clean -xdf
+
+echo
+echo "Next:"
+echo "  git pull && ./run -l"
