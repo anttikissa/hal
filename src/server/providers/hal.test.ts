@@ -234,7 +234,7 @@ test('a skipped intro streams every remaining page at once without delays or gat
 	const delays: number[] = []
 	halProvider.script = 'First page.<pause for="0.5s"/><config key="a" value="1"/><pause until="enter"/>Second.<pause until="enter"/><config key="b" value="2"/>Third.'
 	halProvider.sleep = async (ms) => { delays.push(ms) }
-	halProvider.skip('s1')
+	halProvider.state.skipped.add('s1')
 	const events: any[] = []
 	for await (const event of halProvider.provider.generate({ messages: [], model: 'intro', systemPrompt: '', tools: [], sessionId: 's1' })) events.push(event)
 	expect(events).toEqual([

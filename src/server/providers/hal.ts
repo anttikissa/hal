@@ -33,12 +33,7 @@ Choose a model with \`/model\`, then tell me what you would like to work on.<con
 }
 
 // Sessions whose intro was skipped with Esc: the rest of the script streams at once.
-const state = { skipped: new Set<string>(), wakers: new Map<string, AbortController>() }
-
-function skip(sessionId: string): void {
-	state.skipped.add(sessionId)
-	state.wakers.get(sessionId)?.abort()
-}
+const state = { skipped: new Set<string>() }
 
 // Recommendations are aliases so routine catalog updates do not age the intro.
 // Grok's short alias routes through OpenRouter, so its direct key is special.
@@ -180,21 +175,16 @@ async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 	})
 }
 
-// wake cancels only the pacing sleeps (Esc skip); req.signal cancels the text itself.
-async function* streamText(text: string, req: ProviderRequest, wake?: AbortSignal): AsyncGenerator<ProviderStreamEvent> {
+async function* streamText(text: string, req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
 	const rate = halProvider.config.wordsPerSecond
 	if (!Number.isFinite(rate) || rate <= 0) throw new Error('halProvider.wordsPerSecond must be greater than zero')
 	const chunks = wordChunks(text)
 	for (let i = 0; i < chunks.length; i++) {
 		if (req.signal?.aborted) return
 		yield { type: 'text', text: chunks[i] }
-		if (i < chunks.length - 1 && !wake?.aborted) await halProvider.sleep(1000 / rate, halProvider.anySignal(req.signal, wake))
+		// A skipped intro still streams word by word, just without pacing.
+		if (i < chunks.length - 1 && !state.skipped.has(req.sessionId ?? '')) await halProvider.sleep(1000 / rate, req.signal)
 	}
-}
-
-function anySignal(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined {
-	if (a && b) return AbortSignal.any([a, b])
-	return a ?? b
 }
 
 function toolResultIds(messages: Message[]): Set<string> {
@@ -252,35 +242,29 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		yield { type: 'done' }
 		return
 	}
-	// The waker fires on Esc: pacing sleeps end, Enter gates are passed, and every
-	// remaining page plays through so one keypress lands at the end of the intro.
-	const waker = new AbortController()
+	// After Esc, pauses and Enter gates are passed and every remaining page plays
+	// through, so one keypress lands at the end of the intro. Skip takes effect at
+	// the next word or pause boundary, which is at most half a second away.
 	const sessionId = req.sessionId ?? ''
-	state.wakers.set(sessionId, waker)
-	if (state.skipped.has(sessionId)) waker.abort()
-	try {
-		for (let index = first; index < available.length; index++) {
-			const page = available[index]!
-			for (const step of page.steps) {
-				if (req.signal?.aborted) return
-				if (step.type === 'text') yield* streamText(step.text, req, waker.signal)
-				else if (step.type === 'delay' && !waker.signal.aborted) await halProvider.sleep(step.ms, halProvider.anySignal(req.signal, waker.signal))
-				else if (step.type === 'config') yield { type: 'config', key: step.key, value: step.value }
-			}
+	const skipped = () => state.skipped.has(sessionId)
+	for (let index = first; index < available.length; index++) {
+		for (const step of available[index]!.steps) {
 			if (req.signal?.aborted) return
-			if (page.pause && !waker.signal.aborted) {
-				yield { type: 'pause' }
-				return
-			}
+			if (step.type === 'text') yield* streamText(step.text, req)
+			else if (step.type === 'delay' && !skipped()) await halProvider.sleep(step.ms, req.signal)
+			else if (step.type === 'config') yield { type: 'config', key: step.key, value: step.value }
 		}
-		yield { type: 'done' }
-	} finally {
-		state.wakers.delete(sessionId)
-		state.skipped.delete(sessionId)
+		if (req.signal?.aborted) return
+		if (available[index]!.pause && !skipped()) {
+			yield { type: 'pause' }
+			return
+		}
 	}
+	state.skipped.delete(sessionId)
+	yield { type: 'done' }
 }
 
 const provider: Provider = { generate }
 
 // script stays empty unless a caller pins one scenario for every model.
-export const halProvider = { config, state, script: '', skip, introScript, suggestions, detectedProviders, introDefaultModel, providerSetupText, provider, pages, scriptFor, nextPage, wordChunks, sleep, anySignal, streamText, toolResultIds, scrollCalls, scrollRepro }
+export const halProvider = { config, state, script: '', introScript, suggestions, detectedProviders, introDefaultModel, providerSetupText, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, toolResultIds, scrollCalls, scrollRepro }
