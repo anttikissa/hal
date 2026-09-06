@@ -29,7 +29,7 @@ The status line shows your working directory and model.<pause for="0.3s"/><confi
 
 ${halProvider.providerSetupText()}
 
-Choose a model with \`/model\`, then tell me what you would like to work on.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="${halProvider.introDefaultModel()}"/>`
+Choose a model with \`/model\` or Ctrl-M, then tell me what you would like to work on.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="${halProvider.introDefaultModel()}"/>`
 }
 
 // Sessions whose intro was skipped with Esc: the rest of the script streams at once.
@@ -79,12 +79,13 @@ function providerSetupText(): string {
 		if (model) commands.push(`- \`/model ${model}\` — ${provider}`)
 		else commands.push(`- Custom endpoint ${provider}: use \`/model ${provider}/<model-id>\` with a model that endpoint serves.`)
 	}
-	const login = 'For a subscription instead, use \`/login claude\` or \`/login chatgpt\`.'
+	// Subscriptions lead: most people arriving from another harness have one.
+	const login = 'If you would like to use your Claude or ChatGPT subscription, type \`/login claude\` or \`/login chatgpt\`.'
 	if (keys.length) {
 		const names = new Intl.ListFormat('en', { type: 'conjunction' }).format(keys)
-		return `I see you have ${names} set.\n\nTry:\n${commands.join('\n')}\n\nKeys detected, not verified. API usage is billed by the provider; saved logins take priority.\n\n${login}`
+		return `${login}\n\nI also see ${names} in your environment. To use a key instead:\n${commands.join('\n')}`
 	}
-	return 'Connect your provider:\n- \`/login claude\` — Claude subscription\n- \`/login chatgpt\` — ChatGPT / Codex subscription\n\nOr launch Hal with an API key, such as ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.'
+	return `${login}\n\nOr launch Hal with an API key, such as ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.`
 }
 
 // Recorded verbatim from the GPT 5.6 Terra stream that made the active-tabs table
