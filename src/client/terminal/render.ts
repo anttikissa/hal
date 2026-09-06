@@ -22,6 +22,7 @@ import { renderHistory } from './render-history.ts'
 import type { BlockRenderCache, HistoryRenderContext } from './render-history.ts'
 import { renderStatus } from './render-status.ts'
 import { cursor } from './cursor.ts'
+import { chromeFade } from './chrome-fade.ts'
 import { terminalOutput } from './terminal-output.ts'
 import { visLen, wordWrap } from '../../utils/strings.ts'
 import { terminalQuestions } from './questions.ts'
@@ -151,6 +152,7 @@ function writeTerminal(s: string): void {
 }
 
 function resetRenderer(): void {
+	chromeFade.reset()
 	prevFrame = { lines: [], lineTops: [0], height: 0, cols: 0, cursor: { row: 0, col: 0 } }
 	cursorRow = 0
 	cursorCol = 0
@@ -233,10 +235,19 @@ function buildFrame(): Frame {
 
 	// 3. Chrome: tab bar, prompt box, status line, help bar.
 	const chromeStart = lines.length
-	renderStatus.renderTabBar(lines)
-	renderStatus.renderPrompt(lines)
-	renderStatus.renderStatusLine(lines)
-	renderStatus.renderHelpBar(lines)
+	// If chrome itself exceeds the writable screen, do not animate rows that
+	// could enter immutable scrollback. Resizing back up must not replay a fade.
+	if (chrome > rows) chromeFade.reset()
+	for (const [key, paint] of [
+		['tabsOpacity', renderStatus.renderTabBar],
+		['promptOpacity', renderStatus.renderPrompt],
+		['statusOpacity', renderStatus.renderStatusLine],
+		['helpOpacity', renderStatus.renderHelpBar],
+	] as const) {
+		const start = lines.length
+		paint(lines)
+		if (chrome <= rows) chromeFade.apply(lines, start, key, renderStatus.config[key])
+	}
 	appendLineTops(tops, lines, cols, chromeStart)
 
 	const popupCursor = applyPopupOverlay(lines)
@@ -266,7 +277,7 @@ function positionCursor(from: number, target: { row: number; col: number; questi
 	cursorRow = target.row
 	cursorCol = target.col
 	let visibility = `${CSI}?25l`
-	if (target.question || renderStatus.config.promptOpacity > 0) visibility = `${CSI}?25h`
+	if (target.question || (renderStatus.config.promptOpacity > 0 && !chromeFade.isFading('promptOpacity'))) visibility = `${CSI}?25h`
 	return moveCursor(from, target.row) + `\r${renderStatus.promptCursorColorSequence()}${renderStatus.cursorShapeSequence()}${CSI}${target.col}G${visibility}`
 }
 
@@ -488,6 +499,7 @@ function clearFrame(): void {
 }
 
 function hasAnimatedIndicators(cursorFrame = true, toolFrame = true): boolean {
+	if (chromeFade.active()) return true
 	if (toolFrame && client.currentTab()?.history.some((block) => block.type === 'tool' && block.running)) return true
 	if (!cursorFrame) return false
 	return renderStatus.hasAnimatedIndicators() || renderHistory.hasAnimatedCursor(client.currentTab())

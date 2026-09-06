@@ -405,6 +405,16 @@ every third heartbeat (15 frames, 250ms). Their phases overlap every sixth heart
 which produces one combined paint. Finished tools replace the spinner with `✓`; the
 fixed-width cell keeps card geometry constant.
 
+Chrome reveals use this same 12 Hz heartbeat, not a separate animation timer.
+An observed opacity change from 0 to 1 fades in over twelve ticks; initially
+visible chrome does not replay a fade. OSC 11 supplies the terminal's default
+background, and the fade interpolates the already-resolved theme RGB colors
+against it. No valid response (or no truecolor support) means an immediate
+reveal: never guess black. Terminal replies must be consumed before key handling,
+including fragmented replies, without treating pasted OSC text as a response.
+Fade transforms only chrome rows, preserves their widths/heights, and stops
+animating when the chrome itself would extend outside the writable screen.
+
 This was discovered the hard way: without throttling, keypresses were
 completely unresponsive during assistant output.
 

@@ -7,6 +7,10 @@ const HEARTBEAT_MS = 1000 / 12
 let timer: ReturnType<typeof setTimeout> | null = null
 let onChange: ((cursorFrame: boolean, toolFrame: boolean) => void) | null = null
 
+function heartbeatTick(): number {
+	return Math.floor(Date.now() / HEARTBEAT_MS)
+}
+
 function tick(): number {
 	return Math.floor(Date.now() / 250)
 }
@@ -45,4 +49,4 @@ function stop(): void {
 	onChange = null
 }
 
-export const cursor = { tick, toolTick, isVisible, isFastVisible, scheduleNext, start, stop }
+export const cursor = { heartbeatTick, tick, toolTick, isVisible, isFastVisible, scheduleNext, start, stop }

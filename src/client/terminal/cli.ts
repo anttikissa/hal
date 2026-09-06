@@ -25,6 +25,7 @@ import { promptEdit } from '../prompt-edit.ts'
 import type { DraftPromptEdit } from '../draft.ts'
 import { termCaps } from '../../utils/term-caps.ts'
 import { terminalQuestions } from './questions.ts'
+import { terminalBackground } from './terminal-background.ts'
 
 const RESTART_CODE = 100
 
@@ -723,6 +724,31 @@ function handleQuestionKey(k: KeyEvent): boolean {
 	return terminalQuestions.handleKey(k)
 }
 
+function handleInput(text: string): void {
+	for (const k of keys.parseKeys(text)) {
+		// Popup keys first — an active modal owns the keyboard.
+		if (popup.state.active && popup.handleKey(k)) {
+			draw()
+			continue
+		}
+		// Active questions contain ordinary input, while existing app shortcuts
+		// such as Ctrl-N/P still run through their native handler.
+		if (handleQuestionKey(k)) {
+			draw()
+			continue
+		}
+		// Completion keys next (tab, arrows in popup, etc.)
+		if (handleCompletionKey(k)) {
+			draw()
+			continue
+		}
+		// App keybindings
+		if (handleAppKey(k)) continue
+		// Then prompt editing
+		if (handlePromptKey(k)) continue
+	}
+}
+
 function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; openCwd?: string } = {}): void {
 	// Wire state changes to repaint.
 	client.setOnChange(draw)
@@ -801,34 +827,29 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 		}
 	})
 
+	let inputFlushTimer: ReturnType<typeof setTimeout> | null = null
+	function flushPendingInput(): void {
+		inputFlushTimer = null
+		const pending = terminalBackground.flush()
+		if (pending) handleInput(pending)
+	}
 	process.stdin.on('data', (data: Buffer | string) => {
 		// stdin.setEncoding('utf8') makes data a string with multi-byte sequences
 		// already buffered across chunk boundaries. Pipe-backed stdin (no TTY)
 		// may still deliver Buffers, so coerce defensively.
 		const text = typeof data === 'string' ? data : data.toString('utf-8')
-		for (const k of keys.parseKeys(text)) {
-			// Popup keys first — an active modal owns the keyboard.
-			if (popup.state.active && popup.handleKey(k)) {
-							draw()
-				continue
-			}
-			// Active questions contain ordinary input, while existing app shortcuts
-			// such as Ctrl-N/P still run through their native handler.
-			if (handleQuestionKey(k)) {
-							draw()
-				continue
-			}
-			// Completion keys next (tab, arrows in popup, etc.)
-			if (handleCompletionKey(k)) {
-							draw()
-				continue
-			}
-			// App keybindings
-			if (handleAppKey(k)) continue
-			// Then prompt editing
-			if (handlePromptKey(k)) continue
-		}
+		if (inputFlushTimer) clearTimeout(inputFlushTimer)
+		const input = terminalBackground.consume(text)
+		if (input) handleInput(input)
+		const delay = terminalBackground.flushDelay()
+		if (delay) inputFlushTimer = setTimeout(flushPendingInput, delay)
 	})
+	// OSC replies use stdin, so attach its listener first. The query is opportunistic:
+	// no response means no inferred color and no blocked startup.
+	if (process.stdin.isTTY && process.stdout.isTTY && termCaps.config.truecolor) terminalBackground.query()
+	signal.addEventListener('abort', () => {
+		if (inputFlushTimer) clearTimeout(inputFlushTimer)
+	}, { once: true })
 	process.stdin.on('end', handleStdinClosed)
 	process.stdin.on('close', handleStdinClosed)
 }
