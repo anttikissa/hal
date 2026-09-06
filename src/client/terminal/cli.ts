@@ -24,6 +24,7 @@ import { terminalOutput } from './terminal-output.ts'
 import { promptEdit } from '../prompt-edit.ts'
 import type { DraftPromptEdit } from '../draft.ts'
 import { termCaps } from '../../utils/term-caps.ts'
+import { log } from '../../utils/log.ts'
 import { terminalQuestions } from './questions.ts'
 
 const RESTART_CODE = 100
@@ -833,7 +834,9 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 		const text = typeof data === 'string' ? data : data.toString('utf-8')
 		handleInput(text)
 	})
-	if (process.stdin.isTTY && process.stdout.isTTY && termCaps.config.truecolor) terminalOutput.write('\x1b]11;?\x1b\\')
+	const queryBackground = process.stdin.isTTY && process.stdout.isTTY && termCaps.config.truecolor
+	log.debug('osc11 query', { queryBackground })
+	if (queryBackground) terminalOutput.write('\x1b]11;?\x1b\\')
 	process.stdin.on('end', handleStdinClosed)
 	process.stdin.on('close', handleStdinClosed)
 }
