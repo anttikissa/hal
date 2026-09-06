@@ -22,7 +22,8 @@ import { renderHistory } from './render-history.ts'
 import type { BlockRenderCache, HistoryRenderContext } from './render-history.ts'
 import { renderStatus } from './render-status.ts'
 import { cursor } from './cursor.ts'
-import { chromeFade } from './chrome-fade.ts'
+import { keys } from './keys.ts'
+import { oklch } from '../../utils/oklch.ts'
 import { terminalOutput } from './terminal-output.ts'
 import { visLen, wordWrap } from '../../utils/strings.ts'
 import { terminalQuestions } from './questions.ts'
@@ -32,6 +33,7 @@ const config = {
 }
 
 const CSI = '\x1b['
+const state = { reveals: new Map<string, number>() }
 
 function physicalRows(line: string, cols: number): number {
 	// Intentionally over-width frame lines are standalone URLs, whose printable
@@ -152,7 +154,7 @@ function writeTerminal(s: string): void {
 }
 
 function resetRenderer(): void {
-	chromeFade.reset()
+	state.reveals.clear()
 	prevFrame = { lines: [], lineTops: [0], height: 0, cols: 0, cursor: { row: 0, col: 0 } }
 	cursorRow = 0
 	cursorCol = 0
@@ -237,7 +239,7 @@ function buildFrame(): Frame {
 	const chromeStart = lines.length
 	// If chrome itself exceeds the writable screen, do not animate rows that
 	// could enter immutable scrollback. Resizing back up must not replay a fade.
-	if (chrome > rows) chromeFade.reset()
+	if (chrome > rows) state.reveals.clear()
 	for (const [key, paint] of [
 		['tabsOpacity', renderStatus.renderTabBar],
 		['promptOpacity', renderStatus.renderPrompt],
@@ -246,7 +248,14 @@ function buildFrame(): Frame {
 	] as const) {
 		const start = lines.length
 		paint(lines)
-		if (chrome <= rows) chromeFade.apply(lines, start, key, renderStatus.config[key])
+		// -1 means hidden; missing means already visible when this client started.
+		if (renderStatus.config[key] <= 0) state.reveals.set(key, -1)
+		else if (state.reveals.get(key) === -1) state.reveals.set(key, keys.state.background && chrome <= rows ? cursor.heartbeatTick() : -Infinity)
+		const alpha = Math.min(1, (cursor.heartbeatTick() - (state.reveals.get(key) ?? -Infinity)) / 12)
+		if (alpha >= 1) state.reveals.delete(key)
+		else if (renderStatus.config[key] > 0 && keys.state.background) {
+			for (let i = start; i < lines.length; i++) lines[i] = alpha <= 0 ? ' '.repeat(visLen(lines[i]!)) : oklch.dimAnsi(lines[i]!, alpha, keys.state.background)
+		}
 	}
 	appendLineTops(tops, lines, cols, chromeStart)
 
@@ -277,7 +286,7 @@ function positionCursor(from: number, target: { row: number; col: number; questi
 	cursorRow = target.row
 	cursorCol = target.col
 	let visibility = `${CSI}?25l`
-	if (target.question || (renderStatus.config.promptOpacity > 0 && !chromeFade.isFading('promptOpacity'))) visibility = `${CSI}?25h`
+	if (target.question || renderStatus.config.promptOpacity > 0) visibility = `${CSI}?25h`
 	return moveCursor(from, target.row) + `\r${renderStatus.promptCursorColorSequence()}${renderStatus.cursorShapeSequence()}${CSI}${target.col}G${visibility}`
 }
 
@@ -499,10 +508,10 @@ function clearFrame(): void {
 }
 
 function hasAnimatedIndicators(cursorFrame = true, toolFrame = true): boolean {
-	if (chromeFade.active()) return true
+	if ([...state.reveals.values()].some((tick) => tick >= 0 && cursor.heartbeatTick() - tick <= 12)) return true
 	if (toolFrame && client.currentTab()?.history.some((block) => block.type === 'tool' && block.running)) return true
 	if (!cursorFrame) return false
 	return renderStatus.hasAnimatedIndicators() || renderHistory.hasAnimatedCursor(client.currentTab())
 }
 
-export const render = { config, draw, resetRenderer, enterFullscreen, invalidateHistoryCache, clearFrame, hasAnimatedIndicators, physicalRows, physicalHeight }
+export const render = { state, config, draw, resetRenderer, enterFullscreen, invalidateHistoryCache, clearFrame, hasAnimatedIndicators, physicalRows, physicalHeight }

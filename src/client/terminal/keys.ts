@@ -19,6 +19,8 @@ export interface KeyEvent {
 	cmd: boolean // Super/Meta key; Command (⌘) on macOS
 }
 
+const state = { background: null as number[] | null }
+
 function ke(key: string, mods?: Partial<KeyEvent>): KeyEvent {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
 }
@@ -229,6 +231,13 @@ function splitKeys(data: string): string[] {
 			}
 			continue
 		}
+		// Optimistic OSC 11: complete replies only, after bracketed-paste handling.
+		const background = data.slice(i).match(/^\x1b]11;rgb:([\da-f]{1,4})\/([\da-f]{1,4})\/([\da-f]{1,4})(?:\x07|\x1b\\)/i)
+		if (background) {
+			state.background = background.slice(1).map((hex) => Math.round(parseInt(hex, 16) * 255 / (16 ** hex.length - 1)))
+			i += background[0].length
+			continue
+		}
 		if (data[i] === '\x1b') {
 			if (i + 1 < data.length && (data[i + 1] === '[' || data[i + 1] === 'O')) {
 				// CSI or SS3: scan parameter bytes (0x20-0x3f) then final byte
@@ -336,4 +345,4 @@ export function parseKeys(data: string): KeyEvent[] {
 	return events
 }
 
-export const keys = { parseKey, parseKeys }
+export const keys = { state, parseKey, parseKeys }

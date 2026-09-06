@@ -98,10 +98,10 @@ function mixFg(a: string, b: string, t: number): string {
 	return `\x1b[38;2;${rgb.join(';')}m`
 }
 
-function dimAnsi(line: string, factor: number): string {
+function dimAnsi(line: string, factor: number, background = [0, 0, 0]): string {
 	return line.replace(TRUECOLOR_RE, (_, mode, r, g, b) => {
-		const scale = (v: string) => Math.round(Math.min(255, Number(v) * factor))
-		return `\x1b[${mode};2;${scale(r)};${scale(g)};${scale(b)}m`
+		const rgb = [r, g, b].map((v, i) => Math.round(Math.min(255, background[i]! + (Number(v) - background[i]!) * factor)))
+		return `\x1b[${mode};2;${rgb.join(';')}m`
 	})
 }
 

@@ -25,7 +25,6 @@ import { promptEdit } from '../prompt-edit.ts'
 import type { DraftPromptEdit } from '../draft.ts'
 import { termCaps } from '../../utils/term-caps.ts'
 import { terminalQuestions } from './questions.ts'
-import { terminalBackground } from './terminal-background.ts'
 
 const RESTART_CODE = 100
 
@@ -827,29 +826,14 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 		}
 	})
 
-	let inputFlushTimer: ReturnType<typeof setTimeout> | null = null
-	function flushPendingInput(): void {
-		inputFlushTimer = null
-		const pending = terminalBackground.flush()
-		if (pending) handleInput(pending)
-	}
 	process.stdin.on('data', (data: Buffer | string) => {
 		// stdin.setEncoding('utf8') makes data a string with multi-byte sequences
 		// already buffered across chunk boundaries. Pipe-backed stdin (no TTY)
 		// may still deliver Buffers, so coerce defensively.
 		const text = typeof data === 'string' ? data : data.toString('utf-8')
-		if (inputFlushTimer) clearTimeout(inputFlushTimer)
-		const input = terminalBackground.consume(text)
-		if (input) handleInput(input)
-		const delay = terminalBackground.flushDelay()
-		if (delay) inputFlushTimer = setTimeout(flushPendingInput, delay)
+		handleInput(text)
 	})
-	// OSC replies use stdin, so attach its listener first. The query is opportunistic:
-	// no response means no inferred color and no blocked startup.
-	if (process.stdin.isTTY && process.stdout.isTTY && termCaps.config.truecolor) terminalBackground.query()
-	signal.addEventListener('abort', () => {
-		if (inputFlushTimer) clearTimeout(inputFlushTimer)
-	}, { once: true })
+	if (process.stdin.isTTY && process.stdout.isTTY && termCaps.config.truecolor) terminalOutput.write('\x1b]11;?\x1b\\')
 	process.stdin.on('end', handleStdinClosed)
 	process.stdin.on('close', handleStdinClosed)
 }

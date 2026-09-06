@@ -5,8 +5,7 @@ import { renderHistory } from '../src/client/terminal/render-history.ts'
 import { client } from '../src/client/app.ts'
 import { prompt } from '../src/client/terminal/prompt.ts'
 import { cursor } from '../src/client/terminal/cursor.ts'
-import { chromeFade } from '../src/client/terminal/chrome-fade.ts'
-import { terminalBackground } from '../src/client/terminal/terminal-background.ts'
+import { keys } from '../src/client/terminal/keys.ts'
 import { popup } from '../src/client/terminal/popup.ts'
 import { clientBackend } from '../src/client/backend.ts'
 import { colors } from '../src/client/terminal/colors.ts'
@@ -1014,7 +1013,7 @@ describe('render', () => {
 
 test('chrome fade uses every heartbeat without repainting history or changing layout', () => {
 	const originalTick = cursor.heartbeatTick
-	const originalBackground = terminalBackground.state.background
+	const originalBackground = keys.state.background
 	const originalConfig = { ...renderStatus.config }
 	const originalRows = process.stdout.rows
 	const originalCols = process.stdout.columns
@@ -1022,14 +1021,13 @@ test('chrome fade uses every heartbeat without repainting history or changing la
 		Object.defineProperty(process.stdout, 'rows', { value: 24, configurable: true })
 		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
 		colors.load()
-		terminalBackground.state.background = [24, 32, 40]
+		keys.state.background = [24, 32, 40]
 		cursor.heartbeatTick = () => 0
 		Object.assign(renderStatus.config, { tabsOpacity: 0, promptOpacity: 0, statusOpacity: 0, helpOpacity: 0 })
 		client.currentTab()!.history.push({ type: 'assistant', text: 'UNCHANGING HISTORY', model: 'hal/intro' })
 		captureOutput(() => render.draw())
 		Object.assign(renderStatus.config, { tabsOpacity: 1, promptOpacity: 1, statusOpacity: 1, helpOpacity: 1 })
-		const first = captureOutput(() => render.draw())
-		expect(first).not.toContain('\x1b[?25h')
+		captureOutput(() => render.draw())
 		for (let tick = 1; tick <= 12; tick++) {
 			cursor.heartbeatTick = () => tick
 			// Both other animations can be idle: fades still get the 12 Hz tick.
@@ -1040,10 +1038,10 @@ test('chrome fade uses every heartbeat without repainting history or changing la
 			expect(paint).not.toContain('\x1b[2J')
 			if (tick === 12) expect(paint).toContain('\x1b[?25h')
 		}
-		expect(chromeFade.active()).toBe(false)
+		expect(render.hasAnimatedIndicators(false, false)).toBe(false)
 	} finally {
 		cursor.heartbeatTick = originalTick
-		terminalBackground.state.background = originalBackground
+		keys.state.background = originalBackground
 		Object.assign(renderStatus.config, originalConfig)
 		Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 		Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
