@@ -28,10 +28,8 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 
 # Subagents
 
-- Work directly by default. Use a subagent only when an isolated, focused task clearly benefits from separate context.
-- Hal should fit in one developer's head. Routine implementation is one person's job: do it yourself so the whole change stays coherent and small. Delegation boundaries tend to become module boundaries (Conway's law), so never split one small feature across agents.
-- Good subagent uses: genuinely independent work, fresh-eyes review, or noisy investigation that would swamp the main context.
-- Prefer one fresh subagent on the cheapest model capable of the task. Keep its scope narrow and its deliverable explicit.
+- Work directly by default. Hal should fit in one developer's head, and Conway's law applies to agents too: "organizations which design systems are constrained to produce designs which are copies of the communication structures of these organizations." Delegation boundaries become module boundaries, so never split one small feature across agents.
+- Delegate only when separate context clearly helps: genuinely independent work, fresh-eyes review, or noisy investigation that would swamp the main context. Prefer one fresh subagent on the cheapest capable model, with an explicit deliverable.
 - Ask the user before spawning two or more subagents for one request. Explain why parallel delegation is worth the extra cost and coordination. Never spawn more than three unless the user explicitly requests a larger number.
 - A subagent must not spawn another agent unless the parent deliberately grants it a recursion budget. Recursive delegation is otherwise prohibited.
 - Do not use interactive sessions or `send` as a way around subagent limits.
