@@ -154,3 +154,59 @@ test('intro has one gate, then reveals the prompt before the instruments and fin
 	expect(text).toContain('/login chatgpt')
 	expect(await collect([{ role: 'assistant', content: greeting + text }])).toEqual([{ type: 'done' }])
 })
+
+test('intro recognizes model API keys and suggests commands on the matching routes without exposing secrets', () => {
+	const names = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'GROK_API_KEY', 'SERPER_API_KEY']
+	const saved = new Map(names.map((name) => [name, process.env[name]]))
+	try {
+		for (const name of names) delete process.env[name]
+		for (const name of ['GEMINI_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY']) process.env[name] = `secret-${name}`
+		const text = halProvider.providerSetupText()
+		for (const name of ['GEMINI_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY']) expect(text).toContain(name)
+		for (const command of ['/model gemini', '/model gpt', '/model deepseek']) expect(text).toContain(command)
+		expect(text).not.toContain('secret-')
+		expect(text).not.toContain('/model claude')
+
+		for (const name of names) process.env[name] = `secret-${name}`
+		const all = halProvider.providerSetupText()
+		for (const name of names.filter((name) => name !== 'SERPER_API_KEY')) expect(all).toContain(name)
+		expect(all).toContain('/model claude')
+		// The grok alias uses OpenRouter; a direct xAI key needs the direct route.
+		expect(all).toContain('/model grok/')
+		expect(all.match(/\/model gemini/g)).toHaveLength(1)
+		expect(all).not.toContain('SERPER_API_KEY')
+		expect(all).not.toContain('secret-')
+
+		for (const name of names) delete process.env[name]
+		const none = halProvider.providerSetupText()
+		expect(none).toContain('/login claude')
+		expect(none).toContain('/login chatgpt')
+		expect(none).not.toContain('/model gpt')
+	} finally {
+		for (const [name, value] of saved) {
+			if (value === undefined) delete process.env[name]
+			else process.env[name] = value
+		}
+	}
+})
+
+test('intro detects a custom API key only when Hal has an endpoint to use it with', () => {
+	const key = process.env.INTRO_TEST_API_KEY
+	const url = process.env.INTRO_TEST_BASE_URL
+	try {
+		process.env.INTRO_TEST_API_KEY = 'never-show-this-secret'
+		delete process.env.INTRO_TEST_BASE_URL
+		expect(halProvider.providerSetupText()).not.toContain('INTRO_TEST_API_KEY')
+		process.env.INTRO_TEST_BASE_URL = 'https://example.invalid/v1'
+		const text = halProvider.providerSetupText()
+		expect(text).toContain('INTRO_TEST_API_KEY')
+		expect(text).toContain('/model intro_test/<model-id>')
+		expect(text).not.toContain('never-show-this-secret')
+		expect(text).not.toContain('example.invalid')
+	} finally {
+		if (key === undefined) delete process.env.INTRO_TEST_API_KEY
+		else process.env.INTRO_TEST_API_KEY = key
+		if (url === undefined) delete process.env.INTRO_TEST_BASE_URL
+		else process.env.INTRO_TEST_BASE_URL = url
+	}
+})

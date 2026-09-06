@@ -35,13 +35,18 @@ function store(): Record<string, any> {
 }
 
 // Map provider names to env var names
-const ENV_KEYS: Record<string, string> = {
-	anthropic: 'ANTHROPIC_API_KEY',
-	openai: 'OPENAI_API_KEY',
-	openrouter: 'OPENROUTER_API_KEY',
-	google: 'GOOGLE_API_KEY',
-	grok: 'GROK_API_KEY',
-	serper: 'SERPER_API_KEY',
+const envKeys: Record<string, string[]> = {
+	anthropic: ['ANTHROPIC_API_KEY'],
+	openai: ['OPENAI_API_KEY'],
+	openrouter: ['OPENROUTER_API_KEY'],
+	google: ['GOOGLE_API_KEY', 'GEMINI_API_KEY'],
+	grok: ['GROK_API_KEY'],
+	serper: ['SERPER_API_KEY'],
+}
+
+// Share accepted variable names with onboarding; never share their values there.
+function envKeyNames(providerName: string): string[] {
+	return auth.envKeys[providerName] ?? [`${providerName.toUpperCase()}_API_KEY`]
 }
 
 /** Credential with its type so callers know how to authenticate. */
@@ -183,8 +188,8 @@ function getCredential(providerName: string): Credential | undefined {
 	}
 
 	// No configured credentials — fall back to env var.
-	const envVar = ENV_KEYS[providerName] ?? `${providerName.toUpperCase()}_API_KEY`
-	const envVal = process.env[envVar] ?? (providerName === 'google' ? process.env.GEMINI_API_KEY : undefined)
+	const envVar = auth.envKeyNames(providerName).find((name) => !!process.env[name])
+	const envVal = envVar ? process.env[envVar] : undefined
 	if (envVal) return { value: envVal, type: 'api-key' }
 	return undefined
 }
@@ -376,6 +381,8 @@ function _invalidateCooldownCache(): void {
 }
 
 export const auth = {
+	envKeys,
+	envKeyNames,
 	getCredential,
 	listCredentials,
 	getEntry,

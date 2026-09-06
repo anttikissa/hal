@@ -296,3 +296,22 @@ describe('auth.ensureFresh — anthropic multi-account refresh', () => {
 		}
 	})
 })
+
+test('Google env aliases share onboarding names and skip empty values', () => {
+	const google = process.env.GOOGLE_API_KEY
+	const gemini = process.env.GEMINI_API_KEY
+	try {
+		auth._setStoreForTest({})
+		expect(auth.envKeyNames('google')).toEqual(['GOOGLE_API_KEY', 'GEMINI_API_KEY'])
+		process.env.GOOGLE_API_KEY = ''
+		process.env.GEMINI_API_KEY = 'gemini-test-key'
+		expect(auth.getCredential('google')?.value).toBe('gemini-test-key')
+		process.env.GOOGLE_API_KEY = 'google-test-key'
+		expect(auth.getCredential('google')?.value).toBe('google-test-key')
+	} finally {
+		if (google === undefined) delete process.env.GOOGLE_API_KEY
+		else process.env.GOOGLE_API_KEY = google
+		if (gemini === undefined) delete process.env.GEMINI_API_KEY
+		else process.env.GEMINI_API_KEY = gemini
+	}
+})

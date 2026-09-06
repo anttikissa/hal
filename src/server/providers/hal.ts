@@ -1,3 +1,6 @@
+import { auth } from '../auth.ts'
+import { models } from '../../common/models.ts'
+import { providerShared } from './shared.ts'
 import type { ContentBlock, Message, Provider, ProviderRequest, ProviderStreamEvent } from '../../common/protocol.ts'
 
 type ScriptStep =
@@ -16,21 +19,52 @@ const config = {
 	wordsPerSecond: 10,
 }
 
-const scripts: Record<string, string> = {
-	intro: `Hello. This is HAL 9001.<pause for="0.3s"/> Just call me Hal.
+function introScript(): string {
+	return `Hello. This is HAL 9001.<pause for="0.3s"/> Just call me Hal.
 I help you work on code.
 
 Press Enter to bring up the controls.<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Your controls. Type requests and /commands here.<pause for="0.3s"/><config key="renderStatus.statusOpacity" value="1"/>
 
 The status line shows your working directory and model.<pause for="0.3s"/><config key="renderStatus.tabsOpacity" value="1"/>
 
-Connect your provider:
-- \`/login claude\` — Claude subscription
-- \`/login chatgpt\` — ChatGPT / Codex subscription
+${halProvider.providerSetupText()}
 
-API keys also work: ANTHROPIC_API_KEY or OPENAI_API_KEY in the environment you launch Hal from.
+Choose a model with \`/model\`, then tell me what you would like to work on.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="gpt"/>`
+}
 
-Choose a model with \`/model\`, then tell me what you would like to work on.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="gpt"/>`,
+// Recommendations are aliases so routine catalog updates do not age the intro.
+// Grok's short alias routes through OpenRouter, so its direct key is special.
+const suggestions: Record<string, string> = {
+	anthropic: 'claude',
+	openai: 'gpt',
+	google: 'gemini',
+	openrouter: 'deepseek',
+}
+
+function providerSetupText(): string {
+	const keys: string[] = []
+	const commands: string[] = []
+	// Only model providers belong here: e.g. Serper's key is for a search tool.
+	const providers = new Set(['anthropic', 'openai', ...Object.keys(providerShared.compatEndpoints)])
+	// The loader also accepts NAME_BASE_URL + NAME_API_KEY for custom backends.
+	for (const name of Object.keys(process.env)) {
+		if (/^[A-Z][A-Z0-9_]*_BASE_URL$/.test(name) && process.env[name]) providers.add(name.slice(0, -9).toLowerCase())
+	}
+	for (const provider of providers) {
+		const present = auth.envKeyNames(provider).filter((name) => !!process.env[name])
+		if (!present.length) continue
+		keys.push(...present)
+		let model = halProvider.suggestions[provider]
+		if (provider === 'grok') model = `grok/${models.resolveModel('grok').split('/').at(-1)}`
+		if (model) commands.push(`- \`/model ${model}\` — ${provider}`)
+		else commands.push(`- Custom endpoint ${provider}: use \`/model ${provider}/<model-id>\` with a model that endpoint serves.`)
+	}
+	const login = 'For a subscription instead, use \`/login claude\` or \`/login chatgpt\`.'
+	if (keys.length) {
+		const names = new Intl.ListFormat('en', { type: 'conjunction' }).format(keys)
+		return `I see you have ${names} set.\n\nTry:\n${commands.join('\n')}\n\nKeys detected, not verified. API usage is billed by the provider; saved logins take priority.\n\n${login}`
+	}
+	return 'Connect your provider:\n- \`/login claude\` — Claude subscription\n- \`/login chatgpt\` — ChatGPT / Codex subscription\n\nOr launch Hal with an API key, such as ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.'
 }
 
 // Recorded verbatim from the GPT 5.6 Terra stream that made the active-tabs table
@@ -44,11 +78,11 @@ const CONTROL_RE = /<pause for="(\d+(?:\.\d+)?)s"\s*\/>|<pause until="enter"\s*\
 
 // An explicit halProvider.script overrides the per-model script, which keeps
 // scripted scenarios reproducible from tests and eval.
-function scriptFor(model: string): string {
-	return halProvider.script || halProvider.scripts[model] || halProvider.scripts.intro!
+function scriptFor(): string {
+	return halProvider.script || halProvider.introScript()
 }
 
-function pages(source = scriptFor('intro')): ScriptPage[] {
+function pages(source = scriptFor()): ScriptPage[] {
 	const result: ScriptPage[] = []
 	let steps: ScriptStep[] = []
 	let offset = 0
@@ -181,7 +215,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		yield* scrollRepro(req)
 		return
 	}
-	const available = pages(scriptFor(req.model))
+	const available = pages(scriptFor())
 	const page = available[nextPage(req.messages, available)]
 	if (!page) {
 		yield { type: 'done' }
@@ -200,4 +234,4 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 const provider: Provider = { generate }
 
 // script stays empty unless a caller pins one scenario for every model.
-export const halProvider = { config, script: '', scripts, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, toolResultIds, scrollCalls, scrollRepro }
+export const halProvider = { config, script: '', introScript, suggestions, providerSetupText, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, toolResultIds, scrollCalls, scrollRepro }
