@@ -57,6 +57,18 @@ fi
 log
 log "Analyzing..."
 if [ -n "$local_only" ]; then log "Local setup (--local): files outside this directory will not be modified."; fi
+
+# A local install never links ~/.local/bin/hal, so its usage must name ./run.
+usage() {
+	local cmd="hal"
+	if [ -n "$local_only" ]; then cmd="./run"; fi
+	log "    # Use $cmd to edit project in current directory"
+	log "    $cmd"
+	log
+	log "    # Or, use $cmd to modify or analyze itself"
+	log "    $cmd -s"
+	log
+}
 log
 
 need_git=""
@@ -153,12 +165,7 @@ if [ -z "$need_any" ]; then
 	log
 	log "To get started:"
 	log
-	log "    # Use hal to edit project in current directory"
-	log "    hal"
-	log
-	log "    # Or, use hal to modify or analyze itself"
-	log "    hal -s"
-	log
+	usage
 	exit 0
 fi
 
@@ -336,9 +343,4 @@ else
 	log "To get started:"
 fi
 log
-log "    # Use hal to edit project in current directory"
-log "    hal"
-log
-log "    # Or, use hal to modify or analyze itself"
-log "    hal -s"
-log
+usage
