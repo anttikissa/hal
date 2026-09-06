@@ -23,7 +23,6 @@ import type { BlockRenderCache, HistoryRenderContext } from './render-history.ts
 import { renderStatus } from './render-status.ts'
 import { cursor } from './cursor.ts'
 import { keys } from './keys.ts'
-import { log } from '../../utils/log.ts'
 import { oklch } from '../../utils/oklch.ts'
 import { terminalOutput } from './terminal-output.ts'
 import { visLen, wordWrap } from '../../utils/strings.ts'
@@ -251,10 +250,7 @@ function buildFrame(): Frame {
 		paint(lines)
 		// -1 means hidden; missing means already visible when this client started.
 		if (renderStatus.config[key] <= 0) state.reveals.set(key, -1)
-		else if (state.reveals.get(key) === -1) {
-			state.reveals.set(key, keys.state.background && chrome <= rows ? cursor.heartbeatTick() : -Infinity)
-			log.debug('chrome reveal', { key, start: state.reveals.get(key), background: keys.state.background, chrome, rows })
-		}
+		else if (state.reveals.get(key) === -1) state.reveals.set(key, keys.state.background && chrome <= rows ? cursor.heartbeatTick() : -Infinity)
 		if (renderStatus.config[key] <= 0 || !keys.state.background) continue
 		const alpha = Math.min(1, (cursor.heartbeatTick() - (state.reveals.get(key) ?? -Infinity)) / 12)
 		if (alpha >= 1) state.reveals.delete(key)

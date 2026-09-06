@@ -19,8 +19,6 @@ export interface KeyEvent {
 	cmd: boolean // Super/Meta key; Command (⌘) on macOS
 }
 
-import { log } from '../../utils/log.ts'
-
 const state = { background: null as number[] | null }
 
 function ke(key: string, mods?: Partial<KeyEvent>): KeyEvent {
@@ -237,7 +235,6 @@ function splitKeys(data: string): string[] {
 		const background = data.slice(i).match(/^\x1b]11;rgb:([\da-f]{1,4})\/([\da-f]{1,4})\/([\da-f]{1,4})(?:\x07|\x1b\\)/i)
 		if (background) {
 			state.background = background.slice(1).map((hex) => Math.round(parseInt(hex, 16) * 255 / (16 ** hex.length - 1)))
-			log.debug('osc11 background', { background: state.background })
 			i += background[0].length
 			continue
 		}

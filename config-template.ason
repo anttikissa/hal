@@ -146,7 +146,7 @@
 	},
 	log: {
 		// File log level: '', 'off', 'info', 'error', or 'debug'.
-		level: 'debug'
+		level: 'info'
 	},
 	clipboard: {
 		// Pasted text at or below this many lines stays inline; longer pastes become temp files.
