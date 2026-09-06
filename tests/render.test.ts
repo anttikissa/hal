@@ -1022,14 +1022,15 @@ test('chrome fade uses every heartbeat without repainting history or changing la
 		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
 		colors.load()
 		keys.state.background = [24, 32, 40]
-		cursor.heartbeatTick = () => 0
+		// A realistic large tick: hidden chrome must stay remembered as hidden.
+		cursor.heartbeatTick = () => 1_000_000
 		Object.assign(renderStatus.config, { tabsOpacity: 0, promptOpacity: 0, statusOpacity: 0, helpOpacity: 0 })
 		client.currentTab()!.history.push({ type: 'assistant', text: 'UNCHANGING HISTORY', model: 'hal/intro' })
 		captureOutput(() => render.draw())
 		Object.assign(renderStatus.config, { tabsOpacity: 1, promptOpacity: 1, statusOpacity: 1, helpOpacity: 1 })
 		captureOutput(() => render.draw())
 		for (let tick = 1; tick <= 12; tick++) {
-			cursor.heartbeatTick = () => tick
+			cursor.heartbeatTick = () => 1_000_000 + tick
 			// Both other animations can be idle: fades still get the 12 Hz tick.
 			expect(render.hasAnimatedIndicators(false, false)).toBe(true)
 			const paint = captureOutput(() => render.draw())

@@ -255,9 +255,10 @@ function buildFrame(): Frame {
 			state.reveals.set(key, keys.state.background && chrome <= rows ? cursor.heartbeatTick() : -Infinity)
 			log.debug('chrome reveal', { key, start: state.reveals.get(key), background: keys.state.background, chrome, rows })
 		}
+		if (renderStatus.config[key] <= 0 || !keys.state.background) continue
 		const alpha = Math.min(1, (cursor.heartbeatTick() - (state.reveals.get(key) ?? -Infinity)) / 12)
 		if (alpha >= 1) state.reveals.delete(key)
-		else if (renderStatus.config[key] > 0 && keys.state.background) {
+		else {
 			for (let i = start; i < lines.length; i++) lines[i] = alpha <= 0 ? ' '.repeat(visLen(lines[i]!)) : oklch.dimAnsi(lines[i]!, alpha, keys.state.background)
 		}
 	}
