@@ -29,7 +29,15 @@ The status line shows your working directory and model.<pause for="0.3s"/><confi
 
 ${halProvider.providerSetupText()}
 
-Choose a model with \`/model\`, then tell me what you would like to work on.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="gpt"/>`
+Choose a model with \`/model\`, then tell me what you would like to work on.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="${halProvider.introDefaultModel()}"/>`
+}
+
+// Sessions whose intro was skipped with Esc: the rest of the script streams at once.
+const state = { skipped: new Set<string>(), wakers: new Map<string, AbortController>() }
+
+function skip(sessionId: string): void {
+	state.skipped.add(sessionId)
+	state.wakers.get(sessionId)?.abort()
 }
 
 // Recommendations are aliases so routine catalog updates do not age the intro.
@@ -41,18 +49,35 @@ const suggestions: Record<string, string> = {
 	openrouter: 'deepseek',
 }
 
-function providerSetupText(): string {
-	const keys: string[] = []
-	const commands: string[] = []
-	// Only model providers belong here: e.g. Serper's key is for a search tool.
+// Providers with an API key in the environment, paired with the key names found.
+// Only model providers belong here: e.g. Serper's key is for a search tool.
+function detectedProviders(): Map<string, string[]> {
 	const providers = new Set(['anthropic', 'openai', ...Object.keys(providerShared.compatEndpoints)])
 	// The loader also accepts NAME_BASE_URL + NAME_API_KEY for custom backends.
 	for (const name of Object.keys(process.env)) {
 		if (/^[A-Z][A-Z0-9_]*_BASE_URL$/.test(name) && process.env[name]) providers.add(name.slice(0, -9).toLowerCase())
 	}
+	const found = new Map<string, string[]>()
 	for (const provider of providers) {
 		const present = auth.envKeyNames(provider).filter((name) => !!process.env[name])
-		if (!present.length) continue
+		if (present.length) found.set(provider, present)
+	}
+	return found
+}
+
+// The model the intro hands the session to: the first detected key with a
+// short alias, otherwise gpt. Subscriptions arrive later via /login.
+function introDefaultModel(): string {
+	for (const provider of halProvider.detectedProviders().keys()) {
+		if (halProvider.suggestions[provider]) return halProvider.suggestions[provider]!
+	}
+	return 'gpt'
+}
+
+function providerSetupText(): string {
+	const keys: string[] = []
+	const commands: string[] = []
+	for (const [provider, present] of halProvider.detectedProviders()) {
 		keys.push(...present)
 		let model = halProvider.suggestions[provider]
 		if (provider === 'grok') model = `grok/${models.resolveModel('grok').split('/').at(-1)}`
@@ -155,15 +180,21 @@ async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 	})
 }
 
-async function* streamText(text: string, req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
+// wake cancels only the pacing sleeps (Esc skip); req.signal cancels the text itself.
+async function* streamText(text: string, req: ProviderRequest, wake?: AbortSignal): AsyncGenerator<ProviderStreamEvent> {
 	const rate = halProvider.config.wordsPerSecond
 	if (!Number.isFinite(rate) || rate <= 0) throw new Error('halProvider.wordsPerSecond must be greater than zero')
 	const chunks = wordChunks(text)
 	for (let i = 0; i < chunks.length; i++) {
 		if (req.signal?.aborted) return
 		yield { type: 'text', text: chunks[i] }
-		if (i < chunks.length - 1) await halProvider.sleep(1000 / rate, req.signal)
+		if (i < chunks.length - 1 && !wake?.aborted) await halProvider.sleep(1000 / rate, halProvider.anySignal(req.signal, wake))
 	}
+}
+
+function anySignal(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined {
+	if (a && b) return AbortSignal.any([a, b])
+	return a ?? b
 }
 
 function toolResultIds(messages: Message[]): Set<string> {
@@ -216,22 +247,40 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		return
 	}
 	const available = pages(scriptFor())
-	const page = available[nextPage(req.messages, available)]
-	if (!page) {
+	const first = nextPage(req.messages, available)
+	if (first >= available.length) {
 		yield { type: 'done' }
 		return
 	}
-	for (const step of page.steps) {
-		if (req.signal?.aborted) return
-		if (step.type === 'text') yield* streamText(step.text, req)
-		else if (step.type === 'delay') await halProvider.sleep(step.ms, req.signal)
-		else yield { type: 'config', key: step.key, value: step.value }
+	// The waker fires on Esc: pacing sleeps end, Enter gates are passed, and every
+	// remaining page plays through so one keypress lands at the end of the intro.
+	const waker = new AbortController()
+	const sessionId = req.sessionId ?? ''
+	state.wakers.set(sessionId, waker)
+	if (state.skipped.has(sessionId)) waker.abort()
+	try {
+		for (let index = first; index < available.length; index++) {
+			const page = available[index]!
+			for (const step of page.steps) {
+				if (req.signal?.aborted) return
+				if (step.type === 'text') yield* streamText(step.text, req, waker.signal)
+				else if (step.type === 'delay' && !waker.signal.aborted) await halProvider.sleep(step.ms, halProvider.anySignal(req.signal, waker.signal))
+				else if (step.type === 'config') yield { type: 'config', key: step.key, value: step.value }
+			}
+			if (req.signal?.aborted) return
+			if (page.pause && !waker.signal.aborted) {
+				yield { type: 'pause' }
+				return
+			}
+		}
+		yield { type: 'done' }
+	} finally {
+		state.wakers.delete(sessionId)
+		state.skipped.delete(sessionId)
 	}
-	if (req.signal?.aborted) return
-	yield { type: page.pause ? 'pause' : 'done' }
 }
 
 const provider: Provider = { generate }
 
 // script stays empty unless a caller pins one scenario for every model.
-export const halProvider = { config, script: '', introScript, suggestions, providerSetupText, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, toolResultIds, scrollCalls, scrollRepro }
+export const halProvider = { config, state, script: '', skip, introScript, suggestions, detectedProviders, introDefaultModel, providerSetupText, provider, pages, scriptFor, nextPage, wordChunks, sleep, anySignal, streamText, toolResultIds, scrollCalls, scrollRepro }

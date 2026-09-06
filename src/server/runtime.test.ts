@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { runtime } from './runtime.ts'
+import { halProvider } from './providers/hal.ts'
 import { queueRunner } from './queue-runner.ts'
 import { tabs } from './tabs.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
@@ -1570,6 +1571,22 @@ test('closing an idle parked question does not mutate its history', async () => 
 		runtime.recordTabClosed(sessionId)
 		expect(sessions.loadHistory(sessionId)).toEqual(before)
 	} finally {
+		sessions.deleteSession(sessionId)
+	}
+})
+
+test('abort at an intro gate answers it and skips the rest of the script', async () => {
+	const sessionId = `test-intro-skip-${Date.now().toString(36)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), model: 'hal/intro' })
+	try {
+		await sessions.appendHistory(sessionId, [{ type: 'question', id: '000001-aaa', text: 'Continue?', input: { kind: 'choice', choices: [{ id: 'continue', label: 'Continue' }] }, source: { type: 'intro' } }])
+		runtime.handleCommand({ type: 'abort', sessionId })
+		expect(halProvider.state.skipped.has(sessionId)).toBe(true)
+		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'answer', questionId: '000001-aaa', value: { kind: 'choice', choiceId: 'continue' } })
+		expect(runtime.state.continuingTurns.has(sessionId)).toBe(true)
+	} finally {
+		runtime.cancelSessionWork(sessionId, '')
+		halProvider.state.skipped.delete(sessionId)
 		sessions.deleteSession(sessionId)
 	}
 })

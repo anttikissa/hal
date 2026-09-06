@@ -25,6 +25,7 @@ import { toolRegistry } from './tools/tool.ts'
 import { log } from '../utils/log.ts'
 import { promptQueue } from './runtime/prompt-queue.ts'
 import { openai } from './providers/openai.ts'
+import { halProvider } from './providers/hal.ts'
 import { paths } from './paths.ts'
 import { openingSummary } from './session/opening-summary.ts'
 import { blob } from './session/blob.ts'
@@ -220,6 +221,15 @@ function abortParkedQuestions(sessionId: string): boolean {
 			if (!item.answer) answers.push({ type: 'answer', questionId: item.id, value: { kind: 'aborted' }, ts })
 		}
 		sessionStore.appendHistory(sessionId, answers)
+		emitHistoryUpdated(sessionId)
+		requestContinue(sessionId)
+		return true
+	}
+	// Esc at an intro gate skips the tour: answer the gate and let the provider
+	// stream the remaining pages without pacing.
+	if (question.source.type === 'intro' && question.input.kind === 'choice') {
+		halProvider.skip(sessionId)
+		sessionStore.appendHistory(sessionId, [{ type: 'answer', questionId: question.id, value: { kind: 'choice', choiceId: question.input.choices[0]!.id }, ts }])
 		emitHistoryUpdated(sessionId)
 		requestContinue(sessionId)
 		return true
@@ -917,6 +927,11 @@ function handleCommand(cmd: Command): void {
 		case 'abort': {
 			if (!cmd.sessionId) return
 			if (abortParkedQuestions(cmd.sessionId)) break
+			// Esc while the intro is still speaking: skip ahead instead of pausing.
+			if (sessionStore.loadSessionMeta(cmd.sessionId)?.model === 'hal/intro' && agentLoop.isWorking(cmd.sessionId)) {
+				halProvider.skip(cmd.sessionId)
+				break
+			}
 			const abortText = cmd.abortText ?? (promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)
 			if (!cancelSessionWork(cmd.sessionId, abortText) && abortText !== '') emitInfo(cmd.sessionId, 'No working turn to pause')
 			break

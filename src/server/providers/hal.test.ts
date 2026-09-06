@@ -210,3 +210,42 @@ test('intro detects a custom API key only when Hal has an endpoint to use it wit
 		else process.env.INTRO_TEST_BASE_URL = url
 	}
 })
+
+test('intro defaults to the first detected API-key route and falls back to gpt', () => {
+	const names = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'OPENROUTER_API_KEY', 'GROK_API_KEY']
+	const saved = new Map(names.map((name) => [name, process.env[name]]))
+	try {
+		for (const name of names) delete process.env[name]
+		expect(halProvider.introDefaultModel()).toBe('gpt')
+		process.env.GEMINI_API_KEY = 'secret'
+		expect(halProvider.introDefaultModel()).toBe('gemini')
+		process.env.ANTHROPIC_API_KEY = 'secret'
+		expect(halProvider.introDefaultModel()).toBe('claude')
+		expect(halProvider.pages().at(-1)!.steps).toContainEqual({ type: 'config', key: 'models.default', value: 'claude' })
+	} finally {
+		for (const [name, value] of saved) {
+			if (value === undefined) delete process.env[name]
+			else process.env[name] = value
+		}
+	}
+})
+
+test('a skipped intro streams every remaining page at once without delays or gates', async () => {
+	const delays: number[] = []
+	halProvider.script = 'First page.<pause for="0.5s"/><config key="a" value="1"/><pause until="enter"/>Second.<pause until="enter"/><config key="b" value="2"/>Third.'
+	halProvider.sleep = async (ms) => { delays.push(ms) }
+	halProvider.skip('s1')
+	const events: any[] = []
+	for await (const event of halProvider.provider.generate({ messages: [], model: 'intro', systemPrompt: '', tools: [], sessionId: 's1' })) events.push(event)
+	expect(events).toEqual([
+		{ type: 'text', text: 'First ' },
+		{ type: 'text', text: 'page.' },
+		{ type: 'config', key: 'a', value: '1' },
+		{ type: 'text', text: 'Second.' },
+		{ type: 'config', key: 'b', value: '2' },
+		{ type: 'text', text: 'Third.' },
+		{ type: 'done' },
+	])
+	expect(delays).toEqual([])
+	expect(halProvider.state.skipped.has('s1')).toBe(false)
+})
