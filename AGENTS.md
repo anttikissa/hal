@@ -14,6 +14,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Never kill live Hal; only kill isolated processes you spawned.
 - Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, or flags that won't be used by feature at hand.
 - Hal is a simple developer tool, not a nuclear reactor: cover realistic failure cases, but keep solutions and tests proportionate rather than engineering away every remote race.
+- Before writing a non-trivial feature, post a per-component LOC estimate and name the existing code each piece extends. If any component is over ~15 lines, state the assumption that would make it 5 (e.g. "assume the OSC reply arrives whole") and ask whether it's acceptable. Do not design for failure cases the user hasn't asked for: a cosmetic feature gets zero robustness code.
 - Run `bun cloc` to check line count — our budget for core code is 21 thousand lines. If you added many, see if you can do the same with less. Keep modules under ~400 lines; see "Why the line budget exists" below.
 - Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.
 - Tabs, not spaces (except for package.json)
