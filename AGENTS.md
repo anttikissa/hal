@@ -32,8 +32,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Delegate only when separate context clearly helps: genuinely independent work, fresh-eyes review, or noisy investigation that would swamp the main context. Prefer one fresh subagent on the cheapest capable model, with an explicit deliverable.
 - Ask the user before spawning two or more subagents for one request. Explain why parallel delegation is worth the extra cost and coordination. Never spawn more than three unless the user explicitly requests a larger number.
 - A subagent must not spawn another agent unless the parent deliberately grants it a recursion budget. Recursive delegation is otherwise prohibited.
-- Do not use interactive sessions or `send` as a way around subagent limits.
-- The parent owns the result: monitor delegated work, stop agents that are no longer useful, and report how many were used. Delegation never transfers responsibility.
+- The parent owns the result: monitor delegated work.
 
 # Source layout
 
