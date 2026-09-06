@@ -1006,3 +1006,26 @@ test('enter on empty normal tab does not send continue', () => {
 		client.state.focusedTabIndex = origFocusedTab
 	}
 })
+
+test('typing during the intro reveal keeps the draft until the intro finishes', () => {
+	const tab = makeTab()
+	tab.model = 'hal/intro'
+	const sent: any[] = []
+	withOneTab(tab, () => {
+		withPatched(client, 'sendCommand', ((...args: any[]) => { sent.push(args) }) as typeof client.sendCommand, () => {
+			withPatched(client, 'isWorking', () => true, () => {
+				prompt.setText('explain this project')
+				cli.forTests.handleAppKey(key('enter', { alt: true }))
+				cli.forTests.handleAppKey(key('enter'))
+				expect(prompt.text()).toBe('explain this project')
+				expect(sent).toHaveLength(0)
+			})
+			tab.model = 'openai/gpt-6-astra'
+			withPatched(client, 'isWorking', () => false, () => {
+				cli.forTests.handleAppKey(key('enter'))
+				expect(sent).toHaveLength(1)
+				expect(prompt.text()).toBe('')
+			})
+		})
+	})
+})

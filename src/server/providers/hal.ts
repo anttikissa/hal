@@ -17,17 +17,20 @@ const config = {
 }
 
 const scripts: Record<string, string> = {
-	intro: `Hello. This is HAL 9001, a friendly agent harness.<pause for="0.5s"/>
+	intro: `Hello. This is HAL 9001.<pause for="0.3s"/> Just call me Hal.
+I help you work on code.
 
-Just call me Hal.<pause for="0.2s"/>
+Press Enter to bring up the controls.<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Your controls. Type requests and /commands here.<pause for="0.3s"/><config key="renderStatus.statusOpacity" value="1"/>
 
-Press enter to continue.<pause until="enter"/><config key="renderStatus.tabsOpacity" value="1"/>Those are your session tabs. Each one is an independent conversation.<pause for="0.5s"/>
+The status line shows your working directory and model.<pause for="0.3s"/><config key="renderStatus.tabsOpacity" value="1"/>
 
-Press enter to continue.<pause until="enter"/><config key="renderStatus.statusOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Below them are the status and help bars: session, directory, model, context, and the keys you can press right now.<pause for="0.5s"/>
+Connect your provider:
+- \`/login claude\` — Claude subscription
+- \`/login chatgpt\` — ChatGPT / Codex subscription
 
-Press enter to continue.<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/>That is your prompt.<pause for="0.5s"/>
+API keys also work: ANTHROPIC_API_KEY or OPENAI_API_KEY in the environment you launch Hal from.
 
-To use a real model, run \`/login claude\` or \`/login chatgpt\`, or set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment. Then pick a model with \`/model\` and tell HAL what you would like to do.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="gpt"/>`,
+Choose a model with \`/model\`, then tell me what you would like to work on.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="gpt"/>`,
 }
 
 // Recorded verbatim from the GPT 5.6 Terra stream that made the active-tabs table

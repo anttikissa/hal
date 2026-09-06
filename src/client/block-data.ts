@@ -112,14 +112,6 @@ function historyToBlocks(
 				if (question) result.push({ ...question, ts, dimmed })
 				break
 			}
-			case 'answer': {
-				// A single-choice question renders nothing, so its answer is the only
-				// trace that the user acted. This grey line records it and keeps two
-				// consecutive intro pages from looking like one split reply.
-				const answered = projectedQuestions.get(entry.questionId)
-				if (answered?.input.kind === 'choice' && answered.input.choices.length === 1) result.push({ type: 'log', text: 'Enter pressed', ts, dimmed })
-				break
-			}
 			case 'pending_tools':
 				if (!entry.canceled) result.push({ type: 'log', text: '[paused before local tools]', ts, dimmed })
 				break

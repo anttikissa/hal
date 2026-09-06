@@ -132,3 +132,25 @@ test('explicit script still overrides built-in HAL models', async () => {
 	halProvider.script = 'Pinned.'
 	expect(await collect([], 'scroll')).toEqual([{ type: 'text', text: 'Pinned.' }, { type: 'done' }])
 })
+
+test('intro has one gate, then reveals the prompt before the instruments and finishes', async () => {
+	halProvider.script = ''
+	halProvider.sleep = async () => {}
+	const first = await collect([])
+	expect(first.at(-1)).toEqual({ type: 'pause' })
+	const greeting = first.filter((event) => event.type === 'text').map((event) => event.text).join('')
+	const rest = await collect([{ role: 'assistant', content: greeting }])
+	expect(rest.at(-1)).toEqual({ type: 'done' })
+	const reveals = rest.filter((event) => event.type === 'config' && event.key.startsWith('renderStatus.'))
+	expect(reveals).toEqual([
+		{ type: 'config', key: 'renderStatus.promptOpacity', value: '1' },
+		{ type: 'config', key: 'renderStatus.helpOpacity', value: '1' },
+		{ type: 'config', key: 'renderStatus.statusOpacity', value: '1' },
+		{ type: 'config', key: 'renderStatus.tabsOpacity', value: '1' },
+	])
+	const text = rest.filter((event) => event.type === 'text').map((event) => event.text).join('')
+	// These are functional command affordances, not assertions about generated prose.
+	expect(text).toContain('/login claude')
+	expect(text).toContain('/login chatgpt')
+	expect(await collect([{ role: 'assistant', content: greeting + text }])).toEqual([{ type: 'done' }])
+})

@@ -449,6 +449,12 @@ function renderStatusLine(lines: string[]): void {
 	lines.push(`${base}${renderStatus.paddedLine(inner, cols)}${RESET}`)
 }
 
+// The prompt is revealed while the local intro is still speaking. Keep early
+// input as a draft rather than letting it interrupt/restart the synthetic page.
+function introStreaming(): boolean {
+	return client.currentTab()?.model === 'hal/intro' && client.isWorking()
+}
+
 // Appends one full-width logical row, even when there are no hints. At 12
 // columns an example is: [] → [" esc: abort "] (ANSI omitted).
 function renderHelpBar(lines: string[]): void {
@@ -469,9 +475,16 @@ function renderHelpBar(lines: string[]): void {
 	const question = renderStatus.activeQuestion()
 	if (question) {
 		let hint = 'enter: submit, esc: abort'
-		if (question.input.kind === 'choice') hint = '↑/↓/tab: choose, 1-9/y/n: answer, enter: submit, esc: abort'
+		if (question.input.kind === 'choice') {
+			hint = 'enter: continue, esc: abort'
+			if (question.input.choices.length > 1) hint = '↑/↓/tab: choose, 1-9/y/n: answer, enter: submit, esc: abort'
+		}
 		if (question.input.kind === 'text') hint = 'enter: submit, shift-enter: newline, esc: abort'
 		lines.push(`${renderStatus.paddedLine(`${style.key}${hint}`, cols)}${RESET}`)
+		return
+	}
+	if (renderStatus.introStreaming()) {
+		lines.push(`${renderStatus.paddedLine(`${style.description}Bringing up the controls — you can type; submit when the intro finishes.`, cols)}${RESET}`)
 		return
 	}
 	const editHint = promptEdit.hint(client.currentTab()?.sessionId)
@@ -622,6 +635,7 @@ function chromeLines(): number {
 }
 
 export const renderStatus = {
+	introStreaming,
 	config,
 	// Public (called from render.ts and elsewhere)
 	chromeLines,

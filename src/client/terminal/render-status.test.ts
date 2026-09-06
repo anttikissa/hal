@@ -266,3 +266,18 @@ test('blinkGlyph falls back to presence/absence when color cannot carry the blin
 		cursor.tick = origTick
 	}
 })
+
+test('single-choice continuation help only offers submitting or aborting', () => {
+	const original = renderStatus.activeQuestion
+	const opacity = renderStatus.config.helpOpacity
+	try {
+		renderStatus.config.helpOpacity = 1
+		renderStatus.activeQuestion = () => ({ type: 'question', id: 'q1', text: 'Continue?', input: { kind: 'choice', choices: [{ id: 'continue', label: 'Continue' }] }, source: { type: 'intro' }, active: true })
+		const lines: string[] = []
+		renderStatus.renderHelpBar(lines)
+		expect(blockText.stripAnsiSequences(lines[0]!).trim()).toBe('enter: continue, esc: abort')
+	} finally {
+		renderStatus.activeQuestion = original
+		renderStatus.config.helpOpacity = opacity
+	}
+})
