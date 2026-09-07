@@ -20,6 +20,7 @@ const config = {
 }
 
 function introScript(): string {
+	const alias = halProvider.introDefaultModel()
 	return `Hello. This is HAL 9001.<pause for="0.3s"/> Just call me Hal.
 I help you work on code.
 
@@ -29,7 +30,7 @@ The status line shows your working directory and model.<pause for="0.3s"/><confi
 
 ${halProvider.providerSetupText()}
 
-Choose a model with \`/model\` or Ctrl-M, then tell me what you would like to work on.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="${halProvider.introDefaultModel()}"/>`
+${halProvider.introModelText(alias)} Change it with \`/model\` or Ctrl-M, then tell me what you would like to work on.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="${alias}"/>`
 }
 
 // Sessions whose intro was skipped with Esc: the rest of the script streams at once.
@@ -42,6 +43,17 @@ const suggestions: Record<string, string> = {
 	openai: 'gpt',
 	google: 'gemini',
 	openrouter: 'deepseek',
+}
+
+// How good a first experience each key gives (Sep 2026 coding leaderboards):
+// Claude and GPT trade the top spots, DeepSeek V3.2 is a tier down, and the
+// gemini alias is a Flash model. Ties are broken at random so users holding
+// both frontier keys are split between them.
+const priorities: Record<string, number> = {
+	anthropic: 10,
+	openai: 10,
+	openrouter: 8,
+	google: 7,
 }
 
 // Providers with an API key in the environment, paired with the key names found.
@@ -60,13 +72,26 @@ function detectedProviders(): Map<string, string[]> {
 	return found
 }
 
-// The model the intro hands the session to: the first detected key with a
-// short alias, otherwise gpt. Subscriptions arrive later via /login.
+// The model the intro hands the session to: the highest-priority detected key,
+// otherwise gpt. Subscriptions arrive later via /login.
 function introDefaultModel(): string {
+	let best: string[] = []
+	let bestPriority = 0
 	for (const provider of halProvider.detectedProviders().keys()) {
-		if (halProvider.suggestions[provider]) return halProvider.suggestions[provider]!
+		const priority = halProvider.priorities[provider] ?? 0
+		if (priority > bestPriority) {
+			best = []
+			bestPriority = priority
+		}
+		if (priority === bestPriority && priority > 0) best.push(halProvider.suggestions[provider]!)
 	}
-	return 'gpt'
+	if (best.length === 0) return 'gpt'
+	return best[Math.floor(halProvider.random() * best.length)]!
+}
+
+function introModelText(alias: string): string {
+	const fullId = models.resolveModel(alias)
+	return `I set the default model to \`${alias}\`, aliased to ${fullId} (${models.displayModel(fullId)}).`
 }
 
 function providerSetupText(): string {
@@ -268,4 +293,4 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 const provider: Provider = { generate }
 
 // script stays empty unless a caller pins one scenario for every model.
-export const halProvider = { config, state, script: '', introScript, suggestions, detectedProviders, introDefaultModel, providerSetupText, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, toolResultIds, scrollCalls, scrollRepro }
+export const halProvider = { config, state, script: '', introScript, suggestions, priorities, random: Math.random, detectedProviders, introDefaultModel, introModelText, providerSetupText, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, toolResultIds, scrollCalls, scrollRepro }

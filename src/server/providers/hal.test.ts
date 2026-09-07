@@ -211,18 +211,28 @@ test('intro detects a custom API key only when Hal has an endpoint to use it wit
 	}
 })
 
-test('intro defaults to the first detected API-key route and falls back to gpt', () => {
+test('intro defaults to the best detected API-key route, breaks ties at random, and names the model', () => {
 	const names = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'OPENROUTER_API_KEY', 'GROK_API_KEY']
 	const saved = new Map(names.map((name) => [name, process.env[name]]))
+	const originalRandom = halProvider.random
 	try {
 		for (const name of names) delete process.env[name]
 		expect(halProvider.introDefaultModel()).toBe('gpt')
 		process.env.GEMINI_API_KEY = 'secret'
-		expect(halProvider.introDefaultModel()).toBe('gemini')
+		process.env.OPENROUTER_API_KEY = 'secret'
+		expect(halProvider.introDefaultModel()).toBe('deepseek')
+		process.env.OPENAI_API_KEY = 'secret'
+		expect(halProvider.introDefaultModel()).toBe('gpt')
 		process.env.ANTHROPIC_API_KEY = 'secret'
+		halProvider.random = () => 0
 		expect(halProvider.introDefaultModel()).toBe('claude')
-		expect(halProvider.pages().at(-1)!.steps).toContainEqual({ type: 'config', key: 'models.default', value: 'claude' })
+		halProvider.random = () => 0.99
+		expect(halProvider.introDefaultModel()).toBe('gpt')
+		const last = halProvider.pages().at(-1)!
+		expect(last.steps).toContainEqual({ type: 'config', key: 'models.default', value: 'gpt' })
+		expect(last.text).toContain('default model to `gpt`, aliased to openai/gpt-5.6-terra (GPT 5.6 Terra)')
 	} finally {
+		halProvider.random = originalRandom
 		for (const [name, value] of saved) {
 			if (value === undefined) delete process.env[name]
 			else process.env[name] = value
