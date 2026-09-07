@@ -7,6 +7,8 @@ import { visLen } from '../../utils/strings.ts'
 import { blockText } from './block-text.ts'
 import { cursor } from './cursor.ts'
 import { blocks } from './blocks.ts'
+import { prompt } from './prompt.ts'
+import { placeholders } from './placeholders.ts'
 
 
 function tab(overrides: any = {}): any {
@@ -279,5 +281,26 @@ test('single-choice continuation help only offers submitting or aborting', () =>
 	} finally {
 		renderStatus.activeQuestion = original
 		renderStatus.config.helpOpacity = opacity
+	}
+})
+
+test('an empty prompt shows a dim placeholder once the intro is over', () => {
+	const originalTab = client.currentTab
+	const originalWorking = client.isWorking
+	try {
+		client.currentTab = () => ({ sessionId: 's', cwd: '/p', model: 'openai/gpt-5.6-terra', history: [] }) as any
+		client.isWorking = () => false
+		prompt.clear()
+		const lines: string[] = []
+		renderStatus.renderPrompt(lines)
+		expect(blockText.stripAnsiSequences(lines[1]!)).toContain(placeholders.pick('/p', '', 0))
+		prompt.setText('hi')
+		const typed: string[] = []
+		renderStatus.renderPrompt(typed)
+		expect(blockText.stripAnsiSequences(typed[1]!)).not.toContain(placeholders.pick('/p', '', 0))
+	} finally {
+		prompt.clear()
+		client.currentTab = originalTab
+		client.isWorking = originalWorking
 	}
 })

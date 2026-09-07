@@ -21,6 +21,7 @@ import { promptEdit } from '../prompt-edit.ts'
 import { completionHints } from './completion-hints.ts'
 import type { Tab } from '../app.ts'
 import { blocks } from './blocks.ts'
+import { placeholders } from './placeholders.ts'
 
 const RESET = '\x1b[0m'
 
@@ -624,7 +625,21 @@ function renderPrompt(lines: string[]): void {
 	const below = p.fold.below > 0 ? `↓${p.fold.below}` : ''
 	lines.push(renderStatus.promptRule(cols, above, renderStatus.activityStatusLabel()))
 	for (const line of p.lines) lines.push(renderStatus.paddedPromptLine(line, cols))
+	const placeholder = renderStatus.placeholderText()
+	if (placeholder) lines[lines.length - 1] = renderStatus.paddedPromptLine(`${colors.help.description || colors.status.fg}${placeholder}${renderStatus.inputStyle()}`, cols)
 	lines.push(renderStatus.promptRule(cols, below))
+}
+
+// An example request for the empty prompt. Not shown while the intro plays,
+// while a turn runs, or when a question is waiting.
+function placeholderText(): string {
+	const tab = client.currentTab()
+	if (!tab || prompt.text() || client.isWorking() || tab.model === 'hal/intro' || renderStatus.activeQuestion()) return ''
+	let turns = 0
+	for (const block of tab.history) {
+		if (block.type === 'user') turns++
+	}
+	return placeholders.pick(tab.cwd, renderStatus.currentHalDir(), turns)
 }
 
 // How many frame lines the chrome (tab bar + prompt box + status + help) occupies.
@@ -636,6 +651,7 @@ function chromeLines(): number {
 
 export const renderStatus = {
 	introStreaming,
+	placeholderText,
 	config,
 	// Public (called from render.ts and elsewhere)
 	chromeLines,
