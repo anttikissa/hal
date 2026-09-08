@@ -882,6 +882,7 @@ function clear(): void {
 	historyIndex = -1
 	historyDraft = ''
 	pasteRefs.length = 0
+	state.promptLineLimit = 0
 	state.promptScrollTop = 0
 }
 

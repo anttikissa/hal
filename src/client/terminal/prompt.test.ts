@@ -184,3 +184,10 @@ describe('prompt editor', () => {
 		prompt.state.promptLineLimit = 0
 	})
 })
+	test('clearing a submitted draft restores the automatic prompt height', () => {
+		prompt.setText('a long draft')
+		prompt.state.promptLineLimit = 5
+		prompt.clear()
+		expect(prompt.state.promptLineLimit).toBe(0)
+		expect(prompt.buildPrompt(80).lines).toHaveLength(1)
+	})
