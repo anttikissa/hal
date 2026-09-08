@@ -626,7 +626,9 @@ function renderPrompt(lines: string[]): void {
 	lines.push(renderStatus.promptRule(cols, above, renderStatus.activityStatusLabel()))
 	for (const line of p.lines) lines.push(renderStatus.paddedPromptLine(line, cols))
 	const placeholder = renderStatus.placeholderText()
-	if (placeholder) lines[lines.length - 1] = renderStatus.paddedPromptLine(`${colors.help.description || colors.status.fg}${placeholder}${renderStatus.inputStyle()}`, cols)
+	// The cursor begins on the first prompt row. It matters with an enlarged prompt
+	// box: replacing the last row leaves the placeholder stranded at the bottom.
+	if (placeholder) lines[lines.length - p.lines.length] = renderStatus.paddedPromptLine(`${colors.help.description || colors.status.fg}${placeholder}${renderStatus.inputStyle()}`, cols)
 	lines.push(renderStatus.promptRule(cols, below))
 }
 

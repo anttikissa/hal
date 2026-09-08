@@ -294,6 +294,14 @@ test('an empty prompt shows a dim placeholder once the intro is over', () => {
 		const lines: string[] = []
 		renderStatus.renderPrompt(lines)
 		expect(blockText.stripAnsiSequences(lines[1]!)).toContain(placeholders.pick('/p', '', 0))
+		// With an enlarged prompt box (ctrl-=) the placeholder belongs on the first
+		// row, under the cursor, not on the last row.
+		const tallLines: string[] = []
+		prompt.state.promptLineLimit = 4
+		renderStatus.renderPrompt(tallLines)
+		expect(blockText.stripAnsiSequences(tallLines[1]!)).toContain(placeholders.pick('/p', '', 0))
+		for (const line of tallLines.slice(2, -1)) expect(blockText.stripAnsiSequences(line).trim()).toBe('')
+		prompt.state.promptLineLimit = 0
 		prompt.setText('hi')
 		const typed: string[] = []
 		renderStatus.renderPrompt(typed)
