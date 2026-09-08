@@ -935,6 +935,17 @@ test('/rename updates the current session name directly', async () => {
 })
 
 
+test('/rename permits normal punctuation but rejects control characters', async () => {
+	const session = makeSession()
+	const valid = await commands.executeCommand('/rename Master: payouts, refunds & Payments v3', session)
+	const invalid = await commands.executeCommand('/rename broken\u001bname', session)
+
+	expect(valid.error).toBeUndefined()
+	expect(session.name).toBe('Master: payouts, refunds & Payments v3')
+	expect(invalid.error).toContain('control characters')
+})
+
+
 test('/rename clear resets the current session name', async () => {
 	const session = makeSession()
 	session.name = 'Pause Fix'

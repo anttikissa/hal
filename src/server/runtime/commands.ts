@@ -501,9 +501,8 @@ handlers['rename'] = (args, session) => {
 		session.name = ''
 		return { output: `Cleared session name; using ${session.id}`, handled: true }
 	}
-	if (!/^[A-Za-z0-9._ -]+$/.test(raw)) {
-		return { error: 'Name may contain letters, digits, spaces, dot, dash, and underscore only.', handled: true }
-	}
+	// Names are display text, but terminal control codes could alter the rendered transcript.
+	if (/\p{Cc}/u.test(raw)) return { error: 'Name may not contain control characters.', handled: true }
 	session.name = raw
 	return { output: `Renamed session to ${raw}`, handled: true }
 }
