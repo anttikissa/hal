@@ -11,7 +11,7 @@ const general = [
 ]
 
 const hal = [
-	'Add second precision to message timestamps',
+	'Add one second precision to message timestamps',
 	'Make the tab bar show each session\'s model',
 	'Which module is closest to the 400-line limit?',
 	'Add a /uptime command that shows when the host process started',
