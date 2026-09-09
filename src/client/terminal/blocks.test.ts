@@ -197,12 +197,15 @@ test('status markers lose brackets alongside regular notices', () => {
 })
 
 
-test('interrupted model output ends with a neutral inline marker', () => {
+test('system messages add neutral inline boundaries to model output', () => {
 	colors.load()
-	const rendered = blocks.renderBlock({ type: 'assistant', text: 'Short answer.', interruptedBy: 'restart' }, 80).join('\n')
+	const interrupted = blocks.renderBlock({ type: 'assistant', text: 'First.', interruptedBy: 'system-message' }, 80).join('\n')
+	const continued = blocks.renderBlock({ type: 'assistant', text: 'Second.', continuedAfter: 'system-message' }, 80).join('\n')
 
-	expect(stripAnsi(rendered)).toContain('Short answer. [interrupted by restart]')
-	expect(rendered).toContain(`${colors.log.fg}[interrupted by restart]`)
+	expect(stripAnsi(interrupted)).toContain('First. [interrupted by system message]')
+	expect(interrupted).toContain(`${colors.log.fg}[interrupted by system message]`)
+	expect(stripAnsi(continued)).toContain('[continuing after system message] Second.')
+	expect(continued).toContain(`${colors.log.fg}[continuing after system message]`)
 })
 
 test('usage bars retain their empty track without a status-card background', () => {

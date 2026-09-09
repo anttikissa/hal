@@ -1,5 +1,6 @@
 import type { Block } from './block-data.ts'
 import { ason } from '../utils/ason.ts'
+import { historyProjection } from '../common/history-projection.ts'
 
 interface LiveTab {
 	liveHistory?: Block[]
@@ -48,6 +49,8 @@ function trimPersistedLiveOverlap(blocks: Block[], live: Block[]): Block[] {
 
 function withLive(blocks: Block[], tab: LiveTab): Block[] {
 	const live = trimPersistedLiveOverlap(blocks, tab.liveHistory ?? [])
+	const first = live.find((block) => block.type === 'assistant' || block.type === 'thinking')
+	if (first && historyProjection.continuationAfter(blocks)) first.continuedAfter = 'system-message'
 	if (live.length === 0) return blocks
 	return [...blocks, ...live]
 }

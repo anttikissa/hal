@@ -106,7 +106,7 @@ function fixMeta(meta: SessionMeta, sessionId: string): SessionMeta {
 // entry here it is written, read back as undefined, and the loss is silent.
 // A field can therefore work in a live session and vanish across a restart.
 const historyTopLevelKeys = new Set([
-	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled', 'interruptedBy',
+	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled', 'interruptedBy', 'interruptsModel',
 	'blobId', 'signature', 'model', 'thinkingEffort',
 	'usage', 'purpose', 'requests', 'apiUsd', 'incomplete', 'durationMs', 'abortText', 'provider', 'httpStatus', 'synthetic', 'syntheticKind',
 	'toolId', 'toolIds', 'name', 'input', 'output', 'isError', 'cwd', 'reason',
@@ -217,17 +217,20 @@ function clearLive(sessionId: string): void {
 
 
 function interruptLive(sessionId: string, reason: InterruptionReason): boolean {
+	const blocks = loadLive(sessionId).blocks
 	const entries: HistoryEntry[] = []
-	for (const block of loadLive(sessionId).blocks) {
+	for (const block of blocks) {
 		if ((block.type !== 'assistant' && block.type !== 'thinking') || !block.text) continue
 		const ts = typeof block.ts === 'number' ? new Date(block.ts).toISOString() : block.ts
 		entries.push({ ...block, ts } as HistoryEntry)
 	}
+	const liveLast = blocks.at(-1)
 	const last = entries.at(-1)
-	if (last?.type === 'assistant' || last?.type === 'thinking') last.interruptedBy = reason
+	const marked = (liveLast?.type === 'assistant' || liveLast?.type === 'thinking') && (last?.type === 'assistant' || last?.type === 'thinking')
+	if (marked) last.interruptedBy = reason
 	appendHistory(sessionId, entries)
 	clearLive(sessionId)
-	return !!last
+	return marked
 }
 
 function readSessionMetaFromDisk(sessionId: string): SessionMeta | null {

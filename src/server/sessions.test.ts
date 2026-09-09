@@ -300,6 +300,16 @@ test('interruptLive marks thinking when no assistant text exists', async () => {
 })
 
 
+test('interruptLive does not mark completed model output before a tool', async () => {
+	const id = await makeSession()
+	sessions.applyLiveEvent(id, { type: 'stream-delta', channel: 'assistant', text: 'Using a tool.' })
+	sessions.applyLiveEvent(id, { type: 'tool-call', name: 'read', toolId: 'tool-1' })
+
+	expect(sessions.interruptLive(id, 'system-message')).toBe(false)
+	expect(sessions.loadHistory(id)[0]).not.toHaveProperty('interruptedBy')
+})
+
+
 test('sessionOpenInfo includes tab number and effective model', () => {
 	const info = sessions.sessionOpenInfo({
 		id: '04-middle',

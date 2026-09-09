@@ -148,6 +148,35 @@ test('focus commands do not rebuild sessions or prompt watchers', () => {
 })
 
 
+test('prompt file changes split a working response without bracketed system labels', async () => {
+	const sessionId = `test-system-message-${Date.now().toString(36)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	sessions.applyLiveEvent(sessionId, { type: 'stream-delta', channel: 'assistant', text: 'First.' })
+	const originalWorking = agentLoop.isWorking
+	const originalAbort = agentLoop.abortAndWait
+	const originalAppendEvent = ipc.appendEvent
+	const events: any[] = []
+	let aborted = false
+	agentLoop.isWorking = () => true
+	agentLoop.abortAndWait = () => { aborted = true; return false }
+	ipc.appendEvent = (event) => { events.push(event) }
+	try {
+		runtime.promptFileChanged({ sessionId, name: 'AGENTS.md', path: '/work/AGENTS.md' })
+		expect(sessions.loadHistory(sessionId)).toMatchObject([
+			{ type: 'assistant', text: 'First.', interruptedBy: 'system-message' },
+			{ type: 'log', text: 'AGENTS.md changed: /work/AGENTS.md', interruptsModel: 'system-message' },
+		])
+		expect(events[0]).toMatchObject({ text: 'AGENTS.md changed: /work/AGENTS.md', interruptsModel: 'system-message' })
+		expect(aborted).toBe(true)
+	} finally {
+		agentLoop.isWorking = originalWorking
+		agentLoop.abortAndWait = originalAbort
+		ipc.appendEvent = originalAppendEvent
+		sessions.deleteSession(sessionId)
+	}
+})
+
+
 test('/what stores summarizing in shared state and skips duplicate targets', async () => {
 	const origUpdateState = ipc.updateState
 	const origReadState = ipc.readState
@@ -613,8 +642,6 @@ test('shouldAutoContinue resumes only restarted turns', () => {
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-27T12:00:00.000Z' },
 	])).toBe(false)
 })
-
-
 
 test('subagent closes after a clean completion while leave-open and interactive sessions remain', () => {
 	// A subagent that called wait is parked ('waiting'), not finished: its tab

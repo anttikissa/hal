@@ -16,6 +16,7 @@ type ToolLike = {
 export type RenderedTranscriptItem = {
 	entry: TranscriptEntry
 	text: string
+	continuation?: string
 }
 
 function valueText(value: unknown): string {
@@ -92,7 +93,6 @@ function entryText(entry: TranscriptEntry): string {
 	return ''
 }
 
-
 function interruption(entry: TranscriptEntry): string | undefined {
 	if ((entry.type !== 'assistant' && entry.type !== 'thinking') || !entry.interruptedBy) return undefined
 	return historyProjection.interruptionText(entry.interruptedBy)
@@ -101,13 +101,13 @@ function interruption(entry: TranscriptEntry): string | undefined {
 function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[] {
 	if (!snapshot) return []
 	const result: RenderedTranscriptItem[] = []
-	for (const entry of historyItems(snapshot.history, snapshot.parentCount)) {
+	let continuing = false
+	for (const entry of [...historyItems(snapshot.history, snapshot.parentCount), ...snapshot.live]) {
 		const text = entryText(entry)
-		if (text) result.push({ entry, text })
-	}
-	for (const entry of snapshot.live) {
-		const text = entryText(entry)
-		if (text) result.push({ entry, text })
+		const modelOutput = entry.type === 'assistant' || entry.type === 'thinking'
+		if (text) result.push({ entry, text, continuation: continuing && modelOutput ? historyProjection.continuationText() : undefined })
+		if (entry.type === 'log' && entry.interruptsModel) continuing = true
+		else if (modelOutput) continuing = false
 	}
 	return result
 }

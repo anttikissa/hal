@@ -1,5 +1,6 @@
 import { models } from './models.ts'
 import type { InterruptionReason } from './history.ts'
+import { historyProjection } from './history-projection.ts'
 
 // Browser-safe semantic blocks produced from live server events. Terminal and web
 // clients can enrich or render these blocks independently, but they share this
@@ -30,6 +31,7 @@ export interface LiveAssistantBlock extends LiveBlockBase {
 	syntheticKind?: string
 	sessionId?: string
 	interruptedBy?: InterruptionReason
+	continuedAfter?: 'system-message'
 }
 
 export interface LiveThinkingBlock extends LiveBlockBase {
@@ -41,6 +43,7 @@ export interface LiveThinkingBlock extends LiveBlockBase {
 	blobId?: string
 	sessionId?: string
 	interruptedBy?: InterruptionReason
+	continuedAfter?: 'system-message'
 }
 
 export interface LiveToolBlock extends LiveBlockBase {
@@ -57,6 +60,7 @@ export interface LiveToolBlock extends LiveBlockBase {
 export interface LiveNoticeBlock extends LiveBlockBase {
 	type: 'log' | 'info' | 'warning'
 	text: string
+	interruptsModel?: 'system-message'
 }
 
 export interface LiveErrorBlock extends LiveBlockBase {
@@ -136,6 +140,7 @@ export interface InfoEvent extends LiveEventBase {
 	level?: 'info' | 'warning' | 'error'
 	ui?: 'notice'
 	usageBars?: boolean
+	interruptsModel?: 'system-message'
 }
 
 export interface ResponseEvent extends LiveEventBase {
@@ -186,7 +191,6 @@ function appendBlock<T extends { id?: string }>(blocks: readonly T[], block: T):
 	return { blocks: next, changed: true }
 }
 
-
 function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LiveProjectionOptions = {}): LiveProjectionResult {
 	const sessionId = event.sessionId ?? options.sessionId
 	const ts = liveEventBlocks.timestamp(event)
@@ -229,6 +233,7 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 			if (event.blobId) block.blobId = event.blobId
 			if (sessionId) block.sessionId = sessionId
 			if (ts !== undefined) block.ts = ts
+			block.continuedAfter = historyProjection.continuationAfter(blocks)
 			return liveEventBlocks.appendBlock(closed, block)
 		}
 
@@ -246,6 +251,7 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 		const model = event.model ?? options.defaultModel
 		if (model) block.model = model
 		if (ts !== undefined) block.ts = ts
+		block.continuedAfter = historyProjection.continuationAfter(blocks)
 		return liveEventBlocks.appendBlock(closed, block)
 	}
 
@@ -275,7 +281,12 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 	}
 
 	if (event.type === 'info' && event.text) {
-		const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
+		const interrupted = blocks.slice()
+		const last = interrupted.at(-1)
+		if (event.interruptsModel && (last?.type === 'assistant' || last?.type === 'thinking') && last.streaming) {
+			interrupted[interrupted.length - 1] = { ...last, interruptedBy: event.interruptsModel }
+		}
+		const closed = liveEventBlocks.closeStreamingBlock(interrupted).blocks
 		const type = liveEventBlocks.infoBlockType(event)
 		if (type === 'error') {
 			const block: LiveErrorBlock = { type, text: event.text }
@@ -284,6 +295,7 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 		}
 		const block: LiveNoticeBlock = { type, text: event.text }
 		if (event.usageBars === true) block.usageBars = true
+		if (event.interruptsModel) block.interruptsModel = event.interruptsModel
 		if (ts !== undefined) block.ts = ts
 		return liveEventBlocks.appendBlock(closed, block)
 	}

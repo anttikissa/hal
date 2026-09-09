@@ -120,10 +120,6 @@ function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinki
 	const mdColors = markdownColors(block)
 	const finished = !('streaming' in block && block.streaming)
 	let source = markdownSourceText(block)
-	if ((block.type === 'assistant' || block.type === 'thinking') && block.interruptedBy) {
-		const suffix = historyProjection.interruptionText(block.interruptedBy)
-		source = `${source.trimEnd()} ${colors.log.fg}${suffix}${blockColors(block).fg}`
-	}
 	// Do not paint a partial code-fence delimiter as transcript content: the third
 	// backtick would remove that row after it may already be frozen in scrollback.
 	if (!finished) {
@@ -149,6 +145,12 @@ function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinki
 	}
 	while (lines[0]?.trim() === '') lines.shift()
 	while (lines.at(-1)?.trim() === '') lines.pop()
+	if ((block.type === 'assistant' || block.type === 'thinking') && block.continuedAfter && lines[0] !== undefined) {
+		lines.splice(0, 1, ...wordWrap(`${colors.log.fg}${historyProjection.continuationText()} ${blockColors(block).fg}${lines[0]}`, cols))
+	}
+	if ((block.type === 'assistant' || block.type === 'thinking') && block.interruptedBy && lines.at(-1) !== undefined) {
+		lines.splice(-1, 1, ...wordWrap(`${lines.at(-1)} ${colors.log.fg}${historyProjection.interruptionText(block.interruptedBy)}${blockColors(block).fg}`, cols))
+	}
 	return resolveMarkers(lines)
 }
 

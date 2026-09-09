@@ -20,6 +20,9 @@ export function TranscriptItem(props: TranscriptItemProps) {
 			fallback={<article class={['TranscriptItem', props.item.entry.type]}>
 				<label>{transcriptTitles.label(props.item.entry)}</label>
 				<div class="Markdown">
+					<Show when={props.item.continuation}>
+						{(continuation) => <span class="TranscriptItem-interruption">{continuation()} </span>}
+					</Show>
 					<div class="TranscriptItem-content" innerHTML={webMarkdown.html(props.item.text, 'usageBars' in props.item.entry && props.item.entry.usageBars === true)} />
 					<Show when={webTranscript.interruption(props.item.entry)}>
 						{(interruption) => <span class="TranscriptItem-interruption"> {interruption()}</span>}

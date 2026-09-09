@@ -88,6 +88,7 @@ function historyToBlocks(
 					dimmed,
 					canceled: entry.canceled,
 					interruptedBy: entry.interruptedBy,
+					continuedAfter: historyProjection.continuationAfter(result),
 				})
 				break
 			}
@@ -127,10 +128,11 @@ function historyToBlocks(
 					dimmed,
 					canceled: entry.canceled,
 					interruptedBy: entry.interruptedBy,
+					continuedAfter: historyProjection.continuationAfter(result),
 				})
 				break
 			case 'log':
-				result.push({ type: entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'log', text: entry.text, ts, dimmed, usageBars: entry.usageBars })
+				result.push({ type: entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'log', text: entry.text, ts, dimmed, usageBars: entry.usageBars, interruptsModel: entry.interruptsModel })
 				break
 			case 'info':
 				result.push({ type: 'info', text: entry.text, ts, dimmed, usageBars: entry.usageBars })
