@@ -720,7 +720,7 @@ test('history navigation inside just-sent edit skips the already loaded prompt',
 	}
 })
 
-test('down from just-sent edit continues the original prompt', () => {
+test('down from an edited just-sent prompt keeps the edit', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
@@ -731,15 +731,12 @@ test('down from just-sent edit continues the original prompt', () => {
 		withOneTab(tab, () => {
 			prompt.clear()
 			cli.forTests.handleAppKey(key('up'))
-			prompt.setText('edited but discarded')
-			const handled = cli.forTests.handleAppKey(key('down'))
-			expect(handled).toBe(true)
-			expect(prompt.text()).toBe('')
-			expect(tab.history[0]).toMatchObject({ status: undefined })
-			expect(commands).toEqual([
-				{ type: 'abort', sessionId: 's1', abortText: '' },
-				{ type: 'continue', sessionId: 's1' },
-			])
+			prompt.setText('edited but retained')
+			expect(cli.forTests.handleAppKey(key('down'))).toBe(false)
+			expect(prompt.text()).toBe('edited but retained')
+			expect(promptEdit.hint('s1')).toContain('only unchanged')
+			expect(tab.history[0]).toMatchObject({ status: 'editing' })
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 		})
 	} finally {
 		clientTransport.io.appendCommand = origAppendCommand
@@ -747,11 +744,11 @@ test('down from just-sent edit continues the original prompt', () => {
 		promptEdit.cancel()
 	}
 })
-test('down from restored just-sent edit continues the original prompt', () => {
+test('down from restored just-sent edit keeps the draft', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({
-		inputDraft: 'edited but discarded',
+		inputDraft: 'edited but retained',
 		inputDraftEdit: { mode: 'cancel', originalText: 'original prompt', pausedWorkingTurn: true },
 		history: [{ type: 'user', text: 'original prompt' }, { type: 'assistant', text: 'partial' }] as any[],
 	})
@@ -762,13 +759,11 @@ test('down from restored just-sent edit continues the original prompt', () => {
 			prompt.clear()
 			cli.forTests.restorePromptForCurrentTab()
 
-			expect(prompt.text()).toBe('edited but discarded')
-			expect(promptEdit.hint('s1')).toContain('editing just-sent prompt')
-
-			const handled = cli.forTests.handleAppKey(key('down'))
-			expect(handled).toBe(true)
-			expect(prompt.text()).toBe('')
-			expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
+			expect(prompt.text()).toBe('edited but retained')
+			expect(promptEdit.hint('s1')).toContain('only unchanged')
+			expect(cli.forTests.handleAppKey(key('down'))).toBe(false)
+			expect(prompt.text()).toBe('edited but retained')
+			expect(commands).toEqual([])
 		})
 	} finally {
 		clientTransport.io.appendCommand = origAppendCommand
