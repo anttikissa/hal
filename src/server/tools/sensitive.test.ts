@@ -71,3 +71,15 @@ test('eval refuses obvious auth access code', async () => {
 	expect(fileOut).toContain('refusing to run eval code that mentions protected credentials access')
 	expect(moduleOut).toContain('refusing to run eval code that mentions protected credentials access')
 })
+
+test('write and edit refuse hal_dir files when cwd is elsewhere', async () => {
+	mkdirSync(TEST_DIR, { recursive: true })
+	// Never point this at a real Hal file: if the guard regresses, the test itself
+	// would overwrite it. This name is not used by Hal and is not on disk.
+	const target = join(HAL_DIR, 'no-such-file-for-cd-guard-test.md')
+	const writeOut = await write.executeWrite({ path: target, content: 'x' }, { sessionId: 's', cwd: TEST_DIR })
+	const editOut = await write.executeEdit({ path: target, operation: 'insert', after: '0:000', new_content: 'x' }, { sessionId: 's', cwd: TEST_DIR })
+
+	expect(writeOut).toContain('/cd')
+	expect(editOut).toContain('/cd')
+})

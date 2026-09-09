@@ -5,7 +5,7 @@
 // provider credentials, but read/grep/glob/bash/eval/write/edit should not expose
 // or modify it by accident.
 
-import { basename, resolve } from 'path'
+import { basename, isAbsolute, relative, resolve } from 'path'
 import { HAL_DIR, STATE_DIR } from '../state.ts'
 
 const config = {
@@ -42,6 +42,18 @@ function denyMessage(action: string, path: string): string {
 function denyIfProtected(path: string, action: string): string | null {
 	if (!isProtectedPath(path)) return null
 	return denyMessage(action, path)
+}
+
+// Editing Hal's own files from another cwd skips Hal's AGENTS.md rules, so the
+// write/edit tools refuse it and ask the user to /cd first. Reads are fine.
+function denyIfHalDirNeedsCd(path: string, cwd: string, action: string): string | null {
+	if (!isInside(path, HAL_DIR) || isInside(cwd, HAL_DIR)) return null
+	return `error: refusing to ${action} a file inside hal_dir from another working directory: ${path}\nAsk the user to run /cd first so Hal's AGENTS.md rules are in scope.`
+}
+
+function isInside(path: string, dir: string): boolean {
+	const rel = relative(resolve(dir), normalized(path))
+	return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
 
 function filterPathList(text: string): string {
@@ -86,6 +98,7 @@ export const sensitive = {
 	isProtectedBasename,
 	denyMessage,
 	denyIfProtected,
+	denyIfHalDirNeedsCd,
 	filterPathList,
 	commandMentionsProtectedPath,
 	evalMentionsProtectedAccess,

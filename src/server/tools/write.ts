@@ -89,6 +89,8 @@ async function executeWrite(input: any, ctx: ToolContext): Promise<string> {
 	const path = read.resolvePath(input?.path, ctx.cwd)
 	const denied = ctx.approvedRisk ? null : sensitive.denyIfProtected(path, 'write')
 	if (denied) return denied
+	const needsCd = sensitive.denyIfHalDirNeedsCd(path, ctx.cwd, 'write')
+	if (needsCd) return needsCd
 	const content = String(input?.content ?? '')
 
 	return withLock(path, async () => {
@@ -119,6 +121,8 @@ async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 	const path = read.resolvePath(input?.path, ctx.cwd)
 	const denied = ctx.approvedRisk ? null : sensitive.denyIfProtected(path, 'edit')
 	if (denied) return denied
+	const needsCd = sensitive.denyIfHalDirNeedsCd(path, ctx.cwd, 'edit')
+	if (needsCd) return needsCd
 	const operation = input?.operation
 	const newContent = String(input?.new_content ?? '')
 
