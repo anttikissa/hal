@@ -118,8 +118,8 @@ test('toProviderMessages skips canceled history entries', () => {
 })
 
 
-test('toProviderMessages keeps presentation metadata out of model text', () => {
-	const entries: any[] = [{ type: 'assistant', text: 'partial', interruptedBy: 'system-message' }, { type: 'log', text: 'SYSTEM.md changed', interruptsModel: 'system-message' }]
+test('toProviderMessages keeps interruption metadata out of model text', () => {
+	const entries: any[] = [{ type: 'assistant', text: 'partial', interruptedBy: 'restart' }]
 
 	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
 		{ role: 'assistant', content: [{ type: 'text', text: 'partial' }] },

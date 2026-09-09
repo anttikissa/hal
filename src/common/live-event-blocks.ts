@@ -1,6 +1,5 @@
 import { models } from './models.ts'
 import type { InterruptionReason } from './history.ts'
-import { historyProjection } from './history-projection.ts'
 
 // Browser-safe semantic blocks produced from live server events. Terminal and web
 // clients can enrich or render these blocks independently, but they share this
@@ -233,7 +232,7 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 			if (event.blobId) block.blobId = event.blobId
 			if (sessionId) block.sessionId = sessionId
 			if (ts !== undefined) block.ts = ts
-			block.continuedAfter = historyProjection.continuationAfter(blocks)
+			if (last?.type === 'log' && last.interruptsModel) block.continuedAfter = last.interruptsModel
 			return liveEventBlocks.appendBlock(closed, block)
 		}
 
@@ -251,7 +250,7 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 		const model = event.model ?? options.defaultModel
 		if (model) block.model = model
 		if (ts !== undefined) block.ts = ts
-		block.continuedAfter = historyProjection.continuationAfter(blocks)
+		if (last?.type === 'log' && last.interruptsModel) block.continuedAfter = last.interruptsModel
 		return liveEventBlocks.appendBlock(closed, block)
 	}
 
@@ -283,8 +282,10 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 	if (event.type === 'info' && event.text) {
 		const interrupted = blocks.slice()
 		const last = interrupted.at(-1)
+		let interruption: 'system-message' | undefined
 		if (event.interruptsModel && (last?.type === 'assistant' || last?.type === 'thinking') && last.streaming) {
-			interrupted[interrupted.length - 1] = { ...last, interruptedBy: event.interruptsModel }
+			interruption = event.interruptsModel
+			interrupted[interrupted.length - 1] = { ...last, interruptedBy: interruption }
 		}
 		const closed = liveEventBlocks.closeStreamingBlock(interrupted).blocks
 		const type = liveEventBlocks.infoBlockType(event)
@@ -295,7 +296,7 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 		}
 		const block: LiveNoticeBlock = { type, text: event.text }
 		if (event.usageBars === true) block.usageBars = true
-		if (event.interruptsModel) block.interruptsModel = event.interruptsModel
+		if (interruption) block.interruptsModel = interruption
 		if (ts !== undefined) block.ts = ts
 		return liveEventBlocks.appendBlock(closed, block)
 	}

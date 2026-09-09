@@ -66,13 +66,8 @@ test('status markers render as prose in history and live notices', () => {
 
 test('model output exposes system-message boundary labels separately from text', () => {
 	const interrupted: HistoryEntry = { type: 'assistant', text: 'First.', interruptedBy: 'system-message' }
-	const result = webTranscript.items({
-		session: { id: 's1', cwd: '/tmp' }, meta: { id: 's1', createdAt: '' }, parentCount: 0, live: [],
-		history: [interrupted, { type: 'log', text: 'SYSTEM.md changed', interruptsModel: 'system-message' }, { type: 'assistant', text: 'Second.' }],
-	})
 
 	expect(webTranscript.interruption(interrupted)).toBe('[interrupted by system message]')
-	expect(result.at(-1)).toMatchObject({ text: 'Second.', continuation: '[continuing after system message]' })
 })
 
 test('question rows keep shared projection data and hide queued questions', () => {

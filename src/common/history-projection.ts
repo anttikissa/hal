@@ -43,15 +43,6 @@ function continuationText(): string {
 	return '[continuing after system message]'
 }
 
-function continuationAfter(items: readonly { type: string; interruptsModel?: 'system-message' }[]): 'system-message' | undefined {
-	for (let i = items.length - 1; i >= 0; i--) {
-		const item = items[i]!
-		if (item.type === 'assistant' || item.type === 'thinking') return undefined
-		if (item.interruptsModel) return item.interruptsModel
-	}
-	return undefined
-}
-
 function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 	const history: string[] = []
 	for (const entry of entries) {
@@ -131,4 +122,4 @@ function activeQuestion(entries: HistoryEntry[], parentCount = 0): ProjectedQues
 	return questions(entries, parentCount).find((question) => question.active)
 }
 
-export const historyProjection = { userText, noticeText, interruptionText, continuationText, continuationAfter, inputHistoryFromEntries, questions, activeQuestion }
+export const historyProjection = { userText, noticeText, interruptionText, continuationText, inputHistoryFromEntries, questions, activeQuestion }

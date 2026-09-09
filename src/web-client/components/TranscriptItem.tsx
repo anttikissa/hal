@@ -1,6 +1,7 @@
 import { Show } from 'solid-js'
 import type { AnswerValue } from '../../common/history.ts'
 import { transcriptTitles } from '../../common/transcript-titles.ts'
+import { historyProjection } from '../../common/history-projection.ts'
 import { webTranscript, type RenderedTranscriptItem } from '../utils/transcript.ts'
 import { webMarkdown } from '../utils/markdown.ts'
 import { webQuestion } from '../utils/question.ts'
@@ -20,8 +21,8 @@ export function TranscriptItem(props: TranscriptItemProps) {
 			fallback={<article class={['TranscriptItem', props.item.entry.type]}>
 				<label>{transcriptTitles.label(props.item.entry)}</label>
 				<div class="Markdown">
-					<Show when={props.item.continuation}>
-						{(continuation) => <span class="TranscriptItem-interruption">{continuation()} </span>}
+					<Show when={'continuedAfter' in props.item.entry && props.item.entry.continuedAfter}>
+						<span class="TranscriptItem-interruption">{historyProjection.continuationText()} </span>
 					</Show>
 					<div class="TranscriptItem-content" innerHTML={webMarkdown.html(props.item.text, 'usageBars' in props.item.entry && props.item.entry.usageBars === true)} />
 					<Show when={webTranscript.interruption(props.item.entry)}>

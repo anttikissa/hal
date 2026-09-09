@@ -42,7 +42,6 @@ describe('live event block projection', () => {
 		const events: LiveEvent[] = [
 			{ type: 'stream-delta', sessionId: 'session-1', channel: 'assistant', text: 'hello ', createdAt: '2026-08-13T09:00:00.000Z' },
 			{ type: 'info', sessionId: 'session-1', text: 'SYSTEM.md changed', interruptsModel: 'system-message', createdAt: '2026-08-13T09:00:01.000Z' },
-			{ type: 'info', sessionId: 'session-1', text: 'Another notice' },
 			{ type: 'stream-delta', sessionId: 'session-1', channel: 'assistant', text: 'world', createdAt: '2026-08-13T09:00:02.000Z' },
 		]
 
@@ -53,7 +52,6 @@ describe('live event block projection', () => {
 		expect(first).toEqual([
 			{ type: 'assistant', text: 'hello ', interruptedBy: 'system-message', ts: Date.parse('2026-08-13T09:00:00.000Z') },
 			{ type: 'log', text: 'SYSTEM.md changed', interruptsModel: 'system-message', ts: Date.parse('2026-08-13T09:00:01.000Z') },
-			{ type: 'log', text: 'Another notice' },
 			{ type: 'assistant', text: 'world', continuedAfter: 'system-message', streaming: true, ts: Date.parse('2026-08-13T09:00:02.000Z') },
 		])
 	})

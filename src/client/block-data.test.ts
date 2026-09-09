@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { blockData } from './block-data.ts'
-import { clientHistory } from './history.ts'
+
 test('historyToBlocks preserves original image path in user text', () => {
 	const history: any[] = [
 		{
@@ -73,26 +73,6 @@ test('historyToBlocks uses the session model for later assistant and thinking bl
 	const rendered = blockData.historyToBlocks(history as any, 's1', 0, undefined, 'openai/gpt-5.4')
 	expect(rendered[0]).toMatchObject({ type: 'thinking', model: 'openai/gpt-5.4', thinkingEffort: 'high' })
 	expect(rendered[1]).toMatchObject({ type: 'assistant', model: 'openai/gpt-5.4' })
-})
-
-
-test('historyToBlocks marks model output following a system message as continuing', () => {
-	const result = blockData.historyToBlocks([
-		{ type: 'assistant', text: 'First.', interruptedBy: 'system-message' },
-		{ type: 'log', text: 'SYSTEM.md changed', interruptsModel: 'system-message' },
-		{ type: 'turn_end', status: 'aborted' },
-		{ type: 'assistant', text: 'Second.' },
-	], 's1')
-
-	expect(result.at(-1)).toMatchObject({ type: 'assistant', text: 'Second.', continuedAfter: 'system-message' })
-})
-
-
-test('live continuation keeps its prefix after reconnect', () => {
-	const blocks: any[] = [{ type: 'log', text: 'SYSTEM.md changed', interruptsModel: 'system-message' }]
-	const result = clientHistory.withLive(blocks, { liveHistory: [{ type: 'assistant', text: 'Second.' }] })
-
-	expect(result.at(-1)).toMatchObject({ continuedAfter: 'system-message' })
 })
 
 

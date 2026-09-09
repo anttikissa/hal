@@ -70,7 +70,7 @@ export type HistoryEntry = EntryIdentity & (
 	| { type: 'question'; id: string; text: string; input: QuestionInput; source: QuestionSource; ts?: string }
 	| { type: 'answer'; questionId: string; value: AnswerValue; ts?: string }
 	| ({ type: 'turn_end'; ts?: string } & TurnEndMeta)
-	| { type: 'log'; text: string; level?: 'info' | 'warning' | 'error'; usageBars?: true; visibility?: 'ui' | 'next-user'; interruptsModel?: 'system-message'; ts?: string }
+	| { type: 'log'; text: string; level?: 'info' | 'warning' | 'error'; usageBars?: true; visibility?: 'ui' | 'next-user'; ts?: string }
 	| { type: 'info'; text: string; level?: 'info' | 'warning' | 'error'; usageBars?: true; visibility?: 'ui' | 'next-user'; ui?: 'notice'; ts?: string }
 	| { type: 'warning' | 'error'; text: string; blobId?: string; visibility?: 'ui' | 'next-user'; ts?: string }
 	| { type: 'reset' | 'compact'; ts?: string }

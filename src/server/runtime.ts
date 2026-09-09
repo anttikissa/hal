@@ -126,20 +126,20 @@ function retryAfterLogin(sessionId: string, provider: string): void {
 	if (continuation.shouldRetryAfterLogin(sessionStore.loadAllHistory(sessionId), provider)) requestContinue(sessionId)
 }
 
-function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', opts: { ui?: 'notice'; usageBars?: true; interruptsModel?: 'system-message' } = {}): void {
+function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice', usageBars?: true, interruptsModel?: 'system-message'): void {
 	const createdAt = new Date().toISOString()
-	const entry: HistoryEntry = opts.ui === 'notice'
-		? { type: 'info', text, ts: createdAt, ui: opts.ui, ...(opts.usageBars ? { usageBars: true as const } : {}) }
-		: { type: 'log', text, ts: createdAt, interruptsModel: opts.interruptsModel, ...(level === 'error' ? { level: 'error' as const } : {}), ...(opts.usageBars ? { usageBars: true as const } : {}) }
+	const entry: HistoryEntry = ui === 'notice'
+		? { type: 'info', text, ts: createdAt, ui, ...(usageBars ? { usageBars } : {}) }
+		: { type: 'log', text, ts: createdAt, ...(level === 'error' ? { level: 'error' as const } : {}), ...(usageBars ? { usageBars } : {}) }
 	sessionStore.appendHistory(sessionId, [entry])
 	ipc.appendEvent({
 		id: protocol.eventId(),
 		type: 'info',
 		text,
 		level,
-		...(opts.ui ? { ui: opts.ui } : {}),
-		...(opts.usageBars ? { usageBars: true } : {}),
-		...(opts.interruptsModel ? { interruptsModel: opts.interruptsModel } : {}),
+		...(ui ? { ui } : {}),
+		...(usageBars ? { usageBars } : {}),
+		...(interruptsModel ? { interruptsModel } : {}),
 		sessionId,
 		createdAt,
 	})
@@ -358,20 +358,12 @@ async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec
 	broadcastSessions()
 	await runGeneration(child.id, '')
 }
-function promptFileChanged(change: { sessionId: string; name: string; path: string }): void {
-	const text = `${change.name} changed: ${change.path}`
-	if (!agentLoop.isWorking(change.sessionId)) return emitInfo(change.sessionId, text)
-	const interrupted = sessionStore.interruptLive(change.sessionId, 'system-message')
-	emitInfo(change.sessionId, text, 'info', { interruptsModel: interrupted ? 'system-message' : undefined })
-	const stopped = agentLoop.abortAndWait(change.sessionId, '')
-	if (stopped) void stopped.then(() => requestContinue(change.sessionId))
-}
 
 function restartPromptWatch(): void {
 	state.stopPromptWatch?.()
 	state.stopPromptWatch = context.watchPromptFiles(
 		tabs.openSessionMetas().map((meta) => ({ sessionId: meta.id, cwd: meta.workingDir ?? process.cwd() })),
-		promptFileChanged,
+		(change) => emitInfo(change.sessionId, `${change.name} changed: ${change.path}`, 'info', undefined, undefined, 'system-message'),
 	)
 }
 
@@ -455,7 +447,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 			if (cmdResult.syntheticKind) {
 				modelNotices.emitSyntheticAssistant(sessionId, cmdResult.output, cmdResult.syntheticKind, sessionState.model ?? models.defaultModel())
 			} else {
-				emitInfo(sessionId, cmdResult.output, 'info', { ui: cmdResult.ui, usageBars: cmdResult.usageBars })
+				emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui, cmdResult.usageBars)
 			}
 		}
 		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error')
@@ -1013,7 +1005,7 @@ function handleCommand(cmd: Command): void {
 			}
 			if ('forkSessionId' in cmd) {
 				const child = tabs.createSessionTab({ sourceId: cmd.forkSessionId, workingDir: cmd.cwd })
-				emitInfo(cmd.forkSessionId, `Tab forked to ${tabs.sessionLabel(child)}.`, 'info', { ui: 'notice' })
+				emitInfo(cmd.forkSessionId, `Tab forked to ${tabs.sessionLabel(child)}.`, 'info', 'notice')
 			} else if ('cwd' in cmd && cmd.cwd && cmd.forceNew) {
 				tabs.createSessionTab({ openerId: sessionId, afterId: sessionId, workingDir: cmd.cwd })
 			} else if ('afterSessionId' in cmd) {
@@ -1228,7 +1220,6 @@ export const runtime = {
 	cancelSessionWork,
 	answeredIntroNeedsContinue,
 	shouldAutoContinue,
-	promptFileChanged,
 	isInitialTurn,
 	shouldCloseSessionAfterGeneration,
 	recordTabClosed,

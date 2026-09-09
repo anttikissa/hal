@@ -69,7 +69,7 @@ function emitQueuePausedNotice(sessionId: string): void {
 	const entries = promptQueue.load(sessionId)
 	if (entries.length === 0) return
 	promptQueue.setHeld(sessionId, true)
-	runtime.emitInfo(sessionId, buildQueuePausedNotice(entries), 'info', { ui: 'notice' })
+	runtime.emitInfo(sessionId, buildQueuePausedNotice(entries), 'info', 'notice')
 }
 
 // A waiting turn (model called wait) is parked, not finished: don't drain the
