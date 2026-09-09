@@ -600,6 +600,8 @@ async function* streamResponsesWebSocket(chain: ResponsesWebSocketChain, body: a
 	chain.working = true
 	const pending: any[] = []
 	const streamState: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map() }
+	const expectedPreviousResponseId = body.previous_response_id ?? null
+	let activeResponseId = ''
 	let done = false
 	let failed: Error | null = null
 	let responseId = ''
@@ -621,6 +623,14 @@ async function* streamResponsesWebSocket(chain: ResponsesWebSocketChain, body: a
 	function onMessage(event: MessageEvent): void {
 		try {
 			const parsed = JSON.parse(String(event.data))
+			if (parsed.type === 'response.created') {
+				// A suspended socket can replay its previous response after wake. Bind this
+				// reader only to the response created from the parent we just requested.
+				if ((parsed.response?.previous_response_id ?? null) !== expectedPreviousResponseId) return
+				activeResponseId = parsed.response?.id ?? ''
+			}
+			if (parsed.type !== 'error' && !activeResponseId) return
+			if (parsed.response?.id && parsed.response.id !== activeResponseId) return
 			pending.push(parsed)
 			if (parsed.type === 'error') failed = new ResponsesWebSocketApiError(parsed)
 			if (parsed.type === 'response.completed') {

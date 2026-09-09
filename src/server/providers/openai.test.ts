@@ -668,6 +668,7 @@ class FakeWebSocket {
 		this.sent.push(body)
 		const id = `resp_${this.sent.length}`
 		queueMicrotask(() => {
+			this.message({ type: 'response.created', response: { id, previous_response_id: body.previous_response_id ?? null } })
 			this.message({ type: 'response.output_text.delta', delta: `text${this.sent.length}` })
 			this.message({ type: 'response.completed', response: { id, status: 'completed', usage: { input_tokens: this.sent.length, output_tokens: 2 } } })
 		})
@@ -880,6 +881,43 @@ test('openai websocket continuation sends previous_response_id and only new tool
 	expect(sent).toHaveLength(2)
 	expect(sent[1].previous_response_id).toBe('resp_1')
 	expect(sent[1].input).toEqual([{ type: 'function_call_output', call_id: 'call_1', output: 'hi' }])
+})
+
+
+class ReplayingWebSocket extends FakeWebSocket {
+	override send(raw: string): void {
+		const body = JSON.parse(raw)
+		this.sent.push(body)
+		const id = `resp_${this.sent.length}`
+		queueMicrotask(() => {
+			if (this.sent.length === 2) {
+				this.message({ type: 'response.created', response: { id: 'resp_1', previous_response_id: null } })
+				this.message({ type: 'response.output_text.delta', delta: 'stale' })
+				this.message({ type: 'response.completed', response: { id: 'resp_1', status: 'completed' } })
+			}
+			setTimeout(() => {
+				this.message({ type: 'response.created', response: { id, previous_response_id: body.previous_response_id ?? null } })
+				this.message({ type: 'response.output_text.delta', delta: 'fresh' })
+				this.message({ type: 'response.completed', response: { id, status: 'completed' } })
+			}, 0)
+		})
+	}
+}
+
+test('openai websocket ignores a prior response replayed after the next request', async () => {
+	process.env.HAL_OPENAI_RESPONSES_TRANSPORT = 'ws'
+	FakeWebSocket.instances = []
+	globalThis.WebSocket = ReplayingWebSocket as any
+	setupOpenAiToken()
+	const first: any[] = [{ role: 'user', content: 'first' }]
+	const second: any[] = [...first, { role: 'assistant', content: 'old' }, { role: 'user', content: 'second' }]
+
+	for await (const _ of openaiProvider.generate({ messages: first, model: 'gpt-5.5', systemPrompt: 'system', tools: [], sessionId: 'sid_replay' })) {}
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({ messages: second, model: 'gpt-5.5', systemPrompt: 'system', tools: [], sessionId: 'sid_replay' })) events.push(event)
+
+	expect(events.filter((event) => event.type === 'text').map((event) => event.text)).toEqual(['fresh'])
+	expect(openai.state.webSockets.get('sid_replay')?.previousResponseId).toBe('resp_2')
 })
 
 
