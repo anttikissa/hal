@@ -12,10 +12,6 @@ const config = {
 	protectedBasenames: ['auth.ason', 'server-keys.ason'],
 }
 
-function normalized(path: string): string {
-	return resolve(path)
-}
-
 function protectedPaths(): string[] {
 	const paths: string[] = []
 	for (const name of config.protectedBasenames) paths.push(resolve(HAL_DIR, name))
@@ -24,7 +20,7 @@ function protectedPaths(): string[] {
 }
 
 function isProtectedPath(path: string): boolean {
-	const target = normalized(path)
+	const target = resolve(path)
 	for (const protectedPath of protectedPaths()) {
 		if (target === protectedPath) return true
 	}
@@ -52,7 +48,7 @@ function denyIfHalDirNeedsCd(path: string, cwd: string, action: string): string 
 }
 
 function isInside(path: string, dir: string): boolean {
-	const rel = relative(resolve(dir), normalized(path))
+	const rel = relative(resolve(dir), resolve(path))
 	return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
 
