@@ -81,7 +81,7 @@ function handleResponse(event: any, ctx: any): void {
 function handleInfo(event: any, ctx: any): void {
 	const sessionId = event.sessionId ?? null
 	const tab = ctx.tabForSession(sessionId)
-	if (tab) ctx.applyLiveEventToTab(tab, { type: 'stream-end' })
+	if (tab && !event.interruptsModel) ctx.applyLiveEventToTab(tab, { type: 'stream-end' })
 	if (event.level !== 'error' && event.text === '[paused]') {
 		ctx.scheduleDelayedPaused(sessionId, { type: 'log', text: event.text, ts: event.createdAt ? Date.parse(event.createdAt) : undefined })
 		return

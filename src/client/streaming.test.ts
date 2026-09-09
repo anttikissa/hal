@@ -135,6 +135,7 @@ describe('client streaming blocks', () => {
 			type: 'info',
 			sessionId: 's1',
 			text: 'system.md was reloaded',
+			interruptsModel: 'system-message',
 			createdAt: '2026-04-05T17:31:01.000Z',
 		})
 		client.handleEvent({
@@ -147,9 +148,9 @@ describe('client streaming blocks', () => {
 
 		const tab = client.currentTab()!
 		expect(tab.history).toMatchObject([
-			{ type: 'assistant', text: 'hello ' },
-			{ type: 'log', text: 'system.md was reloaded' },
-			{ type: 'assistant', text: 'world' },
+			{ type: 'assistant', text: 'hello ', interruptedBy: 'system-message' },
+			{ type: 'log', text: 'system.md was reloaded', interruptsModel: 'system-message' },
+			{ type: 'assistant', text: 'world', continuedAfter: 'system-message' },
 		])
 	})
 
