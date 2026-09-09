@@ -574,6 +574,16 @@ test('shouldAutoContinue resumes only restarted turns', () => {
 		{ type: 'log', text: '[restarted]', ts: '2026-05-27T12:00:01.000Z' },
 	])).toBe(true)
 
+	expect(runtime.shouldAutoContinue([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
+		{ type: 'assistant', text: 'partial', interruptedBy: 'restart' },
+	])).toBe(true)
+
+	expect(runtime.shouldAutoContinue([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
+		{ type: 'assistant', text: 'partial', interruptedBy: 'process-exit' },
+	])).toBe(false)
+
 	// A turn continued from a pause is restarted before it produces any history of
 	// its own. The restart marker alone proves the turn was working.
 	expect(runtime.shouldAutoContinue([

@@ -118,6 +118,15 @@ test('toProviderMessages skips canceled history entries', () => {
 })
 
 
+test('toProviderMessages keeps interruption metadata out of model text', () => {
+	const entries: any[] = [{ type: 'assistant', text: 'partial', interruptedBy: 'restart' }]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'assistant', content: [{ type: 'text', text: 'partial' }] },
+	])
+})
+
+
 test('toProviderMessages wraps next-user info in meta tags', () => {
 	const ts = '2026-04-13T14:43:49.970Z'
 	const entries: any[] = [

@@ -196,6 +196,15 @@ test('status markers lose brackets alongside regular notices', () => {
 	expect(lines.join('\n')).not.toContain('[restarted]')
 })
 
+
+test('interrupted model output ends with a neutral inline marker', () => {
+	colors.load()
+	const rendered = blocks.renderBlock({ type: 'assistant', text: 'Short answer.', interruptedBy: 'restart' }, 80).join('\n')
+
+	expect(stripAnsi(rendered)).toContain('Short answer. [interrupted by restart]')
+	expect(rendered).toContain(`${colors.log.fg}[interrupted by restart]`)
+})
+
 test('usage bars retain their empty track without a status-card background', () => {
 	const bar = subscriptionUsage.usageBarMarker(50, 2)
 	const emptyBar = subscriptionUsage.usageBarMarker(0, 2)

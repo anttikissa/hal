@@ -63,6 +63,13 @@ test('status markers render as prose in history and live notices', () => {
 	expect(result.map((item) => item.text)).toEqual(['Restarted', 'Paused before local tools'])
 })
 
+
+test('interrupted model output exposes its presentation marker separately from text', () => {
+	const entry: HistoryEntry = { type: 'assistant', text: 'Short answer.', interruptedBy: 'process-exit' }
+
+	expect(webTranscript.interruption(entry)).toBe('[interrupted by process exit]')
+})
+
 test('question rows keep shared projection data and hide queued questions', () => {
 	const history: HistoryEntry[] = [
 		{ type: 'tool_call', toolId: 'tool-1', name: 'bash', input: { command: 'rm one' } },

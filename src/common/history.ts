@@ -21,6 +21,7 @@ export type UserPart =
 	| { type: 'image'; blobId: string; originalFile?: string }
 
 export type EntryIdentity = { id?: string; canceled?: true }
+export type InterruptionReason = 'restart' | 'process-exit'
 
 
 export type QuestionInput =
@@ -50,6 +51,7 @@ export type HistoryEntry = EntryIdentity & (
 			model?: string
 			thinkingEffort?: string
 			ts?: string
+			interruptedBy?: InterruptionReason
 		}
 	| {
 			type: 'assistant'
@@ -60,6 +62,7 @@ export type HistoryEntry = EntryIdentity & (
 			syntheticKind?: string
 			visibility?: 'ui'
 			ts?: string
+			interruptedBy?: InterruptionReason
 		}
 	| { type: 'tool_call'; toolId: string; name: string; input?: any; blobId?: string; visibility?: 'ui'; ts?: string }
 	| { type: 'tool_result'; toolId: string; output?: any; blobId?: string; isError?: boolean; visibility?: 'ui'; ts?: string }

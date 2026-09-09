@@ -8,7 +8,7 @@ import { STATE_DIR, ensureDir } from './state.ts'
 import { ipc } from './file-ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
-import type { HistoryEntry } from '../common/history.ts'
+import type { HistoryEntry, InterruptionReason } from '../common/history.ts'
 import { liveEventBlocks, type LiveBlock, type LiveEvent } from '../common/live-event-blocks.ts'
 import type { PartialTokenUsage } from '../common/protocol.ts'
 import type { SessionMeta } from '../common/session.ts'
@@ -106,7 +106,7 @@ function fixMeta(meta: SessionMeta, sessionId: string): SessionMeta {
 // entry here it is written, read back as undefined, and the loss is silent.
 // A field can therefore work in a live session and vanish across a restart.
 const historyTopLevelKeys = new Set([
-	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled',
+	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled', 'interruptedBy',
 	'blobId', 'signature', 'model', 'thinkingEffort',
 	'usage', 'purpose', 'requests', 'apiUsd', 'incomplete', 'durationMs', 'abortText', 'provider', 'httpStatus', 'synthetic', 'syntheticKind',
 	'toolId', 'toolIds', 'name', 'input', 'output', 'isError', 'cwd', 'reason',
@@ -213,6 +213,21 @@ function clearLive(sessionId: string): void {
 	updateLive(sessionId, (live) => {
 		live.blocks = []
 	})
+}
+
+
+function interruptLive(sessionId: string, reason: InterruptionReason): boolean {
+	const entries: HistoryEntry[] = []
+	for (const block of loadLive(sessionId).blocks) {
+		if ((block.type !== 'assistant' && block.type !== 'thinking') || !block.text) continue
+		const ts = typeof block.ts === 'number' ? new Date(block.ts).toISOString() : block.ts
+		entries.push({ ...block, ts } as HistoryEntry)
+	}
+	const last = entries.at(-1)
+	if (last?.type === 'assistant' || last?.type === 'thinking') last.interruptedBy = reason
+	appendHistory(sessionId, entries)
+	clearLive(sessionId)
+	return !!last
 }
 
 function readSessionMetaFromDisk(sessionId: string): SessionMeta | null {
@@ -611,5 +626,6 @@ export const sessions = {
 	tailTurnState,
 	applyLiveEvent,
 	clearLive,
+	interruptLive,
 	sessionDir,
 }

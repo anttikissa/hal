@@ -1,4 +1,5 @@
 import { models } from './models.ts'
+import type { InterruptionReason } from './history.ts'
 
 // Browser-safe semantic blocks produced from live server events. Terminal and web
 // clients can enrich or render these blocks independently, but they share this
@@ -28,6 +29,7 @@ export interface LiveAssistantBlock extends LiveBlockBase {
 	synthetic?: boolean
 	syntheticKind?: string
 	sessionId?: string
+	interruptedBy?: InterruptionReason
 }
 
 export interface LiveThinkingBlock extends LiveBlockBase {
@@ -38,6 +40,7 @@ export interface LiveThinkingBlock extends LiveBlockBase {
 	streaming?: boolean
 	blobId?: string
 	sessionId?: string
+	interruptedBy?: InterruptionReason
 }
 
 export interface LiveToolBlock extends LiveBlockBase {

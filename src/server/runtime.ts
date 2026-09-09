@@ -245,14 +245,15 @@ function shouldCloseSessionAfterGeneration(meta: { spawnKind?: SpawnKind } | nul
 	return meta?.spawnKind === 'subagent' && result === 'completed'
 }
 
-// A restart marker can resume only the unfinished turn that precedes it. Checking
+// Restart evidence can resume only the unfinished turn that precedes it. Checking
 // the same projection used by manual continue prevents later UI-only history from
-// reviving an old marker that was already rejected as "Nothing to continue".
+// reviving an old interruption that was already rejected as "Nothing to continue".
 function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i]!
 		if (entry.type === 'turn_end') return false
-		if (entry.type === 'log' && entry.text === RESTARTED_TEXT) return continuation.actionForHistory(entries.slice(0, i + 1)) !== false
+		const interrupted = (entry.type === 'assistant' || entry.type === 'thinking') && entry.interruptedBy === 'restart'
+		if (interrupted || (entry.type === 'log' && entry.text === RESTARTED_TEXT)) return continuation.actionForHistory(entries.slice(0, i + 1)) !== false
 	}
 	return false
 }
@@ -1104,6 +1105,11 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	sessionStore.deactivateAllSessions()
 	const metas = sessionStore.loadSessionMetas()
 	state.openSessionIds = metas.map((meta) => meta.id)
+	// A new host seals any live output left by the host process it replaces.
+	const previousWorking = ipc.readState().working
+	for (const meta of metas) {
+		if (previousWorking[meta.id]) sessionStore.interruptLive(meta.id, 'process-exit')
+	}
 	state.currentSessionId = state.openSessionIds[0] ?? null
 	for (const pending of state.pendingPrompts.values()) pending.controller.abort(RESTARTED_TEXT)
 	state.pendingPrompts.clear()
@@ -1123,10 +1129,14 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	signal.addEventListener('abort', () => {
 		state.stopPromptWatch?.()
 		state.stopPromptWatch = null
+		if (!ipc.ownsHostLock()) return
 		const ts = new Date().toISOString()
+		let reason: 'restart' | 'process-exit' = 'process-exit'
+		if (signal.reason === 'restart') reason = 'restart'
 		for (const sessionId of state.openSessionIds) {
 			if (!agentLoop.isWorking(sessionId)) continue
-			sessionStore.appendHistory(sessionId, [{ type: 'log', text: RESTARTED_TEXT, ts }])
+			const marked = sessionStore.interruptLive(sessionId, reason)
+			if (!marked && reason === 'restart') sessionStore.appendHistory(sessionId, [{ type: 'log', text: RESTARTED_TEXT, ts }])
 			agentLoop.abort(sessionId, '')
 		}
 	}, { once: true })

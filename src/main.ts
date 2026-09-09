@@ -271,13 +271,13 @@ function queueMemoryCheck(): void {
 	}, memory.config.checkIntervalMs)
 }
 
-function cleanup(): void {
+function cleanup(reason: 'restart' | 'process-exit'): void {
 	if (cleaned) return
 	cleaned = true
 	log.info('Cleanup started', { isHost, pid: process.pid })
 	if (electionTimer) clearInterval(electionTimer)
 	if (memoryTimer) clearTimeout(memoryTimer)
-	ac.abort()
+	ac.abort(reason)
 	if (isHost) {
 		ipc.appendEvent({ type: 'host-released' })
 		ipc.releaseHost()
@@ -311,9 +311,13 @@ else {
 	startupTarget = prepareClientStartupTarget(startupCwd)
 }
 
-process.on('exit', cleanup)
+process.on('exit', (code) => {
+	let reason: 'restart' | 'process-exit' = 'process-exit'
+	if (code === processControl.restartExitCode) reason = 'restart'
+	cleanup(reason)
+})
 process.on('SIGTERM', () => {
-	cleanup()
+	cleanup('process-exit')
 	process.exit(0)
 })
 // Monitor only observes fatal exceptions; it does not change normal crash behavior.

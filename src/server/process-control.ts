@@ -47,4 +47,4 @@ function exitOnNextTurn(): void {
 	})
 }
 
-export const processControl = { state, io, requestExit, requestRestart, exitIfRequested, exitOnNextTurn }
+export const processControl = { restartExitCode: RESTART_EXIT_CODE, state, io, requestExit, requestRestart, exitIfRequested, exitOnNextTurn }

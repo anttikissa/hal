@@ -271,6 +271,35 @@ test('live snapshot stores uncommitted streaming blocks', async () => {
 })
 
 
+test('interruptLive persists the model tail, marks only its last block, and clears live state', async () => {
+	const id = await makeSession()
+	sessions.applyLiveEvent(id, { type: 'stream-delta', channel: 'thinking', text: 'Checking', model: 'openai/gpt-5.6-sol', thinkingEffort: 'high' })
+	sessions.applyLiveEvent(id, { type: 'stream-delta', channel: 'assistant', text: 'Short answer', model: 'openai/gpt-5.6-sol' })
+
+	sessions.interruptLive(id, 'restart')
+
+	const history = sessions.loadHistory(id)
+	expect(history).toMatchObject([
+		{ type: 'thinking', text: 'Checking', model: 'openai/gpt-5.6-sol', thinkingEffort: 'high' },
+		{ type: 'assistant', text: 'Short answer', model: 'openai/gpt-5.6-sol', interruptedBy: 'restart' },
+	])
+	expect(history[0]).not.toHaveProperty('interruptedBy')
+	expect(sessions.loadLive(id).blocks).toEqual([])
+})
+
+
+test('interruptLive marks thinking when no assistant text exists', async () => {
+	const id = await makeSession()
+	sessions.applyLiveEvent(id, { type: 'stream-delta', channel: 'thinking', text: 'Still checking' })
+
+	sessions.interruptLive(id, 'process-exit')
+
+	expect(sessions.loadHistory(id)).toMatchObject([
+		{ type: 'thinking', text: 'Still checking', interruptedBy: 'process-exit' },
+	])
+})
+
+
 test('sessionOpenInfo includes tab number and effective model', () => {
 	const info = sessions.sessionOpenInfo({
 		id: '04-middle',

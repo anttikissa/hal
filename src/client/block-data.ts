@@ -87,6 +87,7 @@ function historyToBlocks(
 					ts,
 					dimmed,
 					canceled: entry.canceled,
+					interruptedBy: entry.interruptedBy,
 				})
 				break
 			}
@@ -125,6 +126,7 @@ function historyToBlocks(
 					ts,
 					dimmed,
 					canceled: entry.canceled,
+					interruptedBy: entry.interruptedBy,
 				})
 				break
 			case 'log':

@@ -1,4 +1,4 @@
-import type { HistoryEntry } from './history.ts'
+import type { HistoryEntry, InterruptionReason } from './history.ts'
 
 export type UserTextOptions = {
 	separator?: string
@@ -33,6 +33,10 @@ function noticeText(text: string): string {
 	const marker = text.match(/^\[([A-Za-z][^\]\n]*)\]$/)
 	if (!marker) return text
 	return marker[1]![0]!.toUpperCase() + marker[1]!.slice(1)
+}
+
+function interruptionText(reason: InterruptionReason): string {
+	return `[interrupted by ${reason.replace('-', ' ')}]`
 }
 
 function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
@@ -114,4 +118,4 @@ function activeQuestion(entries: HistoryEntry[], parentCount = 0): ProjectedQues
 	return questions(entries, parentCount).find((question) => question.active)
 }
 
-export const historyProjection = { userText, noticeText, inputHistoryFromEntries, questions, activeQuestion }
+export const historyProjection = { userText, noticeText, interruptionText, inputHistoryFromEntries, questions, activeQuestion }

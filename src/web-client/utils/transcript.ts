@@ -92,6 +92,12 @@ function entryText(entry: TranscriptEntry): string {
 	return ''
 }
 
+
+function interruption(entry: TranscriptEntry): string | undefined {
+	if ((entry.type !== 'assistant' && entry.type !== 'thinking') || !entry.interruptedBy) return undefined
+	return historyProjection.interruptionText(entry.interruptedBy)
+}
+
 function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[] {
 	if (!snapshot) return []
 	const result: RenderedTranscriptItem[] = []
@@ -106,4 +112,4 @@ function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[]
 	return result
 }
 
-export const webTranscript = { valueText, toolText, historyItems, items }
+export const webTranscript = { valueText, toolText, historyItems, interruption, items }
