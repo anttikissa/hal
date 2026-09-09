@@ -12,6 +12,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - If no working sessions, work with the user to fix the tests.
 - Never forge host-lock ownership or run state-writing probes against live shared IPC/session files. Runtime reproductions must use an isolated state directory or test harness.
 - Never kill live Hal; only kill isolated processes you spawned.
+- Never let a test rewrite a load-bearing file. A red test runs before the guard exists, so if it targets a real file it WILL destroy it. Use /tmp or a temp dir; when a test genuinely needs a path under HAL_DIR, use a throwaway name like `testing.txt`, never a real one like SYSTEM.md.
 - Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, or flags that won't be used by feature at hand.
 - Hal is a simple developer tool, not a nuclear reactor: cover realistic failure cases, but keep solutions and tests proportionate rather than engineering away every remote race.
 - Before writing a non-trivial feature, post a per-component LOC estimate and name the existing code each piece extends. If any component is over ~15 lines, state the assumption that would make it 5 (e.g. "assume the OSC reply arrives whole") and ask whether it's acceptable. Do not design for failure cases the user hasn't asked for: a cosmetic feature gets zero robustness code.
