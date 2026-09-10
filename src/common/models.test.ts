@@ -125,7 +125,9 @@ test('model picker lists Grok 4.5 and 4.6 and ranks 4.6 above 4.20', () => {
 	expect(models.resolveModel('grok-4.5')).toBe('openrouter/x-ai/grok-4.5')
 })
 test('model picker lists new open-weight OpenRouter aliases', () => {
-	expect(models.resolveModel('deepseek')).toBe('openrouter/deepseek/deepseek-v3.2')
+	// DeepSeek's own API calls the line "deepseek-flash"; the v3.2 numbered alias is gone.
+	expect(models.resolveModel('deepseek')).toBe('openrouter/deepseek/deepseek-v4.1-flash')
+	expect(models.resolveModel('deepseek-flash')).toBe('openrouter/deepseek/deepseek-v4.1-flash')
 	expect(models.resolveModel('deepseek-4')).toBe('openrouter/deepseek/deepseek-v4-pro')
 	expect(models.resolveModel('qwen')).toBe('openrouter/qwen/qwen3.8-max')
 	expect(models.resolveModel('qwen-coder')).toBe('openrouter/qwen/qwen3-coder')
