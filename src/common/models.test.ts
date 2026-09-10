@@ -26,15 +26,14 @@ test('hydrated registry names display for models without a curated pattern', () 
 })
 
 
-test('curated display patterns win over hydrated registry names', () => {
-	// models.dev says "GPT-5.6 Sol" and "Claude Opus 5"; Hal prefers its own shorter forms.
+test('registry names use official GPT punctuation while curated Claude names stay short', () => {
 	models.hydrate({}, [], {
 		'openai/gpt-5.6-sol': 'GPT-5.6 Sol',
 		'anthropic/claude-opus-5': 'Claude Opus 5',
 		'openrouter/x-ai/grok-4.6': 'Grok 4.6',
 	})
 
-	expect(models.displayModel('openai/gpt-5.6-sol')).toBe('GPT 5.6 Sol')
+	expect(models.displayModel('openai/gpt-5.6-sol')).toBe('GPT-5.6 Sol')
 	expect(models.displayModel('anthropic/claude-opus-5')).toBe('Opus 5')
 	expect(models.displayModel('openrouter/x-ai/grok-4.6')).toBe('Grok 4.6')
 })

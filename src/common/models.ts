@@ -108,6 +108,7 @@ function displayTitleSuffix(text: string): string {
 	return words.join(' ')
 }
 
+
 const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	[/^intro$/, () => 'Intro'],
 	[/^scroll$/, () => 'Scroll Test'],
@@ -146,11 +147,13 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	],
 	// gpt-5.3-codex → Codex 5.3
 	[/^gpt-(\d+\.\d+)-codex$/, (m) => `Codex ${m[1]}`],
-	// gpt-6-astra → GPT 6 Astra
+]
+
+// Offline and fresh installs may not have models.dev metadata yet. These only
+// apply after the registry, so its exact vendor punctuation remains authoritative.
+const FALLBACK_DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	[/^gpt-(\d+(?:\.\d+)?)-([a-z0-9.-]+)$/, (m) => `GPT ${m[1]} ${displayTitleSuffix(m[2]!)}`],
-	// gpt-5.4 → GPT 5.4
 	[/^gpt-(\d+(?:\.\d+)?)$/, (m) => `GPT ${m[1]}`],
-	// x-ai/grok-4.6 → Grok 4.6
 	[/^(?:x-ai\/)?grok-((?:\d+\.)*\d+)$/, (m) => `Grok ${m[1]}`],
 ]
 
@@ -161,9 +164,13 @@ function displayModel(fullId: string | undefined): string {
 		const m = modelId.match(re)
 		if (m) return fmt(m)
 	}
-	// Curated patterns above stay authoritative for the vendors they cover; the
-	// registry name fills in the rest (DeepSeek, GLM, Kimi, MiniMax, …).
-	return registryName(fullId) ?? modelId
+	const name = registryName(fullId)
+	if (name) return name
+	for (const [re, fmt] of FALLBACK_DISPLAY_PATTERNS) {
+		const m = modelId.match(re)
+		if (m) return fmt(m)
+	}
+	return modelId
 }
 
 function reasoningEffort(fullId: string | undefined): string {

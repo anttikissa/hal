@@ -107,8 +107,20 @@ function hasConfiguredDirectSource(fullId: string): boolean {
 	return false
 }
 
+function nameSourceRank(id: string, provider: string): string {
+	let canonical = ''
+	if (id.includes('/')) canonical = 'openrouter'
+	else if (id.startsWith('gpt-') || id.startsWith('o') || id.startsWith('codex')) canonical = 'openai'
+	else if (id.startsWith('claude-')) canonical = 'anthropic'
+	else if (id.startsWith('gemini-')) canonical = 'google'
+	return `${provider === canonical ? '0' : '1'}:${provider}`
+}
+
 function modelsDevMetadata(data: Record<string, { models?: Record<string, any> }>): Record<string, ModelMetadata> {
 	const metadata: Record<string, ModelMetadata> = {}
+	// One id is listed by several provider catalogs. Prefer the route Hal will use;
+	// the ranked fallback keeps a missing canonical name independent of API order.
+	const nameSources = new Map<string, string>()
 	for (const [provider, catalog] of Object.entries(data)) {
 		for (const [id, raw] of Object.entries(catalog.models ?? {})) {
 			const context = raw.limit?.context
@@ -120,7 +132,13 @@ function modelsDevMetadata(data: Record<string, { models?: Record<string, any> }
 			}
 			if (context > model.context) model.context = context
 			if (typeof raw.limit?.output === 'number' && (!model.output || raw.limit.output > model.output)) model.output = raw.limit.output
-			if (typeof raw.name === 'string') model.name = raw.name
+			if (typeof raw.name === 'string') {
+				const source = nameSourceRank(id, provider)
+				if (!nameSources.has(id) || source < nameSources.get(id)!) {
+					model.name = raw.name
+					nameSources.set(id, source)
+				}
+			}
 			if (typeof raw.description === 'string') model.description = raw.description
 			if (typeof raw.family === 'string') model.family = raw.family
 			if (typeof raw.release_date === 'string') model.releaseDate = raw.release_date

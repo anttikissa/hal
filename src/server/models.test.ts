@@ -117,6 +117,28 @@ test('refreshModels reports relevant GPT and Claude additions and context change
 })
 
 
+test('model metadata takes display names from canonical providers, not resellers', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
+	process.env.HAL_STATE_DIR = dir
+	globalThis.fetch = Object.assign(async () => new Response(JSON.stringify({
+		openai: { models: { 'gpt-5.6-sol': { name: 'GPT-5.6 Sol', limit: { context: 1_050_000 } } } },
+		openrouter: { models: { 'deepseek/deepseek-v4.1-flash': { name: 'DeepSeek V4.1 Flash', limit: { context: 1_000_000 } } } },
+		reseller: { models: {
+			'gpt-5.6-sol': { name: 'GPT-5.6 Sol (50% Off)', limit: { context: 1_050_000 } },
+			'deepseek/deepseek-v4.1-flash': { name: 'DeepSeek V4.1 Flash (Reseller)', limit: { context: 1_000_000 } },
+		} },
+	})), { preconnect: () => {} }) as typeof fetch
+
+	try {
+		await serverModels.refreshModels()
+		expect(serverModels.cachedModelMetadata('openai/gpt-5.6-sol')?.name).toBe('GPT-5.6 Sol')
+		expect(serverModels.cachedModelMetadata('openrouter/deepseek/deepseek-v4.1-flash')?.name).toBe('DeepSeek V4.1 Flash')
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+
 test('refreshModels stores model metadata and source providers in the ASON cache', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
 	process.env.HAL_STATE_DIR = dir
