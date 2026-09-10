@@ -7,6 +7,42 @@ beforeEach(() => {
 
 afterEach(() => {
 	models.state.cache = null
+	models.state.names = {}
+})
+
+
+test('hydrated registry names display for models without a curated pattern', () => {
+	models.hydrate({}, [], {
+		'openrouter/deepseek/deepseek-v4.1-flash': 'DeepSeek V4.1 Flash',
+		'openrouter/z-ai/glm-5.3': 'GLM-5.3',
+		'openrouter/moonshotai/kimi-k3': 'Kimi K3',
+		'openrouter/minimax/minimax-m3': 'MiniMax M3',
+	})
+
+	expect(models.displayModel('openrouter/deepseek/deepseek-v4.1-flash')).toBe('DeepSeek V4.1 Flash')
+	expect(models.displayModel('openrouter/z-ai/glm-5.3')).toBe('GLM-5.3')
+	expect(models.displayModel('openrouter/moonshotai/kimi-k3')).toBe('Kimi K3')
+	expect(models.displayModel('openrouter/minimax/minimax-m3')).toBe('MiniMax M3')
+})
+
+
+test('curated display patterns win over hydrated registry names', () => {
+	// models.dev says "GPT-5.6 Sol" and "Claude Opus 5"; Hal prefers its own shorter forms.
+	models.hydrate({}, [], {
+		'openai/gpt-5.6-sol': 'GPT-5.6 Sol',
+		'anthropic/claude-opus-5': 'Claude Opus 5',
+		'openrouter/x-ai/grok-4.6': 'Grok 4.6',
+	})
+
+	expect(models.displayModel('openai/gpt-5.6-sol')).toBe('GPT 5.6 Sol')
+	expect(models.displayModel('anthropic/claude-opus-5')).toBe('Opus 5')
+	expect(models.displayModel('openrouter/x-ai/grok-4.6')).toBe('Grok 4.6')
+})
+
+
+test('an unknown model with no registry name falls back to its bare id', () => {
+	models.hydrate({}, [], {})
+	expect(models.displayModel('openrouter/stealth/ox-alpha')).toBe('stealth/ox-alpha')
 })
 
 test('gpt and openai aliases resolve to the terra tier', () => {

@@ -52,6 +52,15 @@ function contextWindows(metadata: Record<string, ModelMetadata>): Record<string,
 	return contexts
 }
 
+/** Display names from models.dev, for models Hal has no curated display pattern for. */
+function displayNames(metadata: Record<string, ModelMetadata>): Record<string, string> {
+	const names: Record<string, string> = {}
+	for (const [id, model] of Object.entries(metadata)) {
+		if (model.name) names[id] = model.name
+	}
+	return names
+}
+
 /** Every "vendor/model" id OpenRouter serves, newest release first. */
 function openrouterIds(metadata: Record<string, ModelMetadata>): string[] {
 	const ids: string[] = []
@@ -70,7 +79,7 @@ function loadModelsDevCache(): Record<string, number> {
 	try {
 		const parsed = ason.parse(readFileSync(modelsFile(), 'utf-8')) as unknown as ModelsDevCache
 		state.metadata = parsed.models
-		models.hydrate(contextWindows(parsed.models), openrouterIds(parsed.models))
+		models.hydrate(contextWindows(parsed.models), openrouterIds(parsed.models), displayNames(parsed.models))
 	} catch {
 		models.hydrate({})
 		state.metadata = {}
@@ -136,7 +145,7 @@ async function refreshModels(): Promise<RefreshModelsResult> {
 	ensureDir(process.env.HAL_STATE_DIR ?? STATE_DIR)
 	const cache: ModelsDevCache = { version: 1, models: metadata }
 	writeFileSync(modelsFile(), ason.stringify(cache) + '\n')
-	models.hydrate(next, openrouterIds(metadata))
+	models.hydrate(next, openrouterIds(metadata), displayNames(metadata))
 	state.metadata = metadata
 	return {
 		fetched: true,

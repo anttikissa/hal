@@ -161,7 +161,9 @@ function displayModel(fullId: string | undefined): string {
 		const m = modelId.match(re)
 		if (m) return fmt(m)
 	}
-	return modelId
+	// Curated patterns above stay authoritative for the vendors they cover; the
+	// registry name fills in the rest (DeepSeek, GLM, Kimi, MiniMax, …).
+	return registryName(fullId) ?? modelId
 }
 
 function reasoningEffort(fullId: string | undefined): string {
@@ -180,15 +182,30 @@ const state = {
 	cache: null as Record<string, number> | null,
 	// Every OpenRouter model id known to models.dev ("vendor/model"), newest first.
 	openrouterIds: [] as string[],
+	// Display names from models.dev, keyed by the id models.dev reports. These cover
+	// vendors Hal has no curated pattern for (DeepSeek, GLM, Kimi, MiniMax, …).
+	names: {} as Record<string, string>,
 }
 
 function modelCache(): Record<string, number> {
 	return state.cache ?? {}
 }
 
-function hydrate(cache: Record<string, number>, openrouterIds: string[] = []): void {
+function hydrate(cache: Record<string, number>, openrouterIds: string[] = [], names: Record<string, string> = {}): void {
 	state.cache = cache
 	state.openrouterIds = openrouterIds
+	state.names = names
+}
+
+// Registry names arrive keyed by models.dev ids, which drop Hal's provider prefix
+// ("deepseek/deepseek-v4.1-flash" for "openrouter/deepseek/deepseek-v4.1-flash").
+function registryName(fullId: string): string | undefined {
+	const direct = state.names[fullId]
+	if (direct) return direct
+	const slash = fullId.indexOf('/')
+	if (slash < 0) return undefined
+	if (!DIRECT_PROVIDERS.includes(fullId.slice(0, slash))) return undefined
+	return state.names[fullId.slice(slash + 1)]
 }
 
 interface FrontierModelInfo {
