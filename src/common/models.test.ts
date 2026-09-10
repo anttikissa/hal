@@ -7,16 +7,16 @@ beforeEach(() => {
 
 afterEach(() => {
 	models.state.cache = null
-	models.state.names = {}
+	models.state.metadata = {}
 })
 
 
 test('hydrated registry names display for models without a curated pattern', () => {
 	models.hydrate({}, [], {
-		'openrouter/deepseek/deepseek-v4.1-flash': 'DeepSeek V4.1 Flash',
-		'openrouter/z-ai/glm-5.3': 'GLM-5.3',
-		'openrouter/moonshotai/kimi-k3': 'Kimi K3',
-		'openrouter/minimax/minimax-m3': 'MiniMax M3',
+		'deepseek/deepseek-v4.1-flash': { name: 'DeepSeek V4.1 Flash' },
+		'z-ai/glm-5.3': { name: 'GLM-5.3' },
+		'moonshotai/kimi-k3': { name: 'Kimi K3' },
+		'minimax/minimax-m3': { name: 'MiniMax M3' },
 	})
 
 	expect(models.displayModel('openrouter/deepseek/deepseek-v4.1-flash')).toBe('DeepSeek V4.1 Flash')
@@ -28,9 +28,9 @@ test('hydrated registry names display for models without a curated pattern', () 
 
 test('registry names use official GPT punctuation while curated Claude names stay short', () => {
 	models.hydrate({}, [], {
-		'openai/gpt-5.6-sol': 'GPT-5.6 Sol',
-		'anthropic/claude-opus-5': 'Claude Opus 5',
-		'openrouter/x-ai/grok-4.6': 'Grok 4.6',
+		'gpt-5.6-sol': { name: 'GPT-5.6 Sol' },
+		'claude-opus-5': { name: 'Claude Opus 5' },
+		'x-ai/grok-4.6': { name: 'Grok 4.6' },
 	})
 
 	expect(models.displayModel('openai/gpt-5.6-sol')).toBe('GPT-5.6 Sol')

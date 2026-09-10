@@ -52,14 +52,6 @@ function contextWindows(metadata: Record<string, ModelMetadata>): Record<string,
 	return contexts
 }
 
-/** Display names from models.dev, for models Hal has no curated display pattern for. */
-function displayNames(metadata: Record<string, ModelMetadata>): Record<string, string> {
-	const names: Record<string, string> = {}
-	for (const [id, model] of Object.entries(metadata)) {
-		if (model.name) names[id] = model.name
-	}
-	return names
-}
 
 /** Every "vendor/model" id OpenRouter serves, newest release first. */
 function openrouterIds(metadata: Record<string, ModelMetadata>): string[] {
@@ -79,7 +71,7 @@ function loadModelsDevCache(): Record<string, number> {
 	try {
 		const parsed = ason.parse(readFileSync(modelsFile(), 'utf-8')) as unknown as ModelsDevCache
 		state.metadata = parsed.models
-		models.hydrate(contextWindows(parsed.models), openrouterIds(parsed.models), displayNames(parsed.models))
+		models.hydrate(contextWindows(parsed.models), openrouterIds(parsed.models), parsed.models)
 	} catch {
 		models.hydrate({})
 		state.metadata = {}
@@ -107,21 +99,19 @@ function hasConfiguredDirectSource(fullId: string): boolean {
 	return false
 }
 
-function nameSourceRank(id: string, provider: string): string {
-	let canonical = ''
-	if (id.includes('/')) canonical = 'openrouter'
-	else if (id.startsWith('gpt-') || id.startsWith('o') || id.startsWith('codex')) canonical = 'openai'
-	else if (id.startsWith('claude-')) canonical = 'anthropic'
-	else if (id.startsWith('gemini-')) canonical = 'google'
-	return `${provider === canonical ? '0' : '1'}:${provider}`
+function canonicalNameProvider(id: string): string {
+	if (id.includes('/')) return 'openrouter'
+	if (id.startsWith('gpt-') || id.startsWith('o') || id.startsWith('codex')) return 'openai'
+	if (id.startsWith('claude-')) return 'anthropic'
+	if (id.startsWith('gemini-')) return 'google'
+	return ''
 }
 
 function modelsDevMetadata(data: Record<string, { models?: Record<string, any> }>): Record<string, ModelMetadata> {
 	const metadata: Record<string, ModelMetadata> = {}
-	// One id is listed by several provider catalogs. Prefer the route Hal will use;
-	// the ranked fallback keeps a missing canonical name independent of API order.
-	const nameSources = new Map<string, string>()
-	for (const [provider, catalog] of Object.entries(data)) {
+	// One id is listed by several provider catalogs. The canonical route wins;
+	// sorting supplies a stable fallback when that catalog has no name.
+	for (const [provider, catalog] of Object.entries(data).sort(([a], [b]) => a.localeCompare(b))) {
 		for (const [id, raw] of Object.entries(catalog.models ?? {})) {
 			const context = raw.limit?.context
 			if (typeof context !== 'number') continue
@@ -132,13 +122,7 @@ function modelsDevMetadata(data: Record<string, { models?: Record<string, any> }
 			}
 			if (context > model.context) model.context = context
 			if (typeof raw.limit?.output === 'number' && (!model.output || raw.limit.output > model.output)) model.output = raw.limit.output
-			if (typeof raw.name === 'string') {
-				const source = nameSourceRank(id, provider)
-				if (!nameSources.has(id) || source < nameSources.get(id)!) {
-					model.name = raw.name
-					nameSources.set(id, source)
-				}
-			}
+			if (typeof raw.name === 'string' && (!model.name || provider === canonicalNameProvider(id))) model.name = raw.name
 			if (typeof raw.description === 'string') model.description = raw.description
 			if (typeof raw.family === 'string') model.family = raw.family
 			if (typeof raw.release_date === 'string') model.releaseDate = raw.release_date
@@ -163,7 +147,7 @@ async function refreshModels(): Promise<RefreshModelsResult> {
 	ensureDir(process.env.HAL_STATE_DIR ?? STATE_DIR)
 	const cache: ModelsDevCache = { version: 1, models: metadata }
 	writeFileSync(modelsFile(), ason.stringify(cache) + '\n')
-	models.hydrate(next, openrouterIds(metadata), displayNames(metadata))
+	models.hydrate(next, openrouterIds(metadata), metadata)
 	state.metadata = metadata
 	return {
 		fetched: true,
