@@ -17,15 +17,29 @@ test('history-rebased reloads exactly the rebased log prefix', () => {
 })
 
 
-test('history-updated reloads persisted history without peeking into a later live turn', () => {
+test('history-updated force-repaints only the active tab', () => {
 	const tab = { sessionId: 's1' }
 	const calls: any[] = []
 	clientEvents.handle({ type: 'history-updated', sessionId: 's1' }, {
 		tabForSession: () => tab,
+		currentTab: () => tab,
 		reloadTabFromDisk: (...args: any[]) => calls.push(['reload', ...args]),
 		onChange: (force: boolean) => calls.push(['change', force]),
 	})
 	expect(calls).toEqual([['reload', tab, { includeLive: false }], ['change', true]])
+})
+
+test('background history update redraws its tab marker without a force repaint', () => {
+	const active = { sessionId: 's4' }
+	const background = { sessionId: 's5' }
+	const calls: any[] = []
+	clientEvents.handle({ type: 'history-updated', sessionId: 's5' }, {
+		tabForSession: () => background,
+		currentTab: () => active,
+		reloadTabFromDisk: (...args: any[]) => calls.push(['reload', ...args]),
+		onChange: (force: boolean) => calls.push(['change', force]),
+	})
+	expect(calls).toEqual([['reload', background, { includeLive: false }], ['change', false]])
 })
 
 

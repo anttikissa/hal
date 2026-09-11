@@ -148,8 +148,10 @@ function handleHistoryUpdated(event: any, ctx: any): void {
 	if (!tab) return
 	// This event is an ordered persisted-history boundary. Reading live.ason here
 	// can peek past the event into a generation whose stream-start is still queued.
+	// A background question still changes its tab marker, but must not force-repaint
+	// the focused tab and clear the scrollback the user is inspecting.
 	ctx.reloadTabFromDisk(tab, { includeLive: false })
-	ctx.onChange(true)
+	ctx.onChange(ctx.currentTab() === tab)
 }
 
 function handleHistoryRebased(event: any, ctx: any): void {
