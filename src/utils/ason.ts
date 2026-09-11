@@ -52,8 +52,9 @@ function commentPrefix(comment: string | undefined, pad: string): string {
 }
 
 // Tabs encode one ASON indentation level; keep wrapping compatible with the former two-column indentation.
+// In long mode, skip the unused inline candidate: computing both forms at every level is exponential.
 function renderCollection(open: string, close: string, inline: string, col: number, depth: number, maxWidth: number, hasComments: boolean, buildLines: (pad: string, childDepth: number) => string[]): string {
-	if (!hasComments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
+	if (maxWidth > 0 && !hasComments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 	const childDepth = depth + 1
 	return `${open}\n${buildLines('\t'.repeat(childDepth), childDepth).join('\n')}\n${'\t'.repeat(depth)}${close}`
 }
@@ -74,7 +75,7 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 	if (Array.isArray(obj)) {
 		if (obj.length === 0) return '[]'
 		const comments = maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
-		const inline = `[${obj.map((v) => stringifyValue(v, 0, depth, maxWidth)).join(', ')}]`
+		const inline = maxWidth === 0 ? '' : `[${obj.map((v) => stringifyValue(v, 0, depth, maxWidth)).join(', ')}]`
 		return renderCollection('[', ']', inline, col, depth, maxWidth, !!comments, (pad, childDepth) =>
 			obj.map((v, i) => `${commentPrefix(comments?.[i], pad)}${pad}${stringifyValue(v, childDepth * 2, childDepth, maxWidth)}${i < obj.length - 1 ? ',' : ''}`),
 		)
@@ -85,7 +86,7 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		const keys = Object.keys(rec)
 		if (keys.length === 0) return '{}'
 		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
-		const inline = `{ ${keys.map((k) => `${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth)}`).join(', ')} }`
+		const inline = maxWidth === 0 ? '' : `{ ${keys.map((k) => `${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth)}`).join(', ')} }`
 		return renderCollection('{', '}', inline, col, depth, maxWidth, !!comments, (pad, childDepth) =>
 			keys.map((k, i) => `${commentPrefix(comments?.[k], pad)}${pad}${quoteKey(k)}: ${stringifyValue(rec[k], childDepth * 2 + `${quoteKey(k)}: `.length, childDepth, maxWidth)}${i < keys.length - 1 ? ',' : ''}`),
 		)

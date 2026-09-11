@@ -139,6 +139,23 @@ describe('stringify modes', () => {
 		expect(result).toBe('{\n\ta: 1\n}')
 	})
 
+	test('long visits each nested value once', () => {
+		let reads = 0
+		let value: unknown = 1
+		for (let depth = 0; depth < 12; depth++) {
+			const child = value
+			value = Object.defineProperty({}, 'next', {
+				enumerable: true,
+				get: () => {
+					reads++
+					return child
+				},
+			})
+		}
+		stringify(value, 'long')
+		expect(reads).toBe(12)
+	})
+
 	test('default is smart', () => {
 		expect(stringify(wide)).toBe(stringify(wide, 'smart'))
 	})
