@@ -44,6 +44,16 @@ test('returns Markdown responses without HTML extraction', async () => {
 	expect(out).toBe('# API\n\nUseful documentation.\n')
 })
 
+test('returns plain-text source files without HTML extraction', async () => {
+	const source = 'export function identity<T>(value: T): T {\n\treturn value\n}\n'
+	globalThis.fetch = (async () => new Response(source, {
+		headers: { 'content-type': 'text/plain; charset=utf-8' },
+	})) as unknown as typeof fetch
+
+	const out = await readUrl.execute({ url: 'https://raw.githubusercontent.com/example/project/main/file.ts' }, { sessionId: 's', cwd: process.cwd() })
+	expect(out).toBe(source)
+})
+
 test('rejects invalid urls', async () => {
 	const out = await readUrl.execute({ url: 'nope' }, { sessionId: 's', cwd: process.cwd() })
 	expect(out).toBe('error: invalid url')

@@ -1,6 +1,6 @@
-// Read URL tool — fetch a web page and pull out readable text.
+// Read URL tool — fetch a web page or plain-text resource.
 //
-// This stays tiny on purpose. It is only meant as a simple first pass.
+// HTML gets a tiny readability pass; other textual responses stay verbatim.
 
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 
@@ -44,7 +44,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const response = await fetch(url, { signal: ctx.signal })
 	const raw = await response.text()
 	const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
-	if (contentType === 'text/markdown') {
+	if (contentType?.startsWith('text/') && contentType !== 'text/html') {
 		if (raw.length <= MAX_OUTPUT) return raw || 'error: no readable content found'
 		return raw.slice(0, MAX_OUTPUT) + '\n[… truncated]'
 	}
@@ -83,7 +83,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 
 const readUrlTool: Tool = {
 	name: 'read_url',
-	description: 'Read a web page and extract simple readable text from HTML.',
+	description: 'Read a web page or text file, extracting simple readable text from HTML.',
 	parameters: {
 		url: { type: 'string', description: 'HTTP or HTTPS URL to read' },
 	},
