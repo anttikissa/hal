@@ -418,8 +418,8 @@ function getInputHistory(): string[] {
 	return currentTab()?.inputHistory ?? []
 }
 
-function appendInputHistory(line: string): void {
-	const tab = currentTab()
+function appendInputHistory(line: string, sessionId?: string): void {
+	const tab = sessionId ? state.tabs.find((item) => item.sessionId === sessionId) : currentTab()
 	if (!tab || !line.trim()) return
 	tab.inputHistory.push(line)
 }
@@ -462,8 +462,8 @@ function clearDraft(sessionId?: string): void {
 	draftModule.clearDraft(sid)
 }
 
-function onSubmit(text: string): void {
-	appendInputHistory(text)
+function onSubmit(text: string, promptWillArrive = false): void {
+	if (!promptWillArrive) appendInputHistory(text)
 	clearDraft()
 }
 
@@ -595,6 +595,7 @@ function handleEvent(event: any): void {
 		},
 		currentTab,
 		tabForSession,
+		appendInputHistory: (sessionId: string, text: string) => appendInputHistory(text, sessionId),
 		sessionLabel,
 		addBlockToTab,
 		showServerRestart,

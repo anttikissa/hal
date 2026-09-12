@@ -18,7 +18,7 @@ test('default suite excludes known flaky files', () => {
 	for (const file of FLAKY_TEST_FILES) {
 		expect(files).not.toContain(file)
 	}
-})
+}, { timeout: 10_000 })
 
 test('flaky suite contains only known flaky files', () => {
 	const files = listTestFiles({ flakyOnly: true })

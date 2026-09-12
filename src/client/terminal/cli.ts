@@ -408,8 +408,8 @@ function submitPromptText(text: string, displayText: string | undefined, queue?:
 	client.sendCommand(type, text, displayText === text ? undefined : displayText, queue)
 	prompt.clear()
 	clearSavedPromptState()
-	// Update tab's inputHistory + clear persisted draft
-	client.onSubmit(text)
+	// The accepted prompt event updates the per-tab recall list in every client.
+	client.onSubmit(text, true)
 }
 
 function handleLocalCommand(text: string): boolean {

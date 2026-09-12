@@ -61,6 +61,19 @@ describe('client streaming blocks', () => {
 		expect(client.currentTab()!.history[0]).toMatchObject({ type: 'user', text: 'Steer', status: 'steering' })
 	})
 
+	test('prompt event updates the originating tab up-arrow history', () => {
+		client.state.tabs.push(makeTab('s2'))
+		client.handleEvent({
+			type: 'prompt',
+			sessionId: 's2',
+			text: '[...paste]',
+			actualText: 'full prompt',
+		})
+
+		expect(client.state.tabs[0]!.inputHistory).toEqual([])
+		expect(client.state.tabs[1]!.inputHistory).toEqual(['full prompt'])
+	})
+
 	test('thinking stream becomes a real block with blob metadata and survives stream end', () => {
 		const createdAt = '2026-04-05T17:31:00.000Z'
 		client.handleEvent({

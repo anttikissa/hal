@@ -29,6 +29,9 @@ function handle(event: any, ctx: any): void {
 function handlePrompt(event: any, ctx: any): void {
 	if (event.label === 'steering') ctx.cancelDelayedPaused(event.sessionId ?? null)
 	else ctx.flushDelayedPaused(event.sessionId ?? null)
+	// Prompt events are broadcast to every client, so they are the one common point
+	// for keeping each tab's recall list in sync with persisted local-user history.
+	if (!event.source) ctx.appendInputHistory?.(event.sessionId, event.actualText ?? event.text)
 	ctx.addBlockToTab(event.sessionId, {
 		type: 'user',
 		id: typeof event.id === 'string' ? event.id : undefined,

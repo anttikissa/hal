@@ -79,6 +79,24 @@ test('prompt event keeps actual text behind display text', () => {
 	expect(cleared).toEqual(['s1'])
 })
 
+test('prompt events add remote local-user prompts to up-arrow history', () => {
+	const recalls: Array<{ sessionId: string; text: string }> = []
+	clientEvents.handle({ type: 'prompt', id: 'prompt-1', sessionId: 's1', text: '[...paste]', actualText: 'full prompt' }, {
+		flushDelayedPaused: () => {},
+		addBlockToTab: () => {},
+		appendInputHistory: (sessionId: string, text: string) => recalls.push({ sessionId, text }),
+		clearPendingPrompt: () => {},
+	})
+	clientEvents.handle({ type: 'prompt', id: 'prompt-2', sessionId: 's1', text: 'handoff', source: 'other-tab' }, {
+		flushDelayedPaused: () => {},
+		addBlockToTab: () => {},
+		appendInputHistory: (sessionId: string, text: string) => recalls.push({ sessionId, text }),
+		clearPendingPrompt: () => {},
+	})
+
+	expect(recalls).toEqual([{ sessionId: 's1', text: 'full prompt' }])
+})
+
 test('runtime-start from promoted client is not described as restart', () => {
 	let restart: any = null
 	let promotion: any = null
