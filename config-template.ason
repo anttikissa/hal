@@ -105,6 +105,10 @@
 		// Mask account email addresses in usage and status output.
 		censorEmails: false
 	},
+	accountRotation: {
+		// How to pick an available account after quota exhaustion: 'leastUsed' or 'next'.
+		strategy: 'leastUsed'
+	},
 	anthropicUsage: {
 		// Minimum delay between automatic usage refreshes.
 		minAutoRefreshMs: 60000,

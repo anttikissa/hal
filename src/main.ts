@@ -25,6 +25,7 @@ import { anthropicUsage } from './server/anthropic-usage.ts'
 import { resolve } from 'path'
 import { tabs } from './server/tabs.ts'
 import { auth } from './server/auth.ts'
+import { accountRotation } from './server/account-rotation.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { cliArgs } from './client/terminal/args.ts'
 import { terminalOutput } from './client/terminal/terminal-output.ts'
@@ -52,6 +53,24 @@ function subscriptionStatus(provider: string): SubscriptionStatus | null {
 		return { index: account.index, total: account.total, windows }
 	}
 	return null
+}
+
+function accountUsageWindows(provider: string, key: string) {
+	if (provider === 'openai') {
+		const account = openaiUsage.state.accounts[key]
+		return account ? openaiUsage.observationWindows(account) : []
+	}
+	if (provider === 'anthropic') {
+		const account = anthropicUsage.state.accounts[key]
+		return account ? anthropicUsage.observationWindows(account) : []
+	}
+	return []
+}
+
+function currentAccountKey(provider: string): string {
+	if (provider === 'openai') return openaiUsage.state.currentKey
+	if (provider === 'anthropic') return anthropicUsage.state.currentKey
+	return ''
 }
 
 const parsedArgs = cliArgs.parse(process.argv.slice(2), { cwd: process.cwd(), halDir: HAL_DIR })
@@ -116,6 +135,8 @@ openaiUsage.init()
 perf.mark('OpenAI usage initialized')
 anthropicUsage.init()
 perf.mark('Anthropic usage initialized')
+accountRotation.io.currentKey = currentAccountKey
+accountRotation.io.usageWindows = accountUsageWindows
 clientBackend.install({
 	paths: { halDir: HAL_DIR, stateDir: STATE_DIR },
 	sessions: {

@@ -17,6 +17,7 @@ import { liveFiles } from '../utils/live-file.ts'
 import { HAL_DIR } from './state.ts'
 import { ason } from '../utils/ason.ts'
 import { log } from '../utils/log.ts'
+import { accountRotation } from './account-rotation.ts'
 
 const AUTH_PATH = `${HAL_DIR}/auth.ason`
 
@@ -155,6 +156,7 @@ function getCredential(providerName: string): Credential | undefined {
 	const now = Date.now()
 	const total = entries.length
 	let hasConfiguredCredential = false
+	const available: Credential[] = []
 
 	// Try configured entries first. Only real credentials count; metadata-only
 	// objects should not block fallback to an environment API key.
@@ -164,9 +166,9 @@ function getCredential(providerName: string): Credential | undefined {
 		if (!cred) continue
 		hasConfiguredCredential = true
 		const cooldownUntil = loadCooldowns().get(key)
-		if (cooldownUntil && now < cooldownUntil) continue
-		return cred
+		if (!cooldownUntil || now >= cooldownUntil) available.push(cred)
 	}
+	if (available.length > 0) return accountRotation.pick(providerName, available)
 
 	// If configured accounts exist but every one is cooling down, keep rotating
 	// within that configured pool. Falling through to an env var here makes local
@@ -244,16 +246,13 @@ function allOnCooldownMessage(providerName: string): string | null {
 
 /** Get full auth entry for a provider (for refresh, account ID, etc.) */
 function getEntry(providerName: string): Record<string, any> {
-	// For multi-account, return the entry matching the current (non-cooldown) credential
+	// For multi-account auth, return the entry selected by the rotation policy.
 	const raw = store()[providerName]
 	if (Array.isArray(raw)) {
-		const now = Date.now()
+		const credential = auth.getCredential(providerName)
 		for (let i = 0; i < raw.length; i++) {
-			const cooldownUntil = loadCooldowns().get(cooldownKey(providerName, raw[i], i))
-			if (cooldownUntil && now < cooldownUntil) continue
-			return raw[i] ?? {}
+			if (cooldownKey(providerName, raw[i], i) === credential?._key) return raw[i] ?? {}
 		}
-		// All on cooldown — return first
 		return raw[0] ?? {}
 	}
 	return raw ?? {}

@@ -5,6 +5,7 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test'
 import { auth, type Credential } from './auth.ts'
+import { accountRotation } from './account-rotation.ts'
 
 // ── Helpers ──
 // We inject a fake store via auth._setStoreForTest so we don't touch
@@ -53,6 +54,9 @@ describe('auth.getCredential — single account (backward compat)', () => {
 describe('auth.getCredential — multi-account rotation', () => {
 	beforeEach(() => {
 		auth._resetCooldowns()
+		accountRotation.config.strategy = 'leastUsed'
+		accountRotation.io.currentKey = () => ''
+		accountRotation.io.usageWindows = () => []
 		auth._setStoreForTest({
 			openai: [
 				fakeAccount('a@test.com', 'tok_a'),
@@ -72,6 +76,20 @@ describe('auth.getCredential — multi-account rotation', () => {
 		const cred = auth.getCredential('openai')
 		expect(cred!.index).toBe(0)
 		expect(cred!.total).toBe(3)
+	})
+
+	test('leastUsed selects among credentials not on cooldown', () => {
+		accountRotation.io.usageWindows = (_provider, key) => [{
+			durationMinutes: 10_080,
+			usedPercent: { 'openai:a@test.com': 61, 'openai:b@test.com': 24, 'openai:c@test.com': 45 }[key]!,
+		}]
+
+		const first = auth.getCredential('openai')!
+		expect(first.value).toBe('tok_b')
+		expect(auth.getEntry('openai').email).toBe('b@test.com')
+		accountRotation.io.currentKey = () => first._key!
+		auth.markCooldown(first, 60_000)
+		expect(auth.getCredential('openai')!.value).toBe('tok_c')
 	})
 
 	test('skips account on cooldown', () => {

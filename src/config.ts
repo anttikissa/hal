@@ -21,6 +21,7 @@ import { openaiUsage } from './server/openai-usage.ts'
 import { openai } from './server/providers/openai.ts'
 import { halProvider } from './server/providers/hal.ts'
 import { subscriptionUsage } from './common/subscription-usage.ts'
+import { accountRotation } from './server/account-rotation.ts'
 import { toolRegistry } from './server/tools/tool.ts'
 import { log } from './utils/log.ts'
 import { ipc } from './server/file-ipc.ts'
@@ -43,6 +44,7 @@ const modules: Record<string, Record<string, any>> = {
 	memory: memory.config,
 	models: models.config,
 	subscriptionUsage: subscriptionUsage.config,
+	accountRotation: accountRotation.config,
 	anthropicUsage: anthropicUsage.config,
 	openaiUsage: openaiUsage.config,
 	openai: openai.config,
