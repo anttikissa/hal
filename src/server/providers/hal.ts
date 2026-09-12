@@ -17,6 +17,7 @@ type ScriptPage = {
 const config = {
 	/** Streaming speed for HAL's built-in scripted models. */
 	wordsPerSecond: 10,
+	tableChunksPerSecond: 60,
 }
 
 function introScript(): string {
@@ -118,7 +119,6 @@ function providerSetupText(): string {
 // Replaying real token boundaries is essential—the renderer's layout changes depend
 // on a pipe, Markdown marker, or word fragment arriving independently.
 const tableChunks = "##\u001f Recently\u001f active\u001f open\u001f tabs\u001f\n\n\u001f|\u001f Session\u001f |\u001f Last\u001f activity\u001f*\u001f |\u001f Topic\u001f /\u001f last\u001f prompt\u001f |\n\u001f|\u001f---\u001f|\u001f---\u001f:\u001f|\u001f---\u001f|\n\u001f|\u001f **\u001f133\u001f-p\u001fod\u001f**\u001f *(\u001fcurrent\u001f;\u001f working\u001f)*\u001f |\u001f \u001f20\u001f:\u001f54\u001f |\u001f “\u001fShow\u001f recently\u001f active\u001f tabs\u001f”\u001f |\n\u001f|\u001f **\u001f133\u001f-\u001fzen\u001f**\u001f |\u001f \u001f19\u001f:\u001f29\u001f |\u001f Private\u001f Hal\u001f marketing\u001f /\u001f launch\u001f plan\u001f |\n\u001f|\u001f **\u001f133\u001f-h\u001fuh\u001f**\u001f |\u001f \u001f19\u001f:\u001f25\u001f |\u001f “\u001faut\u001fost\u001fash\u001f autore\u001fbase\u001f”\u001f |\n\u001f|\u001f **\u001f133\u001f-\u001ffoo\u001f**\u001f |\u001f \u001f19\u001f:\u001f10\u001f |\u001f “\u001fwith\u001f mc\u001fporter\u001f”\u001f |\n\u001f|\u001f **\u001f133\u001f-web\u001f**\u001f |\u001f \u001f19\u001f:\u001f09\u001f |\u001f No\u001f user\u001f prompt\u001f recorded\u001f |\n\u001f|\u001f **\u001f119\u001f-m\u001fac\u001f**\u001f |\u001f \u001f15\u001f:\u001f52\u001f |\u001f Web\u001f mobile\u001f improvements\u001f plan\u001f |\n\u001f|\u001f **\u001f119\u001f-\u001fgnu\u001f**\u001f |\u001f \u001f15\u001f:\u001f41\u001f |\u001f Build\u001f synthetic\u001f intro\u001f provider\u001f |\n\u001f|\u001f **\u001f115\u001f-\u001faug\u001f**\u001f |\u001f \u001f13\u001f:\u001f18\u001f |\u001f Su\u001funn\u001fit\u001ftele\u001f per\u001fint\u001fä\u001fkir\u001fje\u001fiden\u001f maks\u001fut\u001f ja\u001f tark\u001fist\u001fukset\u001f |\n\n\u001f\\\u001f*\u001fTimes\u001f are\u001f local\u001f (\u001fE\u001fEST\u001f),\u001f based\u001f on\u001f the\u001f latest\u001f history\u001f activity\u001f.\u001f There\u001f are\u001f **\u001f26\u001f open\u001f tabs\u001f**\u001f in\u001f total\u001f;\u001f the\u001f first\u001f five\u001f above\u001f are\u001f today\u001f’s\u001f most\u001f recent\u001f.".split('\x1f')
-
 // Deliberately not a general XML parser. Unrecognized markup is intro text.
 const CONTROL_RE = /<pause for="(\d+(?:\.\d+)?)s"\s*\/>|<pause until="enter"\s*\/>|<config key="([^"]+)" value="([^"]*)"\s*\/>/g
 
@@ -213,6 +213,20 @@ async function* streamText(text: string, req: ProviderRequest): AsyncGenerator<P
 	}
 }
 
+function tableStreamDelay(): number {
+	const rate = halProvider.config.tableChunksPerSecond
+	if (!Number.isFinite(rate) || rate <= 0) throw new Error('halProvider.tableChunksPerSecond must be greater than zero')
+	return 1000 / rate
+}
+
+async function* streamTable(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
+	for (const chunk of tableChunks) {
+		if (req.signal?.aborted) return
+		yield { type: 'text', text: chunk }
+		await halProvider.sleep(tableStreamDelay(), req.signal)
+	}
+}
+
 function toolResultIds(messages: Message[]): Set<string> {
 	const ids = new Set<string>()
 	for (const message of messages) {
@@ -258,6 +272,11 @@ async function* scrollRepro(req: ProviderRequest): AsyncGenerator<ProviderStream
 }
 
 async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
+	if (req.model === 'table' && !halProvider.script) {
+		yield* streamTable(req)
+		yield { type: 'done' }
+		return
+	}
 	if (req.model === 'scroll' && !halProvider.script) {
 		yield* scrollRepro(req)
 		return
@@ -293,4 +312,4 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 const provider: Provider = { generate }
 
 // script stays empty unless a caller pins one scenario for every model.
-export const halProvider = { config, state, script: '', introScript, suggestions, priorities, random: Math.random, detectedProviders, introDefaultModel, introModelText, providerSetupText, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, toolResultIds, scrollCalls, scrollRepro }
+export const halProvider = { config, state, script: '', introScript, suggestions, priorities, random: Math.random, detectedProviders, introDefaultModel, introModelText, providerSetupText, provider, pages, scriptFor, nextPage, wordChunks, sleep, streamText, tableStreamDelay, streamTable, toolResultIds, scrollCalls, scrollRepro }

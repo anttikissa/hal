@@ -134,7 +134,9 @@
 	},
 	halProvider: {
 		// Number of words streamed per second by HAL's built-in scripted models.
-		wordsPerSecond: 10
+		wordsPerSecond: 10,
+		// Number of captured fragments per second in the table-layout reproduction.
+		tableChunksPerSecond: 60
 	},
 	toolRegistry: {
 		// Hard cap for any tool result sent back to the model.
