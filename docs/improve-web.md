@@ -26,23 +26,20 @@ per-session snapshots over one WebSocket. Recent work includes:
 
 What is still broken or missing, roughly in order of pain:
 
-1. No notifications. An agent that finishes, stalls, or waits on a durable
-   question is invisible until you open the page. Field research is unanimous:
-   missed approvals are the #1 reason people abandon phone-based agent control.
-2. Output is mostly raw `pre-wrap` text: no markdown, code blocks, collapsing of
-   tool noise, copy button, or diff rendering. It remains hard to read on a phone.
-3. Connection lifecycle is `location.reload()` after 1s on close. Backgrounded
+1. Connection lifecycle is `location.reload()` after 1s on close. Backgrounded
    iOS Safari kills sockets constantly; reload loses scroll position and feels
    broken. There is no offline/connecting indicator.
-4. The composer has multiline and queue controls, but still lacks abort,
+2. The composer has multiline and queue controls, but still lacks abort,
    autocomplete, and a plan for increasingly complex mobile keyboard behavior.
+3. Formatting is now structured markdown with compact tool cards, but code-copy,
+   diff rendering, and better long-output handling would make phone review easier.
 
 ## What the evidence says mobile is *for*
 
 Ranked by observed frequency across reviews/threads (Happy, Omnara, Claude
 Code remote-control discussions, r/ClaudeAI, HN):
 
-1. Monitor long runs; unblock approvals; get notified when done.
+1. Monitor long runs and unblock approvals.
 2. Short steering prompts ("keep going", "not like that", voice-dictated).
 3. Glance at summaries/diffs lightly; read the last assistant message.
 4. Kick off a new task from a thought away from the desk.
@@ -51,36 +48,28 @@ Explicitly *not* done on phones: deep multi-file review, starting projects,
 complex debugging ("serious review waits until I'm back at the Mac" — HN
 48140529). Design consequence: optimize the phone UI for the
 supervision loop (see → decide → nudge), not for typing or reviewing.
-Tactic Remote's writeups call this "supervise, don't type"; their data point:
-62% of approvals handled from the notification itself when notifications carry
-enough context.
 
 ---
 
 ## Top 5 priorities
 
-### 1. Question notifications
+### 1. Visible tool confirmations
 
-Inline durable questions now cover risky-tool approval end-to-end in terminal and
+Durable questions and tool confirmations are rendered inline in the terminal and
 web clients: exact tool context, ordered No/Yes choices, history-backed restart,
-and frozen ordinary composers. The remaining high-leverage work is notification:
+and frozen ordinary composers. Keep a pending question visible in the selected
+session and easy to find from the mobile session sheet; do not bury it in the
+transcript.
 
-- **Notify later**: plain, short, session-specific notifications that deep-link
-  to the right session: `Hal: session 119-mac finished.`, `Hal: session
-  119-mac wants approval.`, `Hal: session 119-mac rate limited.`, or `Hal:
-  session 119-mac: error 5xx server overloaded.` Send only the relevant one.
-  Tapping opens the session's question or latest event; notifications do not
-  contain approvals or other action controls.
-- **Delivery choices, deferred**: Web Push for installed iOS Home-Screen apps
-  is HTTPS-only. An optional ntfy bridge can serve standalone/local-host users
-  who install its companion app. Add neither implementation until the core
-  mobile supervision UI is solid.
+The web client is intentionally a supervision surface while it is open. Background
+notifications are out of scope. If notifications become a requirement, build a
+native app rather than adding a notification delivery channel to the web client.
 
-Acceptance: a relevant notification opens its matching session directly.
+Acceptance: a pending question is visible in its matching session and can be
+answered there without losing the surrounding transcript.
 
-Safety: never offer permission bypass from the phone. Unanswered questions are
-durable and have no automatic timeout; notify only when input is genuinely
-needed and put notification opt-out in the first useful settings surface.
+Safety: never offer permission bypass from the phone. Unanswered questions remain
+durable and have no automatic timeout.
 
 ### 2. Session board as home screen
 
@@ -161,9 +150,8 @@ Effort M. Impact M-H (this is how people actually use phones: short nudges).
 
 ## Side quests (next 5–10, unordered)
 
-A. **PWA installability**: manifest, icons, standalone display. Needed before
-   iOS Web Push; this feature is HTTPS-only. Keep it small until notifications
-   move from roadmap to implementation.
+A. **Standalone web app polish**: manifest, icons, and standalone display are
+   already available. Keep future work focused on the app shell and mobile layout.
 B. **Diff viewer for edits**: when a tool call is edit-like, render stacked
    +/- lines with syntax tinting instead of JSON dump. Tap-to-expand full file
    comes later; landscape hint even later. (GitHub-Mobile lesson: reuse a good
@@ -196,8 +184,9 @@ J. **Trust posture page**: token auth is already the credential; document +
 
 ## Non-goals (deliberate)
 
-- Native apps / APNs / FCM: Web Push + installed PWA covers it; revisit only
-  if interactive notification buttons prove decisive.
+- Background notifications are not part of the web roadmap. If notifications
+  become a requirement, build a native app instead of adding delivery to the web
+  client.
 - IDE-in-the-browser (code-server path): consistently reviewed as unusable on
   phones; we are a supervision surface with a terminal escape hatch, not an IDE.
 - Rewriting or mirroring the TUI. Improve the existing focused web surface
@@ -206,11 +195,10 @@ J. **Trust posture page**: token auth is already the credential; document +
 
 ## Sequencing
 
-1. §1a approvals rendered + banner (unblocks the core loop; no infra).
+1. §1 visible confirmations + banner (keep the core loop clear).
 2. §4 connection lifecycle + §5 composer basics (textarea/abort/optimistic).
 3. §3 markdown/collapse/streaming pills.
-4. Revisit PWA/Web Push or optional ntfy only after the core loop proves useful.
-5. §2 session board polish; then side quests by itch.
+4. §2 session board polish; then side quests by itch.
 
 Each step keeps `./test` green; UI-only steps need no new tests beyond
 existing transcript/utils coverage (Solid components remain untested per
