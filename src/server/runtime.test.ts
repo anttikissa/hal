@@ -628,6 +628,35 @@ test('subagent closes after a clean completion while leave-open and interactive 
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'interactive' }, 'completed')).toBe(false)
 })
 
+
+test('direct user interaction promotes an autoclose subagent', async () => {
+	const sessionId = `test-promote-subagent-${Date.now().toString(36)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), spawnKind: 'subagent' })
+	try {
+		runtime.promoteSubagentForHumanPrompt(sessionId, undefined)
+		expect(sessions.loadSessionMeta(sessionId)?.spawnKind).toBe('subagent-leave-open')
+		expect(sessions.loadHistory(sessionId)).toContainEqual(expect.objectContaining({
+			type: 'log',
+			text: 'Subagent promoted from `subagent` to `subagent-leave-open` - this session will not be closed automatically.',
+		}))
+	} finally {
+		sessions.deleteSession(sessionId)
+	}
+})
+
+
+test('messages from other sessions do not promote an autoclose subagent', async () => {
+	const sessionId = `test-keep-subagent-${Date.now().toString(36)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), spawnKind: 'subagent' })
+	try {
+		runtime.promoteSubagentForHumanPrompt(sessionId, 'other-session')
+		expect(sessions.loadSessionMeta(sessionId)?.spawnKind).toBe('subagent')
+		expect(sessions.loadHistory(sessionId)).toEqual([])
+	} finally {
+		sessions.deleteSession(sessionId)
+	}
+})
+
 test('queue slash command lists and clears queued prompts', async () => {
 	const sessionId = `test-queue-${Date.now().toString(36)}`
 	const events: any[] = []

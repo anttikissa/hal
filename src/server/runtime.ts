@@ -246,6 +246,14 @@ function shouldCloseSessionAfterGeneration(meta: { spawnKind?: SpawnKind } | nul
 	return meta?.spawnKind === 'subagent' && result === 'completed'
 }
 
+
+function promoteSubagentForHumanPrompt(sessionId: string, source?: string): void {
+	if (source !== undefined) return
+	if (sessionStore.loadSessionMeta(sessionId)?.spawnKind !== 'subagent') return
+	sessionStore.updateMeta(sessionId, { spawnKind: 'subagent-leave-open' })
+	emitInfo(sessionId, 'Subagent promoted from `subagent` to `subagent-leave-open` - this session will not be closed automatically.')
+}
+
 // Restart evidence can resume only the unfinished turn that precedes it. Checking
 // the same projection used by manual continue prevents later UI-only history from
 // reviving an old interruption that was already rejected as "Nothing to continue".
@@ -416,6 +424,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
+	promoteSubagentForHumanPrompt(sessionId, source)
 	if (activeQuestion(sessionId)) {
 		emitInfo(sessionId, 'Waiting for an answer')
 		return
@@ -1222,6 +1231,7 @@ export const runtime = {
 	shouldAutoContinue,
 	isInitialTurn,
 	shouldCloseSessionAfterGeneration,
+	promoteSubagentForHumanPrompt,
 	recordTabClosed,
 	spawnSession,
 	startSpawnedSession,
