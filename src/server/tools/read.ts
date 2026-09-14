@@ -136,7 +136,7 @@ async function execute(input: any, ctx: ToolContext): Promise<ToolOutput> {
 
 const readTool = {
 	name: 'read',
-	description: 'Read a text file with line numbers, or return a supported image as an image attachment. Use optional start/end for a text line range.',
+	description: 'Read a text file with LINE:HASH prefixes on every text line. These prefixes are metadata (line number and fingerprint), not file content; use the LINE:HASH ref with edit. Can also return a supported image as an image attachment. Use optional start/end for a text line range.',
 	parameters: {
 		path: { type: 'string', description: 'File path (absolute or relative to cwd)' },
 		start: { type: 'integer', description: 'First line number (1-based, inclusive)' },

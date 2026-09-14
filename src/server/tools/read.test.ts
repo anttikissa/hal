@@ -45,6 +45,13 @@ test('registers the read tool', () => {
 	expect(toolRegistry.getTool('read')?.name).toBe('read')
 })
 
+test('explains that text lines have metadata prefixes', () => {
+	const description = toolRegistry.getTool('read')?.description
+
+	expect(description).toContain('LINE:HASH')
+	expect(description).toContain('not file content')
+})
+
 test('reads a selected range from a file over 20MB', async () => {
 	const path = join(TEST_DIR, 'large.txt')
 	await writeLargeTextFile(path, 160_000)
