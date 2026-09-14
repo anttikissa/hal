@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'bun:test'
 import { toolRegistry } from './tool.ts'
 import { builtins } from './builtins.ts'
 import { readUrl } from './read_url.ts'
+import { readFile, unlink } from 'fs/promises'
 
 builtins.init()
 const realFetch = globalThis.fetch
@@ -26,7 +27,7 @@ test('extracts readable text from simple html', async () => {
 				</main>
 			</body>
 		</html>
-	`)) as unknown as typeof fetch
+	`, { headers: { 'content-type': 'text/html' } })) as unknown as typeof fetch
 
 	const out = await readUrl.execute({ url: 'https://example.com' }, { sessionId: 's', cwd: process.cwd() })
 	expect(out).toContain('# Example')
@@ -52,6 +53,36 @@ test('returns plain-text source files without HTML extraction', async () => {
 
 	const out = await readUrl.execute({ url: 'https://raw.githubusercontent.com/example/project/main/file.ts' }, { sessionId: 's', cwd: process.cwd() })
 	expect(out).toBe(source)
+})
+
+test('returns supported images as native tool content', async () => {
+	const image = Buffer.from('image bytes')
+	globalThis.fetch = (async () => new Response(image, {
+		headers: { 'content-type': 'image/png' },
+	})) as unknown as typeof fetch
+
+	const out = await readUrl.execute({ url: 'https://example.com/image.png' }, { sessionId: 's', cwd: process.cwd() })
+	expect(out as unknown).toEqual([
+		{ type: 'text', text: 'Read image from https://example.com/image.png [image/png]' },
+		{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: image.toString('base64') } },
+	])
+})
+
+test('saves unsupported responses for other tools to inspect', async () => {
+	const pdf = Buffer.from('%PDF-example')
+	globalThis.fetch = (async () => new Response(pdf, {
+		headers: { 'content-type': 'application/pdf' },
+	})) as unknown as typeof fetch
+
+	const out = await readUrl.execute({ url: 'https://example.com/report.pdf' }, { sessionId: 's', cwd: process.cwd() }) as string
+	const path = out.match(/\/tmp\/hal-file-[\w-]+\.pdf/)?.[0]
+	try {
+		expect(path).toBeDefined()
+		expect(await readFile(path!)).toEqual(pdf)
+		expect(out).toContain('Cannot read report.pdf; saved it to')
+	} finally {
+		if (path) await unlink(path)
+	}
 })
 
 test('rejects invalid urls', async () => {

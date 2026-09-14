@@ -2,7 +2,7 @@
 //
 // HTML gets a tiny readability pass; other textual responses stay verbatim.
 
-import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
+import { toolRegistry, type Tool, type ToolContext, type ToolOutput } from './tool.ts'
 
 const MAX_OUTPUT = 100_000
 
@@ -30,7 +30,7 @@ function cleanText(s: string): string {
 		.trim()
 }
 
-async function execute(input: unknown, ctx: ToolContext): Promise<string> {
+async function execute(input: unknown, ctx: ToolContext): Promise<ToolOutput> {
 	const spec = normalizeInput(input)
 	const rawUrl = (spec.url ?? '').trim()
 	let url: URL
@@ -42,9 +42,19 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	if (url.protocol !== 'http:' && url.protocol !== 'https:') return 'error: invalid url'
 
 	const response = await fetch(url, { signal: ctx.signal })
-	const raw = await response.text()
+	const data = Buffer.from(await response.arrayBuffer())
 	const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
-	if (contentType?.startsWith('text/') && contentType !== 'text/html') {
+	if (/^image\/(png|jpeg|gif|webp)$/.test(contentType ?? '')) return [
+		{ type: 'text', text: `Read image from ${url} [${contentType}]` },
+		{ type: 'image', source: { type: 'base64', media_type: contentType!, data: data.toString('base64') } },
+	]
+	if (!contentType?.startsWith('text/') && !/[/+](json|xml)$/.test(contentType ?? '') && contentType !== 'application/javascript') {
+		const local = `/tmp/hal-file-${crypto.randomUUID()}${url.pathname.match(/\.[a-z0-9-]{1,15}$/i)?.[0] ?? ''}`
+		await Bun.write(local, data)
+		return `Cannot read ${url.pathname.split('/').pop() || 'download'}; saved it to ${local}`
+	}
+	const raw = data.toString('utf8')
+	if (contentType && contentType !== 'text/html' && contentType !== 'application/xhtml+xml') {
 		if (raw.length <= MAX_OUTPUT) return raw || 'error: no readable content found'
 		return raw.slice(0, MAX_OUTPUT) + '\n[… truncated]'
 	}
@@ -83,7 +93,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 
 const readUrlTool: Tool = {
 	name: 'read_url',
-	description: 'Read a web page or text file, extracting simple readable text from HTML.',
+	description: 'Read a web page or text file, extracting simple readable text from HTML. Images are attached; other files are saved under /tmp.',
 	parameters: {
 		url: { type: 'string', description: 'HTTP or HTTPS URL to read' },
 	},
