@@ -15,6 +15,7 @@ of truth; re-read it after upgrades.
 - `src/common/web.ts` — the wire message contract plus `webMessages.applySessionMessage`, which
   folds snapshots and events into one session state. Presentation belongs in `web-client`;
   event-to-block projection belongs in `src/common/live-event-blocks.ts`.
+- Keep transcript wording and structure aligned with the terminal; web styling may adapt to the medium, but moving between clients should require minimal relearning.
 
 ## Stack
 
