@@ -122,8 +122,8 @@ test('activityStatusLabel preserves a readable retry delay', () => {
 	client.state.working = new Map([['04-new', true]])
 	try {
 		expect(renderStatus.activityStatusLabel(tab({ history: [
-			{ type: 'info', text: 'Rate limited — retrying in 202 minutes 18 s (at 16:51)' },
-		] }))).toBe('retrying in 202 minutes 18 s (at 16:51)')
+			{ type: 'info', text: 'Rate limited — retrying in 202 min 18 sec (at 16:51)' },
+		] }))).toBe('retrying in 202 min 18 sec (at 16:51)')
 	} finally {
 		client.state.working = origWorking
 	}

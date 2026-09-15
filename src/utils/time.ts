@@ -82,8 +82,8 @@ function formatRetryDelay(delayMs: number, nowMs = Date.now()): string {
 	const seconds = Math.ceil(Math.max(0, delayMs) / 1000)
 	const minutes = Math.floor(seconds / 60)
 	const remainingSeconds = seconds % 60
-	let duration = `${remainingSeconds} s`
-	if (minutes) duration = `${unit(minutes, 'minute')} ${remainingSeconds} s`
+	let duration = `${remainingSeconds} sec`
+	if (minutes) duration = `${minutes} min ${remainingSeconds} sec`
 	return `${duration} (at ${formatResetAt(nowMs + delayMs, new Date(nowMs))})`
 }
 
