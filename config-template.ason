@@ -69,6 +69,8 @@
 		maxIterations: 200,
 		// Maximum local tools to execute concurrently in one cycle.
 		maxToolConcurrency: 5,
+		// Prune consumed tool results and images before calls near this estimated token count.
+		contextPruneThresholdTokens: 180000,
 		// Base retry delay for transient provider errors.
 		retryBaseDelayMs: 5000,
 		// Maximum total retry time for one provider request.

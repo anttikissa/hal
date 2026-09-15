@@ -301,9 +301,15 @@ function pastBatchThreshold(age: number, threshold: number): boolean {
 	return age >= firstBatch
 }
 
-function pruneMessages(msgs: Message[]): Message[] {
+function pruneMessages(msgs: Message[], pressure = false): Message[] {
 	const heavy = apiConfig.heavyThreshold
 	const thinking = apiConfig.thinkingThreshold
+	let protectedStart = -1
+	if (pressure) {
+		for (let i = msgs.length - 1; i >= 0; i--) {
+			if (msgs[i]!.role === 'assistant') { protectedStart = i; break }
+		}
+	}
 
 	const age = new Array(msgs.length).fill(0)
 	let count = 0
@@ -315,19 +321,18 @@ function pruneMessages(msgs: Message[]): Message[] {
 	const out: Message[] = []
 	for (let i = 0; i < msgs.length; i++) {
 		const msg = msgs[i]!
+		const pruneHeavy = pastBatchThreshold(age[i]!, heavy) || (pressure && i < protectedStart)
 		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
 			let content = (msg.content as ContentBlock[]).map((b) => {
-				if (b.type === 'tool_use' && pastBatchThreshold(age[i]!, heavy)) return { ...b, input: {} }
+				if (b.type === 'tool_use' && pruneHeavy) return { ...b, input: {} }
 				return b
 			})
 			if (pastBatchThreshold(age[i]!, thinking)) content = content.filter((b) => b.type !== 'thinking')
 			out.push({ ...msg, content })
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const content = (msg.content as ContentBlock[]).map((b) => {
-				if (b.type === 'tool_result' && pastBatchThreshold(age[i]!, heavy))
-					return { ...b, content: '[tool result omitted from context]' }
-				if (b.type === 'image' && pastBatchThreshold(age[i]!, heavy))
-					return { type: 'text' as const, text: '[image omitted from context]' }
+				if (b.type === 'tool_result' && pruneHeavy) return { ...b, content: '[tool result omitted from context]' }
+				if (b.type === 'image' && pruneHeavy) return { type: 'text' as const, text: '[image omitted from context]' }
 				return b
 			})
 			out.push({ ...msg, content })

@@ -33,7 +33,6 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 	expect(agentLoop.sanitizeToolCallInput('bash', input, '/var')).toBe(input)
 })
 
-
 test('registers a turn before asynchronous provider loading finishes', async () => {
 	const sessionId = `test-provider-load-${Date.now().toString(36)}`
 	createdSessions.push(sessionId)

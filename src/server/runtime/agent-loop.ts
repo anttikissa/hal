@@ -21,6 +21,7 @@ import { risk, type RiskFinding } from '../tools/risk.ts'
 import { sessions } from '../sessions.ts'
 import { accounting } from '../session/accounting.ts'
 import { blob } from '../session/blob.ts'
+import { apiMessages } from '../session/api-messages.ts'
 import { log } from '../../utils/log.ts'
 import { ason } from '../../utils/ason.ts'
 import { helpers } from '../../utils/helpers.ts'
@@ -38,6 +39,8 @@ const config = {
 	maxIterations: 200,
 	/** Max concurrent tool executions per cycle. */
 	maxToolConcurrency: 5,
+	/** Prune consumed heavy context before calls near this token count. */
+	contextPruneThresholdTokens: 180_000,
 	/** Retry config for transient API errors. */
 	retryBaseDelayMs: 5_000,
 	retryMaxTotalMs: 2 * 60 * 60 * 1000, // 2 hours
@@ -251,6 +254,7 @@ function formatContextLengthWarning(messages: Message[], model: string, overhead
 	].join(' ')
 }
 
+
 // True iff any token class is non-zero. A fully-cached turn has input = 0 but
 // non-zero cacheRead, so we can't just check `input > 0`.
 function hasUsage(u: TokenUsage): boolean {
@@ -430,6 +434,12 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		// We loop when the model returns tool_use blocks.
 		for (let iteration = 0; iteration < config.maxIterations; iteration++) {
 			if (loopSignal.aborted) break
+			const beforePrune = context.estimateContext(messages, model, overheadBytes)
+			if (config.contextPruneThresholdTokens > 0 && beforePrune.used >= Math.min(config.contextPruneThresholdTokens, Math.floor(beforePrune.max * 3 / 4))) {
+				const pruned = apiMessages.pruneMessages(messages, true)
+				const afterPrune = context.estimateContext(pruned, model, overheadBytes)
+				if (afterPrune.used < beforePrune.used) messages.splice(0, messages.length, ...pruned)
+			}
 
 			// Count logical provider calls, including retries whose usage may be unknown.
 			meter.requests++

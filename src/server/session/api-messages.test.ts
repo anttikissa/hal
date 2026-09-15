@@ -49,6 +49,27 @@ test('pruneMessages batches heavy pruning by completed turns', () => {
 	}
 })
 
+test('pruneMessages pressure mode protects the newest unconsumed tool batch', () => {
+	const messages: Message[] = [
+		{ role: 'assistant', content: [{ type: 'tool_use', id: 'old', name: 'read', input: { path: 'old.ts' } }] },
+		{ role: 'user', content: [
+			{ type: 'tool_result', tool_use_id: 'old', content: 'old result' },
+			{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'old-image' } },
+		] },
+		{ role: 'assistant', content: [{ type: 'tool_use', id: 'new', name: 'read', input: { path: 'new.ts' } }] },
+		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'new', content: 'new result' }] },
+	]
+
+	expect(apiMessages.pruneMessages(messages, true)).toEqual([
+		{ role: 'assistant', content: [{ type: 'tool_use', id: 'old', name: 'read', input: {} }] },
+		{ role: 'user', content: [
+			{ type: 'tool_result', tool_use_id: 'old', content: '[tool result omitted from context]' },
+			{ type: 'text', text: '[image omitted from context]' },
+		] },
+		messages[2]!, messages[3]!,
+	])
+})
+
 test('pruneMessages batches thinking pruning too', () => {
 	const prev = {
 		heavyThreshold: apiMessages.config.heavyThreshold,
