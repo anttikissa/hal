@@ -44,6 +44,9 @@ async function execute(input: unknown, ctx: ToolContext): Promise<ToolOutput> {
 	const response = await fetch(url, { signal: ctx.signal })
 	const data = Buffer.from(await response.arrayBuffer())
 	const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+	// Images are attached so the model can see them.
+	// Text is returned directly, while HTML is cleaned up first.
+	// Other files are saved to /tmp for the model to inspect with another tool.
 	if (/^image\/(png|jpeg|gif|webp)$/.test(contentType ?? '')) return [
 		{ type: 'text', text: `Read image from ${url} [${contentType}]` },
 		{ type: 'image', source: { type: 'base64', media_type: contentType!, data: data.toString('base64') } },
