@@ -22,6 +22,13 @@ test('formatFutureDistance describes reset distance in human terms', () => {
 	expect(time.formatFutureDistance(now + 210 * 60_000, now)).toBe('in 3.5 hours')
 })
 
+test('formatRetryDelay gives the exact wait and local retry time', () => {
+	const now = new Date(2026, 4, 20, 13, 29).getTime()
+
+	expect(time.formatRetryDelay(12_138_000, now)).toBe('202 minutes 18 s (at 16:51)')
+	expect(time.formatRetryDelay(65_000, now)).toBe('1 minute 5 s (at 13:30)')
+})
+
 test('formatQuotaWindow keeps compact subscription window labels', () => {
 	expect(time.formatQuotaWindow(300)).toBe('5h')
 	expect(time.formatQuotaWindow(10_080)).toBe('7d')

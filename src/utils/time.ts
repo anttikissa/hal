@@ -78,6 +78,15 @@ function formatResetAt(resetAtMs: number, now = new Date()): string {
 	return `${text} on ${monthDay(date)}`
 }
 
+function formatRetryDelay(delayMs: number, nowMs = Date.now()): string {
+	const seconds = Math.ceil(Math.max(0, delayMs) / 1000)
+	const minutes = Math.floor(seconds / 60)
+	const remainingSeconds = seconds % 60
+	let duration = `${remainingSeconds} s`
+	if (minutes) duration = `${unit(minutes, 'minute')} ${remainingSeconds} s`
+	return `${duration} (at ${formatResetAt(nowMs + delayMs, new Date(nowMs))})`
+}
+
 function formatSystemDate(date = new Date()): string {
 	const day = date.toLocaleDateString('en-US', { weekday: 'long' })
 	return `${date.toISOString().slice(0, 10)}, ${day}`
@@ -104,6 +113,7 @@ export const time = {
 	formatAge,
 	formatLastActiveNotice,
 	formatResetAt,
+	formatRetryDelay,
 	formatSystemDate,
 	formatQuotaWindow,
 	formatFutureDistance,

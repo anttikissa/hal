@@ -117,6 +117,18 @@ test('activityStatusLabel names visible working phases', () => {
 	}
 })
 
+test('activityStatusLabel preserves a readable retry delay', () => {
+	const origWorking = client.state.working
+	client.state.working = new Map([['04-new', true]])
+	try {
+		expect(renderStatus.activityStatusLabel(tab({ history: [
+			{ type: 'info', text: 'Rate limited — retrying in 202 minutes 18 s (at 16:51)' },
+		] }))).toBe('retrying in 202 minutes 18 s (at 16:51)')
+	} finally {
+		client.state.working = origWorking
+	}
+})
+
 test('activityStatusLabel clears after final assistant text while turn cleanup is pending', () => {
 	const origWorking = client.state.working
 	client.state.working = new Map([['04-new', true]])

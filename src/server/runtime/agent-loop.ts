@@ -25,6 +25,7 @@ import { log } from '../../utils/log.ts'
 import { ason } from '../../utils/ason.ts'
 import { helpers } from '../../utils/helpers.ts'
 import { tokenCalibration } from '../token-calibration.ts'
+import { time } from '../../utils/time.ts'
 import { processControl } from '../process-control.ts'
 // Built-in tool registration now happens via explicit startup init.
 // Anthropic also has its own server-side web_search tool
@@ -574,8 +575,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 								const bodyDelay = parseResetsInSeconds(event.body)
 								const delay = event.retryAfterMs ?? bodyDelay ?? computeRetryDelay(undefined, retryAttempt)
 								retryAttempt++
-								const delaySec = Math.ceil(delay / 1000)
-								emitInfo(sessionId, `Rate limited — retrying in ${delaySec}s`)
+								emitInfo(sessionId, `Rate limited — retrying in ${time.formatRetryDelay(delay)}`)
 								await ctx.onStatus?.(true)
 								await sleepWithAbort(delay, loopSignal)
 								if (loopSignal.aborted) {

@@ -561,7 +561,7 @@ function turnActivityStatusLabel(tab: Tab): string {
 		if (block.type === 'assistant' && block.streaming) return 'writing'
 		if (block.type === 'thinking' && block.streaming) return 'thinking'
 		if (block.type === 'info') {
-			const match = block.text.match(/retrying in (\S+)/i)
+			const match = block.text.match(/retrying in (.+)$/i)
 			if (match) return `retrying in ${match[1]}`
 		}
 	}

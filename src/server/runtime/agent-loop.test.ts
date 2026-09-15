@@ -1109,6 +1109,7 @@ test('custom abort text is persisted', async () => {
 			messages: [],
 		})
 		expect(events.some((event) => event.type === 'info' && event.text === 'Tab closed')).toBe(true)
+		expect(events.some((event) => event.type === 'info' && /^Rate limited — retrying in 1 minute 0 s \(at \d{2}:\d{2}\)$/.test(event.text))).toBe(true)
 		expect(sessions.loadHistory(sessionId).filter((entry) => entry.type === 'usage')).toMatchObject([
 			{ purpose: 'turn', requests: 1, incomplete: true },
 		])
