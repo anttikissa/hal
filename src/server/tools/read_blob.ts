@@ -6,7 +6,7 @@
 
 import { blob } from '../session/blob.ts'
 import { blobRef } from './blob-ref.ts'
-import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
+import { toolRegistry, type Tool, type ToolContext, type ToolOutput } from './tool.ts'
 
 const MAX_OUTPUT = 1_000_000
 
@@ -21,7 +21,7 @@ function normalizeInput(input: unknown): ReadBlobInput {
 	}
 }
 
-async function execute(input: unknown, ctx: ToolContext): Promise<string> {
+async function execute(input: unknown, ctx: ToolContext): Promise<ToolOutput> {
 	const spec = normalizeInput(input)
 	const id = spec.id
 	if (!id) return 'error: id parameter is required'
@@ -33,6 +33,12 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 
 	const data = blob.readBlobFromChain(ref.sessionId, ref.blobId)
 	if (data === null) return `error: blob "${id}" not found`
+	if (/^image\/(png|jpeg|gif|webp)$/.test(data?.media_type) && typeof data.data === 'string') {
+		return [
+			{ type: 'text', text: `Read image blob "${id}" [${data.media_type}]` },
+			{ type: 'image', source: { type: 'base64', media_type: data.media_type, data: data.data } },
+		]
+	}
 
 	// Blob data can be any serializable type — stringify for display.
 	const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2)

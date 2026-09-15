@@ -26,14 +26,26 @@ test('read_blob reads bare ids from the current session', async () => {
 	writeBlob('04-whl', '0gdec4-bol', { ok: true })
 
 	const text = await readBlobTool.execute({ id: '0gdec4-bol' }, { sessionId: '04-whl', cwd: process.cwd() })
+	if (typeof text !== 'string') throw new Error('expected text output')
 	const data = JSON.parse(text)
 	expect(data).toEqual({ ok: true })
+})
+
+test('read_blob returns stored image attachments as native tool content', async () => {
+	writeBlob('04-whl', '0gdec4-img', { media_type: 'image/png', data: 'aGVsbG8=' })
+
+	const output = await readBlobTool.execute({ id: '0gdec4-img' }, { sessionId: '04-whl', cwd: process.cwd() })
+	expect(output).toEqual([
+		{ type: 'text', text: 'Read image blob "0gdec4-img" [image/png]' },
+		{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' } },
+	])
 })
 
 test('read_blob reads namespaced ids from another session', async () => {
 	writeBlob('04-fyx', '0gdec4-bol', { source: 'other-session' })
 
 	const text = await readBlobTool.execute({ id: '04-fyx/0gdec4-bol' }, { sessionId: '04-whl', cwd: process.cwd() })
+	if (typeof text !== 'string') throw new Error('expected text output')
 	const data = JSON.parse(text)
 	expect(data).toEqual({ source: 'other-session' })
 })
