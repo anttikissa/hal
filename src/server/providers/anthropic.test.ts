@@ -3,6 +3,7 @@ import { auth, type Credential } from '../auth.ts'
 import { anthropicUsage } from '../anthropic-usage.ts'
 import { anthropicProvider } from './anthropic.ts'
 import { version } from '../version.ts'
+import { blob } from '../session/blob.ts'
 
 const origFetch = globalThis.fetch
 const origGetCredential = auth.getCredential
@@ -12,6 +13,7 @@ const origHasAvailableCredential = auth.hasAvailableCredential
 const origRefreshUsage = anthropicUsage.refreshAll
 
 const origCombined = version.state.combined
+const origWriteRawProviderOutput = blob.writeRawProviderOutput
 
 beforeEach(() => {
 	anthropicUsage.refreshAll = async () => []
@@ -25,6 +27,7 @@ afterEach(() => {
 	auth.markCooldown = origMarkCooldown
 	auth.hasAvailableCredential = origHasAvailableCredential
 	anthropicUsage.refreshAll = origRefreshUsage
+	blob.writeRawProviderOutput = origWriteRawProviderOutput
 })
 
 function installFetchMock(fn: (input: any, init?: RequestInit) => Promise<Response>): void {
@@ -274,6 +277,25 @@ test('anthropic provider ignores malformed SSE JSON lines', async () => {
 	const events = await collect({ value: 'tok-test', type: 'token' })
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
 	expect(events.at(-1)).toMatchObject({ type: 'done', doneStatus: 'completed', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
+})
+
+
+test('preserves raw SSE lines for tool-input forensics', async () => {
+	const raw = [
+		'data: {not json}',
+		'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool_1","name":"bash","input":{}}}',
+		'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"command\\": "}}',
+		'data: {"type":"content_block_stop","index":0}',
+		'data: {"type":"message_stop"}',
+		'',
+	].join('\n')
+	let captured: { sessionId: string; provider: string; text: string } | undefined
+	blob.writeRawProviderOutput = async (sessionId, provider, text) => { captured = { sessionId, provider, text } }
+	installFetchMock(async () => new Response(raw, { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any)
+
+	await collect({ value: 'tok-test', type: 'token' })
+
+	expect(captured).toEqual({ sessionId: 'sid_123', provider: 'anthropic', text: raw })
 })
 
 

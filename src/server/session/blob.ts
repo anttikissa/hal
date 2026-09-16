@@ -49,6 +49,14 @@ function readBlob(sessionId: string, blobId: string): any | null {
 	}
 }
 
+// Preserve the wire response beside its session. Parsed history omits malformed
+// SSE payloads, which otherwise makes provider-stream failures impossible to audit.
+async function writeRawProviderOutput(sessionId: string, provider: string, text: string): Promise<void> {
+	const dir = `${sessions.sessionDir(sessionId)}/provider-streams`
+	ensureDir(dir)
+	await writeFile(`${dir}/${makeBlobId(sessionId)}-${provider}.sse`, text)
+}
+
 // Forks share history but do not copy blobs, so walk back to the parent on demand.
 // The parent never changes, so cache it: resolving it per blob re-parsed the entire
 // history file, which cost seconds once a session had hundreds of tool results.
@@ -72,6 +80,7 @@ export const blob = {
 	state,
 	makeBlobId,
 	writeBlob,
+	writeRawProviderOutput,
 	readBlob,
 	readBlobFromChain,
 	blobsDir,

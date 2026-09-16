@@ -13,6 +13,7 @@ import { anthropicUsage } from '../anthropic-usage.ts'
 import { version } from '../version.ts'
 import { STATE_DIR } from '../state.ts'
 import { appendFileSync } from 'node:fs'
+import { blob } from '../session/blob.ts'
 
 // Per-API-call usage log. One JSON line per call: timestamp, sessionId,
 // input (uncached), cacheRead, cacheCreation, output. Lets us diagnose cache
@@ -171,8 +172,10 @@ async function* parseStream(
 	const serverTools = new Map<number, { block: any; json: string }>()
 	const usage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 	let gotStop = false
+	let rawOutput = ''
 
-	for await (const ev of providerShared.iterateJsonSse(body)) {
+	try {
+		for await (const ev of providerShared.iterateJsonSse(body, { onRawLine(line) { rawOutput += line + '\n' } })) {
 		if (ev.type === 'content_block_start') {
 			const b = ev.content_block
 			if (b.type === 'tool_use') {
@@ -237,6 +240,13 @@ async function* parseStream(
 			const body = JSON.stringify(ev.error ?? ev)
 			const status = errorTypeToStatus(ev.error?.type)
 			yield { type: 'error', message: msg, status, body }
+		}
+		}
+	} finally {
+		if (logContext?.sessionId && rawOutput) {
+			try {
+				await blob.writeRawProviderOutput(logContext.sessionId, 'anthropic', rawOutput)
+			} catch {}
 		}
 	}
 
