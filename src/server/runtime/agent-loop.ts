@@ -39,7 +39,17 @@ const config = {
 	maxIterations: 200,
 	/** Max concurrent tool executions per cycle. */
 	maxToolConcurrency: 5,
-	/** Prune consumed heavy context before calls near this token count. */
+	/** Prune consumed heavy context before calls near this token count.
+	 * Measured 2026-09-16 (session 145-tcp) via state/anthropic-call-log.jsonl,
+	 * comparing 2 days before this pruning landed (commit 5cd718f, 2026-09-15
+	 * ~14:01 UTC) vs. ~1.25 days after: cache-write ratio (cacheCreation /
+	 * (cacheCreation + cacheRead)) stayed flat (~7.4% -> ~7.1%, within the
+	 * historical 7-24% range), so pruning removes already-consumed payloads
+	 * without busting the live cache prefix. $/call estimate dropped ~37%
+	 * (~$37.9 to ~$24.0 per 1000 calls), though call volume/mix also changed
+	 * over that window so treat that number as directional only. If you
+	 * change this threshold, re-check the write ratio in that log rather
+	 * than assuming more aggressive pruning forces more cache writes. */
 	contextPruneThresholdTokens: 180_000,
 	/** Retry config for transient API errors. */
 	retryBaseDelayMs: 5_000,
