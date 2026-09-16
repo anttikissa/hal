@@ -242,7 +242,7 @@ function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolea
 	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return colors.warning
 	if (block.type === 'question') return block.active ? colors.warning : { ...colors.log, bg: '' }
 	if (block.type === 'log' || block.type === 'info') return { ...colors.log, bg: '' }
-	if (block.type === 'tool') return colors.tool(block.name)
+	if (block.type === 'tool') return blocks.toolFailed(block) ? colors.error : colors.tool(block.name)
 	return fixedNoticeColors[block.type]
 }
 
@@ -264,9 +264,14 @@ function toolSpinner(frame: number | undefined): string {
 	return frames[((frame % frames.length) + frames.length) % frames.length]!
 }
 
+// Tools report dispatch/validation failures with the shared "error:" prefix.
+function toolFailed(block: Block): boolean {
+	return block.type === 'tool' && !block.running && /^error:/i.test(block.output ?? '')
+}
+
 function toolActivity(block: Block): string {
 	if (block.type !== 'tool') return ''
-	if (!block.running) return '✓'
+	if (!block.running) return blocks.toolFailed(block) ? '✗' : '✓'
 	return blocks.toolSpinner(block.toolActivityFrame ?? 0)
 }
 
@@ -524,4 +529,5 @@ export const blocks = {
 	idleCursorColor,
 	toolSpinner,
 	toolActivity,
+	toolFailed,
 }

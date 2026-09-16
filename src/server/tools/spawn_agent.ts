@@ -15,7 +15,7 @@ function allocate(remaining: number | undefined, requested: number | undefined) 
 	const childBudget = requested ?? 0
 	const needed = childBudget + 1
 	if (needed > parentBudget) {
-		return { error: `subagent limit ${childBudget} needs ${needed} slots, but only ${parentBudget} remain` }
+		return { error: `subagent limit ${childBudget} needs ${needed} slots, but only ${parentBudget} remain\nUse /budget <n> to increase subagent budget.` }
 	}
 	return { parentBudget: parentBudget - needed, childBudget }
 }

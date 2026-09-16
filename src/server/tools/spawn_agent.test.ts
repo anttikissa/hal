@@ -28,7 +28,7 @@ afterEach(() => {
 test('subagent budgets transfer recursive capacity instead of copying it', () => {
 	expect(spawnAgent.allocate(undefined, undefined)).toEqual({ parentBudget: 4, childBudget: 0 })
 	expect(spawnAgent.allocate(4, 2)).toEqual({ parentBudget: 1, childBudget: 2 })
-	expect(spawnAgent.allocate(2, 2)).toEqual({ error: 'subagent limit 2 needs 3 slots, but only 2 remain' })
+	expect(spawnAgent.allocate(2, 2)).toEqual({ error: 'subagent limit 2 needs 3 slots, but only 2 remain\nUse /budget <n> to increase subagent budget.' })
 	expect(spawnAgent.allocate(1, -1)).toEqual({ error: 'limit must be a non-negative integer' })
 })
 

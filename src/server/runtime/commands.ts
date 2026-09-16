@@ -32,6 +32,7 @@ import { serverKeys } from '../server-keys.ts'
 import { modelRefresh } from '../model-refresh.ts'
 import { paths } from '../paths.ts'
 import { processControl } from '../process-control.ts'
+import { spawnAgent } from '../tools/spawn_agent.ts'
 
 // ── Types ──
 
@@ -117,6 +118,7 @@ type CommandHandler = (
 const handlers: Record<string, CommandHandler> = {}
 const workingSafeCommands = new Set([
 	'broadcast',
+	'budget',
 	'clients',
 	'close',
 	'check',
@@ -351,6 +353,19 @@ function padVisible(text: string, width: number): string {
 	return text + ' '.repeat(Math.max(0, width - visLen(text)))
 }
 
+
+// Signed values adjust the remaining budget; unsigned values replace it.
+handlers['budget'] = (args, session) => {
+	let budget = sessionStore.loadSessionMeta(session.id)?.subagentBudget ?? spawnAgent.config.initialLimit
+	if (args) {
+		if (!/^[+-]?\d+$/.test(args)) return { error: 'Usage: /budget <n>', handled: true }
+		if (/^[+-]/.test(args)) budget += Number(args)
+		else budget = Number(args)
+		if (!Number.isSafeInteger(budget) || budget < 0) return { error: 'Subagent budget must be a non-negative safe integer.', handled: true }
+		sessionStore.updateMeta(session.id, { subagentBudget: budget })
+	}
+	return { output: `Subagent budget: ${budget} slots remaining.`, handled: true }
+}
 
 // /help — list commands or show details for one command
 handlers['help'] = (args) => {

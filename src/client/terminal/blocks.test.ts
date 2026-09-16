@@ -605,3 +605,24 @@ test('tool block header uses padded text without horizontal rules', () => {
 	expect(lines.join('\n')).not.toContain('\n ./test\n')
 })
 
+
+test('failed tool cards use the error palette and a failure mark, including summary cards', () => {
+	colors.load()
+	for (const toolSummary of [false, true]) {
+		const block: Block = { type: 'tool', name: 'spawn_agent', input: { task: 'Work' }, output: 'error: subagent budget exhausted', toolSummary }
+		const rendered = blocks.renderBlock(block, 80)
+		expect(headerLine(rendered)).toContain('✗')
+		expect(headerLine(rendered)).not.toContain('✓')
+		for (const line of rendered) expect(line).toContain(colors.error.fg)
+	}
+})
+
+test('successful and running tool cards keep their normal palette and activity', () => {
+	colors.load()
+	for (const output of ['Queued subagent spawn', 'Source contains error: example']) {
+		const rendered = blocks.renderBlock({ type: 'tool', name: 'spawn_agent', input: {}, output }, 80)
+		expect(headerLine(rendered)).toContain('✓')
+		expect(rendered.join('')).not.toContain(colors.error.fg)
+	}
+	expect(blocks.toolActivity({ type: 'tool', name: 'spawn_agent', input: {}, output: 'error: partial output', running: true })).toBe(blocks.toolSpinner(0))
+})

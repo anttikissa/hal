@@ -10,6 +10,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Use `./test` to run all tests, typechecker and oxlint. Run the tests before writing code.
 - If tests fail, look for working sessions that might have ongoing changes (eval "require('~/server/file-ipc.ts').ipc.readState().working")
 - If no working sessions, work with the user to fix the tests.
+- Do not interrupt a working session over an unrelated baseline failure or assume it owns local changes merely because it is active. Report unrelated failures to the user and leave those files alone; coordinate only with a known owner when your work is blocked.
 - Never forge host-lock ownership or run state-writing probes against live shared IPC/session files. Runtime reproductions must use an isolated state directory or test harness.
 - Never kill live Hal; only kill isolated processes you spawned.
 - Never let a test rewrite a load-bearing file that is actually in use. A red test will destroy it.

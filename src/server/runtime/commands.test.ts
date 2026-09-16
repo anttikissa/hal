@@ -39,6 +39,7 @@ const origOwnsHostLock = ipc.ownsHostLock
 
 const origRefreshModels = serverModels.refreshModels
 const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
+const origUpdateMeta = sessionStore.updateMeta
 const origLoadSessionMeta = sessionStore.loadSessionMeta
 const origLoadAllHistory = sessionStore.loadAllHistory
 const origLoadLive = sessionStore.loadLive
@@ -88,6 +89,7 @@ afterEach(() => {
 	version.state.repoDir = origVersionState.repoDir
 	serverModels.refreshModels = origRefreshModels
 	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
+	sessionStore.updateMeta = origUpdateMeta
 	sessionStore.loadSessionMeta = origLoadSessionMeta
 	sessionStore.loadAllHistory = origLoadAllHistory
 	sessionStore.loadLive = origLoadLive
@@ -1094,4 +1096,26 @@ test('/todo requires an item and stays runnable while working', async () => {
 
 test('/cd is a context switch and cannot run inside an active turn', () => {
 	expect(commands.canRunWhileWorking('/cd /tmp')).toBe(false)
+})
+
+test('/budget shows remaining slots and sets or adjusts the persisted budget while working', async () => {
+	const meta = { ...makeSession(), workingDir: '/tmp', subagentBudget: undefined as number | undefined }
+	sessionStore.loadSessionMeta = () => meta
+	sessionStore.updateMeta = (id, updates) => { expect(id).toBe(meta.id); Object.assign(meta, updates) }
+	expect(await commands.executeCommand('/budget', makeSession())).toEqual({ output: 'Subagent budget: 5 slots remaining.', handled: true })
+	expect(meta.subagentBudget).toBeUndefined()
+	for (const [arg, expected] of [['10', 10], ['+3', 13], ['-3', 10], ['0', 0]] as const) {
+		expect(await commands.executeCommand(`/budget ${arg}`, makeSession())).toEqual({ output: `Subagent budget: ${expected} slots remaining.`, handled: true })
+		expect(meta.subagentBudget).toBe(expected)
+	}
+	expect(commands.canRunWhileWorking('/budget +3')).toBe(true)
+	expect(commands.commandNames()).toContain('budget')
+})
+
+test('/budget rejects malformed or out-of-range values without writing metadata', async () => {
+	sessionStore.loadSessionMeta = () => ({ ...makeSession(), workingDir: '/tmp', subagentBudget: 2 })
+	sessionStore.updateMeta = () => { throw new Error('Invalid budget must not be saved') }
+	for (const arg of ['-3', '1.5', '3 extra', 'NaN', 'Infinity', '1e3', '0x10', '+', '9007199254740992', '+9007199254740991']) {
+		expect((await commands.executeCommand(`/budget ${arg}`, makeSession())).error).toMatch(/^(Usage: \/budget|Subagent budget must be)/)
+	}
 })

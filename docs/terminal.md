@@ -402,8 +402,8 @@ Every tool header reserves one fixed-width status cell immediately before its ti
 A single wall-clock heartbeat runs every five nominal 60Hz display frames. Tool spinners
 advance every second heartbeat (10 frames, about 167ms), while cursor phases advance
 every third heartbeat (15 frames, 250ms). Their phases overlap every sixth heartbeat,
-which produces one combined paint. Finished tools replace the spinner with `✓`; the
-fixed-width cell keeps card geometry constant.
+which produces one combined paint. Finished tools replace the spinner with `✓`; results starting with `error:` use
+`✗` and the error palette instead. The fixed-width cell keeps card geometry constant.
 
 Chrome reveals use this same 12 Hz heartbeat, not a separate animation timer.
 An observed opacity change from 0 to 1 fades in over twelve ticks; initially
