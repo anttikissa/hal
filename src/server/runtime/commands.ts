@@ -118,6 +118,7 @@ const handlers: Record<string, CommandHandler> = {}
 const workingSafeCommands = new Set([
 	'broadcast',
 	'clients',
+	'close',
 	'check',
 	'fork',
 	'help',
@@ -520,6 +521,13 @@ handlers['move'] = (args, session) => {
 
 	ipc.appendCommand({ type: 'move', position: parsed.capped, sessionId: session.id })
 	return { output: `Moving tab to ${parsed.capped}/${parsed.max}...`, handled: true }
+}
+
+// /close — close the current tab through the same runtime path as the UI.
+handlers['close'] = (args, session) => {
+	if (args.trim()) return { error: 'Usage: /close', handled: true }
+	ipc.appendCommand({ type: 'close', sessionId: session.id })
+	return { output: 'Closing tab...', handled: true }
 }
 
 // /compact — summarize conversation

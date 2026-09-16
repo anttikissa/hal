@@ -25,6 +25,7 @@ function normalizeHelpCommand(args: string): string {
 const commandSpecs: Record<string, CommandSpec> = {
 	model: { usage: '[<model>]', summary: 'Switch model or list available models.', detail: 'With no model, shows the current model and the available choices.', arg: 'model' },
 	clear: { summary: 'Clear session history.' },
+	close: { summary: 'Close the current tab.' },
 	clients: { summary: 'List server and connected client versions.' },
 	check: { summary: 'Check models.dev for model metadata and alias updates.' },
 	fork: { summary: 'Fork current session to new tab.' },
@@ -100,7 +101,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 const commandSections: CommandSection[] = [
 	{ title: 'Common', names: ['exit', 'help', 'model', 'pause', 'quit', 'status'] },
 	{ title: 'Conversation', names: ['clear', 'compact', 'history', 'rebase', 'system', 'todo'] },
-	{ title: 'Tabs & sessions', names: ['fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
+	{ title: 'Tabs & sessions', names: ['close', 'fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
 	{ title: 'Messaging & queue', names: ['broadcast', 'queue', 'send'] },
 	{ title: 'Setup & diagnostics', names: ['cd', 'check', 'clients', 'config', 'login', 'mem', 'web'] },
 ]

@@ -600,6 +600,22 @@ test('/move rejects non-numeric positions', async () => {
 	expect(result.error).toContain('Usage: /move <position>')
 })
 
+test('/close queues closure of the current session and rejects arguments', async () => {
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	const close = await commands.executeCommand('/close', makeSession('04-bbb'))
+	const invalid = await commands.executeCommand('/close 2', makeSession('04-bbb'))
+
+	expect(close).toMatchObject({ handled: true })
+	expect(close.error).toBeUndefined()
+	expect(invalid.error).toBe('Usage: /close')
+	expect(appended).toEqual([{ type: 'close', sessionId: '04-bbb' }])
+	expect(commands.canRunWhileWorking('/close')).toBe(true)
+})
+
 test('/rebase runtime handler points users to the interactive client', async () => {
 	const result = await commands.executeCommand('/rebase', makeSession())
 
