@@ -115,7 +115,7 @@ async function readWithTimeout(
  */
 async function* iterateJsonSse(
 	body: ReadableStream<Uint8Array>,
-	options: { trim?: 'end' | 'both'; doneSentinel?: string; onRawLine?: (line: string) => void } = {},
+	options: { trim?: 'end' | 'both'; doneSentinel?: string } = {},
 ): AsyncGenerator<SseEvent> {
 	const reader = body.getReader() as ReadableStreamDefaultReader<Uint8Array>
 	const decoder = new TextDecoder()
@@ -130,7 +130,6 @@ async function* iterateJsonSse(
 			let nl: number
 			while ((nl = buf.indexOf('\n')) !== -1) {
 				const raw = buf.slice(0, nl)
-				options.onRawLine?.(raw)
 				buf = buf.slice(nl + 1)
 				const line = trim === 'both' ? raw.trim() : raw.trimEnd()
 				if (!line.startsWith('data: ')) continue

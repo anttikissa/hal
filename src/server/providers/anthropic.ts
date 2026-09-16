@@ -172,10 +172,8 @@ async function* parseStream(
 	const serverTools = new Map<number, { block: any; json: string }>()
 	const usage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 	let gotStop = false
-	let rawOutput = ''
 
-	try {
-		for await (const ev of providerShared.iterateJsonSse(body, { onRawLine(line) { rawOutput += line + '\n' } })) {
+	for await (const ev of providerShared.iterateJsonSse(body)) {
 		if (ev.type === 'content_block_start') {
 			const b = ev.content_block
 			if (b.type === 'tool_use') {
@@ -240,13 +238,6 @@ async function* parseStream(
 			const body = JSON.stringify(ev.error ?? ev)
 			const status = errorTypeToStatus(ev.error?.type)
 			yield { type: 'error', message: msg, status, body }
-		}
-		}
-	} finally {
-		if (logContext?.sessionId && rawOutput) {
-			try {
-				await blob.writeRawProviderOutput(logContext.sessionId, 'anthropic', rawOutput)
-			} catch {}
 		}
 	}
 
@@ -381,6 +372,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		return
 	}
 
+	const rawOutput = res.clone().text()
 	try {
 		for await (const event of parseStream(res.body!, { sessionId: req.sessionId, model: req.model })) {
 			if (event.type === 'done' && cred.type === 'token') await anthropicUsage.refreshAll().catch(() => {})
@@ -389,6 +381,11 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 	} catch (err) {
 		if (req.signal?.aborted) throw err
 		yield { type: 'error', message: providerShared.formatNetworkError(err), endpoint: url }
+	} finally {
+		// Keep the wire response: the parser drops malformed SSE, so only this shows
+		// whether absent or truncated tool JSON produced an empty tool input.
+		const raw = await rawOutput.catch(() => '')
+		if (req.sessionId && raw) await blob.writeRawProviderOutput(req.sessionId, 'anthropic', raw).catch(() => {})
 	}
 }
 
