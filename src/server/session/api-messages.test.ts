@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import type { Message } from '../../common/protocol.ts'
+import type { Message, ContentBlock } from '../../common/protocol.ts'
 import { apiMessages } from './api-messages.ts'
 
 test('formatLocalTime returns "Mon DD HH:MM" in local time', () => {
@@ -36,7 +36,7 @@ test('pruneMessages batches heavy pruning by completed turns', () => {
 		]
 		expect(apiMessages.pruneMessages(beforeBatch)).toEqual(beforeBatch)
 		expect(apiMessages.pruneMessages(afterBatch)).toEqual([
-			{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'read', input: {} }] },
+			{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'read', input: { path: 'a.ts' } }] },
 			{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: '[tool result omitted from context]' }] },
 			{ role: 'assistant', content: [{ type: 'text', text: 'done' }] },
 			{ role: 'user', content: 'next' },
@@ -45,6 +45,81 @@ test('pruneMessages batches heavy pruning by completed turns', () => {
 	} finally {
 		apiMessages.config.heavyThreshold = prev.heavyThreshold
 		apiMessages.config.thinkingThreshold = prev.thinkingThreshold
+		apiMessages.config.pruneBatchTurns = prev.pruneBatchTurns
+	}
+})
+
+test('pruneMessages keeps small tool arguments so the model never sees empty calls', () => {
+	const prev = { heavyThreshold: apiMessages.config.heavyThreshold, pruneBatchTurns: apiMessages.config.pruneBatchTurns }
+	apiMessages.config.heavyThreshold = 0
+	apiMessages.config.pruneBatchTurns = 2
+	try {
+		const messages: Message[] = [
+			{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'bash', input: { command: 'git log --oneline -3' } }] },
+			{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'alpha' }] },
+			{ role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+			{ role: 'user', content: 'next' },
+			{ role: 'assistant', content: [{ type: 'text', text: 'done again' }] },
+		]
+
+		const pruned = apiMessages.pruneMessages(messages)
+
+		// Arguments are tiny; blanking them saves nothing and teaches the model to emit empty calls.
+		expect((pruned[0]!.content as any)[0].input).toEqual({ command: 'git log --oneline -3' })
+	} finally {
+		apiMessages.config.heavyThreshold = prev.heavyThreshold
+		apiMessages.config.pruneBatchTurns = prev.pruneBatchTurns
+	}
+})
+
+
+test('pruneMessages replaces only oversized tool arguments, keeping the key names', () => {
+	const prev = { heavyThreshold: apiMessages.config.heavyThreshold, pruneBatchTurns: apiMessages.config.pruneBatchTurns }
+	apiMessages.config.heavyThreshold = 0
+	apiMessages.config.pruneBatchTurns = 2
+	try {
+		const big = 'x'.repeat(apiMessages.config.maxToolInput + 1)
+		const call: ContentBlock = { type: 'tool_use', id: 'tool-1', name: 'write', input: { path: 'a.ts', content: big } }
+		apiMessages.state.blockBlobs.set(call, 'blob-1')
+		const messages: Message[] = [
+			{ role: 'assistant', content: [call] },
+			{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'written' }] },
+			{ role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+			{ role: 'user', content: 'next' },
+			{ role: 'assistant', content: [{ type: 'text', text: 'done again' }] },
+		]
+
+		const pruned = apiMessages.pruneMessages(messages)
+
+		// The call still looks like a real call: keys survive, only the fat value is elided.
+		expect((pruned[0]!.content as any)[0].input).toEqual({ path: 'a.ts', content: '[pruned; see blob blob-1]' })
+	} finally {
+		apiMessages.config.heavyThreshold = prev.heavyThreshold
+		apiMessages.config.pruneBatchTurns = prev.pruneBatchTurns
+	}
+})
+
+
+test('pruned tool results name the blob that still holds them', () => {
+	const prev = { heavyThreshold: apiMessages.config.heavyThreshold, pruneBatchTurns: apiMessages.config.pruneBatchTurns }
+	apiMessages.config.heavyThreshold = 0
+	apiMessages.config.pruneBatchTurns = 2
+	try {
+		const result: ContentBlock = { type: 'tool_result', tool_use_id: 'tool-1', content: 'alpha' }
+		apiMessages.state.blockBlobs.set(result, 'blob-9')
+		const messages: Message[] = [
+			{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'bash', input: { command: 'ls' } }] },
+			{ role: 'user', content: [result] },
+			{ role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+			{ role: 'user', content: 'next' },
+			{ role: 'assistant', content: [{ type: 'text', text: 'done again' }] },
+		]
+
+		const pruned = apiMessages.pruneMessages(messages)
+
+		expect((pruned[1]!.content as any)[0].content).toBe('[pruned; see blob blob-9]')
+	} finally {
+		apiMessages.config.heavyThreshold = prev.heavyThreshold
 		apiMessages.config.pruneBatchTurns = prev.pruneBatchTurns
 	}
 })
@@ -61,7 +136,7 @@ test('pruneMessages pressure mode protects the newest unconsumed tool batch', ()
 	]
 
 	expect(apiMessages.pruneMessages(messages, true)).toEqual([
-		{ role: 'assistant', content: [{ type: 'tool_use', id: 'old', name: 'read', input: {} }] },
+		{ role: 'assistant', content: [{ type: 'tool_use', id: 'old', name: 'read', input: { path: 'old.ts' } }] },
 		{ role: 'user', content: [
 			{ type: 'tool_result', tool_use_id: 'old', content: '[tool result omitted from context]' },
 			{ type: 'text', text: '[image omitted from context]' },

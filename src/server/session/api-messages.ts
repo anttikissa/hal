@@ -27,6 +27,11 @@ function structuralMetaText(entry: Extract<HistoryEntry, { type: 'cwd' | 'model'
 	return `${entry.type} changed from ${entry.from} to ${entry.to}`
 }
 
+// Blob ids belong to history entries, not to provider blocks: providers forward
+// blocks verbatim, so an extra field would be sent to the API and rejected. Keep
+// the mapping beside the blocks instead, so pruning can name the blob it elided.
+const state = { blockBlobs: new WeakMap<ContentBlock, string>() }
+
 const apiConfig = {
 	// Max chars for tool result content before truncation
 	maxToolOutput: 50_000,
@@ -34,6 +39,10 @@ const apiConfig = {
 	injectTurnTtl: 3,
 	// Pruning: strip heavy content after this many completed turns
 	heavyThreshold: 4,
+	// Pruning: max chars of a single tool argument to keep verbatim. Arguments are
+	// tiny next to results (~0.5% of what pruning saves), and blanking them made the
+	// model imitate its own argument-less calls, so only oversized values are elided.
+	maxToolInput: 1_000,
 	// Pruning: strip thinking blocks after this many completed turns
 	thinkingThreshold: 10,
 	// Only rewrite old history every N completed turns to avoid constant cache busting
@@ -177,10 +186,12 @@ function buildUserContent(
 		}
 		const data = blob.readBlobFromChain(sessionId, part.blobId)
 		if (data?.media_type && data?.data) {
-			blocks.push({
+			const image: ContentBlock = {
 				type: 'image',
 				source: { type: 'base64', media_type: data.media_type, data: data.data },
-			} as any)
+			}
+			state.blockBlobs.set(image, part.blobId)
+			blocks.push(image)
 		} else {
 			blocks.push({ type: 'text', text: `[image unavailable — blob ${part.blobId}]` })
 		}
@@ -207,7 +218,9 @@ function buildToolUseContent(sessionId: string, entry: Extract<HistoryEntry, { t
 	let input = entry.input
 	const blobData = sessionEntry.loadEntryBlob(sessionId, entry)
 	if (input === undefined) input = blobData?.call?.input ?? {}
-	return { type: 'tool_use', id: entry.toolId, name: entry.name, input: input ?? {} }
+	const block: ContentBlock = { type: 'tool_use', id: entry.toolId, name: entry.name, input: input ?? {} }
+	if (entry.blobId) state.blockBlobs.set(block, entry.blobId)
+	return block
 }
 
 function buildToolResultContent(
@@ -222,7 +235,9 @@ function buildToolResultContent(
 		const truncated = resultContent.length - apiConfig.maxToolOutput
 		resultContent = resultContent.slice(0, apiConfig.maxToolOutput) + `\n[truncated ${truncated} chars]`
 	}
-	return { type: 'tool_result', tool_use_id: entry.toolId, content: resultContent }
+	const block: ContentBlock = { type: 'tool_result', tool_use_id: entry.toolId, content: resultContent }
+	if (entry.blobId) state.blockBlobs.set(block, entry.blobId)
+	return block
 }
 
 function repairToolPairing(msgs: Message[]): void {
@@ -288,6 +303,27 @@ function repairToolPairing(msgs: Message[]): void {
 	}
 }
 
+// Name the blob so the model can fetch what was elided instead of guessing.
+function prunedMarker(block: ContentBlock, what: string): string {
+	const blobId = state.blockBlobs.get(block)
+	if (blobId) return `[pruned; see blob ${blobId}]`
+	return `[${what} omitted from context]`
+}
+
+// Keep arguments verbatim: they are ~0.5% of what pruning saves, and an empty
+// input object reads as a valid argument-less call that the model then imitates.
+// Oversized values (file bodies) are replaced individually, so the argument
+// names still show what the call did.
+function pruneToolInput(block: ContentBlock): Record<string, unknown> {
+	const input = block.input ?? {}
+	const out: Record<string, unknown> = {}
+	for (const [key, value] of Object.entries(input)) {
+		if (typeof value === 'string' && value.length > apiConfig.maxToolInput) out[key] = prunedMarker(block, 'argument')
+		else out[key] = value
+	}
+	return out
+}
+
 function isTurnEnd(msg: Message): boolean {
 	if (msg.role !== 'assistant') return false
 	if (!Array.isArray(msg.content)) return true
@@ -324,15 +360,15 @@ function pruneMessages(msgs: Message[], pressure = false): Message[] {
 		const pruneHeavy = pastBatchThreshold(age[i]!, heavy) || (pressure && i < protectedStart)
 		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
 			let content = (msg.content as ContentBlock[]).map((b) => {
-				if (b.type === 'tool_use' && pruneHeavy) return { ...b, input: {} }
+				if (b.type === 'tool_use' && pruneHeavy) return { ...b, input: pruneToolInput(b) }
 				return b
 			})
 			if (pastBatchThreshold(age[i]!, thinking)) content = content.filter((b) => b.type !== 'thinking')
 			out.push({ ...msg, content })
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const content = (msg.content as ContentBlock[]).map((b) => {
-				if (b.type === 'tool_result' && pruneHeavy) return { ...b, content: '[tool result omitted from context]' }
-				if (b.type === 'image' && pruneHeavy) return { type: 'text' as const, text: '[image omitted from context]' }
+				if (b.type === 'tool_result' && pruneHeavy) return { ...b, content: prunedMarker(b, 'tool result') }
+				if (b.type === 'image' && pruneHeavy) return { type: 'text' as const, text: prunedMarker(b, 'image') }
 				return b
 			})
 			out.push({ ...msg, content })
@@ -346,6 +382,7 @@ function pruneMessages(msgs: Message[], pressure = false): Message[] {
 
 export const apiMessages = {
 	config: apiConfig,
+	state,
 	toProviderMessages,
 	pruneMessages,
 	repairToolPairing,
