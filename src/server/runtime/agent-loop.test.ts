@@ -128,6 +128,28 @@ test('abort before tool dispatch keeps the tool from starting', async () => {
 	}
 })
 
+test('a tool call whose arguments failed to parse is reported, not executed', async () => {
+	const sessionId = `test-parse-error-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const origDispatch = toolRegistry.dispatch
+	let dispatches = 0
+	toolRegistry.dispatch = async () => {
+		dispatches++
+		return 'ran'
+	}
+	try {
+		const call = { id: 'tool-a', name: 'read', input: {}, parseError: "Expected ',' or '}' at 1:38" }
+		const results = await agentLoop.executeToolBatch(sessionId, [call], process.cwd(), new AbortController().signal)
+
+		// Running it would read the cwd instead of the intended path; the model needs the parse error back.
+		expect(dispatches).toBe(0)
+		expect(results[0]?.result).toContain("Expected ',' or '}' at 1:38")
+	} finally {
+		toolRegistry.dispatch = origDispatch
+	}
+})
+
 
 test('flushes a requested exit only after the tool result is durable', async () => {
 	const sessionId = `test-exit-boundary-${Date.now().toString(36)}`

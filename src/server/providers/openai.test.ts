@@ -637,7 +637,7 @@ test('compat provider reports tool JSON parse errors after [DONE] chunks', async
 		id: 'call_1',
 		name: 'search',
 		input: {},
-		parseError: 'Failed to parse tool input JSON (7 chars): {"bad":',
+		parseError: expect.stringContaining('Unexpected token at 1:8'),
 	})
 	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } }))
 })

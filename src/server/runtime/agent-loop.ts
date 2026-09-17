@@ -139,6 +139,8 @@ interface ToolCall {
 	id: string
 	name: string
 	input: any
+	// Set when the model's streamed arguments were not valid JSON/ASON.
+	parseError?: string
 }
 
 // ── IPC helpers ──
@@ -527,6 +529,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 							id: event.id!,
 							name: event.name!,
 							input: sanitizeToolCallInput(event.name!, event.input, ctx.cwd),
+							...(event.parseError ? { parseError: event.parseError } : {}),
 						}
 						toolCalls.push(tc)
 						const blobId = toolBlobMap.get(tc.id) ?? blob.makeBlobId(sessionId)
@@ -960,6 +963,9 @@ async function executeToolsConcurrently(
 				}
 				if (signal.aborted) return finish('[interrupted]')
 				if (policy.rejected?.has(call.id)) return finish('error: user rejected risky tool call')
+				// Arguments that did not parse are lost, so running the tool would act on
+				// the wrong input. Hand the parse error back so the model can reissue.
+				if (call.parseError) return finish(`error: ${call.parseError}`)
 				try {
 					const result = await toolRegistry.dispatch(call.name, call.input, {
 						...context,

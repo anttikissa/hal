@@ -4,6 +4,7 @@
 // helpers without creating a cycle back into the lazy provider loader.
 
 import type { Credential } from '../auth.ts'
+import { ason } from '../../utils/ason.ts'
 
 const config = {
 	// Generous timeout: chunks normally arrive every ~100ms, but allows for slow starts.
@@ -150,12 +151,16 @@ async function* iterateJsonSse(
 
 /** Normalize streamed tool JSON parse failures into one consistent message. */
 function parseToolInput(json: string): { input: Record<string, unknown>; parseError?: string } {
+	// ASON parses JSON but reports the offending line/column with a caret, so the model
+	// is told which token it got wrong instead of a bare "Expected '}'". Empty input is
+	// an error too: a tool_use block that streamed no arguments is a broken call, not a
+	// call with no arguments.
 	try {
-		return { input: JSON.parse(json || '{}') }
-	} catch {
+		return { input: ason.parse(json) as Record<string, unknown> }
+	} catch (err: any) {
 		return {
 			input: {},
-			parseError: `Failed to parse tool input JSON (${json.length} chars): ${json.slice(0, 200)}`,
+			parseError: `Failed to parse tool input: ${err?.message ?? String(err)}`,
 		}
 	}
 }
