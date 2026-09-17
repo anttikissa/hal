@@ -106,6 +106,7 @@ async function readSelectedLines(path: string, start: number, end: number | unde
 }
 
 async function execute(input: any, ctx: ToolContext): Promise<ToolOutput> {
+	if (typeof input?.path !== 'string' || !input.path.trim()) return 'error: missing required argument: path'
 	const path = resolvePath(input?.path, ctx.cwd)
 	const denied = ctx.approvedRisk ? null : sensitive.denyIfProtected(path, 'read')
 	if (denied) return denied

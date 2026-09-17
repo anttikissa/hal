@@ -52,6 +52,12 @@ test('explains that text lines have metadata prefixes', () => {
 	expect(description).toContain('not file content')
 })
 
+test('rejects a missing path instead of reading the working directory', async () => {
+	const out = await read.execute({}, { sessionId: 's', cwd: TEST_DIR })
+
+	expect(out).toBe('error: missing required argument: path')
+})
+
 test('reads a selected range from a file over 20MB', async () => {
 	const path = join(TEST_DIR, 'large.txt')
 	await writeLargeTextFile(path, 160_000)
