@@ -14,9 +14,7 @@ function context(): HistoryRenderContext {
 		cursorTick: 0,
 		toolSpinnerTick: 0,
 		workingSessions: new Map(),
-		sessionLabel: (sessionId) => sessionId,
 		toolRows: 20,
-		sessionLabelVersion: 0,
 	}
 }
 
@@ -106,21 +104,6 @@ test('multi-line notices are separated from adjacent notices by a blank line', (
 	const fetching = clean.findIndex((l) => l.includes('Fetching usage'))
 	expect(clean[fetching - 1]).toBe('')
 	expect(clean[fetching + 1]).toContain('Fetching more')
-})
-
-
-test('session labels refresh when tab metadata changes', () => {
-	const history = [{ type: 'user', text: 'hello', source: '110-gmt' }] as Tab['history']
-	const first = { ...context(), sessionLabel: () => '110-gmt (Architecture revamp, tab 3)' }
-	const lines: string[] = []
-
-	renderHistory.renderLines(lines, tab(history), 80, first)
-	expect(lines.map(stripAnsi).join('\n')).toContain('110-gmt (Architecture revamp, tab 3)')
-
-	const updated = { ...first, sessionLabel: () => '110-gmt (Architecture revamp, tab 2)', sessionLabelVersion: 1 }
-	const refreshed: string[] = []
-	renderHistory.renderLines(refreshed, tab(history), 80, updated)
-	expect(refreshed.map(stripAnsi).join('\n')).toContain('110-gmt (Architecture revamp, tab 2)')
 })
 
 

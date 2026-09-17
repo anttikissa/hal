@@ -20,7 +20,6 @@ export type BlockRenderCache = {
 	version: number
 	cols: number
 	lines: string[]
-	sessionLabelVersion: number
 }
 
 export type HistoryRenderContext = {
@@ -29,8 +28,6 @@ export type HistoryRenderContext = {
 	toolSpinnerTick: number
 	workingSessions: ReadonlyMap<string, boolean>
 	toolRows: number
-	sessionLabel: (sessionId: string) => string
-	sessionLabelVersion: number
 }
 
 const config = {
@@ -60,11 +57,11 @@ function renderEntry(block: Block, cols: number, context: HistoryRenderContext, 
 	if ((block.type === 'assistant' || block.type === 'thinking') && block.streaming && !streamingCursor) renderedBlock = { ...block, streaming: false }
 	const cached = streamingCursor || block.type === 'question' ? undefined : context.blockCache.get(block)
 	const version = block.renderVersion ?? 0
-	if (cached && cached.version === version && cached.cols === cols && cached.sessionLabelVersion === context.sessionLabelVersion) return { lines: cached.lines }
+	if (cached && cached.version === version && cached.cols === cols) return { lines: cached.lines }
 	const fastCursorVisible = cursor.isFastVisible(context.cursorTick)
-	const rendered = blockRenderer.renderBlockDetailed(renderedBlock, cols, streamingCursor && fastCursorVisible, context.sessionLabel)
+	const rendered = blockRenderer.renderBlockDetailed(renderedBlock, cols, streamingCursor && fastCursorVisible)
 	const lines = block.dimmed ? rendered.lines.map((line) => oklch.dimAnsi(line, config.forkHistoryDimFactor)) : rendered.lines
-	if (!streamingCursor && block.type !== 'question') context.blockCache.set(block, { version, cols, lines, sessionLabelVersion: context.sessionLabelVersion })
+	if (!streamingCursor && block.type !== 'question') context.blockCache.set(block, { version, cols, lines })
 	return { lines, cursor: rendered.cursor }
 }
 
@@ -133,7 +130,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 	// Streaming mutates the last block in place and bumps renderVersion without touching
 	// historyVersion, so the tail's identity has to be part of the key.
 	const tail = tab.history.at(-1)
-	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${blockRenderer.outputPad}:${working}:${context.sessionLabelVersion}:${tab.history.length}:${tail?.renderVersion ?? 0}:${terminalQuestions.state.version}:${context.toolSpinnerTick}`
+	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${blockRenderer.outputPad}:${working}:${tab.history.length}:${tail?.renderVersion ?? 0}:${terminalQuestions.state.version}:${context.toolSpinnerTick}`
 	let body = bodyCache.get(tab)
 	if (!body || body.key !== key || (working && body.streaming)) {
 		const history = visibleHistory(tab.history)

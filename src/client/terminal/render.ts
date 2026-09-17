@@ -117,8 +117,6 @@ function historyContext(toolRows: number): HistoryRenderContext {
 		toolSpinnerTick: cursor.toolTick(),
 		workingSessions: client.state.working,
 		toolRows,
-		sessionLabel: client.sessionLabel,
-		sessionLabelVersion: client.state.sessionLabelVersion,
 	}
 }
 

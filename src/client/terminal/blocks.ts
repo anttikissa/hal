@@ -28,8 +28,6 @@ const blockConfig = clientBlockConfig.config
 export type { Block } from '../block-data.ts'
 import type { Block } from '../block-data.ts'
 
-export type SessionLabel = (sessionId: string) => string
-
 function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'fork' | 'question' }>): string {
 	if (block.usageBars) {
 		// Sanitize account labels before turning server-authored semantic markers into
@@ -306,14 +304,14 @@ function padBlock(lines: string[], fg: string, bg: string, bgIsBlack: boolean | 
 
 const fixedLabels = { log: '', info: '', warning: 'Warning', error: 'Error', fork: 'Fork' }
 
-function blockLabel(block: Block, sessionLabel?: SessionLabel): string {
+function blockLabel(block: Block): string {
 	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return block.text.split('\n', 1)[0]!
 	if (block.type === 'user') {
 		if (block.canceled) return 'You (canceled)'
 		if (block.source && block.source !== 'user' && block.source !== 'system') {
-			let sender = transcriptTitles.senderLabel(block.source, block.sourceTab, block.sourceName)
-			if (!block.sourceTab && !block.sourceName) sender = sessionLabel?.(block.source) ?? sender
-			return `Message from ${sender}`
+			// Tab numbers are frozen at send time. Re-resolving them would rewrite
+			// transcript rows already in scrollback and snap the viewport.
+			return `Message from ${transcriptTitles.senderLabel(block.source, block.sourceTab, block.sourceName)}`
 		}
 		if (block.status === 'editing') return 'You (editing this prompt)'
 		if (block.status === 'steering') return 'You (steering)'
@@ -341,7 +339,7 @@ function blockLabel(block: Block, sessionLabel?: SessionLabel): string {
 	}
 	if (block.type === 'tool') {
 		const output = block.toolSummary ? undefined : block.output
-		const title = toolSpecs.getToolSpec(block.name).title?.(block.input, output, sessionLabel) ?? toolSpecs.humanizeName(block.name)
+		const title = toolSpecs.getToolSpec(block.name).title?.(block.input, output) ?? toolSpecs.humanizeName(block.name)
 		return block.canceled && !block.toolSummary ? `${title} (canceled)` : title
 	}
 	if (block.type === 'question') return 'Question'
@@ -484,19 +482,18 @@ function renderQuestionBlock(block: Extract<Block, { type: 'question' }>, cols: 
 	return { lines, cursor: cursorTarget }
 }
 
-function renderBlockDetailed(block: Block, cols: number, cursorVisible = false, sessionLabel?: SessionLabel): RenderedBlock {
+function renderBlockDetailed(block: Block, cols: number, cursorVisible = false): RenderedBlock {
 	if (block.type === 'question') return renderQuestionBlock(block, cols)
-	return { lines: blocks.renderBlock(block, cols, cursorVisible, sessionLabel) }
+	return { lines: blocks.renderBlock(block, cols, cursorVisible) }
 }
 
-function renderBlock(block: Block, cols: number, cursorVisible = false, sessionLabel?: SessionLabel): string[] {
-
+function renderBlock(block: Block, cols: number, cursorVisible = false): string[] {
 	const blobRef =
 		'blobId' in block && 'sessionId' in block && block.blobId && block.sessionId
 			? `${block.sessionId}/${block.blobId}`
 			: ''
 	const { fg, bg, bgIsBlack } = blockColors(block)
-	const label = blockLabel(block, sessionLabel)
+	const label = blockLabel(block)
 	const blockTime = time.formatTimestamp(block.ts)
 	const header = buildHeader(label, blockTime, blobRef, cols, blocks.toolActivity(block))
 	const plainNotice = block.type === 'info' || (block.type === 'log' && !block.text.startsWith('Prompt queued'))

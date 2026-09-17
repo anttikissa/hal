@@ -118,6 +118,32 @@ describe('render fullscreen growth', () => {
 		}
 	})
 
+	// Transcript headers name the tab a message came from. Resolving that number
+	// live meant any tab renumbering rewrote rows already frozen in scrollback,
+	// forcing a canonical repaint that snaps the user's scroll position to bottom.
+	test('renumbering tabs does not rewrite scrollback', () => {
+		const tab = client.currentTab()!
+		const originalRows = process.stdout.rows
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'rows', { value: 6, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
+		try {
+			client.state.tabs.push({ ...tab, sessionId: '09-bx8', history: [] })
+			tab.history.push({ type: 'user', text: 'hello', source: '09-bx8' })
+			tab.history.push({ type: 'info', text: 'one' })
+			captureOutput(() => render.draw())
+
+			// A tab opening or closing elsewhere renumbers every session.
+			client.state.tabs.unshift({ ...tab, sessionId: 'new', history: [] })
+			client.state.focusedTabIndex = 1
+			const output = captureOutput(() => render.draw())
+			expect(output).not.toContain('\x1b[3J')
+		} finally {
+			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
 	test('keeps the physical buffer canonical when changed growth exceeds the viewport', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows

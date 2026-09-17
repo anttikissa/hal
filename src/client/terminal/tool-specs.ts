@@ -84,7 +84,7 @@ interface CommitMetadata {
 
 export interface ToolFormatResult { bodyLines: string[]; hiddenIndicator?: string; suppressOutput?: boolean }
 export type ToolSpec = {
-	title?: (input?: any, output?: string, sessionLabel?: (sessionId: string) => string) => string
+	title?: (input?: any, output?: string) => string
 	command?: (input?: any, output?: string) => string | undefined
 	details?: (input?: any, output?: string) => string | undefined
 	shellContinuations?: (input?: any, output?: string) => boolean
@@ -226,11 +226,6 @@ function isGitCommitAmendCommand(input: any): boolean {
 	return /\bgit\s+commit\b/.test(command) && /(?:^|\s)--amend(?:\s|$)/.test(command)
 }
 
-function sendTargetLabel(input?: any, sessionLabel?: (sessionId: string) => string): string {
-	const target = typeof input?.sessionId === 'string' ? input.sessionId : '?'
-	return sessionLabel?.(target) ?? target
-}
-
 const specs: Record<string, ToolSpec> = {
 	bash: {
 		title(input, output) {
@@ -273,8 +268,8 @@ const specs: Record<string, ToolSpec> = {
 	ls: { title: (input) => `Ls ${input?.path ?? '.'}`, format: (output) => countIndicator(output, '(empty directory)', 'entries') },
 	spawn_agent: { title: (input) => input?.name ? `Spawn agent · ${input.name}` : 'Spawn agent', details: (input) => input == null ? undefined : ason.stringify(input, 'long') },
 	send: {
-		title(input, _output, sessionLabel) {
-			const target = sendTargetLabel(input, sessionLabel)
+		title(input) {
+			const target = typeof input?.sessionId === 'string' ? input.sessionId : '?'
 			return input?.queue ? `Queued message for ${target}` : `Sent message to ${target}`
 		},
 		command(input) {

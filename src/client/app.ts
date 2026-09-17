@@ -3,7 +3,6 @@
 
 import { clientTransport } from './transport.ts'
 import type { ContinuationAction, SharedSessionInfo, SharedState } from '../common/ipc.ts'
-import { sessionLabel as sharedSessionLabel } from '../common/session-label.ts'
 import type { TokenUsage, VersionStatus } from '../common/protocol.ts'
 import { clientBackend } from './backend.ts'
 import { historyProjection } from '../common/history-projection.ts'
@@ -86,7 +85,6 @@ const config = {
 const state = {
 	tabs: [] as Tab[],
 	focusedTabIndex: 0,
-	sessionLabelVersion: 0,
 	role: 'host' as 'host' | 'peer' | 'client',
 	pid: process.pid,
 	startedAt: new Date().toISOString(),
@@ -270,13 +268,6 @@ function showServerPromotion(pid: number, startedAt?: string): void {
 function tabForSession(sessionId: string | null): Tab | null {
 	if (sessionId) return state.tabs.find((tab) => tab.sessionId === sessionId) ?? null
 	return currentTab()
-}
-
-function sessionLabel(sessionId: string): string {
-	const index = state.tabs.findIndex((tab) => tab.sessionId === sessionId)
-	const tab = state.tabs[index]
-	if (!tab) return sessionId
-	return sharedSessionLabel.format({ id: sessionId, name: tab.name, tab: index + 1 })
 }
 
 function applyLiveEventToTab(tab: Tab, event: LiveEvent) {
@@ -540,7 +531,6 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 }
 
 function applySessionList(items: SharedSessionInfo[], preferredSession = ''): void {
-	const previousLabels = state.tabs.map((tab) => `${tab.sessionId}\0${tab.name}`).join('\n')
 	sessionTabs.apply(items, preferredSession, {
 		model: state,
 		makeTabFromDisk,
@@ -555,7 +545,6 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 		onTabSwitch: (from: string, to: string) => onTabSwitch?.(from, to),
 		onChange,
 	})
-	if (previousLabels !== state.tabs.map((tab) => `${tab.sessionId}\0${tab.name}`).join('\n')) state.sessionLabelVersion++
 }
 
 function applySharedStatus(shared: SharedState): void {
@@ -596,7 +585,6 @@ function handleEvent(event: any): void {
 		currentTab,
 		tabForSession,
 		appendInputHistory: (sessionId: string, text: string) => appendInputHistory(text, sessionId),
-		sessionLabel,
 		addBlockToTab,
 		showServerRestart,
 		showServerPromotion,
@@ -689,7 +677,6 @@ function resetForTests(): void {
 	sessionTabs.reset()
 	clientProcess.reset()
 	state.recentTabs = []
-	state.sessionLabelVersion = 0
 	state.hostVersionStatus = 'idle'
 	state.hostVersion = ''
 	state.localVersionStatus = 'idle'
@@ -726,7 +713,6 @@ export const client = {
 	setOnTabSwitch,
 	setOnDraftArrived,
 	currentTab,
-	sessionLabel,
 	isWorking,
 	canContinueCurrentTurn,
 	continueActionForCurrentTurn,
