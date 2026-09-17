@@ -70,6 +70,20 @@ test('send block identifies delivered and queued messages without repeating its 
 	expect(queuedLines.join('\n')).toContain('Wait until the current work finishes.')
 })
 
+test('send block surfaces the failure reason when the target tab is closed', () => {
+	const failed: Block = {
+		type: 'tool',
+		name: 'send',
+		input: { sessionId: '145-ego', text: 'Heads-up: scroll bug', queue: false },
+		output: 'error: unknown session or tab: 145-ego',
+	}
+
+	const lines = blocks.renderBlock(failed, 100).map((line) => stripAnsi(line))
+
+	expect(headerLine(lines)).toContain('Failed to send to 145-ego')
+	expect(contentLines(lines).join('\n')).toContain('error: unknown session or tab: 145-ego')
+})
+
 test('grep block quotes its search pattern in header', () => {
 	const block: Block = {
 		type: 'tool',

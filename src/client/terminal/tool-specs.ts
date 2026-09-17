@@ -268,15 +268,18 @@ const specs: Record<string, ToolSpec> = {
 	ls: { title: (input) => `Ls ${input?.path ?? '.'}`, format: (output) => countIndicator(output, '(empty directory)', 'entries') },
 	spawn_agent: { title: (input) => input?.name ? `Spawn agent · ${input.name}` : 'Spawn agent', details: (input) => input == null ? undefined : ason.stringify(input, 'long') },
 	send: {
-		title(input) {
+		title(input, output) {
 			const target = typeof input?.sessionId === 'string' ? input.sessionId : '?'
+			if (output?.startsWith('error:')) return `Failed to send to ${target}`
 			return input?.queue ? `Queued message for ${target}` : `Sent message to ${target}`
 		},
 		command(input) {
 			if (typeof input?.text !== 'string') return undefined
 			return input.text
 		},
-		format: () => ({ bodyLines: [], suppressOutput: true }),
+		// Errors (e.g. "unknown session or tab") explain the ✗ shown by toolFailed;
+		// success results are redundant with the title, so only surface the output on failure.
+		format: (output) => (output.startsWith('error:') ? { bodyLines: [output] } : { bodyLines: [], suppressOutput: true }),
 	},
 }
 
