@@ -22,6 +22,7 @@ import { colors } from './client/terminal/colors.ts'
 import { termCaps } from './utils/term-caps.ts'
 import { openaiUsage } from './server/openai-usage.ts'
 import { anthropicUsage } from './server/anthropic-usage.ts'
+import { opencodeUsage } from './server/opencode-usage.ts'
 import { resolve } from 'path'
 import { tabs } from './server/tabs.ts'
 import { auth } from './server/auth.ts'
@@ -52,6 +53,13 @@ function subscriptionStatus(provider: string): SubscriptionStatus | null {
 		if (account.sevenDay?.usedPercent != null) windows.push({ label: '7d', usedPercent: account.sevenDay.usedPercent })
 		return { index: account.index, total: account.total, windows }
 	}
+	if (provider === 'opencode-go') {
+		const account = opencodeUsage.current()
+		if (!account) return null
+		const windows: SubscriptionStatus['windows'] = []
+		for (const item of opencodeUsage.observationWindows(account)) windows.push({ label: item.label, usedPercent: item.usedPercent })
+		return { index: account.index, total: account.total, windows }
+	}
 	return null
 }
 
@@ -64,12 +72,17 @@ function accountUsageWindows(provider: string, key: string) {
 		const account = anthropicUsage.state.accounts[key]
 		return account ? anthropicUsage.observationWindows(account) : []
 	}
+	if (provider === 'opencode-go') {
+		const account = opencodeUsage.state.accounts[key]
+		return account ? opencodeUsage.observationWindows(account) : []
+	}
 	return []
 }
 
 function currentAccountKey(provider: string): string {
 	if (provider === 'openai') return openaiUsage.state.currentKey
 	if (provider === 'anthropic') return anthropicUsage.state.currentKey
+	if (provider === 'opencode-go') return opencodeUsage.state.currentKey
 	return ''
 }
 
@@ -135,6 +148,8 @@ openaiUsage.init()
 perf.mark('OpenAI usage initialized')
 anthropicUsage.init()
 perf.mark('Anthropic usage initialized')
+opencodeUsage.init()
+perf.mark('OpenCode Go usage initialized')
 accountRotation.io.currentKey = currentAccountKey
 accountRotation.io.usageWindows = accountUsageWindows
 clientBackend.install({
@@ -153,6 +168,7 @@ clientBackend.install({
 		onChange: (callback) => {
 			openaiUsage.onChange(callback)
 			anthropicUsage.onChange(callback)
+			opencodeUsage.onChange(callback)
 		},
 	},
 })

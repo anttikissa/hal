@@ -11,6 +11,7 @@ import type { Message, Provider, ProviderRequest, ProviderStreamEvent, TurnEndSt
 import { auth, type Credential } from '../auth.ts'
 import { providerShared } from './shared.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { opencodeUsage } from '../opencode-usage.ts'
 import { reasoningSignature } from '../session/reasoning-signature.ts'
 import { models } from '../../common/models.ts'
 import { ason } from '../../utils/ason.ts'
@@ -604,6 +605,9 @@ async function* generateCompat(providerName: string, baseUrl: string, req: Provi
 	try {
 		for await (const event of parseChatCompletionsStream(res.body!)) {
 			if (event.type === 'done' && credential.type === 'token') await openaiUsage.refreshAll().catch(() => {})
+			// Go reports usage as a subscription percentage, so refresh after each turn
+			// to keep the status bar current. A failure here is only cosmetic.
+			if (event.type === 'done' && providerName === 'opencode-go') await opencodeUsage.refreshAll().catch(() => {})
 			yield event
 		}
 	} catch (err) {

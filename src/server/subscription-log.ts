@@ -5,7 +5,7 @@ import { ason } from '../utils/ason.ts'
 import { log } from '../utils/log.ts'
 import { STATE_DIR } from './state.ts'
 
-export type SubscriptionProvider = 'openai' | 'anthropic'
+export type SubscriptionProvider = 'openai' | 'anthropic' | 'opencode-go'
 
 export interface SubscriptionWindow {
 	label: string

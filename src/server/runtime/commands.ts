@@ -19,6 +19,7 @@ import { inbox } from './inbox.ts'
 import { agentLoop } from './agent-loop.ts'
 import { anthropicUsage } from '../anthropic-usage.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { opencodeUsage } from '../opencode-usage.ts'
 import { memory } from '../memory.ts'
 import { version } from '../version.ts'
 import { time } from '../../utils/time.ts'
@@ -581,31 +582,31 @@ handlers['check'] = async (args, session, hooks) => {
 	}
 }
 
-// /status — runtime version + Anthropic / OpenAI OAuth subscription usage
+// /status — runtime version + subscription usage for every configured provider
 handlers['status'] = async (_args, _session, hooks) => {
-	let anthropicText = ''
-	let openaiText = ''
+	const sources = [
+		{ label: 'Anthropic', usage: anthropicUsage },
+		{ label: 'OpenAI', usage: openaiUsage },
+		{ label: 'OpenCode Go', usage: opencodeUsage },
+	]
+	const texts: string[] = []
 	const pending: Promise<void>[] = []
 
-	// Fetch both services concurrently, but emit the notices in a stable order so
+	// Fetch every service concurrently, but emit the notices in a stable order so
 	// the user immediately sees what slow network calls /status is waiting on.
-	if (anthropicUsage.hasCredentials()) {
-		hooks.info?.('Fetching subscription usage from Anthropic...')
-		pending.push(anthropicUsage.renderStatus(true).then((text) => { anthropicText = text }))
-	}
-	if (openaiUsage.hasCredentials()) {
-		hooks.info?.('Fetching subscription usage from OpenAI...')
-		pending.push(openaiUsage.renderStatus(true).then((text) => { openaiText = text }))
+	for (const source of sources) {
+		if (!source.usage.hasCredentials()) continue
+		hooks.info?.(`Fetching subscription usage from ${source.label}...`)
+		pending.push(source.usage.renderStatus(true).then((text) => { texts.push(text) }))
 	}
 
 	await Promise.all(pending)
-	const sections = [anthropicText, openaiText].filter((text) => text && !/^No (Anthropic Claude|OpenAI ChatGPT) subscriptions configured\.$/.test(text.trim()))
-	const hasAnthropic = anthropicUsage.hasCredentials()
-	const hasOpenai = openaiUsage.hasCredentials()
-	let usage = sections.length > 0 ? sections.join('\n\n') : 'No OAuth subscription credentials configured.'
+	const sections = texts.filter((text) => text && !/^No .* subscriptions configured\.$/.test(text.trim()))
+	let usage = sections.length > 0 ? sections.join('\n\n') : 'No subscription credentials configured.'
 	const hints: string[] = []
-	if (!hasAnthropic) hints.push('  /login claude    — log in to Claude')
-	if (!hasOpenai) hints.push('  /login chatgpt   — log in to ChatGPT')
+	if (!anthropicUsage.hasCredentials()) hints.push('  /login claude    — log in to Claude')
+	if (!openaiUsage.hasCredentials()) hints.push('  /login chatgpt   — log in to ChatGPT')
+	if (!opencodeUsage.hasCredentials()) hints.push('  OPENCODE_API_KEY — OpenCode Go subscription key')
 	if (hints.length > 0) {
 		usage += `\n\nAdd a subscription:\n${hints.join('\n')}`
 	}
