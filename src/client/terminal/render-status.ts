@@ -480,10 +480,10 @@ function renderHelpBar(lines: string[]): void {
 		lines.push(`${renderStatus.paddedLine(`${style.key}${hint}`, cols)}${RESET}`)
 		return
 	}
-	if (renderStatus.introStreaming()) {
-		lines.push(`${renderStatus.paddedLine(`${style.description}Bringing up the controls — you can type; submit when the intro finishes.`, cols)}${RESET}`)
-		return
-	}
+	// if (renderStatus.introStreaming()) {
+	// 	lines.push(`${renderStatus.paddedLine(`${style.description}Bringing up the controls — you can type; submit when the intro finishes.`, cols)}${RESET}`)
+	// 	return
+	// }
 	const editHint = promptEdit.hint(client.currentTab()?.sessionId)
 	if (editHint) {
 		const warning = colors.warning.fg || colors.help.description || colors.status.fg

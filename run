@@ -73,7 +73,7 @@ if needs_install; then
 		echo "hal: setup was not completed; rerun ./run when ready." >&2
 		exit 1
 	fi
-	echo
+#	echo
 	echo "Install script finished successfully. Starting Hal..."
 	echo
 fi
