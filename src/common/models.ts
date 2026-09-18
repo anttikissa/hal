@@ -733,10 +733,15 @@ function addStaticProviderChoices(items: ModelChoice[], group: CatalogEntry['gro
 // OpenRouter models are whatever models.dev knows about, grouped by vendor.
 // A catalog alias (grok, qwen, …) replaces the value of the model it points at,
 // so every model is listed exactly once and aliases stay typeable.
+// Registry providers that get their own picker section. Most models.dev providers
+// are omitted because listing ~195 vendors makes the picker unusable.
+const REGISTRY_GROUPS = new Set(['opencode-go'])
+
 function addRegistryProviderChoices(items: ModelChoice[]): void {
 	for (const [provider, modelsList] of Object.entries(state.registryProviderModels)) {
 		// Avoid duplicating providers already rendered by the curated CATALOG.
 		if (DIRECT_PROVIDERS.includes(provider)) continue
+		if (!REGISTRY_GROUPS.has(provider)) continue
 		for (const modelId of modelsList) {
 			const fullId = `${provider}/${modelId}`
 			addModelChoice(items, modelId, fullId, [provider], modelId)
