@@ -24,10 +24,13 @@ const config = {
 function introScript(): string {
 	const alias = halProvider.introDefaultModel()
 	return `Hello. I am HAL 9001, a moderately advanced agent harness and terminal client.<pause for="0.3s"/> You can call me Hal.
-Press Enter to continue.
-<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Your controls. You know the drill.<pause for="0.3s"/><config key="renderStatus.statusOpacity" value="1"/>
 
-You are speaking to synthetic model \`hal/intro\`. To work with real models, credentials are required.<pause for="0.3s"/><config key="renderStatus.tabsOpacity" value="1"/>
+Press Enter to continue.
+<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Here's your prompt and status line. You know the drill.<pause for="0.9s"/><config key="renderStatus.statusOpacity" value="1"/>
+
+Tabs are a feature I urge you to explore.<pause for="0.8s"/>
+
+You are speaking to special intro model \`hal/intro\`. To work with actual models, credentials are required.<pause for="0.3s"/><config key="renderStatus.tabsOpacity" value="1"/>
 
 ${halProvider.providerSetupText()}
 
