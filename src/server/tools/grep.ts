@@ -85,7 +85,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 const grepTool = {
 	name: 'grep',
-	description: 'Search file contents using ripgrep. Returns matching lines with file paths and line numbers.',
+	description: 'Search file contents using ripgrep. Returns matching lines with file paths and line numbers. Use this rather than grep in bash: it skips ignored and binary files and caps output per file.',
 	parameters: {
 		pattern: { type: 'string', description: 'Search pattern (regex)' },
 		path: { type: 'string', description: 'Directory or file to search (default: cwd). Space-separated paths ok.' },
