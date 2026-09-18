@@ -30,7 +30,7 @@ test('HAL provider streams script words at its fixed rate without using request 
 	halProvider.config.wordsPerSecond = 4
 	halProvider.sleep = async (ms) => { delays.push(ms) }
 
-	expect(await collect([{ role: 'user', content: 'private user text' }])).toEqual([
+	expect(await collect([])).toEqual([
 		{ type: 'text', text: 'Hello ' },
 		{ type: 'text', text: 'HAL ' },
 		{ type: 'text', text: 'world.' },
@@ -218,7 +218,10 @@ test('intro defaults to the best detected API-key route, breaks ties at random, 
 	const originalRandom = halProvider.random
 	try {
 		for (const name of names) delete process.env[name]
-		expect(halProvider.introDefaultModel()).toBe('gpt')
+		expect(halProvider.introDefaultModel()).toBeUndefined()
+		const noKeyLast = halProvider.pages().at(-1)!
+		expect(noKeyLast.steps).not.toContainEqual({ type: 'config', key: 'models.default', value: 'gpt' })
+		expect(noKeyLast.text).not.toContain('default model to `gpt`')
 		process.env.GEMINI_API_KEY = 'secret'
 		process.env.OPENROUTER_API_KEY = 'secret'
 		expect(halProvider.introDefaultModel()).toBe('deepseek')

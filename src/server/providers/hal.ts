@@ -30,9 +30,7 @@ Press Enter to continue.
 
 Now let's set up some actual providers.<pause for="0.3s"/><config key="renderStatus.tabsOpacity" value="1"/>
 
-${halProvider.providerSetupText()}
-
-${halProvider.introModelText(alias)} Change it with \`/model\` or \`Ctrl-M\`.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="${alias}"/>`
+${halProvider.providerSetupText()}${alias ? `\n\n${halProvider.introModelText(alias)} Change it with \`/model\` or \`Ctrl-M\`.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="${alias}"/>` : ''}`
 }
 
 // Sessions whose intro was skipped with Esc: the rest of the script streams at once.
@@ -78,8 +76,8 @@ function detectedProviders(): Map<string, string[]> {
 }
 
 // The model the intro hands the session to: the highest-priority detected key,
-// otherwise gpt. Subscriptions arrive later via /login.
-function introDefaultModel(): string {
+// or none if no key is set. Subscriptions arrive later via /login.
+function introDefaultModel(): string | undefined {
 	let best: string[] = []
 	let bestPriority = 0
 	for (const provider of halProvider.detectedProviders().keys()) {
@@ -90,11 +88,12 @@ function introDefaultModel(): string {
 		}
 		if (priority === bestPriority && priority > 0) best.push(halProvider.suggestions[provider]!)
 	}
-	if (best.length === 0) return 'gpt'
+	if (best.length === 0) return undefined
 	return best[Math.floor(halProvider.random() * best.length)]!
 }
 
-function introModelText(alias: string): string {
+function introModelText(alias: string | undefined): string {
+	if (!alias) return ''
 	const fullId = models.resolveModel(alias)
 	return `I set the default model to \`${alias}\`, aliased to ${fullId} (${models.displayModel(fullId)}).`
 }
@@ -294,6 +293,19 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 	}
 	if (req.model === 'scroll' && !halProvider.script) {
 		yield* scrollRepro(req)
+		return
+	}
+	// If the user has already sent a message while still on the intro model, no
+	// real provider was configured. Tell them how to set one up instead of looping.
+	const userText = req.messages
+		.filter((m) => m.role === 'user')
+		.map(messageText)
+		.join('')
+		.replace(/<meta>.*?<\/meta>/gs, '')
+		.trim()
+	if (userText) {
+		yield* streamText('No model configured. Use `/login claude` or `/login chatgpt` for a subscription, or set an API key such as ANTHROPIC_API_KEY or OPENAI_API_KEY.', req)
+		yield { type: 'done' }
 		return
 	}
 	const available = pages(scriptFor())

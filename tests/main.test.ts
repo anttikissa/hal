@@ -31,6 +31,13 @@ function spawnHal(env: Record<string, string | undefined> = {}) {
 			HAL_STATE_DIR: tmpDir,
 			PATH: process.env.PATH,
 			HOME: process.env.HOME,
+			ANTHROPIC_API_KEY: undefined,
+			OPENAI_API_KEY: undefined,
+			GEMINI_API_KEY: undefined,
+			GOOGLE_API_KEY: undefined,
+			OPENROUTER_API_KEY: undefined,
+			GROK_API_KEY: undefined,
+			OPENCODE_API_KEY: undefined,
 			...env,
 		},
 	})
