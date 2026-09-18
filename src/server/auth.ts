@@ -363,6 +363,28 @@ async function ensureFresh(providerName: string): Promise<void> {
 }
 
 /**
+ * Store an API key for a provider, appending it as another account rather than
+ * replacing what is there. `/login` is the only caller, and running it twice should
+ * add a second subscription rather than silently discard the first.
+ */
+function saveApiKey(providerName: string, apiKey: string): void {
+	const s = store()
+	const existing = s[providerName]
+	const entry = { apiKey }
+	if (Array.isArray(existing)) {
+		// Re-authenticating with the same key should not stack duplicates.
+		if (!existing.some((candidate) => candidate?.apiKey === apiKey)) existing.push(entry)
+		s[providerName] = existing
+	} else if (existing && typeof existing === 'object') {
+		if (existing.apiKey === apiKey) s[providerName] = { ...existing }
+		else s[providerName] = [existing, entry]
+	} else {
+		s[providerName] = entry
+	}
+	liveFiles.save(s)
+}
+
+/**
  * Whether a provider bills a subscription rather than per-token.
  *
  * Not the same question as "did we authenticate with a token": OpenCode Go is a
@@ -402,6 +424,7 @@ export const auth = {
 	clearCooldown,
 	hasAvailableCredential,
 	allOnCooldownMessage,
+	saveApiKey,
 	store,
 	_setStoreForTest,
 	_resetCooldowns,

@@ -392,3 +392,23 @@ test('modelDiscoveries reports new direct-provider models once', () => {
 		{ provider: 'OpenAI', model: 'gpt-5.5-instant', context: 400_000 }
 	])
 })
+
+test('registry provider models appear in completion and picker', () => {
+	models.hydrate({}, [], {}, { 'opencode-go': ['kimi-k3', 'glm-5.3'] })
+
+	const names = models.modelCompletionNames()
+	expect(names).toContain('opencode-go/kimi-k3')
+	expect(names).toContain('opencode-go/glm-5.3')
+	expect(names).not.toContain('kimi-k3') // bare name would collide with OpenRouter alias
+
+	const choices = models.listModelChoices()
+	const kimi = choices.find((c) => c.fullId === 'opencode-go/kimi-k3')
+	expect(kimi).toBeDefined()
+	expect(kimi!.path).toEqual(['opencode-go'])
+	expect(kimi!.leafLabel).toBe('kimi-k3')
+})
+
+test('resolveModel keeps registry provider ids intact', () => {
+	models.hydrate({}, [], {}, { 'opencode-go': ['kimi-k3'] })
+	expect(models.resolveModel('opencode-go/kimi-k3')).toBe('opencode-go/kimi-k3')
+})

@@ -119,8 +119,9 @@ test('/login completes provider names and aliases', () => {
 	const anthropic = completion.complete('/login a', '/login a'.length)
 
 	expect(all).not.toBeNull()
-	expect(all!.items).toEqual(['/login anthropic', '/login chatgpt', '/login claude', '/login openai'])
-	expect(openai!.items).toEqual(['/login openai'])
+	expect(all!.items).toEqual(['/login anthropic', '/login chatgpt', '/login claude', '/login openai', '/login opencode'])
+	// 'o' is ambiguous now that OpenCode is a provider.
+	expect(openai!.items).toEqual(['/login openai', '/login opencode'])
 	expect(anthropic!.items).toEqual(['/login anthropic'])
 })
 

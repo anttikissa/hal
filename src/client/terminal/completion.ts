@@ -191,7 +191,7 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 		values = completeSessionTargets(argPrefix, true)
 	} else if (arg === 'login-provider') {
 		// Both provider and product names are accepted by /login, so Tab exposes them all.
-		values = ['anthropic', 'chatgpt', 'claude', 'openai'].filter((provider) => provider.startsWith(argPrefix))
+		values = ['anthropic', 'chatgpt', 'claude', 'openai', 'opencode'].filter((provider) => provider.startsWith(argPrefix))
 	} else if (arg === 'web-action') {
 		// Bare /web lists the tokens, so only the subcommands need completing.
 		values = ['auth', 'revoke'].filter((action) => action.startsWith(argPrefix))

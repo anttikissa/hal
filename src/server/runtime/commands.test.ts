@@ -5,6 +5,7 @@ import { config } from '../../config.ts'
 import { agentLoop } from './agent-loop.ts'
 import { anthropicUsage } from '../anthropic-usage.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { opencodeUsage } from '../opencode-usage.ts'
 import { memory } from '../memory.ts'
 import { models } from '../../common/models.ts'
 import { serverModels } from '../models.ts'
@@ -284,6 +285,7 @@ test('/status reports subscription fetch progress before returning', async () =>
 	expect(progress).toEqual([
 		'Fetching subscription usage from Anthropic...',
 		'Fetching subscription usage from OpenAI...',
+		'Fetching subscription usage from OpenCode Go...',
 	])
 
 	finishAnthropic()
@@ -297,6 +299,7 @@ test('/status reports subscription fetch progress before returning', async () =>
 test('/status progress only mentions configured subscriptions', async () => {
 	anthropicUsage.hasCredentials = () => false
 	openaiUsage.hasCredentials = () => true
+	opencodeUsage.hasCredentials = () => false
 	anthropicUsage.renderStatus = async () => {
 		throw new Error('Anthropic should not be fetched without credentials')
 	}
@@ -316,6 +319,7 @@ test('/status progress only mentions configured subscriptions', async () => {
 test('/status hints /login when a provider has no credentials', async () => {
 	anthropicUsage.hasCredentials = () => false
 	openaiUsage.hasCredentials = () => true
+	opencodeUsage.hasCredentials = () => false
 	openaiUsage.renderStatus = async () => 'OpenAI subscriptions:\n* 1/2 b@test.com · 5h 23% used'
 
 	const result = await commands.executeCommand('/status', makeSession())
@@ -345,6 +349,19 @@ test('/login accepts anthropic and openai as aliases', async () => {
 test('/login with no provider rejects', async () => {
 	const result = await commands.executeCommand('/login', makeSession())
 	expect(result.error).toContain('Usage:')
+})
+
+test('/login opencode asks for the API key through a secret question', async () => {
+	const result = await commands.executeCommand('/login opencode', makeSession())
+
+	expect(result.handled).toBe(true)
+	expect(result.question).toMatchObject({ input: { kind: 'secret', publicKey: expect.any(String) }, source: { type: 'login', provider: 'opencode-go' } })
+	expect(result.question?.text).toContain('OpenCode')
+})
+
+test('/login accepts opencode-go as an alias for opencode', async () => {
+	const result = await commands.executeCommand('/login opencode-go', makeSession())
+	expect(result.question).toMatchObject({ source: { type: 'login', provider: 'opencode-go' } })
 })
 
 test('/mem shows current rss and thresholds', async () => {

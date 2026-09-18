@@ -24,6 +24,7 @@ import { openai } from './providers/openai.ts'
 import { questionCrypto } from '../common/question-crypto.ts'
 import { serverKeys } from './server-keys.ts'
 import { authLogin } from './auth-login.ts'
+import { auth } from './auth.ts'
 
 test('runtime exposes in-memory focused sessions for eval helpers', () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
@@ -2079,5 +2080,45 @@ test('continuing a session whose last turn completed does not call the provider'
 		ipc.appendEvent = origAppendEvent
 		sessions.deleteSession(sessionId)
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
+})
+
+test('OpenCode secret answer stores the API key instead of exchanging an OAuth code', async () => {
+	const sessionId = `test-opencode-answer-${Date.now().toString(36)}`
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString() })
+	const questionId = '000001-aaa'
+	const ciphertext = await questionCrypto.encryptSecret(serverKeys.publicKey(), 'sk-opencode-test')
+	const origFinish = authLogin.finishAnthropic
+	const origAppendEvent = ipc.appendEvent
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	const origOwnsHostLock = ipc.ownsHostLock
+	const origStore = auth.store()
+	const events: any[] = []
+	let exchanged = false
+	authLogin.finishAnthropic = async () => { exchanged = true; return {} }
+	ipc.appendEvent = (event) => { events.push(event) }
+	agentLoop.runAgentLoop = async () => 'completed'
+	ipc.ownsHostLock = () => true
+	auth._setStoreForTest({})
+	try {
+		await sessions.appendHistory(sessionId, [
+			{ type: 'user', parts: [{ type: 'text', text: 'Use OpenCode Go' }] },
+			{ type: 'question', id: questionId, text: 'Paste your OpenCode API key.', input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 190 }, source: { type: 'login', provider: 'opencode-go' } },
+		])
+		await runtime.handleAnswer(sessionId, questionId, { kind: 'secret', ciphertext })
+		for (let i = 0; i < 100 && events.length === 0; i++) await Bun.sleep(1)
+
+		expect(exchanged).toBe(false)
+		expect(auth.store()['opencode-go']).toEqual({ apiKey: 'sk-opencode-test' })
+		// The key itself must never reach the transcript.
+		expect(await Bun.file(`${sessions.sessionDir(sessionId)}/history.asonl`).text()).not.toContain('sk-opencode-test')
+		expect(events.find((event) => event.type === 'info')?.text).toContain('OpenCode Go')
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		agentLoop.runAgentLoop = origRunAgentLoop
+		ipc.ownsHostLock = origOwnsHostLock
+		authLogin.finishAnthropic = origFinish
+		auth._setStoreForTest(origStore)
+		sessions.deleteSession(sessionId)
 	}
 })

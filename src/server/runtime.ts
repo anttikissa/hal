@@ -34,6 +34,7 @@ import type { AnswerValue } from '../common/history.ts'
 import { historyProjection } from '../common/history-projection.ts'
 import { serverKeys } from './server-keys.ts'
 import { authLogin } from './auth-login.ts'
+import { auth } from './auth.ts'
 import { spawnAgent } from './tools/spawn_agent.ts'
 import { processControl } from './process-control.ts'
 
@@ -184,7 +185,13 @@ async function handleAnswer(sessionId: string, questionId: string, value: Answer
 			const plaintext = await serverKeys.decryptSecret(value.ciphertext)
 			question = activeQuestion(sessionId)
 			if (!question || question.id !== questionId || !acceptsAnswer(question, value)) return
-			if (question.source.type === 'login') ({ email } = await authLogin.finishAnthropic(plaintext))
+			// Which flow this answer completes comes from the question itself: Claude
+			// returns an OAuth code to exchange, OpenCode an API key to store.
+			if (question.source.type === 'login' && question.source.provider === 'opencode-go') {
+				auth.saveApiKey('opencode-go', plaintext)
+			} else if (question.source.type === 'login') {
+				;({ email } = await authLogin.finishAnthropic(plaintext))
+			}
 		} catch (err) {
 			emitInfo(sessionId, `Login failed: ${errorMessage(err)}`, 'error')
 			return
@@ -196,7 +203,8 @@ async function handleAnswer(sessionId: string, questionId: string, value: Answer
 	}
 	sessionStore.appendHistory(sessionId, [{ type: 'answer', questionId, value, ts: new Date().toISOString() }])
 	if (question.source.type === 'login') {
-		emitInfo(sessionId, `Logged in to Claude${email ? ` as ${email}` : ''}. Run /status to see usage.`)
+		const label = question.source.provider === 'opencode-go' ? 'OpenCode Go' : 'Claude'
+		emitInfo(sessionId, `Logged in to ${label}${email ? ` as ${email}` : ''}. Run /status to see usage.`)
 		emitHistoryUpdated(sessionId)
 		retryAfterLogin(sessionId, question.source.provider)
 		return

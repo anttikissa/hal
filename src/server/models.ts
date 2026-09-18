@@ -60,6 +60,25 @@ function contextWindows(metadata: Record<string, ModelMetadata>): Record<string,
 	return contexts
 }
 
+/**
+ * Models per registry provider, excluding the curated direct providers already
+ * rendered by the picker. The common registry uses this to offer tab completion
+ * and picker entries for providers like opencode-go without hardcoding each one.
+ */
+function registryProviderModels(metadata: Record<string, ModelMetadata>): Record<string, string[]> {
+	const direct = new Set(['hal', 'anthropic', 'openai', 'google', 'openrouter'])
+	const byProvider: Record<string, Set<string>> = {}
+	for (const [modelId, model] of Object.entries(metadata)) {
+		for (const source of model.sources) {
+			if (direct.has(source.provider)) continue
+			;(byProvider[source.provider] ??= new Set()).add(modelId)
+		}
+	}
+	const result: Record<string, string[]> = {}
+	for (const [provider, ids] of Object.entries(byProvider)) result[provider] = [...ids].sort()
+	return result
+}
+
 
 /** Every "vendor/model" id OpenRouter serves, newest release first. */
 function openrouterIds(metadata: Record<string, ModelMetadata>): string[] {
@@ -80,7 +99,7 @@ function loadModelsDevCache(): Record<string, number> {
 		const parsed = ason.parse(readFileSync(modelsFile(), 'utf-8')) as unknown as ModelsDevCache
 		state.metadata = parsed.models
 		state.providers = parsed.providers ?? {}
-		models.hydrate(contextWindows(parsed.models), openrouterIds(parsed.models), parsed.models)
+		models.hydrate(contextWindows(parsed.models), openrouterIds(parsed.models), parsed.models, registryProviderModels(parsed.models))
 	} catch {
 		models.hydrate({})
 		state.metadata = {}
@@ -178,7 +197,7 @@ async function refreshModels(): Promise<RefreshModelsResult> {
 	ensureDir(process.env.HAL_STATE_DIR ?? STATE_DIR)
 	const cache: ModelsDevCache = { version: 1, models: metadata, providers }
 	writeFileSync(modelsFile(), ason.stringify(cache) + '\n')
-	models.hydrate(next, openrouterIds(metadata), metadata)
+	models.hydrate(next, openrouterIds(metadata), metadata, registryProviderModels(metadata))
 	state.metadata = metadata
 	state.providers = providers
 	return {

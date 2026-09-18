@@ -191,16 +191,25 @@ const state = {
 	openrouterIds: [] as string[],
 	// Browser-safe shape of the models.dev metadata the display code needs.
 	metadata: {} as Record<string, { name?: string }>,
+	// Models from registry providers that are not in the curated CATALOG (e.g. opencode-go).
+	// Map: provider name → list of bare model ids. Populated by the host from models.dev.
+	registryProviderModels: {} as Record<string, string[]>,
 }
 
 function modelCache(): Record<string, number> {
 	return state.cache ?? {}
 }
 
-function hydrate(cache: Record<string, number>, openrouterIds: string[] = [], metadata: Record<string, { name?: string }> = {}): void {
+function hydrate(
+	cache: Record<string, number>,
+	openrouterIds: string[] = [],
+	metadata: Record<string, { name?: string }> = {},
+	registryProviderModels: Record<string, string[]> = {},
+): void {
 	state.cache = cache
 	state.openrouterIds = openrouterIds
 	state.metadata = metadata
+	state.registryProviderModels = registryProviderModels
 }
 
 function registryName(fullId: string): string | undefined {
@@ -724,6 +733,17 @@ function addStaticProviderChoices(items: ModelChoice[], group: CatalogEntry['gro
 // OpenRouter models are whatever models.dev knows about, grouped by vendor.
 // A catalog alias (grok, qwen, …) replaces the value of the model it points at,
 // so every model is listed exactly once and aliases stay typeable.
+function addRegistryProviderChoices(items: ModelChoice[]): void {
+	for (const [provider, modelsList] of Object.entries(state.registryProviderModels)) {
+		// Avoid duplicating providers already rendered by the curated CATALOG.
+		if (DIRECT_PROVIDERS.includes(provider)) continue
+		for (const modelId of modelsList) {
+			const fullId = `${provider}/${modelId}`
+			addModelChoice(items, modelId, fullId, [provider], modelId)
+		}
+	}
+}
+
 function addOpenRouterChoices(items: ModelChoice[]): void {
 	const aliases = new Map<string, string>()
 	for (const entry of CATALOG) {
@@ -763,6 +783,7 @@ function listModelChoices(): ModelChoice[] {
 	addAnthropicChoices(items)
 	addStaticProviderChoices(items, 'Google', 'google')
 	addOpenRouterChoices(items)
+	addRegistryProviderChoices(items)
 	return items
 }
 
@@ -778,6 +799,12 @@ function modelCompletionNames(): string[] {
 		names.add(id.slice(id.indexOf('/') + 1))
 		names.add(id)
 		names.add(`openrouter/${id}`)
+	}
+	// Registry providers like opencode-go expose their models as provider/modelId.
+	for (const [provider, modelsList] of Object.entries(state.registryProviderModels)) {
+		for (const modelId of modelsList) {
+			names.add(`${provider}/${modelId}`)
+		}
 	}
 	return [...names].sort()
 }

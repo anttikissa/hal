@@ -652,7 +652,24 @@ handlers['login'] = async (args, _session, hooks) => {
 		}
 	}
 
-	return { error: 'Usage: /login <claude|chatgpt>', handled: true }
+	// OpenCode Go is a subscription that hands out an API key, so there is no OAuth
+	// round trip: the key is the whole credential. It travels through the same
+	// encrypted secret question as Claude's code, which keeps it out of history and
+	// works on remote hosts.
+	if (provider === 'opencode' || provider === 'opencode-go') {
+		if (codeArg) return { error: 'Usage: /login opencode', handled: true }
+		return {
+			output: 'Paste an OpenCode API key. A Go subscription key gets subscription usage in the status bar; any other OpenCode key bills per token.',
+			question: {
+				text: 'Paste your OpenCode API key.',
+				input: { kind: 'secret', publicKey: serverKeys.publicKey(), maxBytes: 190 },
+				source: { type: 'login', provider: 'opencode-go' },
+			},
+			handled: true,
+		}
+	}
+
+	return { error: 'Usage: /login <claude|chatgpt|opencode>', handled: true }
 }
 
 
