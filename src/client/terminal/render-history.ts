@@ -2,7 +2,7 @@
 //
 // render.ts owns the whole terminal frame and diff engine. This module only turns
 // a tab's historical blocks into rows for the history area: block rendering,
-// grouping, hidden paused notices, assistant separators, fork-history dimming,
+// grouping, hidden paused notices, fork-history dimming,
 // and the idle/working inline HAL cursor.
 //
 // The separation keeps transcript semantics here while terminal mechanics stay
@@ -168,8 +168,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 				fullTools = Infinity
 			}
 			const previous = history[i - 1]
-			if (built.length > 0 && previous?.type === 'assistant' && block.type === 'assistant') built.push('', `${colors.assistant.fg}${'─'.repeat(Math.max(0, cols))}\x1b[39m`, '')
-			else if (built.length > 0 && !(isPlainNotice(previous) && isPlainNotice(block))) built.push('')
+			if (built.length > 0 && !(isPlainNotice(previous) && isPlainNotice(block))) built.push('')
 			const rendered = renderEntry(block, cols, context, activeStreamingBlock)
 			if (rendered.cursor) questionCursor = { row: built.length + rendered.cursor.row, col: rendered.cursor.col }
 			built.push(...rendered.lines)

@@ -37,7 +37,7 @@ function tab(history: Tab['history']): Tab {
 	}
 }
 
-test('adjacent assistant blocks use a Hal-colored rule separator', () => {
+test('adjacent assistant blocks are separated by a blank line, not a rule', () => {
 	colors.load()
 	const lines: string[] = []
 	renderHistory.renderLines(lines, tab([
@@ -47,15 +47,18 @@ test('adjacent assistant blocks use a Hal-colored rule separator', () => {
 
 	const clean = lines.map(stripAnsi)
 	const firstIndex = clean.findIndex((line) => line.includes('first'))
-	const ruleIndex = firstIndex + 2
-	const secondIndex = ruleIndex + 2
+	const headerIndex = clean.findIndex((line) => line.includes('Hal (synthetic)'))
+	const secondIndex = clean.findIndex((line) => line.trim() === 'second')
 
 	expect(firstIndex).toBeGreaterThanOrEqual(0)
-	expect(clean[ruleIndex - 1]).toBe('')
-	expect(clean[ruleIndex + 1]).toBe('')
-	expect(clean[ruleIndex]).toBe('─'.repeat(20))
-	expect(lines[ruleIndex]).toStartWith(colors.assistant.fg)
-	expect(clean[secondIndex]).toContain('Hal (synthetic)')
+	expect(secondIndex).toBeGreaterThan(firstIndex)
+	// Blocks themselves render header + spacer + body. Adjacent blocks should be
+	// separated by exactly one history-level blank line; no wide rule line.
+	const between = clean.slice(firstIndex + 1, secondIndex)
+	expect(between.some((line) => line.includes('─'))).toBe(false)
+	expect(between.at(-1)?.trim()).toBe('')
+	expect(headerIndex).toBeGreaterThanOrEqual(0)
+	expect(headerIndex).toBeLessThan(secondIndex)
 })
 
 

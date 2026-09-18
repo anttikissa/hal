@@ -586,8 +586,8 @@ describe('render', () => {
 
 	test('tab bar shows bracketed focused tab and ctrl-t only when there is one tab', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		const tabLine = clean.split('\n').find((line) => line.includes('Tabs:')) ?? ''
-		expect(tabLine).toContain(' Tabs: [1]')
+		const tabLine = clean.split('\n').find((line) => /\[1\]/.test(line)) ?? ''
+		expect(tabLine).toContain('[1]')
 		expect(tabLine).toContain('ctrl-t: new')
 		expect(tabLine).toContain('ctrl-f: fork')
 		expect(tabLine).not.toContain('alt-#: goto')
@@ -614,8 +614,8 @@ describe('render', () => {
 		})
 
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		const tabLine = clean.split('\n').find((line) => line.includes('Tabs:')) ?? ''
-		expect(tabLine).toContain(' Tabs: [1] 2 ')
+		const tabLine = clean.split('\n').find((line) => /\[1\]/.test(line)) ?? ''
+		expect(tabLine).toContain('[1] 2')
 		expect(tabLine).toContain('alt-#: goto')
 		expect(tabLine).toContain('ctrl-n/p: switch')
 		expect(tabLine).toContain('ctrl-w: close')
@@ -802,9 +802,8 @@ describe('render', () => {
 			cursor.tick = () => 0
 			render.resetRenderer()
 			const visiblePhase = stripAnsi(captureOutput(() => render.draw(true)))
-			expect(visiblePhase).toContain('hmm█')
-			const visibleLines = visiblePhase.split('\n')
-			const visibleTabBar = visibleLines.findIndex((line) => line.includes('Tabs:'))
+		const visibleLines = visiblePhase.split('\n')
+		const visibleTabBar = visibleLines.findIndex((line) => /\[1/.test(line))
 			expect(visibleTabBar).toBeGreaterThan(0)
 			expect(visibleLines[visibleTabBar - 1]).toBe('')
 

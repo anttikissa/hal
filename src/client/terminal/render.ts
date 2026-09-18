@@ -6,7 +6,7 @@
 // owns the terminal diff engine that writes the frame safely.
 //
 // render-history.ts is separate because historical transcript rendering has its
-// own rules: block grouping, hidden paused notices, assistant separators, fork
+// own rules: block grouping, hidden paused notices, fork
 // dimming, and the idle/working HAL cursor. Keeping those out of this file makes
 // this module about terminal mechanics instead of transcript semantics.
 //
