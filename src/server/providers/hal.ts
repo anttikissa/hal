@@ -304,7 +304,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		.replace(/<meta>.*?<\/meta>/gs, '')
 		.trim()
 	if (userText) {
-		yield* streamText('No model configured. Use `/login claude` or `/login chatgpt` for a subscription, or set an API key such as ANTHROPIC_API_KEY or OPENAI_API_KEY.', req)
+		yield* streamText('No model configured. Use `/login claude` or `/login chatgpt` for a subscription, or set an API key such as ANTHROPIC_API_KEY or OPENAI_API_KEY. Then pick a model with `/model` or `Ctrl-M`.', req)
 		yield { type: 'done' }
 		return
 	}
