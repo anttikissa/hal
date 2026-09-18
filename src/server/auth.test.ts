@@ -333,3 +333,17 @@ test('Google env aliases share onboarding names and skip empty values', () => {
 		else process.env.GEMINI_API_KEY = gemini
 	}
 })
+
+test('isSubscription distinguishes billing model from credential type', () => {
+	// OpenCode Go bills a subscription but authenticates with an API key, so the
+	// credential type alone must not decide whether usage windows are shown.
+	auth._setStoreForTest({ 'opencode-go': { apiKey: 'sk-go' }, openrouter: { apiKey: 'sk-or' } })
+	expect(auth.isSubscription('opencode-go')).toBe(true)
+	expect(auth.isSubscription('openrouter')).toBe(false)
+
+	auth._setStoreForTest({ anthropic: { accessToken: 'tok', refreshToken: 'rt' } })
+	expect(auth.isSubscription('anthropic')).toBe(true)
+
+	auth._setStoreForTest({ anthropic: { apiKey: 'sk-ant' } })
+	expect(auth.isSubscription('anthropic')).toBe(false)
+})

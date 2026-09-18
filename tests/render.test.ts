@@ -65,7 +65,7 @@ beforeEach(() => {
 		showSubscription: true,
 		promptCursorShape: 'block',
 	})
-	clientBackend.subscriptions.isApiKey = () => false
+	clientBackend.subscriptions.isSubscription = () => true
 	clientBackend.subscriptions.current = (provider) => {
 		if (provider !== 'openai') return null
 		return { index: 1, total: 3, windows: [{ label: '5h', usedPercent: 23 }, { label: '7d', usedPercent: 61 }] }

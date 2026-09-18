@@ -24,9 +24,16 @@ export interface ModelMetadata {
 	sources: ModelSource[]
 }
 
+/** Base URL and env var names models.dev publishes for a provider. */
+export interface ProviderInfo {
+	api: string
+	env: string[]
+}
+
 interface ModelsDevCache {
 	version: 1
 	models: Record<string, ModelMetadata>
+	providers?: Record<string, ProviderInfo>
 }
 
 export interface RefreshModelsResult {
@@ -40,6 +47,7 @@ export interface RefreshModelsResult {
 
 const state = {
 	metadata: null as Record<string, ModelMetadata> | null,
+	providers: null as Record<string, ProviderInfo> | null,
 }
 
 function modelsFile(): string {
@@ -71,12 +79,24 @@ function loadModelsDevCache(): Record<string, number> {
 	try {
 		const parsed = ason.parse(readFileSync(modelsFile(), 'utf-8')) as unknown as ModelsDevCache
 		state.metadata = parsed.models
+		state.providers = parsed.providers ?? {}
 		models.hydrate(contextWindows(parsed.models), openrouterIds(parsed.models), parsed.models)
 	} catch {
 		models.hydrate({})
 		state.metadata = {}
+		state.providers = {}
 	}
 	return models.state.cache!
+}
+
+/**
+ * Base URL and env var names for a provider, as published by models.dev. Lets the
+ * OpenAI-compatible provider and auth reach ~195 providers without hardcoding each
+ * one; the hardcoded tables remain as seeds for a cold cache.
+ */
+function providerInfo(providerName: string): ProviderInfo | undefined {
+	if (!state.providers) loadModelsDevCache()
+	return state.providers?.[providerName]
 }
 
 function init(): void {
@@ -137,18 +157,30 @@ function modelsDevMetadata(data: Record<string, { models?: Record<string, any> }
 	return metadata
 }
 
+/** Endpoint and env var names per provider, for the ones that publish both. */
+function modelsDevProviders(data: Record<string, { api?: string; env?: string[] }>): Record<string, ProviderInfo> {
+	const providers: Record<string, ProviderInfo> = {}
+	for (const [id, entry] of Object.entries(data)) {
+		if (typeof entry.api !== 'string' || !Array.isArray(entry.env) || entry.env.length === 0) continue
+		providers[id] = { api: entry.api, env: entry.env }
+	}
+	return providers
+}
+
 async function refreshModels(): Promise<RefreshModelsResult> {
 	const hadCache = existsSync(modelsFile())
 	const previous = hadCache ? loadModelsDevCache() : {}
 	const res = await fetch('https://models.dev/api.json', { signal: AbortSignal.timeout(10_000) })
-	const data = (await res.json()) as Record<string, { models?: Record<string, any> }>
+	const data = (await res.json()) as Record<string, { models?: Record<string, any>; api?: string; env?: string[] }>
 	const metadata = modelsDevMetadata(data)
+	const providers = modelsDevProviders(data)
 	const next = contextWindows(metadata)
 	ensureDir(process.env.HAL_STATE_DIR ?? STATE_DIR)
-	const cache: ModelsDevCache = { version: 1, models: metadata }
+	const cache: ModelsDevCache = { version: 1, models: metadata, providers }
 	writeFileSync(modelsFile(), ason.stringify(cache) + '\n')
 	models.hydrate(next, openrouterIds(metadata), metadata)
 	state.metadata = metadata
+	state.providers = providers
 	return {
 		fetched: true,
 		changes: hadCache ? models.modelChangeMessages(previous, next) : [],
@@ -191,6 +223,7 @@ export const serverModels = {
 	cachedModelMetadata,
 	hasConfiguredDirectSource,
 	refreshModels,
+	providerInfo,
 	cachedContextWindow,
 	contextWindow,
 }

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { models } from '../common/models.ts'
 import { auth } from './auth.ts'
 import { serverModels } from './models.ts'
+import { providerShared } from './providers/shared.ts'
 
 const origFetch = globalThis.fetch
 const origStateDir = process.env.HAL_STATE_DIR
@@ -213,6 +214,46 @@ test('refreshModels treats missing cache as initial fetch without change spam', 
 		expect(result.hadCache).toBe(false)
 		expect(result.modelCount).toBe(3)
 		expect(result.changes).toEqual([])
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+test('refresh persists provider endpoints and env keys from models.dev', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
+	process.env.HAL_STATE_DIR = dir
+	models.state.cache = null
+	globalThis.fetch = Object.assign((async () => new Response(JSON.stringify({
+		'opencode-go': {
+			api: 'https://opencode.ai/zen/go/v1',
+			env: ['OPENCODE_API_KEY'],
+			npm: '@ai-sdk/openai-compatible',
+			models: { 'kimi-k3': { limit: { context: 256_000 } } },
+		},
+	}))), { preconnect: () => {} }) as typeof fetch
+
+	try {
+		await serverModels.refreshModels()
+		expect(serverModels.providerInfo('opencode-go')).toEqual({ api: 'https://opencode.ai/zen/go/v1', env: ['OPENCODE_API_KEY'] })
+		// Survives a reload from disk, so a cold process still knows the endpoint.
+		models.state.cache = null
+		serverModels.state.providers = null
+		serverModels.loadModelsDevCache()
+		expect(serverModels.providerInfo('opencode-go')?.api).toBe('https://opencode.ai/zen/go/v1')
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+test('opencode-go resolves its endpoint and env key from the registry', () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
+	process.env.HAL_STATE_DIR = dir
+	models.state.cache = null
+	serverModels.state.providers = { 'opencode-go': { api: 'https://opencode.ai/zen/go/v1', env: ['OPENCODE_API_KEY'] } }
+	try {
+		expect(providerShared.endpointFor('opencode-go')).toBe('https://opencode.ai/zen/go/v1')
+		// Default derivation would produce the broken OPENCODE-GO_API_KEY.
+		expect(auth.envKeyNames('opencode-go')).toEqual(['OPENCODE_API_KEY'])
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}

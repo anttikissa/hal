@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import type { Message } from '../../common/protocol.ts'
 import { halProvider } from './hal.ts'
+import { serverModels } from '../models.ts'
 
 const originalScript = halProvider.script
 const originalWordsPerSecond = halProvider.config.wordsPerSecond
@@ -258,4 +259,26 @@ test('a skipped intro streams every remaining page at once without delays or gat
 	])
 	expect(delays).toEqual([])
 	expect(halProvider.state.skipped.has('s1')).toBe(false)
+})
+
+test('intro prefers the subscription when one key serves two providers', () => {
+	// OPENCODE_API_KEY works for both OpenCode Zen (pay per token) and Go
+	// (subscription). The subscription should be the one recommended, and the
+	// variable named once.
+	const key = process.env.OPENCODE_API_KEY
+	try {
+		process.env.OPENCODE_API_KEY = 'sk-opencode-test'
+		serverModels.state.providers = {
+			opencode: { api: 'https://opencode.ai/zen/v1', env: ['OPENCODE_API_KEY'] },
+			'opencode-go': { api: 'https://opencode.ai/zen/go/v1', env: ['OPENCODE_API_KEY'] },
+		}
+		const text = halProvider.providerSetupText()
+		expect(text.match(/OPENCODE_API_KEY/g)).toHaveLength(1)
+		expect(text).toContain('/model opencode-go/kimi-k3')
+		expect(text).not.toContain('/model opencode/<model-id>')
+	} finally {
+		if (key === undefined) delete process.env.OPENCODE_API_KEY
+		else process.env.OPENCODE_API_KEY = key
+		serverModels.state.providers = null
+	}
 })

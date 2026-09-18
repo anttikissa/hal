@@ -395,7 +395,7 @@ function renderStatusLine(lines: string[]): void {
 
 	const modelId = tab.model || models.defaultModel()
 	const provider = models.providerName(modelId)
-	const isSub = !clientBackend.subscriptions.isApiKey(provider)
+	const isSub = clientBackend.subscriptions.isSubscription(provider)
 	const left = renderStatus.joinStatusParts([
 		renderStatus.config.showSession ? renderStatus.sessionStatusLabel(tab, base) : '',
 		renderStatus.config.showCwd ? renderStatus.cwdStatusLabel(tab, base) : '',

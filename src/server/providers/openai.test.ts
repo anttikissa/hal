@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { auth, type Credential } from '../auth.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { createCompatProvider, openai, openaiProvider } from './openai.ts'
+import { serverModels } from '../models.ts'
 import { providerShared } from './shared.ts'
 
 interface FetchCall {
@@ -265,7 +266,7 @@ test('compat providers stay on chat completions endpoints', async () => {
 	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } }))
 })
 
-test('google compat provider asks for GOOGLE_API_KEY only', async () => {
+test('google compat provider names its accepted API key vars, not OAuth login', async () => {
 	auth.ensureFresh = async () => {}
 	auth.getCredential = () => undefined
 
@@ -279,7 +280,7 @@ test('google compat provider asks for GOOGLE_API_KEY only', async () => {
 		events.push(event)
 	}
 
-	expect(events[0]).toEqual({ type: 'error', message: "No credentials for 'google'. Set GOOGLE_API_KEY" })
+	expect(events[0]).toEqual({ type: 'error', message: "No credentials for 'google'. Set GOOGLE_API_KEY or GEMINI_API_KEY" })
 	expect(events[0].message).not.toContain('login-openai')
 	expect(events.at(-1)?.type).toBe('error')
 })
@@ -952,4 +953,37 @@ test('response.failed error body carries only the error, not the echoed request'
 	const error = events.find((event) => event.type === 'error')
 	expect(error.message).toBe('Our servers are currently overloaded. Please try again later.')
 	expect(error.body).toBe(JSON.stringify(failed.response.error))
+})
+
+test('opencode-go uses the registry endpoint and identifies itself', async () => {
+	serverModels.state.providers = { 'opencode-go': { api: 'https://opencode.ai/zen/go/v1', env: ['OPENCODE_API_KEY'] } }
+	const calls: FetchCall[] = []
+	await collect(createCompatProvider('opencode-go'), 'opencode-go', { value: 'sk-go-test', type: 'api-key' }, calls)
+
+	expect(calls[0]!.url).toBe('https://opencode.ai/zen/go/v1/chat/completions')
+	const headers = new Headers(calls[0]!.init?.headers)
+	expect(headers.get('authorization')).toBe('Bearer sk-go-test')
+	// OpenCode asks clients to identify themselves and group requests by session.
+	expect(headers.get('user-agent')).toBe('hal')
+	expect(headers.get('x-opencode-session')).toBe('sid_123')
+})
+
+test('missing opencode-go key names the real env var, not a derived one', async () => {
+	serverModels.state.providers = { 'opencode-go': { api: 'https://opencode.ai/zen/go/v1', env: ['OPENCODE_API_KEY'] } }
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => undefined
+
+	const events: any[] = []
+	for await (const event of createCompatProvider('opencode-go').generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'opencode-go/kimi-k3',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) {
+		events.push(event)
+	}
+	expect(events[0].type).toBe('error')
+	expect(events[0].message).toContain('OPENCODE_API_KEY')
+	expect(events[0].message).not.toContain('OPENCODE-GO')
 })

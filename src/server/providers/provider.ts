@@ -31,7 +31,7 @@ async function getProvider(providerName: string): Promise<Provider> {
 	} else if (providerName === 'openai') {
 		const { openaiProvider } = await import('./openai.ts')
 		p = openaiProvider
-	} else if (Object.hasOwn(providerShared.compatEndpoints, providerName)) {
+	} else if (providerShared.endpointFor(providerName)) {
 		const { createCompatProvider } = await import('./openai.ts')
 		p = createCompatProvider(providerName)
 	} else {

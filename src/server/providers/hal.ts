@@ -1,6 +1,7 @@
 import { auth } from '../auth.ts'
 import { models } from '../../common/models.ts'
 import { providerShared } from './shared.ts'
+import { serverModels } from '../models.ts'
 import type { ContentBlock, Message, Provider, ProviderRequest, ProviderStreamEvent } from '../../common/protocol.ts'
 
 type ScriptStep =
@@ -44,6 +45,9 @@ const suggestions: Record<string, string> = {
 	openai: 'gpt',
 	google: 'gemini',
 	openrouter: 'deepseek',
+	// Go's own route, not the OpenRouter alias: the point of the key is to bill the
+	// subscription instead of per-token.
+	'opencode-go': 'opencode-go/kimi-k3',
 }
 
 // How good a first experience each key gives (Sep 2026 coding leaderboards):
@@ -60,7 +64,7 @@ const priorities: Record<string, number> = {
 // Providers with an API key in the environment, paired with the key names found.
 // Only model providers belong here: e.g. Serper's key is for a search tool.
 function detectedProviders(): Map<string, string[]> {
-	const providers = new Set(['anthropic', 'openai', ...Object.keys(providerShared.compatEndpoints)])
+	const providers = new Set(['anthropic', 'openai', ...Object.keys(serverModels.state.providers ?? {}), ...Object.keys(providerShared.compatEndpoints)])
 	// The loader also accepts NAME_BASE_URL + NAME_API_KEY for custom backends.
 	for (const name of Object.keys(process.env)) {
 		if (/^[A-Z][A-Z0-9_]*_BASE_URL$/.test(name) && process.env[name]) providers.add(name.slice(0, -9).toLowerCase())
@@ -96,14 +100,25 @@ function introModelText(alias: string): string {
 }
 
 function providerSetupText(): string {
+	// One env var can belong to several providers (OPENCODE_API_KEY covers both
+	// OpenCode Zen and Go). Every such provider is listed, but the variable is named
+	// once, since repeating it reads like a mistake.
 	const keys: string[] = []
+	const seenKeys = new Set<string>()
 	const commands: string[] = []
-	for (const [provider, present] of halProvider.detectedProviders()) {
-		keys.push(...present)
+	// Subscriptions first: one variable can serve several providers (OPENCODE_API_KEY
+	// covers both OpenCode Zen and Go), and the subscription is the better thing to
+	// recommend. Providers whose variables are all already claimed are skipped.
+	const detected = [...halProvider.detectedProviders()].sort((a, b) => Number(auth.isSubscription(b[0])) - Number(auth.isSubscription(a[0])))
+	for (const [provider, present] of detected) {
+		const fresh = present.filter((name) => !seenKeys.has(name))
+		if (fresh.length === 0) continue
+		for (const name of fresh) seenKeys.add(name)
+		keys.push(...fresh)
 		let model = halProvider.suggestions[provider]
 		if (provider === 'grok') model = `grok/${models.resolveModel('grok').split('/').at(-1)}`
 		if (model) commands.push(`- \`/model ${model}\` — ${provider}`)
-		else commands.push(`- Custom endpoint ${provider}: use \`/model ${provider}/<model-id>\` with a model that endpoint serves.`)
+		else commands.push(`- ${provider}: \`/model ${provider}/<model-id>\` for any model that endpoint serves.`)
 	}
 	// Subscriptions lead: most people arriving from another harness have one.
 	const login = 'If you would like to use your Claude or ChatGPT subscription, type \`/login claude\` or \`/login chatgpt\`.'

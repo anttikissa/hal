@@ -148,7 +148,7 @@ clientBackend.install({
 		loadLive: (sessionId) => sessionStore.loadLive(sessionId),
 	},
 	subscriptions: {
-		isApiKey: (provider) => auth.isApiKey(provider),
+		isSubscription: (provider) => auth.isSubscription(provider),
 		current: subscriptionStatus,
 		onChange: (callback) => {
 			openaiUsage.onChange(callback)

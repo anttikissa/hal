@@ -4,6 +4,7 @@
 // helpers without creating a cycle back into the lazy provider loader.
 
 import type { Credential } from '../auth.ts'
+import { serverModels } from '../models.ts'
 import { ason } from '../../utils/ason.ts'
 
 const config = {
@@ -11,10 +12,17 @@ const config = {
 	streamTimeoutMs: 120_000,
 }
 
+// Seeds for a cold models.dev cache. endpointFor() falls back to the cached
+// models.dev registry, which covers ~195 OpenAI-compatible providers.
 const compatEndpoints: Record<string, string> = {
 	openrouter: 'https://openrouter.ai/api/v1',
 	google: 'https://generativelanguage.googleapis.com/v1beta/openai',
 	grok: 'https://api.x.ai/v1',
+}
+
+/** Base URL for an OpenAI-compatible provider, hardcoded seed first. */
+function endpointFor(providerName: string): string | undefined {
+	return compatEndpoints[providerName] ?? serverModels.providerInfo(providerName)?.api
 }
 
 const sseDone = Symbol('sseDone')
@@ -189,6 +197,7 @@ function formatRotationMessage(
 export const providerShared = {
 	config,
 	compatEndpoints,
+	endpointFor,
 	sseDone,
 	parseRetryDelay,
 	parseResetsInSeconds,

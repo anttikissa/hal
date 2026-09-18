@@ -20,7 +20,7 @@ interface SessionBackend {
 }
 
 interface SubscriptionBackend {
-	isApiKey: (provider: string) => boolean
+	isSubscription: (provider: string) => boolean
 	current: (provider: string) => SubscriptionStatus | null
 	onChange: (callback: () => void) => void
 }
@@ -45,7 +45,7 @@ const sessions: SessionBackend = {
 }
 
 const subscriptions: SubscriptionBackend = {
-	isApiKey: () => false,
+	isSubscription: () => false,
 	current: () => null,
 	onChange: () => {},
 }

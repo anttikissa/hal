@@ -16,6 +16,7 @@
 import { liveFiles } from '../utils/live-file.ts'
 import { HAL_DIR } from './state.ts'
 import { ason } from '../utils/ason.ts'
+import { serverModels } from './models.ts'
 import { log } from '../utils/log.ts'
 import { accountRotation } from './account-rotation.ts'
 
@@ -46,8 +47,12 @@ const envKeys: Record<string, string[]> = {
 }
 
 // Share accepted variable names with onboarding; never share their values there.
+// Falls back to the models.dev registry so providers we never hardcoded still get
+// their real variable name — deriving it would give 'opencode-go' the broken
+// OPENCODE-GO_API_KEY instead of OPENCODE_API_KEY.
 function envKeyNames(providerName: string): string[] {
-	return auth.envKeys[providerName] ?? [`${providerName.toUpperCase()}_API_KEY`]
+	const known = auth.envKeys[providerName] ?? serverModels.providerInfo(providerName)?.env
+	return known ?? [`${providerName.toUpperCase()}_API_KEY`]
 }
 
 /** Credential with its type so callers know how to authenticate. */
@@ -357,11 +362,17 @@ async function ensureFresh(providerName: string): Promise<void> {
 	}
 }
 
-// Check whether a provider is using an API key (pay-per-token) or
-// OAuth token (subscription). Returns true for API key, false for token/unknown.
-function isApiKey(providerName: string): boolean {
-	const cred = getCredential(providerName)
-	return cred?.type === 'api-key'
+/**
+ * Whether a provider bills a subscription rather than per-token.
+ *
+ * Not the same question as "did we authenticate with a token": OpenCode Go is a
+ * subscription that hands out an API key, so keying this off the credential type
+ * would hide Go's usage windows from the status bar. Anthropic and OpenAI only have
+ * a subscription route when they hold an OAuth token; Go always is one.
+ */
+function isSubscription(providerName: string): boolean {
+	if (providerName === 'opencode-go') return true
+	return getCredential(providerName)?.type === 'token'
 }
 
 // ── Test helpers ──
@@ -386,7 +397,7 @@ export const auth = {
 	listCredentials,
 	getEntry,
 	ensureFresh,
-	isApiKey,
+	isSubscription,
 	markCooldown,
 	clearCooldown,
 	hasAvailableCredential,

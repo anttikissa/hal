@@ -550,7 +550,24 @@ function getResponsesWebSocket(sessionId: string, key: string, url: string, head
 }
 
 function compatCredentialMessage(providerName: string): string {
-	return `No credentials for '${providerName}'. Set ${providerName.toUpperCase()}_API_KEY`
+	// envKeyNames knows the real variable name; deriving it breaks on hyphens
+	// ('opencode-go' would ask for OPENCODE-GO_API_KEY).
+	return `No credentials for '${providerName}'. Set ${auth.envKeyNames(providerName).join(' or ')}`
+}
+
+/**
+ * Per-provider request headers. OpenCode asks clients to identify themselves and to
+ * send a stable session id per conversation; the default fetch User-Agent would
+ * otherwise be an anonymous HTTP library.
+ */
+function compatHeaders(providerName: string, credential: Credential, req: ProviderRequest): Record<string, string> {
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json',
+		Authorization: `Bearer ${credential.value}`,
+		'User-Agent': 'hal',
+	}
+	if (providerName === 'opencode-go' && req.sessionId) headers['x-opencode-session'] = req.sessionId
+	return headers
 }
 
 async function* generateCompat(providerName: string, baseUrl: string, req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
@@ -570,7 +587,7 @@ async function* generateCompat(providerName: string, baseUrl: string, req: Provi
 	try {
 		res = await fetch(endpoint, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${credential.value}` },
+			headers: compatHeaders(providerName, credential, req),
 			body: JSON.stringify(body),
 			signal: req.signal,
 		})
@@ -843,7 +860,7 @@ export const openaiProvider: Provider = { generate: generateOpenAI }
 
 /** Create a Chat Completions-compatible provider for any OpenAI-like endpoint. */
 export function createCompatProvider(providerName: string, baseUrl?: string): Provider {
-	const url = baseUrl ?? providerShared.compatEndpoints[providerName]
+	const url = baseUrl ?? providerShared.endpointFor(providerName)
 	if (!url) {
 		throw new Error(
 			`Unknown compat provider '${providerName}'. ` +
