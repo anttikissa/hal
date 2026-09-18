@@ -23,16 +23,15 @@ const config = {
 
 function introScript(): string {
 	const alias = halProvider.introDefaultModel()
-	return `Hello. This is HAL 9001.<pause for="0.3s"/> Just call me Hal.
-I help you work on code.
+	return `Hello. I am HAL 9001, a moderately advanced agent harness and terminal client.<pause for="0.3s"/> You can call me Hal.
+Press Enter to continue.
+<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Your controls. You know the drill.<pause for="0.3s"/><config key="renderStatus.statusOpacity" value="1"/>
 
-Press Enter to bring up the controls.<pause until="enter"/><config key="renderStatus.promptOpacity" value="1"/><config key="renderStatus.helpOpacity" value="1"/>Your controls. Type requests and /commands here.<pause for="0.3s"/><config key="renderStatus.statusOpacity" value="1"/>
-
-The status line shows your working directory and model.<pause for="0.3s"/><config key="renderStatus.tabsOpacity" value="1"/>
+You are speaking to synthetic model \`hal/intro\`. To work with real models, credentials are required.<pause for="0.3s"/><config key="renderStatus.tabsOpacity" value="1"/>
 
 ${halProvider.providerSetupText()}
 
-${halProvider.introModelText(alias)} Change it with \`/model\` or Ctrl-M, then tell me what you would like to work on.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="${alias}"/>`
+${halProvider.introModelText(alias)} Change it with \`/model\` or \`Ctrl-M\`.<config key="models.refresh" value="true"/><config key="web.enabled" value="true"/><config key="models.default" value="${alias}"/>`
 }
 
 // Sessions whose intro was skipped with Esc: the rest of the script streams at once.
@@ -124,7 +123,7 @@ function providerSetupText(): string {
 	const login = 'If you would like to use your Claude or ChatGPT subscription, type \`/login claude\` or \`/login chatgpt\`.'
 	if (keys.length) {
 		const names = new Intl.ListFormat('en', { type: 'conjunction' }).format(keys)
-		return `${login}\n\nI also see ${names} in your environment. To use a key instead:\n${commands.join('\n')}`
+		return `${login}\n\nI also see ${names} in your environment. To use a key instead, try e.g.:\n\n${commands.join('\n')}`
 	}
 	return `${login}\n\nOr launch Hal with an API key, such as ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.`
 }

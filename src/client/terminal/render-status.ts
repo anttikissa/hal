@@ -7,9 +7,10 @@
 // namespace, and intra-module calls go through it. That way any helper
 // (e.g. tokenUsageLabel) can be hot-patched at runtime without restart.
 
-import { visLen, clipVisual } from '../../utils/strings.ts'
+import { clipVisual, visLen } from '../../utils/strings.ts'
 import { oklch } from '../../utils/oklch.ts'
 import { helpBar } from './help-bar.ts'
+import type { Tab } from '../app.ts'
 import { client } from '../app.ts'
 import { models } from '../../common/models.ts'
 import type { TokenUsage } from '../../common/protocol.ts'
@@ -19,7 +20,6 @@ import { prompt } from './prompt.ts'
 import { cursor } from './cursor.ts'
 import { promptEdit } from '../prompt-edit.ts'
 import { completionHints } from './completion-hints.ts'
-import type { Tab } from '../app.ts'
 import { blocks } from './blocks.ts'
 import { placeholders } from './placeholders.ts'
 
@@ -228,12 +228,8 @@ function buildTabText(compact = false): string {
 function buildTabBarLines(cols: number): string[] {
 	const width = renderStatus.contentWidth(cols)
 	const tabText = renderStatus.buildTabText()
-	const prefixed = `Tabs: ${tabText}`
-	let content = prefixed + renderStatus.fitTabHelpText(client.state.tabs.length, prefixed, cols)
-	if (visLen(content) > width) {
-		content = tabText + renderStatus.fitTabHelpText(client.state.tabs.length, tabText, cols)
-	}
-	// Even the bare tab numbers (no "Tabs:" label, no help hints) don't fit:
+	let content = tabText + renderStatus.fitTabHelpText(client.state.tabs.length, tabText, cols)
+	// Even the bare tab numbers (no help hints) don't fit:
 	// switch to compact mode, which drops the space padding between tabs and
 	// underlines the active tab instead of bracketing it, rather than
 	// clipping tabs off the end.
