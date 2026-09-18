@@ -449,6 +449,48 @@ test('surfaces Claude web_search as a visible tool with result titles', async ()
 	}
 })
 
+// Anthropic sometimes ends a message with a server_tool_use that it never ran,
+// handing control back for a client tool_use instead. Announcing the search at
+// content_block_start left a tool block stuck "running" for the rest of the turn,
+// and wrote a tool_call to history with no matching tool_result.
+test('an unexecuted web_search is never announced to the UI or history', async () => {
+	const sessionId = `test-web-search-orphan-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'server_tool', serverBlocks: [{ type: 'server_tool_use', id: 'srvtoolu_orphan', name: 'web_search', input: { query: 'never executed' } }] }
+			yield { type: 'text', text: 'Falling back to local tools.' }
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'anthropic/claude-opus-4-8',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'search' }],
+		})
+		expect(result).toBe('completed')
+		expect(events.find((event) => event.type === 'tool-call')).toBeUndefined()
+
+		const history = sessions.loadHistory(sessionId)
+		expect(history.find((entry) => entry.type === 'tool_call')).toBeUndefined()
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
 
 
 

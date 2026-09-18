@@ -474,7 +474,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			// Server-side tool blocks (e.g. web_search) — opaque, go into assistant content verbatim
 			const serverBlocks: any[] = []
 			const serverToolHistory: any[] = []
-			const serverToolBlobMap = new Map<string, string>()
+			const pendingWebSearch = new Map<string, { query: string }>()
 			let aborted = false
 			let shouldRetry = false
 			let iterationDone = false
@@ -549,22 +549,30 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					case 'server_tool': {
 						if (event.serverBlocks) {
 							serverBlocks.push(...event.serverBlocks)
+							// Anthropic sometimes ends a message with a server_tool_use it never
+							// ran, handing control back for a client tool_use instead. Only the
+							// result proves the search happened, so announce the call and the
+							// result together. An unpaired call then never reaches the UI or
+							// history, matching filterUnpairedWebSearch() on the request side.
 							for (const sb of event.serverBlocks) {
 								if (sb.type === 'server_tool_use' && sb.name === 'web_search' && typeof sb.id === 'string') {
-									const input = webSearchInput(sb)
-									const blobId = serverToolBlobMap.get(sb.id) ?? blob.makeBlobId(sessionId)
-									serverToolBlobMap.set(sb.id, blobId)
-									await writeToolCallBlob(sessionId, blobId, 'web_search', input)
-									serverToolHistory.push({ type: 'tool_call', toolId: sb.id, name: 'web_search', input, blobId, visibility: 'ui', ts: new Date().toISOString() })
-									emitEvent(sessionId, { type: 'tool-call', toolId: sb.id, name: 'web_search', input, blobId, phase: 'running' })
+									pendingWebSearch.set(sb.id, webSearchInput(sb))
 								}
 								if (sb.type === 'web_search_tool_result' && typeof sb.tool_use_id === 'string') {
+									const input = pendingWebSearch.get(sb.tool_use_id)
+									if (!input) continue
+									pendingWebSearch.delete(sb.tool_use_id)
+									const ts = new Date().toISOString()
+									const callBlobId = blob.makeBlobId(sessionId)
+									await writeToolCallBlob(sessionId, callBlobId, 'web_search', input)
+									serverToolHistory.push({ type: 'tool_call', toolId: sb.tool_use_id, name: 'web_search', input, blobId: callBlobId, visibility: 'ui', ts })
+									emitEvent(sessionId, { type: 'tool-call', toolId: sb.tool_use_id, name: 'web_search', input, blobId: callBlobId, phase: 'running' })
+
 									const output = formatWebSearchResults(sb)
-									const blobId = serverToolBlobMap.get(sb.tool_use_id) ?? blob.makeBlobId(sessionId)
-									serverToolBlobMap.set(sb.tool_use_id, blobId)
-									await writeToolResultBlob(sessionId, blobId, output)
-									serverToolHistory.push({ type: 'tool_result', toolId: sb.tool_use_id, blobId, visibility: 'ui', ts: new Date().toISOString() })
-									emitEvent(sessionId, { type: 'tool-result', toolId: sb.tool_use_id, name: 'web_search', output: output.slice(0, 500), blobId, phase: 'done' })
+									const resultBlobId = blob.makeBlobId(sessionId)
+									await writeToolResultBlob(sessionId, resultBlobId, output)
+									serverToolHistory.push({ type: 'tool_result', toolId: sb.tool_use_id, blobId: resultBlobId, visibility: 'ui', ts })
+									emitEvent(sessionId, { type: 'tool-result', toolId: sb.tool_use_id, name: 'web_search', output: output.slice(0, 500), blobId: resultBlobId, phase: 'done' })
 								}
 							}
 						}
