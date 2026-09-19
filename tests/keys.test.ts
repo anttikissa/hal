@@ -29,6 +29,17 @@ describe('keys', () => {
 		const parsed = keys.parseKeys('\x1b[200~hello\nworld\x1b[201~')
 		expect(parsed).toEqual([{ key: 'hello\nworld', char: 'hello\nworld', shift: false, alt: false, ctrl: false, cmd: false }])
 	})
+
+	test('abandons an incomplete paste after it goes idle', () => {
+		const pasteState = keys.state
+		try {
+			expect(keys.parseKeys('\x1b[200~interrupted')).toEqual([])
+			pasteState.pasteUpdatedAt = 0
+			expect(keys.parseKeys('x')).toEqual([{ key: 'x', char: 'x', shift: false, alt: false, ctrl: false, cmd: false }])
+		} finally {
+			keys.parseKeys('\x1b[201~')
+		}
+	})
 })
 
 test('complete OSC 11 replies set the background without becoming keystrokes', () => {

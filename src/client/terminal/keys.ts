@@ -19,7 +19,11 @@ export interface KeyEvent {
 	cmd: boolean // Super/Meta key; Command (⌘) on macOS
 }
 
-const state = { background: null as number[] | null }
+const state = {
+	background: null as number[] | null,
+	pasteBuffer: null as string | null,
+	pasteUpdatedAt: 0,
+}
 
 function ke(key: string, mods?: Partial<KeyEvent>): KeyEvent {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
@@ -191,26 +195,31 @@ const CTRL_KEYS: Record<number, string> = {
 // we buffer across calls.
 
 const PASTE_START = '\x1b[200~',
-	PASTE_END = '\x1b[201~'
-
-// Buffer for paste content that spans multiple stdin data events
-let pasteBuffer: string | null = null
+	PASTE_END = '\x1b[201~',
+	PASTE_IDLE_TIMEOUT_MS = 2000
 
 function splitKeys(data: string): string[] {
 	const keys: string[] = []
 	let i = 0
 
+	// A lost closing delimiter must not turn the parser into a permanent input
+	// sink. Paste chunks normally arrive continuously, so idle means interrupted.
+	if (state.pasteBuffer !== null && Date.now() - state.pasteUpdatedAt >= PASTE_IDLE_TIMEOUT_MS) {
+		state.pasteBuffer = null
+	}
+
 	// If we're mid-paste from a previous chunk, accumulate
-	if (pasteBuffer !== null) {
+	if (state.pasteBuffer !== null) {
 		const endIdx = data.indexOf(PASTE_END)
 		if (endIdx >= 0) {
-			const pasted = pasteBuffer + data.slice(0, endIdx)
-			pasteBuffer = null
+			const pasted = state.pasteBuffer + data.slice(0, endIdx)
+			state.pasteBuffer = null
 			if (pasted) keys.push(pasted)
 			i = endIdx + PASTE_END.length
 		} else {
 			// Still no end delimiter — buffer everything
-			pasteBuffer += data
+			state.pasteBuffer += data
+			state.pasteUpdatedAt = Date.now()
 			return keys
 		}
 	}
@@ -226,7 +235,8 @@ function splitKeys(data: string): string[] {
 				i = endIdx + PASTE_END.length
 			} else {
 				// Start buffering — end delimiter will come in a later chunk
-				pasteBuffer = data.slice(contentStart)
+				state.pasteBuffer = data.slice(contentStart)
+				state.pasteUpdatedAt = Date.now()
 				return keys
 			}
 			continue
