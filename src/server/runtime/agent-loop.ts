@@ -741,11 +741,12 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				if (terminalErrorEntry) historyEntries.push(terminalErrorEntry)
 				let emptyResponseMessage = ''
 				if (!thinkingText && !assistantText && serverToolHistory.length === 0 && !terminalErrorEntry) {
-					// A zero-output completion is occasionally transient. Retry it once without
-					// writing history, but leave a repeated empty reply as a retryable failure.
+					// Anthropic documents empty end_turn responses after tool results. Retrying
+					// unchanged repeats the decision; a new user turn asks the model to continue.
 					if (emptyResponseRetries === 0) {
 						emptyResponseRetries++
-						emitInfo(sessionId, 'Provider returned an empty response — retrying once.')
+						messages.push({ role: 'user', content: '<meta>The provider returned an empty completion. Continue the previous response.</meta>' })
+						emitInfo(sessionId, 'Provider returned an empty response — continuing once.')
 						continue
 					}
 					emptyResponseMessage = 'Provider returned an empty response. Please retry.'
