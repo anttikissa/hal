@@ -261,6 +261,28 @@ test('anthropic stream without message_stop does not emit done', async () => {
 })
 
 
+test('anthropic provider surfaces refusal stop details instead of an empty response', async () => {
+	const stopDetails = {
+		type: 'refusal',
+		category: 'cyber',
+		explanation: 'This request triggered restrictions on violative cyber content.',
+	}
+	installFetchMock(async () => new Response([
+		`data: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'refusal', stop_details: stopDetails }, usage: { output_tokens: 0 } })}`,
+		'data: {"type":"message_stop"}',
+		'',
+	].join('\n'), { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any)
+
+	const events = await collect({ value: 'tok-test', type: 'token' })
+	expect(events[0]).toEqual({
+		type: 'error',
+		message: `Claude refused the request: ${stopDetails.explanation}`,
+		body: JSON.stringify({ stop_reason: 'refusal', stop_details: stopDetails }),
+	})
+	expect(events.at(-1)?.type).toBe('done')
+})
+
+
 test('anthropic provider ignores malformed SSE JSON lines', async () => {
 	installFetchMock(async () => new Response([
 		'data: {not json}',

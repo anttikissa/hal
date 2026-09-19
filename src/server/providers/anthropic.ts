@@ -231,6 +231,11 @@ async function* parseStream(
 			})
 		} else if (ev.type === 'message_delta') {
 			if (ev.usage) usage.output += ev.usage.output_tokens ?? 0
+			if (ev.delta?.stop_reason === 'refusal') {
+				const details = { stop_reason: 'refusal', stop_details: ev.delta.stop_details }
+				const explanation = ev.delta.stop_details?.explanation ?? 'The request was blocked by Anthropic policy.'
+				yield { type: 'error', message: `Claude refused the request: ${explanation}`, body: JSON.stringify(details) }
+			}
 		} else if (ev.type === 'message_stop') {
 			gotStop = true
 		} else if (ev.type === 'error') {
