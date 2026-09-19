@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { sessions } from './sessions.ts'
 import { replay } from './session/replay.ts'
 import { ipc } from './file-ipc.ts'
@@ -57,6 +57,17 @@ test('createSession and loadHistory round-trip', async () => {
 	const result = sessions.loadHistory(id)
 	expect(result).toHaveLength(1)
 	expect(entryText(result[0])).toBe('hello')
+})
+
+
+test('loadHistory repairs user entries whose parts are missing', async () => {
+	const id = await makeSession()
+	writeFileSync(`${sessions.sessionDir(id)}/history.asonl`, [
+		"{ type: 'user', text: 'legacy prompt', ts: '2026-05-25T10:00:00.000Z' }",
+		"{ type: 'user', canceled: true }",
+	].join('\n'))
+
+	expect(sessions.loadHistory(id).map(entryText)).toEqual(['legacy prompt', ''])
 })
 
 

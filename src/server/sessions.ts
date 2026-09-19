@@ -134,6 +134,19 @@ function cleanHistoryEntry(entry: HistoryEntry): unknown {
 	return clean
 }
 
+
+// History survives code updates and may contain partially written or legacy user
+// entries. Repair only the in-memory projection; never rewrite source history.
+function repairHistoryEntries(entries: HistoryEntry[]): HistoryEntry[] {
+	for (const entry of entries) {
+		if (entry.type !== 'user' || Array.isArray(entry.parts)) continue
+		const text = (entry as unknown as { text?: unknown }).text
+		entry.parts = []
+		if (typeof text === 'string') entry.parts.push({ type: 'text', text })
+	}
+	return entries
+}
+
 function collectEntryIds(entries: HistoryEntry[], used = new Set<string>()): Set<string> {
 	for (const entry of entries) {
 		if (typeof entry.id === 'string') used.add(entry.id)
@@ -271,6 +284,7 @@ function loadHistoryLog(sessionId: string, logName?: string, limit?: number): Hi
 	try {
 		const content = readFileSync(path, 'utf-8')
 		const entries = content.trim() ? ason.parseAll(content) as HistoryEntry[] : []
+		repairHistoryEntries(entries)
 		return limit === undefined ? entries : entries.slice(0, limit)
 	} catch {
 		return []
