@@ -31,6 +31,13 @@ describe('keys', () => {
 	})
 })
 
+test('a fresh paste recovers from an incomplete earlier paste', () => {
+	expect(keys.parseKeys('\x1b[200~interrupted')).toEqual([])
+	expect(keys.parseKeys('\x1b[200~recovered\x1b[201~')).toEqual([
+		{ key: 'recovered', char: 'recovered', shift: false, alt: false, ctrl: false, cmd: false },
+	])
+})
+
 test('complete OSC 11 replies set the background without becoming keystrokes', () => {
 	const original = keys.state.background
 	try {

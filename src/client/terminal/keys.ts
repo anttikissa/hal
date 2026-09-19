@@ -200,6 +200,15 @@ function splitKeys(data: string): string[] {
 	const keys: string[] = []
 	let i = 0
 
+	// If a new opener arrives before the old paste closed, the terminal lost the
+	// old closer (for example during a restart). Prefer the complete fresh paste:
+	// leaving the old buffer active would swallow every later keystroke forever.
+	const freshStart = pasteBuffer === null ? -1 : data.indexOf(PASTE_START)
+	if (freshStart >= 0) {
+		pasteBuffer = null
+		data = data.slice(freshStart)
+	}
+
 	// If we're mid-paste from a previous chunk, accumulate
 	if (pasteBuffer !== null) {
 		const endIdx = data.indexOf(PASTE_END)
