@@ -71,6 +71,7 @@ button { touch-action: manipulation; }
 @keyframes SessionTabs-pulse { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .SessionTabs-marker.animated { animation: none; } }
 .SessionTabs-close { color: #99a; padding: 0 2px; }
+.SessionTabs-number { font-variant-numeric: tabular-nums; }
 .SessionTabs-new { min-width: 44px; min-height: 44px; }
 
 @media (max-width: 48em) {
@@ -80,7 +81,6 @@ button { touch-action: manipulation; }
 	.SessionTabs-rail > button { flex: none; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; }
 	.SessionTabs-rail > button.selected { max-width: min(14rem, calc(100vw - 76px)); background: #29465e; border-color: #6b9fc6; }
 	.SessionTabs-rail > button:not(.selected) > .SessionTabs-railName { display: none; }
-	.SessionTabs-number { font-variant-numeric: tabular-nums; }
 	.SessionTabs-railName { max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 	/* Short drafts leave room to read; long drafts shrink the transcript first.
@@ -159,6 +159,7 @@ button { touch-action: manipulation; }
 .SessionTabs-list > div.selected { background: #29465e; border-color: #6b9fc6; }
 .SessionTabs-panel button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .SessionTabs-list > div > .SessionTabs-open { flex: 1; min-width: 0; padding: 8px 12px; text-align: left; overflow-wrap: anywhere; }
+.SessionTabs-open > .SessionTabs-number { color: #9eb8ca; margin-right: 6px; }
 .SessionTabs-open > small { display: block; color: #9eb8ca; margin-top: 4px; }
 .SessionTabs-list > div > .SessionTabs-close { flex: none; width: 48px; color: #d47a7a; border-left: 1px solid #555; }
 .SessionTabs-list > div.selected > .SessionTabs-close { border-color: #6b9fc6; }

@@ -115,13 +115,17 @@ export function SessionTabs(props: SessionTabsProps) {
 				</header>
 				<nav class="SessionTabs-list" aria-label="Open sessions">
 					<For each={props.sessions}>
-						{(session) => {
+						{(session, index) => {
 							const activity = () => sessionActivity.describe(session, !!props.working?.[session.id], !!props.summarizing?.[session.id])
+							const number = () => session.tab ?? index() + 1
+							// Model ids are `provider/model`; the provider prefix is noise here.
+							const model = () => session.model?.split('/').at(-1)
 							return <div class={{ selected: session.id === props.selected }}>
-								<button class="SessionTabs-open" onClick={() => select(session.id)} aria-current={session.id === props.selected ? 'page' : undefined} aria-label={`${session.id}: ${session.name || session.id}, ${activity().label}`}>
+								<button class="SessionTabs-open" onClick={() => select(session.id)} aria-current={session.id === props.selected ? 'page' : undefined} aria-label={`Tab ${number()}, ${session.id}: ${session.name || session.id}, ${activity().label}`}>
+									<span class="SessionTabs-number">{number()}</span>
 									<ActivityMarkers description={activity()} />
 									{session.name || session.id}
-									<small>{session.id}{session.id === props.selected ? ' · Current' : ''}</small>
+									<small>{session.id}{model() ? ` · ${model()}` : ''}{session.id === props.selected ? ' · Current' : ''}</small>
 								</button>
 								<Show when={props.sessions.length > 1}>
 									<button class="SessionTabs-close" onClick={(event) => closeTab(event, session.id)} aria-label={`Close ${session.name || session.id}`}>×</button>
