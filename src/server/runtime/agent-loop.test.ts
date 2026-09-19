@@ -608,6 +608,43 @@ test('tool iterations do not re-emit streamed assistant text as responses', asyn
 	}
 })
 
+test('retries one empty completed provider response before failing the turn', async () => {
+	const sessionId = `test-empty-response-retry-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	let attempts = 0
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			attempts++
+			if (attempts === 2) yield { type: 'text', text: 'recovered' }
+			yield { type: 'done', usage: { input: 1, output: attempts === 2 ? 1 : 0, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	ipc.appendEvent = (event: any) => { events.push(event) }
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'answer me' }],
+		})
+		expect(result).toBe('completed')
+		expect(attempts).toBe(2)
+		expect(events).toContainEqual(expect.objectContaining({ type: 'info', text: 'Provider returned an empty response — retrying once.' }))
+		expect(sessions.loadHistory(sessionId)).toContainEqual(expect.objectContaining({ type: 'assistant', text: 'recovered' }))
+		expect(sessions.loadHistory(sessionId).some((entry) => entry.type === 'error')).toBe(false)
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
 test('logs a whitespace-only completed provider response so the user can retry', async () => {
 	const sessionId = `test-empty-response-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)

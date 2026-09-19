@@ -422,6 +422,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		let lastDoneMeta: TurnEndMeta | null = null
 		let retryAttempt = 0
 		let retryStartedAt = 0
+		let emptyResponseRetries = 0
 		let hadTerminalError = false
 		let terminalErrorStatus: number | undefined
 
@@ -740,8 +741,13 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				if (terminalErrorEntry) historyEntries.push(terminalErrorEntry)
 				let emptyResponseMessage = ''
 				if (!thinkingText && !assistantText && serverToolHistory.length === 0 && !terminalErrorEntry) {
-					// An empty provider reply is a failed turn, not a completed one: that way the
-					// prompt shows the retry affordance and a bare Enter re-runs the turn.
+					// A zero-output completion is occasionally transient. Retry it once without
+					// writing history, but leave a repeated empty reply as a retryable failure.
+					if (emptyResponseRetries === 0) {
+						emptyResponseRetries++
+						emitInfo(sessionId, 'Provider returned an empty response — retrying once.')
+						continue
+					}
 					emptyResponseMessage = 'Provider returned an empty response. Please retry.'
 					hadTerminalError = true
 					historyEntries.push(errorHistoryEntry(emptyResponseMessage, undefined, ts))
