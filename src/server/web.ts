@@ -56,12 +56,9 @@ async function gitOut(args: string[]): Promise<string | null> {
 }
 
 /**
- * Authenticated self-update hook used by the optional GitHub Actions deploy job.
- * Its repository variable HAL_UPDATE_URL points here, and repository secret
- * HAL_UPDATE_TOKEN must equal this process's UPDATE_TOKEN environment variable.
- * Without UPDATE_TOKEN every request is rejected, so ordinary clones expose no
- * update capability. A valid request fetches origin and asks `run` to pull and
- * relaunch only when the checkout is behind.
+ * Optional personal deployment hook, not an open restart endpoint: it is inert
+ * unless the server operator sets UPDATE_TOKEN, and every request must present
+ * that token. An authorized request only asks `run` to update when origin moved.
  */
 async function handleUpdateRequest(request: Request): Promise<Response> {
 	if (request.method !== 'POST') return new Response('Not found', { status: 404 })

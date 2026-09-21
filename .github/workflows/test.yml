@@ -21,11 +21,9 @@ jobs:
       - run: ./test
 
 
-  # Auto-deployment is opt-in repository configuration. HAL_UPDATE_URL is a
-  # repository variable containing the full POST endpoint (for example,
-  # https://example.test/api/update); HAL_UPDATE_TOKEN is a repository secret
-  # matching UPDATE_TOKEN in that server process. Forks inherit neither setting,
-  # and a repository missing either one reaches the explicit no-op below.
+  # Optional personal auto-deploy after green builds. The URL is a repository
+  # variable and its bearer token is a secret matching the server's UPDATE_TOKEN.
+  # Forks inherit neither setting; without both, this job is an explicit no-op.
   deploy:
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

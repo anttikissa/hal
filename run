@@ -93,11 +93,9 @@ while true; do
 	if [ "$code" -ne 100 ] && [ "$code" -ne 42 ]; then
 		exit "$code"
 	fi
-	# A valid POST /api/update (see src/server/web.ts) exits with 42 after fetching
-	# origin and finding a newer upstream revision. CI supplies the endpoint as
-	# repository variable HAL_UPDATE_URL and authenticates with a matching token.
-	# Pull only by fast-forward before relaunching; if the deploy checkout has local
-	# commits or a conflict, keep those files and restart the existing revision.
+	# Optional personal auto-deploy: the authenticated update hook exits with 42
+	# after fetching a newer origin. Pull only by fast-forward before relaunching;
+	# on failure, preserve the checkout and restart the existing revision.
 	if [ "$code" -eq 42 ]; then
 		echo "hal: update requested, pulling"
 		git -C "$hal_dir" pull --ff-only || echo "hal: pull failed, keeping current checkout"
