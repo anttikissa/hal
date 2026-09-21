@@ -14,17 +14,19 @@ afterEach(() => {
 test('prompts for a replacement after an invalid remembered token', async () => {
 	const attempts: string[] = []
 	let output = ''
+	let question = ''
 	remoteAuth.open = async (_host, token) => {
 		attempts.push(token)
 		if (token === 'old') throw new Error('Invalid authentication token')
 	}
-	remoteAuth.prompt = () => ' new '
+	remoteAuth.prompt = (message) => { question = message; return ' new ' }
 	remoteAuth.write = (text) => { output += text }
 
 	const token = await remoteAuth.connect('hal.example', 'old', new AbortController().signal)
 
 	expect(token).toBe('new')
 	expect(attempts).toEqual(['old', 'new'])
+	expect(question).toBe('Enter auth token:')
 	expect(output).toContain('Invalid token connecting to hal.example.')
 	expect(output).toContain('run `hal auth`')
 })
