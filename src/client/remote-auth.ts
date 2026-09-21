@@ -22,6 +22,7 @@ async function connect(host: string, authToken: string | null, signal: AbortSign
 			remoteAuth.write(`Invalid token connecting to ${host}.\n`)
 		}
 	}
+	if (!authToken) remoteAuth.write(`No auth token stored for ${host}.\n`)
 	remoteAuth.write(`To get a new token, on the remote server, run \`hal auth\`.\n`)
 	const replacement = remoteAuth.prompt('Enter auth token: ')?.trim()
 	if (!replacement) throw new Error('Authentication cancelled')

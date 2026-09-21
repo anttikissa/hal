@@ -29,14 +29,16 @@ test('prompts for a replacement after an invalid remembered token', async () => 
 	expect(output).toContain('run `hal auth`')
 })
 
-test('prompts immediately when no token is remembered', async () => {
+test('explains when no token is remembered before prompting', async () => {
 	const attempts: string[] = []
+	let output = ''
 	remoteAuth.open = async (_host, token) => { attempts.push(token) }
 	remoteAuth.prompt = () => 'first'
-	remoteAuth.write = () => {}
+	remoteAuth.write = (text) => { output += text }
 
 	expect(await remoteAuth.connect('hal.example', null, new AbortController().signal)).toBe('first')
 	expect(attempts).toEqual(['first'])
+	expect(output).toContain('No auth token stored for hal.example.')
 })
 
 test('does not replace tokens after unrelated connection failures', async () => {
