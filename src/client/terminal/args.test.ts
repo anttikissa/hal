@@ -36,15 +36,24 @@ test('parse supports --state-dir with a following path or equals form', () => {
 	})
 })
 
-test('parse selects a remote web server from a copied authenticated URL', () => {
+test('parse selects a remote host or reuses the remembered host', () => {
 	const env = { cwd: '/work/project', halDir: '/hal' }
-	expect(cliArgs.parse(['-r', 'http://localhost:9001/?auth=aBcDeFgHiJkL'], env)).toEqual({
+	expect(cliArgs.parse(['-r', 'hal.example'], env)).toEqual({
 		ok: true,
 		help: false,
 		targetCwd: '/work/project',
-		remoteUrl: 'http://localhost:9001/?auth=aBcDeFgHiJkL',
+		remoteHost: 'hal.example',
 	})
-	expect(cliArgs.parse(['-r'], env)).toEqual({ ok: true, help: false, targetCwd: '/work/project', remoteUrl: null })
+	expect(cliArgs.parse(['-r'], env)).toEqual({ ok: true, help: false, targetCwd: '/work/project', remoteHost: null })
+})
+
+test('parse accepts the auth command', () => {
+	expect(cliArgs.parse(['auth'], { cwd: '/work/project', halDir: '/hal' })).toEqual({
+		ok: true,
+		help: false,
+		targetCwd: '/work/project',
+		auth: true,
+	})
 })
 
 test('parse rejects unknown options and positional parameters', () => {

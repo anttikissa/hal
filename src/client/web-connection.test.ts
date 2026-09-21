@@ -3,26 +3,23 @@ import { webConnection } from './web-connection.ts'
 import { clientBackend } from './backend.ts'
 import { clientTransport } from './transport.ts'
 
-test('remote connection accepts the URL copied from /web', () => {
-	expect(webConnection.parseUrl('http://localhost:9001/?auth=aBcDeFgHiJkL')).toEqual({
-		webSocketUrl: 'ws://localhost:9001/ws',
-		baseUrl: 'http://localhost:9001',
-		uploadUrl: 'http://localhost:9001/upload?auth=aBcDeFgHiJkL',
-		token: 'aBcDeFgHiJkL',
-	})
+test('remote connection derives HTTPS endpoints from the host', () => {
+	expect(webConnection.socketUrl('hal.example')).toBe('wss://hal.example/ws')
+	expect(webConnection.uploadUrl('hal.example')).toBe('https://hal.example/upload')
 })
 
-test('remote connection requires HTTP and the copied authentication token', () => {
-	expect(() => webConnection.parseUrl('localhost:9001')).toThrow('Remote URL must start with http:// or https://')
-	expect(() => webConnection.parseUrl('http://localhost:9001')).toThrow('Remote URL must contain ?auth=<token>')
+test('remote connection requires a bare hostname', () => {
+	expect(() => webConnection.connect('https://hal.example', 'secret', new AbortController().signal)).toThrow('Remote host must be a hostname')
+	expect(() => webConnection.connect('hal.example:9001', 'secret', new AbortController().signal)).toThrow('Remote host must be a hostname')
 })
 
-test('remote image uploads use the authenticated server endpoint', async () => {
+test('remote image uploads use the host and authentication token separately', async () => {
 	const originalFetch = webConnection.fetch
-	webConnection.state.remote = webConnection.parseUrl('https://hal.example/04-work?auth=secret')
+	webConnection.state.remote = { host: 'hal.example', authToken: 'secret' }
 	try {
 		webConnection.fetch = async (url, init) => {
-			expect(url).toBe('https://hal.example/upload?auth=secret')
+			expect(url).toBe('https://hal.example/upload')
+			expect(init?.headers).toEqual({ Authorization: 'Bearer secret' })
 			expect(init?.method).toBe('POST')
 			const form = init?.body as FormData
 			const file = form.get('file') as File

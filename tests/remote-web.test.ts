@@ -4,28 +4,45 @@ import { ensureStateDir } from '../src/server/state.ts'
 import { web } from '../src/server/web.ts'
 import { serverKeys } from '../src/server/server-keys.ts'
 
+const originalNormalizeHost = webConnection.normalizeHost
+const originalSocketUrl = webConnection.socketUrl
+
+function useLocalWebSocket(): () => void {
+	webConnection.normalizeHost = (host) => host
+	webConnection.socketUrl = (host) => `ws://${host}/ws`
+	return () => {
+		webConnection.normalizeHost = originalNormalizeHost
+		webConnection.socketUrl = originalSocketUrl
+	}
+}
+
 test('remote client reports the server authentication error', async () => {
 	const controller = new AbortController()
+	const restore = useLocalWebSocket()
 	ensureStateDir()
 	web.start(0, controller.signal)
 	try {
-		await expect(webConnection.connect(`http://127.0.0.1:${web.state.port}/?auth=wrong-token`, controller.signal)).rejects.toThrow(
+		await expect(webConnection.connect(`127.0.0.1:${web.state.port}`, 'wrong-token', controller.signal)).rejects.toThrow(
 			'Invalid authentication token',
 		)
 	} finally {
 		controller.abort()
+		webConnection.reset()
+		restore()
 	}
 })
 
 test('remote client reconnects after the host restarts', async () => {
 	ensureStateDir()
+	const restore = useLocalWebSocket()
 	const first = new AbortController()
 	web.start(0, first.signal)
 	const port = web.state.port
-	const url = `http://127.0.0.1:${port}/?auth=${serverKeys.ensureLocalToken().token}`
+	const host = `127.0.0.1:${port}`
+	const token = serverKeys.ensureLocalToken().token
 	const clientAbort = new AbortController()
 	try {
-		await webConnection.connect(url, clientAbort.signal)
+		await webConnection.connect(host, token, clientAbort.signal)
 		expect(webConnection.state.socket?.readyState).toBe(WebSocket.OPEN)
 
 		first.abort()
@@ -47,5 +64,6 @@ test('remote client reconnects after the host restarts', async () => {
 	} finally {
 		clientAbort.abort()
 		webConnection.reset()
+		restore()
 	}
 })

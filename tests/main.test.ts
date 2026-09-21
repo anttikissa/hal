@@ -22,8 +22,8 @@ function stripAnsi(s: string) {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
 
-function spawnHal(env: Record<string, string | undefined> = {}) {
-	const proc = Bun.spawn(['bun', 'src/main.ts'], {
+function spawnHal(env: Record<string, string | undefined> = {}, args: string[] = []) {
+	const proc = Bun.spawn(['bun', 'src/main.ts', ...args], {
 		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'pipe',
@@ -70,6 +70,11 @@ async function waitForOnlySessionHistoryPath(): Promise<string> {
 }
 
 describe('main', () => {
+	test('auth prints the host remote-access token and exits', async () => {
+		const proc = spawnHal({}, ['auth'])
+		expect(await proc.exited).toBe(0)
+		expect((await new Response(proc.stdout).text()).trim()).toMatch(/^[A-Za-z0-9]{12}$/)
+	})
 	test('echoes input via events', async () => {
 		const proc = spawnHal()
 		await Bun.sleep(100)

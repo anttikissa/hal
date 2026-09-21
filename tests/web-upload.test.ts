@@ -52,6 +52,14 @@ test('upload requires a valid web token', async () => {
 	expect(response.status).toBe(401)
 })
 
+test('upload accepts the remote client token in an authorization header', async () => {
+	const url = `http://127.0.0.1:${web.state.port}/upload`
+	const response = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: imageForm('shot.png') })
+	expect(response.status).toBe(200)
+	const body = await response.json() as { path: string }
+	uploadedPaths.push(body.path)
+})
+
 test('upload returns a short temp path while keeping a state copy', async () => {
 	const response = await fetch(uploadUrl(token), { method: 'POST', body: imageForm('shot.png') })
 	expect(response.status).toBe(200)

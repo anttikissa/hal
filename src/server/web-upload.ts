@@ -73,7 +73,9 @@ function saveUpload(name: string, type: string, data: ArrayBuffer): { status: nu
 async function handleUploadRequest(request: Request, ip: string): Promise<Response> {
 	// Same constant-time token check as the WebSocket handshake.
 	const url = new URL(request.url)
-	if (!serverKeys.authenticate(url.searchParams.get('auth') ?? '', ip)) {
+	const authorization = request.headers.get('authorization')
+	const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : url.searchParams.get('auth') ?? ''
+	if (!serverKeys.authenticate(token, ip)) {
 		return new Response('Unauthorized', { status: 401 })
 	}
 	let form: FormData

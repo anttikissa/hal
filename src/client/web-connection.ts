@@ -6,11 +6,9 @@ import { webProtocol } from '../common/web.ts'
 import { clientBackend } from './backend.ts'
 import { clientTransport } from './transport.ts'
 
-type ParsedRemoteUrl = {
-	webSocketUrl: string
-	baseUrl: string
-	uploadUrl: string
-	token: string
+type RemoteCredentials = {
+	host: string
+	authToken: string
 }
 
 const config = { retryMultiplier: 1.6, maxRetryDelayMs: 30_000 }
@@ -23,23 +21,18 @@ const state = {
 	wakeEvent: null as (() => void) | null,
 	stateListener: null as ((shared: SharedState) => void) | null,
 	reconnecting: false,
-	remote: null as ParsedRemoteUrl | null,
+	remote: null as RemoteCredentials | null,
 }
 
-function parseUrl(input: string): ParsedRemoteUrl {
-	if (!/^https?:\/\//.test(input)) throw new Error('Remote URL must start with http:// or https://')
-	const url = new URL(input)
-	const token = url.searchParams.get('auth') ?? ''
-	if (!token) throw new Error('Remote URL must contain ?auth=<token>')
-	const baseUrl = url.origin
-	const upload = new URL('/upload', url)
-	upload.searchParams.set('auth', token)
-	url.search = ''
-	url.hash = ''
-	url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-	url.pathname = '/ws'
-	return { webSocketUrl: url.toString(), baseUrl, uploadUrl: upload.toString(), token }
+function normalizeHost(host: string): string {
+	const normalized = host.trim().toLowerCase()
+	const url = URL.canParse(`https://${normalized}`) ? new URL(`https://${normalized}`) : null
+	if (!url || url.hostname !== normalized || url.host !== normalized) throw new Error('Remote host must be a hostname without a scheme, port, or path')
+	return normalized
 }
+
+function socketUrl(host: string): string { return `wss://${host}/ws` }
+function uploadUrl(host: string): string { return `https://${host}/upload` }
 
 function applySnapshot(snapshot: ClientSessionSnapshot): void {
 	state.snapshots.set(snapshot.session.id, snapshot)
@@ -125,7 +118,11 @@ async function uploadImage(data: Uint8Array): Promise<string> {
 	if (!remote) throw new Error('Remote HAL connection is closed')
 	const form = new FormData()
 	form.append('file', new Blob([new Uint8Array(data).buffer], { type: 'image/png' }), 'clipboard.png')
-	const response = await webConnection.fetch(remote.uploadUrl, { method: 'POST', body: form })
+	const response = await webConnection.fetch(webConnection.uploadUrl(remote.host), {
+		method: 'POST',
+		headers: { Authorization: `Bearer ${remote.authToken}` },
+		body: form,
+	})
 	const body = await response.json().catch(() => null) as { path?: unknown; error?: unknown } | null
 	if (!response.ok || !body || typeof body.path !== 'string') {
 		throw new Error(body && typeof body.error === 'string' ? body.error : `HTTP ${response.status}`)
@@ -147,12 +144,12 @@ async function* tailEvents(signal?: AbortSignal): AsyncGenerator<any> {
 	}
 }
 
-function openSocket(parsed: ParsedRemoteUrl, signal: AbortSignal, reconnect: boolean): Promise<void> {
+function openSocket(remote: RemoteCredentials, signal: AbortSignal, reconnect: boolean): Promise<void> {
 	return new Promise((resolve, reject) => {
 		let authenticated = false
-		const socket = new WebSocket(parsed.webSocketUrl)
+		const socket = new WebSocket(webConnection.socketUrl(remote.host))
 		state.socket = socket
-		socket.onopen = () => socket.send(webProtocol.encode({ type: 'authenticate', token: parsed.token }))
+		socket.onopen = () => socket.send(webProtocol.encode({ type: 'authenticate', token: remote.authToken }))
 		socket.onmessage = (event) => {
 			const message = webProtocol.decode(String(event.data)) as WebServerMessage | null
 			if (!message || typeof message !== 'object' || !('type' in message)) return
@@ -174,13 +171,13 @@ function openSocket(parsed: ParsedRemoteUrl, signal: AbortSignal, reconnect: boo
 			webConnection.applyMessage(message)
 		}
 		socket.onerror = () => {
-			if (!authenticated) reject(new Error(`Could not connect to ${parsed.baseUrl}`))
+			if (!authenticated) reject(new Error(`Could not connect to ${remote.host}`))
 		}
 		socket.onclose = () => {
 			reject(new Error('Connection closed'))
 			state.wakeEvent?.()
 			state.wakeEvent = null
-			if (authenticated) void webConnection.reconnect(parsed, signal)
+			if (authenticated) void webConnection.reconnect(remote, signal)
 		}
 		signal.addEventListener('abort', () => socket.close(), { once: true })
 	})
@@ -188,7 +185,7 @@ function openSocket(parsed: ParsedRemoteUrl, signal: AbortSignal, reconnect: boo
 
 // The host restarts often (Ctrl-R, upgrades), so a closed socket is normal rather
 // than fatal. Retry immediately, then back off until the host answers again.
-async function reconnect(parsed: ParsedRemoteUrl, signal: AbortSignal): Promise<void> {
+async function reconnect(remote: RemoteCredentials, signal: AbortSignal): Promise<void> {
 	if (state.reconnecting) return
 	state.reconnecting = true
 	state.stateListener?.(state.shared)
@@ -198,7 +195,7 @@ async function reconnect(parsed: ParsedRemoteUrl, signal: AbortSignal): Promise<
 			if (delay > 0) await Bun.sleep(delay)
 			if (signal.aborted) return
 			try {
-				await webConnection.openSocket(parsed, signal, true)
+				await webConnection.openSocket(remote, signal, true)
 				return
 			} catch {
 				delay = webConnection.nextRetryDelay(delay)
@@ -209,10 +206,10 @@ async function reconnect(parsed: ParsedRemoteUrl, signal: AbortSignal): Promise<
 	}
 }
 
-function connect(input: string, signal: AbortSignal): Promise<void> {
-	const parsed = webConnection.parseUrl(input)
-	state.remote = parsed
-	return webConnection.openSocket(parsed, signal, false)
+function connect(host: string, authToken: string, signal: AbortSignal): Promise<void> {
+	const remote = { host: webConnection.normalizeHost(host), authToken }
+	state.remote = remote
+	return webConnection.openSocket(remote, signal, false)
 }
 
 function reset(): void {
@@ -231,7 +228,9 @@ function reset(): void {
 export const webConnection = {
 	state,
 	config,
-	parseUrl,
+	normalizeHost,
+	socketUrl,
+	uploadUrl,
 	applySnapshot,
 	applyBootstrap,
 	applyReconnectBootstrap,

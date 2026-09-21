@@ -99,17 +99,24 @@ if (parsedArgs.stateDir && process.env.HAL_STATE_DIR !== parsedArgs.stateDir) {
 	process.stderr.write('--state-dir must be handled by the hal wrapper so HAL_STATE_DIR is set before startup. Use `hal --state-dir <dir>`.\n')
 	process.exit(2)
 }
+if (parsedArgs.auth) {
+	ensureStateDir()
+	const { serverKeys } = await import('./server/server-keys.ts')
+	process.stdout.write(`${serverKeys.ensureLocalToken().token}\n`)
+	process.exit(0)
+}
 const startupCwd = resolve(parsedArgs.targetCwd || '.')
 
-if (parsedArgs.remoteUrl !== undefined) {
+if (parsedArgs.remoteHost !== undefined) {
 	ensureStateDir()
 	const saved = clientPersistence.load()
-	const remoteUrl = parsedArgs.remoteUrl ?? saved.remoteUrl
-	if (!remoteUrl) {
-		process.stderr.write('No remembered remote URL; use hal -r <url>\n')
+	let remoteHost = parsedArgs.remoteHost ?? saved.remoteHost
+	if (!remoteHost) {
+		process.stderr.write('No remembered remote host; use hal -r <host>\n')
 		process.exit(2)
 	}
 	const remoteAbort = new AbortController()
+	let remoteAuthToken: string
 	config.init()
 	termCaps.detect()
 	colors.init()
@@ -117,13 +124,16 @@ if (parsedArgs.remoteUrl !== undefined) {
 	blockData.state.blobLoadingEnabled = false
 	try {
 		const { webConnection } = await import('./client/web-connection.ts')
-		await webConnection.connect(remoteUrl, remoteAbort.signal)
+		const { remoteAuth } = await import('./client/remote-auth.ts')
+		remoteHost = webConnection.normalizeHost(remoteHost)
+		const rememberedToken = saved.remoteHost === remoteHost ? saved.remoteAuthToken : null
+		remoteAuthToken = await remoteAuth.connect(remoteHost, rememberedToken, remoteAbort.signal)
 	} catch (error) {
 		process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
 		process.exit(1)
 	}
-	client.state.remoteUrl = remoteUrl
-	if (parsedArgs.remoteUrl) clientPersistence.save({ ...saved, remoteUrl })
+	clientPersistence.save({ ...saved, remoteHost, remoteAuthToken })
+	process.stderr.write(`Connected to ${remoteHost}.\n`)
 	client.state.role = 'client'
 	process.on('exit', () => remoteAbort.abort())
 	process.on('SIGTERM', () => {

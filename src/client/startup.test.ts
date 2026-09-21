@@ -238,7 +238,8 @@ describe('client startup', () => {
 		writeFileSync(CLIENT_STATE_PATH, ason.stringify({
 			lastTab: 's34',
 			restartTab: 's34',
-			remoteUrl: 'https://example.test/?auth=remember-me',
+			remoteHost: 'hal.example',
+			remoteAuthToken: 'remember-me',
 			peak: 0,
 			peakCols: 0,
 			model: null,
@@ -263,9 +264,10 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.currentTab()?.sessionId).toBe('s34')
-		const saved = ason.parse(readFileSync(CLIENT_STATE_PATH, 'utf-8')) as { restartTab: string | null; remoteUrl?: string }
+		const saved = ason.parse(readFileSync(CLIENT_STATE_PATH, 'utf-8')) as { restartTab: string | null; remoteHost?: string; remoteAuthToken?: string }
 		expect(saved.restartTab).toBeNull()
-		expect(saved.remoteUrl).toBe('https://example.test/?auth=remember-me')
+		expect(saved.remoteHost).toBe('hal.example')
+		expect(saved.remoteAuthToken).toBe('remember-me')
 	})
 
 	test('adds an ephemeral last-active notice for stale sessions', async () => {
