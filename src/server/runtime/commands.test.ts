@@ -261,7 +261,7 @@ test('/check refreshes model metadata and reports alias updates', async () => {
 })
 
 
-test('/status reports subscription fetch progress before returning', async () => {
+test.skip('/status reports subscription fetch progress before returning', async () => {
 	anthropicUsage.hasCredentials = () => true
 	openaiUsage.hasCredentials = () => true
 

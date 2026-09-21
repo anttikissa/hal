@@ -19,3 +19,22 @@ jobs:
       - run: bun install --frozen-lockfile
       # ./test runs the typechecker, oxlint, and the test suite in parallel.
       - run: ./test
+
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request configured deployment update
+        env:
+          HAL_UPDATE_URL: ${{ secrets.HAL_UPDATE_URL }}
+          HAL_UPDATE_TOKEN: ${{ secrets.HAL_UPDATE_TOKEN }}
+        run: |
+          if [ -z "$HAL_UPDATE_URL" ] || [ -z "$HAL_UPDATE_TOKEN" ]; then
+            echo "Auto-update is not configured; skipping."
+            exit 0
+          fi
+          curl --fail --silent --show-error --max-time 30 --request POST \
+            --header "Authorization: Bearer $HAL_UPDATE_TOKEN" \
+            "$HAL_UPDATE_URL"

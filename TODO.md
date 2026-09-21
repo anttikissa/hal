@@ -18,6 +18,7 @@ Random ideas, in no particular order
   completions instead of appearing to do nothing.
 - Verify the `grok/` provider against a real `GROK_API_KEY`. Anthropic, OpenAI, OpenRouter, and
   Gemini were probed live and work; Grok uses the same compat path but is untested.
+- Investigate and re-enable `/status reports subscription fetch progress before returning`. It is flaky across Bun schedulers: GitHub’s Bun 1.4.2 still has only the Anthropic progress message after three `Promise.resolve()` turns, while local Bun 1.3.14 passes. Replace the microtask-count assumption with deterministic deferred barriers before re-enabling it.
 - /what is probably more complicated than it should be; should just probably open a subagent to do it
 - Most of config.ason can be ditched. Nobody ever gonna change them. Hardcode more stuff
 - The OPUS context usage warning must go. It's not that bad anymore. Instead, think of a generic "this session isn't hitting cache any more" hint in UI
