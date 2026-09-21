@@ -9,6 +9,7 @@ import { cursor } from './cursor.ts'
 import { blocks } from './blocks.ts'
 import { prompt } from './prompt.ts'
 import { placeholders } from './placeholders.ts'
+import { webConnection } from '../web-connection.ts'
 
 
 function tab(overrides: any = {}): any {
@@ -42,6 +43,19 @@ test('status identifies host, local peer, and remote client', () => {
 		}
 	} finally {
 		client.state.role = original
+	}
+})
+
+
+test('remote client status shows reconnecting', () => {
+	const originalRole = client.state.role
+	client.state.role = 'client'
+	webConnection.state.reconnecting = true
+	try {
+		expect(renderStatus.serverStatusLabel()).toBe('client · reconnecting')
+	} finally {
+		client.state.role = originalRole
+		webConnection.state.reconnecting = false
 	}
 })
 

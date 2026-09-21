@@ -31,6 +31,8 @@ test('remote client reconnects after the host restarts', async () => {
 		first.abort()
 		await Bun.sleep(50)
 		expect(webConnection.state.socket?.readyState).not.toBe(WebSocket.OPEN)
+		expect(webConnection.state.reconnecting).toBe(true)
+		expect(() => webConnection.sendCommand({ type: 'focus', sessionId: 'missing' })).not.toThrow()
 
 		const second = new AbortController()
 		web.start(port, second.signal)

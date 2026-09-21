@@ -113,8 +113,10 @@ function install(): void {
 	})
 }
 
+// A host restart is a normal transport gap. Never let a remote keypress throw
+// out of the terminal's stdin callback; commands during the gap are ignored.
 function sendCommand(command: Command): void {
-	if (state.socket?.readyState !== WebSocket.OPEN) throw new Error('Remote HAL connection is closed')
+	if (state.socket?.readyState !== WebSocket.OPEN) return
 	state.socket.send(webProtocol.encode({ type: 'command', command }))
 }
 
@@ -161,6 +163,7 @@ function openSocket(parsed: ParsedRemoteUrl, signal: AbortSignal, reconnect: boo
 			if (message.type === 'authenticated') {
 				// A reconnect replaces stale cached sessions, so the whole bootstrap wins
 				// over whatever this client believed before the host went away.
+				if (reconnect) state.reconnecting = false
 				if (reconnect) webConnection.applyReconnectBootstrap(message.bootstrap)
 				else webConnection.applyBootstrap(message.bootstrap)
 				webConnection.install()
@@ -188,6 +191,7 @@ function openSocket(parsed: ParsedRemoteUrl, signal: AbortSignal, reconnect: boo
 async function reconnect(parsed: ParsedRemoteUrl, signal: AbortSignal): Promise<void> {
 	if (state.reconnecting) return
 	state.reconnecting = true
+	state.stateListener?.(state.shared)
 	let delay = 0
 	try {
 		while (!signal.aborted) {

@@ -85,3 +85,13 @@ test('remote history-updated observes the snapshot that arrived immediately befo
 	expect(clientBackend.sessions.loadAllHistoryWithOrigin('04-work').entries[0]).toMatchObject({ type: 'question', id: 'q1' })
 	expect(webConnection.state.events).toEqual([{ type: 'history-updated', sessionId: '04-work' }])
 })
+
+
+test('commands entered during reconnect do not throw', () => {
+	webConnection.reset()
+	webConnection.state.reconnecting = true
+
+	expect(() => webConnection.sendCommand({ type: 'prompt', sessionId: '04-work', text: 'ignored' })).not.toThrow()
+
+	webConnection.reset()
+})

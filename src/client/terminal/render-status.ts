@@ -22,6 +22,7 @@ import { promptEdit } from '../prompt-edit.ts'
 import { completionHints } from './completion-hints.ts'
 import { blocks } from './blocks.ts'
 import { placeholders } from './placeholders.ts'
+import { webConnection } from '../web-connection.ts'
 
 const RESET = '\x1b[0m'
 
@@ -336,6 +337,7 @@ function hostMismatchBadge(): string {
 }
 
 function serverStatusLabel(): string {
+	if (client.state.role === 'client' && webConnection.state.reconnecting) return 'client · reconnecting'
 	return `${client.state.role}${renderStatus.hostMismatchBadge()}`
 }
 
