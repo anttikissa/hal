@@ -38,3 +38,4 @@ Random ideas, in no particular order
 - `src/utils/tail-file.test.ts` “handles truncation” is flaky in GitHub Actions: the pre-truncation chunk can arrive as an empty string. Replace its sleep-based watcher synchronization with deterministic observation of the first chunk, then re-enable it.
 - `tests/perf.test.ts` “startup summary appears in output” is flaky under the full parallel suite: reading the spawned process output can exceed Bun’s 5-second test timeout. Replace its fixed sleep/process timing with deterministic startup observation, then re-enable it.
 - Make a help text into the intro model (after the actual model is set) - it should tell about /help, /keys, tabs, and maybe a special /features or something
+- When connected to remote and remote stops and you enter reconnecting more, you can write prompts and they appear as sent. But they disappear upon reconnect as if nothing had happened
