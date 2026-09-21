@@ -164,7 +164,8 @@ let suspended = false
 // The shell will show its prompt. `fg` resumes us and triggers SIGCONT.
 function suspend(): void {
 	suspended = true
-	terminalOutput.write(`${useKitty() ? KITTY_OFF : ''}${CURSOR_SHAPE_DEFAULT}${CURSOR_COLOR_DEFAULT}\x1b[?25h`)
+	terminalOutput.write(`${useKitty() ? KITTY_OFF : ''}${BRACKETED_PASTE_OFF}${CURSOR_SHAPE_DEFAULT}${CURSOR_COLOR_DEFAULT}\x1b[?25h`)
+	if (process.stdin.isTTY) process.stdin.setRawMode(false)
 	// process.kill(0, ...) sends to the entire process group — this is
 	// the standard way for a foreground job to suspend itself.
 	try { process.kill(0, 'SIGSTOP') } catch { process.kill(process.pid, 'SIGSTOP') }
@@ -636,13 +637,13 @@ function handleAppKey(k: KeyEvent): boolean {
 		}
 		// Ctrl-C: quit
 		if (k.key === 'c') exitCli(0)
-		// Ctrl-D: quit if prompt empty, else let prompt handle (delete forward)
-		if (k.key === 'd' && !prompt.text()) exitCli(0)
 		// Ctrl-Z: suspend (SIGSTOP to process group, like a normal unix program)
 		if (k.key === 'z') {
 			suspend()
 			return true
 		}
+		// Ctrl-D depends on prompt state, so it deliberately stays in layer 3.
+		if (k.key === 'd' && !prompt.text()) exitCli(0)
 		// Ctrl-L: force redraw
 		if (k.key === 'l') {
 			draw(true)
@@ -723,7 +724,18 @@ function handleQuestionKey(k: KeyEvent): boolean {
 	return terminalQuestions.handleKey(k)
 }
 
+// Terminal input passes through three ordered layers: emergency controls first,
+// then stateful ANSI/paste parsing, then ordinary structured-key dispatch. The
+// first layer must remain usable even when the second layer is waiting for input.
 function handleInput(text: string): void {
+	const emergency = keys.emergencyKey(text)
+	if (emergency) {
+		if (emergency.index > 0) handleInput(text.slice(0, emergency.index))
+		keys.state.pasteBuffer = null
+		keys.state.pasteUpdatedAt = 0
+		handleAppKey(emergency.key)
+		return
+	}
 	for (const k of keys.parseKeys(text)) {
 		// Popup keys first — an active modal owns the keyboard.
 		if (popup.state.active && popup.handleKey(k)) {

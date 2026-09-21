@@ -39,4 +39,8 @@ describe('clipboard', () => {
 		const text = 'a\n'.repeat(6)
 		expect(clipboard.cleanPaste(text)).toBe(text)
 	})
+
+	test('removes DEL and C1 controls from pasted text', () => {
+		expect(clipboard.cleanPaste('a\x7fb\u0085c\u009bd')).toBe('abcd')
+	})
 })

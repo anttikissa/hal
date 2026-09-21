@@ -281,7 +281,7 @@ function splitKeys(data: string): string[] {
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 /** Parse a single key sequence token into a KeyEvent, or null if unrecognized. */
-export function parseKey(data: string): KeyEvent | null {
+function parseKey(data: string): KeyEvent | null {
 	// Empty
 	if (!data) return null
 
@@ -345,14 +345,21 @@ export function parseKey(data: string): KeyEvent | null {
 }
 
 /** Parse raw stdin data into key events (handles concatenated sequences). */
-export function parseKeys(data: string): KeyEvent[] {
-	const tokens = splitKeys(data)
+function parseKeys(data: string): KeyEvent[] {
 	const events: KeyEvent[] = []
-	for (const token of tokens) {
-		const k = parseKey(token)
-		if (k) events.push(k)
+	for (const token of splitKeys(data)) {
+		const key = parseKey(token)
+		if (key) events.push(key)
 	}
 	return events
 }
 
-export const keys = { state, parseKey, parseKeys }
+function emergencyKey(data: string): { index: number; key: KeyEvent } | null {
+	const match = data.match(/\x03|\x12|\x1a|\x1b\[(?:99|114|122);5(?::[12])?(?:;[\d:]+)?u/)
+	if (!match || match.index === undefined) return null
+	const key = parseKey(match[0])
+	if (!key) return null
+	return { index: match.index, key }
+}
+
+export const keys = { state, parseKey, parseKeys, emergencyKey }

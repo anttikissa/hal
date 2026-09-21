@@ -199,7 +199,7 @@ function cleanPaste(raw: string): string {
 	const text = raw
 		.replace(/\r\n/g, '\n')
 		.replace(/\r/g, '\n')
-		.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
+		.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, '')
 	if (!text) return ''
 	const trimmed = text.trim()
 	if (trimmed.startsWith('/') && !trimmed.includes('\n') && IMAGE_EXTS.test(trimmed) && existsSync(trimmed)) {

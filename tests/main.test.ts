@@ -75,12 +75,15 @@ describe('main', () => {
 		expect(await proc.exited).toBe(0)
 		expect((await new Response(proc.stdout).text()).trim()).toMatch(/^[A-Za-z0-9]{12}$/)
 	})
-	test('echoes input via events', async () => {
+	test('echoes input and exits from an incomplete paste', async () => {
 		const proc = spawnHal()
 		await Bun.sleep(100)
 		proc.stdin!.write('hello\n')
 		proc.stdin!.flush()
 		await Bun.sleep(200)
+		proc.stdin!.write('\x1b[200~unfinished paste')
+		proc.stdin!.flush()
+		await Bun.sleep(50)
 		// Send ctrl-c to quit
 		proc.stdin!.write(new Uint8Array([0x03]))
 		proc.stdin!.flush()

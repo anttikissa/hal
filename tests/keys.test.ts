@@ -30,6 +30,12 @@ describe('keys', () => {
 		expect(parsed).toEqual([{ key: 'hello\nworld', char: 'hello\nworld', shift: false, alt: false, ctrl: false, cmd: false }])
 	})
 
+	test('finds legacy and kitty emergency controls before stateful parsing', () => {
+		for (const [input, index, key] of [['ab\x03', 2, 'c'], ['\x1b[114;5u', 0, 'r'], ['\x1a', 0, 'z']] as const) {
+			expect(keys.emergencyKey(input)).toMatchObject({ index, key: { key, ctrl: true } })
+		}
+	})
+
 	test('abandons an incomplete paste after it goes idle', () => {
 		const pasteState = keys.state
 		try {
