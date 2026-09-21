@@ -46,19 +46,6 @@ test('status identifies host, local peer, and remote client', () => {
 	}
 })
 
-
-test('remote client status shows reconnecting', () => {
-	const originalRole = client.state.role
-	client.state.role = 'client'
-	webConnection.state.reconnecting = true
-	try {
-		expect(renderStatus.serverStatusLabel()).toBe('client · reconnecting')
-	} finally {
-		client.state.role = originalRole
-		webConnection.state.reconnecting = false
-	}
-})
-
 test('subscriptionStatusLabel renders normalized subscription windows', () => {
 	const current = clientBackend.subscriptions.current
 	try {
@@ -128,6 +115,18 @@ test('activityStatusLabel names visible working phases', () => {
 		] }))).toBe('running 2 tools')
 	} finally {
 		client.state.working = origWorking
+	}
+})
+
+test('activityStatusLabel shows reconnecting ahead of turn activity', () => {
+	const origWorking = client.state.working
+	client.state.working = new Map([['04-new', true]])
+	webConnection.state.reconnecting = true
+	try {
+		expect(renderStatus.activityStatusLabel(tab())).toBe('reconnecting')
+	} finally {
+		client.state.working = origWorking
+		webConnection.state.reconnecting = false
 	}
 })
 

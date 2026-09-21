@@ -45,6 +45,26 @@ test('remote reconnect delay starts at one second and grows by 60 percent', () =
 	expect(delays).toEqual([1_000, 1_600, 2_560, 4_096, 6_554, 10_486, 16_778, 26_845, 30_000, 30_000])
 })
 
+test('reconnect tells the user when the connection drops and returns', async () => {
+	const notices: string[] = []
+	const originalNotify = webConnection.notify
+	const originalOpen = webConnection.openSocket
+	webConnection.notify = (text) => { notices.push(text) }
+	let attempts = 0
+	webConnection.openSocket = async () => {
+		attempts++
+		if (attempts === 1) throw new Error('still down')
+	}
+	try {
+		await webConnection.reconnect({ host: 'hal.example', authToken: 'secret' }, new AbortController().signal)
+		expect(notices).toEqual(['Lost connection to hal.example, reconnecting...', 'Reconnected to hal.example.'])
+	} finally {
+		webConnection.notify = originalNotify
+		webConnection.openSocket = originalOpen
+		webConnection.reset()
+	}
+})
+
 test('remote bootstrap installs the same state and session ports as file IPC', () => {
 	webConnection.applyBootstrap({
 		state: { sessions: [{ id: '04-work', cwd: '/srv/work' }], working: {}, updatedAt: 'now' },

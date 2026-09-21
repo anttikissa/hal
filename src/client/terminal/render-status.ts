@@ -337,7 +337,6 @@ function hostMismatchBadge(): string {
 }
 
 function serverStatusLabel(): string {
-	if (client.state.role === 'client' && webConnection.state.reconnecting) return 'client · reconnecting'
 	return `${client.state.role}${renderStatus.hostMismatchBadge()}`
 }
 
@@ -573,6 +572,8 @@ function turnActivityStatusLabel(tab: Tab): string {
 
 function activityStatusLabel(tab = client.currentTab()): string {
 	if (!tab) return ''
+	// A dead transport outranks turn activity: nothing else on screen is live.
+	if (webConnection.state.reconnecting) return 'reconnecting'
 	return [
 		renderStatus.turnActivityStatusLabel(tab),
 		client.state.summarizing.has(tab.sessionId) ? 'summarizing' : '',

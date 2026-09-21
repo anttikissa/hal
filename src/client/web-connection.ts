@@ -3,6 +3,7 @@ import type { Command } from '../common/protocol.ts'
 import type { ClientBootstrap, ClientSessionSnapshot } from '../common/snapshots.ts'
 import type { WebServerMessage } from '../common/web.ts'
 import { webProtocol } from '../common/web.ts'
+import { client } from './app.ts'
 import { clientBackend } from './backend.ts'
 import { clientTransport } from './transport.ts'
 
@@ -183,12 +184,18 @@ function openSocket(remote: RemoteCredentials, signal: AbortSignal, reconnect: b
 	})
 }
 
+// Transport gaps are invisible otherwise, so say it in the transcript too.
+function notify(text: string): void {
+	client.addStartupEntry(text)
+}
+
 // The host restarts often (Ctrl-R, upgrades), so a closed socket is normal rather
 // than fatal. Retry immediately, then back off until the host answers again.
 async function reconnect(remote: RemoteCredentials, signal: AbortSignal): Promise<void> {
 	if (state.reconnecting) return
 	state.reconnecting = true
 	state.stateListener?.(state.shared)
+	webConnection.notify(`Lost connection to ${remote.host}, reconnecting...`)
 	let delay = 0
 	try {
 		while (!signal.aborted) {
@@ -196,6 +203,7 @@ async function reconnect(remote: RemoteCredentials, signal: AbortSignal): Promis
 			if (signal.aborted) return
 			try {
 				await webConnection.openSocket(remote, signal, true)
+				webConnection.notify(`Reconnected to ${remote.host}.`)
 				return
 			} catch {
 				delay = webConnection.nextRetryDelay(delay)
@@ -243,6 +251,7 @@ export const webConnection = {
 	fetch: globalThis.fetch as (url: string, init?: RequestInit) => Promise<Response>,
 	tailEvents,
 	openSocket,
+	notify,
 	reconnect,
 	connect,
 	reset,
