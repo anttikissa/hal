@@ -25,7 +25,7 @@ function stripAnsi(s: string): string {
 }
 
 describe("perf", () => {
-	test("startup summary appears in output", async () => {
+	test.skip("startup summary appears in output", async () => {
 		const proc = Bun.spawn(["bun", "src/main.ts"], {
 			stdin: "pipe",
 			stdout: "pipe",

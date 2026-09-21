@@ -21,6 +21,11 @@ jobs:
       - run: ./test
 
 
+  # Auto-deployment is opt-in repository configuration. HAL_UPDATE_URL is a
+  # repository variable containing the full POST endpoint (for example,
+  # https://example.test/api/update); HAL_UPDATE_TOKEN is a repository secret
+  # matching UPDATE_TOKEN in that server process. Forks inherit neither setting,
+  # and a repository missing either one reaches the explicit no-op below.
   deploy:
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -28,7 +33,7 @@ jobs:
     steps:
       - name: Request configured deployment update
         env:
-          HAL_UPDATE_URL: ${{ secrets.HAL_UPDATE_URL }}
+          HAL_UPDATE_URL: ${{ vars.HAL_UPDATE_URL }}
           HAL_UPDATE_TOKEN: ${{ secrets.HAL_UPDATE_TOKEN }}
         run: |
           if [ -z "$HAL_UPDATE_URL" ] || [ -z "$HAL_UPDATE_TOKEN" ]; then

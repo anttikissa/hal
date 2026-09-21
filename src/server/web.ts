@@ -56,9 +56,12 @@ async function gitOut(args: string[]): Promise<string | null> {
 }
 
 /**
- * Self-update hook: CI calls this after tests pass. Exiting makes the wrapper
- * pull and relaunch us. With no UPDATE_TOKEN configured (the normal local case)
- * every request is rejected, so the endpoint only exists where it was armed.
+ * Authenticated self-update hook used by the optional GitHub Actions deploy job.
+ * Its repository variable HAL_UPDATE_URL points here, and repository secret
+ * HAL_UPDATE_TOKEN must equal this process's UPDATE_TOKEN environment variable.
+ * Without UPDATE_TOKEN every request is rejected, so ordinary clones expose no
+ * update capability. A valid request fetches origin and asks `run` to pull and
+ * relaunch only when the checkout is behind.
  */
 async function handleUpdateRequest(request: Request): Promise<Response> {
 	if (request.method !== 'POST') return new Response('Not found', { status: 404 })
