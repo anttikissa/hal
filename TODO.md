@@ -35,4 +35,5 @@ Random ideas, in no particular order
 - `tests/stdin-close.test.ts` is flaky under the full parallel suite (times out waiting for exit)
   but passes reliably on its own and under manual 5x concurrency. Skipped for now; find the real
   contention (likely process startup under load) and unskip.
+- `src/utils/tail-file.test.ts` “handles truncation” is flaky in GitHub Actions: the pre-truncation chunk can arrive as an empty string. Replace its sleep-based watcher synchronization with deterministic observation of the first chunk, then re-enable it.
 - Make a help text into the intro model (after the actual model is set) - it should tell about /help, /keys, tabs, and maybe a special /features or something

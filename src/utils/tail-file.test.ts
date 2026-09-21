@@ -102,7 +102,7 @@ test('only gets future data (starts from EOF)', async () => {
 	}
 })
 
-test('handles truncation', async () => {
+test.skip('handles truncation', async () => {
 	const p = tmpFile('trunc')
 	try {
 		const stream = tailFile(p)
