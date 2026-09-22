@@ -165,8 +165,8 @@ let suspended = false
 function suspend(): void {
 	suspended = true
 	terminalOutput.write(`${useKitty() ? KITTY_OFF : ''}${BRACKETED_PASTE_OFF}${CURSOR_SHAPE_DEFAULT}${CURSOR_COLOR_DEFAULT}\x1b[?25h`)
-	// Raw mode disables ICRNL and ISIG. Undo it before SIGSTOP while Hal still
-	// owns the foreground TTY, or the shell may inherit broken Enter and Ctrl-C.
+	// Defensively leave raw mode before SIGSTOP instead of relying on the shell to
+	// repair it after taking control; raw-mode flags may otherwise remain active.
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
 	// process.kill(0, ...) sends to the entire process group — this is
 	// the standard way for a foreground job to suspend itself.
