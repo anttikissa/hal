@@ -409,6 +409,18 @@ test('registry provider models appear in completion and picker', () => {
 	expect(kimi!.leafLabel).toBe('kimi-k3')
 })
 
+test('MiMo aliases select OpenCode Go models without duplicate picker entries', () => {
+	models.hydrate({}, [], {}, { 'opencode-go': ['mimo-v2.6-pro', 'mimo-v2.6-flash'] })
+
+	expect(models.resolveModel('mimo')).toBe('opencode-go/mimo-v2.6-pro')
+	expect(models.resolveModel('mimo-flash')).toBe('opencode-go/mimo-v2.6-flash')
+	const choices = models.listModelChoices()
+	expect(choices.find((choice) => choice.value === 'mimo')).toMatchObject({ fullId: 'opencode-go/mimo-v2.6-pro', path: ['opencode-go'] })
+	expect(choices.find((choice) => choice.value === 'mimo-flash')).toMatchObject({ fullId: 'opencode-go/mimo-v2.6-flash', path: ['opencode-go'] })
+	expect(choices.filter((choice) => choice.fullId === 'opencode-go/mimo-v2.6-pro')).toHaveLength(1)
+	expect(choices.filter((choice) => choice.fullId === 'opencode-go/mimo-v2.6-flash')).toHaveLength(1)
+})
+
 test('resolveModel keeps registry provider ids intact', () => {
 	models.hydrate({}, [], {}, { 'opencode-go': ['kimi-k3'] })
 	expect(models.resolveModel('opencode-go/kimi-k3')).toBe('opencode-go/kimi-k3')
