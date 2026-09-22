@@ -36,7 +36,7 @@ const API_VERSION = '2023-06-01'
 const MAX_TOKENS = 16384
 // Claude Code version we report in the OAuth user-agent (see the header block in generate()).
 // Tracks the version bundled with the Agent SDK we verified against.
-const CLAUDE_CODE_VERSION = '2.1.259'
+const CLAUDE_CODE_VERSION = '2.1.280'
 
 // Map Anthropic error types to HTTP status codes for consistent retry logic
 const ERROR_TYPE_STATUS: Record<string, number> = {
