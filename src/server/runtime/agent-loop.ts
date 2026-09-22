@@ -940,6 +940,21 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 	}
 }
 
+// A model can copy a placeholder from old context into a new tool call. Never
+// treat that placeholder as real file content or a command argument.
+function pruningMarkerBlobId(value: unknown): string | null {
+	if (typeof value === 'string') {
+		const match = value.trim().match(/^\[pruned; see blob ([a-z0-9]+-[a-z0-9]+)\]$/)
+		return match?.[1] ?? null
+	}
+	if (!value || typeof value !== 'object') return null
+	for (const child of Object.values(value)) {
+		const blobId = pruningMarkerBlobId(child)
+		if (blobId) return blobId
+	}
+	return null
+}
+
 /** Execute tool calls with a concurrency cap. */
 async function executeToolsConcurrently(
 	toolCalls: ToolCall[],
@@ -974,6 +989,10 @@ async function executeToolsConcurrently(
 				// Arguments that did not parse are lost, so running the tool would act on
 				// the wrong input. Hand the parse error back so the model can reissue.
 				if (call.parseError) return finish(`error: ${call.parseError}`)
+				const prunedBlobId = pruningMarkerBlobId(call.input)
+				if (prunedBlobId) {
+					return finish(`error: tool input contains an unresolved pruning marker for blob "${prunedBlobId}". Read that blob and retry with its actual value; if it does not exist, regenerate the value.`)
+				}
 				try {
 					const result = await toolRegistry.dispatch(call.name, call.input, {
 						...context,

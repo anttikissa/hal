@@ -151,6 +151,29 @@ test('a tool call whose arguments failed to parse is reported, not executed', as
 })
 
 
+test('a tool call containing an unresolved pruning marker is reported, not executed', async () => {
+	const sessionId = `test-pruned-input-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const origDispatch = toolRegistry.dispatch
+	let dispatches = 0
+	toolRegistry.dispatch = async () => {
+		dispatches++
+		return 'ran'
+	}
+	try {
+		const call = { id: 'tool-a', name: 'write', input: { path: 'browserIdentity.ts', content: '[pruned; see blob 3v1dl9-x9m]' } }
+		const results = await agentLoop.executeToolBatch(sessionId, [call], process.cwd(), new AbortController().signal)
+
+		expect(dispatches).toBe(0)
+		expect(results[0]?.result).toContain('unresolved pruning marker')
+		expect(results[0]?.result).toContain('3v1dl9-x9m')
+	} finally {
+		toolRegistry.dispatch = origDispatch
+	}
+})
+
+
 test('flushes a requested exit only after the tool result is durable', async () => {
 	const sessionId = `test-exit-boundary-${Date.now().toString(36)}`
 	createdSessions.push(sessionId)
