@@ -281,7 +281,7 @@ function splitKeys(data: string): string[] {
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 /** Parse a single key sequence token into a KeyEvent, or null if unrecognized. */
-function parseKey(data: string): KeyEvent | null {
+export function parseKey(data: string): KeyEvent | null {
 	// Empty
 	if (!data) return null
 
@@ -345,15 +345,18 @@ function parseKey(data: string): KeyEvent | null {
 }
 
 /** Parse raw stdin data into key events (handles concatenated sequences). */
-function parseKeys(data: string): KeyEvent[] {
+export function parseKeys(data: string): KeyEvent[] {
+	const tokens = splitKeys(data)
 	const events: KeyEvent[] = []
-	for (const token of splitKeys(data)) {
-		const key = parseKey(token)
-		if (key) events.push(key)
+	for (const token of tokens) {
+		const k = parseKey(token)
+		if (k) events.push(k)
 	}
 	return events
 }
 
+/** Layer 1: find Ctrl-C, Ctrl-R, or Ctrl-Z before stateful ANSI/paste parsing.
+ * These emergency controls must remain available while layer 2 awaits input. */
 function emergencyKey(data: string): { index: number; key: KeyEvent } | null {
 	const match = data.match(/\x03|\x12|\x1a|\x1b\[(?:99|114|122);5(?::[12])?(?:;[\d:]+)?u/)
 	if (!match || match.index === undefined) return null
