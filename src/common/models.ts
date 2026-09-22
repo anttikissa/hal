@@ -42,7 +42,7 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'Google', alias: 'gemini', fullId: 'google/gemini-3.8-flash', fallbackContext: 1_000_000, track: 'gemini' },
 	{ group: 'Google', alias: 'gemini-3.5-flash-lite', fullId: 'google/gemini-3.5-flash-lite', fallbackContext: 1_000_000 },
 	{ group: 'Google', alias: 'gemini-pro', fullId: 'google/gemini-3.1-pro-preview', fallbackContext: 1_000_000, track: 'gemini-pro' },
-	{ group: 'OpenRouter', alias: 'grok', fullId: 'openrouter/x-ai/grok-4.6', fallbackContext: 2_000_000, track: 'grok' },
+	{ group: 'OpenRouter', alias: 'grok', fullId: 'openrouter/x-ai/grok-4.7', fallbackContext: 2_000_000, track: 'grok' },
 	// DeepSeek's API name for the V4.1 line is "deepseek-flash"; V4.1 outranks V4 Pro
 	// on every agentic benchmark and costs ~6x less, so the plain alias tracks it.
 	{ group: 'OpenRouter', alias: 'deepseek', aliases: ['deepseek-flash'], fullId: 'openrouter/deepseek/deepseek-v4.1-flash', fallbackContext: 1_000_000 },
