@@ -34,7 +34,6 @@ test('remote image uploads use the host and authentication token separately', as
 	}
 })
 
-
 test('remote reconnect delay starts at one second and grows by 60 percent', () => {
 	let delay = 0
 	const delays: number[] = []
@@ -84,7 +83,6 @@ test('remote bootstrap installs the same state and session ports as file IPC', (
 	expect(clientBackend.sessions.loadAllHistoryWithOrigin('04-work').entries).toHaveLength(1)
 })
 
-
 test('remote history-updated observes the snapshot that arrived immediately before it', () => {
 	webConnection.reset()
 	webConnection.install()
@@ -102,7 +100,6 @@ test('remote history-updated observes the snapshot that arrived immediately befo
 	expect(clientBackend.sessions.loadAllHistoryWithOrigin('04-work').entries[0]).toMatchObject({ type: 'question', id: 'q1' })
 	expect(webConnection.state.events).toEqual([{ type: 'history-updated', sessionId: '04-work' }])
 })
-
 
 test('commands entered during reconnect do not throw', () => {
 	webConnection.reset()

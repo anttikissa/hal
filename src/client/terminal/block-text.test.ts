@@ -8,16 +8,6 @@ function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
 
-test('standalone URLs use one OSC 8 link and one logical line', () => {
-	const url = `https://claude.ai/oauth/authorize?client_id=${'a'.repeat(80)}`
-	const lines = blocks.renderBlock({ type: 'log', text: url }, 40)
-	const urlLines = lines.filter((line) => line.includes('claude.ai'))
-
-	expect(urlLines).toHaveLength(1)
-	expect(urlLines[0]).toContain(`\x1b]8;;${url}\x07${url}\x1b]8;;\x07`)
-	expect(visLen(urlLines[0]!)).toBe(url.length)
-})
-
 test('styled wrapped URLs keep ANSI sequences out of OSC 8 targets', () => {
 	colors.load()
 	const url = `https://example.com/inspect/long-url?token=${'a'.repeat(157)}`

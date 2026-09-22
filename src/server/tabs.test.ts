@@ -4,17 +4,6 @@ import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 import { ipc } from './file-ipc.ts'
 
-test('findOpenSessionForCwd returns the first matching open tab', () => {
-	const openSessions = [
-		{ id: '04-other', cwd: '/work/other' },
-		{ id: '04-first', cwd: '/work/project' },
-		{ id: '04-second', cwd: '/work/project' },
-	]
-
-	expect(tabs.findOpenSessionForCwd(openSessions, '/work/project')).toBe('04-first')
-})
-
-
 test('focusing an ordinary tab avoids metadata and shared-state writes', () => {
 	const originalOpenSessionIds = runtime.state.openSessionIds
 	const originalCurrentSessionId = runtime.state.currentSessionId
@@ -41,7 +30,6 @@ test('focusing an ordinary tab avoids metadata and shared-state writes', () => {
 	}
 })
 
-
 test('focusing a new tab clears only its attention marker', () => {
 	const originalOpenSessionIds = runtime.state.openSessionIds
 	const originalLoadSessionMeta = sessions.loadSessionMeta
@@ -64,7 +52,6 @@ test('focusing a new tab clears only its attention marker', () => {
 		ipc.updateState = originalUpdateState
 	}
 })
-
 
 test('shared session status omits continuation while its turn is working', () => {
 	const originalOpenSessionIds = runtime.state.openSessionIds

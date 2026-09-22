@@ -26,7 +26,6 @@ test('drain returns entries in order and clears', () => {
 	expect(promptQueue.load(sessionId)).toEqual([])
 })
 
-
 test('held state persists separately from entries', () => {
 	promptQueue.append(sessionId, { text: 'first', createdAt: '2026-05-20T00:00:00.000Z' })
 	promptQueue.setHeld(sessionId, true)

@@ -27,8 +27,6 @@ describe('client streaming blocks', () => {
 		client.state.focusedTabIndex = 0
 	})
 
-
-
 	test('paused info waits briefly before rendering', async () => {
 		client.handleEvent({
 			type: 'info',
@@ -134,8 +132,6 @@ describe('client streaming blocks', () => {
 		expect(client.state.tabs[1]!.history.length).toBeGreaterThan(0)
 	})
 
-
-
 	test('info during assistant streaming preserves both chunks in event order', () => {
 		client.handleEvent({
 			type: 'stream-delta',
@@ -166,7 +162,6 @@ describe('client streaming blocks', () => {
 			{ type: 'assistant', text: 'world', continuedAfter: 'system-message' },
 		])
 	})
-
 
 	test('running tool output updates directly without reloading its blob', async () => {
 		const originalLoadBlobs = blockData.loadBlobs
@@ -248,7 +243,6 @@ test('tool-result reloads full blob output for edit blocks', async () => {
 	}
 })
 
-
 test('response errors keep blob metadata for later inspection', () => {
 	client.resetForTests()
 	client.state.tabs.length = 0
@@ -273,5 +267,4 @@ test('response errors keep blob metadata for later inspection', () => {
 		sessionId: 's1',
 	})
 })
-
 })

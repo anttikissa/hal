@@ -48,7 +48,6 @@ test('bash appends structured metadata for successful git commits', async () => 
 	}
 })
 
-
 test('bash omits the LOC count for commits outside the Hal repo', async () => {
 	// LOC counting only understands this repo's language and comment syntax, so
 	// a Python project would otherwise report a meaningless "0 code lines".
@@ -71,7 +70,6 @@ test('bash omits the LOC count for commits outside the Hal repo', async () => {
 		rmSync(dir, { recursive: true, force: true })
 	}
 })
-
 
 test('bash rejects escaped newlines in git commit messages', async () => {
 	const out = await bash.execute(
@@ -101,7 +99,6 @@ test('bash preserves paragraphs from separate git commit messages', async () => 
 		rmSync(dir, { recursive: true, force: true })
 	}
 })
-
 
 test('bash reports output before the command finishes', async () => {
 	const updates: string[] = []

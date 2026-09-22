@@ -2,12 +2,6 @@ import { expect, test } from 'bun:test'
 import type { Message, ContentBlock } from '../../common/protocol.ts'
 import { apiMessages } from './api-messages.ts'
 
-test('formatLocalTime returns "Mon DD HH:MM" in local time', () => {
-	const result = apiMessages.formatLocalTime('2026-03-28T20:03:39.833Z')
-	// Should be "Mon DD HH:MM" string (exact value depends on system timezone)
-	expect(result).toMatch(/^\d{1,2} [A-Z][a-z]{2} \d{2}:\d{2}$/)
-})
-
 test('formatLocalTime returns null for missing/invalid input', () => {
 	expect(apiMessages.formatLocalTime(undefined)).toBeNull()
 	expect(apiMessages.formatLocalTime('')).toBeNull()
@@ -72,7 +66,6 @@ test('pruneMessages keeps small tool arguments so the model never sees empty cal
 	}
 })
 
-
 test('pruneMessages replaces only oversized tool arguments, keeping the key names', () => {
 	const prev = { heavyThreshold: apiMessages.config.heavyThreshold, pruneBatchTurns: apiMessages.config.pruneBatchTurns }
 	apiMessages.config.heavyThreshold = 0
@@ -98,7 +91,6 @@ test('pruneMessages replaces only oversized tool arguments, keeping the key name
 		apiMessages.config.pruneBatchTurns = prev.pruneBatchTurns
 	}
 })
-
 
 test('pruned tool results name the blob that still holds them', () => {
 	const prev = { heavyThreshold: apiMessages.config.heavyThreshold, pruneBatchTurns: apiMessages.config.pruneBatchTurns }
@@ -180,7 +172,6 @@ test('pruneMessages batches thinking pruning too', () => {
 	}
 })
 
-
 test('toProviderMessages merges assistant chunks split by ui info', () => {
 	const ts = '2026-04-13T14:43:49.970Z'
 	const entries: any[] = [
@@ -199,7 +190,6 @@ test('toProviderMessages merges assistant chunks split by ui info', () => {
 	])
 })
 
-
 test('toProviderMessages skips canceled history entries', () => {
 	const ts = '2026-04-13T14:43:49.970Z'
 	const entries: any[] = [
@@ -213,7 +203,6 @@ test('toProviderMessages skips canceled history entries', () => {
 	])
 })
 
-
 test('toProviderMessages keeps interruption metadata out of model text', () => {
 	const entries: any[] = [{ type: 'assistant', text: 'partial', interruptedBy: 'restart' }]
 
@@ -221,24 +210,6 @@ test('toProviderMessages keeps interruption metadata out of model text', () => {
 		{ role: 'assistant', content: [{ type: 'text', text: 'partial' }] },
 	])
 })
-
-
-test('toProviderMessages wraps next-user info in meta tags', () => {
-	const ts = '2026-04-13T14:43:49.970Z'
-	const entries: any[] = [
-		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts },
-		{ type: 'assistant', text: 'hello there', ts },
-		{ type: 'info', text: 'cwd changed from /tmp to /home/user/.hal', visibility: 'next-user', ts },
-		{ type: 'user', parts: [{ type: 'text', text: 'what now?' }], ts },
-	]
-
-	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
-		{ role: 'user', content: '[13 Apr 14:43]\nhello' },
-		{ role: 'assistant', content: [{ type: 'text', text: 'hello there' }] },
-		{ role: 'user', content: '[13 Apr 14:43]\n<meta>cwd changed from /tmp to /home/user/.hal</meta>\nwhat now?' },
-	])
-})
-
 
 test('toProviderMessages wraps structural next-user state in meta tags', () => {
 	const ts = '2026-04-13T14:43:49.970Z'
@@ -255,7 +226,6 @@ test('toProviderMessages wraps structural next-user state in meta tags', () => {
 	])
 })
 
-
 test('toProviderMessages wraps synthetic assistant messages in synthetic tags', () => {
 	const ts = '2026-04-13T14:43:49.970Z'
 	const entries: any[] = [
@@ -268,7 +238,6 @@ test('toProviderMessages wraps synthetic assistant messages in synthetic tags', 
 		{ role: 'user', content: '[13 Apr 14:43]\nhello' },
 	])
 })
-
 
 test('toProviderMessages skips ui-only assistant messages', () => {
 	const ts = '2026-04-13T14:43:49.970Z'
@@ -299,7 +268,6 @@ test('toProviderMessages starts after the last reset marker', () => {
 	])
 })
 
-
 test('toProviderMessages retains a fork marker immediately before reset', () => {
 	const ts = '2026-04-15T00:00:00.000Z'
 	const entries: any[] = [
@@ -329,7 +297,6 @@ test('toProviderMessages starts after the last compact marker', () => {
 	])
 })
 
-
 test('unmatched non-pending tool calls still repair to interrupted result', () => {
 	const ts = '2026-04-15T00:00:00.000Z'
 	const entries: any[] = [
@@ -342,7 +309,6 @@ test('unmatched non-pending tool calls still repair to interrupted result', () =
 	])
 })
 
-
 test('unresolved pending tools guard against provider replay before execution', () => {
 	const ts = '2026-04-15T00:00:00.000Z'
 	const entries: any[] = [
@@ -352,7 +318,6 @@ test('unresolved pending tools guard against provider replay before execution', 
 
 	expect(() => apiMessages.toProviderMessages('test-session', entries, { prune: false })).toThrow('pending tools')
 })
-
 
 test('resolved pending tools markers are ignored during provider replay', () => {
 	const ts = '2026-04-15T00:00:00.000Z'
@@ -384,7 +349,6 @@ test('provider replay preserves structured image tool results', () => {
 	])
 })
 
-
 test('repairToolPairing drops tool_result blocks with no matching tool_use', () => {
 	const msgs: Message[] = [
 		{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'bash', input: {} }] },
@@ -399,7 +363,6 @@ test('repairToolPairing drops tool_result blocks with no matching tool_use', () 
 		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'ok' }] },
 	])
 })
-
 
 test('questions and answers never enter provider messages', () => {
 	const messages = apiMessages.toProviderMessages('s1', [

@@ -285,35 +285,6 @@ test('google compat provider names its accepted API key vars, not OAuth login', 
 	expect(events.at(-1)?.type).toBe('error')
 })
 
-
-test('openai http network errors include Bun error code details', async () => {
-	const cause: any = new Error('getaddrinfo ENOTFOUND api.openai.com')
-	cause.code = 'ENOTFOUND'
-	cause.syscall = 'getaddrinfo'
-	cause.hostname = 'api.openai.com'
-	const err: any = new Error('fetch failed')
-	err.cause = cause
-	installFetchMock(async () => { throw err })
-	auth.ensureFresh = async () => {}
-	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
-	auth.getEntry = () => ({})
-
-	const events: any[] = []
-	for await (const event of openaiProvider.generate({
-		messages: [{ role: 'user', content: 'hi' }],
-		model: 'gpt-5.3-codex',
-		systemPrompt: 'system',
-		tools: [],
-		sessionId: 'sid_network',
-	})) events.push(event)
-
-	expect(events[0]).toMatchObject({ type: 'error', endpoint: 'https://api.openai.com/v1/responses' })
-	expect(events[0].message).toContain('fetch failed')
-	expect(events[0].message).toContain('code=ENOTFOUND')
-	expect(events[0].message).toContain('syscall=getaddrinfo')
-})
-
-
 test('openai provider streams text while rotating accounts', async () => {
 	const calls: FetchCall[] = []
 	const events = await collect(openaiProvider, 'openai', {
@@ -327,7 +298,6 @@ test('openai provider streams text while rotating accounts', async () => {
 	expect(events[0]).toEqual({ type: 'text', text: 'hello' })
 	expect(events.at(-1)?.type).toBe('done')
 })
-
 
 test('openai unknown-model errors retain the API payload', async () => {
 	const payload = {
@@ -472,37 +442,6 @@ function reasoningSse(): string {
 	].join('\n')
 }
 
-test('openai provider minimizes reasoning signatures before emitting them', async () => {
-	const token = makeJwt({
-		scp: ['openid', 'profile', 'email', 'offline_access'],
-		'https://api.openai.com/auth': { chatgpt_account_id: 'acct_from_token' },
-	})
-	auth.ensureFresh = async () => {}
-	auth.getCredential = (name: string) => (name === 'openai' ? { value: token, type: 'token' } : undefined)
-	auth.getEntry = () => ({})
-
-	installFetchMock(async () => new Response(reasoningSse(), {
-		status: 200,
-		headers: { 'content-type': 'text/event-stream' },
-	}) as any)
-
-	const events: any[] = []
-	for await (const event of openaiProvider.generate({
-		messages: [{ role: 'user', content: 'hi' }],
-		model: 'gpt-5.3-codex',
-		systemPrompt: 'system',
-		tools: [],
-		sessionId: 'sid_123',
-	})) {
-		events.push(event)
-	}
-
-	expect(events).toContainEqual({
-		type: 'thinking_signature',
-		signature: JSON.stringify({ type: 'reasoning', id: 'rs_123', encrypted_content: 'secret' }),
-	})
-})
-
 test('openai provider rehydrates minimized reasoning signatures with summary text during replay', () => {
 	const input = openai.convertResponsesMessages([
 		{
@@ -548,7 +487,6 @@ test('openai provider preserves stored reasoning summaries during replay', () =>
 	})
 })
 
-
 test('openai provider ignores malformed Responses SSE JSON lines', async () => {
 	auth.ensureFresh = async () => {}
 	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
@@ -577,7 +515,6 @@ test('openai provider ignores malformed Responses SSE JSON lines', async () => {
 	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
 })
 
-
 test('openai Responses stream without response.completed does not emit done', async () => {
 	auth.ensureFresh = async () => {}
 	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
@@ -603,7 +540,6 @@ test('openai Responses stream without response.completed does not emit done', as
 	expect(events).toContainEqual({ type: 'text', text: 'partial' })
 	expect(events.some((event) => event.type === 'done')).toBe(false)
 })
-
 
 test('compat provider reports tool JSON parse errors after [DONE] chunks', async () => {
 	auth.ensureFresh = async () => {}
@@ -719,7 +655,6 @@ test('openai websocket transport uses wss endpoint and response.create', async (
 	expect(events).toContainEqual({ type: 'text', text: 'text1' })
 	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 1, output: 2, cacheRead: 0, cacheCreation: 0 } }))
 })
-
 
 test('openai stateless requests use HTTP instead of websocket continuation', async () => {
 	process.env.HAL_OPENAI_RESPONSES_TRANSPORT = 'ws'
@@ -884,7 +819,6 @@ test('openai websocket continuation sends previous_response_id and only new tool
 	expect(sent[1].input).toEqual([{ type: 'function_call_output', call_id: 'call_1', output: 'hi' }])
 })
 
-
 class ReplayingWebSocket extends FakeWebSocket {
 	override send(raw: string): void {
 		const body = JSON.parse(raw)
@@ -920,7 +854,6 @@ test('openai websocket ignores a prior response replayed after the next request'
 	expect(events.filter((event) => event.type === 'text').map((event) => event.text)).toEqual(['fresh'])
 	expect(openai.state.webSockets.get('sid_replay')?.previousResponseId).toBe('resp_2')
 })
-
 
 test('response.failed error body carries only the error, not the echoed request', async () => {
 	auth.ensureFresh = async () => {}

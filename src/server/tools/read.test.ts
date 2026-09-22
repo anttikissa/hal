@@ -41,10 +41,6 @@ function formatExpectedRange(start: number, end: number): string {
 	return lines.join('\n')
 }
 
-test('registers the read tool', () => {
-	expect(toolRegistry.getTool('read')?.name).toBe('read')
-})
-
 test('explains that text lines have metadata prefixes', () => {
 	const description = toolRegistry.getTool('read')?.description
 

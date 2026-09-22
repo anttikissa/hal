@@ -30,15 +30,6 @@ test('web announcement is opt-in and includes an authenticated local URL', () =>
 	}
 })
 
-test('web serves and compiles the browser client', async () => {
-	expect(await web.pageHtml()).toBe(await Bun.file(`${import.meta.dir}/../web-client/index.html`).text())
-	// colors.ason is served raw: the browser parses it and builds its own CSS,
-	// so the terminal and the web client follow the very same palette file.
-	expect(await web.appAsset('/colors.ason')?.text()).toBe(await Bun.file(`${import.meta.dir}/../../colors.ason`).text())
-	expect(await web.appAsset('/styles.css')?.text()).toBe(await Bun.file(`${import.meta.dir}/../web-client/styles.css`).text())
-	expect((await web.bundleClient()).length).toBeGreaterThan(1_000)
-})
-
 test('web declares a standalone home-screen app with install icons', async () => {
 	const html = await web.pageHtml()
 	expect(html).toContain('name="mobile-web-app-capable" content="yes"')

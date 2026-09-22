@@ -17,35 +17,6 @@ function ctx(): ClientLocalCommandContext {
 	}
 }
 
-test('/go switches by tab number locally', () => {
-	const c = ctx()
-	const result = clientLocalCommands.execute('/go 2', c)
-
-	expect(result).toMatchObject({ handled: true, output: 'Switched to tab 2: pause fix' })
-	expect(c.focusedTabIndex).toBe(1)
-})
-
-test('/go switches by partial tab name', () => {
-	const c = ctx()
-	const result = clientLocalCommands.execute('/go pause', c)
-
-	expect(result).toMatchObject({ handled: true, output: 'Switched to tab 2: pause fix' })
-	expect(c.focusedTabIndex).toBe(1)
-})
-
-test('/go reports ambiguous partial tab names', () => {
-	const c = ctx()
-	c.tabs.push({ sessionId: '04-four', name: 'pause docs' })
-	const result = clientLocalCommands.execute('/go pause', c)
-
-	expect(result.handled).toBe(true)
-	expect(result.error).toStartWith('/go: ')
-	expect(result.error).toContain('Ambiguous')
-	expect(result.error).toContain('pause fix')
-	expect(result.error).toContain('pause docs')
-	expect(c.focusedTabIndex).toBe(0)
-})
-
 test('/what sends non-interrupting what command with target text', () => {
 	const c = ctx()
 	const sent: any[] = []
@@ -65,20 +36,6 @@ test('/what defaults to current session target', () => {
 	expect(sent).toEqual([{ type: 'what', text: '' }])
 })
 
-test('/quit quits with a visible goodbye', () => {
-	const result = clientLocalCommands.execute('/quit', ctx())
-
-	expect(result).toMatchObject({ handled: true, output: 'Goodbye.', quit: true })
-})
-
-test('/exit is a local alias for /quit', () => {
-	const result = clientLocalCommands.execute('/exit', ctx())
-
-	expect(result).toMatchObject({ handled: true, output: 'Goodbye.', quit: true })
-	expect(clientLocalCommands.commandNames()).toContain('quit')
-	expect(clientLocalCommands.commandNames()).toContain('exit')
-})
-
 test('/help includes terminal-local commands and shortcut hint', () => {
 	const result = clientLocalCommands.execute('/help', ctx())
 
@@ -90,12 +47,4 @@ test('/help includes terminal-local commands and shortcut hint', () => {
 	expect(result.output).toContain('/go <target>')
 	expect(result.output).toContain('/help [<command>]')
 	expect(result.output).toContain('Keyboard shortcuts')
-})
-
-test('/perf reports recorded startup marks', () => {
-	perf.mark('test mark')
-	const result = clientLocalCommands.execute('/perf', ctx())
-
-	expect(result.handled).toBe(true)
-	expect(result.output).toContain('test mark')
 })

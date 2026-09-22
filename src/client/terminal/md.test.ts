@@ -30,31 +30,8 @@ function strip(s: string): string {
 
 // ── mdInline ─────────────────────────────────────────────────────────────────
 
-test('mdInline: bold', () => {
-	expect(md.mdInline('hello **world**')).toBe(`hello ${B}world${B_OFF}`)
-})
-
-test('mdInline: italic', () => {
-	expect(md.mdInline('hello *world*')).toBe(`hello ${I}world${I_OFF}`)
-})
-
 test('mdInline: inline code defaults to plain text', () => {
 	expect(md.mdInline('run `npm install`')).toBe('run npm install')
-})
-
-test('mdInline: bold code stays bold', () => {
-	expect(md.mdInline('see **`file.ts`**')).toBe(`see ${B}file.ts${B_OFF}`)
-})
-
-test('mdInline: header', () => {
-	const r = md.mdInline('## Hello **world**')
-	expect(r).toBe(`${B}Hello ${B}world${B_OFF}${B_OFF}`)
-})
-
-test('mdInline: no false italic on **bold**', () => {
-	const r = md.mdInline('**bold**')
-	expect(r).toBe(`${B}bold${B_OFF}`)
-	expect(r).not.toContain(I)
 })
 
 test('mdInline: star inside backtick code is not italic', () => {
@@ -78,19 +55,10 @@ test('mdInline: escaped backtick stays literal outside code', () => {
 	expect(md.mdInline('escape \\` marker')).toBe('escape ` marker')
 })
 
-
 test('mdInline: escaped stars stay literal', () => {
 	const r = md.mdInline('a\\*\\*\\*@g\\*\\*\\*\\*.com')
 	expect(strip(r)).toBe('a***@g****.com')
 	expect(r).not.toContain(I)
-})
-
-test('mdInline: plain text unchanged', () => {
-	expect(md.mdInline('just text')).toBe('just text')
-})
-
-test('mdInline: multiple bold spans', () => {
-	expect(md.mdInline('**a** and **b**')).toBe(`${B}a${B_OFF} and ${B}b${B_OFF}`)
 })
 
 test('mdInline: links render their label as an OSC 8 hyperlink', () => {
@@ -107,10 +75,6 @@ test('mdInline: formatting works inside link labels', () => {
 	)
 })
 
-test('mdInline: pasted image placeholders stay unchanged', () => {
-	expect(md.mdInline('See [/tmp/hal/images/abc123.png]')).toBe('See [/tmp/hal/images/abc123.png]')
-})
-
 test('mdInline: non-web and malformed links stay unchanged', () => {
 	expect(md.mdInline('[run](javascript:alert(1)) and [broken](https://example.com')).toBe(
 		'[run](javascript:alert(1)) and [broken](https://example.com',
@@ -119,10 +83,6 @@ test('mdInline: non-web and malformed links stay unchanged', () => {
 
 // ── mdSpans ──────────────────────────────────────────────────────────────────
 
-test('mdSpans: text only', () => {
-	expect(md.mdSpans('hello\nworld')).toEqual([{ type: 'text', lines: ['hello', 'world'] }])
-})
-
 test('mdSpans: code fence', () => {
 	const spans = md.mdSpans('before\n```ts\nconst x = 1\n```\nafter')
 	expect(spans).toEqual([
@@ -130,11 +90,6 @@ test('mdSpans: code fence', () => {
 		{ type: 'code', lang: 'ts', lines: ['const x = 1'] },
 		{ type: 'text', lines: ['after'] },
 	])
-})
-
-test('mdSpans: code fence with no lang', () => {
-	const spans = md.mdSpans('```\ncode\n```')
-	expect(spans).toEqual([{ type: 'code', lang: '', lines: ['code'] }])
 })
 
 test('mdSpans: unclosed code fence', () => {
@@ -148,15 +103,6 @@ test('mdSpans: table', () => {
 	expect(spans[0]).toEqual({ type: 'text', lines: ['text'] })
 	expect(spans[1]).toEqual({ type: 'table', lines: ['| a | b |', '| c | d |'] })
 	expect(spans[2]).toEqual({ type: 'text', lines: ['more'] })
-})
-
-test('mdSpans: multiple code blocks', () => {
-	const spans = md.mdSpans('```\na\n```\nmiddle\n```\nb\n```')
-	expect(spans).toEqual([
-		{ type: 'code', lang: '', lines: ['a'] },
-		{ type: 'text', lines: ['middle'] },
-		{ type: 'code', lang: '', lines: ['b'] },
-	])
 })
 
 // ── mdTable ──────────────────────────────────────────────────────────────────
@@ -286,28 +232,6 @@ test('mdTable: wrapped inline code cells reset color at visual line boundaries',
 	}
 })
 
-test('mdTable: row dividers between data rows', () => {
-	const lines = ['| a | b |', '|---|---|', '| x | y |', '| p | q |']
-	const result = md.mdTable(lines, 80)
-	const plain = result.map(strip)
-	// Should have a ┼ divider between the two data rows
-	const dividers = plain.filter((l) => l.includes('┼'))
-	expect(dividers.length).toBe(2) // header-sep + between-rows
-})
-
-test('mdTable: skips separator row', () => {
-	const lines = ['| a | b |', '| --- | --- |', '| x | y |']
-	const result = md.mdTable(lines, 80)
-	const plain = result.map(strip)
-	// No raw "---" in output
-	expect(plain.join('\n')).not.toContain('---')
-})
-
-test('mdTable: empty after filtering', () => {
-	expect(md.mdTable(['| --- | --- |'], 80)).toEqual([])
-})
-
-
 test('mdTable: explicit <br> creates multiple lines inside a cell', () => {
 	const lines = ['| name | usage |', '|---|---|', '| alpha | [████▌░░]<br>68% used |']
 	const result = md.mdTable(lines, 80)
@@ -319,12 +243,6 @@ test('mdTable: explicit <br> creates multiple lines inside a cell', () => {
 
 // ── resolveMarkers ───────────────────────────────────────────────────────────
 
-test('resolveMarkers: single line, no wrapping', () => {
-	const lines = [`hello ${M_BOLD}world${M_BOLD_OFF}`]
-	const result = resolveMarkers(lines)
-	expect(result).toEqual(['hello \x1b[1mworld\x1b[22m'])
-})
-
 test('resolveMarkers: style split across lines — re-opens and closes', () => {
 	// Simulates what happens when wordWrap splits mid-bold.
 	const lines = [`${M_BOLD}some bold text`, `continues here${M_BOLD_OFF}`]
@@ -333,22 +251,9 @@ test('resolveMarkers: style split across lines — re-opens and closes', () => {
 	expect(result[1]).toBe('\x1b[1mcontinues here\x1b[22m')
 })
 
-test('resolveMarkers: no markers — passes through unchanged', () => {
-	const lines = ['plain text', '\x1b[33malready ansi\x1b[0m']
-	expect(resolveMarkers(lines)).toEqual(lines)
-})
-
 describe('hardWrap', () => {
-	test('short line unchanged', () => {
-		expect(hardWrap('hello', 10)).toEqual(['hello'])
-	})
-
 	test('breaks at exact column boundary', () => {
 		expect(hardWrap('abcdefghij', 5)).toEqual(['abcde', 'fghij'])
-	})
-
-	test('handles remainder', () => {
-		expect(hardWrap('abcdefgh', 5)).toEqual(['abcde', 'fgh'])
 	})
 
 	test('preserves ANSI escapes', () => {

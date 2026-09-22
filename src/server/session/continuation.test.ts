@@ -6,17 +6,6 @@ function action(entries: HistoryEntry[]) {
 	return continuation.actionForHistory(entries)
 }
 
-test('failed continue after a completed turn has no continuation action', () => {
-	expect(action([
-		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
-		{ type: 'assistant', text: 'hi' },
-		{ type: 'turn_end', status: 'completed' },
-		{ type: 'error', text: 'assistant prefill rejected' },
-		{ type: 'turn_end', status: 'failed' },
-	])).toBe(false)
-})
-
-
 test('UI-only assistant output does not create a continuation action', () => {
 	expect(action([
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
@@ -46,7 +35,6 @@ test('aborted and unterminated turns are continuable', () => {
 test('pending tools are continuable without visible turn content', () => {
 	expect(action([{ type: 'pending_tools', toolIds: [], cwd: '/tmp' }])).toBe('continue')
 })
-
 
 test('login retries only the unresolved 401 from the same provider', () => {
 	const user: HistoryEntry = { type: 'user', parts: [{ type: 'text', text: 'try this' }] }

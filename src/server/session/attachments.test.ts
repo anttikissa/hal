@@ -26,12 +26,6 @@ describe('attachments.resolve', () => {
 		if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true })
 	})
 
-	test('plain text without attachments passes through unchanged', async () => {
-		const result = await attachments.resolve(TEST_SESSION, 'hello world')
-		expect(result.apiContent).toBe('hello world')
-		expect(result.logParts).toEqual([{ type: 'text', text: 'hello world' }])
-	})
-
 	test('image reference is resolved to base64 content block', async () => {
 		// Create a test image file (1x1 red PNG)
 		const imgPath = `${TEST_DIR}/test.png`

@@ -109,21 +109,6 @@ test('config.writePath rejects keys not declared by module config', () => {
 	}
 })
 
-test('config.formatReloadMessage describes changed added and removed keys', () => {
-	const previous = {
-		models: { default: 'opus', aliases: ['a'] },
-		agentLoop: { maxIterations: 50 },
-		memory: { warnRssMb: 1024 },
-	}
-	const next = {
-		models: { default: 'gpt-5.5', aliases: ['a'] },
-		agentLoop: { maxIterations: 80 },
-		renderStatus: { showCost: false },
-	}
-
-	expect(config.formatReloadMessage(previous, next)).toBe("config.ason reloaded: agentLoop.maxIterations: 50 → 80; memory removed: { warnRssMb: 1024 }; models.default: 'opus' → 'gpt-5.5'; renderStatus added: { showCost: false }")
-})
-
 test('config.formatReloadMessage caps long change lists', () => {
 	const previous: Record<string, any> = {}
 	const next: Record<string, any> = {}

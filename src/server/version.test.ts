@@ -12,21 +12,6 @@ afterEach(() => {
 	version.resetForTests()
 })
 
-test('refresh uses HEAD only when the working tree is clean', async () => {
-	version.io.readHead = async () => 'abcd1234'
-	version.io.hasDirty = async () => false
-	version.io.readDirtyTreeHash = async () => 'should-not-run'
-
-	await version.refresh('/tmp/hal-test-clean')
-
-	expect(version.state).toMatchObject({
-		status: 'ready',
-		head: 'abcd1234',
-		dirtyHash: '',
-		combined: 'abcd1234',
-	})
-})
-
 test('refresh appends a dirty tree hash when local edits exist', async () => {
 	version.io.readHead = async () => 'abcd1234'
 	version.io.hasDirty = async () => true

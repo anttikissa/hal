@@ -17,7 +17,6 @@ test('historyToBlocks preserves original image path in user text', () => {
 	expect(result[0]).toMatchObject({ type: 'user', text: 'see [/tmp/hal/images/test.png] now' })
 })
 
-
 test('historyToBlocks keeps pasted text contents behind display text', () => {
 	const history: any[] = [
 		{
@@ -54,7 +53,6 @@ test('historyToBlocks recovers continue state from aborted turn_end', () => {
 	expect(result.at(-1)).toMatchObject({ type: 'log', text: '[paused]' })
 })
 
-
 test('historyToBlocks hides internally-suppressed aborted turn_end', () => {
 	const result = blockData.historyToBlocks([
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
@@ -75,7 +73,6 @@ test('historyToBlocks uses the session model for later assistant and thinking bl
 	expect(rendered[1]).toMatchObject({ type: 'assistant', model: 'openai/gpt-5.4' })
 })
 
-
 test('historyToBlocks keeps rebase lineage out of the transcript', () => {
 	const result = blockData.historyToBlocks([
 		{ type: 'rebased_from', log: 'history.asonl', ts: '2026-04-15T14:54:00.000Z' },
@@ -86,7 +83,6 @@ test('historyToBlocks keeps rebase lineage out of the transcript', () => {
 	expect(result).toEqual([expect.objectContaining({ type: 'user', text: 'hello' })])
 })
 
-
 test('historyToBlocks attaches hydrated tool_result output to its tool block', () => {
 	const result = blockData.historyToBlocks([
 		{ type: 'tool_call', toolId: 't1', name: 'edit', input: { operation: 'replace' }, blobId: 'b1' },
@@ -95,7 +91,6 @@ test('historyToBlocks attaches hydrated tool_result output to its tool block', (
 
 	expect(result).toEqual([expect.objectContaining({ type: 'tool', name: 'edit', output: '--- before\n1:aaa x\n\n+++ after\n1:bbb y', blobLoaded: true })])
 })
-
 
 test('historyToBlocks projects answered and only first active questions as semantic blocks', () => {
 	const result = blockData.historyToBlocks([

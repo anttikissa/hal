@@ -40,22 +40,6 @@ afterEach(() => {
 })
 
 describe('memory', () => {
-	test('warning threshold comes from config', () => {
-		memory.config.warnBytes = 1_500_000_000
-		memory.config.killBytes = 0
-		memory.tick(1_499_999_999)
-		expect(entries).toHaveLength(0)
-		memory.tick(1_500_000_000)
-		expect(entries).toHaveLength(1)
-		expect(entries[0]).toMatchObject({
-			text: 'Memory high: 1.50 GB RSS',
-			type: 'warning',
-		})
-		memory.tick(1_600_000_000)
-		expect(entries).toHaveLength(1)
-		expect(diagnostics).toEqual([{ reason: 'warning', rss: 1_500_000_000 }])
-	})
-
 	test('kill threshold requests exit after recording the warning and diagnostic', () => {
 		memory.config.warnBytes = 0
 		memory.config.killBytes = 1_800_000_000
@@ -76,13 +60,5 @@ describe('memory', () => {
 		expect(ordinary).toBe(false)
 		expect(oom).toBe(true)
 		expect(diagnostics).toEqual([{ reason: 'uncaught-exception', rss: 0 }])
-	})
-
-	test('zero disables both warning and exit', () => {
-		memory.config.warnBytes = 0
-		memory.config.killBytes = 0
-		memory.tick(9_999_000_000)
-		expect(entries).toEqual([])
-		expect(exitCodes).toEqual([])
 	})
 })

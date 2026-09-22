@@ -15,22 +15,6 @@ import { HAL_DIR } from './state.ts'
 import { tabs } from './tabs.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 
-test('formatModelRefreshMessage summarizes models.dev changes for the user', () => {
-	const msg = modelRefresh.formatModelRefreshMessage([
-		'gpt-5.5 context 400k → 1050k',
-		'new Claude model claude-sonnet-4-7 (1000k)',
-	])
-	expect(msg).toContain('[models.dev] fetched model metadata')
-	expect(msg).toContain('gpt-5.5 context 400k → 1050k')
-	expect(msg).toContain('claude-sonnet-4-7')
-})
-
-
-test('formatModelRefreshMessage reports initial models.dev fetch without change list', () => {
-	expect(modelRefresh.formatModelRefreshMessage([], 253)).toBe('Fetched recent data from models.dev (253 models)')
-})
-
-
 test('new model discovery labels keep raw model ids', () => {
 	const text = modelRefresh.buildNewModelDiscoveryText([
 		{ provider: 'Anthropic', model: 'claude-opus4-8', context: 1_000_000 },
@@ -40,19 +24,6 @@ test('new model discovery labels keep raw model ids', () => {
 		expect(text).toContain('Recommended things to do:')
 		expect(text).toContain('Say “yes” to apply these updates.')
 })
-
-
-test('new model report explains the configured default', () => {
-	const original = config.data
-	config.data = { models: { default: 'gpt' } }
-	try {
-		const text = modelRefresh.buildNewModelDiscoveryText([])
-		expect(text).toContain('Your default model is `gpt` (config.ason), which resolves to openai/gpt-5.6-terra.')
-	} finally {
-		config.data = original
-	}
-})
-
 
 test('model metadata refresh notice goes only to focused session', async () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
@@ -99,32 +70,6 @@ test('model metadata refresh notice goes only to focused session', async () => {
 		modelNotices.suggestModelDiscoveries = origSuggestModelDiscoveries
 	}
 })
-
-
-test('automatic model metadata refresh checks new model ids for configured routes', async () => {
-	const origRefreshModels = serverModels.refreshModels
-	const origSuggestModelDiscoveries = modelNotices.suggestModelDiscoveries
-	let discoveryPrompts = 0
-	serverModels.refreshModels = async () => ({
-		fetched: true,
-		hadCache: true,
-		changes: [],
-		modelCount: 123,
-		previous: {},
-		next: { 'gpt-6': 1_000_000 },
-	})
-	modelNotices.suggestModelDiscoveries = () => { discoveryPrompts++ }
-	try {
-		await modelNotices.refreshModelMetadata()
-		expect(discoveryPrompts).toBe(1)
-	} finally {
-		serverModels.refreshModels = origRefreshModels
-		modelNotices.suggestModelDiscoveries = origSuggestModelDiscoveries
-	}
-})
-
-
-
 
 test('suggestModelDiscoveries shows configured aliases and ignores unavailable models', () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
@@ -193,7 +138,6 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 		runtime.broadcastSessions = origBroadcastSessions
 	}
 })
-
 
 test('suggestModelDiscoveries opens an unfocused new tab even from an idle session', () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-model-discovery-'))

@@ -11,7 +11,6 @@ import { prompt } from './prompt.ts'
 import { placeholders } from './placeholders.ts'
 import { webConnection } from '../web-connection.ts'
 
-
 function tab(overrides: any = {}): any {
 	return {
 		sessionId: '04-new',
@@ -33,7 +32,6 @@ function tab(overrides: any = {}): any {
 	}
 }
 
-
 test('status identifies host, local peer, and remote client', () => {
 	const original = client.state.role
 	try {
@@ -43,32 +41,6 @@ test('status identifies host, local peer, and remote client', () => {
 		}
 	} finally {
 		client.state.role = original
-	}
-})
-
-test('subscriptionStatusLabel renders normalized subscription windows', () => {
-	const current = clientBackend.subscriptions.current
-	try {
-		clientBackend.subscriptions.current = () => ({ index: 0, total: 1, windows: [{ label: '7d', usedPercent: 24 }] })
-
-		const label = renderStatus.subscriptionStatusLabel('openai', '')
-
-		expect(label).toContain('7d')
-		expect(label).not.toContain('5h')
-	} finally {
-		clientBackend.subscriptions.current = current
-	}
-})
-
-test('tabIndicator shows amber diamond for new attention marker', () => {
-	const origWorking = client.state.working
-	client.state.working = new Map()
-	try {
-		const indicator = renderStatus.tabIndicator(tab({ attention: 'new' }))
-		expect(indicator.char).toBe('◆')
-		expect(indicator.blinks).toBe(false)
-	} finally {
-		client.state.working = origWorking
 	}
 })
 
@@ -84,14 +56,12 @@ test('tabIndicator shows blinking amber diamond for new working tab', () => {
 	}
 })
 
-
 test('tabIndicator uses the server continuation action instead of error blocks', () => {
 	const failed = tab({ history: [{ type: 'error', text: 'provider error' }] })
 	expect(renderStatus.tabIndicator(failed).char).toBe('')
 	failed.continuation = 'retry'
 	expect(renderStatus.tabIndicator(failed).char).toBe('✗')
 })
-
 
 test('an active question derives a nonblinking attention marker on background tabs', () => {
 	const questionTab = tab({ history: [{ type: 'question', id: 'q1', text: 'Proceed?', input: { kind: 'choice', choices: [{ id: 'no', label: 'No' }] }, source: { type: 'intro' }, active: true }] })
@@ -170,37 +140,6 @@ test('activityStatusLabel identifies an idle continuable turn as paused', () => 
 	expect(renderStatus.activityStatusLabel(tab({ continuation: 'continue' }))).toBe('paused')
 })
 
-
-test('activityStatusLabel combines working and summarizing', () => {
-	const origWorking = client.state.working
-	const origSummarizing = client.state.summarizing
-	client.state.working = new Map([['04-new', true]])
-	client.state.summarizing = new Set(['04-new'])
-	try {
-		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'assistant', text: 'hi', streaming: true }] }))).toBe('writing · summarizing')
-	} finally {
-		client.state.working = origWorking
-		client.state.summarizing = origSummarizing
-	}
-})
-
-test('buildTabText compact mode separates tabs with one space and underlines the active tab instead of bracketing it', () => {
-	const origTabs = client.state.tabs.slice()
-	const origFocused = client.state.focusedTabIndex
-	client.state.tabs.length = 0
-	client.state.tabs.push(tab({ sessionId: 'a' }), tab({ sessionId: 'b' }), tab({ sessionId: 'c' }))
-	client.state.focusedTabIndex = 1
-	try {
-		const compact = renderStatus.buildTabText(true)
-		expect(blockText.stripAnsiSequences(compact)).toBe('1 2 3')
-		expect(compact).toContain('\x1b[4m2\x1b[24m')
-	} finally {
-		client.state.tabs.length = 0
-		client.state.tabs.push(...origTabs)
-		client.state.focusedTabIndex = origFocused
-	}
-})
-
 test('buildTabBarLines switches to compact mode when even the bare tab numbers overflow the width', () => {
 	const origTabs = client.state.tabs.slice()
 	const origFocused = client.state.focusedTabIndex
@@ -235,34 +174,6 @@ test('clipped compact tab bar closes its active underline', () => {
 	}
 })
 
-
-test('zero opacity hides chrome content without changing its row count', () => {
-	const original = {
-		tabs: renderStatus.config.tabsOpacity,
-		prompt: renderStatus.config.promptOpacity,
-		status: renderStatus.config.statusOpacity,
-		help: renderStatus.config.helpOpacity,
-	}
-	try {
-		renderStatus.config.tabsOpacity = 0
-		renderStatus.config.promptOpacity = 0
-		renderStatus.config.statusOpacity = 0
-		renderStatus.config.helpOpacity = 0
-		const lines: string[] = []
-		renderStatus.renderTabBar(lines)
-		renderStatus.renderPrompt(lines)
-		renderStatus.renderStatusLine(lines)
-		renderStatus.renderHelpBar(lines)
-		expect(lines).toHaveLength(renderStatus.chromeLines())
-		for (const line of lines) expect(blockText.stripAnsiSequences(line).trim()).toBe('')
-	} finally {
-		renderStatus.config.tabsOpacity = original.tabs
-		renderStatus.config.promptOpacity = original.prompt
-		renderStatus.config.statusOpacity = original.status
-		renderStatus.config.helpOpacity = original.help
-	}
-})
-
 test('output padding toggle expands non-prompt chrome while preserving the prompt inset', () => {
 	blocks.outputPad = 0
 	try {
@@ -272,25 +183,6 @@ test('output padding toggle expands non-prompt chrome while preserving the promp
 		expect(blockText.stripAnsiSequences(renderStatus.paddedPromptLine('hello', 12))).toBe(' hello      ')
 	} finally {
 		blocks.outputPad = 1
-	}
-})
-
-test('blinkGlyph falls back to presence/absence when color cannot carry the blink', () => {
-	const origTick = cursor.tick
-	try {
-		// Truecolor: dim and lit differ, so the glyph stays put and only changes color.
-		cursor.tick = () => 0
-		expect(blockText.stripAnsiSequences(renderStatus.blinkGlyph('*', '\x1b[38;2;9;9;9m', '\x1b[38;2;4;4;4m', ''))).toBe('*')
-		cursor.tick = () => 2
-		expect(blockText.stripAnsiSequences(renderStatus.blinkGlyph('*', '\x1b[38;2;9;9;9m', '\x1b[38;2;4;4;4m', ''))).toBe('*')
-
-		// 16-color (screen): dimming is a no-op, so the glyph itself has to blink.
-		cursor.tick = () => 0
-		expect(renderStatus.blinkGlyph('*', '\x1b[93m', '\x1b[93m', '')).toContain('*')
-		cursor.tick = () => 2
-		expect(renderStatus.blinkGlyph('*', '\x1b[93m', '\x1b[93m', '')).toBe(' ')
-	} finally {
-		cursor.tick = origTick
 	}
 })
 

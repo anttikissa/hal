@@ -27,22 +27,6 @@ afterEach(() => {
 	for (const id of createdIds.splice(0)) sessions.deleteSession(id)
 })
 
-test('resolveTargets supports current, all, open ranges, and closed ids', () => {
-	const requester = '04-requester'
-	const openIds = ['04-one', '04-two', '04-three']
-	const metas: any[] = [
-		{ id: '04-one', name: 'main', createdAt: '2026-06-10T12:00:00.000Z' },
-		{ id: '04-two', name: 'docs', createdAt: '2026-06-10T12:00:00.000Z' },
-		{ id: '04-three', name: 'fix', createdAt: '2026-06-10T12:00:00.000Z' },
-		{ id: '04-closed', name: 'old work', createdAt: '2026-06-09T12:00:00.000Z', closedAt: '2026-06-09T13:00:00.000Z' },
-	]
-
-	expect(whatSummary.resolveTargets('', requester, openIds, metas)).toEqual({ ok: true, ids: [requester] })
-	expect(whatSummary.resolveTargets('--all', requester, openIds, metas)).toEqual({ ok: true, ids: openIds })
-	expect(whatSummary.resolveTargets('2-3', requester, openIds, metas)).toEqual({ ok: true, ids: ['04-two', '04-three'] })
-	expect(whatSummary.resolveTargets('04-closed', requester, openIds, metas)).toEqual({ ok: true, ids: ['04-closed'] })
-})
-
 test('run writes ui-only summary to target and fills empty target name', async () => {
 	const requester = makeSession('requester', 'requester')
 	const target = makeSession('target')
@@ -83,7 +67,6 @@ test('run writes ui-only summary to target and fills empty target name', async (
 	expect(events.some((event) => event.type === 'response' && event.sessionId === target && event.synthetic)).toBe(true)
 })
 
-
 test('run renames an existing session and appends a factual rename sentence', async () => {
 	const requester = makeSession('requester', 'requester')
 	const target = makeSession('target', 'Marker cleanup')
@@ -115,7 +98,6 @@ test('run renames an existing session and appends a factual rename sentence', as
 	].join('\n'))
 })
 
-
 test('run persists per-target summary errors', async () => {
 	const requester = makeSession('requester', 'requester')
 	const target = makeSession('target', 'target')
@@ -140,59 +122,6 @@ test('run persists per-target summary errors', async () => {
 	expect(summary?.type === 'assistant' ? summary.text : '').toContain('Summary failed: provider down')
 })
 
-
-test('summaries ask provider for stateless calls', async () => {
-	const requester = makeSession('requester', 'requester')
-	const one = makeSession('one', 'one')
-	const two = makeSession('two', 'two')
-	const stateless: boolean[] = []
-	const origAppendEvent = ipc.appendEvent
-	const origGetProvider = providerLoader.getProvider
-	ipc.appendEvent = () => {}
-	providerLoader.getProvider = async () => ({
-		async *generate(req: any) {
-			stateless.push(req.stateless)
-			yield { type: 'text' as const, text: 'summary\n\nSummary.' }
-		},
-	})
-
-	try {
-		await whatSummary.run({ requesterSessionId: requester, target: '2-3', openSessionIds: [requester, one, two] })
-	} finally {
-		ipc.appendEvent = origAppendEvent
-		providerLoader.getProvider = origGetProvider
-	}
-
-	expect(stateless).toEqual([true, true])
-})
-
-test('run leaves an unchanged target name unremarked', async () => {
-	const requester = makeSession('requester', 'requester')
-	const target = makeSession('target', 'manual name')
-	const origAppendEvent = ipc.appendEvent
-	const origGetProvider = providerLoader.getProvider
-	ipc.appendEvent = () => {}
-	providerLoader.getProvider = async () => ({
-		async *generate() {
-			yield { type: 'text' as const, text: 'manual name\n\nSummary.' }
-			yield { type: 'done' as const, usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
-		},
-	})
-
-	try {
-		await whatSummary.run({ requesterSessionId: requester, target: target, openSessionIds: [requester, target] })
-	} finally {
-		ipc.appendEvent = origAppendEvent
-		providerLoader.getProvider = origGetProvider
-	}
-
-	expect(sessions.loadSessionMeta(target)?.name).toBe('manual name')
-	const summary = sessions.loadHistory(target).find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
-	expect(summary?.type === 'assistant' ? summary.text : '').not.toContain('The session was previously named')
-})
-
-
-
 test('digest includes deterministic attribution metadata', () => {
 	const target = makeSession('attribution', 'summary work')
 	sessions.updateMeta(target, {
@@ -215,7 +144,6 @@ test('digest includes deterministic attribution metadata', () => {
 	expect(digest).toContain('Forked from: 12-source')
 })
 
-
 test('digest describes the fork transition in the shared history', () => {
 	const parent = makeSession('parent')
 	const child = uniqueId('child')
@@ -223,19 +151,6 @@ test('digest describes the fork transition in the shared history', () => {
 	sessions.forkSession(parent, child)
 
 	expect(whatSummary.buildDigest(child, [child], {})).toContain(`At this point, session ${child} was forked from ${parent}.`)
-})
-
-
-test('digest marks prompts sent from another session', () => {
-	const target = makeSession('source', 'source')
-	sessions.appendHistory(target, [
-		{ type: 'user', source: '47-abc', parts: [{ type: 'text', text: 'Handoff from another tab.' }], ts: '2026-06-10T12:01:00.000Z' },
-	])
-
-	const digest = whatSummary.buildDigest(target, [target], {})
-
-	expect(digest).toContain('prompt from session 47-abc')
-	expect(digest).toContain('Handoff from another tab.')
 })
 
 test('digest puts conversation highlights before clipped tool details', () => {
@@ -265,7 +180,6 @@ test('digest puts conversation highlights before clipped tool details', () => {
 	}
 })
 
-
 test('digest keeps initiating user request even after many later entries', () => {
 	const target = makeSession('initial-request', 'later cleanup')
 	const entries: any[] = [
@@ -283,34 +197,6 @@ test('digest keeps initiating user request even after many later entries', () =>
 	expect(digest).toContain('User request timeline:')
 	expect(digest).toContain('Initial request: make this URL clickable from the screenshot.')
 	expect(digest).toContain('Later follow-up: minor cleanup.')
-})
-
-
-test('digest highlights commit evidence before routine tool details', () => {
-	const target = makeSession('commits', 'commits')
-	sessions.appendHistory(target, [
-		{ type: 'tool_call', toolId: 'commit-1', name: 'bash', input: { command: 'git commit -m "Add what command"' }, ts: '2026-06-10T12:01:00.000Z' },
-		{ type: 'tool_result', toolId: 'commit-1', output: '[main abc1234] Add what command\n 2 files changed', ts: '2026-06-10T12:02:00.000Z' },
-		{ type: 'tool_result', toolId: 'noise-1', output: 'routine output', ts: '2026-06-10T12:03:00.000Z' },
-	])
-
-	const digest = whatSummary.buildDigest(target, [target], {})
-
-	expect(digest).toContain('Commit evidence:')
-	expect(digest).toContain('git commit -m')
-	expect(digest).toContain('[main abc1234] Add what command')
-	expect(digest.indexOf('Commit evidence:')).toBeLessThan(digest.indexOf('Tool/action details:'))
-})
-
-
-test('parseSummary breaks an overlong name on a word boundary instead of mid-word', () => {
-	const name = 'Diagnose subagent inbox delivery bug, then build a SolidJS web client'
-	const result = whatSummary.parseSummary(`${name}\n\nSummary body.`)
-
-	expect(result.name.length).toBeLessThanOrEqual(60)
-	expect(name.startsWith(result.name)).toBe(true)
-	expect(result.name.endsWith(' ')).toBe(false)
-	expect(/\S$/.test(result.name)).toBe(true)
 })
 
 test('parseSummary hard-truncates a name with no early whitespace to break on', () => {

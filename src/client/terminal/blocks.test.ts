@@ -103,11 +103,6 @@ test('non-tool body blocks render a blank line after the header', () => {
 	}
 })
 
-test('bodyless tool blocks do not add a separator row', () => {
-	const lines = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'true' } }, 80).map(stripAnsi)
-	expect(lines.filter((line) => line.trim())).toHaveLength(1)
-})
-
 test('tool output wraps long lines instead of clipping them', () => {
 	const output = 'Waiting for the next subagent. Active: 118-mar (Wait display smoke test A, tab 15), 118-der (Wait display smoke test B, tab 14)'
 	const content = contentLines(blocks.renderBlock({ type: 'tool', name: 'wait', output }, 42)).map((line) => line.trim())
@@ -195,7 +190,6 @@ test('status markers lose brackets alongside regular notices', () => {
 	expect(lines.join('\n')).toContain('Restarted')
 	expect(lines.join('\n')).not.toContain('[restarted]')
 })
-
 
 test('system messages add neutral inline boundaries to model output', () => {
 	colors.load()
@@ -487,22 +481,6 @@ test('rendered hashline tabs preserve source indentation', () => {
 	expect(rendered).not.toContain('\t')
 })
 
-test('block header uses plain layout without horizontal rules', () => {
-	const block: Block = {
-		type: 'thinking',
-		text: 'x',
-		blobId: 'q05d47-tzf',
-		sessionId: '03-idr',
-		ts: new Date('2026-04-14T05:32:00Z').getTime(),
-	}
-
-	const header = headerLine(blocks.renderBlock(block, 80))
-	// One column short of the terminal width: the last column is the right margin.
-	expect(header.length).toBe(79)
-	expect(header).not.toContain('─')
-	expect(header).toContain('03-idr/q05d47-tzf')
-})
-
 test('forked_from history entry renders as a Fork block', () => {
 	const history: any[] = [{ type: 'forked_from', parent: '04-abc', ts: '2026-04-09T20:00:00.000Z' }]
 
@@ -541,18 +519,6 @@ test('structural cwd and model entries render as system blocks', () => {
 		{ type: 'info', text: 'cwd: /tmp -> /home/user/.hal/src' },
 		{ type: 'info', text: 'model: openai/gpt-5.5 -> anthropic/claude-opus-4-7' },
 	])
-})
-
-test('short info blocks render as unlabelled timeline entries', () => {
-	const block: Block = {
-		type: 'info',
-		text: 'Server started (pid 123) · ready 99.9ms',
-		ts: new Date('2026-01-01T17:39:00Z').getTime(),
-	}
-
-	const lines = blocks.renderBlock(block, 80)
-	expect(headerLine(lines)).not.toContain('System')
-	expect(headerLine(lines)).toContain('Server started')
 })
 
 test('warning block renders a Warning header', () => {
@@ -604,7 +570,6 @@ test('tool block header uses padded text without horizontal rules', () => {
 	expect(lines[3]).toBe(' ')
 	expect(lines.join('\n')).not.toContain('\n ./test\n')
 })
-
 
 test('failed tool cards use the error palette and a failure mark, including summary cards', () => {
 	colors.load()

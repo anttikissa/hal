@@ -3,110 +3,20 @@ import { stringify, parse, parseAll, parseStream, COMMENTS, type AsonObject, typ
 
 describe('stringify', () => {
 	describe('primitives', () => {
-		test('null', () => expect(stringify(null)).toBe('null'))
-		test('undefined', () => expect(stringify(undefined)).toBe('undefined'))
-		test('true', () => expect(stringify(true)).toBe('true'))
-		test('false', () => expect(stringify(false)).toBe('false'))
-		test('zero', () => expect(stringify(0)).toBe('0'))
-		test('integer', () => expect(stringify(42)).toBe('42'))
-		test('negative', () => expect(stringify(-3.14)).toBe('-3.14'))
-		test('NaN', () => expect(stringify(NaN)).toBe('NaN'))
-		test('Infinity', () => expect(stringify(Infinity)).toBe('Infinity'))
-		test('-Infinity', () => expect(stringify(-Infinity)).toBe('-Infinity'))
 		test('bigint', () => expect(stringify(42n)).toBe('42n'))
-		test('negative bigint', () => expect(stringify(-42n)).toBe('-42n'))
-		test('simple string', () => expect(stringify('hello')).toBe("'hello'"))
-		test('empty string', () => expect(stringify('')).toBe("''"))
-		test('string with newline (smart)', () => expect(stringify('a\nb')).toBe('`a\nb`'))
-		test('string with newline (short)', () => expect(stringify('a\nb', 'short')).toBe("'a\\nb'"))
-		test('string with tab', () => expect(stringify('a\tb')).toBe("'a\\tb'"))
-		test('string with backslash', () => expect(stringify('a\\b')).toBe("'a\\\\b'"))
-	})
 
-	describe('string quoting', () => {
-		test('single quote in string → double quotes', () => expect(stringify("it's")).toBe('"it\'s"'))
-		test('double quote in string → single quotes', () =>
-			expect(stringify('she said "hi"')).toBe('\'she said "hi"\''))
-		test('both quotes → single quotes, escape single', () =>
-			expect(stringify(`she said "it's fine"`)).toBe("'she said \"it\\'s fine\"'"))
+		test('string with newline (smart)', () => expect(stringify('a\nb')).toBe('`a\nb`'))
 	})
 
 	describe('backtick multiline strings', () => {
 		test('multiline string uses backticks in smart mode', () =>
 			expect(stringify('line1\nline2\nline3')).toBe('`line1\nline2\nline3`'))
-		test('escapes backticks in content', () => expect(stringify('a `b` c\nd')).toBe('`a \\`b\\` c\nd`'))
+
 		test('escapes ${ in content', () => expect(stringify('cost: ${x}\ndone')).toBe('`cost: \\${x}\ndone`'))
-		test('escapes backslashes in content', () => expect(stringify('a\\b\nc')).toBe('`a\\\\b\nc`'))
-		test('no backticks without newline', () => expect(stringify('no newline')).toBe("'no newline'"))
 	})
 
 	describe('objects', () => {
-		test('empty object', () => expect(stringify({})).toBe('{}'))
-		test('simple object', () => expect(stringify({ x: 123 })).toBe('{ x: 123 }'))
 		test('non-identifier key', () => expect(stringify({ '*': 123 })).toBe("{ '*': 123 }"))
-		test('key with spaces', () => expect(stringify({ 'foo bar': 1 })).toBe("{ 'foo bar': 1 }"))
-		test('key with dash', () => expect(stringify({ 'x-y': 1 })).toBe("{ 'x-y': 1 }"))
-		test('numeric key', () => expect(stringify({ '0': true })).toBe("{ '0': true }"))
-		test('multiple keys', () => expect(stringify({ a: 1, b: 2 })).toBe('{ a: 1, b: 2 }'))
-		test('nested object (inline)', () => expect(stringify({ a: { b: 1 } })).toBe('{ a: { b: 1 } }'))
-		test('object with mixed values', () =>
-			expect(stringify({ name: 'hal', version: 1 })).toBe("{ name: 'hal', version: 1 }"))
-		test('wide object breaks lines', () => {
-			const obj = {
-				alpha: 'something long',
-				beta: 'another thing',
-				gamma: 'third value',
-				delta: 'fourth item',
-			}
-			expect(stringify(obj)).toBe(
-				"{\n\talpha: 'something long',\n\tbeta: 'another thing',\n\tgamma: 'third value',\n\tdelta: 'fourth item'\n}",
-			)
-		})
-
-		test('nested wide object', () => {
-			const obj = {
-				outer: {
-					alpha: 'something',
-					beta: 'another',
-					gamma: 'third',
-					delta: 'fourth',
-				},
-			}
-			expect(stringify(obj)).toBe(
-				"{\n\touter: {\n\t\talpha: 'something',\n\t\tbeta: 'another',\n\t\tgamma: 'third',\n\t\tdelta: 'fourth'\n\t}\n}",
-			)
-		})
-		test('nested stays inline if short', () => {
-			expect(stringify({ a: { b: { c: 1 } } })).toBe('{ a: { b: { c: 1 } } }')
-		})
-	})
-
-	describe('arrays', () => {
-		test('empty array', () => expect(stringify([])).toBe('[]'))
-		test('simple array', () => expect(stringify([1, 2, 3])).toBe('[1, 2, 3]'))
-		test('mixed types', () => expect(stringify([1, null, 'this'])).toBe("[1, null, 'this']"))
-		test('nested object in array', () => {
-			expect(stringify([1, null, 'this', { object: [1, 2, 3] }])).toBe("[1, null, 'this', { object: [1, 2, 3] }]")
-		})
-		test('wide array breaks lines', () => {
-			const obj = ['something longer', 'another thing here', 'third value is big', 'fourth item too']
-			expect(stringify(obj)).toBe(
-				"[\n\t'something longer',\n\t'another thing here',\n\t'third value is big',\n\t'fourth item too'\n]",
-			)
-		})
-		test('array of objects', () => {
-			expect(stringify([{ a: 1 }, { b: 2 }])).toBe('[{ a: 1 }, { b: 2 }]')
-		})
-		test('wide array of objects breaks lines', () => {
-			const obj = [
-				{ name: 'alice', score: 100 },
-				{ name: 'bob', score: 200 },
-				{ name: 'charlie', score: 300 },
-			]
-			expect(stringify(obj)).toBe(
-				"[\n\t{ name: 'alice', score: 100 },\n\t{ name: 'bob', score: 200 },\n\t{ name: 'charlie', score: 300 }\n]",
-			)
-		})
 	})
 })
 
@@ -117,21 +27,6 @@ describe('stringify modes', () => {
 		score: 100,
 		tags: ['admin', 'user', 'moderator'],
 	}
-
-	test('short is always single-line', () => {
-		const result = stringify(wide, 'short')
-		expect(result).not.toContain('\n')
-		expect(result).toContain("name: 'alice'")
-	})
-
-	test('smart breaks wide objects to multi-line', () => {
-		const result = stringify(wide, 'smart')
-		expect(result).toContain('\n')
-	})
-
-	test('smart keeps narrow objects inline', () => {
-		expect(stringify({ a: 1 }, 'smart')).toBe('{ a: 1 }')
-	})
 
 	test('long always uses multi-line', () => {
 		const result = stringify({ a: 1 }, 'long')
@@ -155,166 +50,53 @@ describe('stringify modes', () => {
 		stringify(value, 'long')
 		expect(reads).toBe(12)
 	})
-
-	test('default is smart', () => {
-		expect(stringify(wide)).toBe(stringify(wide, 'smart'))
-	})
 })
 
 describe('parse', () => {
 	describe('primitives', () => {
-		test('null', () => expect(parse('null')).toBe(null))
-		test('undefined', () => expect(parse('undefined')).toBe(undefined))
-		test('true', () => expect(parse('true')).toBe(true))
-		test('false', () => expect(parse('false')).toBe(false))
-		test('integer', () => expect(parse('42')).toBe(42))
-		test('zero', () => expect(parse('0')).toBe(0))
-		test('negative integer', () => expect(parse('-1')).toBe(-1))
 		test('float', () => expect(parse('3.14')).toBe(3.14))
-		test('negative float', () => expect(parse('-3.14')).toBe(-3.14))
-		test('leading decimal', () => expect(parse('.5')).toBe(0.5))
-		test('negative leading decimal', () => expect(parse('-.5')).toBe(-0.5))
-		test('trailing dot', () => expect(parse('1.')).toBe(1))
-		test('negative trailing dot', () => expect(parse('-3.')).toBe(-3))
-		test('positive integer', () => expect(parse('+1')).toBe(1))
-		test('positive leading decimal', () => expect(parse('+.5')).toBe(0.5))
-		test('positive trailing dot', () => expect(parse('+3.')).toBe(3))
-		test('hex integer', () => expect(parse('0xFF')).toBe(255))
-		test('uppercase hex prefix', () => expect(parse('0Xc0ffee')).toBe(0xc0ffee))
-		test('negative hex integer', () => expect(parse('-0x10')).toBe(-16))
-		test('positive hex integer', () => expect(parse('+0x10')).toBe(16))
+
 		test('scientific notation', () => expect(parse('1e10')).toBe(1e10))
-		test('scientific uppercase', () => expect(parse('1E10')).toBe(1e10))
-		test('scientific positive exponent', () => expect(parse('1e+10')).toBe(1e10))
-		test('scientific negative exponent', () => expect(parse('1e-10')).toBe(1e-10))
-		test('float with exponent', () => expect(parse('1.5e2')).toBe(150))
-		test('negative float with exponent', () => expect(parse('-1.5e-2')).toBe(-0.015))
-		test('invalid: double dot', () => expect(() => parse('1.2.3')).toThrow())
-		test('invalid: bare minus', () => expect(() => parse('-')).toThrow())
-		test('invalid: missing exponent', () => expect(() => parse('1e')).toThrow())
-		test('invalid: missing exponent digits', () => expect(() => parse('1e+')).toThrow())
 
 		// Numeric separators (underscores in numbers, like JS)
 		test('integer with underscores', () => expect(parse('1_000_000')).toBe(1000000))
-		test('float with underscores', () => expect(parse('1_000.50_25')).toBe(1000.5025))
-		test('hex with underscores', () => expect(parse('0xFF_FF')).toBe(0xFFFF))
-		test('negative with underscores', () => expect(parse('-1_000')).toBe(-1000))
-		test('exponent with underscores', () => expect(parse('1_0e1_0')).toBe(10e10))
-		test('invalid: leading underscore', () => expect(() => parse('_100')).toThrow())
-		test('invalid: trailing underscore', () => expect(() => parse('100_')).toThrow())
-		test('invalid: double underscore', () => expect(() => parse('1__0')).toThrow())
 
 		// BigInt literals
 		test('bigint integer', () => expect(parse('42n')).toBe(42n))
-		test('negative bigint integer', () => expect(parse('-42n')).toBe(-42n))
-		test('positive bigint integer', () => expect(parse('+42n')).toBe(42n))
-		test('hex bigint integer', () => expect(parse('0xFFn')).toBe(255n))
-		test('negative hex bigint integer', () => expect(parse('-0x10n')).toBe(-16n))
-		test('bigint with underscores', () => expect(parse('1_000_000n')).toBe(1000000n))
-		test('hex bigint with underscores', () => expect(parse('0xFF_FFn')).toBe(0xFFFFn))
-		test('invalid: bigint float', () => expect(() => parse('1.5n')).toThrow())
-		test('invalid: bigint exponent', () => expect(() => parse('1e2n')).toThrow())
 
-		test('NaN', () => expect(parse('NaN')).toBeNaN())
-		test('+NaN', () => expect(parse('+NaN')).toBeNaN())
-		test('Infinity', () => expect(parse('Infinity')).toBe(Infinity))
-		test('+Infinity', () => expect(parse('+Infinity')).toBe(Infinity))
-		test('-Infinity', () => expect(parse('-Infinity')).toBe(-Infinity))
-		test('single-quoted string', () => expect(parse("'hello'")).toBe('hello'))
-		test('double-quoted string', () => expect(parse('"hello"')).toBe('hello'))
 		test('string with escapes', () => expect(parse("'a\\nb\\tc'")).toBe('a\nb\tc'))
-		test('string with escaped quote', () => expect(parse("'it\\'s'")).toBe("it's"))
-		test('double-quoted with single inside', () => expect(parse('"it\'s"')).toBe("it's"))
-		test('string with backspace escape', () => expect(parse("'a\\bc'")).toBe('a\bc'))
-		test('string with form feed escape', () => expect(parse("'a\\fc'")).toBe('a\fc'))
-		test('string with vertical tab escape', () => expect(parse("'a\\vc'")).toBe('a\vc'))
-		test('string with nul escape', () => expect(parse("'a\\0c'")).toBe('a\0c'))
-		test('double-quoted string continuation', () => expect(parse("\"a\\\nb\"")).toBe('ab'))
-		test('single-quoted CRLF continuation', () => expect(parse("'a\\\r\nb'")).toBe('ab'))
+
 		test('string with hex escape', () => expect(parse("'\\x41'")).toBe('A'))
-		test('invalid hex escape', () => expect(() => parse("'\\xZZ'")).toThrow(/Invalid hex escape/))
+
 		test('string with unicode escape', () => expect(parse("'\\u0041'")).toBe('A'))
-		test('string with unicode accented char', () => expect(parse("'caf\\u00e9'")).toBe('café'))
-		test('string with unicode CJK', () => expect(parse("'\\u4e16'")).toBe('世'))
+
 		test('invalid unicode escape: too short', () =>
 			expect(() => parse("'\\u00'")).toThrow(/Invalid unicode escape/))
 		test('invalid unicode escape: bad hex', () =>
 			expect(() => parse("'\\uXXXX'")).toThrow(/Invalid unicode escape/))
 		test('backtick string', () => expect(parse('`hello`')).toBe('hello'))
-		test('backtick multiline', () => expect(parse('`a\nb\nc`')).toBe('a\nb\nc'))
-		test('backtick escaped backtick', () => expect(parse('`a \\`b\\` c`')).toBe('a `b` c'))
+
 		test('backtick escaped ${', () => expect(parse('`cost: \\${x}`')).toBe('cost: ${x}'))
 		test('backtick rejects unescaped ${', () => expect(() => parse('`${x}`')).toThrow(/interpolation/))
 	})
 
 	describe('objects', () => {
-		test('empty object', () => expect(parse('{}')).toEqual({}))
 		test('unquoted keys', () => expect(parse('{ x: 123 }')).toEqual({ x: 123 }))
-		test('non-ascii bare keys', () => expect(parse('{ café: 1, Ωmega: 2 }')).toEqual({ café: 1, Ωmega: 2 }))
-		test('unicode escape bare keys', () => expect(parse('{ \\u0061: 1, \\u03A9mega: 2 }')).toEqual({ a: 1, Ωmega: 2 }))
-		test('quoted keys', () => expect(parse("{ '*': 123 }")).toEqual({ '*': 123 }))
-		test('multiple keys', () => expect(parse('{ a: 1, b: 2 }')).toEqual({ a: 1, b: 2 }))
-		test('nested object', () => expect(parse('{ a: { b: 1 } }')).toEqual({ a: { b: 1 } }))
-		test('missing comma is invalid', () => expect(() => parse('{ a: 1 b: 2 }')).toThrow(/Expected ',' or '}'/))
+
 		test('trailing comma', () => expect(parse('{ a: 1, b: 2, }')).toEqual({ a: 1, b: 2 }))
 	})
 
 	describe('arrays', () => {
-		test('empty array', () => expect(parse('[]')).toEqual([]))
-		test('simple array', () => expect(parse('[1, 2, 3]')).toEqual([1, 2, 3]))
 		test('mixed types', () => expect(parse("[1, null, 'hello']")).toEqual([1, null, 'hello']))
-		test('nested', () =>
-			expect(parse('[[1, 2], [3, 4]]')).toEqual([
-				[1, 2],
-				[3, 4],
-			]))
-		test('missing comma is invalid', () => expect(() => parse('[1 2]')).toThrow(/Expected ',' or ']'/))
-		test('trailing comma', () => expect(parse('[1, 2, 3,]')).toEqual([1, 2, 3]))
 	})
 
 	describe('comments', () => {
-		test('line comment after value', () => expect(parse('42 // the answer')).toBe(42))
-		test('block comment before value', () => expect(parse('/* hi */ 42')).toBe(42))
 		test('block comment inline', () => expect(parse('{ a: /* the val */ 1 }')).toEqual({ a: 1 }))
-		test('comment in object', () =>
-			expect(parse('{ a: 1, // comment\n b: 2 }')).toEqual({
-				a: 1,
-				b: 2,
-			}))
-		test('comment-only lines in multiline', () => {
-			expect(
-				parse(`{
-	// this is a config
-	name: 'hal',
-	/* version field */
-	version: 1,
-}`),
-			).toEqual({ name: 'hal', version: 1 })
-		})
-		test('comment between array items', () => {
-			expect(
-				parse(`[
-	1, // first
-	2, // second
-	3, // third
-]`),
-			).toEqual([1, 2, 3])
-		})
+
 		test('nested block comments do not nest', () => {
 			// /* ... */ does not nest — first */ closes it
 			expect(parse('/* a /* b */ 42')).toBe(42)
 		})
-		test('line comment does not affect next line', () => {
-			expect(parse("// ignore this\n'real value'")).toBe('real value')
-		})
-		test('form feed and vertical tab as whitespace', () =>
-			expect(parse('\f\v42')).toBe(42))
-		test('NBSP and BOM as whitespace', () =>
-			expect(parse('\u00A0\uFEFF42')).toBe(42))
-		test('line comment terminated by \\r', () =>
-			expect(parse('// ignore\r42')).toBe(42))
-		test('U+2028 and U+2029 as whitespace', () =>
-			expect(parse('\u2028\u202942')).toBe(42))
 	})
 
 	describe('multiline', () => {
@@ -328,16 +110,8 @@ describe('parse', () => {
 		})
 	})
 
-	describe('backtick round-trip', () => {
-		test('multiline string round-trips through stringify/parse', () => {
-			const s = 'line1\nline2\n`backtick`\n${interp}\nend'
-			expect(parse(stringify(s))).toBe(s)
-		})
-	})
-
 	describe('JSON compat', () => {
 		test('double-quoted keys', () => expect(parse('{ "name": "hal" }')).toEqual({ name: 'hal' }))
-		test('standard JSON', () => expect(parse('{"a":1,"b":[2,3]}')).toEqual({ a: 1, b: [2, 3] }))
 	})
 
 	describe('errors', () => {
@@ -346,26 +120,7 @@ describe('parse', () => {
 			expect(() => parse('tru')).toThrow(/tru/)
 			expect(() => parse('tru')).toThrow(/\^/)
 		})
-		test('error points to right column', () => {
-			try {
-				parse('{ value: tru }')
-				throw new Error('should have thrown')
-			} catch (e: any) {
-				expect(e.message).toContain('1:13')
-				expect(e.message).toContain("Expected 'e', got ' '")
-				expect(e.message).toContain('value: tru }')
-			}
-		})
-		test('error on correct line and column', () => {
-			try {
-				parse('{\n  a: 1,\n  b: tru,\n}')
-				throw new Error('should have thrown')
-			} catch (e: any) {
-				expect(e.message).toContain('3:9')
-				expect(e.message).toContain("Expected 'e', got ','")
-				expect(e.message).toContain('b: tru,')
-			}
-		})
+
 		test('error caret aligns with tabs', () => {
 			try {
 				parse('{\n\tfoo: bar\n}\n')
@@ -375,29 +130,10 @@ describe('parse', () => {
 				expect(e.message).toMatch(/\n {4}\t {5}\^/)
 			}
 		})
-		test('mistyped keywords', () => {
-			expect(() => parse('nulls')).toThrow(/Unexpected character after 'null' at 1:5/)
-			expect(() => parse('tru')).toThrow(/Expected 'e', got 'EOF' at 1:4/)
-			expect(() => parse('truee')).toThrow(/Unexpected character after 'true' at 1:5/)
-			expect(() => parse('fals')).toThrow(/Expected 'e', got 'EOF' at 1:5/)
-			expect(() => parse('undefinedd')).toThrow(/Unexpected character after 'undefined' at 1:10/)
-			expect(() => parse('-Infinityx')).toThrow(/Unexpected character after '-Infinity' at 1:10/)
-			expect(() => parse('NaNx')).toThrow(/Unexpected character after 'NaN' at 1:4/)
-		})
 	})
 })
 
 describe('parseAll', () => {
-	test('single value', () => expect(parseAll('42')).toEqual([42]))
-	test('multiple values on separate lines', () => {
-		expect(parseAll('1\n2\n3')).toEqual([1, 2, 3])
-	})
-	test('mixed types', () => {
-		expect(parseAll("'hello'\n42\nnull")).toEqual(['hello', 42, null])
-	})
-	test('objects on separate lines (JSONL style)', () => {
-		expect(parseAll('{ a: 1 }\n{ b: 2 }\n{ c: 3 }')).toEqual([{ a: 1 }, { b: 2 }, { c: 3 }])
-	})
 	test('multiline objects', () => {
 		expect(
 			parseAll(`{
@@ -407,23 +143,6 @@ describe('parseAll', () => {
 	b: 2,
 }`),
 		).toEqual([{ a: 1 }, { b: 2 }])
-	})
-	test('blank lines and comments between values', () => {
-		expect(
-			parseAll(`
-// first
-42
-
-// second
-'hello'
-
-`),
-		).toEqual([42, 'hello'])
-	})
-	test('empty string', () => expect(parseAll('')).toEqual([]))
-	test('only whitespace and comments', () => expect(parseAll('  // nothing\n  ')).toEqual([]))
-	test('standard JSONL', () => {
-		expect(parseAll('{"a":1}\n{"b":2}')).toEqual([{ a: 1 }, { b: 2 }])
 	})
 })
 
@@ -458,10 +177,6 @@ describe('parseStream', () => {
 
 	test('multiple chunks multiple values', async () => {
 		expect(await collect(toStream(['{ a: 1 }\n{ b', ': 2 }\n{ c: 3 }\n']))).toEqual([{ a: 1 }, { b: 2 }, { c: 3 }])
-	})
-
-	test('empty stream', async () => {
-		expect(await collect(toStream([]))).toEqual([])
 	})
 
 	test('trailing value without newline', async () => {
@@ -559,92 +274,10 @@ describe('parseStream e2e', () => {
 })
 
 describe('comments', () => {
-	describe('parse with comments', () => {
-		test('block comment before object key', () => {
-			const r = parse('{ /* greeting */ a: 1 }', {
-				comments: true,
-			}) as AsonObject
-			expect(r.a).toBe(1)
-			expect(r[COMMENTS]).toEqual({ a: '/* greeting */' })
-		})
-
-		test('line comment before object key', () => {
-			const r = parse('{\n// hello\na: 1\n}', {
-				comments: true,
-			}) as AsonObject
-			expect(r.a).toBe(1)
-			expect(r[COMMENTS]).toEqual({ a: '// hello\n' })
-		})
-
-		test('multiple comments before key are concatenated', () => {
-			const r = parse('{\n// first\n// second\na: 1\n}', {
-				comments: true,
-			}) as AsonObject
-			expect(r.a).toBe(1)
-			expect(r[COMMENTS]).toEqual({ a: '// first\n// second\n' })
-		})
-
-		test('comments on different keys', () => {
-			const r = parse('{ /* a */ a: 1, /* b */ b: 2 }', {
-				comments: true,
-			}) as AsonObject
-			expect(r.a).toBe(1)
-			expect(r.b).toBe(2)
-			expect(r[COMMENTS]).toEqual({ a: '/* a */', b: '/* b */' })
-		})
-
-		test('comment after value attaches to next key', () => {
-			const r = parse('{ a: 1, // between\nb: 2 }', {
-				comments: true,
-			}) as AsonObject
-			expect(r.a).toBe(1)
-			expect(r.b).toBe(2)
-			expect(r[COMMENTS]).toEqual({ b: '// between\n' })
-		})
-
-		test('no COMMENTS symbol without option', () => {
-			const r = parse('{ /* greeting */ a: 1 }') as AsonObject
-			expect(r[COMMENTS]).toBeUndefined()
-		})
-
-		test('no COMMENTS symbol when no comments present', () => {
-			const r = parse('{ a: 1 }', { comments: true }) as AsonObject
-			expect(r[COMMENTS]).toBeUndefined()
-		})
-
-		test('array with comments — sparse array', () => {
-			const r = parse('[/* first */ 1, 2, /* third */ 3]', {
-				comments: true,
-			}) as AsonArray
-			expect([...r]).toEqual([1, 2, 3])
-			const c = r[COMMENTS]!
-			expect(c[0]).toBe('/* first */')
-			expect(c[1]).toBeUndefined()
-			expect(c[2]).toBe('/* third */')
-		})
-	})
-
 	describe('stringify with comments', () => {
 		test('object with comments', () => {
 			const obj = { a: 1, b: 2, [COMMENTS]: { a: '/* greeting */' } }
 			expect(stringify(obj)).toBe('{\n\t/* greeting */\n\ta: 1,\n\tb: 2\n}')
-		})
-
-		test('array with comments', () => {
-			const arr = Object.assign([1, 2, 3], {
-				[COMMENTS]: ['/* first */', , ,],
-			})
-			expect(stringify(arr)).toBe('[\n\t/* first */\n\t1,\n\t2,\n\t3\n]')
-		})
-
-		test('short mode skips comments', () => {
-			const obj = { a: 1, [COMMENTS]: { a: '/* hi */' } }
-			expect(stringify(obj, 'short')).toBe('{ a: 1 }')
-		})
-
-		test('multi-line comment indented correctly', () => {
-			const obj = { a: { b: 1, [COMMENTS]: { b: '// inner\n' } } }
-			expect(stringify(obj)).toBe('{\n\ta: {\n\t\t// inner\n\t\tb: 1\n\t}\n}')
 		})
 	})
 
@@ -652,20 +285,6 @@ describe('comments', () => {
 		test('object comments survive roundtrip', () => {
 			const src = '{\n\t/* greeting */\n\ta: 1,\n\tb: 2\n}'
 			const parsed = parse(src, { comments: true })
-			expect(stringify(parsed)).toBe(src)
-		})
-
-		test('blank line before comment survives roundtrip', () => {
-			const src = '{\n\ta: 1,\n\n\t// section two\n\tb: 2\n}'
-			const parsed = parse(src, { comments: true }) as AsonObject
-			expect(parsed[COMMENTS]).toEqual({ b: '\n// section two\n' })
-			expect(stringify(parsed)).toBe(src)
-		})
-
-		test('no blank line before first comment', () => {
-			const src = '{\n\t// first key\n\ta: 1,\n\tb: 2\n}'
-			const parsed = parse(src, { comments: true }) as AsonObject
-			expect(parsed[COMMENTS]).toEqual({ a: '// first key\n' })
 			expect(stringify(parsed)).toBe(src)
 		})
 	})

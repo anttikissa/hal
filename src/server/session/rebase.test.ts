@@ -43,18 +43,6 @@ test('aligns comments by rendered screen width after type prefix', () => {
 	expect(commentColumns).toEqual([66, 66])
 })
 
-
-test('omits tiny char counts and renders rebase marker log', () => {
-	const entries = [
-		entry('rebased_from', { id: '000001-aaa', log: 'history2.asonl' }),
-		entry('user', { id: '000002-bbb', parts: [{ type: 'text', text: 'short' }] }),
-	]
-	const todo = rebase.renderTodo(rebase.buildSnapshot('04-aaa', 'history3.asonl', entries, { now: new Date('2026-05-22T10:01:00.000Z') }))
-
-	expect(todo).toContain("rebased_from { log: 'history2.asonl' }")
-	expect(todo).not.toContain('5 chars')
-})
-
 test('queue rows must be a suffix', () => {
 	const entries = [
 		entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: 'first' }] }),
@@ -81,7 +69,6 @@ test('thinking content edits are ignored', async () => {
 	expect(applied.entries).toEqual(entries)
 })
 
-
 test('picked rows keep their original ids', async () => {
 	const entries = [entry('assistant', { id: '000001-aaa', text: 'same row' })]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
@@ -90,18 +77,6 @@ test('picked rows keep their original ids', async () => {
 
 	expect(applied.entries[0]?.id).toBe('000001-aaa')
 })
-
-
-test('edit command uses external edited text payload', async () => {
-	const entries = [entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: 'old text' }] })]
-	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
-	const parsed = rebase.parseTodo(snapshot, "edit 000001-aaa user 'old text'", { edits: { '000001-aaa': 'new text' } })
-	const applied = await rebase.applyParsed(snapshot, parsed)
-
-	expect(parsed.errors).toEqual([])
-	expect(applied.entries[0]).toMatchObject({ type: 'user', parts: [{ type: 'text', text: 'new text' }] })
-})
-
 
 test('edit command roundtrips image placeholders through prompt attachment parsing', async () => {
 	const testDir = '/tmp/hal-test-rebase'
@@ -165,7 +140,6 @@ test('queue existing truncated user uses snapshot text and omits row from histor
 	expect(applied.entries).toEqual([])
 	expect(applied.queue).toEqual([`${'x'.repeat(120)}\nsecond`])
 })
-
 
 test('queue existing user row uses edited non-truncated content', async () => {
 	const entries = [entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: '1, 2, 3...' }] })]

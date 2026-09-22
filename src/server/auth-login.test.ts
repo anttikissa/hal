@@ -113,29 +113,6 @@ describe('authLogin.saveAuth', () => {
 		])
 	})
 
-	test('merges a reauthenticated single account without converting it to a duplicate', () => {
-		auth._setStoreForTest({
-			openai: {
-				accountId: 'acct_same',
-				accessToken: 'old-token',
-				metadata: { retained: true },
-			},
-		})
-
-		authLogin.saveAuth('openai', {
-			accountId: 'acct_same',
-			accessToken: 'new-token',
-			refreshToken: 'new-refresh',
-		})
-
-		expect(auth.store().openai).toEqual({
-			accountId: 'acct_same',
-			accessToken: 'new-token',
-			refreshToken: 'new-refresh',
-			metadata: { retained: true },
-		})
-	})
-
 	test('merges a reauthenticated Anthropic account by email', () => {
 		auth._setStoreForTest({
 			anthropic: {

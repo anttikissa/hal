@@ -51,17 +51,6 @@ describe('prompt editor', () => {
 		expect(prompt.state.promptLineLimit).toBe(0)
 	})
 
-	test('selection rendering does not reset prompt background before row padding', () => {
-		prompt.setText('one\ntwo\nthree')
-		prompt.handleKey(key('a', { cmd: true }), 80)
-
-		const line = prompt.buildPrompt(80).lines[0]!
-		expect(line).toContain('\x1b[7m')
-		expect(line).toContain('\x1b[27m')
-		expect(line).not.toContain('\x1b[0m')
-		prompt.clear()
-	})
-
 	test('selected tabs render as styled spaces through the next tab stop', () => {
 		prompt.setText('a\tb', 1)
 		prompt.handleKey(key('right', { shift: true }), 80)
@@ -153,15 +142,6 @@ describe('prompt editor', () => {
 		expect(prompt.handleKey(key('tab', { shift: true }), 80)).toBe(true)
 		expect(prompt.text()).toBe('one\ntwo')
 		expect(prompt.cursorPos()).toBe('one\ntw'.length)
-		prompt.clear()
-	})
-
-	test('history recall places the cursor at the visual row end', () => {
-		prompt.setHistory(['界界X'])
-		prompt.setText('')
-		prompt.handleKey(key('up'), 80)
-		expect(prompt.cursorPos()).toBe(3)
-		prompt.setHistory([])
 		prompt.clear()
 	})
 

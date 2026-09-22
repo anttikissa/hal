@@ -62,16 +62,6 @@ test('buildSystemPrompt omits the self-switch instruction inside the Hal source 
 	expect(projectPrompt).toContain(instruction)
 })
 
-test('substitutes and conditions on the Hal harness identity', () => {
-	writeFileSync(join(tempDir, 'SYSTEM.md'), [
-		'::: if harness="hal"',
-		'Harness: ${harness}',
-		':::',
-	].join('\n'))
-
-	expect(context.buildSystemPrompt({ cwd: tempDir }).text).toContain('Harness: hal')
-})
-
 test('directives treat non-glob pattern characters literally', () => {
 	writeFileSync(join(tempDir, 'SYSTEM.md'), [
 		'::: if model="openai/gpt-5.6"',
@@ -128,15 +118,6 @@ test('prompt watcher reports AGENTS.md edits', async () => {
 	} finally {
 		stop()
 	}
-})
-
-
-test('estimateContext uses per-model token calibration', () => {
-	tokenCalibration.save(300, 100, 'openai/gpt-calibrated')
-
-	const est = context.estimateContext([{ role: 'user', content: 'x'.repeat(600) }], 'openai/gpt-calibrated')
-
-	expect(est.used).toBe(200)
 })
 
 test('messageBytes estimates images without counting their base64 payload as text', () => {

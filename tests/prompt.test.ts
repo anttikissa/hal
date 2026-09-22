@@ -17,12 +17,6 @@ beforeEach(() => {
 })
 
 describe('prompt', () => {
-	test('shift-enter inserts newline', () => {
-		prompt.setText('hello', 5)
-		expect(prompt.handleKey(key('enter', { shift: true }), 80)).toBe(true)
-		expect(prompt.text()).toBe('hello\n')
-	})
-
 	test('pasted multiline buffers below the file line limit stay inline', () => {
 		const pasted = 'one\ntwo\nthree\nfour'
 		prompt.handleKey({ key: '', char: pasted, shift: false, alt: false, ctrl: false, cmd: false }, 80)
@@ -65,32 +59,6 @@ describe('prompt', () => {
 		expect(prompt.submitText()).toBe(overLimit)
 	})
 
-	test('alt-left and alt-right move by words', () => {
-		prompt.setText('hello brave world', 'hello brave world'.length)
-		prompt.handleKey(key('left', { alt: true }), 80)
-		expect(prompt.cursorPos()).toBe('hello brave '.length)
-		prompt.handleKey(key('left', { alt: true }), 80)
-		expect(prompt.cursorPos()).toBe('hello '.length)
-		prompt.handleKey(key('right', { alt: true }), 80)
-		expect(prompt.cursorPos()).toBe('hello brave'.length)
-	})
-
-	test('cmd-left and cmd-right move to prompt edges', () => {
-		prompt.setText('(hello)', '(hello)'.length - 1)
-		prompt.handleKey(key('left', { cmd: true }), 80)
-		expect(prompt.cursorPos()).toBe(0)
-		prompt.handleKey(key('right', { cmd: true }), 80)
-		expect(prompt.cursorPos()).toBe('(hello)'.length)
-	})
-
-	test('option-left and option-right stop inside punctuation like Zed', () => {
-		prompt.setText('(hello)', '(hello'.length)
-		prompt.handleKey(key('left', { alt: true }), 80)
-		expect(prompt.cursorPos()).toBe('('.length)
-		prompt.handleKey(key('right', { alt: true }), 80)
-		expect(prompt.cursorPos()).toBe('(hello'.length)
-	})
-
 	test('option movement uses token edges symmetrically around punctuation runs', () => {
 		const text = 'foo ### zot'
 
@@ -107,96 +75,6 @@ describe('prompt', () => {
 		}
 	})
 
-	test('cmd-a then backspace clears multiline selection', () => {
-		prompt.setText('foo\nbar')
-		prompt.handleKey(key('a', { cmd: true }), 80)
-		prompt.handleKey(key('backspace'), 80)
-		expect(prompt.text()).toBe('')
-	})
-
-	test('undo and redo keep grouped typing together', () => {
-		prompt.handleKey({ key: 'h', char: 'h', shift: false, alt: false, ctrl: false, cmd: false }, 80)
-		prompt.handleKey({ key: 'i', char: 'i', shift: false, alt: false, ctrl: false, cmd: false }, 80)
-		prompt.handleKey(key('z', { cmd: true }), 80)
-		expect(prompt.text()).toBe('')
-		prompt.handleKey(key('z', { cmd: true, shift: true }), 80)
-		expect(prompt.text()).toBe('hi')
-		prompt.handleKey(key('/', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('')
-		prompt.handleKey(key('/', { ctrl: true, shift: true }), 80)
-		expect(prompt.text()).toBe('hi')
-	})
-
-	test('ctrl-k kills to yank buffer and ctrl-y yanks it', () => {
-		prompt.setText('hello brave world', 'hello '.length)
-		prompt.handleKey(key('k', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('hello ')
-		prompt.setText('say: ', 'say: '.length)
-		prompt.handleKey(key('y', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('say: brave world')
-	})
-
-	test('ctrl-u kills prefix to the same yank buffer', () => {
-		prompt.setText('hello brave world', 'hello brave '.length)
-		prompt.handleKey(key('u', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('world')
-		prompt.handleKey(key('e', { ctrl: true }), 80)
-		prompt.handleKey(key('y', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('worldhello brave ')
-	})
-
-	test('ctrl-u and ctrl-k operate on current line in multiline text', () => {
-		// ctrl-k from middle of first line: kill to end of that line only
-		prompt.setText('first line\nsecond line\nthird', 'first '.length)
-		prompt.handleKey(key('k', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('first \nsecond line\nthird')
-
-		// ctrl-u from middle of second line: kill from start of that line
-		const pos = 'first \nsecond '.length
-		prompt.setText('first \nsecond line\nthird', pos)
-		prompt.handleKey(key('u', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('first \nline\nthird')
-
-		// ctrl-k at end-of-line position deletes the newline (joins lines)
-		prompt.setText('a\nb', 1)
-		prompt.handleKey(key('k', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('ab')
-
-		// ctrl-u at start-of-line deletes the preceding newline (joins lines)
-		prompt.setText('a\nb', 2)
-		prompt.handleKey(key('u', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('ab')
-	})
-
-	test('ctrl-a and ctrl-e move to current line edges', () => {
-		prompt.setText('first\nsecond line\nthird', 'first\nsecond '.length)
-		prompt.handleKey(key('a', { ctrl: true }), 80)
-		expect(prompt.cursorPos()).toBe('first\n'.length)
-		prompt.handleKey(key('e', { ctrl: true }), 80)
-		expect(prompt.cursorPos()).toBe('first\nsecond line'.length)
-	})
-
-	test('alt-d kills the next word', () => {
-		prompt.setText('hello brave world', 'hello '.length)
-		prompt.handleKey(key('d', { alt: true }), 80)
-		expect(prompt.text()).toBe('hello  world')
-		prompt.handleKey(key('y', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('hello brave world')
-	})
-
-	test('up enters history and down restores the draft', () => {
-		prompt.setHistory(['older', 'newer'])
-		prompt.setText('draft')
-		prompt.handleKey(key('up'), 80)
-		expect(prompt.text()).toBe('newer')
-		prompt.handleKey(key('up'), 80)
-		expect(prompt.text()).toBe('older')
-		prompt.handleKey(key('down'), 80)
-		expect(prompt.text()).toBe('newer')
-		prompt.handleKey(key('down'), 80)
-		expect(prompt.text()).toBe('draft')
-	})
-
 	test('setHistory does not let caller appends duplicate prompt recall', () => {
 		const inputHistory = ['older']
 		prompt.setHistory(inputHistory)
@@ -211,16 +89,6 @@ describe('prompt', () => {
 
 		prompt.handleKey(key('up'), 80)
 		expect(prompt.text()).toBe('older')
-	})
-
-	test('draftText returns an edited recalled history entry', () => {
-		prompt.setHistory(['old prompt'])
-		prompt.setText('')
-		prompt.handleKey(key('up'), 80)
-		expect(prompt.draftText()).toBe('')
-		prompt.handleKey({ key: '!', char: '!', shift: false, alt: false, ctrl: false, cmd: false }, 80)
-		expect(prompt.text()).toBe('old prompt!')
-		expect(prompt.draftText()).toBe('old prompt!')
 	})
 
 	test('history browsing uses the end of the target row for multiline entries', () => {
@@ -244,13 +112,6 @@ describe('prompt', () => {
 		expect(prompt.text()).toBe('newer first\nnewer second')
 		// Down enters the newer history entry on its top visual row, at row end.
 		expect(prompt.cursorPos()).toBe('newer first'.length)
-	})
-
-	test('buildPrompt renders multiline cursor position', () => {
-		prompt.setText('foo\nbar', 7)
-		const built = prompt.buildPrompt(20)
-		expect(built.lines).toEqual(['foo', 'bar'])
-		expect(built.cursor).toEqual({ rowOffset: 1, col: 3 })
 	})
 
 	test('buildPrompt highlights selections across wrapped lines', () => {

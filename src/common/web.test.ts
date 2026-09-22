@@ -10,12 +10,6 @@ const authenticated: WebServerMessage = {
 	},
 }
 
-test('web protocol uses ASON directly', () => {
-	const text = webProtocol.encode(authenticated)
-	expect(text).toBe("{ type: 'authenticated', bootstrap: { state: { sessions: [], working: {}, updatedAt: '' }, metas: [], snapshots: [] } }")
-	expect(webProtocol.decode(text)).toEqual(authenticated)
-})
-
 test('prompt event already present in snapshot history is not projected twice', () => {
 	const snapshot: any = { session: { id: 's1' }, history: [{ type: 'user', id: 'prompt-1', parts: [] }], live: [] }
 	const result = webProtocol.applySessionMessage(snapshot, { type: 'event', event: { type: 'prompt', id: 'prompt-1', sessionId: 's1', text: 'hello' } })

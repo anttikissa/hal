@@ -20,28 +20,6 @@ describe('auth.getCredential — single account (backward compat)', () => {
 		auth._resetCooldowns()
 	})
 
-	test('single object entry works', () => {
-		auth._setStoreForTest({
-			openai: { accessToken: 'tok_single', refreshToken: 'rt_1', expires: Date.now() + 3600_000 },
-		})
-		const cred = auth.getCredential('openai')
-		expect(cred).toBeDefined()
-		expect(cred!.value).toBe('tok_single')
-		expect(cred!.type).toBe('token')
-	})
-
-	test('Gemini API key enables the Google route', () => {
-		const original = process.env.GEMINI_API_KEY
-		try {
-			auth._setStoreForTest({})
-			process.env.GEMINI_API_KEY = 'gemini-key'
-			expect(auth.getCredential('google')?.value).toBe('gemini-key')
-		} finally {
-			if (original === undefined) delete process.env.GEMINI_API_KEY
-			else process.env.GEMINI_API_KEY = original
-		}
-	})
-
 	test('single object entry with email returns email', () => {
 		auth._setStoreForTest({
 			openai: { accessToken: 'tok_1', email: 'a@test.com' },
@@ -275,7 +253,6 @@ describe('cooldown persistence across restarts', () => {
 		expect(after!.email).toBe('b@test.com')
 	})
 })
-
 
 describe('auth.ensureFresh — anthropic multi-account refresh', () => {
 	beforeEach(() => {

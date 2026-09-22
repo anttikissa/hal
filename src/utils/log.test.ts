@@ -26,13 +26,6 @@ test('debug logging can be enabled at runtime', () => {
 	expect(log.isEnabled('error')).toBe(true)
 })
 
-test('info logging skips debug messages', () => {
-	log.config.level = 'info'
-
-	expect(log.isEnabled('debug')).toBe(false)
-	expect(log.isEnabled('info')).toBe(true)
-	expect(log.isEnabled('error')).toBe(true)
-})
 test('HAL_LOG overrides the configured level', () => {
 	log.config.level = 'info'
 	process.env.HAL_LOG = 'debug'

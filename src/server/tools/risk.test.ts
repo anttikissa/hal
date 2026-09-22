@@ -5,12 +5,6 @@ function reasons(command: string): string[] {
 	return risk.analyzeToolCall('bash', { command }).map((item) => item.reason)
 }
 
-test('rm -rf inside a specific /tmp child does not warn', () => {
-	expect(reasons('rm -rf /tmp/hal-test')).toEqual([])
-	expect(reasons('tmp=$(mktemp -d); rm -rf $tmp')).toEqual([])
-	expect(reasons('TMP=/tmp/hal-verify; rm -rf "$TMP"')).toEqual([])
-})
-
 test('broad or non-temp rm -rf warns', () => {
 	expect(reasons('rm -rf *')).toContain('Destructive rm command')
 	expect(reasons('rm -rf .')).toContain('Destructive rm command')

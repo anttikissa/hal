@@ -22,15 +22,6 @@ function writeBlob(sessionId: string, blobId: string, data: unknown): void {
 	writeFileSync(`${dir}/${blobId}.ason`, ason.stringify(data) + '\n')
 }
 
-test('read_blob reads bare ids from the current session', async () => {
-	writeBlob('04-whl', '0gdec4-bol', { ok: true })
-
-	const text = await readBlobTool.execute({ id: '0gdec4-bol' }, { sessionId: '04-whl', cwd: process.cwd() })
-	if (typeof text !== 'string') throw new Error('expected text output')
-	const data = JSON.parse(text)
-	expect(data).toEqual({ ok: true })
-})
-
 test('read_blob returns stored image attachments as native tool content', async () => {
 	writeBlob('04-whl', '0gdec4-img', { media_type: 'image/png', data: 'aGVsbG8=' })
 

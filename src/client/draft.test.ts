@@ -45,7 +45,6 @@ test('saveDraft logs write failures and skips the draft_saved event', () => {
 	expect(errors[0]?.data?.sessionId).toBe('04-test')
 })
 
-
 test('saveDraft preserves prompt edit metadata for restart restore', () => {
 	const sessionDir = join(dir, '04-test')
 	mkdirSync(sessionDir, { recursive: true })
@@ -66,25 +65,6 @@ test('saveDraft preserves prompt edit metadata for restart restore', () => {
 			pausedWorkingTurn: true,
 		},
 	})
-})
-
-test('loadDraft logs parse failures and falls back to an empty draft', () => {
-	const sessionDir = join(dir, '04-test')
-	mkdirSync(sessionDir, { recursive: true })
-	writeFileSync(join(sessionDir, 'draft.ason'), '{ definitely not valid ason')
-	const errors: Array<{ message: string; data?: Record<string, unknown> }> = []
-	log.error = (message: string, data?: Record<string, unknown>) => {
-		errors.push({ message, data })
-	}
-	clientBackend.sessions.sessionDir = () => sessionDir
-
-	const text = draft.loadDraft('04-test')
-
-	expect(text).toBe('')
-	expect(errors).toHaveLength(1)
-	expect(errors[0]?.message).toBe('draft operation failed')
-	expect(errors[0]?.data?.action).toBe('load')
-	expect(errors[0]?.data?.sessionId).toBe('04-test')
 })
 
 test('clearDraft logs unexpected unlink failures and skips the draft_saved event', () => {

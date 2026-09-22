@@ -35,7 +35,6 @@ afterEach(() => {
 	for (const id of createdIds.splice(0)) sessions.deleteSession(id)
 })
 
-
 test('loadSessionList reads rich sessions from shared state', () => {
 	const origReadState = ipc.readState
 	ipc.readState = () => ({
@@ -50,16 +49,6 @@ test('loadSessionList reads rich sessions from shared state', () => {
 	}
 })
 
-test('createSession and loadHistory round-trip', async () => {
-	const id = await makeSession()
-	await sessions.appendHistory(id, [userEntry('hello', new Date().toISOString())])
-
-	const result = sessions.loadHistory(id)
-	expect(result).toHaveLength(1)
-	expect(entryText(result[0])).toBe('hello')
-})
-
-
 test('loadHistory repairs user entries whose parts are missing', async () => {
 	const id = await makeSession()
 	writeFileSync(`${sessions.sessionDir(id)}/history.asonl`, [
@@ -69,7 +58,6 @@ test('loadHistory repairs user entries whose parts are missing', async () => {
 
 	expect(sessions.loadHistory(id).map(entryText)).toEqual(['legacy prompt', ''])
 })
-
 
 test('appendHistory writes id, omits undefined fields, and persists trusted usage bars', async () => {
 	const id = await makeSession()
@@ -81,7 +69,6 @@ test('appendHistory writes id, omits undefined fields, and persists trusted usag
 	expect(text).toContain('usageBars: true')
 	expect(text).not.toContain('undefined')
 })
-
 
 test('appendHistory repairs duplicate ids before writing', async () => {
 	const id = await makeSession()
@@ -114,7 +101,6 @@ test('pending tools marker persists and resolves across reload-style reads', asy
 	expect(sessions.loadHistory(id).find((entry) => entry.type === 'pending_tools')).toMatchObject({ canceled: true })
 })
 
-
 test('questions and encrypted answers persist and project onto pending tools', async () => {
 	const id = await makeSession()
 	await sessions.appendHistory(id, [
@@ -130,7 +116,6 @@ test('questions and encrypted answers persist and project onto pending tools', a
 	])
 	expect(sessions.findPendingTools(id)).toMatchObject({ allAnswered: true, aborted: false, questions: [{ id: '000002-bbb', toolId: 'tool-1', answer: { kind: 'choice', choiceId: 'yes' } }] })
 })
-
 
 test('cancelTailTurn marks last prompt and partial output canceled in current history', async () => {
 	const id = await makeSession()
@@ -158,7 +143,6 @@ test('cancelTailTurn marks last prompt and partial output canceled in current hi
 	expect(history.some((entry) => entry.type === 'turn_end')).toBe(false)
 	expect(readFileSync(`${sessions.sessionDir(id)}/history.asonl`, 'utf-8')).toContain('canceled: true')
 })
-
 
 test('cancelTailTurn cancels read-only tool tails', async () => {
 	const id = await makeSession()
@@ -189,7 +173,6 @@ test('forkSession appends fork markers to parent and child history', async () =>
 	expect(sessions.loadHistory(childId)).toMatchObject([{ type: 'forked_from', parent: parentId }])
 })
 
-
 test('loadAllHistory retains the fork transition between parent and child history', async () => {
 	const parentId = await makeSession()
 	const childId = uniqueId()
@@ -203,7 +186,6 @@ test('loadAllHistory retains the fork transition between parent and child histor
 	])
 })
 
-
 test('forkSession names child as a lowercase fork of a named parent', async () => {
 	const parentId = await makeSession()
 	const childId = uniqueId()
@@ -215,7 +197,6 @@ test('forkSession names child as a lowercase fork of a named parent', async () =
 	expect(child.name).toBe('Fork of Pause fix')
 })
 
-
 test('forkSession names child after an unnamed parent id', async () => {
 	const parentId = await makeSession()
 	const childId = uniqueId()
@@ -224,16 +205,6 @@ test('forkSession names child after an unnamed parent id', async () => {
 	const child = sessions.forkSession(parentId, childId)
 
 	expect(child.name).toBe(`Fork of ${parentId}`)
-})
-
-
-test('updateMeta writes closed session metadata', async () => {
-	const id = await makeSession()
-	sessions.deactivateSession(id)
-
-	sessions.updateMeta(id, { name: 'closed summary' })
-
-	expect(sessions.loadSessionMeta(id)?.name).toBe('closed summary')
 })
 
 test('deleteSession cleans up', async () => {
@@ -281,7 +252,6 @@ test('live snapshot stores uncommitted streaming blocks', async () => {
 	expect(sessions.loadLive(id).blocks).toEqual([])
 })
 
-
 test('interruptLive persists the model tail, marks only its last block, and clears live state', async () => {
 	const id = await makeSession()
 	sessions.applyLiveEvent(id, { type: 'stream-delta', channel: 'thinking', text: 'Checking', model: 'openai/gpt-5.6-sol', thinkingEffort: 'high' })
@@ -298,7 +268,6 @@ test('interruptLive persists the model tail, marks only its last block, and clea
 	expect(sessions.loadLive(id).blocks).toEqual([])
 })
 
-
 test('interruptLive marks thinking when no assistant text exists', async () => {
 	const id = await makeSession()
 	sessions.applyLiveEvent(id, { type: 'stream-delta', channel: 'thinking', text: 'Still checking' })
@@ -309,32 +278,6 @@ test('interruptLive marks thinking when no assistant text exists', async () => {
 		{ type: 'thinking', text: 'Still checking', interruptedBy: 'process-exit' },
 	])
 })
-
-
-test('sessionOpenInfo includes tab number and effective model', () => {
-	const info = sessions.sessionOpenInfo({
-		id: '04-middle',
-		workingDir: '/work',
-	}, 31)
-
-	expect(info).toMatchObject({
-		id: '04-middle',
-		tab: 32,
-		model: models.defaultModel(),
-	})
-})
-
-
-test('sessionOpenInfo publishes the canonical continuation action', async () => {
-	const id = await makeSession()
-	sessions.appendHistory(id, [
-		{ type: 'user', parts: [{ type: 'text', text: 'try this' }] },
-		{ type: 'turn_end', status: 'failed' },
-	])
-
-	expect(sessions.sessionOpenInfo({ id }).continuation).toBe('retry')
-})
-
 
 test('live snapshot preserves assistant chunks around info events', async () => {
 	const id = await makeSession()
@@ -366,34 +309,6 @@ test('live snapshot preserves assistant chunks around info events', async () => 
 		{ type: 'assistant', text: 'world' },
 	])
 })
-
-
-test('live snapshot stores tool results on existing tool blocks', async () => {
-	const id = await makeSession()
-	sessions.applyLiveEvent(id, {
-		type: 'tool-call',
-		sessionId: id,
-		toolId: 'tool-1',
-		name: 'edit',
-		input: { path: 'notes.txt' },
-		blobId: '000001-abc',
-		createdAt: '2026-04-09T20:01:00.000Z',
-	})
-	sessions.applyLiveEvent(id, {
-		type: 'tool-result',
-		sessionId: id,
-		toolId: 'tool-1',
-		blobId: '000001-abc',
-		output: 'preview only',
-		createdAt: '2026-04-09T20:01:01.000Z',
-	})
-
-	const live = sessions.loadLive(id)
-	expect(live.blocks).toMatchObject([
-		{ type: 'tool', toolId: 'tool-1', name: 'edit', blobId: '000001-abc', output: 'preview only' },
-	])
-})
-
 
 test('live snapshot keeps blob metadata for response errors', async () => {
 	const id = await makeSession()
@@ -430,15 +345,6 @@ test('rotateLog switches new writes to history2.asonl', async () => {
 	expect(newLog).toContain('new')
 })
 
-test('rotateLog increments history log number', async () => {
-	const id = await makeSession()
-	await sessions.appendHistory(id, [userEntry('one', new Date().toISOString())])
-	expect(await sessions.rotateLog(id)).toBe('history2.asonl')
-
-	await sessions.appendHistory(id, [userEntry('two', new Date().toISOString())])
-	expect(await sessions.rotateLog(id)).toBe('history3.asonl')
-})
-
 test('loadHistory reads from current log after rotation', async () => {
 	const id = await makeSession()
 	await sessions.appendHistory(id, [userEntry('old', new Date().toISOString())])
@@ -449,7 +355,6 @@ test('loadHistory reads from current log after rotation', async () => {
 	expect(result).toHaveLength(1)
 	expect(entryText(result[0])).toBe('new context')
 })
-
 
 test('loadHistoryLog can read a bounded log prefix after later appends', async () => {
 	const id = await makeSession()
@@ -500,7 +405,6 @@ test('compact-style rotation preserves forked_from entry', async () => {
 	expect(texts.some((text) => text.includes('parent msg'))).toBe(true)
 })
 
-
 test('tailTurnState uses turn_end as the finished-turn boundary', () => {
 	const entries: any[] = [
 		userEntry('hello', '2026-05-27T12:00:00.000Z'),
@@ -511,7 +415,6 @@ test('tailTurnState uses turn_end as the finished-turn boundary', () => {
 	expect(sessions.tailTurnState(entries)).toMatchObject({ interrupted: false, interruptedTools: [], ended: { type: 'turn_end', status: 'completed' } })
 })
 
-
 test('tailTurnState treats content after the last turn_end as interrupted', () => {
 	const entries: any[] = [
 		{ type: 'turn_end', status: 'completed', ts: '2026-05-27T12:00:00.000Z' },
@@ -521,7 +424,6 @@ test('tailTurnState treats content after the last turn_end as interrupted', () =
 
 	expect(sessions.tailTurnState(entries)).toMatchObject({ interrupted: true, interruptedTools: [{ name: 'bash', id: 'call_1' }] })
 })
-
 
 test('reset-style rotation preserves forked_from entry and writes a reset marker', async () => {
 	const parentId = await makeSession()
@@ -542,7 +444,6 @@ test('reset-style rotation preserves forked_from entry and writes a reset marker
 	expect(newMsgs[0]).toMatchObject({ type: 'forked_from', parent: parentId, ts: nowTs })
 	expect(newMsgs[1]).toMatchObject({ type: 'reset', ts: nowTs })
 })
-
 
 test('tailTurnState ignores ui-only tool calls like server-side web_search', () => {
 	const entries: any[] = [

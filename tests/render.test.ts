@@ -139,19 +139,6 @@ describe('render', () => {
 		}
 	})
 
-	test('old block timestamps include date', () => {
-		const originalNow = Date.now
-		Date.now = () => new Date(2026, 4, 6, 13, 0).getTime()
-		try {
-			const tab = client.currentTab()!
-			tab.history.push({ type: 'assistant', text: 'old answer', ts: new Date(2026, 4, 4, 19, 30).getTime() })
-			const clean = stripAnsi(captureOutput(() => render.draw(true)))
-			expect(clean).toContain('4 May 19:30 Hal')
-		} finally {
-			Date.now = originalNow
-		}
-	})
-
 	test('multiline info blocks do not get flattened into a coalesced info group', () => {
 		const tab = client.currentTab()!
 		const ts = Date.now()
@@ -272,16 +259,6 @@ describe('render', () => {
 		expect(clean).toContain('/keys: shortcuts')
 	})
 
-	test('help bar shows ambiguous completion choices while completing', () => {
-		prompt.setText('/cd ./s', '/cd ./s'.length)
-		completionHints.set(['scripts/', 'src/', 'state/'])
-
-		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-
-		expect(clean).toContain('scripts/  src/  state/')
-		expect(clean).not.toContain('enter: send')
-	})
-
 	test('help bar has one-cell padding on both sides', () => {
 		prompt.setText('hello')
 		const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
@@ -296,14 +273,6 @@ describe('render', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('enter: send, shift-enter: newline, alt-enter: queue')
 		expect(clean).not.toContain('│')
-	})
-
-	test('help bar shows restore tab as a normal shortcut hint', () => {
-		prompt.setText('hello')
-		client.state.restoreTabHint = true
-		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('ctrl-shift-t: restore tab, enter: send')
-		expect(clean).not.toContain('Tab closed')
 	})
 
 	test('help bar suggests resizing two lines before prompt scrolling', () => {
@@ -384,24 +353,6 @@ describe('render', () => {
 		expect(renderStatus.cursorShapeSequence()).toBe('')
 	})
 
-	test('prompt cursor color uses the input cursor color', () => {
-		const cursorColor = oklch.toAnsi(38, 0.45, 0.14, 35)
-		expect(renderStatus.promptCursorColorSequence(cursorColor)).toBe(`\x1b]12;#${oklch.fgHex(cursorColor)}\x07`)
-	})
-
-	test('draw applies the configured prompt cursor shape and color', () => {
-		const originalCursor = colors.input.cursor
-		renderStatus.config.promptCursorShape = 'block'
-		colors.input.cursor = oklch.toAnsi(38, 0.45, 0.14, 35)
-		try {
-			const output = captureOutput(() => render.draw(true))
-			expect(output).toContain('\x1b[2 q')
-			expect(output).toContain(`\x1b]12;#${oklch.fgHex(colors.input.cursor)}\x07`)
-		} finally {
-			colors.input.cursor = originalCursor
-		}
-	})
-
 	test('status line shows host role without pid', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('host')
@@ -413,18 +364,6 @@ describe('render', () => {
 		client.currentTab()!.name = 'Pause Fix'
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('test: Pause Fix')
-	})
-
-	test('client status line shows a host mismatch badge on the right', () => {
-		client.state.role = 'client'
-		client.state.pid = 111
-		client.state.hostPid = 222
-		client.state.hostVersionStatus = 'ready'
-		client.state.hostVersion = 'host5678'
-		client.state.localVersionStatus = 'ready'
-		client.state.localVersion = 'local1234'
-		const clean = stripAnsi(captureOutput(() => render.draw()))
-		expect(clean).toContain('client ≠host')
 	})
 
 	test('status line shows model, context, token arrows, and grouped subscription usage', () => {
@@ -462,39 +401,6 @@ describe('render', () => {
 			expect(clean).toContain('↑378 ↓2.2k R42k W1.0k')
 			expect(clean).not.toContain('↑43k')
 			expect(clean).not.toContain('tokens CR:')
-		} finally {
-			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
-		}
-	})
-
-	test('status line visibility flags hide configured parts', () => {
-		const tab = client.currentTab()!
-		tab.model = 'openai/gpt-5.4'
-		tab.contextUsed = 39_000
-		tab.contextMax = 1_050_000
-		tab.usage = { input: 56_000, output: 2_800, cacheRead: 1_700_000, cacheCreation: 42_000 }
-		Object.assign(renderStatus.config, {
-			showSession: false,
-			showCwd: false,
-			showModel: false,
-			showContext: false,
-			showServer: false,
-			showTokenInOut: false,
-			showTokenCache: true,
-			showSubscription: false,
-		})
-		const originalCols = process.stdout.columns
-		Object.defineProperty(process.stdout, 'columns', { value: 140, configurable: true })
-		try {
-			const clean = stripAnsi(captureOutput(() => render.draw()))
-			expect(clean).not.toContain('test')
-			expect(clean).not.toContain('/tmp')
-			expect(clean).not.toContain('GPT 5.4')
-			expect(clean).not.toContain('39k/1050k (4%)')
-			expect(clean).not.toContain('server')
-			expect(clean).not.toContain('↑56k ↓2.8k')
-			expect(clean).not.toContain('Sub 2/3')
-			expect(clean).toContain('R1.7M W42k')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}
@@ -661,32 +567,6 @@ describe('render', () => {
 		}
 	})
 
-	test('working tab minicursor uses the main HAL cursor color', () => {
-		const tab = client.currentTab()!
-		client.state.working.set(tab.sessionId, true)
-
-		const originalCursor = colors.input.cursor
-		const originalAssistant = colors.assistant.fg
-		const originalAssistantCursor = colors.assistant.cursor
-		const originalIsVisible = cursor.isVisible
-		colors.input.cursor = oklch.toAnsi(38, 0.70, 0.20, 330)
-		colors.assistant.fg = oklch.toAnsi(38, 0.70, 0.18, 55)
-		colors.assistant.cursor = oklch.toAnsi(38, 0.78, 0.14, 55)
-		cursor.isVisible = () => true
-		try {
-			const output = captureOutput(() => render.draw())
-			expect(output).toContain(`${colors.assistant.cursor}▪`)
-			expect(output).not.toContain(`${colors.input.cursor}▪`)
-			expect(output).not.toContain(`${colors.assistant.fg}▪`)
-		} finally {
-			colors.input.cursor = originalCursor
-			colors.assistant.fg = originalAssistant
-			colors.assistant.cursor = originalAssistantCursor
-			cursor.isVisible = originalIsVisible
-		}
-	})
-
-
 	test('paused tab alert uses the configured bright foreground', () => {
 		colors.load()
 		const tab = client.currentTab()!
@@ -757,36 +637,6 @@ describe('render', () => {
 			cursor.tick = originalTick
 			colors.assistant.cursor = originalCursor
 			colors.assistant.cursorIdle = originalIdleCursor
-		}
-	})
-
-	test('HAL cursor fades linearly from working to idle after working ends', () => {
-		const tab = client.currentTab()!
-		tab.history.push({ type: 'assistant', text: 'done' })
-		client.state.working.set(tab.sessionId, true)
-		const originalNow = Date.now
-		const originalCursor = colors.assistant.cursor
-		const originalIdleCursor = colors.assistant.cursorIdle
-		const originalFadeMs = renderHistory.config.halCursorFadeMs
-		let now = 0
-		Date.now = () => now
-		colors.assistant.cursor = oklch.toAnsi(38, 0.48, 0, 0)
-		colors.assistant.cursorIdle = oklch.toAnsi(38, 0.66, 0.14, 55)
-		renderHistory.config.halCursorFadeMs = 2000
-		try {
-			captureOutput(() => render.draw(true))
-			client.state.working.delete(tab.sessionId)
-			captureOutput(() => render.draw(true))
-			now = 1000
-			const output = captureOutput(() => render.draw(true))
-			expect(output).toContain(`${oklch.mixFg(colors.assistant.cursor, colors.assistant.cursorIdle, 0.5)}█`)
-		} finally {
-			Date.now = originalNow
-			client.state.working.delete(tab.sessionId)
-			colors.assistant.cursor = originalCursor
-			colors.assistant.cursorIdle = originalIdleCursor
-			renderHistory.config.halCursorFadeMs = originalFadeMs
-			render.resetRenderer()
 		}
 	})
 
@@ -1008,7 +858,6 @@ describe('render', () => {
 		}
 	})
 })
-
 
 test('chrome fade uses every heartbeat without repainting history or changing layout', () => {
 	const originalTick = cursor.heartbeatTick

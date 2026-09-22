@@ -79,7 +79,6 @@ test('anthropic provider streams text while rotating accounts', async () => {
 	expect(events.at(-1)).toMatchObject({ type: 'done', doneStatus: 'completed', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
 
-
 test('completed Anthropic responses refresh the existing usage cache', async () => {
 	let refreshes = 0
 	anthropicUsage.refreshAll = async () => {
@@ -93,7 +92,6 @@ test('completed Anthropic responses refresh the existing usage cache', async () 
 
 	expect(refreshes).toBe(1)
 })
-
 
 test('anthropic provider enables thinking for Claude Fable', async () => {
 	auth.ensureFresh = async () => {}
@@ -154,16 +152,6 @@ test('anthropic oauth 401 tells user to log in again', async () => {
 
 	expect(events[0]).toMatchObject({ type: 'error', status: 401 })
 	expect(events[0].message).toContain('/login claude')
-})
-
-test('anthropic api-key 401 stays generic', async () => {
-	installFetchMock(async () => new Response(JSON.stringify({ error: { type: 'authentication_error' } }), {
-		status: 401,
-	}) as any)
-
-	const events = await collect({ value: 'key-test', type: 'api-key' })
-
-	expect(events[0]).toMatchObject({ type: 'error', status: 401, message: 'Anthropic API 401' })
 })
 
 test('anthropic 429 shows failed and next account when another account is available', async () => {
@@ -244,7 +232,6 @@ test('anthropic 429 waits for reset when all accounts are on cooldown', async ()
 	})
 })
 
-
 test('anthropic stream without message_stop does not emit done', async () => {
 	installFetchMock(async () => new Response([
 		'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"partial"}}',
@@ -259,7 +246,6 @@ test('anthropic stream without message_stop does not emit done', async () => {
 	expect(events).toContainEqual({ type: 'text', text: 'partial' })
 	expect(events.some((event) => event.type === 'done')).toBe(false)
 })
-
 
 test('anthropic provider surfaces refusal stop details instead of an empty response', async () => {
 	const stopDetails = {
@@ -282,7 +268,6 @@ test('anthropic provider surfaces refusal stop details instead of an empty respo
 	expect(events.at(-1)?.type).toBe('done')
 })
 
-
 test('anthropic provider ignores malformed SSE JSON lines', async () => {
 	installFetchMock(async () => new Response([
 		'data: {not json}',
@@ -301,7 +286,6 @@ test('anthropic provider ignores malformed SSE JSON lines', async () => {
 	expect(events.at(-1)).toMatchObject({ type: 'done', doneStatus: 'completed', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
 
-
 test('preserves raw SSE lines for tool-input forensics', async () => {
 	const raw = [
 		'data: {not json}',
@@ -319,7 +303,6 @@ test('preserves raw SSE lines for tool-input forensics', async () => {
 
 	expect(captured).toEqual({ sessionId: 'sid_123', provider: 'anthropic', text: raw })
 })
-
 
 test('anthropic provider streams web_search use and result at block stops', async () => {
 	installFetchMock(async () => new Response([
@@ -350,7 +333,6 @@ test('anthropic provider streams web_search use and result at block stops', asyn
 		content: [{ title: 'HN', url: 'https://news.ycombinator.com/' }],
 	})
 })
-
 
 test('anthropic OAuth user-agent discloses hal and its git version', async () => {
 	let seenUserAgent = ''

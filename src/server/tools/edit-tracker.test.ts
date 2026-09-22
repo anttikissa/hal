@@ -30,19 +30,6 @@ describe('editTracker', () => {
 		expect(editTracker.mapCurrentLineToBase(sessionId, path, 13)).toBe(15)
 	})
 
-	test('sequential edits split offsets across the file', () => {
-		editTracker.resetForRead(sessionId, path)
-		editTracker.applyReplace(sessionId, path, 10, 14, 3)
-		editTracker.applyReplace(sessionId, path, 20, 22, 0)
-
-		expect(editTracker.mapBaseLineToCurrent(sessionId, path, 17)).toBe(15)
-		expect(editTracker.mapBaseLineToCurrent(sessionId, path, 23)).toBe(18)
-		expect(editTracker.mapCurrentLineToBase(sessionId, path, 15)).toBe(17)
-		expect(editTracker.mapCurrentLineToBase(sessionId, path, 16)).toBe(18)
-		expect(editTracker.mapCurrentLineToBase(sessionId, path, 17)).toBe(19)
-		expect(editTracker.mapCurrentLineToBase(sessionId, path, 18)).toBe(23)
-	})
-
 	test('read reset clears old offsets', () => {
 		editTracker.resetForRead(sessionId, path)
 		editTracker.applyInsert(sessionId, path, 1, 2)

@@ -11,7 +11,6 @@ test('input history includes persisted slash-command retries', () => {
 	expect(history).toEqual(['hello', '/config models.default ['])
 })
 
-
 test('input history excludes inbox-originated user entries', () => {
 	const history = replay.inputHistoryFromEntries([
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
@@ -20,7 +19,6 @@ test('input history excludes inbox-originated user entries', () => {
 
 	expect(history).toEqual(['hello'])
 })
-
 
 test('input history preserves image placeholders in user entries', () => {
 	const history = replay.inputHistoryFromEntries([
@@ -37,7 +35,6 @@ test('input history preserves image placeholders in user entries', () => {
 	expect(history).toEqual(['see [/tmp/hal/images/test.png] now'])
 })
 
-
 test('input history keeps image placeholders at the start', () => {
 	const history = replay.inputHistoryFromEntries([
 		{
@@ -52,7 +49,6 @@ test('input history keeps image placeholders at the start', () => {
 	expect(history).toEqual(['[/tmp/hal/images/test.png] explain this'])
 })
 
-
 test('input history excludes synthetic system user entries only', () => {
 	const history = replay.inputHistoryFromEntries([
 		{ type: 'user', parts: [{ type: 'text', text: '[system] Session was reset.' }] },
@@ -61,7 +57,6 @@ test('input history excludes synthetic system user entries only', () => {
 
 	expect(history).toEqual(['[not-system] user prompt'])
 })
-
 
 test('replay preserves original image path in user text', () => {
 	const result = replay.replayEntries('s1', [
@@ -80,7 +75,6 @@ test('replay preserves original image path in user text', () => {
 		{ type: 'input', text: 'see [/tmp/hal/images/test.png] now', model: undefined, source: undefined, ts: undefined },
 	])
 })
-
 
 test('compaction context preserves first pair and recent user-assistant context', () => {
 	const context = replay.buildCompactionContext('s1', [
@@ -121,7 +115,6 @@ test('compaction context preserves first pair and recent user-assistant context'
 		`Full history: ${STATE_DIR}/sessions/s1/history*.asonl + blobs/`,
 	].join('\n'))
 })
-
 
 test('compaction context trims huge assistant blocks from the middle', () => {
 	const longAssistant = `${'A'.repeat(1100)}${'M'.repeat(3000)}${'Z'.repeat(2200)}`

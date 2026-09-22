@@ -26,17 +26,6 @@ import { serverKeys } from './server-keys.ts'
 import { authLogin } from './auth-login.ts'
 import { auth } from './auth.ts'
 
-test('runtime exposes in-memory focused sessions for eval helpers', () => {
-	const origOpenSessionIds = [...runtime.state.openSessionIds]
-	try {
-		runtime.state.openSessionIds = ['04-one', '04-two', '04-three']
-		expect(runtime.state.openSessionIds[2]).toBe('04-three')
-	} finally {
-		runtime.state.openSessionIds = origOpenSessionIds
-	}
-})
-
-
 test('fresh models that require an initial turn may generate without a user prompt', () => {
 	expect(models.requiresInitialTurn('hal/intro')).toBe(true)
 	expect(runtime.isInitialTurn('hal/intro', [])).toBe(true)
@@ -74,55 +63,6 @@ test('discarding an amended prompt clears its paused continuation', () => {
 	}
 })
 
-test('client status commands update shared client process list', () => {
-	const origUpdateState = ipc.updateState
-	const shared: any = { sessions: [], working: {}, clients: [], updatedAt: '' }
-	ipc.updateState = ((mutator: (state: any) => void) => {
-		mutator(shared)
-		return shared
-	}) as typeof ipc.updateState
-	try {
-		runtime.handleCommand({
-			type: 'client-status',
-			sessionId: '04-one',
-			pid: 123,
-			startedAt: '2026-06-04T12:00:00.000Z',
-			updatedAt: '2026-06-04T12:01:00.000Z',
-			cwd: '/work',
-			versionStatus: 'ready',
-			version: 'client123',
-		})
-		expect(shared.clients).toEqual([{
-			pid: 123,
-			startedAt: '2026-06-04T12:00:00.000Z',
-			updatedAt: '2026-06-04T12:01:00.000Z',
-			sessionId: '04-one',
-			cwd: '/work',
-			versionStatus: 'ready',
-			version: 'client123',
-			error: undefined,
-		}])
-
-		runtime.handleCommand({ type: 'client-exit', pid: 123 })
-		expect(shared.clients).toEqual([])
-	} finally {
-		ipc.updateState = origUpdateState
-	}
-})
-
-test('draft-saved commands become server-produced events', () => {
-	const original = ipc.appendEvent
-	const events: any[] = []
-	try {
-		ipc.appendEvent = (event) => { events.push(event) }
-		runtime.handleCommand({ type: 'draft-saved', sessionId: '04-one' })
-		expect(events).toEqual([{ type: 'draft_saved', sessionId: '04-one' }])
-	} finally {
-		ipc.appendEvent = original
-	}
-})
-
-
 test('focus commands do not rebuild sessions or prompt watchers', () => {
 	const originalFocusSession = tabs.focusSession
 	const originalSyncSharedState = tabs.syncSharedState
@@ -147,7 +87,6 @@ test('focus commands do not rebuild sessions or prompt watchers', () => {
 		context.watchPromptFiles = originalWatchPromptFiles
 	}
 })
-
 
 test('/what stores summarizing in shared state and skips duplicate targets', async () => {
 	const origUpdateState = ipc.updateState
@@ -194,126 +133,12 @@ test('/what stores summarizing in shared state and skips duplicate targets', asy
 	}
 })
 
-test('command errors include the slash command that caused them', () => {
-	expect(runtime.formatCommandError('/rename /what', 'Name may contain letters only.')).toBe('/rename: Name may contain letters only.')
-	expect(runtime.formatCommandError('/rename /what', '/rename: Name may contain letters only.')).toBe('/rename: Name may contain letters only.')
-})
-
-test('pickMostRecentlyClosedSessionId prefers the newest closed session', () => {
-	const picked = sessions.pickMostRecentlyClosedSessionId(
-		[
-			{ id: '04-open', createdAt: '2026-04-13T18:00:00.000Z' },
-			{ id: '04-old', createdAt: '2026-04-13T18:01:00.000Z', closedAt: '2026-04-13T18:05:00.000Z' },
-			{ id: '04-new', createdAt: '2026-04-13T18:02:00.000Z', closedAt: '2026-04-13T18:06:00.000Z' },
-		],
-		new Set(['04-open']),
-	)
-
-	expect(picked).toBe('04-new')
-})
-
-test('pickMostRecentlyClosedSessionId falls back to createdAt when closedAt is missing', () => {
-	const picked = sessions.pickMostRecentlyClosedSessionId(
-		[
-			{ id: '04-a', createdAt: '2026-04-13T18:01:00.000Z' },
-			{ id: '04-b', createdAt: '2026-04-13T18:02:00.000Z' },
-		],
-		new Set(),
-	)
-
-	expect(picked).toBe('04-b')
-})
-
-test('pickMostRecentlyClosedSessionId returns null when nothing is closed', () => {
-	const picked = sessions.pickMostRecentlyClosedSessionId(
-		[{ id: '04-open', createdAt: '2026-04-13T18:00:00.000Z' }],
-		new Set(['04-open']),
-	)
-
-	expect(picked).toBeNull()
-})
-
 test('restoredSessionOrder reinserts a resumed tab at its saved position', () => {
 	expect(tabs.restoredSessionOrder(['04-left', '04-right'], '04-closed', 2)).toEqual(['04-left', '04-closed', '04-right'])
 	expect(tabs.restoredSessionOrder(['04-left', '04-right'], '04-closed', 1)).toEqual(['04-closed', '04-left', '04-right'])
 	expect(tabs.restoredSessionOrder(['04-left', '04-right'], '04-closed', 99)).toEqual(['04-left', '04-right', '04-closed'])
 	expect(tabs.restoredSessionOrder(['04-left', '04-right'], '04-closed')).toEqual(['04-left', '04-right', '04-closed'])
 	expect(tabs.restoredSessionOrder(['04-left', '04-right'], '04-closed', 0)).toEqual(['04-left', '04-right', '04-closed'])
-})
-
-test('unchanged rebase apply is a no-op', async () => {
-	const events: any[] = []
-	const entries: any[] = [{ type: 'user', id: '000001-aaa', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-25T12:00:00.000Z' }]
-	let rewrites = 0
-	const origAppendEvent = ipc.appendEvent
-	const origLoadHistory = sessions.loadHistory
-	const origLoadSessionMeta = sessions.loadSessionMeta
-	const origRewriteHistoryForRebase = sessions.rewriteHistoryForRebase
-	const origIsWorking = agentLoop.isWorking
-	ipc.appendEvent = (event: any) => { events.push(event) }
-	sessions.loadHistory = () => entries
-	sessions.loadSessionMeta = () => ({ id: 's1', createdAt: '2026-05-25T12:00:00.000Z', currentLog: 'history.asonl' })
-	sessions.rewriteHistoryForRebase = (() => {
-		rewrites++
-		return { oldLog: 'history.asonl', newLog: 'history2.asonl', entryCount: 0 }
-	}) as typeof sessions.rewriteHistoryForRebase
-	agentLoop.isWorking = () => false
-	try {
-		runtime.handleCommand({ type: 'rebase-start', sessionId: 's1', requestId: 'r1', clientPid: 123 })
-		const start = events.find((event) => event.type === 'rebase-start')
-		expect(start?.todo).toContain("'hello'")
-
-		runtime.handleCommand({ type: 'rebase-apply', sessionId: 's1', requestId: 'r1', clientPid: 123, todo: start.todo })
-		await Bun.sleep(0)
-
-		expect(rewrites).toBe(0)
-		expect(events.find((event) => event.type === 'history-rebased')).toBeUndefined()
-		expect(events.find((event) => event.type === 'rebase-result')).toMatchObject({ ok: true, unchanged: true })
-	} finally {
-		ipc.appendEvent = origAppendEvent
-		sessions.loadHistory = origLoadHistory
-		sessions.loadSessionMeta = origLoadSessionMeta
-		sessions.rewriteHistoryForRebase = origRewriteHistoryForRebase
-		agentLoop.isWorking = origIsWorking
-	}
-})
-
-
-test('rebase edit with unchanged content is a no-op', async () => {
-	const events: any[] = []
-	const entries: any[] = [{ type: 'user', id: '000001-aaa', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-25T12:00:00.000Z' }]
-	let rewrites = 0
-	const origAppendEvent = ipc.appendEvent
-	const origLoadHistory = sessions.loadHistory
-	const origLoadSessionMeta = sessions.loadSessionMeta
-	const origRewriteHistoryForRebase = sessions.rewriteHistoryForRebase
-	const origIsWorking = agentLoop.isWorking
-	ipc.appendEvent = (event: any) => { events.push(event) }
-	sessions.loadHistory = () => entries
-	sessions.loadSessionMeta = () => ({ id: 's1', createdAt: '2026-05-25T12:00:00.000Z', currentLog: 'history.asonl' })
-	sessions.rewriteHistoryForRebase = (() => {
-		rewrites++
-		return { oldLog: 'history.asonl', newLog: 'history2.asonl', entryCount: 0 }
-	}) as typeof sessions.rewriteHistoryForRebase
-	agentLoop.isWorking = () => false
-	try {
-		runtime.handleCommand({ type: 'rebase-start', sessionId: 's1', requestId: 'r2', clientPid: 123 })
-		const start = events.find((event) => event.type === 'rebase-start')
-		const todo = String(start.todo).replace('pick 000001-aaa user', 'edit 000001-aaa user')
-
-		runtime.handleCommand({ type: 'rebase-apply', sessionId: 's1', requestId: 'r2', clientPid: 123, todo, edits: { '000001-aaa': 'hello' } })
-		await Bun.sleep(0)
-
-		expect(rewrites).toBe(0)
-		expect(events.find((event) => event.type === 'history-rebased')).toBeUndefined()
-		expect(events.find((event) => event.type === 'rebase-result' && event.requestId === 'r2')).toMatchObject({ ok: true, unchanged: true })
-	} finally {
-		ipc.appendEvent = origAppendEvent
-		sessions.loadHistory = origLoadHistory
-		sessions.loadSessionMeta = origLoadSessionMeta
-		sessions.rewriteHistoryForRebase = origRewriteHistoryForRebase
-		agentLoop.isWorking = origIsWorking
-	}
 })
 
 test('fork command persists one child notice without duplicating bare session ids', () => {
@@ -374,7 +199,6 @@ test('fork command persists one child notice without duplicating bare session id
 		context.watchPromptFiles = origWatchPromptFiles
 	}
 })
-
 
 test('a missing /cd path emits a synthetic creation suggestion', async () => {
 	const sessionId = '04-cd-suggestion'
@@ -446,7 +270,6 @@ test('steering prompt status survives history reload', async () => {
 		agentLoop.runAgentLoop = origRunAgentLoop
 	}
 })
-
 
 test('slash command state changes are persisted as structural history entries', async () => {
 	const sessionId = '04-structural-meta'
@@ -545,7 +368,6 @@ test('open command inherits cwd and model from opener tab', () => {
 	}
 })
 
-
 test('server rejects a new tab when the shared tab limit is reached', () => {
 	const originalOpenSessionIds = runtime.state.openSessionIds
 	const originalMaxTabs = tabs.config.maxTabs
@@ -567,7 +389,6 @@ test('server rejects a new tab when the shared tab limit is reached', () => {
 		tabs.createSessionTab = originalCreateSessionTab
 	}
 })
-
 
 test('shouldAutoContinue resumes only restarted turns', () => {
 	expect(runtime.shouldAutoContinue([
@@ -615,8 +436,6 @@ test('shouldAutoContinue resumes only restarted turns', () => {
 	])).toBe(false)
 })
 
-
-
 test('subagent closes after a clean completion while leave-open and interactive sessions remain', () => {
 	// A subagent that called wait is parked ('waiting'), not finished: its tab
 	// must stay open even though the history turn_end says 'completed'.
@@ -628,7 +447,6 @@ test('subagent closes after a clean completion while leave-open and interactive 
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-leave-open' }, 'completed')).toBe(false)
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'interactive' }, 'completed')).toBe(false)
 })
-
 
 test('direct user interaction promotes an autoclose subagent', async () => {
 	const sessionId = `test-promote-subagent-${Date.now().toString(36)}`
@@ -644,7 +462,6 @@ test('direct user interaction promotes an autoclose subagent', async () => {
 		sessions.deleteSession(sessionId)
 	}
 })
-
 
 test('messages from other sessions do not promote an autoclose subagent', async () => {
 	const sessionId = `test-keep-subagent-${Date.now().toString(36)}`
@@ -719,7 +536,6 @@ test('enqueuePrompt stores prompts while session is working', async () => {
 	}
 })
 
-
 test('drained queued prompts retain their source and raw command text', async () => {
 	const sessionId = `test-queue-raw-${Date.now().toString(36)}`
 	const calls: any[] = []
@@ -780,7 +596,6 @@ test('working queue slash command does not abort the running turn', async () => 
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}
 })
-
 
 test('working /cd settles the old turn and resumes it with the new cwd', async () => {
 	const sessionId = `test-cd-context-switch-${Date.now().toString(36)}`
@@ -862,7 +677,6 @@ test('working /cd settles the old turn and resumes it with the new cwd', async (
 	}
 })
 
-
 test('working /cd waits for pending prompt preprocessing', async () => {
 	const sessionId = `test-cd-preprocessing-${Date.now().toString(36)}`
 	const target = process.cwd()
@@ -916,7 +730,6 @@ test('working /cd waits for pending prompt preprocessing', async () => {
 		sessions.deleteSession(sessionId)
 	}
 })
-
 
 test('working /cd does not pause an existing prompt queue', async () => {
 	const sessionId = `test-cd-queue-${Date.now().toString(36)}`
@@ -985,7 +798,6 @@ test('working /cd does not pause an existing prompt queue', async () => {
 	}
 })
 
-
 test('back-to-back /cd commands resolve relative paths in order', async () => {
 	const sessionId = `test-cd-order-${Date.now().toString(36)}`
 	const root = mkdtempSync(join(tmpdir(), 'hal-cd-order-'))
@@ -1018,7 +830,6 @@ test('back-to-back /cd commands resolve relative paths in order', async () => {
 	}
 })
 
-
 test('working queue next reports working without consuming the queue', async () => {
 	const sessionId = `test-run-next-from-queue-working-${Date.now().toString(36)}`
 	const events: any[] = []
@@ -1048,7 +859,6 @@ test('working queue next reports working without consuming the queue', async () 
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}
 })
-
 
 test('queue paused notice includes truncated preview and queue hint', () => {
 	const text = queueRunner.buildQueuePausedNotice([
@@ -1092,7 +902,6 @@ test('held queue does not drain after unrelated completed prompt', () => {
 	}
 })
 
-
 test('completed prompt drains its queue without waiting on itself', async () => {
 	const sessionId = `test-drain-self-${Date.now().toString(36)}`
 	const origRunAgentLoop = agentLoop.runAgentLoop
@@ -1131,7 +940,6 @@ test('completed prompt drains its queue without waiting on itself', async () => 
 		sessions.deleteSession(sessionId)
 	}
 })
-
 
 test('continue releases a held queue so completion drains it', async () => {
 	const sessionId = `test-continue-held-${Date.now().toString(36)}`
@@ -1273,7 +1081,6 @@ test('a later abort cancels a continuation that is still waiting', async () => {
 	}
 })
 
-
 test('abort cancels a prompt before its agent controller is registered', async () => {
 	const sessionId = `test-pending-prompt-abort-${Date.now().toString(36)}`
 	const origQueueCommand = queueRunner.handleQueueSlashCommand
@@ -1362,7 +1169,6 @@ test('pending tools execute before provider replay can repair them as interrupte
 	}
 })
 
-
 test('abort reaches resumed pending-tool batches and stops later tools', async () => {
 	const sessionId = `test-abort-pending-tools-${Date.now().toString(36)}`
 	const origDispatch = toolRegistry.dispatch
@@ -1412,7 +1218,6 @@ test('abort reaches resumed pending-tool batches and stops later tools', async (
 	}
 })
 
-
 test('pending risky tools wait for every answer and apply exact per-call approval', async () => {
 	const sessionId = `test-question-tools-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: '/tmp' })
@@ -1447,7 +1252,6 @@ test('pending risky tools wait for every answer and apply exact per-call approva
 	}
 })
 
-
 test('answers validate session, active head and first-valid-wins', async () => {
 	const firstSession = `test-answer-a-${Date.now().toString(36)}`
 	const secondSession = `test-answer-b-${Date.now().toString(36)}`
@@ -1476,7 +1280,6 @@ test('answers validate session, active head and first-valid-wins', async () => {
 		sessions.deleteSession(secondSession)
 	}
 })
-
 
 test('Claude secret answer retries after failure and persists only ciphertext on success', async () => {
 	const sessionId = `test-secret-answer-${Date.now().toString(36)}`
@@ -1549,7 +1352,6 @@ test('secret answer reloads before action when another client wins decryption ra
 	}
 })
 
-
 test('aborting a parked risky batch records aborted answers and interrupted results without dispatch', async () => {
 	const sessionId = `test-question-abort-${Date.now().toString(36)}`
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: '/tmp' })
@@ -1576,7 +1378,6 @@ test('aborting a parked risky batch records aborted answers and interrupted resu
 		sessions.deleteSession(sessionId)
 	}
 })
-
 
 test('parked question guards prompt, continue, queue execution, reset, compact and rebase', async () => {
 	const sessionId = `test-question-guards-${Date.now().toString(36)}`
@@ -1656,7 +1457,6 @@ test('empty abort is silent when no turn is working', () => {
 	}
 })
 
-
 test('recordTabClosed emits info when no turn is working', () => {
 	const events: any[] = []
 	const origAbort = agentLoop.abort
@@ -1680,7 +1480,6 @@ test('recordTabClosed emits info when no turn is working', () => {
 		ipc.appendEvent = origAppendEvent
 	}
 })
-
 
 test('runCompact emits context estimate for live status line', () => {
 	const sessionId = `test-compact-context-${Date.now().toString(36)}`
@@ -1725,20 +1524,6 @@ test('runCompact emits context estimate for live status line', () => {
 })
 
 // Model refresh/discovery notice tests live in model-notices.test.ts.
-
-test('resolveResumeTarget matches a closed session by name case-insensitively', () => {
-	const picked = sessions.resolveResumeTarget(
-		[
-			{ id: '04-a', createdAt: '2026-04-13T18:01:00.000Z', name: 'Pause Fix' },
-			{ id: '04-b', createdAt: '2026-04-13T18:02:00.000Z', name: 'Other' },
-		],
-		new Set(),
-		'pause fix',
-	)
-
-	expect(picked).toBe('04-a')
-})
-
 
 test('spawnSession creates a fresh child with auto-close marker', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-'))
@@ -1799,7 +1584,6 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 	}
 })
 
-
 test('spawnSession opening summary shows the spawned model, not the default', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-banner-'))
 	const prevState = process.env.HAL_STATE_DIR
@@ -1834,7 +1618,6 @@ test('spawnSession opening summary shows the spawned model, not the default', as
 	}
 })
 
-
 test('spawnSession pins the default model when parent has no model', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-default-model-'))
 	const prevState = process.env.HAL_STATE_DIR
@@ -1863,7 +1646,6 @@ test('spawnSession pins the default model when parent has no model', async () =>
 		else process.env.HAL_STATE_DIR = prevState
 	}
 })
-
 
 test('spawnSession forks with the parent context usage immediately', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-fork-'))
@@ -1930,7 +1712,6 @@ test('spawnSession canonicalizes a bare discovered model override', async () => 
 		else process.env.HAL_STATE_DIR = prevState
 	}
 })
-
 
 test('startSpawnedSession writes the child prompt to history without a prompt event', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-'))

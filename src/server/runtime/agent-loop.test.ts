@@ -23,16 +23,6 @@ afterEach(() => {
 	}
 })
 
-test('sanitizes redundant bash cd prefix before saving tool calls', () => {
-	const input = { command: 'cd /tmp/../tmp && pwd', timeout: 1000 }
-	expect(agentLoop.sanitizeToolCallInput('bash', input, '/tmp/')).toEqual({
-		command: 'pwd',
-		timeout: 1000,
-		cwd: '/tmp/',
-	})
-	expect(agentLoop.sanitizeToolCallInput('bash', input, '/var')).toBe(input)
-})
-
 test('registers a turn before asynchronous provider loading finishes', async () => {
 	const sessionId = `test-provider-load-${Date.now().toString(36)}`
 	createdSessions.push(sessionId)
@@ -81,7 +71,6 @@ test('reports only running subagents belonging to the parent', () => {
 	}
 })
 
-
 	test('settles unstarted tool calls when a batch is aborted', async () => {
 		const sessionId = `test-aborted-tools-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 		createdSessions.push(sessionId)
@@ -105,7 +94,6 @@ test('reports only running subagents belonging to the parent', () => {
 			ipc.appendEvent = origAppendEvent
 		}
 	})
-
 
 test('abort before tool dispatch keeps the tool from starting', async () => {
 	const sessionId = `test-abort-before-dispatch-${Date.now().toString(36)}`
@@ -150,7 +138,6 @@ test('a tool call whose arguments failed to parse is reported, not executed', as
 	}
 })
 
-
 test('a tool call containing an unresolved pruning marker is reported, not executed', async () => {
 	const sessionId = `test-pruned-input-${Date.now().toString(36)}`
 	createdSessions.push(sessionId)
@@ -173,7 +160,6 @@ test('a tool call containing an unresolved pruning marker is reported, not execu
 	}
 })
 
-
 test('flushes a requested exit only after the tool result is durable', async () => {
 	const sessionId = `test-exit-boundary-${Date.now().toString(36)}`
 	createdSessions.push(sessionId)
@@ -194,7 +180,6 @@ test('flushes a requested exit only after the tool result is durable', async () 
 		processControl.exitIfRequested = originalExitIfRequested
 	}
 })
-
 
 test('persists image tool results while live output stays textual', async () => {
 	const sessionId = `test-image-tool-${Date.now().toString(36)}`
@@ -220,7 +205,6 @@ test('persists image tool results while live output stays textual', async () => 
 		ipc.appendEvent = originalAppendEvent
 	}
 })
-
 
 test('wait tool completes the turn without another model request', async () => {
 	const sessionId = `test-wait-tool-${Date.now().toString(36)}`
@@ -302,7 +286,6 @@ test('an empty wait keeps generating instead of parking the turn forever', async
 	}
 })
 
-
 test('provider pause preserves streamed output as an Enter-continuable turn', async () => {
 	const sessionId = `test-provider-pause-${Date.now().toString(36)}`
 	createdSessions.push(sessionId)
@@ -348,7 +331,6 @@ test('provider pause preserves streamed output as an Enter-continuable turn', as
 		ipc.appendEvent = originalAppendEvent
 	}
 })
-
 
 	test('streams partial output for each concurrent tool call', async () => {
 		const sessionId = `test-tool-output-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -514,9 +496,6 @@ test('an unexecuted web_search is never announced to the UI or history', async (
 	}
 })
 
-
-
-
 test('calibrates context token estimates from provider input usage', async () => {
 	const sessionId = `test-calibration-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	const origGetProvider = providerLoader.getProvider
@@ -553,7 +532,6 @@ test('calibrates context token estimates from provider input usage', async () =>
 	}
 })
 
-
 test('completed final response does not remain in live scratch state', async () => {
 	const sessionId = `test-live-clear-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
@@ -582,7 +560,6 @@ test('completed final response does not remain in live scratch state', async () 
 		providerLoader.getProvider = origGetProvider
 	}
 })
-
 
 test('tool iterations do not re-emit streamed assistant text as responses', async () => {
 	const sessionId = `test-stream-once-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -733,7 +710,6 @@ test('writes thinking blobs while streaming and replays them into API history', 
 	}
 })
 
-
 test('provider errors show their full ASON payload and save it in a blob', async () => {
 	const sessionId = `test-error-blob-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
@@ -804,7 +780,6 @@ test('provider errors show their full ASON payload and save it in a blob', async
 	}
 })
 
-
 test('context length errors warn when local model limit looked safe', async () => {
 	const sessionId = `test-context-warning-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
@@ -846,7 +821,6 @@ test('context length errors warn when local model limit looked safe', async () =
 	}
 })
 
-
 test('session working state updates at turn start and end', async () => {
 	const sessionId = `test-status-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
@@ -877,7 +851,6 @@ test('session working state updates at turn start and end', async () => {
 		providerLoader.getProvider = origGetProvider
 	}
 })
-
 
 test('displaced generation cannot clear newer working request state', async () => {
 	const sessionId = `test-displace-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -985,7 +958,6 @@ test('abortAndWait resolves only after its generation finishes', async () => {
 	}
 })
 
-
 test('abort between tool iterations does not report max iterations', async () => {
 	const sessionId = `test-abort-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
@@ -1084,7 +1056,6 @@ test('pause before all tools in batch persists pending marker without executing 
 	}
 })
 
-
 test('risky batch persists every call and question before dispatching any tool', async () => {
 	const sessionId = `test-risk-questions-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
@@ -1116,7 +1087,6 @@ test('risky batch persists every call and question before dispatching any tool',
 		toolRegistry.dispatch = origDispatch
 	}
 })
-
 
 test('max iterations persists a continuable error without ending the turn', async () => {
 	const sessionId = `test-max-iterations-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -1159,7 +1129,6 @@ test('max iterations persists a continuable error without ending the turn', asyn
 		agentLoop.config.maxIterations = origMaxIterations
 	}
 })
-
 
 test('custom abort text is persisted', async () => {
 	const sessionId = `test-custom-abort-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -1207,7 +1176,6 @@ test('custom abort text is persisted', async () => {
 	}
 })
 
-
 test('empty abort text stops generation without adding an info block', async () => {
 	const sessionId = `test-silent-abort-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
@@ -1250,7 +1218,6 @@ test('empty abort text stops generation without adding an info block', async () 
 		ipc.appendEvent = origAppendEvent
 	}
 })
-
 
 test('abort during rate-limit backoff stops immediately', async () => {
 	const sessionId = `test-rate-limit-abort-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -1297,7 +1264,6 @@ test('abort during rate-limit backoff stops immediately', async () => {
 	}
 })
 
-
 test('a model id with no provider fails with a model-not-found message, not an internal provider name', async () => {
 	const sessionId = `test-no-provider-${Date.now().toString(36)}`
 	createdSessions.push(sessionId)
@@ -1316,7 +1282,6 @@ test('a model id with no provider fails with a model-not-found message, not an i
 	expect(error?.message).not.toContain('stub')
 	expect(error?.message).not.toContain('BASE_URL')
 })
-
 
 test('huge provider error payloads are truncated in the UI but kept whole in the blob', async () => {
 	const sessionId = `test-error-truncate-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`

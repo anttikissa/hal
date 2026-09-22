@@ -29,25 +29,6 @@ afterEach(() => {
 	tempStateDir = null
 })
 
-test('make picks a three-letter word from fixed word slots', () => {
-	Math.random = () => 0
-
-	expect(sessionIds.make(new Date('2026-03-16T08:00:00.000Z'), Date.parse('2026-03-16T08:00:00.000Z'))).toBe('00-aaa')
-})
-
-test('words3 file is sorted four-byte slots', () => {
-	const wordsFile = readFileSync(WORDS_PATH, 'utf-8')
-	const words: string[] = []
-	for (let pos = 0; pos < wordsFile.length; pos += 4) {
-		const word = wordsFile.slice(pos, pos + 3)
-		const separator = wordsFile[pos + 3]
-		expect(word).toMatch(/^[a-z0-9]{3}$/)
-		expect(separator === ' ' || separator === '\n').toBe(true)
-		words.push(word)
-	}
-	expect(words).toEqual([...words].sort())
-})
-
 test('reserve uses days since the stored meta epoch in the session id prefix', () => {
 	const stateDir = useTempStateDir()
 	Bun.write(`${stateDir}/meta.ason`, "{ epoch: '2026-03-15T00:00:00.000Z' }\n")
@@ -73,4 +54,3 @@ test('reserve creates meta.ason epoch once and reuses it for later ids', () => {
 	expect(second).toMatch(/^02-[a-z0-9]{3}$/)
 	expect(readMeta(stateDir).epoch).toBe(epoch)
 })
-

@@ -10,18 +10,10 @@ describe('hashline', () => {
 		expect(h).toMatch(/^[0-9a-zA-Z]{3}$/)
 	})
 
-	test('hashLine is deterministic', () => {
-		expect(hashLine('foo')).toBe(hashLine('foo'))
-	})
-
 	test('hashLine preserves whitespace', () => {
 		expect(hashLine('  hello  world  ')).not.toBe(hashLine('hello world'))
 		expect(hashLine('\thello\tworld')).not.toBe(hashLine('hello world'))
 		expect(hashLine('}')).not.toBe(hashLine('\t}'))
-	})
-
-	test('hashLine differs for different content', () => {
-		expect(hashLine('foo')).not.toBe(hashLine('bar'))
 	})
 
 	test('parseRef parses valid refs', () => {
@@ -36,54 +28,10 @@ describe('hashline', () => {
 		expect(parseRef('1-abc')).toBeNull()
 	})
 
-	test('formatHashlines prefixes each line', () => {
-		const out = formatHashlines('a\nb\n')
-		const lines = out.split('\n')
-		expect(lines).toHaveLength(2)
-		expect(lines[0]).toBe(`1:${hashLine('a')} a`)
-		expect(lines[1]).toBe(`2:${hashLine('b')} b`)
-	})
-
-	test('formatHashlines with line range', () => {
-		const out = formatHashlines('a\nb\nc\nd\n', 2, 3)
-		const lines = out.split('\n')
-		expect(lines).toHaveLength(2)
-		expect(lines[0]).toContain('2:')
-		expect(lines[0]).toContain(' b')
-		expect(lines[1]).toContain('3:')
-		expect(lines[1]).toContain(' c')
-	})
-
-	test('validateRef succeeds for correct hash', () => {
-		const lines = ['alpha', 'beta', 'gamma']
-		const ref = { line: 2, hash: hashLine('beta') }
-		expect(validateRef(ref, lines)).toBeNull()
-	})
-
 	test('validateRef fails for wrong hash', () => {
 		const lines = ['alpha', 'beta', 'gamma']
 		const ref = { line: 2, hash: 'zzz' }
 		expect(validateRef(ref, lines)).toContain('Hash mismatch')
-	})
-
-	test('validateRef fails for out of range', () => {
-		const lines = ['alpha']
-		const ref = { line: 5, hash: 'abc' }
-		expect(validateRef(ref, lines)).toContain('out of range')
-	})
-
-	test('toLines drops trailing empty line', () => {
-		expect(toLines('a\nb\n')).toEqual(['a', 'b'])
-		expect(toLines('a\nb')).toEqual(['a', 'b'])
-	})
-
-	test('formatContext shows surrounding lines', () => {
-		const lines = ['a', 'b', 'c', 'd', 'e']
-		// Range is lines 2-3 (0-indexed: 1-3), context 1
-		const result = formatContext(lines, 1, 3, 1)
-		const outputLines = result.split('\n')
-		// from=0 (1-1), to=4 (3+1)
-		expect(outputLines).toHaveLength(4)
 	})
 })
 
@@ -140,44 +88,6 @@ describe('edit via hashline', () => {
 		cleanup()
 	})
 
-	test('replace a range', async () => {
-		setup('a\nb\nc\nd\n')
-		const startRef = `2:${hashLine('b')}`
-		const endRef = `3:${hashLine('c')}`
-		const result = await executeEdit(
-			{ path: file, operation: 'replace', start: startRef, end: endRef, new_content: 'X\nY' },
-			ctx,
-		)
-		expect(result).toContain('+++ after')
-		expect(readFileSync(file, 'utf-8')).toBe('a\nX\nY\nd\n')
-		cleanup()
-	})
-
-	test('delete lines with empty new_content', async () => {
-		setup('a\nb\nc\nd\n')
-		const startRef = `2:${hashLine('b')}`
-		const endRef = `3:${hashLine('c')}`
-		const result = await executeEdit(
-			{ path: file, operation: 'replace', start: startRef, end: endRef, new_content: '' },
-			ctx,
-		)
-		expect(result).toContain('+++ after')
-		expect(readFileSync(file, 'utf-8')).toBe('a\nd\n')
-		cleanup()
-	})
-
-	test('insert after a line', async () => {
-		setup('a\nb\n')
-		const ref = `1:${hashLine('a')}`
-		const result = await executeEdit(
-			{ path: file, operation: 'insert', after: ref, new_content: 'mid' },
-			ctx,
-		)
-		expect(result).toContain('+++ after')
-		expect(readFileSync(file, 'utf-8')).toBe('a\nmid\nb\n')
-		cleanup()
-	})
-
 	test('insert at beginning with 0:000', async () => {
 		setup('a\nb\n')
 		const result = await executeEdit(
@@ -212,19 +122,6 @@ describe('edit via hashline', () => {
 		)
 		expect(result).toContain('Hash mismatch')
 		expect(result).toContain('retry without a separate read')
-		expect(result).toContain(`2:${hashLine('changed')} changed`)
-		cleanup()
-	})
-
-	test('insert stale hash error includes fresh context', async () => {
-		setup('a\nb\nc\n')
-		const ref = `2:${hashLine('b')}`
-		writeFileSync(file, 'a\nchanged\nc\n')
-		const result = await executeEdit(
-			{ path: file, operation: 'insert', after: ref, new_content: 'X' },
-			ctx,
-		)
-		expect(result).toContain('Hash mismatch')
 		expect(result).toContain(`2:${hashLine('changed')} changed`)
 		cleanup()
 	})

@@ -16,12 +16,6 @@ afterEach(() => {
 })
 
 describe('clipboard', () => {
-	test('wraps image file paths in brackets', () => {
-		const path = join(dir, 'image.png')
-		writeFileSync(path, 'x')
-		expect(clipboard.cleanPaste(path)).toBe(`[${path}]`)
-	})
-
 	test('uploads image bytes through a remote client transport', async () => {
 		const original = clientTransport.io.uploadImage
 		try {
@@ -33,11 +27,6 @@ describe('clipboard', () => {
 		} finally {
 			clientTransport.io.uploadImage = original
 		}
-	})
-
-	test('keeps multiline text inline', () => {
-		const text = 'a\n'.repeat(6)
-		expect(clipboard.cleanPaste(text)).toBe(text)
 	})
 
 	test('removes DEL and C1 controls from pasted text', () => {

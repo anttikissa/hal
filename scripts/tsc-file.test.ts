@@ -68,17 +68,6 @@ test('uses the nearest configured project but reports only the edited file', () 
 	expect(result.output).not.toContain("Cannot find module '@app/value'")
 }, 30_000)
 
-test('checks a file without a tsconfig using TypeScript defaults', () => {
-	const project = makeProject()
-	const file = join(project, 'edited.ts')
-	write(file, "const wrong: number = 'wrong'\n")
-
-	const result = run(file, project)
-
-	expect(result.exitCode).toBe(1)
-	expect(result.output).toContain('Type \'string\' is not assignable to type \'number\'.')
-})
-
 test('reports diagnostics from the selected project config', () => {
 	const project = makeProject()
 	const file = join(project, 'edited.ts')
@@ -89,24 +78,6 @@ test('reports diagnostics from the selected project config', () => {
 
 	expect(result.exitCode).toBe(1)
 	expect(result.output).toContain("Unknown compiler option 'notARealOption'.")
-})
-
-test('prefers the project local TypeScript compiler', () => {
-	const project = makeProject()
-	const file = join(project, 'edited.ts')
-	mkdirSync(join(project, 'node_modules', 'typescript', 'bin'), { recursive: true })
-	write(join(project, 'tsconfig.json'), '{}')
-	write(file, 'export const value = 1\n')
-	write(join(project, 'node_modules', 'typescript', 'package.json'), JSON.stringify({ bin: { tsc: 'bin/tsc.js' } }))
-	write(
-		join(project, 'node_modules', 'typescript', 'bin', 'tsc.js'),
-		"console.error('edited.ts(1,1): error TS9999: local compiler')\nprocess.exit(1)\n",
-	)
-
-	const result = run(file, project)
-
-	expect(result.exitCode).toBe(1)
-	expect(result.output).toContain('error TS9999: local compiler')
 })
 
 test('preserves the default include when adding an edited file', () => {

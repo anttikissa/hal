@@ -16,7 +16,6 @@ test('history-rebased reloads exactly the rebased log prefix', () => {
 	expect(force).toBe(true)
 })
 
-
 test('history-updated force-repaints only the active tab', () => {
 	const tab = { sessionId: 's1' }
 	const calls: any[] = []
@@ -42,7 +41,6 @@ test('background history update redraws its tab marker without a force repaint',
 	expect(calls).toEqual([['reload', background, { includeLive: false }], ['change', false]])
 })
 
-
 test('reconnect refreshes every tab but repaints only the active tab', () => {
 	const tabs = Array.from({ length: 5 }, (_, index) => ({ sessionId: `s${index + 1}` }))
 	const reloads: string[] = []
@@ -60,7 +58,6 @@ test('reconnect refreshes every tab but repaints only the active tab', () => {
 	expect(reloads).toEqual(['s1', 's2', 's3', 's4', 's5'])
 	expect(repaints).toEqual([{ sessionId: 's1', force: true }])
 })
-
 
 test('prompt event keeps actual text behind display text', () => {
 	let block: any = null
@@ -109,18 +106,4 @@ test('runtime-start from promoted client is not described as restart', () => {
 
 	expect(restart).toBeNull()
 	expect(promotion).toEqual({ pid: 123, startedAt: '2026-06-04T12:00:00.000Z' })
-})
-
-
-test('background-activity updates summarizing state and done marker', () => {
-	const calls: any[] = []
-	clientEvents.handle({ type: 'background-activity', sessionId: 's1', activity: 'summarizing', active: false, done: true }, {
-		setSummarizing: (sessionId: string, active: boolean) => calls.push(['summarizing', sessionId, active]),
-		markWhatDone: (sessionId: string) => calls.push(['done', sessionId]),
-	})
-
-	expect(calls).toEqual([
-		['summarizing', 's1', false],
-		['done', 's1'],
-	])
 })

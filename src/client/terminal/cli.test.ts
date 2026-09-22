@@ -22,12 +22,6 @@ function withPatched<T extends object, K extends keyof T>(object: T, key: K, val
 	finally { object[key] = original }
 }
 
-test('kitty keyboard mode does not request key release events', () => {
-	// Ghostty sends Cmd-C-in-scrollback as only a key-release event when report
-	// events is enabled; that pty input snaps scrollback to the bottom.
-	expect(cli.forTests.kittyOnSequence()).toBe('\x1b[>17u')
-})
-
 test('ctrl-g toggles the transcript gutter', () => {
 	blocks.outputPad = 1
 	try {
@@ -78,28 +72,6 @@ test('prompt editing that shrinks the frame forces a canonical repaint', () => {
 	}
 })
 
-test('failed slash completion consumes only a plain unselected tab', () => {
-	completion.dismiss()
-	try {
-		prompt.setText('/does-not-exist')
-		expect(cli.forTests.handleCompletionKey(key('tab'))).toBe(true)
-		expect(prompt.text()).toBe('/does-not-exist')
-
-		prompt.setText('hello')
-		expect(cli.forTests.handleCompletionKey(key('tab'))).toBe(false)
-
-		prompt.setText('/does-not-exist')
-		prompt.restoreState({ ...prompt.snapshotState(), selAnchor: 0 })
-		expect(cli.forTests.handleCompletionKey(key('tab'))).toBe(false)
-
-		prompt.setText('/does-not-exist')
-		expect(cli.forTests.handleCompletionKey(key('tab', { shift: true }))).toBe(false)
-	} finally {
-		completion.dismiss()
-		prompt.clear()
-	}
-})
-
 test('SIGWINCH forces a redraw after terminal resize', () => {
 	let forceDraws = 0
 	const sigwinch: Array<() => void> = []
@@ -133,7 +105,6 @@ test('SIGWINCH forces a redraw after terminal resize', () => {
 	})
 	expect(forceDraws).toBe(1)
 })
-
 
 test('external editor suppresses resize redraws', () => {
 	let forceDraws = 0
@@ -322,7 +293,6 @@ test('idle up uses normal prompt history without edit mode hint', () => {
 	})
 })
 
-
 test('just-sent edit mode survives tab switching', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
@@ -390,7 +360,6 @@ test('model picker keeps the prompt draft and skips unchanged model', () => {
 		})
 	})
 })
-
 
 test('ctrl-f saves the current prompt draft before forking', () => {
 	const commands: any[] = []

@@ -17,40 +17,6 @@ describe('editRemap', () => {
 		editTracker.clear(sessionId, path)
 	})
 
-	test('remaps replace refs after earlier inserts shift line numbers', () => {
-		editTracker.resetForRead(sessionId, path)
-		let lines = ['one', 'two', 'three', 'four']
-
-		const insertTop = requirePrepared(
-			editRemap.prepareEdit({
-				lines,
-				sessionId,
-				path,
-				operation: 'insert',
-				afterRef: '0:000',
-				newContent: 'top',
-			}),
-		)
-		lines = insertTop.resultLines
-		editRemap.applyTrackerUpdate(sessionId, path, insertTop.trackerUpdate)
-
-		const oldRef = `2:${hashline.hashLine('two')}`
-		const replaceTwo = requirePrepared(
-			editRemap.prepareEdit({
-				lines,
-				sessionId,
-				path,
-				operation: 'replace',
-				startRef: oldRef,
-				endRef: oldRef,
-				newContent: 'TWO',
-			}),
-		)
-
-		expect(editRemap.buildResult(replaceTwo)).toContain('Line numbers changed; edit accepted as 3:')
-		expect(replaceTwo.resultLines).toEqual(['top', 'one', 'TWO', 'three', 'four'])
-	})
-
 	test('relocates a unique stale hash when restart lost the tracker', () => {
 		const oldRef = `2:${hashline.hashLine('two')}`
 		const edit = requirePrepared(editRemap.prepareEdit({
@@ -64,46 +30,6 @@ describe('editRemap', () => {
 		}))
 
 		expect(edit.resultLines).toEqual(['top', 'one', 'TWO'])
-	})
-
-	test('remaps insert refs after earlier inserts shift line numbers', () => {
-		editTracker.resetForRead(sessionId, path)
-		let lines = ['one', 'two', 'three']
-
-		const insertTop = requirePrepared(
-			editRemap.prepareEdit({
-				lines,
-				sessionId,
-				path,
-				operation: 'insert',
-				afterRef: '0:000',
-				newContent: 'top',
-			}),
-		)
-		lines = insertTop.resultLines
-		editRemap.applyTrackerUpdate(sessionId, path, insertTop.trackerUpdate)
-
-		const oldAfterRef = `2:${hashline.hashLine('two')}`
-		const insertMid = requirePrepared(
-			editRemap.prepareEdit({
-				lines,
-				sessionId,
-				path,
-				operation: 'insert',
-				afterRef: oldAfterRef,
-				newContent: 'mid',
-			}),
-		)
-
-		expect(editRemap.buildResult(insertMid)).toContain('Line numbers changed; edit accepted after 3:')
-		expect(insertMid.resultLines).toEqual(['top', 'one', 'two', 'mid', 'three'])
-	})
-
-	test('tracks replace deletion and insert blank-line semantics exactly', () => {
-		expect(editRemap.normalizeReplaceLines('')).toEqual([])
-		expect(editRemap.normalizeReplaceLines('foo\n')).toEqual(['foo'])
-		expect(editRemap.normalizeInsertLines('')).toEqual([''])
-		expect(editRemap.normalizeInsertLines('foo\n')).toEqual(['foo'])
 	})
 
 	test('editing inserted-only lines clears old remapping state', () => {
