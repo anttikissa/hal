@@ -297,6 +297,7 @@ async function refreshCredential(credential: Credential, force = false): Promise
 	const lastFetch = existing?.fetchedAt ? Date.parse(existing.fetchedAt) : 0
 	if (!force && existing && lastFetch && Date.now() - lastFetch < config.minAutoRefreshMs) return existing
 	const account = await fetchUsage(credential)
+	if (!account.email) account.email = existing?.email
 	subscriptionLog.observe(
 		'openai',
 		key,

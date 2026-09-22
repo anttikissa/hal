@@ -160,6 +160,21 @@ test('status table identifies every account whose token expired', async () => {
 	expect(text).toContain('| 2/2 | valid@test.com (plus) |')
 })
 
+test('token expiry keeps the email cached from prior usage', async () => {
+	auth.ensureFresh = async () => {}
+	auth.listCredentials = () => [{ ...makeCredential(0, ''), email: undefined }]
+	openaiUsage.state.accounts = {
+		'openai:0': { key: 'openai:0', email: 'known@test.com', index: 0, total: 1 },
+	}
+	globalThis.fetch = Object.assign(async () => {
+		return new Response(JSON.stringify({ error: { code: 'token_expired' } }), { status: 401 }) as any
+	}, { preconnect: () => {} }) as typeof fetch
+
+	await openaiUsage.refreshAll(true)
+
+	expect(openaiUsage.all()[0]?.email).toBe('known@test.com')
+})
+
 test('refreshAll drops cached rows for old credential keys', async () => {
 	auth.ensureFresh = async () => {}
 	auth.listCredentials = () => [
