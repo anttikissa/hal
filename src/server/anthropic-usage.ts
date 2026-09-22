@@ -318,7 +318,7 @@ async function renderStatus(force = true): Promise<string> {
 		return formatStatusText()
 	} catch (err: any) {
 		const suffix = err?.message ? String(err.message) : String(err)
-		return all().length > 0 ? `${formatStatusText()}\n\nRefresh failed: ${suffix}` : `Anthropic subscription usage unavailable: ${suffix}`
+		return all().length > 0 ? `${formatStatusText()}\n\nRefresh failed: Anthropic: ${suffix}` : `Anthropic subscription usage unavailable: ${suffix}`
 	}
 }
 

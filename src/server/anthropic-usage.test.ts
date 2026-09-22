@@ -158,6 +158,25 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 	expect(text).toContain(`| 1/2 * | a\\*\\*\\*@l\\*\\*\\*.fi | ${subscriptionUsage.usageBarMarker(68, 14)}`)
 })
 
+test('renderStatus identifies Anthropic when a cached usage refresh fails', async () => {
+	auth.ensureFresh = async () => {}
+	auth.listCredentials = () => [makeCredential(0, 'a@test.com')]
+	anthropicUsage.state.accounts = {
+		'anthropic:0': {
+			key: 'anthropic:0',
+			email: 'a@test.com',
+			index: 0,
+			total: 1,
+			fiveHour: { usedPercent: 10 },
+		},
+	}
+	globalThis.fetch = Object.assign(async () => new Response('OAuth access token has been revoked.', { status: 401 }), { preconnect: () => {} }) as typeof fetch
+
+	const text = await anthropicUsage.renderStatus(true)
+
+	expect(text).toContain('Refresh failed: Anthropic: /api/oauth/usage 401: OAuth access token has been revoked.')
+})
+
 test('records only changed fresh Anthropic quota observations', async () => {
 	auth.ensureFresh = async () => {}
 	const credential = { ...makeCredential(0, 'private@test.com'), _key: 'anthropic:private@test.com' }

@@ -261,7 +261,7 @@ async function renderStatus(force = true): Promise<string> {
 		return formatStatusText()
 	} catch (err: any) {
 		const suffix = err?.message ? String(err.message) : String(err)
-		return all().length > 0 ? `${formatStatusText()}\n\nRefresh failed: ${suffix}` : `OpenCode Go usage unavailable: ${suffix}`
+		return all().length > 0 ? `${formatStatusText()}\n\nRefresh failed: OpenCode Go: ${suffix}` : `OpenCode Go usage unavailable: ${suffix}`
 	}
 }
 
