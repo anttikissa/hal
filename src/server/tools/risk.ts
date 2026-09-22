@@ -83,8 +83,8 @@ function checkShell(command: string, out: RiskFinding[]): void {
 	checkText(command, out)
 	// Each check matches against the original command so the finding can report
 	// the offending text verbatim for highlighting.
-	const rmRf = command.match(/\brm\s+[^\n;&|]*-[^\n;&|]*r[^\n;&|]*f[^\n;&|]*|\brm\s+[^\n;&|]*-[^\n;&|]*f[^\n;&|]*r[^\n;&|]*/i)
-	if (rmRf && !rmRfIsOnlySafeTmp(command)) add(out, 'danger', 'DESTRUCTIVE RM -RF COMMAND', rmRf[0].trim())
+	const rm = command.match(/\brm\s+-r?f\b[^\n;&|]*/i)
+	if (rm && (!rm[0].toLowerCase().startsWith('rm -rf') || !rmRfIsOnlySafeTmp(command))) add(out, 'danger', 'Destructive rm command', rm[0].trim())
 	const patterns: Array<[RegExp, string]> = [
 		[/\bgit\s+reset\s+--hard\b[^\n;&|]*/i, 'DESTRUCTIVE GIT RESET --HARD'],
 		[/\bgit\s+clean\b[^\n;&|]*-[^\n;&|]*[xfd][^\n;&|]*/i, 'DESTRUCTIVE GIT CLEAN'],

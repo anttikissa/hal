@@ -12,11 +12,15 @@ test('rm -rf inside a specific /tmp child does not warn', () => {
 })
 
 test('broad or non-temp rm -rf warns', () => {
-	expect(reasons('rm -rf *')).toContain('DESTRUCTIVE RM -RF COMMAND')
-	expect(reasons('rm -rf .')).toContain('DESTRUCTIVE RM -RF COMMAND')
-	expect(reasons('rm -rf /tmp')).toContain('DESTRUCTIVE RM -RF COMMAND')
-	expect(reasons('rm -rf /tmp/*')).toContain('DESTRUCTIVE RM -RF COMMAND')
-	expect(reasons('rm -rf "$HOME/project"')).toContain('DESTRUCTIVE RM -RF COMMAND')
+	expect(reasons('rm -rf *')).toContain('Destructive rm command')
+	expect(reasons('rm -rf .')).toContain('Destructive rm command')
+	expect(reasons('rm -rf /tmp')).toContain('Destructive rm command')
+	expect(reasons('rm -rf /tmp/*')).toContain('Destructive rm command')
+	expect(reasons('rm -rf "$HOME/project"')).toContain('Destructive rm command')
+})
+
+test('rm -f warns even for a single local file', () => {
+	expect(reasons('rm -f local/facebook-cookies.txt headless-update')).toContain('Destructive rm command')
 })
 
 test('destructive git commands warn but plain stash does not', () => {
