@@ -26,7 +26,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Put one-off scripts in `/tmp`
 - Avoid backwards compatibility code by default. Hal is under heavy development and breaking changes are expected. Keep the code minimal and free of legacy clutter
 
-- Keep model aliases current across routine minor-version updates. Ask before making a substantially more expensive model the default.
+- Keep model aliases current across routine minor-version updates. For a promising new default, say so plainly and ask if the user wants to try it. Mention a material caveat briefly, not before the recommendation; ask before switching to a substantially more expensive model.
 
 # Subagents
 
@@ -55,24 +55,6 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Write human-readable, simple and boring code. `if` over ternaries. `for of` over `.map()`. No clever one-liners.
 - Explain in comments non-obvious tricks like "process.kill(serverPid, 0)" (which looks like it kills a process but doesn't).
 
-# Eval-friendliness
-
-All modules must be designed to be safely hot-patchable at runtime through the eval tool. This means:
-
-A single mutable namespace object:
-```
-// service.ts (generic example, not a real file)
-function start(): void { ... }
-function stop(): void { ... }
-let state = {
-	running: false,
-	// ...
-}
-export const service = { state, start, stop, ... }
-```
-
-Avoid constants and private functions because those cannot be changed with eval.
-
 # Logging and user-visible messages
 
 - Avoid console.log.
@@ -89,7 +71,7 @@ Avoid constants and private functions because those cannot be changed with eval.
 
 # Module convention
 
-Every module exports a single mutable namespace object. All cross-module calls go through these objects, so eval patches take effect immediately at runtime.
+Every module exports a single mutable namespace object. Route cross-module calls through it and avoid private functions that cannot be patched via eval.
 
 ```ts
 // service.ts (generic example, not a real file)
