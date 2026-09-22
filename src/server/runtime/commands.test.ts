@@ -748,11 +748,11 @@ test('/model changes session model and user-visible output', async () => {
 
 test('/model is quiet when the resolved model is unchanged', async () => {
 	const session = makeSession()
-	session.model = 'openai/gpt-5.6-terra'
+	session.model = 'openai/gpt-6-sol'
 	const result = await commands.executeCommand('/model gpt', session)
 
 	expect(result.handled).toBe(true)
-	expect(session.model).toBe('openai/gpt-5.6-terra')
+	expect(session.model).toBe('openai/gpt-6-sol')
 	expect(result.output).toBeUndefined()
 	expect(result.ui).toBeUndefined()
 })

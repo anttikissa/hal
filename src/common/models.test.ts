@@ -44,12 +44,6 @@ test('an unknown model with no registry name falls back to its bare id', () => {
 	expect(models.displayModel('openrouter/stealth/ox-alpha')).toBe('stealth/ox-alpha')
 })
 
-test('gpt and openai aliases resolve to the terra tier', () => {
-	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.6-terra')
-	expect(models.resolveModel('openai')).toBe('openai/gpt-5.6-terra')
-})
-
-
 test('sol and luna aliases resolve to GPT-6 while terra remains on GPT-5.6', () => {
 	expect(models.resolveModel('sol')).toBe('openai/gpt-6-sol')
 	expect(models.resolveModel('terra')).toBe('openai/gpt-5.6-terra')
@@ -101,7 +95,7 @@ test('hydrated tier aliases track newer generations but ignore pro variants', ()
 		'gpt-5.8-sol-pro': 1_050_000,
 	})
 	expect(models.resolveModel('terra')).toBe('openai/gpt-5.7-terra')
-	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.7-terra')
+	expect(models.resolveModel('gpt')).toBe('openai/gpt-6-sol')
 	expect(models.resolveModel('sol')).toBe('openai/gpt-6-sol')
 })
 
@@ -113,26 +107,13 @@ test('updated anthropic aliases avoid dated model ids', () => {
 })
 
 
-test('default model resolves to gpt-5.6-terra', () => {
-	const origDefault = models.config.default
-	try {
-		models.config.default = 'gpt'
-		expect(models.defaultModel()).toBe('openai/gpt-5.6-terra')
-	} finally {
-		models.config.default = origDefault
-	}
-})
-
 test('model picker lists updated frontier aliases', () => {
 	expect(models.listModelChoices().find((item) => item.value === 'gpt')).toMatchObject({
 		value: 'gpt',
-		label: expect.stringContaining('GPT 5.6 Terra'),
-		search: expect.stringContaining('openai/gpt-5.6-terra'),
-	})
-	expect(models.listModelChoices().find((item) => item.value === 'sol')).toMatchObject({
-		value: 'sol',
+		label: expect.stringContaining('GPT 6 Sol'),
 		search: expect.stringContaining('openai/gpt-6-sol'),
 	})
+	expect(models.listModelChoices().find((item) => item.value === 'terra')).toMatchObject({ fullId: 'openai/gpt-5.6-terra' })
 	expect(models.listModelChoices().find((item) => item.value === 'luna')).toMatchObject({
 		value: 'luna',
 		search: expect.stringContaining('openai/gpt-6-luna'),
@@ -266,7 +247,7 @@ test('model picker choices list newest curated versions first', () => {
 })
 
 
-test('model picker and aliases use the newest Anthropic model from catalog or cache; GPT falls back to catalog terra', () => {
+test('model picker and aliases use the newest Anthropic model from catalog or cache; GPT falls back to catalog Sol', () => {
 	models.state.cache = {
 		'claude-opus-4-7': 1_000_000,
 		'claude-opus-4-8': 1_000_000,
@@ -279,12 +260,12 @@ test('model picker and aliases use the newest Anthropic model from catalog or ca
 	expect(models.resolveModel('opus')).toBe('anthropic/claude-opus-5-5')
 	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-5-5')
 	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-5')
-	// No tier models in cache: the gpt alias falls back to the catalog terra entry.
-	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.6-terra')
-	expect(models.resolveModel('openai')).toBe('openai/gpt-5.6-terra')
+	// No tier models in cache: the gpt alias falls back to the catalog Sol entry.
+	expect(models.resolveModel('gpt')).toBe('openai/gpt-6-sol')
+	expect(models.resolveModel('openai')).toBe('openai/gpt-6-sol')
 	expect(models.listModelChoices().find((item) => item.value === 'opus')).toMatchObject({ search: expect.stringContaining('anthropic/claude-opus-5-5') })
 	expect(models.listModelChoices().find((item) => item.value === 'sonnet')).toMatchObject({ search: expect.stringContaining('anthropic/claude-sonnet-5') })
-	expect(models.listModelChoices().find((item) => item.value === 'gpt')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.6-terra') })
+	expect(models.listModelChoices().find((item) => item.value === 'gpt')).toMatchObject({ search: expect.stringContaining('openai/gpt-6-sol') })
 	expect(models.listModelChoices().find((item) => item.value === 'gpt-5.6')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.6') })
 	expect(models.modelCompletionNames()).toContain('opus-5-5')
 })
