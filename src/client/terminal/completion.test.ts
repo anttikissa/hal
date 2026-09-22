@@ -158,16 +158,16 @@ test('/model completes current model aliases and bare model ids', () => {
 
 test('/model completes the latest cached Opus shortcut before older versions', () => {
 	models.state.cache = {
-		'claude-opus-5': 1_000_000,
-		'claude-opus-5-1': 1_000_000,
+		'claude-opus-5-5': 1_000_000,
+		'claude-opus-5-6': 1_000_000,
 	}
 
 	const result = completion.complete('/model opus-5', '/model opus-5'.length)
 
 	expect(result).not.toBeNull()
-	expect(result!.items).toContain('/model opus-5-1')
-	expect(result!.items).not.toContain('/model opus-5')
-	expect(result!.prefix).toBe('/model opus-5-1')
+	expect(result!.items).toContain('/model opus-5-6')
+	expect(result!.items).not.toContain('/model opus-5-5')
+	expect(result!.prefix).toBe('/model opus-5-6')
 })
 
 

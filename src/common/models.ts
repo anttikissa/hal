@@ -24,16 +24,18 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'HAL', alias: 'intro', fullId: 'hal/intro', fallbackContext: 1_000_000, initialTurn: true },
 	{ group: 'HAL', alias: 'scroll', fullId: 'hal/scroll', fallbackContext: 1_000_000 },
 	{ group: 'HAL', alias: 'table', fullId: 'hal/table', fallbackContext: 1_000_000 },
-	{ group: 'Anthropic', alias: 'opus', aliases: ['anthropic', 'claude'], fullId: 'anthropic/claude-opus-5', fallbackContext: 1_000_000, pricing: { input: 5, output: 25 }, track: 'opus' },
+	{ group: 'Anthropic', alias: 'opus', aliases: ['anthropic', 'claude'], fullId: 'anthropic/claude-opus-5-5', fallbackContext: 1_000_000, pricing: { input: 4, output: 20 }, track: 'opus' },
 	{ group: 'Anthropic', alias: 'sonnet', fullId: 'anthropic/claude-sonnet-5', fallbackContext: 1_000_000, pricing: { input: 3, output: 15 }, track: 'sonnet' },
 	{ group: 'Anthropic', alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5', fallbackContext: 200_000, pricing: { input: 1, output: 5 }, track: 'haiku' },
 	{ group: 'Anthropic', alias: 'fable', fullId: 'anthropic/claude-fable-5-1', fallbackContext: 1_000_000, pricing: { input: 10, output: 50 }, track: 'fable' },
 	// GPT tiers since 5.6: sol = flagship, terra = everyday/default, luna = fast+cheap.
-	// The plain-numbered gpt-X.Y line ended at 5.5; "gpt" tracks the terra tier.
+	// GPT-6 has no Terra release, so "gpt" stays on 5.6 while Sol and Luna move to 6.
 	{ group: 'OpenAI', alias: 'astra', fullId: 'openai/gpt-6-astra', fallbackContext: 1_050_000, pricing: { input: 10, output: 50 } },
-	{ group: 'OpenAI', alias: 'gpt', aliases: ['openai', 'terra'], fullId: 'openai/gpt-5.6-terra', fallbackContext: 1_050_000, pricing: { input: 2.5, output: 15 }, track: 'terra' },
-	{ group: 'OpenAI', alias: 'sol', fullId: 'openai/gpt-5.6-sol', fallbackContext: 1_050_000, pricing: { input: 5, output: 30 }, track: 'sol' },
-	{ group: 'OpenAI', alias: 'luna', fullId: 'openai/gpt-5.6-luna', fallbackContext: 1_050_000, pricing: { input: 1, output: 6 }, track: 'luna' },
+	{ group: 'OpenAI', alias: 'gpt', aliases: ['openai', 'terra'], fullId: 'openai/gpt-5.6-terra', fallbackContext: 1_050_000, pricing: { input: 2, output: 12 }, track: 'terra' },
+	{ group: 'OpenAI', alias: 'sol', fullId: 'openai/gpt-6-sol', fallbackContext: 1_050_000, pricing: { input: 2, output: 10 }, track: 'sol' },
+	{ group: 'OpenAI', alias: 'luna', fullId: 'openai/gpt-6-luna', fallbackContext: 1_050_000, pricing: { input: 0.1, output: 0.5 }, track: 'luna' },
+	{ group: 'OpenAI', alias: 'gpt-5.6-sol', fullId: 'openai/gpt-5.6-sol', fallbackContext: 1_050_000, pricing: { input: 4, output: 20 } },
+	{ group: 'OpenAI', alias: 'gpt-5.6-luna', fullId: 'openai/gpt-5.6-luna', fallbackContext: 1_050_000, pricing: { input: 0.2, output: 1.2 } },
 	{ group: 'OpenAI', alias: 'gpt-5.5', fullId: 'openai/gpt-5.5', fallbackContext: 1_050_000 },
 	{ group: 'OpenAI', alias: 'gpt-5.4', fullId: 'openai/gpt-5.4', fallbackContext: 1_050_000 },
 	{ group: 'OpenAI', alias: 'gpt-5.6', fullId: 'openai/gpt-5.6', fallbackContext: 1_050_000 },
@@ -179,7 +181,7 @@ function reasoningEffort(fullId: string | undefined): string {
 	if (!fullId) return ''
 	const modelId = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
 	if (modelId.includes('codex')) return 'xhigh'
-	if (/^o\d/.test(modelId) || /^gpt-5\./.test(modelId) || modelId.startsWith('gpt-6-astra')) return 'high'
+	if (/^o\d/.test(modelId) || /^gpt-5\./.test(modelId) || modelId.startsWith('gpt-6-')) return 'high'
 	return ''
 }
 
@@ -361,16 +363,18 @@ function parseGptCandidate(modelId: string): ModelCandidate | null {
 	}
 }
 
-// GPT tier IDs like gpt-5.6-terra. Excludes -pro variants (API/Pro-plan only,
-// rejected by the ChatGPT subscription backend).
+// GPT tier IDs use gpt-5.6-terra or, from GPT-6 onward, gpt-6-sol. Excludes
+// -pro variants (API/Pro-plan only, rejected by the ChatGPT subscription backend).
 function parseGptTierCandidate(tier: 'sol' | 'terra' | 'luna', modelId: string): ModelCandidate | null {
-	const match = modelId.match(new RegExp(`^gpt-(\\d+)\\.(\\d+)-${tier}$`))
+	const match = modelId.match(new RegExp(`^gpt-(\\d+)(?:\\.(\\d+))?-${tier}$`))
 	if (!match) return null
-	return {
-		canonical: `gpt-${match[1]}.${match[2]}-${tier}`,
-		version: [Number(match[1]), Number(match[2])],
-		stability: 1,
+	const version = [Number(match[1])]
+	let canonicalVersion = match[1]!
+	if (match[2]) {
+		version.push(Number(match[2]))
+		canonicalVersion += `.${match[2]}`
 	}
+	return { canonical: `gpt-${canonicalVersion}-${tier}`, version, stability: 1 }
 }
 
 function parseCodexCandidate(modelId: string): ModelCandidate | null {
@@ -711,7 +715,7 @@ function addOpenAiChoices(items: ModelChoice[]): void {
 			// terra is the "gpt" default alias; sol/luna use their own tier aliases.
 			const alias = tier === 'terra' ? 'gpt' : tier
 			const value = aliasFullId(alias) === fullId ? alias : candidate.canonical
-			choices.push({ candidate, suffix: `${versionLeaf(candidate.version, true)}-${tier}`, value, fullId })
+			choices.push({ candidate, suffix: `${versionLeaf(candidate.version, candidate.version.length > 1)}-${tier}`, value, fullId })
 		}
 	}
 	for (const candidate of curatedCandidates(parseCodexCandidate, 5)) {

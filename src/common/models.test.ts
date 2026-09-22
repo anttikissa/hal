@@ -50,10 +50,21 @@ test('gpt and openai aliases resolve to the terra tier', () => {
 })
 
 
-test('sol, terra, and luna aliases resolve to gpt-5.6 tier models', () => {
-	expect(models.resolveModel('sol')).toBe('openai/gpt-5.6-sol')
+test('sol and luna aliases resolve to GPT-6 while terra remains on GPT-5.6', () => {
+	expect(models.resolveModel('sol')).toBe('openai/gpt-6-sol')
 	expect(models.resolveModel('terra')).toBe('openai/gpt-5.6-terra')
-	expect(models.resolveModel('luna')).toBe('openai/gpt-5.6-luna')
+	expect(models.resolveModel('luna')).toBe('openai/gpt-6-luna')
+	expect(models.reasoningEffort('openai/gpt-6-sol')).toBe('high')
+	expect(models.reasoningEffort('openai/gpt-6-luna')).toBe('high')
+})
+
+test('curated prices match current standard API rates', () => {
+	expect(models.pricing('openai/gpt-6-sol')).toEqual({ input: 2, output: 10 })
+	expect(models.pricing('openai/gpt-6-luna')).toEqual({ input: 0.1, output: 0.5 })
+	expect(models.pricing('openai/gpt-5.6-terra')).toEqual({ input: 2, output: 12 })
+	expect(models.pricing('openai/gpt-5.6-sol')).toEqual({ input: 4, output: 20 })
+	expect(models.pricing('openai/gpt-5.6-luna')).toEqual({ input: 0.2, output: 1.2 })
+	expect(models.pricing('anthropic/claude-opus-5-5')).toEqual({ input: 4, output: 20 })
 })
 
 
@@ -91,12 +102,12 @@ test('hydrated tier aliases track newer generations but ignore pro variants', ()
 	})
 	expect(models.resolveModel('terra')).toBe('openai/gpt-5.7-terra')
 	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.7-terra')
-	expect(models.resolveModel('sol')).toBe('openai/gpt-5.6-sol')
+	expect(models.resolveModel('sol')).toBe('openai/gpt-6-sol')
 })
 
 
 test('updated anthropic aliases avoid dated model ids', () => {
-	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-5')
+	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-5-5')
 	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-5')
 	expect(models.resolveModel('haiku')).toBe('anthropic/claude-haiku-4-5')
 })
@@ -120,12 +131,14 @@ test('model picker lists updated frontier aliases', () => {
 	})
 	expect(models.listModelChoices().find((item) => item.value === 'sol')).toMatchObject({
 		value: 'sol',
-		search: expect.stringContaining('openai/gpt-5.6-sol'),
+		search: expect.stringContaining('openai/gpt-6-sol'),
 	})
 	expect(models.listModelChoices().find((item) => item.value === 'luna')).toMatchObject({
 		value: 'luna',
-		search: expect.stringContaining('openai/gpt-5.6-luna'),
+		search: expect.stringContaining('openai/gpt-6-luna'),
 	})
+	expect(models.listModelChoices().find((item) => item.value === 'gpt-5.6-sol')).toMatchObject({ fullId: 'openai/gpt-5.6-sol' })
+	expect(models.listModelChoices().find((item) => item.value === 'gpt-5.6-luna')).toMatchObject({ fullId: 'openai/gpt-5.6-luna' })
 	expect(models.listModelChoices().find((item) => item.value === 'sonnet')).toMatchObject({
 		value: 'sonnet',
 		search: expect.stringContaining('anthropic/claude-sonnet-5'),
@@ -263,17 +276,17 @@ test('model picker and aliases use the newest Anthropic model from catalog or ca
 		'gpt-5.6': 1_200_000,
 	}
 
-	expect(models.resolveModel('opus')).toBe('anthropic/claude-opus-5')
-	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-5')
+	expect(models.resolveModel('opus')).toBe('anthropic/claude-opus-5-5')
+	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-5-5')
 	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-5')
 	// No tier models in cache: the gpt alias falls back to the catalog terra entry.
 	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.6-terra')
 	expect(models.resolveModel('openai')).toBe('openai/gpt-5.6-terra')
-	expect(models.listModelChoices().find((item) => item.value === 'opus')).toMatchObject({ search: expect.stringContaining('anthropic/claude-opus-5') })
+	expect(models.listModelChoices().find((item) => item.value === 'opus')).toMatchObject({ search: expect.stringContaining('anthropic/claude-opus-5-5') })
 	expect(models.listModelChoices().find((item) => item.value === 'sonnet')).toMatchObject({ search: expect.stringContaining('anthropic/claude-sonnet-5') })
 	expect(models.listModelChoices().find((item) => item.value === 'gpt')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.6-terra') })
 	expect(models.listModelChoices().find((item) => item.value === 'gpt-5.6')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.6') })
-	expect(models.modelCompletionNames()).toContain('opus-5')
+	expect(models.modelCompletionNames()).toContain('opus-5-5')
 })
 
 
@@ -325,8 +338,8 @@ test('aliasUpdateSuggestions detects alias-family upgrades without moving pinned
 		{
 			'gpt-5.5': 1_050_000,
 			'gpt-5.6': 1_050_000,
-			'claude-opus-5': 1_000_000,
-			'claude-opus-5-1': 1_000_000,
+			'claude-opus-5-5': 1_000_000,
+			'claude-opus-5-6': 1_000_000,
 			'claude-sonnet-5': 1_000_000,
 			'claude-sonnet-5-1': 1_000_000,
 			'google/gemini-3.5-flash': 1_000_000,
@@ -335,7 +348,7 @@ test('aliasUpdateSuggestions detects alias-family upgrades without moving pinned
 			'x-ai/grok-4.8': 2_000_000,
 		},
 	)).toEqual([
-		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-5', newModel: 'anthropic/claude-opus-5-1' },
+		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-5-5', newModel: 'anthropic/claude-opus-5-6' },
 		{ aliases: ['sonnet'], oldModel: 'anthropic/claude-sonnet-5', newModel: 'anthropic/claude-sonnet-5-1' },
 		{ aliases: ['gemini'], oldModel: 'google/gemini-3.8-flash', newModel: 'google/gemini-4-flash-preview' },
 		{ aliases: ['grok'], oldModel: 'openrouter/x-ai/grok-4.7', newModel: 'openrouter/x-ai/grok-4.8' },
@@ -345,13 +358,13 @@ test('aliasUpdateSuggestions detects alias-family upgrades without moving pinned
 
 test('aliasUpdateSuggestions treats dated Claude IDs as older than decimal versions', () => {
 	expect(models.aliasUpdateSuggestions(
-		{ 'claude-opus-5': 1_000_000 },
+		{ 'claude-opus-5-5': 1_000_000 },
 		{
 			'anthropic/claude-opus-5-20250514': 200_000,
-			'anthropic/claude-opus-5.1': 1_000_000,
+			'anthropic/claude-opus-5.6': 1_000_000,
 		},
 	)).toEqual([
-		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-5', newModel: 'anthropic/claude-opus-5-1' },
+		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-5-5', newModel: 'anthropic/claude-opus-5-6' },
 	])
 })
 test('modelChangeMessages reports new Claude families such as Fable', () => {
