@@ -221,20 +221,16 @@ function failStartup(message: string, code = 1): never {
 
 function prepareClientStartupTarget(cwd: string): { preferredSessionId?: string; openCwd?: string } {
 	const shared = ipc.readState()
-	const openId = tabs.findOpenSessionForCwd(shared.sessions, cwd)
+	let openId = tabs.findOpenSessionForCwd(shared.sessions, cwd)
+	if (!openId && shared.sessions.length >= tabs.config.maxTabs) openId = shared.sessions[0]?.id ?? null
 	if (openId) {
-		log.info('Client startup target already open', {
+		log.info('Client startup target selected', {
 			cwd,
 			sessionId: openId,
 			openSessions: shared.sessions.length,
 			stateUpdatedAt: shared.updatedAt,
 		})
 		return { preferredSessionId: openId }
-	}
-
-	if (shared.sessions.length >= tabs.config.maxTabs) {
-		// A full tab list prevents opening a new tab, not connecting to the host.
-		return { preferredSessionId: shared.sessions[0]?.id }
 	}
 
 	log.info('Client startup target queued for host', {
