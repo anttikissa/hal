@@ -509,8 +509,9 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 					case 'thinking_signature':
 						thinkingSignature = event.signature ?? ''
-						if (thinkingBlobId) {
-							await writeThinkingBlob(sessionId, thinkingBlobId, thinkingText, thinkingSignature || undefined)
+						if (thinkingSignature) {
+							if (!thinkingBlobId) thinkingBlobId = blob.makeBlobId(sessionId)
+							await writeThinkingBlob(sessionId, thinkingBlobId, thinkingText, thinkingSignature)
 						}
 						break
 
@@ -685,7 +686,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			if (!iterationDone && !hadTerminalError) {
 				const ts = new Date().toISOString()
 				const historyEntries: any[] = []
-				if (thinkingText) {
+				if (thinkingText || thinkingSignature) {
 					const blobId = thinkingBlobId || blob.makeBlobId(sessionId)
 					await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature || undefined)
 					historyEntries.push({ type: 'thinking', model, thinkingEffort, blobId, ts })
@@ -714,7 +715,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				// Thinking stays separate from assistant text; large payloads still live in blobs.
 				const ts = new Date().toISOString()
 				const historyEntries: any[] = []
-				if (thinkingText) {
+				if (thinkingText || thinkingSignature) {
 					const blobId = thinkingBlobId || blob.makeBlobId(sessionId)
 					await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature || undefined)
 					historyEntries.push({
@@ -777,7 +778,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			// ── Tool execution ──
 			// Build assistant message with text + tool_use blocks
 			const assistantContent: any[] = []
-			if (thinkingText && thinkingSignature) {
+			if (thinkingSignature) {
 				assistantContent.push({ type: 'thinking', thinking: thinkingText, signature: thinkingSignature })
 			}
 			if (assistantText) {
@@ -794,7 +795,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			// Save assistant response and each tool call as separate history entries.
 			const ts = new Date().toISOString()
 			const historyEntries: any[] = []
-			if (thinkingText) {
+			if (thinkingText || thinkingSignature) {
 				const blobId = thinkingBlobId || blob.makeBlobId(sessionId)
 				await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature || undefined)
 				historyEntries.push({

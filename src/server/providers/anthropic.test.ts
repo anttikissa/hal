@@ -44,14 +44,14 @@ function anthropicSse(): string {
 	].join('\n')
 }
 
-async function collect(credential: Credential): Promise<any[]> {
+async function collect(credential: Credential, model = 'claude-sonnet-4-5'): Promise<any[]> {
 	auth.ensureFresh = async () => {}
 	auth.getCredential = () => credential
 
 	const events: any[] = []
 	for await (const event of anthropicProvider.generate({
 		messages: [{ role: 'user', content: 'hi' }],
-		model: 'claude-sonnet-4-5',
+		model,
 		systemPrompt: 'system',
 		tools: [],
 		sessionId: 'sid_123',
@@ -93,26 +93,20 @@ test('completed Anthropic responses refresh the existing usage cache', async () 
 	expect(refreshes).toBe(1)
 })
 
-test('anthropic provider enables thinking for Claude Fable', async () => {
-	auth.ensureFresh = async () => {}
-	auth.getCredential = () => ({ value: 'tok-test', type: 'api-key' })
+test('Anthropic uses adaptive thinking for current models on both credential paths', async () => {
 	let body: any
 	installFetchMock(async (_input, init) => {
-		body = JSON.parse(String(init?.body ?? '{}'))
-		return new Response(anthropicSse(), {
-			status: 200,
-			headers: { 'content-type': 'text/event-stream' },
-		}) as any
+		body = JSON.parse(String(init?.body))
+		return new Response(anthropicSse(), { status: 200 })
 	})
-
-	for await (const _ of anthropicProvider.generate({
-		messages: [{ role: 'user', content: 'hi' }],
-		model: 'claude-fable-5',
-		systemPrompt: 'system',
-		tools: [],
-		sessionId: 'sid_fable',
-	})) {}
-
+	const adaptiveModels = ['claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-fable-5-1', 'claude-fable-5', 'claude-sonnet-5', 'claude-sonnet-4-6']
+	for (const model of adaptiveModels) {
+		for (const type of ['api-key', 'token'] as const) {
+			await collect({ value: 'tok-test', type }, model)
+			expect(body.thinking).toEqual({ type: 'adaptive' })
+		}
+	}
+	await collect({ value: 'tok-test', type: 'api-key' })
 	expect(body.thinking).toEqual({ type: 'enabled', budget_tokens: 10000 })
 })
 

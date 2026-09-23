@@ -261,8 +261,8 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		return
 	}
 
-	// Determine thinking mode based on model
-	const isAdaptive = /^claude-(opus|sonnet)-4-6/.test(req.model)
+	// Manual budget_tokens is rejected by Opus 4.7+, Sonnet 5, and Fable 5.
+	const isAdaptive = /^claude-(?:opus-(?:4-[678]|5(?:-|$))|sonnet-(?:4-6|5(?:-|$))|fable-5(?:-|$))/.test(req.model)
 	const supportsThinking = /^claude-(opus|sonnet|fable)/.test(req.model)
 
 	const isOAuth = cred.type === 'token'

@@ -210,7 +210,7 @@ function buildThinkingContent(
 		if (!thinkingText) thinkingText = blobData?.thinking
 		if (!thinkingSignature) thinkingSignature = blobData?.signature
 	}
-	if (!thinkingText || !thinkingSignature) return null
+	if (thinkingText === undefined || !thinkingSignature) return null
 	return { type: 'thinking', thinking: thinkingText, signature: thinkingSignature }
 }
 

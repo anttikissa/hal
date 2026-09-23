@@ -710,6 +710,38 @@ test('writes thinking blobs while streaming and replays them into API history', 
 	}
 })
 
+test('replays signed thinking with omitted text across tool continuation and history', async () => {
+	const sessionId = `test-omitted-thinking-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const origGetProvider = providerLoader.getProvider
+	const origDispatch = toolRegistry.dispatch
+	let nextMessages: any[] = []
+	let calls = 0
+	providerLoader.getProvider = async () => ({
+		async *generate(req: any) {
+			if (++calls === 1) {
+				yield { type: 'thinking_signature', signature: 'signed-omitted' }
+				yield { type: 'tool_call', id: 'tool-1', name: 'read', input: { path: 'x' } }
+			} else {
+				nextMessages = req.messages
+				yield { type: 'text', text: 'done' }
+			}
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	toolRegistry.dispatch = async () => 'ok'
+	try {
+		expect(await agentLoop.runAgentLoop({ sessionId, model: 'anthropic/claude-opus-5-5', cwd: process.cwd(), systemPrompt: 'test', messages: [{ role: 'user', content: 'hi' }] })).toBe('completed')
+		const signed = { type: 'thinking', thinking: '', signature: 'signed-omitted' }
+		expect((nextMessages[1]!.content as any[])[0]).toEqual(signed)
+		expect((apiMessages.toProviderMessages(sessionId).find((msg) => msg.role === 'assistant')!.content as any[])[0]).toEqual(signed)
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		toolRegistry.dispatch = origDispatch
+	}
+})
+
 test('provider errors show their full ASON payload and save it in a blob', async () => {
 	const sessionId = `test-error-blob-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
