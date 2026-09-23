@@ -233,7 +233,8 @@ function prepareClientStartupTarget(cwd: string): { preferredSessionId?: string;
 	}
 
 	if (shared.sessions.length >= tabs.config.maxTabs) {
-		failStartup(`Cannot open ${cwd}: max tabs reached (${tabs.config.maxTabs}). Close one first.`)
+		// A full tab list prevents opening a new tab, not connecting to the host.
+		return { preferredSessionId: shared.sessions[0]?.id }
 	}
 
 	log.info('Client startup target queued for host', {

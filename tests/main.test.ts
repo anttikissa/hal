@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { ason } from '../src/utils/ason.ts'
@@ -74,6 +74,44 @@ describe('main', () => {
 		const proc = spawnHal({}, ['auth'])
 		expect(await proc.exited).toBe(0)
 		expect((await new Response(proc.stdout).text()).trim()).toMatch(/^[A-Za-z0-9]{12}$/)
+	})
+	test('at the tab limit, peers and replacement hosts start on an existing tab', async () => {
+		const halDir = join(tmpDir, 'hal-config')
+		mkdirSync(halDir)
+		writeFileSync(join(halDir, 'config.ason'), '{ tabs: { maxTabs: 1 } }\n')
+		const env = { HAL_DIR: halDir }
+		const statePath = join(tmpDir, 'ipc', 'state.ason')
+		async function waitForState(check: (state: any) => boolean): Promise<any> {
+			const deadline = Date.now() + 4000
+			while (Date.now() < deadline) {
+				if (existsSync(statePath)) {
+					const state = ason.parse(readFileSync(statePath, 'utf-8')) as any
+					if (check(state)) return state
+				}
+				await Bun.sleep(30)
+			}
+			throw new Error('Timed out waiting for startup state')
+		}
+
+		const host = spawnHal(env)
+		const first = await waitForState((state) => state.host?.pid === host.pid && state.sessions.length === 1)
+		const peer = spawnHal(env, ['--self'])
+		const connected = await waitForState((state) => state.clients?.some((item: any) => item.pid === peer.pid && item.sessionId === first.sessions[0]!.id))
+		expect(peer.exitCode).toBeNull()
+		expect(connected.sessions.map((item: any) => item.id)).toEqual(first.sessions.map((item: any) => item.id))
+		expect(connected.clients.find((item: any) => item.pid === peer.pid)?.sessionId).toBe(first.sessions[0]!.id)
+
+		peer.stdin!.write(new Uint8Array([0x03]))
+		peer.stdin!.flush()
+		await peer.exited
+		host.stdin!.write(new Uint8Array([0x03]))
+		host.stdin!.flush()
+		await host.exited
+
+		const replacement = spawnHal(env, ['--self'])
+		const restarted = await waitForState((state) => state.host?.pid === replacement.pid)
+		expect(replacement.exitCode).toBeNull()
+		expect(restarted.sessions.map((item: any) => item.id)).toEqual(first.sessions.map((item: any) => item.id))
 	})
 	test('echoes input and exits from an incomplete paste', async () => {
 		const proc = spawnHal()

@@ -1140,8 +1140,13 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	let startupSessionId: string | undefined
 	if (opts.targetCwd) {
 		const target = tabs.openSessionForCwd(opts.targetCwd)
-		if (!target.ok) return target
-		startupSessionId = target.sessionId
+		if (!target.ok) {
+			if (!state.currentSessionId) return target
+			// At the tab limit, start on an existing tab rather than refusing to start.
+			startupSessionId = state.currentSessionId
+		} else {
+			startupSessionId = target.sessionId
+		}
 	} else if (state.openSessionIds.length === 0) {
 		startupSessionId = tabs.createSessionTab({}).id
 		if (!signal.aborted && state.activeRuntimePid === process.pid) broadcastSessions()
