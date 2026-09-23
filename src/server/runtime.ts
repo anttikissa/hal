@@ -673,8 +673,12 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 			if (question.answer?.kind === 'choice' && question.answer.choiceId === 'yes') approvedRisk.add(question.toolId)
 			else if (question.answer?.kind !== 'aborted') rejected.add(question.toolId)
 		}
-		await agentLoop.executeToolBatch(sessionId, calls, pending.cwd, ac.signal, blobMap, { approvedRisk, rejected })
+		// Resolve before running: a tool may restart the host (eval requestRestart),
+		// and a still-open marker would make every new host replay the whole batch
+		// forever. If the host dies mid-batch, startup treats the unfinished calls as
+		// ordinary interrupted tools.
 		sessionStore.resolvePendingTools(sessionId, pending.id)
+		await agentLoop.executeToolBatch(sessionId, calls, pending.cwd, ac.signal, blobMap, { approvedRisk, rejected })
 		emitHistoryUpdated(sessionId)
 		return true
 	} finally {

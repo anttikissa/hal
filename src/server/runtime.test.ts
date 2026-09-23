@@ -1222,9 +1222,11 @@ test('pending risky tools wait for every answer and apply exact per-call approva
 	const sessionId = `test-question-tools-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: '/tmp' })
 	const origDispatch = toolRegistry.dispatch
-	const dispatched: Array<{ name: string; approvedRisk?: boolean }> = []
+	const dispatched: Array<{ name: string; approvedRisk?: boolean; pendingDuringRun: boolean }> = []
 	toolRegistry.dispatch = async (name, _input, ctx) => {
-		dispatched.push({ name, approvedRisk: ctx.approvedRisk })
+		// A tool may restart the host (eval requestRestart). The pending marker must
+		// already be resolved by then, or the next host replays the whole batch.
+		dispatched.push({ name, approvedRisk: ctx.approvedRisk, pendingDuringRun: sessions.findPendingTools(sessionId) !== null })
 		return `ran ${name}`
 	}
 	try {
@@ -1243,7 +1245,7 @@ test('pending risky tools wait for every answer and apply exact per-call approva
 
 		await sessions.appendHistory(sessionId, [{ type: 'answer', questionId: '000003-ccc', value: { kind: 'choice', choiceId: 'yes' } }])
 		expect(await runtime.continuePendingTools(sessionId)).toBe(true)
-		expect(dispatched).toEqual([{ name: 'read', approvedRisk: undefined }, { name: 'bash', approvedRisk: true }])
+		expect(dispatched).toEqual([{ name: 'read', approvedRisk: undefined, pendingDuringRun: false }, { name: 'bash', approvedRisk: true, pendingDuringRun: false }])
 		const results = sessions.loadHistory(sessionId).filter((entry) => entry.type === 'tool_result')
 		expect(results.map((entry) => entry.toolId)).toEqual(['safe', 'deny', 'allow'])
 	} finally {
