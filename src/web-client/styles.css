@@ -161,6 +161,8 @@ button { touch-action: manipulation; }
 .SessionTabs-list > div > .SessionTabs-open { flex: 1; min-width: 0; padding: 8px 12px; text-align: left; overflow-wrap: anywhere; }
 .SessionTabs-open > .SessionTabs-number { color: #9eb8ca; margin-right: 6px; }
 .SessionTabs-open > small { display: block; color: #9eb8ca; margin-top: 4px; }
+/* Show the project for a useful session list; truncate deep paths rather than shrinking the close target. */
+.SessionTabs-open > .SessionTabs-cwd { display: block; overflow: hidden; color: #9eb8ca; text-overflow: ellipsis; white-space: nowrap; }
 .SessionTabs-list > div > .SessionTabs-close { flex: none; width: 48px; color: #d47a7a; border-left: 1px solid #555; }
 .SessionTabs-list > div.selected > .SessionTabs-close { border-color: #6b9fc6; }
 .SessionTabs-actions { flex: none; border-top: 1px solid #444; padding: 12px 8px 4px; }

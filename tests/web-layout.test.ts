@@ -198,3 +198,12 @@ test('session menu reveals the current tab and keeps actions outside the scrolli
 	expect(declaration('.SessionTabs-actions', 'flex')).toBe('none')
 	expect(declaration('.SessionTabs-list > div.selected', 'background')).toBe('#29465e')
 })
+
+
+test('session menu shows each session cwd without letting long paths distort its row', () => {
+	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
+	expect(source).toContain('<span class="SessionTabs-cwd" title={session.cwd}>{session.cwd}</span>')
+	expect(declaration('.SessionTabs-open > .SessionTabs-cwd', 'overflow')).toBe('hidden')
+	expect(declaration('.SessionTabs-open > .SessionTabs-cwd', 'text-overflow')).toBe('ellipsis')
+	expect(declaration('.SessionTabs-open > .SessionTabs-cwd', 'white-space')).toBe('nowrap')
+})

@@ -126,6 +126,7 @@ export function SessionTabs(props: SessionTabsProps) {
 									<ActivityMarkers description={activity()} />
 									{session.name || session.id}
 									<small>{session.id}{model() ? ` · ${model()}` : ''}{session.id === props.selected ? ' · Current' : ''}</small>
+									<span class="SessionTabs-cwd" title={session.cwd}>{session.cwd}</span>
 								</button>
 								<Show when={props.sessions.length > 1}>
 									<button class="SessionTabs-close" onClick={(event) => closeTab(event, session.id)} aria-label={`Close ${session.name || session.id}`}>×</button>
