@@ -462,6 +462,15 @@ test('openai provider rehydrates minimized reasoning signatures with summary tex
 	})
 })
 
+test('openai provider replays reasoning without visible summary using an empty summary array', () => {
+	const input = openai.convertResponsesMessages([{
+		role: 'assistant',
+		content: [{ type: 'thinking', thinking: '', signature: JSON.stringify({ type: 'reasoning', id: 'rs_empty', encrypted_content: 'enc_empty' }) }],
+	}] as any)
+
+	expect(input).toContainEqual({ type: 'reasoning', id: 'rs_empty', encrypted_content: 'enc_empty', summary: [] })
+})
+
 test('openai provider preserves stored reasoning summaries during replay', () => {
 	const input = openai.convertResponsesMessages([
 		{
@@ -817,6 +826,41 @@ test('openai websocket continuation sends previous_response_id and only new tool
 	expect(sent).toHaveLength(2)
 	expect(sent[1].previous_response_id).toBe('resp_1')
 	expect(sent[1].input).toEqual([{ type: 'function_call_output', call_id: 'call_1', output: 'hi' }])
+})
+
+class EmptyFirstWebSocket extends FakeWebSocket {
+	static requests = 0
+	override send(raw: string): void {
+		const body = JSON.parse(raw)
+		this.sent.push(body)
+		const id = `resp_${++EmptyFirstWebSocket.requests}`
+		queueMicrotask(() => {
+			this.message({ type: 'response.created', response: { id, previous_response_id: body.previous_response_id ?? null } })
+			if (EmptyFirstWebSocket.requests === 1) {
+				this.message({ type: 'response.output_item.added', output_index: 0, item: { type: 'reasoning' } })
+				this.message({ type: 'response.output_item.done', output_index: 0, item: { type: 'reasoning', id: 'rs_1', encrypted_content: 'secret' } })
+			} else this.message({ type: 'response.output_text.delta', delta: 'answer' })
+			this.message({ type: 'response.completed', response: { id, status: 'completed' } })
+		})
+	}
+}
+
+test('openai websocket retries a reasoning-only completion with the full conversation', async () => {
+	process.env.HAL_OPENAI_RESPONSES_TRANSPORT = 'ws'
+	FakeWebSocket.instances = []
+	EmptyFirstWebSocket.requests = 0
+	globalThis.WebSocket = EmptyFirstWebSocket as any
+	setupOpenAiToken()
+	const request = { messages: [{ role: 'user' as const, content: 'question' }], model: 'gpt-5.5', systemPrompt: 'system', tools: [], sessionId: 'sid_empty' }
+	for await (const _ of openaiProvider.generate(request)) {}
+	const events: any[] = []
+	for await (const event of openaiProvider.generate(request)) events.push(event)
+
+	expect(FakeWebSocket.instances).toHaveLength(2)
+	expect(FakeWebSocket.instances[0]!.readyState).toBe(3)
+	expect(FakeWebSocket.instances[1]!.sent[0].previous_response_id).toBeUndefined()
+	expect(FakeWebSocket.instances[1]!.sent[0].input).toEqual([{ role: 'user', content: [{ type: 'input_text', text: 'question' }] }])
+	expect(events).toContainEqual({ type: 'text', text: 'answer' })
 })
 
 class ReplayingWebSocket extends FakeWebSocket {

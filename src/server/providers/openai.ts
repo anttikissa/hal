@@ -725,14 +725,21 @@ async function* generateOpenAIWebSocket(req: ProviderRequest, credential: Creden
 	if (deltaInput && chain.previousResponseId) body.previous_response_id = chain.previousResponseId
 
 	let completedResponseId = ''
+	let outputText = ''
+	let hasToolCall = false
 	for await (const item of streamResponsesWebSocket(chain, body, req.signal)) {
 		if (item.responseId) completedResponseId = item.responseId
+		if (item.event.type === 'text') outputText += item.event.text ?? ''
+		if (item.event.type === 'tool_call') hasToolCall = true
 		if (item.event.type === 'done' && credential.type === 'token') await openaiUsage.refreshAll().catch(() => {})
 		yield item.event
 	}
-	if (completedResponseId) {
+	if (completedResponseId && (outputText.trim() || hasToolCall)) {
 		chain.previousResponseId = completedResponseId
 		chain.requestMessageCount = req.messages.length
+	} else {
+		// A reasoning-only or whitespace reply is a failed turn; retry from full history.
+		closeResponsesWebSocket(sessionId)
 	}
 }
 

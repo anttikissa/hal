@@ -41,15 +41,12 @@ function withSummary(signature: unknown, thinking: unknown): ReasoningItem | nul
 	const item = typeof signature === 'string' ? parse(signature) : fromObject(signature)
 	if (!item) return null
 	if (Array.isArray(item.summary) && item.summary.length > 0) return item
-	if (typeof thinking !== 'string') return item
 
-	// The stored thinking text is the streamed reasoning summary text, so it is
-	// safe to use as a replay summary when a compacted signature omitted it.
-	const text = thinking.trim()
-	if (!text) return item
+	// Codex requires `summary` even when the provider emitted no visible thinking.
+	const text = typeof thinking === 'string' ? thinking.trim() : ''
 	return {
 		...item,
-		summary: [{ type: 'summary_text', text }],
+		summary: text ? [{ type: 'summary_text', text }] : [],
 	}
 }
 
