@@ -222,7 +222,7 @@ describe('client startup', () => {
 		client.startClient(ac.signal, { openCwd: '/work/project' })
 		await Bun.sleep(10)
 		expect(client.currentTab()?.sessionId).toBe('s1')
-		expect(appendedCommands).toEqual([{ type: 'open', cwd: '/work/project', sessionId: 's1' }])
+		expect(appendedCommands).toEqual([{ type: 'open', cwd: '/work/project', sessionId: 's1', startup: true }])
 
 		shared.sessions = [
 			{ id: 's1', tab: 1, name: 'tab 1', cwd: '/tmp/s1', model: 'openai/gpt-5.4' },

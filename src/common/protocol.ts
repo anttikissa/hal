@@ -84,6 +84,8 @@ export interface OpenNewCommand extends CommandBase {
 	// session has this cwd. Peer startup leaves this false and reuses the first open
 	// match; dormant sessions are resumed only by an explicit resume operation.
 	forceNew?: boolean
+	// Shell startup can open its cwd even when the ordinary tab limit is reached.
+	startup?: true
 }
 export interface OpenForkCommand extends CommandBase {
 	type: 'open'

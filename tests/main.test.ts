@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { ason } from '../src/utils/ason.ts'
@@ -22,8 +22,9 @@ function stripAnsi(s: string) {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
 
-function spawnHal(env: Record<string, string | undefined> = {}, args: string[] = []) {
-	const proc = Bun.spawn(['bun', 'src/main.ts', ...args], {
+function spawnHal(env: Record<string, string | undefined> = {}, args: string[] = [], cwd = process.cwd()) {
+	const proc = Bun.spawn(['bun', join(import.meta.dir, '..', 'src/main.ts'), ...args], {
+		cwd,
 		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'pipe',
@@ -75,7 +76,7 @@ describe('main', () => {
 		expect(await proc.exited).toBe(0)
 		expect((await new Response(proc.stdout).text()).trim()).toMatch(/^[A-Za-z0-9]{12}$/)
 	})
-	test('at the tab limit, peers and replacement hosts start on an existing tab', async () => {
+	test('at the tab limit, peer and replacement host still open their launch directories', async () => {
 		const halDir = join(tmpDir, 'hal-config')
 		mkdirSync(halDir)
 		writeFileSync(join(halDir, 'config.ason'), '{ tabs: { maxTabs: 1 } }\n')
@@ -95,11 +96,12 @@ describe('main', () => {
 
 		const host = spawnHal(env)
 		const first = await waitForState((state) => state.host?.pid === host.pid && state.sessions.length === 1)
-		const peer = spawnHal(env, ['--self'])
-		const connected = await waitForState((state) => state.clients?.some((item: any) => item.pid === peer.pid && item.sessionId === first.sessions[0]!.id))
+		const peer = spawnHal(env, [], halDir)
+		const connected = await waitForState((state) => state.sessions.length === 2)
 		expect(peer.exitCode).toBeNull()
-		expect(connected.sessions.map((item: any) => item.id)).toEqual(first.sessions.map((item: any) => item.id))
-		expect(connected.clients.find((item: any) => item.pid === peer.pid)?.sessionId).toBe(first.sessions[0]!.id)
+		expect(connected.sessions).toHaveLength(2)
+		expect(connected.sessions[1]?.cwd).toBe(realpathSync(halDir))
+		expect(connected.sessions[0]?.id).toBe(first.sessions[0]?.id)
 
 		peer.stdin!.write(new Uint8Array([0x03]))
 		peer.stdin!.flush()
@@ -108,10 +110,14 @@ describe('main', () => {
 		host.stdin!.flush()
 		await host.exited
 
-		const replacement = spawnHal(env, ['--self'])
-		const restarted = await waitForState((state) => state.host?.pid === replacement.pid)
+		const otherDir = join(tmpDir, 'other-config')
+		mkdirSync(otherDir)
+		writeFileSync(join(otherDir, 'config.ason'), '{ tabs: { maxTabs: 1 } }\n')
+		const replacement = spawnHal({ HAL_DIR: otherDir }, [], otherDir)
+		const restarted = await waitForState((state) => state.host?.pid === replacement.pid && state.sessions.length === 3)
 		expect(replacement.exitCode).toBeNull()
-		expect(restarted.sessions.map((item: any) => item.id)).toEqual(first.sessions.map((item: any) => item.id))
+		expect(restarted.sessions[2]?.cwd).toBe(realpathSync(otherDir))
+		expect(restarted.sessions.slice(0, 2).map((item: any) => item.id)).toEqual(connected.sessions.map((item: any) => item.id))
 	})
 	test('echoes input and exits from an incomplete paste', async () => {
 		const proc = spawnHal()

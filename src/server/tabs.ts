@@ -114,7 +114,8 @@ function openLimitReason(cwd?: string): string | null {
 	return `Max tabs reached (${tabs.config.maxTabs}). Close one first.`
 }
 
-function openSessionForCwd(cwd: string): { ok: true; sessionId: string } | { ok: false; reason: string } {
+// Shell startup may open its cwd beyond the tab cap; interactive opens still obey it.
+function openSessionForCwd(cwd: string, startup = false): { ok: true; sessionId: string } | { ok: false; reason: string } {
 	const normalizedCwd = tabs.normalizeCwd(cwd)
 	const openSessions = tabs.openSessionMetas().map((meta) => sessionStore.sessionOpenInfo(meta))
 	const openId = tabs.findOpenSessionForCwd(openSessions, normalizedCwd)
@@ -124,7 +125,7 @@ function openSessionForCwd(cwd: string): { ok: true; sessionId: string } | { ok:
 		return { ok: true, sessionId: openId }
 	}
 
-	const limitReason = tabs.openLimitReason(normalizedCwd)
+	const limitReason = startup ? null : tabs.openLimitReason(normalizedCwd)
 	if (limitReason) return { ok: false, reason: limitReason }
 
 	const created = tabs.createSessionTab({ workingDir: normalizedCwd })

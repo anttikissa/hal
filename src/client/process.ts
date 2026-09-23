@@ -28,7 +28,7 @@ function start(signal: AbortSignal, opts: any, ctx: any): void {
 	if (!opts.openCwd) ctx.focusCurrentTab()
 	if (opts.openCwd) {
 		ctx.onStartupOpen()
-		clientTransport.io.appendCommand({ type: 'open', cwd: opts.openCwd, sessionId: ctx.currentSessionId() })
+		clientTransport.io.appendCommand({ type: 'open', cwd: opts.openCwd, sessionId: ctx.currentSessionId(), startup: true })
 		log.info('Client queued startup open command', { cwd: opts.openCwd, sessionId: ctx.currentSessionId() ?? null })
 	}
 	ctx.onChange(false)

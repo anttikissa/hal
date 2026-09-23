@@ -221,8 +221,7 @@ function failStartup(message: string, code = 1): never {
 
 function prepareClientStartupTarget(cwd: string): { preferredSessionId?: string; openCwd?: string } {
 	const shared = ipc.readState()
-	let openId = tabs.findOpenSessionForCwd(shared.sessions, cwd)
-	if (!openId && shared.sessions.length >= tabs.config.maxTabs) openId = shared.sessions[0]?.id ?? null
+	const openId = tabs.findOpenSessionForCwd(shared.sessions, cwd)
 	if (openId) {
 		log.info('Client startup target selected', {
 			cwd,

@@ -1033,7 +1033,7 @@ function handleCommand(cmd: Command): void {
 			} else if ('afterSessionId' in cmd) {
 				tabs.createSessionTab({ openerId: sessionId, afterId: cmd.afterSessionId })
 			} else if (cmd.cwd) {
-				const target = tabs.openSessionForCwd(cmd.cwd)
+				const target = tabs.openSessionForCwd(cmd.cwd, cmd.startup === true)
 				if (!target.ok) {
 					const sid = sessionId ?? state.openSessionIds[0]
 					if (sid) emitInfo(sid, target.reason, 'error')
@@ -1140,12 +1140,9 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	state.contextSwitching.clear()
 	let startupSessionId: string | undefined
 	if (opts.targetCwd) {
-		const target = tabs.openSessionForCwd(opts.targetCwd)
-		if (!target.ok) {
-			if (!state.currentSessionId) return target
-			// At the tab limit, start on an existing tab rather than refusing to start.
-			startupSessionId = state.currentSessionId
-		} else startupSessionId = target.sessionId
+		const target = tabs.openSessionForCwd(opts.targetCwd, true)
+		if (!target.ok) return target
+		startupSessionId = target.sessionId
 	} else if (state.openSessionIds.length === 0) {
 		startupSessionId = tabs.createSessionTab({}).id
 		if (!signal.aborted && state.activeRuntimePid === process.pid) broadcastSessions()
