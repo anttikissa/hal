@@ -561,7 +561,7 @@ test('completed final response does not remain in live scratch state', async () 
 	}
 })
 
-test('tool iterations do not re-emit streamed assistant text as responses', async () => {
+test('tool iterations stream once and replay signed thinking with omitted text', async () => {
 	const sessionId = `test-stream-once-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
@@ -571,10 +571,13 @@ test('tool iterations do not re-emit streamed assistant text as responses', asyn
 	const origAppendEvent = ipc.appendEvent
 	const origDispatch = toolRegistry.dispatch
 	let generation = 0
+	let nextMessages: any[] = []
 	providerLoader.getProvider = async () => ({
-		async *generate() {
+		async *generate(req: any) {
 			generation++
+			if (generation === 2) nextMessages = req.messages
 			if (generation <= 2) {
+				if (generation === 1) yield { type: 'thinking_signature', signature: 'signed-omitted' }
 				yield { type: 'text', text: `marker ${generation}` }
 				yield { type: 'tool_call', id: `tool-${generation}`, name: 'bash', input: { command: `printf ${generation}` } }
 			} else {
@@ -589,7 +592,7 @@ test('tool iterations do not re-emit streamed assistant text as responses', asyn
 	try {
 		const result = await agentLoop.runAgentLoop({
 			sessionId,
-			model: 'openai/gpt-5.4',
+			model: 'anthropic/claude-opus-5-5',
 			cwd: process.cwd(),
 			systemPrompt: 'test prompt',
 			messages: [{ role: 'user', content: 'run two tools' }],
@@ -599,8 +602,11 @@ test('tool iterations do not re-emit streamed assistant text as responses', asyn
 		expect(events.filter((event) => event.type === 'response' && !event.isError)).toEqual([])
 		const receipts = sessions.loadHistory(sessionId).filter((entry) => entry.type === 'usage')
 		expect(receipts).toHaveLength(1)
-		expect(receipts[0]).toMatchObject({ model: 'openai/gpt-5.4', purpose: 'turn', requests: 3, usage: { input: 3, output: 3, cacheRead: 0, cacheCreation: 0 } })
+		expect(receipts[0]).toMatchObject({ model: 'anthropic/claude-opus-5-5', purpose: 'turn', requests: 3, usage: { input: 3, output: 3, cacheRead: 0, cacheCreation: 0 } })
 		expect(receipts[0]?.incomplete).toBeUndefined()
+		const signed = { type: 'thinking', thinking: '', signature: 'signed-omitted' }
+		expect((nextMessages[1]!.content as any[])[0]).toEqual(signed)
+		expect((apiMessages.toProviderMessages(sessionId).find((msg) => msg.role === 'assistant')!.content as any[])[0]).toEqual(signed)
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent
@@ -707,38 +713,6 @@ test('writes thinking blobs while streaming and replays them into API history', 
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent
-	}
-})
-
-test('replays signed thinking with omitted text across tool continuation and history', async () => {
-	const sessionId = `test-omitted-thinking-${Date.now().toString(36)}`
-	createdSessions.push(sessionId)
-	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
-	const origGetProvider = providerLoader.getProvider
-	const origDispatch = toolRegistry.dispatch
-	let nextMessages: any[] = []
-	let calls = 0
-	providerLoader.getProvider = async () => ({
-		async *generate(req: any) {
-			if (++calls === 1) {
-				yield { type: 'thinking_signature', signature: 'signed-omitted' }
-				yield { type: 'tool_call', id: 'tool-1', name: 'read', input: { path: 'x' } }
-			} else {
-				nextMessages = req.messages
-				yield { type: 'text', text: 'done' }
-			}
-			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
-		},
-	})
-	toolRegistry.dispatch = async () => 'ok'
-	try {
-		expect(await agentLoop.runAgentLoop({ sessionId, model: 'anthropic/claude-opus-5-5', cwd: process.cwd(), systemPrompt: 'test', messages: [{ role: 'user', content: 'hi' }] })).toBe('completed')
-		const signed = { type: 'thinking', thinking: '', signature: 'signed-omitted' }
-		expect((nextMessages[1]!.content as any[])[0]).toEqual(signed)
-		expect((apiMessages.toProviderMessages(sessionId).find((msg) => msg.role === 'assistant')!.content as any[])[0]).toEqual(signed)
-	} finally {
-		providerLoader.getProvider = origGetProvider
-		toolRegistry.dispatch = origDispatch
 	}
 })
 
