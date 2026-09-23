@@ -9,7 +9,7 @@ import { renderStatus } from './render-status.ts'
 import { cursor } from './cursor.ts'
 import { keys } from './keys.ts'
 import { prompt, type PromptEditorState } from './prompt.ts'
-import { completion } from './completion.ts'
+import { completion, type CompletionResult } from './completion.ts'
 import { completionHints } from './completion-hints.ts'
 import { clientLocalCommands } from '../local-commands.ts'
 import { popup } from './popup.ts'
@@ -464,6 +464,24 @@ function submit(override?: string, queue?: boolean, amend?: boolean): void {
 // scrollback. Active state is tracked in `completion.state` and matters for
 // what subsequent keys do.
 
+function showCompletion(result: CompletionResult): void {
+	completion.state.active = true
+	completion.state.lastResult = result
+	completionHints.set(result.hints)
+	completion.state.selectedIndex = 0
+	// If there's a common prefix longer than what we have, extend to it
+	if (result.prefix.length > prompt.text().slice(0, prompt.cursorPos()).length) {
+		const after = prompt.text().slice(prompt.cursorPos())
+		prompt.setText(result.prefix + after, result.prefix.length)
+	}
+	// If only one match, apply it immediately
+	if (result.items.length === 1) {
+		const applied = completion.apply(prompt.text(), prompt.cursorPos(), result.items[0]!)
+		prompt.setText(applied.text, applied.cursor)
+		completion.dismiss()
+	}
+}
+
 function handleCompletionKey(k: KeyEvent): boolean {
 	// Tab triggers or cycles completion
 	if (k.key === 'tab' && !k.ctrl && !k.alt && !k.cmd) {
@@ -472,27 +490,23 @@ function handleCompletionKey(k: KeyEvent): boolean {
 			const text = prompt.text()
 			const cursor = prompt.cursorPos()
 			const result = completion.complete(text, cursor, client.currentTab()?.cwd)
+			const pending = completion.state.pending
+			if (pending) {
+				// Remote /cd: show the listing when it arrives, unless the user moved on.
+				void pending.then((late) => {
+					if (!late || completion.state.active || prompt.text() !== text || prompt.cursorPos() !== cursor) return
+					showCompletion(late)
+					draw()
+				})
+				return true
+			}
 			if (!result || result.items.length === 0) {
 				// Slash commands are the only completion syntax. A plain, unselected Tab
 				// in that syntax is an attempted completion even if nothing matches.
 				const before = text.slice(0, cursor)
 				return !k.shift && prompt.snapshotState().selAnchor === null && before.startsWith('/') && !before.includes('\n')
 			}
-			completion.state.active = true
-			completion.state.lastResult = result
-			completionHints.set(result.hints)
-			completion.state.selectedIndex = 0
-			// If there's a common prefix longer than what we have, extend to it
-			if (result.prefix.length > prompt.text().slice(0, prompt.cursorPos()).length) {
-				const after = prompt.text().slice(prompt.cursorPos())
-				prompt.setText(result.prefix + after, result.prefix.length)
-			}
-			// If only one match, apply it immediately
-			if (result.items.length === 1) {
-				const applied = completion.apply(prompt.text(), prompt.cursorPos(), result.items[0]!)
-				prompt.setText(applied.text, applied.cursor)
-				completion.dismiss()
-			}
+			showCompletion(result)
 			return true
 		}
 		// Already active: cycle forward

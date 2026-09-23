@@ -9,6 +9,11 @@ import { ensureStateDir } from './state.ts'
 import { web } from './web.ts'
 import { serverKeys } from './server-keys.ts'
 import { processControl } from './process-control.ts'
+import { webUpload } from './web-upload.ts'
+import { ason } from '../utils/ason.ts'
+import { mkdirSync, mkdtempSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 
 test('web fallback port advances by a randomized exponential step', () => {
 	expect(web.nextPort(9001, 1, () => 0)).toBe(9002)
@@ -164,6 +169,22 @@ test('websocket snapshots refresh history boundaries', () => {
 	expect(web.isSnapshotBoundary({ type: 'history-rebased' })).toBe(true)
 	expect(web.isSnapshotBoundary({ type: 'history-updated' })).toBe(true)
 	expect(web.isSnapshotBoundary({ type: 'stream-delta' })).toBe(false)
+})
+
+test('dirs endpoint lists host directories for authenticated remote /cd completion', async () => {
+	ensureStateDir()
+	const token = serverKeys.list()[0]!.token
+	const root = mkdtempSync(join(tmpdir(), 'hal-dirs-'))
+	try {
+		mkdirSync(join(root, 'alpha'))
+		mkdirSync(join(root, 'beta'))
+		const query = `cwd=${encodeURIComponent(root)}&prefix=a`
+		expect((await webUpload.handleDirsRequest(new Request(`https://hal.local/dirs?${query}`), 'test')).status).toBe(401)
+		const response = await webUpload.handleDirsRequest(new Request(`https://hal.local/dirs?${query}`, { headers: { authorization: `Bearer ${token}` } }), 'test')
+		expect(ason.parse(await response.text())).toEqual(['alpha/'])
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
 })
 
 test('update endpoint is inert without a token and rejects wrong credentials', async () => {

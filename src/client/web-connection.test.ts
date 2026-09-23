@@ -34,6 +34,21 @@ test('remote image uploads use the host and authentication token separately', as
 	}
 })
 
+test('remote /cd completion asks the host for its directories', async () => {
+	const originalFetch = webConnection.fetch
+	webConnection.state.remote = { host: 'hal.example', authToken: 'secret' }
+	try {
+		webConnection.fetch = async (url, init) => {
+			expect(url).toBe('https://hal.example/dirs?cwd=%2Fsrv&prefix=a')
+			expect(init?.headers).toEqual({ Authorization: 'Bearer secret' })
+			return new Response(`['alpha/']`)
+		}
+		expect(await webConnection.completeDirs('a', '/srv')).toEqual(['alpha/'])
+	} finally {
+		webConnection.fetch = originalFetch
+		webConnection.state.remote = null
+	}
+})
 test('remote reconnect delay starts at one second and grows by 60 percent', () => {
 	let delay = 0
 	const delays: number[] = []

@@ -1,3 +1,4 @@
+import { ason } from '../utils/ason.ts'
 import type { SharedState } from '../common/ipc.ts'
 import type { Command } from '../common/protocol.ts'
 import type { ClientBootstrap, ClientSessionSnapshot } from '../common/snapshots.ts'
@@ -104,6 +105,7 @@ function install(): void {
 		watchState: (callback) => { state.stateListener = callback },
 		uploadImage: (data) => webConnection.uploadImage(data),
 		tailEvents: (signal) => webConnection.tailEvents(signal),
+		completeDirs: (argPrefix, cwd) => webConnection.completeDirs(argPrefix, cwd),
 	})
 }
 
@@ -129,6 +131,20 @@ async function uploadImage(data: Uint8Array): Promise<string> {
 		throw new Error(body && typeof body.error === 'string' ? body.error : `HTTP ${response.status}`)
 	}
 	return body.path
+}
+
+// Best-effort: a host restart or error just means no completions this time.
+async function completeDirs(argPrefix: string, cwd: string): Promise<string[]> {
+	const remote = state.remote
+	if (!remote) return []
+	const query = new URLSearchParams({ cwd, prefix: argPrefix })
+	try {
+		const response = await webConnection.fetch(`https://${remote.host}/dirs?${query}`, { headers: { Authorization: `Bearer ${remote.authToken}` } })
+		if (!response.ok) return []
+		return ason.parse(await response.text()) as string[]
+	} catch {
+		return []
+	}
 }
 
 async function* tailEvents(signal?: AbortSignal): AsyncGenerator<any> {
@@ -248,6 +264,7 @@ export const webConnection = {
 	install,
 	sendCommand,
 	uploadImage,
+	completeDirs,
 	fetch: globalThis.fetch as (url: string, init?: RequestInit) => Promise<Response>,
 	tailEvents,
 	openSocket,

@@ -1,8 +1,6 @@
 // Tab completion for slash commands, models, config keys, and /cd paths.
 
-import { basename, resolve, dirname } from 'path'
-import { readdirSync, statSync } from 'fs'
-import { homedir } from 'os'
+import { basename } from 'path'
 import { config as runtimeConfig } from '../../config.ts'
 import { commandMetadata } from '../../common/command-metadata.ts'
 import { models } from '../../common/models.ts'
@@ -27,6 +25,8 @@ const state = {
 	active: false,
 	selectedIndex: 0,
 	lastResult: null as CompletionResult | null,
+	// Set by complete() when directory names must come from a remote host.
+	pending: null as Promise<CompletionResult | null> | null,
 }
 
 function longestCommonPrefix(values: string[]): string {
@@ -41,63 +41,9 @@ function longestCommonPrefix(values: string[]): string {
 	return prefix
 }
 
-function expandTilde(p: string): string {
-	if (p === '~') return homedir()
-	if (p.startsWith('~/')) return homedir() + p.slice(1)
-	return p
-}
-
-function listDirs(dir: string): string[] {
-	try {
-		return readdirSync(dir, { withFileTypes: true })
-			.filter((entry) => {
-				if (entry.name.startsWith('.')) return false
-				if (entry.isDirectory()) return true
-				if (entry.isSymbolicLink()) {
-					try {
-						return statSync(resolve(dir, entry.name)).isDirectory()
-					} catch {
-						return false
-					}
-				}
-				return false
-			})
-			.map((entry) => entry.name)
-			.sort()
-	} catch {
-		return []
-	}
-}
-
 function cdArgPrefix(before: string, command: string): string {
 	const start = 1 + command.length
 	return before.slice(start).replace(/^[ \t]/, '')
-}
-
-function completeDirs(argPrefix: string, cwd: string): string[] {
-	const expanded = expandTilde(argPrefix)
-
-	let searchDir: string
-	let prefix: string
-	if (expanded.endsWith('/') || expanded === '') {
-		searchDir = expanded === '' ? cwd : resolve(cwd, expanded)
-		prefix = ''
-	} else {
-		searchDir = resolve(cwd, dirname(expanded))
-		prefix = basename(expanded)
-	}
-
-	const dirs = listDirs(searchDir)
-	const matching = prefix ? dirs.filter((dir) => dir.startsWith(prefix)) : dirs
-	const base = expanded.endsWith('/')
-		? argPrefix
-		: argPrefix === ''
-			? ''
-			: argPrefix.includes('/')
-				? argPrefix.slice(0, argPrefix.lastIndexOf('/') + 1)
-				: ''
-
-	return matching.map((dir) => base + dir + '/')
 }
 
 function dirHint(value: string): string {
@@ -148,6 +94,7 @@ function completeSessionTargets(argPrefix: string, closedOnly = false): string[]
 
 
 function complete(text: string, cursor: number, cwd = process.cwd()): CompletionResult | null {
+	state.pending = null
 	if (cursor < 0 || cursor > text.length) cursor = text.length
 	const before = text.slice(0, cursor)
 	if (!before.startsWith('/')) return null
@@ -180,7 +127,12 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 		values = modelNames().filter((model) => model.startsWith(argPrefix))
 	} else if (arg === 'dir') {
 		argPrefix = cdArgPrefix(before, command)
-		values = completeDirs(argPrefix, cwd)
+		const found = clientTransport.io.completeDirs(argPrefix, cwd)
+		if (found instanceof Promise) {
+			state.pending = found.then((late) => resultFor(command, arg, late))
+			return null
+		}
+		values = found
 	} else if (arg === 'command') {
 		values = commandNamesForPrompt().filter((name) => name.startsWith(argPrefix))
 	} else if (arg === 'session') {
@@ -198,9 +150,11 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	} else {
 		values = runtimeConfig.listPaths().filter((path) => path.startsWith(argPrefix))
 	}
+	return resultFor(command, arg, values)
+}
 
+function resultFor(command: string, arg: string, values: string[]): CompletionResult | null {
 	if (values.length === 0) return null
-
 	const items = values.map((value) => `/${command} ${value}`)
 	const hints = arg === 'dir' ? values.map((value) => completion.dirHint(value)) : values
 	const prefix = longestCommonPrefix(items)

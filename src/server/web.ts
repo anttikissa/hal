@@ -303,6 +303,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 					const url = new URL(request.url)
 					if (url.pathname === '/api/update') return handleUpdateRequest(request)
 					if (url.pathname === '/upload') return webUpload.handleUploadRequest(request, server.requestIP(request)?.address ?? 'unknown')
+					if (url.pathname === '/dirs') return webUpload.handleDirsRequest(request, server.requestIP(request)?.address ?? 'unknown')
 					const asset = web.appAsset(url.pathname)
 					if (asset) return asset
 					// `/` and `/<sessionId>` are both the browser app: the client
