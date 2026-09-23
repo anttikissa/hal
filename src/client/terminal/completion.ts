@@ -129,7 +129,7 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 		argPrefix = cdArgPrefix(before, command)
 		const found = clientTransport.io.completeDirs(argPrefix, cwd)
 		if (found instanceof Promise) {
-			state.pending = found.then((late) => resultFor(command, arg, late))
+			state.pending = found.then((late) => resultFor(command, arg, late), () => null)
 			return null
 		}
 		values = found

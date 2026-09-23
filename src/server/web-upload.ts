@@ -5,17 +5,12 @@
 // Prompts use short, installation-neutral paths under /tmp/hal/i. A second copy
 // under state/uploads preserves the upload until prompt attachment resolution
 // stores it in the session's blob directory.
-//
-// /dirs also lives here: remote terminal clients complete `/cd` paths against
-// the host's filesystem, and it shares the same bearer-token check.
 
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { join } from 'path'
 import { STATE_DIR } from './state.ts'
 import { serverKeys } from './server-keys.ts'
-import { dirs } from '../utils/dirs.ts'
-import { ason } from '../utils/ason.ts'
 
 const IMAGE_UPLOAD_TYPES: Record<string, string> = {
 	'image/png': 'png',
@@ -75,15 +70,14 @@ function saveUpload(name: string, type: string, data: ArrayBuffer): { status: nu
 	return { status: 200, body: { path } }
 }
 
-// Same constant-time token check as the WebSocket handshake.
-function authorized(request: Request, ip: string): boolean {
-	const authorization = request.headers.get('authorization')
-	const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : new URL(request.url).searchParams.get('auth') ?? ''
-	return serverKeys.authenticate(token, ip) !== null
-}
-
 async function handleUploadRequest(request: Request, ip: string): Promise<Response> {
-	if (!authorized(request, ip)) return new Response('Unauthorized', { status: 401 })
+	// Same constant-time token check as the WebSocket handshake.
+	const url = new URL(request.url)
+	const authorization = request.headers.get('authorization')
+	const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : url.searchParams.get('auth') ?? ''
+	if (!serverKeys.authenticate(token, ip)) {
+		return new Response('Unauthorized', { status: 401 })
+	}
 	let form: FormData
 	try {
 		form = await request.formData()
@@ -99,10 +93,4 @@ async function handleUploadRequest(request: Request, ip: string): Promise<Respon
 	})
 }
 
-function handleDirsRequest(request: Request, ip: string): Response {
-	if (!authorized(request, ip)) return new Response('Unauthorized', { status: 401 })
-	const params = new URL(request.url).searchParams
-	return new Response(ason.stringify(dirs.complete(params.get('prefix') ?? '', params.get('cwd') ?? '/')))
-}
-
-export const webUpload = { config, uploadDir, tempUploadDir, saveUpload, handleUploadRequest, handleDirsRequest }
+export const webUpload = { config, uploadDir, tempUploadDir, saveUpload, handleUploadRequest }

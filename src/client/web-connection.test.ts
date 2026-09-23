@@ -39,7 +39,7 @@ test('remote /cd completion asks the host for its directories', async () => {
 	webConnection.state.remote = { host: 'hal.example', authToken: 'secret' }
 	try {
 		webConnection.fetch = async (url, init) => {
-			expect(url).toBe('https://hal.example/dirs?cwd=%2Fsrv&prefix=a')
+			expect(url).toBe('https://hal.example/completions/cd?cwd=%2Fsrv&prefix=a')
 			expect(init?.headers).toEqual({ Authorization: 'Bearer secret' })
 			return new Response(`['alpha/']`)
 		}

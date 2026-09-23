@@ -133,18 +133,10 @@ async function uploadImage(data: Uint8Array): Promise<string> {
 	return body.path
 }
 
-// Best-effort: a host restart or error just means no completions this time.
 async function completeDirs(argPrefix: string, cwd: string): Promise<string[]> {
-	const remote = state.remote
-	if (!remote) return []
 	const query = new URLSearchParams({ cwd, prefix: argPrefix })
-	try {
-		const response = await webConnection.fetch(`https://${remote.host}/dirs?${query}`, { headers: { Authorization: `Bearer ${remote.authToken}` } })
-		if (!response.ok) return []
-		return ason.parse(await response.text()) as string[]
-	} catch {
-		return []
-	}
+	const response = await webConnection.fetch(`https://${state.remote!.host}/completions/cd?${query}`, { headers: { Authorization: `Bearer ${state.remote!.authToken}` } })
+	return ason.parse(await response.text()) as string[]
 }
 
 async function* tailEvents(signal?: AbortSignal): AsyncGenerator<any> {

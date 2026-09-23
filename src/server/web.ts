@@ -12,6 +12,8 @@ import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 import { serverKeys, type WebToken } from './server-keys.ts'
 import { webUpload } from './web-upload.ts'
+import { dirs } from '../utils/dirs.ts'
+import { ason } from '../utils/ason.ts'
 import { processControl } from './process-control.ts'
 
 type SocketData = {
@@ -303,7 +305,11 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 					const url = new URL(request.url)
 					if (url.pathname === '/api/update') return handleUpdateRequest(request)
 					if (url.pathname === '/upload') return webUpload.handleUploadRequest(request, server.requestIP(request)?.address ?? 'unknown')
-					if (url.pathname === '/dirs') return webUpload.handleDirsRequest(request, server.requestIP(request)?.address ?? 'unknown')
+					if (url.pathname === '/completions/cd') {
+						const token = request.headers.get('authorization')?.replace(/^Bearer /, '') ?? ''
+						if (!serverKeys.authenticate(token, server.requestIP(request)?.address ?? 'unknown')) return new Response('Unauthorized', { status: 401 })
+						return new Response(ason.stringify(dirs.complete(url.searchParams.get('prefix') ?? '', url.searchParams.get('cwd') ?? '/')))
+					}
 					const asset = web.appAsset(url.pathname)
 					if (asset) return asset
 					// `/` and `/<sessionId>` are both the browser app: the client

@@ -9,7 +9,6 @@ import { ensureStateDir } from './state.ts'
 import { web } from './web.ts'
 import { serverKeys } from './server-keys.ts'
 import { processControl } from './process-control.ts'
-import { webUpload } from './web-upload.ts'
 import { ason } from '../utils/ason.ts'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
@@ -171,19 +170,21 @@ test('websocket snapshots refresh history boundaries', () => {
 	expect(web.isSnapshotBoundary({ type: 'stream-delta' })).toBe(false)
 })
 
-test('dirs endpoint lists host directories for authenticated remote /cd completion', async () => {
+test('completions/cd lists host directories for authenticated remote clients', async () => {
+	const controller = new AbortController()
 	ensureStateDir()
-	const token = serverKeys.list()[0]!.token
+	web.start(0, controller.signal)
 	const root = mkdtempSync(join(tmpdir(), 'hal-dirs-'))
 	try {
 		mkdirSync(join(root, 'alpha'))
 		mkdirSync(join(root, 'beta'))
-		const query = `cwd=${encodeURIComponent(root)}&prefix=a`
-		expect((await webUpload.handleDirsRequest(new Request(`https://hal.local/dirs?${query}`), 'test')).status).toBe(401)
-		const response = await webUpload.handleDirsRequest(new Request(`https://hal.local/dirs?${query}`, { headers: { authorization: `Bearer ${token}` } }), 'test')
+		const url = `http://127.0.0.1:${web.state.port}/completions/cd?cwd=${encodeURIComponent(root)}&prefix=a`
+		expect((await fetch(url)).status).toBe(401)
+		const response = await fetch(url, { headers: { authorization: `Bearer ${serverKeys.list()[0]!.token}` } })
 		expect(ason.parse(await response.text())).toEqual(['alpha/'])
 	} finally {
 		rmSync(root, { recursive: true, force: true })
+		controller.abort()
 	}
 })
 
