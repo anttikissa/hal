@@ -14,6 +14,7 @@ export type EventType =
 	| 'runtime-start'
 	| 'host-released'
 	| 'prompt'
+	| 'input-history'
 	| 'response'
 	| 'info'
 	| 'error'

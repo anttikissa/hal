@@ -410,11 +410,12 @@ function recordTabClosed(sessionId: string): void {
 }
 
 // Handled slash commands never become user entries, so persist the typed text
-// as input_history for up-arrow recall after restart. Commands arriving from
-// subagents or the inbox carry a source and are not human keystrokes.
+// as input_history for up-arrow recall after restart, and tell every client
+// so their recall lists match. Commands from other sessions are not human input.
 function persistCommandInput(sessionId: string, text: string, source?: string): void {
-	if (source) return
+	if (!historyProjection.isHumanSource(source)) return
 	sessionStore.appendHistory(sessionId, [{ type: 'input_history', text, ts: new Date().toISOString() }])
+	ipc.appendEvent({ type: 'input-history', sessionId, text })
 }
 
 function buildSessionState(meta: SessionMeta): SessionState {

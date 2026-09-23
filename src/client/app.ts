@@ -350,7 +350,8 @@ function switchTab(index: number): void {
 // Also extracts per-tab input history for up-arrow recall.
 function ensureTabLoaded(tab: Tab): void {
 	if (tab.loaded) return
-	tab.inputHistory = historyProjection.inputHistoryFromEntries(tab.rawHistory!)
+	// Refill in place: saved prompt editor states share this array.
+	tab.inputHistory.splice(0, Infinity, ...historyProjection.inputHistoryFromEntries(tab.rawHistory!))
 	tab.history = clientHistory.withLive(blockData.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom, tab.model), tab)
 	sessionLoader.addLastActiveNotice(tab)
 	tab.rawHistory = undefined

@@ -20,6 +20,14 @@ test('input history excludes inbox-originated user entries', () => {
 	expect(history).toEqual(['hello'])
 })
 
+test('input history includes prompts typed in the web client', () => {
+	const history = replay.inputHistoryFromEntries([
+		{ type: 'user', parts: [{ type: 'text', text: 'from web' }], source: 'web' },
+	])
+
+	expect(history).toEqual(['from web'])
+})
+
 test('input history preserves image placeholders in user entries', () => {
 	const history = replay.inputHistoryFromEntries([
 		{

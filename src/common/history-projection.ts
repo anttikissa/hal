@@ -43,14 +43,20 @@ function continuationText(): string {
 	return '[continuing after system message]'
 }
 
+// Humans type in the terminal (no source) or the web client ('web'). Every
+// other source is another session: a subagent handoff or /send.
+function isHumanSource(source: string | undefined): boolean {
+	return !source || source === 'web'
+}
+
 function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 	const history: string[] = []
 	for (const entry of entries) {
 		let text = ''
 		if (entry.type === 'input_history') text = entry.text
 		// Inbox and subagent handoffs are persisted as user entries, but were not
-		// typed by the local user and must stay out of up-arrow editing history.
-		if (entry.type === 'user' && !entry.source) {
+		// typed by a human and must stay out of up-arrow editing history.
+		if (entry.type === 'user' && isHumanSource(entry.source)) {
 			text = historyProjection.userText(entry, { images: 'path-or-blob-or-image', display: 'ui' })
 		}
 		if (text && !text.startsWith('[system]')) history.push(text)
@@ -122,4 +128,4 @@ function activeQuestion(entries: HistoryEntry[], parentCount = 0): ProjectedQues
 	return questions(entries, parentCount).find((question) => question.active)
 }
 
-export const historyProjection = { userText, noticeText, interruptionText, continuationText, inputHistoryFromEntries, questions, activeQuestion }
+export const historyProjection = { userText, noticeText, interruptionText, continuationText, isHumanSource, inputHistoryFromEntries, questions, activeQuestion }

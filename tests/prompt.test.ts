@@ -75,20 +75,16 @@ describe('prompt', () => {
 		}
 	})
 
-	test('setHistory does not let caller appends duplicate prompt recall', () => {
+	test('setHistory shares the tab list so prompts from other clients are recallable', () => {
 		const inputHistory = ['older']
 		prompt.setHistory(inputHistory)
-
-		// The CLI echoes a just-submitted prompt into the editor history for
-		// immediate up-arrow recall, then appends the same prompt to the tab's
-		// inputHistory. These are separate owners; sharing the same array makes the
-		// just-sent prompt appear twice while editing it.
-		prompt.pushHistory('hello')
-		inputHistory.push('hello')
-		prompt.setText('hello')
+		const saved = prompt.snapshotState()
+		prompt.restoreState(saved)
+		// The tab's list is the single owner: prompt events from any client append to it.
+		inputHistory.push('from web')
 
 		prompt.handleKey(key('up'), 80)
-		expect(prompt.text()).toBe('older')
+		expect(prompt.text()).toBe('from web')
 	})
 
 	test('history browsing uses the end of the target row for multiline entries', () => {

@@ -771,7 +771,8 @@ function snapshotState(): PromptEditorState {
 		undoStack: undoStack.map(cloneSnapshot),
 		redoStack: redoStack.map(cloneSnapshot),
 		undoGrouping,
-		history: history.slice(),
+		// Shared, not copied: the tab's list is the single owner of recall history.
+		history,
 		historyIndex,
 		historyDraft,
 		pasteRefs: pasteRefs.map((ref) => ({ ...ref })),
@@ -788,7 +789,7 @@ function restoreState(saved: PromptEditorState): void {
 	undoStack = saved.undoStack.map(cloneSnapshot)
 	redoStack = saved.redoStack.map(cloneSnapshot)
 	undoGrouping = saved.undoGrouping
-	history = saved.history.slice()
+	history = saved.history
 	historyIndex = saved.historyIndex
 	historyDraft = saved.historyDraft
 	pasteRefs.length = 0
@@ -886,13 +887,12 @@ function clear(): void {
 	state.promptScrollTop = 0
 }
 
+// Shares the caller's array: prompt events from every client append to the
+// tab's list, and the editor must see them without a second copy.
 function setHistory(h: string[]): void {
-	history = h.slice()
+	history = h
 	historyIndex = -1
 	historyDraft = ''
-}
-function pushHistory(text: string): void {
-	history.push(text)
 }
 function setRenderCallback(cb: () => void): void {
 	renderCallback = cb
@@ -916,7 +916,6 @@ export const prompt = {
 	setText,
 	clear,
 	setHistory,
-	pushHistory,
 	setRenderCallback,
 	handleKey,
 	atVerticalBoundary,

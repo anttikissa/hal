@@ -404,8 +404,6 @@ function submitPromptText(text: string, displayText: string | undefined, queue?:
 	completion.dismiss()
 	popup.close()
 	promptEdit.cancel()
-	// Push to prompt module for immediate up-arrow recall
-	prompt.pushHistory(text)
 	// Human typing now uses the same prompt command path as inbox messages.
 	// The runtime decides whether an working turn makes this behave like steering.
 	client.sendCommand(type, text, displayText === text ? undefined : displayText, queue)
@@ -417,7 +415,6 @@ function submitPromptText(text: string, displayText: string | undefined, queue?:
 
 function handleLocalCommand(text: string): boolean {
 	if (text === '/rebase') {
-		prompt.pushHistory(text)
 		client.sendCommand('rebase-start', rebaseRequestId())
 		prompt.clear()
 		clearSavedPromptState()
@@ -429,7 +426,6 @@ function handleLocalCommand(text: string): boolean {
 	if (!parsed) return false
 	if (!clientLocalCommands.commandNames().includes(parsed.name)) return false
 
-	prompt.pushHistory(text)
 	prompt.clear()
 	clearSavedPromptState()
 	client.onSubmit(text)

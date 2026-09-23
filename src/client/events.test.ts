@@ -94,6 +94,20 @@ test('prompt events add remote local-user prompts to up-arrow history', () => {
 	expect(recalls).toEqual([{ sessionId: 's1', text: 'full prompt' }])
 })
 
+test('web prompts and handled commands join up-arrow history', () => {
+	const recalls: Array<{ sessionId: string; text: string }> = []
+	const ctx = {
+		flushDelayedPaused: () => {},
+		addBlockToTab: () => {},
+		appendInputHistory: (sessionId: string, text: string) => recalls.push({ sessionId, text }),
+		clearPendingPrompt: () => {},
+	}
+	clientEvents.handle({ type: 'prompt', id: 'prompt-1', sessionId: 's1', text: 'from web', source: 'web' }, ctx)
+	clientEvents.handle({ type: 'input-history', sessionId: 's1', text: '/model x' }, ctx)
+
+	expect(recalls).toEqual([{ sessionId: 's1', text: 'from web' }, { sessionId: 's1', text: '/model x' }])
+})
+
 test('runtime-start from promoted client is not described as restart', () => {
 	let restart: any = null
 	let promotion: any = null

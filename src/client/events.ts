@@ -1,5 +1,6 @@
 import { draft as draftModule } from './draft.ts'
 import { blockData } from './block-data.ts'
+import { historyProjection } from '../common/history-projection.ts'
 
 function handle(event: any, ctx: any): void {
 	if (event.type === 'host-released') return
@@ -11,6 +12,7 @@ function handle(event: any, ctx: any): void {
 		return
 	}
 	if (event.type === 'prompt') return handlePrompt(event, ctx)
+	if (event.type === 'input-history') return ctx.appendInputHistory?.(event.sessionId, event.text)
 	if (event.type === 'stream-start' && event.sessionId) return handleStreamStart(event, ctx)
 	if (event.type === 'stream-delta' && event.sessionId && event.text) return handleStreamDelta(event, ctx)
 	if (event.type === 'stream-end' && event.sessionId) return handleStreamEnd(event, ctx)
@@ -31,7 +33,7 @@ function handlePrompt(event: any, ctx: any): void {
 	else ctx.flushDelayedPaused(event.sessionId ?? null)
 	// Prompt events are broadcast to every client, so they are the one common point
 	// for keeping each tab's recall list in sync with persisted local-user history.
-	if (!event.source) ctx.appendInputHistory?.(event.sessionId, event.actualText ?? event.text)
+	if (historyProjection.isHumanSource(event.source)) ctx.appendInputHistory?.(event.sessionId, event.actualText ?? event.text)
 	ctx.addBlockToTab(event.sessionId, {
 		type: 'user',
 		id: typeof event.id === 'string' ? event.id : undefined,
