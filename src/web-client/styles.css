@@ -211,16 +211,20 @@ button { touch-action: manipulation; }
 	white-space: normal;
 	box-shadow: 0 1px 0 rgb(0 0 0 / .35);
 }
-.ToolCard > header { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.ToolCard > header > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ToolCard > header > span { flex: none; margin-left: auto; color: #8d969f; font-size: .9em; }
-.ToolCard.running > header > span { color: var(--tool-fg); }
-.ToolCard > p, .ToolCard > small { display: block; margin: 5px 0 0; color: #aeb7c1; }
-.ToolCard > pre {
-	max-height: 8.4em;
+.ToolCard.target { border-color: var(--tool-fg); box-shadow: 0 0 0 2px color-mix(in oklch, var(--tool-fg) 40%, transparent); }
+.ToolCard > details > summary { cursor: pointer; list-style: none; }
+.ToolCard > details > summary::-webkit-details-marker { display: none; }
+.ToolCard > details > summary > header { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.ToolCard > details > summary > header::before { content: '▸'; color: var(--tool-fg); }
+.ToolCard > details[open] > summary > header::before { content: '▾'; }
+.ToolCard > details > summary > header > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ToolCard > details > summary > header > span { flex: none; margin-left: auto; color: #8d969f; font-size: .9em; }
+.ToolCard.running > details > summary > header > span { color: var(--tool-fg); }
+.ToolCard > details > summary > p, .ToolCard > details > summary > small { display: block; margin: 5px 0 0; color: #aeb7c1; }
+.ToolCard > details pre {
 	margin: 6px 0 0;
-	padding: 5px 6px;
-	overflow: hidden;
+	padding: 6px;
+	overflow: auto;
 	background: #101214;
 	border: 1px solid #292d32;
 	color: #cbd3da;
@@ -229,7 +233,14 @@ button { touch-action: manipulation; }
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
-.ToolCard > small { color: #818b95; }
+.ToolCard > details > summary > pre { max-height: 8.4em; overflow: hidden; }
+.ToolCard > details[open] > summary > pre, .ToolCard > details[open] > summary > small { display: none; }
+.ToolCard > details > summary > small { color: #818b95; }
+.ToolCard > details > summary:focus-visible, .ToolCard button:focus-visible, .ToolCard a:focus-visible { outline: 2px solid #8fc5ed; outline-offset: 2px; }
+.ToolCard-link { display: inline-block; margin-top: 9px; color: #8fc5ed; }
+.ToolCard-section { margin-top: 10px; }
+.ToolCard-section > button { float: right; color: #cbd3da; background: #202832; border: 1px solid #526579; cursor: pointer; }
+.ToolCard-section > pre { max-height: 65vh; clear: both; }
 
 /* Markdown is renderer-owned HTML from utils/markdown.ts; source text is
    escaped before these fixed tags are inserted. */

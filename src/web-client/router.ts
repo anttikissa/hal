@@ -32,6 +32,13 @@ function parse(from: string): string {
 function format(target: string): string {
 	return target ? `/${target}` : '/'
 }
+function toolHash(toolId: string): string {
+	return `#tool=${encodeURIComponent(toolId)}`
+}
+
+function toolTarget(): string {
+	return new URLSearchParams(new URL(router.href()).hash.slice(1)).get('tool') ?? ''
+}
 
 function navigate(target: string, options?: { replace?: boolean }): void {
 	// Selecting the tab you are already on must not stack history entries,
@@ -65,4 +72,4 @@ function start(): () => void {
 	return () => removeEventListener('popstate', onPopState)
 }
 
-export const router = { sessionId, href, write, parse, format, navigate, handlePopState, takeSearchParam, start }
+export const router = { sessionId, href, write, parse, format, toolHash, toolTarget, navigate, handlePopState, takeSearchParam, start }

@@ -36,6 +36,14 @@ test('ignores query and hash when parsing', () => {
 	expect(router.parse('https://example.test/05-wan?auth=secret#msg')).toBe('05-wan')
 })
 
+test('tool deep links preserve their target through token consumption', () => {
+	fakeBrowser('https://example.test/05-wan?auth=secret#tool=call_1%2F2')
+	expect(router.toolTarget()).toBe('call_1/2')
+	expect(router.takeSearchParam('auth')).toBe('secret')
+	expect(router.toolTarget()).toBe('call_1/2')
+	expect(written).toEqual([{ url: '/05-wan#tool=call_1%2F2', replace: true }])
+	expect(router.toolHash('call_1/2')).toBe('#tool=call_1%2F2')
+})
 test('formats session ids back into paths', () => {
 	expect(router.format('05-wan')).toBe('/05-wan')
 	expect(router.format('')).toBe('/')
