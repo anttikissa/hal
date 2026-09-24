@@ -262,6 +262,19 @@ test('anthropic provider surfaces refusal stop details instead of an empty respo
 	expect(events.at(-1)?.type).toBe('done')
 })
 
+test('anthropic provider surfaces max_tokens truncation instead of an empty response', async () => {
+	installFetchMock(async () => new Response([
+		'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool_1","name":"write","input":{}}}',
+		'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"path\\": "}}',
+		'data: {"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"output_tokens":16384}}',
+		'data: {"type":"message_stop"}',
+		'',
+	].join('\n'), { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any)
+
+	const events = await collect({ value: 'tok-test', type: 'token' })
+	expect(events.find((event) => event.type === 'error')?.message).toContain('output token limit')
+})
+
 test('anthropic provider ignores malformed SSE JSON lines', async () => {
 	installFetchMock(async () => new Response([
 		'data: {not json}',

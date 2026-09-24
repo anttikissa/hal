@@ -33,7 +33,10 @@ function logCall(entry: Record<string, unknown>): void {
 // errors far more frequently.
 const API_URL = 'https://api.anthropic.com/v1/messages?beta=true'
 const API_VERSION = '2023-06-01'
-const MAX_TOKENS = 16384
+// Large enough for big file writes: current Claude models allow at least 64k output.
+const MAX_TOKENS = 64000
+// Stop reasons that end a turn normally; anything else is surfaced as an error.
+const NORMAL_STOP_REASONS = ['end_turn', 'tool_use', 'stop_sequence', 'pause_turn']
 // Claude Code version we report in the OAuth user-agent (see the header block in generate()).
 // Tracks the version bundled with the Agent SDK we verified against.
 const CLAUDE_CODE_VERSION = '2.1.280'
@@ -172,6 +175,7 @@ async function* parseStream(
 	const serverTools = new Map<number, { block: any; json: string }>()
 	const usage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 	let gotStop = false
+	let stopReason = ''
 
 	for await (const ev of providerShared.iterateJsonSse(body)) {
 		if (ev.type === 'content_block_start') {
@@ -231,10 +235,19 @@ async function* parseStream(
 			})
 		} else if (ev.type === 'message_delta') {
 			if (ev.usage) usage.output += ev.usage.output_tokens ?? 0
-			if (ev.delta?.stop_reason === 'refusal') {
+			stopReason = ev.delta?.stop_reason ?? stopReason
+			if (stopReason === 'refusal') {
 				const details = { stop_reason: 'refusal', stop_details: ev.delta.stop_details }
 				const explanation = ev.delta.stop_details?.explanation ?? 'The request was blocked by Anthropic policy.'
 				yield { type: 'error', message: `Claude refused the request: ${explanation}`, body: JSON.stringify(details) }
+			} else if (stopReason === 'max_tokens') {
+				// A tool call cut off mid-input never gets content_block_stop, so without
+				// this error the turn would look empty.
+				let cutOff = ''
+				for (const t of tools.values()) cutOff = ` while writing a ${t.name} tool call (${t.json.length} chars of input dropped)`
+				yield { type: 'error', message: `Response hit the output token limit (${MAX_TOKENS} tokens)${cutOff}.`, body: JSON.stringify(ev.delta) }
+			} else if (stopReason && !NORMAL_STOP_REASONS.includes(stopReason)) {
+				yield { type: 'error', message: `Response stopped with stop_reason ${stopReason}`, body: JSON.stringify(ev.delta) }
 			}
 		} else if (ev.type === 'message_stop') {
 			gotStop = true
@@ -247,7 +260,7 @@ async function* parseStream(
 	}
 
 	if (!gotStop) return
-	yield { type: 'done', doneStatus: 'completed', usage }
+	yield { type: 'done', doneStatus: 'completed', usage, stopReason }
 }
 
 // ── Generate ──
