@@ -13,7 +13,7 @@ type TranscriptProps = {
 
 export function Transcript(props: TranscriptProps) {
 	let element: HTMLElement | undefined
-	let autoFollow = true
+	let bottomGap: number | null = 0
 	let openedTarget = ''
 	function focusTarget(): void {
 		const blockId = router.blockTarget()
@@ -28,7 +28,7 @@ export function Transcript(props: TranscriptProps) {
 		const highlight = target.closest('.ToolCard') ?? target
 		highlight.classList.add('target')
 		if (target instanceof HTMLDetailsElement) target.open = true
-		autoFollow = false
+		bottomGap = null
 		target.scrollIntoView({ block: 'center' })
 		openedTarget = key
 	}
@@ -48,8 +48,8 @@ export function Transcript(props: TranscriptProps) {
 	createEffect(() => [props.items, router.sessionId()], focusTarget)
 	// The render grows the transcript before the effect runs, so retain the user's last
 	// scroll intent instead of measuring the newly enlarged gap in the effect.
-	function updateAutoFollow(): void {
-		if (element) autoFollow = webScroll.isNearBottom(element)
+	function updateBottomGap(): void {
+		if (element) bottomGap = webScroll.bottomGap(element)
 	}
 	onSettled(() => {
 		if (!element) return
@@ -57,7 +57,7 @@ export function Transcript(props: TranscriptProps) {
 		// Keyboard and draft growth resize this same pane without changing items.
 		// Follow its bottom only while the reader has not scrolled back.
 		const observer = new ResizeObserver(() => {
-			if (element && autoFollow) webScroll.toBottom(element)
+			if (element && bottomGap !== null) webScroll.toBottom(element, bottomGap)
 		})
 		observer.observe(element)
 		return () => observer.disconnect()
@@ -65,10 +65,10 @@ export function Transcript(props: TranscriptProps) {
 	createEffect(
 		() => props.items,
 		() => {
-			if (element && autoFollow) webScroll.toBottom(element)
+			if (element && bottomGap !== null) webScroll.toBottom(element, bottomGap)
 		},
 	)
-	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateAutoFollow} onClick={onBlockLinkClick}>
+	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateBottomGap} onClick={onBlockLinkClick}>
 		<For each={props.items} keyed={webTranscript.rowKey}>{(item) => <TranscriptItem item={item()} token={props.token} onAnswer={props.onAnswer} />}</For>
 	</main>
 }
