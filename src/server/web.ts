@@ -262,10 +262,10 @@ function encode(message: WebServerMessage): string {
 	return webProtocol.encode(message)
 }
 
-async function bundleClient(): Promise<string> {
+async function bundleClient(entry = 'main.tsx'): Promise<string> {
 	const { transform } = await import('@dom-expressions/compiler')
 	const result = await Bun.build({
-		entrypoints: [`${import.meta.dir}/../web-client/main.tsx`],
+		entrypoints: [`${import.meta.dir}/../web-client/${entry}`],
 		target: 'browser',
 		minify: true,
 		plugins: [{
@@ -367,6 +367,8 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 					}
 					const asset = web.appAsset(url.pathname)
 					if (asset) return asset
+					if (url.pathname === '/demo/') return new Response('<meta name="viewport" content="width=device-width,initial-scale=1"><title>Solid block demo</title><div id="app"></div><script type="module" src="/demo.js"></script>', { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
+					if (url.pathname === '/demo.js') return new Response(await web.bundleClient('demo.tsx'), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
 					// `/` and `/<sessionId>` are both the browser app: the client
 					// reads the session out of the path so a tab can be linked.
 					if (url.pathname === '/' || webProtocol.isSessionPath(url.pathname)) return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } })
