@@ -1,4 +1,4 @@
-import { createEffect, For, onSettled } from 'solid-js'
+import { createEffect, For, onSettled, Show } from 'solid-js'
 import { router } from '../router.ts'
 import type { AnswerValue } from '../../common/history.ts'
 import { webTranscript, type RenderedTranscriptItem } from '../utils/transcript.ts'
@@ -103,7 +103,7 @@ export function Transcript(props: TranscriptProps) {
 		webScroll.toBottom(element, 0, smoothFollow)
 	})
 	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateBottomGap} onScrollEnd={() => { smoothFollow = false; updateBottomGap() }} onWheel={cancelSmoothFollow} onTouchStart={cancelSmoothFollow} onClick={(event) => { onCardClick(event); onBlockLinkClick(event) }}>
-		<For each={props.items} keyed={webTranscript.rowKey}>{(item) => <TranscriptItem item={item()} token={props.token} onAnswer={props.onAnswer} />}</For>
-		<div class={['Transcript-cursor', { thinking: webTranscript.thinkingCursor(props.items) }]} aria-label="Hal cursor"><span aria-hidden="true" /></div>
+		<For each={props.items} keyed={webTranscript.rowKey}>{(item) => <TranscriptItem item={item()} cursor={webTranscript.activeCursorEntry(props.items) === item().entry} token={props.token} onAnswer={props.onAnswer} />}</For>
+		<Show when={!webTranscript.activeCursorEntry(props.items)}><div class="Transcript-cursor" aria-label="Hal cursor"><span aria-hidden="true" /></div></Show>
 	</main>
 }

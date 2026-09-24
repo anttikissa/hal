@@ -141,8 +141,10 @@ test('a replacement snapshot settles the active question into compact history', 
 	}))
 })
 
-test('the Hal cursor dims only during live thinking', () => {
-	expect(webTranscript.thinkingCursor([])).toBe(false)
-	expect(webTranscript.thinkingCursor([{ entry: { type: 'thinking', text: 'older' }, text: 'older' }])).toBe(false)
-	expect(webTranscript.thinkingCursor([{ entry: { type: 'thinking', text: 'now', streaming: true }, text: 'now' }])).toBe(true)
+test('Hal cursor belongs to the latest streaming assistant or thinking card', () => {
+	const thinking = { entry: { type: 'thinking' as const, text: 'reason', streaming: true }, text: 'reason' }
+	const assistant = { entry: { type: 'assistant' as const, text: 'answer', streaming: true }, text: 'answer' }
+	expect(webTranscript.activeCursorEntry([thinking, assistant])).toBe(assistant.entry)
+	expect(webTranscript.activeCursorEntry([thinking])).toBe(thinking.entry)
+	expect(webTranscript.activeCursorEntry([{ entry: { ...assistant.entry, streaming: false }, text: 'answer' }])).toBeUndefined()
 })

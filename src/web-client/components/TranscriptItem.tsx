@@ -13,6 +13,7 @@ type TranscriptItemProps = {
 	item: RenderedTranscriptItem
 	token: string
 	onAnswer: (questionId: string, value: AnswerValue) => Promise<boolean>
+	cursor?: boolean
 }
 
 export function TranscriptItem(props: TranscriptItemProps) {
@@ -20,7 +21,7 @@ export function TranscriptItem(props: TranscriptItemProps) {
 		when={webQuestion.projected(props.item.entry)}
 		fallback={<Show
 			when={props.item.entry.type === 'tool' ? props.item.entry : undefined}
-			fallback={<article class={['TranscriptItem', props.item.entry.type]} id={webTranscript.blockId(props.item.entry) || undefined}>
+			fallback={<article class={['TranscriptItem', props.item.entry.type, { streaming: !!props.cursor }]} id={webTranscript.blockId(props.item.entry) || undefined}>
 				<header><strong>{transcriptTitles.label(props.item.entry)}</strong>
 					<Show when={router.blockHash(webTranscript.blockId(props.item.entry))}>
 						{(hash) => <a class="Transcript-blockLink" href={hash()}>{webTranscript.blockId(props.item.entry)}</a>}
@@ -42,6 +43,7 @@ export function TranscriptItem(props: TranscriptItemProps) {
 								</Show>}</For>}
 						</Show>
 					</div>
+					<Show when={props.cursor}><span class={['Transcript-cursor', { thinking: props.item.entry.type === 'thinking' }, 'inline']} aria-label="Hal cursor"><span aria-hidden="true" /></span></Show>
 					<Show when={webTranscript.interruption(props.item.entry)}>
 						{(interruption) => <span class="TranscriptItem-interruption"> {interruption()}</span>}
 					</Show>

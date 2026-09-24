@@ -147,8 +147,10 @@ function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[]
 	return result
 }
 
-function thinkingCursor(items: RenderedTranscriptItem[]): boolean {
-	return items.some((item) => item.entry.type === 'thinking' && 'streaming' in item.entry && item.entry.streaming === true)
+function activeCursorEntry(items: RenderedTranscriptItem[]): TranscriptEntry | undefined {
+	for (const item of [...items].reverse()) {
+		if ((item.entry.type === 'thinking' || item.entry.type === 'assistant') && 'streaming' in item.entry && item.entry.streaming) return item.entry
+	}
 }
 
-export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker, blockId, rowKey, thinkingCursor }
+export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker, blockId, rowKey, activeCursorEntry }
