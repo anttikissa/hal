@@ -24,15 +24,16 @@ function localToken(): string {
 function url(sessionId: string, blockId?: string): string {
 	if (!webProtocol.isSessionPath(`/${sessionId}`)) return ''
 	const remote = webConnection.state.remote
-	if (!client.state.webOrigin) return '' // The host has not started its web server.
-	const origin = remote ? `https://${remote.host}` : client.state.webOrigin
-	// Never send a remote token to an address supplied by the remote server.
+	if (!client.state.webOrigin) return '' // The server has not advertised a web endpoint.
+	const origin = client.state.webOrigin
+	// The authenticated server chooses its canonical browser host, not the connection alias.
 	const token = remote ? remote.authToken : webLinks.localToken()
 	if (!token) return ''
 	let parsed: URL
 	try { parsed = new URL(origin) } catch { return '' }
 	if (parsed.origin !== origin || parsed.username || parsed.password) return ''
 	if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && parsed.hostname === 'localhost')) return ''
+	if (remote && parsed.protocol !== 'https:') return ''
 	const hash = blockId ? `#${encodeURIComponent(blockId)}` : ''
 	return `${origin}/${sessionId}?auth=${encodeURIComponent(token)}${hash}`
 }

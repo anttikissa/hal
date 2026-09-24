@@ -21,16 +21,18 @@ test('local session and tool links use the advertised bound port and local web t
 	}
 })
 
-test('remote links use the connected host and existing auth token, never a different advertised host', () => {
+test('remote links use the server-advertised HTTPS origin, not the connection alias', () => {
 	const origin = client.state.webOrigin
 	const remote = webConnection.state.remote
 	try {
-		webConnection.state.remote = { host: 'hal.antti.dev', authToken: 'remoteToken1' }
-		client.state.webOrigin = 'https://another.example'
-		expect(webLinks.url('05-wan', '0403ru-pku')).toBe('https://hal.antti.dev/05-wan?auth=remoteToken1#0403ru-pku')
-		client.state.webOrigin = 'https://hal.antti.dev'
-		expect(webLinks.url('05-wan')).toBe('https://hal.antti.dev/05-wan?auth=remoteToken1')
-		expect(webLinks.imageUrl('05-wan', '000123-abc')).toBe('https://hal.antti.dev/images/05-wan/000123-abc?auth=remoteToken1')
+		webConnection.state.remote = { host: 'kissa.dev', authToken: 'remoteToken1' }
+		client.state.webOrigin = 'https://hal.kissa.dev'
+		expect(webLinks.url('05-wan', '0403ru-pku')).toBe('https://hal.kissa.dev/05-wan?auth=remoteToken1#0403ru-pku')
+		expect(webLinks.imageUrl('05-wan', '000123-abc')).toBe('https://hal.kissa.dev/images/05-wan/000123-abc?auth=remoteToken1')
+		client.state.webOrigin = ''
+		expect(webLinks.url('05-wan')).toBe('')
+		client.state.webOrigin = 'http://localhost:9001'
+		expect(webLinks.url('05-wan')).toBe('')
 	} finally {
 		client.state.webOrigin = origin
 		webConnection.state.remote = remote
