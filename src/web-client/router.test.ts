@@ -59,11 +59,6 @@ test('paste links retain their message target through token consumption', () => 
 	expect(router.takeSearchParam('auth')).toBe('secret')
 	expect(router.pasteHash('000001-abc')).toBe('#paste=000001-abc')
 })
-test('formats session ids back into paths', () => {
-	expect(router.format('05-wan')).toBe('/05-wan')
-	expect(router.format('')).toBe('/')
-})
-
 test('navigate pushes a history entry and updates the current session', () => {
 	router.navigate('05-wan')
 	expect(written).toEqual([{ url: '/05-wan', replace: false }])

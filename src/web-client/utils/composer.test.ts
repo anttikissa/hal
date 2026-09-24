@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { attachmentRef, enterAction, pastedImage, sendLabel, submissionCommand, typingKey } from './composer.ts'
+import { attachmentRef, enterAction, pastedImage, submissionCommand, typingKey } from './composer.ts'
 
 describe('enterAction', () => {
 	test('desktop: Enter submits, Shift+Enter newlines', () => {
@@ -12,9 +12,6 @@ describe('enterAction', () => {
 		expect(enterAction('Enter', { shift: true, coarse: true })).toBe('newline')
 	})
 
-	test('other keys do nothing', () => {
-		expect(enterAction('a', {})).toBe('none')
-	})
 })
 
 test('Cmd/Ctrl+Enter queues while working, otherwise sends normally', () => {
@@ -48,13 +45,6 @@ test('attachmentRef adds spacing at the captured insertion point', () => {
 	expect(attachmentRef('beforeafter', 6, 'image.png')).toBe(' [image.png] ')
 	expect(attachmentRef('before after', 7, 'image.png')).toBe('[image.png] ')
 	expect(attachmentRef('', 0, 'image.png')).toBe('[image.png] ')
-})
-
-describe('sendLabel', () => {
-	test('names what the button will actually do', () => {
-		expect(sendLabel(false)).toBe('Send')
-		expect(sendLabel(true)).toBe('Steer')
-	})
 })
 
 describe('submissionCommand', () => {

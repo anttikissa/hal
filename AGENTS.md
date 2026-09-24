@@ -7,6 +7,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Use bun - never node, npm or npx
 - Use red-green TDD.
 - Do not write tests for exact LLM output. LLM output is indeterministic; test deterministic parsing, wiring, and fallback behavior instead.
+- Do not write tautological tests. Never assert on source text (`toContain` over a `.ts`/`.tsx` file), never copy CSS values, markup, or template strings into expectations, and never test one-line formatters or guards. Such tests have never caught a bug here; they only fail on intentional changes. Pure styling or copy changes need no test. Test behavior, invariants, and relations instead (e.g. the mount chain, equal padding, platform minimums).
 - Use `./test` to run all tests, typechecker and oxlint. Run the tests before writing code.
 - Treat test failures as baseline findings first: report unrelated failures to the user and leave those files alone. If a failure blocks your task and no owner is known, work with the user rather than polling other agents.
 - The working-session list is global across projects, not a list of collaborators in your repository. Before contacting another session about a failure or local change, verify its cwd/project and require concrete evidence that it owns the affected work (such as an explicit task or prior coordination). Activity, tab proximity, and even a shared repository are not ownership evidence. Contact a known owner only when your work is blocked; never interrupt unrelated sessions to ask whether a change is theirs.

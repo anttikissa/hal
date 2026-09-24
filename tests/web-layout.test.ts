@@ -124,58 +124,6 @@ test('the transcript is the only scrolling row', () => {
 	expect(declaration('.PromptComposer', 'flex')).toBe('none')
 })
 
-test('transcript and composer use viewport width without the old narrow column', () => {
-	for (const selector of ['.Transcript', '.PromptComposer']) {
-		expect(declaration(selector, 'width')).toBe('100%')
-		expect(declaration(selector, 'margin')).toBeUndefined()
-	}
-})
-
-test('idle composer activity uses the palette idle grey instead of the done-tab green', () => {
-	expect(declaration('.PromptComposer-activity', 'color')).toBe('var(--assistant-cursorIdle, var(--status-fg, var(--muted)))')
-})
-
-test('accepted messages force the transcript to its bottom even if the reader scrolled up', () => {
-	const main = readFileSync(resolve(webDir, 'main.tsx'), 'utf8')
-	const transcript = readFileSync(resolve(webDir, 'components/Transcript.tsx'), 'utf8')
-	expect(main).toContain('setSendCount((count) => count + 1)')
-	expect(main).toContain('sendCount={sendCount()}')
-	expect(transcript).toContain('webScroll.toBottom(element)')
-	expect(transcript).toContain('() => props.sendCount')
-})
-
-test('native motion is only requested for new blocks or sends and respects reduced motion', () => {
-	const transcript = readFileSync(resolve(webDir, 'components/Transcript.tsx'), 'utf8')
-	expect(transcript).toContain('items.length > lastCount')
-	expect(transcript).toContain("matchMedia('(prefers-reduced-motion: reduce)').matches")
-	expect(transcript).toContain('onScrollEnd=')
-})
-
-test('desktop text shares the 15px type scale while touch fields avoid iOS zoom', () => {
-	expect(declaration('.SessionTabs > .SessionTabs-title', 'font-size')).toBe('15px')
-	expect(declaration('.PromptComposer-input > textarea', 'font-size')).toBe('15px')
-	expect(declaration('.PromptComposer > .PromptComposer-help', 'font-size')).toBe('15px')
-	expect(declaration('.PromptComposer-input > textarea', 'line-height')).toBe('24px')
-	expect(declarationInside('@media (pointer: coarse)', '.PromptComposer-input > textarea', 'font-size')).toBe('16px')
-})
-
-test('a clipped input shell keeps scrolled prompt text out of the status line', () => {
-	const source = readFileSync(resolve(webDir, 'components/PromptComposer.tsx'), 'utf8')
-	expect(source).toContain('<div class="PromptComposer-input" ref=')
-	expect(declaration('.PromptComposer-input', 'overflow')).toBe('hidden')
-	expect(declaration('.PromptComposer-input', 'min-height')).toBe('44px')
-})
-
-test('composer controls use CSS borders rather than native control decoration', () => {
-	const controls = '.PromptComposer-input > textarea, .PromptComposer-controls > button'
-	expect(declaration(controls, 'appearance')).toBe('none')
-	expect(declaration(controls, 'margin')).toBe('0')
-	expect(declaration(controls, 'border-radius')).toBe('0')
-	expect(declaration(controls, 'box-shadow')).toBe('none')
-	expect(declaration('.PromptComposer', 'align-items')).toBe('stretch')
-	expect(declaration('.PromptComposer > .PromptComposer-controls', 'align-items')).toBe('stretch')
-})
-
 test('short composer buttons fit within the same 44px minimum as the textarea', () => {
 	const buttons = '.PromptComposer-controls > button'
 	expect(declaration(buttons, 'min-height')).toBe(declaration('.PromptComposer-input > textarea', 'min-height'))
@@ -192,85 +140,12 @@ test('single-line prompt text has equal space above and below its line box', () 
 	expect(line + 2 * padding).toBe(height)
 })
 
-test('tab strip measures its width and renders only visible, keyboard-focusable shortcuts', () => {
-	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
-	expect(source).toContain('new ResizeObserver(')
-	expect(source).toContain('sessionActivity.capacity(')
-	expect(source).toContain('<For each={shown()} keyed={(session) => session.id}>')
-	expect(declaration('.SessionTabs > .SessionTabs-rail', 'min-width')).toBe('0')
-	expect(declaration('.SessionTabs-rail > a', 'width')).toBe('56px')
-})
-
-test('phone editing grows the draft while retaining context and avoiding the bottom inset', () => {
-	const media = '@media (max-width: 48em)'
-	const focused = '#app:has(> .PromptComposer .PromptComposer-input > textarea:focus)'
-	const composer = `${focused} > .PromptComposer`
-	expect(declarationInside(media, `${focused} > .Transcript`, 'min-height')).toBe('min(64px, 15%)')
-	expect(declarationInside(media, composer, 'flex')).toBe('0 1 auto')
-	expect(declarationInside(media, composer, 'flex-direction')).toBe('column')
-	expect(declarationInside(media, composer, 'padding-bottom')).toBe('8px')
-	expect(declarationInside(media, `${composer} > .PromptComposer-input`, 'min-height')).toBe('44px')
-	expect(declarationInside(media, `${composer} > .PromptComposer-input`, 'max-height')).toBe('none')
-	// CSS keeps the desktop cap; JS must measure the whole draft, not eight lines.
-	const source = readFileSync(resolve(webDir, 'components/PromptComposer.tsx'), 'utf8')
-	expect(source).toContain('`${input.scrollHeight}px`')
-	expect(source).toContain('inputShell.style.height = `${input.scrollHeight}px`')
-	expect(declaration('.PromptComposer-input > textarea', 'max-height')).toBe('168px')
-})
-
-test('tab header keeps the current name and complete searchable session menu at any size', () => {
-	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
-	expect(source).toContain('class="SessionTabs-title" title={props.status}')
-	expect(source).toContain('sessionActivity.ordered(')
-	expect(source).toContain('sessionActivity.matches(session, query(), number())')
-	expect(source).toContain('aria-label="Find session"')
-	expect(declaration('.SessionTabs-list > div[hidden]', 'display')).toBe('none')
-})
-
-test('numbered tabs precede the session name without narrowing the strip', () => {
-	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
-	expect(source.indexOf('<nav class="SessionTabs-rail"')).toBeLessThan(source.indexOf('<span class="SessionTabs-title"'))
-	expect(declaration('.SessionTabs > .SessionTabs-rail', 'grid-row')).toBe('1')
-	expect(declaration('.SessionTabs > .SessionTabs-title', 'grid-row')).toBe('2')
-	expect(declaration('.SessionTabs > .SessionTabs-title', 'font-size')).toBe('15px')
-})
-
-test('compact desktop tabs are vertically centered, with no header or composer dividers', () => {
-	expect(declaration('.SessionTabs > .SessionTabs-rail', 'height')).toBe('32px')
-	expect(declaration('.SessionTabs-rail > a', 'height')).toBe('28px')
-	expect(declaration('.SessionTabs-rail > a', 'align-items')).toBe('center')
-	expect(declaration('.SessionTabs', 'border-bottom')).toBeUndefined()
-	expect(declaration('.PromptComposer', 'border-top')).toBeUndefined()
-})
-
-test('compact desktop chrome retains 44px targets on touch screens', () => {
+// Platform thresholds rather than design choices: iOS zooms the page when a
+// focused field is under 16px, and touch targets need at least 44px.
+test('touch screens keep 16px fields and 44px tab targets', () => {
 	const media = '@media (pointer: coarse)'
-	expect(declarationInside(media, '.SessionTabs-rail > a', 'height')).toBe('44px')
-	expect(declarationInside(media, '.SessionTabs-rail > button', 'height')).toBe('44px')
-})
-
-test('session menu reveals the current tab and keeps actions outside the scrolling list', () => {
-	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
-	expect(source).toContain('dialog.showModal()')
-	expect(source).toContain("'[aria-current=\"page\"]'")
-	expect(source).toContain("current?.scrollIntoView({ block: 'center' })")
-	expect(source).toContain('<Show when={appActions.isInstalled()}>')
-	expect(declaration('.SessionTabs-list', 'overflow-y')).toBe('auto')
-	expect(declaration('.SessionTabs-actions', 'flex')).toBe('none')
-	expect(declaration('.SessionTabs-list > div.selected', 'background')).toBe('var(--user-bg, var(--page))')
-})
-
-
-test('session menu shows each session cwd without letting long paths distort its row', () => {
-	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
-	expect(source).toContain('<span class="SessionTabs-cwd" title={session.cwd}>{session.cwd}</span>')
-	expect(declaration('.SessionTabs-open > .SessionTabs-cwd', 'overflow')).toBe('hidden')
-	expect(declaration('.SessionTabs-open > .SessionTabs-cwd', 'text-overflow')).toBe('ellipsis')
-	expect(declaration('.SessionTabs-open > .SessionTabs-cwd', 'white-space')).toBe('nowrap')
-})
-
-
-test('the streaming HAL cursor follows prose instead of starting a new line', () => {
-	const prose = '.TranscriptItem.streaming .TranscriptItem-content > div:not(:has(> :is(pre, table)))'
-	expect(declaration(prose, 'display')).toBe('contents')
+	expect(parseFloat(declarationInside(media, '.PromptComposer-input > textarea', 'font-size')!)).toBeGreaterThanOrEqual(16)
+	for (const target of ['.SessionTabs-rail > a', '.SessionTabs-rail > button']) {
+		expect(parseFloat(declarationInside(media, target, 'height')!)).toBeGreaterThanOrEqual(44)
+	}
 })

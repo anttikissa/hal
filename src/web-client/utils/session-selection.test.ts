@@ -34,8 +34,3 @@ test('an open request expires so a failed open cannot hijack a later tab', () =>
 	sessionSelection.state.requestedAt -= sessionSelection.config.openRequestTtlMs + 1
 	expect(sessionSelection.isOpenRequestPending()).toBe(false)
 })
-
-test('finds the bootstrap snapshot for a deep-linked session', () => {
-	const selected = sessionSelection.snapshotFor('05-pay', [snapshotOf('05-pay'), snapshotOf('11-sad')])
-	expect(selected?.session.id).toBe('05-pay')
-})
