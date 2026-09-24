@@ -329,6 +329,7 @@ function loadAllHistoryWithOrigin(sessionId: string): {
 
 
 function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, index?: number): SharedSessionInfo {
+	const history = loadAllHistory(meta.id)
 	return {
 		id: meta.id,
 		tab: index === undefined ? undefined : index + 1,
@@ -336,8 +337,9 @@ function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, i
 		cwd: meta.workingDir ?? process.cwd(),
 		model: meta.model ?? models.defaultModel(),
 		currentLog: meta.currentLog ?? DEFAULT_LOG,
-		continuation: continuation.actionForHistory(loadAllHistory(meta.id)) || undefined,
+		continuation: continuation.actionForHistory(history) || undefined,
 		attention: meta.attention,
+		activeAt: history.at(-1)?.ts ?? meta.createdAt,
 	}
 }
 

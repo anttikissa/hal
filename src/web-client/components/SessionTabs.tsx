@@ -1,8 +1,10 @@
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from 'solid-js'
 import type { SharedSessionInfo } from '../../common/ipc.ts'
 import { appActions } from '../utils/app-actions.ts'
-import { sessionActivity } from '../utils/session-activity.ts'
+import { sessionActivity, type SortMode } from '../utils/session-activity.ts'
 import { router } from '../router.ts'
+
+const SORT_KEY = 'hal-web-session-sort'
 
 type SessionTabsProps = {
 	sessions: SharedSessionInfo[]
@@ -27,8 +29,13 @@ export function SessionTabs(props: SessionTabsProps) {
 	const [menuOpen, setMenuOpen] = createSignal(false)
 	const [refreshError, setRefreshError] = createSignal(false)
 	const [query, setQuery] = createSignal('')
+	// An unknown stored value simply falls back to the default ordering.
+	const [sort, setSort] = createSignal((localStorage.getItem(SORT_KEY) ?? 'activity') as SortMode)
 	const [visibleCount, setVisibleCount] = createSignal(1)
+	// The rail is a shortcut strip, so it always ranks by activity; only the
+	// menu list follows the reader's chosen order.
 	const shown = createMemo(() => sessionActivity.ordered(props.sessions, props.selected, props.working ?? {}, props.summarizing ?? {}).slice(0, visibleCount()))
+	const listed = createMemo(() => sessionActivity.ordered(props.sessions, props.selected, props.working ?? {}, props.summarizing ?? {}, sort()))
 	let rail: HTMLElement
 	let dialog: HTMLDialogElement | undefined
 
@@ -112,12 +119,23 @@ export function SessionTabs(props: SessionTabsProps) {
 					<strong>Sessions ({props.sessions.length})</strong>
 					<button onClick={() => setMenuOpen(false)} aria-label="Close menu">×</button>
 				</header>
-				<input class="SessionTabs-search" type="search" aria-label="Find session" placeholder="Find number, name or path" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} />
+				<div class="SessionTabs-filters">
+					<input class="SessionTabs-search" type="search" aria-label="Find session" placeholder="Find number, name or path" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} />
+					<label class="SessionTabs-sort">Sort by
+						<select value={sort()} onChange={(event) => {
+							const mode = event.currentTarget.value as SortMode
+							localStorage.setItem(SORT_KEY, mode)
+							setSort(mode)
+						}}>
+							<For each={sessionActivity.sortModes}>{(mode) => <option value={mode.id}>{mode.label}</option>}</For>
+						</select>
+					</label>
+				</div>
 				<nav class="SessionTabs-list" aria-label="Open sessions">
-					<For each={props.sessions}>
-						{(session, index) => {
+					<For each={listed()}>
+						{(session) => {
 							const activity = () => sessionActivity.describe(session, !!props.working?.[session.id], !!props.summarizing?.[session.id])
-							const number = () => session.tab ?? index() + 1
+							const number = () => session.tab ?? props.sessions.indexOf(session) + 1
 							// Model ids are `provider/model`; the provider prefix is noise here.
 							const model = () => session.model?.split('/').at(-1)
 							return <div class={{ selected: session.id === props.selected }} hidden={!sessionActivity.matches(session, query(), number())}>

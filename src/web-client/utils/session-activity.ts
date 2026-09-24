@@ -35,15 +35,30 @@ function describe(session: SharedSessionInfo, working: boolean, summarizing: boo
 	return { markers, label: states.join(', ') || 'idle' }
 }
 
-function ordered(sessions: SharedSessionInfo[], selected: string, working: Record<string, boolean>, summarizing: Record<string, boolean> = {}): SharedSessionInfo[] {
+// Sort choices offered in the session menu. 'activity' is the shortcut ranking
+// the rail always uses; the others are plain orderings a human can predict.
+const sortModes = [
+	{ id: 'activity', label: 'Activity' },
+	{ id: 'recent', label: 'Recent' },
+	{ id: 'tab', label: 'Tab' },
+	{ id: 'name', label: 'Name' },
+] as const
+type SortMode = typeof sortModes[number]['id']
+
+function ordered(sessions: SharedSessionInfo[], selected: string, working: Record<string, boolean>, summarizing: Record<string, boolean> = {}, mode: SortMode = 'activity'): SharedSessionInfo[] {
 	function priority(session: SharedSessionInfo): number {
 		if (session.id === selected) return 0
 		if (working[session.id] || summarizing[session.id]) return 1
 		if (session.attention === 'new' || session.continuation) return 2
 		return 3
 	}
-	// A stable sort retains terminal tab order within each priority group.
-	return [...sessions].sort((a, b) => priority(a) - priority(b))
+	// A stable sort retains terminal tab order within each priority group, which
+	// is also all 'tab' needs: the source list is already in tab order.
+	const list = [...sessions]
+	if (mode === 'tab') return list
+	if (mode === 'recent') return list.sort((a, b) => String(b.activeAt ?? '').localeCompare(String(a.activeAt ?? '')))
+	if (mode === 'name') return list.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id, undefined, { sensitivity: 'base' }))
+	return list.sort((a, b) => priority(a) - priority(b))
 }
 
 function matches(session: SharedSessionInfo, query: string, number = session.tab): boolean {
@@ -55,4 +70,5 @@ function capacity(width: number, buttonWidth: number, gap: number): number {
 	return Math.max(1, Math.floor((width + gap) / (buttonWidth + gap)))
 }
 
-export const sessionActivity = { describe, ordered, matches, capacity }
+export type { SortMode }
+export const sessionActivity = { describe, ordered, matches, capacity, sortModes }

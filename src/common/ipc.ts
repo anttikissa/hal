@@ -15,6 +15,8 @@ export interface SharedSessionInfo {
 	currentLog?: string
 	continuation?: ContinuationAction
 	attention?: 'new'
+	// Timestamp of the last history entry, for "most recent" ordering.
+	activeAt?: string
 }
 
 export interface SharedHostInfo {

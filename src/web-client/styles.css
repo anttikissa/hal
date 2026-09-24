@@ -125,8 +125,11 @@ button { touch-action: manipulation; }
 }
 .SessionTabs-panelHeading { flex: none; display: flex; align-items: center; justify-content: space-between; padding-left: 8px; }
 .SessionTabs-panelHeading > button { min-width: 44px; min-height: 44px; }
-.SessionTabs-search { flex: none; width: 100%; min-height: 44px; margin: 4px 0 8px; padding: 8px; font: inherit; color: var(--text); background: var(--page); border: 1px solid var(--status-fg, var(--muted)); border-radius: 6px; }
-.SessionTabs-search:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.SessionTabs-filters { flex: none; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+.SessionTabs-search { flex: 1 1 150px; min-height: 44px; padding: 8px; font: inherit; color: var(--text); background: var(--page); border: 1px solid var(--status-fg, var(--muted)); border-radius: 6px; }
+.SessionTabs-sort { flex: none; display: flex; gap: 6px; align-items: center; color: var(--muted); }
+.SessionTabs-sort > select { min-height: 44px; padding: 8px; font: inherit; color: var(--text); background: var(--page); border: 1px solid var(--status-fg, var(--muted)); border-radius: 6px; }
+.SessionTabs-search:focus-visible, .SessionTabs-sort > select:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .SessionTabs-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .SessionTabs-list > div {
 	display: flex;
@@ -355,6 +358,6 @@ button { touch-action: manipulation; }
 	.SessionTabs-rail > a { height: 44px; }
 	.SessionTabs-rail > button { height: 44px; }
 	.PromptComposer-input > textarea { font-size: 16px; }
-	.SessionTabs-search, .AuthGate > form > input, .QuestionBlock > form > textarea, .QuestionBlock > form > input { font-size: 16px; }
+	.SessionTabs-search, .SessionTabs-sort > select, .AuthGate > form > input, .QuestionBlock > form > textarea, .QuestionBlock > form > input { font-size: 16px; }
 	.PromptComposer-help { display: none; }
 }
