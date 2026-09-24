@@ -24,7 +24,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Thinking of fixing duplicate messages by deduplicating? DON'T, fix the root cause instead: don't produce duplicates in the first place
 - When removing a feature, don't add a test to check that the feature is removed (lol)
 - Do not leave any tech debt behind. If you have taken any shortcuts, go back and do them right.
-- Put one-off scripts in `/tmp` and leave them there: never delete them with `rm` (it prompts the user for approval and costs their attention)
+- Put one-off scripts in `/tmp`, don't `rm -f` them (causes dangerous tool call prompt)
 - Avoid backwards compatibility code by default. Hal is under heavy development and breaking changes are expected. Keep the code minimal and free of legacy clutter
 
 - Keep model aliases current across routine minor-version updates. For a promising new default, say so plainly and ask if the user wants to try it. Mention a material caveat briefly, not before the recommendation; ask before switching to a substantially more expensive model.
