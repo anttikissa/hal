@@ -268,3 +268,9 @@ test('session menu shows each session cwd without letting long paths distort its
 	expect(declaration('.SessionTabs-open > .SessionTabs-cwd', 'text-overflow')).toBe('ellipsis')
 	expect(declaration('.SessionTabs-open > .SessionTabs-cwd', 'white-space')).toBe('nowrap')
 })
+
+
+test('the streaming HAL cursor follows prose instead of starting a new line', () => {
+	const prose = '.TranscriptItem.streaming .TranscriptItem-content > div:not(:has(> :is(pre, table)))'
+	expect(declaration(prose, 'display')).toBe('contents')
+})

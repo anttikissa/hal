@@ -27,7 +27,7 @@ function humanize(name: string): string {
 
 function title(item: TranscriptItem): string {
 	if (item.type === 'user') {
-		if (item.source && item.source !== 'system') return `Message from ${senderLabel(item.source, item.sourceTab, item.sourceName)}`
+		if (item.source && item.source !== 'web' && item.source !== 'user' && item.source !== 'system') return `Message from ${senderLabel(item.source, item.sourceTab, item.sourceName)}`
 		return 'You'
 	}
 	if (item.type === 'assistant') {

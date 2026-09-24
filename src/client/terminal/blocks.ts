@@ -326,7 +326,7 @@ function blockLabel(block: Block): string {
 	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return block.text.split('\n', 1)[0]!
 	if (block.type === 'user') {
 		if (block.canceled) return 'You (canceled)'
-		if (block.source && block.source !== 'user' && block.source !== 'system') {
+		if (block.source && block.source !== 'web' && block.source !== 'user' && block.source !== 'system') {
 			// Tab numbers are frozen at send time. Re-resolving them would rewrite
 			// transcript rows already in scrollback and snap the viewport.
 			return `Message from ${transcriptTitles.senderLabel(block.source, block.sourceTab, block.sourceName)}`

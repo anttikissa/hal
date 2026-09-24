@@ -290,6 +290,11 @@ test('incoming prompts name their sender, tab, and optional tab name', () => {
 	expect(rendered).not.toContain(colors.info.bg)
 })
 
+test('web prompts appear as yours in the terminal', () => {
+	const header = headerLine(blocks.renderBlock({ type: 'user', text: 'hello', source: 'web' }, 80))
+	expect(header.trim()).toBe('You')
+})
+
 test('user blocks use user colors', () => {
 	colors.load()
 	const block: Block = { type: 'user', text: 'hello' }

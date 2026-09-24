@@ -7,3 +7,8 @@ test('transcript titles reserve labels for actionable notices', () => {
 	expect(transcriptTitles.label({ type: 'log', text: 'Restarted', ts: Date.parse('2026-08-13T15:10:00.000Z') })).toBe('15:10')
 	expect(transcriptTitles.label({ type: 'info', text: 'model: old -> new', ts: Date.parse('2026-08-13T15:10:00.000Z') })).toBe('15:10')
 })
+
+test('web prompts are yours, while another session remains attributed', () => {
+	expect(transcriptTitles.title({ type: 'user', parts: [{ type: 'text', text: 'hello' }], source: 'web' })).toBe('You')
+	expect(transcriptTitles.title({ type: 'user', parts: [{ type: 'text', text: 'hello' }], source: '09-bx8', sourceTab: 9 })).toBe('Message from 09-bx8 (tab 9)')
+})

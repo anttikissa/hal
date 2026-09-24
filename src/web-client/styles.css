@@ -172,8 +172,9 @@ button { touch-action: manipulation; }
 .Transcript-cursor > span { display: block; width: 1ch; height: 1lh; background: currentColor; animation: Transcript-blink 1s steps(1, end) infinite; }
 .Transcript-cursor.inline { display: inline-flex; vertical-align: -.12em; min-height: 0; padding: 0; margin-left: .2ch; }
 .Transcript-cursor.inline:not(.thinking) { color: var(--assistant-cursor, var(--assistant-fg, var(--text))); }
-.TranscriptItem.streaming .TranscriptItem-content > div:has(> p:last-child) { display: contents; }
-.TranscriptItem.streaming .TranscriptItem-content > div > p:last-child { display: inline; }
+/* The markdown renderer emits prose as text in its wrapper, so collapse that wrapper
+   while streaming. Block markdown keeps its own row and leaves the cursor below it. */
+.TranscriptItem.streaming .TranscriptItem-content > div:not(:has(> :is(pre, table))) { display: contents; }
 @keyframes Transcript-blink { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .Transcript-cursor > span { animation: none; } }
 /* Colored rails are the demo's visual identity; history remains fully readable by default. */
