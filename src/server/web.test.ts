@@ -7,6 +7,7 @@ import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 import { ensureStateDir } from './state.ts'
 import { web } from './web.ts'
+import { webUpload } from './web-upload.ts'
 import { serverKeys } from './server-keys.ts'
 import { processControl } from './process-control.ts'
 import { ason } from '../utils/ason.ts'
@@ -18,6 +19,20 @@ test('web fallback port advances by a randomized exponential step', () => {
 	expect(web.nextPort(9001, 1, () => 0)).toBe(9002)
 	expect(web.nextPort(9001, 1, () => 0.99)).toBe(9003)
 	expect(web.nextPort(9003, 2, () => 0)).toBe(9004)
+})
+test('web origin uses the actual local port or configured public hostname', () => {
+	const original = webUpload.config.hostname
+	try {
+		webUpload.config.hostname = ''
+		expect(web.origin(9002)).toBe('http://localhost:9002')
+		webUpload.config.hostname = 'hal.antti.dev'
+		expect(web.origin(9002)).toBe('https://hal.antti.dev')
+		expect(web.urlForToken({ token: 'secret', purpose: 'test', createdAt: '' }, 9002)).toBe('https://hal.antti.dev/?auth=secret')
+		webUpload.config.hostname = 'evil.test/steal'
+		expect(() => web.origin(9002)).toThrow('Invalid web hostname')
+	} finally {
+		webUpload.config.hostname = original
+	}
 })
 
 test('web announcement is opt-in and includes an authenticated local URL', () => {

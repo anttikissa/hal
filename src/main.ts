@@ -295,6 +295,8 @@ function becomeHost(kind: 'start' | 'promote'): void {
 		void import('./server/web.ts')
 			.then(({ web }) => web.start(port, ac.signal, announceWeb ? startupTarget.preferredSessionId : undefined))
 			.catch((error) => log.error('web client startup failed', { error: String(error) }))
+	} else {
+		ipc.updateState((shared) => { shared.web = undefined })
 	}
 	ipc.appendEvent({
 		type: 'runtime-start',

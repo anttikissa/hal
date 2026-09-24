@@ -41,6 +41,7 @@ export interface SharedState {
 	working: Record<string, boolean>
 	summarizing?: Record<string, boolean>
 	host?: SharedHostInfo
+	web?: { origin: string }
 	clients?: SharedClientInfo[]
 	updatedAt: string
 }

@@ -34,6 +34,8 @@ const EXT_TO_TYPE: Record<string, string> = {
 const config = {
 	enabled: true,
 	port: 9001,
+	// Public HTTPS hostname when served through a reverse proxy; empty for local-only use.
+	hostname: '',
 	maxUploadBytes: 8 * 1024 * 1024,
 }
 

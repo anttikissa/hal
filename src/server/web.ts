@@ -301,8 +301,16 @@ function command(args: string): { output?: string; error?: string } {
 	return { error: 'Usage: /web | /web auth [purpose…] | /web revoke <number>' }
 }
 
+function origin(port = state.port): string {
+	const host = webUpload.config.hostname.trim().toLowerCase()
+	if (!host) return `http://localhost:${port}`
+	const url = URL.canParse(`https://${host}`) ? new URL(`https://${host}`) : null
+	if (!url || url.host !== host || url.hostname !== host) throw new Error('Invalid web hostname: expected a DNS name without scheme, port, or path')
+	return url.origin
+}
+
 function urlForToken(token: WebToken, port = state.port): string {
-	return `http://localhost:${port}/?auth=${token.token}`
+	return `${web.origin(port)}/?auth=${token.token}`
 }
 
 function publishSnapshot(server: Bun.Server<SocketData>, sessionId: string): void {
@@ -318,6 +326,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 		web.announce(announcementSessionId, state.port)
 		return
 	}
+	web.origin(port) // Reject an invalid public hostname before binding the server.
 	serverKeys.init()
 	const sockets = new Map<string, Set<Bun.ServerWebSocket<SocketData>>>()
 	const unsubscribeRevocation = serverKeys.onRevoke((token) => {
@@ -412,6 +421,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 		server.publish('web', web.encode({ type: 'state', state: shared }))
 		openIds = nextIds
 	})
+	ipc.updateState((shared) => { shared.web = { origin: web.origin(state.port) } })
 	void (async () => {
 		for await (const event of ipc.tailEvents(signal)) {
 			const sessionId = event && typeof event.sessionId === 'string' ? event.sessionId : ''
@@ -427,6 +437,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 		server.stop(true)
 		if (state.server === server) {
 			state.server = null
+			ipc.updateState((shared) => { shared.web = undefined })
 			state.port = 0
 		}
 	}, { once: true })
@@ -443,6 +454,7 @@ export const web = {
 	start,
 	command,
 	nextPort,
+	origin,
 	urlForToken,
 	announce,
 	pageHtml,

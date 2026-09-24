@@ -166,6 +166,8 @@
 		enabled: false,
 		// Port for the local browser client.
 		port: 9001,
+		// Public HTTPS hostname for remote browser links, without a scheme or path. Leave empty for local-only use.
+		hostname: '',
 		// Maximum size accepted for images uploaded through the web client's attach button.
 		maxUploadBytes: 8388608
 	}
