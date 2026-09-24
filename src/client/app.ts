@@ -91,6 +91,7 @@ const state = {
 	hostPid: null as number | null,
 	hostVersionStatus: 'idle' as VersionStatus,
 	hostVersion: '',
+	webOrigin: '',
 	localVersionStatus: 'idle' as VersionStatus,
 	localVersion: '',
 	localVersionError: '',
@@ -569,6 +570,7 @@ function applySharedStatus(shared: SharedState): void {
 	if (changedDoneUnseen) saveClientState()
 	state.hostVersionStatus = shared.host?.versionStatus ?? 'idle'
 	state.hostVersion = shared.host?.version ?? ''
+	state.webOrigin = shared.web?.origin ?? ''
 }
 
 function applySharedState(shared: SharedState): void {

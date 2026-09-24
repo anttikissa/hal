@@ -19,6 +19,7 @@ import { toolSpecs } from './tool-specs.ts'
 // `blockConfig.x` call sites unchanged; it is the same mutable object, so
 // config reloads and eval patches still apply.
 import { blockConfig as clientBlockConfig } from '../block-config.ts'
+import { webLinks } from '../web-links.ts'
 import { terminalQuestions } from './questions.ts'
 
 const blockConfig = clientBlockConfig.config
@@ -498,7 +499,10 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const header = buildHeader(label, blockTime, blobRef, cols, blocks.toolActivity(block))
 	const plainNotice = block.type === 'info' || (block.type === 'log' && !block.text.startsWith('Prompt queued'))
 	const lines: string[] = []
-	if (!plainNotice) lines.push(bgLine(`${fg}${header}`, cols, bg))
+	if (!plainNotice) {
+		const url = block.type === 'tool' && block.sessionId && block.toolId ? webLinks.url(block.sessionId, block.toolId) : ''
+		lines.push(bgLine(`${fg}${blockText.hyperlink(header, url)}`, cols, bg))
+	}
 	const contentCols = Math.max(1, cols - 1 - blocks.outputPad)
 	const rawContent = plainNotice ? noticeContent(block, contentCols) : blockContent(block, contentCols)
 	const content = blockText.hyperlinkUrls(rawContent, contentCols)

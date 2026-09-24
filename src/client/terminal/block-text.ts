@@ -160,6 +160,9 @@ function pushUrlSpans(spans: LinkSpan[], lines: string[], lineIndex: number, sta
 function osc8(url: string, label: string, id: string): string {
 	return `\x1b]8;id=${id};${url}\x07${label}\x1b]8;;\x07`
 }
+function hyperlink(label: string, url: string): string {
+	return url ? `\x1b]8;;${url}\x07${label}\x1b]8;;\x07` : label
+}
 
 function insideOsc8Link(line: string, index: number): boolean {
 	const start = line.lastIndexOf('\x1b]8;;', index)
@@ -213,5 +216,6 @@ export const blockText = {
 	sanitizeTerminalText,
 	stripAnsiSequences,
 	standaloneHyperlink,
+	hyperlink,
 	hyperlinkUrls,
 }

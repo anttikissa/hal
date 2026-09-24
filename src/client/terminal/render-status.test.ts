@@ -10,6 +10,7 @@ import { blocks } from './blocks.ts'
 import { prompt } from './prompt.ts'
 import { placeholders } from './placeholders.ts'
 import { webConnection } from '../web-connection.ts'
+import { webLinks } from '../web-links.ts'
 
 function tab(overrides: any = {}): any {
 	return {
@@ -32,6 +33,15 @@ function tab(overrides: any = {}): any {
 	}
 }
 
+test('tab labels link to their web session without altering their visual width', () => {
+	const original = webLinks.url
+	webLinks.url = (sessionId) => `http://localhost:9001/${sessionId}`
+	try {
+		const label = renderStatus.tabLabel(tab(), 0)
+		expect(label).toContain('\x1b]8;;http://localhost:9001/04-new\x07')
+		expect(visLen(label)).toBe(3)
+	} finally { webLinks.url = original }
+})
 test('status identifies host, local peer, and remote client', () => {
 	const original = client.state.role
 	try {

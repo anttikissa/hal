@@ -23,6 +23,8 @@ import { completionHints } from './completion-hints.ts'
 import { blocks } from './blocks.ts'
 import { placeholders } from './placeholders.ts'
 import { webConnection } from '../web-connection.ts'
+import { blockText } from './block-text.ts'
+import { webLinks } from '../web-links.ts'
 
 const RESET = '\x1b[0m'
 
@@ -150,7 +152,7 @@ function tabLabel(tab: Tab, i: number, compact = false): string {
 	const isActive = i === focusedIndex
 	const base = isActive ? colors.tab.activeFg || colors.status.highlight : colors.tab.inactiveFg || colors.status.fg
 	const ind = renderStatus.renderIndicator(tab, base)
-	const content = renderStatus.tabInner(i + 1, ind)
+	const content = blockText.hyperlink(renderStatus.tabInner(i + 1, ind), webLinks.url(tab.sessionId))
 	if (!compact) {
 		if (isActive) return `${base}[${content}]${RESET}`
 		return `${base} ${content} ${RESET}`

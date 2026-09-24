@@ -6,6 +6,7 @@ import { subscriptionUsage } from '../../common/subscription-usage.ts'
 import { blockText } from './block-text.ts'
 import { visLen } from '../../utils/strings.ts'
 
+import { webLinks } from '../web-links.ts'
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
@@ -77,6 +78,15 @@ test('block headers keep a right margin', () => {
 	const withBlobRef = blocks.renderBlock({ type: 'error', text: 'boom', blobId: '0008sg-46t', sessionId: '102-era' }, 40)
 	expect(stripAnsi(withBlobRef[0]!)).toMatch(/\) $/)
 	expect(stripAnsi(withBlobRef[0]!).length).toBe(39)
+})
+test('tool headers link to their exact web card without changing visible width', () => {
+	const original = webLinks.url
+	webLinks.url = (sessionId, toolId) => `http://localhost:9001/${sessionId}#tool=${toolId}`
+	try {
+		const header = blocks.renderBlock({ type: 'tool', name: 'bash', sessionId: '05-wan', toolId: 'call-1', input: { command: 'pwd' } }, 40)[0]!
+		expect(header).toContain('\x1b]8;;http://localhost:9001/05-wan#tool=call-1\x07')
+		expect(visLen(header)).toBe(39)
+	} finally { webLinks.url = original }
 })
 
 test('streaming cursor leaves the terminal last column unused', () => {
