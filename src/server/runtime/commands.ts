@@ -299,14 +299,14 @@ function renderTabs(args: string, session: SessionState): CommandResult {
 }
 
 function renderRuntimeStatus(): string {
-	const host = ipc.readState().host
+	const isHost = ipc.ownsHostLock()
+	const host = isHost ? null : ipc.readState().host
 	const lines = [
 		'Runtime:',
-		`Role: ${ipc.ownsHostLock() ? 'server' : 'client'}`,
-		`PID: ${process.pid}`,
+		`PID: ${process.pid} (${isHost ? 'host' : 'peer'})`,
 		`Version: ${version.state.status === 'ready' ? version.state.combined : version.state.status === 'error' ? `error: ${version.state.error}` : 'checking...'}`,
 	]
-	if (host?.pid) lines.push(`Host: ${host.pid}${host.startedAt ? ` (${host.startedAt})` : ''}`)
+	if (host?.pid && host.pid !== process.pid) lines.push(`Host PID: ${host.pid}${host.startedAt ? ` (${host.startedAt})` : ''}`)
 	return lines.join('\n')
 }
 

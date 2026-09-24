@@ -27,6 +27,7 @@ const origMaxIterations = agentLoop.config.maxIterations
 const origIsWorking = agentLoop.isWorking
 const origAnthropicRenderStatus = anthropicUsage.renderStatus
 const origRenderStatus = openaiUsage.renderStatus
+const origOpencodeHasCredentials = opencodeUsage.hasCredentials
 const origAnthropicHasCredentials = anthropicUsage.hasCredentials
 const origOpenaiHasCredentials = openaiUsage.hasCredentials
 const origMemoryConfig = { ...memory.config }
@@ -78,6 +79,7 @@ afterEach(() => {
 	openaiUsage.renderStatus = origRenderStatus
 	anthropicUsage.hasCredentials = origAnthropicHasCredentials
 	openaiUsage.hasCredentials = origOpenaiHasCredentials
+	opencodeUsage.hasCredentials = origOpencodeHasCredentials
 	Object.assign(memory.config, origMemoryConfig)
 	memory.io.readRss = origReadRss
 	models.config.default = origDefaultModel
@@ -201,6 +203,25 @@ test('/status renders Anthropic and OpenAI subscription usage', async () => {
 	expect(result.error).toBeUndefined()
 	expect(result.output).toContain('Anthropic subscriptions:')
 	expect(result.output).toContain('OpenAI subscriptions:')
+})
+
+test('/status labels the local PID without repeating the host PID', async () => {
+	anthropicUsage.hasCredentials = () => false
+	openaiUsage.hasCredentials = () => false
+	opencodeUsage.hasCredentials = () => false
+	ipc.ownsHostLock = () => true
+	ipc.readState = () => ({ host: { pid: process.pid, startedAt: '2026-09-24T14:11:39.888Z' } }) as any
+	const host = (await commands.executeCommand('/status', makeSession())).output!
+	expect(host).toContain(`PID: ${process.pid} (host)`)
+	expect(host).not.toContain('Host PID:')
+	expect(host).not.toContain('Role:')
+
+	ipc.ownsHostLock = () => false
+	ipc.readState = () => ({ host: { pid: 1234, startedAt: '2026-09-24T14:11:39.888Z' } }) as any
+	const peer = (await commands.executeCommand('/status', makeSession())).output!
+	expect(peer).toContain(`PID: ${process.pid} (peer)`)
+	expect(peer).toContain('Host PID: 1234 (2026-09-24T14:11:39.888Z)')
+	expect(peer).not.toContain('Role:')
 })
 
 test('/clients lists server and client versions', async () => {
