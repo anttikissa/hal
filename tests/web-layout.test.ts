@@ -208,6 +208,14 @@ test('tab header keeps the current name and complete searchable session menu at 
 	expect(declaration('.SessionTabs-list > div[hidden]', 'display')).toBe('none')
 })
 
+test('numbered tabs precede the smaller session name without narrowing the strip', () => {
+	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
+	expect(source.indexOf('<nav class="SessionTabs-rail"')).toBeLessThan(source.indexOf('<span class="SessionTabs-title"'))
+	expect(declaration('.SessionTabs > .SessionTabs-rail', 'grid-row')).toBe('1')
+	expect(declaration('.SessionTabs > .SessionTabs-title', 'grid-row')).toBe('2')
+	expect(declaration('.SessionTabs > .SessionTabs-title', 'font-size')).toBe('13px')
+})
+
 test('session menu reveals the current tab and keeps actions outside the scrolling list', () => {
 	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
 	expect(source).toContain('dialog.showModal()')

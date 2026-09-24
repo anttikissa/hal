@@ -75,16 +75,6 @@ export function SessionTabs(props: SessionTabsProps) {
 	}
 
 	return <header class="SessionTabs">
-		<button
-			class="SessionTabs-menu"
-			onClick={() => { setQuery(''); setMenuOpen(!menuOpen()) }}
-			aria-label={`All ${props.sessions.length} sessions and actions`}
-			aria-expanded={menuOpen() ? 'true' : 'false'}
-			aria-haspopup="dialog"
-			aria-controls="SessionTabs-panel"
-		>☰</button>
-		<span class="SessionTabs-title" title={props.status}>{props.status}</span>
-		<button class="SessionTabs-new" onClick={newTab} aria-label="New tab">+</button>
 		<nav class="SessionTabs-rail" ref={(element) => { rail = element }} aria-label="Session shortcuts">
 			<span class="SessionTabs-prefix" aria-hidden="true">Tabs:</span>
 			<For each={shown()} keyed={(session) => session.id}>
@@ -105,6 +95,16 @@ export function SessionTabs(props: SessionTabsProps) {
 				}}
 			</For>
 		</nav>
+		<button
+			class="SessionTabs-menu"
+			onClick={() => { setQuery(''); setMenuOpen(!menuOpen()) }}
+			aria-label={`All ${props.sessions.length} sessions and actions`}
+			aria-expanded={menuOpen() ? 'true' : 'false'}
+			aria-haspopup="dialog"
+			aria-controls="SessionTabs-panel"
+		>☰</button>
+		<span class="SessionTabs-title" title={props.status}>{props.status}</span>
+		<button class="SessionTabs-new" onClick={newTab} aria-label="New tab">+</button>
 		{/* Native modal supplies focus containment, Escape and focus restoration. */}
 		<dialog id="SessionTabs-panel" ref={(element) => { dialog = element }} class="SessionTabs-sheet" onCancel={() => setMenuOpen(false)} onClick={(event) => {
 			if (event.target === event.currentTarget) setMenuOpen(false)

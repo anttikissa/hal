@@ -42,8 +42,8 @@ button { touch-action: manipulation; }
 }
 .AuthGate > form > button { cursor: pointer; }
 
-/* Two lines like the demo: current name above a numbered strip. Only the buttons
-   that fit are mounted, so hidden sessions cannot steal keyboard focus. */
+/* Numbered shortcuts get the full width above the smaller current-session name.
+   Only buttons that fit are mounted, so hidden sessions cannot steal focus. */
 .SessionTabs {
 	flex: none;
 	display: grid;
@@ -53,9 +53,9 @@ button { touch-action: manipulation; }
 	background: var(--page);
 	border-bottom: 1px solid var(--status-fg, var(--muted));
 }
-.SessionTabs > .SessionTabs-title { min-width: 0; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tab-activeFg, var(--text)); font-weight: 600; }
-.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { width: 44px; height: 44px; padding: 0; background: transparent; border: 0; color: var(--tab-activeFg, var(--text)); }
-.SessionTabs > .SessionTabs-rail { grid-column: 1 / -1; min-width: 0; display: flex; align-items: center; gap: 4px; height: 44px; overflow: hidden; }
+.SessionTabs > .SessionTabs-title { grid-column: 2; grid-row: 2; min-width: 0; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tab-activeFg, var(--text)); font-size: 13px; }
+.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { grid-row: 2; width: 44px; height: 44px; padding: 0; background: transparent; border: 0; color: var(--tab-activeFg, var(--text)); }
+.SessionTabs > .SessionTabs-rail { grid-column: 1 / -1; grid-row: 1; min-width: 0; display: flex; align-items: center; gap: 4px; height: 44px; overflow: hidden; }
 .SessionTabs-prefix { flex: 0 0 52px; color: var(--status-fg, var(--muted)); }
 .SessionTabs-rail > button { flex: none; width: 56px; height: 44px; padding: 0 2px; text-align: center; background: transparent; border: 0; color: var(--tab-inactiveFg, var(--muted)); }
 .SessionTabs-rail > button.selected { color: var(--tab-activeFg, var(--text)); font-weight: 600; }
