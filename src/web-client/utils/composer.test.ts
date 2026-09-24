@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { enterAction, pastedImage, sendLabel, submissionCommand } from './composer.ts'
+import { attachmentRef, enterAction, pastedImage, sendLabel, submissionCommand } from './composer.ts'
 
 describe('enterAction', () => {
 	test('desktop: Enter submits, Shift+Enter newlines', () => {
@@ -24,6 +24,12 @@ describe('pastedImage', () => {
 		expect(pastedImage([{ type: text.type, getAsFile: () => text }, { type: image.type, getAsFile: () => image }])).toBe(image)
 		expect(pastedImage([{ type: text.type, getAsFile: () => text }])).toBeNull()
 	})
+})
+
+test('attachmentRef adds spacing at the captured insertion point', () => {
+	expect(attachmentRef('beforeafter', 6, 'image.png')).toBe(' [image.png] ')
+	expect(attachmentRef('before after', 7, 'image.png')).toBe('[image.png] ')
+	expect(attachmentRef('', 0, 'image.png')).toBe('[image.png] ')
 })
 
 describe('sendLabel', () => {

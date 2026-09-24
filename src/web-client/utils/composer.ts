@@ -17,6 +17,11 @@ function sendLabel(working: boolean): string {
 	return working ? 'Steer' : 'Send'
 }
 
+// Include a separator only when the marker follows non-whitespace text.
+function attachmentRef(value: string, start: number, path: string): string {
+	return `${start > 0 && !/\s/.test(value[start - 1]!) ? ' ' : ''}[${path}] `
+}
+
 function pastedImage<T extends { type: string }>(items: Iterable<{ type: string; getAsFile: () => T | null }>): T | null {
 	for (const item of items) {
 		if (!item.type.startsWith('image/')) continue
@@ -35,5 +40,5 @@ function submissionCommand(text: string, sessionId: string, id: string, queue: b
 	return { type: 'prompt', id, sessionId, text, source: 'web', queue }
 }
 
-export { enterAction, pastedImage, sendLabel, submissionCommand }
+export { attachmentRef, enterAction, pastedImage, sendLabel, submissionCommand }
 export type { EnterAction }

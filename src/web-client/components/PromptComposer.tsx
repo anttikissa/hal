@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onSettled, Show } from 'solid-js'
-import { enterAction, pastedImage, sendLabel } from '../utils/composer.ts'
+import { attachmentRef, enterAction, pastedImage, sendLabel } from '../utils/composer.ts'
 import { webDraft } from '../utils/draft.ts'
 
 type PromptComposerProps = {
@@ -11,13 +11,6 @@ type PromptComposerProps = {
 	disabled?: boolean
 	onSubmit: (text: string, queue: boolean) => Promise<boolean>
 	onAttach: (file: File) => Promise<string>
-}
-
-// Append an attachment marker so it reads as part of the sentence: no double
-// spaces before it, one trailing space so typing can continue right away.
-function appendRef(value: string, path: string): string {
-	const spacer = !value || /\s$/.test(value) ? '' : ' '
-	return `${value}${spacer}[${path}] `
 }
 
 function hasCoarsePointer(): boolean {
@@ -94,10 +87,14 @@ export function PromptComposer(props: PromptComposerProps) {
 
 	async function attach(file: File): Promise<void> {
 		if (props.disabled || !input || attaching()) return
+		const sessionId = props.sessionId
+		const start = input.selectionStart
+		const end = input.selectionEnd
 		setAttaching(true)
 		try {
 			const path = await props.onAttach(file)
-			input.value = appendRef(input.value, path)
+			if (props.sessionId !== sessionId) return
+			input.setRangeText(attachmentRef(input.value, start, path), start, end, 'end')
 			saveDraft()
 			input.focus()
 		} catch (error) {

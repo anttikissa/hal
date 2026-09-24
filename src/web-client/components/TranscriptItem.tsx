@@ -52,7 +52,7 @@ export function TranscriptItem(props: TranscriptItemProps) {
 					{(text) => <details class="TranscriptItem-paste" id={props.item.entry.id ? `paste-${encodeURIComponent(props.item.entry.id)}` : undefined}>
 						<summary>View pasted text</summary>
 						<button type="button" onClick={() => void navigator.clipboard.writeText(text())}>Copy text</button>
-						<textarea readonly rows={10} spellcheck={false} aria-label="Pasted text" value={text()} />
+						<pre>{text()}</pre>
 					</details>}
 				</Show>
 			</article>}

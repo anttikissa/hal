@@ -157,6 +157,8 @@ Before designing or restyling web UI, read `docs/frontend-design.md` (Anthropic'
 frontend-design skill). Plan tokens (palette, type roles, one signature element)
 before writing CSS, and avoid the templated "AI slop" looks it describes.
 
+- Never nest a scrolling area inside another scrolling area in the web UI. Expanded transcript blocks grow to their full content height; the transcript alone scrolls.
+
 # Terminal width
 
 ALL terminal width calculations MUST use `visLen()` from `src/utils/strings.ts`.

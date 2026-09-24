@@ -198,8 +198,8 @@ button { touch-action: manipulation; }
 .TranscriptItem-paste.target { outline: 2px solid var(--focus); outline-offset: 2px; }
 .TranscriptItem-paste > summary { cursor: pointer; }
 .TranscriptItem-paste > button { float: right; margin: 8px 0; color: inherit; background: var(--page); border: 1px solid var(--user-fg, var(--text)); cursor: pointer; }
-.TranscriptItem-paste > textarea { display: block; width: 100%; min-height: 10rem; max-height: 55vh; padding: 8px; clear: both; resize: vertical; color: var(--user-fg, var(--text)); background: var(--page); border: 1px solid var(--user-fg, var(--text)); font: inherit; }
-.TranscriptItem-paste :is(summary, button, textarea):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.TranscriptItem-paste > pre { width: 100%; margin: 0; padding: 8px; clear: both; color: var(--user-fg, var(--text)); background: var(--page); border: 1px solid var(--user-fg, var(--text)); font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+.TranscriptItem-paste :is(summary, button):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* Tool details stay inspectable; colors.ason supplies each tool's live palette. */
 .ToolCard {
@@ -225,7 +225,7 @@ button { touch-action: manipulation; }
 .ToolCard > details > summary > header > span { flex: none; margin-left: auto; color: var(--muted); }
 .ToolCard.running > details > summary > header > span { color: var(--tool-fg); }
 .ToolCard > details > summary > p, .ToolCard > details > summary > small { display: block; margin: 8px 0 0; color: var(--text); }
-.ToolCard > details pre { margin: 8px 0 0; overflow: auto; color: inherit; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ToolCard > details pre { margin: 8px 0 0; color: inherit; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ToolCard > details > summary > pre { max-height: 8.4em; overflow: hidden; }
 .ToolCard > details[open] > summary > pre, .ToolCard > details[open] > summary > small { display: none; }
 .ToolCard > details > summary > small { color: var(--muted); }
@@ -233,21 +233,21 @@ button { touch-action: manipulation; }
 .ToolCard > .ToolCard-link { position: absolute; top: 13px; right: 13px; color: var(--muted); }
 .ToolCard-section { margin-top: 10px; color: var(--text); }
 .ToolCard-section > button { float: right; color: var(--text); background: transparent; border: 1px solid var(--muted); cursor: pointer; }
-.ToolCard-section > pre { max-height: 65vh; clear: both; }
+.ToolCard-section > pre { clear: both; }
 
 /* Markdown is renderer-owned HTML from utils/markdown.ts; source text is
    escaped before these fixed tags are inserted. */
 .Markdown { white-space: pre-wrap; }
 .Markdown :is(b, i) { color: inherit; }
 .Markdown code { padding: .1em .3em; background: var(--assistant-linkBg, var(--info-bg, var(--page))); border-radius: 3px; color: var(--assistant-code, var(--text)); }
-.Markdown pre { margin: 7px 0; padding: 8px; overflow: auto; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); white-space: pre; }
+.Markdown pre { margin: 7px 0; padding: 8px; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); white-space: pre-wrap; overflow-wrap: anywhere; }
 .Markdown pre > code { padding: 0; background: transparent; }
 .Markdown a { color: var(--assistant-linkFg, var(--user-fg, var(--text))); text-decoration-color: currentColor; text-underline-offset: .18em; }
 .TranscriptItem.user .Markdown :is(code, a) { color: var(--user-fg, var(--text)); }
 .TranscriptItem.thinking .Markdown :is(code, a) { color: var(--thinking-code, var(--thinking-fg, var(--text))); }
 .Markdown a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.Markdown table { display: block; max-width: 100%; margin: 7px 0; overflow-x: auto; border-collapse: collapse; white-space: nowrap; }
-.Markdown th, .Markdown td { padding: 4px 6px; border: 1px solid var(--status-fg, var(--muted)); text-align: left; }
+.Markdown table { width: 100%; margin: 7px 0; table-layout: fixed; border-collapse: collapse; white-space: normal; }
+.Markdown th, .Markdown td { padding: 4px 6px; border: 1px solid var(--status-fg, var(--muted)); text-align: left; overflow-wrap: anywhere; }
 .Markdown th { color: var(--text); background: var(--info-bg, var(--page)); }
 
 /* A waiting question is an inline gate in the transcript, not a modal. The blue
@@ -259,7 +259,7 @@ button { touch-action: manipulation; }
 .QuestionBlock > header > span { flex: none; color: var(--user-fg, var(--text)); }
 .QuestionBlock > details { margin-top: 8px; color: var(--muted); }
 .QuestionBlock > details > summary { cursor: pointer; color: var(--user-fg, var(--text)); }
-.QuestionBlock > details > pre { max-height: 12rem; margin: 7px 0 0; padding: 8px; overflow: auto; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); white-space: pre-wrap; overflow-wrap: anywhere; }
+.QuestionBlock > details > pre { margin: 7px 0 0; padding: 8px; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); white-space: pre-wrap; overflow-wrap: anywhere; }
 .QuestionBlock > fieldset { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; border: 0; }
 .QuestionBlock > fieldset > legend { margin-bottom: 8px; color: var(--muted); }
 .QuestionBlock > fieldset > button { min-height: 44px; padding: 8px 10px; font: inherit; text-align: left; color: inherit; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); cursor: pointer; }
@@ -314,12 +314,12 @@ button { touch-action: manipulation; }
 	caret-color: var(--input-cursor, var(--user-fg, var(--text)));
 }
 .PromptComposer-input > textarea::placeholder { color: var(--user-fg, var(--text)); opacity: .65; }
-.PromptComposer-input > textarea:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+/* The same inset cyan edge marks typing and keyboard-focused actions. */
+.PromptComposer-input > textarea:focus-visible, .PromptComposer-controls > button:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--user-fg, var(--text)); }
 /* Native iOS decoration and the emoji line box must not enlarge the input row. */
 .PromptComposer-input > textarea, .PromptComposer-controls > button { appearance: none; margin: 0; border-radius: 0; box-shadow: none; }
 .PromptComposer > .PromptComposer-controls { display: flex; align-items: stretch; background: var(--input-bg, var(--user-bg, var(--page))); }
-.PromptComposer-controls > button { min-width: 44px; min-height: 44px; padding: 8px; border: 0; background: transparent; color: var(--user-fg, var(--text)); line-height: 24px; font-weight: 600; }
-.PromptComposer-controls > button[type=submit] { border-left: 1px solid var(--user-fg, var(--text)); }
+.PromptComposer-controls > button { min-width: 44px; min-height: 44px; padding: 8px; border: 0; border-left: 1px solid var(--user-fg, var(--text)); background: transparent; color: var(--user-fg, var(--text)); line-height: 24px; font-weight: 600; }
 .PromptComposer > .PromptComposer-help { flex: 1 0 100%; padding-top: 7px; color: var(--help-description, var(--muted)); font-size: 15px; }
 .PromptComposer-help > b { color: var(--help-key, var(--text)); font-weight: 600; }
 .PromptComposer.disabled { opacity: .55; }
