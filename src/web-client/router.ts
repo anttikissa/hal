@@ -36,9 +36,16 @@ function toolHash(toolId: string): string {
 	return `#tool=${encodeURIComponent(toolId)}`
 }
 
-function toolTarget(): string {
-	return new URLSearchParams(new URL(router.href()).hash.slice(1)).get('tool') ?? ''
+function pasteHash(entryId: string): string {
+	return `#paste=${encodeURIComponent(entryId)}`
 }
+
+function hashTarget(kind: 'tool' | 'paste'): string {
+	return new URLSearchParams(new URL(router.href()).hash.slice(1)).get(kind) ?? ''
+}
+
+function toolTarget(): string { return router.hashTarget('tool') }
+function pasteTarget(): string { return router.hashTarget('paste') }
 
 function navigate(target: string, options?: { replace?: boolean }): void {
 	// Selecting the tab you are already on must not stack history entries,
@@ -72,4 +79,4 @@ function start(): () => void {
 	return () => removeEventListener('popstate', onPopState)
 }
 
-export const router = { sessionId, href, write, parse, format, toolHash, toolTarget, navigate, handlePopState, takeSearchParam, start }
+export const router = { sessionId, href, write, parse, format, toolHash, toolTarget, pasteHash, pasteTarget, hashTarget, navigate, handlePopState, takeSearchParam, start }

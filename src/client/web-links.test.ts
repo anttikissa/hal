@@ -11,6 +11,7 @@ test('local session and tool links use the advertised bound port and local web t
 		webLinks.localToken = () => 'localToken12'
 		expect(webLinks.url('05-wan')).toBe('http://localhost:9002/05-wan?auth=localToken12')
 		expect(webLinks.url('05-wan', 'tool/a')).toBe('http://localhost:9002/05-wan?auth=localToken12#tool=tool%2Fa')
+		expect(webLinks.pasteUrl('05-wan', '000001-abc')).toBe('http://localhost:9002/05-wan?auth=localToken12#paste=000001-abc')
 		expect(webLinks.imageUrl('05-wan', '000123-abc')).toBe('http://localhost:9002/images/05-wan/000123-abc?auth=localToken12')
 		expect(webLinks.imageUrl('05-wan', '../secret')).toBe('')
 		expect(webLinks.url('../secret')).toBe('')

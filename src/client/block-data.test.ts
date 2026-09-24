@@ -15,6 +15,7 @@ test('historyToBlocks preserves original image path in user text', () => {
 
 	const result = blockData.historyToBlocks(history as any, 's1')
 	expect(result[0]).toMatchObject({ type: 'user', text: 'see [/tmp/hal/images/test.png] now' })
+	expect(result[0]).toMatchObject({ sessionId: 's1', parts: history[0].parts })
 })
 
 test('historyToBlocks keeps pasted text contents behind display text', () => {
@@ -33,6 +34,7 @@ test('historyToBlocks keeps pasted text contents behind display text', () => {
 		text: 'Analyze this:\n\n[/tmp/hal/paste/0002.txt]',
 		actualText: 'Analyze this:\n\nline one\nline two',
 	})
+	expect(result[0]).toMatchObject({ sessionId: 's1', parts: history[0].parts })
 })
 
 test('historyToBlocks recovers retry state from failed turn_end', () => {

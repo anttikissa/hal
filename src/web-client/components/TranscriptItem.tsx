@@ -30,7 +30,9 @@ export function TranscriptItem(props: TranscriptItemProps) {
 						<Show when={props.item.entry.type === 'user' && !('text' in props.item.entry && typeof props.item.entry.text === 'string') && 'parts' in props.item.entry ? props.item.entry.parts : undefined}
 							fallback={<div innerHTML={webMarkdown.html(props.item.text, 'usageBars' in props.item.entry && props.item.entry.usageBars === true)} />}>
 							{(parts) => <For each={parts()}>{(part) => part.type === 'text'
-								? <div class="TranscriptItem-part" innerHTML={webMarkdown.html(part.displayText ?? part.text)} />
+								? <For each={part.displayText ? webTranscript.pasteSegments(part.displayText) : [part.text]}>{(segment) => part.displayText && props.item.entry.id && webTranscript.isPasteMarker(segment)
+									? <a href={router.pasteHash(props.item.entry.id)}>{segment}</a>
+									: <div class="TranscriptItem-part" innerHTML={webMarkdown.html(segment)} />}</For>
 								: <Show when={webTranscript.imageHref(router.sessionId(), part.blobId, props.token)} fallback={<span>{part.originalFile ? `[${part.originalFile}]` : '[image]'}</span>}>
 									{(href) => <a href={href()} target="_blank" rel="noreferrer">{part.originalFile ? `[${part.originalFile}]` : '[image]'}</a>}
 								</Show>}</For>}
@@ -40,6 +42,13 @@ export function TranscriptItem(props: TranscriptItemProps) {
 						{(interruption) => <span class="TranscriptItem-interruption"> {interruption()}</span>}
 					</Show>
 				</div>
+				<Show when={webTranscript.pastedText(props.item.entry)}>
+					{(text) => <details class="TranscriptItem-paste" id={props.item.entry.id ? `paste-${encodeURIComponent(props.item.entry.id)}` : undefined}>
+						<summary>View pasted text</summary>
+						<button type="button" onClick={() => void navigator.clipboard.writeText(text())}>Copy text</button>
+						<textarea readonly rows={10} spellcheck={false} aria-label="Pasted text" value={text()} />
+					</details>}
+				</Show>
 			</article>}
 		>
 			{(tool) => <ToolCard tool={tool()} />}

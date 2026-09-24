@@ -86,6 +86,10 @@ test('tool headers link to their exact web card without changing visible width',
 		const header = blocks.renderBlock({ type: 'tool', name: 'bash', sessionId: '05-wan', toolId: 'call-1', input: { command: 'pwd' } }, 40)[0]!
 		expect(header).toContain('\x1b]8;;http://localhost:9001/05-wan#tool=call-1\x07')
 		expect(visLen(header)).toBe(39)
+		const body = blocks.renderBlock({ type: 'tool', name: 'bash', sessionId: '05-wan', toolId: 'call-1', output: 'done' }, 40).join('')
+		expect(body).toContain('\x1b]8;;http://localhost:9001/05-wan#tool=call-1\x07done\x1b]8;;\x07')
+		const external = blocks.renderBlock({ type: 'tool', name: 'bash', sessionId: '05-wan', toolId: 'call-1', output: 'https://example.com' }, 40).join('')
+		expect(external).toContain(';https://example.com\x07https://example.com\x1b]8;;\x07')
 	} finally { webLinks.url = original }
 })
 test('image path labels link to their stored blob on the host', () => {
@@ -100,6 +104,17 @@ test('image path labels link to their stored blob on the host', () => {
 		expect(lines.join('')).toContain('\x1b]8;;https://hal.antti.dev/images/05-wan/000123-abc?auth=valid\x07[/tmp/hal/images/paste.png]\x1b]8;;\x07')
 		expect(blockText.stripAnsiSequences(lines.join(''))).toContain('see [/tmp/hal/images/paste.png]')
 	} finally { webLinks.imageUrl = original }
+})
+test('saved paste marker links to its full text in the browser', () => {
+	const original = webLinks.pasteUrl
+	webLinks.pasteUrl = () => 'http://localhost:9001/05-wan#paste=000001-abc'
+	try {
+		const block: Block = { type: 'user', id: '000001-abc', sessionId: '05-wan', text: 'see [/tmp/hal/paste/0002.txt]', parts: [
+			{ type: 'text', text: 'see all of these lines', displayText: 'see [/tmp/hal/paste/0002.txt]' },
+		] }
+		const body = blocks.renderBlock(block, 80).join('')
+		expect(body).toContain('\x1b]8;;http://localhost:9001/05-wan#paste=000001-abc\x07[/tmp/hal/paste/0002.txt]\x1b]8;;\x07')
+	} finally { webLinks.pasteUrl = original }
 })
 
 test('streaming cursor leaves the terminal last column unused', () => {

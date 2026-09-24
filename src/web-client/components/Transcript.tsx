@@ -15,24 +15,28 @@ export function Transcript(props: TranscriptProps) {
 	let element: HTMLElement | undefined
 	let autoFollow = true
 	let openedTarget = ''
-	function focusTool(): void {
+	function focusTarget(): void {
 		const toolId = router.toolTarget()
-		const key = `${router.sessionId()}:${toolId}`
-		if (!toolId || !element || openedTarget === key) return
-		const details = document.getElementById(`tool-${encodeURIComponent(toolId)}`) as HTMLDetailsElement | null
+		const pasteId = router.pasteTarget()
+		if (!toolId && !pasteId) { openedTarget = ''; return }
+		const id = toolId ? `tool-${encodeURIComponent(toolId)}` : `paste-${encodeURIComponent(pasteId)}`
+		const key = `${router.sessionId()}:${id}`
+		if (!element || openedTarget === key) return
+		const details = document.getElementById(id) as HTMLDetailsElement | null
 		if (!details || !element.contains(details)) return // The linked session's snapshot may still be loading.
-		element.querySelector('.ToolCard.target')?.classList.remove('target')
-		details.closest('.ToolCard')?.classList.add('target')
+		element.querySelector('.ToolCard.target, .TranscriptItem-paste.target')?.classList.remove('target')
+		const highlight = details.closest('.ToolCard') ?? details
+		highlight.classList.add('target')
 		details.open = true
 		autoFollow = false
 		details.scrollIntoView({ block: 'center' })
 		openedTarget = key
 	}
 	onSettled(() => {
-		window.addEventListener('hashchange', focusTool)
-		return () => window.removeEventListener('hashchange', focusTool)
+		window.addEventListener('hashchange', focusTarget)
+		return () => window.removeEventListener('hashchange', focusTarget)
 	})
-	createEffect(() => [props.items, router.sessionId()], focusTool)
+	createEffect(() => [props.items, router.sessionId()], focusTarget)
 	// The render grows the transcript before the effect runs, so retain the user's last
 	// scroll intent instead of measuring the newly enlarged gap in the effect.
 	function updateAutoFollow(): void {

@@ -192,6 +192,12 @@ button { touch-action: manipulation; }
 .TranscriptItem .TranscriptItem-content { display: contents; }
 .TranscriptItem .TranscriptItem-part { display: contents; }
 .TranscriptItem .TranscriptItem-interruption { color: #aaa; }
+.TranscriptItem-paste { margin-top: 9px; padding: 8px; background: #161d24; border: 1px solid #354a59; border-left: 3px solid #8fc5ed; color: #d7e1ea; }
+.TranscriptItem-paste.target { outline: 2px solid #8fc5ed; outline-offset: 2px; }
+.TranscriptItem-paste > summary { cursor: pointer; }
+.TranscriptItem-paste > button { float: right; margin: 8px 0; color: inherit; background: #202832; border: 1px solid #526579; cursor: pointer; }
+.TranscriptItem-paste > textarea { display: block; width: 100%; min-height: 10rem; max-height: 55vh; padding: 8px; clear: both; resize: vertical; color: #d7e1ea; background: #101214; border: 1px solid #354a59; font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.TranscriptItem-paste :is(summary, button, textarea):focus-visible { outline: 2px solid #8fc5ed; outline-offset: 2px; }
 
 /* Tool cards are tiny command tickets, not log panes. Their colored left edge
    identifies the kind of operation at a glance; the payload is sampled above,

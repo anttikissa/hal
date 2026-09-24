@@ -224,8 +224,14 @@ function blockContent(block: Block, cols: number): string[] {
 	if (block.type === 'user' && block.parts && block.sessionId) {
 		text = ''
 		for (const part of block.parts) {
-			if (part.type === 'text') text += blockText.sanitizeTerminalText(part.displayText ?? part.text)
-			else {
+			if (part.type === 'text') {
+				let shown = blockText.sanitizeTerminalText(part.displayText ?? part.text)
+				if (part.displayText && block.id) {
+					const url = webLinks.pasteUrl(block.sessionId, block.id)
+					shown = shown.replace(/\[\/tmp\/hal\/paste\/\d+\.txt\]/g, (label) => blockText.hyperlink(label, url))
+				}
+				text += shown
+			} else {
 				const label = blockText.sanitizeTerminalText(part.originalFile ? `[${part.originalFile}]` : '[image]')
 				text += blockText.hyperlink(label, webLinks.imageUrl(block.sessionId, part.blobId))
 			}
@@ -510,17 +516,16 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const header = buildHeader(label, blockTime, blobRef, cols, blocks.toolActivity(block))
 	const plainNotice = block.type === 'info' || (block.type === 'log' && !block.text.startsWith('Prompt queued'))
 	const lines: string[] = []
-	if (!plainNotice) {
-		const url = block.type === 'tool' && block.sessionId && block.toolId ? webLinks.url(block.sessionId, block.toolId) : ''
-		lines.push(bgLine(`${fg}${blockText.hyperlink(header, url)}`, cols, bg))
-	}
+	const toolUrl = block.type === 'tool' && block.sessionId && block.toolId ? webLinks.url(block.sessionId, block.toolId) : ''
+	if (!plainNotice) lines.push(bgLine(`${fg}${blockText.hyperlink(header, toolUrl)}`, cols, bg))
 	const contentCols = Math.max(1, cols - 1 - blocks.outputPad)
 	const rawContent = plainNotice ? noticeContent(block, contentCols) : blockContent(block, contentCols)
 	const content = blockText.hyperlinkUrls(rawContent, contentCols)
 	if (content.length > 0 && !plainNotice && block.type !== 'tool') lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {
 		const fullWidth = visLen(line) > contentCols
-		const text = block.canceled ? `${STRIKE}${line}${STRIKE_OFF}` : line
+		const linked = toolUrl && !line.includes('\x1b]8;') ? blockText.hyperlink(line, toolUrl) : line
+		const text = block.canceled ? `${STRIKE}${linked}${STRIKE_OFF}` : linked
 		lines.push(bodyLine(text, fg, bg, cols, fullWidth))
 	}
 	// Streaming cursors blink on the shared pulse so active output feels alive

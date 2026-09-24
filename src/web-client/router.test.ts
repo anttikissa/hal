@@ -44,6 +44,12 @@ test('tool deep links preserve their target through token consumption', () => {
 	expect(written).toEqual([{ url: '/05-wan#tool=call_1%2F2', replace: true }])
 	expect(router.toolHash('call_1/2')).toBe('#tool=call_1%2F2')
 })
+test('paste links retain their message target through token consumption', () => {
+	fakeBrowser('https://example.test/05-wan?auth=secret#paste=000001-abc')
+	expect(router.pasteTarget()).toBe('000001-abc')
+	expect(router.takeSearchParam('auth')).toBe('secret')
+	expect(router.pasteHash('000001-abc')).toBe('#paste=000001-abc')
+})
 test('formats session ids back into paths', () => {
 	expect(router.format('05-wan')).toBe('/05-wan')
 	expect(router.format('')).toBe('/')

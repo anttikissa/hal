@@ -3,6 +3,7 @@
 import { readFileSync } from 'fs'
 import { ason } from '../utils/ason.ts'
 import { webProtocol } from '../common/web.ts'
+import { historyIds } from '../common/history-ids.ts'
 import { clientBackend } from './backend.ts'
 import { client } from './app.ts'
 import { webConnection } from './web-connection.ts'
@@ -43,5 +44,10 @@ function imageUrl(sessionId: string, blobId: string): string {
 	link.pathname = path
 	return link.href
 }
+function pasteUrl(sessionId: string, entryId: string): string {
+	if (!historyIds.isValid(entryId)) return ''
+	const base = webLinks.url(sessionId)
+	return base ? `${base}#paste=${encodeURIComponent(entryId)}` : ''
+}
 
-export const webLinks = { state, localToken, url, imageUrl }
+export const webLinks = { state, localToken, url, imageUrl, pasteUrl }

@@ -27,13 +27,21 @@ of truth; re-read it after upgrades.
 
 ## Routing
 
-`src/web-client/router.ts` is a ~70-line router, not a dependency. The whole
-URL surface is `/<sessionId>` (`example.test/05-wan`), so a tab is a
-shareable link and Back/Forward move between tabs.
+`src/web-client/router.ts` is a small router, not a dependency. Browser app routes
+are `/<sessionId>` (`example.test/05-wan`), so tabs are shareable and Back/Forward
+move between tabs. `#tool=<toolId>` expands and scrolls to a tool; `#paste=<entryId>`
+opens the saved text paste. Those targets can arrive after a session snapshot, so
+the transcript retries focus as data loads.
 
-- `src/common/web.ts` owns `isSessionPath()`. The server serves the app for
-  those paths and the client parses the session out of the same shape, so the
-  two can never disagree about what a session URL is.
+- `src/common/web.ts` owns `isSessionPath()` and `imagePath()`. The server serves
+  the app at session routes and authenticated image blobs at
+  `/images/<sessionId>/<blobId>`; never serve an arbitrary path from a prompt.
+- Terminal links carry `?auth=<token>` once. The app strips it from its address bar
+  and stores it locally; image links also require authentication. Treat URLs that
+  still contain `auth=` as credentials, not safe-to-share links.
+- The host publishes the actual local web origin in shared state; `web.hostname`
+  configures a public HTTPS hostname. Remote terminal links remain pinned to the
+  host that `hal -r` authenticated, not a URL advertised by that host.
 - The router is the single source of truth for the selected session: `main.tsx`
   derives `selected` from `router.sessionId()` rather than keeping its own
   signal. `popstate` therefore needs no special case.

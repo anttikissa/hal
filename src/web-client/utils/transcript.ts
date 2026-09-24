@@ -102,6 +102,26 @@ function imageHref(sessionId: string, blobId: string, token: string): string {
 	const path = webProtocol.imagePath(sessionId, blobId)
 	return path ? `${path}?auth=${encodeURIComponent(token)}` : ''
 }
+function pastedText(entry: TranscriptEntry): string {
+	if (entry.type !== 'user' || !('parts' in entry) || !entry.parts) return ''
+	for (const part of entry.parts) {
+		if (part.type !== 'text' || !part.displayText) continue
+		const marker = /\[\/tmp\/hal\/paste\/\d+\.txt\]/.exec(part.displayText)
+		if (!marker) continue
+		const before = part.displayText.slice(0, marker.index)
+		const after = part.displayText.slice(marker.index + marker[0].length)
+		if (part.text.startsWith(before) && part.text.endsWith(after)) return part.text.slice(before.length, part.text.length - after.length)
+		return part.text
+	}
+	return ''
+}
+function pasteSegments(text: string): string[] {
+	return text.split(/(\[\/tmp\/hal\/paste\/\d+\.txt\])/g).filter(Boolean)
+}
+
+function isPasteMarker(text: string): boolean {
+	return /^\[\/tmp\/hal\/paste\/\d+\.txt\]$/.test(text)
+}
 
 function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[] {
 	if (!snapshot) return []
@@ -117,4 +137,4 @@ function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[]
 	return result
 }
 
-export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref }
+export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker }

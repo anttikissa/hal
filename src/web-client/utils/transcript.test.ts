@@ -6,6 +6,16 @@ test('browser image links use the stored blob rather than the original server pa
 	expect(webTranscript.imageHref('05-wan', '000123-abc', 'myToken')).toBe('/images/05-wan/000123-abc?auth=myToken')
 	expect(webTranscript.imageHref('05-wan', '../secret', 'myToken')).toBe('')
 })
+test('paste inspector reads original text from the persisted part, not its display marker', () => {
+	expect(webTranscript.pastedText({ type: 'user', id: '000001-abc', parts: [{ type: 'text', text: 'original\ntext', displayText: '[/tmp/hal/paste/0002.txt]' }] })).toBe('original\ntext')
+	expect(webTranscript.pastedText({ type: 'user', parts: [{ type: 'text', text: 'Analyze this:\n\noriginal\ntext now', displayText: 'Analyze this:\n\n[/tmp/hal/paste/0002.txt] now' }] })).toBe('original\ntext')
+	expect(webTranscript.pastedText({ type: 'user', parts: [{ type: 'text', text: 'ordinary message' }] })).toBe('')
+})
+test('paste markers split from surrounding prose without losing their text', () => {
+	expect(webTranscript.pasteSegments('see [/tmp/hal/paste/0002.txt] now')).toEqual(['see ', '[/tmp/hal/paste/0002.txt]', ' now'])
+	expect(webTranscript.isPasteMarker('[/tmp/hal/paste/0002.txt]')).toBe(true)
+	expect(webTranscript.isPasteMarker('see [/tmp/hal/paste/0002.txt]')).toBe(false)
+})
 test('history tool results merge into their call block', () => {
 	const history: HistoryEntry[] = [
 		{ type: 'tool_call', toolId: 'tool-1', name: 'bash', input: { command: 'printf hello' }, blobId: 'blob-1', ts: '2026-08-13T12:00:00.000Z' },
