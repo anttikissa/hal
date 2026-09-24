@@ -1,6 +1,7 @@
 // A phone transcript needs the result of a tool call, not its entire transport
 // payload. These are intentionally the same small facts the terminal surfaces:
 // paths, ranges, counts, and at most a few useful output lines.
+import { webProtocol } from '../../common/web.ts'
 
 type ToolLike = {
 	name: string
@@ -14,6 +15,8 @@ export type ToolCard = {
 	detail?: string
 	preview: string[]
 	hiddenLines?: number
+	commitFiles?: string[]
+	commitBody?: string
 }
 
 function objectInput(input: unknown): Record<string, unknown> {
@@ -89,7 +92,35 @@ function sampled(output: string | undefined, limit: number): Pick<ToolCard, 'pre
 	return hiddenLines > 0 ? { preview, hiddenLines } : { preview }
 }
 
+function commitCard(output: string | undefined): ToolCard | null {
+	const start = output?.indexOf('[hal-commit]') ?? -1
+	const end = output?.indexOf('[/hal-commit]', start + 12) ?? -1
+	if (!output || start < 0 || end < 0) return null
+	const raw = webProtocol.decode(output.slice(start + 12, end).trim())
+	if (!raw || typeof raw !== 'object') return null
+	const meta = raw as Record<string, unknown>
+	if (typeof meta.branch !== 'string' || typeof meta.hash !== 'string' || typeof meta.summary !== 'string' || !Array.isArray(meta.files)) return null
+	const files = meta.files as Array<{ path: string; added: number; removed: number; locDelta?: number; isCode?: boolean }>
+	if (!files.every((file) => file && typeof file.path === 'string' && Number.isFinite(file.added) && Number.isFinite(file.removed))) return null
+	const message = typeof meta.message === 'string' ? meta.message.trim() : ''
+	const newline = message.indexOf('\n')
+	const subject = (newline < 0 ? message : message.slice(0, newline)) || meta.summary
+	const commitBody = newline < 0 ? '' : message.slice(newline).trim()
+	const preview: string[] = []
+	if (typeof meta.locDeltaCode === 'number' && typeof meta.locDelta === 'number') preview.push(`LOC: ${signed(meta.locDeltaCode)} code (${signed(meta.locDelta)} with tests)`)
+	const commitFiles = files.map((file) => `${file.added} + / ${file.removed} −  ${file.path}${file.isCode && Number.isFinite(file.locDelta) ? ` · ${signed(file.locDelta!)} LOC` : ''}`)
+	return { title: `Commit ${meta.hash}: ${subject}`, detail: `${meta.branch} · ${meta.summary}`, preview, commitFiles, commitBody }
+}
+
+function signed(value: number): string {
+	return value > 0 ? `+${value}` : String(value)
+}
+
 function present(tool: ToolLike): ToolCard {
+	if (tool.name === 'bash') {
+		const commit = commitCard(tool.output)
+		if (commit) return commit
+	}
 	const input = objectInput(tool.input)
 	const card: ToolCard = { title: title(tool.name, input), preview: [] }
 	if (tool.running) card.detail = 'Running…'

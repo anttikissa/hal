@@ -18,10 +18,14 @@ export function ToolCard(props: ToolCardProps) {
 				<Show when={card().preview.length}><pre>{card().preview.join('\n')}</pre></Show>
 				<Show when={card().hiddenLines}>{(count) => <small>… {count()} more {count() === 1 ? 'line' : 'lines'}</small>}</Show>
 			</summary>
-			<Show when={props.tool.input !== undefined}>
+			<Show when={card().commitFiles}>
+				{(files) => <div class="ToolCard-section"><strong>Files</strong><pre>{files().join('\n')}</pre></div>}
+			</Show>
+			<Show when={card().commitBody}><div class="ToolCard-section"><strong>Message</strong><pre>{card().commitBody}</pre></div></Show>
+			<Show when={!card().commitFiles && props.tool.input !== undefined}>
 				<div class="ToolCard-section"><strong>Input</strong><button type="button" onClick={() => void navigator.clipboard.writeText(webTranscript.valueText(props.tool.input))}>Copy</button><pre>{webTranscript.valueText(props.tool.input)}</pre></div>
 			</Show>
-			<Show when={props.tool.output !== undefined}>
+			<Show when={!card().commitFiles && props.tool.output !== undefined}>
 				<div class="ToolCard-section"><strong>Output</strong><button type="button" onClick={() => void navigator.clipboard.writeText(props.tool.output ?? '')}>Copy</button><pre>{props.tool.output}</pre></div>
 			</Show>
 		</details>
