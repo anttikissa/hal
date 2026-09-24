@@ -31,3 +31,13 @@ test('preserves the exact bottom gap across content growth', () => {
 	element.scrollTop = 284 // 50px away: do not follow.
 	expect(webScroll.bottomGap(element)).toBeNull()
 })
+
+test('a tool toggle preserves the pre-toggle gap, without pulling readers back from above', () => {
+	const values = { scrollHeight: 1_234, clientHeight: 1_000, scrollTop: 214 }
+	const element = fakeScroller(values)
+	webScroll.keepBottom(element, () => { values.scrollHeight += 200 })
+	expect(values.scrollTop).toBe(414)
+	values.scrollTop = 100
+	webScroll.keepBottom(element, () => { values.scrollHeight += 200 })
+	expect(values.scrollTop).toBe(100)
+})

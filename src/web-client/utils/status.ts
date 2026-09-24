@@ -1,4 +1,5 @@
 import type { SharedSessionInfo } from '../../common/ipc.ts'
+import type { LiveBlock } from '../../common/live-event-blocks.ts'
 import { models } from '../../common/models.ts'
 import type { SessionMeta } from '../../common/session.ts'
 
@@ -30,10 +31,16 @@ function text(session: SharedSessionInfo | undefined): string {
 	return webStatus.sessionText(session)
 }
 
-function activity(working: boolean, reconnecting: boolean, waiting: boolean): string {
+function activity(working: boolean, reconnecting: boolean, waiting: boolean, live: readonly LiveBlock[] = []): string {
 	if (reconnecting) return 'Reconnecting…'
 	if (waiting) return 'Waiting for answer'
-	return working ? 'Working…' : 'Idle'
+	if (!working) return 'Idle'
+	for (const block of [...live].reverse()) {
+		if (block.type === 'tool' && block.running) return `Running ${block.name}…`
+		if (block.type === 'thinking' && block.streaming) return 'Thinking…'
+		if (block.type === 'assistant' && block.streaming) return 'Writing…'
+	}
+	return 'Working…'
 }
 
 export const webStatus = { text, location, contextText, sessionText, activity }

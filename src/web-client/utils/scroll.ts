@@ -7,4 +7,10 @@ function bottomGap(element: HTMLElement): number | null {
 	return gap < 50 ? gap : null
 }
 
-export const webScroll = { toBottom, bottomGap }
+function keepBottom(element: HTMLElement, change: () => void): void {
+	const gap = webScroll.bottomGap(element)
+	change()
+	if (gap !== null) webScroll.toBottom(element, gap)
+}
+
+export const webScroll = { toBottom, bottomGap, keepBottom }

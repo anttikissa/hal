@@ -44,6 +44,12 @@ test('saved rows keep their identity across replacement snapshots', () => {
 	const live = { entry: { type: 'tool' as const, name: 'bash' }, text: 'running' }
 	expect(webTranscript.rowKey(live)).not.toBe(webTranscript.rowKey({ entry: { ...live.entry }, text: 'running' }))
 })
+
+test('a running tool keeps its open state when it becomes a saved block', () => {
+	const live = { entry: { type: 'tool' as const, name: 'bash', toolId: 'call-1', running: true }, text: 'running' }
+	const saved = { entry: { type: 'tool' as const, name: 'bash', toolId: 'call-1', id: '000003-pku' }, text: 'done' }
+	expect(webTranscript.rowKey(live)).toBe(webTranscript.rowKey(saved))
+})
 test('persisted user messages keep every uploaded image reference visible', () => {
 	const result = webTranscript.items({
 		session: { id: 's1', cwd: '/tmp' },

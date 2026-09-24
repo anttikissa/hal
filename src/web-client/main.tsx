@@ -46,6 +46,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	const [sharedState, setSharedState] = createSignal<SharedState>({ sessions: [], working: {}, updatedAt: '' })
 	const [snapshot, setSnapshot] = createSignal<ClientSessionSnapshot | null>(null)
 	const [reconnecting, setReconnecting] = createSignal(false)
+	const [sendCount, setSendCount] = createSignal(0)
 	const transcript = createMemo(() => {
 		const current = snapshot()
 		if (!current || current.session.id !== selected()) return []
@@ -121,6 +122,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			const next = { ...current, live: liveEventBlocks.reduce(current.live, { type: 'prompt', id, text, createdAt: new Date().toISOString() }).blocks }
 			snapshots.set(sessionId, next)
 			setSnapshot(next)
+			setSendCount((count) => count + 1)
 		}
 		return Promise.resolve(true)
 	}
@@ -234,8 +236,8 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			onSelect={selectSession}
 			onCommand={onTabCommand}
 		/>
-		<Transcript items={transcript()} token={props.token} onAnswer={submitAnswer} />
-		<PromptComposer sessionId={selected()} location={webStatus.location(session())} context={webStatus.contextText(snapshot()?.meta)} activity={webStatus.activity(!!sharedState().working[selected()], reconnecting(), !!activeQuestion())} disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
+		<Transcript items={transcript()} sendCount={sendCount()} token={props.token} onAnswer={submitAnswer} />
+		<PromptComposer sessionId={selected()} location={webStatus.location(session())} context={webStatus.contextText(snapshot()?.meta)} activity={webStatus.activity(!!sharedState().working[selected()], reconnecting(), !!activeQuestion(), snapshot()?.live)} disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
 	</>
 }
 

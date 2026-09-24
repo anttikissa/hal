@@ -22,8 +22,9 @@ function blockId(entry: TranscriptEntry): string {
 	return 'blobId' in entry && entry.blobId || entry.id || ''
 }
 
-// Persisted IDs survive fresh server snapshots; unsaved live rows have no stable key yet.
+// Persisted IDs survive snapshots; the tool call ID also survives live -> saved.
 function rowKey(item: RenderedTranscriptItem): string | TranscriptEntry {
+	if (item.entry.type === 'tool' && item.entry.toolId) return `tool:${item.entry.toolId}`
 	return item.entry.id || ('blobId' in item.entry && item.entry.blobId) || item.entry
 }
 

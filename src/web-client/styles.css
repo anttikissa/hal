@@ -226,7 +226,9 @@ button { touch-action: manipulation; }
 	border-left: 3px solid var(--tool-fg);
 	color: var(--tool-fg);
 	white-space: normal;
+	cursor: pointer;
 }
+.ToolCard :is(pre, p) { cursor: text; }
 .ToolCard.target { outline: 1px solid var(--focus); outline-offset: 2px; }
 .ToolCard > details > summary { cursor: pointer; list-style: none; }
 .ToolCard > details > summary::-webkit-details-marker { display: none; }

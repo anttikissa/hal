@@ -31,3 +31,10 @@ test('composer activity reports the useful next action', () => {
 	expect(webStatus.activity(false, true, false)).toBe('Reconnecting…')
 	expect(webStatus.activity(false, false, true)).toBe('Waiting for answer')
 })
+
+test('composer activity names the live work rather than just reporting busy', () => {
+	expect(webStatus.activity(true, false, false, [{ type: 'thinking', text: 'draft', streaming: true }])).toBe('Thinking…')
+	expect(webStatus.activity(true, false, false, [{ type: 'tool', name: 'bash', running: true }])).toBe('Running bash…')
+	expect(webStatus.activity(true, false, false, [{ type: 'assistant', text: 'Hi', streaming: true }])).toBe('Writing…')
+	expect(webStatus.activity(false, false, false, [{ type: 'tool', name: 'bash', running: true }])).toBe('Idle')
+})

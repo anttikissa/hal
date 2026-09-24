@@ -124,6 +124,15 @@ test('the transcript is the only scrolling row', () => {
 	expect(declaration('.PromptComposer', 'flex')).toBe('none')
 })
 
+test('accepted messages force the transcript to its bottom even if the reader scrolled up', () => {
+	const main = readFileSync(resolve(webDir, 'main.tsx'), 'utf8')
+	const transcript = readFileSync(resolve(webDir, 'components/Transcript.tsx'), 'utf8')
+	expect(main).toContain('setSendCount((count) => count + 1)')
+	expect(main).toContain('sendCount={sendCount()}')
+	expect(transcript).toContain('webScroll.toBottom(element)')
+	expect(transcript).toContain('() => props.sendCount')
+})
+
 test('prompt type stays readable without triggering iOS focus zoom', () => {
 	expect(declaration('.PromptComposer > textarea', 'font-size')).toBe('16px')
 	expect(declaration('.PromptComposer > textarea', 'line-height')).toBe('24px')

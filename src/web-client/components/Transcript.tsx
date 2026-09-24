@@ -7,6 +7,7 @@ import { TranscriptItem } from './TranscriptItem.tsx'
 
 type TranscriptProps = {
 	items: RenderedTranscriptItem[]
+	sendCount: number
 	onAnswer: (questionId: string, value: AnswerValue) => Promise<boolean>
 	token: string
 }
@@ -41,6 +42,17 @@ export function Transcript(props: TranscriptProps) {
 		openedTarget = '' // Clicking the current hash should focus it again, too.
 		focusTarget()
 	}
+
+	function onCardClick(event: MouseEvent): void {
+		if (!element || !(event.target instanceof Element) || event.target.closest('a, button, textarea, input, select')) return
+		const card = event.target.closest('.ToolCard')
+		if (!card || !element.contains(card)) return
+		if (window.getSelection()?.isCollapsed === false) { event.preventDefault(); return }
+		const details = card.querySelector('details')
+		if (!details) return
+		event.preventDefault() // The summary's native toggle would undo our measured toggle.
+		webScroll.keepBottom(element, () => { details.open = !details.open })
+	}
 	onSettled(() => {
 		window.addEventListener('hashchange', focusTarget)
 		return () => window.removeEventListener('hashchange', focusTarget)
@@ -68,7 +80,12 @@ export function Transcript(props: TranscriptProps) {
 			if (element && bottomGap !== null) webScroll.toBottom(element, bottomGap)
 		},
 	)
-	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateBottomGap} onClick={onBlockLinkClick}>
+	createEffect(() => props.sendCount, (count) => {
+		if (!count || !element) return
+		bottomGap = 0
+		webScroll.toBottom(element)
+	})
+	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateBottomGap} onClick={(event) => { onCardClick(event); onBlockLinkClick(event) }}>
 		<For each={props.items} keyed={webTranscript.rowKey}>{(item) => <TranscriptItem item={item()} token={props.token} onAnswer={props.onAnswer} />}</For>
 		<div class={['Transcript-cursor', { thinking: webTranscript.thinkingCursor(props.items) }]} aria-label="Hal cursor"><span aria-hidden="true" /></div>
 	</main>
