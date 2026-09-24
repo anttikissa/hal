@@ -964,3 +964,47 @@ test('missing opencode-go key names the real env var, not a derived one', async 
 	expect(events[0].message).toContain('OPENCODE_API_KEY')
 	expect(events[0].message).not.toContain('OPENCODE-GO')
 })
+
+test('compat provider surfaces abnormal finish_reason as an error', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-or-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+	installFetchMock(async () => new Response([
+		'data: {"choices":[{"delta":{"content":"hel"}}]}',
+		'data: {"choices":[{"finish_reason":"length"}]}',
+		'data: [DONE]',
+		'',
+	].join('\n'), { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any)
+
+	const events: any[] = []
+	for await (const event of createCompatProvider('openrouter').generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'some-model',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) events.push(event)
+
+	expect(events.find((event) => event.type === 'error')?.message).toBe('Response stopped: length')
+})
+
+test('responses provider names the incomplete reason', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+	installFetchMock(async () => new Response([
+		'data: {"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"}}}',
+		'',
+	].join('\n'), { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.4',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) events.push(event)
+
+	expect(events.find((event) => event.type === 'error')?.message).toBe('Response incomplete: max_output_tokens')
+})

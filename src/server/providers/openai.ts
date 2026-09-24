@@ -324,7 +324,11 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 		const events: ProviderStreamEvent[] = []
 		if (doneStatus === 'failed') {
 			const detail = response?.status_details?.error?.message ?? response?.status_details?.message ?? rawStatus
-			events.push({ type: 'error', message: `Response ${rawStatus}`, body: String(detail) })
+			// incomplete_details.reason says why, e.g. max_output_tokens or content_filter.
+			const reason = response?.incomplete_details?.reason
+			let message = `Response ${rawStatus}`
+			if (reason) message += `: ${reason}`
+			events.push({ type: 'error', message, body: String(detail) })
 		}
 		const usage = response?.usage
 		const done: ProviderStreamEvent = { type: 'done', doneStatus }
@@ -381,8 +385,12 @@ async function* parseChatCompletionsStream(body: ReadableStream<Uint8Array>): As
 				if (tc.function?.arguments) entry.args += tc.function.arguments
 			}
 		}
-		if (choice.finish_reason === 'stop' || choice.finish_reason === 'tool_calls') {
+		if (choice.finish_reason) {
 			gotFinish = true
+			// e.g. length or content_filter: say why instead of looking empty.
+			if (choice.finish_reason !== 'stop' && choice.finish_reason !== 'tool_calls') {
+				yield { type: 'error', message: `Response stopped: ${choice.finish_reason}`, body: JSON.stringify(choice) }
+			}
 			if (chunk.usage) {
 				inputTokens = chunk.usage.prompt_tokens ?? 0
 				outputTokens = chunk.usage.completion_tokens ?? 0
@@ -413,14 +421,13 @@ function responsesTransportMode(): ResponsesTransportMode {
 }
 
 function buildResponsesBody(req: ProviderRequest, transport: OpenAITransport, input: any[]): any {
+	// No max_output_tokens: leaving it unset lets the model's own maximum apply.
 	const body: any = { model: req.model, store: false, stream: true, input }
 	if (req.systemPrompt) body.instructions = req.systemPrompt
 	if (transport.usesCodexBackend) {
 		body.text = { verbosity: 'high' }
 		body.include = ['reasoning.encrypted_content']
 		if (req.sessionId) body.prompt_cache_key = req.sessionId
-	} else {
-		body.max_output_tokens = req.model.includes('codex') ? 128_000 : 16_384
 	}
 	if (req.tools?.length) {
 		body.tools = convertResponsesTools(req.tools)
