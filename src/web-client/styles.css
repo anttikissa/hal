@@ -190,6 +190,9 @@ button { touch-action: manipulation; }
 .TranscriptItem.assistant { color: #eee; }
 .TranscriptItem.log, .TranscriptItem.info { color: #aaa; }
 .TranscriptItem > label { font-size: .9em; color: #aaa; }
+.TranscriptItem > label > .Transcript-blockLink { margin-left: 1ch; color: #8fc5ed; text-decoration: none; }
+.TranscriptItem > label > .Transcript-blockLink:hover { text-decoration: underline; }
+.Transcript-blockLink:focus-visible { outline: 2px solid #8fc5ed; outline-offset: 2px; }
 .TranscriptItem .TranscriptItem-content { display: contents; }
 .TranscriptItem .TranscriptItem-part { display: contents; }
 .TranscriptItem .TranscriptItem-interruption { color: #aaa; }

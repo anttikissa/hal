@@ -44,6 +44,15 @@ test('bare block hashes survive token consumption', () => {
 	expect(written).toEqual([{ url: '/152-act#0403ru-pku', replace: true }])
 	expect(router.blockHash('0403ru-pku')).toBe('#0403ru-pku')
 })
+
+test('block links push a shareable hash without a native anchor navigation', () => {
+	fakeBrowser('https://example.test/152-act?view=compact#000001-abc')
+	expect(router.navigateBlock('0403ru-pku')).toBe(true)
+	expect(written).toEqual([{ url: '/152-act?view=compact#0403ru-pku', replace: false }])
+	expect(router.blockTarget()).toBe('0403ru-pku')
+	expect(router.navigateBlock('../bad')).toBe(false)
+	expect(written).toHaveLength(1)
+})
 test('paste links retain their message target through token consumption', () => {
 	fakeBrowser('https://example.test/05-wan?auth=secret#paste=000001-abc')
 	expect(router.pasteTarget()).toBe('000001-abc')

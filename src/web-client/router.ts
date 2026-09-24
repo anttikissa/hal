@@ -36,6 +36,14 @@ function blockHash(blockId: string): string {
 	return historyIds.isValid(blockId) ? `#${blockId}` : ''
 }
 
+function navigateBlock(blockId: string): boolean {
+	const hash = router.blockHash(blockId)
+	if (!hash) return false
+	const url = new URL(router.href())
+	router.write(`${url.pathname}${url.search}${hash}`, false)
+	return true
+}
+
 function blockTarget(): string {
 	const hash = new URL(router.href()).hash.slice(1)
 	return historyIds.isValid(hash) ? hash : ''
@@ -81,4 +89,4 @@ function start(): () => void {
 	return () => removeEventListener('popstate', onPopState)
 }
 
-export const router = { sessionId, href, write, parse, format, blockHash, blockTarget, pasteHash, pasteTarget, navigate, handlePopState, takeSearchParam, start }
+export const router = { sessionId, href, write, parse, format, blockHash, blockTarget, navigateBlock, pasteHash, pasteTarget, navigate, handlePopState, takeSearchParam, start }

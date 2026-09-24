@@ -18,7 +18,6 @@ export function ToolCard(props: ToolCardProps) {
 				<Show when={card().preview.length}><pre>{card().preview.join('\n')}</pre></Show>
 				<Show when={card().hiddenLines}>{(count) => <small>… {count()} more {count() === 1 ? 'line' : 'lines'}</small>}</Show>
 			</summary>
-			<Show when={webTranscript.blockId(props.tool)}>{(id) => <a class="ToolCard-link" href={router.blockHash(id())}>Link to this tool</a>}</Show>
 			<Show when={props.tool.input !== undefined}>
 				<div class="ToolCard-section"><strong>Input</strong><button type="button" onClick={() => void navigator.clipboard.writeText(webTranscript.valueText(props.tool.input))}>Copy</button><pre>{webTranscript.valueText(props.tool.input)}</pre></div>
 			</Show>
@@ -26,5 +25,8 @@ export function ToolCard(props: ToolCardProps) {
 				<div class="ToolCard-section"><strong>Output</strong><button type="button" onClick={() => void navigator.clipboard.writeText(props.tool.output ?? '')}>Copy</button><pre>{props.tool.output}</pre></div>
 			</Show>
 		</details>
+		<Show when={router.blockHash(webTranscript.blockId(props.tool))}>
+			{(hash) => <a class="Transcript-blockLink ToolCard-link" href={hash()} aria-label="Link to this tool">{webTranscript.blockId(props.tool)}</a>}
+		</Show>
 	</article>
 }

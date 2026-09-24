@@ -32,6 +32,15 @@ export function Transcript(props: TranscriptProps) {
 		target.scrollIntoView({ block: 'center' })
 		openedTarget = key
 	}
+
+	function onBlockLinkClick(event: MouseEvent): void {
+		if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+		const link = event.target instanceof Element ? event.target.closest('a.Transcript-blockLink') : null
+		if (!link || !router.navigateBlock((link as HTMLAnchorElement).hash.slice(1))) return
+		event.preventDefault() // The native anchor jump aligns to the top instead of centering.
+		openedTarget = '' // Clicking the current hash should focus it again, too.
+		focusTarget()
+	}
 	onSettled(() => {
 		window.addEventListener('hashchange', focusTarget)
 		return () => window.removeEventListener('hashchange', focusTarget)
@@ -59,7 +68,7 @@ export function Transcript(props: TranscriptProps) {
 			if (element && autoFollow) webScroll.toBottom(element)
 		},
 	)
-	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateAutoFollow}>
+	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateAutoFollow} onClick={onBlockLinkClick}>
 		<For each={props.items} keyed={webTranscript.rowKey}>{(item) => <TranscriptItem item={item()} token={props.token} onAnswer={props.onAnswer} />}</For>
 	</main>
 }
