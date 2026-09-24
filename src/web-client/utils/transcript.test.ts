@@ -31,7 +31,11 @@ test('history tool results merge into their call block', () => {
 		ts: Date.parse('2026-08-13T12:00:00.000Z'),
 	}])
 })
-
+test('transcript anchors use each visible short block id', () => {
+	expect(webTranscript.blockId({ type: 'assistant', id: '0474y5-tv7', text: 'hello' })).toBe('0474y5-tv7')
+	expect(webTranscript.blockId({ type: 'tool', blobId: '0403ru-pku', name: 'bash' })).toBe('0403ru-pku')
+	expect(webTranscript.blockId({ type: 'thinking', blobId: '0403ru-xyz', text: 'hmm' })).toBe('0403ru-xyz')
+})
 test('persisted user messages keep every uploaded image reference visible', () => {
 	const result = webTranscript.items({
 		session: { id: 's1', cwd: '/tmp' },

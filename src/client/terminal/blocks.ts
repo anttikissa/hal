@@ -437,7 +437,9 @@ function questionLabel(block: Extract<Block, { type: 'question' }>): string {
 
 function renderQuestionBlock(block: Extract<Block, { type: 'question' }>, cols: number): RenderedBlock {
 	const { fg, bg, bgIsBlack } = blockColors(block)
-	const header = buildHeader(questionLabel(block), time.formatTimestamp(block.ts), '', cols)
+	const ref = block.id && block.sessionId ? `${block.sessionId}/${block.id}` : ''
+	const url = block.id && block.sessionId ? webLinks.url(block.sessionId, block.id) : ''
+	const header = buildHeader(questionLabel(block), time.formatTimestamp(block.ts), ref, cols, '', url)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	if (!block.active) {
 		lines[lines.length - 1]! += FG_OFF
@@ -506,16 +508,15 @@ function renderBlockDetailed(block: Block, cols: number, cursorVisible = false):
 }
 
 function renderBlock(block: Block, cols: number, cursorVisible = false): string[] {
-	const blobRef =
-		'blobId' in block && 'sessionId' in block && block.blobId && block.sessionId
-			? `${block.sessionId}/${block.blobId}`
-			: ''
+	const blockId = 'blobId' in block && block.blobId || block.id
+	const sessionId = 'sessionId' in block ? block.sessionId : undefined
+	const blobRef = blockId && sessionId ? `${sessionId}/${blockId}` : ''
 	const { fg, bg, bgIsBlack } = blockColors(block)
 	const label = blockLabel(block)
 	const blockTime = time.formatTimestamp(block.ts)
-	const toolUrl = block.type === 'tool' && block.sessionId && block.blobId ? webLinks.url(block.sessionId, block.blobId) : ''
-	const header = buildHeader(label, blockTime, blobRef, cols, blocks.toolActivity(block), toolUrl)
-	const plainNotice = block.type === 'info' || (block.type === 'log' && !block.text.startsWith('Prompt queued'))
+	const blockUrl = sessionId && blockId ? webLinks.url(sessionId, blockId) : ''
+	const header = buildHeader(label, blockTime, blobRef, cols, blocks.toolActivity(block), blockUrl)
+	const plainNotice = !blobRef && (block.type === 'info' || (block.type === 'log' && !block.text.startsWith('Prompt queued')))
 	const lines: string[] = []
 	if (!plainNotice) lines.push(bgLine(`${fg}${header}`, cols, bg))
 	const contentCols = Math.max(1, cols - 1 - blocks.outputPad)

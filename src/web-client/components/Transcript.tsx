@@ -16,20 +16,20 @@ export function Transcript(props: TranscriptProps) {
 	let autoFollow = true
 	let openedTarget = ''
 	function focusTarget(): void {
-		const blobId = router.toolTarget()
+		const blockId = router.blockTarget()
 		const pasteId = router.pasteTarget()
-		if (!blobId && !pasteId) { openedTarget = ''; return }
-		const id = blobId ? `tool-${encodeURIComponent(blobId)}` : `paste-${encodeURIComponent(pasteId)}`
+		if (!blockId && !pasteId) { openedTarget = ''; return }
+		const id = blockId || `paste-${encodeURIComponent(pasteId)}`
 		const key = `${router.sessionId()}:${id}`
 		if (!element || openedTarget === key) return
-		const details = document.getElementById(id) as HTMLDetailsElement | null
-		if (!details || !element.contains(details)) return // The linked session's snapshot may still be loading.
-		element.querySelector('.ToolCard.target, .TranscriptItem-paste.target')?.classList.remove('target')
-		const highlight = details.closest('.ToolCard') ?? details
+		const target = document.getElementById(id)
+		if (!target || !element.contains(target)) return // The linked session's snapshot may still be loading.
+		element.querySelector('.target')?.classList.remove('target')
+		const highlight = target.closest('.ToolCard') ?? target
 		highlight.classList.add('target')
-		details.open = true
+		if (target instanceof HTMLDetailsElement) target.open = true
 		autoFollow = false
-		details.scrollIntoView({ block: 'center' })
+		target.scrollIntoView({ block: 'center' })
 		openedTarget = key
 	}
 	onSettled(() => {

@@ -5,10 +5,10 @@
 //
 // The address bar is reached through `href`/`write` so tests can drive the
 // router without a DOM, and so eval can hot-patch navigation at runtime.
-// A `#hash` needs no support here: the browser scrolls to a matching element
-// id on its own, and switching tabs should drop it anyway.
+// Block hashes are short persisted IDs. Focus waits for the session snapshot.
 import { createSignal } from 'solid-js'
 import { webProtocol } from '../common/web.ts'
+import { historyIds } from '../common/history-ids.ts'
 
 const [sessionId, setSessionId] = createSignal('')
 
@@ -32,20 +32,22 @@ function parse(from: string): string {
 function format(target: string): string {
 	return target ? `/${target}` : '/'
 }
-function toolHash(blobId: string): string {
-	return `#tool=${encodeURIComponent(blobId)}`
+function blockHash(blockId: string): string {
+	return historyIds.isValid(blockId) ? `#${blockId}` : ''
+}
+
+function blockTarget(): string {
+	const hash = new URL(router.href()).hash.slice(1)
+	return historyIds.isValid(hash) ? hash : ''
 }
 
 function pasteHash(entryId: string): string {
 	return `#paste=${encodeURIComponent(entryId)}`
 }
 
-function hashTarget(kind: 'tool' | 'paste'): string {
-	return new URLSearchParams(new URL(router.href()).hash.slice(1)).get(kind) ?? ''
+function pasteTarget(): string {
+	return new URLSearchParams(new URL(router.href()).hash.slice(1)).get('paste') ?? ''
 }
-
-function toolTarget(): string { return router.hashTarget('tool') }
-function pasteTarget(): string { return router.hashTarget('paste') }
 
 function navigate(target: string, options?: { replace?: boolean }): void {
 	// Selecting the tab you are already on must not stack history entries,
@@ -79,4 +81,4 @@ function start(): () => void {
 	return () => removeEventListener('popstate', onPopState)
 }
 
-export const router = { sessionId, href, write, parse, format, toolHash, toolTarget, pasteHash, pasteTarget, hashTarget, navigate, handlePopState, takeSearchParam, start }
+export const router = { sessionId, href, write, parse, format, blockHash, blockTarget, pasteHash, pasteTarget, navigate, handlePopState, takeSearchParam, start }

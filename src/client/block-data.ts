@@ -16,6 +16,7 @@ import { blockConfig } from './block-config.ts'
 
 interface PresentationBlock {
 	dimmed?: boolean
+	sessionId?: string
 	renderVersion?: number
 	blobLoaded?: boolean
 	toolSummary?: boolean
@@ -52,6 +53,7 @@ function historyToBlocks(
 		const ts = parseTs(entry.ts)
 		const dimmed = i < parentEntryCount ? true : undefined
 		const blobOwner = i < parentEntryCount && parentId ? parentId : sessionId
+		const before = result.length
 		switch (entry.type) {
 			case 'user': {
 				const text = historyProjection.userText(entry, { images: 'path-or-image', display: 'ui' })
@@ -165,6 +167,11 @@ function historyToBlocks(
 			case 'model':
 				result.push({ type: 'info', text: `model: ${entry.from} -> ${entry.to}`, ts, dimmed })
 				break
+		}
+		if (entry.id && result.length > before && ['user', 'thinking', 'tool_call', 'question', 'assistant', 'log', 'info', 'warning', 'error'].includes(entry.type)) {
+			const block = result.at(-1)!
+			block.id = entry.id
+			block.sessionId = blobOwner
 		}
 	}
 	return result

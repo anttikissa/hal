@@ -6,6 +6,7 @@ import type { InterruptionReason, UserPart } from './history.ts'
 // projection so a snapshot and a live event stream always converge.
 export interface LiveBlockBase {
 	id?: string
+	sessionId?: string
 	ts?: number
 	canceled?: boolean
 	usageBars?: true
@@ -15,7 +16,6 @@ export interface LiveUserBlock extends LiveBlockBase {
 	type: 'user'
 	text: string
 	parts?: UserPart[]
-	sessionId?: string
 	actualText?: string
 	source?: string
 	status?: string
@@ -30,7 +30,6 @@ export interface LiveAssistantBlock extends LiveBlockBase {
 	streaming?: boolean
 	synthetic?: boolean
 	syntheticKind?: string
-	sessionId?: string
 	interruptedBy?: InterruptionReason
 	continuedAfter?: 'system-message'
 }
@@ -42,7 +41,6 @@ export interface LiveThinkingBlock extends LiveBlockBase {
 	thinkingEffort?: string
 	streaming?: boolean
 	blobId?: string
-	sessionId?: string
 	interruptedBy?: InterruptionReason
 	continuedAfter?: 'system-message'
 }
@@ -53,7 +51,6 @@ export interface LiveToolBlock extends LiveBlockBase {
 	input?: unknown
 	output?: string
 	blobId?: string
-	sessionId?: string
 	toolId?: string
 	running?: boolean
 }
@@ -68,7 +65,6 @@ export interface LiveErrorBlock extends LiveBlockBase {
 	type: 'error'
 	text: string
 	blobId?: string
-	sessionId?: string
 }
 
 export interface LiveForkBlock extends LiveBlockBase {
@@ -200,6 +196,7 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 		const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
 		const block: LiveUserBlock = { type: 'user', text: event.text }
 		if (event.id) block.id = event.id
+		if (event.id && sessionId) block.sessionId = sessionId
 		if (event.actualText) block.actualText = event.actualText
 		if (event.source) block.source = event.source
 		if (event.sourceTab !== undefined) block.sourceTab = event.sourceTab

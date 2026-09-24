@@ -185,6 +185,7 @@ button { touch-action: manipulation; }
 	overflow-wrap: anywhere;
 }
 .TranscriptItem { padding: 10px 0; border-bottom: 1px solid #333; }
+.TranscriptItem.target, .QuestionBlock.target { outline: 2px solid #8fc5ed; outline-offset: 2px; background: #19232c; }
 .TranscriptItem.user { color: #9cf; }
 .TranscriptItem.assistant { color: #eee; }
 .TranscriptItem.log, .TranscriptItem.info { color: #aaa; }

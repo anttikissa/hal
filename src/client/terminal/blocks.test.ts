@@ -79,18 +79,24 @@ test('block headers keep a right margin', () => {
 	expect(stripAnsi(withBlobRef[0]!)).toMatch(/\) $/)
 	expect(stripAnsi(withBlobRef[0]!).length).toBe(39)
 })
-test('only the short block reference links to its web tool card', () => {
+test('only each block reference links to its web transcript item', () => {
 	const original = webLinks.url
-	webLinks.url = (sessionId, blobId) => `http://localhost:9001/${sessionId}#tool=${blobId}`
+	webLinks.url = (sessionId, blockId) => `http://localhost:9001/${sessionId}${blockId ? `#${blockId}` : ''}`
 	try {
-		const block: Block = { type: 'tool', name: 'bash', sessionId: '152-act', blobId: '0403ru-pku', toolId: 'call_gJTY1EdGkAekFoW0UUhnowp7', input: { command: 'pwd' }, output: 'done' }
-		const lines = blocks.renderBlock(block, 52)
-		expect(lines[0]).toContain('\x1b]8;;http://localhost:9001/152-act#tool=0403ru-pku\x07(152-act/0403ru-pku)\x1b]8;;\x07')
-		expect((lines[0]!.match(/\x1b]8;;/g) ?? [])).toHaveLength(2)
-		expect(visLen(lines[0]!)).toBe(51)
-		expect(lines.slice(1).join('')).not.toContain('#tool=')
-		const withoutBlob = blocks.renderBlock({ ...block, blobId: undefined }, 52).join('')
-		expect(withoutBlob).not.toContain('#tool=')
+		for (const block of [
+			{ type: 'tool', name: 'bash', sessionId: '152-act', blobId: '0403ru-pku', toolId: 'call_gJTY1EdGkAekFoW0UUhnowp7', input: { command: 'pwd' }, output: 'done' },
+			{ type: 'assistant', sessionId: '152-act', text: 'hello', id: '0474y5-tv7' },
+			{ type: 'question', sessionId: '152-act', id: '0403ru-ask', text: 'Continue?', input: { kind: 'choice', choices: [{ id: 'yes', label: 'Yes' }] }, source: { type: 'intro' }, active: true },
+		] as Block[]) {
+			const id = 'blobId' in block && block.blobId || block.id
+			const lines = blocks.renderBlock(block, 52)
+			expect(lines[0]).toContain(`\x1b]8;;http://localhost:9001/152-act#${id}\x07(152-act/${id})\x1b]8;;\x07`)
+			expect((lines[0]!.match(/\x1b]8;;/g) ?? [])).toHaveLength(2)
+			expect(visLen(lines[0]!)).toBe(51)
+			expect(lines.slice(1).join('')).not.toContain(`#${id}`)
+		}
+		const withoutId = blocks.renderBlock({ type: 'assistant', text: 'no id', sessionId: '152-act' }, 52).join('')
+		expect(withoutId).not.toContain('\x1b]8;;http://')
 	} finally { webLinks.url = original }
 })
 test('image path labels link to their stored blob on the host', () => {

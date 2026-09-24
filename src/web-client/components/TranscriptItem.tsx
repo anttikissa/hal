@@ -20,7 +20,7 @@ export function TranscriptItem(props: TranscriptItemProps) {
 		when={webQuestion.projected(props.item.entry)}
 		fallback={<Show
 			when={props.item.entry.type === 'tool' ? props.item.entry : undefined}
-			fallback={<article class={['TranscriptItem', props.item.entry.type]}>
+			fallback={<article class={['TranscriptItem', props.item.entry.type]} id={webTranscript.blockId(props.item.entry) || undefined}>
 				<label>{transcriptTitles.label(props.item.entry)}</label>
 				<div class="Markdown">
 					<Show when={'continuedAfter' in props.item.entry && props.item.entry.continuedAfter}>

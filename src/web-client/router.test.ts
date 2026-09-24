@@ -36,13 +36,13 @@ test('ignores query and hash when parsing', () => {
 	expect(router.parse('https://example.test/05-wan?auth=secret#msg')).toBe('05-wan')
 })
 
-test('tool deep links preserve their short blob id through token consumption', () => {
-	fakeBrowser('https://example.test/152-act?auth=secret#tool=0403ru-pku')
-	expect(router.toolTarget()).toBe('0403ru-pku')
+test('bare block hashes survive token consumption', () => {
+	fakeBrowser('https://example.test/152-act?auth=secret#0403ru-pku')
+	expect(router.blockTarget()).toBe('0403ru-pku')
 	expect(router.takeSearchParam('auth')).toBe('secret')
-	expect(router.toolTarget()).toBe('0403ru-pku')
-	expect(written).toEqual([{ url: '/152-act#tool=0403ru-pku', replace: true }])
-	expect(router.toolHash('0403ru-pku')).toBe('#tool=0403ru-pku')
+	expect(router.blockTarget()).toBe('0403ru-pku')
+	expect(written).toEqual([{ url: '/152-act#0403ru-pku', replace: true }])
+	expect(router.blockHash('0403ru-pku')).toBe('#0403ru-pku')
 })
 test('paste links retain their message target through token consumption', () => {
 	fakeBrowser('https://example.test/05-wan?auth=secret#paste=000001-abc')

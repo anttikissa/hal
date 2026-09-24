@@ -37,6 +37,7 @@ function handlePrompt(event: any, ctx: any): void {
 	ctx.addBlockToTab(event.sessionId, {
 		type: 'user',
 		id: typeof event.id === 'string' ? event.id : undefined,
+		sessionId: event.sessionId,
 		text: event.text,
 		actualText: typeof event.actualText === 'string' ? event.actualText : undefined,
 		source: typeof event.source === 'string' ? event.source : undefined,

@@ -18,6 +18,9 @@ export type RenderedTranscriptItem = {
 	entry: TranscriptEntry
 	text: string
 }
+function blockId(entry: TranscriptEntry): string {
+	return 'blobId' in entry && entry.blobId || entry.id || ''
+}
 
 function valueText(value: unknown): string {
 	if (typeof value === 'string') return value
@@ -53,6 +56,7 @@ function historyItems(history: readonly HistoryEntry[], parentCount = 0): Transc
 		if (entry.type === 'tool_call') {
 			const tool: LiveToolBlock = {
 				type: 'tool',
+				id: entry.id,
 				name: entry.name,
 				input: entry.input,
 				toolId: entry.toolId,
@@ -71,7 +75,7 @@ function historyItems(history: readonly HistoryEntry[], parentCount = 0): Transc
 				continue
 			}
 			if (entry.output !== undefined) tool.output = valueText(entry.output)
-			if (entry.blobId) tool.blobId = entry.blobId
+			if (entry.blobId && !tool.blobId && !tool.id) tool.blobId = entry.blobId
 			if (entry.canceled) tool.canceled = true
 			continue
 		}
@@ -137,4 +141,4 @@ function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[]
 	return result
 }
 
-export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker }
+export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker, blockId }

@@ -69,6 +69,7 @@ export function QuestionBlock(props: QuestionBlockProps) {
 
 	return <article
 		class={['QuestionBlock', props.question.active ? 'active' : 'compact']}
+		id={props.question.id}
 		aria-labelledby={titleId()}
 		aria-busy={submitting() ? 'true' : 'false'}
 	>

@@ -484,9 +484,9 @@ test('host delivers prompt and abort directly instead of waiting for disk IPC', 
 			const id = urgent[0].id
 			expect(urgent[0]).toMatchObject({ type: 'prompt', sessionId: 's1', text: 'hello', id: expect.any(String) })
 			expect(urgent[1]).toEqual({ type: 'abort', sessionId: 's1', abortText: '' })
-			expect(tab.history).toEqual([{ type: 'user', text: 'hello', id, ts: expect.any(Number) }])
+			expect(tab.history).toEqual([{ type: 'user', text: 'hello', id, sessionId: 's1', ts: expect.any(Number) }])
 			client.handleEvent({ type: 'prompt', sessionId: 's1', text: 'hello from server', id, createdAt: '2026-08-24T08:00:00.000Z' })
-			expect(tab.history).toEqual([{ type: 'user', text: 'hello from server', id, ts: Date.parse('2026-08-24T08:00:00.000Z') }])
+			expect(tab.history).toEqual([{ type: 'user', text: 'hello from server', id, sessionId: 's1', ts: Date.parse('2026-08-24T08:00:00.000Z') }])
 			expect(disk).toEqual([])
 		})
 	} finally {

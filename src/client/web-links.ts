@@ -21,7 +21,7 @@ function localToken(): string {
 	return state.localToken
 }
 
-function url(sessionId: string, blobId?: string): string {
+function url(sessionId: string, blockId?: string): string {
 	if (!webProtocol.isSessionPath(`/${sessionId}`)) return ''
 	const remote = webConnection.state.remote
 	if (!client.state.webOrigin) return '' // The host has not started its web server.
@@ -33,7 +33,7 @@ function url(sessionId: string, blobId?: string): string {
 	try { parsed = new URL(origin) } catch { return '' }
 	if (parsed.origin !== origin || parsed.username || parsed.password) return ''
 	if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && parsed.hostname === 'localhost')) return ''
-	const hash = blobId ? `#tool=${encodeURIComponent(blobId)}` : ''
+	const hash = blockId ? `#${encodeURIComponent(blockId)}` : ''
 	return `${origin}/${sessionId}?auth=${encodeURIComponent(token)}${hash}`
 }
 function imageUrl(sessionId: string, blobId: string): string {
