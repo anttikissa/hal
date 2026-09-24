@@ -454,3 +454,17 @@ test('tailTurnState ignores ui-only tool calls like server-side web_search', () 
 
 	expect(sessions.tailTurnState(entries)).toMatchObject({ interrupted: true, interruptedTools: [{ name: 'bash', id: 'call_1' }] })
 })
+
+test('activeAt tracks only what a user or the assistant wrote', async () => {
+	const id = await makeSession()
+	await sessions.appendHistory(id, [{ type: 'info', text: 'opened', ts: '2026-09-24T10:00:00.000Z' }])
+	expect(sessions.loadSessionMeta(id)?.activeAt).toBeUndefined()
+
+	await sessions.appendHistory(id, [userEntry('hello', '2026-09-24T11:00:00.000Z')])
+	await sessions.appendHistory(id, [
+		{ type: 'assistant', text: 'hi', ts: '2026-09-24T11:00:05.000Z' },
+		{ type: 'turn_end', status: 'completed', ts: '2026-09-24T11:00:06.000Z' },
+	])
+	expect(sessions.loadSessionMeta(id)?.activeAt).toBe('2026-09-24T11:00:05.000Z')
+	expect(sessions.sessionOpenInfo(sessions.loadSessionMeta(id)!).activeAt).toBe('2026-09-24T11:00:05.000Z')
+})

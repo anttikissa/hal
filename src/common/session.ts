@@ -10,6 +10,9 @@ export interface SessionMeta {
 	model?: string
 	currentLog?: string
 	closedAt?: string
+	// When a user or the assistant last wrote to this session. Drives "Recent"
+	// ordering, so tool churn and info lines deliberately do not count.
+	activeAt?: string
 	forkedFrom?: string
 	spawnKind?: SpawnKind
 	attention?: 'new'

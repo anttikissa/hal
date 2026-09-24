@@ -35,17 +35,18 @@ function describe(session: SharedSessionInfo, working: boolean, summarizing: boo
 	return { markers, label: states.join(', ') || 'idle' }
 }
 
-// Sort choices offered in the session menu. 'activity' is the shortcut ranking
-// the rail always uses; the others are plain orderings a human can predict.
+// Sort choices offered in the session menu. 'status' is the shortcut ranking the
+// rail always uses: what the session is doing now, not when it last did it.
+// 'recent' is purely the clock. The rest are plain predictable orderings.
 const sortModes = [
-	{ id: 'activity', label: 'Activity' },
+	{ id: 'status', label: 'Status' },
 	{ id: 'recent', label: 'Recent' },
 	{ id: 'tab', label: 'Tab' },
 	{ id: 'name', label: 'Name' },
 ] as const
 type SortMode = typeof sortModes[number]['id']
 
-function ordered(sessions: SharedSessionInfo[], selected: string, working: Record<string, boolean>, summarizing: Record<string, boolean> = {}, mode: SortMode = 'activity'): SharedSessionInfo[] {
+function ordered(sessions: SharedSessionInfo[], selected: string, working: Record<string, boolean>, summarizing: Record<string, boolean> = {}, mode: SortMode = 'status'): SharedSessionInfo[] {
 	function priority(session: SharedSessionInfo): number {
 		if (session.id === selected) return 0
 		if (working[session.id] || summarizing[session.id]) return 1

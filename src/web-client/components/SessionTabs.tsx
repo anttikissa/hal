@@ -30,7 +30,7 @@ export function SessionTabs(props: SessionTabsProps) {
 	const [refreshError, setRefreshError] = createSignal(false)
 	const [query, setQuery] = createSignal('')
 	// An unknown stored value simply falls back to the default ordering.
-	const [sort, setSort] = createSignal((localStorage.getItem(SORT_KEY) ?? 'activity') as SortMode)
+	const [sort, setSort] = createSignal((localStorage.getItem(SORT_KEY) ?? 'status') as SortMode)
 	const [visibleCount, setVisibleCount] = createSignal(1)
 	// The rail is a shortcut strip, so it always ranks by activity; only the
 	// menu list follows the reader's chosen order.

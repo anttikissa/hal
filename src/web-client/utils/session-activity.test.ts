@@ -46,7 +46,7 @@ test('the session list can be sorted by recency, tab order, and name', () => {
 	expect(order('tab')).toEqual(['01-zulu', '02-alpha', '03-mike'])
 	// Unnamed sessions sort under their ID, and case must not split the alphabet.
 	expect(order('name')).toEqual(['03-mike', '02-alpha', '01-zulu'])
-	expect(order('activity')[0]).toBe('01-zulu')
+	expect(order('status')[0]).toBe('01-zulu')
 })
 
 test('background summarization is also a working shortcut', () => {

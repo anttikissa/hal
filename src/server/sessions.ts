@@ -339,7 +339,8 @@ function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, i
 		currentLog: meta.currentLog ?? DEFAULT_LOG,
 		continuation: continuation.actionForHistory(history) || undefined,
 		attention: meta.attention,
-		activeAt: history.at(-1)?.ts ?? meta.createdAt,
+		// Sessions written before activeAt existed still have their history.
+		activeAt: meta.activeAt ?? writtenAt(history) ?? meta.createdAt,
 	}
 }
 
@@ -378,12 +379,20 @@ function createSession(id: string, meta: SessionMeta): SessionMeta {
 	return liveMeta
 }
 
+// "Wrote something": a prompt or an assistant message. Tool noise, info lines
+// and turn bookkeeping do not make a session look freshly used.
+function writtenAt(entries: HistoryEntry[]): string | undefined {
+	return entries.findLast((entry) => entry.type === 'user' || entry.type === 'assistant')?.ts
+}
+
 function appendHistory(sessionId: string, entries: HistoryEntry[]): void {
 	if (entries.length === 0) return
 	ensureSessionDir(sessionId)
 	const logName = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG
 	const used = usedHistoryIds(sessionId, logName)
 	appendFileSync(historyLogPath(sessionId, logName), `${ensureEntryIds(entries, used).map(stringifyHistoryEntry).join('\n')}\n`)
+	const activeAt = writtenAt(entries)
+	if (activeAt) updateMeta(sessionId, { activeAt })
 }
 
 function rewriteCurrentHistory(sessionId: string, entries: HistoryEntry[]): { logName: string; entryCount: number } {
