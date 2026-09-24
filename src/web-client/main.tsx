@@ -152,8 +152,8 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	// Adopt the URL the page was opened with and follow Back/Forward from here on.
 	onSettled(() => router.start())
 
-	// Tool colors live in colors.ason, which the terminal watches and reloads.
-	// The browser polls the same file so editing it restyles both at once.
+	// The server emits colors.ason as CSS; polling keeps the web and terminal
+	// palettes in sync while either client is open.
 	onSettled(() => {
 		const style = document.createElement('style')
 		document.head.append(style)
@@ -235,7 +235,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			onCommand={onTabCommand}
 		/>
 		<Transcript items={transcript()} token={props.token} onAnswer={submitAnswer} />
-		<PromptComposer sessionId={selected()} location={webStatus.location(session())} context={webStatus.contextText(snapshot()?.meta)} disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
+		<PromptComposer sessionId={selected()} location={webStatus.location(session())} context={webStatus.contextText(snapshot()?.meta)} activity={webStatus.activity(!!sharedState().working[selected()], reconnecting(), !!activeQuestion())} disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
 	</>
 }
 

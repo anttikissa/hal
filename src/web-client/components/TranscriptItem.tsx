@@ -21,11 +21,11 @@ export function TranscriptItem(props: TranscriptItemProps) {
 		fallback={<Show
 			when={props.item.entry.type === 'tool' ? props.item.entry : undefined}
 			fallback={<article class={['TranscriptItem', props.item.entry.type]} id={webTranscript.blockId(props.item.entry) || undefined}>
-				<label>{transcriptTitles.label(props.item.entry)}
+				<header><strong>{transcriptTitles.label(props.item.entry)}</strong>
 					<Show when={router.blockHash(webTranscript.blockId(props.item.entry))}>
 						{(hash) => <a class="Transcript-blockLink" href={hash()}>{webTranscript.blockId(props.item.entry)}</a>}
 					</Show>
-				</label>
+				</header>
 				<div class="Markdown">
 					<Show when={'continuedAfter' in props.item.entry && props.item.entry.continuedAfter}>
 						<span class="TranscriptItem-interruption">{historyProjection.continuationText()} </span>

@@ -6,6 +6,7 @@ type PromptComposerProps = {
 	sessionId: string
 	location?: string
 	context?: string
+	activity: string
 	working?: boolean
 	disabled?: boolean
 	onSubmit: (text: string, queue: boolean) => Promise<boolean>
@@ -116,11 +117,10 @@ export function PromptComposer(props: PromptComposerProps) {
 		void attach(file)
 	}
 
-	// The execution details live beside the composer: the directory and model answer
-	// "where and with what will this prompt run", while context remains visible even
-	// when a long path has to truncate on a phone.
+	// Keep activity, execution location and context in the terminal-style status row.
 	return <form class={['PromptComposer', props.disabled && 'disabled']} aria-disabled={props.disabled ? 'true' : undefined} onSubmit={(event: SubmitEvent) => { event.preventDefault(); void submit() }}>
 		<div class="PromptComposer-status">
+			<span class={['PromptComposer-activity', { busy: !!props.working, warning: props.activity === 'Reconnecting…' }]} aria-live="polite"><span aria-hidden="true">●</span> {props.activity}</span>
 			<span class="PromptComposer-location">{props.location}</span>
 			<Show when={props.context}><span class="PromptComposer-context">{props.context}</span></Show>
 			<Show when={!draftDurable()}><span class="PromptComposer-draft-warning" role="status">Draft not saved — keep this page open</span></Show>
@@ -147,5 +147,6 @@ export function PromptComposer(props: PromptComposerProps) {
 			</Show>
 			<button type="submit" disabled={attaching() || props.disabled}>{sendLabel(!!props.working)}</button>
 		</div>
+		<div class="PromptComposer-help"><b>enter</b> send <b>shift+enter</b> newline</div>
 	</form>
 }

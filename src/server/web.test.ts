@@ -79,6 +79,14 @@ test('web declares a standalone home-screen app with install icons', async () =>
 	}
 })
 
+test('the public CSS asset resolves the current shared palette without authentication', async () => {
+	const response = web.appAsset('/colors.css')
+	expect(response?.headers.get('content-type')).toBe('text/css; charset=utf-8')
+	expect(response?.headers.get('cache-control')).toBe('no-store')
+	expect(response?.headers.get('x-content-type-options')).toBe('nosniff')
+	expect(await response?.text()).toContain('--assistant-fg: oklch(')
+})
+
 test('session snapshot exposes complete client bootstrap data', () => {
 	const originalReadState = ipc.readState
 	const originalLoadMeta = sessions.loadSessionMeta

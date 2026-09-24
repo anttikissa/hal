@@ -1,9 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap');
+:root { --page: color-mix(in oklch, var(--assistant-bg, black) 84%, var(--status-highlight, white)); --text: var(--status-highlight, white); --muted: var(--status-fg, gray); --focus: var(--status-highlight, white); }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-/* Small type is deliberate: a phone screen holds far more transcript this way,
-   and monospace stays legible down here. The composer opts back up to 16px
-   because iOS auto-zooms any focused input below that. */
-body { margin: 0; font: 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #111; color: #eee; overscroll-behavior-y: none; }
+/* The demo's monospace and scale; the input stays at least 16px to prevent iOS zoom. */
+body { margin: 0; font: 15px/1.5 'IBM Plex Mono', ui-monospace, Menlo, monospace; background: var(--page); color: var(--text); overscroll-behavior-y: none; }
 /* #app is the element main.tsx renders into, so the rows (tab strip, transcript,
    composer) are its direct flex children. The flex column must live here and not
    on body: a wrapper between the column and the rows makes them ordinary blocks,
@@ -18,7 +18,7 @@ body { margin: 0; font: 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consol
 #app { position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-height, 100dvh); overflow: hidden; display: flex; flex-direction: column; }
 button { touch-action: manipulation; }
 
-.SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer-controls > button, .PromptComposer > textarea { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
+.SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer-controls > button, .PromptComposer > textarea { font: inherit; padding: 8px; background: var(--info-bg, var(--page)); color: inherit; border: 1px solid var(--status-fg, var(--muted)); }
 .SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer-controls > button { cursor: pointer; }
 
 .AuthGate {
@@ -33,8 +33,8 @@ button { touch-action: manipulation; }
 	flex: 1;
 }
 .AuthGate > form > input, .AuthGate > form > button {
-	background: #181818;
-	border: 1px solid #444;
+	background: var(--info-bg, var(--page));
+	border: 1px solid var(--status-fg, var(--muted));
 	border-radius: .25rem;
 	color: inherit;
 	padding: .6rem;
@@ -51,26 +51,27 @@ button { touch-action: manipulation; }
 	align-items: flex-start;
 	gap: 8px;
 	padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
-	background: #111;
-	border-bottom: 1px solid #444;
+	background: var(--page);
+	border-bottom: 1px solid var(--status-fg, var(--muted));
 }
+.SessionTabs :is(.SessionTabs-menu, .SessionTabs-new), .SessionTabs-row > button, .SessionTabs-rail > button { background: transparent; border: 0; color: var(--tab-inactiveFg, var(--muted)); }
+.SessionTabs-row > button.selected, .SessionTabs-rail > button.selected { background: var(--user-bg, var(--page)); color: var(--tab-activeFg, var(--user-fg, var(--text))); }
 .SessionTabs > .SessionTabs-menu { flex: none; min-width: 44px; min-height: 44px; }
-.SessionTabs > .SessionTabs-title { display: none; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: center; color: #ccc; }
+.SessionTabs > .SessionTabs-title { display: none; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: center; color: var(--tab-activeFg, var(--text)); }
 .SessionTabs > .SessionTabs-rail { display: none; }
 .SessionTabs > .SessionTabs-row { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .SessionTabs-row > button { display: inline-flex; gap: 6px; align-items: baseline; text-align: left; max-width: 100%; }
-.SessionTabs-row > button.selected { background: #456; }
 .SessionTabs-activity { display: inline-flex; align-items: center; gap: 2px; }
 .SessionTabs-activity:empty { display: none; }
 .SessionTabs-marker { line-height: 1; }
-.SessionTabs-marker.running { color: #ffa156; }
-.SessionTabs-marker.background { color: #8fc5ed; }
-.SessionTabs-marker.attention { color: #e7bf6a; }
-.SessionTabs-marker.error { color: #e58282; }
+.SessionTabs-marker.running { color: var(--assistant-cursor, var(--assistant-fg, var(--text))); }
+.SessionTabs-marker.background { color: var(--tab-activeFg, var(--text)); }
+.SessionTabs-marker.attention { color: var(--tab-warningFg, var(--text)); }
+.SessionTabs-marker.error { color: var(--tab-errorFg, var(--text)); }
 .SessionTabs-marker.animated { animation: SessionTabs-pulse 1.2s ease-in-out infinite; }
 @keyframes SessionTabs-pulse { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .SessionTabs-marker.animated { animation: none; } }
-.SessionTabs-close { color: #99a; padding: 0 2px; }
+.SessionTabs-close { color: var(--muted); padding: 0 2px; }
 .SessionTabs-number { font-variant-numeric: tabular-nums; }
 .SessionTabs-new { min-width: 44px; min-height: 44px; }
 
@@ -79,7 +80,7 @@ button { touch-action: manipulation; }
 	.SessionTabs > .SessionTabs-rail { flex: 1; min-width: 0; display: flex; flex-wrap: nowrap; gap: 4px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
 	.SessionTabs-rail::-webkit-scrollbar { display: none; }
 	.SessionTabs-rail > button { flex: none; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; }
-	.SessionTabs-rail > button.selected { max-width: min(14rem, calc(100vw - 76px)); background: #29465e; border-color: #6b9fc6; }
+	.SessionTabs-rail > button.selected { max-width: min(14rem, calc(100vw - 76px)); background: var(--user-bg, var(--page)); color: var(--tab-activeFg, var(--text)); }
 	.SessionTabs-rail > button:not(.selected) > .SessionTabs-railName { display: none; }
 	.SessionTabs-railName { max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -116,7 +117,7 @@ button { touch-action: manipulation; }
 .SessionTabs.compact { flex-wrap: nowrap; align-items: center; }
 .SessionTabs.compact > .SessionTabs-row, .SessionTabs.compact > .SessionTabs-rail { display: none; }
 .SessionTabs.compact > .SessionTabs-menu { display: block; }
-.SessionTabs.compact > .SessionTabs-title { display: block; flex: 1; order: 0; color: #eee; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.SessionTabs.compact > .SessionTabs-title { display: block; flex: 1; order: 0; color: var(--tab-activeFg, var(--text)); font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
 
 /* Sessions scroll independently so occasional actions remain within reach. */
 .SessionTabs-sheet {
@@ -140,8 +141,8 @@ button { touch-action: manipulation; }
 	display: flex;
 	flex-direction: column;
 	padding: 8px;
-	background: #161616;
-	border: 1px solid #444;
+	background: var(--info-bg, var(--page));
+	border: 1px solid var(--status-fg, var(--muted));
 	border-radius: 12px;
 }
 .SessionTabs-panelHeading { flex: none; display: flex; align-items: center; justify-content: space-between; padding-left: 8px; }
@@ -151,24 +152,24 @@ button { touch-action: manipulation; }
 	display: flex;
 	min-height: 48px;
 	margin-bottom: 6px;
-	background: #222;
-	border: 1px solid #555;
+	background: var(--page);
+	border: 1px solid var(--status-fg, var(--muted));
 	border-radius: 8px;
 	overflow: hidden;
 }
-.SessionTabs-list > div.selected { background: #29465e; border-color: #6b9fc6; }
+.SessionTabs-list > div.selected { background: var(--user-bg, var(--page)); border-color: var(--user-fg, var(--text)); }
 .SessionTabs-panel button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .SessionTabs-list > div > .SessionTabs-open { flex: 1; min-width: 0; padding: 8px 12px; text-align: left; overflow-wrap: anywhere; }
-.SessionTabs-open > .SessionTabs-number { color: #9eb8ca; margin-right: 6px; }
-.SessionTabs-open > small { display: block; color: #9eb8ca; margin-top: 4px; }
+.SessionTabs-open > .SessionTabs-number { color: var(--tab-activeFg, var(--text)); margin-right: 6px; }
+.SessionTabs-open > small { display: block; color: var(--muted); margin-top: 4px; }
 /* Show the project for a useful session list; truncate deep paths rather than shrinking the close target. */
-.SessionTabs-open > .SessionTabs-cwd { display: block; overflow: hidden; color: #9eb8ca; text-overflow: ellipsis; white-space: nowrap; }
-.SessionTabs-list > div > .SessionTabs-close { flex: none; width: 48px; color: #d47a7a; border-left: 1px solid #555; }
-.SessionTabs-list > div.selected > .SessionTabs-close { border-color: #6b9fc6; }
-.SessionTabs-actions { flex: none; border-top: 1px solid #444; padding: 12px 8px 4px; }
+.SessionTabs-open > .SessionTabs-cwd { display: block; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.SessionTabs-list > div > .SessionTabs-close { flex: none; width: 48px; color: var(--error-fg, var(--text)); border-left: 1px solid var(--status-fg, var(--muted)); }
+.SessionTabs-list > div.selected > .SessionTabs-close { border-color: var(--user-fg, var(--text)); }
+.SessionTabs-actions { flex: none; border-top: 1px solid var(--status-fg, var(--muted)); padding: 12px 8px 4px; }
 .SessionTabs-actions > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.SessionTabs-actions button { min-height: 44px; padding: 8px 12px; background: #222; border: 1px solid #555; border-radius: 8px; }
-.SessionTabs-panel button:focus-visible { outline: 2px solid #8fc5ed; outline-offset: -2px; }
+.SessionTabs-actions button { min-height: 44px; padding: 8px 12px; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); border-radius: 8px; }
+.SessionTabs-panel button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 
 /* The only scrolling region. min-height:0 lets a flex child shrink below its
    content height, which is what allows it to scroll instead of pushing the
@@ -178,225 +179,184 @@ button { touch-action: manipulation; }
 	min-height: 0;
 	overflow-y: auto;
 	overscroll-behavior: contain;
-	width: min(100%, 900px);
+	width: min(100%, 772px);
 	margin: 0 auto;
-	padding: 12px;
+	padding: 16px;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
 /* The transcript owns Hal's cursor; the composer keeps its native editing caret. */
-.Transcript-cursor { min-height: 2lh; padding: 6px 0; color: #ffa156; }
-.Transcript-cursor.thinking { color: #97a7b7; }
+.Transcript-cursor { min-height: 2lh; padding: 6px 0; color: var(--assistant-cursorIdle, var(--assistant-fg, var(--text))); }
+.Transcript-cursor.thinking { color: var(--thinking-fg, var(--muted)); }
 .Transcript-cursor > span { display: block; width: 1ch; height: 1lh; background: currentColor; animation: Transcript-blink 1s steps(1, end) infinite; }
 @keyframes Transcript-blink { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .Transcript-cursor > span { animation: none; } }
-.TranscriptItem { padding: 10px 0; border-bottom: 1px solid #333; }
-.TranscriptItem.target, .QuestionBlock.target { outline: 2px solid #8fc5ed; outline-offset: 2px; background: #19232c; }
-.TranscriptItem.user { color: #9cf; }
-.TranscriptItem.assistant { color: #eee; }
-.TranscriptItem.log, .TranscriptItem.info { color: #aaa; }
-.TranscriptItem > label { font-size: .9em; color: #aaa; }
-.TranscriptItem > label > .Transcript-blockLink { margin-left: 1ch; color: #8fc5ed; text-decoration: none; }
-.TranscriptItem > label > .Transcript-blockLink:hover { text-decoration: underline; }
-.Transcript-blockLink:focus-visible { outline: 2px solid #8fc5ed; outline-offset: 2px; }
-.TranscriptItem .TranscriptItem-content { display: contents; }
-.TranscriptItem .TranscriptItem-part { display: contents; }
-.TranscriptItem .TranscriptItem-interruption { color: #aaa; }
-.TranscriptItem-paste { margin-top: 9px; padding: 8px; background: #161d24; border: 1px solid #354a59; border-left: 3px solid #8fc5ed; color: #d7e1ea; }
-.TranscriptItem-paste.target { outline: 2px solid #8fc5ed; outline-offset: 2px; }
+/* Colored rails are the demo's visual identity; history remains fully readable by default. */
+.TranscriptItem { margin: 0 0 10px; padding: 13px; background: var(--assistant-bg, black); color: var(--assistant-fg, var(--text)); border-left: 3px solid var(--assistant-fg, var(--text)); }
+.TranscriptItem.user { background: var(--user-bg, var(--page)); color: var(--user-fg, var(--text)); border-left-color: var(--user-fg, var(--text)); }
+.TranscriptItem.thinking { background: var(--thinking-bg, var(--assistant-bg, black)); color: var(--thinking-fg, var(--muted)); border-left-color: var(--thinking-fg, var(--muted)); }
+.TranscriptItem.log { background: var(--page); color: var(--log-fg, var(--muted)); border-left-color: var(--log-fg, var(--muted)); }
+.TranscriptItem.info { background: var(--info-bg, var(--page)); color: var(--info-fg, var(--text)); border-left-color: var(--info-fg, var(--text)); }
+.TranscriptItem.warning { background: var(--warning-bg, var(--page)); color: var(--warning-fg, var(--text)); border-left-color: var(--warning-fg, var(--text)); }
+.TranscriptItem.error { background: var(--error-bg, var(--page)); color: var(--error-fg, var(--text)); border-left-color: var(--error-fg, var(--text)); }
+.TranscriptItem.fork { background: var(--fork-bg, var(--page)); color: var(--fork-fg, var(--text)); border-left-color: var(--fork-fg, var(--text)); }
+.TranscriptItem.target, .QuestionBlock.target { outline: 1px solid var(--focus); outline-offset: 2px; }
+.TranscriptItem > header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 12px; }
+.TranscriptItem > header > strong { min-width: 0; font-weight: 600; }
+.TranscriptItem > header > .Transcript-blockLink { margin-left: auto; color: var(--muted); font-weight: 400; }
+.Transcript-blockLink:hover { color: var(--focus); }
+.Transcript-blockLink:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+.TranscriptItem .TranscriptItem-content, .TranscriptItem .TranscriptItem-part { display: contents; }
+.TranscriptItem .TranscriptItem-interruption { color: var(--muted); }
+.TranscriptItem-paste { margin-top: 9px; padding: 8px; background: var(--user-bg, var(--page)); border: 1px solid var(--user-fg, var(--text)); border-left: 3px solid var(--user-fg, var(--text)); color: var(--user-fg, var(--text)); }
+.TranscriptItem-paste.target { outline: 2px solid var(--focus); outline-offset: 2px; }
 .TranscriptItem-paste > summary { cursor: pointer; }
-.TranscriptItem-paste > button { float: right; margin: 8px 0; color: inherit; background: #202832; border: 1px solid #526579; cursor: pointer; }
-.TranscriptItem-paste > textarea { display: block; width: 100%; min-height: 10rem; max-height: 55vh; padding: 8px; clear: both; resize: vertical; color: #d7e1ea; background: #101214; border: 1px solid #354a59; font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; }
-.TranscriptItem-paste :is(summary, button, textarea):focus-visible { outline: 2px solid #8fc5ed; outline-offset: 2px; }
+.TranscriptItem-paste > button { float: right; margin: 8px 0; color: inherit; background: var(--page); border: 1px solid var(--user-fg, var(--text)); cursor: pointer; }
+.TranscriptItem-paste > textarea { display: block; width: 100%; min-height: 10rem; max-height: 55vh; padding: 8px; clear: both; resize: vertical; color: var(--user-fg, var(--text)); background: var(--page); border: 1px solid var(--user-fg, var(--text)); font: inherit; }
+.TranscriptItem-paste :is(summary, button, textarea):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-/* Tool cards are tiny command tickets, not log panes. Their colored left edge
-   identifies the kind of operation at a glance; the payload is sampled above,
-   so even a noisy grep cannot turn a phone transcript into a five-page scroll.
-   --tool-fg/--tool-bg come from colors.ason via utils/palette.ts, so a card is
-   tinted with the same oklch values the terminal paints its block with. The
-   fallbacks here only matter before the first poll answers. */
+/* Tool details stay inspectable; colors.ason supplies each tool's live palette. */
 .ToolCard {
-	--tool-fg: oklch(0.8 0.15 250);
-	--tool-bg: oklch(0.25 0.04 250);
-	margin: 8px 0;
-	padding: 8px 9px 7px;
+	--tool-fg: var(--info-fg, var(--text));
+	--tool-bg: var(--info-bg, var(--page));
+	position: relative;
+	margin: 0 0 10px;
+	padding: 13px;
 	background: var(--tool-bg);
-	border: 1px solid color-mix(in oklch, var(--tool-fg) 25%, transparent);
 	border-left: 3px solid var(--tool-fg);
-	border-radius: 6px;
-	color: #e5e9ed;
+	color: var(--tool-fg);
 	white-space: normal;
-	box-shadow: 0 1px 0 rgb(0 0 0 / .35);
 }
-.ToolCard.target { border-color: var(--tool-fg); box-shadow: 0 0 0 2px color-mix(in oklch, var(--tool-fg) 40%, transparent); }
+.ToolCard.target { outline: 1px solid var(--focus); outline-offset: 2px; }
 .ToolCard > details > summary { cursor: pointer; list-style: none; }
 .ToolCard > details > summary::-webkit-details-marker { display: none; }
-.ToolCard > details > summary > header { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.ToolCard > details > summary > header::before { content: '▸'; color: var(--tool-fg); }
+.ToolCard > details > summary > header { display: flex; align-items: baseline; gap: 8px; padding-right: 12ch; }
+.ToolCard > details > summary > header::before { content: '▸'; }
 .ToolCard > details[open] > summary > header::before { content: '▾'; }
 .ToolCard > details > summary > header > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ToolCard > details > summary > header > span { flex: none; margin-left: auto; color: #8d969f; font-size: .9em; }
+.ToolCard > details > summary > header > span { flex: none; margin-left: auto; color: var(--muted); }
 .ToolCard.running > details > summary > header > span { color: var(--tool-fg); }
-.ToolCard > details > summary > p, .ToolCard > details > summary > small { display: block; margin: 5px 0 0; color: #aeb7c1; }
-.ToolCard > details pre {
-	margin: 6px 0 0;
-	padding: 6px;
-	overflow: auto;
-	background: #101214;
-	border: 1px solid #292d32;
-	color: #cbd3da;
-	font: inherit;
-	line-height: 1.4;
-	white-space: pre-wrap;
-	overflow-wrap: anywhere;
-}
+.ToolCard > details > summary > p, .ToolCard > details > summary > small { display: block; margin: 8px 0 0; color: var(--text); }
+.ToolCard > details pre { margin: 8px 0 0; overflow: auto; color: inherit; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ToolCard > details > summary > pre { max-height: 8.4em; overflow: hidden; }
 .ToolCard > details[open] > summary > pre, .ToolCard > details[open] > summary > small { display: none; }
-.ToolCard > details > summary > small { color: #818b95; }
-.ToolCard > details > summary:focus-visible, .ToolCard button:focus-visible, .ToolCard a:focus-visible { outline: 2px solid #8fc5ed; outline-offset: 2px; }
-.ToolCard-link { display: inline-block; margin-top: 9px; color: #8fc5ed; }
-.ToolCard-section { margin-top: 10px; }
-.ToolCard-section > button { float: right; color: #cbd3da; background: #202832; border: 1px solid #526579; cursor: pointer; }
+.ToolCard > details > summary > small { color: var(--muted); }
+.ToolCard > details > summary:focus-visible, .ToolCard button:focus-visible, .ToolCard a:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+.ToolCard > .ToolCard-link { position: absolute; top: 13px; right: 13px; color: var(--muted); }
+.ToolCard-section { margin-top: 10px; color: var(--text); }
+.ToolCard-section > button { float: right; color: var(--text); background: transparent; border: 1px solid var(--muted); cursor: pointer; }
 .ToolCard-section > pre { max-height: 65vh; clear: both; }
 
 /* Markdown is renderer-owned HTML from utils/markdown.ts; source text is
    escaped before these fixed tags are inserted. */
 .Markdown { white-space: pre-wrap; }
 .Markdown :is(b, i) { color: inherit; }
-.Markdown code { padding: .1em .3em; background: #20242a; border-radius: 3px; color: #d7e1ea; }
-.Markdown pre { margin: 7px 0; padding: 8px; overflow: auto; background: #101214; border: 1px solid #30343a; white-space: pre; }
+.Markdown code { padding: .1em .3em; background: var(--assistant-linkBg, var(--info-bg, var(--page))); border-radius: 3px; color: var(--assistant-code, var(--text)); }
+.Markdown pre { margin: 7px 0; padding: 8px; overflow: auto; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); white-space: pre; }
 .Markdown pre > code { padding: 0; background: transparent; }
-.Markdown a { color: #8fc5ed; text-decoration-color: #52758e; text-underline-offset: .18em; }
-.Markdown a:focus-visible { outline: 2px solid #8fc5ed; outline-offset: 2px; }
+.Markdown a { color: var(--assistant-linkFg, var(--user-fg, var(--text))); text-decoration-color: currentColor; text-underline-offset: .18em; }
+.TranscriptItem.user .Markdown :is(code, a) { color: var(--user-fg, var(--text)); }
+.TranscriptItem.thinking .Markdown :is(code, a) { color: var(--thinking-code, var(--thinking-fg, var(--text))); }
+.Markdown a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .Markdown table { display: block; max-width: 100%; margin: 7px 0; overflow-x: auto; border-collapse: collapse; white-space: nowrap; }
-.Markdown th, .Markdown td { padding: 4px 6px; border: 1px solid #3b4148; text-align: left; }
-.Markdown th { color: #c9d8e6; background: #1c2229; }
+.Markdown th, .Markdown td { padding: 4px 6px; border: 1px solid var(--status-fg, var(--muted)); text-align: left; }
+.Markdown th { color: var(--text); background: var(--info-bg, var(--page)); }
 
 /* A waiting question is an inline gate in the transcript, not a modal. The blue
    left rail is the one deliberate signature: it keeps approval in the timeline
    while making the single actionable row unmistakable. */
-.QuestionBlock {
-	margin: 8px 0;
-	padding: 9px 10px;
-	background: #181818;
-	border: 1px solid #3d3d3d;
-	border-left: 3px solid #66737c;
-	border-radius: 4px;
-	white-space: normal;
-}
-.QuestionBlock.active { padding: 12px; background: #182027; border-color: #52758e; border-left-color: #8fc5ed; }
+.QuestionBlock { margin: 10px 0; padding: 13px; background: var(--info-bg, var(--page)); border-left: 3px solid var(--info-fg, var(--text)); white-space: normal; }
+.QuestionBlock.active { background: var(--user-bg, var(--page)); border-left-color: var(--user-fg, var(--text)); }
 .QuestionBlock > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .QuestionBlock > header > strong { font-size: 1.05em; }
-.QuestionBlock > header > span { flex: none; color: #9eb8ca; font-size: .9em; }
-.QuestionBlock > details { margin-top: 8px; color: #bbb; }
-.QuestionBlock > details > summary { cursor: pointer; color: #9eb8ca; }
-.QuestionBlock > details > pre { max-height: 12rem; margin: 7px 0 0; padding: 8px; overflow: auto; background: #111; border: 1px solid #333; white-space: pre-wrap; overflow-wrap: anywhere; }
+.QuestionBlock > header > span { flex: none; color: var(--user-fg, var(--text)); font-size: .9em; }
+.QuestionBlock > details { margin-top: 8px; color: var(--muted); }
+.QuestionBlock > details > summary { cursor: pointer; color: var(--user-fg, var(--text)); }
+.QuestionBlock > details > pre { max-height: 12rem; margin: 7px 0 0; padding: 8px; overflow: auto; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); white-space: pre-wrap; overflow-wrap: anywhere; }
 .QuestionBlock > fieldset { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; border: 0; }
-.QuestionBlock > fieldset > legend { margin-bottom: 8px; color: #aaa; }
-.QuestionBlock > fieldset > button {
-	min-height: 44px;
-	padding: 8px 10px;
-	font: inherit;
-	text-align: left;
-	color: inherit;
-	background: #222b31;
-	border: 1px solid #596d79;
-	border-radius: 4px;
-	cursor: pointer;
-}
-.QuestionBlock > fieldset > button:first-of-type { border-color: #8a9a7a; background: #222a20; }
-.QuestionBlock > fieldset > button > span { display: block; margin-top: 3px; color: #aaa; font-size: .9em; }
+.QuestionBlock > fieldset > legend { margin-bottom: 8px; color: var(--muted); }
+.QuestionBlock > fieldset > button { min-height: 44px; padding: 8px 10px; font: inherit; text-align: left; color: inherit; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); cursor: pointer; }
+.QuestionBlock > fieldset > button:first-of-type { border-color: var(--user-fg, var(--text)); }
+.QuestionBlock > fieldset > button > span { display: block; margin-top: 3px; color: var(--muted); font-size: .9em; }
 .QuestionBlock > form { display: grid; grid-template-columns: 1fr auto; gap: 7px; margin-top: 12px; }
-.QuestionBlock > form > label { grid-column: 1 / -1; color: #aaa; }
-.QuestionBlock > form > textarea, .QuestionBlock > form > input {
-	min-width: 0;
-	padding: 9px;
-	font: inherit;
-	font-size: 16px;
-	line-height: 1.4;
-	color: inherit;
-	background: #111;
-	border: 1px solid #596d79;
-	border-radius: 4px;
-}
+.QuestionBlock > form > label { grid-column: 1 / -1; color: var(--muted); }
+.QuestionBlock > form > textarea, .QuestionBlock > form > input { min-width: 0; padding: 9px; font: inherit; font-size: 16px; line-height: 1.4; color: inherit; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); }
 .QuestionBlock > form > textarea { grid-column: 1 / -1; resize: vertical; }
-.QuestionBlock > form > button {
-	min-width: 7rem;
-	padding: 9px;
-	font: inherit;
-	color: inherit;
-	background: #29465e;
-	border: 1px solid #6b9fc6;
-	border-radius: 4px;
-	cursor: pointer;
-}
-.QuestionBlock > form > small { align-self: center; color: #999; }
-.QuestionBlock > form > small.exceeded, .QuestionBlock-error { color: #e78d8d; }
-.QuestionBlock-answer { margin: 6px 0 0; overflow: hidden; color: #aaa; text-overflow: ellipsis; white-space: nowrap; }
+.QuestionBlock > form > button { min-width: 7rem; padding: 9px; font: inherit; color: var(--user-fg, var(--text)); background: var(--user-bg, var(--page)); border: 1px solid var(--user-fg, var(--text)); cursor: pointer; }
+.QuestionBlock > form > small { align-self: center; color: var(--muted); }
+.QuestionBlock > form > small.exceeded, .QuestionBlock-error { color: var(--error-fg, var(--text)); }
+.QuestionBlock-answer { margin: 6px 0 0; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
 .QuestionBlock-error { margin: 8px 0 0; }
-.QuestionBlock button:focus-visible, .QuestionBlock input:focus-visible, .QuestionBlock textarea:focus-visible, .QuestionBlock summary:focus-visible { outline: 2px solid #8fc5ed; outline-offset: 2px; }
+.QuestionBlock button:focus-visible, .QuestionBlock input:focus-visible, .QuestionBlock textarea:focus-visible, .QuestionBlock summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .QuestionBlock button:disabled, .QuestionBlock input:disabled, .QuestionBlock textarea:disabled { cursor: default; opacity: .55; }
 
 .PromptComposer {
 	flex: none;
 	flex-wrap: wrap;
-	width: min(100%, 900px);
+	width: min(100%, 772px);
 	margin: 0 auto;
 	display: flex;
 	align-items: stretch;
-	gap: 8px;
-	padding: 12px;
-	padding-bottom: calc(12px + env(safe-area-inset-bottom));
-	background: #111;
-	border-top: 1px solid #444;
+	padding: 8px 16px calc(10px + env(safe-area-inset-bottom));
+	background: var(--page);
+	border-top: 1px solid var(--status-fg, var(--muted));
 }
-/* Execution details get their own row above the input. The context is kept at
-   the trailing edge so it remains visible while an unusually long path truncates. */
-.PromptComposer > .PromptComposer-status { display: flex; flex: 1 0 100%; gap: 8px; min-width: 0; }
-.PromptComposer-status > .PromptComposer-location { flex: 1; min-width: 0; overflow: hidden; color: #9eb8ca; text-overflow: ellipsis; white-space: nowrap; }
-.PromptComposer-status > .PromptComposer-context { flex: none; color: #d6c08a; white-space: nowrap; }
-.PromptComposer-status > .PromptComposer-draft-warning { flex: none; color: #ff9b8f; font-weight: 700; }
+/* Execution context still truncates rather than pushing the action off a narrow screen. */
+.PromptComposer > .PromptComposer-status { display: flex; flex: 1 0 100%; align-items: baseline; gap: 8px; min-width: 0; padding-bottom: 8px; color: var(--status-fg, var(--muted)); font-size: 12px; }
+.PromptComposer-activity { flex: none; color: var(--tab-doneFg, var(--text)); }
+.PromptComposer-activity.busy { color: var(--assistant-cursor, var(--assistant-fg, var(--text))); }
+.PromptComposer-activity.warning { color: var(--warning-fg, var(--text)); }
+.PromptComposer-status > .PromptComposer-location { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.PromptComposer-status > .PromptComposer-context { flex: none; color: var(--status-highlight, var(--text)); white-space: nowrap; }
+.PromptComposer-status > .PromptComposer-draft-warning { flex: none; color: var(--error-fg, var(--text)); font-weight: 600; }
 .PromptComposer > textarea {
 	flex: 1;
 	min-width: 0;
 	min-height: 44px;
 	max-height: 168px;
 	resize: none;
-	line-height: 21px;
-	/* Center one line in 44px: (height - two borders - line-height) / 2. */
-	padding-block: 10.5px;
-	font-size: 16px; /* This declared minimum prevents iOS from zooming the page. */
-	font-size-adjust: .48; /* Reduce the visible x-height without crossing that minimum. */
+	line-height: 24px;
+	padding: 10px 12px;
+	font-size: 16px; /* iOS must not zoom when the composer receives focus. */
+	color: var(--user-fg, var(--text));
+	background: var(--input-bg, var(--user-bg, var(--page)));
+	border: 0;
+	border-left: 3px solid var(--user-fg, var(--text));
+	outline: none;
+	caret-color: var(--input-cursor, var(--user-fg, var(--text)));
 }
-/* Native iOS textarea decoration can paint an inset edge even with our border.
-   Reset both control types so flex stretch aligns the visible border boxes too. */
+.PromptComposer > textarea::placeholder { color: var(--user-fg, var(--text)); opacity: .65; }
+.PromptComposer > textarea:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+/* Native iOS decoration and the emoji line box must not enlarge the input row. */
 .PromptComposer > textarea, .PromptComposer-controls > button { appearance: none; margin: 0; border-radius: 0; box-shadow: none; }
-.PromptComposer > .PromptComposer-controls { display: flex; align-items: stretch; gap: 8px; }
-/* Apple Color Emoji's normal line box can exceed the short input's 44px.
-   Bound the line box, not the button height: tall drafts must still stretch it. */
-.PromptComposer-controls > button { min-width: 44px; min-height: 44px; line-height: 21px; }
+.PromptComposer > .PromptComposer-controls { display: flex; align-items: stretch; background: var(--input-bg, var(--user-bg, var(--page))); }
+.PromptComposer-controls > button { min-width: 44px; min-height: 44px; padding: 8px; border: 0; background: transparent; color: var(--user-fg, var(--text)); line-height: 24px; font-weight: 600; }
+.PromptComposer-controls > button[type=submit] { border-left: 1px solid var(--user-fg, var(--text)); }
 .PromptComposer-controls > .PromptComposer-attach { font-size: 20px; }
-.PromptComposer.disabled { opacity: .42; filter: grayscale(.75); }
-.PromptComposer.disabled > textarea { color: #aaa; }
+.PromptComposer > .PromptComposer-help { flex: 1 0 100%; padding-top: 7px; color: var(--help-description, var(--muted)); font-size: 12px; }
+.PromptComposer-help > b { color: var(--help-key, var(--text)); font-weight: 600; }
+@media (pointer: coarse) { .PromptComposer-help { display: none; } }
+.PromptComposer.disabled { opacity: .55; }
+.PromptComposer.disabled > textarea { color: var(--muted); }
 
 /* Status accounts stack instead of forcing a wide terminal table onto a phone.
    Reuse transcript colors/type; slim quota meters are the only visual accent. */
-.UsageAccounts { white-space: normal; margin: 8px 0; color: #c9d8e6; }
-.UsageAccounts > article { padding: 10px 0; border-top: 1px solid #3b4148; }
+.UsageAccounts { white-space: normal; margin: 8px 0; color: var(--text); }
+.UsageAccounts > article { padding: 10px 0; border-top: 1px solid var(--status-fg, var(--muted)); }
 .UsageAccounts header { display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
-.UsageAccounts header > small { color: #aeb7c1; font-size: .9em; }
-.UsageAccounts header > strong { color: #eee; }
+.UsageAccounts header > small { color: var(--muted); font-size: .9em; }
+.UsageAccounts header > strong { color: var(--text); }
 .UsageAccounts dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 10px 0 0; }
 .UsageAccounts dl > div { min-width: 0; }
 .UsageAccounts dt { margin-bottom: 4px; font-weight: bold; }
-.UsageAccounts dd { margin: 0; overflow-wrap: anywhere; line-height: 1.5; color: #aeb7c1; }
-.UsageAccounts meter { display: block; width: 100%; height: 6px; margin: 5px 0; background: #1c2229; border: 0; border-radius: 2px; appearance: none; }
+.UsageAccounts dd { margin: 0; overflow-wrap: anywhere; line-height: 1.5; color: var(--muted); }
+.UsageAccounts meter { display: block; width: 100%; height: 6px; margin: 5px 0; background: var(--info-bg, var(--page)); border: 0; border-radius: 2px; appearance: none; }
 .UsageAccounts meter + br { display: none; }
-.UsageAccounts meter::-webkit-meter-bar { background: #1c2229; border: 0; border-radius: 2px; }
-.UsageAccounts meter::-webkit-meter-optimum-value { background: #8fc5ed; }
-.UsageAccounts meter::-moz-meter-bar { background: #8fc5ed; }
+.UsageAccounts meter::-webkit-meter-bar { background: var(--info-bg, var(--page)); border: 0; border-radius: 2px; }
+.UsageAccounts meter::-webkit-meter-optimum-value { background: var(--user-fg, var(--text)); }
+.UsageAccounts meter::-moz-meter-bar { background: var(--user-fg, var(--text)); }
 
-.UsageAccounts dd > strong { display: block; color: #eee; font-weight: 600; }
+.UsageAccounts dd > strong { display: block; color: var(--text); font-weight: 600; }
 .UsageAccounts dd > small { display: block; font-size: .9em; }
 @media (min-width: 700px) {
 	.UsageAccounts > article { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 24px; align-items: start; }

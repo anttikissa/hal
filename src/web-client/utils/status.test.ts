@@ -24,3 +24,10 @@ test('pairs the directory with the model, as the terminal status line does', () 
 	expect(webStatus.location({ id: '05-fit', cwd: '/root/hal' })).toBe('/root/hal')
 	expect(webStatus.location(undefined)).toBe('')
 })
+
+test('composer activity reports the useful next action', () => {
+	expect(webStatus.activity(false, false, false)).toBe('Idle')
+	expect(webStatus.activity(true, false, false)).toBe('Working…')
+	expect(webStatus.activity(false, true, false)).toBe('Reconnecting…')
+	expect(webStatus.activity(false, false, true)).toBe('Waiting for answer')
+})

@@ -124,10 +124,9 @@ test('the transcript is the only scrolling row', () => {
 	expect(declaration('.PromptComposer', 'flex')).toBe('none')
 })
 
-test('prompt type is compact without triggering iOS focus zoom', () => {
+test('prompt type stays readable without triggering iOS focus zoom', () => {
 	expect(declaration('.PromptComposer > textarea', 'font-size')).toBe('16px')
-	expect(declaration('.PromptComposer > textarea', 'font-size-adjust')).toBe('.48')
-	expect(declaration('.PromptComposer > textarea', 'line-height')).toBe('21px')
+	expect(declaration('.PromptComposer > textarea', 'line-height')).toBe('24px')
 })
 
 test('composer controls use CSS borders rather than native control decoration', () => {
@@ -143,18 +142,17 @@ test('composer controls use CSS borders rather than native control decoration', 
 test('short composer buttons fit within the same 44px minimum as the textarea', () => {
 	const buttons = '.PromptComposer-controls > button'
 	expect(declaration(buttons, 'min-height')).toBe(declaration('.PromptComposer > textarea', 'min-height'))
-	// An explicit line box prevents Apple Color Emoji metrics from making the
-	// attachment button taller than the input: 21 + 2*8 padding + 2*1 border < 44.
-	expect(declaration(buttons, 'line-height')).toBe('21px')
+	// An explicit 24px line box bounds Apple Color Emoji within the touch target.
+	expect(declaration(buttons, 'line-height')).toBe('24px')
 })
 
 test('single-line prompt text has equal space above and below its line box', () => {
 	const textarea = '.PromptComposer > textarea'
 	const height = parseFloat(declaration(textarea, 'min-height')!)
 	const line = parseFloat(declaration(textarea, 'line-height')!)
-	const padding = parseFloat(declaration(textarea, 'padding-block')!)
-	// Both 1px borders are inside the shared border-box height.
-	expect(line + 2 * padding + 2).toBe(height)
+	const padding = parseFloat(declaration(textarea, 'padding')!)
+	// The left rail is the only border: top and bottom have equal 10px padding.
+	expect(line + 2 * padding).toBe(height)
 })
 
 test('phone tabs stay in one compact scrollable row', () => {
@@ -196,7 +194,7 @@ test('session menu reveals the current tab and keeps actions outside the scrolli
 	expect(source).toContain('<Show when={appActions.isInstalled()}>')
 	expect(declaration('.SessionTabs-list', 'overflow-y')).toBe('auto')
 	expect(declaration('.SessionTabs-actions', 'flex')).toBe('none')
-	expect(declaration('.SessionTabs-list > div.selected', 'background')).toBe('#29465e')
+	expect(declaration('.SessionTabs-list > div.selected', 'background')).toBe('var(--user-bg, var(--page))')
 })
 
 

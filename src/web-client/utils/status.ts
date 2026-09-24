@@ -30,4 +30,10 @@ function text(session: SharedSessionInfo | undefined): string {
 	return webStatus.sessionText(session)
 }
 
-export const webStatus = { text, location, contextText, sessionText }
+function activity(working: boolean, reconnecting: boolean, waiting: boolean): string {
+	if (reconnecting) return 'Reconnecting…'
+	if (waiting) return 'Waiting for answer'
+	return working ? 'Working…' : 'Idle'
+}
+
+export const webStatus = { text, location, contextText, sessionText, activity }

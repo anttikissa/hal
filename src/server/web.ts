@@ -1,11 +1,13 @@
 // Local web transport. Browser assets are bundled lazily, so normal startup
 // does not pay for the web client.
 
+import { readFileSync } from 'fs'
 import type { Command } from '../common/protocol.ts'
 import type { ClientBootstrap, ClientSessionSnapshot } from '../common/snapshots.ts'
 import type { WebClientMessage, WebServerMessage } from '../common/web.ts'
 import { webProtocol } from '../common/web.ts'
 import { historyIds } from '../common/history-ids.ts'
+import { colorCss } from '../common/color-css.ts'
 import { blob } from './session/blob.ts'
 import { ipc } from './file-ipc.ts'
 import { runtime } from './runtime.ts'
@@ -83,12 +85,10 @@ async function handleUpdateRequest(request: Request): Promise<Response> {
 	return new Response('Updating\n')
 }
 
-// Static files served verbatim. colors.ason lives at the Hal root and is the
-// terminal's palette too: the browser polls it and builds its own CSS, so both
-// clients follow one file and the server needs no color code at all.
+// Static app assets and the public palette. The generated CSS is read afresh
+// on each request so edits to colors.ason reach the browser without restarting.
 const appAssets: Record<string, [file: string, type: string]> = {
 	'/styles.css': ['styles.css', 'text/css; charset=utf-8'],
-	'/colors.ason': ['../../colors.ason', 'text/plain; charset=utf-8'],
 	'/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
 	'/icon.svg': ['icon.svg', 'image/svg+xml'],
 	'/icons/icon-180.png': ['icons/icon-180.png', 'image/png'],
@@ -97,6 +97,7 @@ const appAssets: Record<string, [file: string, type: string]> = {
 }
 
 function appAsset(pathname: string): Response | null {
+	if (pathname === '/colors.css') return new Response(colorCss.css(readFileSync(`${import.meta.dir}/../../colors.ason`, 'utf8')), { headers: { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
 	const asset = web.appAssets[pathname]
 	if (!asset) return null
 	return new Response(Bun.file(`${import.meta.dir}/../web-client/${asset[0]}`), { headers: { 'content-type': asset[1], 'cache-control': 'no-store' } })
