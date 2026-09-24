@@ -22,6 +22,11 @@ function blockId(entry: TranscriptEntry): string {
 	return 'blobId' in entry && entry.blobId || entry.id || ''
 }
 
+// Persisted IDs survive fresh server snapshots; unsaved live rows have no stable key yet.
+function rowKey(item: RenderedTranscriptItem): string | TranscriptEntry {
+	return item.entry.id || ('blobId' in item.entry && item.entry.blobId) || item.entry
+}
+
 function valueText(value: unknown): string {
 	if (typeof value === 'string') return value
 	if (value === undefined) return ''
@@ -141,4 +146,4 @@ function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[]
 	return result
 }
 
-export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker, blockId }
+export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker, blockId, rowKey }

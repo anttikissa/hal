@@ -1,7 +1,7 @@
 import { createEffect, For, onSettled } from 'solid-js'
 import { router } from '../router.ts'
 import type { AnswerValue } from '../../common/history.ts'
-import type { RenderedTranscriptItem } from '../utils/transcript.ts'
+import { webTranscript, type RenderedTranscriptItem } from '../utils/transcript.ts'
 import { webScroll } from '../utils/scroll.ts'
 import { TranscriptItem } from './TranscriptItem.tsx'
 
@@ -60,6 +60,6 @@ export function Transcript(props: TranscriptProps) {
 		},
 	)
 	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateAutoFollow}>
-		<For each={props.items}>{(item) => <TranscriptItem item={item} token={props.token} onAnswer={props.onAnswer} />}</For>
+		<For each={props.items} keyed={webTranscript.rowKey}>{(item) => <TranscriptItem item={item()} token={props.token} onAnswer={props.onAnswer} />}</For>
 	</main>
 }

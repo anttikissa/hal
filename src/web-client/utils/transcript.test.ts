@@ -36,6 +36,14 @@ test('transcript anchors use each visible short block id', () => {
 	expect(webTranscript.blockId({ type: 'tool', blobId: '0403ru-pku', name: 'bash' })).toBe('0403ru-pku')
 	expect(webTranscript.blockId({ type: 'thinking', blobId: '0403ru-xyz', text: 'hmm' })).toBe('0403ru-xyz')
 })
+
+test('saved rows keep their identity across replacement snapshots', () => {
+	const saved = { entry: { type: 'tool' as const, id: '000003-pku', name: 'bash' }, text: 'first' }
+	const replacement = { entry: { ...saved.entry }, text: 'updated' }
+	expect(webTranscript.rowKey(saved)).toBe(webTranscript.rowKey(replacement))
+	const live = { entry: { type: 'tool' as const, name: 'bash' }, text: 'running' }
+	expect(webTranscript.rowKey(live)).not.toBe(webTranscript.rowKey({ entry: { ...live.entry }, text: 'running' }))
+})
 test('persisted user messages keep every uploaded image reference visible', () => {
 	const result = webTranscript.items({
 		session: { id: 's1', cwd: '/tmp' },
