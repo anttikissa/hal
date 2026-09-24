@@ -126,6 +126,8 @@ if (parsedArgs.remoteHost !== undefined) {
 		const { webConnection } = await import('./client/web-connection.ts')
 		const { remoteAuth } = await import('./client/remote-auth.ts')
 		remoteHost = webConnection.normalizeHost(remoteHost)
+		// The bootstrap can take seconds to arrive; the first TUI draw clears this line.
+		process.stderr.write(`Connecting to ${remoteHost}...\n`)
 		const rememberedToken = saved.remoteHost === remoteHost ? saved.remoteAuthToken : null
 		remoteAuthToken = await remoteAuth.connect(remoteHost, rememberedToken, remoteAbort.signal)
 	} catch (error) {
@@ -133,7 +135,6 @@ if (parsedArgs.remoteHost !== undefined) {
 		process.exit(1)
 	}
 	clientPersistence.save({ ...saved, remoteHost, remoteAuthToken })
-	process.stderr.write(`Connected to ${remoteHost}.\n`)
 	client.state.role = 'client'
 	process.on('exit', () => remoteAbort.abort())
 	process.on('SIGTERM', () => {
