@@ -39,3 +39,4 @@ Random ideas, in no particular order
 - `tests/perf.test.ts` “startup summary appears in output” is flaky under the full parallel suite: reading the spawned process output can exceed Bun’s 5-second test timeout. Replace its fixed sleep/process timing with deterministic startup observation, then re-enable it.
 - Make a help text into the intro model (after the actual model is set) - it should tell about /help, /keys, tabs, and maybe a special /features or something
 - When connected to remote and remote stops and you enter reconnecting more, you can write prompts and they appear as sent. But they disappear upon reconnect as if nothing had happened
+- Web: ws messages are HUGE. Need to be smaller - hard to debug and copy paste messages around. WS not meant for that
