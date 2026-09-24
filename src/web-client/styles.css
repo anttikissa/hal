@@ -18,8 +18,8 @@ body { margin: 0; font: 15px/1.5 'IBM Plex Mono', ui-monospace, Menlo, monospace
 #app { position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-height, 100dvh); overflow: hidden; display: flex; flex-direction: column; }
 button { touch-action: manipulation; }
 
-.SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer-controls > button, .PromptComposer > textarea { font: inherit; padding: 8px; background: var(--info-bg, var(--page)); color: inherit; border: 1px solid var(--status-fg, var(--muted)); }
-.SessionTabs > button, .SessionTabs-row > button, .SessionTabs-rail > button, .PromptComposer-controls > button { cursor: pointer; }
+.SessionTabs > button, .SessionTabs-rail > button, .PromptComposer-controls > button, .PromptComposer > textarea { font: inherit; padding: 8px; background: var(--info-bg, var(--page)); color: inherit; border: 1px solid var(--status-fg, var(--muted)); }
+.SessionTabs > button, .SessionTabs-rail > button, .PromptComposer-controls > button { cursor: pointer; }
 
 .AuthGate {
 	max-width: 36rem;
@@ -42,25 +42,26 @@ button { touch-action: manipulation; }
 }
 .AuthGate > form > button { cursor: pointer; }
 
-/* The header is a tab map, not just a menu. Desktop keeps full wrapping tabs;
-   phone uses a single horizontally scrollable rail, expanding the selected one
-   to reveal its name without letting a large session set consume the screen. */
+/* Two lines like the demo: current name above a numbered strip. Only the buttons
+   that fit are mounted, so hidden sessions cannot steal keyboard focus. */
 .SessionTabs {
 	flex: none;
-	display: flex;
-	align-items: flex-start;
-	gap: 8px;
+	display: grid;
+	grid-template-columns: 44px minmax(0, 1fr) 44px;
+	gap: 4px 8px;
 	padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
 	background: var(--page);
 	border-bottom: 1px solid var(--status-fg, var(--muted));
 }
-.SessionTabs :is(.SessionTabs-menu, .SessionTabs-new), .SessionTabs-row > button, .SessionTabs-rail > button { background: transparent; border: 0; color: var(--tab-inactiveFg, var(--muted)); }
-.SessionTabs-row > button.selected, .SessionTabs-rail > button.selected { background: var(--user-bg, var(--page)); color: var(--tab-activeFg, var(--user-fg, var(--text))); }
-.SessionTabs > .SessionTabs-menu { flex: none; min-width: 44px; min-height: 44px; }
-.SessionTabs > .SessionTabs-title { display: none; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: center; color: var(--tab-activeFg, var(--text)); }
-.SessionTabs > .SessionTabs-rail { display: none; }
-.SessionTabs > .SessionTabs-row { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
-.SessionTabs-row > button { display: inline-flex; gap: 6px; align-items: baseline; text-align: left; max-width: 100%; }
+.SessionTabs > .SessionTabs-title { min-width: 0; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tab-activeFg, var(--text)); font-weight: 600; }
+.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { width: 44px; height: 44px; padding: 0; background: transparent; border: 0; color: var(--tab-activeFg, var(--text)); }
+.SessionTabs > .SessionTabs-rail { grid-column: 1 / -1; min-width: 0; display: flex; align-items: center; gap: 4px; height: 44px; overflow: hidden; }
+.SessionTabs-prefix { flex: 0 0 52px; color: var(--status-fg, var(--muted)); }
+.SessionTabs-rail > button { flex: none; width: 56px; height: 44px; padding: 0 2px; text-align: center; background: transparent; border: 0; color: var(--tab-inactiveFg, var(--muted)); }
+.SessionTabs-rail > button.selected { color: var(--tab-activeFg, var(--text)); font-weight: 600; }
+.SessionTabs-rail > button.selected > .SessionTabs-number::before { content: '['; }
+.SessionTabs-rail > button.selected > .SessionTabs-number::after { content: ']'; }
+.SessionTabs > button:focus-visible, .SessionTabs-rail > button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .SessionTabs-activity { display: inline-flex; align-items: center; gap: 2px; }
 .SessionTabs-activity:empty { display: none; }
 .SessionTabs-marker { line-height: 1; }
@@ -76,14 +77,6 @@ button { touch-action: manipulation; }
 .SessionTabs-new { min-width: 44px; min-height: 44px; }
 
 @media (max-width: 48em) {
-	.SessionTabs > .SessionTabs-row, .SessionTabs > .SessionTabs-title { display: none; }
-	.SessionTabs > .SessionTabs-rail { flex: 1; min-width: 0; display: flex; flex-wrap: nowrap; gap: 4px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
-	.SessionTabs-rail::-webkit-scrollbar { display: none; }
-	.SessionTabs-rail > button { flex: none; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; }
-	.SessionTabs-rail > button.selected { max-width: min(14rem, calc(100vw - 76px)); background: var(--user-bg, var(--page)); color: var(--tab-activeFg, var(--text)); }
-	.SessionTabs-rail > button:not(.selected) > .SessionTabs-railName { display: none; }
-	.SessionTabs-railName { max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 	/* Short drafts leave room to read; long drafts shrink the transcript first.
 	   Keep the existing scroll regions, not a duplicate conversation preview. */
 	#app:has(> .PromptComposer > textarea:focus) > .Transcript { min-height: min(64px, 15%); }
@@ -106,19 +99,6 @@ button { touch-action: manipulation; }
 	}
 	#app:has(> .PromptComposer > textarea:focus) > .PromptComposer > .PromptComposer-controls { flex: none; justify-content: flex-end; }
 }
-@media (min-width: 48.01em) {
-	.SessionTabs { flex-wrap: wrap; }
-	.SessionTabs > .SessionTabs-row { flex: 1; order: 1; }
-	.SessionTabs > .SessionTabs-title { display: block; flex-basis: 100%; order: 2; }
-}
-
-/* A crowded tab strip tells less than the current identity. Keep the same
-   compact header at every viewport size; navigation stays in the selector. */
-.SessionTabs.compact { flex-wrap: nowrap; align-items: center; }
-.SessionTabs.compact > .SessionTabs-row, .SessionTabs.compact > .SessionTabs-rail { display: none; }
-.SessionTabs.compact > .SessionTabs-menu { display: block; }
-.SessionTabs.compact > .SessionTabs-title { display: block; flex: 1; order: 0; color: var(--tab-activeFg, var(--text)); font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
-
 /* Sessions scroll independently so occasional actions remain within reach. */
 .SessionTabs-sheet {
 	position: fixed;
@@ -147,6 +127,8 @@ button { touch-action: manipulation; }
 }
 .SessionTabs-panelHeading { flex: none; display: flex; align-items: center; justify-content: space-between; padding-left: 8px; }
 .SessionTabs-panelHeading > button { min-width: 44px; min-height: 44px; }
+.SessionTabs-search { flex: none; width: 100%; min-height: 44px; margin: 4px 0 8px; padding: 8px; font: 16px/1.5 'IBM Plex Mono', ui-monospace, Menlo, monospace; color: var(--text); background: var(--page); border: 1px solid var(--status-fg, var(--muted)); border-radius: 6px; }
+.SessionTabs-search:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .SessionTabs-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .SessionTabs-list > div {
 	display: flex;
@@ -157,6 +139,7 @@ button { touch-action: manipulation; }
 	border-radius: 8px;
 	overflow: hidden;
 }
+.SessionTabs-list > div[hidden] { display: none; }
 .SessionTabs-list > div.selected { background: var(--user-bg, var(--page)); border-color: var(--user-fg, var(--text)); }
 .SessionTabs-panel button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .SessionTabs-list > div > .SessionTabs-open { flex: 1; min-width: 0; padding: 8px 12px; text-align: left; overflow-wrap: anywhere; }

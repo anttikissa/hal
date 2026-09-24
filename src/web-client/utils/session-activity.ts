@@ -35,9 +35,24 @@ function describe(session: SharedSessionInfo, working: boolean, summarizing: boo
 	return { markers, label: states.join(', ') || 'idle' }
 }
 
-function shortName(session: SharedSessionInfo): string {
-	if (session.name && session.name !== session.id) return session.name
-	return session.id.replace(/^\d+-/, '') || session.id
+function ordered(sessions: SharedSessionInfo[], selected: string, working: Record<string, boolean>, summarizing: Record<string, boolean> = {}): SharedSessionInfo[] {
+	function priority(session: SharedSessionInfo): number {
+		if (session.id === selected) return 0
+		if (working[session.id] || summarizing[session.id]) return 1
+		if (session.attention === 'new' || session.continuation) return 2
+		return 3
+	}
+	// A stable sort retains terminal tab order within each priority group.
+	return [...sessions].sort((a, b) => priority(a) - priority(b))
 }
 
-export const sessionActivity = { describe, shortName }
+function matches(session: SharedSessionInfo, query: string, number = session.tab): boolean {
+	const term = query.trim().toLowerCase()
+	return !term || [number, session.name, session.id, session.cwd].some((value) => String(value ?? '').toLowerCase().includes(term))
+}
+
+function capacity(width: number, buttonWidth: number, gap: number): number {
+	return Math.max(1, Math.floor((width + gap) / (buttonWidth + gap)))
+}
+
+export const sessionActivity = { describe, ordered, matches, capacity }

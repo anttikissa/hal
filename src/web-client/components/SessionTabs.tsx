@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onSettled, Show } from 'solid-js'
 import type { SharedSessionInfo } from '../../common/ipc.ts'
 import { appActions } from '../utils/app-actions.ts'
 import { sessionActivity } from '../utils/session-activity.ts'
@@ -21,12 +21,26 @@ function ActivityMarkers(props: { description: ReturnType<typeof sessionActivity
 	</span>
 }
 
-// Small sets keep direct tab access. Larger sets show the current session title
-// and move navigation into the selector on both phone and desktop.
+// The strip ranks useful shortcuts; the menu always exposes every session.
 export function SessionTabs(props: SessionTabsProps) {
 	const [menuOpen, setMenuOpen] = createSignal(false)
 	const [refreshError, setRefreshError] = createSignal(false)
+	const [query, setQuery] = createSignal('')
+	const [visibleCount, setVisibleCount] = createSignal(1)
+	const shown = createMemo(() => sessionActivity.ordered(props.sessions, props.selected, props.working ?? {}, props.summarizing ?? {}).slice(0, visibleCount()))
+	let rail: HTMLElement
 	let dialog: HTMLDialogElement | undefined
+
+	onSettled(() => {
+		const observer = new ResizeObserver(() => {
+			const width = rail.querySelector('button')?.getBoundingClientRect().width ?? 56
+			const gap = parseFloat(getComputedStyle(rail).gap) || 0
+			const prefix = rail.querySelector('.SessionTabs-prefix')?.getBoundingClientRect().width ?? 0
+			setVisibleCount(sessionActivity.capacity(rail.clientWidth - prefix - gap, width, gap))
+		})
+		observer.observe(rail)
+		return () => observer.disconnect()
+	})
 
 	createEffect(() => menuOpen(), (open) => {
 		if (!dialog) return
@@ -60,59 +74,47 @@ export function SessionTabs(props: SessionTabsProps) {
 		if (props.sessions.length > 1) props.onCommand({ type: 'close', sessionId })
 	}
 
-	return <header class={['SessionTabs', props.sessions.length > 4 && 'compact']}>
+	return <header class="SessionTabs">
 		<button
 			class="SessionTabs-menu"
-			onClick={() => setMenuOpen(!menuOpen())}
-			aria-label="Sessions and actions"
+			onClick={() => { setQuery(''); setMenuOpen(!menuOpen()) }}
+			aria-label={`All ${props.sessions.length} sessions and actions`}
 			aria-expanded={menuOpen() ? 'true' : 'false'}
 			aria-haspopup="dialog"
 			aria-controls="SessionTabs-panel"
 		>☰</button>
 		<span class="SessionTabs-title" title={props.status}>{props.status}</span>
-		<nav class="SessionTabs-rail" aria-label="Open sessions">
-			<For each={props.sessions}>
-				{(session, index) => {
-					const activity = () => sessionActivity.describe(session, !!props.working?.[session.id], !!props.summarizing?.[session.id])
-					const number = () => session.tab ?? index() + 1
+		<button class="SessionTabs-new" onClick={newTab} aria-label="New tab">+</button>
+		<nav class="SessionTabs-rail" ref={(element) => { rail = element }} aria-label="Session shortcuts">
+			<span class="SessionTabs-prefix" aria-hidden="true">Tabs:</span>
+			<For each={shown()} keyed={(session) => session.id}>
+				{(item) => {
+					const session = () => item()
+					const activity = () => sessionActivity.describe(session(), !!props.working?.[session().id], !!props.summarizing?.[session().id])
+					const number = () => session().tab ?? props.sessions.indexOf(session()) + 1
 					return <button
-						class={{ selected: session.id === props.selected }}
-						onClick={() => select(session.id)}
-						aria-current={session.id === props.selected ? 'page' : undefined}
-						aria-label={`Tab ${number()}, ${session.name || session.id}, ${activity().label}`}
-						title={`${number()} ${session.name || session.id} · ${activity().label}`}
+						class={{ selected: session().id === props.selected }}
+						onClick={() => select(session().id)}
+						aria-current={session().id === props.selected ? 'page' : undefined}
+						aria-label={`Tab ${number()}, ${session().name || session().id}, ${activity().label}`}
+						title={`${number()} ${session().name || session().id} · ${activity().label}`}
 					>
 						<span class="SessionTabs-number">{number()}</span>
 						<ActivityMarkers description={activity()} />
-						<span class="SessionTabs-railName">{sessionActivity.shortName(session)}</span>
 					</button>
 				}}
 			</For>
 		</nav>
-		<div class="SessionTabs-row">
-			<For each={props.sessions}>
-				{(session) => {
-					const activity = () => sessionActivity.describe(session, !!props.working?.[session.id], !!props.summarizing?.[session.id])
-					return <button class={{ selected: session.id === props.selected }} onClick={() => select(session.id)} aria-label={`${session.tab ?? ''} ${session.name || session.id}, ${activity().label}`}>
-						<ActivityMarkers description={activity()} />
-						{session.tab ?? ''} {session.name || session.id}
-						<Show when={props.sessions.length > 1}>
-							<span class="SessionTabs-close" onClick={(event) => closeTab(event, session.id)}>×</span>
-						</Show>
-					</button>
-				}}
-			</For>
-			<button class="SessionTabs-new" onClick={newTab} aria-label="New tab">+</button>
-		</div>
 		{/* Native modal supplies focus containment, Escape and focus restoration. */}
 		<dialog id="SessionTabs-panel" ref={(element) => { dialog = element }} class="SessionTabs-sheet" onCancel={() => setMenuOpen(false)} onClick={(event) => {
 			if (event.target === event.currentTarget) setMenuOpen(false)
 		}} aria-label="Sessions and actions">
 			<div class="SessionTabs-panel">
 				<header class="SessionTabs-panelHeading">
-					<strong>Sessions</strong>
+					<strong>Sessions ({props.sessions.length})</strong>
 					<button onClick={() => setMenuOpen(false)} aria-label="Close menu">×</button>
 				</header>
+				<input class="SessionTabs-search" type="search" aria-label="Find session" placeholder="Find number, name or path" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} />
 				<nav class="SessionTabs-list" aria-label="Open sessions">
 					<For each={props.sessions}>
 						{(session, index) => {
@@ -120,7 +122,7 @@ export function SessionTabs(props: SessionTabsProps) {
 							const number = () => session.tab ?? index() + 1
 							// Model ids are `provider/model`; the provider prefix is noise here.
 							const model = () => session.model?.split('/').at(-1)
-							return <div class={{ selected: session.id === props.selected }}>
+							return <div class={{ selected: session.id === props.selected }} hidden={!sessionActivity.matches(session, query(), number())}>
 								<button class="SessionTabs-open" onClick={() => select(session.id)} aria-current={session.id === props.selected ? 'page' : undefined} aria-label={`Tab ${number()}, ${session.id}: ${session.name || session.id}, ${activity().label}`}>
 									<span class="SessionTabs-number">{number()}</span>
 									<ActivityMarkers description={activity()} />

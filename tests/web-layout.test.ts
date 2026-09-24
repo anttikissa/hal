@@ -175,11 +175,13 @@ test('single-line prompt text has equal space above and below its line box', () 
 	expect(line + 2 * padding).toBe(height)
 })
 
-test('phone tabs stay in one compact scrollable row', () => {
-	const media = '@media (max-width: 48em)'
-	const rail = '.SessionTabs > .SessionTabs-rail'
-	expect(declarationInside(media, rail, 'flex-wrap')).toBe('nowrap')
-	expect(declarationInside(media, rail, 'overflow-x')).toBe('auto')
+test('tab strip measures its width and renders only visible, keyboard-focusable shortcuts', () => {
+	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
+	expect(source).toContain('new ResizeObserver(')
+	expect(source).toContain('sessionActivity.capacity(')
+	expect(source).toContain('<For each={shown()} keyed={(session) => session.id}>')
+	expect(declaration('.SessionTabs > .SessionTabs-rail', 'min-width')).toBe('0')
+	expect(declaration('.SessionTabs-rail > button', 'width')).toBe('56px')
 })
 
 test('phone editing grows the draft while retaining context and avoiding the bottom inset', () => {
@@ -197,13 +199,13 @@ test('phone editing grows the draft while retaining context and avoiding the bot
 	expect(declaration('.PromptComposer > textarea', 'max-height')).toBe('168px')
 })
 
-test('crowded session headers show the current title and selector on all screen sizes', () => {
+test('tab header keeps the current name and complete searchable session menu at any size', () => {
 	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
-	expect(source).toContain("props.sessions.length > 4 && 'compact'")
-	expect(declaration('.SessionTabs.compact > .SessionTabs-row, .SessionTabs.compact > .SessionTabs-rail', 'display')).toBe('none')
-	expect(declaration('.SessionTabs.compact > .SessionTabs-menu', 'display')).toBe('block')
-	expect(declaration('.SessionTabs.compact > .SessionTabs-title', 'display')).toBe('block')
-	expect(declaration('.SessionTabs.compact > .SessionTabs-title', 'flex')).toBe('1')
+	expect(source).toContain('class="SessionTabs-title" title={props.status}')
+	expect(source).toContain('sessionActivity.ordered(')
+	expect(source).toContain('sessionActivity.matches(session, query(), number())')
+	expect(source).toContain('aria-label="Find session"')
+	expect(declaration('.SessionTabs-list > div[hidden]', 'display')).toBe('none')
 })
 
 test('session menu reveals the current tab and keeps actions outside the scrolling list', () => {
