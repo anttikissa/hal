@@ -3,7 +3,7 @@ function toBottom(element: HTMLElement): void {
 }
 
 function isNearBottom(element: HTMLElement): boolean {
-	return element.scrollHeight - element.clientHeight - element.scrollTop < 25
+	return element.scrollHeight - element.clientHeight - element.scrollTop < 50
 }
 
 export const webScroll = { toBottom, isNearBottom }

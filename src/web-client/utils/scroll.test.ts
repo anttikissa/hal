@@ -13,9 +13,9 @@ test('scrolls the transcript to its bottom', () => {
 	expect(element.scrollTop).toBe(1_234)
 })
 
-test('recognizes a scroller within 25 pixels of the bottom', () => {
-	const element = fakeScroller({ scrollHeight: 1_234, clientHeight: 1_000, scrollTop: 210 })
+test('recognizes a scroller within 50 pixels of the bottom', () => {
+	const element = fakeScroller({ scrollHeight: 1_234, clientHeight: 1_000, scrollTop: 185 })
 	expect(webScroll.isNearBottom(element)).toBe(true)
-	element.scrollTop = 209
+	element.scrollTop = 184
 	expect(webScroll.isNearBottom(element)).toBe(false)
 })
