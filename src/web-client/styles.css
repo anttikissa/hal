@@ -184,6 +184,12 @@ button { touch-action: manipulation; }
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
+/* The transcript owns Hal's cursor; the composer keeps its native editing caret. */
+.Transcript-cursor { min-height: 2lh; padding: 6px 0; color: #ffa156; }
+.Transcript-cursor.thinking { color: #97a7b7; }
+.Transcript-cursor > span { display: block; width: 1ch; height: 1lh; background: currentColor; animation: Transcript-blink 1s steps(1, end) infinite; }
+@keyframes Transcript-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .Transcript-cursor > span { animation: none; } }
 .TranscriptItem { padding: 10px 0; border-bottom: 1px solid #333; }
 .TranscriptItem.target, .QuestionBlock.target { outline: 2px solid #8fc5ed; outline-offset: 2px; background: #19232c; }
 .TranscriptItem.user { color: #9cf; }

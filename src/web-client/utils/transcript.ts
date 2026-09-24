@@ -146,4 +146,8 @@ function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[]
 	return result
 }
 
-export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker, blockId, rowKey }
+function thinkingCursor(items: RenderedTranscriptItem[]): boolean {
+	return items.some((item) => item.entry.type === 'thinking' && 'streaming' in item.entry && item.entry.streaming === true)
+}
+
+export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker, blockId, rowKey, thinkingCursor }

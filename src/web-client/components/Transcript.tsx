@@ -70,5 +70,6 @@ export function Transcript(props: TranscriptProps) {
 	)
 	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateBottomGap} onClick={onBlockLinkClick}>
 		<For each={props.items} keyed={webTranscript.rowKey}>{(item) => <TranscriptItem item={item()} token={props.token} onAnswer={props.onAnswer} />}</For>
+		<div class={['Transcript-cursor', { thinking: webTranscript.thinkingCursor(props.items) }]} aria-label="Hal cursor"><span aria-hidden="true" /></div>
 	</main>
 }

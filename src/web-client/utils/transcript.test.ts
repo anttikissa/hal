@@ -134,3 +134,9 @@ test('a replacement snapshot settles the active question into compact history', 
 		answer: { kind: 'choice', choiceId: 'continue' },
 	}))
 })
+
+test('the Hal cursor dims only during live thinking', () => {
+	expect(webTranscript.thinkingCursor([])).toBe(false)
+	expect(webTranscript.thinkingCursor([{ entry: { type: 'thinking', text: 'older' }, text: 'older' }])).toBe(false)
+	expect(webTranscript.thinkingCursor([{ entry: { type: 'thinking', text: 'now', streaming: true }, text: 'now' }])).toBe(true)
+})
