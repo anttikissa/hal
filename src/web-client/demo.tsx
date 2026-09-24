@@ -101,7 +101,7 @@ function easeOut(t: number): number {
 // [F15] `force` follows even when scrolled away, landing at the very bottom (gap 0):
 // sending a message means the reader wants to see it and the reply.
 function keepBottom(change: () => void, mode: 'glide' | 'jump' | 'track' = 'glide', force = false): void {
-	const root = document.scrollingElement ?? document.documentElement
+	const root = document.querySelector('main')!
 	// [F10] Mid-glide the reader is still above their destination; keep following its target
 	// instead of measuring, or a fast stream would outrun the 50px zone and stop the follow.
 	let gap = root.scrollHeight - root.scrollTop - root.clientHeight
@@ -307,7 +307,15 @@ function Demo() {
 			* { box-sizing: border-box; }
 			/* One typeface and one size everywhere; hierarchy comes from weight and color only. */
 			body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
-			main { width: min(100% - 32px, 740px); margin: 40px auto 0; }
+			.demo-shell { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+			.demo-title { flex: none; padding: 8px 16px; border-bottom: 1px solid var(--muted); background: var(--bg); }
+			.demo-title h1 { margin: 0 0 4px; }
+			.demo-tabs { display: flex; gap: 1ch; overflow-x: auto; white-space: nowrap; color: var(--muted); }
+			.demo-tabs span { flex: none; width: 4ch; text-align: center; }
+			.demo-tabs .active { color: var(--user-fg); font-weight: 600; }
+			main { flex: 1; min-height: 0; width: 100%; margin: 0; padding: 16px; overflow-y: auto; overscroll-behavior: contain; }
+			.demo-shell > .composer { flex: none; position: static; width: 100%; margin: 0; padding: 8px 16px max(10px, env(safe-area-inset-bottom)); }
+			.demo-shell > .composer > * { width: 100%; }
 			h1 { font-size: inherit; font-weight: 600; margin-bottom: 4px; }
 			p { color: var(--muted); }
 			article { margin: 10px 0; background: var(--assistant-bg); color: var(--assistant-fg); border-left: 3px solid var(--assistant-edge); }
@@ -377,27 +385,33 @@ function Demo() {
 			@media (prefers-reduced-motion: reduce) { .hal-cursor span { animation: none; } }
 			label { display: block; margin-bottom: 16px; color: var(--muted); cursor: pointer; }
 		`}</style>
-		<main style={{ '--fade-ms': `${FADE_MS * speed()}ms`, '--toggle-ms': `${TOGGLE_MS * speed()}ms` }}><h1>Block identity experiment</h1>
-			<p>Every second: clone every block and update its data. A new block streams without an ID, grows a line per second, then gets its ID. Open any card; it should stay open.</p>
-			<label><input type="checkbox" checked={byIndex()} onChange={(event) => setByIndex(event.currentTarget.checked)} /> Key rows by index instead of ID [F8]</label>
-			<label><input type="checkbox" checked={slow()} onChange={(event) => setSlow(event.currentTarget.checked)} /> Slow motion (5×): ticks, glide, and fade</label>
-			<label><input type="checkbox" checked={offline()} onChange={(event) => setOffline(event.currentTarget.checked)} /> Simulate lost connection [F14]</label>
-			{/* [F8] Two lists because keyed={false} and keyed={fn} are different <For> modes. */}
-			<Show when={byIndex()} fallback={
-				<For each={blocks()} keyed={(block) => block.id}>
-					{(block) => <BlockCard block={block()} />}
-				</For>
-			}>
-				<For each={blocks()} keyed={false}>
-					{(block) => <BlockCard block={block()} />}
-				</For>
-			</Show>
-			<div class={['hal-cursor', blocks().some((block) => !block.id && block.kind === 'thinking') ? 'thinking' : '']} aria-label="Hal cursor"><span aria-hidden="true" /></div>
-		</main>
-		<Composer status={status()} onSend={(text) => keepBottom(() => {
-			// [F13] Always append: index keying [F8] relies on the list being append-only.
-			setBlocks((previous) => [...previous, { id: `${String(previous.length + 1).padStart(6, '0')}-usr`, kind: 'user', updates: 0, lines: 1, text }])
-		}, 'glide', true)} />
+		<div class="demo-shell" style={{ '--fade-ms': `${FADE_MS * speed()}ms`, '--toggle-ms': `${TOGGLE_MS * speed()}ms` }}>
+			<div class="demo-title">
+				<h1>Block identity experiment</h1>
+				<div class="demo-tabs">Tabs: <span class="active">[1]</span><span>2</span><span>3</span><span>4</span></div>
+			</div>
+			<main>
+				<p>Every second: clone every block and update its data. A new block streams without an ID, grows a line per second, then gets its ID. Open any card; it should stay open.</p>
+				<label><input type="checkbox" checked={byIndex()} onChange={(event) => setByIndex(event.currentTarget.checked)} /> Key rows by index instead of ID [F8]</label>
+				<label><input type="checkbox" checked={slow()} onChange={(event) => setSlow(event.currentTarget.checked)} /> Slow motion (5×): ticks, glide, and fade</label>
+				<label><input type="checkbox" checked={offline()} onChange={(event) => setOffline(event.currentTarget.checked)} /> Simulate lost connection [F14]</label>
+				{/* [F8] Two lists because keyed={false} and keyed={fn} are different <For> modes. */}
+				<Show when={byIndex()} fallback={
+					<For each={blocks()} keyed={(block) => block.id}>
+						{(block) => <BlockCard block={block()} />}
+					</For>
+				}>
+					<For each={blocks()} keyed={false}>
+						{(block) => <BlockCard block={block()} />}
+					</For>
+				</Show>
+				<div class={['hal-cursor', blocks().some((block) => !block.id && block.kind === 'thinking') ? 'thinking' : '']} aria-label="Hal cursor"><span aria-hidden="true" /></div>
+			</main>
+			<Composer status={status()} onSend={(text) => keepBottom(() => {
+				// [F13] Always append: index keying [F8] relies on the list being append-only.
+				setBlocks((previous) => [...previous, { id: `${String(previous.length + 1).padStart(6, '0')}-usr`, kind: 'user', updates: 0, lines: 1, text }])
+			}, 'glide', true)} />
+		</div>
 	</>
 }
 
