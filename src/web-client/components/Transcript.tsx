@@ -16,10 +16,10 @@ export function Transcript(props: TranscriptProps) {
 	let autoFollow = true
 	let openedTarget = ''
 	function focusTarget(): void {
-		const toolId = router.toolTarget()
+		const blobId = router.toolTarget()
 		const pasteId = router.pasteTarget()
-		if (!toolId && !pasteId) { openedTarget = ''; return }
-		const id = toolId ? `tool-${encodeURIComponent(toolId)}` : `paste-${encodeURIComponent(pasteId)}`
+		if (!blobId && !pasteId) { openedTarget = ''; return }
+		const id = blobId ? `tool-${encodeURIComponent(blobId)}` : `paste-${encodeURIComponent(pasteId)}`
 		const key = `${router.sessionId()}:${id}`
 		if (!element || openedTarget === key) return
 		const details = document.getElementById(id) as HTMLDetailsElement | null

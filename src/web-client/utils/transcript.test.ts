@@ -18,16 +18,16 @@ test('paste markers split from surrounding prose without losing their text', () 
 })
 test('history tool results merge into their call block', () => {
 	const history: HistoryEntry[] = [
-		{ type: 'tool_call', toolId: 'tool-1', name: 'bash', input: { command: 'printf hello' }, blobId: 'blob-1', ts: '2026-08-13T12:00:00.000Z' },
-		{ type: 'tool_result', toolId: 'tool-1', output: 'hello', blobId: 'blob-1', ts: '2026-08-13T12:00:01.000Z' },
+		{ type: 'tool_call', toolId: 'call_gJTY1EdGkAekFoW0UUhnowp7', name: 'bash', input: { command: 'printf hello' }, blobId: '0403ru-pku', ts: '2026-08-13T12:00:00.000Z' },
+		{ type: 'tool_result', toolId: 'call_gJTY1EdGkAekFoW0UUhnowp7', output: 'hello', blobId: '0403ru-pku', ts: '2026-08-13T12:00:01.000Z' },
 	]
 	expect(webTranscript.historyItems(history)).toEqual([{
 		type: 'tool',
 		name: 'bash',
 		input: { command: 'printf hello' },
 		output: 'hello',
-		toolId: 'tool-1',
-		blobId: 'blob-1',
+		toolId: 'call_gJTY1EdGkAekFoW0UUhnowp7',
+		blobId: '0403ru-pku',
 		ts: Date.parse('2026-08-13T12:00:00.000Z'),
 	}])
 })

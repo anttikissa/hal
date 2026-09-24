@@ -79,17 +79,18 @@ test('block headers keep a right margin', () => {
 	expect(stripAnsi(withBlobRef[0]!)).toMatch(/\) $/)
 	expect(stripAnsi(withBlobRef[0]!).length).toBe(39)
 })
-test('tool headers link to their exact web card without changing visible width', () => {
+test('only the short block reference links to its web tool card', () => {
 	const original = webLinks.url
-	webLinks.url = (sessionId, toolId) => `http://localhost:9001/${sessionId}#tool=${toolId}`
+	webLinks.url = (sessionId, blobId) => `http://localhost:9001/${sessionId}#tool=${blobId}`
 	try {
-		const header = blocks.renderBlock({ type: 'tool', name: 'bash', sessionId: '05-wan', toolId: 'call-1', input: { command: 'pwd' } }, 40)[0]!
-		expect(header).toContain('\x1b]8;;http://localhost:9001/05-wan#tool=call-1\x07')
-		expect(visLen(header)).toBe(39)
-		const body = blocks.renderBlock({ type: 'tool', name: 'bash', sessionId: '05-wan', toolId: 'call-1', output: 'done' }, 40).join('')
-		expect(body).toContain('\x1b]8;;http://localhost:9001/05-wan#tool=call-1\x07done\x1b]8;;\x07')
-		const external = blocks.renderBlock({ type: 'tool', name: 'bash', sessionId: '05-wan', toolId: 'call-1', output: 'https://example.com' }, 40).join('')
-		expect(external).toContain(';https://example.com\x07https://example.com\x1b]8;;\x07')
+		const block: Block = { type: 'tool', name: 'bash', sessionId: '152-act', blobId: '0403ru-pku', toolId: 'call_gJTY1EdGkAekFoW0UUhnowp7', input: { command: 'pwd' }, output: 'done' }
+		const lines = blocks.renderBlock(block, 52)
+		expect(lines[0]).toContain('\x1b]8;;http://localhost:9001/152-act#tool=0403ru-pku\x07(152-act/0403ru-pku)\x1b]8;;\x07')
+		expect((lines[0]!.match(/\x1b]8;;/g) ?? [])).toHaveLength(2)
+		expect(visLen(lines[0]!)).toBe(51)
+		expect(lines.slice(1).join('')).not.toContain('#tool=')
+		const withoutBlob = blocks.renderBlock({ ...block, blobId: undefined }, 52).join('')
+		expect(withoutBlob).not.toContain('#tool=')
 	} finally { webLinks.url = original }
 })
 test('image path labels link to their stored blob on the host', () => {

@@ -29,9 +29,9 @@ of truth; re-read it after upgrades.
 
 `src/web-client/router.ts` is a small router, not a dependency. Browser app routes
 are `/<sessionId>` (`example.test/05-wan`), so tabs are shareable and Back/Forward
-move between tabs. `#tool=<toolId>` expands and scrolls to a tool; `#paste=<entryId>`
-opens the saved text paste. Those targets can arrive after a session snapshot, so
-the transcript retries focus as data loads.
+move between tabs. `#tool=<blobId>` expands and scrolls to a tool by its short
+block ID; `#paste=<entryId>` opens a saved text paste. Those targets can arrive
+after a session snapshot, so the transcript retries focus as data loads.
 
 - `src/common/web.ts` owns `isSessionPath()` and `imagePath()`. The server serves
   the app at session routes and authenticated image blobs at

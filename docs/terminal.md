@@ -139,11 +139,12 @@ it shows creation hints such as `ctrl-t: new`; with multiple tabs, it switches
 to navigation hints such as `alt-#: goto` and `ctrl-n/p: switch`. It stays one
 row: tab-specific hints are dropped from lowest to highest priority, then the
 "Tabs:" label is dropped, rather than wrapping.
-Tab labels are OSC 8 links to the same session in the browser; tool headers and
-non-URL tool body lines link to that tool's web inspector. Image and saved-paste
-markers link to their host-backed content. OSC 8 is an optional terminal feature:
-ordinary keyboard tab switching is unchanged, and existing URLs in tool output
-retain their own targets. Measure linked rows with `visLen()`, not byte length.
+Tab labels are OSC 8 links to the same session in the browser; only the
+`(sessionId/blobId)` reference in a tool header links to its web inspector.
+Image and saved-paste markers link to their host-backed content. OSC 8 is an
+optional terminal feature: ordinary keyboard tab switching is unchanged, and
+existing URLs in tool output retain their own targets. Measure linked rows with
+`visLen()`, not byte length.
 
 ### Text tab characters
 

@@ -32,8 +32,8 @@ function parse(from: string): string {
 function format(target: string): string {
 	return target ? `/${target}` : '/'
 }
-function toolHash(toolId: string): string {
-	return `#tool=${encodeURIComponent(toolId)}`
+function toolHash(blobId: string): string {
+	return `#tool=${encodeURIComponent(blobId)}`
 }
 
 function pasteHash(entryId: string): string {

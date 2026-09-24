@@ -262,10 +262,10 @@ function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolea
 	return fixedNoticeColors[block.type]
 }
 
-function buildHeader(title: string, time: string, blobRef: string, cols: number, activity = ''): string {
+function buildHeader(title: string, time: string, blobRef: string, cols: number, activity = '', url = ''): string {
 	let prefix = `${' '.repeat(blocks.outputPad)}${time ? `${time} ` : ''}`
 	if (activity) prefix += `${activity} `
-	const right = blobRef ? ` (${blobRef}) ` : ''
+	const right = blobRef ? ` ${blockText.hyperlink(`(${blobRef})`, url)} ` : ''
 	// Stop one column short of the edge so headers keep the same right margin as
 	// block bodies. bgLine still paints the background across the full row.
 	const width = Math.max(1, cols - 1)
@@ -513,19 +513,18 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const { fg, bg, bgIsBlack } = blockColors(block)
 	const label = blockLabel(block)
 	const blockTime = time.formatTimestamp(block.ts)
-	const header = buildHeader(label, blockTime, blobRef, cols, blocks.toolActivity(block))
+	const toolUrl = block.type === 'tool' && block.sessionId && block.blobId ? webLinks.url(block.sessionId, block.blobId) : ''
+	const header = buildHeader(label, blockTime, blobRef, cols, blocks.toolActivity(block), toolUrl)
 	const plainNotice = block.type === 'info' || (block.type === 'log' && !block.text.startsWith('Prompt queued'))
 	const lines: string[] = []
-	const toolUrl = block.type === 'tool' && block.sessionId && block.toolId ? webLinks.url(block.sessionId, block.toolId) : ''
-	if (!plainNotice) lines.push(bgLine(`${fg}${blockText.hyperlink(header, toolUrl)}`, cols, bg))
+	if (!plainNotice) lines.push(bgLine(`${fg}${header}`, cols, bg))
 	const contentCols = Math.max(1, cols - 1 - blocks.outputPad)
 	const rawContent = plainNotice ? noticeContent(block, contentCols) : blockContent(block, contentCols)
 	const content = blockText.hyperlinkUrls(rawContent, contentCols)
 	if (content.length > 0 && !plainNotice && block.type !== 'tool') lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {
 		const fullWidth = visLen(line) > contentCols
-		const linked = toolUrl && !line.includes('\x1b]8;') ? blockText.hyperlink(line, toolUrl) : line
-		const text = block.canceled ? `${STRIKE}${linked}${STRIKE_OFF}` : linked
+		const text = block.canceled ? `${STRIKE}${line}${STRIKE_OFF}` : line
 		lines.push(bodyLine(text, fg, bg, cols, fullWidth))
 	}
 	// Streaming cursors blink on the shared pulse so active output feels alive
