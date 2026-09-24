@@ -308,12 +308,12 @@ function Demo() {
 			/* One typeface and one size everywhere; hierarchy comes from weight and color only. */
 			body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
 			.demo-shell { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-			.demo-title { flex: none; padding: 8px 16px; border-bottom: 1px solid var(--muted); background: var(--bg); }
+			.demo-title { flex: none; padding: 8px 16px; background: var(--bg); }
 			.demo-title h1 { margin: 0 0 4px; }
 			.demo-tabs { display: flex; gap: 1ch; overflow-x: auto; white-space: nowrap; color: var(--muted); }
 			.demo-tabs span { flex: none; width: 4ch; text-align: center; }
 			.demo-tabs .active { color: var(--user-fg); font-weight: 600; }
-			main { flex: 1; min-height: 0; width: 100%; margin: 0; padding: 16px; overflow-y: auto; overscroll-behavior: contain; }
+			main { flex: 1; min-height: 0; width: 100%; margin: 0; padding: 16px; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--assistant-fg) var(--bg); }
 			.demo-shell > .composer { flex: none; position: static; width: 100%; margin: 0; padding: 8px 16px max(10px, env(safe-area-inset-bottom)); }
 			.demo-shell > .composer > * { width: 100%; }
 			h1 { font-size: inherit; font-weight: 600; margin-bottom: 4px; }
