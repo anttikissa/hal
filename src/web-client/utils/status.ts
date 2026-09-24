@@ -35,12 +35,22 @@ function activity(working: boolean, reconnecting: boolean, waiting: boolean, liv
 	if (reconnecting) return 'Reconnecting…'
 	if (waiting) return 'Waiting for answer'
 	if (!working) return 'Idle'
-	for (const block of [...live].reverse()) {
-		if (block.type === 'tool' && block.running) return `Running ${block.name}…`
-		if (block.type === 'thinking' && block.streaming) return 'Thinking…'
-		if (block.type === 'assistant' && block.streaming) return 'Writing…'
+	let tools = 0
+	let toolName = ''
+	for (const block of live) {
+		if (block.type !== 'tool' || !block.running) continue
+		tools++
+		toolName = block.name
 	}
-	return 'Working…'
+	if (tools > 1) return `Running ${tools} tools`
+	if (tools === 1) return `Running ${toolName}`
+	for (const block of [...live].reverse()) {
+		if (block.type === 'assistant' && block.streaming) return 'Writing'
+		if (block.type === 'thinking' && block.streaming) return 'Thinking'
+	}
+	// Stream-end lands before working=false; avoid flashing Processing after the answer.
+	if (live.at(-1)?.type === 'assistant') return 'Idle'
+	return 'Processing'
 }
 
 export const webStatus = { text, location, contextText, sessionText, activity }

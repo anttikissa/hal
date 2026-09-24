@@ -25,16 +25,15 @@ test('pairs the directory with the model, as the terminal status line does', () 
 	expect(webStatus.location(undefined)).toBe('')
 })
 
-test('composer activity reports the useful next action', () => {
+test('composer status mirrors the terminal phases from live blocks', () => {
 	expect(webStatus.activity(false, false, false)).toBe('Idle')
-	expect(webStatus.activity(true, false, false)).toBe('Working…')
+	expect(webStatus.activity(true, false, false)).toBe('Processing')
+	expect(webStatus.activity(true, false, false, [{ type: 'thinking', text: 'draft', streaming: true }])).toBe('Thinking')
+	expect(webStatus.activity(true, false, false, [{ type: 'tool', name: 'bash', running: true }])).toBe('Running bash')
+	expect(webStatus.activity(true, false, false, [{ type: 'tool', name: 'bash', running: true }, { type: 'tool', name: 'eval', running: true }])).toBe('Running 2 tools')
+	expect(webStatus.activity(true, false, false, [{ type: 'assistant', text: 'Hi', streaming: true }])).toBe('Writing')
+	expect(webStatus.activity(true, false, false, [{ type: 'assistant', text: 'Hi' }])).toBe('Idle')
+	expect(webStatus.activity(false, false, false, [{ type: 'tool', name: 'bash', running: true }])).toBe('Idle')
 	expect(webStatus.activity(false, true, false)).toBe('Reconnecting…')
 	expect(webStatus.activity(false, false, true)).toBe('Waiting for answer')
-})
-
-test('composer activity names the live work rather than just reporting busy', () => {
-	expect(webStatus.activity(true, false, false, [{ type: 'thinking', text: 'draft', streaming: true }])).toBe('Thinking…')
-	expect(webStatus.activity(true, false, false, [{ type: 'tool', name: 'bash', running: true }])).toBe('Running bash…')
-	expect(webStatus.activity(true, false, false, [{ type: 'assistant', text: 'Hi', streaming: true }])).toBe('Writing…')
-	expect(webStatus.activity(false, false, false, [{ type: 'tool', name: 'bash', running: true }])).toBe('Idle')
 })

@@ -124,6 +124,10 @@ test('the transcript is the only scrolling row', () => {
 	expect(declaration('.PromptComposer', 'flex')).toBe('none')
 })
 
+test('idle composer activity uses the palette idle grey instead of the done-tab green', () => {
+	expect(declaration('.PromptComposer-activity', 'color')).toBe('var(--assistant-cursorIdle, var(--status-fg, var(--muted)))')
+})
+
 test('accepted messages force the transcript to its bottom even if the reader scrolled up', () => {
 	const main = readFileSync(resolve(webDir, 'main.tsx'), 'utf8')
 	const transcript = readFileSync(resolve(webDir, 'components/Transcript.tsx'), 'utf8')

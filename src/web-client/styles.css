@@ -305,7 +305,7 @@ button { touch-action: manipulation; }
 }
 /* Execution context still truncates rather than pushing the action off a narrow screen. */
 .PromptComposer > .PromptComposer-status { display: flex; flex: 1 0 100%; align-items: baseline; gap: 8px; min-width: 0; padding-bottom: 8px; color: var(--status-fg, var(--muted)); font-size: 12px; }
-.PromptComposer-activity { flex: none; color: var(--tab-doneFg, var(--text)); }
+.PromptComposer-activity { flex: none; color: var(--assistant-cursorIdle, var(--status-fg, var(--muted))); }
 .PromptComposer-activity.busy { color: var(--assistant-cursor, var(--assistant-fg, var(--text))); }
 .PromptComposer-activity.warning { color: var(--warning-fg, var(--text)); }
 .PromptComposer-status > .PromptComposer-location { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

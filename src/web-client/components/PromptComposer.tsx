@@ -120,7 +120,7 @@ export function PromptComposer(props: PromptComposerProps) {
 	// Keep activity, execution location and context in the terminal-style status row.
 	return <form class={['PromptComposer', props.disabled && 'disabled']} aria-disabled={props.disabled ? 'true' : undefined} onSubmit={(event: SubmitEvent) => { event.preventDefault(); void submit() }}>
 		<div class="PromptComposer-status">
-			<span class={['PromptComposer-activity', { busy: !!props.working, warning: props.activity === 'Reconnecting…' }]} aria-live="polite"><span aria-hidden="true">●</span> {props.activity}</span>
+			<span class={['PromptComposer-activity', { busy: !!props.working && props.activity !== 'Idle', warning: props.activity === 'Reconnecting…' }]} aria-live="polite"><span aria-hidden="true">●</span> {props.activity}</span>
 			<span class="PromptComposer-location">{props.location}</span>
 			<Show when={props.context}><span class="PromptComposer-context">{props.context}</span></Show>
 			<Show when={!draftDurable()}><span class="PromptComposer-draft-warning" role="status">Draft not saved — keep this page open</span></Show>
