@@ -47,20 +47,19 @@ button { touch-action: manipulation; }
 .SessionTabs {
 	flex: none;
 	display: grid;
-	grid-template-columns: 44px minmax(0, 1fr) 44px;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 2px 8px;
 	padding: calc(6px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 6px calc(8px + env(safe-area-inset-left));
 	background: var(--page);
 }
-.SessionTabs > .SessionTabs-title { grid-column: 2; grid-row: 2; min-width: 0; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tab-activeFg, var(--text)); font-size: 15px; }
-.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { grid-row: 2; width: 44px; height: 32px; padding: 0; background: transparent; border: 0; color: var(--tab-activeFg, var(--text)); }
-.SessionTabs > .SessionTabs-rail { grid-column: 1 / -1; grid-row: 1; min-width: 0; display: flex; align-items: center; gap: 4px; height: 32px; overflow: hidden; }
-.SessionTabs-prefix { flex: 0 0 52px; color: var(--status-fg, var(--muted)); }
+.SessionTabs > .SessionTabs-title { grid-row: 2; min-width: 0; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tab-activeFg, var(--text)); font-size: 15px; }
+.SessionTabs > .SessionTabs-rail { grid-row: 1; min-width: 0; display: flex; align-items: center; gap: 4px; height: 32px; overflow: hidden; }
+.SessionTabs-rail > button { flex: none; width: 44px; height: 28px; padding: 0; font: inherit; background: transparent; border: 0; color: var(--tab-activeFg, var(--text)); cursor: pointer; }
 .SessionTabs-rail > a { flex: none; display: inline-flex; justify-content: center; align-items: center; gap: 2px; width: 56px; height: 28px; padding: 3px 2px; line-height: 1; text-align: center; text-decoration: none; background: transparent; border: 0; color: var(--tab-inactiveFg, var(--muted)); }
 .SessionTabs-rail > a.selected { color: var(--tab-activeFg, var(--text)); font-weight: 600; }
 .SessionTabs-rail > a.selected > .SessionTabs-number::before { content: '['; }
 .SessionTabs-rail > a.selected > .SessionTabs-number::after { content: ']'; }
-.SessionTabs > button:focus-visible, .SessionTabs-rail > a:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.SessionTabs-rail > :is(button, a):focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .SessionTabs-activity { display: inline-flex; align-items: center; gap: 2px; }
 .SessionTabs-activity:empty { display: none; }
 .SessionTabs-marker { line-height: 1; }
@@ -353,7 +352,7 @@ button { touch-action: manipulation; }
 @media (pointer: coarse) {
 	.SessionTabs > .SessionTabs-rail { height: 48px; }
 	.SessionTabs-rail > a { height: 44px; }
-	.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { height: 44px; }
+	.SessionTabs-rail > button { height: 44px; }
 	.PromptComposer-input > textarea { font-size: 16px; }
 	.SessionTabs-search, .AuthGate > form > input, .QuestionBlock > form > textarea, .QuestionBlock > form > input { font-size: 16px; }
 	.PromptComposer-help { display: none; }

@@ -36,8 +36,8 @@ export function SessionTabs(props: SessionTabsProps) {
 		const observer = new ResizeObserver(() => {
 			const width = rail.querySelector('a')?.getBoundingClientRect().width ?? 56
 			const gap = parseFloat(getComputedStyle(rail).gap) || 0
-			const prefix = rail.querySelector('.SessionTabs-prefix')?.getBoundingClientRect().width ?? 0
-			setVisibleCount(sessionActivity.capacity(rail.clientWidth - prefix - gap, width, gap))
+			const actions = [...rail.querySelectorAll('button')].reduce((total, button) => total + button.getBoundingClientRect().width, 0)
+			setVisibleCount(sessionActivity.capacity(rail.clientWidth - actions - gap * 2, width, gap))
 		})
 		observer.observe(rail)
 		return () => observer.disconnect()
@@ -77,7 +77,7 @@ export function SessionTabs(props: SessionTabsProps) {
 
 	return <header class="SessionTabs">
 		<nav class="SessionTabs-rail" ref={(element) => { rail = element }} aria-label="Session shortcuts">
-			<span class="SessionTabs-prefix" aria-hidden="true">Tabs:</span>
+			<button class="SessionTabs-menu" onClick={() => { setQuery(''); setMenuOpen(!menuOpen()) }} aria-label={`All ${props.sessions.length} sessions and actions`} aria-expanded={menuOpen() ? 'true' : 'false'} aria-haspopup="dialog" aria-controls="SessionTabs-panel">☰</button>
 			<For each={shown()} keyed={(session) => session.id}>
 				{(item) => {
 					const session = () => item()
@@ -100,17 +100,9 @@ export function SessionTabs(props: SessionTabsProps) {
 					</a>
 				}}
 			</For>
+			<button class="SessionTabs-new" onClick={newTab} aria-label="New tab">+</button>
 		</nav>
-		<button
-			class="SessionTabs-menu"
-			onClick={() => { setQuery(''); setMenuOpen(!menuOpen()) }}
-			aria-label={`All ${props.sessions.length} sessions and actions`}
-			aria-expanded={menuOpen() ? 'true' : 'false'}
-			aria-haspopup="dialog"
-			aria-controls="SessionTabs-panel"
-		>☰</button>
 		<span class="SessionTabs-title" title={props.status}>{props.status}</span>
-		<button class="SessionTabs-new" onClick={newTab} aria-label="New tab">+</button>
 		{/* Native modal supplies focus containment, Escape and focus restoration. */}
 		<dialog id="SessionTabs-panel" ref={(element) => { dialog = element }} class="SessionTabs-sheet" onCancel={() => setMenuOpen(false)} onClick={(event) => {
 			if (event.target === event.currentTarget) setMenuOpen(false)

@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onSettled, Show } from 'solid-js'
-import { attachmentRef, enterAction, pastedImage, sendLabel } from '../utils/composer.ts'
+import { attachmentRef, enterAction, pastedImage, sendLabel, typingKey } from '../utils/composer.ts'
 import { webDraft } from '../utils/draft.ts'
 
 type PromptComposerProps = {
@@ -45,6 +45,7 @@ export function PromptComposer(props: PromptComposerProps) {
 	createEffect(() => props.sessionId, (sessionId) => {
 		if (!input) return
 		input.value = sessionId ? webDraft.load(sessionId) : ''
+		input.setSelectionRange(input.value.length, input.value.length)
 		setDraftDurable(webDraft.isDurable())
 		autosize()
 	})
@@ -55,9 +56,13 @@ export function PromptComposer(props: PromptComposerProps) {
 		const preserve = () => saveDraft()
 		addEventListener('pagehide', preserve)
 		document.addEventListener('visibilitychange', preserve)
+		document.addEventListener('keydown', redirectKey)
+		document.addEventListener('paste', redirectPaste)
 		return () => {
 			removeEventListener('pagehide', preserve)
 			document.removeEventListener('visibilitychange', preserve)
+			document.removeEventListener('keydown', redirectKey)
+			document.removeEventListener('paste', redirectPaste)
 		}
 	})
 
@@ -78,10 +83,10 @@ export function PromptComposer(props: PromptComposerProps) {
 	}
 
 	function onKeyDown(event: KeyboardEvent): void {
-		const action = enterAction(event.key, { shift: event.shiftKey, coarse: hasCoarsePointer() })
-		if (action === 'submit') {
+		const action = enterAction(event.key, { shift: event.shiftKey, coarse: hasCoarsePointer(), meta: event.metaKey, ctrl: event.ctrlKey, working: !!props.working })
+		if (action === 'submit' || action === 'queue') {
 			event.preventDefault()
-			void submit()
+			void submit(action === 'queue')
 		}
 	}
 
@@ -117,6 +122,39 @@ export function PromptComposer(props: PromptComposerProps) {
 		void attach(file)
 	}
 
+	function redirectable(event: Event): boolean {
+		if (!input || props.disabled || event.defaultPrevented || document.querySelector('dialog[open]')) return false
+		return !(event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable], [role="textbox"]'))
+	}
+
+	function insert(text: string): void {
+		if (!input) return
+		input.focus()
+		input.setRangeText(text, input.selectionStart, input.selectionEnd, 'end')
+		saveDraft()
+	}
+
+	function redirectKey(event: KeyboardEvent): void {
+		if (!redirectable(event) || !typingKey(event)) return
+		if (event.key === ' ' && event.target instanceof Element && event.target.closest('button, a, summary, [role="button"]')) return
+		event.preventDefault()
+		insert(event.key)
+	}
+
+	function redirectPaste(event: ClipboardEvent): void {
+		if (!redirectable(event)) return
+		const image = pastedImage(event.clipboardData?.items ?? [])
+		const text = event.clipboardData?.getData('text/plain') ?? ''
+		if (!image && !text) return
+		event.preventDefault()
+		if (image) {
+			input?.focus()
+			void attach(image)
+		} else {
+			insert(text)
+		}
+	}
+
 	// Keep activity, execution location and context in the terminal-style status row.
 	return <form class={['PromptComposer', props.disabled && 'disabled']} aria-disabled={props.disabled ? 'true' : undefined} onSubmit={(event: SubmitEvent) => { event.preventDefault(); void submit() }}>
 		<div class="PromptComposer-status">
@@ -149,6 +187,6 @@ export function PromptComposer(props: PromptComposerProps) {
 			</Show>
 			<button type="submit" disabled={attaching() || props.disabled}>{sendLabel(!!props.working)}</button>
 		</div>
-		<div class="PromptComposer-help"><b>enter</b> send <b>shift+enter</b> newline</div>
+		<div class="PromptComposer-help"><b>enter</b> send <b>shift+enter</b> newline <Show when={props.working}><b>cmd+enter</b> queue</Show></div>
 	</form>
 }

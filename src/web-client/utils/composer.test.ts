@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { attachmentRef, enterAction, pastedImage, sendLabel, submissionCommand } from './composer.ts'
+import { attachmentRef, enterAction, pastedImage, sendLabel, submissionCommand, typingKey } from './composer.ts'
 
 describe('enterAction', () => {
 	test('desktop: Enter submits, Shift+Enter newlines', () => {
@@ -15,6 +15,24 @@ describe('enterAction', () => {
 	test('other keys do nothing', () => {
 		expect(enterAction('a', {})).toBe('none')
 	})
+})
+
+test('Cmd/Ctrl+Enter queues while working, otherwise sends normally', () => {
+	expect(enterAction('Enter', { meta: true, working: true })).toBe('queue')
+	expect(enterAction('Enter', { ctrl: true, working: true })).toBe('queue')
+	expect(enterAction('Enter', { meta: true, working: false })).toBe('submit')
+	expect(enterAction('Enter', { meta: true, shift: true, working: true })).toBe('newline')
+})
+
+test('typingKey only redirects printable unmodified keystrokes', () => {
+	const event = (key: string, modifiers = {}) => ({ key, ctrlKey: false, metaKey: false, altKey: false, isComposing: false, ...modifiers }) as KeyboardEvent
+	expect(typingKey(event('a'))).toBe(true)
+	expect(typingKey(event(' '))).toBe(true)
+	expect(typingKey(event('😀'))).toBe(true)
+	for (const key of ['Enter', 'Tab', 'Escape', 'Dead']) expect(typingKey(event(key))).toBe(false)
+	for (const modifiers of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }, { isComposing: true }]) {
+		expect(typingKey(event('a', modifiers))).toBe(false)
+	}
 })
 
 describe('pastedImage', () => {

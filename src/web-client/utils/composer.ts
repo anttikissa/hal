@@ -1,14 +1,20 @@
 import type { Command } from '../../common/protocol.ts'
 
-type EnterAction = 'submit' | 'newline' | 'none'
+type EnterAction = 'submit' | 'queue' | 'newline' | 'none'
 
 // Desktop chat convention: Enter sends, Shift+Enter inserts a newline. On touch
 // keyboards (coarse pointer) there is no Shift, so Enter inserts a newline and
 // the Send button sends — the iMessage/WhatsApp pattern.
-function enterAction(key: string, opts: { shift?: boolean; coarse?: boolean }): EnterAction {
+function enterAction(key: string, opts: { shift?: boolean; coarse?: boolean; meta?: boolean; ctrl?: boolean; working?: boolean }): EnterAction {
 	if (key !== 'Enter') return 'none'
-	if (opts.shift || opts.coarse) return 'newline'
+	if (opts.shift) return 'newline'
+	if (opts.working && (opts.meta || opts.ctrl)) return 'queue'
+	if (opts.coarse) return 'newline'
 	return 'submit'
+}
+
+function typingKey(event: KeyboardEvent): boolean {
+	return [...event.key].length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing
 }
 
 // While a turn runs, sending interrupts it — the terminal calls that steering.
@@ -40,5 +46,5 @@ function submissionCommand(text: string, sessionId: string, id: string, queue: b
 	return { type: 'prompt', id, sessionId, text, source: 'web', queue }
 }
 
-export { attachmentRef, enterAction, pastedImage, sendLabel, submissionCommand }
+export { attachmentRef, enterAction, pastedImage, sendLabel, submissionCommand, typingKey }
 export type { EnterAction }

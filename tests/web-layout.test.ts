@@ -246,7 +246,7 @@ test('compact desktop tabs are vertically centered, with no header or composer d
 test('compact desktop chrome retains 44px targets on touch screens', () => {
 	const media = '@media (pointer: coarse)'
 	expect(declarationInside(media, '.SessionTabs-rail > a', 'height')).toBe('44px')
-	expect(declarationInside(media, '.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new)', 'height')).toBe('44px')
+	expect(declarationInside(media, '.SessionTabs-rail > button', 'height')).toBe('44px')
 })
 
 test('session menu reveals the current tab and keeps actions outside the scrolling list', () => {
