@@ -2,6 +2,7 @@ import type { HistoryEntry } from '../../common/history.ts'
 import { historyProjection, type ProjectedQuestion } from '../../common/history-projection.ts'
 import type { LiveBlock, LiveToolBlock } from '../../common/live-event-blocks.ts'
 import type { ClientSessionSnapshot } from '../../common/snapshots.ts'
+import { webProtocol } from '../../common/web.ts'
 
 export type TranscriptEntry = HistoryEntry | LiveBlock | ProjectedQuestion
 
@@ -82,7 +83,7 @@ function historyItems(history: readonly HistoryEntry[], parentCount = 0): Transc
 function entryText(entry: TranscriptEntry): string {
 	if (entry.type === 'question') return entry.text
 	if (entry.type === 'user') {
-		if (!('parts' in entry)) return entry.text
+		if (typeof entry.text === 'string') return entry.text
 		return historyProjection.userText(entry, { images: 'path-or-image', display: 'ui' })
 	}
 	if (entry.type === 'thinking') return entry.text ?? ''
@@ -96,6 +97,10 @@ function entryText(entry: TranscriptEntry): string {
 function interruption(entry: TranscriptEntry): string | undefined {
 	if ((entry.type !== 'assistant' && entry.type !== 'thinking') || !entry.interruptedBy) return undefined
 	return historyProjection.interruptionText(entry.interruptedBy)
+}
+function imageHref(sessionId: string, blobId: string, token: string): string {
+	const path = webProtocol.imagePath(sessionId, blobId)
+	return path ? `${path}?auth=${encodeURIComponent(token)}` : ''
 }
 
 function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[] {
@@ -112,4 +117,4 @@ function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[]
 	return result
 }
 
-export const webTranscript = { valueText, toolText, historyItems, interruption, items }
+export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref }

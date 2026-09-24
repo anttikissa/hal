@@ -234,7 +234,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 			onSelect={selectSession}
 			onCommand={onTabCommand}
 		/>
-		<Transcript items={transcript()} onAnswer={submitAnswer} />
+		<Transcript items={transcript()} token={props.token} onAnswer={submitAnswer} />
 		<PromptComposer sessionId={selected()} location={webStatus.location(session())} context={webStatus.contextText(snapshot()?.meta)} disabled={!!activeQuestion()} working={!!sharedState().working[selected()]} onSubmit={submitPrompt} onAttach={attachImage} />
 	</>
 }

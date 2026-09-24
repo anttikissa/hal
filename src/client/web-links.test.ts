@@ -11,6 +11,8 @@ test('local session and tool links use the advertised bound port and local web t
 		webLinks.localToken = () => 'localToken12'
 		expect(webLinks.url('05-wan')).toBe('http://localhost:9002/05-wan?auth=localToken12')
 		expect(webLinks.url('05-wan', 'tool/a')).toBe('http://localhost:9002/05-wan?auth=localToken12#tool=tool%2Fa')
+		expect(webLinks.imageUrl('05-wan', '000123-abc')).toBe('http://localhost:9002/images/05-wan/000123-abc?auth=localToken12')
+		expect(webLinks.imageUrl('05-wan', '../secret')).toBe('')
 		expect(webLinks.url('../secret')).toBe('')
 	} finally {
 		client.state.webOrigin = origin
@@ -27,6 +29,7 @@ test('remote links use the connected host and existing auth token, never a diffe
 		expect(webLinks.url('05-wan', 'tool-1')).toBe('https://hal.antti.dev/05-wan?auth=remoteToken1#tool=tool-1')
 		client.state.webOrigin = 'https://hal.antti.dev'
 		expect(webLinks.url('05-wan')).toBe('https://hal.antti.dev/05-wan?auth=remoteToken1')
+		expect(webLinks.imageUrl('05-wan', '000123-abc')).toBe('https://hal.antti.dev/images/05-wan/000123-abc?auth=remoteToken1')
 	} finally {
 		client.state.webOrigin = origin
 		webConnection.state.remote = remote

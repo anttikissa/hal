@@ -88,6 +88,19 @@ test('tool headers link to their exact web card without changing visible width',
 		expect(visLen(header)).toBe(39)
 	} finally { webLinks.url = original }
 })
+test('image path labels link to their stored blob on the host', () => {
+	const original = webLinks.imageUrl
+	webLinks.imageUrl = () => 'https://hal.antti.dev/images/05-wan/000123-abc?auth=valid'
+	try {
+		const block: Block = { type: 'user', text: 'see [/tmp/hal/images/paste.png]', sessionId: '05-wan', parts: [
+			{ type: 'text', text: 'see ' },
+			{ type: 'image', blobId: '000123-abc', originalFile: '/tmp/hal/images/paste.png' },
+		] }
+		const lines = blocks.renderBlock(block, 80)
+		expect(lines.join('')).toContain('\x1b]8;;https://hal.antti.dev/images/05-wan/000123-abc?auth=valid\x07[/tmp/hal/images/paste.png]\x1b]8;;\x07')
+		expect(blockText.stripAnsiSequences(lines.join(''))).toContain('see [/tmp/hal/images/paste.png]')
+	} finally { webLinks.imageUrl = original }
+})
 
 test('streaming cursor leaves the terminal last column unused', () => {
 	const lines = blocks.renderBlock({ type: 'thinking', text: '1234567', streaming: true }, 9, true)

@@ -1,5 +1,5 @@
 import { models } from './models.ts'
-import type { InterruptionReason } from './history.ts'
+import type { InterruptionReason, UserPart } from './history.ts'
 
 // Browser-safe semantic blocks produced from live server events. Terminal and web
 // clients can enrich or render these blocks independently, but they share this
@@ -14,6 +14,8 @@ export interface LiveBlockBase {
 export interface LiveUserBlock extends LiveBlockBase {
 	type: 'user'
 	text: string
+	parts?: UserPart[]
+	sessionId?: string
 	actualText?: string
 	source?: string
 	status?: string

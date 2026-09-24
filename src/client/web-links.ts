@@ -35,5 +35,13 @@ function url(sessionId: string, toolId?: string): string {
 	const hash = toolId ? `#tool=${encodeURIComponent(toolId)}` : ''
 	return `${origin}/${sessionId}?auth=${encodeURIComponent(token)}${hash}`
 }
+function imageUrl(sessionId: string, blobId: string): string {
+	const path = webProtocol.imagePath(sessionId, blobId)
+	const sessionUrl = path && webLinks.url(sessionId)
+	if (!sessionUrl) return ''
+	const link = new URL(sessionUrl)
+	link.pathname = path
+	return link.href
+}
 
-export const webLinks = { state, localToken, url }
+export const webLinks = { state, localToken, url, imageUrl }

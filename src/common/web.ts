@@ -68,5 +68,9 @@ const sessionPathPattern = /^\/\d+-[a-z]+$/
 function isSessionPath(pathname: string): boolean {
 	return sessionPathPattern.test(pathname)
 }
+function imagePath(sessionId: string, blobId: string): string {
+	if (!webProtocol.isSessionPath(`/${sessionId}`) || !/^[a-z0-9]{6,}-[a-z0-9]{3}$/.test(blobId)) return ''
+	return `/images/${sessionId}/${blobId}`
+}
 
-export const webProtocol = { encode, decode, applySessionMessage, applyMessageToSnapshots, isSessionPath }
+export const webProtocol = { encode, decode, applySessionMessage, applyMessageToSnapshots, isSessionPath, imagePath }

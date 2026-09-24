@@ -131,6 +131,27 @@ test('session snapshot hydrates persisted tool output', () => {
 		blob.readBlobFromChain = originalReadBlob
 	}
 })
+test('image endpoint serves stored blobs only with web authentication', async () => {
+	const originalRead = blob.readBlobFromChain
+	const originalAuth = serverKeys.authenticate
+	blob.readBlobFromChain = () => ({ media_type: 'image/png', data: 'aGVsbG8=' })
+	serverKeys.authenticate = (token) => token === 'valid' ? { token, purpose: 'test', createdAt: '' } : null
+	try {
+		const path = 'http://localhost:9001/images/05-wan/000123-abc'
+		const denied = await web.imageResponse(new Request(path), '127.0.0.1')
+		expect(denied.status).toBe(401)
+		const allowed = await web.imageResponse(new Request(`${path}?auth=valid`), '127.0.0.1')
+		expect(allowed.status).toBe(200)
+		expect(allowed.headers.get('content-type')).toBe('image/png')
+		expect(await allowed.text()).toBe('hello')
+		expect((await web.imageResponse(new Request('http://localhost:9001/images/05-wan/../secret?auth=valid'), '127.0.0.1')).status).toBe(404)
+		blob.readBlobFromChain = () => ({ media_type: 'text/html', data: 'aGVsbG8=' })
+		expect((await web.imageResponse(new Request(`${path}?auth=valid`), '127.0.0.1')).status).toBe(404)
+	} finally {
+		blob.readBlobFromChain = originalRead
+		serverKeys.authenticate = originalAuth
+	}
+})
 
 test('websocket parser accepts ASON authentication and ordinary commands', () => {
 	expect(web.parseClientMessage("{ type: 'authenticate', token: 'aBcDeFgHiJkL' }")).toEqual({ type: 'authenticate', token: 'aBcDeFgHiJkL' })

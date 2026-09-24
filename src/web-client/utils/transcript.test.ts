@@ -2,6 +2,10 @@ import { expect, test } from 'bun:test'
 import type { HistoryEntry } from '../../common/history.ts'
 import { webTranscript } from './transcript.ts'
 
+test('browser image links use the stored blob rather than the original server path', () => {
+	expect(webTranscript.imageHref('05-wan', '000123-abc', 'myToken')).toBe('/images/05-wan/000123-abc?auth=myToken')
+	expect(webTranscript.imageHref('05-wan', '../secret', 'myToken')).toBe('')
+})
 test('history tool results merge into their call block', () => {
 	const history: HistoryEntry[] = [
 		{ type: 'tool_call', toolId: 'tool-1', name: 'bash', input: { command: 'printf hello' }, blobId: 'blob-1', ts: '2026-08-13T12:00:00.000Z' },

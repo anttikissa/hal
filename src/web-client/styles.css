@@ -190,6 +190,7 @@ button { touch-action: manipulation; }
 .TranscriptItem.log, .TranscriptItem.info { color: #aaa; }
 .TranscriptItem > label { font-size: .9em; color: #aaa; }
 .TranscriptItem .TranscriptItem-content { display: contents; }
+.TranscriptItem .TranscriptItem-part { display: contents; }
 .TranscriptItem .TranscriptItem-interruption { color: #aaa; }
 
 /* Tool cards are tiny command tickets, not log panes. Their colored left edge

@@ -1,4 +1,4 @@
-import { Show } from 'solid-js'
+import { For, Show } from 'solid-js'
 import type { AnswerValue } from '../../common/history.ts'
 import { transcriptTitles } from '../../common/transcript-titles.ts'
 import { historyProjection } from '../../common/history-projection.ts'
@@ -7,9 +7,11 @@ import { webMarkdown } from '../utils/markdown.ts'
 import { webQuestion } from '../utils/question.ts'
 import { QuestionBlock } from './QuestionBlock.tsx'
 import { ToolCard } from './ToolCard.tsx'
+import { router } from '../router.ts'
 
 type TranscriptItemProps = {
 	item: RenderedTranscriptItem
+	token: string
 	onAnswer: (questionId: string, value: AnswerValue) => Promise<boolean>
 }
 
@@ -24,7 +26,16 @@ export function TranscriptItem(props: TranscriptItemProps) {
 					<Show when={'continuedAfter' in props.item.entry && props.item.entry.continuedAfter}>
 						<span class="TranscriptItem-interruption">{historyProjection.continuationText()} </span>
 					</Show>
-					<div class="TranscriptItem-content" innerHTML={webMarkdown.html(props.item.text, 'usageBars' in props.item.entry && props.item.entry.usageBars === true)} />
+					<div class="TranscriptItem-content">
+						<Show when={props.item.entry.type === 'user' && !('text' in props.item.entry && typeof props.item.entry.text === 'string') && 'parts' in props.item.entry ? props.item.entry.parts : undefined}
+							fallback={<div innerHTML={webMarkdown.html(props.item.text, 'usageBars' in props.item.entry && props.item.entry.usageBars === true)} />}>
+							{(parts) => <For each={parts()}>{(part) => part.type === 'text'
+								? <div class="TranscriptItem-part" innerHTML={webMarkdown.html(part.displayText ?? part.text)} />
+								: <Show when={webTranscript.imageHref(router.sessionId(), part.blobId, props.token)} fallback={<span>{part.originalFile ? `[${part.originalFile}]` : '[image]'}</span>}>
+									{(href) => <a href={href()} target="_blank" rel="noreferrer">{part.originalFile ? `[${part.originalFile}]` : '[image]'}</a>}
+								</Show>}</For>}
+						</Show>
+					</div>
 					<Show when={webTranscript.interruption(props.item.entry)}>
 						{(interruption) => <span class="TranscriptItem-interruption"> {interruption()}</span>}
 					</Show>

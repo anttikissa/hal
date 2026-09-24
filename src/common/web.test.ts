@@ -46,3 +46,8 @@ test('session routes are the paths the browser app serves itself', () => {
 	expect(webProtocol.isSessionPath('/api/update')).toBe(false)
 	expect(webProtocol.isSessionPath('/05-wan/extra')).toBe(false)
 })
+test('image paths accept only stored blob identifiers', () => {
+	expect(webProtocol.imagePath('05-wan', '000123-abc')).toBe('/images/05-wan/000123-abc')
+	expect(webProtocol.imagePath('05-wan', '../secret')).toBe('')
+	expect(webProtocol.imagePath('../secret', '000123-abc')).toBe('')
+})

@@ -8,6 +8,7 @@ import { TranscriptItem } from './TranscriptItem.tsx'
 type TranscriptProps = {
 	items: RenderedTranscriptItem[]
 	onAnswer: (questionId: string, value: AnswerValue) => Promise<boolean>
+	token: string
 }
 
 export function Transcript(props: TranscriptProps) {
@@ -55,6 +56,6 @@ export function Transcript(props: TranscriptProps) {
 		},
 	)
 	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateAutoFollow}>
-		<For each={props.items}>{(item) => <TranscriptItem item={item} onAnswer={props.onAnswer} />}</For>
+		<For each={props.items}>{(item) => <TranscriptItem item={item} token={props.token} onAnswer={props.onAnswer} />}</For>
 	</main>
 }

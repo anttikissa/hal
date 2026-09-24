@@ -220,7 +220,18 @@ function blockContent(block: Block, cols: number): string[] {
 		return containToolLines(lines, cols, spec.overflow, hiddenIndicator)
 	}
 	const lines: string[] = []
-	for (const raw of expandTabs(blockText.sanitizeTerminalText(block.text), blockConfig.tabWidth).split('\n')) {
+	let text = blockText.sanitizeTerminalText(block.text)
+	if (block.type === 'user' && block.parts && block.sessionId) {
+		text = ''
+		for (const part of block.parts) {
+			if (part.type === 'text') text += blockText.sanitizeTerminalText(part.displayText ?? part.text)
+			else {
+				const label = blockText.sanitizeTerminalText(part.originalFile ? `[${part.originalFile}]` : '[image]')
+				text += blockText.hyperlink(label, webLinks.imageUrl(block.sessionId, part.blobId))
+			}
+		}
+	}
+	for (const raw of expandTabs(text, blockConfig.tabWidth).split('\n')) {
 		lines.push(...wordWrap(raw, cols))
 	}
 	return lines

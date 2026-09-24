@@ -102,6 +102,23 @@ function appAsset(pathname: string): Response | null {
 	return new Response(Bun.file(`${import.meta.dir}/../web-client/${asset[0]}`), { headers: { 'content-type': asset[1], 'cache-control': 'no-store' } })
 }
 
+async function imageResponse(request: Request, ip: string): Promise<Response> {
+	const url = new URL(request.url)
+	const match = /^\/images\/(\d+-[a-z]+)\/([a-z0-9]{6,}-[a-z0-9]{3})$/.exec(url.pathname)
+	if (request.method !== 'GET' || !match || webProtocol.imagePath(match[1]!, match[2]!) !== url.pathname) return new Response('Not found', { status: 404 })
+	const auth = request.headers.get('authorization')
+	const token = auth?.startsWith('Bearer ') ? auth.slice(7) : url.searchParams.get('auth') ?? ''
+	if (!serverKeys.authenticate(token, ip)) return new Response('Unauthorized', { status: 401 })
+	const image = blob.readBlobFromChain(match[1]!, match[2]!)
+	if (!/^image\/(png|jpeg|gif|webp)$/.test(image?.media_type) || typeof image.data !== 'string') return new Response('Not found', { status: 404 })
+	return new Response(Buffer.from(image.data, 'base64'), { headers: {
+		'content-type': image.media_type,
+		'cache-control': 'no-store',
+		'referrer-policy': 'no-referrer',
+		'x-content-type-options': 'nosniff',
+	} })
+}
+
 function sessionSnapshot(sessionId: string): ClientSessionSnapshot | null {
 	const session = ipc.readState().sessions.find((item) => item.id === sessionId)
 	const meta = sessions.loadSessionMeta(sessionId)
@@ -342,6 +359,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 					const url = new URL(request.url)
 					if (url.pathname === '/api/update') return handleUpdateRequest(request)
 					if (url.pathname === '/upload') return webUpload.handleUploadRequest(request, server.requestIP(request)?.address ?? 'unknown')
+					if (url.pathname.startsWith('/images/')) return web.imageResponse(request, server.requestIP(request)?.address ?? 'unknown')
 					if (url.pathname === '/completions/cd') {
 						const token = request.headers.get('authorization')?.replace(/^Bearer /, '') ?? ''
 						if (!serverKeys.authenticate(token, server.requestIP(request)?.address ?? 'unknown')) return new Response('Unauthorized', { status: 401 })
@@ -460,6 +478,7 @@ export const web = {
 	pageHtml,
 	appAssets,
 	appAsset,
+	imageResponse,
 	bundleClient,
 	hydrateHistory,
 	sessionSnapshot,

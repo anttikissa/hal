@@ -64,6 +64,8 @@ function historyToBlocks(
 					type: 'user',
 					id: entry.id,
 					text: displayText,
+					parts: !isSystem && entry.parts.some((part) => part.type === 'image') ? entry.parts : undefined,
+					sessionId: blobOwner,
 					actualText: editText === displayText ? undefined : editText,
 					source: isSystem ? 'system' : entry.source ?? undefined,
 					status: entry.status,
