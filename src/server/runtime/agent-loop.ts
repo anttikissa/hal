@@ -420,7 +420,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		const provider = await providerPromise
 		const totalUsage = meter.usage
 		let lastDoneMeta: TurnEndMeta | null = null
-		let lastDone: ProviderStreamEvent | null = null
 		let retryAttempt = 0
 		let retryStartedAt = 0
 		let hadTerminalError = false
@@ -651,7 +650,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 							}
 							iterationDone = true
 							lastDoneMeta = { status: event.doneStatus ?? 'completed' }
-							lastDone = event
 							break
 						}
 					}
@@ -745,8 +743,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				if (!thinkingText && !assistantText && serverToolHistory.length === 0 && !terminalErrorEntry) {
 					// An empty provider reply is a failed turn, not a completed one: that way the
 					// prompt shows the retry affordance and a bare Enter re-runs the turn.
-					// Name the stop reason so the user sees why, not just that it was empty.
-					emptyResponseMessage = `Provider returned no output (stop_reason: ${lastDone?.stopReason ?? 'unknown'}, ${lastDone?.usage?.output ?? 0} output tokens). Please retry.`
+					emptyResponseMessage = 'Provider returned an empty response. Please retry.'
 					hadTerminalError = true
 					historyEntries.push(errorHistoryEntry(emptyResponseMessage, undefined, ts))
 				}

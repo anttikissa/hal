@@ -626,7 +626,7 @@ test('logs a whitespace-only completed provider response so the user can retry',
 	providerLoader.getProvider = async () => ({
 		async *generate() {
 			yield { type: 'text', text: '\n\n' }
-			yield { type: 'done', usage: { input: 1, output: 4, cacheRead: 0, cacheCreation: 0 }, stopReason: 'end_turn' }
+			yield { type: 'done', usage: { input: 1, output: 4, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})
 	ipc.appendEvent = (event: any) => {
@@ -645,11 +645,11 @@ test('logs a whitespace-only completed provider response so the user can retry',
 		expect(events).toContainEqual(expect.objectContaining({
 			type: 'response',
 			isError: true,
-			text: 'Provider returned no output (stop_reason: end_turn, 4 output tokens). Please retry.',
+			text: 'Provider returned an empty response. Please retry.',
 		}))
 		expect(sessions.loadHistory(sessionId)).toContainEqual(expect.objectContaining({
 			type: 'error',
-			text: 'Provider returned no output (stop_reason: end_turn, 4 output tokens). Please retry.',
+			text: 'Provider returned an empty response. Please retry.',
 		}))
 		expect(sessions.loadHistory(sessionId).findLast((entry) => entry.type === 'turn_end')).toMatchObject({ type: 'turn_end', status: 'failed' })
 		expect(continuation.actionForHistory(sessions.loadHistory(sessionId))).toBe('retry')

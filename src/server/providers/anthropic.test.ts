@@ -272,7 +272,7 @@ test('anthropic provider surfaces max_tokens truncation instead of an empty resp
 	].join('\n'), { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any)
 
 	const events = await collect({ value: 'tok-test', type: 'token' })
-	expect(events.find((event) => event.type === 'error')?.message).toContain('output token limit')
+	expect(events.find((event) => event.type === 'error')?.message).toContain('Response stopped: max_tokens')
 })
 
 test('anthropic provider ignores malformed SSE JSON lines', async () => {

@@ -175,7 +175,6 @@ async function* parseStream(
 	const serverTools = new Map<number, { block: any; json: string }>()
 	const usage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 	let gotStop = false
-	let stopReason = ''
 
 	for await (const ev of providerShared.iterateJsonSse(body)) {
 		if (ev.type === 'content_block_start') {
@@ -235,19 +234,14 @@ async function* parseStream(
 			})
 		} else if (ev.type === 'message_delta') {
 			if (ev.usage) usage.output += ev.usage.output_tokens ?? 0
-			stopReason = ev.delta?.stop_reason ?? stopReason
+			const stopReason = ev.delta?.stop_reason
 			if (stopReason === 'refusal') {
 				const details = { stop_reason: 'refusal', stop_details: ev.delta.stop_details }
 				const explanation = ev.delta.stop_details?.explanation ?? 'The request was blocked by Anthropic policy.'
 				yield { type: 'error', message: `Claude refused the request: ${explanation}`, body: JSON.stringify(details) }
-			} else if (stopReason === 'max_tokens') {
-				// A tool call cut off mid-input never gets content_block_stop, so without
-				// this error the turn would look empty.
-				let cutOff = ''
-				for (const t of tools.values()) cutOff = ` while writing a ${t.name} tool call (${t.json.length} chars of input dropped)`
-				yield { type: 'error', message: `Response hit the output token limit (${MAX_TOKENS} tokens)${cutOff}.`, body: JSON.stringify(ev.delta) }
 			} else if (stopReason && !NORMAL_STOP_REASONS.includes(stopReason)) {
-				yield { type: 'error', message: `Response stopped with stop_reason ${stopReason}`, body: JSON.stringify(ev.delta) }
+				// e.g. max_tokens: a tool call cut off mid-input is dropped, so the turn would look empty.
+				yield { type: 'error', message: `Response stopped: ${stopReason} (max_tokens is ${MAX_TOKENS})`, body: JSON.stringify(ev.delta) }
 			}
 		} else if (ev.type === 'message_stop') {
 			gotStop = true
@@ -260,7 +254,7 @@ async function* parseStream(
 	}
 
 	if (!gotStop) return
-	yield { type: 'done', doneStatus: 'completed', usage, stopReason }
+	yield { type: 'done', doneStatus: 'completed', usage }
 }
 
 // ── Generate ──

@@ -340,8 +340,6 @@ export interface ProviderStreamEvent {
 	// Providers without cache tracking (e.g. OpenAI) leave cacheRead/cacheCreation as 0.
 	usage?: TokenUsage
 	doneStatus?: TurnEndStatus
-	// Raw provider stop reason, shown when a turn ends with no output.
-	stopReason?: string
 }
 
 export interface ProviderRequest {
