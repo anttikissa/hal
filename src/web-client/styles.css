@@ -18,8 +18,8 @@ body { margin: 0; font: 15px/1.5 'IBM Plex Mono', ui-monospace, Menlo, monospace
 #app { position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-height, 100dvh); overflow: hidden; display: flex; flex-direction: column; }
 button { touch-action: manipulation; }
 
-.SessionTabs > button, .SessionTabs-rail > button, .PromptComposer-controls > button, .PromptComposer-input > textarea { font: inherit; padding: 8px; background: var(--info-bg, var(--page)); color: inherit; border: 1px solid var(--status-fg, var(--muted)); }
-.SessionTabs > button, .SessionTabs-rail > button, .PromptComposer-controls > button { cursor: pointer; }
+.SessionTabs > button, .PromptComposer-controls > button, .PromptComposer-input > textarea { font: inherit; padding: 8px; background: var(--info-bg, var(--page)); color: inherit; border: 1px solid var(--status-fg, var(--muted)); }
+.SessionTabs > button, .PromptComposer-controls > button { cursor: pointer; }
 
 .AuthGate {
 	max-width: 36rem;
@@ -56,11 +56,11 @@ button { touch-action: manipulation; }
 .SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { grid-row: 2; width: 44px; height: 32px; padding: 0; background: transparent; border: 0; color: var(--tab-activeFg, var(--text)); }
 .SessionTabs > .SessionTabs-rail { grid-column: 1 / -1; grid-row: 1; min-width: 0; display: flex; align-items: center; gap: 4px; height: 32px; overflow: hidden; }
 .SessionTabs-prefix { flex: 0 0 52px; color: var(--status-fg, var(--muted)); }
-.SessionTabs-rail > button { flex: none; display: inline-flex; justify-content: center; align-items: center; gap: 2px; width: 56px; height: 28px; padding: 3px 2px; line-height: 1; text-align: center; background: transparent; border: 0; color: var(--tab-inactiveFg, var(--muted)); }
-.SessionTabs-rail > button.selected { color: var(--tab-activeFg, var(--text)); font-weight: 600; }
-.SessionTabs-rail > button.selected > .SessionTabs-number::before { content: '['; }
-.SessionTabs-rail > button.selected > .SessionTabs-number::after { content: ']'; }
-.SessionTabs > button:focus-visible, .SessionTabs-rail > button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.SessionTabs-rail > a { flex: none; display: inline-flex; justify-content: center; align-items: center; gap: 2px; width: 56px; height: 28px; padding: 3px 2px; line-height: 1; text-align: center; text-decoration: none; background: transparent; border: 0; color: var(--tab-inactiveFg, var(--muted)); }
+.SessionTabs-rail > a.selected { color: var(--tab-activeFg, var(--text)); font-weight: 600; }
+.SessionTabs-rail > a.selected > .SessionTabs-number::before { content: '['; }
+.SessionTabs-rail > a.selected > .SessionTabs-number::after { content: ']'; }
+.SessionTabs > button:focus-visible, .SessionTabs-rail > a:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .SessionTabs-activity { display: inline-flex; align-items: center; gap: 2px; }
 .SessionTabs-activity:empty { display: none; }
 .SessionTabs-marker { line-height: 1; }
@@ -141,7 +141,7 @@ button { touch-action: manipulation; }
 .SessionTabs-list > div[hidden] { display: none; }
 .SessionTabs-list > div.selected { background: var(--user-bg, var(--page)); border-color: var(--user-fg, var(--text)); }
 .SessionTabs-panel button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; }
-.SessionTabs-list > div > .SessionTabs-open { flex: 1; min-width: 0; padding: 8px 12px; text-align: left; overflow-wrap: anywhere; }
+.SessionTabs-list > div > .SessionTabs-open { flex: 1; min-width: 0; padding: 8px 12px; text-align: left; overflow-wrap: anywhere; text-decoration: none; color: inherit; }
 .SessionTabs-open > .SessionTabs-number { color: var(--tab-activeFg, var(--text)); margin-right: 6px; }
 .SessionTabs-open > small { display: block; color: var(--muted); font-size: inherit; margin-top: 4px; }
 /* Show the project for a useful session list; truncate deep paths rather than shrinking the close target. */
@@ -352,7 +352,7 @@ button { touch-action: manipulation; }
 /* Touch fields need 16px to avoid Safari's automatic input zoom. */
 @media (pointer: coarse) {
 	.SessionTabs > .SessionTabs-rail { height: 48px; }
-	.SessionTabs-rail > button { height: 44px; }
+	.SessionTabs-rail > a { height: 44px; }
 	.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { height: 44px; }
 	.PromptComposer-input > textarea { font-size: 16px; }
 	.SessionTabs-search, .AuthGate > form > input, .QuestionBlock > form > textarea, .QuestionBlock > form > input { font-size: 16px; }

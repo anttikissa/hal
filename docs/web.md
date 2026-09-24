@@ -17,6 +17,8 @@ of truth; re-read it after upgrades.
   event-to-block projection belongs in `src/common/live-event-blocks.ts`.
 - Keep transcript wording and structure aligned with the terminal; web styling may adapt to the medium, but moving between clients should require minimal relearning.
 - Never put a scrolling region inside another scrolling region. The transcript owns scrolling; expanded blocks, tool output, saved pastes, and question details grow to their full height. Wrap wide code and tables instead of adding inner scrollbars.
+- Load `colors.css` once as a stylesheet. **Never poll static assets or configuration from the browser**: periodic requests for unchanged data are unacceptable. If live updates become necessary, use push invalidation instead of a timer.
+- Navigation is a link (`<a href>`), not a button: preserve Cmd/Ctrl-click, middle-click, copy-link, and new-tab behavior. Only intercept an unmodified primary click for client-side routing.
 
 ## Stack
 

@@ -198,7 +198,7 @@ test('tab strip measures its width and renders only visible, keyboard-focusable 
 	expect(source).toContain('sessionActivity.capacity(')
 	expect(source).toContain('<For each={shown()} keyed={(session) => session.id}>')
 	expect(declaration('.SessionTabs > .SessionTabs-rail', 'min-width')).toBe('0')
-	expect(declaration('.SessionTabs-rail > button', 'width')).toBe('56px')
+	expect(declaration('.SessionTabs-rail > a', 'width')).toBe('56px')
 })
 
 test('phone editing grows the draft while retaining context and avoiding the bottom inset', () => {
@@ -237,15 +237,15 @@ test('numbered tabs precede the session name without narrowing the strip', () =>
 
 test('compact desktop tabs are vertically centered, with no header or composer dividers', () => {
 	expect(declaration('.SessionTabs > .SessionTabs-rail', 'height')).toBe('32px')
-	expect(declaration('.SessionTabs-rail > button', 'height')).toBe('28px')
-	expect(declaration('.SessionTabs-rail > button', 'align-items')).toBe('center')
+	expect(declaration('.SessionTabs-rail > a', 'height')).toBe('28px')
+	expect(declaration('.SessionTabs-rail > a', 'align-items')).toBe('center')
 	expect(declaration('.SessionTabs', 'border-bottom')).toBeUndefined()
 	expect(declaration('.PromptComposer', 'border-top')).toBeUndefined()
 })
 
 test('compact desktop chrome retains 44px targets on touch screens', () => {
 	const media = '@media (pointer: coarse)'
-	expect(declarationInside(media, '.SessionTabs-rail > button', 'height')).toBe('44px')
+	expect(declarationInside(media, '.SessionTabs-rail > a', 'height')).toBe('44px')
 	expect(declarationInside(media, '.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new)', 'height')).toBe('44px')
 })
 

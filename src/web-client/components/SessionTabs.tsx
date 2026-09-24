@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show } from 'so
 import type { SharedSessionInfo } from '../../common/ipc.ts'
 import { appActions } from '../utils/app-actions.ts'
 import { sessionActivity } from '../utils/session-activity.ts'
+import { router } from '../router.ts'
 
 type SessionTabsProps = {
 	sessions: SharedSessionInfo[]
@@ -33,7 +34,7 @@ export function SessionTabs(props: SessionTabsProps) {
 
 	onSettled(() => {
 		const observer = new ResizeObserver(() => {
-			const width = rail.querySelector('button')?.getBoundingClientRect().width ?? 56
+			const width = rail.querySelector('a')?.getBoundingClientRect().width ?? 56
 			const gap = parseFloat(getComputedStyle(rail).gap) || 0
 			const prefix = rail.querySelector('.SessionTabs-prefix')?.getBoundingClientRect().width ?? 0
 			setVisibleCount(sessionActivity.capacity(rail.clientWidth - prefix - gap, width, gap))
@@ -82,16 +83,21 @@ export function SessionTabs(props: SessionTabsProps) {
 					const session = () => item()
 					const activity = () => sessionActivity.describe(session(), !!props.working?.[session().id], !!props.summarizing?.[session().id])
 					const number = () => session().tab ?? props.sessions.indexOf(session()) + 1
-					return <button
+					return <a
+						href={router.format(session().id)}
 						class={{ selected: session().id === props.selected }}
-						onClick={() => select(session().id)}
+						onClick={(event) => {
+							if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+							event.preventDefault()
+							select(session().id)
+						}}
 						aria-current={session().id === props.selected ? 'page' : undefined}
 						aria-label={`Tab ${number()}, ${session().name || session().id}, ${activity().label}`}
 						title={`${number()} ${session().name || session().id} · ${activity().label}`}
 					>
 						<span class="SessionTabs-number">{number()}</span>
 						<ActivityMarkers description={activity()} />
-					</button>
+					</a>
 				}}
 			</For>
 		</nav>
@@ -123,13 +129,17 @@ export function SessionTabs(props: SessionTabsProps) {
 							// Model ids are `provider/model`; the provider prefix is noise here.
 							const model = () => session.model?.split('/').at(-1)
 							return <div class={{ selected: session.id === props.selected }} hidden={!sessionActivity.matches(session, query(), number())}>
-								<button class="SessionTabs-open" onClick={() => select(session.id)} aria-current={session.id === props.selected ? 'page' : undefined} aria-label={`Tab ${number()}, ${session.id}: ${session.name || session.id}, ${activity().label}`}>
+								<a class="SessionTabs-open" href={router.format(session.id)} onClick={(event) => {
+									if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+									event.preventDefault()
+									select(session.id)
+								}} aria-current={session.id === props.selected ? 'page' : undefined} aria-label={`Tab ${number()}, ${session.id}: ${session.name || session.id}, ${activity().label}`}>
 									<span class="SessionTabs-number">{number()}</span>
 									<ActivityMarkers description={activity()} />
 									{session.name || session.id}
 									<small>{session.id}{model() ? ` · ${model()}` : ''}{session.id === props.selected ? ' · Current' : ''}</small>
 									<span class="SessionTabs-cwd" title={session.cwd}>{session.cwd}</span>
-								</button>
+								</a>
 								<Show when={props.sessions.length > 1}>
 									<button class="SessionTabs-close" onClick={(event) => closeTab(event, session.id)} aria-label={`Close ${session.name || session.id}`}>×</button>
 								</Show>

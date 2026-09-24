@@ -1,6 +1,5 @@
 import { expect, test } from 'bun:test'
-import { palette } from './palette.ts'
-import { colorCss } from '../../common/color-css.ts'
+import { colorCss } from './color-css.ts'
 
 const SOURCE = `{
 	vars: { fgL: 0.80, fgC: 0.15, bgL: 0.25, bgC: 0.04 },
@@ -40,23 +39,4 @@ test('all transcript and composer roles resolve to CSS variables', () => {
 
 test('invalid triples and selectors never enter the CSS', () => {
 	expect(colorCss.css(`{ tools: { "x} body { color: red": { fg: [0.8, 0.15, 320], bg: [0.25, 0.04, 320] }, bash: { fg: [0.8, 0.15], bg: ["$missing", 0, 0] } } }`)).toBe('')
-})
-
-test('live reload applies CSS edits and stays quiet while it is unchanged', async () => {
-	const sources = ['.ToolCard-bash { --tool-fg: oklch(0.8 0.15 320); }', '', '']
-	const applied: string[] = []
-	let reads = 0
-	const originalFetchSource = palette.fetchSource
-	const originalPause = palette.pause
-	try {
-		palette.fetchSource = async () => sources[reads++] ?? ''
-		palette.pause = async () => {}
-		await palette.sync((css) => applied.push(css), () => reads >= sources.length)
-
-		// Two distinct sources, three reads: the repeated one must not restyle.
-		expect(applied).toEqual([sources[0]!, ''])
-	} finally {
-		palette.fetchSource = originalFetchSource
-		palette.pause = originalPause
-	}
 })
