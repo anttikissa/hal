@@ -124,6 +124,13 @@ test('the transcript is the only scrolling row', () => {
 	expect(declaration('.PromptComposer', 'flex')).toBe('none')
 })
 
+test('transcript and composer use viewport width without the old narrow column', () => {
+	for (const selector of ['.Transcript', '.PromptComposer']) {
+		expect(declaration(selector, 'width')).toBe('100%')
+		expect(declaration(selector, 'margin')).toBeUndefined()
+	}
+})
+
 test('idle composer activity uses the palette idle grey instead of the done-tab green', () => {
 	expect(declaration('.PromptComposer-activity', 'color')).toBe('var(--assistant-cursorIdle, var(--status-fg, var(--muted)))')
 })
@@ -214,6 +221,20 @@ test('numbered tabs precede the smaller session name without narrowing the strip
 	expect(declaration('.SessionTabs > .SessionTabs-rail', 'grid-row')).toBe('1')
 	expect(declaration('.SessionTabs > .SessionTabs-title', 'grid-row')).toBe('2')
 	expect(declaration('.SessionTabs > .SessionTabs-title', 'font-size')).toBe('13px')
+})
+
+test('compact desktop tabs are vertically centered, with no header or composer dividers', () => {
+	expect(declaration('.SessionTabs > .SessionTabs-rail', 'height')).toBe('32px')
+	expect(declaration('.SessionTabs-rail > button', 'height')).toBe('28px')
+	expect(declaration('.SessionTabs-rail > button', 'align-items')).toBe('center')
+	expect(declaration('.SessionTabs', 'border-bottom')).toBeUndefined()
+	expect(declaration('.PromptComposer', 'border-top')).toBeUndefined()
+})
+
+test('compact desktop chrome retains 44px targets on touch screens', () => {
+	const media = '@media (pointer: coarse)'
+	expect(declarationInside(media, '.SessionTabs-rail > button', 'height')).toBe('44px')
+	expect(declarationInside(media, '.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new)', 'height')).toBe('44px')
 })
 
 test('session menu reveals the current tab and keeps actions outside the scrolling list', () => {

@@ -48,16 +48,15 @@ button { touch-action: manipulation; }
 	flex: none;
 	display: grid;
 	grid-template-columns: 44px minmax(0, 1fr) 44px;
-	gap: 4px 8px;
-	padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
+	gap: 2px 8px;
+	padding: calc(6px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 6px calc(8px + env(safe-area-inset-left));
 	background: var(--page);
-	border-bottom: 1px solid var(--status-fg, var(--muted));
 }
 .SessionTabs > .SessionTabs-title { grid-column: 2; grid-row: 2; min-width: 0; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tab-activeFg, var(--text)); font-size: 13px; }
-.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { grid-row: 2; width: 44px; height: 44px; padding: 0; background: transparent; border: 0; color: var(--tab-activeFg, var(--text)); }
-.SessionTabs > .SessionTabs-rail { grid-column: 1 / -1; grid-row: 1; min-width: 0; display: flex; align-items: center; gap: 4px; height: 44px; overflow: hidden; }
+.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { grid-row: 2; width: 44px; height: 32px; padding: 0; background: transparent; border: 0; color: var(--tab-activeFg, var(--text)); }
+.SessionTabs > .SessionTabs-rail { grid-column: 1 / -1; grid-row: 1; min-width: 0; display: flex; align-items: center; gap: 4px; height: 32px; overflow: hidden; }
 .SessionTabs-prefix { flex: 0 0 52px; color: var(--status-fg, var(--muted)); }
-.SessionTabs-rail > button { flex: none; width: 56px; height: 44px; padding: 0 2px; text-align: center; background: transparent; border: 0; color: var(--tab-inactiveFg, var(--muted)); }
+.SessionTabs-rail > button { flex: none; display: inline-flex; justify-content: center; align-items: center; gap: 2px; width: 56px; height: 28px; padding: 3px 2px; line-height: 1; text-align: center; background: transparent; border: 0; color: var(--tab-inactiveFg, var(--muted)); }
 .SessionTabs-rail > button.selected { color: var(--tab-activeFg, var(--text)); font-weight: 600; }
 .SessionTabs-rail > button.selected > .SessionTabs-number::before { content: '['; }
 .SessionTabs-rail > button.selected > .SessionTabs-number::after { content: ']'; }
@@ -74,7 +73,11 @@ button { touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) { .SessionTabs-marker.animated { animation: none; } }
 .SessionTabs-close { color: var(--muted); padding: 0 2px; }
 .SessionTabs-number { font-variant-numeric: tabular-nums; }
-.SessionTabs-new { min-width: 44px; min-height: 44px; }
+@media (pointer: coarse) {
+	.SessionTabs > .SessionTabs-rail { height: 48px; }
+	.SessionTabs-rail > button { height: 44px; }
+	.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { height: 44px; }
+}
 
 @media (max-width: 48em) {
 	/* Short drafts leave room to read; long drafts shrink the transcript first.
@@ -162,8 +165,7 @@ button { touch-action: manipulation; }
 	min-height: 0;
 	overflow-y: auto;
 	overscroll-behavior: contain;
-	width: min(100%, 772px);
-	margin: 0 auto;
+	width: 100%;
 	padding: 16px;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
@@ -278,13 +280,11 @@ button { touch-action: manipulation; }
 .PromptComposer {
 	flex: none;
 	flex-wrap: wrap;
-	width: min(100%, 772px);
-	margin: 0 auto;
+	width: 100%;
 	display: flex;
 	align-items: stretch;
 	padding: 8px 16px calc(10px + env(safe-area-inset-bottom));
 	background: var(--page);
-	border-top: 1px solid var(--status-fg, var(--muted));
 }
 /* Execution context still truncates rather than pushing the action off a narrow screen. */
 .PromptComposer > .PromptComposer-status { display: flex; flex: 1 0 100%; align-items: baseline; gap: 8px; min-width: 0; padding-bottom: 8px; color: var(--status-fg, var(--muted)); font-size: 12px; }
