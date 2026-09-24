@@ -406,7 +406,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 
 function isSnapshotBoundary(event: unknown): boolean {
 	if (!isObject(event)) return false
-	return event.type === 'stream-end' || event.type === 'history-rebased' || event.type === 'history-updated'
+	return event.type === 'stream-end' || event.type === 'history-replaced' || event.type === 'history-updated'
 }
 
 export const web = {

@@ -98,7 +98,7 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 	const { oldLog, newLog, entryCount } = sessionStore.rewriteHistoryForRebase(sessionId, applied.entries)
 	openai.resetSession(sessionId)
 	snapshots.delete(requestId)
-	ipc.appendEvent({ type: 'history-rebased', sessionId, oldLog, newLog, entryCount })
+	ipc.appendEvent({ type: 'history-replaced', sessionId, oldLog, newLog, entryCount })
 	for (const text of applied.queue) await queueRunner.enqueuePrompt(sessionId, text)
 	emitRebaseResult(clientPid, requestId, sessionId, { ok: true, newLog, queued: applied.queue.length })
 }

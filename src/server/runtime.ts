@@ -617,7 +617,7 @@ async function amendLastPrompt(sessionId: string, text: string, source?: string,
 		const { oldLog, newLog, entryCount } = sessionStore.rewriteHistoryForRebase(sessionId, entries)
 		resetProviderConversation(sessionId)
 		sessionStore.clearLive(sessionId)
-		ipc.appendEvent({ type: 'history-rebased', sessionId, oldLog, newLog, entryCount })
+		ipc.appendEvent({ type: 'history-replaced', sessionId, oldLog, newLog, entryCount })
 		return true
 	}
 	return false
@@ -628,7 +628,7 @@ function cancelAmendedPrompt(sessionId: string): void {
 	if (!canceled) return
 	resetProviderConversation(sessionId)
 	sessionStore.clearLive(sessionId)
-	ipc.appendEvent({ type: 'history-rebased', sessionId, newLog: canceled.logName, entryCount: canceled.entryCount })
+	ipc.appendEvent({ type: 'history-replaced', sessionId, newLog: canceled.logName, entryCount: canceled.entryCount })
 	ipc.updateState((shared) => updateSharedTurnStatus(shared, sessionId, false))
 }
 

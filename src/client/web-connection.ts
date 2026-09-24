@@ -65,7 +65,7 @@ function applyReconnectBootstrap(bootstrap: ClientBootstrap): void {
 	state.events = []
 	webConnection.applyBootstrap(bootstrap)
 	state.stateListener?.(bootstrap.state)
-	for (const snapshot of bootstrap.snapshots) webConnection.queueEvent({ type: 'history-rebased', sessionId: snapshot.session.id })
+	for (const snapshot of bootstrap.snapshots) webConnection.queueEvent({ type: 'history-replaced', sessionId: snapshot.session.id })
 }
 
 function applyMessage(message: WebServerMessage): void {

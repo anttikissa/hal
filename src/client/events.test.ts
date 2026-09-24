@@ -1,12 +1,12 @@
 import { expect, test } from 'bun:test'
 import { clientEvents } from './events.ts'
 
-test('history-rebased reloads exactly the rebased log prefix', () => {
+test('history-replaced reloads exactly the rebased log prefix', () => {
 	const tab = { sessionId: 's1' }
 	let reload: any = null
 	let force: any = null
 
-	clientEvents.handle({ type: 'history-rebased', sessionId: 's1', newLog: 'history8.asonl', entryCount: 6 }, {
+	clientEvents.handle({ type: 'history-replaced', sessionId: 's1', newLog: 'history8.asonl', entryCount: 6 }, {
 		tabForSession: (sessionId: string) => sessionId === 's1' ? tab : null,
 		reloadTabFromDisk: (receivedTab: any, opts: any) => { reload = { tab: receivedTab, opts } },
 		repaintIfActive: (_tab: any, value: boolean) => { force = value },
@@ -53,7 +53,7 @@ test('reconnect refreshes every tab but repaints only the active tab', () => {
 		},
 	}
 
-	for (const tab of tabs) clientEvents.handle({ type: 'history-rebased', sessionId: tab.sessionId }, ctx)
+	for (const tab of tabs) clientEvents.handle({ type: 'history-replaced', sessionId: tab.sessionId }, ctx)
 
 	expect(reloads).toEqual(['s1', 's2', 's3', 's4', 's5'])
 	expect(repaints).toEqual([{ sessionId: 's1', force: true }])

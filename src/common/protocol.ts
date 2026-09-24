@@ -26,7 +26,7 @@ export type EventType =
 	| 'history-updated'
 	| 'rebase-start'
 	| 'rebase-result'
-	| 'history-rebased'
+	| 'history-replaced'
 	| 'background-activity'
 	| 'draft_saved'
 

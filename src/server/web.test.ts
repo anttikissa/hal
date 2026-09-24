@@ -165,7 +165,7 @@ test('websocket is an authenticated ASON command bus', async () => {
 
 test('websocket snapshots refresh history boundaries', () => {
 	expect(web.isSnapshotBoundary({ type: 'stream-end' })).toBe(true)
-	expect(web.isSnapshotBoundary({ type: 'history-rebased' })).toBe(true)
+	expect(web.isSnapshotBoundary({ type: 'history-replaced' })).toBe(true)
 	expect(web.isSnapshotBoundary({ type: 'history-updated' })).toBe(true)
 	expect(web.isSnapshotBoundary({ type: 'stream-delta' })).toBe(false)
 })

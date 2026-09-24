@@ -24,7 +24,7 @@ function handle(event: any, ctx: any): void {
 	if (event.type === 'draft_saved' && event.sessionId) return handleDraftSaved(event, ctx)
 	if (event.type === 'rebase-start') return handleRebaseStart(event, ctx)
 	if (event.type === 'rebase-result') return handleRebaseResult(event, ctx)
-	if (event.type === 'history-rebased') return handleHistoryRebased(event, ctx)
+	if (event.type === 'history-replaced') return handleHistoryReplaced(event, ctx)
 	if (event.type === 'background-activity' && event.sessionId) return handleBackgroundActivity(event, ctx)
 }
 
@@ -159,7 +159,7 @@ function handleHistoryUpdated(event: any, ctx: any): void {
 	ctx.onChange(ctx.currentTab() === tab)
 }
 
-function handleHistoryRebased(event: any, ctx: any): void {
+function handleHistoryReplaced(event: any, ctx: any): void {
 	ctx.clearPendingPrompt?.(event.sessionId)
 	const tab = ctx.tabForSession(event.sessionId)
 	if (!tab) return
