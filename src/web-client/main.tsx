@@ -19,6 +19,7 @@ import { sessionSelection } from './utils/session-selection.ts'
 import { reconnect } from './utils/reconnect.ts'
 import { webDraft } from './utils/draft.ts'
 import { webViewport } from './utils/viewport.ts'
+import { webShortcuts } from './utils/shortcuts.ts'
 import { router } from './router.ts'
 
 const tokenStorageKey = 'hal-web-auth'
@@ -138,6 +139,33 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 		sendCommand(command as unknown as Command)
 	}
 
+	function onShortcut(event: KeyboardEvent): void {
+		if (document.querySelectorAll('dialog[open]').length) return
+		const action = webShortcuts.action(event)
+		if (action === null) return
+		const sessions = sharedState().sessions
+		if (typeof action === 'number') {
+			const tab = sessions.find((item, index) => (item.tab ?? index + 1) === action)
+			if (!tab) return
+			event.preventDefault()
+			selectSession(tab.id)
+			return
+		}
+		if ((action === 'close' && sessions.length < 2) || (action === 'abort' && !sharedState().working[selected()])) return
+		event.preventDefault()
+		if (action === 'next' || action === 'prev') {
+			const index = sessions.findIndex((item) => item.id === selected())
+			const offset = action === 'next' ? 1 : sessions.length - 1
+			if (index >= 0 && sessions.length) selectSession(sessions[(index + offset) % sessions.length]!.id)
+			return
+		}
+		if (action === 'fork') onTabCommand({ type: 'open', forkSessionId: selected() })
+		else onTabCommand({ type: action, sessionId: selected() })
+	}
+	onSettled(() => {
+		addEventListener('keydown', onShortcut)
+		return () => removeEventListener('keydown', onShortcut)
+	})
 
 	async function attachImage(file: File): Promise<string> {
 		const form = new FormData()
