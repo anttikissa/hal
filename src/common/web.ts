@@ -7,6 +7,8 @@ import { liveEventBlocks } from './live-event-blocks.ts'
 export interface WebAuthenticateMessage {
 	type: 'authenticate'
 	token: string
+	// Session the client will show first; only its history is in the bootstrap.
+	focus?: string
 }
 
 export interface WebCommandMessage {

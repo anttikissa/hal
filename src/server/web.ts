@@ -125,14 +125,39 @@ function hydrateHistory(sessionId: string, history: ReturnType<typeof sessions.l
 	})
 }
 
-function bootstrap(): ClientBootstrap {
+// Building every snapshot takes about as long as sending them (reading tool
+// outputs dominates), so the bootstrap carries only the tab the client shows
+// first. Without a focus (the browser), the first tab stands in for it.
+function bootstrap(focus?: string): ClientBootstrap {
 	const shared = ipc.readState()
+	const focused = shared.sessions.find((session) => session.id === focus) ?? shared.sessions[0]
 	const snapshots: ClientSessionSnapshot[] = []
-	for (const session of shared.sessions) {
-		const snapshot = web.sessionSnapshot(session.id)
-		if (snapshot) snapshots.push(snapshot)
-	}
+	const snapshot = focused ? web.sessionSnapshot(focused.id) : null
+	if (snapshot) snapshots.push(snapshot)
 	return { state: shared, metas: sessions.loadAllSessionMetas(), snapshots }
+}
+
+// The sessions left out of the bootstrap, nearest tabs to the focused one first.
+function streamOrder(focus?: string): string[] {
+	const ids = ipc.readState().sessions.map((session) => session.id)
+	const center = Math.max(0, ids.indexOf(focus ?? ''))
+	const order: string[] = []
+	for (let distance = 1; distance < ids.length; distance++) {
+		if (center - distance >= 0) order.push(ids[center - distance]!)
+		if (center + distance < ids.length) order.push(ids[center + distance]!)
+	}
+	return order
+}
+
+// Yield between snapshots so live traffic and other clients are not starved
+// while dozens of large histories are read and sent.
+async function streamSnapshots(ws: Bun.ServerWebSocket<SocketData>, focus?: string): Promise<void> {
+	for (const sessionId of web.streamOrder(focus)) {
+		await Bun.sleep(0)
+		if (ws.readyState !== WebSocket.OPEN) return
+		const snapshot = web.sessionSnapshot(sessionId)
+		if (snapshot) ws.send(web.encode({ type: 'snapshot', snapshot }))
+	}
 }
 
 function isObject(value: unknown): value is Record<string, any> {
@@ -205,7 +230,10 @@ function parseCommand(value: unknown): Command | null {
 function parseClientMessage(text: string): WebClientMessage | null {
 	const value = webProtocol.decode(text)
 	if (!isObject(value)) return null
-	if (value.type === 'authenticate' && typeof value.token === 'string' && value.token) return { type: 'authenticate', token: value.token }
+	if (value.type === 'authenticate' && typeof value.token === 'string' && value.token) {
+		if (typeof value.focus === 'string') return { type: 'authenticate', token: value.token, focus: value.focus }
+		return { type: 'authenticate', token: value.token }
+	}
 	if (value.type === 'command') {
 		const command = web.parseCommand(value.command)
 		if (command) return { type: 'command', command }
@@ -350,7 +378,8 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 							}
 							tokenSockets.add(ws)
 							ws.subscribe('web')
-							ws.send(web.encode({ type: 'authenticated', bootstrap: web.bootstrap() }))
+							ws.send(web.encode({ type: 'authenticated', bootstrap: web.bootstrap(message.focus) }))
+							void web.streamSnapshots(ws, message.focus)
 							return
 						}
 						if (message.type === 'command') runtime.handleCommand({ ...message.command, createdAt: new Date().toISOString() })
@@ -423,6 +452,8 @@ export const web = {
 	hydrateHistory,
 	sessionSnapshot,
 	bootstrap,
+	streamOrder,
+	streamSnapshots,
 	parseCommand,
 	parseClientMessage,
 	uploadDir: () => webUpload.uploadDir(),

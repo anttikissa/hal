@@ -6,6 +6,7 @@ import type { WebServerMessage } from '../common/web.ts'
 import { webProtocol } from '../common/web.ts'
 import { client } from './app.ts'
 import { clientBackend } from './backend.ts'
+import { clientPersistence } from './persistence.ts'
 import { clientTransport } from './transport.ts'
 
 type RemoteCredentials = {
@@ -19,6 +20,8 @@ const state = {
 	shared: { sessions: [], working: {}, updatedAt: '' } as SharedState,
 	metas: new Map<string, ClientBootstrap['metas'][number]>(),
 	snapshots: new Map<string, ClientSessionSnapshot>(),
+	// Open sessions the bootstrap left out; the host streams them in afterwards.
+	pending: new Set<string>(),
 	events: [] as any[],
 	wakeEvent: null as (() => void) | null,
 	stateListener: null as ((shared: SharedState) => void) | null,
@@ -47,6 +50,7 @@ function applyBootstrap(bootstrap: ClientBootstrap): void {
 	state.snapshots.clear()
 	for (const meta of bootstrap.metas) state.metas.set(meta.id, meta)
 	for (const snapshot of bootstrap.snapshots) webConnection.applySnapshot(snapshot)
+	state.pending = new Set(bootstrap.state.sessions.map((session) => session.id).filter((id) => !state.snapshots.has(id)))
 }
 
 function queueEvent(event: any): void {
@@ -76,6 +80,9 @@ function applyMessage(message: WebServerMessage): void {
 	}
 	if (message.type === 'snapshot') {
 		webConnection.applySnapshot(message.snapshot)
+		// A tab may already be showing without its history. Reload it through the
+		// event queue so events received before this snapshot are not applied twice.
+		if (state.pending.delete(message.snapshot.session.id)) webConnection.queueEvent({ type: 'history-replaced', sessionId: message.snapshot.session.id })
 		return
 	}
 	if (message.type === 'event') webConnection.queueEvent(message.event)
@@ -153,12 +160,21 @@ async function* tailEvents(signal?: AbortSignal): AsyncGenerator<any> {
 	}
 }
 
+// The tab this client shows first gets its history in the bootstrap. Before the
+// UI exists that is the tab startup will pick (see client.initializeSessions).
+function focus(): string | undefined {
+	const current = client.currentTab()?.sessionId
+	if (current) return current
+	const saved = clientPersistence.load()
+	return saved.restartTab ?? saved.lastTab ?? undefined
+}
+
 function openSocket(remote: RemoteCredentials, signal: AbortSignal, reconnect: boolean): Promise<void> {
 	return new Promise((resolve, reject) => {
 		let authenticated = false
 		const socket = new WebSocket(webConnection.socketUrl(remote.host))
 		state.socket = socket
-		socket.onopen = () => socket.send(webProtocol.encode({ type: 'authenticate', token: remote.authToken }))
+		socket.onopen = () => socket.send(webProtocol.encode({ type: 'authenticate', token: remote.authToken, focus: webConnection.focus() }))
 		socket.onmessage = (event) => {
 			const message = webProtocol.decode(String(event.data)) as WebServerMessage | null
 			if (!message || typeof message !== 'object' || !('type' in message)) return
@@ -234,6 +250,7 @@ function reset(): void {
 	state.shared = { sessions: [], working: {}, updatedAt: '' }
 	state.metas.clear()
 	state.snapshots.clear()
+	state.pending.clear()
 	state.events = []
 	state.wakeEvent = null
 	state.stateListener = null
@@ -246,6 +263,7 @@ export const webConnection = {
 	config,
 	normalizeHost,
 	socketUrl,
+	focus,
 	uploadUrl,
 	applySnapshot,
 	applyBootstrap,

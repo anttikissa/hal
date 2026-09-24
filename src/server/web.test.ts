@@ -119,6 +119,7 @@ test('session snapshot hydrates persisted tool output', () => {
 
 test('websocket parser accepts ASON authentication and ordinary commands', () => {
 	expect(web.parseClientMessage("{ type: 'authenticate', token: 'aBcDeFgHiJkL' }")).toEqual({ type: 'authenticate', token: 'aBcDeFgHiJkL' })
+	expect(web.parseClientMessage("{ type: 'authenticate', token: 'aBcDeFgHiJkL', focus: '04-work' }")).toEqual({ type: 'authenticate', token: 'aBcDeFgHiJkL', focus: '04-work' })
 	expect(web.parseClientMessage("{ type: 'command', command: { type: 'abort', sessionId: '04-work' } }")).toEqual({ type: 'command', command: { type: 'abort', sessionId: '04-work' } })
 	expect(web.parseClientMessage("{ type: 'command', command: { type: 'prompt', text: 42 } }")).toBeNull()
 	expect(web.parseClientMessage("{ type: 'command', command: { type: 'prompt', id: 'bad', text: 'hello' } }")).toBeNull()
@@ -265,5 +266,23 @@ test('session urls serve the browser app so a tab is shareable as a link', async
 		expect((await fetch(`${base}/styles.css`)).headers.get('content-type')).toContain('text/css')
 	} finally {
 		controller.abort()
+	}
+})
+
+test('bootstrap carries only the focused snapshot; the rest stream nearest-first', () => {
+	const originalReadState = ipc.readState
+	const originalSnapshot = web.sessionSnapshot
+	const ids = ['01-a', '02-b', '03-c', '04-d', '05-e']
+	ipc.readState = () => ({ sessions: ids.map((id) => ({ id, cwd: '/' })), working: {}, updatedAt: '' })
+	web.sessionSnapshot = (id: string) => ({ session: { id, cwd: '/' }, meta: { id, createdAt: '' }, history: [], parentCount: 0, live: [] })
+	try {
+		expect(web.bootstrap('04-d').snapshots.map((s) => s.session.id)).toEqual(['04-d'])
+		expect(web.streamOrder('04-d')).toEqual(['03-c', '05-e', '02-b', '01-a'])
+		// Browsers send no focus; the first tab stands in for it.
+		expect(web.bootstrap().snapshots.map((s) => s.session.id)).toEqual(['01-a'])
+		expect(web.streamOrder()).toEqual(['02-b', '03-c', '04-d', '05-e'])
+	} finally {
+		ipc.readState = originalReadState
+		web.sessionSnapshot = originalSnapshot
 	}
 })

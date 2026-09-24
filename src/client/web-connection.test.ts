@@ -124,3 +124,18 @@ test('commands entered during reconnect do not throw', () => {
 
 	webConnection.reset()
 })
+
+test('streamed snapshots of tabs missing from the bootstrap reload those tabs once', () => {
+	webConnection.reset()
+	const snapshot = (id: string) => ({ session: { id, cwd: '/' }, meta: { id, createdAt: '' }, history: [], parentCount: 0, live: [] })
+	webConnection.applyBootstrap({
+		state: { sessions: [{ id: '01-a', cwd: '/' }, { id: '02-b', cwd: '/' }], working: {}, updatedAt: '' },
+		metas: [],
+		snapshots: [snapshot('01-a')],
+	})
+	webConnection.applyMessage({ type: 'snapshot', snapshot: snapshot('01-a') })
+	webConnection.applyMessage({ type: 'snapshot', snapshot: snapshot('02-b') })
+	webConnection.applyMessage({ type: 'snapshot', snapshot: snapshot('02-b') })
+	expect(webConnection.state.events).toEqual([{ type: 'history-replaced', sessionId: '02-b' }])
+	webConnection.reset()
+})
