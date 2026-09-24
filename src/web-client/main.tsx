@@ -69,6 +69,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	// spot the session that appears for the first time and select it.
 	let previousIds = new Set<string>()
 	let socket: WebSocket | undefined
+	let colorsRevision = 0
 	let unauthorized = false
 
 	// `replace` is for selections the user did not ask for (the initial landing
@@ -189,6 +190,11 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 		connection.onmessage = (event) => {
 			const message = webProtocol.decode(String(event.data)) as WebServerMessage | null
 			if (!message || typeof message !== 'object' || !('type' in message)) return
+			if (message.type === 'colors-changed') {
+				const link = document.querySelector<HTMLLinkElement>('link[href^="/colors.css"]')
+				if (link) link.href = `/colors.css?v=${++colorsRevision}`
+				return
+			}
 			if (message.type === 'error') {
 				unauthorized = true
 				props.onUnauthorized()

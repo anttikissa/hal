@@ -1,7 +1,7 @@
 // Local web transport. Browser assets are bundled lazily, so normal startup
 // does not pay for the web client.
 
-import { readFileSync } from 'fs'
+import { readFileSync, watch } from 'fs'
 import type { Command } from '../common/protocol.ts'
 import type { ClientBootstrap, ClientSessionSnapshot } from '../common/snapshots.ts'
 import type { WebClientMessage, WebServerMessage } from '../common/web.ts'
@@ -331,6 +331,10 @@ function urlForToken(token: WebToken, port = state.port): string {
 	return `${web.origin(port)}/?auth=${token.token}`
 }
 
+function publishColorsChanged(server: Bun.Server<SocketData>): void {
+	if (server.subscriberCount('web')) server.publish('web', web.encode({ type: 'colors-changed' }))
+}
+
 function publishSnapshot(server: Bun.Server<SocketData>, sessionId: string): void {
 	// Building a snapshot reloads and hydrates the whole session, so skip it entirely
 	// when nobody is listening: the host runs this server even with no client attached.
@@ -434,6 +438,10 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 	}
 	state.server = server
 	state.port = server.port ?? port
+	// Watch the directory so atomic editor saves (rename into place) also notify browsers.
+	const colorsWatcher = watch(`${import.meta.dir}/../..`, { persistent: false }, (_event, name) => {
+		if (name === 'colors.ason') web.publishColorsChanged(server)
+	})
 	let openIds = new Set(ipc.readState().sessions.map((session) => session.id))
 	const unsubscribeState = ipc.onStateChange((shared) => {
 		const nextIds = new Set(shared.sessions.map((session) => session.id))
@@ -452,6 +460,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 		}
 	})()
 	signal.addEventListener('abort', () => {
+		colorsWatcher.close()
 		unsubscribeRevocation()
 		unsubscribeState()
 		// Close live sockets too: the server is going away, and remote clients should
@@ -501,4 +510,5 @@ export const web = {
 	handleUpdateRequest,
 	encode,
 	publishSnapshot,
+	publishColorsChanged,
 }

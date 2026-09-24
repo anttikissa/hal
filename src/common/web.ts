@@ -24,6 +24,7 @@ export type WebServerMessage =
 	| { type: 'state'; state: SharedState }
 	| { type: 'snapshot'; snapshot: ClientSessionSnapshot }
 	| { type: 'event'; event: any }
+	| { type: 'colors-changed' }
 
 function encode(message: WebClientMessage | WebServerMessage): string {
 	return ason.stringify(message, 'short')

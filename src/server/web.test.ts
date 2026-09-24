@@ -87,6 +87,12 @@ test('the public CSS asset resolves the current shared palette without authentic
 	expect(await response?.text()).toContain('--assistant-fg: oklch(')
 })
 
+test('palette changes notify authenticated web subscribers over the existing channel', () => {
+	const sent: Array<[string, string]> = []
+	web.publishColorsChanged({ subscriberCount: () => 1, publish: (channel: string, message: string) => { sent.push([channel, message]); return 1 } } as unknown as Bun.Server<any>)
+	expect(sent.map(([channel, message]) => [channel, webProtocol.decode(message)])).toEqual([['web', { type: 'colors-changed' }]])
+})
+
 test('session snapshot exposes complete client bootstrap data', () => {
 	const originalReadState = ipc.readState
 	const originalLoadMeta = sessions.loadSessionMeta
