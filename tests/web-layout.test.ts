@@ -151,13 +151,23 @@ test('native motion is only requested for new blocks or sends and respects reduc
 	expect(transcript).toContain('onScrollEnd=')
 })
 
-test('prompt type stays readable without triggering iOS focus zoom', () => {
-	expect(declaration('.PromptComposer > textarea', 'font-size')).toBe('16px')
-	expect(declaration('.PromptComposer > textarea', 'line-height')).toBe('24px')
+test('desktop text shares the 15px type scale while touch fields avoid iOS zoom', () => {
+	expect(declaration('.SessionTabs > .SessionTabs-title', 'font-size')).toBe('15px')
+	expect(declaration('.PromptComposer-input > textarea', 'font-size')).toBe('15px')
+	expect(declaration('.PromptComposer > .PromptComposer-help', 'font-size')).toBe('15px')
+	expect(declaration('.PromptComposer-input > textarea', 'line-height')).toBe('24px')
+	expect(declarationInside('@media (pointer: coarse)', '.PromptComposer-input > textarea', 'font-size')).toBe('16px')
+})
+
+test('a clipped input shell keeps scrolled prompt text out of the status line', () => {
+	const source = readFileSync(resolve(webDir, 'components/PromptComposer.tsx'), 'utf8')
+	expect(source).toContain('<div class="PromptComposer-input" ref=')
+	expect(declaration('.PromptComposer-input', 'overflow')).toBe('hidden')
+	expect(declaration('.PromptComposer-input', 'min-height')).toBe('44px')
 })
 
 test('composer controls use CSS borders rather than native control decoration', () => {
-	const controls = '.PromptComposer > textarea, .PromptComposer-controls > button'
+	const controls = '.PromptComposer-input > textarea, .PromptComposer-controls > button'
 	expect(declaration(controls, 'appearance')).toBe('none')
 	expect(declaration(controls, 'margin')).toBe('0')
 	expect(declaration(controls, 'border-radius')).toBe('0')
@@ -168,13 +178,13 @@ test('composer controls use CSS borders rather than native control decoration', 
 
 test('short composer buttons fit within the same 44px minimum as the textarea', () => {
 	const buttons = '.PromptComposer-controls > button'
-	expect(declaration(buttons, 'min-height')).toBe(declaration('.PromptComposer > textarea', 'min-height'))
+	expect(declaration(buttons, 'min-height')).toBe(declaration('.PromptComposer-input > textarea', 'min-height'))
 	// An explicit 24px line box bounds Apple Color Emoji within the touch target.
 	expect(declaration(buttons, 'line-height')).toBe('24px')
 })
 
 test('single-line prompt text has equal space above and below its line box', () => {
-	const textarea = '.PromptComposer > textarea'
+	const textarea = '.PromptComposer-input > textarea'
 	const height = parseFloat(declaration(textarea, 'min-height')!)
 	const line = parseFloat(declaration(textarea, 'line-height')!)
 	const padding = parseFloat(declaration(textarea, 'padding')!)
@@ -193,17 +203,19 @@ test('tab strip measures its width and renders only visible, keyboard-focusable 
 
 test('phone editing grows the draft while retaining context and avoiding the bottom inset', () => {
 	const media = '@media (max-width: 48em)'
-	const focused = '#app:has(> .PromptComposer > textarea:focus)'
+	const focused = '#app:has(> .PromptComposer .PromptComposer-input > textarea:focus)'
 	const composer = `${focused} > .PromptComposer`
 	expect(declarationInside(media, `${focused} > .Transcript`, 'min-height')).toBe('min(64px, 15%)')
 	expect(declarationInside(media, composer, 'flex')).toBe('0 1 auto')
 	expect(declarationInside(media, composer, 'flex-direction')).toBe('column')
 	expect(declarationInside(media, composer, 'padding-bottom')).toBe('8px')
-	expect(declarationInside(media, `${composer} > textarea`, 'max-height')).toBe('none')
+	expect(declarationInside(media, `${composer} > .PromptComposer-input`, 'min-height')).toBe('44px')
+	expect(declarationInside(media, `${composer} > .PromptComposer-input`, 'max-height')).toBe('none')
 	// CSS keeps the desktop cap; JS must measure the whole draft, not eight lines.
 	const source = readFileSync(resolve(webDir, 'components/PromptComposer.tsx'), 'utf8')
 	expect(source).toContain('`${input.scrollHeight}px`')
-	expect(declaration('.PromptComposer > textarea', 'max-height')).toBe('168px')
+	expect(source).toContain('inputShell.style.height = `${input.scrollHeight}px`')
+	expect(declaration('.PromptComposer-input > textarea', 'max-height')).toBe('168px')
 })
 
 test('tab header keeps the current name and complete searchable session menu at any size', () => {
@@ -215,12 +227,12 @@ test('tab header keeps the current name and complete searchable session menu at 
 	expect(declaration('.SessionTabs-list > div[hidden]', 'display')).toBe('none')
 })
 
-test('numbered tabs precede the smaller session name without narrowing the strip', () => {
+test('numbered tabs precede the session name without narrowing the strip', () => {
 	const source = readFileSync(resolve(webDir, 'components/SessionTabs.tsx'), 'utf8')
 	expect(source.indexOf('<nav class="SessionTabs-rail"')).toBeLessThan(source.indexOf('<span class="SessionTabs-title"'))
 	expect(declaration('.SessionTabs > .SessionTabs-rail', 'grid-row')).toBe('1')
 	expect(declaration('.SessionTabs > .SessionTabs-title', 'grid-row')).toBe('2')
-	expect(declaration('.SessionTabs > .SessionTabs-title', 'font-size')).toBe('13px')
+	expect(declaration('.SessionTabs > .SessionTabs-title', 'font-size')).toBe('15px')
 })
 
 test('compact desktop tabs are vertically centered, with no header or composer dividers', () => {

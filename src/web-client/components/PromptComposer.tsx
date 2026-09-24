@@ -26,6 +26,7 @@ function hasCoarsePointer(): boolean {
 
 export function PromptComposer(props: PromptComposerProps) {
 	let input: HTMLTextAreaElement | undefined
+	let inputShell: HTMLDivElement | undefined
 	let fileInput: HTMLInputElement | undefined
 	const [attaching, setAttaching] = createSignal(false)
 	const [draftDurable, setDraftDurable] = createSignal(true)
@@ -33,9 +34,11 @@ export function PromptComposer(props: PromptComposerProps) {
 	// Measure the whole draft. CSS caps desktop height; focused phone editing
 	// can use the remaining viewport before the textarea needs to scroll.
 	function autosize(): void {
-		if (!input) return
+		if (!input || !inputShell) return
+		inputShell.style.height = 'auto'
 		input.style.height = 'auto'
 		input.style.height = `${input.scrollHeight}px`
+		inputShell.style.height = `${input.scrollHeight}px`
 	}
 
 	function saveDraft(): void {
@@ -125,18 +128,20 @@ export function PromptComposer(props: PromptComposerProps) {
 			<Show when={props.context}><span class="PromptComposer-context">{props.context}</span></Show>
 			<Show when={!draftDurable()}><span class="PromptComposer-draft-warning" role="status">Draft not saved — keep this page open</span></Show>
 		</div>
-		<textarea
-			ref={(element) => { input = element }}
-			rows={1}
-			autocomplete="off"
-			placeholder="Message"
-			disabled={props.disabled}
-			onInput={saveDraft}
-			onFocus={autosize}
-			onBlur={autosize}
-			onKeyDown={onKeyDown}
-			onPaste={onPaste}
-		/>
+		<div class="PromptComposer-input" ref={(element) => { inputShell = element }}>
+			<textarea
+				ref={(element) => { input = element }}
+				rows={1}
+				autocomplete="off"
+				placeholder="Message"
+				disabled={props.disabled}
+				onInput={saveDraft}
+				onFocus={autosize}
+				onBlur={autosize}
+				onKeyDown={onKeyDown}
+				onPaste={onPaste}
+			/>
+		</div>
 		<input ref={(element) => { fileInput = element }} type="file" accept="image/*" style="display: none" disabled={props.disabled} onChange={attachPickedFile} />
 		<div class="PromptComposer-controls">
 			<button type="button" class="PromptComposer-attach" disabled={attaching() || props.disabled} title="Attach image" onClick={() => fileInput?.click()}>📎</button>

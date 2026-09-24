@@ -18,7 +18,7 @@ body { margin: 0; font: 15px/1.5 'IBM Plex Mono', ui-monospace, Menlo, monospace
 #app { position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-height, 100dvh); overflow: hidden; display: flex; flex-direction: column; }
 button { touch-action: manipulation; }
 
-.SessionTabs > button, .SessionTabs-rail > button, .PromptComposer-controls > button, .PromptComposer > textarea { font: inherit; padding: 8px; background: var(--info-bg, var(--page)); color: inherit; border: 1px solid var(--status-fg, var(--muted)); }
+.SessionTabs > button, .SessionTabs-rail > button, .PromptComposer-controls > button, .PromptComposer-input > textarea { font: inherit; padding: 8px; background: var(--info-bg, var(--page)); color: inherit; border: 1px solid var(--status-fg, var(--muted)); }
 .SessionTabs > button, .SessionTabs-rail > button, .PromptComposer-controls > button { cursor: pointer; }
 
 .AuthGate {
@@ -38,7 +38,7 @@ button { touch-action: manipulation; }
 	border-radius: .25rem;
 	color: inherit;
 	padding: .6rem;
-	font-size: 16px;
+	font-size: 15px;
 }
 .AuthGate > form > button { cursor: pointer; }
 
@@ -52,7 +52,7 @@ button { touch-action: manipulation; }
 	padding: calc(6px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 6px calc(8px + env(safe-area-inset-left));
 	background: var(--page);
 }
-.SessionTabs > .SessionTabs-title { grid-column: 2; grid-row: 2; min-width: 0; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tab-activeFg, var(--text)); font-size: 13px; }
+.SessionTabs > .SessionTabs-title { grid-column: 2; grid-row: 2; min-width: 0; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tab-activeFg, var(--text)); font-size: 15px; }
 .SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { grid-row: 2; width: 44px; height: 32px; padding: 0; background: transparent; border: 0; color: var(--tab-activeFg, var(--text)); }
 .SessionTabs > .SessionTabs-rail { grid-column: 1 / -1; grid-row: 1; min-width: 0; display: flex; align-items: center; gap: 4px; height: 32px; overflow: hidden; }
 .SessionTabs-prefix { flex: 0 0 52px; color: var(--status-fg, var(--muted)); }
@@ -73,17 +73,12 @@ button { touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) { .SessionTabs-marker.animated { animation: none; } }
 .SessionTabs-close { color: var(--muted); padding: 0 2px; }
 .SessionTabs-number { font-variant-numeric: tabular-nums; }
-@media (pointer: coarse) {
-	.SessionTabs > .SessionTabs-rail { height: 48px; }
-	.SessionTabs-rail > button { height: 44px; }
-	.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { height: 44px; }
-}
 
 @media (max-width: 48em) {
 	/* Short drafts leave room to read; long drafts shrink the transcript first.
 	   Keep the existing scroll regions, not a duplicate conversation preview. */
-	#app:has(> .PromptComposer > textarea:focus) > .Transcript { min-height: min(64px, 15%); }
-	#app:has(> .PromptComposer > textarea:focus) > .PromptComposer {
+	#app:has(> .PromptComposer .PromptComposer-input > textarea:focus) > .Transcript { min-height: min(64px, 15%); }
+	#app:has(> .PromptComposer .PromptComposer-input > textarea:focus) > .PromptComposer {
 		flex: 0 1 auto;
 		min-height: 0;
 		width: 100%;
@@ -93,14 +88,15 @@ button { touch-action: manipulation; }
 		   indicator inset must not reserve another empty strip inside that box. */
 		padding-bottom: 8px;
 	}
-	#app:has(> .PromptComposer > textarea:focus) > .PromptComposer > .PromptComposer-status { flex: none; }
-	#app:has(> .PromptComposer > textarea:focus) > .PromptComposer > textarea {
+	#app:has(> .PromptComposer .PromptComposer-input > textarea:focus) > .PromptComposer > .PromptComposer-status { flex: none; }
+	#app:has(> .PromptComposer .PromptComposer-input > textarea:focus) > .PromptComposer > .PromptComposer-input {
 		flex: 1 1 auto;
 		width: 100%;
-		min-height: 0;
+		min-height: 44px;
 		max-height: none;
 	}
-	#app:has(> .PromptComposer > textarea:focus) > .PromptComposer > .PromptComposer-controls { flex: none; justify-content: flex-end; }
+	#app:has(> .PromptComposer .PromptComposer-input > textarea:focus) > .PromptComposer > .PromptComposer-input > textarea { min-height: 44px; max-height: none; }
+	#app:has(> .PromptComposer .PromptComposer-input > textarea:focus) > .PromptComposer > .PromptComposer-controls { flex: none; justify-content: flex-end; }
 }
 /* Sessions scroll independently so occasional actions remain within reach. */
 .SessionTabs-sheet {
@@ -130,7 +126,7 @@ button { touch-action: manipulation; }
 }
 .SessionTabs-panelHeading { flex: none; display: flex; align-items: center; justify-content: space-between; padding-left: 8px; }
 .SessionTabs-panelHeading > button { min-width: 44px; min-height: 44px; }
-.SessionTabs-search { flex: none; width: 100%; min-height: 44px; margin: 4px 0 8px; padding: 8px; font: 16px/1.5 'IBM Plex Mono', ui-monospace, Menlo, monospace; color: var(--text); background: var(--page); border: 1px solid var(--status-fg, var(--muted)); border-radius: 6px; }
+.SessionTabs-search { flex: none; width: 100%; min-height: 44px; margin: 4px 0 8px; padding: 8px; font: inherit; color: var(--text); background: var(--page); border: 1px solid var(--status-fg, var(--muted)); border-radius: 6px; }
 .SessionTabs-search:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .SessionTabs-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .SessionTabs-list > div {
@@ -147,7 +143,7 @@ button { touch-action: manipulation; }
 .SessionTabs-panel button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .SessionTabs-list > div > .SessionTabs-open { flex: 1; min-width: 0; padding: 8px 12px; text-align: left; overflow-wrap: anywhere; }
 .SessionTabs-open > .SessionTabs-number { color: var(--tab-activeFg, var(--text)); margin-right: 6px; }
-.SessionTabs-open > small { display: block; color: var(--muted); margin-top: 4px; }
+.SessionTabs-open > small { display: block; color: var(--muted); font-size: inherit; margin-top: 4px; }
 /* Show the project for a useful session list; truncate deep paths rather than shrinking the close target. */
 .SessionTabs-open > .SessionTabs-cwd { display: block; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
 .SessionTabs-list > div > .SessionTabs-close { flex: none; width: 48px; color: var(--error-fg, var(--text)); border-left: 1px solid var(--status-fg, var(--muted)); }
@@ -170,6 +166,7 @@ button { touch-action: manipulation; }
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
+.Transcript small { font-size: inherit; }
 /* The transcript owns Hal's cursor; the composer keeps its native editing caret. */
 .Transcript-cursor { min-height: 2lh; padding: 6px 0; color: var(--assistant-cursorIdle, var(--assistant-fg, var(--text))); }
 .Transcript-cursor.thinking { color: var(--thinking-fg, var(--muted)); }
@@ -255,8 +252,7 @@ button { touch-action: manipulation; }
 .QuestionBlock { margin: 10px 0; padding: 13px; background: var(--info-bg, var(--page)); border-left: 3px solid var(--info-fg, var(--text)); white-space: normal; }
 .QuestionBlock.active { background: var(--user-bg, var(--page)); border-left-color: var(--user-fg, var(--text)); }
 .QuestionBlock > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.QuestionBlock > header > strong { font-size: 1.05em; }
-.QuestionBlock > header > span { flex: none; color: var(--user-fg, var(--text)); font-size: .9em; }
+.QuestionBlock > header > span { flex: none; color: var(--user-fg, var(--text)); }
 .QuestionBlock > details { margin-top: 8px; color: var(--muted); }
 .QuestionBlock > details > summary { cursor: pointer; color: var(--user-fg, var(--text)); }
 .QuestionBlock > details > pre { max-height: 12rem; margin: 7px 0 0; padding: 8px; overflow: auto; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -264,10 +260,10 @@ button { touch-action: manipulation; }
 .QuestionBlock > fieldset > legend { margin-bottom: 8px; color: var(--muted); }
 .QuestionBlock > fieldset > button { min-height: 44px; padding: 8px 10px; font: inherit; text-align: left; color: inherit; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); cursor: pointer; }
 .QuestionBlock > fieldset > button:first-of-type { border-color: var(--user-fg, var(--text)); }
-.QuestionBlock > fieldset > button > span { display: block; margin-top: 3px; color: var(--muted); font-size: .9em; }
+.QuestionBlock > fieldset > button > span { display: block; margin-top: 3px; color: var(--muted); }
 .QuestionBlock > form { display: grid; grid-template-columns: 1fr auto; gap: 7px; margin-top: 12px; }
 .QuestionBlock > form > label { grid-column: 1 / -1; color: var(--muted); }
-.QuestionBlock > form > textarea, .QuestionBlock > form > input { min-width: 0; padding: 9px; font: inherit; font-size: 16px; line-height: 1.4; color: inherit; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); }
+.QuestionBlock > form > textarea, .QuestionBlock > form > input { min-width: 0; padding: 9px; font: inherit; line-height: 1.4; color: inherit; background: var(--page); border: 1px solid var(--status-fg, var(--muted)); }
 .QuestionBlock > form > textarea { grid-column: 1 / -1; resize: vertical; }
 .QuestionBlock > form > button { min-width: 7rem; padding: 9px; font: inherit; color: var(--user-fg, var(--text)); background: var(--user-bg, var(--page)); border: 1px solid var(--user-fg, var(--text)); cursor: pointer; }
 .QuestionBlock > form > small { align-self: center; color: var(--muted); }
@@ -294,7 +290,10 @@ button { touch-action: manipulation; }
 .PromptComposer-status > .PromptComposer-location { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .PromptComposer-status > .PromptComposer-context { flex: none; color: var(--status-highlight, var(--text)); white-space: nowrap; }
 .PromptComposer-status > .PromptComposer-draft-warning { flex: none; color: var(--error-fg, var(--text)); font-weight: 600; }
-.PromptComposer > textarea {
+/* Native textarea scroll paint can escape its own border; the shell clips it
+   before it reaches the status row without interfering with the text caret. */
+.PromptComposer-input { flex: 1 1 420px; display: flex; flex-direction: column; min-width: 0; min-height: 44px; max-height: 168px; overflow: hidden; }
+.PromptComposer-input > textarea {
 	flex: 1;
 	min-width: 0;
 	min-height: 44px;
@@ -302,7 +301,7 @@ button { touch-action: manipulation; }
 	resize: none;
 	line-height: 24px;
 	padding: 10px 12px;
-	font-size: 16px; /* iOS must not zoom when the composer receives focus. */
+	font-size: 15px;
 	color: var(--user-fg, var(--text));
 	background: var(--input-bg, var(--user-bg, var(--page)));
 	border: 0;
@@ -310,26 +309,24 @@ button { touch-action: manipulation; }
 	outline: none;
 	caret-color: var(--input-cursor, var(--user-fg, var(--text)));
 }
-.PromptComposer > textarea::placeholder { color: var(--user-fg, var(--text)); opacity: .65; }
-.PromptComposer > textarea:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+.PromptComposer-input > textarea::placeholder { color: var(--user-fg, var(--text)); opacity: .65; }
+.PromptComposer-input > textarea:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
 /* Native iOS decoration and the emoji line box must not enlarge the input row. */
-.PromptComposer > textarea, .PromptComposer-controls > button { appearance: none; margin: 0; border-radius: 0; box-shadow: none; }
+.PromptComposer-input > textarea, .PromptComposer-controls > button { appearance: none; margin: 0; border-radius: 0; box-shadow: none; }
 .PromptComposer > .PromptComposer-controls { display: flex; align-items: stretch; background: var(--input-bg, var(--user-bg, var(--page))); }
 .PromptComposer-controls > button { min-width: 44px; min-height: 44px; padding: 8px; border: 0; background: transparent; color: var(--user-fg, var(--text)); line-height: 24px; font-weight: 600; }
 .PromptComposer-controls > button[type=submit] { border-left: 1px solid var(--user-fg, var(--text)); }
-.PromptComposer-controls > .PromptComposer-attach { font-size: 20px; }
-.PromptComposer > .PromptComposer-help { flex: 1 0 100%; padding-top: 7px; color: var(--help-description, var(--muted)); font-size: 12px; }
+.PromptComposer > .PromptComposer-help { flex: 1 0 100%; padding-top: 7px; color: var(--help-description, var(--muted)); font-size: 15px; }
 .PromptComposer-help > b { color: var(--help-key, var(--text)); font-weight: 600; }
-@media (pointer: coarse) { .PromptComposer-help { display: none; } }
 .PromptComposer.disabled { opacity: .55; }
-.PromptComposer.disabled > textarea { color: var(--muted); }
+.PromptComposer.disabled .PromptComposer-input > textarea { color: var(--muted); }
 
 /* Status accounts stack instead of forcing a wide terminal table onto a phone.
    Reuse transcript colors/type; slim quota meters are the only visual accent. */
 .UsageAccounts { white-space: normal; margin: 8px 0; color: var(--text); }
 .UsageAccounts > article { padding: 10px 0; border-top: 1px solid var(--status-fg, var(--muted)); }
 .UsageAccounts header { display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
-.UsageAccounts header > small { color: var(--muted); font-size: .9em; }
+.UsageAccounts header > small { color: var(--muted); font-size: inherit; }
 .UsageAccounts header > strong { color: var(--text); }
 .UsageAccounts dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 10px 0 0; }
 .UsageAccounts dl > div { min-width: 0; }
@@ -342,8 +339,18 @@ button { touch-action: manipulation; }
 .UsageAccounts meter::-moz-meter-bar { background: var(--user-fg, var(--text)); }
 
 .UsageAccounts dd > strong { display: block; color: var(--text); font-weight: 600; }
-.UsageAccounts dd > small { display: block; font-size: .9em; }
+.UsageAccounts dd > small { display: block; font-size: inherit; }
 @media (min-width: 700px) {
 	.UsageAccounts > article { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 24px; align-items: start; }
 	.UsageAccounts dl { margin: 0; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+}
+
+/* Touch fields need 16px to avoid Safari's automatic input zoom. */
+@media (pointer: coarse) {
+	.SessionTabs > .SessionTabs-rail { height: 48px; }
+	.SessionTabs-rail > button { height: 44px; }
+	.SessionTabs > :is(.SessionTabs-menu, .SessionTabs-new) { height: 44px; }
+	.PromptComposer-input > textarea { font-size: 16px; }
+	.SessionTabs-search, .AuthGate > form > input, .QuestionBlock > form > textarea, .QuestionBlock > form > input { font-size: 16px; }
+	.PromptComposer-help { display: none; }
 }
