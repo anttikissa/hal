@@ -133,6 +133,13 @@ test('accepted messages force the transcript to its bottom even if the reader sc
 	expect(transcript).toContain('() => props.sendCount')
 })
 
+test('native motion is only requested for new blocks or sends and respects reduced motion', () => {
+	const transcript = readFileSync(resolve(webDir, 'components/Transcript.tsx'), 'utf8')
+	expect(transcript).toContain('items.length > lastCount')
+	expect(transcript).toContain("matchMedia('(prefers-reduced-motion: reduce)').matches")
+	expect(transcript).toContain('onScrollEnd=')
+})
+
 test('prompt type stays readable without triggering iOS focus zoom', () => {
 	expect(declaration('.PromptComposer > textarea', 'font-size')).toBe('16px')
 	expect(declaration('.PromptComposer > textarea', 'line-height')).toBe('24px')

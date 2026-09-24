@@ -1,5 +1,7 @@
-function toBottom(element: HTMLElement, gap = 0): void {
-	element.scrollTop = element.scrollHeight - element.clientHeight - gap
+function toBottom(element: HTMLElement, gap = 0, smooth = false): void {
+	const top = element.scrollHeight - element.clientHeight - gap
+	if (smooth) element.scrollTo({ top, behavior: 'smooth' })
+	else element.scrollTop = top
 }
 
 function bottomGap(element: HTMLElement): number | null {

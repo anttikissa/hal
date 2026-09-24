@@ -16,6 +16,9 @@ export function Transcript(props: TranscriptProps) {
 	let element: HTMLElement | undefined
 	let bottomGap: number | null = 0
 	let openedTarget = ''
+	let smoothFollow = false
+	let lastCount = 0
+	let lastSession = ''
 	function focusTarget(): void {
 		const blockId = router.blockTarget()
 		const pasteId = router.pasteTarget()
@@ -30,6 +33,7 @@ export function Transcript(props: TranscriptProps) {
 		highlight.classList.add('target')
 		if (target instanceof HTMLDetailsElement) target.open = true
 		bottomGap = null
+		smoothFollow = false
 		target.scrollIntoView({ block: 'center' })
 		openedTarget = key
 	}
@@ -61,7 +65,13 @@ export function Transcript(props: TranscriptProps) {
 	// The render grows the transcript before the effect runs, so retain the user's last
 	// scroll intent instead of measuring the newly enlarged gap in the effect.
 	function updateBottomGap(): void {
-		if (element) bottomGap = webScroll.bottomGap(element)
+		if (element && !smoothFollow) bottomGap = webScroll.bottomGap(element)
+	}
+	function cancelSmoothFollow(): void {
+		if (!smoothFollow || !element) return
+		smoothFollow = false
+		bottomGap = webScroll.bottomGap(element)
+		element.scrollTo({ top: element.scrollTop, behavior: 'instant' }) // Stop the browser's in-flight scroll.
 	}
 	onSettled(() => {
 		if (!element) return
@@ -69,23 +79,30 @@ export function Transcript(props: TranscriptProps) {
 		// Keyboard and draft growth resize this same pane without changing items.
 		// Follow its bottom only while the reader has not scrolled back.
 		const observer = new ResizeObserver(() => {
-			if (element && bottomGap !== null) webScroll.toBottom(element, bottomGap)
+			if (element && bottomGap !== null) webScroll.toBottom(element, bottomGap, smoothFollow)
 		})
 		observer.observe(element)
 		return () => observer.disconnect()
 	})
 	createEffect(
 		() => props.items,
-		() => {
-			if (element && bottomGap !== null) webScroll.toBottom(element, bottomGap)
+		(items) => {
+			const session = router.sessionId()
+			const appended = session === lastSession && items.length > lastCount
+			lastSession = session
+			lastCount = items.length
+			if (!element || bottomGap === null) return
+			smoothFollow = (smoothFollow || appended) && !matchMedia('(prefers-reduced-motion: reduce)').matches
+			webScroll.toBottom(element, bottomGap, smoothFollow)
 		},
 	)
 	createEffect(() => props.sendCount, (count) => {
 		if (!count || !element) return
 		bottomGap = 0
-		webScroll.toBottom(element)
+		smoothFollow = !matchMedia('(prefers-reduced-motion: reduce)').matches
+		webScroll.toBottom(element, 0, smoothFollow)
 	})
-	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateBottomGap} onClick={(event) => { onCardClick(event); onBlockLinkClick(event) }}>
+	return <main class="Transcript" ref={(node) => { element = node }} onScroll={updateBottomGap} onScrollEnd={() => { smoothFollow = false; updateBottomGap() }} onWheel={cancelSmoothFollow} onTouchStart={cancelSmoothFollow} onClick={(event) => { onCardClick(event); onBlockLinkClick(event) }}>
 		<For each={props.items} keyed={webTranscript.rowKey}>{(item) => <TranscriptItem item={item()} token={props.token} onAnswer={props.onAnswer} />}</For>
 		<div class={['Transcript-cursor', { thinking: webTranscript.thinkingCursor(props.items) }]} aria-label="Hal cursor"><span aria-hidden="true" /></div>
 	</main>
