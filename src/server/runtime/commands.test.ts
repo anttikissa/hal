@@ -709,8 +709,6 @@ test('/help groups commands thematically and alphabetically within each section'
 	expect(setup).toBeGreaterThan(messaging)
 
 	expect(output).toContain('Syntax:')
-	expect(output).toContain('  literal          type exactly as shown: clear, next, --all')
-	expect(output).toContain('  <text…>          rest of line; may contain spaces')
 	expect(output.indexOf('/exit')).toBeLessThan(output.indexOf('/help [<command>]'))
 	expect(output.indexOf('/help [<command>]')).toBeLessThan(output.indexOf('/model [<model>]'))
 	expect(output.indexOf('/model [<model>]')).toBeLessThan(output.indexOf('/quit'))

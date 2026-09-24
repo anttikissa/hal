@@ -159,6 +159,21 @@ User-written composer text must survive tab switches, page reloads, iOS eviction
 
 ## Tests
 
+Tests run without a browser or layout engine, so most web bugs (visual,
+layout, touch, focus) cannot be caught by a unit test. Red-green TDD therefore
+applies differently here:
+
+- Put decisions in plain `utils/*.ts` functions (key handling, selection,
+  ordering, parsing, persistence) and test those like any other code.
+- Do not write red tests for CSS, markup, or component wiring. Reading
+  `styles.css` or a `.tsx` file and asserting what it says only restates the
+  change; in this repo such tests never caught a bug and broke on every
+  redesign. Check styling and components in a real browser at phone and
+  desktop widths instead, and say in your handoff what you checked.
+- The exceptions are structural rules that already broke once or are platform
+  limits: the mount chain and single scroller (ccf5df8), and minimums like
+  16px iOS fields or 44px touch targets. Assert those as relations or bounds
+  (`>= 44`), never as the exact current value.
 No web test imports `solid-js` yet. The first one that does must deal with this:
 
 - **Bun resolves Solid's server build by default, and it fails silently.**

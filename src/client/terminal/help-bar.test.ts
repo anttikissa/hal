@@ -12,5 +12,6 @@ test('text entry hints show send newline and queue together', () => {
 test('working text hints keep steer and queue adjacent', () => {
 	const text = helpBar.build(true, true)
 
-	expect(text).toBe('enter: steer, alt-enter: queue, shift-enter: newline, esc: pause')
+	const hints = text.split(', ')
+	expect(hints.indexOf('alt-enter: queue')).toBe(hints.indexOf('enter: steer') + 1)
 })

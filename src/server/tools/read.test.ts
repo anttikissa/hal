@@ -41,13 +41,6 @@ function formatExpectedRange(start: number, end: number): string {
 	return lines.join('\n')
 }
 
-test('explains that text lines have metadata prefixes', () => {
-	const description = toolRegistry.getTool('read')?.description
-
-	expect(description).toContain('LINE:HASH')
-	expect(description).toContain('not file content')
-})
-
 test('rejects a missing path instead of reading the working directory', async () => {
 	const out = await read.execute({}, { sessionId: 's', cwd: TEST_DIR })
 

@@ -58,21 +58,11 @@ test('web declares a standalone home-screen app with install icons', async () =>
 
 	const manifestResponse = web.appAsset('/manifest.webmanifest')
 	expect(manifestResponse?.headers.get('content-type')).toBe('application/manifest+json; charset=utf-8')
-	expect(await manifestResponse?.json()).toEqual({
-		name: 'HAL',
-		short_name: 'HAL',
-		start_url: '/',
-		scope: '/',
-		display: 'standalone',
-		background_color: '#111111',
-		theme_color: '#111111',
-		icons: [
-			{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-			{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-		],
-	})
+	const manifest = await manifestResponse?.json() as { display: string; icons: { src: string }[] }
+	expect(manifest.display).toBe('standalone')
 
-	for (const path of ['/icon.svg', '/icons/icon-180.png', '/icons/icon-192.png', '/icons/icon-512.png']) {
+	// Every icon the page or manifest points at must actually be served.
+	for (const path of ['/icon.svg', '/icons/icon-180.png', ...manifest.icons.map((icon) => icon.src)]) {
 		const response = web.appAsset(path)
 		expect(response?.status).toBe(200)
 		expect((await response?.arrayBuffer())?.byteLength).toBeGreaterThan(0)
