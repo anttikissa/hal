@@ -12,7 +12,9 @@ Each task lives in a directory named by its ID, with a task.ason record and opti
 - Conversation truth is per-session ASONL history of provider-neutral
   blocks. Provider input is rebuilt from it; display state never is.
 - Providers are small request/stream mappers behind one interface.
-- Small ASON state files go through liveFile, never hand-rolled I/O.
+- Small ASON state files (config, metadata, credentials) go through
+  `liveFiles.liveFile` in `src/host/live-file.ts`; never hand-roll
+  reading, parsing or writing them.
 - No config file: config values are functions on module objects,
   overridable from one gitignored `local.ts`.
 
