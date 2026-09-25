@@ -1,0 +1,393 @@
+// Rebuild provider-neutral Message[] values from the flat on-disk history.
+// Provider-specific repair and pruning stays here so the stored history format
+// can remain simple and UI-oriented.
+
+import type { HistoryEntry } from '../sessions.ts'
+import { sessions } from '../sessions.ts'
+import type { Message, ContentBlock } from '../../common/protocol.ts'
+import { blob } from './blob.ts'
+import { sessionEntry } from './entry.ts'
+import { time } from '../../utils/time.ts'
+
+function formatLocalTime(ts?: string): string | null {
+	return time.formatLocalDateTime(ts)
+}
+
+function metaText(text: string): string {
+	return `<meta>${text}</meta>`
+}
+
+function syntheticText(text: string): string {
+	return `<synthetic>${text}</synthetic>`
+}
+
+function structuralMetaText(entry: Extract<HistoryEntry, { type: 'cwd' | 'model' | 'forked_from' | 'forked_to' }>): string {
+	if (entry.type === 'forked_from') return `session forked from ${entry.parent}`
+	if (entry.type === 'forked_to') return `session forked to ${entry.child}`
+	return `${entry.type} changed from ${entry.from} to ${entry.to}`
+}
+
+// Blob ids belong to history entries, not to provider blocks: providers forward
+// blocks verbatim, so an extra field would be sent to the API and rejected. Keep
+// the mapping beside the blocks instead, so pruning can name the blob it elided.
+const state = { blockBlobs: new WeakMap<ContentBlock, string>() }
+
+const apiConfig = {
+	// Max chars for tool result content before truncation
+	maxToolOutput: 50_000,
+	// Expire next-user injected infos after this many user turns
+	injectTurnTtl: 3,
+	// Pruning: strip heavy content after this many completed turns
+	heavyThreshold: 4,
+	// Pruning: max chars of a single tool argument to keep verbatim. Arguments are
+	// tiny next to results (~0.5% of what pruning saves), and blanking them made the
+	// model imitate its own argument-less calls, so only oversized values are elided.
+	maxToolInput: 1_000,
+	// Pruning: strip thinking blocks after this many completed turns
+	thinkingThreshold: 10,
+	// Only rewrite old history every N completed turns to avoid constant cache busting
+	pruneBatchTurns: 8,
+}
+
+function findReplayStart(entries: HistoryEntry[]): number {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const e = entries[i]!
+		if (e.type === 'reset' || e.type === 'compact') {
+			if (entries[i - 1]?.type === 'forked_from') return i - 1
+			return i + 1
+		}
+	}
+	return 0
+}
+
+function assertNoUnresolvedPendingTools(entries: HistoryEntry[]): void {
+	for (const entry of entries) {
+		if (entry.type === 'pending_tools') {
+			throw new Error('Cannot rebuild provider messages while pending tools are unresolved; continue must execute pending tools first.')
+		}
+	}
+}
+
+function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts?: { prune?: boolean }): Message[] {
+	const entries = allEntries ?? sessions.loadAllHistory(sessionId)
+	const start = findReplayStart(entries)
+	const sliced = entries.slice(start).filter((entry) => !entry.canceled)
+	// Unmatched tool calls are repaired as interrupted/corrupt history below, but
+	// an explicit pending-tools marker means the batch is deliberately paused and
+	// must be executed before provider replay can happen.
+	assertNoUnresolvedPendingTools(sliced)
+	const out: Message[] = []
+
+	const totalUserTurns = sliced.filter((entry) => entry.type === 'user').length
+	let userTurnsSeen = 0
+	let pendingInfos: string[] = []
+	let pendingAssistant: ContentBlock[] = []
+	let pendingToolResults: ContentBlock[] = []
+
+	function flushAssistant(): void {
+		if (pendingAssistant.length === 0) return
+		out.push({ role: 'assistant', content: pendingAssistant })
+		pendingAssistant = []
+	}
+
+	function flushToolResults(): void {
+		if (pendingToolResults.length === 0) return
+		out.push({ role: 'user', content: pendingToolResults })
+		pendingToolResults = []
+	}
+
+	for (const entry of sliced) {
+		if (entry.type === 'log' || entry.type === 'info' || entry.type === 'warning' || entry.type === 'error') {
+			const turnsRemaining = totalUserTurns - userTurnsSeen
+			const visibility = entry.visibility ?? (entry.type === 'error' || (entry.type === 'log' && entry.level === 'error') ? 'next-user' : 'ui')
+			if (visibility === 'next-user' && turnsRemaining <= apiConfig.injectTurnTtl) {
+				pendingInfos.push(metaText(entry.text))
+			}
+			continue
+		}
+
+		if (entry.type === 'cwd' || entry.type === 'model' || entry.type === 'forked_from' || entry.type === 'forked_to') {
+			pendingInfos.push(metaText(structuralMetaText(entry)))
+			continue
+		}
+
+		switch (entry.type) {
+			case 'user': {
+				flushAssistant()
+				flushToolResults()
+				userTurnsSeen++
+				out.push({ role: 'user', content: buildUserContent(sessionId, entry, pendingInfos) })
+				pendingInfos = []
+				break
+			}
+			case 'thinking': {
+				flushToolResults()
+				pendingInfos = []
+				const block = buildThinkingContent(sessionId, entry)
+				if (block) pendingAssistant.push(block)
+				break
+			}
+			case 'assistant': {
+				if (entry.visibility === 'ui') break
+				flushToolResults()
+				pendingInfos = []
+				const text = entry.synthetic ? syntheticText(entry.text) : entry.text
+				pendingAssistant.push({ type: 'text', text })
+				break
+			}
+			case 'tool_call': {
+				if (entry.visibility === 'ui') break
+				flushToolResults()
+				pendingInfos = []
+				pendingAssistant.push(buildToolUseContent(sessionId, entry))
+				break
+			}
+			case 'tool_result': {
+				if (entry.visibility === 'ui') break
+				flushAssistant()
+				pendingToolResults.push(buildToolResultContent(sessionId, entry))
+				break
+			}
+			default:
+				break
+		}
+	}
+
+	flushAssistant()
+	flushToolResults()
+	repairToolPairing(out)
+	return opts?.prune === false ? out : pruneMessages(out)
+}
+
+function buildUserContent(
+	sessionId: string,
+	entry: Extract<HistoryEntry, { type: 'user' }>,
+	pendingInfos: string[],
+): string | ContentBlock[] {
+	const time = formatLocalTime(entry.ts)
+	const prefix = [
+		...(time ? [`[${time}]`] : []),
+		...(entry.source ? [`[Inbox · ${entry.source}]`] : []),
+		...pendingInfos,
+	].join('\n')
+
+	const onlyText = entry.parts.every((part) => part.type === 'text')
+	if (onlyText) {
+		const text = sessionEntry.userText(entry)
+		return prefix ? `${prefix}\n${text}` : text
+	}
+
+	const blocks: ContentBlock[] = []
+	if (prefix) blocks.push({ type: 'text', text: prefix })
+	for (const part of entry.parts) {
+		if (part.type === 'text') {
+			blocks.push({ type: 'text', text: part.text })
+			continue
+		}
+		const data = blob.readBlobFromChain(sessionId, part.blobId)
+		if (data?.media_type && data?.data) {
+			const image: ContentBlock = {
+				type: 'image',
+				source: { type: 'base64', media_type: data.media_type, data: data.data },
+			}
+			state.blockBlobs.set(image, part.blobId)
+			blocks.push(image)
+		} else {
+			blocks.push({ type: 'text', text: `[image unavailable — blob ${part.blobId}]` })
+		}
+	}
+	return blocks
+}
+
+function buildThinkingContent(
+	sessionId: string,
+	entry: Extract<HistoryEntry, { type: 'thinking' }>,
+): ContentBlock | null {
+	let thinkingText = entry.text
+	let thinkingSignature = entry.signature
+	if (!thinkingText || !thinkingSignature) {
+		const blobData = sessionEntry.loadEntryBlob(sessionId, entry)
+		if (!thinkingText) thinkingText = blobData?.thinking
+		if (!thinkingSignature) thinkingSignature = blobData?.signature
+	}
+	if (thinkingText === undefined || !thinkingSignature) return null
+	return { type: 'thinking', thinking: thinkingText, signature: thinkingSignature }
+}
+
+function buildToolUseContent(sessionId: string, entry: Extract<HistoryEntry, { type: 'tool_call' }>): ContentBlock {
+	let input = entry.input
+	const blobData = sessionEntry.loadEntryBlob(sessionId, entry)
+	if (input === undefined) input = blobData?.call?.input ?? {}
+	const block: ContentBlock = { type: 'tool_use', id: entry.toolId, name: entry.name, input: input ?? {} }
+	if (entry.blobId) state.blockBlobs.set(block, entry.blobId)
+	return block
+}
+
+function buildToolResultContent(
+	sessionId: string,
+	entry: Extract<HistoryEntry, { type: 'tool_result' }>,
+): ContentBlock {
+	let resultContent = entry.output
+	const blobData = sessionEntry.loadEntryBlob(sessionId, entry)
+	if (resultContent === undefined) resultContent = blobData?.result?.content ?? '[interrupted]'
+	if (resultContent === undefined) resultContent = '[interrupted]'
+	if (typeof resultContent === 'string' && resultContent.length > apiConfig.maxToolOutput) {
+		const truncated = resultContent.length - apiConfig.maxToolOutput
+		resultContent = resultContent.slice(0, apiConfig.maxToolOutput) + `\n[truncated ${truncated} chars]`
+	}
+	const block: ContentBlock = { type: 'tool_result', tool_use_id: entry.toolId, content: resultContent }
+	if (entry.blobId) state.blockBlobs.set(block, entry.blobId)
+	return block
+}
+
+function repairToolPairing(msgs: Message[]): void {
+	// Every tool_result needs a tool_use; orphans are a hard API error, so drop
+	// them before filling in missing results below.
+	const allToolUseIds = new Set<string>()
+	for (const msg of msgs) {
+		if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue
+		for (const b of msg.content as ContentBlock[]) if (b.type === 'tool_use' && b.id) allToolUseIds.add(b.id)
+	}
+	for (const msg of msgs) {
+		if (msg.role !== 'user' || !Array.isArray(msg.content)) continue
+		const blocks = msg.content as ContentBlock[]
+		for (let i = blocks.length - 1; i >= 0; i--) {
+			if (blocks[i]!.type === 'tool_result' && !allToolUseIds.has(blocks[i]!.tool_use_id!)) blocks.splice(i, 1)
+		}
+	}
+
+	for (let i = 0; i < msgs.length; i++) {
+		const msg = msgs[i]!
+		if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue
+
+		const toolUseIds = (msg.content as ContentBlock[]).filter((b) => b.type === 'tool_use').map((b) => b.id!)
+		if (toolUseIds.length === 0) continue
+
+		const nextIdx = i + 1
+		const haveIds = new Set<string>()
+		if (nextIdx < msgs.length && msgs[nextIdx]!.role === 'user' && Array.isArray(msgs[nextIdx]!.content)) {
+			for (const b of msgs[nextIdx]!.content as ContentBlock[]) {
+				if (b.type === 'tool_result' && toolUseIds.includes(b.tool_use_id!)) haveIds.add(b.tool_use_id!)
+			}
+		}
+
+		const missingIds = toolUseIds.filter((id) => !haveIds.has(id))
+		if (missingIds.length === 0) continue
+
+		const collected: ContentBlock[] = []
+		for (const id of missingIds) {
+			let found = false
+			for (let j = nextIdx; j < msgs.length && !found; j++) {
+				if (msgs[j]!.role !== 'user' || !Array.isArray(msgs[j]!.content)) continue
+				const blocks = msgs[j]!.content as ContentBlock[]
+				const bIdx = blocks.findIndex((b) => b.type === 'tool_result' && b.tool_use_id === id)
+				if (bIdx >= 0) {
+					collected.push(blocks[bIdx]!)
+					blocks.splice(bIdx, 1)
+					found = true
+				}
+			}
+			if (!found) collected.push({ type: 'tool_result', tool_use_id: id, content: '[interrupted]' })
+		}
+
+		if (haveIds.size > 0 && nextIdx < msgs.length) {
+			;(msgs[nextIdx]!.content as ContentBlock[]).push(...collected)
+		} else {
+			msgs.splice(nextIdx, 0, { role: 'user', content: collected })
+			i++
+		}
+	}
+
+	for (let i = msgs.length - 1; i >= 0; i--) {
+		if (Array.isArray(msgs[i]!.content) && (msgs[i]!.content as ContentBlock[]).length === 0) msgs.splice(i, 1)
+	}
+}
+
+// Name the blob so the model can fetch what was elided instead of guessing.
+function prunedMarker(block: ContentBlock, what: string): string {
+	const blobId = state.blockBlobs.get(block)
+	if (blobId) return `[pruned; see blob ${blobId}]`
+	return `[${what} omitted from context]`
+}
+
+// Keep arguments verbatim: they are ~0.5% of what pruning saves, and an empty
+// input object reads as a valid argument-less call that the model then imitates.
+// Oversized values (file bodies) are replaced individually, so the argument
+// names still show what the call did.
+function pruneToolInput(block: ContentBlock): Record<string, unknown> {
+	const input = block.input ?? {}
+	const out: Record<string, unknown> = {}
+	for (const [key, value] of Object.entries(input)) {
+		if (typeof value === 'string' && value.length > apiConfig.maxToolInput) out[key] = prunedMarker(block, 'argument')
+		else out[key] = value
+	}
+	return out
+}
+
+function isTurnEnd(msg: Message): boolean {
+	if (msg.role !== 'assistant') return false
+	if (!Array.isArray(msg.content)) return true
+	return !(msg.content as any[]).some((b: any) => b.type === 'tool_use')
+}
+
+function pruneMessages(msgs: Message[], pressure = false): Message[] {
+	const heavy = apiConfig.heavyThreshold
+	const thinking = apiConfig.thinkingThreshold
+	let protectedStart = -1
+	if (pressure) {
+		for (let i = msgs.length - 1; i >= 0; i--) {
+			if (msgs[i]!.role === 'assistant') { protectedStart = i; break }
+		}
+	}
+
+	// age = completed turns after the message. Measured from the live end it grows
+	// every turn, so each turn would prune one more old turn and rewrite the prompt
+	// prefix hundreds of messages back, busting the provider cache. Measuring from
+	// the last batch checkpoint instead (subtract turns since it) keeps ages frozen
+	// between checkpoints; the cutoff jumps only once every pruneBatchTurns turns.
+	const age = new Array(msgs.length).fill(0)
+	let count = 0
+	for (let i = msgs.length - 1; i >= 0; i--) {
+		age[i] = count
+		if (isTurnEnd(msgs[i]!)) count++
+	}
+	const sinceCheckpoint = count % Math.max(1, apiConfig.pruneBatchTurns)
+
+	const out: Message[] = []
+	for (let i = 0; i < msgs.length; i++) {
+		const msg = msgs[i]!
+		const frozenAge = age[i]! - sinceCheckpoint
+		const pruneHeavy = frozenAge > heavy || (pressure && i < protectedStart)
+		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+			let content = (msg.content as ContentBlock[]).map((b) => {
+				if (b.type === 'tool_use' && pruneHeavy) return { ...b, input: pruneToolInput(b) }
+				return b
+			})
+			if (frozenAge > thinking) content = content.filter((b) => b.type !== 'thinking')
+			out.push({ ...msg, content })
+		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
+			const content = (msg.content as ContentBlock[]).map((b) => {
+				if (b.type === 'tool_result' && pruneHeavy) return { ...b, content: prunedMarker(b, 'tool result') }
+				if (b.type === 'image' && pruneHeavy) return { type: 'text' as const, text: prunedMarker(b, 'image') }
+				return b
+			})
+			out.push({ ...msg, content })
+		} else {
+			out.push(msg)
+		}
+	}
+
+	return out
+}
+
+export const apiMessages = {
+	config: apiConfig,
+	state,
+	toProviderMessages,
+	pruneMessages,
+	repairToolPairing,
+	findReplayStart,
+	formatLocalTime,
+	metaText,
+	syntheticText,
+}

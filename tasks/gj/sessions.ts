@@ -1,0 +1,656 @@
+// Session persistence. Open sessions keep session.ason as a liveFile; closed
+// sessions are read straight from disk until the runtime resumes them.
+
+import { readFileSync, existsSync, readdirSync, rmSync, appendFileSync, writeFileSync, renameSync } from 'fs'
+import type { SharedSessionInfo } from '../common/ipc.ts'
+import { historyIds } from '../common/history-ids.ts'
+import { STATE_DIR, ensureDir } from './state.ts'
+import { ipc } from './file-ipc.ts'
+import { ason } from '../utils/ason.ts'
+import { liveFiles } from '../utils/live-file.ts'
+import type { HistoryEntry, InterruptionReason } from '../common/history.ts'
+import { liveEventBlocks, type LiveBlock, type LiveEvent } from '../common/live-event-blocks.ts'
+import type { PartialTokenUsage } from '../common/protocol.ts'
+import type { SessionMeta } from '../common/session.ts'
+import { models } from '../common/models.ts'
+import { continuation } from './session/continuation.ts'
+
+export type { EntryIdentity, HistoryEntry, UserPart } from '../common/history.ts'
+export type { SessionMeta } from '../common/session.ts'
+const SESSIONS_DIR = `${STATE_DIR}/sessions`
+const DEFAULT_LOG = 'history.asonl'
+/**
+ * live.ason is each session's replace-in-place snapshot of the uncommitted
+ * transcript tail. The server creates and rewrites it as provider/tool events
+ * arrive; local clients read it through this session store, and web clients get
+ * the same blocks in session snapshots. It lets reconnecting clients render an
+ * in-progress turn. Unlike append-only history.asonl, it is derived working
+ * state: blocks may temporarily overlap newly committed history and are cleared
+ * when the turn is committed, canceled, or rebased.
+ */
+const LIVE_FILE = 'live.ason'
+const liveSessionMetas = new Map<string, SessionMeta>()
+const liveSessionState = new Map<string, SessionLive>()
+
+
+const SIDE_EFFECT_TOOL_NAMES = new Set(['bash', 'edit', 'write', 'eval', 'send', 'spawn_agent'])
+
+function isSideEffectTool(name: string): boolean {
+	return SIDE_EFFECT_TOOL_NAMES.has(name)
+}
+
+export interface PendingToolCall {
+	id: string
+	name: string
+	input?: any
+	blobId?: string
+}
+
+export interface PendingToolsState {
+	id: string
+	toolIds: string[]
+	toolCalls: PendingToolCall[]
+	cwd: string
+	model?: string
+	usage?: PartialTokenUsage
+	questions: Array<{ id: string; toolId: string; answer?: Extract<HistoryEntry, { type: 'answer' }>['value'] }>
+	allAnswered: boolean
+	aborted: boolean
+}
+
+export interface SessionLive {
+	blocks: LiveBlock[]
+}
+
+function sessionDir(sessionId: string): string { return `${SESSIONS_DIR}/${sessionId}` }
+function sessionFile(sessionId: string, fileName: string): string { return `${sessionDir(sessionId)}/${fileName}` }
+function ensureSessionDir(sessionId: string): void {
+	ensureDir(sessionDir(sessionId))
+}
+
+function readAson<T>(path: string, fallback: T, parse: (text: string) => T): T {
+	if (!existsSync(path)) return fallback
+	try {
+		return parse(readFileSync(path, 'utf-8'))
+	} catch {
+		return fallback
+	}
+}
+
+function activateFile<T extends Record<string, any>>(
+	cache: Map<string, T>,
+	sessionId: string,
+	fileName: string,
+	defaults: T,
+	fix: (data: T) => T,
+	allowMissing = false,
+): T | null {
+	const cached = cache.get(sessionId)
+	if (cached) return cached
+	const path = sessionFile(sessionId, fileName)
+	if (allowMissing && !existsSync(path)) return null
+	ensureSessionDir(sessionId)
+	const data = fix(liveFiles.liveFile(path, defaults, { watch: false }) as T)
+	cache.set(sessionId, data)
+	return data
+}
+
+function fixMeta(meta: SessionMeta, sessionId: string): SessionMeta {
+	if (!meta.id) meta.id = sessionId
+	if (!meta.currentLog) meta.currentLog = DEFAULT_LOG
+	return meta
+}
+
+// Whitelist of history fields that survive to disk. cleanHistoryEntry() drops
+// everything else, so adding a field to HistoryEntry is not enough: without an
+// entry here it is written, read back as undefined, and the loss is silent.
+// A field can therefore work in a live session and vanish across a restart.
+const historyTopLevelKeys = new Set([
+	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled', 'interruptedBy',
+	'blobId', 'signature', 'model', 'thinkingEffort',
+	'usage', 'purpose', 'requests', 'apiUsd', 'incomplete', 'durationMs', 'abortText', 'provider', 'httpStatus', 'synthetic', 'syntheticKind',
+	'toolId', 'toolIds', 'name', 'input', 'output', 'isError', 'cwd', 'reason',
+	'questionId', 'value', 'level', 'visibility', 'ui', 'usageBars', 'parent', 'child', 'log', 'from', 'to',
+])
+
+function stripUndefined(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map((item) => stripUndefined(item))
+	if (!value || typeof value !== 'object') return value
+	const clean: Record<string, unknown> = {}
+	for (const [key, item] of Object.entries(value)) {
+		if (item === undefined) continue
+		clean[key] = stripUndefined(item)
+	}
+	return clean
+}
+
+function cleanHistoryEntry(entry: HistoryEntry): unknown {
+	const clean: Record<string, unknown> = {}
+	for (const [key, item] of Object.entries(entry)) {
+		if (!historyTopLevelKeys.has(key)) continue
+		if (item === undefined) continue
+		clean[key] = stripUndefined(item)
+	}
+	return clean
+}
+
+
+// History survives code updates and may contain partially written or legacy user
+// entries. Repair only the in-memory projection; never rewrite source history.
+function repairHistoryEntries(entries: HistoryEntry[]): HistoryEntry[] {
+	for (const entry of entries) {
+		if (entry.type !== 'user' || Array.isArray(entry.parts)) continue
+		const text = (entry as unknown as { text?: unknown }).text
+		entry.parts = []
+		if (typeof text === 'string') entry.parts.push({ type: 'text', text })
+	}
+	return entries
+}
+
+function collectEntryIds(entries: HistoryEntry[], used = new Set<string>()): Set<string> {
+	for (const entry of entries) {
+		if (typeof entry.id === 'string') used.add(entry.id)
+	}
+	return used
+}
+
+function usedHistoryIds(sessionId: string, logName?: string): Set<string> {
+	return collectEntryIds(loadHistoryLog(sessionId, logName))
+}
+
+function ensureEntryIds(entries: HistoryEntry[], used = new Set<string>()): HistoryEntry[] {
+	for (const entry of entries) {
+		const id = typeof entry.id === 'string' && !used.has(entry.id) ? entry.id : historyIds.make(used)
+		Object.defineProperty(entry, 'id', { value: id, enumerable: true, writable: true, configurable: true })
+		used.add(id)
+	}
+	return entries
+}
+
+
+function newHistoryIds(sessionId: string, count: number): string[] {
+	const used = usedHistoryIds(sessionId)
+	const ids: string[] = []
+	for (let i = 0; i < count; i++) {
+		const id = historyIds.make(used)
+		used.add(id)
+		ids.push(id)
+	}
+	return ids
+}
+
+function stringifyHistoryEntry(entry: HistoryEntry): string {
+	return ason.stringify(cleanHistoryEntry(entry), 'short')
+}
+
+function defaultLive(): SessionLive { return { blocks: [] } }
+
+function fixLive(live: SessionLive | null | undefined): SessionLive {
+	const data = live ?? defaultLive()
+	if (!Array.isArray(data.blocks)) data.blocks = []
+	return data
+}
+
+function readLiveFromDisk(sessionId: string): SessionLive {
+	return readAson(sessionFile(sessionId, LIVE_FILE), defaultLive(), (text) =>
+		fixLive(ason.parse(text) as unknown as SessionLive),
+	)
+}
+
+function activateLive(sessionId: string): SessionLive {
+	return activateFile(liveSessionState, sessionId, LIVE_FILE, defaultLive(), fixLive)!
+}
+
+function loadLive(sessionId: string): SessionLive {
+	return liveSessionState.get(sessionId) ?? readLiveFromDisk(sessionId)
+}
+
+function saveLive(live: SessionLive): void {
+	liveFiles.save(fixLive(live))
+}
+
+function updateLive(sessionId: string, mutator: (live: SessionLive) => void): SessionLive {
+	const live = activateLive(sessionId)
+	mutator(live)
+	saveLive(live)
+	return live
+}
+
+function applyLiveEvent(sessionId: string, event: LiveEvent): void {
+	updateLive(sessionId, (live) => {
+		live.blocks = liveEventBlocks.reduce(live.blocks, event, { sessionId }).blocks
+	})
+}
+
+function clearLive(sessionId: string): void {
+	updateLive(sessionId, (live) => {
+		live.blocks = []
+	})
+}
+
+
+function interruptLive(sessionId: string, reason: InterruptionReason): boolean {
+	const entries: HistoryEntry[] = []
+	for (const block of loadLive(sessionId).blocks) {
+		if ((block.type !== 'assistant' && block.type !== 'thinking') || !block.text) continue
+		const ts = typeof block.ts === 'number' ? new Date(block.ts).toISOString() : block.ts
+		entries.push({ ...block, ts } as HistoryEntry)
+	}
+	const last = entries.at(-1)
+	if (last?.type === 'assistant' || last?.type === 'thinking') last.interruptedBy = reason
+	appendHistory(sessionId, entries)
+	clearLive(sessionId)
+	return !!last
+}
+
+function readSessionMetaFromDisk(sessionId: string): SessionMeta | null {
+	return readAson(sessionFile(sessionId, 'session.ason'), null, (text) =>
+		fixMeta(ason.parse(text) as unknown as SessionMeta, sessionId),
+	)
+}
+
+function activateSession(sessionId: string, defaults?: SessionMeta): SessionMeta | null {
+	return activateFile(
+		liveSessionMetas,
+		sessionId,
+		'session.ason',
+		fixMeta({ id: sessionId, createdAt: defaults?.createdAt ?? new Date().toISOString(), ...defaults }, sessionId),
+		(meta) => fixMeta(meta, sessionId),
+		!defaults,
+	)
+}
+
+function deactivateSession(sessionId: string): void {
+	liveSessionMetas.delete(sessionId)
+	liveSessionState.delete(sessionId)
+}
+
+function deactivateAllSessions(): void {
+	liveSessionMetas.clear()
+	liveSessionState.clear()
+}
+
+function loadSessionMeta(sessionId: string): SessionMeta | null {
+	return liveSessionMetas.get(sessionId) ?? readSessionMetaFromDisk(sessionId)
+}
+
+function historyLogPath(sessionId: string, logName = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG): string {
+	return sessionFile(sessionId, logName)
+}
+
+function loadHistoryLog(sessionId: string, logName?: string, limit?: number): HistoryEntry[] {
+	const path = historyLogPath(sessionId, logName)
+	if (!existsSync(path)) return []
+	try {
+		const content = readFileSync(path, 'utf-8')
+		const entries = content.trim() ? ason.parseAll(content) as HistoryEntry[] : []
+		repairHistoryEntries(entries)
+		return limit === undefined ? entries : entries.slice(0, limit)
+	} catch {
+		return []
+	}
+}
+
+function loadHistory(sessionId: string): HistoryEntry[] {
+	return loadHistoryLog(sessionId)
+}
+
+function loadSessionList(): string[] {
+	return ipc.readState().sessions.map((item) => item.id)
+}
+
+function loadMetas(ids: string[], load: (id: string) => SessionMeta | null): SessionMeta[] {
+	return ids.map(load).filter((meta): meta is SessionMeta => !!meta)
+}
+
+function loadSessionMetas(): SessionMeta[] { return loadMetas(loadSessionList(), activateSession) }
+function loadAllSessionMetas(): SessionMeta[] {
+	return existsSync(SESSIONS_DIR) ? loadMetas(readdirSync(SESSIONS_DIR).sort(), readSessionMetaFromDisk) : []
+}
+
+function loadAllHistory(sessionId: string): HistoryEntry[] {
+	return loadAllHistoryWithOrigin(sessionId).entries
+}
+
+// Like loadAllHistory but also returns parent provenance for blob resolution.
+function loadAllHistoryWithOrigin(sessionId: string): {
+	entries: HistoryEntry[]
+	parentCount: number
+	parentId?: string
+} {
+	const entries = loadHistory(sessionId)
+	const first = entries[0]
+	if (first?.type !== 'forked_from' || !first.parent) return { entries, parentCount: 0 }
+	const parent = loadAllHistoryWithOrigin(first.parent)
+	const before = first.ts ? parent.entries.filter((entry) => !entry.ts || entry.ts < first.ts!) : parent.entries
+	return { entries: [...before, first, ...entries.slice(1)], parentCount: before.length, parentId: first.parent }
+}
+
+
+
+function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, index?: number): SharedSessionInfo {
+	const history = loadAllHistory(meta.id)
+	return {
+		id: meta.id,
+		tab: index === undefined ? undefined : index + 1,
+		name: meta.name,
+		cwd: meta.workingDir ?? process.cwd(),
+		model: meta.model ?? models.defaultModel(),
+		currentLog: meta.currentLog ?? DEFAULT_LOG,
+		continuation: continuation.actionForHistory(history) || undefined,
+		attention: meta.attention,
+		// Sessions written before activeAt existed still have their history.
+		activeAt: meta.activeAt ?? writtenAt(history) ?? meta.createdAt,
+	}
+}
+
+function pickMostRecentlyClosedSessionId(
+	metas: Array<{ id: string; createdAt: string; closedAt?: string }>,
+	openIds: Set<string>,
+): string | null {
+	const closed = metas.filter((meta) => !openIds.has(meta.id)).sort((a, b) => (b.closedAt ?? b.createdAt).localeCompare(a.closedAt ?? a.createdAt))
+	return closed[0]?.id ?? null
+}
+
+function normalizeSessionName(text: string): string { return text.trim().replace(/\s+/g, ' ').toLowerCase() }
+
+function resolveResumeTarget(
+	metas: Array<{ id: string; createdAt: string; closedAt?: string; name?: string }>,
+	openIds: Set<string>,
+	query?: string,
+): string | null {
+	const trimmed = query?.trim()
+	if (!trimmed) return pickMostRecentlyClosedSessionId(metas, openIds)
+	const exactId = metas.find((meta) => !openIds.has(meta.id) && meta.id === trimmed)
+	if (exactId) return exactId.id
+	const normalized = normalizeSessionName(trimmed)
+	return metas.find((meta) => !openIds.has(meta.id) && normalizeSessionName(meta.name ?? '') === normalized)?.id ?? null
+}
+
+function saveMeta(meta: SessionMeta): void {
+	liveFiles.save(fixMeta(meta, meta.id))
+}
+
+function createSession(id: string, meta: SessionMeta): SessionMeta {
+	const liveMeta = activateSession(id, meta)
+	if (!liveMeta) throw new Error(`Failed to create session ${id}`)
+	Object.assign(liveMeta, meta)
+	saveMeta(liveMeta)
+	return liveMeta
+}
+
+// "Wrote something": a prompt or an assistant message. Tool noise, info lines
+// and turn bookkeeping do not make a session look freshly used.
+function writtenAt(entries: HistoryEntry[]): string | undefined {
+	return entries.findLast((entry) => entry.type === 'user' || entry.type === 'assistant')?.ts
+}
+
+function appendHistory(sessionId: string, entries: HistoryEntry[]): void {
+	if (entries.length === 0) return
+	ensureSessionDir(sessionId)
+	const logName = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG
+	const used = usedHistoryIds(sessionId, logName)
+	appendFileSync(historyLogPath(sessionId, logName), `${ensureEntryIds(entries, used).map(stringifyHistoryEntry).join('\n')}\n`)
+	const activeAt = writtenAt(entries)
+	if (activeAt) updateMeta(sessionId, { activeAt })
+}
+
+function rewriteCurrentHistory(sessionId: string, entries: HistoryEntry[]): { logName: string; entryCount: number } {
+	const logName = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG
+	const path = historyLogPath(sessionId, logName)
+	const rewritten = ensureEntryIds(entries, new Set()).map(stringifyHistoryEntry).join('\n')
+	let content = ''
+	if (rewritten) content = `${rewritten}\n`
+	const tmp = `${path}.tmp.${process.pid}`
+	writeFileSync(tmp, content)
+	renameSync(tmp, path)
+	return { logName, entryCount: entries.length }
+}
+
+function liveBlockToCanceledEntry(block: any): HistoryEntry | null {
+	if (block.type !== 'assistant' && block.type !== 'thinking') return null
+	const ts = typeof block.ts === 'number' ? new Date(block.ts).toISOString() : block.ts
+	return { ...block, ts, canceled: true }
+}
+
+// Mark the visible tail turn as history-only before retrying an edited prompt.
+// The tail starts at the last user entry. User, assistant, thinking, and
+// side-effectless tool entries after it become canceled; the old aborted
+// turn_end is removed. Side-effectful tool tails are refused because the world
+// already changed.
+function cancelTailTurn(sessionId: string): { logName: string; entryCount: number } | false {
+	const entries = loadHistory(sessionId)
+	let lastUser = -1
+	for (let i = entries.length - 1; i >= 0; i--) {
+		if (entries[i]?.type === 'user') {
+			lastUser = i
+			break
+		}
+	}
+	if (lastUser < 0) return false
+
+	const liveBlocks = loadLive(sessionId).blocks
+	for (const entry of entries.slice(lastUser + 1)) {
+		if (entry.type === 'tool_call' && isSideEffectTool(entry.name)) return false
+	}
+	for (const block of liveBlocks) {
+		if (block?.type === 'tool' && isSideEffectTool(block.name)) return false
+	}
+
+	const next: HistoryEntry[] = []
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i]!
+		if (i === lastUser && entry.type === 'user') next.push({ ...entry, canceled: true })
+		else if (i > lastUser && (entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result')) next.push({ ...entry, canceled: true })
+		else if (i > lastUser && entry.type === 'turn_end') continue
+		else next.push(entry)
+	}
+	for (const block of liveBlocks) {
+		const entry = liveBlockToCanceledEntry(block)
+		if (entry) next.push(entry)
+	}
+	return rewriteCurrentHistory(sessionId, next)
+}
+
+function findPendingTools(sessionId: string): PendingToolsState | null {
+	const entries = loadHistory(sessionId)
+	const toolCalls = new Map<string, PendingToolCall>()
+	let pending: Extract<HistoryEntry, { type: 'pending_tools' }> | null = null
+	for (const entry of entries) {
+		if (entry.canceled) continue
+		if (entry.type === 'tool_call') toolCalls.set(entry.toolId, { id: entry.toolId, name: entry.name, input: entry.input, blobId: entry.blobId })
+		if (entry.type === 'pending_tools') pending = entry
+	}
+	if (!pending?.id) return null
+	const calls: PendingToolCall[] = []
+	for (const toolId of pending.toolIds) {
+		const call = toolCalls.get(toolId)
+		if (call) calls.push(call)
+	}
+	const answers = new Map<string, Extract<HistoryEntry, { type: 'answer' }>['value']>()
+	for (const entry of entries) {
+		if (entry.type === 'answer' && !entry.canceled && !answers.has(entry.questionId)) answers.set(entry.questionId, entry.value)
+	}
+	const questions: PendingToolsState['questions'] = []
+	for (const entry of entries) {
+		if (entry.type !== 'question' || entry.canceled || entry.source.type !== 'tool' || entry.source.pendingId !== pending.id) continue
+		questions.push({ id: entry.id, toolId: entry.source.toolId, answer: answers.get(entry.id) })
+	}
+	return {
+		id: pending.id,
+		toolIds: pending.toolIds,
+		toolCalls: calls,
+		cwd: pending.cwd,
+		model: pending.model,
+		usage: pending.usage,
+		questions,
+		allAnswered: questions.every((question) => question.answer !== undefined),
+		aborted: questions.some((question) => question.answer?.kind === 'aborted'),
+	}
+}
+
+function resolvePendingTools(sessionId: string, pendingId: string): boolean {
+	// Pending-tools is explicit durable state, not inferred from missing results.
+	// Resolving it rewrites only the current log so normal replay can safely pair
+	// the already-written tool calls with newly-written tool results.
+	const entries = loadHistory(sessionId)
+	let changed = false
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i]!
+		if (entry.type !== 'pending_tools' || entry.id !== pendingId || entry.canceled) continue
+		entries[i] = { ...entry, canceled: true }
+		changed = true
+		break
+	}
+	if (!changed) return false
+	rewriteCurrentHistory(sessionId, entries)
+	return true
+}
+
+function updateMeta(sessionId: string, updates: Partial<SessionMeta>): void {
+	const live = liveSessionMetas.get(sessionId)
+	if (live) {
+		Object.assign(live, updates)
+		saveMeta(live)
+		return
+	}
+
+	const meta = readSessionMetaFromDisk(sessionId)
+	if (!meta) return
+	Object.assign(meta, updates)
+	ensureSessionDir(sessionId)
+	writeFileSync(sessionFile(sessionId, 'session.ason'), ason.stringify(fixMeta(meta, sessionId)) + '\n')
+}
+
+function rotateLog(sessionId: string): string {
+	const meta = liveSessionMetas.get(sessionId)
+	if (!meta) throw new Error(`Session ${sessionId} is not live`)
+	const currentLog = meta.currentLog ?? DEFAULT_LOG
+	if (!existsSync(historyLogPath(sessionId, currentLog))) return currentLog
+	const match = currentLog.match(/^history(\d+)\.asonl$/)
+	const nextLog = `history${match ? parseInt(match[1]!, 10) + 1 : 2}.asonl`
+	updateMeta(sessionId, { currentLog: nextLog })
+	return nextLog
+}
+
+function rewriteHistoryAfterRotation(sessionId: string, entries: HistoryEntry[]): { oldLog: string; newLog: string } {
+	const oldEntries = loadHistory(sessionId)
+	const oldLog = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG
+	const newLog = rotateLog(sessionId)
+	const forkEntry = oldEntries[0]?.type === 'forked_from' ? [oldEntries[0]] : []
+	appendHistory(sessionId, [...forkEntry, ...entries])
+	return { oldLog, newLog }
+}
+
+function nextHistoryLogName(currentLog: string): string {
+	const match = currentLog.match(/^history(\d*)\.asonl$/)
+	const current = match ? (match[1] ? parseInt(match[1], 10) : 1) : 1
+	return `history${current + 1}.asonl`
+}
+
+function rewriteHistoryForRebase(sessionId: string, entries: HistoryEntry[]): { oldLog: string; newLog: string; entryCount: number } {
+	ensureSessionDir(sessionId)
+	const oldLog = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG
+	const newLog = nextHistoryLogName(oldLog)
+	const ts = new Date().toISOString()
+	const oldEntries = loadHistory(sessionId)
+	const forkEntry = oldEntries[0]?.type === 'forked_from' ? [oldEntries[0]] : []
+	const bodyEntries = entries[0]?.type === 'forked_from' ? entries.slice(1) : entries
+	const rebasedEntries = ensureEntryIds([...forkEntry, { type: 'rebased_from', log: oldLog, ts }, ...bodyEntries], usedHistoryIds(sessionId, newLog))
+	appendFileSync(historyLogPath(sessionId, newLog), `${rebasedEntries.map(stringifyHistoryEntry).join('\n')}\n`)
+	const oldLogMarker = ensureEntryIds([{ type: 'rebased_to', log: newLog, ts }], collectEntryIds(oldEntries))[0]!
+	appendFileSync(historyLogPath(sessionId, oldLog), `${stringifyHistoryEntry(oldLogMarker)}\n`)
+	updateMeta(sessionId, { currentLog: newLog })
+	return { oldLog, newLog, entryCount: rebasedEntries.length }
+}
+
+
+function forkSession(sourceId: string, newId: string, atIndex?: number): SessionMeta {
+	const sourceMeta = loadSessionMeta(sourceId)
+	if (!sourceMeta) throw new Error(`Source session ${sourceId} not found`)
+	const history = atIndex !== undefined ? loadHistory(sourceId) : []
+	const forkTs =
+		atIndex !== undefined && atIndex >= 0 && atIndex < history.length && history[atIndex]!.ts
+			? history[atIndex]!.ts!
+			: new Date().toISOString()
+	const child = createSession(newId, {
+		id: newId,
+		workingDir: sourceMeta.workingDir,
+		createdAt: forkTs,
+		name: `Fork of ${sourceMeta.name || sourceId}`,
+		model: sourceMeta.model ?? models.defaultModel(),
+		forkedFrom: sourceId,
+	})
+	appendHistory(sourceId, [{ type: 'forked_to', child: newId, ts: forkTs }])
+	appendHistory(newId, [{ type: 'forked_from', parent: sourceId, ts: forkTs }])
+	return child
+}
+
+function deleteSession(sessionId: string): void {
+	deactivateSession(sessionId)
+	if (existsSync(sessionDir(sessionId))) rmSync(sessionDir(sessionId), { recursive: true, force: true })
+}
+
+function tailTurnState(entries: HistoryEntry[]): { interrupted: boolean; interruptedTools: { name: string; id: string }[]; ended?: Extract<HistoryEntry, { type: 'turn_end' }> } {
+	let start = -1
+	let ended: Extract<HistoryEntry, { type: 'turn_end' }> | undefined
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i]!
+		if (entry.type === 'turn_end') {
+			start = i
+			ended = entry
+			break
+		}
+	}
+
+	const completedToolIds = new Set<string>()
+	const interruptedTools: { name: string; id: string }[] = []
+	let sawTurnContent = false
+	for (let i = start + 1; i < entries.length; i++) {
+		const entry = entries[i]!
+		if (entry.type === 'tool_result') completedToolIds.add(entry.toolId)
+		if (entry.type === 'user' || entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result') sawTurnContent = true
+	}
+	for (let i = start + 1; i < entries.length; i++) {
+		const entry = entries[i]!
+		// ui-only calls (server-side web_search) never become provider tool_use
+		// blocks, so a synthetic result for them would be an orphan.
+		if (entry.type === 'tool_call' && entry.visibility !== 'ui' && !completedToolIds.has(entry.toolId)) interruptedTools.push({ name: entry.name, id: entry.toolId })
+	}
+	return { interrupted: sawTurnContent, interruptedTools, ended }
+}
+
+export const sessions = {
+	newHistoryIds,
+	loadSessionMetas,
+	loadAllSessionMetas,
+	loadSessionList,
+	loadSessionMeta,
+	loadHistory,
+	loadHistoryLog,
+	loadAllHistory,
+	loadAllHistoryWithOrigin,
+	loadLive,
+	activateSession,
+	deactivateSession,
+	deactivateAllSessions,
+	createSession,
+	appendHistory,
+	updateMeta,
+	forkSession,
+	deleteSession,
+	rotateLog,
+	rewriteHistoryAfterRotation,
+	rewriteHistoryForRebase,
+	cancelTailTurn,
+	findPendingTools,
+	resolvePendingTools,
+	pickMostRecentlyClosedSessionId,
+	resolveResumeTarget,
+	sessionOpenInfo,
+	tailTurnState,
+	applyLiveEvent,
+	clearLive,
+	interruptLive,
+	sessionDir,
+}

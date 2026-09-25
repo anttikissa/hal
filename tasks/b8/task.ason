@@ -1,6 +1,6 @@
 {
 	title: 'Copied OAuth credentials',
-	description: 'Read anthropic credentials from the gitignored ./auth.ason through liveFile, supporting the old single-entry and array shapes, without logging or echoing secrets. If the token has expired, refresh it through Anthropic OAuth and atomically rewrite only this copy with mode 0600; never touch ~/.hal/auth.ason. Missing or malformed credentials and failed refresh are clear errors. Tests use fake credentials and a fake refresh endpoint, never the real file. Reference: auth.ts artifact (old reader, refresh and shapes).',
+	description: 'Read anthropic credentials from the gitignored ./auth.ason through liveFile, supporting the old single-entry and array shapes, without logging or echoing secrets. If the token has expired, refresh it through Anthropic OAuth and atomically rewrite only this copy with mode 0600; never touch ~/.hal/auth.ason. Missing or malformed credentials and failed refresh are clear errors. Tests use fake credentials and a fake refresh endpoint, never the real file.',
 	status: 'planned',
 	needs: ['n']
 }

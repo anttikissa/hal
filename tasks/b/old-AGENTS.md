@@ -1,0 +1,176 @@
+# This is Hal
+
+Hal is a coding agent. If you're Hal, you already saw the system prompt - otherwise read it from SYSTEM.md.
+
+# Rules
+
+- Use bun - never node, npm or npx
+- Use red-green TDD.
+- Do not write tests for exact LLM output. LLM output is indeterministic; test deterministic parsing, wiring, and fallback behavior instead.
+- Do not write tautological tests. Never assert on source text (`toContain` over a `.ts`/`.tsx` file), never copy CSS values, markup, or template strings into expectations, and never test one-line formatters or guards. Such tests have never caught a bug here; they only fail on intentional changes. Pure styling or copy changes need no test. Test behavior, invariants, and relations instead (e.g. the mount chain, equal padding, platform minimums).
+- Use `./test` to run all tests, typechecker and oxlint. Run the tests before writing code.
+- Treat test failures as baseline findings first: report unrelated failures to the user and leave those files alone. If a failure blocks your task and no owner is known, work with the user rather than polling other agents.
+- The working-session list is global across projects, not a list of collaborators in your repository. Before contacting another session about a failure or local change, verify its cwd/project and require concrete evidence that it owns the affected work (such as an explicit task or prior coordination). Activity, tab proximity, and even a shared repository are not ownership evidence. Contact a known owner only when your work is blocked; never interrupt unrelated sessions to ask whether a change is theirs.
+- Never forge host-lock ownership or run state-writing probes against live shared IPC/session files. Runtime reproductions must use an isolated state directory or test harness.
+- Never kill live Hal; only kill isolated processes you spawned.
+- Never let a test rewrite a load-bearing file that is actually in use. A red test will destroy it.
+- Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, or flags that won't be used by feature at hand.
+- Absolutely NO SPECULATIVE FIXES.
+- Hal is a simple developer tool, not a nuclear reactor: cover realistic failure cases, but keep solutions and tests proportionate rather than engineering away every remote race.
+- Before writing a non-trivial feature, post a per-component LOC estimate and name the existing code each piece extends. If any component is over ~15 lines, state the assumption that would make it 5 (e.g. "assume the OSC reply arrives whole") and ask whether it's acceptable. Do not design for failure cases the user hasn't asked for: a cosmetic feature gets zero robustness code.
+- Run `bun cloc` to check line count — our budget for core code is 21 thousand lines. If you added many, see if you can do the same with less. Keep modules under ~400 lines; see "Why the line budget exists" below.
+- Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.
+- Tabs, not spaces (except for package.json)
+- Thinking of using JSON? Don't, use ASON instead. Use .ason or .asonl for internal state files, ason.stringify() to format data for reading ('short' if oneline result is needed)
+- Thinking of fixing duplicate messages by deduplicating? DON'T, fix the root cause instead: don't produce duplicates in the first place
+- When removing a feature, don't add a test to check that the feature is removed (lol)
+- Do not leave any tech debt behind. If you have taken any shortcuts, go back and do them right.
+- Put one-off scripts in `/tmp`, don't `rm -f` them (causes dangerous tool call prompt)
+- Avoid backwards compatibility code by default. Hal is under heavy development and breaking changes are expected. Keep the code minimal and free of legacy clutter
+
+- Keep model aliases current across routine minor-version updates. For a promising new default, say so plainly and ask if the user wants to try it. Mention a material caveat briefly, not before the recommendation; ask before switching to a substantially more expensive model.
+
+# Subagents
+
+- Work directly by default. Hal should fit in one developer's head, and Conway's law applies to agents too: "organizations which design systems are constrained to produce designs which are copies of the communication structures of these organizations." Delegation boundaries become module boundaries, so never split one small feature across agents.
+- Delegate only when separate context clearly helps: genuinely independent work, fresh-eyes review, or noisy investigation that would swamp the main context. Prefer one fresh subagent on the cheapest capable model, with an explicit deliverable.
+- Ask the user before spawning two or more subagents for one request. Explain why parallel delegation is worth the extra cost and coordination. Never spawn more than three unless the user explicitly requests a larger number.
+- A subagent must not spawn another agent unless the parent deliberately grants it a recursion budget. Recursive delegation is otherwise prohibited.
+- The parent owns the result: monitor delegated work.
+
+# Source layout
+
+- `main.ts` — composition root and startup order.
+- `config.ts` — cross-component configuration.
+- `client/` — terminal client; terminal-specific UI lives in `client/terminal/`.
+- `server/` — runtime, persistence, providers, tools, and transports.
+- `web-client/` — browser app.
+- `common/` — Hal-specific types and utilities; must be browser-safe.
+- `utils/` — generic utilities that could live outside Hal.
+
+`client/`, `server/`, and `web-client/` may import `common/` and `utils/`, never each other. `common/` may import `utils/`. `tests/import-boundaries.test.ts` enforces this.
+
+# Code style
+
+- Functions use `function f() {}` syntax.
+- Comment code well, not obvious things but stuff that helps humans to understand why things are written that way.
+- Write human-readable, simple and boring code. `if` over ternaries. `for of` over `.map()`. No clever one-liners.
+- Explain in comments non-obvious tricks like "process.kill(serverPid, 0)" (which looks like it kills a process but doesn't).
+
+# Logging and user-visible messages
+
+- Avoid console.log.
+- Use `runtime.emitInfo` for user-visible messages.
+- For developer diagnostics, use `src/utils/log.ts`.
+
+# Git
+
+- Commit after you have done your job.
+- Other sessions may stage or commit while you work. Never use `git add -A`, `git add .`, or `git commit -a`; commit with `git commit --only -- <exact files you edited>` so concurrent staged files cannot slip in. Verify the committed file list afterward. Never rewind a shared branch to repair a commit: another session may already have committed on top.
+- Commit messages: use a separate `-m` option for the title, each body paragraph, and the `Generated by <harness>/<model> (session <session-id>)` footer. Never embed `\n` in a message argument. Copy the exact values from the opening `<harness>` and `<model>` tags, and read `<session-id>` from the `<session_dir>` tag. After a fork the transcript still contains the parent session's ID, so never copy a session ID out of earlier context.
+- Pulling always rebases: the repo sets `pull.rebase=true` and `branch.autoSetupRebase=always`. Never pull with a merge (`--no-rebase`) and never create merge commits from remote work.
+- If a rebase hits conflicts, the puller resolves them and replays their own commits on top of the remote history. Fix the conflict and `git rebase --continue`; use `git rebase --abort` to back out. Never `git checkout`/`git restore` files that hold uncommitted work.
+
+# Module convention
+
+Every module exports a single mutable namespace object. Route cross-module calls through it and avoid private functions that cannot be patched via eval.
+
+```ts
+// service.ts (generic example, not a real file)
+function start(): void { ... }
+function stop(): void { ... }
+let state = {
+	running: false,
+	// ...
+}
+export const service = { state, start, stop, ... }
+```
+
+Caller:
+```ts
+import { service } from './service.ts'
+service.start()
+```
+
+Stateful modules should include a `state` field. Tweakable constants should go to a `config` field. True invariants like ANSI sequences can be `const FOO = ...`.
+
+Avoid import-time snapshots of values that may change at runtime, such as env-derived config, feature flags, and replaceable callbacks. Put those values on the exported namespace object, `state`, or `config`, and read them at call time. This enables the eval tool to inspect and hot-patch anything at runtime.
+
+# Startup initialization rule
+
+- Importing a module must be cheap and side-effect free.
+- Startup work MUST live in explicit `init()` functions.
+- At import time, you can initialize cheap in-memory state like `new Map()`.
+- Forbidden at import time: file/network I/O, config loading/applying, file watchers, timers/intervals, signal handlers, tool registration, IPC lock work, and starting runtime/client loops.
+- `init()` must be idempotent.
+- Cross-module startup order must be centralized in one bootstrap path, not spread across imports.
+- When adding a new module, ask: "Can this line wait until `init()`?" If yes, it belongs in `init()`.
+
+# Configuration
+
+- Non-secret user settings live in local `config.ason` at the repo root.
+- `config.ason` is ignored by git. Never "clean up" or reset a user's local edits to it unless explicitly asked.
+- The tracked source of truth for new installs is `config-template.ason` at the repo root.
+- The install script creates `config.ason` from `config-template.ason` when the local file is missing.
+- Each configurable module exports a mutable `config` object.
+- Register that object in `src/config.ts` under the module name.
+- `config.ason` and `config-template.ason` use that module name as their top-level key.
+- `src/config.ts` applies overrides with `Object.assign`, so keep config values plain ASON-compatible data.
+- Read config at call time. Do not capture config values at import time.
+- When adding or changing config variables, update both `config-template.ason` and `config.ason` with the default value and a descriptive comment.
+
+Example:
+```ts
+// src/server/runtime/agent-loop.ts
+const config = {
+	maxIterations: 50,
+}
+export const agentLoop = { config, runAgentLoop, abort, isActive }
+```
+
+```ts
+// src/config.ts
+const modules = {
+	agentLoop: agentLoop.config,
+}
+```
+
+```ason
+{
+	agentLoop: {
+		maxIterations: 50,
+	}
+}
+```
+
+# Terminal rules (see docs/terminal.md)
+
+Read docs/terminal.md BEFORE touching any rendering or terminal code. It
+contains hard-won rules about scrollback, line width, diffing, and the
+fullscreen flag. Violating them causes visual corruption.
+
+# Web rules
+
+Before editing web or SolidJS code, read `docs/web.md`; its prerelease Solid 2
+rules override remembered Solid 1 and React patterns.
+
+Before designing or restyling web UI, read `docs/frontend-design.md` (Anthropic's
+frontend-design skill). Plan tokens (palette, type roles, one signature element)
+before writing CSS, and avoid the templated "AI slop" looks it describes.
+
+- Never nest a scrolling area inside another scrolling area in the web UI. Expanded transcript blocks grow to their full content height; the transcript alone scrolls.
+
+# Terminal width
+
+ALL terminal width calculations MUST use `visLen()` from `src/utils/strings.ts`.
+Never use `.length` for measuring how wide a string is on screen. Emojis,
+CJK characters, and other wide chars take 2 columns. ANSI escapes take 0.
+There is ONE function for this - use it everywhere.
+
+Word wrapping: use `wordWrap()` from the same file. It's ANSI-aware and
+uses `charWidth()` internally which is the same width logic as `visLen()`.
+
+# Tool result size limit
+
+Tool call results must never exceed 1 MB. Truncate or summarize if needed. Error message must
+make clear that agent can use eval to change the limit if necessary.
