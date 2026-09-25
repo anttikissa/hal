@@ -1,6 +1,6 @@
 {
 	title: 'Durable session history',
 	description: 'Each session appends its conversation to ASONL as neutral blocks: submitted prompts, assistant blocks, and a turn end recording completed, cancelled or error, plus usage. Provider input is rebuilt from this history alone, never from display state or client messages, and thinking signatures replay exactly. A partially written last record is recovered, and a turn that never ended (host died) is closed as interrupted when the session opens. Tests cover cancellation, truncation and replay.',
-	status: 'planned',
+	status: 'done',
 	needs: ['gj', '7f']
 }

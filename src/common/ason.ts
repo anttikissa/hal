@@ -374,4 +374,51 @@ function stringifyLine(value: unknown): string {
 	return `${ason.stringify(value, 'short')}\n`
 }
 
-export const ason = { stringify, stringifyLine, parse, parseAll }
+/** Yields newline-delimited lines from a byte stream, and whether each
+ *  was newline-terminated (only the last one may not be). */
+async function* streamLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<[string, boolean]> {
+	const decoder = new TextDecoder()
+	let buf = ''
+	for await (const chunk of stream) {
+		buf += decoder.decode(chunk, { stream: true })
+		const lines = buf.split('\n')
+		buf = lines.pop()!
+		for (const line of lines) yield [line, true]
+	}
+	buf += decoder.decode()
+	if (buf) yield [buf, false]
+}
+
+export type ParseStreamOptions = {
+	/** The stream may start mid-record (e.g. read from an offset): skip a bad first line. */
+	midRecord?: boolean
+	/** An unterminated last line that fails to parse is a partial write:
+	 *  hand it here instead of throwing. */
+	onPartial?: (fragment: string) => void
+}
+
+/** Yields parsed ASON values from a byte stream, one per newline-delimited
+ *  record, as soon as each line is complete. A bad record throws. */
+async function* parseStream(stream: ReadableStream<Uint8Array>, opts: ParseStreamOptions = {}): AsyncGenerator<AsonValue> {
+	let first = true
+	for await (const [line, terminated] of streamLines(stream)) {
+		if (!line.trim()) continue
+		let value: AsonValue
+		try {
+			value = ason.parse(line)
+		} catch (e) {
+			const skipFirst = first && opts.midRecord
+			first = false
+			if (skipFirst) continue
+			if (!terminated && opts.onPartial) {
+				opts.onPartial(line)
+				continue
+			}
+			throw e
+		}
+		first = false
+		yield value
+	}
+}
+
+export const ason = { stringify, stringifyLine, parse, parseAll, parseStream }

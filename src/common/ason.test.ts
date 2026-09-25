@@ -279,3 +279,75 @@ describe('ASONL', () => {
 		expect(e?.message).toContain('2:6')
 	})
 })
+
+describe('parseStream', () => {
+	function toStream(chunks: (string | Uint8Array)[]): ReadableStream<Uint8Array> {
+		let encoder = new TextEncoder()
+		return new ReadableStream({
+			start(controller) {
+				for (let chunk of chunks) controller.enqueue(typeof chunk === 'string' ? encoder.encode(chunk) : chunk)
+				controller.close()
+			},
+		})
+	}
+
+	async function collect(chunks: (string | Uint8Array)[], opts?: Parameters<typeof ason.parseStream>[1]): Promise<any[]> {
+		let results: any[] = []
+		for await (let value of ason.parseStream(toStream(chunks), opts)) results.push(value)
+		return results
+	}
+
+	test('records split anywhere across chunks come out whole and in order', async () => {
+		expect(await collect(['{ a:', ' 1 }\n{ b', ": 'x\\ny' }\n{ c: 3 }\n"])).toEqual([{ a: 1 }, { b: 'x\ny' }, { c: 3 }])
+	})
+
+	test('a multibyte character split across chunks survives', async () => {
+		let bytes = new TextEncoder().encode("{ s: 'ä€😀' }\n")
+		expect(await collect([bytes.slice(0, 8), bytes.slice(8, 11), bytes.slice(11)])).toEqual([{ s: 'ä€😀' }])
+	})
+
+	test('blank lines are skipped', async () => {
+		expect(await collect(['{ a: 1 }\n\n\n{ b: 2 }\n'])).toEqual([{ a: 1 }, { b: 2 }])
+	})
+
+	test('a complete record without a trailing newline is yielded', async () => {
+		expect(await collect(['{ a: 1 }\n{ b: 2 }'])).toEqual([{ a: 1 }, { b: 2 }])
+	})
+
+	test('a bad record in the middle throws, even on the first line', async () => {
+		await expect(collect(['@@@\n{ a: 1 }\n'])).rejects.toThrow(/Unexpected token/)
+		await expect(collect(['{ a: 1 }\n@@@\n{ b: 2 }\n'])).rejects.toThrow(/Unexpected token/)
+	})
+
+	test('an unterminated unparseable last line throws by default', async () => {
+		await expect(collect(['{ a: 1 }\n{ b: '])).rejects.toThrow()
+	})
+
+	test('an unterminated unparseable last line goes to onPartial', async () => {
+		let partial: string[] = []
+		let out = await collect(['{ a: 1 }\n', "{ b: 'hal"], { onPartial: (s) => partial.push(s) })
+		expect(out).toEqual([{ a: 1 }])
+		expect(partial).toEqual(["{ b: 'hal"])
+	})
+
+	test('a terminated bad last line is corruption, not a partial write', async () => {
+		await expect(collect(['{ a: 1 }\n{ b: \n'], { onPartial: () => {} })).rejects.toThrow()
+	})
+
+	test('midRecord skips a bad first line (reading from an offset)', async () => {
+		expect(await collect(["artial' }\n{ a: 1 }\n"], { midRecord: true })).toEqual([{ a: 1 }])
+		expect(await collect(['{ a: 1 }\n'], { midRecord: true })).toEqual([{ a: 1 }])
+		await expect(collect(['{ a: 1 }\n@@@\n'], { midRecord: true })).rejects.toThrow()
+	})
+
+	test('yields a newline-terminated record before the stream closes', async () => {
+		let controller!: ReadableStreamDefaultController<Uint8Array>
+		let stream = new ReadableStream<Uint8Array>({ start: (c) => void (controller = c) })
+		let iter = ason.parseStream(stream)
+		controller.enqueue(new TextEncoder().encode("{ event: 'key' }\n"))
+		let result = await Promise.race([iter.next(), Bun.sleep(100).then(() => 'timeout' as const)])
+		expect(result).toEqual({ done: false, value: { event: 'key' } })
+		controller.close()
+		await iter.return(undefined)
+	})
+})
