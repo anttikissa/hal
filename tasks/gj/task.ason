@@ -1,6 +1,6 @@
 {
 	title: 'What is a session',
-	description: 'A session has an id, its own directory under the state root and small ASON metadata: at least cwd, model, name and creation time. The host can create, list, open and close several sessions at once, even though the first terminal client shows only one. A session without history is valid; malformed metadata is reported, not replaced. No forking or tab UI yet.',
+	description: 'A session has an id, its own directory under the state root and small ASON metadata kept in a liveFile: at least cwd, model, name and creation time. The host can create, list, open and close several sessions at once, even though the first terminal client shows only one. A session without history is valid; malformed metadata is reported, not replaced. No forking or tab UI yet.',
 	status: 'planned',
-	needs: ['8', 'p']
+	needs: ['n']
 }
