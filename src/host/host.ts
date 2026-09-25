@@ -6,15 +6,17 @@
 // Snapshot and live events are sent from the same synchronous step, so a
 // client that opens a session never misses or double-counts an event.
 // The conversation lives only in durable history (history.ts): prompts,
-// finished blocks and turn ends are on disk before clients hear of them,
-// and snapshots and provider input are read back from there.
+// finished blocks, tool results and turn ends are on disk before clients
+// hear of them, and snapshots and provider input are read back from
+// there.
 
 import { ason } from '../common/ason.ts'
-import { blocks, type StreamEvent } from '../common/blocks.ts'
+import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock } from '../common/blocks.ts'
 import { protocol, type Command, type Event, type Snapshot } from '../common/protocol.ts'
 import { history } from './history.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
+import { tools } from './tools.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -130,20 +132,49 @@ function cancel(client: Client, id: string): void {
 	running.controller.abort()
 }
 
-// Streams one turn and always ends it: history.record persists the
-// output and the turn end whatever the stream does, and followers get
-// the turn end as recorded. Provider input is read from history here,
-// inside the recorded stream, so a failure to build it ends the turn too.
+// Runs one turn and always ends it. A turn is every provider round from
+// the prompt to the model's answer: while a round ends asking for tools,
+// the host runs them, records their results and starts the next round.
+// Blocks and results are in history before followers hear of them, and
+// there is one turn end, with the usage of all rounds. Provider input is
+// read from history inside the recorded stream, so a failure to build
+// it ends the turn too.
+//
+// A tool call is recorded before it runs and its result after, so a
+// host that dies in between leaves an unanswered call: history.open
+// closes the turn as interrupted and nothing runs it again (replay.ts).
 async function runTurn(id: string, model: string, running: Running): Promise<void> {
 	let { signal } = running.controller
 	async function* stream(): AsyncGenerator<StreamEvent> {
-		yield* host.stream(model, { messages: await history.messages(id) }, signal)
+		yield* host.stream(model, { messages: await history.messages(id), tools: tools.defs() }, signal)
 	}
+	let last: DoneEvent | ErrorEvent | undefined
 	let failure: string | undefined
 	try {
-		for await (let event of history.record(id, running.provider, stream())) {
-			if (event.type === 'done' || event.type === 'error' || signal.aborted) break
-			host.broadcast(id, { type: 'stream', sessionId: id, event })
+		while (true) {
+			let round = blocks.newTurn(running.provider)
+			last = undefined
+			for await (let event of history.record(id, running.provider, stream())) {
+				blocks.apply(round, event)
+				if (event.type === 'done' || event.type === 'error') {
+					last = event
+					break
+				}
+				if (signal.aborted) break
+				host.broadcast(id, { type: 'stream', sessionId: id, event })
+			}
+			let calls = round.blocks.filter((b) => b.type === 'tool_call')
+			if (last?.type !== 'done' || !calls.length) break
+			// The turn wanted to go on: a cancel now stops it as cancelled.
+			let cancelled = () => signal.aborted && ((last = undefined), true)
+			if (cancelled()) break
+			let cwd = sessions.open(id).cwd
+			let results: ToolResultBlock[] = []
+			for (let call of calls) results.push(await tools.run(call, { cwd, signal }))
+			if (host.state.running.get(id) !== running) return
+			history.results(id, results)
+			host.broadcast(id, { type: 'tool-results', sessionId: id, results })
+			if (cancelled()) break
 		}
 	} catch (e: any) {
 		failure = String(e?.message ?? e)
@@ -151,17 +182,18 @@ async function runTurn(id: string, model: string, running: Running): Promise<voi
 	// A reset host has forgotten this turn; don't write into its successor.
 	if (host.state.running.get(id) !== running) return
 	host.state.running.delete(id)
-	let last: ReturnType<typeof history.readSync>[number] | undefined
+	let recorded: ReturnType<typeof history.readSync>[number] | undefined
 	try {
-		last = history.readSync(id).at(-1)
+		history.end(id, failure !== undefined ? { type: 'error', message: failure } : last)
+		recorded = history.readSync(id).at(-1)
 	} catch (e: any) {
 		failure ??= String(e?.message ?? e)
 	}
 	let end: Event & { type: 'turn-end' } = { type: 'turn-end', sessionId: id, status: 'error', error: failure ?? 'turn end was not recorded' }
-	if (last?.type === 'turn_end') {
-		end = { type: 'turn-end', sessionId: id, status: last.status }
-		if (Object.keys(last.usage).length) end.usage = last.usage
-		if (last.error !== undefined) end.error = last.error
+	if (recorded?.type === 'turn_end') {
+		end = { type: 'turn-end', sessionId: id, status: recorded.status }
+		if (Object.keys(recorded.usage).length) end.usage = recorded.usage
+		if (recorded.error !== undefined) end.error = recorded.error
 	}
 	host.broadcast(id, end)
 }

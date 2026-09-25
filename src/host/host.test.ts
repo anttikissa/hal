@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync } from 'fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import type { StreamEvent } from '../common/blocks.ts'
@@ -9,6 +9,7 @@ import { history } from './history.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
+import { tools } from './tools.ts'
 
 const savedHome = process.env.HAL_HOME
 const origStream = host.stream
@@ -360,7 +361,137 @@ test('every event is plain data that survives ASON and is not shared', async () 
 	late.of('snapshot')[0].snapshot.turn.blocks.push({ type: 'text', text: 'junk' })
 	late.of('snapshot')[0].snapshot.history.push({ type: 'user', blocks: [{ type: 'text', text: 'junk' }], ts: '' })
 	calls[0]!.push({ type: 'done', reason: 'tool_use' })
+	await until(() => calls.length === 2)
+	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length)
 	for (let e of [...a.events, ...late.events]) expect(ason.parse(ason.stringify(e))).toEqual(e as any)
 	expect(await fresh(id)).toEqual(a.views.get(id)!)
+})
+
+// ── Tools ──
+
+function toolSession(c: ReturnType<typeof client>): string {
+	writeFileSync(`${home}/notes.txt`, 'remember the milk\n')
+	return created(c, home)
+}
+
+const readCall = (id = 't1'): StreamEvent => ({ type: 'tool_call', id, name: 'read', input: { path: 'notes.txt' } })
+
+test('a tool call runs on the host and the turn continues with its result', async () => {
+	let a = client()
+	let id = toolSession(a)
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	a.conn.send({ type: 'submit', sessionId: id, text: 'what did I note?' })
+	await until(() => calls.length === 1)
+	expect(calls[0]!.input.tools.map((t: any) => t.name)).toContain('read')
+	calls[0]!.push({ type: 'text', text: 'Let me look.' }, readCall(), { type: 'usage', usage: { input: 10, output: 5 } }, { type: 'done', reason: 'tool_use' })
+	await until(() => calls.length === 2)
+	expect(calls[1]!.input.messages.slice(1)).toEqual([
+		{
+			role: 'assistant',
+			blocks: [
+				{ type: 'text', text: 'Let me look.' },
+				{ type: 'tool_call', id: 't1', name: 'read', input: { path: 'notes.txt' } },
+			],
+		},
+		{ role: 'user', blocks: [{ type: 'tool_result', id: 't1', output: 'remember the milk\n' }] },
+	])
+	// Still one turn: nobody has seen it end.
+	expect(a.of('turn-end')).toEqual([])
+	let late = client()
+	late.conn.send({ type: 'open', sessionId: id })
+	calls[1]!.push({ type: 'text', text: 'Milk.' }, { type: 'usage', usage: { input: 20, output: 1 } }, { type: 'done', reason: 'end' })
+	await until(() => b.of('turn-end').length && late.of('turn-end').length)
+
+	let view = await fresh(id)
+	expect(view.items).toEqual([
+		{ type: 'prompt', text: 'what did I note?' },
+		{ type: 'text', text: 'Let me look.' },
+		{ type: 'tool', id: 't1', name: 'read', input: { path: 'notes.txt' } },
+		{ type: 'tool-result', id: 't1', output: 'remember the milk\n' },
+		{ type: 'text', text: 'Milk.' },
+		{ type: 'turn-end', status: 'completed', usage: { input: 30, output: 6 } },
+	])
+	expect(a.views.get(id)).toEqual(view)
+	expect(b.views.get(id)).toEqual(view)
+	expect(late.views.get(id)).toEqual(view)
+	expect((await records(id)).filter((r) => r.type === 'turn_end')).toHaveLength(1)
+})
+
+test('a restart after a tool ran keeps its result and does not run it again', async () => {
+	let ran = 0
+	let origRun = tools.run
+	tools.run = (...args) => (ran++, origRun(...args))
+	try {
+		let a = client()
+		let id = toolSession(a)
+		a.conn.send({ type: 'submit', sessionId: id, text: 'look' })
+		await until(() => calls.length === 1)
+		calls[0]!.push(readCall(), { type: 'done', reason: 'tool_use' })
+		await until(() => calls.length === 2)
+		expect(ran).toBe(1)
+		// The host dies while the model answers the result.
+		restartHost()
+
+		let b = client()
+		b.conn.send({ type: 'open', sessionId: id })
+		await until(() => b.views.get(id))
+		expect(b.views.get(id)!.items.slice(-2)).toEqual([
+			{ type: 'tool-result', id: 't1', output: 'remember the milk\n' },
+			{ type: 'turn-end', status: 'interrupted' },
+		])
+		b.conn.send({ type: 'submit', sessionId: id, text: 'and?' })
+		await until(() => calls.length === 3)
+		expect(calls[2]!.input.messages.at(-1).blocks).toEqual([
+			{ type: 'tool_result', id: 't1', output: 'remember the milk\n' },
+			{ type: 'text', text: 'and?' },
+		])
+		expect(ran).toBe(1)
+	} finally {
+		tools.run = origRun
+	}
+})
+
+test('a tool call cut off by a restart is reported to the model, not run', async () => {
+	let ran = 0
+	let origRun = tools.run
+	tools.run = (...args) => (ran++, origRun(...args))
+	try {
+		let a = client()
+		let id = toolSession(a)
+		a.conn.send({ type: 'submit', sessionId: id, text: 'look' })
+		await until(() => calls.length === 1)
+		calls[0]!.push(readCall())
+		await until(() => a.of('stream').length === 1)
+		restartHost()
+
+		let b = client()
+		b.conn.send({ type: 'open', sessionId: id })
+		await until(() => b.views.get(id))
+		b.conn.send({ type: 'submit', sessionId: id, text: 'again' })
+		await until(() => calls.length === 2)
+		let results = calls[1]!.input.messages.at(-1).blocks
+		expect(results[0]).toMatchObject({ type: 'tool_result', id: 't1', isError: true })
+		expect(results[1]).toEqual({ type: 'text', text: 'again' })
+		expect(ran).toBe(0)
+	} finally {
+		tools.run = origRun
+	}
+})
+
+test('cancel between tool rounds ends the turn and keeps the results', async () => {
+	let a = client()
+	let id = toolSession(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'look' })
+	await until(() => calls.length === 1)
+	calls[0]!.push(readCall(), { type: 'done', reason: 'tool_use' })
+	await until(() => calls.length === 2)
+	a.conn.send({ type: 'cancel', sessionId: id })
+	await until(() => a.of('turn-end').length)
+	expect(a.of('turn-end')[0].status).toBe('cancelled')
+	let view = await fresh(id)
+	expect(view).toEqual(a.views.get(id)!)
+	expect(view.items.map((i) => i.type)).toEqual(['prompt', 'tool', 'tool-result', 'turn-end'])
+	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'user', 'turn_end'])
 })

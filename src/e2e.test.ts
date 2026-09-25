@@ -26,13 +26,43 @@ const finish = [
 	sseEvent({ type: 'message_stop' }),
 ]
 
+const sse = (events: Uint8Array[]) =>
+	new Response(
+		new ReadableStream<Uint8Array>({
+			start(c) {
+				for (let e of events) c.enqueue(e)
+				c.close()
+			},
+		}),
+		{ headers: { 'content-type': 'text/event-stream' } },
+	)
+
+// "read <path>" asks for the read tool; a tool result is answered with
+// SAW(<its first line>).
+const toolUse = (path: string) => [
+	sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }),
+	sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_1', name: 'read', input: {} } }),
+	sseEvent({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ path }) } }),
+	sseEvent({ type: 'content_block_stop', index: 0 }),
+	sseEvent({ type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 3 } }),
+	sseEvent({ type: 'message_stop' }),
+]
+const toolAnswer = (result: any) => [
+	sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }),
+	textDelta(`SAW(${String(result.content).split('\n')[0]})`),
+	...finish,
+]
+
 // Answers "<prompt>" with "ECHO(<prompt>)". A prompt starting with
 // "hold" streams PART1, then waits for release() to send PART2 and
 // finish, or for the client to abort.
 function reply(req: Request, body: any): Response {
 	let messages = body.messages
 	requests.push(messages)
-	let prompt: string = messages.at(-1).content.at(-1).text
+	let lastBlock = messages.at(-1).content.at(-1)
+	if (lastBlock.type === 'tool_result') return sse([sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }), ...toolAnswer(lastBlock)])
+	let prompt: string = lastBlock.text
+	if (prompt.startsWith('read ')) return sse(toolUse(prompt.slice(5)))
 	let stream = new ReadableStream<Uint8Array>({
 		start(c) {
 			c.enqueue(sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }))
@@ -223,4 +253,13 @@ test('a host restarted mid-turn records it interrupted and everyone rejoins', as
 		.map((r) => r.status)
 	expect(ends).toEqual(['interrupted', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)
+}, 30_000)
+
+test('the model reads a file through the host and answers from it', async () => {
+	let p = run()
+	await until('a session', () => sessionCount() === 1)
+	type(p, 'read run\r')
+	await until('the answer from the file', () => seen(p, 'SAW(#!/usr/bin/env bash)'))
+	expect(requests).toHaveLength(2)
+	expect(requests[1]!.at(-1).content[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu_1' })
 }, 30_000)

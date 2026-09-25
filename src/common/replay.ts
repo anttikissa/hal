@@ -39,12 +39,19 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			let answered = new Set(results.map((b) => b.id))
 			let missing: ToolResultBlock[] = pending
 				.filter((id) => !answered.has(id))
-				.map((id) => ({ type: 'tool_result', id, output: `Tool call did not run: the turn ${status ?? 'ended'}.`, isError: true }))
+				.map((id): ToolResultBlock => ({ type: 'tool_result', id, output: replay.missingResult(status), isError: true }))
 			pending = []
 			push({ role: 'user', blocks: [...results, ...missing, ...r.blocks.filter((b) => b.type !== 'tool_result')] })
 		}
 	}
 	return out
+}
+
+// What the model is told about a call with no recorded result. A host
+// that died may have run it without recording the result.
+function missingResult(status: TurnStatus | undefined): string {
+	if (status === 'interrupted') return 'No result: the turn was interrupted, so this tool call may or may not have run.'
+	return `Tool call did not run: the turn ${status ?? 'ended'}.`
 }
 
 // True if the last turn has not ended: something follows the last turn end.
@@ -53,4 +60,4 @@ function openTurn(records: HistoryRecord[]): boolean {
 	return last !== undefined && last.type !== 'turn_end'
 }
 
-export const replay = { toMessages, openTurn }
+export const replay = { toMessages, missingResult, openTurn }

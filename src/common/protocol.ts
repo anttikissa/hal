@@ -6,7 +6,7 @@
 // so far plus any in-progress turn) and then live events. Reconnecting
 // is connecting again: there is no replay and no sequence numbers.
 
-import type { AssistantBlock, StreamEvent, Usage } from './blocks.ts'
+import type { AssistantBlock, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 
@@ -16,7 +16,7 @@ export type { TurnStatus } from './replay.ts'
 // A snapshot carries the session's durable history records as stored.
 
 // The running turn's output streamed so far and not yet in history (its
-// prompt and every finished block already are). Clients continue it by
+// prompt, every finished block and any tool results already are). Clients continue it by
 // folding later `stream` events with blocks.apply; at `turn-end` the
 // host has recorded its blocks and the turn end, so its blocks, if any,
 // followed by the turn end match what a later snapshot shows.
@@ -47,6 +47,9 @@ export type Event =
 	// The prompt is now in history and a turn is running.
 	| { type: 'turn-start'; sessionId: string; prompt: string; provider: string }
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent }
+	// The host ran the round's tool calls and recorded these results; the
+	// turn goes on with a new provider round, streamed after them.
+	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[] }
 	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string }
 	// Sent only to the client whose command was refused.
 	| { type: 'rejected'; sessionId?: string; command: string; reason: string }

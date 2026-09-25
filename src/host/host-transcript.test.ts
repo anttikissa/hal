@@ -79,7 +79,7 @@ async function until(check: () => unknown): Promise<void> {
 
 // Runs one turn watched from the start, and by a client that joins
 // mid-turn; `finish` ends it. Returns both and one that joins after.
-async function turn(finish: (push: (...e: StreamEvent[]) => void, send: (c: unknown) => void, id: string) => void) {
+async function turn(finish: (push: (...e: StreamEvent[]) => void, send: (c: unknown) => void, id: string) => void | Promise<void>) {
 	let early = viewer()
 	early.send({ type: 'create', cwd: '/tmp/w', model: 'fake/m' })
 	let id = early.t!.meta.id
@@ -89,7 +89,7 @@ async function turn(finish: (push: (...e: StreamEvent[]) => void, send: (c: unkn
 	await until(() => early.t!.items.some((i) => i.type === 'text'))
 	let mid = viewer()
 	mid.send({ type: 'open', sessionId: id })
-	finish(pushes[0]!, early.send, id)
+	await finish(pushes[0]!, early.send, id)
 	await until(() => early.ends && mid.ends)
 	let late = viewer()
 	late.send({ type: 'open', sessionId: id })
@@ -97,15 +97,19 @@ async function turn(finish: (push: (...e: StreamEvent[]) => void, send: (c: unkn
 }
 
 test('completed: every client shows the same finished turn', async () => {
-	let { early, mid, late } = await turn((push) =>
-		push({ type: 'text', text: 'tial' }, { type: 'tool_call', id: 't', name: 'ls', input: {} }, { type: 'usage', usage: { output: 3 } }, { type: 'done', reason: 'end' }),
-	)
+	let { early, mid, late } = await turn(async (push) => {
+		push({ type: 'text', text: 'tial' }, { type: 'tool_call', id: 't', name: 'ls', input: {} }, { type: 'usage', usage: { output: 3 } }, { type: 'done', reason: 'tool_use' })
+		await until(() => pushes.length === 2)
+		pushes[1]!({ type: 'text', text: 'done' }, { type: 'usage', usage: { output: 1 } }, { type: 'done', reason: 'end' })
+	})
 	expect(late.items).toEqual([
 		{ type: 'prompt', text: 'go' },
 		{ type: 'thinking', text: 'hm' },
 		{ type: 'text', text: 'partial' },
 		{ type: 'tool', id: 't', name: 'ls', input: {} },
-		{ type: 'turn-end', status: 'completed', usage: { output: 3 } },
+		{ type: 'tool-result', id: 't', output: "Error: unknown tool 'ls'", isError: true },
+		{ type: 'text', text: 'done' },
+		{ type: 'turn-end', status: 'completed', usage: { output: 4 } },
 	])
 	expect(early).toEqual(late)
 	expect(mid).toEqual(late)
