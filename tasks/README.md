@@ -37,6 +37,21 @@ Each task lives in a directory named by its ID, with a task.ason record and opti
 - Config values are plain functions on these objects, such as
   `models.defaultModel()`, read at call time — never captured at import.
 
+## Emergency keys (invariants)
+
+- Ctrl-C quits, Ctrl-Z suspends, Ctrl-R restarts — in every state,
+  including the legacy bytes and the kitty CSI-u forms.
+- They are found in raw stdin (`src/client/emergency.ts`) before any
+  stateful decoding; no escape parser, paste buffer, editor, modal,
+  queue or host round-trip may sit in front of them or delay them.
+- Handling is synchronous in the client (`src/client/terminal.ts`) and
+  never waits on the host. No feature may rebind or capture them.
+- Quit and restart restore the terminal and never clear it or use the
+  alternate screen, so the last frame stays visible. Restart exits with
+  `terminal.restartCode` (100), which ./run answers by starting again.
+- Suspend restores the terminal and SIGSTOPs the process group; on
+  SIGCONT it re-enters raw mode and calls `terminal.redraw()`.
+
 ## Artifacts
 
 Files in a task directory are its artifacts, copied from the old Hal.
