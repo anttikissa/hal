@@ -1,6 +1,6 @@
 {
 	title: 'ASON compatibility',
-	description: 'Parse and stringify ASON and ASONL as documented in ~/.hal/docs/ason.md, reading files written by old Hal such as auth.ason. Invalid input throws an error with its position. The format is a contract, so tests assert exact output and round trips.',
+	description: 'Lift ~/.hal/src/utils/ason.ts and ason.test.ts (self-contained, format per ~/.hal/docs/ason.md) rather than rewriting them. Keep parse, stringify and ASONL; drop parts no task needs yet, such as comment preservation or streaming, unless they cost nothing to keep. Invalid input throws an error with its position. The format is a contract, so tests assert exact output and round trips.',
 	status: 'planned',
 	needs: ['r']
 }
