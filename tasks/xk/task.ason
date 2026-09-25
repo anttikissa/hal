@@ -1,6 +1,6 @@
 {
 	title: 'Terminal key decoding',
 	description: 'Decode raw terminal bytes incrementally into printable text, Enter, Backspace, arrows, Escape, Ctrl-D and paste; sequences may span chunks. Keep decoding separate from the editor and ignore unsupported sequences without inserting escape bytes. Use terminal fixtures, not a real user TTY.',
-	status: 'planned',
+	status: 'done',
 	needs: ['b']
 }
