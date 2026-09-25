@@ -1,6 +1,6 @@
 {
 	title: 'Restart lifecycle',
-	description: './run restarts its child on a dedicated restart exit code and otherwise exits. Clients survive a host restart by reconnecting or taking over, and the session continues. Ctrl-C and ordinary exit leave the terminal usable.',
+	description: 'A host restart (Ctrl-R in the host process) keeps the session going: clients reconnect or take over, a running turn is recorded as interrupted, and the restarted process rejoins as a client or host. The terminal stays usable throughout.',
 	status: 'planned',
 	needs: ['b3']
 }
