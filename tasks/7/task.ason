@@ -1,0 +1,6 @@
+{
+	title: 'Durable session history',
+	description: 'One session has small ASON metadata and append-oriented ASONL history. Persist submitted prompts and completed/cancelled turns with unambiguous turn boundaries; after restart rebuild provider input from durable history, not terminal text, snapshots or IPC. Tests cover truncation/cancellation and recovery of a partially written last record. Do not add tabs or forking.',
+	status: 'planned',
+	needs: ['8', 'p']
+}

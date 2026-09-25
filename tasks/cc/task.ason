@@ -1,0 +1,6 @@
+{
+	title: 'Terminal output and redraw',
+	description: 'Render transcript plus editable prompt and streaming answer without corrupting terminal scrollback; do not clear screen on start, and restore terminal mode on exit or failure. Handle visual widths of wide/combining characters and wrapping through one tested width helper. Keep redraw minimal for this slice; introduce a diff engine only if observable behavior requires it. Use fake terminal tests and the lessons in ~/.hal/docs/terminal.md.',
+	status: 'planned',
+	needs: ['11', 'ca']
+}

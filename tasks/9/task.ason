@@ -1,0 +1,6 @@
+{
+	title: 'Local code overrides',
+	description: 'A gitignored optional root local.ts can replace exported functions on module objects before startup; internal calls to overridable functions go through those objects. Start with one real overridable choice rather than converting every constant. ./test typechecks local.ts when present and smoke-imports it in a separate process, without applying local overrides to unrelated tests. A missing local.ts is normal; do not create a config.ason schema.',
+	status: 'planned',
+	needs: ['b']
+}

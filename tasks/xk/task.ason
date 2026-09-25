@@ -1,0 +1,6 @@
+{
+	title: 'Terminal key decoding',
+	description: 'Decode raw terminal bytes incrementally into printable text, Enter, Backspace, arrows, Ctrl-C/D and paste; sequences may span chunks. Keep decoding separate from the editor and ignore unsupported sequences without inserting escape bytes. Use terminal fixtures, not a real user TTY. Add Kitty-specific support only if the initial editor actually needs it.',
+	status: 'planned',
+	needs: ['b']
+}
