@@ -1,5 +1,5 @@
 {
-  "exclude": ["node_modules"],
+  "exclude": ["node_modules", "tasks"],
   "compilerOptions": {
     "lib": ["ESNext"],
     "target": "ESNext",
