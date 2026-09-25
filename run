@@ -1,2 +1,9 @@
 #!/usr/bin/env bash
-exec bun "$(dirname "$(readlink -f "$0")")/src/main.ts" "$@"
+# Starts Hal, and starts it again whenever it exits with 100 (Ctrl-R;
+# terminal.restartCode in src/client/terminal.ts).
+main="$(dirname "$(readlink -f "$0")")/src/main.ts"
+while true; do
+	bun "$main" "$@"
+	code=$?
+	[ "$code" -eq 100 ] || exit "$code"
+done

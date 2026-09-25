@@ -2,6 +2,8 @@
 // work on import; start() calls their init() functions in order.
 import { existsSync } from 'fs'
 import { join } from 'path'
+import { terminal } from './client/terminal.ts'
+import { paths } from './host/paths.ts'
 
 const repoRoot = join(import.meta.dir, '..')
 
@@ -19,7 +21,11 @@ async function loadLocal(): Promise<void> {
 }
 
 // Module init() calls go here, in order, once modules have them.
-function init(): void {}
+function init(): void {
+	paths.init()
+	// Piped stdin (tests, scripts) has no raw mode and no emergency keys.
+	if (process.stdin.isTTY) terminal.init()
+}
 
 async function start(): Promise<void> {
 	await main.loadLocal()
