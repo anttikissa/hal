@@ -9,7 +9,7 @@
 
 import { appendFileSync, existsSync, openSync, readFileSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
 import { ason } from '../common/ason.ts'
-import { blocks, type StreamEvent, type Turn, type UserBlock } from '../common/blocks.ts'
+import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock, type Turn, type Usage, type UserBlock } from '../common/blocks.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { diag } from './diag.ts'
 import { paths } from './paths.ts'
@@ -20,8 +20,16 @@ type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit
 
 const recordTypes = new Set(['user', 'assistant', 'turn_end'])
 
+// One running turn: its current provider round (`turn`), how many of
+// that round's blocks are on disk, and the usage of earlier rounds.
 // `ended`: its turn end is on disk (interrupt() got there first).
-type Running = { turn: Turn; written: number; ended?: boolean }
+type Running = { turn: Turn; written: number; prior: Usage; ended?: boolean }
+
+function addUsage(a: Usage, b: Usage): Usage {
+	let sum = { ...a }
+	for (let [k, v] of Object.entries(b)) if (v !== undefined) sum[k as keyof Usage] = (sum[k as keyof Usage] ?? 0) + v
+	return sum
+}
 
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
@@ -128,12 +136,15 @@ async function messages(id: string) {
 	return replay.toMessages(await history.read(id))
 }
 
-// Passes stream events through, appending each assistant block as soon
-// as it is complete and a turn end last. A consumer that stops early
-// ends the turn as cancelled; a stream that throws ends it as an error,
-// yielded like any other error event.
+// One provider round of a turn. Passes stream events through,
+// appending each assistant block as soon as it is complete (and the
+// rest when the consumer stops early). A stream that throws ends as an
+// error, yielded like any other error event. The turn stays running,
+// through tool calls and later rounds, until end().
 async function* record(id: string, providerName: string, events: AsyncIterable<StreamEvent>): AsyncGenerator<StreamEvent> {
-	let running: Running = { turn: blocks.newTurn(providerName), written: 0 }
+	let before = history.state.running.get(id)
+	let prior = before ? addUsage(before.prior, before.turn.usage) : {}
+	let running: Running = { turn: blocks.newTurn(providerName), written: 0, prior }
 	let { turn } = running
 	let flush = (upTo: number) => {
 		if (running.ended) return
@@ -141,31 +152,37 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 	}
 	history.state.running.set(id, running)
 	try {
-		try {
-			for await (let event of events) {
-				blocks.apply(turn, event)
-				flush(turn.blocks.length - 1)
-				if (turn.end) break
-				yield event
-			}
-		} catch (e: any) {
-			turn.end = { type: 'error', message: String(e?.message ?? e) }
+		for await (let event of events) {
+			blocks.apply(turn, event)
+			flush(turn.blocks.length - 1)
+			if (turn.end) break
+			yield event
 		}
+	} catch (e: any) {
+		turn.end = { type: 'error', message: String(e?.message ?? e) }
 	} finally {
-		try {
-			flush(turn.blocks.length)
-			let end = turn.end
-			let usage = turn.usage
-			if (running.ended) {
-				// interrupt() already ended it.
-			} else if (end?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: end.reason, usage })
-			else if (end?.type === 'error' && !end.cancelled) history.append(id, { type: 'turn_end', status: 'error', error: end.message, usage })
-			else history.append(id, { type: 'turn_end', status: 'cancelled', usage })
-		} finally {
-			if (history.state.running.get(id) === running) history.state.running.delete(id)
-		}
+		flush(turn.blocks.length)
 	}
 	if (turn.end && !running.ended) yield turn.end
+}
+
+// Records the results of a round's tool calls, unless the turn has
+// already ended (interrupt()).
+function results(id: string, list: ToolResultBlock[]): void {
+	if (history.state.running.has(id)) history.append(id, { type: 'user', blocks: list })
+}
+
+// Ends the running turn, with the usage of all its rounds: `last` is
+// how its last round ended (none: the consumer stopped, so cancelled).
+// Does nothing for a turn not running here, or already ended.
+function end(id: string, last: DoneEvent | ErrorEvent | undefined): void {
+	let running = history.state.running.get(id)
+	if (!running) return
+	history.state.running.delete(id)
+	let usage = addUsage(running.prior, running.turn.usage)
+	if (last?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: last.reason, usage })
+	else if (last?.type === 'error' && !last.cancelled) history.append(id, { type: 'turn_end', status: 'error', error: last.message, usage })
+	else history.append(id, { type: 'turn_end', status: 'cancelled', usage })
 }
 
 // Ends every turn running in this host as interrupted, keeping the
@@ -181,7 +198,7 @@ function interrupt(): void {
 		let { turn } = running
 		try {
 			for (; running.written < turn.blocks.length; running.written++) history.append(id, { type: 'assistant', block: turn.blocks[running.written]! })
-			history.append(id, { type: 'turn_end', status: 'interrupted', usage: turn.usage })
+			history.append(id, { type: 'turn_end', status: 'interrupted', usage: addUsage(running.prior, turn.usage) })
 		} catch (e: any) {
 			// history.open closes the turn on the next start instead.
 			diag.log(`history ${id}: could not record interrupted turn: ${e?.message ?? e}`)
@@ -189,8 +206,8 @@ function interrupt(): void {
 	}
 }
 
-// The running turn's output not yet in history: its last, unfinished
-// block (if any) and the usage so far.
+// The running turn's output not yet in history: the current round's
+// last, unfinished block (if any) and that round's usage so far.
 function live(id: string): Turn | undefined {
 	let running = history.state.running.get(id)
 	if (!running) return undefined
@@ -198,16 +215,26 @@ function live(id: string): Turn | undefined {
 	return { provider: turn.provider, blocks: turn.blocks.slice(written), usage: { ...turn.usage } }
 }
 
-// One model turn for an open session, from its history and model.
+// One single-round model turn for an open session, from its history
+// and model, ended however the consumer stops. Tool calls are left
+// unanswered; the host's turns run them (host.ts).
 async function* turn(id: string, opts: Omit<ProviderRequest, 'model' | 'messages'> = {}, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
 	let modelId = sessions.open(id).model
 	let input = { ...opts, messages: await history.messages(id) }
 	let providerName = blocks.parseModelId(modelId)?.provider ?? modelId
-	yield* history.record(id, providerName, provider.stream(modelId, input, signal))
+	let last: DoneEvent | ErrorEvent | undefined
+	try {
+		for await (let event of history.record(id, providerName, provider.stream(modelId, input, signal))) {
+			if (event.type === 'done' || event.type === 'error') last = event
+			yield event
+		}
+	} finally {
+		history.end(id, last)
+	}
 }
 
 export const history = {
-	// Sessions with a turn streaming in this host.
+	// Sessions with a turn running in this host, and its current round.
 	state: { running: new Map<string, Running>() },
 	check,
 	file,
@@ -220,6 +247,8 @@ export const history = {
 	open,
 	messages,
 	record,
+	results,
+	end,
 	interrupt,
 	live,
 	turn,

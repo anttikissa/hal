@@ -42,6 +42,8 @@ test('no row is wider than the terminal, whatever the text', () => {
 		{ type: 'thinking', text },
 		{ type: 'text', text },
 		{ type: 'tool', id: 't', name: 'bash', input: { command: text } },
+		{ type: 'tool-result', id: 't', output: text },
+		{ type: 'tool-result', id: 't', output: text, isError: true },
 		{ type: 'turn-end', status: 'error', error: text },
 	]
 	for (let cols = 6; cols < 50; cols++) {
@@ -52,6 +54,14 @@ test('no row is wider than the terminal, whatever the text', () => {
 		}
 		expect(f.cursor.col).toBeLessThan(cols)
 	}
+})
+
+test('a long tool result shows only its first rows', () => {
+	let output = Array.from({ length: 100 }, (_, i) => `row ${i}`).join('\n')
+	let lines = plain(frame.build(view([{ type: 'tool-result', id: 't', output }]), 40).lines)
+	expect(lines.join('\n')).toContain('row 0')
+	expect(lines.join('\n')).not.toContain('row 50')
+	expect(lines.length).toBeLessThan(10)
 })
 
 test('text cannot send escape sequences to the terminal', () => {

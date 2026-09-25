@@ -5,7 +5,7 @@
 // from history on the host, never from here, so items drop what only a
 // provider needs (thinking signatures, their provider).
 
-import { blocks, type AssistantBlock, type Usage } from './blocks.ts'
+import { blocks, type AssistantBlock, type ToolResultBlock, type Usage } from './blocks.ts'
 import type { Event, LiveTurn, Snapshot, TurnStatus } from './protocol.ts'
 import type { HistoryRecord } from './replay.ts'
 import type { SessionMeta } from './session.ts'
@@ -15,6 +15,7 @@ export type Item =
 	| { type: 'text'; text: string }
 	| { type: 'thinking'; text: string }
 	| { type: 'tool'; id: string; name: string; input: Record<string, unknown> }
+	| { type: 'tool-result'; id: string; output: string; isError?: boolean }
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string }
 
 export type Transcript = {
@@ -37,11 +38,16 @@ function blockItems(list: AssistantBlock[]): Item[] {
 	return out
 }
 
-// Display items for one history record. Prompts show their text; tool
-// results are not shown yet.
+function resultItem(b: ToolResultBlock): Item {
+	let item: Item = { type: 'tool-result', id: b.id, output: b.output }
+	if (b.isError) item.isError = true
+	return item
+}
+
+// Display items for one history record.
 function recordItems(r: HistoryRecord): Item[] {
 	if (r.type === 'assistant') return transcript.blockItems([r.block])
-	if (r.type === 'user') return r.blocks.flatMap((b): Item[] => (b.type === 'text' ? [{ type: 'prompt', text: b.text }] : []))
+	if (r.type === 'user') return r.blocks.map((b): Item => (b.type === 'text' ? { type: 'prompt', text: b.text } : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
 
@@ -89,8 +95,13 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		blocks.apply(turn, event.event)
 		return { meta: t.meta, items: [...settled, ...transcript.blockItems(turn.blocks)], live: { start: t.live.start, turn } }
 	}
+	if (event.type === 'tool-results') {
+		// The round's blocks are in history now; the next round starts empty.
+		let items = [...settled, ...transcript.blockItems(t.live.turn.blocks), ...event.results.map((b) => transcript.resultItem(b))]
+		return { meta: t.meta, items, live: { start: items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
+	}
 	let end = transcript.endItem(event)
 	return { meta: t.meta, items: [...settled, ...transcript.blockItems(t.live.turn.blocks), end] }
 }
 
-export const transcript = { blockItems, recordItems, endItem, fromSnapshot, copyTurn, fold }
+export const transcript = { blockItems, resultItem, recordItems, endItem, fromSnapshot, copyTurn, fold }

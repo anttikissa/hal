@@ -40,6 +40,7 @@ test('a snapshot shows history as display items without provider details', () =>
 		{ type: 'text', text: 'hello' },
 		{ type: 'tool', id: 't1', name: 'bash', input: { cmd: 'ls' } },
 		{ type: 'turn-end', status: 'completed', usage: { input: 3 } },
+		{ type: 'tool-result', id: 't1', output: 'x' },
 		{ type: 'turn-end', status: 'interrupted' },
 	])
 	expect(t.live).toBeUndefined()
@@ -111,4 +112,39 @@ test('a later snapshot replaces whatever was folded before', () => {
 	])!
 	expect(t.items).toEqual([{ type: 'prompt', text: 'fresh' }])
 	expect(t.live).toBeUndefined()
+})
+
+test('tool results settle the round so far; the next round streams after them', () => {
+	let call = { type: 'tool_call' as const, id: 't1', name: 'read', input: { path: 'a' } }
+	let events: Event[] = [
+		snap({ history: [] }),
+		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'look' } },
+		{ type: 'stream', sessionId, event: call },
+		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 't1', output: 'no such file', isError: true }] },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'gone' } },
+	]
+	let t = fold(events)!
+	expect(t.items).toEqual([
+		{ type: 'prompt', text: 'go' },
+		{ type: 'text', text: 'look' },
+		{ type: 'tool', id: 't1', name: 'read', input: { path: 'a' } },
+		{ type: 'tool-result', id: 't1', output: 'no such file', isError: true },
+		{ type: 'text', text: 'gone' },
+	])
+	// A client that connects now sees the same.
+	let late = fold([
+		snap({
+			history: [
+				prompt('go'),
+				said({ type: 'text', text: 'look' }),
+				said(call),
+				{ type: 'user', blocks: [{ type: 'tool_result', id: 't1', output: 'no such file', isError: true }], ts },
+			],
+			turn: { provider: 'fake', blocks: [{ type: 'text', text: 'gone' }], usage: {} },
+		}),
+	])!
+	expect(late).toEqual(t)
+	let end: Event = { type: 'turn-end', sessionId, status: 'completed' }
+	expect(fold([end], late)).toEqual(fold([end], t)!)
 })

@@ -1,6 +1,6 @@
 {
 	title: 'First tool round trip',
 	description: 'Add one safe, useful local tool: the model calls it, the host runs it with a bounded result, and the turn continues. Calls and results are persisted, so a restart neither loses nor silently repeats execution.',
-	status: 'planned',
+	status: 'done',
 	needs: ['b3']
 }

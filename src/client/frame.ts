@@ -55,6 +55,13 @@ function itemLines(item: Item, width: number): string[] {
 			let input = frame.clean(JSON.stringify(item.input)).replace(/\s+/g, ' ')
 			return [strings.clipVisual(`▸ ${frame.clean(item.name)} ${input}`, width)]
 		}
+		case 'tool-result': {
+			// A glimpse: tool output can be long, the model sees all of it.
+			let rows = frame.wrap(item.output.replace(/\n$/, ''), Math.max(1, width - 2))
+			let shown = rows.slice(0, frame.resultRows())
+			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
+			return shown.map((l, i) => DIM + strings.clipVisual((i ? '  ' : item.isError ? '✗ ' : '◂ ') + l, width) + UNDIM)
+		}
 		case 'turn-end':
 			if (item.status === 'error') return frame.wrap(`error: ${item.error ?? 'turn failed'}`, width)
 			if (item.status === 'completed') return []
@@ -123,4 +130,12 @@ function build(view: View, cols: number): Frame {
 	return { lines, cursor: { row: top + p.row, col: PAD.length + PROMPT_FIRST.length + p.col } }
 }
 
-export const frame = { clean, wrap, itemLines, layoutPrompt, build }
+export const frame = {
+	// Rows of a tool result shown in the transcript.
+	resultRows: () => 3,
+	clean,
+	wrap,
+	itemLines,
+	layoutPrompt,
+	build,
+}
