@@ -1,0 +1,132 @@
+// Transcript projection against the real host: a client that followed
+// a turn's events and one that connected afterwards show the same thing.
+import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import type { StreamEvent } from '../common/blocks.ts'
+import type { Event } from '../common/protocol.ts'
+import { transcript, type Transcript } from '../common/transcript.ts'
+import { host } from './host.ts'
+import { liveFiles } from './live-file.ts'
+import { sessions } from './sessions.ts'
+
+const savedHome = process.env.HAL_HOME
+const origStream = host.stream
+const origOnError = liveFiles.onError
+let home = ''
+
+// Each provider call yields what the test pushes; an abort ends it as
+// cancelled, like provider.stream.
+let pushes: ((...e: StreamEvent[]) => void)[] = []
+
+function scripted(_model: string, _input: unknown, signal?: AbortSignal): AsyncIterable<StreamEvent> {
+	let queue: StreamEvent[] = []
+	let wake = () => {}
+	pushes.push((...e) => {
+		queue.push(...e)
+		wake()
+	})
+	signal?.addEventListener('abort', () => wake())
+	return (async function* () {
+		while (true) {
+			if (signal?.aborted) return yield { type: 'error', message: 'Cancelled', cancelled: true }
+			let e = queue.shift()
+			if (!e) {
+				await new Promise<void>((r) => (wake = r))
+				continue
+			}
+			yield e
+			if (e.type === 'done' || e.type === 'error') return
+		}
+	})()
+}
+
+beforeEach(() => {
+	home = mkdtempSync(`${tmpdir()}/hal-transcript-`)
+	process.env.HAL_HOME = home
+	liveFiles.onError = () => {}
+	host.stream = scripted
+	pushes = []
+})
+
+afterEach(() => {
+	host.reset()
+	sessions.closeAll()
+	host.stream = origStream
+	liveFiles.onError = origOnError
+	if (savedHome === undefined) delete process.env.HAL_HOME
+	else process.env.HAL_HOME = savedHome
+	rmSync(home, { recursive: true, force: true })
+})
+
+function viewer() {
+	let v: { t?: Transcript; ends: number; send: (c: unknown) => void } = { ends: 0, send: () => {} }
+	let conn = host.connect((e: Event) => {
+		v.t = transcript.fold(v.t, e)
+		if (e.type === 'turn-end') v.ends++
+	})
+	v.send = conn.send
+	return v
+}
+
+async function until(check: () => unknown): Promise<void> {
+	for (let i = 0; i < 200; i++) {
+		if (check()) return
+		await new Promise((r) => setTimeout(r, 1))
+	}
+	throw new Error('timed out')
+}
+
+// Runs one turn watched from the start, and by a client that joins
+// mid-turn; `finish` ends it. Returns both and one that joins after.
+async function turn(finish: (push: (...e: StreamEvent[]) => void, send: (c: unknown) => void, id: string) => void) {
+	let early = viewer()
+	early.send({ type: 'create', cwd: '/tmp/w', model: 'fake/m' })
+	let id = early.t!.meta.id
+	early.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => pushes.length === 1)
+	pushes[0]!({ type: 'thinking', text: 'hm' }, { type: 'signature', value: 's' }, { type: 'text', text: 'par' })
+	await until(() => early.t!.items.some((i) => i.type === 'text'))
+	let mid = viewer()
+	mid.send({ type: 'open', sessionId: id })
+	finish(pushes[0]!, early.send, id)
+	await until(() => early.ends && mid.ends)
+	let late = viewer()
+	late.send({ type: 'open', sessionId: id })
+	return { early: early.t!, mid: mid.t!, late: late.t! }
+}
+
+test('completed: every client shows the same finished turn', async () => {
+	let { early, mid, late } = await turn((push) =>
+		push({ type: 'text', text: 'tial' }, { type: 'tool_call', id: 't', name: 'ls', input: {} }, { type: 'usage', usage: { output: 3 } }, { type: 'done', reason: 'end' }),
+	)
+	expect(late.items).toEqual([
+		{ type: 'prompt', text: 'go' },
+		{ type: 'thinking', text: 'hm' },
+		{ type: 'text', text: 'partial' },
+		{ type: 'tool', id: 't', name: 'ls', input: {} },
+		{ type: 'turn-end', status: 'completed', usage: { output: 3 } },
+	])
+	expect(early).toEqual(late)
+	expect(mid).toEqual(late)
+})
+
+test('cancelled: partial output and the cancellation look the same everywhere', async () => {
+	let { early, mid, late } = await turn((_push, send, id) => send({ type: 'cancel', sessionId: id }))
+	expect(late.items.slice(-2)).toEqual([
+		{ type: 'text', text: 'par' },
+		{ type: 'turn-end', status: 'cancelled' },
+	])
+	expect(early).toEqual(late)
+	expect(mid).toEqual(late)
+})
+
+test('error: the error ends the turn the same way everywhere', async () => {
+	let { early, mid, late } = await turn((push) => push({ type: 'text', text: '!' }, { type: 'error', message: 'HTTP 500' }))
+	expect(late.items.slice(-2)).toEqual([
+		{ type: 'text', text: 'par!' },
+		{ type: 'turn-end', status: 'error', error: 'HTTP 500' },
+	])
+	expect(early).toEqual(late)
+	expect(mid).toEqual(late)
+})

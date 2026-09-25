@@ -1,6 +1,6 @@
 {
 	title: 'Transcript projection',
 	description: 'One pure function folds a session snapshot and later events into a display model, shared by every client; the display is never provider context. Tests show that a client that followed the events and one that connected afterwards see the same transcript after completion, cancellation and error.',
-	status: 'planned',
+	status: 'done',
 	needs: ['7', '6']
 }

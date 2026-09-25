@@ -1,0 +1,111 @@
+import { expect, test } from 'bun:test'
+import type { Event, Snapshot } from './protocol.ts'
+import { transcript, type Transcript } from './transcript.ts'
+
+const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
+const sessionId = meta.id
+
+function fold(events: Event[], start?: Transcript): Transcript | undefined {
+	return events.reduce<Transcript | undefined>((t, e) => transcript.fold(t, e), start)
+}
+
+function snap(snapshot: Omit<Snapshot, 'meta'>): Event {
+	return { type: 'snapshot', sessionId, snapshot: { meta, ...snapshot } }
+}
+
+test('a snapshot shows history as display items without provider details', () => {
+	let t = fold([
+		snap({
+			history: [
+				{ type: 'prompt', text: 'hi' },
+				{
+					type: 'assistant',
+					blocks: [
+						{ type: 'thinking', text: 'hmm', signature: 'sig', provider: 'fake' },
+						{ type: 'thinking', text: '', signature: 'redacted', provider: 'fake' },
+						{ type: 'text', text: 'hello' },
+						{ type: 'tool_call', id: 't1', name: 'bash', input: { cmd: 'ls' } },
+					],
+				},
+				{ type: 'turn-end', status: 'completed', usage: { input: 3 } },
+			],
+		}),
+	])!
+	expect(t.meta).toEqual(meta)
+	expect(t.items).toEqual([
+		{ type: 'prompt', text: 'hi' },
+		{ type: 'thinking', text: 'hmm' },
+		{ type: 'text', text: 'hello' },
+		{ type: 'tool', id: 't1', name: 'bash', input: { cmd: 'ls' } },
+		{ type: 'turn-end', status: 'completed', usage: { input: 3 } },
+	])
+	expect(t.live).toBeUndefined()
+})
+
+test('streamed deltas merge into the running turn and turn-end settles it', () => {
+	let t = fold([
+		snap({ history: [] }),
+		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
+		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'a' } },
+		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'b' } },
+		{ type: 'stream', sessionId, event: { type: 'signature', value: 's' } },
+		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'c' } },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'x' } },
+		{ type: 'stream', sessionId, event: { type: 'usage', usage: { output: 4 } } },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'y' } },
+	])!
+	expect(t.items).toEqual([
+		{ type: 'prompt', text: 'go' },
+		{ type: 'thinking', text: 'ab' },
+		{ type: 'thinking', text: 'c' },
+		{ type: 'text', text: 'xy' },
+	])
+	expect(t.live).toMatchObject({ start: 1, turn: { usage: { output: 4 } } })
+
+	let done = fold([{ type: 'turn-end', sessionId, status: 'completed', usage: { output: 4 } }], t)!
+	expect(done.items.slice(1)).toEqual([
+		{ type: 'thinking', text: 'ab' },
+		{ type: 'thinking', text: 'c' },
+		{ type: 'text', text: 'xy' },
+		{ type: 'turn-end', status: 'completed', usage: { output: 4 } },
+	])
+	expect(done.live).toBeUndefined()
+})
+
+test('folding never mutates the previous transcript', () => {
+	let before = fold([
+		snap({ history: [{ type: 'prompt', text: 'go' }], turn: { provider: 'fake', blocks: [{ type: 'text', text: 'a' }], usage: {} } }),
+	])!
+	let copy = structuredClone(before)
+	fold(
+		[
+			{ type: 'stream', sessionId, event: { type: 'text', text: 'b' } },
+			{ type: 'stream', sessionId, event: { type: 'usage', usage: { input: 1 } } },
+			{ type: 'turn-end', sessionId, status: 'completed' },
+		],
+		before,
+	)
+	expect(before).toEqual(copy)
+})
+
+test('events for other sessions, rejections and events before a snapshot change nothing', () => {
+	expect(fold([{ type: 'turn-start', sessionId, prompt: 'x', provider: 'p' }])).toBeUndefined()
+	let t = fold([snap({ history: [{ type: 'prompt', text: 'a' }] })])!
+	for (let e of [
+		{ type: 'turn-start', sessionId: 'other', prompt: 'x', provider: 'p' },
+		{ type: 'rejected', sessionId, command: 'submit', reason: 'busy' },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'stray' } },
+	] as Event[])
+		expect(transcript.fold(t, e)).toBe(t)
+})
+
+test('a later snapshot replaces whatever was folded before', () => {
+	let t = fold([
+		snap({ history: [] }),
+		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'x' } },
+		snap({ history: [{ type: 'prompt', text: 'fresh' }] }),
+	])!
+	expect(t.items).toEqual([{ type: 'prompt', text: 'fresh' }])
+	expect(t.live).toBeUndefined()
+})
