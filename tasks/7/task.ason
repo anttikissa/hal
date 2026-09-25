@@ -1,6 +1,6 @@
 {
 	title: 'Durable session history',
-	description: 'One session has small ASON metadata and append-oriented ASONL history. Persist submitted prompts and completed/cancelled turns with unambiguous turn boundaries; after restart rebuild provider input from durable history, not terminal text, snapshots or IPC. Tests cover truncation/cancellation and recovery of a partially written last record. Do not add tabs or forking.',
+	description: 'Each session appends its conversation to ASONL as neutral blocks: submitted prompts, assistant blocks, and a turn end recording completed, cancelled or error, plus usage. No per-record version field. Provider input is rebuilt from this history alone, never from display state or client messages, and thinking signatures replay exactly. A partially written last record is recovered, and a turn that never ended (host died) is closed as interrupted when the session opens. Tests cover cancellation, truncation and replay.',
 	status: 'planned',
-	needs: ['8', 'p']
+	needs: ['gj', '7f']
 }

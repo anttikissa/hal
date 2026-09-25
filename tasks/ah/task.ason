@@ -1,6 +1,6 @@
 {
 	title: 'Restart lifecycle',
-	description: 'Once persisted sessions work, make ./run restart its child only on an explicit restart exit code and reopen the same session; ordinary exit and Ctrl-C leave the terminal usable. Document ownership of one host and its state; do not add file IPC, host election or multiple terminals in this task.',
+	description: './run restarts its child on a dedicated restart exit code and otherwise exits. Clients survive a host restart by reconnecting or taking over, and the session continues. Ctrl-C and ordinary exit leave the terminal usable.',
 	status: 'planned',
 	needs: ['b3']
 }

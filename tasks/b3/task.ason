@@ -1,6 +1,6 @@
 {
 	title: 'First end-to-end model conversation',
-	description: './run loads local.ts before initialization, opens a session, accepts edited input from a TTY, streams the model answer, permits cancel, and reloads conversation after restart. A local fake Anthropic server and temp state/auth exercise the full path in tests; one manual TTY check documents any limitations. Never require real credentials for ./test.',
+	description: './run applies local overrides, joins or becomes the host, opens a session, accepts edited input, streams a real model answer, permits cancel, and reloads the conversation after restart. A second ./run on the same state root attaches as a client and sees the same stream; quitting the host leaves the other one running as host. Tests use a fake Anthropic server with temp state and auth; one manual TTY check documents limitations.',
 	status: 'planned',
-	needs: ['ne', 'cc', '9']
+	needs: ['ne', 'cc', '9', 'ja']
 }
