@@ -3,7 +3,7 @@
 // in for the tty (stdin in, frames out) and points anthropic at the fake,
 // so neither the real auth.ason nor the real API is touched.
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from './common/ason.ts'
 
@@ -85,7 +85,12 @@ anthropic.apiUrl = () => 'http://127.0.0.1:${server.port}/v1/messages'
 })
 
 afterEach(async () => {
-	for (let p of procs) p.sub.kill('SIGKILL')
+	// The whole group: killing ./run alone would orphan its bun child.
+	for (let p of procs) {
+		try {
+			process.kill(-p.sub.pid, 'SIGKILL')
+		} catch {}
+	}
 	await Promise.all(procs.map((p) => p.sub.exited))
 	procs = []
 	server.stop(true)
@@ -96,6 +101,8 @@ function run(): Proc {
 	let sub = Bun.spawn(['./run'], {
 		cwd: `${import.meta.dir}/..`,
 		env: { ...process.env, HAL_HOME: home },
+		// Its own process group, so afterEach can kill ./run with its child.
+		detached: true,
 		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'pipe',
@@ -177,5 +184,43 @@ test('a second ./run follows the same stream and takes over when the host quits'
 	type(b, 'after\r')
 	await until('an answer through the new host', () => seen(b, 'ECHO(after)'))
 	expect(b.exit).toBeUndefined()
+	expect(sessionCount()).toBe(1)
+}, 30_000)
+
+test('a host restarted mid-turn records it interrupted and everyone rejoins', async () => {
+	let a = run()
+	await until('a session', () => sessionCount() === 1)
+	let b = run()
+	type(a, 'hold it\r')
+	await until('both to see the stream', () => seen(a, 'PART1') && seen(b, 'PART1'))
+
+	let markA = a.out.length
+	let markB = b.out.length
+	type(a, '\x12') // Ctrl-R in the host, while the turn runs
+	await until('the dead host to drop its request', () => aborted === 1)
+	// The cut-off turn, streamed text included, is in history as
+	// interrupted: the survivor sees it (repainting only what changed),
+	// and so does the restarted host, which paints it all afresh.
+	await until('the survivor to show the interrupted turn', () => seen(b, '[interrupted]', markB))
+	await until('the restarted process to rejoin', () => seen(a, '[interrupted]', markA) && seen(a, 'PART1', markA))
+	expect(a.exit).toBeUndefined()
+	expect(b.exit).toBeUndefined()
+
+	type(b, 'from b\r')
+	await until('an answer to b', () => seen(b, 'ECHO(from b)') && seen(a, 'ECHO(from b)'))
+	type(a, 'from a\r')
+	await until('an answer to a', () => seen(a, 'ECHO(from a)') && seen(b, 'ECHO(from a)'))
+	// The model got the cut-off text back; nothing was sent twice.
+	let texts = requests.at(-1)!.flatMap((m) => m.content.map((b: any) => b.text))
+	expect(texts).toEqual(['hold it', 'PART1', 'from b', 'ECHO(from b)', 'from a'])
+
+	let [id] = readdirSync(`${home}/sessions`)
+	let ends = readFileSync(`${home}/sessions/${id}/history.asonl`, 'utf8')
+		.split('\n')
+		.filter((l) => l.trim())
+		.map((l) => ason.parse(l) as any)
+		.filter((r) => r.type === 'turn_end')
+		.map((r) => r.status)
+	expect(ends).toEqual(['interrupted', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)
 }, 30_000)
