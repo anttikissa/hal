@@ -2,3 +2,5 @@ node_modules/
 auth.ason
 local.ts
 .idea/
+sessions/
+state/

@@ -6,7 +6,7 @@ Each task lives in a directory named by its ID, with a task.ason record and opti
 
 ## Architecture
 
-- One host per state root owns sessions, provider calls and all state
+- One host per home (sessions/ + state/) owns sessions, provider calls and all state
   writes. Every other process is a client over a Unix socket; if the
   host goes away, a client takes over. Reconnect = connect + snapshot.
 - Conversation truth is per-session ASONL history of provider-neutral
