@@ -92,7 +92,8 @@ export function Transcript(props: TranscriptProps) {
 			lastSession = session
 			lastCount = items.length
 			if (!element || bottomGap === null) return
-			smoothFollow = (smoothFollow || appended) && !matchMedia('(prefers-reduced-motion: reduce)').matches
+			// A new row may glide in; streaming changes to that row must not restart the animation.
+			smoothFollow = appended && !matchMedia('(prefers-reduced-motion: reduce)').matches
 			webScroll.toBottom(element, bottomGap, smoothFollow)
 		},
 	)
