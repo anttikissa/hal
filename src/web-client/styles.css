@@ -73,7 +73,9 @@ button { touch-action: manipulation; }
 .SessionTabs-close { color: var(--muted); padding: 0 2px; }
 .SessionTabs-number { font-variant-numeric: tabular-nums; }
 
-@media (max-width: 48em) {
+/* Phones only: the on-screen keyboard steals most of the viewport. A narrow
+   desktop window keeps the normal row layout when the prompt gains focus. */
+@media (max-width: 48em) and (pointer: coarse) {
 	/* Short drafts leave room to read; long drafts shrink the transcript first.
 	   Keep the existing scroll regions, not a duplicate conversation preview. */
 	#app:has(> .PromptComposer .PromptComposer-input > textarea:focus) > .Transcript { min-height: min(64px, 15%); }
