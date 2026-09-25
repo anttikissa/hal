@@ -1,6 +1,6 @@
 {
 	title: 'Host and client protocol',
-	description: 'One host owns sessions, provider calls and every write to state. Clients send typed commands (open session, submit, cancel) and receive typed events; every message names its session and is plain serializable data. On connect a client gets a snapshot of each session it opens, including any in-progress turn, followed by live events; reconnecting is just connecting again, so no event replay or sequence numbers. Implement an in-memory connection here; the socket is a separate task.',
+	description: 'One host owns sessions, provider calls and every write to state. Clients send typed commands (open session, submit, cancel) and receive typed events; every message names its session and is plain serializable data. On connect a client gets a snapshot of each session it opens, including any in-progress turn, followed by live events. Several clients may drive one session: a submit while a turn is running is rejected with a clear event; reconnecting is just connecting again, so no event replay or sequence numbers. Implement an in-memory connection here; the socket is a separate task.',
 	status: 'planned',
 	needs: ['b', 'gj']
 }
