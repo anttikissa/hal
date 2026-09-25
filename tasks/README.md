@@ -15,3 +15,9 @@ Each task lives in a directory named by its ID, with a task.ason record and opti
 - Small ASON state files go through liveFile, never hand-rolled I/O.
 - No config file: config values are functions on module objects,
   overridable from one gitignored `local.ts`.
+
+## Artifacts
+
+Files in a task directory are its artifacts, copied from the old Hal.
+"Lift" means copy into src and adapt; "reference" means read, don't
+copy. Never read the old Hal directly: artifacts survive `tsk reset`.

@@ -1,0 +1,192 @@
+import { test, expect, beforeEach, afterEach } from 'bun:test'
+import { liveFiles } from './live-file.ts'
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, renameSync, statSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
+import { ason } from './ason.ts'
+
+let dir: string
+
+beforeEach(() => {
+	dir = mkdtempSync(join(tmpdir(), 'livefile-test-'))
+})
+
+afterEach(() => {
+	rmSync(dir, { recursive: true, force: true })
+})
+
+test('loads defaults when file does not exist', () => {
+	const data = liveFiles.liveFile(join(dir, 'missing.ason'), { foo: 1, bar: 'hello' }, { watch: false })
+	expect(data.foo).toBe(1)
+	expect(data.bar).toBe('hello')
+})
+
+test('loads from disk, merging over defaults', () => {
+	const path = join(dir, 'existing.ason')
+	writeFileSync(path, ason.stringify({ foo: 42 }) + '\n')
+	const data = liveFiles.liveFile(path, { foo: 1, bar: 'default' }, { watch: false })
+	expect(data.foo).toBe(42)
+	expect(data.bar).toBe('default') // default preserved for missing keys
+})
+
+test('mutations auto-save on microtask', async () => {
+	const path = join(dir, 'autosave.ason')
+	const data = liveFiles.liveFile(path, { count: 0 }, { watch: false })
+	data.count = 5
+	data.count = 10 // coalesced
+	// Flush happens on microtask
+	await new Promise((r) => queueMicrotask(r))
+	await Bun.sleep(0) // extra tick for rename
+	const disk = ason.parse(readFileSync(path, 'utf-8')) as any
+	expect(disk.count).toBe(10)
+})
+
+test('save() forces immediate flush', () => {
+	const path = join(dir, 'forcesave.ason')
+	const data = liveFiles.liveFile(path, { x: 0 }, { watch: false })
+	data.x = 99
+	liveFiles.save(data)
+	const disk = ason.parse(readFileSync(path, 'utf-8')) as any
+	expect(disk.x).toBe(99)
+})
+
+test('reload refreshes unwatched data from disk', () => {
+	const path = join(dir, 'reload.ason')
+	writeFileSync(path, ason.stringify({ v: 1 }) + '\n')
+	const data = liveFiles.liveFile(path, { v: 0 }, { watch: false })
+	writeFileSync(path, ason.stringify({ v: 2 }) + '\n')
+	expect(liveFiles.reload(data).v).toBe(2)
+})
+
+test('nested object mutations auto-save', async () => {
+	const path = join(dir, 'nested.ason')
+	const data = liveFiles.liveFile(path, { deep: { val: 1 } }, { watch: false })
+	data.deep.val = 42
+	await new Promise((r) => queueMicrotask(r))
+	await Bun.sleep(0)
+	const disk = ason.parse(readFileSync(path, 'utf-8')) as any
+	expect(disk.deep.val).toBe(42)
+})
+
+test('onChange fires on external file change', async () => {
+	const path = join(dir, 'watched.ason')
+	writeFileSync(path, ason.stringify({ v: 1 }) + '\n')
+	const data = liveFiles.liveFile(path, { v: 0 })
+	expect(data.v).toBe(1)
+
+	// Give Bun's directory watcher one tick to arm before we simulate an edit.
+	await Bun.sleep(50)
+
+	let called = false
+	liveFiles.onChange(data, () => {
+		called = true
+	})
+
+	// Simulate external edit via atomic rename (like real editors do).
+	const tmp = path + '.tmp'
+	writeFileSync(tmp, ason.stringify({ v: 99 }) + '\n')
+	renameSync(tmp, path)
+	// Poll until the watcher fires, rather than sleeping a fixed duration.
+	// fs.watch on macOS can be slow under load.
+	for (let i = 0; i < 100 && !called; i++) await Bun.sleep(50)
+
+	expect(called).toBe(true)
+	expect(data.v).toBe(99)
+})
+
+test('onChange receives path and previous/next snapshots', async () => {
+	const path = join(dir, 'watched-change.ason')
+	writeFileSync(path, ason.stringify({ nested: { v: 1 }, remove: true }) + '\n')
+	const data = liveFiles.liveFile(path, { nested: { v: 0 } })
+
+	await Bun.sleep(50)
+
+	let change: any = null
+	liveFiles.onChange(data, (item) => {
+		change = item
+	})
+
+	const tmp = path + '.tmp'
+	writeFileSync(tmp, ason.stringify({ nested: { v: 2 }, added: 'yes' }) + '\n')
+	renameSync(tmp, path)
+	for (let i = 0; i < 100 && !change; i++) await Bun.sleep(50)
+
+	expect(change?.path).toBe(path)
+	expect(change?.previous).toEqual({ nested: { v: 1 }, remove: true })
+	expect(change?.next).toEqual({ nested: { v: 2 }, added: 'yes' })
+	expect(data.nested.v).toBe(2)
+	if (change) change.previous.nested.v = 99
+	expect(data.nested.v).toBe(2)
+})
+
+test('onChange works when defaults contain nested live-file proxies', async () => {
+	const path = join(dir, 'proxy-defaults.ason')
+	writeFileSync(path, ason.stringify({ sessions: [{ id: 'old' }], working: {}, updatedAt: 'one' }) + '\n')
+	const writer = liveFiles.liveFile<{ sessions: any[]; working: Record<string, any>; updatedAt: string }>(path, { sessions: [], working: {}, updatedAt: '' }, { watch: false })
+	const data = liveFiles.liveFile(path, writer)
+
+	await Bun.sleep(50)
+
+	let called = false
+	liveFiles.onChange(data, () => {
+		called = true
+	})
+
+	writer.sessions = [{ id: 'old' }, { id: 'new' }]
+	writer.updatedAt = 'two'
+	liveFiles.save(writer)
+	for (let i = 0; i < 40 && !called; i++) await Bun.sleep(50)
+
+	expect(called).toBe(true)
+	expect(data.sessions.map((session: any) => session.id)).toEqual(['old', 'new'])
+})
+
+test('own writes do not trigger onChange', async () => {
+	const path = join(dir, 'ownwrite.ason')
+	const data = liveFiles.liveFile(path, { v: 0 })
+
+	let called = false
+	liveFiles.onChange(data, () => {
+		called = true
+	})
+
+	data.v = 42
+	liveFiles.save(data)
+	await Bun.sleep(200)
+
+	expect(called).toBe(false)
+})
+
+test('parse errors in file are ignored gracefully', () => {
+	const path = join(dir, 'bad.ason')
+	writeFileSync(path, '{{{{ not valid ason')
+	const data = liveFiles.liveFile(path, { safe: true }, { watch: false })
+	expect(data.safe).toBe(true) // defaults survive
+})
+
+test('save preserves ASON comments from disk', () => {
+	const path = join(dir, 'comments.ason')
+	const src = `{
+	// model defaults
+	models: {
+		// preferred alias
+		default: 'opus'
+	}
+}`
+	writeFileSync(path, src + '\n')
+	const data = liveFiles.liveFile(path, { models: { default: '' } }, { watch: false })
+	data.models.default = 'gpt'
+	liveFiles.save(data)
+	const disk = readFileSync(path, 'utf-8')
+	expect(disk).toContain('// model defaults')
+	expect(disk).toContain('// preferred alias')
+	expect(disk).toContain("default: 'gpt'")
+})
+
+test('mode option restricts file permissions', () => {
+	const path = join(dir, 'secret.ason')
+	const data = liveFiles.liveFile(path, { token: '' }, { watch: false, mode: 0o600 })
+	data.token = 'sekret'
+	liveFiles.save(data)
+	expect(statSync(path).mode & 0o777).toBe(0o600)
+})

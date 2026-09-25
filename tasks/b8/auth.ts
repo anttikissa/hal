@@ -1,0 +1,433 @@
+// Auth — reads credentials from auth.ason, falls back to env vars.
+// auth.ason is live-reloaded so /login changes take effect immediately.
+//
+// Credential priority:
+// 1. auth.ason accessToken (from /login OAuth)
+// 2. auth.ason apiKey (hand-edited)
+// 3. Environment variable (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+//
+// Token rotation:
+// A provider entry can be a single object or an array of objects.
+// Single: { accessToken, refreshToken, email, ... }
+// Multiple: [{ accessToken, ..., email: "a@x.com" }, { ... }]
+// When multiple accounts exist, getCredential() skips ones on cooldown.
+// Call markCooldown() after a 429 to rotate to the next account.
+
+import { liveFiles } from '../utils/live-file.ts'
+import { HAL_DIR } from './state.ts'
+import { ason } from '../utils/ason.ts'
+import { serverModels } from './models.ts'
+import { log } from '../utils/log.ts'
+import { accountRotation } from './account-rotation.ts'
+
+const AUTH_PATH = `${HAL_DIR}/auth.ason`
+
+// Anthropic OAuth client ID (shared with /login claude).
+const ANTHROPIC_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
+
+// OpenAI OAuth client ID (shared with /login chatgpt).
+const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
+const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token'
+
+// Live-reloaded auth store — external edits and /login updates are picked up automatically.
+let _store: Record<string, any> | null = null
+function store(): Record<string, any> {
+	if (!_store) _store = liveFiles.liveFile(AUTH_PATH, {}, { mode: 0o600 }) // contains OAuth tokens and API keys
+	return _store
+}
+
+// Map provider names to env var names
+const envKeys: Record<string, string[]> = {
+	anthropic: ['ANTHROPIC_API_KEY'],
+	openai: ['OPENAI_API_KEY'],
+	openrouter: ['OPENROUTER_API_KEY'],
+	google: ['GOOGLE_API_KEY', 'GEMINI_API_KEY'],
+	grok: ['GROK_API_KEY'],
+	serper: ['SERPER_API_KEY'],
+}
+
+// Share accepted variable names with onboarding; never share their values there.
+// Falls back to the models.dev registry so providers we never hardcoded still get
+// their real variable name — deriving it would give 'opencode-go' the broken
+// OPENCODE-GO_API_KEY instead of OPENCODE_API_KEY.
+function envKeyNames(providerName: string): string[] {
+	const known = auth.envKeys[providerName] ?? serverModels.providerInfo(providerName)?.env
+	return known ?? [`${providerName.toUpperCase()}_API_KEY`]
+}
+
+/** Credential with its type so callers know how to authenticate. */
+interface Credential {
+	value: string
+	type: 'token' | 'api-key'
+	/** Identifying label (e.g. email) for the account this came from. */
+	email?: string
+	/** Zero-based position inside the provider's account pool. */
+	index?: number
+	/** Total number of configured accounts for this provider. */
+	total?: number
+	/** Internal key for cooldown tracking. Absent for env-var credentials. */
+	_key?: string
+}
+
+// ── Cooldown tracking ──
+// Map of "provider:key" -> timestamp when cooldown expires.
+// Persisted to STATE_DIR/cooldowns.ason so cooldowns survive restarts.
+// Loaded lazily on first access, written on every markCooldown call.
+
+import { STATE_DIR } from './state.ts'
+import { readFileSync, writeFileSync } from 'fs'
+
+const COOLDOWN_PATH = `${STATE_DIR}/cooldowns.ason`
+let cooldowns: Map<string, number> | null = null  // null = not yet loaded
+
+function loadCooldowns(): Map<string, number> {
+	if (cooldowns) return cooldowns
+	cooldowns = new Map()
+	try {
+		const data = ason.parse(readFileSync(COOLDOWN_PATH, 'utf8')) as Record<string, unknown>
+		const now = Date.now()
+		// Only load entries that haven't expired yet
+		for (const [key, until] of Object.entries(data)) {
+			if (typeof until === 'number' && until > now) {
+				cooldowns.set(key, until)
+			}
+		}
+	} catch {
+		// File doesn't exist or is corrupt — start fresh
+	}
+	return cooldowns
+}
+
+function saveCooldowns(): void {
+	const map = loadCooldowns()
+	const obj: Record<string, number> = {}
+	const now = Date.now()
+	for (const [key, until] of map) {
+		// Only persist entries that haven't expired
+		if (until > now) obj[key] = until
+	}
+	try {
+		writeFileSync(COOLDOWN_PATH, ason.stringify(obj) + '\n', 'utf8')
+	} catch {
+		// State dir may not exist yet during early startup
+	}
+}
+
+/** Normalize a provider entry: single object → [object], array stays array. */
+function normalizeEntries(raw: any): any[] {
+	if (!raw) return []
+	if (Array.isArray(raw)) return raw
+	return [raw]
+}
+
+/**
+ * Cooldowns must follow the real account, not its current array slot.
+ * OpenAI stores accountId/email, Anthropic may only have slot order for now.
+ */
+function cooldownKey(providerName: string, entry: any, index: number): string {
+	const id =
+		typeof entry?.accountId === 'string' && entry.accountId ? entry.accountId
+			: typeof entry?.email === 'string' && entry.email ? entry.email
+			: typeof entry?.id === 'string' && entry.id ? entry.id
+			: ''
+	return `${providerName}:${id || index}`
+}
+
+/** Extract credential from a single auth entry. */
+function credFromEntry(entry: any, key: string, index: number, total: number): Credential | undefined {
+	if (entry.accessToken) return { value: entry.accessToken, type: 'token', email: entry.email, index, total, _key: key }
+	if (entry.apiKey) return { value: entry.apiKey, type: 'api-key', email: entry.email, index, total, _key: key }
+	return undefined
+}
+
+/** Get all configured credentials for a provider, in configured order. */
+function listCredentials(providerName: string): Credential[] {
+	const raw = store()[providerName]
+	const entries = normalizeEntries(raw)
+	const total = entries.length
+	const credentials: Credential[] = []
+	for (let i = 0; i < entries.length; i++) {
+		const key = cooldownKey(providerName, entries[i], i)
+		const cred = credFromEntry(entries[i], key, i, total)
+		if (cred) credentials.push(cred)
+	}
+	return credentials
+}
+
+/** Get credential for a provider. Skips accounts on cooldown. */
+function getCredential(providerName: string): Credential | undefined {
+	const raw = store()[providerName]
+	const entries = normalizeEntries(raw)
+	const now = Date.now()
+	const total = entries.length
+	let hasConfiguredCredential = false
+	const available: Credential[] = []
+
+	// Try configured entries first. Only real credentials count; metadata-only
+	// objects should not block fallback to an environment API key.
+	for (let i = 0; i < entries.length; i++) {
+		const key = cooldownKey(providerName, entries[i], i)
+		const cred = credFromEntry(entries[i], key, i, total)
+		if (!cred) continue
+		hasConfiguredCredential = true
+		const cooldownUntil = loadCooldowns().get(key)
+		if (!cooldownUntil || now >= cooldownUntil) available.push(cred)
+	}
+	if (available.length > 0) return accountRotation.pick(providerName, available)
+
+	// If configured accounts exist but every one is cooling down, keep rotating
+	// within that configured pool. Falling through to an env var here makes local
+	// shell credentials unexpectedly override the user's account-rotation state.
+	if (hasConfiguredCredential) {
+		let best: Credential | undefined
+		let bestUntil = Infinity
+		for (let i = 0; i < entries.length; i++) {
+			const key = cooldownKey(providerName, entries[i], i)
+			const cred = credFromEntry(entries[i], key, i, total)
+			if (!cred) continue
+			const until = loadCooldowns().get(key) ?? 0
+			if (until < bestUntil) {
+				bestUntil = until
+				best = cred
+			}
+		}
+		return best
+	}
+
+	// No configured credentials — fall back to env var.
+	const envVar = auth.envKeyNames(providerName).find((name) => !!process.env[name])
+	const envVal = envVar ? process.env[envVar] : undefined
+	if (envVal) return { value: envVal, type: 'api-key' }
+	return undefined
+}
+
+/** Mark a credential as on cooldown for durationMs. Persists to disk. */
+function markCooldown(cred: Credential, durationMs: number): void {
+	if (!cred._key) return
+	loadCooldowns().set(cred._key, Date.now() + durationMs)
+	saveCooldowns()
+}
+
+/** Clear one account's cooldown immediately. */
+function clearCooldown(cred: Credential): void {
+	if (!cred._key) return
+	loadCooldowns().delete(cred._key)
+	saveCooldowns()
+}
+
+/** True if at least one credential for this provider is NOT on cooldown. */
+function hasAvailableCredential(providerName: string): boolean {
+	const entries = normalizeEntries(store()[providerName])
+	const now = Date.now()
+	for (let i = 0; i < entries.length; i++) {
+		const until = loadCooldowns().get(cooldownKey(providerName, entries[i], i)) ?? 0
+		if (now >= until) return true
+	}
+	return false
+}
+
+/** If all accounts for a provider are on cooldown, return a user-facing error message. */
+function allOnCooldownMessage(providerName: string): string | null {
+	const raw = store()[providerName]
+	const entries = normalizeEntries(raw)
+	if (entries.length === 0) return null
+
+	const now = Date.now()
+	// Check if any entry is NOT on cooldown
+	for (let i = 0; i < entries.length; i++) {
+		const cooldownUntil = loadCooldowns().get(cooldownKey(providerName, entries[i], i))
+		if (!cooldownUntil || now >= cooldownUntil) return null
+	}
+
+	// All on cooldown — build message with account emails
+	const emails = entries
+		.map((e: any) => e.email)
+		.filter(Boolean)
+	const accountList = emails.length > 0
+		? ` (${emails.join(', ')})`
+		: ` (${entries.length} account${entries.length > 1 ? 's' : ''})`
+	return `All ${providerName} accounts rate limited${accountList}. Add another account, upgrade your plan, or switch providers.`
+}
+
+/** Get full auth entry for a provider (for refresh, account ID, etc.) */
+function getEntry(providerName: string): Record<string, any> {
+	// For multi-account auth, return the entry selected by the rotation policy.
+	const raw = store()[providerName]
+	if (Array.isArray(raw)) {
+		const credential = auth.getCredential(providerName)
+		for (let i = 0; i < raw.length; i++) {
+			if (cooldownKey(providerName, raw[i], i) === credential?._key) return raw[i] ?? {}
+		}
+		return raw[0] ?? {}
+	}
+	return raw ?? {}
+}
+
+// ── Token refresh ──
+
+/** Refresh Anthropic OAuth tokens if expired. Handles both single and multi-account. */
+async function refreshAnthropic(): Promise<void> {
+	const raw = store().anthropic
+	const entries = normalizeEntries(raw)
+
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i]
+		if (!entry?.refreshToken) continue
+		if (entry.expires && Date.now() < entry.expires - 60_000) continue
+
+		const res = await fetch('https://console.anthropic.com/v1/oauth/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				grant_type: 'refresh_token',
+				refresh_token: entry.refreshToken,
+				client_id: ANTHROPIC_CLIENT_ID,
+			}),
+		})
+		if (!res.ok) {
+			const text = await res.text().catch(() => '')
+			throw new Error(`Anthropic token refresh failed: ${res.status} ${text}`)
+		}
+		const data = (await res.json()) as any
+		if (!data.access_token) throw new Error('Anthropic refresh: missing access_token')
+
+		const updated = {
+			...entry,
+			accessToken: data.access_token,
+			refreshToken: data.refresh_token,
+			expires: Date.now() + (data.expires_in ?? 3600) * 1000,
+		}
+
+		if (Array.isArray(raw)) {
+			raw[i] = updated
+			store().anthropic = raw
+		} else {
+			store().anthropic = updated
+		}
+	}
+}
+
+/** Refresh OpenAI OAuth tokens if expired. Handles both single and multi-account. */
+async function refreshOpenAI(): Promise<void> {
+	const raw = store().openai
+	const entries = normalizeEntries(raw)
+
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i]
+		if (!entry?.refreshToken) continue
+		if (entry.accessToken && entry.accessToken.startsWith('sk-')) continue
+		if (entry.expires && Date.now() < entry.expires - 60_000) continue
+
+		const res = await fetch(OPENAI_TOKEN_URL, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: new URLSearchParams({
+				grant_type: 'refresh_token',
+				refresh_token: entry.refreshToken,
+				client_id: OPENAI_CLIENT_ID,
+			}),
+		})
+		if (!res.ok) {
+			const text = await res.text().catch(() => '')
+			throw new Error(`OpenAI token refresh failed: ${res.status} ${text}`)
+		}
+		const data = (await res.json()) as any
+		if (!data.access_token) throw new Error('OpenAI refresh: missing access_token')
+
+		const updated = {
+			...entry,
+			accessToken: data.access_token,
+			refreshToken: data.refresh_token,
+			expires: Date.now() + (data.expires_in ?? 3600) * 1000,
+		}
+
+		// Write back to the correct slot
+		if (Array.isArray(raw)) {
+			raw[i] = updated
+			store().openai = raw
+		} else {
+			store().openai = updated
+		}
+	}
+}
+
+/** Refresh token for a provider if needed. Safe to call often. */
+async function ensureFresh(providerName: string): Promise<void> {
+	try {
+		if (providerName === 'anthropic') await refreshAnthropic()
+		else if (providerName === 'openai') await refreshOpenAI()
+	} catch (e: any) {
+		// Log but don't crash — stale token may still work, or user can re-login
+		log.error('auth refresh failed', { provider: providerName, error: e?.message ?? String(e) })
+	}
+}
+
+/**
+ * Store an API key for a provider, appending it as another account rather than
+ * replacing what is there. `/login` is the only caller, and running it twice should
+ * add a second subscription rather than silently discard the first.
+ */
+function saveApiKey(providerName: string, apiKey: string): void {
+	const s = store()
+	const existing = s[providerName]
+	const entry = { apiKey }
+	if (Array.isArray(existing)) {
+		// Re-authenticating with the same key should not stack duplicates.
+		if (!existing.some((candidate) => candidate?.apiKey === apiKey)) existing.push(entry)
+		s[providerName] = existing
+	} else if (existing && typeof existing === 'object') {
+		if (existing.apiKey === apiKey) s[providerName] = { ...existing }
+		else s[providerName] = [existing, entry]
+	} else {
+		s[providerName] = entry
+	}
+	liveFiles.save(s)
+}
+
+/**
+ * Whether a provider bills a subscription rather than per-token.
+ *
+ * Not the same question as "did we authenticate with a token": OpenCode Go is a
+ * subscription that hands out an API key, so keying this off the credential type
+ * would hide Go's usage windows from the status bar. Anthropic and OpenAI only have
+ * a subscription route when they hold an OAuth token; Go always is one.
+ */
+function isSubscription(providerName: string): boolean {
+	if (providerName === 'opencode-go') return true
+	return getCredential(providerName)?.type === 'token'
+}
+
+// ── Test helpers ──
+
+function _setStoreForTest(data: Record<string, any>): void {
+	_store = data
+}
+
+function _resetCooldowns(): void {
+	cooldowns = new Map()
+}
+
+/** Force next loadCooldowns() to re-read from disk. For testing restart. */
+function _invalidateCooldownCache(): void {
+	cooldowns = null
+}
+
+export const auth = {
+	envKeys,
+	envKeyNames,
+	getCredential,
+	listCredentials,
+	getEntry,
+	ensureFresh,
+	isSubscription,
+	markCooldown,
+	clearCooldown,
+	hasAvailableCredential,
+	allOnCooldownMessage,
+	saveApiKey,
+	store,
+	_setStoreForTest,
+	_resetCooldowns,
+	_invalidateCooldownCache,
+}
+export type { Credential }

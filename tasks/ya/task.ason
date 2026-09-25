@@ -1,6 +1,6 @@
 {
 	title: 'Anthropic provider',
-	description: 'Implement Anthropic Messages on the provider interface with OAuth credentials, following the OAuth contract in old Hal (endpoint, headers, required system identity); verify it still works before relying on it. Include thinking blocks and their signatures. Tests use a local fake server; ./test never needs real credentials.',
+	description: 'Implement Anthropic Messages on the provider interface with OAuth credentials, following the OAuth contract in the anthropic.ts artifact (endpoint, headers, required system identity); verify it still works before relying on it. Include thinking blocks and their signatures. Tests use a local fake server; ./test never needs real credentials.',
 	status: 'planned',
 	needs: ['7f', 'b8']
 }
