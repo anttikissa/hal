@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import type { AssistantBlock } from './blocks.ts'
 import type { Event, Snapshot } from './protocol.ts'
 import { transcript, type Transcript } from './transcript.ts'
 
@@ -9,6 +10,10 @@ function fold(events: Event[], start?: Transcript): Transcript | undefined {
 	return events.reduce<Transcript | undefined>((t, e) => transcript.fold(t, e), start)
 }
 
+const ts = '2026-09-26T00:00:01Z'
+const prompt = (text: string) => ({ type: 'user' as const, blocks: [{ type: 'text' as const, text }], ts })
+const said = (block: AssistantBlock) => ({ type: 'assistant' as const, block, ts })
+
 function snap(snapshot: Omit<Snapshot, 'meta'>): Event {
 	return { type: 'snapshot', sessionId, snapshot: { meta, ...snapshot } }
 }
@@ -17,17 +22,14 @@ test('a snapshot shows history as display items without provider details', () =>
 	let t = fold([
 		snap({
 			history: [
-				{ type: 'prompt', text: 'hi' },
-				{
-					type: 'assistant',
-					blocks: [
-						{ type: 'thinking', text: 'hmm', signature: 'sig', provider: 'fake' },
-						{ type: 'thinking', text: '', signature: 'redacted', provider: 'fake' },
-						{ type: 'text', text: 'hello' },
-						{ type: 'tool_call', id: 't1', name: 'bash', input: { cmd: 'ls' } },
-					],
-				},
-				{ type: 'turn-end', status: 'completed', usage: { input: 3 } },
+				prompt('hi'),
+				said({ type: 'thinking', text: 'hmm', signature: 'sig', provider: 'fake' }),
+				said({ type: 'thinking', text: '', signature: 'redacted', provider: 'fake' }),
+				said({ type: 'text', text: 'hello' }),
+				said({ type: 'tool_call', id: 't1', name: 'bash', input: { cmd: 'ls' } }),
+				{ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 3 }, ts },
+				{ type: 'user', blocks: [{ type: 'tool_result', id: 't1', output: 'x' }], ts },
+				{ type: 'turn_end', status: 'interrupted', usage: {}, ts },
 			],
 		}),
 	])!
@@ -38,6 +40,7 @@ test('a snapshot shows history as display items without provider details', () =>
 		{ type: 'text', text: 'hello' },
 		{ type: 'tool', id: 't1', name: 'bash', input: { cmd: 'ls' } },
 		{ type: 'turn-end', status: 'completed', usage: { input: 3 } },
+		{ type: 'turn-end', status: 'interrupted' },
 	])
 	expect(t.live).toBeUndefined()
 })
@@ -74,7 +77,7 @@ test('streamed deltas merge into the running turn and turn-end settles it', () =
 
 test('folding never mutates the previous transcript', () => {
 	let before = fold([
-		snap({ history: [{ type: 'prompt', text: 'go' }], turn: { provider: 'fake', blocks: [{ type: 'text', text: 'a' }], usage: {} } }),
+		snap({ history: [prompt('go')], turn: { provider: 'fake', blocks: [{ type: 'text', text: 'a' }], usage: {} } }),
 	])!
 	let copy = structuredClone(before)
 	fold(
@@ -90,7 +93,7 @@ test('folding never mutates the previous transcript', () => {
 
 test('events for other sessions, rejections and events before a snapshot change nothing', () => {
 	expect(fold([{ type: 'turn-start', sessionId, prompt: 'x', provider: 'p' }])).toBeUndefined()
-	let t = fold([snap({ history: [{ type: 'prompt', text: 'a' }] })])!
+	let t = fold([snap({ history: [prompt('a')] })])!
 	for (let e of [
 		{ type: 'turn-start', sessionId: 'other', prompt: 'x', provider: 'p' },
 		{ type: 'rejected', sessionId, command: 'submit', reason: 'busy' },
@@ -104,7 +107,7 @@ test('a later snapshot replaces whatever was folded before', () => {
 		snap({ history: [] }),
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'x' } },
-		snap({ history: [{ type: 'prompt', text: 'fresh' }] }),
+		snap({ history: [prompt('fresh')] }),
 	])!
 	expect(t.items).toEqual([{ type: 'prompt', text: 'fresh' }])
 	expect(t.live).toBeUndefined()

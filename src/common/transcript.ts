@@ -6,7 +6,8 @@
 // provider needs (thinking signatures, their provider).
 
 import { blocks, type AssistantBlock, type Usage } from './blocks.ts'
-import type { Entry, Event, LiveTurn, Snapshot, TurnStatus } from './protocol.ts'
+import type { Event, LiveTurn, Snapshot, TurnStatus } from './protocol.ts'
+import type { HistoryRecord } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 
 export type Item =
@@ -36,13 +37,24 @@ function blockItems(list: AssistantBlock[]): Item[] {
 	return out
 }
 
-function entryItems(entry: Entry): Item[] {
-	if (entry.type === 'assistant') return transcript.blockItems(entry.blocks)
-	return [{ ...entry }]
+// Display items for one history record. Prompts show their text; tool
+// results are not shown yet.
+function recordItems(r: HistoryRecord): Item[] {
+	if (r.type === 'assistant') return transcript.blockItems([r.block])
+	if (r.type === 'user') return r.blocks.flatMap((b): Item[] => (b.type === 'text' ? [{ type: 'prompt', text: b.text }] : []))
+	return [transcript.endItem(r)]
+}
+
+// A turn end as shown, the same from a record or a live turn-end event.
+function endItem(end: { status: TurnStatus; usage?: Usage; error?: string }): Item {
+	let item: Item = { type: 'turn-end', status: end.status }
+	if (end.usage && Object.keys(end.usage).length) item.usage = end.usage
+	if (end.error !== undefined) item.error = end.error
+	return item
 }
 
 function fromSnapshot(snapshot: Snapshot): Transcript {
-	let items = snapshot.history.flatMap((e) => transcript.entryItems(e))
+	let items = snapshot.history.flatMap((r) => transcript.recordItems(r))
 	let t: Transcript = { meta: { ...snapshot.meta }, items }
 	if (snapshot.turn) {
 		let turn = transcript.copyTurn(snapshot.turn)
@@ -77,10 +89,8 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		blocks.apply(turn, event.event)
 		return { meta: t.meta, items: [...settled, ...transcript.blockItems(turn.blocks)], live: { start: t.live.start, turn } }
 	}
-	let end: Item = { type: 'turn-end', status: event.status }
-	if (event.usage) end.usage = event.usage
-	if (event.error) end.error = event.error
+	let end = transcript.endItem(event)
 	return { meta: t.meta, items: [...settled, ...transcript.blockItems(t.live.turn.blocks), end] }
 }
 
-export const transcript = { blockItems, entryItems, fromSnapshot, copyTurn, fold }
+export const transcript = { blockItems, recordItems, endItem, fromSnapshot, copyTurn, fold }
