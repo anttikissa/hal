@@ -31,7 +31,8 @@ function stateDir(): string {
 	return `${paths.home()}/state`
 }
 
-// Credentials copied in by the user. Input only; Hal never writes it.
+// Credentials copied in by the user. Hal only rewrites it to store
+// refreshed OAuth tokens (src/host/auth.ts).
 function authFile(): string {
 	return `${paths.home()}/auth.ason`
 }
