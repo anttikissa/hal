@@ -1,6 +1,6 @@
 {
 	title: 'Restart lifecycle',
 	description: 'A host restart (Ctrl-R in the host process) keeps the session going: clients reconnect or take over, a running turn is recorded as interrupted, and the restarted process rejoins as a client or host. The terminal stays usable throughout.',
-	status: 'planned',
+	status: 'done',
 	needs: ['b3']
 }

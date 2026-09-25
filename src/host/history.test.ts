@@ -245,6 +245,25 @@ test('open does not close a turn that is running in this host', async () => {
 	expect(ends).toMatchObject([{ status: 'completed' }])
 })
 
+test('a host that exits mid-turn records the output so far as interrupted, once', async () => {
+	let id = newSession()
+	history.submit(id, 'q')
+	let it = history.record(id, 'fake', events({ type: 'text', text: 'a' }, { type: 'usage', usage: { output: 1 } }, { type: 'text', text: 'b' }, { type: 'done', reason: 'end' }))
+	await it.next()
+	await it.next()
+	history.interrupt()
+	expect(history.live(id)).toBeUndefined()
+	// Whatever the abandoned stream does afterwards writes nothing more,
+	// and reopening finds no open turn to close.
+	await drain(it)
+	sessions.closeAll()
+	await history.open(id)
+	expect(strip(await history.read(id)).slice(1)).toEqual([
+		{ type: 'assistant', block: { type: 'text', text: 'a' } },
+		{ type: 'turn_end', status: 'interrupted', usage: { output: 1 } },
+	])
+})
+
 test('a session without history has no records and no messages', async () => {
 	let id = newSession()
 	expect(await history.read(id)).toEqual([])

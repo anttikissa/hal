@@ -20,7 +20,8 @@ type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit
 
 const recordTypes = new Set(['user', 'assistant', 'turn_end'])
 
-type Running = { turn: Turn; written: number }
+// `ended`: its turn end is on disk (interrupt() got there first).
+type Running = { turn: Turn; written: number; ended?: boolean }
 
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
@@ -135,6 +136,7 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 	let running: Running = { turn: blocks.newTurn(providerName), written: 0 }
 	let { turn } = running
 	let flush = (upTo: number) => {
+		if (running.ended) return
 		for (; running.written < upTo; running.written++) history.append(id, { type: 'assistant', block: turn.blocks[running.written]! })
 	}
 	history.state.running.set(id, running)
@@ -154,14 +156,37 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 			flush(turn.blocks.length)
 			let end = turn.end
 			let usage = turn.usage
-			if (end?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: end.reason, usage })
+			if (running.ended) {
+				// interrupt() already ended it.
+			} else if (end?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: end.reason, usage })
 			else if (end?.type === 'error' && !end.cancelled) history.append(id, { type: 'turn_end', status: 'error', error: end.message, usage })
 			else history.append(id, { type: 'turn_end', status: 'cancelled', usage })
 		} finally {
-			history.state.running.delete(id)
+			if (history.state.running.get(id) === running) history.state.running.delete(id)
 		}
 	}
-	if (turn.end) yield turn.end
+	if (turn.end && !running.ended) yield turn.end
+}
+
+// Ends every turn running in this host as interrupted, keeping the
+// output so far, for a host about to exit (Ctrl-R, Ctrl-C, SIGTERM).
+// Synchronous, so it can run in a process 'exit' handler, before the
+// host lock is released to a successor. The abandoned streams write
+// nothing more.
+function interrupt(): void {
+	for (let [id, running] of history.state.running) {
+		history.state.running.delete(id)
+		if (running.ended) continue
+		running.ended = true
+		let { turn } = running
+		try {
+			for (; running.written < turn.blocks.length; running.written++) history.append(id, { type: 'assistant', block: turn.blocks[running.written]! })
+			history.append(id, { type: 'turn_end', status: 'interrupted', usage: turn.usage })
+		} catch (e: any) {
+			// history.open closes the turn on the next start instead.
+			diag.log(`history ${id}: could not record interrupted turn: ${e?.message ?? e}`)
+		}
+	}
 }
 
 // The running turn's output not yet in history: its last, unfinished
@@ -195,6 +220,7 @@ export const history = {
 	open,
 	messages,
 	record,
+	interrupt,
 	live,
 	turn,
 }

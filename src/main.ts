@@ -32,6 +32,7 @@ async function loadLocal(): Promise<void> {
 // Module init() calls go here, in order, once modules have them.
 function init(): void {
 	paths.init()
+	host.init()
 	anthropic.init()
 	openaiCompat.init()
 	// Piped stdin (tests, scripts) has no raw mode and no emergency keys.

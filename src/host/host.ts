@@ -166,6 +166,14 @@ async function runTurn(id: string, model: string, running: Running): Promise<voi
 	host.broadcast(id, end)
 }
 
+// Records running turns as interrupted whenever this process exits
+// (a restart included) while it is host. Idempotent.
+function init(): void {
+	if (host.state.inited) return
+	host.state.inited = true
+	process.on('exit', () => history.interrupt())
+}
+
 // Forgets every client and turn (tests).
 function reset(): void {
 	for (let r of host.state.running.values()) r.controller.abort()
@@ -180,9 +188,11 @@ export const host = {
 		running: new Map<string, Running>(),
 		// Sessions being opened from disk (history.open).
 		opening: new Map<string, Promise<void>>(),
+		inited: false,
 	},
 	stream: (model: string, input: Omit<ProviderRequest, 'model'>, signal?: AbortSignal): AsyncIterable<StreamEvent> =>
 		provider.stream(model, input, signal),
+	init,
 	connect,
 	handle,
 	reject,
