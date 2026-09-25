@@ -7,27 +7,22 @@
 // is connecting again: there is no replay and no sequence numbers.
 
 import type { AssistantBlock, StreamEvent, Usage } from './blocks.ts'
+import type { HistoryRecord, TurnStatus } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 
+export type { TurnStatus } from './replay.ts'
+
 // ── Conversation as clients see it ──
-// Protocol shape only; how the host stores history is its own business.
-
-// How a turn ended. `interrupted`: the host died before it ended.
-export type TurnStatus = 'completed' | 'cancelled' | 'error' | 'interrupted'
-
-export type Entry =
-	| { type: 'prompt'; text: string }
-	| { type: 'assistant'; blocks: AssistantBlock[] }
-	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string }
+// A snapshot carries the session's durable history records as stored.
 
 // The running turn's output streamed so far and not yet in history (its
-// prompt already is). Clients continue it by folding later `stream`
-// events with blocks.apply; at `turn-end` its blocks, if any, become an
-// assistant entry followed by the turn-end entry, exactly as the host
-// records them.
+// prompt and every finished block already are). Clients continue it by
+// folding later `stream` events with blocks.apply; at `turn-end` the
+// host has recorded its blocks and the turn end, so its blocks, if any,
+// followed by the turn end match what a later snapshot shows.
 export type LiveTurn = { provider: string; blocks: AssistantBlock[]; usage: Usage }
 
-export type Snapshot = { meta: SessionMeta; history: Entry[]; turn?: LiveTurn }
+export type Snapshot = { meta: SessionMeta; history: HistoryRecord[]; turn?: LiveTurn }
 
 // Stream events forwarded live; terminal done/error become `turn-end`.
 export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'error' }>
@@ -49,7 +44,7 @@ export type CommandType = Command['type']
 
 export type Event =
 	| { type: 'snapshot'; sessionId: string; snapshot: Snapshot }
-	// The prompt entry is now in history and a turn is running.
+	// The prompt is now in history and a turn is running.
 	| { type: 'turn-start'; sessionId: string; prompt: string; provider: string }
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent }
 	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string }

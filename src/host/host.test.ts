@@ -2,8 +2,10 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
-import { blocks, type StreamEvent } from '../common/blocks.ts'
-import type { Entry, Event, LiveTurn } from '../common/protocol.ts'
+import type { StreamEvent } from '../common/blocks.ts'
+import type { Event } from '../common/protocol.ts'
+import { transcript, type Item, type Transcript } from '../common/transcript.ts'
+import { history } from './history.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
@@ -69,24 +71,13 @@ afterEach(() => {
 // A client that records events and folds them into what it would show.
 function client() {
 	let events: Event[] = []
-	let views = new Map<string, { history: Entry[]; turn?: LiveTurn }>()
+	let views = new Map<string, Transcript>()
 	let conn = host.connect((e) => {
 		events.push(e)
 		let id = 'sessionId' in e ? e.sessionId : undefined
-		let v = id ? views.get(id) : undefined
-		if (e.type === 'snapshot') views.set(e.sessionId, structuredClone(e.snapshot))
-		else if (!v) return
-		else if (e.type === 'turn-start') {
-			v.history.push({ type: 'prompt', text: e.prompt })
-			v.turn = { provider: e.provider, blocks: [], usage: {} }
-		} else if (e.type === 'stream') blocks.apply(v.turn as any, e.event)
-		else if (e.type === 'turn-end') {
-			if (v.turn?.blocks.length) v.history.push({ type: 'assistant', blocks: v.turn.blocks })
-			let end: Entry = { type: 'turn-end', status: e.status }
-			if (e.usage) end.usage = e.usage
-			if (e.error) end.error = e.error
-			v.history.push(end)
-			v.turn = undefined
+		if (id) {
+			let t = transcript.fold(views.get(id), e)
+			if (t) views.set(id, t)
 		}
 	})
 	return { conn, events, views, of: (type: string) => events.filter((e) => e.type === type) as any[] }
@@ -107,11 +98,21 @@ function created(c: ReturnType<typeof client>, cwd = '/tmp/w'): string {
 }
 
 // What a client connecting now would see.
-function fresh(id: string) {
+async function fresh(id: string): Promise<Transcript> {
 	let c = client()
 	c.conn.send({ type: 'open', sessionId: id })
+	await until(() => c.views.get(id))
 	return c.views.get(id)!
 }
+
+// The host process goes away and a new one starts on the same home.
+function restartHost() {
+	host.reset()
+	sessions.closeAll()
+	history.state.running.clear()
+}
+
+const records = async (id: string) => (await history.read(id)).map(({ ts: _ts, ...r }) => r)
 
 test('create makes a session and sends its snapshot', () => {
 	let a = client()
@@ -123,48 +124,91 @@ test('create makes a session and sends its snapshot', () => {
 	expect(sessions.list().map((s) => s.id)).toEqual([id])
 })
 
-test('a completed turn reaches every follower and later snapshots agree', async () => {
+test('a completed turn reaches every follower and is durable before turn-end', async () => {
 	let a = client()
 	let id = created(a)
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
 	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
+	expect(await records(id)).toEqual([{ type: 'user', blocks: [{ type: 'text', text: 'hi' }] }])
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'thinking', text: 'hmm' }, { type: 'signature', value: 'sig' }, { type: 'text', text: 'hel' })
 	calls[0]!.push({ type: 'text', text: 'lo' }, { type: 'usage', usage: { input: 5, output: 2 } }, { type: 'done', reason: 'end' })
+	let onDisk: unknown
+	let watcher = host.connect((e) => {
+		if (e.type === 'turn-end') onDisk = history.readSync(id).map((r) => r.type)
+	})
+	watcher.send({ type: 'open', sessionId: id })
 	await until(() => b.of('turn-end').length)
+	expect(onDisk).toEqual(['user', 'assistant', 'assistant', 'turn_end'])
 
-	let expected: Entry[] = [
+	let expected: Item[] = [
 		{ type: 'prompt', text: 'hi' },
-		{
-			type: 'assistant',
-			blocks: [
-				{ type: 'thinking', text: 'hmm', signature: 'sig', provider: 'fake' },
-				{ type: 'text', text: 'hello' },
-			],
-		},
+		{ type: 'thinking', text: 'hmm' },
+		{ type: 'text', text: 'hello' },
 		{ type: 'turn-end', status: 'completed', usage: { input: 5, output: 2 } },
 	]
-	expect(a.views.get(id)!.history).toEqual(expected)
-	expect(b.views.get(id)!.history).toEqual(expected)
-	expect(fresh(id).history).toEqual(expected)
+	expect(a.views.get(id)!.items).toEqual(expected)
+	expect(b.views.get(id)!.items).toEqual(expected)
+	expect((await fresh(id)).items).toEqual(expected)
+	expect((await records(id)).at(-1)).toEqual({ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 5, output: 2 } })
 })
 
-test('provider input is rebuilt from history on each turn', async () => {
+test('the next turn replays durable history, even after a host restart', async () => {
 	let a = client()
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'one' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'text', text: 'first' }, { type: 'done', reason: 'end' })
+	calls[0]!.push({ type: 'thinking', text: 'why' }, { type: 'signature', value: 'sig' }, { type: 'text', text: 'first' }, { type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 1)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'two' })
+	restartHost()
+
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.views.get(id))
+	expect(b.views.get(id)!.items).toEqual(a.views.get(id)!.items)
+	b.conn.send({ type: 'submit', sessionId: id, text: 'two' })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.model).toBe('fake/m1')
 	expect(calls[1]!.input.messages).toEqual([
 		{ role: 'user', blocks: [{ type: 'text', text: 'one' }] },
-		{ role: 'assistant', blocks: [{ type: 'text', text: 'first' }] },
+		{
+			role: 'assistant',
+			blocks: [
+				{ type: 'thinking', text: 'why', signature: 'sig', provider: 'fake' },
+				{ type: 'text', text: 'first' },
+			],
+		},
 		{ role: 'user', blocks: [{ type: 'text', text: 'two' }] },
 	])
+})
+
+test('a turn cut off by a host crash shows as interrupted and the session goes on', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: 'a' }, { type: 'tool_call', id: 't1', name: 'bash', input: {} })
+	await until(() => a.of('stream').length === 2)
+	// The process dies: nothing more is written for this turn.
+	host.state.running.clear()
+	history.state.running.clear()
+	sessions.closeAll()
+	host.reset()
+
+	let view = await fresh(id)
+	expect(view.items).toEqual([
+		{ type: 'prompt', text: 'go' },
+		{ type: 'text', text: 'a' },
+		{ type: 'turn-end', status: 'interrupted' },
+	])
+	expect(view.live).toBeUndefined()
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.views.get(id))
+	b.conn.send({ type: 'submit', sessionId: id, text: 'again' })
+	await until(() => calls.length === 2)
+	expect(calls[1]!.input.messages.at(-1)).toEqual({ role: 'user', blocks: [{ type: 'text', text: 'again' }] })
 })
 
 test('a client connecting mid-turn gets the partial turn, then live events', async () => {
@@ -178,13 +222,13 @@ test('a client connecting mid-turn gets the partial turn, then live events', asy
 	let late = client()
 	late.conn.send({ type: 'open', sessionId: id })
 	let snap = late.of('snapshot')[0].snapshot
-	expect(snap.history).toEqual([{ type: 'prompt', text: 'go' }])
+	expect(snap.history.map((r: any) => r.type)).toEqual(['user'])
 	expect(snap.turn.blocks).toEqual([{ type: 'text', text: 'par' }])
 
 	calls[0]!.push({ type: 'text', text: 'tial' }, { type: 'done', reason: 'end' })
 	await until(() => late.of('turn-end').length)
 	expect(late.views.get(id)).toEqual(a.views.get(id)!)
-	expect(late.views.get(id)!.history[1]).toEqual({ type: 'assistant', blocks: [{ type: 'text', text: 'partial' }] })
+	expect(late.views.get(id)!.items[1]).toEqual({ type: 'text', text: 'partial' })
 })
 
 test('reconnecting is connecting again: the snapshot carries the running turn', async () => {
@@ -198,8 +242,8 @@ test('reconnecting is connecting again: the snapshot carries the running turn', 
 	calls[0]!.push({ type: 'text', text: 'y' })
 	let again = client()
 	again.conn.send({ type: 'open', sessionId: id })
-	await until(() => (again.views.get(id)?.turn?.blocks[0] as any)?.text === 'xy')
-	expect(again.views.get(id)!.turn!.blocks).toEqual([{ type: 'text', text: 'xy' }])
+	await until(() => (again.views.get(id)?.live?.turn.blocks[0] as any)?.text === 'xy')
+	expect(again.views.get(id)!.live!.turn.blocks).toEqual([{ type: 'text', text: 'xy' }])
 	let seen = a.events.length
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => again.of('turn-end').length)
@@ -221,7 +265,7 @@ test('a submit while a turn runs is rejected to that client only', async () => {
 	expect(calls.length).toBe(1)
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => b.of('turn-end').length)
-	expect(fresh(id).history.filter((e) => e.type === 'prompt')).toEqual([{ type: 'prompt', text: 'first' }])
+	expect((await fresh(id)).items.filter((e) => e.type === 'prompt')).toEqual([{ type: 'prompt', text: 'first' }])
 })
 
 test('cancel ends the turn as cancelled, keeping partial output', async () => {
@@ -236,12 +280,13 @@ test('cancel ends the turn as cancelled, keeping partial output', async () => {
 	b.conn.send({ type: 'cancel', sessionId: id })
 	await until(() => a.of('turn-end').length)
 	expect(a.of('turn-end')[0].status).toBe('cancelled')
-	let view = fresh(id)
+	let view = await fresh(id)
 	expect(view).toEqual(a.views.get(id)!)
-	expect(view.history.slice(1)).toEqual([
-		{ type: 'assistant', blocks: [{ type: 'text', text: 'part' }] },
+	expect(view.items.slice(1)).toEqual([
+		{ type: 'text', text: 'part' },
 		{ type: 'turn-end', status: 'cancelled' },
 	])
+	expect((await records(id)).at(-1)).toMatchObject({ type: 'turn_end', status: 'cancelled' })
 	// The session takes new prompts afterwards.
 	a.conn.send({ type: 'submit', sessionId: id, text: 'again' })
 	await until(() => calls.length === 2)
@@ -255,7 +300,7 @@ test('a provider error ends the turn with the error', async () => {
 	calls[0]!.push({ type: 'error', message: 'HTTP 500 from fake', status: 500 })
 	await until(() => a.of('turn-end').length)
 	expect(a.of('turn-end')[0]).toMatchObject({ status: 'error', error: 'HTTP 500 from fake' })
-	expect(fresh(id)).toEqual(a.views.get(id)!)
+	expect(await fresh(id)).toEqual(a.views.get(id)!)
 })
 
 test('a stream that throws still ends the turn and frees the session', async () => {
@@ -267,12 +312,13 @@ test('a stream that throws still ends the turn and frees the session', async () 
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => a.of('turn-end').length)
 	expect(a.of('turn-end')[0]).toMatchObject({ status: 'error', error: 'boom' })
+	expect((await records(id)).at(-1)).toMatchObject({ type: 'turn_end', status: 'error', error: 'boom' })
 	host.stream = fakeStream
 	a.conn.send({ type: 'submit', sessionId: id, text: 'again' })
 	await until(() => calls.length === 1)
 })
 
-test('bad commands are rejected, not thrown', () => {
+test('bad commands are rejected, not thrown', async () => {
 	let a = client()
 	for (let bad of [null, 'open', { type: 'explode' }, { type: 'submit', sessionId: 1, text: 'x' }, { type: 'create' }]) {
 		expect(() => a.conn.send(bad)).not.toThrow()
@@ -282,7 +328,7 @@ test('bad commands are rejected, not thrown', () => {
 	let id = created(client())
 	a.conn.send({ type: 'submit', sessionId: id, text: 'not opened here' })
 	a.conn.send({ type: 'cancel', sessionId: id })
-	expect(a.of('rejected').length).toBe(9)
+	await until(() => a.of('rejected').length === 9)
 	expect(a.events.every((e) => e.type === 'rejected')).toBe(true)
 	expect(calls).toEqual([])
 })
@@ -312,9 +358,9 @@ test('every event is plain data that survives ASON and is not shared', async () 
 	late.conn.send({ type: 'open', sessionId: id })
 	// Mutating what a client received must not reach the host.
 	late.of('snapshot')[0].snapshot.turn.blocks.push({ type: 'text', text: 'junk' })
-	late.of('snapshot')[0].snapshot.history.push({ type: 'prompt', text: 'junk' })
+	late.of('snapshot')[0].snapshot.history.push({ type: 'user', blocks: [{ type: 'text', text: 'junk' }], ts: '' })
 	calls[0]!.push({ type: 'done', reason: 'tool_use' })
 	await until(() => a.of('turn-end').length)
 	for (let e of [...a.events, ...late.events]) expect(ason.parse(ason.stringify(e))).toEqual(e as any)
-	expect(fresh(id)).toEqual(a.views.get(id)!)
+	expect(await fresh(id)).toEqual(a.views.get(id)!)
 })

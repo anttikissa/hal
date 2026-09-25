@@ -251,3 +251,49 @@ test('a session without history has no records and no messages', async () => {
 	expect(await history.messages(id)).toEqual([])
 	expect((await history.open(id)).id).toBe(id)
 })
+
+test('a stream that throws ends the turn as an error, yielded and recorded', async () => {
+	let id = newSession()
+	history.submit(id, 'x')
+	async function* broken(): AsyncGenerator<StreamEvent> {
+		yield { type: 'text', text: 'half' }
+		throw new Error('socket hang up')
+	}
+	let seen = await drain(history.record(id, 'fake', broken()))
+	expect(seen.at(-1)).toEqual({ type: 'error', message: 'socket hang up' })
+	expect(strip(await history.read(id)).slice(1)).toEqual([
+		{ type: 'assistant', block: { type: 'text', text: 'half' } },
+		{ type: 'turn_end', status: 'error', error: 'socket hang up', usage: {} },
+	])
+	expect(history.state.running.has(id)).toBe(false)
+})
+
+test('live output and the file together always hold the whole turn once', async () => {
+	let id = newSession()
+	history.submit(id, 'go')
+	let it = history.record(id, 'fake', events({ type: 'text', text: 'a' }, { type: 'text', text: 'b' }, { type: 'tool_call', id: 't', name: 'x', input: {} }, { type: 'usage', usage: { output: 2 } }, { type: 'done', reason: 'tool_use' }))
+	let whole = () => [...history.readSync(id).flatMap((r) => (r.type === 'assistant' ? [r.block] : [])), ...(history.live(id)?.blocks ?? [])]
+	await it.next()
+	expect(whole()).toEqual([{ type: 'text', text: 'a' }])
+	await it.next()
+	expect(whole()).toEqual([{ type: 'text', text: 'ab' }])
+	await it.next()
+	expect(whole()).toEqual([{ type: 'text', text: 'ab' }, { type: 'tool_call', id: 't', name: 'x', input: {} }])
+	await it.next()
+	expect(history.live(id)!.usage).toEqual({ output: 2 })
+	await drain(it)
+	expect(history.live(id)).toBeUndefined()
+	expect(whole()).toEqual([{ type: 'text', text: 'ab' }, { type: 'tool_call', id: 't', name: 'x', input: {} }])
+})
+
+test('readSync agrees with read, skipping a partial last record', async () => {
+	let id = newSession()
+	expect(history.readSync(id)).toEqual([])
+	history.submit(id, 'a')
+	await drain(history.record(id, 'fake', events({ type: 'text', text: 'b' }, { type: 'done', reason: 'end' })))
+	appendFileSync(history.file(id), "{ type: 'user', blo")
+	expect(history.readSync(id)).toEqual(await history.read(id))
+	expect(history.readSync(id)).toHaveLength(3)
+	appendFileSync(history.file(id), "\n{ type: @@ }\n")
+	expect(() => history.readSync(id)).toThrow(new RegExp(id))
+})
