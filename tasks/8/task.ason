@@ -1,6 +1,6 @@
 {
 	title: 'ASON compatibility',
-	description: 'Implement ASON parse and stringify sufficient to read old Hal auth.ason and store our state; preserve documented syntax and round-trip semantics from ~/.hal/docs/ason.md, with format tests. Reject invalid data visibly; no silent fallback to empty credentials or history. Keep this codec free of filesystem or startup side effects.',
+	description: 'Parse and stringify ASON and ASONL as documented in ~/.hal/docs/ason.md, reading files written by old Hal such as auth.ason. Invalid input throws an error with its position. The format is a contract, so tests assert exact output and round trips.',
 	status: 'planned',
 	needs: ['r']
 }
