@@ -1,6 +1,6 @@
 {
 	title: 'Terminal output and redraw',
-	description: 'Render transcript, streaming answer and prompt like a normal REPL: start at the current cursor without clearing, and leave the last frame visible on quit. When the frame first outgrows the terminal height, switch one-way to fullscreen mode per ~/.hal/docs/terminal.md (grow and full modes, never slice history to the viewport, scrollback is immutable). One tested width helper handles wide and combining characters and wrapping. Restore terminal mode on exit or crash. Test with a fake terminal.',
+	description: 'Render transcript, streaming answer and prompt like a normal REPL: start at the current cursor without clearing, and leave the last frame visible on quit. When the frame first outgrows the terminal height, switch one-way to fullscreen mode per the terminal.md artifact (grow and full modes, never slice history to the viewport, scrollback is immutable). One tested width helper handles wide and combining characters and wrapping. Restore terminal mode on exit or crash. Test with a fake terminal. Lift the strings.ts artifact (width and wrapping) and its tests.',
 	status: 'planned',
 	needs: ['11', 'ca']
 }

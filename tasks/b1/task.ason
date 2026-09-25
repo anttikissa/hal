@@ -1,6 +1,6 @@
 {
 	title: 'OpenAI-compatible provider',
-	description: 'Implement Chat Completions on the provider interface with an API key from the environment and an overridable base URL, so OpenRouter, local servers and similar work. Test against a local fake server.',
+	description: 'Implement Chat Completions on the provider interface with an API key from the environment and an overridable base URL, so OpenRouter, local servers and similar work. Test against a local fake server. Reference: openai.ts artifact for provider quirks.',
 	status: 'planned',
 	needs: ['7f']
 }
