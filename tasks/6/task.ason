@@ -1,0 +1,6 @@
+{
+	title: 'In-process host and typed messages',
+	description: 'One process owns model calls and session state; terminal calls a host through typed, serializable commands and receives typed events. Define submit/cancel/stream completion without filesystem IPC or socket transport. A future second client can use the contract, but do not implement another client now.',
+	status: 'planned',
+	needs: ['b']
+}

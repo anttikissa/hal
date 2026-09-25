@@ -1,0 +1,6 @@
+{
+	title: 'Transcript projection',
+	description: 'Fold durable history and live events into a single display model with a pure function; the live display is not the provider context or a second source of conversation truth. Test stream completion and cancellation converge with reloading the durable session. Do not add a web renderer or persistence for ephemeral frames.',
+	status: 'planned',
+	needs: ['7', '6']
+}

@@ -1,0 +1,6 @@
+{
+	title: 'Bootstrap and module boundaries',
+	description: 'Define a single explicit startup path. Imports do no I/O, watchers, or signal setup; initialization is idempotent. Keep terminal, runtime, and browser-safe types separate and enforce import direction with a test. Record the dependency rule in tasks/README.md. Do not introduce a second process or transport.',
+	status: 'planned',
+	needs: ['r']
+}

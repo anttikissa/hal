@@ -1,0 +1,6 @@
+{
+	title: 'One cancellable conversation turn',
+	description: 'Connect host, provider, session log and transcript projection: persist the user message, stream the answer, persist the completed assistant message, and expose cancel and recoverable error states. Subsequent turns use durable history as context. An aborted or failed call must not leave orphaned provider messages; tests prove restart after both. No tools yet.',
+	status: 'planned',
+	needs: ['ya', 'ca']
+}

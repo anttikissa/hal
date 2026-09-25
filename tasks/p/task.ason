@@ -1,0 +1,6 @@
+{
+	title: 'State paths and safe diagnostics',
+	description: 'Put generated state beneath one root, overridable by HAL_STATE_DIR so tests never touch live state. Keep the copied, gitignored ./auth.ason as input, separate from generated state. Provide paths to components explicitly. Diagnostics never print tokens or mix into terminal model output; do not build a logging framework before it is needed.',
+	status: 'planned',
+	needs: ['b']
+}

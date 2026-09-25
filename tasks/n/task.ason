@@ -1,0 +1,6 @@
+{
+	title: 'Live ASON files',
+	description: 'Provide opt-in liveFile(path, defaults, options): changes to the object coalesce into an atomic .ason write (with restrictive mode for secrets), external atomic replacements update the same object, and a caller can force save/close. Surface malformed files and write errors rather than silently resetting or overwriting them. Use temp dirs in tests. Do not automatically rewrite auth.ason merely by reading it.',
+	status: 'planned',
+	needs: ['8', 'p']
+}
