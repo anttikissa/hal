@@ -1,6 +1,6 @@
 {
 	title: 'Bootstrap and module conventions',
 	description: 'One explicit startup path; importing a module does no I/O, timers, watchers or signal setup. Each module exports one mutable object and calls its own functions through that object, so eval, hot patches and local overrides take effect. Config values are plain functions on these objects (such as defaultModel()), not a config file or schema. Code is split into common (browser-safe types and pure functions), host (sessions, providers, disk) and client (terminal); a test enforces that common imports neither and that client and host meet only through common. Record these rules in tasks/README.md.',
-	status: 'planned',
+	status: 'done',
 	needs: ['r']
 }
