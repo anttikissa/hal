@@ -1,0 +1,100 @@
+// Provider-neutral conversation blocks and stream events. How they map
+// onto Anthropic Messages, OpenAI Responses and Chat Completions is
+// recorded in tasks/7f/mapping.md.
+
+export type TextBlock = { type: 'text'; text: string }
+
+// `signature` is opaque and only meaningful to `provider`, the provider
+// that produced it; others must not send it back.
+export type ThinkingBlock = { type: 'thinking'; text: string; signature?: string; provider?: string }
+
+export type ToolCallBlock = { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
+
+export type ToolResultBlock = { type: 'tool_result'; id: string; output: string; isError?: boolean }
+
+export type UserBlock = TextBlock | ToolResultBlock
+export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock
+
+export type Message = { role: 'user'; blocks: UserBlock[] } | { role: 'assistant'; blocks: AssistantBlock[] }
+
+// Token counts. Cumulative: each usage event overwrites what it carries.
+export type Usage = { input?: number; output?: number; cacheRead?: number; cacheWrite?: number }
+
+export type StopReason = 'end' | 'tool_use' | 'max_tokens' | 'refusal'
+
+export type DoneEvent = { type: 'done'; reason: StopReason }
+export type ErrorEvent = {
+	type: 'error'
+	message: string
+	status?: number
+	body?: string
+	// Set when the caller aborted; the turn was cancelled, not failed.
+	cancelled?: boolean
+}
+
+// A stream ends with exactly one terminal event: done or error.
+export type StreamEvent =
+	| { type: 'text'; text: string }
+	| { type: 'thinking'; text: string }
+	// Closes the current thinking block (or makes an empty one).
+	| { type: 'signature'; value: string }
+	| ({ type: 'tool_call' } & Omit<ToolCallBlock, 'type'>)
+	| { type: 'usage'; usage: Usage }
+	| DoneEvent
+	| ErrorEvent
+
+// An assistant turn folded from stream events.
+export type Turn = {
+	provider: string
+	blocks: AssistantBlock[]
+	usage: Usage
+	end?: DoneEvent | ErrorEvent
+}
+
+function newTurn(provider: string): Turn {
+	return { provider, blocks: [], usage: {} }
+}
+
+// Fold one event into the turn, merging consecutive deltas of a kind.
+// A signature closes its thinking block.
+function apply(turn: Turn, event: StreamEvent): void {
+	let last = turn.blocks.at(-1)
+	switch (event.type) {
+		case 'text':
+			if (last?.type === 'text') last.text += event.text
+			else turn.blocks.push({ type: 'text', text: event.text })
+			break
+		case 'thinking':
+			if (last?.type === 'thinking' && last.signature === undefined) last.text += event.text
+			else turn.blocks.push({ type: 'thinking', text: event.text })
+			break
+		case 'signature':
+			if (last?.type === 'thinking' && last.signature === undefined) Object.assign(last, { signature: event.value, provider: turn.provider })
+			else turn.blocks.push({ type: 'thinking', text: '', signature: event.value, provider: turn.provider })
+			break
+		case 'tool_call':
+			turn.blocks.push({ type: 'tool_call', id: event.id, name: event.name, input: event.input })
+			break
+		case 'usage':
+			for (let [k, v] of Object.entries(event.usage)) if (v !== undefined) turn.usage[k as keyof Usage] = v
+			break
+		default:
+			turn.end = event
+	}
+}
+
+function collect(events: Iterable<StreamEvent>, provider: string): Turn {
+	let turn = blocks.newTurn(provider)
+	for (let e of events) blocks.apply(turn, e)
+	return turn
+}
+
+// "provider/model", split on the first slash: the model part may
+// contain slashes itself (openrouter/anthropic/claude-...).
+function parseModelId(id: string): { provider: string; model: string } | undefined {
+	let slash = id.indexOf('/')
+	if (slash <= 0 || slash === id.length - 1) return undefined
+	return { provider: id.slice(0, slash), model: id.slice(slash + 1) }
+}
+
+export const blocks = { newTurn, apply, collect, parseModelId }
