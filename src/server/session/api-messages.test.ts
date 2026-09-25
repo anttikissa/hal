@@ -43,6 +43,33 @@ test('pruneMessages batches heavy pruning by completed turns', () => {
 	}
 })
 
+test('pruneMessages rewrites old history only at batch checkpoints, keeping the cached prefix stable in between', () => {
+	const prev = { heavyThreshold: apiMessages.config.heavyThreshold, pruneBatchTurns: apiMessages.config.pruneBatchTurns }
+	apiMessages.config.heavyThreshold = 2
+	apiMessages.config.pruneBatchTurns = 4
+	try {
+		const history: Message[] = []
+		let previous: Message[] = []
+		const rewrites: number[] = []
+		for (let turn = 1; turn <= 12; turn++) {
+			history.push(
+				{ role: 'user', content: `prompt ${turn}` },
+				{ role: 'assistant', content: [{ type: 'tool_use', id: `t${turn}`, name: 'read', input: {} }] },
+				{ role: 'user', content: [{ type: 'tool_result', tool_use_id: `t${turn}`, content: `result ${turn}` }] },
+				{ role: 'assistant', content: [{ type: 'text', text: `done ${turn}` }] },
+			)
+			const pruned = apiMessages.pruneMessages(history)
+			// The previous request must still be an exact prefix unless we crossed a checkpoint.
+			if (JSON.stringify(pruned.slice(0, previous.length)) !== JSON.stringify(previous)) rewrites.push(turn)
+			previous = pruned
+		}
+		expect(rewrites).toEqual([4, 8, 12])
+	} finally {
+		apiMessages.config.heavyThreshold = prev.heavyThreshold
+		apiMessages.config.pruneBatchTurns = prev.pruneBatchTurns
+	}
+})
+
 test('pruneMessages keeps small tool arguments so the model never sees empty calls', () => {
 	const prev = { heavyThreshold: apiMessages.config.heavyThreshold, pruneBatchTurns: apiMessages.config.pruneBatchTurns }
 	apiMessages.config.heavyThreshold = 0

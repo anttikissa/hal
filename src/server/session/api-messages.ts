@@ -330,13 +330,6 @@ function isTurnEnd(msg: Message): boolean {
 	return !(msg.content as any[]).some((b: any) => b.type === 'tool_use')
 }
 
-function pastBatchThreshold(age: number, threshold: number): boolean {
-	if (age <= threshold) return false
-	const batch = Math.max(1, apiConfig.pruneBatchTurns)
-	const firstBatch = Math.ceil((threshold + 1) / batch) * batch
-	return age >= firstBatch
-}
-
 function pruneMessages(msgs: Message[], pressure = false): Message[] {
 	const heavy = apiConfig.heavyThreshold
 	const thinking = apiConfig.thinkingThreshold
@@ -347,23 +340,30 @@ function pruneMessages(msgs: Message[], pressure = false): Message[] {
 		}
 	}
 
+	// age = completed turns after the message. Measured from the live end it grows
+	// every turn, so each turn would prune one more old turn and rewrite the prompt
+	// prefix hundreds of messages back, busting the provider cache. Measuring from
+	// the last batch checkpoint instead (subtract turns since it) keeps ages frozen
+	// between checkpoints; the cutoff jumps only once every pruneBatchTurns turns.
 	const age = new Array(msgs.length).fill(0)
 	let count = 0
 	for (let i = msgs.length - 1; i >= 0; i--) {
 		age[i] = count
 		if (isTurnEnd(msgs[i]!)) count++
 	}
+	const sinceCheckpoint = count % Math.max(1, apiConfig.pruneBatchTurns)
 
 	const out: Message[] = []
 	for (let i = 0; i < msgs.length; i++) {
 		const msg = msgs[i]!
-		const pruneHeavy = pastBatchThreshold(age[i]!, heavy) || (pressure && i < protectedStart)
+		const frozenAge = age[i]! - sinceCheckpoint
+		const pruneHeavy = frozenAge > heavy || (pressure && i < protectedStart)
 		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
 			let content = (msg.content as ContentBlock[]).map((b) => {
 				if (b.type === 'tool_use' && pruneHeavy) return { ...b, input: pruneToolInput(b) }
 				return b
 			})
-			if (pastBatchThreshold(age[i]!, thinking)) content = content.filter((b) => b.type !== 'thinking')
+			if (frozenAge > thinking) content = content.filter((b) => b.type !== 'thinking')
 			out.push({ ...msg, content })
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const content = (msg.content as ContentBlock[]).map((b) => {
