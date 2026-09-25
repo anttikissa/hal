@@ -1,6 +1,6 @@
 {
 	title: 'Editable prompt state',
 	description: 'A pure state transition for text, cursor and key events: insert and paste, left/right, Backspace, Enter submits, Escape cancels, Ctrl-D on empty input quits. Unicode graphemes are the unit. Test edits in the middle and at both ends.',
-	status: 'planned',
+	status: 'done',
 	needs: ['xk']
 }
