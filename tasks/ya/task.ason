@@ -1,6 +1,6 @@
 {
-	title: 'Anthropic streaming adapter',
-	description: 'Given a prompt and OAuth credential, call Anthropic Messages and turn chunked SSE into typed text, usage and completion/error events, with abort support. Follow the current OAuth contract documented in old Hal (endpoint, headers, required system identity) and verify it still applies before use. Choose one working model as a code default with an overridable function; no generic multi-provider framework. Test against an injected local fake server without network credentials.',
+	title: 'Anthropic provider',
+	description: 'Implement Anthropic Messages on the provider interface with OAuth credentials, following the OAuth contract in old Hal (endpoint, headers, required system identity); verify it still works before relying on it. Include thinking blocks and their signatures. Tests use a local fake server; ./test never needs real credentials.',
 	status: 'planned',
-	needs: ['b8', '6', '9']
+	needs: ['7f', 'b8']
 }

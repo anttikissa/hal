@@ -1,0 +1,6 @@
+{
+	title: 'Provider interface',
+	description: 'Define provider-neutral conversation blocks (user text, assistant text, thinking with an opaque provider signature, tool call, tool result) and stream events (text and thinking deltas, usage, done, error). A provider is a small object that maps neutral messages to one HTTP request and parses the response stream back into events; fetch, SSE splitting and abort live once in shared code. A model id of the form provider/model selects the provider. Check the shape against Anthropic Messages, OpenAI Responses and OpenAI-compatible Chat Completions, and record the mapping as a task artifact before writing code. No network calls in this task.',
+	status: 'planned',
+	needs: ['b']
+}
