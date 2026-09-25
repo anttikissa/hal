@@ -5,4 +5,10 @@ status=0
 bun test src || status=1
 ./node_modules/.bin/tsc --noEmit || status=1
 ./node_modules/.bin/oxlint src || status=1
+# The optional, gitignored local.ts is typechecked by tsc above (it sits in
+# the project root); here it is also imported in its own process, since
+# ordinary tests never load it.
+if [ -f local.ts ]; then
+	bun -e "await import('./local.ts')" || status=1
+fi
 exit $status
