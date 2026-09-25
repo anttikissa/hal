@@ -1,6 +1,6 @@
 {
 	title: 'First end-to-end model conversation',
-	description: './run joins or becomes the host, opens a session, accepts edited input, streams a real model answer, permits cancel, and reloads the conversation after restart. A second ./run on the same state root attaches as a client and sees the same stream; quitting the host leaves the other one running as host. Tests use a fake Anthropic server with temp state and auth; one manual TTY check documents limitations.',
+	description: './run joins or becomes the host, opens a session, accepts edited input, streams a real model answer, cancels on Escape, and reloads the conversation after restart. A second ./run on the same state root attaches as a client and sees the same stream; quitting the host leaves the other one running as host. Tests use a fake Anthropic server with temp state and auth; one manual TTY check documents limitations.',
 	status: 'planned',
-	needs: ['ne', 'cc', 'ja']
+	needs: ['ne', 'cc', 'ja', 'w6']
 }
