@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Resolve symlinks to find the real .hal directory.
+hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+
+args=()
+local_install=false
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+		-f|--fresh)
+			# Fresh state means this invocation is intentionally isolated: no other
+			# terminal can join it, and it cannot join the normal host.
+			export HAL_STATE_DIR="$(mktemp -d /tmp/hal-state-XXXXXX)"
+			shift
+			;;
+		-l)
+			local_install=true
+			shift
+			;;
+		--state-dir)
+			[ "$#" -ge 2 ] || { echo "hal: --state-dir requires a directory" >&2; exit 2; }
+			export HAL_STATE_DIR="$2"
+			shift 2
+			;;
+		--state-dir=*)
+			state_dir="${1#--state-dir=}"
+			[ -n "$state_dir" ] || { echo "hal: --state-dir requires a directory" >&2; exit 2; }
+			export HAL_STATE_DIR="$state_dir"
+			shift
+			;;
+		-r)
+			args+=("$1")
+			shift
+			if [ "$#" -gt 0 ] && [[ "$1" != -* ]]; then
+				args+=("$1")
+				shift
+			fi
+			;;
+		*)
+			args+=("$1")
+			shift
+			;;
+	esac
+done
+
+# `./run` is an explicit checkout-local invocation. It only delegates missing
+# local prerequisites to the installer; -l keeps that setup local too.
+needs_install() {
+	if ! command -v bun >/dev/null 2>&1; then return 0; fi
+	if [ ! -d "$hal_dir/node_modules" ] || [ ! -f "$hal_dir/config.ason" ]; then return 0; fi
+	return 1
+}
+
+if needs_install; then
+	if [ "$local_install" = true ]; then
+		echo "Looks like you need to run ./install -l first."
+		echo
+		echo "Running ./install -l..."
+		"$hal_dir/install" -l
+	else
+		echo "Looks like you need to run ./install first."
+		echo
+		echo "Running ./install..."
+		"$hal_dir/install"
+	fi
+	install_code=$?
+	if [ "$install_code" -ne 0 ]; then
+		echo "hal: install failed." >&2
+		exit "$install_code"
+	fi
+	if needs_install; then
+		echo "hal: setup was not completed; rerun ./run when ready." >&2
+		exit 1
+	fi
+#	echo
+	echo "Install script finished successfully. Starting Hal..."
+	echo
+fi
+
+while true; do
+	startup_epoch_ms="$(NO_COLOR=1 bun -e 'console.log(Date.now())')"
+	if [ "${#args[@]}" -eq 0 ]; then
+		# macOS still ships Bash 3.2. Under `set -u`, expanding an empty array raises
+		# "unbound variable", so only forward the array when it actually has items.
+		HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts"
+	else
+		HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts" "${args[@]}"
+	fi
+
+	code=$?
+	# Exit code 100 restarts - used by Ctrl-R.
+	if [ "$code" -ne 100 ] && [ "$code" -ne 42 ]; then
+		exit "$code"
+	fi
+	# Optional personal auto-deploy: the authenticated update hook exits with 42
+	# after fetching a newer origin. Pull only by fast-forward before relaunching;
+	# on failure, preserve the checkout and restart the existing revision.
+	if [ "$code" -eq 42 ]; then
+		echo "hal: update requested, pulling"
+		git -C "$hal_dir" pull --ff-only || echo "hal: pull failed, keeping current checkout"
+	fi
+done

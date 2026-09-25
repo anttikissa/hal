@@ -1,6 +1,6 @@
 {
 	title: 'First tool round trip',
-	description: 'After the text-only slice works, add exactly one safe, useful local tool with a schema, bounded result and explicit turn loop; persist calls and results so a restart neither loses nor silently repeats execution. Do not design a general permission system or broad tool catalog before seeing this tool work.',
+	description: 'Add one safe, useful local tool: the model calls it, the host runs it with a bounded result, and the turn continues. Calls and results are persisted, so a restart neither loses nor silently repeats execution.',
 	status: 'planned',
 	needs: ['b3']
 }
