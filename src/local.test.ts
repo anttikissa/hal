@@ -73,10 +73,12 @@ test('start loads local.ts before initializing modules', () => {
 		writeFileSync(join(home, 'local.ts'), `globalThis.localLoaded = true\n`)
 		let script = `
 let { main } = await import(${JSON.stringify(`${srcDir}/main.ts`)})
-let seen
-main.init = () => { seen = globalThis.localLoaded === true }
+// Report and stop at init: without a tty, start would exit next.
+main.init = () => {
+	process.stderr.write('local-before-init=' + (globalThis.localLoaded === true))
+	process.exit(0)
+}
 await main.start()
-process.stderr.write('local-before-init=' + seen)
 `
 		let out = run(home, script)
 		expect(out.exitCode).toBe(0)

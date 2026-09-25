@@ -96,3 +96,19 @@ test('an empty session is just the prompt', () => {
 	expect(plain(f.lines)).toEqual(['>'])
 	expect(f.cursor).toEqual({ row: 0, col: 3 })
 })
+
+test('a notice sits between the transcript and the prompt, wrapped and cleaned', () => {
+	let v = view([{ type: 'text', text: 'answer' }], 'typed')
+	v.notice = 'refused: a turn is already running\x1b[2J in this session'
+	let f = frame.build(v, 20)
+	let lines = plain(f.lines)
+	let at = lines.findIndex((l) => l.startsWith('refused'))
+	expect(at).toBeGreaterThan(lines.indexOf('answer'))
+	expect(lines.at(-1)).toBe('> typed')
+	expect(lines.join(' ')).toContain('in this session')
+	for (let line of f.lines) {
+		expect(strings.visLen(line)).toBeLessThanOrEqual(20)
+		expect(strip(line)).not.toContain('\x1b')
+	}
+	expect(f.cursor.row).toBe(f.lines.length - 1)
+})
