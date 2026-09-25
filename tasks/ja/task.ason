@@ -1,6 +1,6 @@
 {
 	title: 'Socket transport and host takeover',
 	description: 'Processes sharing a home find each other through one Unix socket in state/: whoever holds an exclusive host lock file there is host and alone may create or replace the socket; others connect as clients. A lock left by a dead process is stale and can be taken over by exactly one process. When the host exits, a surviving client becomes the new host and the others reconnect to it. Messages are line-delimited ASON. The host process runs its own terminal client through the same protocol. Test that killing the host (including kill -9) with several clients connected always leaves exactly one host and all clients reconnected; use several processes on a temp home. Web clients and cross-machine peers are out of scope, but nothing here should rule them out.',
-	status: 'planned',
+	status: 'done',
 	needs: ['6']
 }
