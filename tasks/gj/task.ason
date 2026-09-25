@@ -1,6 +1,6 @@
 {
 	title: 'What is a session',
 	description: 'A session has an id, its own directory under sessions/ and small ASON metadata kept in a liveFile: at least cwd, model, name and creation time. The host can create, list, open and close several sessions at once, even though the first terminal client shows only one. A session without history is valid; malformed metadata is reported, not replaced.',
-	status: 'planned',
+	status: 'done',
 	needs: ['n']
 }
