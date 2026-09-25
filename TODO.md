@@ -40,3 +40,16 @@ Random ideas, in no particular order
 - Make a help text into the intro model (after the actual model is set) - it should tell about /help, /keys, tabs, and maybe a special /features or something
 - When connected to remote and remote stops and you enter reconnecting more, you can write prompts and they appear as sent. But they disappear upon reconnect as if nothing had happened
 - Web: ws messages are HUGE. Need to be smaller - hard to debug and copy paste messages around. WS not meant for that
+- ason: `{__proto__: {a: 1}}` replaces the parsed object's prototype instead of creating a
+  `__proto__` key, so the key vanishes and `obj.a` becomes 1. Define keys with
+  `Object.defineProperty` in `parseObject`.
+- ason: Unclosed `/*` comments are accepted silently at the top level (`1 /* open` parses as 1);
+  inside an object they give a misleading "Expected ',' or '}'". Fail with "Unterminated comment".
+- ason: `stringify(-0)` writes `0`, so the sign is lost on round-trip.
+- ason: With `{ comments: true }`, a comment after the last entry (just before `}` or `]`) is
+  dropped, so comment-preserving round-trips lose it.
+- ason: `stringify` writes control characters (e.g. NUL, U+2028) raw instead of escaping them.
+- ason: Multiline backtick output keeps `\r` raw; JS normalizes `\r\n` to `\n` in template
+  literals, so the same text means different things to ASON and JS.
+- ason: Unquoted keys accept any characters up to a delimiter (`{a-b.c@: 1}` parses), which is
+  looser than JS identifiers and than what `stringify` emits unquoted.
