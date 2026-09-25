@@ -18,7 +18,10 @@ export interface TerminalIO {
 	/** Stop this process like a shell job (SIGSTOP). */
 	stop(): void
 	onContinue(fn: () => void): void
+	/** Runs on every way out: exit, crash, SIGTERM, SIGHUP. */
 	onExit(fn: () => void): void
+	size(): { rows: number; cols: number }
+	onResize(fn: () => void): void
 }
 
 interface TerminalState {
@@ -59,7 +62,14 @@ function realIO(): TerminalIO {
 			}
 		},
 		onContinue: (fn) => process.on('SIGCONT', fn),
-		onExit: (fn) => process.on('exit', fn),
+		onExit(fn) {
+			// Uncaught errors still emit 'exit'; these signals do not.
+			process.on('exit', fn)
+			process.on('SIGTERM', () => process.exit(143))
+			process.on('SIGHUP', () => process.exit(129))
+		},
+		size: () => ({ rows: process.stdout.rows || 24, cols: process.stdout.columns || 80 }),
+		onResize: (fn) => process.stdout.on('resize', fn),
 	}
 }
 
@@ -70,11 +80,15 @@ function enter(): void {
 	terminal.state.entered = true
 }
 
-// Restore the terminal for the shell. Leaves the screen content alone.
+// Restore the terminal for the shell. Leaves the screen content alone,
+// with the cursor parked below it.
 function leave(): void {
 	let io = terminal.state.io
 	if (!io || !terminal.state.entered) return
 	terminal.state.entered = false
+	try {
+		terminal.park()
+	} catch {}
 	io.write((terminal.kitty() ? KITTY_OFF : '') + BRACKETED_PASTE_OFF + SHOW_CURSOR)
 	io.setRawMode(false)
 }
@@ -100,6 +114,12 @@ function resumed(): void {
 	terminal.state.suspended = false
 	terminal.enter()
 	terminal.redraw()
+}
+
+// Only while we own the terminal; a resize during a suspend is answered
+// by the redraw on resume.
+function resized(): void {
+	if (terminal.state.entered) terminal.onResize()
 }
 
 const ACTIONS: Record<EmergencyAction, () => void> = {
@@ -130,6 +150,7 @@ function init(io: TerminalIO = terminal.realIO()): void {
 	terminal.state.io = io
 	io.onData((chunk) => terminal.onData(chunk))
 	io.onContinue(() => terminal.resumed())
+	io.onResize(() => terminal.resized())
 	// Safety net for exits that skip quit(): uncaught errors, SIGTERM.
 	io.onExit(() => terminal.leave())
 	terminal.enter()
@@ -150,6 +171,11 @@ export const terminal = {
 	onKeys: (_events: KeyEvent[]): void => {},
 	/** Repaints the screen after resume; replaced by the renderer. */
 	redraw: (): void => {},
+	/** Repaints after a terminal resize; replaced by the renderer. */
+	onResize: (): void => {},
+	/** Moves the cursor below the frame before the terminal is given
+	 * back; replaced by the renderer. Must not throw or clear. */
+	park: (): void => {},
 	realIO,
 	init,
 	reset,
@@ -160,4 +186,5 @@ export const terminal = {
 	restart,
 	suspend,
 	resumed,
+	resized,
 }

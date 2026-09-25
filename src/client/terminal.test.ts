@@ -10,6 +10,8 @@ function fixture() {
 	let raw = false
 	let onData: ((chunk: string | Uint8Array) => void) | undefined
 	let onContinue: (() => void) | undefined
+	let onResize: (() => void) | undefined
+	let onExit: (() => void) | undefined
 	let io: TerminalIO = {
 		setRawMode(on) {
 			raw = on
@@ -31,12 +33,20 @@ function fixture() {
 		onContinue(fn) {
 			onContinue = fn
 		},
-		onExit() {},
+		onExit(fn) {
+			onExit = fn
+		},
+		size: () => ({ rows: 24, cols: 80 }),
+		onResize(fn) {
+			onResize = fn
+		},
 	}
 	let keys: KeyEvent[] = []
 	let redraws = 0
 	terminal.onKeys = (events) => keys.push(...events)
 	terminal.redraw = () => redraws++
+	terminal.park = () => log.push('park')
+	terminal.onResize = () => log.push('resize')
 	terminal.init(io)
 	return {
 		log,
@@ -52,6 +62,8 @@ function fixture() {
 		},
 		type: (...chunks: (string | Uint8Array)[]) => chunks.forEach((c) => onData!(c)),
 		resume: () => onContinue!(),
+		resize: () => onResize!(),
+		crash: () => onExit!(),
 		clearOutput() {
 			out = ''
 			log.length = 0
@@ -59,7 +71,7 @@ function fixture() {
 	}
 }
 
-const defaults = { onKeys: terminal.onKeys, redraw: terminal.redraw }
+const defaults = { onKeys: terminal.onKeys, redraw: terminal.redraw, park: terminal.park, onResize: terminal.onResize }
 afterEach(() => {
 	terminal.reset()
 	Object.assign(terminal, defaults)
@@ -178,5 +190,50 @@ describe('suspend', () => {
 		let t = fixture()
 		t.type('\x1b[122;5u')
 		expect(t.log.at(-1)).toBe('stop')
+	})
+})
+
+describe('leaving', () => {
+	test.each([
+		['quit', '\x03'],
+		['restart', '\x12'],
+		['suspend', '\x1a'],
+	])('%s parks the cursor below the frame before restoring', (_name, seq) => {
+		let t = fixture()
+		t.clearOutput()
+		t.type(seq)
+		expect(t.log.indexOf('park')).toBeGreaterThanOrEqual(0)
+		expect(t.log.indexOf('park')).toBeLessThan(t.log.indexOf('cooked'))
+	})
+
+	test('an exit without quit (crash, signal) still restores the terminal, once', () => {
+		let t = fixture()
+		t.clearOutput()
+		t.crash()
+		t.crash()
+		expect(t.raw).toBe(false)
+		expect(t.out).toContain(BRACKETED_PASTE_OFF)
+		expect(t.log.filter((l) => l === 'park' || l === 'cooked')).toEqual(['park', 'cooked'])
+	})
+
+	test('a failing park cannot keep the terminal raw', () => {
+		let t = fixture()
+		terminal.park = () => {
+			throw new Error('renderer broke')
+		}
+		t.type('\x03')
+		expect(t.raw).toBe(false)
+		expect(t.log.at(-1)).toBe('exit 0')
+	})
+})
+
+describe('resize', () => {
+	test('repaints while we own the terminal, not while suspended', () => {
+		let t = fixture()
+		t.resize()
+		expect(t.log.filter((l) => l === 'resize').length).toBe(1)
+		t.type('\x1a')
+		t.resize()
+		expect(t.log.filter((l) => l === 'resize').length).toBe(1)
 	})
 })
