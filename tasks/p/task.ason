@@ -1,6 +1,6 @@
 {
 	title: 'State paths and safe diagnostics',
-	description: 'Everything Hal writes lives under one home, HAL_HOME when set, else the repo root, so tests use a temp home and never touch live data. The home has two gitignored directories, both persistent: sessions/ (conversations, one directory per session) and state/ (everything else, including socket, host lock and later peer and access keys, so it is created with owner-only permissions). The copied ./auth.ason is input. Diagnostics never print tokens or appear in the model transcript.',
+	description: 'Everything Hal writes lives under its home, which is the repo root: git clone is the only install. HAL_HOME exists only so tests use a temp home and never touch live data. The home has two gitignored directories, both persistent: sessions/ (conversations, one directory per session) and state/ (everything else, including socket, host lock and later peer and access keys, so it is created with owner-only permissions). The copied ./auth.ason is input. Diagnostics never print tokens or appear in the model transcript.',
 	status: 'planned',
 	needs: ['b']
 }
