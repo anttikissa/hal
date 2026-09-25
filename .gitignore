@@ -1,3 +1,4 @@
 node_modules/
 auth.ason
+local.ts
 scripts/deploy

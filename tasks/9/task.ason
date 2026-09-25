@@ -1,6 +1,6 @@
 {
 	title: 'Local overrides',
-	description: 'Any gitignored foo.local.ts beside a module may replace functions on that module object; startup applies all of them before initialization. A missing override is normal. ./test typechecks local files and smoke-imports them in a separate process, but ordinary tests run without them. Prove it with one real config function, such as the default model.',
+	description: 'An optional, gitignored local.ts in the repo root imports module objects and replaces their functions; startup loads it after modules are imported and before initialization. A missing local.ts is normal. ./test typechecks it and smoke-imports it in a separate process, but ordinary tests run without it. Prove it with one real config function, such as the default model.',
 	status: 'planned',
 	needs: ['b']
 }
