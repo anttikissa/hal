@@ -2,12 +2,17 @@
 // work on import; start() calls their init() functions in order.
 import { existsSync } from 'fs'
 import { join } from 'path'
+import { app } from './client/app.ts'
 import { link, type Role } from './client/link.ts'
+import { render } from './client/render.ts'
 import { terminal } from './client/terminal.ts'
 import type { Event } from './common/protocol.ts'
+import { anthropic } from './host/anthropic.ts'
 import { host } from './host/host.ts'
+import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
 import { server } from './host/server.ts'
+import { sessions } from './host/sessions.ts'
 
 const repoRoot = join(import.meta.dir, '..')
 
@@ -27,8 +32,14 @@ async function loadLocal(): Promise<void> {
 // Module init() calls go here, in order, once modules have them.
 function init(): void {
 	paths.init()
+	anthropic.init()
+	openaiCompat.init()
 	// Piped stdin (tests, scripts) has no raw mode and no emergency keys.
-	if (process.stdin.isTTY) terminal.init()
+	if (terminal.available()) {
+		terminal.init()
+		render.init()
+		app.init()
+	}
 }
 
 // Joins this home's host, or becomes it; resolves once connected. Either
@@ -44,13 +55,29 @@ function joinHost(onEvent: (event: Event) => void, onRole?: (role: Role | null) 
 	})
 }
 
+// The session to open at start: the newest readable one on disk, so a
+// restart comes back to the same conversation.
+function lastSession(): string | undefined {
+	let ids = sessions.list().flatMap((s) => (s.meta ? [s.id] : []))
+	return ids.sort((a, b) => parseInt(b) - parseInt(a))[0]
+}
+
 async function start(): Promise<void> {
 	await main.loadLocal()
 	main.init()
-	console.log('hal2')
+	if (!terminal.available()) {
+		process.stderr.write('hal2 needs a terminal\n')
+		process.exit(1)
+	}
+	await main.joinHost(
+		(event) => app.onEvent(event),
+		(role) => app.onRole(role),
+	)
+	let id = main.lastSession()
+	link.send(id ? { type: 'open', sessionId: id } : { type: 'create', cwd: process.cwd() })
 }
 
-export const main = { localPath, loadLocal, init, joinHost, start }
+export const main = { localPath, loadLocal, init, joinHost, lastSession, start }
 
 // Only ./run starts Hal; importing this file (tests, eval) does nothing.
 if (import.meta.main) await main.start()

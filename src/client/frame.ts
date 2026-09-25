@@ -14,6 +14,8 @@ import type { PromptState } from './prompt.ts'
 export interface View {
 	transcript?: Transcript
 	prompt: PromptState
+	/** A passing message for the user, such as a refused command. */
+	notice?: string
 }
 
 export interface Frame {
@@ -108,6 +110,10 @@ function build(view: View, cols: number): Frame {
 		if (!rows.length) continue
 		if (lines.length) lines.push('')
 		for (let r of rows) lines.push(PAD + r)
+	}
+	if (view.notice) {
+		if (lines.length) lines.push('')
+		for (let r of frame.wrap(view.notice, width)) lines.push(PAD + DIM + r + UNDIM)
 	}
 	if (lines.length) lines.push('')
 	let promptWidth = Math.max(1, width - PROMPT_FIRST.length)

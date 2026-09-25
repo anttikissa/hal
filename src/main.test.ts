@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 
-test('./run starts the app', () => {
+test('./run without a terminal says so and fails', () => {
 	// A temp home keeps the user's real local.ts out of the test.
 	let home = mkdtempSync(join(tmpdir(), 'hal2-main-'))
 	try {
@@ -11,8 +11,8 @@ test('./run starts the app', () => {
 			cwd: `${import.meta.dir}/..`,
 			env: { ...process.env, HAL_HOME: home },
 		})
-		expect(out.exitCode).toBe(0)
-		expect(out.stdout.toString()).toBe('hal2\n')
+		expect(out.exitCode).toBe(1)
+		expect(out.stderr.toString()).toContain('terminal')
 	} finally {
 		rmSync(home, { recursive: true, force: true })
 	}

@@ -31,6 +31,8 @@ interface TerminalState {
 	/** Raw mode and our terminal modes are on. */
 	entered: boolean
 	suspended: boolean
+	/** Resolves a lone ESC once input goes idle (keys.flush). */
+	escapeTimer: ReturnType<typeof setTimeout> | null
 }
 
 const BRACKETED_PASTE_ON = '\x1b[?2004h'
@@ -41,7 +43,7 @@ const KITTY_OFF = '\x1b[<u'
 const SHOW_CURSOR = '\x1b[?25h'
 
 function createState(): TerminalState {
-	return { io: null, decoder: keys.createState(), emergency: emergency.createState(), entered: false, suspended: false }
+	return { io: null, decoder: keys.createState(), emergency: emergency.createState(), entered: false, suspended: false, escapeTimer: null }
 }
 
 function realIO(): TerminalIO {
@@ -140,7 +142,21 @@ function onData(chunk: string | Uint8Array): void {
 		// Only reached when exit is faked (tests): deliver nothing more.
 		if (action !== 'suspend') return
 	}
-	let events = keys.feed(st.decoder, chunk).filter((k) => !isEmergency(k))
+	if (st.escapeTimer) clearTimeout(st.escapeTimer)
+	st.escapeTimer = null
+	terminal.deliver(keys.feed(st.decoder, chunk))
+	// A lone ESC may be Escape or the start of a sequence: wait briefly
+	// for the rest before calling it Escape.
+	if (keys.pending(st.decoder)) {
+		st.escapeTimer = setTimeout(() => {
+			st.escapeTimer = null
+			terminal.deliver(keys.flush(st.decoder))
+		}, terminal.escapeMs())
+	}
+}
+
+function deliver(events: KeyEvent[]): void {
+	events = events.filter((k) => !isEmergency(k))
 	if (events.length) terminal.onKeys(events)
 }
 
@@ -158,6 +174,7 @@ function init(io: TerminalIO = terminal.realIO()): void {
 
 /** Forget the terminal (tests). Does not restore it. */
 function reset(): void {
+	if (terminal.state.escapeTimer) clearTimeout(terminal.state.escapeTimer)
 	terminal.state = createState()
 }
 
@@ -167,6 +184,10 @@ export const terminal = {
 	restartCode: 100,
 	/** Enable the kitty keyboard protocol. */
 	kitty: () => true,
+	/** How long a lone ESC waits for the rest of a sequence. */
+	escapeMs: () => 50,
+	/** Whether there is a terminal to take over; tests replace it. */
+	available: (): boolean => !!process.stdin.isTTY,
 	/** Receives decoded keys; replaced by the prompt. */
 	onKeys: (_events: KeyEvent[]): void => {},
 	/** Repaints the screen after resume; replaced by the renderer. */
@@ -182,6 +203,7 @@ export const terminal = {
 	enter,
 	leave,
 	onData,
+	deliver,
 	quit,
 	restart,
 	suspend,

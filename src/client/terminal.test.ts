@@ -237,3 +237,29 @@ describe('resize', () => {
 		expect(t.log.filter((l) => l === 'resize').length).toBe(1)
 	})
 })
+
+describe('escape', () => {
+	test('a lone ESC becomes Escape once input goes idle', async () => {
+		let t = fixture()
+		t.type('\x1b')
+		expect(t.keys).toEqual([])
+		await Bun.sleep(terminal.escapeMs() + 30)
+		expect(t.keys.map((k) => k.key)).toEqual(['escape'])
+	})
+
+	test('an escape sequence split across reads is one key, not Escape', async () => {
+		let t = fixture()
+		t.type('\x1b')
+		t.type('[A')
+		await Bun.sleep(terminal.escapeMs() + 30)
+		expect(t.keys.map((k) => k.key)).toEqual(['up'])
+	})
+
+	test('reset stops a pending escape timer', async () => {
+		let t = fixture()
+		t.type('\x1b')
+		terminal.reset()
+		await Bun.sleep(terminal.escapeMs() + 30)
+		expect(t.keys).toEqual([])
+	})
+})
