@@ -1,6 +1,6 @@
 {
 	title: 'ASON compatibility',
 	description: 'Lift the ason.ts and ason.test.ts artifacts (self-contained, format in ason.md) rather than rewriting them. Keep parse, stringify and ASONL; drop parts no task needs yet, such as comment preservation or streaming, unless they cost nothing to keep. Invalid input throws an error with its position. The format is a contract, so tests assert exact output and round trips.',
-	status: 'planned',
+	status: 'done',
 	needs: ['r']
 }
