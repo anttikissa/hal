@@ -39,3 +39,6 @@ handling, security, accessibility or explicit requirements.
 Other agents may work in the same tree at once. Stage only your own
 changes (never `git add -A` or a whole file holding others' edits), and
 never `git checkout`, `git restore` or `git stash` over uncommitted work.
+The index is shared too: commit with `git commit <your paths>` (or
+check `git diff --cached --stat` first) so files another agent staged
+don't ride along in your commit.
