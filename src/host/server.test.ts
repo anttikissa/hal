@@ -8,8 +8,10 @@ import { host } from './host.ts'
 import { paths } from './paths.ts'
 import { server } from './server.ts'
 import { sessions } from './sessions.ts'
+import { web } from './web.ts'
 
 const savedHome = process.env.HAL_HOME
+const origPort = web.port
 let home = ''
 let sockets: Socket[] = []
 
@@ -17,6 +19,8 @@ beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-server-`)
 	process.env.HAL_HOME = home
 	paths.init()
+	// Never the real port: a running Hal may hold it.
+	web.port = () => 0
 })
 
 afterEach(async () => {
@@ -25,6 +29,7 @@ afterEach(async () => {
 	await server.stop()
 	host.reset()
 	sessions.closeAll()
+	web.port = origPort
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome
 	rmSync(home, { recursive: true, force: true })

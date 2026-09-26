@@ -128,6 +128,13 @@ function list(): SessionListing[] {
 	return out
 }
 
+// The newest readable session, so a restart or another client comes
+// back to the same conversation.
+function newest(): string | undefined {
+	let ids = sessions.list().flatMap((s) => (s.meta ? [s.id] : []))
+	return ids.sort((a, b) => parseInt(b) - parseInt(a))[0]
+}
+
 export const sessions = {
 	state: { open: new Map<string, SessionMeta>() },
 	validate,
@@ -139,4 +146,5 @@ export const sessions = {
 	closeAll,
 	openIds,
 	list,
+	newest,
 }

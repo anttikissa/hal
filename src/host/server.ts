@@ -9,7 +9,8 @@
 // are close-on-exec, so child processes never inherit the lock.
 //
 // Each socket connection is one host.connect() connection, both ways as
-// line-delimited ASON (src/common/lines.ts).
+// line-delimited ASON (src/common/lines.ts). The host also serves the
+// web endpoint (web.ts) for as long as it is host.
 
 import { dlopen, FFIType } from 'bun:ffi'
 import { closeSync, openSync, rmSync } from 'fs'
@@ -19,6 +20,7 @@ import { lines } from '../common/lines.ts'
 import type { Event } from '../common/protocol.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
+import { web } from './web.ts'
 
 const LOCK_EX = 2
 const LOCK_NB = 4
@@ -65,6 +67,7 @@ async function serve(): Promise<boolean> {
 		server.state.lockFd = null
 		throw e
 	}
+	web.start()
 	return true
 }
 
@@ -109,6 +112,7 @@ async function stop(): Promise<void> {
 	let { listener, lockFd } = server.state
 	server.state.listener = null
 	server.state.lockFd = null
+	await web.stop()
 	for (let socket of server.state.sockets) socket.destroy()
 	if (listener) await new Promise((resolve) => listener.close(resolve))
 	if (lockFd !== null) {

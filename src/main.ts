@@ -54,13 +54,6 @@ function joinHost(onEvent: (event: Event) => void, onRole?: (role: Role | null) 
 	})
 }
 
-// The session to open at start: the newest readable one on disk, so a
-// restart comes back to the same conversation.
-function lastSession(): string | undefined {
-	let ids = sessions.list().flatMap((s) => (s.meta ? [s.id] : []))
-	return ids.sort((a, b) => parseInt(b) - parseInt(a))[0]
-}
-
 async function start(): Promise<void> {
 	await main.loadLocal()
 	main.init()
@@ -72,11 +65,11 @@ async function start(): Promise<void> {
 		(event) => app.onEvent(event),
 		(role) => app.onRole(role),
 	)
-	let id = main.lastSession()
+	let id = sessions.newest()
 	link.send(id ? { type: 'open', sessionId: id } : { type: 'create', cwd: process.cwd() })
 }
 
-export const main = { localPath, loadLocal, init, joinHost, lastSession, start }
+export const main = { localPath, loadLocal, init, joinHost, start }
 
 // Only ./run starts Hal; importing this file (tests, eval) does nothing.
 if (import.meta.main) await main.start()

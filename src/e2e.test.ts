@@ -97,6 +97,8 @@ beforeEach(() => {
 		`${home}/local.ts`,
 		`import { terminal } from ${JSON.stringify(`${import.meta.dir}/client/terminal.ts`)}
 import { anthropic } from ${JSON.stringify(`${import.meta.dir}/host/anthropic.ts`)}
+import { web } from ${JSON.stringify(`${import.meta.dir}/host/web.ts`)}
+web.port = () => 0
 terminal.available = () => true
 terminal.realIO = () => ({
 	setRawMode() {},
