@@ -3,12 +3,15 @@
 // then one session's transcript above a textarea. Enter submits
 // (steering a running turn; Alt+Enter queues after it, Shift+Enter is a
 // newline), Escape pauses a running turn. Waiting messages (the inbox)
-// always show above the input. Plain DOM;
+// always show above the input. The textarea is the session's draft
+// (common/drafts.ts, kept in localStorage too); a sent prompt shows at
+// once, pending until the host has it, connected or not. Plain DOM;
 // web.ts bundles this file into index.html at request time.
 
 import type { Event } from '../common/protocol.ts'
 import { transcript, type Item } from '../common/transcript.ts'
 import { connection, type LinkState } from '../common/connection.ts'
+import { drafts, type Local } from '../common/drafts.ts'
 import { link } from './link.ts'
 import { view, type ViewState } from './view.ts'
 
@@ -21,11 +24,13 @@ type PageState = {
 	resumed: HTMLElement | null
 	notice: HTMLElement | null
 	inbox: HTMLElement | null
+	// Prompts sent and not yet acknowledged, after the transcript.
+	pending: HTMLElement | null
 	input: HTMLTextAreaElement | null
 }
 
 function createState(): PageState {
-	return { view: {}, drawn: [], log: null, resumed: null, notice: null, inbox: null, input: null }
+	return { view: {}, drawn: [], log: null, resumed: null, notice: null, inbox: null, pending: null, input: null }
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}): HTMLElementTagNameMap[K] {
@@ -57,6 +62,11 @@ function draw(): void {
 		else log.append(st.resumed)
 	} else st.resumed?.remove()
 	st.inbox!.replaceChildren(...view.inbox(st.view).map((m) => el('div', { className: 'log', textContent: `${m.label}: ${m.text}` })))
+	let id = st.view.transcript?.meta.id
+	st.pending ??= el('div', { className: 'log' })
+	st.pending.replaceChildren(...(id ? drafts.pending(id) : []).map((text) => el('div', { className: 'user pending', textContent: text })))
+	st.pending.style.display = 'contents'
+	log.append(st.pending)
 	st.notice!.textContent = st.view.notice ?? ''
 	let status = view.status(st.view)
 	st.input!.placeholder = status ? `${status}; Enter steers, Alt+Enter queues, Escape pauses` : 'Message Hal (Enter sends, Shift+Enter for a newline)'
@@ -64,8 +74,41 @@ function draw(): void {
 }
 
 function onEvent(event: Event): void {
-	page.state.view = view.onEvent(page.state.view, event)
+	let st = page.state
+	let changed = drafts.onEvent(event)
+	st.view = view.onEvent(st.view, event)
+	let id = st.view.transcript?.meta.id
+	if (id && (changed || event.type === 'snapshot') && st.input!.value !== drafts.text(id)) {
+		st.input!.value = drafts.text(id)
+		page.fitInput()
+	}
 	page.draw()
+}
+
+// The browser's local copy of drafts, for typing while disconnected
+// and prompts not yet acknowledged when the tab closes.
+const store = {
+	load: (id: string): Local | undefined => {
+		try {
+			return JSON.parse(localStorage.getItem(`hal-draft:${id}`) ?? 'null') ?? undefined
+		} catch {
+			return undefined
+		}
+	},
+	save: (id: string, local: Local): void => {
+		try {
+			if (!local.text && !local.sending.length) localStorage.removeItem(`hal-draft:${id}`)
+			else localStorage.setItem(`hal-draft:${id}`, JSON.stringify(local))
+		} catch {
+			// Storage full or disabled: the host still has the draft.
+		}
+	},
+}
+
+function onInput(): void {
+	let id = page.state.view.transcript?.meta.id
+	if (id) drafts.edit(id, page.state.input!.value)
+	page.fitInput()
 }
 
 function setNotice(notice: string | undefined): void {
@@ -94,12 +137,11 @@ function onKey(e: KeyboardEvent): void {
 	if (e.key !== 'Enter' || e.shiftKey || e.target !== st.input) return
 	e.preventDefault()
 	let { command, notice, keep } = view.submit(st.view, st.input!.value, e.altKey)
-	// Until drafts and pending prompts (task rw), typed text waits here.
-	if (command && !connection.connected()) notice = 'not connected; try again in a moment'
-	else {
-		if (command) connection.send(command)
-		if (!keep) st.input!.value = ''
-	}
+	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean } | undefined
+	// A prompt shows at once and waits, pending, for the host.
+	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c.queue)
+	else if (c) connection.send(c)
+	if (!keep) st.input!.value = ''
 	page.setNotice(notice)
 	page.fitInput()
 }
@@ -111,12 +153,13 @@ function chat(): void {
 	st.notice = el('div', { id: 'notice', className: 'log' })
 	st.inbox = el('div', { id: 'inbox' })
 	st.input = el('textarea', { rows: 1, autofocus: true, ariaLabel: 'Message', className: 'input' })
-	st.input.addEventListener('input', () => page.fitInput())
+	st.input.addEventListener('input', () => page.onInput())
 	let footer = el('footer')
 	footer.append(st.inbox, st.notice, st.input)
 	document.body.append(st.log, footer)
 	document.addEventListener('keydown', (e) => page.onKey(e))
 	st.input.focus()
+	drafts.store = store
 	page.draw()
 	let scheme = location.protocol === 'https:' ? 'wss' : 'ws'
 	link.start({
@@ -152,7 +195,7 @@ async function init(): Promise<void> {
 	else page.chat()
 }
 
-export const page = { state: createState(), draw, onEvent, setNotice, onState, fitInput, onKey, chat, loginForm, init }
+export const page = { state: createState(), store, onInput, draw, onEvent, setNotice, onState, fitInput, onKey, chat, loginForm, init }
 
 // Runs in the browser only; importing it elsewhere does nothing.
 if (typeof document !== 'undefined') void page.init()

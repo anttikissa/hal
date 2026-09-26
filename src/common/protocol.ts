@@ -29,10 +29,17 @@ export type { TurnStatus } from './replay.ts'
 // followed by the turn end match what a later snapshot shows.
 export type LiveTurn = { provider: string; blocks: AssistantBlock[]; usage: Usage }
 
+// Text typed into a session but not sent yet, one per session, shared
+// by every client (tasks/j1/states.md, Drafts and sending). `rev` counts
+// the host's changes to it, so a client can tell whether its edit was
+// based on the latest one.
+export type Draft = { text: string; rev: number }
+
 // `state` is the session's one state (src/common/states.ts); `inbox` the
 // messages waiting for it (src/common/inbox.ts), also in `history`;
-// the host always sends it, an older one may not.
-export type Snapshot = { meta: SessionMeta; history: HistoryRecord[]; state: SessionState; inbox?: InboxItem[]; turn?: LiveTurn }
+// the host always sends it, an older one may not. No draft: empty,
+// never changed.
+export type Snapshot = { meta: SessionMeta; history: HistoryRecord[]; state: SessionState; inbox?: InboxItem[]; turn?: LiveTurn; draft?: Draft }
 
 // Stream events forwarded live; terminal done/error become `turn-end`.
 export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'error' }>
@@ -51,6 +58,10 @@ export type Command = (
 	// A prompt. While a turn is busy it waits in the inbox: steering, sent
 	// before the turn's next request; with `queue`, run after it ends.
 	| { type: 'submit'; sessionId: string; text: string; queue?: boolean }
+	// Replace the session's draft. `base`: the draft rev the text was
+	// edited from. If another client changed the draft since, the host
+	// keeps both texts rather than lose one.
+	| { type: 'draft'; sessionId: string; text: string; base?: number }
 	// Escape: pause the running turn; it can continue later.
 	| { type: 'pause'; sessionId: string }
 	// Bare Enter: continue a paused turn, or retry a failed one.
@@ -80,6 +91,9 @@ export type Event =
 	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string }
 	// Something the user should fix (config.ason); not tied to a session.
 	| { type: 'warning'; text: string }
+	// The session's draft changed; `command` is the id of the command
+	// that changed it (a draft, or a submit that sent it).
+	| { type: 'draft'; sessionId: string; draft: Draft; command?: string }
 	// Sent only to the client whose command was refused.
 	| { type: 'rejected'; sessionId?: string; command: string; reason: string; id?: string }
 	// Sent only to the sender: the command with this id was carried out.
@@ -87,7 +101,7 @@ export type Event =
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'pause', 'continue']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -102,7 +116,8 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
 	if (c.type === 'submit' && c.queue !== undefined && typeof c.queue !== 'boolean') return 'submit: queue must be a boolean'
-	return str('sessionId') ?? (c.type === 'submit' ? str('text') : undefined)
+	if (c.type === 'draft' && c.base !== undefined && !Number.isInteger(c.base)) return 'draft: base must be an integer'
+	return str('sessionId') ?? (c.type === 'submit' || c.type === 'draft' ? str('text') : undefined)
 }
 
 export const protocol = { commandTypes, invalid }

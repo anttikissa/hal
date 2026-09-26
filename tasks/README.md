@@ -31,6 +31,10 @@ owns it; later tasks point to it.
   It re-opens followed sessions and resends unanswered commands; each
   command's client-made id lets the host ignore repeats. The host side
   of every transport is `host.adapt()`.
+- Typed text is never lost: each session's draft lives on the host
+  (`src/host/drafts.ts`) and in every client's local store, synced by
+  `src/common/drafts.ts`, which also keeps sent prompts pending until
+  acknowledged (task rw).
 - Conversation truth is per-session ASONL history of provider-neutral
   blocks. Provider input is rebuilt from it; display state never is.
 - Providers are small request/stream mappers behind one interface.

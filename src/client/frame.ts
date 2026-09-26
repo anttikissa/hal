@@ -19,6 +19,8 @@ export interface View {
 	/** Where replayed history ends: a line there says it is old. */
 	resumed?: Resumed
 	prompt: PromptState
+	/** Prompts sent but not yet acknowledged by the host. */
+	pending?: string[]
 	/** A passing message for the user, such as a refused command. */
 	notice?: string
 }
@@ -175,6 +177,11 @@ function build(view: View, cols: number): Frame {
 	for (let i = 0; i <= items.length; i++) {
 		if (i === view.resumed?.at) block(frame.wrap(transcript.resumedLabel(view.resumed), width), { fg: colors.log().fg! })
 		if (i < items.length) block(frame.itemLines(items[i]!, width), frame.itemStyle(items[i]!))
+	}
+	for (let text of view.pending ?? []) {
+		let rows = frame.itemLines({ type: 'prompt', text }, width)
+		rows.push(`${PROMPT_REST}${DIM}sending…${UNDIM}`)
+		block(rows, colors.user())
 	}
 	// The inbox, always in view above the prompt.
 	let t = view.transcript

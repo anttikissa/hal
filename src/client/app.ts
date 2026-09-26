@@ -1,9 +1,12 @@
 // The terminal client: one session's transcript above an editable
 // prompt. Keys become commands to the host (through the connection), and every
 // event from the host is folded into the transcript and shown. Nothing
-// here waits on the host.
+// here waits on the host. The prompt is the session's draft, kept and
+// shared through common/drafts.ts; a sent prompt shows at once, pending
+// until the host has it.
 
 import { connection, type LinkState } from '../common/connection.ts'
+import { drafts } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
@@ -25,6 +28,8 @@ function view(): View {
 	let v: View = { prompt: st.prompt }
 	if (st.transcript) v.transcript = st.transcript
 	if (st.resumed) v.resumed = st.resumed
+	let pending = st.transcript ? drafts.pending(st.transcript.meta.id) : []
+	if (pending.length) v.pending = pending
 	// A passing notice, else what the session is doing.
 	let notice = st.notice ?? (st.transcript && states.describe(st.transcript.state))
 	if (notice) v.notice = notice
@@ -37,12 +42,20 @@ function show(): void {
 
 function onEvent(event: Event): void {
 	let st = app.state
+	// Text typed before the first session arrived joins its draft.
+	let early = !st.transcript && event.type === 'snapshot' ? st.prompt.text : ''
+	if (drafts.onEvent(event) && st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id) app.setPrompt(drafts.text(event.sessionId))
 	if (event.type === 'rejected') st.notice = `${event.command} refused: ${event.reason}`
 	else if (event.type === 'warning') st.notice = event.text
 	else {
 		let t = transcript.fold(st.transcript, event)
 		if (event.type === 'snapshot' && t && t !== st.transcript) st.resumed = transcript.resumed(event.snapshot, t)
 		st.transcript = t
+		if (event.type === 'snapshot' && t) {
+			let id = t.meta.id
+			if (early) drafts.edit(id, drafts.text(id) ? `${drafts.text(id)}\n${early}` : early)
+			app.setPrompt(drafts.text(id))
+		}
 	}
 	app.show()
 }
@@ -69,9 +82,18 @@ function submit(text: string, queue = false): boolean {
 	}
 	if (command) {
 		st.notice = undefined
-		app.send(command)
+		let c = command as { type: string; text?: string; queue?: boolean }
+		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, c.queue)
+		else app.send(command)
 	}
 	return true
+}
+
+// Puts `text` in the prompt, unless it is there already (the cursor
+// stays where the user left it).
+function setPrompt(text: string): void {
+	let st = app.state
+	if (st.prompt.text !== text) st.prompt = { text, cursor: text.length }
 }
 
 function onKeys(events: KeyEvent[]): void {
@@ -79,7 +101,9 @@ function onKeys(events: KeyEvent[]): void {
 	for (let k of events) {
 		let { state, action } = prompt.apply(st.prompt, k)
 		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
+		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
 		st.prompt = state
+		if (edited && st.transcript) drafts.edit(st.transcript.meta.id, state.text)
 		let pause = action?.type === 'cancel' && st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 		if (pause) app.send(pause)
 		if (action?.type === 'quit') return terminal.quit()
@@ -95,6 +119,7 @@ function init(): void {
 
 function reset(): void {
 	app.state = createState()
+	drafts.reset()
 }
 
 export const app = {
@@ -105,6 +130,7 @@ export const app = {
 	onEvent,
 	onState,
 	submit,
+	setPrompt,
 	onKeys,
 	init,
 	reset,

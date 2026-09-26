@@ -3,10 +3,12 @@
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { app } from './client/app.ts'
+import { draftFile } from './client/draft-file.ts'
 import { link } from './client/link.ts'
 import { render } from './client/render.ts'
 import { terminal } from './client/terminal.ts'
 import { connection, type LinkState } from './common/connection.ts'
+import { drafts } from './common/drafts.ts'
 import type { Event } from './common/protocol.ts'
 import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
@@ -42,6 +44,9 @@ function init(): void {
 		// on the host socket) can carry them on (tasks/j1/states.md).
 		terminal.onQuit = () => host.quitting(server.state.sockets.size === 0)
 		render.init()
+		// Drafts are kept on this machine too, for when the host is gone.
+		draftFile.dir = () => join(paths.stateDir(), 'drafts')
+		drafts.store = draftFile
 		app.init()
 	}
 }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { drafts } from '../common/drafts.ts'
 import type { Event, Snapshot } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
 import { app } from './app.ts'
@@ -10,15 +11,24 @@ import { terminal } from './terminal.ts'
 // The app with a recording link and renderer: what the user types
 // becomes commands, and what the host says becomes the view.
 
+// Commands as sent, ids left out; draft updates are in `drafted`.
 let sent: any[] = []
+let drafted: any[] = []
 let quits = 0
-const saved = { send: app.send, show: render.show, quit: terminal.quit }
+const saved = { send: app.send, show: render.show, quit: terminal.quit, draftSend: drafts.send }
+const record = (c: any) => {
+	let { id: _id, ...rest } = c
+	if (c.type === 'draft') drafted.push(rest)
+	else sent.push(rest)
+}
 
 beforeEach(() => {
 	sent = []
+	drafted = []
 	quits = 0
 	app.reset()
-	app.send = (c) => sent.push(c)
+	app.send = record
+	drafts.send = record
 	render.show = () => {}
 	terminal.quit = () => {
 		quits++
@@ -27,13 +37,15 @@ beforeEach(() => {
 
 afterEach(() => {
 	Object.assign(app, { send: saved.send })
+	drafts.send = saved.draftSend
 	render.show = saved.show
 	terminal.quit = saved.quit
 	app.reset()
 })
 
-const snapshot = (id = 's1', state: SessionState = { type: 'idle' }): Event => {
+const snapshot = (id = 's1', state: SessionState = { type: 'idle' }, draft?: Snapshot['draft']): Event => {
 	let snap: Snapshot = { meta: { id, cwd: '/', model: 'anthropic/x', createdAt: '' }, history: [], state }
+	if (draft) snap.draft = draft
 	return { type: 'snapshot', sessionId: id, snapshot: snap }
 }
 const key = (key: string, text?: string): KeyEvent => ({ key, text, shift: false, alt: false, ctrl: false, cmd: false })
@@ -171,4 +183,37 @@ test('losing the host is shown, and cleared on reconnect', () => {
 test('Ctrl-D on an empty prompt quits', () => {
 	app.onKeys([{ ...key('d'), ctrl: true }])
 	expect(quits).toBe(1)
+})
+
+test('a sent prompt shows at once, marked pending until acknowledged', () => {
+	app.onEvent(snapshot())
+	let ids: string[] = []
+	drafts.send = (c: any) => (c.type === 'submit' && ids.push(c.id), record(c))
+	type('hello')
+	enter()
+	let rows = () => frame.build(app.view(), 80).lines.map((l) => l.replace(new RegExp(`${'\x1b'}\\[[0-9;]*m`, 'g'), '').trim())
+	expect(rows()).toContain('> hello')
+	expect(rows().join('\n')).toContain('sending')
+	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'hello', provider: 'anthropic' })
+	app.onEvent({ type: 'ack', id: ids[0]! })
+	expect(rows().filter((r) => r === '> hello')).toHaveLength(1)
+	expect(rows().join('\n')).not.toContain('sending')
+})
+
+test('typing updates the shared draft; a draft from elsewhere fills the prompt', () => {
+	app.onEvent(snapshot('s1', { type: 'idle' }, { text: 'from the phone', rev: 3 }))
+	expect(app.view().prompt.text).toBe('from the phone')
+	type('!')
+	expect(drafted).toEqual([{ type: 'draft', sessionId: 's1', text: 'from the phone!', base: 3 }])
+	app.reset()
+	app.onEvent(snapshot())
+	app.onEvent({ type: 'draft', sessionId: 's1', draft: { text: 'typed elsewhere', rev: 1 } })
+	expect(app.view().prompt.text).toBe('typed elsewhere')
+})
+
+test('text typed before the session arrives is kept in its draft', () => {
+	type('early')
+	app.onEvent(snapshot('s1', { type: 'idle' }, { text: 'saved', rev: 1 }))
+	expect(app.view().prompt.text).toBe('saved\nearly')
+	expect(drafted.at(-1)?.text).toBe('saved\nearly')
 })

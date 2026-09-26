@@ -31,6 +31,7 @@ import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { config } from './config.ts'
 import { diag } from './diag.ts'
+import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
@@ -113,7 +114,7 @@ function reject(client: Client, command: unknown, reason: string, sessionId?: un
 // Commands whose effect outlives the connection. A repeat of one of
 // these ids is answered as before and not carried out again. Opening
 // and closing are per connection, so a repeat always acts.
-const once = new Set(['create', 'submit', 'pause', 'continue'])
+const once = new Set(['create', 'submit', 'draft', 'pause', 'continue'])
 
 // Records what a command with an id did, forgetting the oldest beyond
 // host.remembered().
@@ -189,7 +190,10 @@ function act(client: Client, c: Command): Outcome | undefined {
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	let refused: string | undefined
 	if (c.type === 'close') client.open.delete(c.sessionId)
-	else if (c.type === 'submit') refused = host.submit(c.sessionId, c.text, c.id, c.queue)
+	else if (c.type === 'submit') {
+		refused = host.submit(c.sessionId, c.text, c.id, c.queue)
+		if (refused === undefined) host.sent(c.sessionId, c.text, c.id)
+	} else if (c.type === 'draft') host.draft(c.sessionId, drafts.set(c.sessionId, c.text, c.base), c.id)
 	else if (c.type === 'continue') refused = host.resume(c.sessionId)
 	else if (c.type === 'pause') refused = host.stop(c.sessionId)
 	return refused === undefined ? {} : { refused }
@@ -217,6 +221,13 @@ function follow(client: Client, id: string): void {
 function snapshot(id: string): Snapshot {
 	let records = history.readSync(id)
 	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: records, state: host.stateOf(id, records), inbox: host.inboxOf(id, records) }
+	try {
+		let draft = drafts.get(id)
+		if (draft.rev) snap.draft = draft
+	} catch (e: any) {
+		// A malformed draft.ason stays on disk untouched; the session opens.
+		diag.log(`draft ${id}: ${e?.message ?? e}`)
+	}
 	let running = host.state.running.get(id)
 	if (running) {
 		let live = history.live(id)
@@ -302,6 +313,25 @@ function next(id: string): void {
 	if (!queued || host.transition(id, { type: 'submit' })) return
 	host.deliver(id, [queued], undefined, undefined, true)
 	host.start(id, queued.text)
+}
+
+// After a submit: the draft it was typed in is sent, so it clears
+// (drafts.sent), and followers hear it with the submit's id.
+function sent(id: string, text: string, command?: string): void {
+	try {
+		host.draft(id, drafts.sent(id, text), command)
+	} catch (e: any) {
+		diag.log(`draft ${id}: ${e?.message ?? e}`)
+	}
+}
+
+// Tells followers the session's draft changed (if it did), naming the
+// command that changed it.
+function draft(id: string, changed: ReturnType<typeof drafts.get> | undefined, command?: string): void {
+	if (!changed) return
+	let event: Event = { type: 'draft', sessionId: id, draft: changed }
+	if (command !== undefined) event.command = command
+	host.broadcast(id, event)
 }
 
 // Continue: a paused turn goes on, a failed one retries.
@@ -510,6 +540,7 @@ function reset(): void {
 	host.state.clients.clear()
 	host.state.states.clear()
 	host.state.done.clear()
+	drafts.reset()
 	host.state.pauseOnExit = false
 }
 
@@ -554,6 +585,8 @@ export const host = {
 	deliver,
 	steer,
 	next,
+	sent,
+	draft,
 	resume,
 	start,
 	stop,
