@@ -2,5 +2,12 @@
 	title: 'Terminal key decoding',
 	description: 'Decode raw terminal bytes incrementally into printable text, Enter, Backspace, arrows, Escape, Ctrl-D and paste; sequences may span chunks. Keep decoding separate from the editor and ignore unsupported sequences without inserting escape bytes. Use terminal fixtures, not a real user TTY.',
 	status: 'done',
+	notes: [
+		"The keys.ts artifact is not incremental despite its paste buffering: its splitKeys emits a chunk-final `ESC [` or a split UTF-8 char as a token, and misses a PASTE_START split across chunks. Its parseKey also ignores SS3 (`ESC O A`) arrows. Don't lift the tokenizer as is.",
+		"Lone ESC is ambiguous with a sequence prefix, so the decoder can't resolve it alone: the terminal layer must call keys.flush() after an idle timeout. flush() drops other unfinished sequences but never ends an open paste.",
+		'The old 2 s paste idle timeout was dropped. A paste that loses its end marker buffers forever; only the emergency keys (scanned before decoding) escape it. Re-add a timeout if that ever bites.',
+		'Ctrl-D is `{key: \'d\', ctrl: true}`, not a named key. A paste is `{key: \'paste\', text}` with CR/CRLF normalized to LF; typed keys with ctrl/alt/cmd carry no `text`, so "insert if text" is safe.',
+		'Test gotcha: JSON.stringify escapes \\x04 but not \\x7f.'
+	],
 	needs: ['b']
 }
