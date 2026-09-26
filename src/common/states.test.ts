@@ -1,0 +1,118 @@
+import { expect, test } from 'bun:test'
+import type { HistoryRecord, TurnStatus } from './replay.ts'
+import { states, type SessionState, type StateEvent } from './states.ts'
+
+const idle: SessionState = { type: 'idle' }
+const requesting: SessionState = { type: 'running', phase: 'requesting' }
+const streaming: SessionState = { type: 'running', phase: 'streaming' }
+const tools: SessionState = { type: 'running', phase: 'tools' }
+const retrying: SessionState = { type: 'retrying', at: '2026-09-26T12:00:00.000Z', reason: '529 overloaded' }
+const blocked: SessionState = { type: 'blocked', reason: 'log in to anthropic' }
+const paused: SessionState = { type: 'paused' }
+const error: SessionState = { type: 'error', message: '400 bad request' }
+const all = [idle, requesting, streaming, tools, retrying, blocked, paused, error]
+
+const events: StateEvent[] = [
+	{ type: 'submit' },
+	{ type: 'continue' },
+	{ type: 'request' },
+	{ type: 'stream' },
+	{ type: 'tools' },
+	{ type: 'pause' },
+	{ type: 'pause', reason: 'why' },
+	{ type: 'end' },
+	{ type: 'end', error: 'boom' },
+]
+
+const refused = expect.any(String)
+
+// [state, event, next state, or refused]
+const table: [SessionState, StateEvent, SessionState | typeof refused][] = [
+	// Only the user starts work.
+	[idle, { type: 'submit' }, requesting],
+	[paused, { type: 'submit' }, requesting],
+	[error, { type: 'submit' }, requesting],
+	[streaming, { type: 'submit' }, refused],
+	[retrying, { type: 'submit' }, refused],
+	[blocked, { type: 'submit' }, refused],
+	[paused, { type: 'continue' }, requesting],
+	[error, { type: 'continue' }, requesting],
+	[idle, { type: 'continue' }, refused],
+	[tools, { type: 'continue' }, refused],
+	// A turn moves through its phases.
+	[requesting, { type: 'stream' }, streaming],
+	[streaming, { type: 'tools' }, tools],
+	[tools, { type: 'request' }, requesting],
+	[retrying, { type: 'request' }, requesting],
+	// Late turn events change nothing once it stopped.
+	[paused, { type: 'stream' }, paused],
+	[idle, { type: 'tools' }, idle],
+	[error, { type: 'request' }, error],
+	// Only running work pauses; paused keeps its reason.
+	[streaming, { type: 'pause' }, paused],
+	[retrying, { type: 'pause' }, paused],
+	[blocked, { type: 'pause' }, paused],
+	[tools, { type: 'pause', reason: 'loop' }, { type: 'paused', reason: 'loop' }],
+	[idle, { type: 'pause' }, refused],
+	[paused, { type: 'pause' }, refused],
+	[error, { type: 'pause' }, refused],
+	// A turn ends completed or failed.
+	[streaming, { type: 'end' }, idle],
+	[requesting, { type: 'end', error: 'boom' }, { type: 'error', message: 'boom' }],
+	[retrying, { type: 'end', error: 'boom' }, { type: 'error', message: 'boom' }],
+	[paused, { type: 'end' }, paused],
+]
+
+test.each(table)('%o on %o', (state, event, next) => {
+	expect(states.step(state, event)).toEqual(next)
+})
+
+test('every state but idle, paused and error names what ends it', () => {
+	let seen: SessionState[] = [...all]
+	for (let s of all) for (let e of events) {
+		let next = states.step(s, e)
+		if (typeof next !== 'string') seen.push(next)
+	}
+	for (let s of seen) {
+		if (s.type === 'running') expect(['requesting', 'streaming', 'tools']).toContain(s.phase)
+		else if (s.type === 'retrying') expect(!isNaN(Date.parse(s.at)) && s.reason.length > 0).toBe(true)
+		else if (s.type === 'blocked') expect(s.reason.length).toBeGreaterThan(0)
+		else expect(['idle', 'paused', 'error']).toContain(s.type)
+	}
+})
+
+test('nothing but a pause stops work: no event takes a busy state to paused otherwise', () => {
+	for (let s of [requesting, streaming, tools, retrying, blocked])
+		for (let e of events) {
+			let next = states.step(s, e)
+			if (typeof next !== 'string' && next.type === 'paused') expect(e.type).toBe('pause')
+		}
+})
+
+const ts = '2026-01-01T00:00:00.000Z'
+const say = (text: string): HistoryRecord => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
+const out = (text: string): HistoryRecord => ({ type: 'assistant', block: { type: 'text', text }, ts })
+const end = (status: TurnStatus, extra = {}): HistoryRecord => ({ type: 'turn_end', status, usage: {}, ts, ...extra })
+const cont: HistoryRecord = { type: 'continue', ts }
+
+test('history alone: an unfinished turn is running, ends say the rest', () => {
+	expect(states.fromHistory([])).toEqual(idle)
+	expect(states.fromHistory([say('a')])).toEqual(requesting)
+	expect(states.fromHistory([say('a'), out('b')])).toEqual(requesting)
+	expect(states.fromHistory([say('a'), end('paused'), cont])).toEqual(requesting)
+	expect(states.fromHistory([say('a'), end('completed')])).toEqual(idle)
+	expect(states.fromHistory([say('a'), end('error', { error: '400 nope' })])).toEqual({ type: 'error', message: '400 nope' })
+	expect(states.fromHistory([say('a'), end('paused')])).toEqual(paused)
+	expect(states.fromHistory([say('a'), end('paused', { pauseReason: 'loop' })])).toEqual({ type: 'paused', reason: 'loop' })
+	// The old Escape and the old restart could both continue.
+	expect(states.fromHistory([say('a'), end('cancelled')])).toEqual(paused)
+	expect(states.fromHistory([say('a'), end('interrupted')])).toEqual(paused)
+})
+
+test('recoveries counts continues since the last finished round, partial output aside', () => {
+	expect(states.recoveries([say('a')])).toBe(0)
+	expect(states.recoveries([say('a'), cont, out('x'), cont, out('y')])).toBe(2)
+	// A finished round (tool results) or a turn end is progress.
+	expect(states.recoveries([say('a'), cont, cont, say('results'), cont])).toBe(1)
+	expect(states.recoveries([say('a'), cont, end('paused'), cont])).toBe(1)
+})

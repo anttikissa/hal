@@ -4,6 +4,8 @@ import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
+import { replay } from '../common/replay.ts'
+import { states } from '../common/states.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { config } from './config.ts'
 import { history } from './history.ts'
@@ -185,32 +187,44 @@ test('the next turn replays durable history, even after a host restart', async (
 	])
 })
 
-test('a turn cut off by a host crash shows as interrupted and the session goes on', async () => {
+test('a turn cut off by a host that went away continues on the next host, told what happened', async () => {
 	let a = client()
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'text', text: 'a' }, { type: 'tool_call', id: 't1', name: 'bash', input: {} })
-	await until(() => a.of('stream').length === 2)
+	calls[0]!.push({ type: 'text', text: 'a' })
+	await until(() => a.of('stream').length === 1)
 	// The process dies: nothing more is written for this turn.
-	host.state.running.clear()
-	history.state.running.clear()
-	sessions.closeAll()
-	host.reset()
+	history.stop(false)
+	restartHost()
 
-	let view = await fresh(id)
-	expect(view.items).toEqual([
-		{ type: 'prompt', text: 'go' },
-		{ type: 'text', text: 'a' },
-		{ type: 'turn-end', status: 'interrupted' },
-	])
-	expect(view.live).toBeUndefined()
+	// Until the new host continues it, the turn shows as running.
+	let early = await fresh(id)
+	expect(early.state).toEqual({ type: 'running', phase: 'requesting' })
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
 	await until(() => b.views.get(id))
-	b.conn.send({ type: 'submit', sessionId: id, text: 'again' })
+	await host.recover()
 	await until(() => calls.length === 2)
-	expect(calls[1]!.input.messages.at(-1)).toEqual({ role: 'user', blocks: [{ type: 'text', text: 'again' }] })
+	expect(calls[1]!.input.messages).toEqual([
+		{ role: 'user', blocks: [{ type: 'text', text: 'go' }] },
+		{ role: 'assistant', blocks: [{ type: 'text', text: 'a' }] },
+		{ role: 'user', blocks: [{ type: 'text', text: replay.continueNote }] },
+	])
+	calls[1]!.push({ type: 'text', text: 'b' }, { type: 'done', reason: 'end' })
+	await until(() => b.of('turn-end').length)
+	let expected: Item[] = [
+		{ type: 'prompt', text: 'go' },
+		{ type: 'text', text: 'a' },
+		{ type: 'text', text: 'b' },
+		{ type: 'turn-end', status: 'completed' },
+	]
+	expect(b.views.get(id)!.items).toEqual(expected)
+	expect(b.views.get(id)!.state).toEqual({ type: 'idle' })
+	expect(await fresh(id)).toEqual(b.views.get(id)!)
+	// Nothing is left to continue.
+	await host.recover()
+	expect(calls.length).toBe(2)
 })
 
 test('a client connecting mid-turn gets the partial turn, then live events', async () => {
@@ -270,7 +284,7 @@ test('a submit while a turn runs is rejected to that client only', async () => {
 	expect((await fresh(id)).items.filter((e) => e.type === 'prompt')).toEqual([{ type: 'prompt', text: 'first' }])
 })
 
-test('cancel ends the turn as cancelled, keeping partial output', async () => {
+test('pause stops the turn, keeping partial output, and continue carries it on', async () => {
 	let a = client()
 	let id = created(a)
 	let b = client()
@@ -279,19 +293,66 @@ test('cancel ends the turn as cancelled, keeping partial output', async () => {
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'part' })
 	await until(() => a.of('stream').length)
-	b.conn.send({ type: 'cancel', sessionId: id })
+	expect(a.views.get(id)!.state).toEqual({ type: 'running', phase: 'streaming' })
+	b.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.of('turn-end').length)
-	expect(a.of('turn-end')[0].status).toBe('cancelled')
+	expect(a.of('turn-end')[0].status).toBe('paused')
+	expect(a.views.get(id)!.state).toEqual({ type: 'paused' })
 	let view = await fresh(id)
 	expect(view).toEqual(a.views.get(id)!)
 	expect(view.items.slice(1)).toEqual([
 		{ type: 'text', text: 'part' },
-		{ type: 'turn-end', status: 'cancelled' },
+		{ type: 'turn-end', status: 'paused' },
 	])
-	expect((await records(id)).at(-1)).toMatchObject({ type: 'turn_end', status: 'cancelled' })
-	// The session takes new prompts afterwards.
-	a.conn.send({ type: 'submit', sessionId: id, text: 'again' })
+	// A new host does not continue a paused turn.
+	restartHost()
+	await host.recover()
+	expect(calls.length).toBe(1)
+	a = client()
+	a.conn.send({ type: 'open', sessionId: id })
+	await until(() => a.views.get(id))
+	expect(a.views.get(id)!.state).toEqual({ type: 'paused' })
+	a.conn.send({ type: 'continue', sessionId: id })
 	await until(() => calls.length === 2)
+	expect(calls[1]!.input.messages.at(-1)).toEqual({ role: 'user', blocks: [{ type: 'text', text: replay.continueNote }] })
+	calls[1]!.push({ type: 'text', text: 'rest' }, { type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length)
+	expect(a.views.get(id)!.items.slice(1)).toEqual([
+		{ type: 'text', text: 'part' },
+		{ type: 'turn-end', status: 'paused' },
+		{ type: 'text', text: 'rest' },
+		{ type: 'turn-end', status: 'completed' },
+	])
+	expect(await fresh(id)).toEqual(a.views.get(id)!)
+})
+
+test('continue is refused with nothing to continue; after an error it retries the request', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'continue', sessionId: id })
+	expect(a.of('rejected')[0]).toMatchObject({ command: 'continue', reason: expect.stringMatching(/nothing/) })
+	a.conn.send({ type: 'pause', sessionId: id })
+	expect(a.of('rejected')[1]).toMatchObject({ command: 'pause' })
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'error', message: '400 bad request', status: 400 })
+	await until(() => a.of('turn-end').length)
+	expect(a.views.get(id)!.state).toEqual({ type: 'error', message: '400 bad request' })
+	a.conn.send({ type: 'continue', sessionId: id })
+	await until(() => calls.length === 2)
+	expect(calls[1]!.input.messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: 'go' }] }])
+})
+
+test('a user message to a paused turn goes on from there', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	a.conn.send({ type: 'pause', sessionId: id })
+	await until(() => a.of('turn-end').length)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'actually' })
+	await until(() => calls.length === 2)
+	expect(a.views.get(id)!.state.type).toBe('running')
 })
 
 test('a provider error ends the turn with the error', async () => {
@@ -329,7 +390,7 @@ test('bad commands are rejected, not thrown', async () => {
 	a.conn.send({ type: 'open', sessionId: '../etc' })
 	let id = created(client())
 	a.conn.send({ type: 'submit', sessionId: id, text: 'not opened here' })
-	a.conn.send({ type: 'cancel', sessionId: id })
+	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.of('rejected').length === 9)
 	expect(a.events.every((e) => e.type === 'rejected')).toBe(true)
 	expect(calls).toEqual([])
@@ -420,7 +481,7 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 	expect((await records(id)).filter((r) => r.type === 'turn_end')).toHaveLength(1)
 })
 
-test('a restart after a tool ran keeps its result and does not run it again', async () => {
+test('a restart after a tool ran keeps its result, continues, and does not run it again', async () => {
 	let ran = 0
 	let origRun = tools.run
 	tools.run = (...args) => (ran++, origRun(...args))
@@ -434,19 +495,17 @@ test('a restart after a tool ran keeps its result and does not run it again', as
 		expect(ran).toBe(1)
 		// The host dies while the model answers the result.
 		restartHost()
-
-		let b = client()
-		b.conn.send({ type: 'open', sessionId: id })
-		await until(() => b.views.get(id))
-		expect(b.views.get(id)!.items.slice(-2)).toEqual([
-			{ type: 'tool-result', id: 't1', output: 'remember the milk\n' },
-			{ type: 'turn-end', status: 'interrupted' },
-		])
-		b.conn.send({ type: 'submit', sessionId: id, text: 'and?' })
+		await host.recover()
 		await until(() => calls.length === 3)
-		expect(calls[2]!.input.messages.at(-1).blocks).toEqual([
-			{ type: 'tool_result', id: 't1', output: 'remember the milk\n' },
-			{ type: 'text', text: 'and?' },
+		// The model picks up at the result; no note, nothing was cut off.
+		expect(calls[2]!.input.messages).toEqual(calls[1]!.input.messages)
+		calls[2]!.push({ type: 'text', text: 'milk' }, { type: 'done', reason: 'end' })
+		await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
+		let view = await fresh(id)
+		expect(view.items.slice(-3)).toEqual([
+			{ type: 'tool-result', id: 't1', output: 'remember the milk\n' },
+			{ type: 'text', text: 'milk' },
+			{ type: 'turn-end', status: 'completed' },
 		])
 		expect(ran).toBe(1)
 	} finally {
@@ -466,15 +525,11 @@ test('a tool call cut off by a restart is reported to the model, not run', async
 		calls[0]!.push(readCall())
 		await until(() => a.of('stream').length === 1)
 		restartHost()
-
-		let b = client()
-		b.conn.send({ type: 'open', sessionId: id })
-		await until(() => b.views.get(id))
-		b.conn.send({ type: 'submit', sessionId: id, text: 'again' })
+		await host.recover()
 		await until(() => calls.length === 2)
-		let results = calls[1]!.input.messages.at(-1).blocks
-		expect(results[0]).toMatchObject({ type: 'tool_result', id: 't1', isError: true })
-		expect(results[1]).toEqual({ type: 'text', text: 'again' })
+		let [result, note] = calls[1]!.input.messages.at(-1).blocks
+		expect(result).toMatchObject({ type: 'tool_result', id: 't1', isError: true })
+		expect(note).toEqual({ type: 'text', text: replay.continueNote })
 		expect(ran).toBe(0)
 	} finally {
 		tools.run = origRun
@@ -494,12 +549,7 @@ test('a command cut off mid-run by a crash is never run again, and the model hea
 		calls[0]!.push(rm, { type: 'done', reason: 'tool_use' })
 		await until(() => ran === 1)
 		restartHost()
-
-		let b = client()
-		b.conn.send({ type: 'open', sessionId: id })
-		await until(() => b.views.get(id))
-		expect(b.views.get(id)!.items.at(-1)).toEqual({ type: 'turn-end', status: 'interrupted' })
-		b.conn.send({ type: 'submit', sessionId: id, text: 'done?' })
+		await host.recover()
 		await until(() => calls.length === 2)
 		let [result] = calls[1]!.input.messages.at(-1).blocks
 		expect(result).toMatchObject({ type: 'tool_result', id: 'b1', isError: true })
@@ -510,16 +560,59 @@ test('a command cut off mid-run by a crash is never run again, and the model hea
 	}
 })
 
-test('cancel between tool rounds ends the turn and keeps the results', async () => {
+test('a turn that keeps bringing hosts down is paused with a reason, not continued forever', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'crash' })
+	await until(() => calls.length === 1)
+	for (let n = 1; n <= states.maxRecoveries(); n++) {
+		calls.at(-1)!.push({ type: 'text', text: 'x' })
+		await until(() => calls.length === n)
+		restartHost()
+		await host.recover()
+		await until(() => calls.length === n + 1)
+	}
+	restartHost()
+	await host.recover()
+	expect(calls.length).toBe(states.maxRecoveries() + 1)
+	let view = await fresh(id)
+	expect(view.state).toMatchObject({ type: 'paused', reason: expect.stringMatching(/without progress/) })
+	expect(view.items.at(-1)).toEqual({ type: 'turn-end', status: 'paused' })
+	// The user can still continue it by hand.
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.views.get(id))
+	b.conn.send({ type: 'continue', sessionId: id })
+	await until(() => calls.length === states.maxRecoveries() + 2)
+})
+
+test('pausing a turn another host left unfinished records it paused', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	restartHost()
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.views.get(id))
+	b.conn.send({ type: 'pause', sessionId: id })
+	await until(() => b.of('turn-end').length)
+	expect(b.views.get(id)!.state).toEqual({ type: 'paused' })
+	expect(await fresh(id)).toEqual(b.views.get(id)!)
+	await host.recover()
+	expect(calls.length).toBe(1)
+})
+
+test('pause between tool rounds ends the turn and keeps the results', async () => {
 	let a = client()
 	let id = toolSession(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'look' })
 	await until(() => calls.length === 1)
 	calls[0]!.push(readCall(), { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
-	a.conn.send({ type: 'cancel', sessionId: id })
+	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.of('turn-end').length)
-	expect(a.of('turn-end')[0].status).toBe('cancelled')
+	expect(a.of('turn-end')[0].status).toBe('paused')
 	let view = await fresh(id)
 	expect(view).toEqual(a.views.get(id)!)
 	expect(view.items.map((i) => i.type)).toEqual(['prompt', 'tool', 'tool-result', 'turn-end'])

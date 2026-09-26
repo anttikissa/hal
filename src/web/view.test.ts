@@ -11,14 +11,14 @@ const shown = (st: ViewState) => st.transcript!.items.map(view.show).filter(Bool
 
 test('events fold into what the page shows, like the terminal transcript', () => {
 	let st = fold([
-		{ type: 'snapshot', sessionId, snapshot: { meta, history: [{ type: 'user', blocks: [{ type: 'text', text: 'old' }], ts }] } },
+		{ type: 'snapshot', sessionId, snapshot: { meta, history: [{ type: 'user', blocks: [{ type: 'text', text: 'old' }], ts }], state: { type: 'idle' } } },
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
 		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'he' } },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'llo' } },
 		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 't', name: 'bash', input: { command: 'ls -l', description: 'List files' } } },
 		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 't', output: 'a\nb\n' }] },
-		{ type: 'turn-end', sessionId, status: 'cancelled' },
+		{ type: 'turn-end', sessionId, status: 'paused' },
 		{ type: 'turn-start', sessionId, prompt: 'again', provider: 'fake' },
 		{ type: 'turn-end', sessionId, status: 'error', error: 'boom' },
 		{ type: 'turn-start', sessionId, prompt: 'ok', provider: 'fake' },
@@ -31,7 +31,7 @@ test('events fold into what the page shows, like the terminal transcript', () =>
 		{ kind: 'assistant', text: 'hello' },
 		{ kind: 'tool tool-bash', text: '▸ List files\n  $ ls -l' },
 		{ kind: 'result log', text: '◂ a\n  b' },
-		{ kind: 'end log', text: '[cancelled]' },
+		{ kind: 'end log', text: '[paused]' },
 		{ kind: 'user', text: 'again' },
 		{ kind: 'end error', text: 'error: boom' },
 		{ kind: 'user', text: 'ok' },
@@ -48,29 +48,32 @@ test('long and failed tool results show a marked glimpse', () => {
 })
 
 test('a rejected command becomes a notice and keeps the transcript', () => {
-	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [] } }])
+	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
 	let after = view.onEvent(st, { type: 'rejected', sessionId, command: 'submit', reason: 'busy' })
 	expect(after.notice).toBe('submit refused: busy')
 	expect(after.transcript).toBe(st.transcript)
 })
 
 test('a config warning becomes a notice and keeps the transcript', () => {
-	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [] } }])
+	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
 	let after = view.onEvent(st, { type: 'warning', text: 'config.ason: webPort: bad' })
 	expect(after.notice).toContain('webPort')
 	expect(after.transcript).toBe(st.transcript)
 })
 
-test('submit and cancel follow whether a turn is running', () => {
+test('Enter and Escape follow the session state', () => {
 	expect(view.submit({}, 'hi')).toEqual({ notice: 'no session yet', keep: true })
-	let idle = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [] } }])
+	let idle = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
 	expect(view.submit(idle, '  \n')).toEqual({ keep: false })
 	expect(view.submit(idle, 'hi')).toEqual({ command: { type: 'submit', sessionId, text: 'hi' }, keep: false })
-	expect(view.cancel(idle)).toBeUndefined()
-	let busy = view.onEvent(idle, { type: 'turn-start', sessionId, prompt: 'hi', provider: 'fake' })
+	expect(view.pause(idle)).toBeUndefined()
+	let busy = view.onEvent(idle, { type: 'state', sessionId, state: { type: 'running', phase: 'streaming' } })
 	expect(view.submit(busy, 'more').keep).toBe(true)
 	expect(view.submit(busy, 'more').command).toBeUndefined()
-	expect(view.cancel(busy)).toEqual({ type: 'cancel', sessionId })
+	expect(view.pause(busy)).toEqual({ type: 'pause', sessionId })
+	let paused = view.onEvent(idle, { type: 'state', sessionId, state: { type: 'paused' } })
+	expect(view.status(paused)).toMatch(/paused/)
+	expect(view.submit(paused, '')).toEqual({ command: { type: 'continue', sessionId }, keep: false })
 })
 
 test('a tool gets a class for its name that no name can break out of', () => {

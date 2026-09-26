@@ -9,6 +9,7 @@ import { terminal } from './client/terminal.ts'
 import type { Event } from './common/protocol.ts'
 import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
+import { diag } from './host/diag.ts'
 import { host } from './host/host.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
@@ -37,6 +38,9 @@ function init(): void {
 	// Piped stdin (tests, scripts) has no raw mode and no emergency keys.
 	if (terminal.available()) {
 		terminal.init()
+		// Ctrl-C pauses running turns only if no other Hal process (a peer
+		// on the host socket) can carry them on (tasks/j1/states.md).
+		terminal.onQuit = () => host.quitting(server.state.sockets.size === 0)
 		render.init()
 		app.init()
 	}
@@ -48,11 +52,19 @@ function init(): void {
 function joinHost(onEvent: (event: Event) => void, onRole?: (role: Role | null) => void): Promise<void> {
 	return link.start({
 		socketPath: server.socketPath(),
-		tryHost: () => server.serve(),
+		tryHost: () => main.becomeHost(),
 		local: (deliver) => host.connect(deliver),
 		onEvent,
 		onRole,
 	})
+}
+
+// Becomes host if nobody is, and then continues every turn the previous
+// host left unfinished.
+async function becomeHost(): Promise<boolean> {
+	if (!(await server.serve())) return false
+	host.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
+	return true
 }
 
 async function start(): Promise<void> {
@@ -73,7 +85,7 @@ async function start(): Promise<void> {
 	link.send(id ? { type: 'open', sessionId: id } : { type: 'create', cwd: process.cwd() })
 }
 
-export const main = { localPath, loadLocal, init, joinHost, start }
+export const main = { localPath, loadLocal, init, becomeHost, joinHost, start }
 
 // Only ./run starts Hal; importing this file (tests, eval) does nothing.
 if (import.meta.main) await main.start()

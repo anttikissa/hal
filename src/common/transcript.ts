@@ -9,6 +9,7 @@ import { blocks, type AssistantBlock, type ToolResultBlock, type Usage } from '.
 import type { Event, LiveTurn, Snapshot, TurnStatus } from './protocol.ts'
 import type { HistoryRecord } from './replay.ts'
 import type { SessionMeta } from './session.ts'
+import type { SessionState } from './states.ts'
 
 export type Item =
 	| { type: 'prompt'; text: string }
@@ -20,6 +21,8 @@ export type Item =
 
 export type Transcript = {
 	meta: SessionMeta
+	// The session's state, as the host last said (src/common/states.ts).
+	state: SessionState
 	// Everything to show, in order, including the running turn's output.
 	items: Item[]
 	// The running turn: items from `start` on are its output so far, and
@@ -47,6 +50,7 @@ function resultItem(b: ToolResultBlock): Item {
 // Display items for one history record.
 function recordItems(r: HistoryRecord): Item[] {
 	if (r.type === 'assistant') return transcript.blockItems([r.block])
+	if (r.type === 'continue') return []
 	if (r.type === 'user') return r.blocks.map((b): Item => (b.type === 'text' ? { type: 'prompt', text: b.text } : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
@@ -61,7 +65,7 @@ function endItem(end: { status: TurnStatus; usage?: Usage; error?: string }): It
 
 function fromSnapshot(snapshot: Snapshot): Transcript {
 	let items = snapshot.history.flatMap((r) => transcript.recordItems(r))
-	let t: Transcript = { meta: { ...snapshot.meta }, items }
+	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, items }
 	if (snapshot.turn) {
 		let turn = transcript.copyTurn(snapshot.turn)
 		t.live = { start: items.length, turn }
@@ -84,24 +88,26 @@ function copyTurn(turn: LiveTurn): LiveTurn {
 function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'snapshot') return t && t.meta.id !== event.sessionId ? t : transcript.fromSnapshot(event.snapshot)
 	if (!t || event.type === 'rejected' || event.type === 'warning' || event.sessionId !== t.meta.id) return t
+	if (event.type === 'state') return { ...t, state: event.state }
 	if (event.type === 'turn-start') {
-		let items: Item[] = [...t.items, { type: 'prompt', text: event.prompt }]
-		return { meta: t.meta, items, live: { start: items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
+		let items: Item[] = event.prompt === undefined ? t.items : [...t.items, { type: 'prompt', text: event.prompt }]
+		return { ...t, items, live: { start: items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
 	}
-	if (!t.live) return t
+	// A turn left unfinished by another host ends without running here.
+	if (!t.live) return event.type === 'turn-end' ? { ...t, items: [...t.items, transcript.endItem(event)] } : t
 	let settled = t.items.slice(0, t.live.start)
 	if (event.type === 'stream') {
 		let turn = transcript.copyTurn(t.live.turn)
 		blocks.apply(turn, event.event)
-		return { meta: t.meta, items: [...settled, ...transcript.blockItems(turn.blocks)], live: { start: t.live.start, turn } }
+		return { ...t, items: [...settled, ...transcript.blockItems(turn.blocks)], live: { start: t.live.start, turn } }
 	}
 	if (event.type === 'tool-results') {
 		// The round's blocks are in history now; the next round starts empty.
 		let items = [...settled, ...transcript.blockItems(t.live.turn.blocks), ...event.results.map((b) => transcript.resultItem(b))]
-		return { meta: t.meta, items, live: { start: items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
+		return { ...t, items, live: { start: items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
 	}
 	let end = transcript.endItem(event)
-	return { meta: t.meta, items: [...settled, ...transcript.blockItems(t.live.turn.blocks), end] }
+	return { meta: t.meta, state: t.state, items: [...settled, ...transcript.blockItems(t.live.turn.blocks), end] }
 }
 
 export const transcript = { blockItems, resultItem, recordItems, endItem, fromSnapshot, copyTurn, fold }

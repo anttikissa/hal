@@ -96,6 +96,9 @@ function leave(): void {
 }
 
 function quit(): void {
+	try {
+		terminal.onQuit()
+	} catch {}
 	terminal.leave()
 	terminal.state.io!.exit(0)
 }
@@ -190,6 +193,9 @@ export const terminal = {
 	available: (): boolean => !!process.stdin.isTTY,
 	/** Receives decoded keys; replaced by the prompt. */
 	onKeys: (_events: KeyEvent[]): void => {},
+	/** Runs as the user quits, before the exit; set by main. Must be
+	 * synchronous, quick and never throw or wait on the host. */
+	onQuit: (): void => {},
 	/** Repaints the screen after resume; replaced by the renderer. */
 	redraw: (): void => {},
 	/** Repaints after a terminal resize; replaced by the renderer. */

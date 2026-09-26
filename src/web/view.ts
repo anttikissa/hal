@@ -4,6 +4,7 @@
 // it the events from link.ts and draws it.
 
 import type { Event } from '../common/protocol.ts'
+import { states } from '../common/states.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 
 export type ViewState = { transcript?: Transcript; notice?: string }
@@ -21,18 +22,23 @@ function onEvent(st: ViewState, event: Event): ViewState {
 	return t === st.transcript ? st : { ...st, transcript: t }
 }
 
-// What a submit of `text` does: send a command, or show why not (the
-// typed text stays). Empty text does nothing.
+// What Enter with `text` does: send a prompt (or a continue, when empty
+// on a paused or failed turn), or show why not (the typed text stays).
 function submit(st: ViewState, text: string): { command?: unknown; notice?: string; keep: boolean } {
-	if (!text.trim()) return { keep: false }
-	if (!st.transcript) return { notice: 'no session yet', keep: true }
-	if (st.transcript.live) return { notice: 'a turn is running; Escape cancels it', keep: true }
-	return { command: { type: 'submit', sessionId: st.transcript.meta.id, text }, keep: false }
+	if (!st.transcript) return text.trim() ? { notice: 'no session yet', keep: true } : { keep: false }
+	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text)
+	if (refused) return { notice: refused, keep: true }
+	return command ? { command, keep: false } : { keep: false }
 }
 
-// The cancel command for Escape, if a turn is running.
-function cancel(st: ViewState): unknown {
-	return st.transcript?.live ? { type: 'cancel', sessionId: st.transcript.meta.id } : undefined
+// The pause command for Escape, if anything is running.
+function pause(st: ViewState): unknown {
+	return st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
+}
+
+// What the session is doing, for the input's placeholder.
+function status(st: ViewState): string | undefined {
+	return st.transcript && states.describe(st.transcript.state)
 }
 
 function oneLine(s: string): string {
@@ -73,6 +79,7 @@ export const view = {
 	resultRows: () => 8,
 	onEvent,
 	submit,
-	cancel,
+	pause,
+	status,
 	show,
 }

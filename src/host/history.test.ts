@@ -112,7 +112,7 @@ test('each block reaches disk once complete, before the turn ends', async () => 
 	expect(strip(await history.read(id)).at(-1)).toMatchObject({ type: 'turn_end', reason: 'tool_use' })
 })
 
-test('cancellation keeps the partial reply and records the turn as cancelled', async () => {
+test('cancellation keeps the partial reply and records the turn as paused', async () => {
 	let id = newSession()
 	let sent = fakeStream((input) =>
 		input.messages.length === 1
@@ -122,7 +122,7 @@ test('cancellation keeps the partial reply and records the turn as cancelled', a
 	history.submit(id, 'first')
 	await drain(history.turn(id))
 	let last = (await history.read(id)).at(-1)
-	expect(last).toMatchObject({ type: 'turn_end', status: 'cancelled', usage: { input: 5 } })
+	expect(last).toMatchObject({ type: 'turn_end', status: 'paused', usage: { input: 5 } })
 	history.submit(id, 'second')
 	await drain(history.turn(id))
 	expect(sent[1]).toEqual([
@@ -132,13 +132,13 @@ test('cancellation keeps the partial reply and records the turn as cancelled', a
 	])
 })
 
-test('a consumer that stops early still ends the turn, as cancelled', async () => {
+test('a consumer that stops early still ends the turn, as paused', async () => {
 	let id = newSession()
 	history.submit(id, 'x')
 	for await (let _ of ended(id, events({ type: 'text', text: 'a' }, { type: 'text', text: 'b' }, { type: 'done', reason: 'end' }))) break
 	expect(strip(await history.read(id)).slice(1)).toEqual([
 		{ type: 'assistant', block: { type: 'text', text: 'a' } },
-		{ type: 'turn_end', status: 'cancelled', usage: {} },
+		{ type: 'turn_end', status: 'paused', usage: {} },
 	])
 	expect(history.state.running.has(id)).toBe(false)
 })
@@ -201,9 +201,10 @@ test('open recovers a partially written last record and appends cleanly after it
 	expect(logged.join('\n')).not.toContain('secret-ish')
 	history.submit(id, 'after')
 	let records = strip(await history.read(id))
-	expect(records.map((r) => r.type)).toEqual(['user', 'turn_end', 'user'])
-	expect(records[1]).toMatchObject({ status: 'interrupted' })
-	expect(records[2]).toEqual({ type: 'user', blocks: [{ type: 'text', text: 'after' }] })
+	expect(records).toEqual([
+		{ type: 'user', blocks: [{ type: 'text', text: 'kept' }] },
+		{ type: 'user', blocks: [{ type: 'text', text: 'after' }] },
+	])
 })
 
 test('a complete last record missing its newline is kept', async () => {
@@ -213,7 +214,7 @@ test('a complete last record missing its newline is kept', async () => {
 	sessions.closeAll()
 	await history.open(id)
 	history.submit(id, 'b')
-	expect(strip(await history.read(id)).map((r) => r.type)).toEqual(['user', 'user', 'turn_end', 'user'])
+	expect(strip(await history.read(id)).map((r) => r.type)).toEqual(['user', 'user', 'user'])
 })
 
 test('a corrupt record mid-file is reported and the file left untouched', async () => {
@@ -229,50 +230,41 @@ test('a corrupt record mid-file is reported and the file left untouched', async 
 	expect(sessions.openIds()).toEqual([])
 })
 
-test('a turn left open by a dead host is closed as interrupted on open, once', async () => {
+test('open leaves an unfinished turn unfinished, for the host to continue', async () => {
 	let id = newSession()
 	history.submit(id, 'q')
 	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 't1', name: 'bash', input: {} } })
 	sessions.closeAll()
+	let before = readFileSync(history.file(id), 'utf8')
 	await history.open(id)
-	await history.open(id)
-	sessions.closeAll()
-	await history.open(id)
-	let records = strip(await history.read(id))
-	expect(records.filter((r) => r.type === 'turn_end')).toEqual([{ type: 'turn_end', status: 'interrupted', usage: {} }])
-	// The next prompt replays with the dangling tool call answered.
-	history.submit(id, 'again')
-	let msgs = await history.messages(id)
-	expect(msgs.at(-1)!.blocks[0]).toMatchObject({ type: 'tool_result', id: 't1', isError: true })
+	expect(readFileSync(history.file(id), 'utf8')).toBe(before)
 })
 
-test('open does not close a turn that is running in this host', async () => {
-	let id = newSession()
-	history.submit(id, 'q')
-	let it = ended(id, events({ type: 'text', text: 'a' }, { type: 'done', reason: 'end' }))
-	await it.next()
-	await history.open(id)
-	await drain(it)
-	let ends = (await history.read(id)).filter((r) => r.type === 'turn_end')
-	expect(ends).toMatchObject([{ status: 'completed' }])
-})
-
-test('a host that exits mid-turn records the output so far as interrupted, once', async () => {
+test('a host exiting mid-turn writes the output so far and leaves the turn unfinished', async () => {
 	let id = newSession()
 	history.submit(id, 'q')
 	let it = ended(id, events({ type: 'text', text: 'a' }, { type: 'usage', usage: { output: 1 } }, { type: 'text', text: 'b' }, { type: 'done', reason: 'end' }))
 	await it.next()
 	await it.next()
-	history.interrupt()
+	history.stop(false)
 	expect(history.live(id)).toBeUndefined()
-	// Whatever the abandoned stream does afterwards writes nothing more,
-	// and reopening finds no open turn to close.
+	// Whatever the abandoned stream does afterwards writes nothing more.
 	await drain(it)
-	sessions.closeAll()
-	await history.open(id)
+	expect(strip(await history.read(id)).slice(1)).toEqual([{ type: 'assistant', block: { type: 'text', text: 'a' } }])
+})
+
+test('the last Hal process quitting mid-turn records it paused, once', async () => {
+	let id = newSession()
+	history.submit(id, 'q')
+	let it = ended(id, events({ type: 'text', text: 'a' }, { type: 'usage', usage: { output: 1 } }, { type: 'text', text: 'b' }, { type: 'done', reason: 'end' }))
+	await it.next()
+	await it.next()
+	history.stop(true)
+	history.stop(true)
+	await drain(it)
 	expect(strip(await history.read(id)).slice(1)).toEqual([
 		{ type: 'assistant', block: { type: 'text', text: 'a' } },
-		{ type: 'turn_end', status: 'interrupted', usage: { output: 1 } },
+		{ type: 'turn_end', status: 'paused', usage: { output: 1 } },
 	])
 })
 
@@ -347,13 +339,29 @@ test('a turn spans tool rounds: one turn end with the usage of all rounds', asyn
 	])
 })
 
-test('a host exiting between tool rounds ends the turn once; late results are dropped', async () => {
+test('a host quitting between tool rounds pauses the turn once; late results are dropped', async () => {
 	let id = newSession()
 	history.submit(id, 'q')
 	await drain(history.record(id, 'fake', events({ type: 'tool_call', id: 't1', name: 'read', input: {} }, { type: 'usage', usage: { output: 4 } }, { type: 'done', reason: 'tool_use' })))
-	history.interrupt()
+	history.stop(true)
 	history.results(id, [{ type: 'tool_result', id: 't1', output: 'late' }])
 	history.end(id, undefined)
 	expect(strip(await history.read(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'turn_end'])
-	expect((await history.read(id)).at(-1)).toMatchObject({ status: 'interrupted', usage: { output: 4 } })
+	expect((await history.read(id)).at(-1)).toMatchObject({ status: 'paused', usage: { output: 4 } })
+})
+
+test('unfinished: a turn with no end record, however long its last line', async () => {
+	let id = newSession()
+	expect(history.unfinished(id)).toBe(false)
+	history.submit(id, 'q')
+	expect(history.unfinished(id)).toBe(true)
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	expect(history.unfinished(id)).toBe(false)
+	history.submit(id, 'x'.repeat(200_000))
+	expect(history.unfinished(id)).toBe(true)
+	history.append(id, { type: 'turn_end', status: 'paused', pauseReason: 'y'.repeat(100_000), usage: {} })
+	expect(history.unfinished(id)).toBe(false)
+	// A record cut off mid-write never happened; open drops it.
+	appendFileSync(history.file(id), "{ type: 'user', blocks: [")
+	expect(history.unfinished(id)).toBe(false)
 })

@@ -4,15 +4,22 @@
 
 import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock } from './blocks.ts'
 
-export type TurnStatus = 'completed' | 'cancelled' | 'error' | 'interrupted'
+// `paused`: the user stopped the turn (tasks/j1/states.md); it can
+// continue. `cancelled` and `interrupted` are only in older histories
+// (the old Escape and restart) and read as paused.
+export type TurnStatus = 'completed' | 'paused' | 'error' | 'cancelled' | 'interrupted'
 
 export type HistoryRecord =
 	// A submitted prompt, or tool results.
 	| { type: 'user'; blocks: UserBlock[]; ts: string }
 	// One assistant block, appended as soon as it is complete.
 	| { type: 'assistant'; block: AssistantBlock; ts: string }
-	// Ends one model turn. `interrupted`: the host died mid-turn.
-	| { type: 'turn_end'; status: TurnStatus; reason?: StopReason; error?: string; usage: Usage; ts: string }
+	// Ends one model turn, or pauses it (then `pauseReason` if Hal, not
+	// the user, paused it). A turn with no end is unfinished: the host
+	// died or restarted mid-turn, and the next host continues it.
+	| { type: 'turn_end'; status: TurnStatus; reason?: StopReason; error?: string; pauseReason?: string; usage: Usage; ts: string }
+	// The turn goes on after a pause, a failure or a host that went away.
+	| { type: 'continue'; ts: string }
 
 // Provider messages from history. Unsigned thinking (a cut-off stream) is
 // not replayable and is left out. Each tool call gets a result before the
@@ -27,9 +34,19 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		if (last?.role === msg.role) (last.blocks as unknown[]).push(...msg.blocks)
 		else if (msg.blocks.length) out.push(msg)
 	}
+	let prev: HistoryRecord | undefined
 	for (let r of records) {
+		let before = prev
+		prev = r
 		if (r.type === 'turn_end') status = r.status
-		else if (r.type === 'assistant') {
+		else if (r.type === 'continue') {
+			let why = before?.type === 'turn_end' ? before.status : 'interrupted'
+			let cut = out.at(-1)?.role === 'assistant'
+			let missing = pending.map((id): ToolResultBlock => ({ type: 'tool_result', id, output: replay.missingResult(why), isError: true }))
+			pending = []
+			push({ role: 'user', blocks: missing })
+			if (cut) push({ role: 'user', blocks: [{ type: 'text', text: replay.continueNote }] })
+		} else if (r.type === 'assistant') {
 			let b = r.block
 			if (b.type === 'thinking' && !b.signature) continue
 			if (b.type === 'tool_call') pending.push(b.id)
@@ -48,16 +65,15 @@ function toMessages(records: HistoryRecord[]): Message[] {
 }
 
 // What the model is told about a call with no recorded result. A host
-// that died may have run it without recording the result.
+// that went away, or a pause, may have cut it off mid-run.
 function missingResult(status: TurnStatus | undefined): string {
-	if (status === 'interrupted') return 'No result: the turn was interrupted, so this tool call may or may not have run.'
+	if (status === 'interrupted' || status === 'paused') return 'No result: the turn was interrupted, so this tool call may or may not have run.'
 	return `Tool call did not run: the turn ${status ?? 'ended'}.`
 }
 
-// True if the last turn has not ended: something follows the last turn end.
-function openTurn(records: HistoryRecord[]): boolean {
-	let last = records.at(-1)
-	return last !== undefined && last.type !== 'turn_end'
+export const replay = {
+	// Told to the model when a cut-off answer continues.
+	continueNote: '<meta>The previous response was interrupted. Continue without repeating completed work.</meta>',
+	toMessages,
+	missingResult,
 }
-
-export const replay = { toMessages, missingResult, openTurn }

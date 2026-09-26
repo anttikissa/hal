@@ -169,7 +169,20 @@ const seen = (p: Proc, text: string, from = 0) => p.out.indexOf(text, from) >= 0
 const sessionCount = () =>
 	existsSync(`${home}/sessions`) ? readdirSync(`${home}/sessions`).filter((id) => existsSync(`${home}/sessions/${id}/session.ason`)).length : 0
 
-test('a conversation streams, cancels on Escape and survives a restart', async () => {
+// Every turn end in the one session's history: its status.
+function ends(): string[] {
+	let [id] = readdirSync(`${home}/sessions`)
+	return readFileSync(`${home}/sessions/${id}/history.asonl`, 'utf8')
+		.split('\n')
+		.filter((l) => l.trim())
+		.map((l) => ason.parse(l) as any)
+		.filter((r) => r.type === 'turn_end')
+		.map((r) => r.status)
+}
+
+const continued = 'ECHO(<meta>The previous response'
+
+test('Escape pauses a turn; it stays paused over a restart and Enter continues it', async () => {
 	let p = run()
 	await until('a session', () => sessionCount() === 1)
 	type(p, 'first\r')
@@ -179,18 +192,23 @@ test('a conversation streams, cancels on Escape and survives a restart', async (
 	await until('streaming output', () => seen(p, 'PART1'))
 	// A lone ESC, as a terminal without the kitty protocol sends it.
 	type(p, '\x1b')
-	await until('the turn to be cancelled', () => seen(p, '[cancelled]'))
+	await until('the turn to be paused', () => seen(p, '[paused]'))
 	await until('the request to be aborted', () => aborted === 1)
 
 	let mark = p.out.length
 	type(p, '\x12') // Ctrl-R
-	await until('the conversation after restart', () => seen(p, 'ECHO(first)', mark) && seen(p, 'PART1', mark))
+	await until('the conversation after restart', () => seen(p, 'ECHO(first)', mark) && seen(p, 'PART1', mark) && seen(p, 'Enter continues', mark))
 	expect(p.exit).toBeUndefined()
+	await Bun.sleep(200)
+	expect(requests).toHaveLength(2)
+	type(p, '\r')
+	await until('the paused turn to continue', () => seen(p, continued, mark))
 	type(p, 'second\r')
 	await until('an answer after restart', () => seen(p, 'ECHO(second)'))
 	// The model got the whole conversation back, cut-off turn included.
 	let texts = requests.at(-1)!.flatMap((m) => m.content.map((b: any) => b.text))
 	expect(texts).toEqual(expect.arrayContaining(['first', 'ECHO(first)', 'hold on', 'PART1', 'second']))
+	expect(ends()).toEqual(['completed', 'paused', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)
 
 	type(p, '\x03') // Ctrl-C
@@ -198,7 +216,7 @@ test('a conversation streams, cancels on Escape and survives a restart', async (
 	expect(p.exit).toBe(0)
 }, 30_000)
 
-test('a second ./run follows the same stream and takes over when the host quits', async () => {
+test('a second ./run follows the same stream and carries the turn on when the host quits', async () => {
 	let a = run()
 	await until('a session', () => sessionCount() === 1)
 	type(a, 'hold this\r')
@@ -206,20 +224,35 @@ test('a second ./run follows the same stream and takes over when the host quits'
 
 	let b = run()
 	await until('the second to see the running turn', () => seen(b, 'PART1'))
-	holds[0]!()
-	await until('both to see the rest of the stream', () => seen(a, 'PART2') && seen(b, 'PART2'))
-
 	type(a, '\x03')
 	await until('the host to quit', () => a.exit !== undefined)
 	expect(a.exit).toBe(0)
-	// Nobody else is left to answer: b must now be host.
+	// Another Hal process remains: nothing pauses, b continues the turn.
+	await until('the new host to continue the turn', () => seen(b, continued))
+	expect(requests).toHaveLength(2)
 	type(b, 'after\r')
 	await until('an answer through the new host', () => seen(b, 'ECHO(after)'))
+	expect(ends()).toEqual(['completed', 'completed'])
 	expect(b.exit).toBeUndefined()
 	expect(sessionCount()).toBe(1)
 }, 30_000)
 
-test('a host restarted mid-turn records it interrupted and everyone rejoins', async () => {
+test('Ctrl-C of the last Hal process pauses the turn, and the next start leaves it paused', async () => {
+	let a = run()
+	await until('a session', () => sessionCount() === 1)
+	type(a, 'hold this\r')
+	await until('streaming output', () => seen(a, 'PART1'))
+	type(a, '\x03')
+	await until('quit', () => a.exit !== undefined)
+	expect(ends()).toEqual(['paused'])
+
+	let b = run()
+	await until('the paused turn', () => seen(b, 'PART1') && seen(b, 'Enter continues'))
+	await Bun.sleep(200)
+	expect(requests).toHaveLength(1)
+}, 30_000)
+
+test('a host restarted mid-turn continues it, and everyone rejoins', async () => {
 	let a = run()
 	await until('a session', () => sessionCount() === 1)
 	let b = run()
@@ -227,14 +260,10 @@ test('a host restarted mid-turn records it interrupted and everyone rejoins', as
 	await until('both to see the stream', () => seen(a, 'PART1') && seen(b, 'PART1'))
 
 	let markA = a.out.length
-	let markB = b.out.length
 	type(a, '\x12') // Ctrl-R in the host, while the turn runs
 	await until('the dead host to drop its request', () => aborted === 1)
-	// The cut-off turn, streamed text included, is in history as
-	// interrupted: the survivor sees it (repainting only what changed),
-	// and so does the restarted host, which paints it all afresh.
-	await until('the survivor to show the interrupted turn', () => seen(b, '[interrupted]', markB))
-	await until('the restarted process to rejoin', () => seen(a, '[interrupted]', markA) && seen(a, 'PART1', markA))
+	// Whoever is host now continues the turn, streamed text included.
+	await until('both to see the turn continue', () => seen(b, continued) && seen(a, continued, markA))
 	expect(a.exit).toBeUndefined()
 	expect(b.exit).toBeUndefined()
 
@@ -242,18 +271,11 @@ test('a host restarted mid-turn records it interrupted and everyone rejoins', as
 	await until('an answer to b', () => seen(b, 'ECHO(from b)') && seen(a, 'ECHO(from b)'))
 	type(a, 'from a\r')
 	await until('an answer to a', () => seen(a, 'ECHO(from a)') && seen(b, 'ECHO(from a)'))
-	// The model got the cut-off text back; nothing was sent twice.
+	// The model got the cut-off text back, was told, and nothing was sent twice.
+	expect(requests).toHaveLength(4)
 	let texts = requests.at(-1)!.flatMap((m) => m.content.map((b: any) => b.text))
-	expect(texts).toEqual(['hold it', 'PART1', 'from b', 'ECHO(from b)', 'from a'])
-
-	let [id] = readdirSync(`${home}/sessions`)
-	let ends = readFileSync(`${home}/sessions/${id}/history.asonl`, 'utf8')
-		.split('\n')
-		.filter((l) => l.trim())
-		.map((l) => ason.parse(l) as any)
-		.filter((r) => r.type === 'turn_end')
-		.map((r) => r.status)
-	expect(ends).toEqual(['interrupted', 'completed', 'completed'])
+	expect(texts.filter((t: string) => !t.startsWith('<meta>') && !t.startsWith('ECHO(<meta>'))).toEqual(['hold it', 'PART1', 'from b', 'ECHO(from b)', 'from a'])
+	expect(ends()).toEqual(['completed', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)
 }, 30_000)
 

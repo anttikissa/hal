@@ -14,8 +14,8 @@ const ts = '2026-09-26T00:00:01Z'
 const prompt = (text: string) => ({ type: 'user' as const, blocks: [{ type: 'text' as const, text }], ts })
 const said = (block: AssistantBlock) => ({ type: 'assistant' as const, block, ts })
 
-function snap(snapshot: Omit<Snapshot, 'meta'>): Event {
-	return { type: 'snapshot', sessionId, snapshot: { meta, ...snapshot } }
+function snap(snapshot: Omit<Snapshot, 'meta' | 'state'>): Event {
+	return { type: 'snapshot', sessionId, snapshot: { meta, state: { type: 'idle' }, ...snapshot } }
 }
 
 test('a snapshot shows history as display items without provider details', () => {
@@ -147,4 +147,23 @@ test('tool results settle the round so far; the next round streams after them', 
 	expect(late).toEqual(t)
 	let end: Event = { type: 'turn-end', sessionId, status: 'completed' }
 	expect(fold([end], late)).toEqual(fold([end], t)!)
+})
+
+test('state events and a continued turn fold like the snapshot that follows them', () => {
+	let running = { type: 'running' as const, phase: 'streaming' as const }
+	let t = fold([
+		snap({ history: [prompt('go'), said({ type: 'text', text: 'a' }), { type: 'turn_end', status: 'paused', usage: {}, ts }] }),
+		{ type: 'state', sessionId, state: running },
+		{ type: 'turn-start', sessionId, provider: 'fake' },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'b' } },
+	])!
+	expect(t.state).toEqual(running)
+	let later = fold([
+		snap({
+			history: [prompt('go'), said({ type: 'text', text: 'a' }), { type: 'turn_end', status: 'paused', usage: {}, ts }, { type: 'continue', ts }],
+			turn: { provider: 'fake', blocks: [{ type: 'text', text: 'b' }], usage: {} },
+		}),
+		{ type: 'state', sessionId, state: running },
+	])!
+	expect(later).toEqual(t)
 })

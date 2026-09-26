@@ -3,9 +3,9 @@
 // Provider input for every turn is rebuilt from this file alone.
 //
 // Opening a session repairs its history: a partially written last record
-// (the host died mid-write) is cut off, and a turn that never ended is
-// closed as interrupted. Any other malformed record is reported and the
-// file is left untouched.
+// (the host died mid-write) is cut off. Any other malformed record is
+// reported and the file is left untouched. A turn with no end record is
+// unfinished, not broken: the host continues it (host.recover).
 
 import { appendFileSync, existsSync, openSync, readFileSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
 import { ason } from '../common/ason.ts'
@@ -18,11 +18,11 @@ import { sessions, type SessionMeta } from './sessions.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
 
-const recordTypes = new Set(['user', 'assistant', 'turn_end'])
+const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue'])
 
 // One running turn: its current provider round (`turn`), how many of
 // that round's blocks are on disk, and the usage of earlier rounds.
-// `ended`: its turn end is on disk (interrupt() got there first).
+// `ended`: stop() has written its last record; nothing more is written.
 type Running = { turn: Turn; written: number; prior: Usage; ended?: boolean }
 
 function addUsage(a: Usage, b: Usage): Usage {
@@ -105,6 +105,32 @@ function lastByte(path: string): number | undefined {
 	}
 }
 
+// True if the last turn has no end record. Reads only the file's tail
+// unless its last line is longer (or cut off), so a new host can check
+// every session cheaply.
+function unfinished(id: string): boolean {
+	let path = history.file(id)
+	if (!existsSync(path)) return false
+	let size = statSync(path).size
+	let fd = openSync(path, 'r')
+	let tail: string
+	try {
+		let buf = Buffer.alloc(Math.min(size, 65536))
+		readFd(fd, buf, 0, buf.length, size - buf.length)
+		tail = buf.toString('utf8')
+	} finally {
+		closeSync(fd)
+	}
+	let lines = tail.split('\n').filter((l) => l.trim())
+	let whole = lines.length > 1 || size <= 65536
+	let last: HistoryRecord | undefined
+	try {
+		if (lines.length && whole) last = history.check(ason.parse(lines.at(-1)!))
+	} catch {}
+	last ??= history.readSync(id).at(-1)
+	return last !== undefined && last.type !== 'turn_end'
+}
+
 // Opens the session and repairs its history so appends land cleanly.
 async function open(id: string): Promise<SessionMeta> {
 	let meta = sessions.open(id)
@@ -125,9 +151,6 @@ async function open(id: string): Promise<SessionMeta> {
 	} else if (existsSync(path)) {
 		let last = history.lastByte(path)
 		if (last !== undefined && last !== 10) appendFileSync(path, '\n')
-	}
-	if (!history.state.running.has(id) && replay.openTurn(loaded.records)) {
-		history.append(id, { type: 'turn_end', status: 'interrupted', usage: {} })
 	}
 	return meta
 }
@@ -167,13 +190,13 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 }
 
 // Records the results of a round's tool calls, unless the turn has
-// already ended (interrupt()).
+// already ended (stop()).
 function results(id: string, list: ToolResultBlock[]): void {
 	if (history.state.running.has(id)) history.append(id, { type: 'user', blocks: list })
 }
 
 // Ends the running turn, with the usage of all its rounds: `last` is
-// how its last round ended (none: the consumer stopped, so cancelled).
+// how its last round ended (none, or cancelled: the user paused it).
 // Does nothing for a turn not running here, or already ended.
 function end(id: string, last: DoneEvent | ErrorEvent | undefined): void {
 	let running = history.state.running.get(id)
@@ -182,15 +205,15 @@ function end(id: string, last: DoneEvent | ErrorEvent | undefined): void {
 	let usage = addUsage(running.prior, running.turn.usage)
 	if (last?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: last.reason, usage })
 	else if (last?.type === 'error' && !last.cancelled) history.append(id, { type: 'turn_end', status: 'error', error: last.message, usage })
-	else history.append(id, { type: 'turn_end', status: 'cancelled', usage })
+	else history.append(id, { type: 'turn_end', status: 'paused', usage })
 }
 
-// Ends every turn running in this host as interrupted, keeping the
-// output so far, for a host about to exit (Ctrl-R, Ctrl-C, SIGTERM).
-// Synchronous, so it can run in a process 'exit' handler, before the
-// host lock is released to a successor. The abandoned streams write
-// nothing more.
-function interrupt(): void {
+// For a host about to exit: writes every running turn's output so far
+// and stops recording it. With `pause` (Ctrl-C of the last Hal process)
+// each turn is ended as paused; otherwise it is left unfinished, for the
+// next host to continue. Synchronous, so it can run in a process 'exit'
+// handler, before the host lock is released to a successor.
+function stop(pause: boolean): void {
 	for (let [id, running] of history.state.running) {
 		history.state.running.delete(id)
 		if (running.ended) continue
@@ -198,10 +221,9 @@ function interrupt(): void {
 		let { turn } = running
 		try {
 			for (; running.written < turn.blocks.length; running.written++) history.append(id, { type: 'assistant', block: turn.blocks[running.written]! })
-			history.append(id, { type: 'turn_end', status: 'interrupted', usage: addUsage(running.prior, turn.usage) })
+			if (pause) history.append(id, { type: 'turn_end', status: 'paused', usage: addUsage(running.prior, turn.usage) })
 		} catch (e: any) {
-			// history.open closes the turn on the next start instead.
-			diag.log(`history ${id}: could not record interrupted turn: ${e?.message ?? e}`)
+			diag.log(`history ${id}: could not record the stopped turn: ${e?.message ?? e}`)
 		}
 	}
 }
@@ -244,12 +266,13 @@ export const history = {
 	lastByte,
 	read,
 	readSync,
+	unfinished,
 	open,
 	messages,
 	record,
 	results,
 	end,
-	interrupt,
+	stop,
 	live,
 	turn,
 }

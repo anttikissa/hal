@@ -21,7 +21,7 @@ let localCommands: any[] = []
 const path = () => `${dir}/host.sock`
 
 function snapshotOf(id: string): Event {
-	return { type: 'snapshot', sessionId: id, snapshot: { meta: { id, cwd: '/', model: 'm', createdAt: '' }, history: [] } }
+	return { type: 'snapshot', sessionId: id, snapshot: { meta: { id, cwd: '/', model: 'm', createdAt: '' }, history: [], state: { type: 'idle' } } }
 }
 
 async function fakeHost(): Promise<FakeHost> {

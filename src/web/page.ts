@@ -43,7 +43,8 @@ function draw(): void {
 		st.drawn.push({ item, node })
 	}
 	st.notice!.textContent = st.view.notice ?? ''
-	st.input!.placeholder = st.view.transcript?.live ? 'running… Escape cancels' : 'Message Hal (Enter sends, Shift+Enter for a newline)'
+	let status = view.status(st.view)
+	st.input!.placeholder = status ? `${status}; Escape pauses a running turn` : 'Message Hal (Enter sends, Shift+Enter for a newline)'
 	if (atBottom) log.scrollTop = log.scrollHeight
 }
 
@@ -78,7 +79,7 @@ function onKey(e: KeyboardEvent): void {
 	let st = page.state
 	if (e.isComposing) return
 	if (e.key === 'Escape') {
-		let command = view.cancel(st.view)
+		let command = view.pause(st.view)
 		if (command) link.send(command)
 		return
 	}

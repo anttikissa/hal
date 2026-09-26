@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import type { Event, Snapshot } from '../common/protocol.ts'
+import type { SessionState } from '../common/states.ts'
 import { app } from './app.ts'
 import type { KeyEvent } from './keys.ts'
 import { render } from './render.ts'
@@ -30,8 +31,8 @@ afterEach(() => {
 	app.reset()
 })
 
-const snapshot = (id = 's1'): Event => {
-	let snap: Snapshot = { meta: { id, cwd: '/', model: 'anthropic/x', createdAt: '' }, history: [] }
+const snapshot = (id = 's1', state: SessionState = { type: 'idle' }): Event => {
+	let snap: Snapshot = { meta: { id, cwd: '/', model: 'anthropic/x', createdAt: '' }, history: [], state }
 	return { type: 'snapshot', sessionId: id, snapshot: snap }
 }
 const key = (key: string, text?: string): KeyEvent => ({ key, text, shift: false, alt: false, ctrl: false, cmd: false })
@@ -62,15 +63,35 @@ test('a submit before any session arrives keeps the text', () => {
 	expect(app.view().notice).toBeTruthy()
 })
 
-test('while a turn runs, Enter keeps the text and Escape cancels it', () => {
+test('while a turn runs, Enter keeps the text and Escape pauses it', () => {
 	app.onEvent(snapshot())
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'q', provider: 'anthropic' })
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'requesting' } })
 	type('next')
 	enter()
 	expect(sent).toEqual([])
 	expect(app.view().prompt.text).toBe('next')
 	escape()
-	expect(sent).toEqual([{ type: 'cancel', sessionId: 's1' }])
+	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
+})
+
+test('Escape pauses a turn another host is carrying on, too', () => {
+	app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
+	escape()
+	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
+})
+
+test('bare Enter continues a paused or failed turn, and says so', () => {
+	app.onEvent(snapshot('s1', { type: 'paused' }))
+	expect(app.view().notice).toMatch(/paused.*Enter/)
+	enter()
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'error', message: '400 nope' } })
+	expect(app.view().notice).toMatch(/400 nope/)
+	enter()
+	expect(sent).toEqual([
+		{ type: 'continue', sessionId: 's1' },
+		{ type: 'continue', sessionId: 's1' },
+	])
 })
 
 test('Escape with no turn running sends nothing', () => {

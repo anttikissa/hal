@@ -115,12 +115,13 @@ test('completed: every client shows the same finished turn', async () => {
 	expect(mid).toEqual(late)
 })
 
-test('cancelled: partial output and the cancellation look the same everywhere', async () => {
-	let { early, mid, late } = await turn((_push, send, id) => send({ type: 'cancel', sessionId: id }))
+test('paused: partial output and the pause look the same everywhere', async () => {
+	let { early, mid, late } = await turn((_push, send, id) => send({ type: 'pause', sessionId: id }))
 	expect(late.items.slice(-2)).toEqual([
 		{ type: 'text', text: 'par' },
-		{ type: 'turn-end', status: 'cancelled' },
+		{ type: 'turn-end', status: 'paused' },
 	])
+	expect(late.state).toEqual({ type: 'paused' })
 	expect(early).toEqual(late)
 	expect(mid).toEqual(late)
 })

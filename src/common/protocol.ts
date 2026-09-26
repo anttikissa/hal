@@ -9,6 +9,7 @@
 import type { AssistantBlock, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 import type { SessionMeta } from './session.ts'
+import type { SessionState } from './states.ts'
 
 export type { TurnStatus } from './replay.ts'
 
@@ -22,7 +23,8 @@ export type { TurnStatus } from './replay.ts'
 // followed by the turn end match what a later snapshot shows.
 export type LiveTurn = { provider: string; blocks: AssistantBlock[]; usage: Usage }
 
-export type Snapshot = { meta: SessionMeta; history: HistoryRecord[]; turn?: LiveTurn }
+// `state` is the session's one state (src/common/states.ts).
+export type Snapshot = { meta: SessionMeta; history: HistoryRecord[]; state: SessionState; turn?: LiveTurn }
 
 // Stream events forwarded live; terminal done/error become `turn-end`.
 export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'error' }>
@@ -36,7 +38,10 @@ export type Command =
 	// Stop following it. The session and any running turn carry on.
 	| { type: 'close'; sessionId: string }
 	| { type: 'submit'; sessionId: string; text: string }
-	| { type: 'cancel'; sessionId: string }
+	// Escape: pause the running turn; it can continue later.
+	| { type: 'pause'; sessionId: string }
+	// Bare Enter: continue a paused turn, or retry a failed one.
+	| { type: 'continue'; sessionId: string }
 
 export type CommandType = Command['type']
 
@@ -44,8 +49,11 @@ export type CommandType = Command['type']
 
 export type Event =
 	| { type: 'snapshot'; sessionId: string; snapshot: Snapshot }
-	// The prompt is now in history and a turn is running.
-	| { type: 'turn-start'; sessionId: string; prompt: string; provider: string }
+	// The prompt is now in history and a turn is running. No prompt: an
+	// earlier turn continues (a `continue` record).
+	| { type: 'turn-start'; sessionId: string; prompt?: string; provider: string }
+	// The session's state changed.
+	| { type: 'state'; sessionId: string; state: SessionState }
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent }
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
@@ -58,7 +66,7 @@ export type Event =
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open', 'close', 'submit', 'cancel']
+const commandTypes: CommandType[] = ['create', 'open', 'close', 'submit', 'pause', 'continue']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.

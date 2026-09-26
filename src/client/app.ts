@@ -4,6 +4,7 @@
 // here waits on the host.
 
 import type { Event } from '../common/protocol.ts'
+import { states } from '../common/states.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
 import type { KeyEvent } from './keys.ts'
 import { link, type Role } from './link.ts'
@@ -22,7 +23,9 @@ function view(): View {
 	let st = app.state
 	let v: View = { prompt: st.prompt }
 	if (st.transcript) v.transcript = st.transcript
-	if (st.notice) v.notice = st.notice
+	// A passing notice, else what the session is doing.
+	let notice = st.notice ?? (st.transcript && states.describe(st.transcript.state))
+	if (notice) v.notice = notice
 	return v
 }
 
@@ -43,18 +46,25 @@ function onRole(role: Role | null): void {
 	app.show()
 }
 
-// Refuses (keeping the typed text) what the host would refuse anyway.
+// Enter: a prompt, or a continue on an empty prompt. Refuses (keeping
+// the typed text) what the host would refuse anyway.
 function submit(text: string): boolean {
 	let st = app.state
-	if (!text.trim()) return true
-	if (!st.transcript) st.notice = 'no session yet'
-	else if (st.transcript.live) st.notice = 'a turn is running; Escape cancels it'
-	else {
-		st.notice = undefined
-		app.send({ type: 'submit', sessionId: st.transcript.meta.id, text })
-		return true
+	if (!st.transcript) {
+		if (!text.trim()) return true
+		st.notice = 'no session yet'
+		return false
 	}
-	return false
+	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text)
+	if (refused) {
+		st.notice = refused
+		return false
+	}
+	if (command) {
+		st.notice = undefined
+		app.send(command)
+	}
+	return true
 }
 
 function onKeys(events: KeyEvent[]): void {
@@ -63,7 +73,8 @@ function onKeys(events: KeyEvent[]): void {
 		let { state, action } = prompt.apply(st.prompt, k)
 		if (action?.type === 'submit' && !app.submit(action.text)) continue
 		st.prompt = state
-		if (action?.type === 'cancel' && st.transcript?.live) app.send({ type: 'cancel', sessionId: st.transcript.meta.id })
+		let pause = action?.type === 'cancel' && st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
+		if (pause) app.send(pause)
 		if (action?.type === 'quit') return terminal.quit()
 	}
 	app.show()

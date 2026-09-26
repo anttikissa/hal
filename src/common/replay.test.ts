@@ -97,9 +97,25 @@ test('tool results without a matching call are dropped', () => {
 	])
 })
 
-test('openTurn: records after the last turn end mean a turn is still open', () => {
-	expect(replay.openTurn([])).toBe(false)
-	expect(replay.openTurn([say('a'), end('completed')])).toBe(false)
-	expect(replay.openTurn([say('a')])).toBe(true)
-	expect(replay.openTurn([say('a'), end('completed'), say('b'), block({ type: 'text', text: 'x' })])).toBe(true)
+const cont: HistoryRecord = { type: 'continue', ts }
+
+test('a turn continued after a host went away tells the model, and cut-off calls may have run', () => {
+	let msgs = replay.toMessages([say('go'), block({ type: 'text', text: 'half' }), block(call('a')), cont, block({ type: 'text', text: 'rest' })])
+	expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant'])
+	let [result, note] = msgs[2]!.blocks
+	expect(result).toMatchObject({ type: 'tool_result', id: 'a', isError: true })
+	expect((result as any).output).toMatch(/may or may not have run/)
+	expect(note).toEqual({ type: 'text', text: replay.continueNote })
+})
+
+test('continuing a paused turn after tool results asks nothing extra', () => {
+	let msgs = replay.toMessages([say('go'), block(call('a')), user({ type: 'tool_result', id: 'a', output: 'ok' }), end('paused'), cont])
+	expect(msgs.at(-1)).toEqual({ role: 'user', blocks: [{ type: 'tool_result', id: 'a', output: 'ok' }] })
+})
+
+test('a paused cut-off answer continues with the note; a failed request retries as it was', () => {
+	let paused = replay.toMessages([say('go'), block({ type: 'text', text: 'half' }), end('paused'), cont])
+	expect(paused.at(-1)!.blocks).toEqual([{ type: 'text', text: replay.continueNote }])
+	let failed = replay.toMessages([say('go'), end('error'), cont])
+	expect(failed).toEqual([{ role: 'user', blocks: [{ type: 'text', text: 'go' }] }])
 })

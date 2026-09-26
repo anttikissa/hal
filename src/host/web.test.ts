@@ -178,7 +178,7 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	await until(() => w.events.some((e) => e.type === 'turn-end') && local.some((e) => e.type === 'turn-end'))
 	let seen = (events: any[]) => events.filter((e) => e.type !== 'snapshot' && e.type !== 'rejected')
 	expect(seen(w.events)).toEqual(seen(local))
-	expect(seen(w.events).map((e) => e.type)).toEqual(['turn-start', 'stream', 'turn-end'])
+	expect(seen(w.events).map((e) => e.type)).toEqual(['state', 'turn-start', 'state', 'stream', 'turn-end', 'state'])
 
 	// A closed browser is no longer a host client.
 	w.ws.close()

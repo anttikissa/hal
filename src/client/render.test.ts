@@ -140,7 +140,7 @@ class FakeTerminal {
 const meta = { id: 's', cwd: '/', model: 'm', createdAt: '' }
 
 function transcript(items: Item[]): Transcript {
-	return { meta, items }
+	return { meta, state: { type: 'idle' }, items }
 }
 
 // n question/answer pairs.
