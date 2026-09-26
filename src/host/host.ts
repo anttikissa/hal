@@ -24,6 +24,7 @@
 import { ason } from '../common/ason.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
 import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock } from '../common/blocks.ts'
+import { forms, type Answers, type Form } from '../common/forms.ts'
 import { protocol, type Command, type Event, type Snapshot } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { states, type SessionState, type StateEvent } from '../common/states.ts'
@@ -35,6 +36,7 @@ import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
+import { synthetic } from './synthetic.ts'
 import { tools } from './tools.ts'
 
 export type Connection = {
@@ -114,7 +116,7 @@ function reject(client: Client, command: unknown, reason: string, sessionId?: un
 // Commands whose effect outlives the connection. A repeat of one of
 // these ids is answered as before and not carried out again. Opening
 // and closing are per connection, so a repeat always acts.
-const once = new Set(['create', 'submit', 'draft', 'pause', 'continue'])
+const once = new Set(['create', 'submit', 'draft', 'pause', 'continue', 'answer'])
 
 // Records what a command with an id did, forgetting the oldest beyond
 // host.remembered().
@@ -196,6 +198,7 @@ function act(client: Client, c: Command): Outcome | undefined {
 	} else if (c.type === 'draft') host.draft(c.sessionId, drafts.set(c.sessionId, c.text, c.base), c.id)
 	else if (c.type === 'continue') refused = host.resume(c.sessionId)
 	else if (c.type === 'pause') refused = host.stop(c.sessionId)
+	else if (c.type === 'answer') refused = host.reply(c.sessionId, c.question, c.answers)
 	return refused === undefined ? {} : { refused }
 }
 
@@ -342,15 +345,47 @@ function resume(id: string): string | undefined {
 	host.start(id)
 }
 
+// Asks the open turn's human a durable question: in history first,
+// then shown; the turn stops running here and waits, blocked, for the
+// first answer (reply), which runs it again. Nothing waits in memory.
+function ask(id: string, form: Form): void {
+	let problem = forms.invalid(form)
+	if (problem) throw new Error(`bad question: ${problem}`)
+	let question = crypto.randomUUID().slice(0, 8)
+	history.park(id)
+	host.state.running.delete(id)
+	history.append(id, { type: 'question', id: question, form })
+	host.broadcast(id, { type: 'question', sessionId: id, id: question, form })
+	host.transition(id, { type: 'block', reason: 'question' })
+}
+
+// The first valid answer to the open question: recorded (secrets only
+// named), shown, and the turn that asked runs again with it. Returns
+// why it is refused: not the open question (someone answered first),
+// or answers that don't fit the form.
+function reply(id: string, question: string, answers: Answers): string | undefined {
+	let open = forms.open(history.readSync(id))
+	if (!open || open.id !== question || host.state.running.has(id)) return 'that question is not open (answered already?)'
+	let problem = forms.check(open.form, answers)
+	if (problem) return problem
+	let refused = host.transition(id, { type: 'answer' })
+	if (refused) return refused
+	let kept = forms.redact(open.form, answers)
+	history.append(id, { type: 'answer', question, ...kept })
+	host.broadcast(id, { type: 'answer', sessionId: id, question, ...kept })
+	host.start(id, undefined, answers)
+}
+
 // Runs a turn whose prompt or `continue` record is in history.
-function start(id: string, prompt?: string): void {
+// `answers`: the fresh answer to its question, secrets included.
+function start(id: string, prompt?: string, answers?: Answers): void {
 	let model = sessions.open(id).model
 	let running: Running = { provider: blocks.parseModelId(model)?.provider ?? model, controller: new AbortController() }
 	host.state.running.set(id, running)
 	let event: Event = { type: 'turn-start', sessionId: id, provider: running.provider }
 	if (prompt !== undefined) event.prompt = prompt
 	host.broadcast(id, event)
-	void host.runTurn(id, model, running)
+	void host.runTurn(id, model, running, answers)
 }
 
 // Pauses the session's turn: one running here stops and runTurn records
@@ -425,10 +460,20 @@ async function recover(): Promise<void> {
 // A round that fails in a way the host can fix (error.failure,
 // provider.ts) is tried again within the turn: retrying at a time, or
 // blocked on a login; only the user's Escape stops that.
-async function runTurn(id: string, model: string, running: Running): Promise<void> {
+//
+// A synthetic model (synthetic.ts) runs here instead of a provider and
+// may end its round by asking a question, which parks the turn (ask).
+async function runTurn(id: string, model: string, running: Running, answers?: Answers): Promise<void> {
 	let { signal } = running.controller
+	let asking: Form | undefined
 	async function* stream(): AsyncGenerator<StreamEvent> {
-		yield* host.stream(model, { messages: await history.messages(id), tools: tools.defs() }, signal)
+		let scripted = synthetic.find(model)
+		if (!scripted) return yield* host.stream(model, { messages: await history.messages(id), tools: tools.defs() }, signal)
+		let reply = scripted(await history.read(id), answers)
+		answers = undefined
+		asking = reply.ask
+		if (reply.say) yield { type: 'text', text: reply.say }
+		yield { type: 'done', reason: 'end' }
 	}
 	let last: DoneEvent | ErrorEvent | undefined
 	let failure: string | undefined
@@ -460,6 +505,7 @@ async function runTurn(id: string, model: string, running: Running): Promise<voi
 				continue
 			}
 			if (last?.type === 'done') failures = 0
+			if (asking && last?.type === 'done' && !signal.aborted) return host.ask(id, asking)
 			let calls = round.blocks.filter((b) => b.type === 'tool_call')
 			if (last?.type !== 'done') break
 			// A finished answer with steering waiting: the model hears it.
@@ -605,6 +651,8 @@ export const host = {
 	resume,
 	start,
 	stop,
+	ask,
+	reply,
 	recover,
 	runTurn,
 	waitOut,

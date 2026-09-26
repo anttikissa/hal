@@ -3,6 +3,7 @@
 // these records alone, never from display state.
 
 import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock } from './blocks.ts'
+import type { Answers, Form } from './forms.ts'
 
 // `paused`: the user stopped the turn (tasks/j1/states.md); it can
 // continue. `cancelled` and `interrupted` are only in older histories
@@ -25,6 +26,12 @@ export type HistoryRecord =
 	| { type: 'turn_end'; status: TurnStatus; reason?: StopReason; error?: string; pauseReason?: string; usage: Usage; ts: string }
 	// The turn goes on after a pause, a failure or a host that went away.
 	| { type: 'continue'; ts: string }
+	// A durable question (tasks/w4/forms.md): the turn waits, blocked,
+	// with nothing in memory, until an answer re-runs whoever asked.
+	| { type: 'question'; id: string; form: Form; ts: string }
+	// The first answer to question `question`. Secret fields are left
+	// out of `answers` and only named in `secrets`.
+	| { type: 'answer'; question: string; answers: Answers; secrets?: string[]; ts: string }
 
 // Provider messages from history. Unsigned thinking (a cut-off stream) is
 // not replayable and is left out. Each tool call gets a result before the
@@ -46,7 +53,8 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	}
 	let prev: HistoryRecord | undefined
 	for (let r of records) {
-		if (r.type === 'inbox') continue
+		// For the human; whoever asked hears the answer another way.
+		if (r.type === 'inbox' || r.type === 'question' || r.type === 'answer') continue
 		let before = prev
 		prev = r
 		if (r.type === 'turn_end') {

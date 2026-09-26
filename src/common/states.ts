@@ -8,6 +8,7 @@
 // or a human-facing reason (blocked). A session that waits on nothing is
 // a bug.
 
+import { forms } from './forms.ts'
 import type { HistoryRecord } from './replay.ts'
 
 export type Phase = 'requesting' | 'streaming' | 'tools'
@@ -19,7 +20,8 @@ export type SessionState =
 	| { type: 'running'; phase: Phase }
 	// A failure the host is fixing on its own, again at `at` (ISO time).
 	| { type: 'retrying'; at: string; reason: string }
-	// Needs a human: login now, approval later.
+	// Needs a human: a login, or an answer (reason `question`, the open
+	// question in history: tasks/w4/forms.md).
 	| { type: 'blocked'; reason: string }
 	// The user stopped it (or the loop guard did); the turn can continue.
 	| { type: 'paused'; reason?: string }
@@ -43,8 +45,11 @@ export type StateEvent =
 	| { type: 'end'; error?: string }
 	// A request failed in a way the host fixes itself, trying again at `at`.
 	| { type: 'retry'; at: string; reason: string }
-	// A request failed in a way only a human fixes (log in).
+	// A request failed in a way only a human fixes (log in), or the turn
+	// asked a question (reason `question`).
 	| { type: 'block'; reason: string }
+	// Someone answered the open question; whoever asked runs again.
+	| { type: 'answer' }
 
 // A turn continued this many times in a row by new hosts without
 // finishing a round is paused instead: it may be what kills them.
@@ -80,6 +85,8 @@ function step(state: SessionState, event: StateEvent): SessionState | string {
 			return busy(state) ? { type: 'retrying', at: event.at, reason: event.reason } : state
 		case 'block':
 			return busy(state) ? { type: 'blocked', reason: event.reason } : state
+		case 'answer':
+			return state.type === 'blocked' && state.reason === 'question' ? { type: 'running', phase: 'requesting' } : 'no question is open'
 		case 'end':
 			if (!busy(state)) return state
 			return event.error !== undefined ? { type: 'error', message: event.error } : { type: 'idle' }
@@ -87,13 +94,13 @@ function step(state: SessionState, event: StateEvent): SessionState | string {
 }
 
 // The state durable history alone implies. An unfinished turn (no end
-// record) is running: whoever is host must be carrying it on, and a new
-// host continues it. Legacy ends (cancelled: the old Escape;
+// record) is blocked on its open question, if it has one, else running:
+// whoever is host must be carrying it on, and a new host continues it. Legacy ends (cancelled: the old Escape;
 // interrupted: the old restart) read as paused, so they can continue.
 function fromHistory(records: HistoryRecord[]): SessionState {
 	let last = records.at(-1)
 	if (!last) return { type: 'idle' }
-	if (last.type !== 'turn_end') return { type: 'running', phase: 'requesting' }
+	if (last.type !== 'turn_end') return forms.open(records) ? { type: 'blocked', reason: 'question' } : { type: 'running', phase: 'requesting' }
 	if (last.status === 'completed') return { type: 'idle' }
 	if (last.status === 'error') return { type: 'error', message: last.error ?? 'turn failed' }
 	let paused: SessionState = { type: 'paused' }

@@ -186,3 +186,27 @@ test('the resumed mark names the last turn time, and its date when not today', (
 	expect(transcript.resumedLabel({ at: 0, last }, new Date(2026, 8, 26, 9, 0))).toBe('resumed · last turn 00:51')
 	expect(transcript.resumedLabel({ at: 0, last }, new Date(2026, 8, 27, 0, 10))).toBe('resumed · last turn 2026-09-26 00:51')
 })
+
+test('a question and its answer fold like the snapshot that follows them, and only the waiting one is open', () => {
+	let form = { text: 'Name?', fields: [{ type: 'secret' as const, name: 'key' }] }
+	let asking = { type: 'blocked' as const, reason: 'question' }
+	let live = fold([
+		snap({ history: [prompt('hi')], turn: { provider: 'hal', blocks: [], usage: {} } }),
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'Hello.' } },
+		{ type: 'question', sessionId, id: 'q1', form },
+		{ type: 'state', sessionId, state: asking },
+	])!
+	let stored = fold([snap({ history: [prompt('hi'), said({ type: 'text', text: 'Hello.' }), { type: 'question', id: 'q1', form, ts }] }), { type: 'state', sessionId, state: asking }])!
+	expect(live).toEqual(stored)
+	expect(live.live).toBeUndefined()
+	expect(transcript.question(live)?.id).toBe('q1')
+	let answered = fold([{ type: 'answer', sessionId, question: 'q1', answers: {}, secrets: ['key'] }, { type: 'state', sessionId, state: { type: 'idle' } }], live)!
+	expect(answered.items.at(-1)).toEqual({ type: 'question', id: 'q1', form, answers: {}, secrets: ['key'] })
+	expect(transcript.question(answered)).toBeUndefined()
+	let later = fold([
+		snap({ history: [prompt('hi'), said({ type: 'text', text: 'Hello.' }), { type: 'question', id: 'q1', form, ts }, { type: 'answer', question: 'q1', answers: {}, secrets: ['key'], ts }] }),
+	])!
+	expect(later.items).toEqual(answered.items)
+	// A question left by a pause is not open.
+	expect(transcript.question({ ...live, state: { type: 'paused' } })).toBeUndefined()
+})

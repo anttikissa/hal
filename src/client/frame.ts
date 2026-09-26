@@ -8,6 +8,7 @@
 // it shows.
 
 import { colors, type Style } from '../common/colors.ts'
+import { forms, type FormState } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
 import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
@@ -23,6 +24,8 @@ export interface View {
 	pending?: string[]
 	/** A passing message for the user, such as a refused command. */
 	notice?: string
+	/** The open question being answered here: keys and cursor go to it. */
+	form?: FormState
 }
 
 export interface Frame {
@@ -37,6 +40,8 @@ const PROMPT_FIRST = '> '
 const PROMPT_REST = '  '
 const DIM = '\x1b[2m'
 const UNDIM = '\x1b[22m'
+const INVERSE = '\x1b[7m'
+const UNINVERSE = '\x1b[27m'
 const UNCOLOR = '\x1b[39;49m'
 
 // The escape that switches to a style's fg and bg (truecolor).
@@ -77,6 +82,8 @@ function itemStyle(item: Item): Style | undefined {
 			return { fg: (item.isError ? colors.error() : colors.log()).fg! }
 		case 'turn-end':
 			return item.status === 'error' ? colors.error() : { fg: colors.log().fg! }
+		case 'question':
+			return colors.warning()
 	}
 }
 
@@ -122,7 +129,50 @@ function itemLines(item: Item, width: number): string[] {
 			if (item.status === 'error') return frame.wrap(`error: ${item.error ?? 'turn failed'}`, width)
 			if (item.status === 'completed') return []
 			return [`[${item.status}]`]
+		case 'question': {
+			let rows = frame.wrap(`? ${item.form.text}`, width)
+			let said = item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
+			return [...rows, ...said.flatMap((l) => frame.wrap(l, width - 2).map((r) => `  ${r}`))]
+		}
 	}
+}
+
+/**
+ * Rows of an open question being filled in, at `width` columns, and
+ * where the cursor goes in them: in the focused text, or on the
+ * selected option.
+ */
+function formLines(st: FormState, width: number): { rows: string[]; cursor: { row: number; col: number } } {
+	let rows = frame.wrap(`? ${st.form.text}`, width)
+	let cursor = { row: 0, col: 0 }
+	st.form.fields.forEach((field, i) => {
+		let head = `  ${field.label ? `${frame.clean(field.label)}: ` : ''}`
+		let value = st.values[i]!
+		let focused = i === st.focus
+		if (field.type === 'choice') {
+			let col = strings.visLen(head)
+			let parts = field.options.map((o) => {
+				let label = ` ${frame.clean(o)} `
+				if (o === value && focused) cursor = { row: rows.length, col: col + 1 }
+				col += strings.visLen(label) + 1
+				return o === value ? INVERSE + label + UNINVERSE : label
+			})
+			rows.push(strings.clipVisual(head + parts.join(' '), width))
+			return
+		}
+		// A secret shows one dot per character typed, never the text.
+		let dots = (s: string) => '•'.repeat([...new Intl.Segmenter().segment(s)].length)
+		let shown = field.type === 'secret' ? dots(value) : value
+		let at = field.type === 'secret' ? dots(value.slice(0, st.cursor)).length : st.cursor
+		let indent = Math.min(strings.visLen(head), Math.max(0, width - 1))
+		let p = frame.layoutPrompt(shown, at, Math.max(1, width - indent))
+		if (!value && field.type === 'text' && field.placeholder) p.rows[0] = DIM + strings.clipVisual(frame.clean(field.placeholder), width - indent) + UNDIM
+		if (focused) cursor = { row: rows.length + p.row, col: indent + p.col }
+		p.rows.forEach((r, j) => rows.push((j ? ' '.repeat(indent) : strings.clipVisual(head, indent)) + r))
+	})
+	let hint = st.form.fields.length > 1 ? 'Enter: next · Tab: move · Escape: pause' : 'Enter: answer · Escape: pause'
+	rows.push(DIM + strings.clipVisual(`  ${hint}`, width) + UNDIM)
+	return { rows, cursor }
 }
 
 /**
@@ -174,9 +224,16 @@ function build(view: View, cols: number): Frame {
 		for (let r of rows) lines.push(frame.paint(r, style, cols))
 	}
 	let items = view.transcript?.items ?? []
+	let formCursor: Frame['cursor'] | undefined
 	for (let i = 0; i <= items.length; i++) {
 		if (i === view.resumed?.at) block(frame.wrap(transcript.resumedLabel(view.resumed), width), { fg: colors.log().fg! })
-		if (i < items.length) block(frame.itemLines(items[i]!, width), frame.itemStyle(items[i]!))
+		if (i >= items.length) continue
+		let item = items[i]!
+		if (item.type === 'question' && view.form?.id === item.id) {
+			let f = frame.formLines(view.form, width)
+			block(f.rows, frame.itemStyle(item))
+			formCursor = { row: lines.length - f.rows.length + f.cursor.row, col: PAD.length + f.cursor.col }
+		} else block(frame.itemLines(item, width), frame.itemStyle(item))
 	}
 	for (let text of view.pending ?? []) {
 		let rows = frame.itemLines({ type: 'prompt', text }, width)
@@ -193,7 +250,7 @@ function build(view: View, cols: number): Frame {
 	let top = lines.length
 	let input = colors.input()
 	p.rows.forEach((r, i) => lines.push(frame.paint((i ? PROMPT_REST : PROMPT_FIRST) + r, input, cols)))
-	return { lines, cursor: { row: top + p.row, col: PAD.length + PROMPT_FIRST.length + p.col } }
+	return { lines, cursor: formCursor ?? { row: top + p.row, col: PAD.length + PROMPT_FIRST.length + p.col } }
 }
 
 export const frame = {
@@ -206,6 +263,7 @@ export const frame = {
 	toolStyle,
 	itemStyle,
 	itemLines,
+	formLines,
 	layoutPrompt,
 	build,
 }

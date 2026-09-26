@@ -10,7 +10,8 @@ const retrying: SessionState = { type: 'retrying', at: '2026-09-26T12:00:00.000Z
 const blocked: SessionState = { type: 'blocked', reason: 'log in to anthropic' }
 const paused: SessionState = { type: 'paused' }
 const error: SessionState = { type: 'error', message: '400 bad request' }
-const all = [idle, requesting, streaming, tools, retrying, blocked, paused, error]
+const asking: SessionState = { type: 'blocked', reason: 'question' }
+const all = [idle, requesting, streaming, tools, retrying, blocked, asking, paused, error]
 
 const events: StateEvent[] = [
 	{ type: 'submit' },
@@ -24,6 +25,8 @@ const events: StateEvent[] = [
 	{ type: 'end', error: 'boom' },
 	{ type: 'retry', at: '2026-09-26T12:00:12.000Z', reason: 'connection lost' },
 	{ type: 'block', reason: 'log in' },
+	{ type: 'block', reason: 'question' },
+	{ type: 'answer' },
 ]
 
 const refused = expect.any(String)
@@ -74,6 +77,15 @@ const table: [SessionState, StateEvent, SessionState | typeof refused][] = [
 	// A late failure after a pause changes nothing.
 	[paused, { type: 'retry', at: ts12, reason: 'x' }, paused],
 	[idle, { type: 'block', reason: 'x' }, idle],
+	// A question blocks the turn until the first answer re-runs it.
+	[streaming, { type: 'block', reason: 'question' }, asking],
+	[asking, { type: 'answer' }, requesting],
+	// A message sent meanwhile waits in the inbox (steering).
+	[asking, { type: 'submit' }, asking],
+	[asking, { type: 'pause' }, paused],
+	[requesting, { type: 'answer' }, refused],
+	[blocked, { type: 'answer' }, refused],
+	[paused, { type: 'answer' }, refused],
 ]
 
 test.each(table)('%o on %o', (state, event, next) => {
@@ -108,6 +120,8 @@ const out = (text: string): HistoryRecord => ({ type: 'assistant', block: { type
 const end = (status: TurnStatus, extra = {}): HistoryRecord => ({ type: 'turn_end', status, usage: {}, ts, ...extra })
 const cont: HistoryRecord = { type: 'continue', ts }
 const waiting = (id: string): HistoryRecord => ({ type: 'inbox', id, text: id, ts })
+const ask = (id: string): HistoryRecord => ({ type: 'question', id, form: { text: 'Name?', fields: [{ type: 'text', name: 'name' }] }, ts })
+const reply = (id: string): HistoryRecord => ({ type: 'answer', question: id, answers: { name: 'Dave' }, ts })
 
 test('history alone: an unfinished turn is running, ends say the rest', () => {
 	expect(states.fromHistory([])).toEqual(idle)
@@ -121,6 +135,15 @@ test('history alone: an unfinished turn is running, ends say the rest', () => {
 	// The old Escape and the old restart could both continue.
 	expect(states.fromHistory([say('a'), end('cancelled')])).toEqual(paused)
 	expect(states.fromHistory([say('a'), end('interrupted')])).toEqual(paused)
+})
+
+test('history alone: an open question blocks the turn until answered or paused', () => {
+	expect(states.fromHistory([say('a'), out('hi'), ask('q1')])).toEqual(asking)
+	expect(states.fromHistory([say('a'), ask('q1'), reply('q1')])).toEqual(requesting)
+	expect(states.fromHistory([say('a'), ask('q1'), reply('q1'), out('x'), ask('q2')])).toEqual(asking)
+	// Escape while it waited: paused, and continuing asks again.
+	expect(states.fromHistory([say('a'), ask('q1'), end('paused')])).toEqual(paused)
+	expect(states.fromHistory([say('a'), ask('q1'), end('paused'), cont])).toEqual(requesting)
 })
 
 test('recoveries counts continues since the last finished round, partial output aside', () => {

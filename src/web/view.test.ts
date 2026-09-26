@@ -99,3 +99,22 @@ test('waiting messages are shown with why they wait', () => {
 	expect(view.inbox(view.onEvent(st, { type: 'inbox', sessionId, inbox: [] }))).toEqual([])
 	expect(view.inbox({})).toEqual([])
 })
+
+test('the open question is filled in with browser keys and answered; afterwards it shows the answer', () => {
+	let form = { text: 'Create it?', fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'], initial: 1 }] }
+	let st = fold([
+		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'blocked', reason: 'question' } } },
+		{ type: 'question', sessionId, id: 'q1', form },
+	])
+	expect(st.form?.id).toBe('q1')
+	let browser = (key: string, mods = {}) => view.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods })
+	expect(browser('Shift')).toBeUndefined()
+	let left = view.formKey(st, browser('ArrowLeft')!)
+	expect(left.command).toBeUndefined()
+	let enter = view.formKey(left.state, browser('Enter')!)
+	expect(enter.command).toEqual({ type: 'answer', sessionId, question: 'q1', answers: { ok: 'yes' } })
+	expect(view.formKey(st, browser('Escape')!).command).toEqual({ type: 'pause', sessionId })
+	st = fold([{ type: 'answer', sessionId, question: 'q1', answers: { ok: 'yes' } }], enter.state)
+	expect(st.form).toBeUndefined()
+	expect(shown(st)).toEqual([{ kind: 'question warning', text: '? Create it?\n  yes' }])
+})

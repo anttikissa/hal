@@ -22,6 +22,9 @@ textarea, input { width: 100%; background: #1f2227; color: var(--fg); border: 1p
 textarea:focus, input:focus { border-color: var(--accent); }
 .input { caret-color: var(--cursor); }
 form { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
+main > form.question { max-width: 60rem; margin: 0 auto 0.9rem; padding: 0.4rem 0.6rem; border-radius: 4px; gap: 0.4rem; }
+form.question button { padding: 0.2rem 0.8rem; }
+button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
 button { background: #2b3a55; color: var(--fg); border: 0; border-radius: 6px; padding: 0.5rem; cursor: pointer; }
 /* The theme (src/common/colors.ts), put here by the host. */
 /*COLORS*/

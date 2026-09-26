@@ -12,6 +12,7 @@
 // command resent after a reconnect never acts twice.
 
 import type { AssistantBlock, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
+import type { Answers, Form } from './forms.ts'
 import type { InboxItem } from './inbox.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 import type { SessionMeta } from './session.ts'
@@ -66,6 +67,9 @@ export type Command = (
 	| { type: 'pause'; sessionId: string }
 	// Bare Enter: continue a paused turn, or retry a failed one.
 	| { type: 'continue'; sessionId: string }
+	// Answers the open question `question` (src/common/forms.ts), secrets
+	// included; refused if it is not open (someone answered first).
+	| { type: 'answer'; sessionId: string; question: string; answers: Answers }
 ) & { id?: string }
 
 export type CommandType = Command['type']
@@ -89,6 +93,11 @@ export type Event =
 	// turn goes on with a new provider round, streamed after them.
 	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[] }
 	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string }
+	// The turn asked a question, now in history; it waits for an answer
+	// with no turn running (the state says blocked).
+	| { type: 'question'; sessionId: string; id: string; form: Form }
+	// The first answer to it, as history keeps it (secrets only named).
+	| { type: 'answer'; sessionId: string; question: string; answers: Answers; secrets?: string[] }
 	// Something the user should fix (config.ason); not tied to a session.
 	| { type: 'warning'; text: string }
 	// The session's draft changed; `command` is the id of the command
@@ -101,7 +110,7 @@ export type Event =
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue', 'answer']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -117,6 +126,11 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'open-newest') return str('cwd', true)
 	if (c.type === 'submit' && c.queue !== undefined && typeof c.queue !== 'boolean') return 'submit: queue must be a boolean'
 	if (c.type === 'draft' && c.base !== undefined && !Number.isInteger(c.base)) return 'draft: base must be an integer'
+	if (c.type === 'answer') {
+		let a = c.answers
+		let strings = a && typeof a === 'object' && !Array.isArray(a) && Object.values(a).every((v) => typeof v === 'string')
+		return str('sessionId') ?? str('question') ?? (strings ? undefined : 'answer: answers must map names to strings')
+	}
 	return str('sessionId') ?? (c.type === 'submit' || c.type === 'draft' ? str('text') : undefined)
 }
 

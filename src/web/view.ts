@@ -3,13 +3,15 @@
 // passing notice, and what each item looks like as text. page.ts feeds
 // it the events from link.ts and draws it.
 
+import { forms, type FormState, type Key } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Item, type Resumed, type Transcript } from '../common/transcript.ts'
 
 // `resumed`: where the history of the last snapshot ends, marked on the page.
-export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string }
+// `form`: the open question as filled in on this page.
+export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState }
 
 // One transcript item as shown: CSS classes and its text. The classes
 // are theme style names (src/common/colors.ts in kebab case), whose CSS
@@ -22,8 +24,29 @@ function onEvent(st: ViewState, event: Event): ViewState {
 	if (event.type === 'warning') return { ...st, notice: event.text }
 	let t = transcript.fold(st.transcript, event)
 	if (t === st.transcript) return st
-	if (event.type === 'snapshot' && t) return { ...st, transcript: t, resumed: transcript.resumed(event.snapshot, t) }
-	return { ...st, transcript: t }
+	let next: ViewState = { ...st, transcript: t }
+	if (event.type === 'snapshot' && t) next.resumed = transcript.resumed(event.snapshot, t)
+	let form = forms.follow(st.form, transcript.question(t))
+	if (form) next.form = form
+	else delete next.form
+	return next
+}
+
+// A browser key as a form key, or undefined for keys forms ignore.
+function key(e: { key: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean }): Key | undefined {
+	let names: Record<string, string> = { Enter: 'enter', Escape: 'escape', Tab: 'tab', ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Backspace: 'backspace', Delete: 'delete', Home: 'home', End: 'end' }
+	let mods = { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey }
+	if (names[e.key]) return { key: names[e.key]!, ...mods }
+	return [...e.key].length === 1 ? { key: e.key, text: e.key, ...mods } : undefined
+}
+
+// A key on the open form: the new state and the command to send, if any
+// (the answer, or a pause for Escape).
+function formKey(st: ViewState, k: Key): { state: ViewState; command?: unknown } {
+	if (!st.form || !st.transcript) return { state: st }
+	let { state, action } = forms.step(st.form, k)
+	let next = { ...st, form: state }
+	return action ? { state: next, command: forms.command(st.transcript.meta.id, state, action) } : { state: next }
 }
 
 // What Enter with `text` does: send a prompt (steering a busy turn;
@@ -82,6 +105,10 @@ function show(item: Item): Shown {
 			if (item.status === 'error') return { kind: 'end error', text: `error: ${item.error ?? 'turn failed'}` }
 			if (item.status === 'completed') return null
 			return { kind: 'end log', text: `[${item.status}]` }
+		case 'question': {
+			let said = item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
+			return { kind: 'question warning', text: [`? ${item.form.text}`, ...said.map((l) => `  ${l}`)].join('\n') }
+		}
 	}
 }
 
@@ -89,6 +116,8 @@ export const view = {
 	// Rows of a tool result shown in the transcript.
 	resultRows: () => 8,
 	onEvent,
+	key,
+	formKey,
 	submit,
 	pause,
 	status,

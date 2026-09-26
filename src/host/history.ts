@@ -18,7 +18,7 @@ import { sessions, type SessionMeta } from './sessions.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
 
-const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox'])
+const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer'])
 
 // One running turn: its current provider round (`turn`), how many of
 // that round's blocks are on disk, and the usage of earlier rounds.
@@ -216,6 +216,13 @@ function end(id: string, last: DoneEvent | ErrorEvent | undefined): void {
 	else history.append(id, { type: 'turn_end', status: 'paused', usage })
 }
 
+// Stops recording the running turn without ending it: it asked a
+// question and waits, unfinished, with nothing in memory. The answer
+// runs it again. Usage of its rounds so far is not kept.
+function park(id: string): void {
+	history.state.running.delete(id)
+}
+
 // For a host about to exit: writes every running turn's output so far
 // and stops recording it. With `pause` (Ctrl-C of the last Hal process)
 // each turn is ended as paused; otherwise it is left unfinished, for the
@@ -281,6 +288,7 @@ export const history = {
 	record,
 	results,
 	end,
+	park,
 	stop,
 	live,
 	turn,

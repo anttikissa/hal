@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { colors } from '../common/colors.ts'
+import { forms } from '../common/forms.ts'
 import { oklch, type Oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
@@ -181,4 +182,40 @@ test('the terminal follows a theme override at the next build', () => {
 	} finally {
 		colors.fgL = saved
 	}
+})
+
+const ask = { type: 'text' as const, name: 'name', label: 'Name', placeholder: 'leave empty' }
+const secretForm = { text: 'Log in', fields: [{ type: 'secret' as const, name: 'key', label: 'Key' }, { type: 'choice' as const, name: 'ok', options: ['yes', 'no'] }] }
+
+test('an open question shows its fields and takes the cursor into the focused text', () => {
+	let item: Item = { type: 'question', id: 'q1', form: { text: 'How should I call you?', fields: [ask] } }
+	let v = view([item], 'draft')
+	let st = forms.step(forms.start('q1', item.form), { key: 'D', text: 'D' }).state
+	let f = frame.build({ ...v, form: st }, 40)
+	let rows = plain(f.lines)
+	expect(rows[0]).toBe('? How should I call you?')
+	expect(rows[1]).toBe('Name: D')
+	// The cursor is just after the typed D, on the frame's row for it.
+	expect(f.cursor).toEqual({ row: 1, col: strip(f.lines[1]!).indexOf('D') + 1 })
+	// An empty text shows its placeholder; the prompt stays below.
+	let empty = frame.build({ ...v, form: forms.start('q1', item.form) }, 40)
+	expect(plain(empty.lines)[1]).toBe('Name: leave empty')
+	expect(plain(empty.lines).at(-1)).toBe('> draft')
+})
+
+test('a secret is never on screen; the chosen option is marked', () => {
+	let item: Item = { type: 'question', id: 'q1', form: secretForm }
+	let st = forms.start('q1', secretForm)
+	for (let c of 'sk-éé') st = forms.step(st, { key: c, text: c }).state
+	let f = frame.build({ ...view([item]), form: st }, 40)
+	expect(f.lines.join('\n')).not.toContain('sk-')
+	expect(plain(f.lines)[1]).toBe('Key: •••••')
+	expect(f.lines[2]).toContain('\x1b[7m yes \x1b[27m')
+})
+
+test('an answered question shows its answers, secrets only as given; one not answered says so', () => {
+	let done: Item = { type: 'question', id: 'q1', form: secretForm, answers: { ok: 'yes' }, secrets: ['key'] }
+	expect(plain(frame.build(view([done]), 40).lines).slice(0, 3)).toEqual(['? Log in', 'Key: (given)', 'yes'])
+	let left: Item = { type: 'question', id: 'q1', form: secretForm }
+	expect(plain(frame.build(view([left]), 40).lines).slice(0, 2)).toEqual(['? Log in', '(not answered)'])
 })

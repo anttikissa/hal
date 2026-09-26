@@ -1,0 +1,199 @@
+// Forms: the one way Hal asks a human something (tasks/w4/forms.md).
+// A form is a list of fields; a durable question is a form in session
+// history, answered from any client (first answer wins). This module
+// holds what every client shares: the form's shape, checking and
+// redacting answers, finding the open question in history, and the
+// key handling of a form being filled in, as a pure function of
+// (state, key) → state, so keys mean the same in terminal and web.
+
+import type { HistoryRecord } from './replay.ts'
+
+export type Field =
+	// One line of text; may be left empty.
+	| { type: 'text'; name: string; label?: string; placeholder?: string }
+	// Like text, but never shown and never written to history.
+	| { type: 'secret'; name: string; label?: string }
+	// One of `options`, `initial` (an index) selected at first: y/N is
+	// ['yes', 'no'] with initial 1; a single option is "press Enter".
+	| { type: 'choice'; name: string; label?: string; options: string[]; initial?: number }
+
+export type Form = { text: string; fields: Field[] }
+
+// Field name → value. A choice's value is one of its options.
+export type Answers = Record<string, string>
+
+// A key as both clients report it (the terminal's KeyEvent fits).
+export type Key = { key: string; text?: string; shift?: boolean; ctrl?: boolean; alt?: boolean; cmd?: boolean }
+
+// A form being filled in: one value per field, the focused field and
+// the cursor (a UTF-16 offset on a grapheme boundary) in its text.
+export type FormState = { id: string; form: Form; values: string[]; focus: number; cursor: number }
+
+export type FormAction = { type: 'submit'; answers: Answers } | { type: 'cancel' }
+
+type QuestionRecord = Extract<HistoryRecord, { type: 'question' }>
+
+// Why `value` is not a usable form, or undefined if it is. Forms come
+// from trusted host code, but a bad one must fail where it is made.
+function invalid(value: unknown): string | undefined {
+	let f = value as Form
+	if (!f || typeof f.text !== 'string' || !Array.isArray(f.fields) || !f.fields.length) return 'a form needs text and fields'
+	let names = new Set<string>()
+	for (let field of f.fields) {
+		if (!field || typeof field.name !== 'string' || names.has(field.name)) return 'every field needs a unique name'
+		names.add(field.name)
+		if (field.type === 'choice') {
+			if (!Array.isArray(field.options) || !field.options.length || field.options.some((o) => typeof o !== 'string')) return `${field.name}: choices need options`
+		} else if (field.type !== 'text' && field.type !== 'secret') return `${(field as Field).name}: unknown field type`
+	}
+	return undefined
+}
+
+// Why `answers` do not answer `form`, or undefined if they do. Answers
+// cross the wire, so the host checks them before recording anything.
+function check(form: Form, answers: unknown): string | undefined {
+	if (!answers || typeof answers !== 'object' || Array.isArray(answers)) return 'answers must be an object'
+	let a = answers as Record<string, unknown>
+	for (let key of Object.keys(a)) if (!form.fields.some((f) => f.name === key)) return `no field named ${key}`
+	for (let f of form.fields) {
+		let v = a[f.name]
+		if (typeof v !== 'string') return `${f.name}: answer must be a string`
+		if (f.type === 'choice' && !f.options.includes(v)) return `${f.name}: not one of ${f.options.join(', ')}`
+	}
+	return undefined
+}
+
+// Answers as history keeps them: secrets left out, only named as given.
+function redact(form: Form, answers: Answers): { answers: Answers; secrets?: string[] } {
+	let kept: Answers = {}
+	let secrets: string[] = []
+	for (let f of form.fields) {
+		if (f.type === 'secret') secrets.push(f.name)
+		else kept[f.name] = answers[f.name]!
+	}
+	return secrets.length ? { answers: kept, secrets } : { answers: kept }
+}
+
+// The question waiting for an answer: the last one in the unfinished
+// turn, if nothing answered it since. A turn end closes it (a pause).
+function open(records: HistoryRecord[]): QuestionRecord | undefined {
+	for (let i = records.length - 1; i >= 0; i--) {
+		let r = records[i]!
+		if (r.type === 'question') return r
+		if (r.type === 'answer' || r.type === 'turn_end') return undefined
+	}
+	return undefined
+}
+
+// A question answered, in one line per field: "Dave", "API key: (given)".
+function summary(form: Form, answers: Answers, secrets: string[] = []): string[] {
+	return form.fields.map((f) => {
+		let value = secrets.includes(f.name) ? '(given)' : answers[f.name] || '(empty)'
+		return f.label ? `${f.label}: ${value}` : value
+	})
+}
+
+function start(id: string, form: Form): FormState {
+	let values = form.fields.map((f) => (f.type === 'choice' ? f.options[Math.min(f.initial ?? 0, f.options.length - 1)]! : ''))
+	return { id, form, values, focus: 0, cursor: 0 }
+}
+
+// The form state for question `open` (the transcript's open one): the
+// one being filled in if it is for that question, else a fresh one.
+function follow(st: FormState | undefined, open: { id: string; form: Form } | undefined): FormState | undefined {
+	if (!open) return undefined
+	return st?.id === open.id ? st : forms.start(open.id, open.form)
+}
+
+// The value of a text or secret field set from outside (a browser input).
+function set(st: FormState, index: number, value: string): FormState {
+	let values = st.values.slice()
+	values[index] = value
+	return { ...st, values, focus: index, cursor: value.length }
+}
+
+const segmenter = new Intl.Segmenter()
+
+function edges(text: string): number[] {
+	return [...[...segmenter.segment(text)].map((s) => s.index), text.length]
+}
+
+function answers(st: FormState): Answers {
+	return Object.fromEntries(st.form.fields.map((f, i) => [f.name, st.values[i]!]))
+}
+
+function focusOn(st: FormState, focus: number): FormState {
+	let n = st.form.fields.length
+	focus = (focus + n) % n
+	return { ...st, focus, cursor: st.values[focus]!.length }
+}
+
+// What `key` does to the form. Enter moves to the next field and on
+// the last one submits; Tab, Shift-Tab, up and down move between
+// fields; Escape cancels (the client pauses the session). A choice
+// changes with left and right, or picks the option with the typed
+// initial, which on a one-field form also submits (y on y/N).
+function step(st: FormState, key: Key): { state: FormState; action?: FormAction } {
+	let field = st.form.fields[st.focus]!
+	let last = st.focus === st.form.fields.length - 1
+	let plain = !key.ctrl && !key.alt && !key.cmd
+	switch (key.key) {
+		case 'escape':
+			return { state: st, action: { type: 'cancel' } }
+		case 'enter':
+			if (!plain) return { state: st }
+			return last ? { state: st, action: { type: 'submit', answers: forms.answers(st) } } : { state: forms.focusOn(st, st.focus + 1) }
+		case 'tab':
+			return { state: forms.focusOn(st, st.focus + (key.shift ? -1 : 1)) }
+		case 'down':
+			return { state: forms.focusOn(st, st.focus + 1) }
+		case 'up':
+			return { state: forms.focusOn(st, st.focus - 1) }
+	}
+	let value = st.values[st.focus]!
+	if (field.type === 'choice') {
+		let at = field.options.indexOf(value)
+		let move = key.key === 'left' ? -1 : key.key === 'right' ? 1 : 0
+		if (move) return { state: forms.set(st, st.focus, field.options[(at + move + field.options.length) % field.options.length]!) }
+		let typed = plain && key.text?.toLowerCase()
+		let pick = typed ? field.options.find((o) => o.toLowerCase().startsWith(typed)) : undefined
+		if (!pick) return { state: st }
+		let state = forms.set(st, st.focus, pick)
+		return st.form.fields.length === 1 ? { state, action: { type: 'submit', answers: forms.answers(state) } } : { state }
+	}
+	let put = (text: string, cursor: number) => {
+		let state = forms.set(st, st.focus, text)
+		return { state: { ...state, cursor } }
+	}
+	let bounds = edges(value)
+	let before = bounds.filter((b) => b < st.cursor).at(-1) ?? 0
+	let after = bounds.find((b) => b > st.cursor) ?? value.length
+	switch (key.key) {
+		case 'left':
+			return { state: { ...st, cursor: before } }
+		case 'right':
+			return { state: { ...st, cursor: after } }
+		case 'home':
+			return { state: { ...st, cursor: 0 } }
+		case 'end':
+			return { state: { ...st, cursor: value.length } }
+		case 'backspace':
+			return st.cursor ? put(value.slice(0, before) + value.slice(st.cursor), before) : { state: st }
+		case 'delete':
+			return put(value.slice(0, st.cursor) + value.slice(after), st.cursor)
+	}
+	let text = key.key === 'paste' || plain ? key.text : undefined
+	if (!text) return { state: st }
+	// One line: a pasted newline becomes a space.
+	text = text.replace(/\r?\n|\r/g, ' ')
+	return put(value.slice(0, st.cursor) + text + value.slice(st.cursor), st.cursor + text.length)
+}
+
+// The command a form action sends for session `sessionId`: the answer,
+// or a pause for Escape.
+function command(sessionId: string, st: FormState, action: FormAction): unknown {
+	if (action.type === 'cancel') return { type: 'pause', sessionId }
+	return { type: 'answer', sessionId, question: st.id, answers: action.answers }
+}
+
+export const forms = { invalid, check, redact, open, summary, start, follow, set, answers, focusOn, step, command }

@@ -6,6 +6,7 @@
 // until the host has it.
 
 import { connection, type LinkState } from '../common/connection.ts'
+import { forms, type FormState } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
@@ -17,7 +18,9 @@ import { terminal } from './terminal.ts'
 import type { View } from './frame.ts'
 
 // `resumed`: where the history of the last snapshot ends, marked on screen.
-type AppState = { transcript?: Transcript; resumed?: Resumed; prompt: PromptState; notice?: string }
+// `form`: the session's open question as filled in here; while there is
+// one, keys go to it instead of the prompt.
+type AppState = { transcript?: Transcript; resumed?: Resumed; prompt: PromptState; notice?: string; form?: FormState }
 
 function createState(): AppState {
 	return { prompt: prompt.empty() }
@@ -30,6 +33,7 @@ function view(): View {
 	if (st.resumed) v.resumed = st.resumed
 	let pending = st.transcript ? drafts.pending(st.transcript.meta.id) : []
 	if (pending.length) v.pending = pending
+	if (st.form) v.form = st.form
 	// A passing notice, else what the session is doing.
 	let notice = st.notice ?? (st.transcript && states.describe(st.transcript.state))
 	if (notice) v.notice = notice
@@ -56,6 +60,7 @@ function onEvent(event: Event): void {
 			if (early) drafts.edit(id, drafts.text(id) ? `${drafts.text(id)}\n${early}` : early)
 			app.setPrompt(drafts.text(id))
 		}
+		st.form = forms.follow(st.form, transcript.question(t))
 	}
 	app.show()
 }
@@ -99,6 +104,12 @@ function setPrompt(text: string): void {
 function onKeys(events: KeyEvent[]): void {
 	let st = app.state
 	for (let k of events) {
+		if (st.form && st.transcript) {
+			let { state, action } = forms.step(st.form, k)
+			st.form = state
+			if (action) app.send(forms.command(st.transcript.meta.id, state, action))
+			continue
+		}
 		let { state, action } = prompt.apply(st.prompt, k)
 		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'

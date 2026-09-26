@@ -217,3 +217,26 @@ test('text typed before the session arrives is kept in its draft', () => {
 	expect(app.view().prompt.text).toBe('saved\nearly')
 	expect(drafted.at(-1)?.text).toBe('saved\nearly')
 })
+
+test('an open question takes the keys until it is answered; the prompt keeps its text', () => {
+	app.onEvent(snapshot())
+	type('draft')
+	let form = { text: 'How should I call you?', fields: [{ type: 'text' as const, name: 'name' }] }
+	app.onEvent({ type: 'question', sessionId: 's1', id: 'q1', form })
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'blocked', reason: 'question' } })
+	type('Dave')
+	enter()
+	expect(sent).toEqual([{ type: 'answer', sessionId: 's1', question: 'q1', answers: { name: 'Dave' } }])
+	expect(app.view().form?.values).toEqual(['Dave'])
+	app.onEvent({ type: 'answer', sessionId: 's1', question: 'q1', answers: { name: 'Dave' } })
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'requesting' } })
+	expect(app.view().form).toBeUndefined()
+	expect(app.view().prompt.text).toBe('draft')
+})
+
+test('Escape on an open question pauses the session', () => {
+	app.onEvent(snapshot('s1', { type: 'blocked', reason: 'question' }))
+	app.onEvent({ type: 'question', sessionId: 's1', id: 'q1', form: { text: 'Go?', fields: [{ type: 'choice', name: 'go', options: ['continue'] }] } })
+	escape()
+	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
+})
