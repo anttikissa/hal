@@ -1,0 +1,6 @@
+{
+	title: 'Minimal bash tool with a required description',
+	description: 'Add a bash tool, kept as small as possible: run one command with bash -c in the session cwd, honour the turn abort signal, and return exit status plus combined stdout/stderr bounded like read. Its input has two required fields: command and description, a short plain-language sentence saying what the command does and why (e.g. "Show the first 40 lines of the config"), so that chains of cat, sed and pipes stay intelligible to the user. A missing or empty description is an error result and the command does not run. The transcript shows the description prominently and the command beside it. Bash mutates, so face the crash case: a call recorded but with no result is never re-run on restart and the model is told it may or may not have run. No sandbox or approval yet.',
+	status: 'planned',
+	needs: ['sj']
+}
