@@ -1,0 +1,23 @@
+# b8 notes
+
+- Hal's bash tool refuses any command whose text mentions the
+  credentials filename, including heredocs, inline scripts and commit
+  messages. Use the write/edit tools for files that mention it, and
+  leave the name out of commit messages.
+- The artifact's `ensureFresh` logs a failed refresh and carries on
+  with the stale token. The task wants a clear error instead, so
+  `auth.anthropic()` throws.
+- OAuth error responses can echo the refresh token (for example in
+  `error_description`). Only the HTTP status and a sanitized `error`
+  code go into messages.
+- A liveFile for a missing path just returns the defaults, so auth
+  checks that the file exists first. Otherwise a missing file would
+  surface as "no anthropic credentials" and the cause would be hidden.
+- paths.ts originally said Hal never writes this file; b8 contradicts
+  that (it writes refreshed tokens back), so the comment was changed.
+- Left out on purpose (later tasks may need them): rotating across
+  several accounts, 429 cooldowns and the ANTHROPIC_API_KEY
+  environment fallback. The first usable entry always wins.
+- Tests point `auth.tokenUrl` at a local Bun.serve server and must call
+  `auth.close()` in afterEach, or the directory watcher outlives the
+  temp home.
