@@ -219,3 +219,24 @@ test('an answered question shows its answers, secrets only as given; one not ans
 	let left: Item = { type: 'question', id: 'q1', form: secretForm }
 	expect(plain(frame.build(view([left]), 40).lines).slice(0, 2)).toEqual(['? Log in', '(not answered)'])
 })
+
+test('a quote shows under the question with its marked part highlighted on every row it wraps to', () => {
+	let command = 'cd build && rm -rf everything-in-this-directory'
+	let from = command.indexOf('rm')
+	let form = { text: 'Run this?', quote: { text: command, marks: [[from, command.length]] as [number, number][] }, fields: [{ type: 'choice' as const, name: 'run', options: ['yes', 'no'], initial: 1 }] }
+	let item: Item = { type: 'question', id: 'q1', form }
+	let open = frame.build({ ...view([item]), form: forms.start('q1', form) }, 30).lines
+	let answered = frame.build(view([{ ...item, answers: { run: 'no' } }]), 30).lines
+	for (let lines of [open, answered]) {
+		// Quote rows are indented past the answer rows.
+		let rows = lines.filter((l) => strip(l).startsWith(' '.repeat(5)))
+		expect(rows.length).toBe(3)
+		expect(rows.map((r) => strip(r).trim()).join(' ').replace(/\s+/g, ' ')).toContain('cd build && rm -rf')
+		// Marked text is inverse; every row ends it, so nothing bleeds.
+		expect(rows[0]).toContain('\x1b[7mrm')
+		expect(rows[0]).not.toContain('\x1b[7mcd')
+		for (let row of rows.slice(1)) expect(row).toContain('\x1b[7m')
+		for (let row of rows) expect(row.lastIndexOf('\x1b[7m')).toBeLessThan(row.lastIndexOf('\x1b[27m'))
+	}
+	expect(plain(answered)).toContain('no')
+})

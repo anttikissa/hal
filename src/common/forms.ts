@@ -17,7 +17,11 @@ export type Field =
 	// ['yes', 'no'] with initial 1; a single option is "press Enter".
 	| { type: 'choice'; name: string; label?: string; options: string[]; initial?: number }
 
-export type Form = { text: string; fields: Field[] }
+// `quote`: text shown as it is below the question (a command to
+// approve), with `marks`, [start, end) offsets, highlighted.
+export type Quote = { text: string; marks?: [number, number][] }
+
+export type Form = { text: string; quote?: Quote; fields: Field[] }
 
 // Field name → value. A choice's value is one of its options.
 export type Answers = Record<string, string>
@@ -38,6 +42,12 @@ type QuestionRecord = Extract<HistoryRecord, { type: 'question' }>
 function invalid(value: unknown): string | undefined {
 	let f = value as Form
 	if (!f || typeof f.text !== 'string' || !Array.isArray(f.fields) || !f.fields.length) return 'a form needs text and fields'
+	if (f.quote !== undefined) {
+		let q = f.quote
+		if (!q || typeof q.text !== 'string') return 'a quote needs text'
+		let ok = (m: unknown) => Array.isArray(m) && m.length === 2 && Number.isInteger(m[0]) && Number.isInteger(m[1]) && 0 <= m[0] && m[0] <= m[1] && m[1] <= q.text.length
+		if (q.marks !== undefined && (!Array.isArray(q.marks) || !q.marks.every(ok))) return 'quote marks must be [start, end] offsets into its text'
+	}
 	let names = new Set<string>()
 	for (let field of f.fields) {
 		if (!field || typeof field.name !== 'string' || names.has(field.name)) return 'every field needs a unique name'
@@ -83,6 +93,24 @@ function open(records: HistoryRecord[]): QuestionRecord | undefined {
 		if (r.type === 'answer' || r.type === 'turn_end') return undefined
 	}
 	return undefined
+}
+
+// A quote cut into its plain and marked parts, in order; overlapping
+// marks merge.
+function quoteParts(q: Quote): { text: string; marked: boolean }[] {
+	let marks = [...(q.marks ?? [])].sort((a, b) => a[0] - b[0])
+	let out: { text: string; marked: boolean }[] = []
+	let at = 0
+	let add = (to: number, marked: boolean) => {
+		if (to > at) out.push({ text: q.text.slice(at, to), marked })
+		at = Math.max(at, to)
+	}
+	for (let [from, to] of marks) {
+		add(from, false)
+		add(to, true)
+	}
+	add(q.text.length, false)
+	return out
 }
 
 // A question answered, in one line per field: "Dave", "API key: (given)".
@@ -196,4 +224,4 @@ function command(sessionId: string, st: FormState, action: FormAction): unknown 
 	return { type: 'answer', sessionId, question: st.id, answers: action.answers }
 }
 
-export const forms = { invalid, check, redact, open, summary, start, follow, set, answers, focusOn, step, command }
+export const forms = { invalid, check, redact, open, quoteParts, summary, start, follow, set, answers, focusOn, step, command }

@@ -93,6 +93,12 @@ function formNode(item: Item & { type: 'question' }): HTMLElement {
 	let st = page.state
 	let box = el('form', { className: 'question warning' })
 	box.append(el('div', { textContent: `? ${item.form.text}` }))
+	// The quote (a command to approve) with its marked parts highlighted.
+	if (item.form.quote) {
+		let pre = el('pre', { className: 'quote' })
+		for (let part of forms.quoteParts(item.form.quote)) pre.append(part.marked ? el('mark', { textContent: part.text }) : part.text)
+		box.append(pre)
+	}
 	st.fields = item.form.fields.map((f, i) => {
 		let label = f.label ?? item.form.text
 		if (f.type === 'choice') {

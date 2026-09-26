@@ -1,6 +1,13 @@
 {
 	title: 'Approval for dangerous tool calls',
 	description: 'Before running a tool call, the host checks it against patterns for dangerous commands (rm -rf and friends; not plain rm -f, which models overuse harmlessly). A match asks a durable y/N question showing the call with the offending part highlighted; No returns an error result to the model, Yes runs it. The config setting security switches it: best-effort (default: ask on matches) or none (never ask). It is best effort by name: no sandbox, and a determined model gets around patterns. See tasks/w4/forms.md (Approval).',
-	status: 'planned',
-	needs: ['w4', '1r', 'pc']
+	status: 'done',
+	needs: ['w4', '1r', 'pc'],
+	notes: [
+		'Shape: src/host/approval.ts holds the patterns (only bash commands, split at ; & | and newlines; rm needs both recursive and force, rm -rf inside /tmp or of a mktemp dir is allowed; git reset --hard, clean -f/-x/-d, stash drop/clear, push --force/-f, checkout/restore of paths), form(call) (y/N, default No, undefined when security is none or nothing matches), declined(call), and held(records).',
+		'Highlight: Form has an optional quote { text, marks: [start, end][] }, cut by forms.quoteParts. Terminal: frame.quoteLines (inverse, reopened and closed on every wrapped row). Web: <pre class=quote> with <mark>; answered questions show the quote as plain text (view.show).',
+		"Flow: runTurn asks for the first undecided dangerous call of a round (question record `call`), one question at a time, before any call of that round runs. The re-run turn finds the calls held (approval.held: the last round's calls, asked about, no results, and no `continue` after all questions were answered, since then they may have run) and the decisions from the answers, and runs them (declined ones get an error result) before its next round.",
+		'A pause at an approval then continue asks again; replay (toMessages) keeps held calls pending across that `continue` instead of giving them "may or may not have run" results, as held() runs them. Answered-then-crash is treated as maybe-run: never run twice.',
+		"Usage across a question (fixed for every question, not only approval): history.park returns the turn's usage so far, host.ask keeps it in the question record (`usage`), runTurn starts with history.carry(host.parkedUsage(records)), and host.stop of a parked turn ends it with that usage. So the turn end counts every round, even across a restart."
+	]
 }

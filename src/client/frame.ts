@@ -8,7 +8,7 @@
 // it shows.
 
 import { colors, type Style } from '../common/colors.ts'
-import { forms, type FormState } from '../common/forms.ts'
+import { forms, type FormState, type Quote } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
 import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
@@ -130,11 +130,34 @@ function itemLines(item: Item, width: number): string[] {
 			if (item.status === 'completed') return []
 			return [`[${item.status}]`]
 		case 'question': {
-			let rows = frame.wrap(`? ${item.form.text}`, width)
+			let rows = [...frame.wrap(`? ${item.form.text}`, width), ...frame.quoteLines(item.form.quote, width)]
 			let said = item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
 			return [...rows, ...said.flatMap((l) => frame.wrap(l, width - 2).map((r) => `  ${r}`))]
 		}
 	}
+}
+
+// Rows of a question's quote, indented, its marked parts in inverse.
+// Each row closes what it opens and reopens what it continues, so a
+// repaint of one row never leaks inverse into another.
+function quoteLines(quote: Quote | undefined, width: number): string[] {
+	if (!quote) return []
+	let indent = '    '
+	let text = forms
+		.quoteParts(quote)
+		.map((p) => {
+			let t = frame.clean(p.text.replace(/\r\n?/g, '\n'))
+			return p.marked ? t.split('\n').map((l) => INVERSE + l + UNINVERSE).join('\n') : t
+		})
+		.join('')
+	let on = false
+	return strings.wordWrap(strings.expandTabs(text), Math.max(1, width - indent.length)).map((r) => {
+		let row = (on ? INVERSE : '') + r
+		let opened = r.lastIndexOf(INVERSE)
+		let closed = r.lastIndexOf(UNINVERSE)
+		if (opened !== closed) on = opened > closed
+		return indent + row + (on ? UNINVERSE : '')
+	})
 }
 
 /**
@@ -143,7 +166,7 @@ function itemLines(item: Item, width: number): string[] {
  * selected option.
  */
 function formLines(st: FormState, width: number): { rows: string[]; cursor: { row: number; col: number } } {
-	let rows = frame.wrap(`? ${st.form.text}`, width)
+	let rows = [...frame.wrap(`? ${st.form.text}`, width), ...frame.quoteLines(st.form.quote, width)]
 	let cursor = { row: 0, col: 0 }
 	st.form.fields.forEach((field, i) => {
 		let head = `  ${field.label ? `${frame.clean(field.label)}: ` : ''}`
@@ -263,6 +286,7 @@ export const frame = {
 	toolStyle,
 	itemStyle,
 	itemLines,
+	quoteLines,
 	formLines,
 	layoutPrompt,
 	build,

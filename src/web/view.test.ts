@@ -136,3 +136,13 @@ test('Up on an empty input while the model works edits the last prompt; Enter se
 	// Escape keeps changed text.
 	expect(view.editKey(editing, 'escape', 'fix it')).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: 'fix it' })
 })
+
+test('a question shows its quote under the text', () => {
+	let form = { text: 'Run this?', quote: { text: 'rm -rf x', marks: [[0, 8]] as [number, number][] }, fields: [{ type: 'choice' as const, name: 'run', options: ['yes', 'no'] }] }
+	let st = fold([
+		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'blocked', reason: 'question' } } },
+		{ type: 'question', sessionId, id: 'q1', form },
+		{ type: 'answer', sessionId, question: 'q1', answers: { run: 'no' } },
+	])
+	expect(shown(st)).toEqual([{ kind: 'question warning', text: '? Run this?\n    rm -rf x\n  no' }])
+})

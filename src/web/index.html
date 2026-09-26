@@ -24,6 +24,8 @@ textarea:focus, input:focus { border-color: var(--accent); }
 form { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
 main > form.question { max-width: 60rem; margin: 0 auto 0.9rem; padding: 0.4rem 0.6rem; border-radius: 4px; gap: 0.4rem; }
 form.question button { padding: 0.2rem 0.8rem; }
+form.question pre.quote { margin: 0 0 0 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+form.question mark { background: currentColor; color: var(--bg); }
 button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
 button { background: #2b3a55; color: var(--fg); border: 0; border-radius: 6px; padding: 0.5rem; cursor: pointer; }
 /* The theme (src/common/colors.ts), put here by the host. */

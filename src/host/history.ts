@@ -218,9 +218,19 @@ function end(id: string, last: DoneEvent | ErrorEvent | undefined): void {
 
 // Stops recording the running turn without ending it: it asked a
 // question and waits, unfinished, with nothing in memory. The answer
-// runs it again. Usage of its rounds so far is not kept.
-function park(id: string): void {
+// runs it again. Returns the usage of its rounds so far, which the
+// caller keeps in history for the turn to go on from (carry).
+function park(id: string): Usage {
+	let running = history.state.running.get(id)
 	history.state.running.delete(id)
+	return running ? addUsage(running.prior, running.turn.usage) : {}
+}
+
+// Starts recording a turn that already used `usage` (the rounds before
+// it was parked), so its end counts them. A turn carried but ended
+// before any round (held tool calls, then a pause) still gets its end.
+function carry(id: string, providerName: string, usage: Usage): void {
+	history.state.running.set(id, { turn: blocks.newTurn(providerName), written: 0, prior: { ...usage } })
 }
 
 // For a host about to exit: writes every running turn's output so far
@@ -289,6 +299,7 @@ export const history = {
 	results,
 	end,
 	park,
+	carry,
 	stop,
 	live,
 	turn,

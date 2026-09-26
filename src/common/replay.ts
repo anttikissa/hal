@@ -30,7 +30,10 @@ export type HistoryRecord =
 	| { type: 'continue'; ts: string }
 	// A durable question (tasks/w4/forms.md): the turn waits, blocked,
 	// with nothing in memory, until an answer re-runs whoever asked.
-	| { type: 'question'; id: string; form: Form; ts: string }
+	// `call`: the tool call it asks approval for (host/approval.ts).
+	// `usage`: the turn's usage so far, which the answered turn goes on
+	// from, as nothing of the turn stays in memory while it waits.
+	| { type: 'question'; id: string; form: Form; call?: string; usage?: Usage; ts: string }
 	// The first answer to question `question`. Secret fields are left
 	// out of `answers` and only named in `secrets`.
 	| { type: 'answer'; question: string; answers: Answers; secrets?: string[]; ts: string }
@@ -55,9 +58,19 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		else if (msg.blocks.length) out.push(msg)
 	}
 	let prev: HistoryRecord | undefined
+	// The approval question the pending calls wait on, while unanswered:
+	// none of them has run, and a continue runs them (host/approval.ts).
+	let waiting: string | undefined
 	for (let r of records) {
+		if (r.type === 'question' && r.call !== undefined && pending.includes(r.call)) waiting = r.id
+		if (r.type === 'answer' && r.question === waiting) waiting = undefined
 		// For the human; whoever asked hears the answer another way.
 		if (r.type === 'inbox' || r.type === 'question' || r.type === 'answer') continue
+		// Held calls go on waiting for their results.
+		if (r.type === 'continue' && waiting !== undefined) {
+			note = undefined
+			continue
+		}
 		let before = prev
 		prev = r
 		if (r.type === 'turn_end') {
@@ -69,6 +82,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			let cut = out.at(-1)?.role === 'assistant'
 			let missing = pending.map((id): ToolResultBlock => ({ type: 'tool_result', id, output: replay.missingResult(why), isError: true }))
 			pending = []
+			waiting = undefined
 			push({ role: 'user', blocks: missing })
 			if (cut) push({ role: 'user', blocks: [{ type: 'text', text: replay.continueNote }] })
 		} else if (r.type === 'assistant') {
@@ -83,6 +97,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 				.filter((id) => !answered.has(id))
 				.map((id): ToolResultBlock => ({ type: 'tool_result', id, output: replay.missingResult(status), isError: true }))
 			pending = []
+			waiting = undefined
 			push({ role: 'user', blocks: [...results, ...missing] })
 			let texts = r.blocks.filter((b) => b.type === 'text')
 			if (!texts.length) continue

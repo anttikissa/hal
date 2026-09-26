@@ -29,11 +29,12 @@
 
 import { ason } from '../common/ason.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
-import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock } from '../common/blocks.ts'
+import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolCallBlock, type ToolResultBlock, type Usage } from '../common/blocks.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import { protocol, type Command, type Event, type Snapshot } from '../common/protocol.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states, type SessionState, type StateEvent } from '../common/states.ts'
+import { approval } from './approval.ts'
 import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { config } from './config.ts'
@@ -388,14 +389,19 @@ function resume(id: string): string | undefined {
 
 // Asks the open turn's human a durable question: in history first,
 // then shown; the turn stops running here and waits, blocked, for the
-// first answer (reply), which runs it again. Nothing waits in memory.
-function ask(id: string, form: Form): void {
+// first answer (reply), which runs it again. Nothing waits in memory:
+// the question keeps the turn's usage so far. `call`: the tool call it
+// asks approval for.
+function ask(id: string, form: Form, call?: string): void {
 	let problem = forms.invalid(form)
 	if (problem) throw new Error(`bad question: ${problem}`)
 	let question = crypto.randomUUID().slice(0, 8)
-	history.park(id)
+	let usage = history.park(id)
 	host.state.running.delete(id)
-	history.append(id, { type: 'question', id: question, form })
+	let record: Omit<HistoryRecord & { type: 'question' }, 'ts'> = { type: 'question', id: question, form }
+	if (call !== undefined) record.call = call
+	if (Object.keys(usage).length) record.usage = usage
+	history.append(id, record)
 	host.broadcast(id, { type: 'question', sessionId: id, id: question, form })
 	host.transition(id, { type: 'block', reason: 'question' })
 }
@@ -438,10 +444,13 @@ function stop(id: string, reason?: string): string | undefined {
 	if (refused) return refused
 	let running = host.state.running.get(id)
 	if (running) return void running.controller.abort()
-	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = { type: 'turn_end', status: 'paused', usage: {} }
+	// A turn parked at a question has its usage so far there.
+	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = { type: 'turn_end', status: 'paused', usage: forms.open(history.readSync(id))?.usage ?? {} }
 	if (reason !== undefined) end.pauseReason = reason
 	history.append(id, end)
-	host.broadcast(id, { type: 'turn-end', sessionId: id, status: 'paused' })
+	let ended: Event = { type: 'turn-end', sessionId: id, status: 'paused' }
+	if (Object.keys(end.usage).length) ended.usage = end.usage
+	host.broadcast(id, ended)
 }
 
 // Continues every unfinished turn on disk (a new host after a restart or
@@ -504,8 +513,16 @@ async function recover(): Promise<void> {
 //
 // A synthetic model (synthetic.ts) runs here instead of a provider and
 // may end its round by asking a question, which parks the turn (ask).
+// So may a dangerous tool call (approval.ts): each one asks, one at a
+// time, before any of the round's calls runs; once all are answered
+// the turn, run again, finds the calls held (approval.held) and runs
+// them, or gives the declined ones an error result, before its next
+// round. A parked turn's usage so far is in its question and carried on.
 async function runTurn(id: string, model: string, running: Running, answers?: Answers): Promise<void> {
 	let { signal } = running.controller
+	let records = history.readSync(id)
+	history.carry(id, running.provider, host.parkedUsage(records))
+	let held = approval.held(records)
 	let asking: Form | undefined
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
@@ -522,45 +539,56 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let failures = 0
 	try {
 		while (true) {
-			let round = blocks.newTurn(running.provider)
-			last = undefined
-			host.steer(id)
-			host.transition(id, { type: 'request' })
-			for await (let event of history.record(id, running.provider, stream())) {
-				blocks.apply(round, event)
-				if (event.type === 'done' || event.type === 'error') {
-					last = event
-					break
-				}
-				if (signal.aborted) break
-				host.transition(id, { type: 'stream' })
-				host.broadcast(id, { type: 'stream', sessionId: id, event })
-			}
-			if (last?.type === 'error' && last.failure && !last.cancelled && !signal.aborted) {
-				await host.waitOut(id, last, failures++, signal)
-				if (host.state.running.get(id) !== running) return
-				if (signal.aborted) {
-					last = undefined
-					break
-				}
-				continue
-			}
-			if (last?.type === 'done') failures = 0
-			if (asking && last?.type === 'done' && !signal.aborted) return host.ask(id, asking)
-			let calls = round.blocks.filter((b) => b.type === 'tool_call')
-			if (last?.type !== 'done') break
-			// A finished answer with steering waiting: the model hears it.
-			if (!calls.length) {
-				if (signal.aborted || !host.inboxOf(id).some((m) => !m.queue)) break
-				continue
-			}
 			// The turn wanted to go on: a pause now stops it as paused.
 			let cancelled = () => signal.aborted && ((last = undefined), true)
+			let calls: ToolCallBlock[]
+			let decided = held?.decided ?? new Map<string, boolean>()
+			if (held) {
+				calls = held.calls
+				held = undefined
+			} else {
+				let round = blocks.newTurn(running.provider)
+				last = undefined
+				host.steer(id)
+				host.transition(id, { type: 'request' })
+				for await (let event of history.record(id, running.provider, stream())) {
+					blocks.apply(round, event)
+					if (event.type === 'done' || event.type === 'error') {
+						last = event
+						break
+					}
+					if (signal.aborted) break
+					host.transition(id, { type: 'stream' })
+					host.broadcast(id, { type: 'stream', sessionId: id, event })
+				}
+				if (last?.type === 'error' && last.failure && !last.cancelled && !signal.aborted) {
+					await host.waitOut(id, last, failures++, signal)
+					if (host.state.running.get(id) !== running) return
+					if (signal.aborted) {
+						last = undefined
+						break
+					}
+					continue
+				}
+				if (last?.type === 'done') failures = 0
+				if (asking && last?.type === 'done' && !signal.aborted) return host.ask(id, asking)
+				calls = round.blocks.filter((b) => b.type === 'tool_call')
+				if (last?.type !== 'done') break
+				// A finished answer with steering waiting: the model hears it.
+				if (!calls.length) {
+					if (signal.aborted || !host.inboxOf(id).some((m) => !m.queue)) break
+					continue
+				}
+			}
 			if (cancelled()) break
+			for (let call of calls) {
+				let form = decided.has(call.id) ? undefined : approval.form(call)
+				if (form) return host.ask(id, form, call.id)
+			}
 			let cwd = sessions.open(id).cwd
 			host.transition(id, { type: 'tools' })
 			let results: ToolResultBlock[] = []
-			for (let call of calls) results.push(await tools.run(call, { cwd, signal }))
+			for (let call of calls) results.push(decided.get(call.id) === false ? approval.declined(call) : await tools.run(call, { cwd, signal }))
 			if (host.state.running.get(id) !== running) return
 			history.results(id, results)
 			host.broadcast(id, { type: 'tool-results', sessionId: id, results })
@@ -590,6 +618,17 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	if (end.status === 'paused') host.transition(id, { type: 'pause' })
 	else host.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
 	if (end.status === 'completed') host.next(id)
+}
+
+// The usage an unfinished turn had when it was last parked at a
+// question, to go on from; none if it never was.
+function parkedUsage(records: HistoryRecord[]): Usage {
+	for (let i = records.length - 1; i >= 0; i--) {
+		let r = records[i]!
+		if (r.type === 'turn_end') break
+		if (r.type === 'question' && r.usage) return r.usage
+	}
+	return {}
 }
 
 // Waits out a failed round (tasks/j1/states.md, Failures) and shows
@@ -698,6 +737,7 @@ export const host = {
 	reply,
 	recover,
 	runTurn,
+	parkedUsage,
 	waitOut,
 	backoffMs,
 	quitting,

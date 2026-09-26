@@ -85,6 +85,11 @@ test('invalid refuses forms no client could fill in', () => {
 	expect(forms.invalid({ text: 'x', fields: [] })).toBeString()
 	expect(forms.invalid({ text: 'x', fields: [{ type: 'choice', name: 'a', options: [] }] })).toBeString()
 	expect(forms.invalid({ text: 'x', fields: [{ type: 'text', name: 'a' }, { type: 'text', name: 'a' }] })).toBeString()
+	let field = { type: 'text' as const, name: 'a' }
+	expect(forms.invalid({ text: 'x', quote: { text: 'rm -rf x', marks: [[0, 8]] }, fields: [field] })).toBeUndefined()
+	for (let marks of [[[0, 9]], [[3, 2]], [[-1, 2]], [[0.5, 2]], [0, 1]] as any[]) {
+		expect(forms.invalid({ text: 'x', quote: { text: 'rm -rf x', marks }, fields: [field] })).toBeString()
+	}
 })
 
 test('history keeps only that a secret was given', () => {
@@ -109,4 +114,15 @@ test('a client keeps what was typed while the same question is open, and starts 
 	expect(forms.follow(typedIn, { id: 'q1', form: name })).toBe(typedIn)
 	expect(forms.follow(typedIn, { id: 'q2', form: name })?.values).toEqual([''])
 	expect(forms.follow(typedIn, undefined)).toBeUndefined()
+})
+
+test('a quote cuts into plain and marked parts in order, overlapping marks merged', () => {
+	let parts = forms.quoteParts({ text: 'ls; rm -rf a; git reset --hard', marks: [[14, 30], [4, 12], [6, 9]] })
+	expect(parts).toEqual([
+		{ text: 'ls; ', marked: false },
+		{ text: 'rm -rf a', marked: true },
+		{ text: '; ', marked: false },
+		{ text: 'git reset --hard', marked: true },
+	])
+	expect(forms.quoteParts({ text: 'ls' })).toEqual([{ text: 'ls', marked: false }])
 })

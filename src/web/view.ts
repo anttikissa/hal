@@ -137,7 +137,8 @@ function show(item: Item): Shown {
 			return { kind: 'end log', text: `[${item.status}]` }
 		case 'question': {
 			let said = item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
-			return { kind: 'question warning', text: [`? ${item.form.text}`, ...said.map((l) => `  ${l}`)].join('\n') }
+			let quote = item.form.quote ? item.form.quote.text.split('\n').map((l) => `    ${l}`) : []
+			return { kind: 'question warning', text: [`? ${item.form.text}`, ...quote, ...said.map((l) => `  ${l}`)].join('\n') }
 		}
 	}
 }
