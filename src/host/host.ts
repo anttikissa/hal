@@ -21,6 +21,8 @@ import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolRes
 import { protocol, type Command, type Event, type Snapshot } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { states, type SessionState, type StateEvent } from '../common/states.ts'
+import { auth } from './auth.ts'
+import { clock } from './clock.ts'
 import { config } from './config.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
@@ -319,6 +321,10 @@ async function recover(): Promise<void> {
 // host that dies in between leaves an unanswered call: the next host
 // continues the turn, telling the model it may or may not have run, and
 // never runs it again (replay.ts).
+//
+// A round that fails in a way the host can fix (error.failure,
+// provider.ts) is tried again within the turn: retrying at a time, or
+// blocked on a login; only the user's Escape stops that.
 async function runTurn(id: string, model: string, running: Running): Promise<void> {
 	let { signal } = running.controller
 	async function* stream(): AsyncGenerator<StreamEvent> {
@@ -326,6 +332,8 @@ async function runTurn(id: string, model: string, running: Running): Promise<voi
 	}
 	let last: DoneEvent | ErrorEvent | undefined
 	let failure: string | undefined
+	// Failed rounds in a row, for the backoff.
+	let failures = 0
 	try {
 		while (true) {
 			let round = blocks.newTurn(running.provider)
@@ -341,6 +349,16 @@ async function runTurn(id: string, model: string, running: Running): Promise<voi
 				host.transition(id, { type: 'stream' })
 				host.broadcast(id, { type: 'stream', sessionId: id, event })
 			}
+			if (last?.type === 'error' && last.failure && !last.cancelled && !signal.aborted) {
+				await host.waitOut(id, last, failures++, signal)
+				if (host.state.running.get(id) !== running) return
+				if (signal.aborted) {
+					last = undefined
+					break
+				}
+				continue
+			}
+			if (last?.type === 'done') failures = 0
 			let calls = round.blocks.filter((b) => b.type === 'tool_call')
 			if (last?.type !== 'done' || !calls.length) break
 			// The turn wanted to go on: a pause now stops it as paused.
@@ -380,6 +398,30 @@ async function runTurn(id: string, model: string, running: Running): Promise<voi
 	else host.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
 }
 
+// Waits out a failed round (tasks/j1/states.md, Failures) and shows
+// why: retrying at a time (temporary: at once, then backing off; rate
+// limited: when the provider said, or at once when another account can
+// take over), or blocked until the credentials file changes (a broken
+// login). Ends early on Escape (`signal`); a wake retries at once.
+async function waitOut(id: string, error: ErrorEvent, failures: number, signal: AbortSignal): Promise<void> {
+	// Output cut off mid-answer: the model hears it was interrupted.
+	if (history.readSync(id).at(-1)?.type === 'assistant') history.append(id, { type: 'continue' })
+	if (error.failure === 'auth' && error.retryAt === undefined) {
+		host.transition(id, { type: 'block', reason: `log in: ${error.message}` })
+		await auth.changed(signal)
+		return
+	}
+	let at = error.retryAt ?? clock.now() + host.backoffMs(failures)
+	host.transition(id, { type: 'retry', at: new Date(at).toISOString(), reason: error.message })
+	await clock.until(at, signal)
+}
+
+// The wait before the next try after `failures` failed rounds in a
+// row: none at first, then doubling up to half a minute.
+function backoffMs(failures: number): number {
+	return failures === 0 ? 0 : Math.min(1000 * 2 ** (failures - 1), 30_000)
+}
+
 // Whenever this process exits while it is host, writes the output of
 // running turns so far and leaves them unfinished, for the next host to
 // continue; or, if the user quit the last Hal process (quitting()),
@@ -388,6 +430,7 @@ function init(): void {
 	if (host.state.inited) return
 	host.state.inited = true
 	process.on('exit', () => history.stop(host.state.pauseOnExit))
+	clock.init()
 }
 
 // The user is quitting this process. If no other Hal process can carry
@@ -450,6 +493,8 @@ export const host = {
 	stop,
 	recover,
 	runTurn,
+	waitOut,
+	backoffMs,
 	quitting,
 	reset,
 }
