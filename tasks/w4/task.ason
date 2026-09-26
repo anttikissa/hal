@@ -1,0 +1,6 @@
+{
+	title: 'Questions: durable forms in the session',
+	description: 'The one way Hal asks a human something, as specified in tasks/w4/forms.md (sections Forms and In a block). A question is a form (text with placeholder, secret, choice including y/N and single press-Enter) written to history, shown as a block, answerable from any client (first answer wins), surviving restart; while one is open the session is blocked (question) per tasks/j1/states.md. Secrets travel over the connection as-is and history records only that one was provided. Terminal and web both render and answer them, sharing form state and key handling from common code. Prove it with a synthetic model that asks "How should I call you?" and uses the answer.',
+	status: 'planned',
+	needs: ['j1']
+}

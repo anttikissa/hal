@@ -1,0 +1,6 @@
+{
+	title: 'Model picker',
+	description: 'Ctrl-M and /model open a modal list of models from configured providers, filtered as you type, with sensible ranking (typing opus-5.5 puts claude-opus-5-5 first, not step-3.5-flash). Enter switches the session model (a protocol command, recorded in history); the list comes from the host. The tree view with thinking level is a later task; see tasks/w4/forms.md (Model picker).',
+	status: 'planned',
+	needs: ['kv', 'et']
+}

@@ -1,0 +1,6 @@
+{
+	title: 'Modal overlays in the terminal',
+	description: 'Modal UI (model picker, /login, /config, find) draws over the conversation instead of replacing whole rows: the frame is composited, so the transcript stays visible left and right of the box, with one blank column and an outline around it, and the diff renderer handles it like any other frame change. A modal has a fixed height: 80% of the rows, at most 50, and scrolls its contents, so typing into a search box never makes it jump. Modals are client-only and never in history; their result is an ordinary command. See tasks/w4/forms.md (Modals) and tasks/cc/terminal.md.',
+	status: 'planned',
+	needs: ['cc', 'w4']
+}

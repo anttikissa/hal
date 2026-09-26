@@ -16,7 +16,10 @@ Each task lives in a directory named by its ID, with a task.ason record and opti
 - **server**: only the listeners (Unix socket, HTTP), never a role.
 
 How sessions behave (states, who may pause, failures, steering,
-drafts) is decided in tasks/j1/states.md. Follow it; don't reinvent it.
+drafts) is decided in tasks/j1/states.md; forms, commands, modals,
+approval and how terminal and web share code in tasks/w4/forms.md.
+Follow them; don't reinvent them. A design doc lives in the task that
+owns it; later tasks point to it.
 ## Architecture
 
 - One host per home (sessions/ + state/) owns sessions, provider calls and all state
