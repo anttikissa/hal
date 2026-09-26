@@ -5,6 +5,13 @@ agents. The user starts a fresh-context agent for each task (`tsk ready`,
 `tsk show <id>`), which works test-first, with `tsk done <id>` and a
 `Task: <id>` trailer in the same commit.
 
+Tasks are living specs for a rebuild from scratch, not one-time
+actions. Describe the state a task keeps true, not a step to take: not
+"initialise package.json with version 0.1.0" but "package.json holds
+the current version: 0.1.0 at first, later the latest release in git
+history". Avoid `once`; old files a rebuild needs belong in the task's
+artifacts.
+
 Lessons that would help the next implementer (surprises, wrong
 artifacts, decisions later tasks depend on) go in the task's `notes`
 field in task.ason, a list of strings that `tsk show` prints. Never
