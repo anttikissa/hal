@@ -1,0 +1,13 @@
+# Notes from implementing task 9
+
+- tsc typechecks local.ts only because tsconfig.json has no `include`
+  (it picks up every .ts in the root). Adding `include: ["src"]` would
+  silently stop checking it; ./test would then only smoke-import it.
+- `main.localPath()` still resolves the home itself
+  (`HAL_HOME || repoRoot`) because paths.ts wasn't committed yet. It
+  lacks paths.home()'s NODE_ENV=test fallback, so a test that spawns
+  ./run without HAL_HOME loads the user's real local.ts. Switch it to
+  `paths.home()`, or always set HAL_HOME in spawned tests.
+- Override tests must run in a subprocess: module objects are process
+  singletons, so an override applied in the test runner leaks into
+  every other test file.
