@@ -4,6 +4,19 @@ Shared context for implementing every task in this project: goals, constraints, 
 
 Each task lives in a directory named by its ID, with a task.ason record and optional supporting files. Use `tsk ready` to find work, `tsk show <id>` for details, and `tsk done <id>` when it is implemented.
 
+## Terms
+
+- **host**: the one process that owns a home (sessions, provider
+  calls, every state write). It also serves remote terminal and web
+  clients.
+- **peer**: another Hal process on the same machine, in the client
+  role; it can become host.
+- **client**: anything following sessions: the host's own terminal, a
+  peer, a browser.
+- **server**: only the listeners (Unix socket, HTTP), never a role.
+
+How sessions behave (states, who may pause, failures, steering,
+drafts) is decided in tasks/j1/states.md. Follow it; don't reinvent it.
 ## Architecture
 
 - One host per home (sessions/ + state/) owns sessions, provider calls and all state

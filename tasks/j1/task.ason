@@ -1,0 +1,7 @@
+{
+	title: 'Session states: pause only on purpose',
+	description: 'Give every session one explicit state that the host derives from history plus its own memory, and put it in snapshots so every client shows the same thing. The rules and the state list are in states.md (decisions made with the user, not suggestions). Core: only the user pauses work (Escape pauses that session; Ctrl-C pauses everything only when no other Hal process can carry on). A restart (Ctrl-R) or a host that dies while another process remains must continue every running turn as if nothing happened. Implement the pure transition function with table tests, the durable paused marker, the automatic continuation on a new host, and snapshot status; replace task ah behaviour (turns are left interrupted) accordingly. Retries, blocked reasons, steering and amend are separate tasks that extend this machine; leave their states defined but unimplemented.',
+	status: 'planned',
+	needs: ['1r'],
+	foldInto: ['6', 'ne', 'ah']
+}

@@ -1,0 +1,7 @@
+{
+	title: 'Replay tells the model what happened',
+	description: 'Provider input rebuilt from history must not garble or hide what happened. Today a turn that failed or was paused with no output leaves a user record, and replay.toMessages merges it with the next prompt into one message whose text blocks the provider joins with no separator ("Say just the word pong" + "k" was read as "pongk"). Fix it the way the old Hal does (reference: ~/.hal/src/server/session/api-messages.ts): each prompt stays its own user message, starting with a [HH:MM] line; how a turn ended (error, paused, continued after a restart) reaches the model as a short <meta> note in front of the next prompt. Clients should also make replayed history recognisable as old (for example a "resumed · last turn 00:51" line), so an old error redrawn at startup does not look like a new one. Test with the real replay of: an errored turn followed by a prompt, a paused turn followed by a prompt, and a normal two-turn history (which must not change).',
+	status: 'planned',
+	needs: ['j1'],
+	foldInto: ['7']
+}

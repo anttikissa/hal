@@ -1,0 +1,7 @@
+{
+	title: 'Steering and a visible inbox',
+	description: 'Sending while a turn runs no longer gets rejected. It goes into the session inbox (durable, in history) and the model gets every waiting message together, as one user message after the current round, before the next provider request: steering. Alt-Enter queues instead: the message runs after the turn ends. The inbox is part of the snapshot and every client shows it all the time; queued messages always either run or stay visibly waiting with a reason (paused, blocked), never hidden behind a command. Escape pauses; queued messages run when the user continues. See tasks/j1/states.md (Talking while it works). Check that repeated steering keeps the prompt cache warm (cacheRead in usage).',
+	status: 'planned',
+	needs: ['j1'],
+	foldInto: ['6', 'ne']
+}

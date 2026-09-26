@@ -1,0 +1,7 @@
+{
+	title: 'One client connection for terminal, peer and web',
+	description: 'Terminal, peer and browser clients each carry their own copy of joining, reconnecting and command handling (src/client/link.ts, src/web/link.ts, host/server.ts plus host/web.ts). Replace them with one common core over small transports (in-process, Unix socket, WebSocket): the client states joining, connected as host or client, disconnected with a retry time; re-opening followed sessions on reconnect; and an id on every command, made by the client, that the host uses to ignore repeats, so a resend after a reconnect never acts twice. The host side gets one adapter from a transport to a host connection. Choosing which session to open (newest, or create one in a cwd) becomes a protocol command, replacing the /session endpoint and the hal-cwd header. States and terms: tasks/j1/states.md. Keep the existing multi-process takeover and browser tests green; they are the safety net.',
+	status: 'planned',
+	needs: ['j1'],
+	foldInto: ['ja', 'p6', 'dz']
+}
