@@ -52,6 +52,13 @@ function itemLines(item: Item, width: number): string[] {
 		case 'thinking':
 			return frame.wrap(item.text, width).map((l) => DIM + l + UNDIM)
 		case 'tool': {
+			let { command, description } = item.input
+			// A described command: the sentence first, the command dimmed beside it.
+			if (typeof command === 'string' && typeof description === 'string') {
+				let head = strings.clipVisual(`▸ ${frame.clean(description).replace(/\s+/g, ' ')}`, width)
+				let rest = strings.clipVisual(`  $ ${frame.clean(command).replace(/\s+/g, ' ')}`, width - strings.visLen(head))
+				return [head + (rest ? DIM + rest + UNDIM : '')]
+			}
 			let input = frame.clean(JSON.stringify(item.input)).replace(/\s+/g, ' ')
 			return [strings.clipVisual(`▸ ${frame.clean(item.name)} ${input}`, width)]
 		}

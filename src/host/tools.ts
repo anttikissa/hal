@@ -3,9 +3,12 @@
 // no result is larger than tools.maxChars(). Tool input comes from the
 // model, so it is checked like any untrusted data.
 //
-// Only read-only tools for now: running one again (or not at all) after
-// a crash is harmless.
+// A call is recorded before it runs and its result after, so a host
+// that dies in between never runs it again; replay tells the model it
+// may or may not have run. That is what makes bash, which mutates,
+// safe to offer.
 
+import { spawn } from 'child_process'
 import { readdirSync, statSync } from 'fs'
 import { homedir } from 'os'
 import { resolve } from 'path'
@@ -75,6 +78,52 @@ const read: Tool = {
 	},
 }
 
+const bash: Tool = {
+	def: {
+		name: 'bash',
+		description:
+			'Run a command with bash -c in the working directory. Returns the exit status and stdout and stderr combined. ' +
+			'No stdin; long output is cut.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				command: { type: 'string', description: 'The command to run' },
+				description: {
+					type: 'string',
+					description: 'One short plain-language sentence for the user: what the command does and why, e.g. "Show the first 40 lines of the config"',
+				},
+			},
+			required: ['command', 'description'],
+		},
+	},
+	run(input, ctx) {
+		if (typeof input.command !== 'string' || !input.command.trim()) throw new Error('command must be a non-empty string')
+		if (typeof input.description !== 'string' || !input.description.trim()) throw new Error('description must be a non-empty sentence; the command did not run')
+		if (ctx.signal.aborted) throw new Error('cancelled; the command did not run')
+		// Its own process group, so cancel stops pipelines and children too.
+		let child = spawn('bash', ['-c', `exec 2>&1\n${input.command}`], { cwd: ctx.cwd, detached: true, stdio: ['ignore', 'pipe', 'ignore'] })
+		let kill = () => {
+			try {
+				process.kill(-child.pid!, 'SIGKILL')
+			} catch {}
+		}
+		ctx.signal.addEventListener('abort', kill, { once: true })
+		// Keep only what can be shown; drain the rest so the command is not blocked.
+		let out = ''
+		child.stdout!.setEncoding('utf8').on('data', (d: string) => {
+			if (out.length <= tools.maxChars()) out += d
+		})
+		return new Promise((done, fail) => {
+			child.on('error', fail)
+			child.on('close', (code, sig) => {
+				ctx.signal.removeEventListener('abort', kill)
+				let status = ctx.signal.aborted ? 'cancelled' : sig ? `killed by ${sig}` : `exit ${code}`
+				done(`[${status}]\n${out}`)
+			})
+		})
+	},
+}
+
 // Runs one call. Never throws: unknown tools, bad input and failures
 // become error results.
 async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlock> {
@@ -92,7 +141,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 }
 
 export const tools = {
-	state: { tools: { read } as Record<string, Tool> },
+	state: { tools: { read, bash } as Record<string, Tool> },
 	// Largest result handed to the model, in characters.
 	maxChars: () => 50_000,
 	maxLines: () => 2000,

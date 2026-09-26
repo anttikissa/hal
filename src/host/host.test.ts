@@ -480,6 +480,35 @@ test('a tool call cut off by a restart is reported to the model, not run', async
 	}
 })
 
+test('a command cut off mid-run by a crash is never run again, and the model hears it may have run', async () => {
+	let ran = 0
+	let origRun = tools.run
+	tools.run = () => (ran++, new Promise(() => {}))
+	try {
+		let a = client()
+		let id = toolSession(a)
+		a.conn.send({ type: 'submit', sessionId: id, text: 'clean up' })
+		await until(() => calls.length === 1)
+		let rm: StreamEvent = { type: 'tool_call', id: 'b1', name: 'bash', input: { command: 'rm notes.txt', description: 'Delete the notes' } }
+		calls[0]!.push(rm, { type: 'done', reason: 'tool_use' })
+		await until(() => ran === 1)
+		restartHost()
+
+		let b = client()
+		b.conn.send({ type: 'open', sessionId: id })
+		await until(() => b.views.get(id))
+		expect(b.views.get(id)!.items.at(-1)).toEqual({ type: 'turn-end', status: 'interrupted' })
+		b.conn.send({ type: 'submit', sessionId: id, text: 'done?' })
+		await until(() => calls.length === 2)
+		let [result] = calls[1]!.input.messages.at(-1).blocks
+		expect(result).toMatchObject({ type: 'tool_result', id: 'b1', isError: true })
+		expect(result.output).toMatch(/may or may not have run/)
+		expect(ran).toBe(1)
+	} finally {
+		tools.run = origRun
+	}
+})
+
 test('cancel between tool rounds ends the turn and keeps the results', async () => {
 	let a = client()
 	let id = toolSession(a)

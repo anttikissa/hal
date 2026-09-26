@@ -1,6 +1,13 @@
 {
 	title: 'Minimal bash tool with a required description',
 	description: 'Add a bash tool, kept as small as possible: run one command with bash -c in the session cwd, honour the turn abort signal, and return exit status plus combined stdout/stderr bounded like read. Its input has two required fields: command and description, a short plain-language sentence saying what the command does and why (e.g. "Show the first 40 lines of the config"), so that chains of cat, sed and pipes stay intelligible to the user. A missing or empty description is an error result and the command does not run. The transcript shows the description prominently and the command beside it. Bash mutates, so face the crash case: a call recorded but with no result is never re-run on restart and the model is told it may or may not have run. No sandbox or approval yet.',
-	status: 'planned',
-	needs: ['sj']
+	status: 'done',
+	needs: ['sj'],
+	notes: [
+		'The crash case needed no new host code: record-before-run plus replay.missingResult already gave "may or may not have run". A host test now pins it for a command cut off mid-run.',
+		'Each command runs in its own process group (detached) so cancel SIGKILLs pipelines and children. Consequence: if the host dies, the command and its children keep running; nothing kills them on exit.',
+		'The result waits for stdout to close, so a backgrounded child that keeps stdout open (cmd &) holds the call until Escape. No timeout yet.',
+		'Output is `[exit N]` / `[killed by SIG]` / `[cancelled]` on the first line, then stdout+stderr merged via `exec 2>&1` prepended to the script. Truncation keeps the head; the status stays because it comes first.',
+		'The client shows any tool whose input has string command and description as "▸ description  $ command" (command dimmed); frame.ts does not check the tool name.'
+	]
 }

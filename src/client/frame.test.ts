@@ -42,6 +42,7 @@ test('no row is wider than the terminal, whatever the text', () => {
 		{ type: 'thinking', text },
 		{ type: 'text', text },
 		{ type: 'tool', id: 't', name: 'bash', input: { command: text } },
+		{ type: 'tool', id: 't', name: 'bash', input: { command: text, description: text } },
 		{ type: 'tool-result', id: 't', output: text },
 		{ type: 'tool-result', id: 't', output: text, isError: true },
 		{ type: 'turn-end', status: 'error', error: text },
@@ -54,6 +55,15 @@ test('no row is wider than the terminal, whatever the text', () => {
 		}
 		expect(f.cursor.col).toBeLessThan(cols)
 	}
+})
+
+test('a described command shows its description first and the command dimmed beside it', () => {
+	let input = { command: "sed -n '1,40p' config.ason |\n  cat -n", description: 'Show the first 40 lines of the config' }
+	let [line] = frame.build(view([{ type: 'tool', id: 't', name: 'bash', input }]), 100).lines
+	let [before, after] = line!.split(DIM)
+	expect(strip(before!)).toContain('Show the first 40 lines of the config')
+	expect(strip(before!)).not.toContain('sed')
+	expect(strip(after!)).toContain("sed -n '1,40p' config.ason | cat -n")
 })
 
 test('a long tool result shows only its first rows', () => {
