@@ -28,6 +28,11 @@ form.question pre.quote { margin: 0 0 0 1.5rem; white-space: pre-wrap; overflow-
 form.question mark { background: currentColor; color: var(--bg); }
 button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
 button { background: #2b3a55; color: var(--fg); border: 0; border-radius: 6px; padding: 0.5rem; cursor: pointer; }
+dialog { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--bg); color: var(--fg); border: 1px solid #33373e; border-radius: 6px; padding: 0.6rem; }
+dialog[open] { display: flex; flex-direction: column; gap: 0.4rem; }
+dialog ul { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+dialog li { padding: 0 0.4rem; cursor: pointer; }
+dialog li[aria-selected="true"] { background: #2b3a55; }
 /* The theme (src/common/colors.ts), put here by the host. */
 /*COLORS*/
 </style>

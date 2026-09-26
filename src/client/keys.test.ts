@@ -41,6 +41,8 @@ describe('single chunks', () => {
 	test('kitty CSI-u keys', () => {
 		expect(decode('\x1b[13u', '\x1b[127u', '\x1b[27u')).toEqual(['enter', 'backspace', 'escape'])
 		expect(decode('\x1b[100;5u')).toEqual(['C-d'])
+		// Ctrl-M (the model picker) is not Enter only here.
+		expect(decode('\x1b[109;5u', '\r')).toEqual(['C-m', 'enter'])
 		expect(decode('\x1b[97u')).toEqual(['text:a'])
 		expect(decode('\x1b[97;1:3u')).toEqual([]) // key release
 	})

@@ -36,6 +36,8 @@ export type Provider = {
 	rejected?(account: string): void
 	// Should end with done or error; shared code adds an error if not.
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
+	// The model names it offers (without "provider/"), for the picker.
+	models?(signal: AbortSignal): Promise<string[]>
 }
 
 class Cancelled extends Error {}

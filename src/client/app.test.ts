@@ -364,3 +364,26 @@ test('Tab on a command asks the host to complete it; the answer fills the prompt
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: ['/cd ~/prof/'] })
 	expect(app.state.prompt.text).toBe('/cd ~/project')
 })
+
+test('Ctrl-M asks the host for the models; the picker filters as you type and Enter switches', () => {
+	app.onEvent(snapshot())
+	type('draft')
+	app.onKeys([{ ...key('m'), ctrl: true }])
+	expect(sent).toEqual([{ type: 'models', sessionId: 's1' }])
+	expect(app.view().modal).toBeUndefined()
+	let items = ['anthropic/x', 'openrouter/stepfun/step-3.5-flash', 'anthropic/claude-opus-5-5']
+	app.onEvent({ type: 'models', sessionId: 's1', current: 'anthropic/x', items })
+	expect(app.view().modal?.items).toEqual(items)
+	type('opus-5.5')
+	expect(app.view().modal?.items).toEqual(['anthropic/claude-opus-5-5'])
+	enter()
+	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: '/model anthropic/claude-opus-5-5' })
+	expect(app.view().modal).toBeUndefined()
+	expect(app.state.prompt.text).toBe('draft')
+})
+
+test('a model list for another session opens nothing', () => {
+	app.onEvent(snapshot())
+	app.onEvent({ type: 'models', sessionId: 's2', current: 'a/b', items: ['a/b'] })
+	expect(app.view().modal).toBeUndefined()
+})

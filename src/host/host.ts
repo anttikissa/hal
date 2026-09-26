@@ -43,6 +43,7 @@ import { diag } from './diag.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
+import { models as modelList } from './models.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
@@ -219,6 +220,7 @@ function act(client: Client, c: Command): Outcome | undefined {
 	else if (c.type === 'continue') refused = host.resume(c.sessionId)
 	else if (c.type === 'pause') refused = host.stop(c.sessionId)
 	else if (c.type === 'answer') refused = host.reply(c.sessionId, c.question, c.answers)
+	else if (c.type === 'models') void host.models(c.sessionId).then((e) => host.state.clients.has(client) && client.deliver(e))
 	else if (c.type === 'complete') client.deliver({ type: 'completions', sessionId: c.sessionId, text: c.text, items: commands.complete(c.text, host.context(c.sessionId)) })
 	return refused === undefined ? {} : { refused }
 }
@@ -397,6 +399,7 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 	}
 	if (reply.say !== undefined) host.output(id, reply.say)
 	if (reply.error !== undefined) host.output(id, reply.error, true)
+	if (reply.open === 'models') void host.models(id).then((e) => host.broadcast(id, e))
 	if (!reply.ask) return
 	let problem = forms.invalid(reply.ask)
 	if (problem) return host.output(id, `/${name} asked a bad question: ${problem}`, true)
@@ -406,6 +409,12 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 	history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args } })
 	host.broadcast(id, { type: 'question', sessionId: id, id: question, form: reply.ask })
 	host.settle(id, before)
+}
+
+// The model picker's content for session `id`.
+async function models(id: string): Promise<Event & { type: 'models' }> {
+	let current = sessions.open(id).model
+	return { type: 'models', sessionId: id, current, items: await modelList.list(current) }
 }
 
 function output(id: string, text: string, error = false): void {
@@ -852,6 +861,7 @@ export const host = {
 	context,
 	change,
 	runCommand,
+	models,
 	output,
 	settle,
 	drain,

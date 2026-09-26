@@ -11,6 +11,7 @@ import { connection, type LinkState } from '../common/connection.ts'
 import { forms, type FormState } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
 import { modals, type ModalAction, type ModalState } from '../common/modals.ts'
+import { picker } from '../common/picker.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
@@ -25,7 +26,8 @@ import type { View } from './frame.ts'
 // one, keys go to it instead of the prompt.
 // `editing`: the last prompt is in the editor (src/common/amend.ts).
 // `modal`: client-only UI over everything, taking the keys first;
-// `onModal` makes the command its Enter sends.
+// `onModal` makes the command its Enter sends; `onModalKey` updates it
+// after a key (the picker refilters its list).
 type AppState = {
 	transcript?: Transcript
 	resumed?: Resumed
@@ -34,7 +36,8 @@ type AppState = {
 	form?: FormState
 	editing?: Editing
 	modal?: ModalState
-	onModal?: (action: Extract<ModalAction, { type: 'submit' }>) => unknown
+	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
+	onModalKey?: (modal: ModalState) => ModalState
 }
 
 function createState(): AppState {
@@ -68,6 +71,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'rejected') st.notice = `${event.command} refused: ${event.reason}`
 	else if (event.type === 'warning') st.notice = event.text
 	else if (event.type === 'completions') app.completed(event)
+	else if (event.type === 'models') app.pick(event)
 	else {
 		let t = transcript.fold(st.transcript, event)
 		if (event.type === 'snapshot' && t && t !== st.transcript) st.resumed = transcript.resumed(event.snapshot, t)
@@ -168,10 +172,11 @@ function onKeys(events: KeyEvent[]): void {
 		if (st.modal) {
 			let { state, action } = modals.step(st.modal, k)
 			st.modal = state
+			if (!action && st.onModalKey) st.modal = st.onModalKey(state)
 			if (!action) continue
 			let submit = st.onModal
 			app.close()
-			let command = action.type === 'submit' ? submit?.(action) : undefined
+			let command = action.type === 'submit' ? submit?.(action, state) : undefined
 			if (command) app.send(command)
 			continue
 		}
@@ -179,6 +184,11 @@ function onKeys(events: KeyEvent[]): void {
 			let { state, action } = forms.step(st.form, k)
 			st.form = state
 			if (action) app.send(forms.command(st.transcript.meta.id, state, action))
+			continue
+		}
+		// Ctrl-M: the model picker, once the host has sent the list.
+		if (k.key === 'm' && k.ctrl && !k.alt && !k.cmd && st.transcript) {
+			app.send({ type: 'models', sessionId: st.transcript.meta.id })
 			continue
 		}
 		if (app.editKey(k)) continue
@@ -203,16 +213,30 @@ function onKeys(events: KeyEvent[]): void {
 
 // Opens `modal` over everything. Enter closes it and sends what
 // `submit` makes of it (nothing if undefined); Escape just closes it.
-function open(modal: ModalState, submit: NonNullable<AppState['onModal']>): void {
+function open(modal: ModalState, submit: NonNullable<AppState['onModal']>, onKey?: AppState['onModalKey']): void {
 	app.state.modal = modal
 	app.state.onModal = submit
+	if (onKey) app.state.onModalKey = onKey
+	else delete app.state.onModalKey
 	app.show()
 }
 
 function close(): void {
 	delete app.state.modal
 	delete app.state.onModal
+	delete app.state.onModalKey
 	app.show()
+}
+
+// The host's model list: the picker for this session, if it is on screen.
+function pick(event: Event & { type: 'models' }): void {
+	if (app.state.transcript?.meta.id !== event.sessionId) return
+	let id = event.sessionId
+	app.open(
+		picker.open(event.current, event.items),
+		(action, modal) => picker.command(id, modal, action),
+		(modal) => picker.refilter(modal, event.items),
+	)
 }
 
 // Takes keys from the terminal and paints the first frame. Idempotent.
@@ -240,6 +264,7 @@ export const app = {
 	onKeys,
 	open,
 	close,
+	pick,
 	init,
 	reset,
 }

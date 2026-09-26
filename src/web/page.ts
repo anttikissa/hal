@@ -9,7 +9,7 @@
 // once, pending until the host has it, connected or not. Plain DOM;
 // web.ts bundles this file into index.html at request time.
 
-import { forms, type FormAction } from '../common/forms.ts'
+import { forms, type FormAction, type Key } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import { transcript, type Item } from '../common/transcript.ts'
 import { connection, type LinkState } from '../common/connection.ts'
@@ -32,10 +32,13 @@ type PageState = {
 	// Prompts sent and not yet acknowledged, after the transcript.
 	pending: HTMLElement | null
 	input: HTMLTextAreaElement | null
+	// The modal (model picker): a native <dialog> with a title, a search
+	// box and the list.
+	dialog: { box: HTMLDialogElement; title: HTMLElement; search: HTMLInputElement; list: HTMLElement; hint: HTMLElement } | null
 }
 
 function createState(): PageState {
-	return { view: {}, drawn: [], fields: [], log: null, resumed: null, notice: null, inbox: null, pending: null, input: null }
+	return { view: {}, drawn: [], fields: [], log: null, resumed: null, notice: null, inbox: null, pending: null, input: null, dialog: null }
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}): HTMLElementTagNameMap[K] {
@@ -84,6 +87,52 @@ function draw(): void {
 	let status = view.status(st.view)
 	st.input!.placeholder = status ? `${status}; Enter steers, Alt+Enter queues, Escape pauses` : 'Message Hal (Enter sends, Shift+Enter for a newline)'
 	if (atBottom) log.scrollTop = log.scrollHeight
+	page.drawModal()
+}
+
+// The modal as the view has it: open with its items, or closed.
+function drawModal(): void {
+	let d = page.state.dialog
+	let m = page.state.view.modal
+	if (!d) return
+	if (!m) {
+		if (d.box.open) {
+			d.box.close()
+			page.state.input?.focus()
+		}
+		return
+	}
+	if (!d.box.open) d.box.showModal()
+	d.title.textContent = m.title
+	d.hint.textContent = m.hint ?? ''
+	let value = m.form?.values[0] ?? ''
+	if (d.search.value !== value) d.search.value = value
+	d.list.replaceChildren(
+		...m.items.map((item, i) => {
+			let option = el('li', { role: 'option', textContent: item, id: `modal-item-${i}` } as Partial<HTMLLIElement>)
+			option.ariaSelected = String(i === m.selected)
+			option.addEventListener('click', () => {
+				let modal = page.state.view.modal
+				if (!modal) return
+				page.state.view = { ...page.state.view, modal: { ...modal, selected: i } }
+				page.modalKey({ key: 'enter' })
+			})
+			return option
+		}),
+	)
+	d.search.setAttribute('aria-activedescendant', m.items.length ? `modal-item-${m.selected}` : '')
+	d.list.children[m.selected]?.scrollIntoView({ block: 'nearest' })
+	if (document.activeElement !== d.search) d.search.focus()
+}
+
+// A key for the open modal: Enter sends its command, Escape closes it.
+function modalKey(k: Key): void {
+	let st = page.state
+	let { state, command } = view.modalKey(st.view, k)
+	st.view = state
+	if (command && !connection.connected()) st.view = { ...st.view, notice: 'not connected; try again in a moment' }
+	else if (command) connection.send(command)
+	page.draw()
 }
 
 // The open question as a form: a text or password input per text
@@ -230,8 +279,20 @@ function fitInput(): void {
 function onKey(e: KeyboardEvent): void {
 	let st = page.state
 	if (e.isComposing) return
+	let k = view.key(e)
+	// The modal takes the keys first; its search box edits natively.
+	if (st.view.modal) {
+		if (!k || !['enter', 'escape', 'up', 'down'].includes(k.key)) return
+		e.preventDefault()
+		return page.modalKey(k)
+	}
+	let models = k && view.modelsKey(st.view, k)
+	if (models) {
+		e.preventDefault()
+		connection.send(models)
+		return
+	}
 	if (st.view.form) {
-		let k = view.key(e)
 		// Text fields edit natively; the shared form keys decide the rest.
 		let native = e.target instanceof HTMLInputElement && !['enter', 'escape', 'tab', 'up', 'down'].includes(k?.key ?? '')
 		if (!k || native || (e.target instanceof HTMLButtonElement && e.key === 'Enter' && e.target.type !== 'button')) return
@@ -295,7 +356,20 @@ function chat(): void {
 	st.input.addEventListener('input', () => page.onInput())
 	let footer = el('footer')
 	footer.append(st.inbox, st.notice, st.input)
-	document.body.append(st.log, footer)
+	let box = el('dialog', { ariaLabel: 'Model picker' } as Partial<HTMLDialogElement>)
+	let dialog = { box, title: el('div', { className: 'title' }), search: el('input', { type: 'text', ariaLabel: 'Search', autocomplete: 'off', className: 'input' }), list: el('ul', { role: 'listbox' } as Partial<HTMLUListElement>), hint: el('div', { className: 'log' }) }
+	dialog.search.addEventListener('input', () => {
+		st.view = view.search(st.view, dialog.search.value)
+		page.draw()
+	})
+	// Escape the browser handles itself (it closes the dialog).
+	box.addEventListener('cancel', (e) => {
+		e.preventDefault()
+		page.modalKey({ key: 'escape' })
+	})
+	box.append(dialog.title, dialog.search, dialog.list, dialog.hint)
+	st.dialog = dialog
+	document.body.append(st.log, footer, box)
 	document.addEventListener('keydown', (e) => page.onKey(e))
 	st.input.focus()
 	drafts.store = store
@@ -334,7 +408,7 @@ async function init(): Promise<void> {
 	else page.chat()
 }
 
-export const page = { state: createState(), store, onInput, draw, formNode, syncForm, pick, sendForm, onEvent, setNotice, onState, fitInput, onKey, chat, loginForm, init }
+export const page = { state: createState(), store, onInput, draw, formNode, syncForm, pick, sendForm, drawModal, modalKey, onEvent, setNotice, onState, fitInput, onKey, chat, loginForm, init }
 
 // Runs in the browser only; importing it elsewhere does nothing.
 if (typeof document !== 'undefined') void page.init()

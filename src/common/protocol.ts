@@ -66,6 +66,9 @@ export type Command = (
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }
+	// Ctrl-M: the models to pick from; answered, to this client only,
+	// with `models`. Nothing is recorded.
+	| { type: 'models'; sessionId: string }
 	// Replace the session's draft. `base`: the draft rev the text was
 	// edited from. If another client changed the draft since, the host
 	// keeps both texts rather than lose one.
@@ -116,6 +119,10 @@ export type Event =
 	// Sent only to the client that asked: every full text `text` may
 	// complete to, none if nothing fits.
 	| { type: 'completions'; sessionId: string; text: string; items: string[] }
+	// Open the model picker: the session's model and every model id to
+	// offer. Sent to the client that asked (`models`), or to every
+	// follower when /model runs alone.
+	| { type: 'models'; sessionId: string; current: string; items: string[] }
 	// Something the user should fix (config.ason); not tied to a session.
 	| { type: 'warning'; text: string }
 	// The session's draft changed; `command` is the id of the command
@@ -128,7 +135,7 @@ export type Event =
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.

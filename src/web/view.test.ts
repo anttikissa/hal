@@ -176,3 +176,24 @@ test('Tab asks the host to complete a command; its answer fills the box only if 
 	expect(view.completed(st, event, '/cd ~/px')).toBeUndefined()
 	expect(view.completed(st, { ...event, items: [] }, '/cd ~/p')).toEqual({ text: '/cd ~/p', notice: 'no completions' })
 })
+
+test('Ctrl-M opens the model picker from the host list; typing filters, Enter switches, Escape closes', () => {
+	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
+	expect(view.modelsKey(st, view.key({ key: 'm', ctrlKey: true, shiftKey: false, altKey: false, metaKey: false })!)).toEqual({ type: 'models', sessionId })
+	expect(view.modelsKey(st, view.key({ key: 'm', ctrlKey: false, shiftKey: false, altKey: false, metaKey: false })!)).toBeUndefined()
+	let items = ['fake/m', 'x/step-3.5-flash', 'anthropic/claude-opus-5-5']
+	st = view.onEvent(st, { type: 'models', sessionId, current: 'fake/m', items })
+	expect(st.modal?.items).toEqual(items)
+	st = view.search(st, 'opus-5.5')
+	expect(st.modal?.items).toEqual(['anthropic/claude-opus-5-5'])
+	let r = view.modalKey(st, { key: 'enter' })
+	expect(r.command).toEqual({ type: 'submit', sessionId, text: '/model anthropic/claude-opus-5-5' })
+	expect(r.state.modal).toBeUndefined()
+	st = view.onEvent(r.state, { type: 'models', sessionId, current: 'fake/m', items })
+	r = view.modalKey(view.modalKey(st, { key: 'down' }).state, { key: 'escape' })
+	expect(r.command).toBeUndefined()
+	expect(r.state.modal).toBeUndefined()
+	expect(r.state.transcript).toBe(st.transcript)
+	// Another session's list opens nothing.
+	expect(view.onEvent(r.state, { type: 'models', sessionId: 'x', current: 'a/b', items }).modal).toBeUndefined()
+})

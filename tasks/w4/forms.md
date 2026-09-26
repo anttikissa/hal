@@ -65,6 +65,16 @@ broadcast to every client of that session. How commands that change a
 client view (switching tabs) get there is decided later, but it must be
 possible, even at 10–50 lines of cost.
 
+Decided with task 0x for modals: a command's reply may carry
+`open: '<modal>'`; the host then broadcasts that modal's data as an
+event to every client following the session, and each client opens
+the modal on receiving it. `/model` alone broadcasts `models { current,
+items }`, so a `/model` sent by another session opens the picker for
+whoever watches that tab. A client-only opening (Ctrl-M) asks with
+the `models` protocol command and gets the same event to itself;
+nothing is recorded. A future view change (switching tabs) can use the
+same shape.
+
 It must never be disguised: history records who sent each prompt and
 command. "You" means the human typed it; anything else shows as, for
 example, "You (sent from 123-xyz)".

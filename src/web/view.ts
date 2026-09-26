@@ -7,6 +7,8 @@ import { amend, type Editing } from '../common/amend.ts'
 import { completion } from '../common/completion.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
+import { modals, type ModalState } from '../common/modals.ts'
+import { picker } from '../common/picker.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Item, type Resumed, type Transcript } from '../common/transcript.ts'
@@ -14,7 +16,9 @@ import { transcript, type Item, type Resumed, type Transcript } from '../common/
 // `resumed`: where the history of the last snapshot ends, marked on the page.
 // `form`: the open question as filled in on this page.
 // `editing`: the last prompt is in the input (src/common/amend.ts).
-export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState; editing?: Editing }
+// `modal`: the model picker over the page, taking the keys first;
+// `models` the host's full list it filters.
+export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState; editing?: Editing; modal?: ModalState; models?: string[] }
 
 // One transcript item as shown: CSS classes and its text. The classes
 // are theme style names (src/common/colors.ts in kebab case), whose CSS
@@ -25,6 +29,7 @@ export type Shown = { kind: string; text: string } | null
 function onEvent(st: ViewState, event: Event): ViewState {
 	if (event.type === 'rejected') return { ...st, notice: `${event.command} refused: ${event.reason}` }
 	if (event.type === 'warning') return { ...st, notice: event.text }
+	if (event.type === 'models') return event.sessionId === st.transcript?.meta.id ? { ...st, modal: picker.open(event.current, event.items), models: event.items } : st
 	let t = transcript.fold(st.transcript, event)
 	if (t === st.transcript) return st
 	let next: ViewState = { ...st, transcript: t }
@@ -52,6 +57,33 @@ function formKey(st: ViewState, k: Key): { state: ViewState; command?: unknown }
 	let { state, action } = forms.step(st.form, k)
 	let next = { ...st, form: state }
 	return action ? { state: next, command: forms.command(st.transcript.meta.id, state, action) } : { state: next }
+}
+
+// Ctrl-M: the command asking the host for the model list.
+function modelsKey(st: ViewState, k: Key): unknown {
+	let ctrlM = k.key === 'm' && k.ctrl && !k.alt && !k.cmd
+	return ctrlM && st.transcript ? { type: 'models', sessionId: st.transcript.meta.id } : undefined
+}
+
+function closed(st: ViewState): ViewState {
+	let { modal: _m, models: _l, ...rest } = st
+	return rest
+}
+
+// A key on the open modal: the view after and the command Enter sends.
+function modalKey(st: ViewState, k: Key): { state: ViewState; command?: unknown } {
+	if (!st.modal || !st.transcript) return { state: st }
+	let { state, action } = modals.step(st.modal, k)
+	if (!action) return { state: { ...st, modal: picker.refilter(state, st.models ?? []) } }
+	let command = action.type === 'submit' ? picker.command(st.transcript.meta.id, state, action) : undefined
+	return command ? { state: closed(st), command } : { state: closed(st) }
+}
+
+// The search box now says `text` (typed natively in its input).
+function search(st: ViewState, text: string): ViewState {
+	if (!st.modal?.form) return st
+	let modal = { ...st.modal, form: forms.set(st.modal.form, 0, text), selected: 0, scroll: 0 }
+	return { ...st, modal: picker.refilter(modal, st.models ?? []) }
 }
 
 // What Enter with `text` does: send a prompt (steering a busy turn;
@@ -169,6 +201,9 @@ export const view = {
 	onEvent,
 	key,
 	formKey,
+	modelsKey,
+	modalKey,
+	search,
 	submit,
 	editKey,
 	notice,

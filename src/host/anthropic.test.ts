@@ -13,6 +13,7 @@ import { provider } from './provider.ts'
 type Seen = { path: string; query: string; headers: Headers; body: any }
 let seen: Seen[] = []
 let reply: () => Response = () => new Response('')
+let models: () => Response = () => Response.json({ data: [{ id: 'claude-new-9' }, { id: 'claude-old-1' }] })
 let server: ReturnType<typeof Bun.serve>
 let home = ''
 const savedHome = process.env.HAL_HOME
@@ -30,6 +31,7 @@ function writeAuth(entry: unknown) {
 
 beforeEach(() => {
 	seen = []
+	models = () => Response.json({ data: [{ id: 'claude-new-9' }, { id: 'claude-old-1' }] })
 	home = mkdtempSync(`${tmpdir()}/hal-anthropic-`)
 	process.env.HAL_HOME = home
 	writeAuth({ accessToken: 'fake-oauth-token', refreshToken: 'r', expires: Date.now() + 3_600_000 })
@@ -38,6 +40,10 @@ beforeEach(() => {
 		async fetch(req) {
 			let url = new URL(req.url)
 			if (url.pathname === '/token') return Response.json({ access_token: 'refreshed-token', refresh_token: 'r2', expires_in: 3600 })
+			if (req.method === 'GET') {
+				seen.push({ path: url.pathname, query: url.search, headers: req.headers, body: undefined })
+				return models()
+			}
 			seen.push({ path: url.pathname, query: url.search, headers: req.headers, body: await req.json() })
 			return reply()
 		},
@@ -263,4 +269,13 @@ test('errors: HTTP status, error event mid-stream, bad tool JSON, stream cut sho
 
 	reply = () => sse(start(), { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
 	expect((await run()).map((e) => e.type)).toEqual(['error'])
+})
+
+test('models are listed with the same credentials; a failed listing falls back to the known models', async () => {
+	let signal = new AbortController().signal
+	expect(await provider.state.providers.anthropic!.models!(signal)).toEqual(['claude-new-9', 'claude-old-1'])
+	expect(seen.at(-1)!.path).toBe('/v1/models')
+	expect(seen.at(-1)!.headers.get('authorization')).toBe('Bearer fake-oauth-token')
+	models = () => new Response('nope', { status: 403 })
+	expect(await provider.state.providers.anthropic!.models!(signal)).toEqual(anthropic.knownModels())
 })

@@ -78,8 +78,10 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 	return b
 }
 
-async function request(req: ProviderRequest) {
-	let cred = await auth.anthropic(req.model)
+// Headers for the next usable account (auth.ts), which may be chosen
+// for `model`.
+async function headers(model?: string): Promise<{ headers: Record<string, string>; oauth: boolean; account: string }> {
+	let cred = await auth.anthropic(model)
 	let oauth = cred.type === 'token'
 	let headers: Record<string, string> = oauth
 		? {
@@ -90,7 +92,27 @@ async function request(req: ProviderRequest) {
 			}
 		: { 'x-api-key': cred.value, 'anthropic-beta': TOOL_STREAMING_BETA }
 	headers['anthropic-version'] = '2023-06-01'
-	return { url: anthropic.apiUrl(), headers, body: anthropic.body(req, oauth), account: cred.account }
+	return { headers, oauth, account: cred.account }
+}
+
+async function request(req: ProviderRequest) {
+	let { headers, oauth, account } = await anthropic.headers(req.model)
+	return { url: anthropic.apiUrl(), headers, body: anthropic.body(req, oauth), account }
+}
+
+// The models the account may use (GET /v1/models), else the known ones.
+async function models(signal: AbortSignal): Promise<string[]> {
+	try {
+		let url = new URL(anthropic.apiUrl())
+		url.pathname = url.pathname.replace(/\/messages$/, '/models')
+		url.searchParams.set('limit', '1000')
+		let res = await provider.fetch(String(url), { headers: (await anthropic.headers()).headers, signal })
+		if (!res.ok) throw new Error(`HTTP ${res.status}`)
+		let body = (await res.json()) as { data?: { id?: unknown }[] }
+		let ids = (body.data ?? []).flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))
+		if (ids.length) return ids
+	} catch {}
+	return anthropic.knownModels()
 }
 
 const reasons: Record<string, StopReason> = {
@@ -193,7 +215,7 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 
 // Registers the provider. Idempotent.
 function init(): void {
-	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse, rejected: (account) => auth.rejected(account) })
+	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse, rejected: (account) => auth.rejected(account), models: (signal) => anthropic.models(signal) })
 }
 
 export const anthropic = {
@@ -203,9 +225,13 @@ export const anthropic = {
 	// Current Claude models allow at least 64k output: big file writes.
 	maxTokens: () => 64_000,
 	thinkingBudget: () => 10_000,
+	// Offered when the account's list can't be read.
+	knownModels: () => ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
 	toMessages,
 	body,
+	headers,
 	request,
+	models,
 	parse,
 	init,
 }

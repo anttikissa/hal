@@ -1,0 +1,165 @@
+import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { mkdirSync, mkdtempSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import type { Event } from '../common/protocol.ts'
+import { transcript, type Transcript } from '../common/transcript.ts'
+import { history } from './history.ts'
+import { host } from './host.ts'
+import { liveFiles } from './live-file.ts'
+import { models } from './models.ts'
+import { provider, type Provider } from './provider.ts'
+import { sessions } from './sessions.ts'
+import { synthetic } from './synthetic.ts'
+
+// /model and the model list: the host lists every configured
+// provider's models, and switching is an ordinary command.
+
+const savedHome = process.env.HAL_HOME
+const origOnError = liveFiles.onError
+const origModels = synthetic.models
+const origProviders = provider.state.providers
+let home = ''
+let calls = 0
+
+const fake = (ids: string[] | Error): Provider => ({
+	request: () => ({ url: 'http://x', headers: {}, body: {} }),
+	parse: async function* () {},
+	models: async () => {
+		calls++
+		if (ids instanceof Error) throw ids
+		return ids
+	},
+})
+
+beforeEach(() => {
+	home = mkdtempSync(`${tmpdir()}/hal-models-`)
+	process.env.HAL_HOME = home
+	mkdirSync(`${home}/state`)
+	liveFiles.onError = () => {}
+	calls = 0
+	synthetic.models = { ...origModels, ok: () => ({ say: 'ok' }) }
+	provider.state.providers = { acme: fake(['big-1', 'small-1']), down: fake(new Error('offline')) }
+	models.state.lists.clear()
+})
+
+afterEach(() => {
+	host.reset()
+	sessions.closeAll()
+	history.state.running.clear()
+	synthetic.models = origModels
+	provider.state.providers = origProviders
+	models.state.lists.clear()
+	liveFiles.onError = origOnError
+	if (savedHome === undefined) delete process.env.HAL_HOME
+	else process.env.HAL_HOME = savedHome
+	rmSync(home, { recursive: true, force: true })
+})
+
+function client() {
+	let events: Event[] = []
+	let views = new Map<string, Transcript>()
+	let conn = host.connect((e) => {
+		events.push(e)
+		let id = 'sessionId' in e ? e.sessionId : undefined
+		if (id) {
+			let t = transcript.fold(views.get(id), e)
+			if (t) views.set(id, t)
+		}
+	})
+	return { conn, events, views, of: (type: string) => events.filter((e) => e.type === type) as any[] }
+}
+
+async function until(check: () => unknown): Promise<void> {
+	for (let i = 0; i < 200; i++) {
+		if (check()) return
+		await new Promise((r) => setTimeout(r, 1))
+	}
+	throw new Error('timed out')
+}
+
+function created(c: ReturnType<typeof client>, model = 'hal/intro'): string {
+	c.conn.send({ type: 'create', cwd: home, model })
+	return c.of('snapshot').at(-1).sessionId
+}
+
+async function opened(id: string) {
+	let c = client()
+	c.conn.send({ type: 'open', sessionId: id })
+	await until(() => c.views.get(id))
+	return c
+}
+
+test('the list holds the current model, every provider that answered, and the synthetic models', async () => {
+	let ids = await models.list('acme/old-0')
+	expect(ids[0]).toBe('acme/old-0')
+	expect(ids).toEqual(expect.arrayContaining(['acme/big-1', 'acme/small-1', 'hal/intro', 'hal/ok']))
+	expect(new Set(ids).size).toBe(ids.length)
+	expect(ids.some((id) => id.startsWith('down/'))).toBe(false)
+	// Answers are kept a while; a provider that failed is asked again.
+	await models.list('acme/big-1')
+	expect(calls).toBe(3)
+})
+
+test('a provider that never answers does not hold up the list', async () => {
+	provider.state.providers.slow = { ...fake([]), models: (signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))) }
+	let saved = models.timeoutMs
+	models.timeoutMs = () => 5
+	try {
+		expect(await models.list('acme/big-1')).toContain('acme/small-1')
+	} finally {
+		models.timeoutMs = saved
+	}
+})
+
+test('/model <id> switches the session model for every follower and the next turn', async () => {
+	let a = client()
+	let id = created(a)
+	let b = await opened(id)
+	a.conn.send({ type: 'submit', sessionId: id, text: '/model hal/ok' })
+	await until(() => b.views.get(id)!.meta.model === 'hal/ok')
+	expect(sessions.open(id).model).toBe('hal/ok')
+	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
+	await until(() => a.of('turn-end').length)
+	expect(a.views.get(id)!.items.some((i) => i.type === 'text' && i.text === 'ok')).toBe(true)
+})
+
+test('/model refuses an id no provider serves', async () => {
+	let a = client()
+	let id = created(a)
+	for (let text of ['/model nowhere/x', '/model plain', '/model hal/none']) a.conn.send({ type: 'submit', sessionId: id, text })
+	await until(() => a.views.get(id)!.items.filter((i) => i.type === 'output' && i.error).length === 3)
+	expect(sessions.open(id).model).toBe('hal/intro')
+})
+
+test('/model alone opens the picker on every client following the session', async () => {
+	let a = client()
+	let id = created(a)
+	let b = await opened(id)
+	let other = client()
+	created(other)
+	a.conn.send({ type: 'submit', sessionId: id, text: '/model', from: '9-xyz' })
+	await until(() => b.of('models').length)
+	await until(() => a.of('models').length)
+	expect(b.of('models')[0]).toMatchObject({ sessionId: id, current: 'hal/intro', items: expect.arrayContaining(['acme/big-1']) })
+	expect(other.of('models')).toEqual([])
+})
+
+test('the models command lists them for the asker only, recording nothing', async () => {
+	let a = client()
+	let id = created(a)
+	let b = await opened(id)
+	let before = history.readSync(id).length
+	a.conn.send({ type: 'models', sessionId: id })
+	await until(() => a.of('models').length)
+	expect(a.of('models')[0].items).toContain('acme/small-1')
+	expect(b.of('models')).toEqual([])
+	expect(history.readSync(id).length).toBe(before)
+})
+
+test('/model completes model ids the host knows', async () => {
+	let a = client()
+	let id = created(a)
+	await models.list('hal/intro')
+	a.conn.send({ type: 'complete', sessionId: id, text: '/model acme/b' })
+	expect(a.of('completions').at(-1).items).toEqual(['/model acme/big-1'])
+})

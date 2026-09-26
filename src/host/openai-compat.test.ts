@@ -23,7 +23,12 @@ beforeEach(() => {
 	server = Bun.serve({
 		port: 0,
 		async fetch(req) {
-			seen.push({ path: new URL(req.url).pathname, auth: req.headers.get('authorization'), body: await req.json() })
+			let path = new URL(req.url).pathname
+			if (req.method === 'GET') {
+				seen.push({ path, auth: req.headers.get('authorization'), body: undefined })
+				return path === '/v1/models' ? Response.json({ data: [{ id: 'vendor/a-1' }, { id: 'b-2' }] }) : new Response('', { status: 404 })
+			}
+			seen.push({ path, auth: req.headers.get('authorization'), body: await req.json() })
 			return reply()
 		},
 	})
@@ -171,4 +176,15 @@ test('errors: HTTP status, error chunk, bad tool JSON, stream cut before finish'
 	reply = () => sse({ choices: [{ delta: { content: 'partial' } }] })
 	let events = await run('fake/m')
 	expect(events.map((e) => e.type)).toEqual(['text', 'error'])
+})
+
+test('models are listed from the endpoint, with its key; without the key there is no list', async () => {
+	let signal = new AbortController().signal
+	expect(await provider.state.providers.fake!.models!(signal)).toEqual(['vendor/a-1', 'b-2'])
+	expect(seen.at(-1)).toMatchObject({ path: '/v1/models', auth: 'Bearer sk-test' })
+	delete process.env.FAKE_COMPAT_KEY
+	let count = seen.length
+	await expect(provider.state.providers.fake!.models!(signal)).rejects.toThrow(/FAKE_COMPAT_KEY/)
+	expect(seen.length).toBe(count)
+	expect(await provider.state.providers.local!.models!(signal)).toEqual(['vendor/a-1', 'b-2'])
 })

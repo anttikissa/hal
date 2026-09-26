@@ -111,21 +111,35 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 	if (reason) yield { type: 'done', reason }
 }
 
+// The endpoint's base URL and headers. Read at call time so local.ts
+// and env changes apply.
+function endpoint(name: string): { base: string; headers: Record<string, string> } {
+	let ep = openaiCompat.endpoints()[name]
+	if (!ep) throw new Error(`No endpoint configured for '${name}'`)
+	let headers: Record<string, string> = {}
+	if (ep.keyEnv) {
+		let key = process.env[ep.keyEnv]
+		if (!key) throw new Error(`No API key for '${name}': set ${ep.keyEnv}`)
+		headers.authorization = `Bearer ${key}`
+	}
+	return { base: ep.baseUrl.replace(/\/+$/, ''), headers }
+}
+
 function create(name: string): Provider {
 	return {
 		request(req) {
-			// Read at call time so local.ts and env changes apply.
-			let ep = openaiCompat.endpoints()[name]
-			if (!ep) throw new Error(`No endpoint configured for '${name}'`)
-			let headers: Record<string, string> = {}
-			if (ep.keyEnv) {
-				let key = process.env[ep.keyEnv]
-				if (!key) throw new Error(`No API key for '${name}': set ${ep.keyEnv}`)
-				headers.authorization = `Bearer ${key}`
-			}
-			return { url: `${ep.baseUrl.replace(/\/+$/, '')}/chat/completions`, headers, body: openaiCompat.body(req) }
+			let { base, headers } = openaiCompat.endpoint(name)
+			return { url: `${base}/chat/completions`, headers, body: openaiCompat.body(req) }
 		},
 		parse: openaiCompat.parse,
+		// GET /models, which OpenRouter, Ollama and most servers offer.
+		async models(signal) {
+			let { base, headers } = openaiCompat.endpoint(name)
+			let res = await provider.fetch(`${base}/models`, { headers, signal })
+			if (!res.ok) throw new Error(`HTTP ${res.status} listing models`)
+			let body = (await res.json()) as { data?: { id?: unknown }[] }
+			return (body.data ?? []).flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))
+		},
 	}
 }
 
@@ -146,6 +160,7 @@ export const openaiCompat = {
 	toMessages,
 	body,
 	parse,
+	endpoint,
 	create,
 	init,
 }

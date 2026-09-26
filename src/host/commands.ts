@@ -12,7 +12,9 @@ import { resolve } from 'path'
 import type { Answers, Form } from '../common/forms.ts'
 
 // What a command did: something to say, a failure, or a question.
-export type Reply = { say?: string; error?: string; ask?: Form }
+// `open`: a client modal to open on every client following the session
+// (tasks/w4/forms.md, Provenance): 'models' is the model picker.
+export type Reply = { say?: string; error?: string; ask?: Form; open?: 'models' }
 
 // The session the command runs in.
 // setCwd and setModel also tell the model, on its next prompt.
