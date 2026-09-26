@@ -5,7 +5,7 @@
 
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
-import { transcript, type Transcript } from '../common/transcript.ts'
+import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
 import type { KeyEvent } from './keys.ts'
 import { link, type Role } from './link.ts'
 import { prompt, type PromptState } from './prompt.ts'
@@ -13,7 +13,8 @@ import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import type { View } from './frame.ts'
 
-type AppState = { transcript?: Transcript; prompt: PromptState; notice?: string }
+// `resumed`: where the history of the last snapshot ends, marked on screen.
+type AppState = { transcript?: Transcript; resumed?: Resumed; prompt: PromptState; notice?: string }
 
 function createState(): AppState {
 	return { prompt: prompt.empty() }
@@ -23,6 +24,7 @@ function view(): View {
 	let st = app.state
 	let v: View = { prompt: st.prompt }
 	if (st.transcript) v.transcript = st.transcript
+	if (st.resumed) v.resumed = st.resumed
 	// A passing notice, else what the session is doing.
 	let notice = st.notice ?? (st.transcript && states.describe(st.transcript.state))
 	if (notice) v.notice = notice
@@ -37,7 +39,11 @@ function onEvent(event: Event): void {
 	let st = app.state
 	if (event.type === 'rejected') st.notice = `${event.command} refused: ${event.reason}`
 	else if (event.type === 'warning') st.notice = event.text
-	else st.transcript = transcript.fold(st.transcript, event)
+	else {
+		let t = transcript.fold(st.transcript, event)
+		if (event.type === 'snapshot' && t && t !== st.transcript) st.resumed = transcript.resumed(event.snapshot, t)
+		st.transcript = t
+	}
 	app.show()
 }
 

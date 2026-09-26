@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import type { Event, Snapshot } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
 import { app } from './app.ts'
+import { frame } from './frame.ts'
 import type { KeyEvent } from './keys.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
@@ -105,6 +106,23 @@ test('streamed output reaches the view', () => {
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'q', provider: 'anthropic' })
 	app.onEvent({ type: 'stream', sessionId: 's1', event: { type: 'text', text: 'answer' } })
 	expect(app.view().transcript?.items).toContainEqual({ type: 'text', text: 'answer' })
+})
+
+test('history from a snapshot is marked as old; what follows comes after the mark', () => {
+	let history: Snapshot['history'] = [
+		{ type: 'user', blocks: [{ type: 'text', text: 'old question' }], ts: '2026-09-26T00:50:00Z' },
+		{ type: 'turn_end', status: 'error', error: 'overloaded', usage: {}, ts: '2026-09-26T00:51:00Z' },
+	]
+	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, history, state: { type: 'idle' } } })
+	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'new question', provider: 'anthropic' })
+	let rows = frame.build(app.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim()).filter(Boolean)
+	let at = (s: string) => rows.findIndex((r) => r.includes(s))
+	expect(at('error: overloaded')).toBeLessThan(at('resumed · last turn'))
+	expect(at('resumed · last turn')).toBeLessThan(at('new question'))
+	// A session that starts empty has nothing old to mark.
+	app.reset()
+	app.onEvent(snapshot())
+	expect(frame.build(app.view(), 80).lines.join('')).not.toContain('resumed')
 })
 
 test('a refused command is shown until the next submit', () => {

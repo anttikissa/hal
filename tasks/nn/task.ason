@@ -1,7 +1,13 @@
 {
 	title: 'Replay tells the model what happened',
 	description: 'Provider input rebuilt from history must not garble or hide what happened. Today a turn that failed or was paused with no output leaves a user record, and replay.toMessages merges it with the next prompt into one message whose text blocks the provider joins with no separator ("Say just the word pong" + "k" was read as "pongk"). Fix it the way the old Hal does (reference: ~/.hal/src/server/session/api-messages.ts): each prompt stays its own user message, starting with a [HH:MM] line; how a turn ended (error, paused, continued after a restart) reaches the model as a short <meta> note in front of the next prompt. Clients should also make replayed history recognisable as old (for example a "resumed · last turn 00:51" line), so an old error redrawn at startup does not look like a new one. Test with the real replay of: an errored turn followed by a prompt, a paused turn followed by a prompt, and a normal two-turn history (which must not change).',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'replay.toMessages: a prompt record always starts a user message of its own, never merged; tool results (answered or made up) go in a message before it. So consecutive user messages are normal: Anthropic combines them server-side, openai-compat already splits results into tool messages. Text prompts start with `[HH:MM]` (replay.clock, local time) then the end note, joined by newlines into the first text block, not a separate block (providers join blocks with no separator).',
+		'replay.endNote(turn_end) makes the note: error (message clipped to 500 chars), paused by Hal (pauseReason), interrupted (legacy), else paused by the user; completed gives none. A `continue` record drops the pending note: the continue note (or nothing) says it instead. Only the next prompt gets a note.',
+		'Tests and fakes that read the prompt must strip the stamp: e2e.test.ts has bare(), host/history tests match /^\\[\\d\\d:\\d\\d\\]\\n.../.',
+		'The resumed mark is not in the Transcript (a client that followed events must equal one that connected later). transcript.resumed(snapshot, t) gives { at, last }: the item index where snapshot history ends (before a running turn), and the last record ts; clients keep it beside the transcript (app.state.resumed, ViewState.resumed), set on every snapshot, and draw transcript.resumedLabel() there. A reconnect snapshot moves the mark to the new end.'
+	],
 	needs: ['j1'],
 	foldInto: ['7']
 }

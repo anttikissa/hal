@@ -10,11 +10,13 @@
 import { colors, type Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
-import type { Item, Transcript } from '../common/transcript.ts'
+import { transcript, type Item, type Resumed, type Transcript } from '../common/transcript.ts'
 import type { PromptState } from './prompt.ts'
 
 export interface View {
 	transcript?: Transcript
+	/** Where replayed history ends: a line there says it is old. */
+	resumed?: Resumed
 	prompt: PromptState
 	/** A passing message for the user, such as a refused command. */
 	notice?: string
@@ -163,17 +165,17 @@ function layoutPrompt(text: string, cursor: number, width: number): { rows: stri
 function build(view: View, cols: number): Frame {
 	let width = Math.max(1, cols - 2 * PAD.length)
 	let lines: string[] = []
-	for (let item of view.transcript?.items ?? []) {
-		let rows = frame.itemLines(item, width)
-		if (!rows.length) continue
+	let block = (rows: string[], style: Style | undefined) => {
+		if (!rows.length) return
 		if (lines.length) lines.push('')
-		let style = frame.itemStyle(item)
 		for (let r of rows) lines.push(frame.paint(r, style, cols))
 	}
-	if (view.notice) {
-		if (lines.length) lines.push('')
-		for (let r of frame.wrap(view.notice, width)) lines.push(frame.paint(r, { fg: colors.log().fg! }, cols))
+	let items = view.transcript?.items ?? []
+	for (let i = 0; i <= items.length; i++) {
+		if (i === view.resumed?.at) block(frame.wrap(transcript.resumedLabel(view.resumed), width), { fg: colors.log().fg! })
+		if (i < items.length) block(frame.itemLines(items[i]!, width), frame.itemStyle(items[i]!))
 	}
+	if (view.notice) block(frame.wrap(view.notice, width), { fg: colors.log().fg! })
 	if (lines.length) lines.push('')
 	let promptWidth = Math.max(1, width - PROMPT_FIRST.length)
 	let p = frame.layoutPrompt(view.prompt.text, view.prompt.cursor, promptWidth)

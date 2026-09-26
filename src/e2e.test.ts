@@ -53,6 +53,10 @@ const toolAnswer = (result: any) => [
 	...finish,
 ]
 
+// A prompt's own text, without the [HH:MM] line and <meta> notes that
+// replay puts in front of it.
+const bare = (text: string) => text.replace(/^\[\d\d:\d\d\]\n(<meta>[^]*?<\/meta>\n)*/, '')
+
 // Answers "<prompt>" with "ECHO(<prompt>)". A prompt starting with
 // "hold" streams PART1, then waits for release() to send PART2 and
 // finish, or for the client to abort.
@@ -61,7 +65,7 @@ function reply(req: Request, body: any): Response {
 	requests.push(messages)
 	let lastBlock = messages.at(-1).content.at(-1)
 	if (lastBlock.type === 'tool_result') return sse([sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }), ...toolAnswer(lastBlock)])
-	let prompt: string = lastBlock.text
+	let prompt: string = bare(lastBlock.text)
 	if (prompt.startsWith('read ')) return sse(toolUse(prompt.slice(5)))
 	let stream = new ReadableStream<Uint8Array>({
 		start(c) {
@@ -206,7 +210,7 @@ test('Escape pauses a turn; it stays paused over a restart and Enter continues i
 	type(p, 'second\r')
 	await until('an answer after restart', () => seen(p, 'ECHO(second)'))
 	// The model got the whole conversation back, cut-off turn included.
-	let texts = requests.at(-1)!.flatMap((m) => m.content.map((b: any) => b.text))
+	let texts = requests.at(-1)!.flatMap((m) => m.content.map((b: any) => b.text && bare(b.text)))
 	expect(texts).toEqual(expect.arrayContaining(['first', 'ECHO(first)', 'hold on', 'PART1', 'second']))
 	expect(ends()).toEqual(['completed', 'paused', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)
@@ -273,7 +277,7 @@ test('a host restarted mid-turn continues it, and everyone rejoins', async () =>
 	await until('an answer to a', () => seen(a, 'ECHO(from a)') && seen(b, 'ECHO(from a)'))
 	// The model got the cut-off text back, was told, and nothing was sent twice.
 	expect(requests).toHaveLength(4)
-	let texts = requests.at(-1)!.flatMap((m) => m.content.map((b: any) => b.text))
+	let texts = requests.at(-1)!.flatMap((m) => m.content.map((b: any) => b.text && bare(b.text)))
 	expect(texts.filter((t: string) => !t.startsWith('<meta>') && !t.startsWith('ECHO(<meta>'))).toEqual(['hold it', 'PART1', 'from b', 'ECHO(from b)', 'from a'])
 	expect(ends()).toEqual(['completed', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)

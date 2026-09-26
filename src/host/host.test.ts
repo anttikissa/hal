@@ -116,6 +116,9 @@ function restartHost() {
 	history.state.running.clear()
 }
 
+// A prompt as replay sends it: its [HH:MM] line, then the text.
+const stamped = (text: string) => expect.stringMatching(new RegExp(`^\\[\\d\\d:\\d\\d\\]\\n${text}$`))
+
 const records = async (id: string) => (await history.read(id)).map(({ ts: _ts, ...r }) => r)
 
 test('create makes a session and sends its snapshot', () => {
@@ -175,7 +178,7 @@ test('the next turn replays durable history, even after a host restart', async (
 	await until(() => calls.length === 2)
 	expect(calls[1]!.model).toBe('fake/m1')
 	expect(calls[1]!.input.messages).toEqual([
-		{ role: 'user', blocks: [{ type: 'text', text: 'one' }] },
+		{ role: 'user', blocks: [{ type: 'text', text: stamped('one') }] },
 		{
 			role: 'assistant',
 			blocks: [
@@ -183,7 +186,7 @@ test('the next turn replays durable history, even after a host restart', async (
 				{ type: 'text', text: 'first' },
 			],
 		},
-		{ role: 'user', blocks: [{ type: 'text', text: 'two' }] },
+		{ role: 'user', blocks: [{ type: 'text', text: stamped('two') }] },
 	])
 })
 
@@ -207,7 +210,7 @@ test('a turn cut off by a host that went away continues on the next host, told w
 	await host.recover()
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages).toEqual([
-		{ role: 'user', blocks: [{ type: 'text', text: 'go' }] },
+		{ role: 'user', blocks: [{ type: 'text', text: stamped('go') }] },
 		{ role: 'assistant', blocks: [{ type: 'text', text: 'a' }] },
 		{ role: 'user', blocks: [{ type: 'text', text: replay.continueNote }] },
 	])
@@ -340,7 +343,7 @@ test('continue is refused with nothing to continue; after an error it retries th
 	expect(a.views.get(id)!.state).toEqual({ type: 'error', message: '400 bad request' })
 	a.conn.send({ type: 'continue', sessionId: id })
 	await until(() => calls.length === 2)
-	expect(calls[1]!.input.messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: 'go' }] }])
+	expect(calls[1]!.input.messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: stamped('go') }] }])
 })
 
 test('a user message to a paused turn goes on from there', async () => {

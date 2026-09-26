@@ -25,10 +25,15 @@ export type HistoryRecord =
 // not replayable and is left out. Each tool call gets a result before the
 // next user message: a missing one becomes an error result, and results
 // with no call are dropped, so the input stays valid for every provider.
+// Each prompt is its own message, starting with its [HH:MM] line and, if
+// the turn before it failed or was paused, a <meta> note saying so:
+// providers join adjacent text blocks with no separator, so merged
+// prompts read as one ("pong" + "k" became "pongk").
 function toMessages(records: HistoryRecord[]): Message[] {
 	let out: Message[] = []
 	let pending: string[] = []
 	let status: TurnStatus | undefined
+	let note: string | undefined
 	let push = (msg: Message) => {
 		let last = out.at(-1)
 		if (last?.role === msg.role) (last.blocks as unknown[]).push(...msg.blocks)
@@ -38,8 +43,11 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	for (let r of records) {
 		let before = prev
 		prev = r
-		if (r.type === 'turn_end') status = r.status
-		else if (r.type === 'continue') {
+		if (r.type === 'turn_end') {
+			status = r.status
+			note = replay.endNote(r)
+		} else if (r.type === 'continue') {
+			note = undefined
 			let why = before?.type === 'turn_end' ? before.status : 'interrupted'
 			let cut = out.at(-1)?.role === 'assistant'
 			let missing = pending.map((id): ToolResultBlock => ({ type: 'tool_result', id, output: replay.missingResult(why), isError: true }))
@@ -58,10 +66,37 @@ function toMessages(records: HistoryRecord[]): Message[] {
 				.filter((id) => !answered.has(id))
 				.map((id): ToolResultBlock => ({ type: 'tool_result', id, output: replay.missingResult(status), isError: true }))
 			pending = []
-			push({ role: 'user', blocks: [...results, ...missing, ...r.blocks.filter((b) => b.type !== 'tool_result')] })
+			push({ role: 'user', blocks: [...results, ...missing] })
+			let texts = r.blocks.filter((b) => b.type === 'text')
+			if (!texts.length) continue
+			let head = [`[${replay.clock(r.ts)}]`, ...(note ? [note] : [])].join('\n')
+			note = undefined
+			// Never merged: a prompt always starts a message of its own.
+			out.push({ role: 'user', blocks: texts.map((b, i) => (i ? b : { type: 'text', text: `${head}\n${b.text}` })) })
 		}
 	}
 	return out
+}
+
+// How a turn ended, told in front of the next prompt; nothing when it
+// completed. A long provider error is clipped: the model needs the gist.
+function endNote(end: Extract<HistoryRecord, { type: 'turn_end' }>): string | undefined {
+	if (end.status === 'completed') return undefined
+	if (end.status === 'error') {
+		let error = end.error ?? 'unknown error'
+		if (error.length > 500) error = error.slice(0, 500) + '…'
+		return `<meta>The previous turn failed with an error: ${error}</meta>`
+	}
+	if (end.pauseReason !== undefined) return `<meta>Hal paused the previous turn: ${end.pauseReason}</meta>`
+	if (end.status === 'interrupted') return '<meta>The previous turn was interrupted.</meta>'
+	return '<meta>The user paused the previous turn.</meta>'
+}
+
+// Local wall-clock HH:MM of an ISO timestamp.
+function clock(ts: string): string {
+	let d = new Date(ts)
+	let two = (n: number) => String(n).padStart(2, '0')
+	return `${two(d.getHours())}:${two(d.getMinutes())}`
 }
 
 // What the model is told about a call with no recorded result. A host
@@ -75,5 +110,7 @@ export const replay = {
 	// Told to the model when a cut-off answer continues.
 	continueNote: '<meta>The previous response was interrupted. Continue without repeating completed work.</meta>',
 	toMessages,
+	endNote,
+	clock,
 	missingResult,
 }

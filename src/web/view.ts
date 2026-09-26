@@ -5,9 +5,10 @@
 
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
-import { transcript, type Item, type Transcript } from '../common/transcript.ts'
+import { transcript, type Item, type Resumed, type Transcript } from '../common/transcript.ts'
 
-export type ViewState = { transcript?: Transcript; notice?: string }
+// `resumed`: where the history of the last snapshot ends, marked on the page.
+export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string }
 
 // One transcript item as shown: CSS classes and its text. The classes
 // are theme style names (src/common/colors.ts in kebab case), whose CSS
@@ -19,7 +20,9 @@ function onEvent(st: ViewState, event: Event): ViewState {
 	if (event.type === 'rejected') return { ...st, notice: `${event.command} refused: ${event.reason}` }
 	if (event.type === 'warning') return { ...st, notice: event.text }
 	let t = transcript.fold(st.transcript, event)
-	return t === st.transcript ? st : { ...st, transcript: t }
+	if (t === st.transcript) return st
+	if (event.type === 'snapshot' && t) return { ...st, transcript: t, resumed: transcript.resumed(event.snapshot, t) }
+	return { ...st, transcript: t }
 }
 
 // What Enter with `text` does: send a prompt (or a continue, when empty

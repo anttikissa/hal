@@ -81,3 +81,12 @@ test('a tool gets a class for its name that no name can break out of', () => {
 	expect(kind.split(' ')[0]).toBe('tool')
 	expect(kind.split(' ')[1]).toMatch(/^tool-[a-z0-9-]+$/)
 })
+
+test('a snapshot with history marks where it ends; later events keep the mark', () => {
+	let old = { type: 'snapshot', sessionId, snapshot: { meta, history: [{ type: 'user', blocks: [{ type: 'text', text: 'old' }], ts }], state: { type: 'idle' } } } as Event
+	let st = fold([old, { type: 'turn-start', sessionId, prompt: 'new', provider: 'fake' }])
+	expect(st.resumed).toEqual({ at: 1, last: ts })
+	expect(st.transcript!.items.slice(st.resumed!.at)).toEqual([{ type: 'prompt', text: 'new' }])
+	let empty = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }], st)
+	expect(empty.resumed).toBeUndefined()
+})

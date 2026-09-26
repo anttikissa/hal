@@ -7,7 +7,7 @@
 
 import { blocks, type AssistantBlock, type ToolResultBlock, type Usage } from './blocks.ts'
 import type { Event, LiveTurn, Snapshot, TurnStatus } from './protocol.ts'
-import type { HistoryRecord } from './replay.ts'
+import { replay, type HistoryRecord } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
 
@@ -110,4 +110,23 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	return { meta: t.meta, state: t.state, items: [...settled, ...transcript.blockItems(t.live.turn.blocks), end] }
 }
 
-export const transcript = { blockItems, resultItem, recordItems, endItem, fromSnapshot, copyTurn, fold }
+// Where the history a client got in a snapshot ends (an index into
+// items) and when it was last written. Clients mark that spot, so an old
+// error redrawn at startup does not look like a new one. Kept out of the
+// transcript: a client that followed the events has no such spot.
+export type Resumed = { at: number; last: string }
+
+function resumed(snapshot: Snapshot, t: Transcript): Resumed | undefined {
+	let last = snapshot.history.at(-1)
+	return last && { at: t.live?.start ?? t.items.length, last: last.ts }
+}
+
+// "resumed · last turn 00:51", with the date when it was not today.
+function resumedLabel(r: Resumed, now = new Date()): string {
+	let d = new Date(r.last)
+	let day = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+	let when = day(d) === day(now) ? replay.clock(r.last) : `${day(d)} ${replay.clock(r.last)}`
+	return `resumed · last turn ${when}`
+}
+
+export const transcript = { blockItems, resultItem, recordItems, endItem, fromSnapshot, copyTurn, fold, resumed, resumedLabel }

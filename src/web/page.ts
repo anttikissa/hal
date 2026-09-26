@@ -5,7 +5,7 @@
 // web.ts bundles this file into index.html at request time.
 
 import type { Event } from '../common/protocol.ts'
-import type { Item } from '../common/transcript.ts'
+import { transcript, type Item } from '../common/transcript.ts'
 import { link } from './link.ts'
 import { view, type ViewState } from './view.ts'
 
@@ -14,12 +14,14 @@ type PageState = {
 	// Transcript items on screen and their nodes, in order.
 	drawn: { item: Item; node: HTMLElement | null }[]
 	log: HTMLElement | null
+	// The line marking where replayed history ends.
+	resumed: HTMLElement | null
 	notice: HTMLElement | null
 	input: HTMLTextAreaElement | null
 }
 
 function createState(): PageState {
-	return { view: {}, drawn: [], log: null, notice: null, input: null }
+	return { view: {}, drawn: [], log: null, resumed: null, notice: null, input: null }
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}): HTMLElementTagNameMap[K] {
@@ -42,6 +44,14 @@ function draw(): void {
 		if (node) log.append(node)
 		st.drawn.push({ item, node })
 	}
+	let resumed = st.view.resumed
+	if (resumed) {
+		st.resumed ??= el('div', { className: 'log' })
+		st.resumed.textContent = transcript.resumedLabel(resumed)
+		let next = st.drawn.slice(resumed.at).find((d) => d.node)?.node
+		if (next) log.insertBefore(st.resumed, next)
+		else log.append(st.resumed)
+	} else st.resumed?.remove()
 	st.notice!.textContent = st.view.notice ?? ''
 	let status = view.status(st.view)
 	st.input!.placeholder = status ? `${status}; Escape pauses a running turn` : 'Message Hal (Enter sends, Shift+Enter for a newline)'
