@@ -2,5 +2,11 @@
 	title: 'What is a session',
 	description: 'A session has an id, its own directory under sessions/ and small ASON metadata kept in a liveFile: at least cwd, model, name and creation time. The host can create, list, open and close several sessions at once, even though the first terminal client shows only one. A session without history is valid; malformed metadata is reported, not replaced.',
 	status: 'done',
+	notes: [
+		'`liveFile(path, defaults)` never writes defaults by itself; only assignments mark it dirty. To create a file, open with `{}` and `Object.assign` the initial data, then `liveFiles.save`. My first version passed the metadata as defaults and nothing reached disk.',
+		'For the same reason, load existing metadata with `{}` defaults and validate afterwards: defaults would silently fill in missing fields, which the task forbids ("reported, not replaced").',
+		"The artifact `sessions.ts` does the opposite of this task: its `fixMeta`/`readAson` repair or swallow bad metadata. Don't lift those.",
+		'The artifact names the field `workingDir`; the task says cwd, so the stored field is `cwd`. Old fields (currentLog, closedAt, fork data) were left out; add them in the tasks that need them.'
+	],
 	needs: ['n']
 }

@@ -2,5 +2,13 @@
 	title: 'Restart lifecycle',
 	description: 'A host restart (Ctrl-R in the host process) keeps the session going: clients reconnect or take over, a running turn is recorded as interrupted, and the restarted process rejoins as a client or host. The terminal stays usable throughout.',
 	status: 'done',
+	notes: [
+		"Record the interrupted turn from a synchronous `process.on('exit')` handler (`host.init()`). The kernel releases the host flock only after that handler has run, so the successor never sees a turn left half-written. Anything async there is lost. A SIGKILL skips it, so the repair in `history.open` is still needed.",
+		'Ctrl-C in the host during a turn now ends it as `interrupted`, not `cancelled`: the process dies with the turn still running. `cancelled` means Escape.',
+		"The `process-control.ts` artifact (`requestExit`/`exitIfRequested`) wasn't needed: `terminal.restart()` exits directly, and the exit handler provides the durability boundary.",
+		"`./run` is a bash loop with a `bun` child. Killing the spawned `./run` orphans that child, which stays alive until killed by hand (b3's e2e tests leaked about 15 of them). Spawn with `detached: true` and kill the group (`process.kill(-pid)`). After multi-process tests, check `pgrep -fl src/main.ts`.",
+		'oxlint rejects `return` inside `finally` (no-unsafe-finally). Guard the writes with a flag instead.',
+		"When a shared test file also holds another agent's edits, stage only your hunks (for example with `git hash-object -w` + `git update-index --cacheinfo`). `git add <file>` committed another agent's work here by mistake."
+	],
 	needs: ['b3']
 }
