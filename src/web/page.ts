@@ -2,7 +2,8 @@
 // The browser client's page: a password form until the cookie is set,
 // then one session's transcript above a textarea. Enter submits
 // (steering a running turn; Alt+Enter queues after it, Shift+Enter is a
-// newline), Escape pauses a running turn. Waiting messages (the inbox)
+// newline), Escape pauses a running turn, Up on an empty input edits
+// the last prompt (src/common/amend.ts). Waiting messages (the inbox)
 // always show above the input. The textarea is the session's draft
 // (common/drafts.ts, kept in localStorage too); a sent prompt shows at
 // once, pending until the host has it, connected or not. Plain DOM;
@@ -74,7 +75,7 @@ function draw(): void {
 	st.pending.replaceChildren(...(id ? drafts.pending(id) : []).map((text) => el('div', { className: 'user pending', textContent: text })))
 	st.pending.style.display = 'contents'
 	log.append(st.pending)
-	st.notice!.textContent = st.view.notice ?? ''
+	st.notice!.textContent = view.notice(st.view) ?? ''
 	// The open question owns input; the message box waits, keeping its text.
 	let wasDisabled = st.input!.disabled
 	st.input!.disabled = !!st.view.form
@@ -230,6 +231,20 @@ function onKey(e: KeyboardEvent): void {
 		page.syncForm()
 		return
 	}
+	// Editing the last prompt: Up loads it, Down (unchanged) or Escape
+	// leaves; the input stays the draft.
+	let arrow = { ArrowUp: 'up', ArrowDown: 'down', Escape: 'escape' } as const
+	let editKey = e.key in arrow && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && e.target === st.input
+	let edit = editKey ? view.editKey(st.view, arrow[e.key as keyof typeof arrow], st.input!.value) : undefined
+	if (edit) {
+		e.preventDefault()
+		st.view = edit.view
+		st.input!.value = edit.text
+		if (edit.command) connection.send(edit.command)
+		page.onInput()
+		page.draw()
+		return
+	}
 	if (e.key === 'Escape') {
 		let command = view.pause(st.view)
 		if (command) connection.send(command)
@@ -238,11 +253,14 @@ function onKey(e: KeyboardEvent): void {
 	if (e.key !== 'Enter' || e.shiftKey || e.target !== st.input) return
 	e.preventDefault()
 	let { command, notice, keep } = view.submit(st.view, st.input!.value, e.altKey)
-	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean } | undefined
+	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; amend?: boolean } | undefined
 	// A prompt shows at once and waits, pending, for the host.
-	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c.queue)
+	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c.queue, c.amend)
 	else if (c) connection.send(c)
-	if (!keep) st.input!.value = ''
+	if (!keep) {
+		st.input!.value = ''
+		st.view = { ...st.view, editing: undefined }
+	}
 	page.setNotice(notice)
 	page.fitInput()
 }

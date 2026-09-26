@@ -18,7 +18,9 @@ import type { ToolDef } from './provider.ts'
 export type ToolContext = { cwd: string; signal: AbortSignal }
 
 // Returns the output; throwing makes an error result with the message.
-export type Tool = { def: ToolDef; run(input: Record<string, unknown>, ctx: ToolContext): Promise<string> }
+// `readOnly`: running it changes nothing, so an edited prompt may
+// replace the turn that ran it (host.amend).
+export type Tool = { def: ToolDef; readOnly?: true; run(input: Record<string, unknown>, ctx: ToolContext): Promise<string> }
 
 function positive(input: Record<string, unknown>, key: string): number | undefined {
 	let v = input[key]
@@ -46,6 +48,7 @@ function page(text: string, offset = 1, limit = tools.maxLines()): string {
 }
 
 const read: Tool = {
+	readOnly: true,
 	def: {
 		name: 'read',
 		description:
@@ -148,6 +151,8 @@ export const tools = {
 	maxLineChars: () => 2000,
 	// Larger files are refused rather than loaded whole.
 	maxFileBytes: () => 20_000_000,
+	// Unknown tools count as having side effects.
+	readOnly: (name: string): boolean => tools.state.tools[name]?.readOnly === true,
 	defs: (): ToolDef[] => Object.values(tools.state.tools).map((t) => t.def),
 	page,
 	run,

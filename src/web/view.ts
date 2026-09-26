@@ -3,6 +3,7 @@
 // passing notice, and what each item looks like as text. page.ts feeds
 // it the events from link.ts and draws it.
 
+import { amend, type Editing } from '../common/amend.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
 import type { Event } from '../common/protocol.ts'
@@ -11,7 +12,8 @@ import { transcript, type Item, type Resumed, type Transcript } from '../common/
 
 // `resumed`: where the history of the last snapshot ends, marked on the page.
 // `form`: the open question as filled in on this page.
-export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState }
+// `editing`: the last prompt is in the input (src/common/amend.ts).
+export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState; editing?: Editing }
 
 // One transcript item as shown: CSS classes and its text. The classes
 // are theme style names (src/common/colors.ts in kebab case), whose CSS
@@ -26,6 +28,8 @@ function onEvent(st: ViewState, event: Event): ViewState {
 	if (t === st.transcript) return st
 	let next: ViewState = { ...st, transcript: t }
 	if (event.type === 'snapshot' && t) next.resumed = transcript.resumed(event.snapshot, t)
+	// An edited prompt may have replaced what the mark was after.
+	else if (st.resumed && t && st.resumed.at > t.items.length) next.resumed = { ...st.resumed, at: t.items.length }
 	let form = forms.follow(st.form, transcript.question(t))
 	if (form) next.form = form
 	else delete next.form
@@ -52,11 +56,37 @@ function formKey(st: ViewState, k: Key): { state: ViewState; command?: unknown }
 // What Enter with `text` does: send a prompt (steering a busy turn;
 // `queue`, Alt-Enter: after it), a continue (empty, on a paused or
 // failed turn), or show why not (the typed text stays).
+// While editing the last prompt, Enter sends the edit.
 function submit(st: ViewState, text: string, queue = false): { command?: unknown; notice?: string; keep: boolean } {
+	if (st.editing) {
+		let command = amend.enter(st.editing, st.transcript, text, queue)
+		return command ? { command, keep: false } : { keep: false }
+	}
 	if (!st.transcript) return text.trim() ? { notice: 'no session yet', keep: true } : { keep: false }
 	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, queue)
 	if (refused) return { notice: refused, keep: true }
 	return command ? { command, keep: false } : { keep: false }
+}
+
+// Up, Down or Escape with `text` in the input, for editing the last
+// prompt: the view after, the command to send and the input's new text;
+// undefined if the key means nothing here.
+function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { view: ViewState; command?: unknown; text: string } | undefined {
+	if (key === 'up') {
+		let begun = !st.editing && amend.begin(st.transcript, text)
+		return begun ? { view: { ...st, editing: begun.editing }, command: begun.command, text: begun.editing.original } : undefined
+	}
+	let editing = st.editing
+	if (!editing || (key === 'down' && text !== editing.original)) return undefined
+	let command = amend.resume(editing, st.transcript)
+	let out: { view: ViewState; command?: unknown; text: string } = { view: { ...st, editing: undefined }, text: text === editing.original ? '' : text }
+	if (command) out.command = command
+	return out
+}
+
+// The passing notice, else the hint while editing the last prompt.
+function notice(st: ViewState): string | undefined {
+	return st.notice ?? (st.editing && amend.hint())
 }
 
 // The pause command for Escape, if anything is running.
@@ -119,6 +149,8 @@ export const view = {
 	key,
 	formKey,
 	submit,
+	editKey,
+	notice,
 	pause,
 	status,
 	inbox: waiting,

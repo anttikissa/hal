@@ -151,3 +151,24 @@ test('waiting inbox messages are not sent; once delivered they are one prompt, o
 	// One text block: providers join blocks with no separator.
 	expect(after.at(-1)!.blocks).toEqual([{ type: 'text', text: `[${hhmm(ts)}]\none\n\nthree` }])
 })
+
+test('an edited prompt supersedes the prompt it replaces and that turn, as if written that way', () => {
+	let replaced: HistoryRecord = { type: 'user', blocks: [{ type: 'text', text: 'fix it' }], replaces: true, ts }
+	let before = [say('hi'), block({ type: 'text', text: 'hello' }), end('error', { error: 'boom' })]
+	let msgs = replay.toMessages([
+		...before,
+		say('fix ti'),
+		block({ type: 'text', text: 'Looking' }),
+		block({ type: 'tool_call', id: 'r1', name: 'read', input: { path: 'x' } }),
+		user({ type: 'tool_result', id: 'r1', output: 'x' }),
+		end('paused'),
+		cont,
+		{ type: 'inbox', id: 'm1', text: 'waiting', ts },
+		end('paused'),
+		replaced,
+	])
+	expect(msgs).toEqual(replay.toMessages([...before, say('fix it')]))
+	// The prompt before it is not touched; a second edit replaces the first.
+	let again: HistoryRecord = { ...replaced, blocks: [{ type: 'text', text: 'fix it now' }] }
+	expect(replay.toMessages([...before, say('fix ti'), end('paused'), replaced, end('paused'), again])).toEqual(replay.toMessages([...before, say('fix it now')]))
+})

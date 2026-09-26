@@ -553,6 +553,98 @@ test('a user message to a paused turn goes on from there', async () => {
 	expect(a.views.get(id)!.state.type).toBe('running')
 })
 
+// ── Editing the last prompt (tasks/j1/states.md) ──
+
+// Up while the model works: the client pauses the turn, then sends the edit.
+async function pauseAndEdit(a: ReturnType<typeof client>, id: string, text: string) {
+	a.conn.send({ type: 'pause', sessionId: id })
+	a.conn.send({ type: 'submit', sessionId: id, text, amend: true })
+}
+
+test('an edit after only reading replaces the prompt: the model sees it as if written that way', async () => {
+	let a = client()
+	let id = toolSession(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: 'hello' }, { type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length === 1)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'what did I ntoe?' })
+	await until(() => calls.length === 2)
+	calls[1]!.push({ type: 'text', text: 'Let me look.' }, readCall(), { type: 'done', reason: 'tool_use' })
+	await until(() => calls.length === 3)
+	calls[2]!.push({ type: 'text', text: 'You no' })
+	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
+	await pauseAndEdit(a, id, 'what did I note?')
+	await until(() => calls.length === 4)
+	let expected = [...calls[1]!.input.messages.slice(0, -1), { role: 'user', blocks: [{ type: 'text', text: stamped('what did I note\\?') }] }]
+	expect(calls[3]!.input.messages).toEqual(expected)
+	calls[3]!.push({ type: 'text', text: 'Milk.' }, { type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length === 3)
+	let view = await fresh(id)
+	expect(view).toEqual(a.views.get(id)!)
+	expect(view.items.slice(3)).toEqual([
+		{ type: 'prompt', text: 'what did I note?' },
+		{ type: 'text', text: 'Milk.' },
+		{ type: 'turn-end', status: 'completed' },
+	])
+	// History is only appended to: the first attempt is still there.
+	expect((await records(id)).some((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.text === 'what did I ntoe?'))).toBe(true)
+	// And the next turn builds on the edit.
+	a.conn.send({ type: 'submit', sessionId: id, text: 'thanks' })
+	await until(() => calls.length === 5)
+	expect(calls[4]!.input.messages.slice(0, 4)).toEqual([...expected, { role: 'assistant', blocks: [{ type: 'text', text: 'Milk.' }] }])
+})
+
+test('an edit after a tool with side effects keeps history and is sent on top', async () => {
+	let origRun = tools.run
+	tools.run = async (call) => ({ type: 'tool_result', id: call.id, output: '[exit 0]\n' })
+	try {
+		let a = client()
+		let id = created(a)
+		a.conn.send({ type: 'submit', sessionId: id, text: 'clean up' })
+		await until(() => calls.length === 1)
+		let rm: StreamEvent = { type: 'tool_call', id: 'b1', name: 'bash', input: { command: 'rm x', description: 'Delete x' } }
+		calls[0]!.push(rm, { type: 'done', reason: 'tool_use' })
+		await until(() => calls.length === 2)
+		await pauseAndEdit(a, id, 'clean up, but keep x')
+		await until(() => calls.length === 3)
+		let msgs = calls[2]!.input.messages
+		expect(msgs.slice(0, -1)).toEqual(calls[1]!.input.messages)
+		expect(msgs.at(-1).blocks[0].text).toMatch(/paused the previous turn[^]*\nclean up, but keep x$/)
+		calls[2]!.push({ type: 'done', reason: 'end' })
+		await until(() => a.of('turn-end').length === 2)
+		expect(await fresh(id)).toEqual(a.views.get(id)!)
+		expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt')).toEqual([
+			{ type: 'prompt', text: 'clean up' },
+			{ type: 'prompt', text: 'clean up, but keep x' },
+		])
+	} finally {
+		tools.run = origRun
+	}
+})
+
+test('an edit sent while the paused turn is still stopping waits for it to end', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'wrnog' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: 'partial' })
+	await until(() => a.of('stream').length)
+	// Both arrive before the aborted stream has wound down.
+	await pauseAndEdit(a, id, 'right')
+	await until(() => calls.length === 2)
+	expect(calls[1]!.input.messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: stamped('right') }] }])
+	calls[1]!.push({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
+	await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
+	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'turn_end', 'user', 'assistant', 'turn_end'])
+	expect(await fresh(id)).toEqual(a.views.get(id)!)
+	expect(a.views.get(id)!.items).toEqual([
+		{ type: 'prompt', text: 'right' },
+		{ type: 'text', text: 'ok' },
+		{ type: 'turn-end', status: 'completed' },
+	])
+})
+
 test('a provider error ends the turn with the error', async () => {
 	let a = client()
 	let id = created(a)

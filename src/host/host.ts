@@ -20,13 +20,19 @@
 // (src/common/inbox.ts), durable in history: steering messages go to
 // the model together before the turn's next request, queued ones run as
 // turns of their own once it has completed.
+//
+// An edit of the last prompt (submit with `amend`, sent after the
+// client paused the turn) replaces that prompt when nothing with side
+// effects ran since: a new record that supersedes it and its turn for the
+// provider (replay.current), history staying append-only. Otherwise it
+// is sent on top like any prompt.
 
 import { ason } from '../common/ason.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
 import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock } from '../common/blocks.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import { protocol, type Command, type Event, type Snapshot } from '../common/protocol.ts'
-import type { HistoryRecord } from '../common/replay.ts'
+import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states, type SessionState, type StateEvent } from '../common/states.ts'
 import { auth } from './auth.ts'
 import { clock } from './clock.ts'
@@ -48,7 +54,8 @@ export type Connection = {
 type Client = { deliver: (event: Event) => void; open: Set<string> }
 // What a command did: refused (why), or done, naming a created session.
 type Outcome = { refused?: string; sessionId?: string }
-type Running = { provider: string; controller: AbortController }
+// `done`: settles when runTurn has returned.
+type Running = { provider: string; controller: AbortController; done?: Promise<void> }
 
 // The in-memory stand-in for the wire: both directions go through ASON,
 // so nothing non-serializable or shared by reference crosses it.
@@ -190,10 +197,17 @@ function act(client: Client, c: Command): Outcome | undefined {
 		return undefined
 	}
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
+	// An edit waits for the turn it paused to finish stopping, so nothing
+	// that turn still records lands after the edit.
+	let stopping = c.type === 'submit' && c.amend && host.stateOf(c.sessionId).type === 'paused' && host.state.running.get(c.sessionId)?.done
+	if (stopping) {
+		stopping.then(() => host.state.clients.has(client) && host.handle(client, c))
+		return undefined
+	}
 	let refused: string | undefined
 	if (c.type === 'close') client.open.delete(c.sessionId)
 	else if (c.type === 'submit') {
-		refused = host.submit(c.sessionId, c.text, c.id, c.queue)
+		refused = c.amend && !c.queue ? host.amend(c.sessionId, c.text, c.id) : host.submit(c.sessionId, c.text, c.id, c.queue)
 		if (refused === undefined) host.sent(c.sessionId, c.text, c.id)
 	} else if (c.type === 'draft') host.draft(c.sessionId, drafts.set(c.sessionId, c.text, c.base), c.id)
 	else if (c.type === 'continue') refused = host.resume(c.sessionId)
@@ -291,6 +305,33 @@ function submit(id: string, text: string, command?: string, queue = false): stri
 	host.start(id)
 }
 
+// An edit of the last prompt. If only reading happened since it, the
+// edit replaces it and the turn runs again as if it had been written
+// that way; otherwise, or while the turn is still busy, it is a prompt
+// like any other. The edit is of the prompt's last text: messages it
+// delivered from the inbox before that stay.
+function amend(id: string, text: string, command?: string): string | undefined {
+	let records = history.readSync(id)
+	let at = replay.lastPrompt(records)
+	let old = records[at]
+	if (states.busy(host.stateOf(id, records)) || old?.type !== 'user' || !host.harmless(records.slice(at + 1))) return host.submit(id, text, command)
+	let refused = host.transition(id, { type: 'submit' })
+	if (refused) return refused
+	let texts = old.blocks.flatMap((b) => (b.type === 'text' ? [b.text] : []))
+	texts[texts.length - 1] = text
+	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks: texts.map((t) => ({ type: 'text', text: t })), replaces: true }
+	if (command !== undefined) record.command = command
+	history.append(id, record)
+	host.broadcast(id, { type: 'prompt', sessionId: id, texts, replaces: true })
+	host.start(id)
+}
+
+// Whether the records after a prompt leave the world as it was: no
+// tool call except read-only ones (tools.readOnly).
+function harmless(records: HistoryRecord[]): boolean {
+	return records.every((r) => r.type !== 'assistant' || r.block.type !== 'tool_call' || tools.readOnly(r.block.name))
+}
+
 // Records inbox messages (and a new prompt `text`) as one prompt and
 // tells followers: a `prompt` event, or with `quiet` nothing, as the
 // caller's turn-start carries it.
@@ -385,7 +426,7 @@ function start(id: string, prompt?: string, answers?: Answers): void {
 	let event: Event = { type: 'turn-start', sessionId: id, provider: running.provider }
 	if (prompt !== undefined) event.prompt = prompt
 	host.broadcast(id, event)
-	void host.runTurn(id, model, running, answers)
+	running.done = host.runTurn(id, model, running, answers).catch((e) => diag.log(`turn ${id}: ${e?.message ?? e}`))
 }
 
 // Pauses the session's turn: one running here stops and runTurn records
@@ -643,6 +684,8 @@ export const host = {
 	transition,
 	inboxOf,
 	submit,
+	amend,
+	harmless,
 	deliver,
 	steer,
 	next,

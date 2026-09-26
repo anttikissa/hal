@@ -118,3 +118,21 @@ test('the open question is filled in with browser keys and answered; afterwards 
 	expect(st.form).toBeUndefined()
 	expect(shown(st)).toEqual([{ kind: 'question warning', text: '? Create it?\n  yes' }])
 })
+
+test('Up on an empty input while the model works edits the last prompt; Enter sends it, Down or Escape continues', () => {
+	let running = fold([
+		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'running', phase: 'streaming' } } },
+		{ type: 'turn-start', sessionId, prompt: 'fix ti', provider: 'fake' },
+	])
+	expect(view.editKey(running, 'up', 'draft')).toBeUndefined()
+	let up = view.editKey(running, 'up', '')!
+	expect(up).toMatchObject({ command: { type: 'pause', sessionId }, text: 'fix ti' })
+	let editing = fold([{ type: 'state', sessionId, state: { type: 'paused' } }], up.view)
+	expect(view.notice(editing)).toMatch(/editing/)
+	expect(view.submit(editing, 'fix it')).toEqual({ command: { type: 'submit', sessionId, text: 'fix it', amend: true }, keep: false })
+	expect(view.editKey(editing, 'down', 'fix it')).toBeUndefined()
+	let down = view.editKey(editing, 'down', 'fix ti')!
+	expect(down).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: '' })
+	// Escape keeps changed text.
+	expect(view.editKey(editing, 'escape', 'fix it')).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: 'fix it' })
+})

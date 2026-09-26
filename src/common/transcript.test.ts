@@ -210,3 +210,32 @@ test('a question and its answer fold like the snapshot that follows them, and on
 	// A question left by a pause is not open.
 	expect(transcript.question({ ...live, state: { type: 'paused' } })).toBeUndefined()
 })
+
+test('an edited prompt takes the place of the prompt it replaces and its turn, live as on reconnect', () => {
+	let paused = { type: 'turn_end' as const, status: 'paused' as const, usage: {}, ts }
+	let before = [prompt('hi'), said({ type: 'text', text: 'hello' }), { type: 'turn_end' as const, status: 'completed' as const, usage: {}, ts }]
+	// A prompt that delivered a steering message ('one') with the typed one.
+	let two = { type: 'user' as const, blocks: [{ type: 'text' as const, text: 'one' }, { type: 'text' as const, text: 'fix ti' }], ts }
+	let history = [...before, two, said({ type: 'text', text: 'Looking' }), paused]
+	let t = fold([
+		snap({ history }),
+		{ type: 'prompt', sessionId, texts: ['one', 'fix it'], replaces: true },
+		{ type: 'turn-start', sessionId, provider: 'fake' },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'Fixed' } },
+	])!
+	expect(t.items.slice(before.length)).toEqual([
+		{ type: 'prompt', text: 'one' },
+		{ type: 'prompt', text: 'fix it' },
+		{ type: 'text', text: 'Fixed' },
+	])
+	let edited = { type: 'user' as const, blocks: [{ type: 'text' as const, text: 'one' }, { type: 'text' as const, text: 'fix it' }], replaces: true as const, ts }
+	let late = fold([snap({ history: [...history, edited], turn: { provider: 'fake', blocks: [{ type: 'text', text: 'Fixed' }], usage: {} } })])!
+	expect(late).toEqual(t)
+	// Edited again: the edit is now the prompt it replaces.
+	let again: Event = { type: 'prompt', sessionId, texts: ['fix it!'], replaces: true }
+	let end: Event = { type: 'turn-end', sessionId, status: 'paused' }
+	let t2 = fold([end, again], t)!
+	expect(t2.items.slice(before.length)).toEqual([{ type: 'prompt', text: 'fix it!' }])
+	let late2 = fold([snap({ history: [...history, edited, said({ type: 'text', text: 'Fixed' }), paused, { ...edited, blocks: [{ type: 'text', text: 'fix it!' }] }] })])!
+	expect(late2).toEqual(t2)
+})

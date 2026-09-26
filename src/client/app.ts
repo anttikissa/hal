@@ -5,6 +5,7 @@
 // shared through common/drafts.ts; a sent prompt shows at once, pending
 // until the host has it.
 
+import { amend, type Editing } from '../common/amend.ts'
 import { connection, type LinkState } from '../common/connection.ts'
 import { forms, type FormState } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
@@ -20,7 +21,8 @@ import type { View } from './frame.ts'
 // `resumed`: where the history of the last snapshot ends, marked on screen.
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
-type AppState = { transcript?: Transcript; resumed?: Resumed; prompt: PromptState; notice?: string; form?: FormState }
+// `editing`: the last prompt is in the editor (src/common/amend.ts).
+type AppState = { transcript?: Transcript; resumed?: Resumed; prompt: PromptState; notice?: string; form?: FormState; editing?: Editing }
 
 function createState(): AppState {
 	return { prompt: prompt.empty() }
@@ -35,7 +37,7 @@ function view(): View {
 	if (pending.length) v.pending = pending
 	if (st.form) v.form = st.form
 	// A passing notice, else what the session is doing.
-	let notice = st.notice ?? (st.transcript && states.describe(st.transcript.state))
+	let notice = st.notice ?? (st.editing ? amend.hint() : st.transcript && states.describe(st.transcript.state))
 	if (notice) v.notice = notice
 	return v
 }
@@ -54,6 +56,8 @@ function onEvent(event: Event): void {
 	else {
 		let t = transcript.fold(st.transcript, event)
 		if (event.type === 'snapshot' && t && t !== st.transcript) st.resumed = transcript.resumed(event.snapshot, t)
+		// An edited prompt may have replaced what the mark was after.
+		if (st.resumed && t && st.resumed.at > t.items.length) st.resumed = { ...st.resumed, at: t.items.length }
 		st.transcript = t
 		if (event.type === 'snapshot' && t) {
 			let id = t.meta.id
@@ -70,8 +74,8 @@ function onState(state: LinkState): void {
 	app.show()
 }
 
-// Enter: a prompt (steering a busy turn; `queue`: after it), or a
-// continue on an empty prompt. Refuses (keeping the typed text) what the
+// Enter: a prompt (steering a busy turn; `queue`: after it), an edit
+// of the last prompt, or a continue on an empty prompt. Refuses (keeping the typed text) what the
 // host would refuse anyway.
 function submit(text: string, queue = false): boolean {
 	let st = app.state
@@ -80,15 +84,19 @@ function submit(text: string, queue = false): boolean {
 		st.notice = 'no session yet'
 		return false
 	}
-	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, queue)
+	// While editing the last prompt, Enter sends the edit.
+	let { command, refused } = st.editing
+		? { command: amend.enter(st.editing, st.transcript, text, queue), refused: undefined }
+		: states.enter(st.transcript.meta.id, st.transcript.state, text, queue)
 	if (refused) {
 		st.notice = refused
 		return false
 	}
+	st.editing = undefined
 	if (command) {
 		st.notice = undefined
-		let c = command as { type: string; text?: string; queue?: boolean }
-		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, c.queue)
+		let c = command as { type: string; text?: string; queue?: boolean; amend?: boolean }
+		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, c.queue, c.amend)
 		else app.send(command)
 	}
 	return true
@@ -101,6 +109,34 @@ function setPrompt(text: string): void {
 	if (st.prompt.text !== text) st.prompt = { text, cursor: text.length }
 }
 
+// Up, Down and Escape for editing the last prompt; true if handled. The
+// editor text is the draft, as ever.
+function editKey(k: KeyEvent): boolean {
+	let st = app.state
+	let plain = !k.shift && !k.ctrl && !k.alt && !k.cmd
+	if (!plain || !st.transcript) return false
+	let id = st.transcript.meta.id
+	if (k.key === 'up' && !st.editing) {
+		let begun = amend.begin(st.transcript, st.prompt.text)
+		if (!begun) return false
+		st.editing = begun.editing
+		st.prompt = { text: begun.editing.original, cursor: begun.editing.original.length }
+		drafts.edit(id, st.prompt.text)
+		app.send(begun.command)
+		return true
+	}
+	let editing = st.editing
+	if (!editing || !(k.key === 'escape' || (k.key === 'down' && st.prompt.text === editing.original))) return false
+	st.editing = undefined
+	if (st.prompt.text === editing.original) {
+		st.prompt = prompt.empty()
+		drafts.edit(id, '')
+	}
+	let command = amend.resume(editing, st.transcript)
+	if (command) app.send(command)
+	return true
+}
+
 function onKeys(events: KeyEvent[]): void {
 	let st = app.state
 	for (let k of events) {
@@ -110,6 +146,7 @@ function onKeys(events: KeyEvent[]): void {
 			if (action) app.send(forms.command(st.transcript.meta.id, state, action))
 			continue
 		}
+		if (app.editKey(k)) continue
 		let { state, action } = prompt.apply(st.prompt, k)
 		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
@@ -142,6 +179,7 @@ export const app = {
 	onState,
 	submit,
 	setPrompt,
+	editKey,
 	onKeys,
 	init,
 	reset,

@@ -58,7 +58,9 @@ export type Command = (
 	| { type: 'close'; sessionId: string }
 	// A prompt. While a turn is busy it waits in the inbox: steering, sent
 	// before the turn's next request; with `queue`, run after it ends.
-	| { type: 'submit'; sessionId: string; text: string; queue?: boolean }
+	// With `amend`, an edit of the last prompt: the host decides from
+	// history whether it replaces that prompt or is sent on top.
+	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean }
 	// Replace the session's draft. `base`: the draft rev the text was
 	// edited from. If another client changed the draft since, the host
 	// keeps both texts rather than lose one.
@@ -86,8 +88,9 @@ export type Event =
 	// The inbox changed: every message now waiting.
 	| { type: 'inbox'; sessionId: string; inbox: InboxItem[] }
 	// Inbox messages (and maybe a new prompt) are in history as one
-	// prompt, after the running turn's output so far.
-	| { type: 'prompt'; sessionId: string; texts: string[] }
+	// prompt, after the running turn's output so far. `replaces`: an edit
+	// that takes the place of the last prompt and everything after it.
+	| { type: 'prompt'; sessionId: string; texts: string[]; replaces?: true }
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent }
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
@@ -124,7 +127,7 @@ function invalid(value: unknown): string | undefined {
 	if (problem) return problem
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
-	if (c.type === 'submit' && c.queue !== undefined && typeof c.queue !== 'boolean') return 'submit: queue must be a boolean'
+	for (let flag of ['queue', 'amend']) if (c.type === 'submit' && c[flag] !== undefined && typeof c[flag] !== 'boolean') return `submit: ${flag} must be a boolean`
 	if (c.type === 'draft' && c.base !== undefined && !Number.isInteger(c.base)) return 'draft: base must be an integer'
 	if (c.type === 'answer') {
 		let a = c.answers

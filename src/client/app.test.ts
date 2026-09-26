@@ -126,6 +126,84 @@ test('bare Enter continues a paused or failed turn, and says so', () => {
 	])
 })
 
+// A session working on `prompt`, as the host would show it.
+function working(prompt = 'fix ti') {
+	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
+	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt, provider: 'anthropic' })
+}
+const up = () => app.onKeys([key('up')])
+const down = () => app.onKeys([key('down')])
+const paused = () => app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'paused' } })
+
+test('Up on an empty prompt while the model works pauses it and edits the last prompt; Enter sends the edit', () => {
+	working()
+	up()
+	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
+	expect(app.view().prompt).toEqual({ text: 'fix ti', cursor: 6 })
+	expect(app.view().notice).toMatch(/editing/)
+	paused()
+	app.onKeys([key('backspace'), key('backspace'), key('i', 'i'), key('t', 't')])
+	enter()
+	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'fix it', amend: true })
+	expect(app.view().prompt.text).toBe('')
+	// The edit is over: the next prompt is a new one.
+	type('more')
+	enter()
+	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'more' })
+})
+
+test('an edit not yet acknowledged is sent again as an edit by the next client', () => {
+	let stored = new Map<string, any>()
+	let store = drafts.store
+	drafts.store = { load: (id) => stored.get(id) && structuredClone(stored.get(id)), save: (id, l) => void stored.set(id, structuredClone(l)) }
+	try {
+		working()
+		up()
+		paused()
+		type('!')
+		enter()
+		// The client crashes before the ack; a new one connects.
+		app.reset()
+		sent = []
+		app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
+		expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: 'fix ti!', amend: true }])
+	} finally {
+		drafts.store = store
+	}
+})
+
+test('Down with the text unchanged, or Escape, continues the paused turn', () => {
+	working()
+	up()
+	paused()
+	down()
+	expect(sent.at(-1)).toEqual({ type: 'continue', sessionId: 's1' })
+	expect(app.view().prompt.text).toBe('')
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'streaming' } })
+	sent = []
+	up()
+	paused()
+	type('!')
+	// Changed: Down is no way out; Escape is, keeping the text typed.
+	down()
+	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
+	escape()
+	expect(sent.at(-1)).toEqual({ type: 'continue', sessionId: 's1' })
+	expect(app.view().prompt.text).toBe('fix ti!')
+	expect(app.view().notice ?? '').not.toMatch(/editing/)
+})
+
+test('Up does nothing with text typed or when nothing works', () => {
+	working()
+	type('x')
+	up()
+	app.onKeys([key('backspace')])
+	paused()
+	up()
+	expect(sent).toEqual([])
+	expect(app.view().prompt.text).toBe('')
+})
+
 test('Escape with no turn running sends nothing', () => {
 	app.onEvent(snapshot())
 	escape()

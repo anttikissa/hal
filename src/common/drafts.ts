@@ -17,8 +17,9 @@
 import { connection } from './connection.ts'
 import type { Event } from './protocol.ts'
 
-// `queue`: run after the current turn instead of steering it.
-export type Sending = { id: string; text: string; queue?: boolean }
+// `queue`: run after the current turn instead of steering it. `amend`:
+// an edit of the last prompt (src/common/amend.ts).
+export type Sending = { id: string; text: string; queue?: boolean; amend?: boolean }
 
 export type Local = {
 	// What the editor holds.
@@ -62,7 +63,7 @@ function local(id: string): Local {
 // as no draft rather than breaking the client.
 function valid(l: Local | undefined): Local | undefined {
 	if (!l || typeof l.text !== 'string' || typeof l.base !== 'number' || !Array.isArray(l.sending)) return undefined
-	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.queue === undefined || typeof s.queue === 'boolean'))
+	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.queue === undefined || typeof s.queue === 'boolean') && (s.amend === undefined || typeof s.amend === 'boolean'))
 	return { text: l.text, base: l.base, dirty: l.dirty === true, sending }
 }
 
@@ -99,10 +100,11 @@ function flush(id: string): void {
 }
 
 // Sends `text` as a prompt: pending, and the editor empties.
-function submit(id: string, text: string, queue = false): void {
+function submit(id: string, text: string, queue = false, amend = false): void {
 	let l = drafts.local(id)
 	let sending: Sending = { id: drafts.nextId(), text }
 	if (queue) sending.queue = true
+	if (amend) sending.amend = true
 	l.sending.push(sending)
 	l.text = ''
 	// The host clears its draft when it takes the prompt.
@@ -112,7 +114,7 @@ function submit(id: string, text: string, queue = false): void {
 }
 
 function command(sessionId: string, s: Sending): object {
-	return { type: 'submit', sessionId, text: s.text, ...(s.queue ? { queue: true } : {}), id: s.id }
+	return { type: 'submit', sessionId, text: s.text, ...(s.queue ? { queue: true } : {}), ...(s.amend ? { amend: true } : {}), id: s.id }
 }
 
 // Folds a host event in. True if the session's editor text changed.

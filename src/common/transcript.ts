@@ -31,6 +31,9 @@ export type Transcript = {
 	inbox: InboxItem[]
 	// Everything to show, in order, including the running turn's output.
 	items: Item[]
+	// Where the last prompt's items start: an edit of it replaces them
+	// and everything after.
+	prompt?: number
 	// The running turn: items from `start` on are its output so far, and
 	// `turn` is the raw fold they are drawn from.
 	live?: { start: number; turn: LiveTurn }
@@ -89,8 +92,13 @@ function question(t: Transcript | undefined): (Item & { type: 'question' }) | un
 
 function fromSnapshot(snapshot: Snapshot): Transcript {
 	let items: Item[] = []
-	for (let r of snapshot.history) items = r.type === 'answer' ? transcript.answered(items, r) : [...items, ...transcript.recordItems(r)]
+	let prompt: number | undefined
+	for (let r of replay.current(snapshot.history)) {
+		if (replay.isPrompt(r)) prompt = items.length
+		items = r.type === 'answer' ? transcript.answered(items, r) : [...items, ...transcript.recordItems(r)]
+	}
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
+	if (prompt !== undefined) t.prompt = prompt
 	if (snapshot.turn) {
 		let turn = transcript.copyTurn(snapshot.turn)
 		t.live = { start: items.length, turn }
@@ -117,21 +125,22 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'inbox') return { ...t, inbox: event.inbox }
 	if (event.type === 'answer') return { ...t, items: transcript.answered(t.items, event) }
 	if (event.type === 'turn-start') {
-		let items: Item[] = event.prompt === undefined ? t.items : [...t.items, { type: 'prompt', text: event.prompt }]
-		return { ...t, items, live: { start: items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
+		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
+		let items: Item[] = [...t.items, { type: 'prompt', text: event.prompt }]
+		return { ...t, items, prompt: t.items.length, live: { start: items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
 	}
 	let question: Item | undefined = event.type === 'question' ? { type: 'question', id: event.id, form: event.form } : undefined
 	// A turn left unfinished by another host ends without running here.
 	if (!t.live) {
 		if (event.type === 'turn-end') return { ...t, items: [...t.items, transcript.endItem(event)] }
-		if (event.type === 'prompt') return { ...t, items: [...t.items, ...event.texts.map((text): Item => ({ type: 'prompt', text }))] }
+		if (event.type === 'prompt') return transcript.prompted(t, t.items, event)
 		return question ? { ...t, items: [...t.items, question] } : t
 	}
 	let settled = t.items.slice(0, t.live.start)
 	if (event.type === 'prompt') {
 		// The round's blocks are in history before the prompt.
-		let items = [...settled, ...transcript.blockItems(t.live.turn.blocks), ...event.texts.map((text): Item => ({ type: 'prompt', text }))]
-		return { ...t, items, live: { start: items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
+		let next = transcript.prompted(t, [...settled, ...transcript.blockItems(t.live.turn.blocks)], event)
+		return { ...next, live: { start: next.items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
 	}
 	if (event.type === 'stream') {
 		let turn = transcript.copyTurn(t.live.turn)
@@ -145,7 +154,16 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	}
 	// Asking stops the running turn: its output is in history.
 	let end = question ?? transcript.endItem(event as Event & { type: 'turn-end' })
-	return { meta: t.meta, state: t.state, inbox: t.inbox, items: [...settled, ...transcript.blockItems(t.live.turn.blocks), end] }
+	let { live: _live, ...rest } = t
+	return { ...rest, items: [...settled, ...transcript.blockItems(t.live.turn.blocks), end] }
+}
+
+// After `items`, a prompt event's texts; an edit (`replaces`) takes
+// the place of the last prompt and everything after it.
+function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' }): Transcript {
+	let keep = event.replaces && t.prompt !== undefined ? items.slice(0, t.prompt) : items
+	let { live: _live, ...rest } = t
+	return { ...rest, items: [...keep, ...event.texts.map((text): Item => ({ type: 'prompt', text }))], prompt: keep.length }
 }
 
 // Where the history a client got in a snapshot ends (an index into
@@ -167,4 +185,4 @@ function resumedLabel(r: Resumed, now = new Date()): string {
 	return `resumed · last turn ${when}`
 }
 
-export const transcript = { blockItems, resultItem, recordItems, endItem, answered, question, fromSnapshot, copyTurn, fold, resumed, resumedLabel }
+export const transcript = { blockItems, resultItem, recordItems, endItem, answered, question, fromSnapshot, copyTurn, fold, prompted, resumed, resumedLabel }

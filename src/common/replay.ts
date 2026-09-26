@@ -12,8 +12,10 @@ export type TurnStatus = 'completed' | 'paused' | 'error' | 'cancelled' | 'inter
 
 export type HistoryRecord =
 	// A submitted prompt, or tool results. `inbox`: the ids of the inbox
-	// messages it delivers, which are its first text blocks.
-	| { type: 'user'; blocks: UserBlock[]; command?: string; inbox?: string[]; ts: string }
+	// messages it delivers, which are its first text blocks. `replaces`:
+	// an edit of the last prompt (tasks/j1/states.md, Editing the last
+	// prompt); it supersedes that prompt and everything after it.
+	| { type: 'user'; blocks: UserBlock[]; command?: string; inbox?: string[]; replaces?: true; ts: string }
 	// A message sent while the session was busy, waiting in the inbox
 	// (src/common/inbox.ts) until a prompt record delivers it. Not
 	// provider input by itself. `id`: the client's command id, if any.
@@ -42,6 +44,7 @@ export type HistoryRecord =
 // providers join adjacent text blocks with no separator, so merged
 // prompts read as one ("pong" + "k" became "pongk").
 function toMessages(records: HistoryRecord[]): Message[] {
+	records = replay.current(records)
 	let out: Message[] = []
 	let pending: string[] = []
 	let status: TurnStatus | undefined
@@ -93,6 +96,34 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	return out
 }
 
+// Whether the record is a prompt: a user record with text.
+function isPrompt(r: HistoryRecord): r is Extract<HistoryRecord, { type: 'user' }> {
+	return r.type === 'user' && r.blocks.some((b) => b.type === 'text')
+}
+
+// Index of the last prompt record, or -1.
+function lastPrompt(records: HistoryRecord[]): number {
+	for (let i = records.length - 1; i >= 0; i--) if (replay.isPrompt(records[i]!)) return i
+	return -1
+}
+
+// History as the conversation now stands: each edited prompt in place
+// of the prompt it replaces and everything after that. Inbox and answer
+// records are kept: the inbox is read from every record, and an answer
+// may be to a question asked before.
+function current(records: HistoryRecord[]): HistoryRecord[] {
+	if (!records.some((r) => r.type === 'user' && r.replaces)) return records
+	let out: HistoryRecord[] = []
+	for (let r of records) {
+		if (r.type === 'user' && r.replaces) {
+			let at = replay.lastPrompt(out)
+			if (at >= 0) out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer')]
+		}
+		out.push(r)
+	}
+	return out
+}
+
 // How a turn ended, told in front of the next prompt; nothing when it
 // completed. A long provider error is clipped: the model needs the gist.
 function endNote(end: Extract<HistoryRecord, { type: 'turn_end' }>): string | undefined {
@@ -125,6 +156,9 @@ export const replay = {
 	// Told to the model when a cut-off answer continues.
 	continueNote: '<meta>The previous response was interrupted. Continue without repeating completed work.</meta>',
 	toMessages,
+	isPrompt,
+	lastPrompt,
+	current,
 	endNote,
 	clock,
 	missingResult,
