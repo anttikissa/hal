@@ -226,7 +226,7 @@ export const anthropic = {
 	maxTokens: () => 64_000,
 	thinkingBudget: () => 10_000,
 	// Offered when the account's list can't be read.
-	knownModels: () => ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+	knownModels: () => ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5', 'claude-sonnet-5'],
 	toMessages,
 	body,
 	headers,
