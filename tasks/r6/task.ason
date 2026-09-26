@@ -1,7 +1,15 @@
 {
 	title: 'One client connection for terminal, peer and web',
 	description: 'Terminal, peer and browser clients each carry their own copy of joining, reconnecting and command handling (src/client/link.ts, src/web/link.ts, host/server.ts plus host/web.ts). Replace them with one common core over small transports (in-process, Unix socket, WebSocket): the client states joining, connected as host or client, disconnected with a retry time; re-opening followed sessions on reconnect; and an id on every command, made by the client, that the host uses to ignore repeats, so a resend after a reconnect never acts twice. The host side gets one adapter from a transport to a host connection. Choosing which session to open (newest, or create one in a cwd) becomes a protocol command, replacing the /session endpoint and the hal-cwd header. States and terms: tasks/j1/states.md. Keep the existing multi-process takeover and browser tests green; they are the safety net.',
-	status: 'planned',
+	status: 'done',
 	needs: ['j1'],
-	foldInto: ['ja', 'p6', 'dz']
+	foldInto: ['ja', 'p6', 'dz'],
+	notes: [
+		'Core: src/common/connection.ts (singleton `connection`; send, connected, state.link). Transports implement one connect attempt returning { conn, role } or null, then call dropped() once. A first attempt that throws fails start(); later throws just retry. Retry waits min(maxMs, baseMs * 2^n) with jitter: terminal 20ms/1s (takeover must be quick), web 250ms/10s. A drop redials at once; only a failed attempt waits.',
+		'Command ids: connection.send adds `<random client>.<n>`; the command stays in state.pending until an `ack` or a `rejected` with that id, and is resent on every new connection. Host tests send commands without ids: then no ack is sent and nothing is deduplicated.',
+		'Host dedup (host.handle): create, submit, pause and continue are remembered in host.state.done (last host.remembered() = 1000) with their outcome; a repeat is answered the same way (a repeated create re-follows its session) without acting. open, close and open-newest act on every repeat: they are per connection. A submit prompt record carries `command: <id>`, so a new host also recognises a resend of a submit the old host recorded (host.submitted). Create across a host change is not deduplicated (rare; could store the id in session meta).',
+		'open-newest replaced GET /session and hal-cwd: the host opens sessions.newest() or creates one in the given cwd, else host.cwd() (was web.cwd()). The terminal sends it with process.cwd() after joining; the page sends it without cwd. The page checks its cookie with GET /login (204 or 401).',
+		'host.adapt(write) is the one transport-to-host adapter: receive(text), unreadable(reason), close(). The socket feeds it raw lines via lines.decoder(..., parse = identity); the WebSocket feeds each message.',
+		'The page still refuses to send while not connected (notice), though the core would queue: showing pending prompts is task rw, which should build on state.pending and ack events.'
+	]
 }

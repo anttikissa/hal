@@ -17,6 +17,7 @@ let server: ReturnType<typeof Bun.serve>
 let home = ''
 const savedHome = process.env.HAL_HOME
 const originalUrl = anthropic.apiUrl
+const originalTokenUrl = auth.tokenUrl
 
 function sse(...events: any[]): Response {
 	let text = events.map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join('')
@@ -36,11 +37,13 @@ beforeEach(() => {
 		port: 0,
 		async fetch(req) {
 			let url = new URL(req.url)
+			if (url.pathname === '/token') return Response.json({ access_token: 'refreshed-token', refresh_token: 'r2', expires_in: 3600 })
 			seen.push({ path: url.pathname, query: url.search, headers: req.headers, body: await req.json() })
 			return reply()
 		},
 	})
 	anthropic.apiUrl = () => `http://127.0.0.1:${server.port}/v1/messages?beta=true`
+	auth.tokenUrl = () => `http://127.0.0.1:${server.port}/token`
 	anthropic.init()
 })
 
@@ -48,6 +51,7 @@ afterEach(() => {
 	auth.close()
 	server.stop(true)
 	anthropic.apiUrl = originalUrl
+	auth.tokenUrl = originalTokenUrl
 	provider.state.providers = {}
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome
@@ -232,7 +236,11 @@ test('stop reasons map to neutral ones', async () => {
 
 test('errors: HTTP status, error event mid-stream, bad tool JSON, stream cut short', async () => {
 	reply = () => new Response('{"type":"error","error":{"type":"authentication_error","message":"bad token"}}', { status: 401 })
-	expect(await run()).toEqual([expect.objectContaining({ type: 'error', status: 401, body: expect.stringContaining('bad token') })])
+	expect(await run()).toEqual([expect.objectContaining({ type: 'error', status: 401, failure: 'auth', body: expect.stringContaining('bad token') })])
+	// The rejected token is refreshed for the next request.
+	reply = () => sse(start(), ...stop('end_turn'))
+	expect(await run()).toEqual([{ type: 'done', reason: 'end' }])
+	expect(seen.at(-1)!.headers.get('authorization')).toBe('Bearer refreshed-token')
 
 	reply = () =>
 		sse(

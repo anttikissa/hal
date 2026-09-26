@@ -1,13 +1,13 @@
 // The terminal client: one session's transcript above an editable
-// prompt. Keys become commands to the host (through link), and every
+// prompt. Keys become commands to the host (through the connection), and every
 // event from the host is folded into the transcript and shown. Nothing
 // here waits on the host.
 
+import { connection, type LinkState } from '../common/connection.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
 import type { KeyEvent } from './keys.ts'
-import { link, type Role } from './link.ts'
 import { prompt, type PromptState } from './prompt.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
@@ -47,8 +47,8 @@ function onEvent(event: Event): void {
 	app.show()
 }
 
-function onRole(role: Role | null): void {
-	app.state.notice = role ? undefined : 'host lost; reconnecting…'
+function onState(state: LinkState): void {
+	app.state.notice = state.type === 'connected' ? undefined : 'host lost; reconnecting…'
 	app.show()
 }
 
@@ -98,11 +98,11 @@ function reset(): void {
 
 export const app = {
 	state: createState(),
-	send: (command: unknown): void => link.send(command),
+	send: (command: unknown): void => connection.send(command),
 	view,
 	show,
 	onEvent,
-	onRole,
+	onState,
 	submit,
 	onKeys,
 	init,

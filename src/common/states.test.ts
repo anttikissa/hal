@@ -22,9 +22,12 @@ const events: StateEvent[] = [
 	{ type: 'pause', reason: 'why' },
 	{ type: 'end' },
 	{ type: 'end', error: 'boom' },
+	{ type: 'retry', at: '2026-09-26T12:00:12.000Z', reason: 'connection lost' },
+	{ type: 'block', reason: 'log in' },
 ]
 
 const refused = expect.any(String)
+const ts12 = '2026-09-26T12:00:12.000Z'
 
 // [state, event, next state, or refused]
 const table: [SessionState, StateEvent, SessionState | typeof refused][] = [
@@ -61,6 +64,15 @@ const table: [SessionState, StateEvent, SessionState | typeof refused][] = [
 	[requesting, { type: 'end', error: 'boom' }, { type: 'error', message: 'boom' }],
 	[retrying, { type: 'end', error: 'boom' }, { type: 'error', message: 'boom' }],
 	[paused, { type: 'end' }, paused],
+	// Failures the host fixes itself: retrying at a time, or blocked on a human.
+	[streaming, { type: 'retry', at: ts12, reason: 'connection lost' }, { type: 'retrying', at: ts12, reason: 'connection lost' }],
+	[blocked, { type: 'retry', at: ts12, reason: 'rate limited' }, { type: 'retrying', at: ts12, reason: 'rate limited' }],
+	[requesting, { type: 'block', reason: 'log in' }, { type: 'blocked', reason: 'log in' }],
+	[retrying, { type: 'block', reason: 'log in' }, { type: 'blocked', reason: 'log in' }],
+	[blocked, { type: 'request' }, requesting],
+	// A late failure after a pause changes nothing.
+	[paused, { type: 'retry', at: ts12, reason: 'x' }, paused],
+	[idle, { type: 'block', reason: 'x' }, idle],
 ]
 
 test.each(table)('%o on %o', (state, event, next) => {
@@ -115,4 +127,15 @@ test('recoveries counts continues since the last finished round, partial output 
 	// A finished round (tool results) or a turn end is progress.
 	expect(states.recoveries([say('a'), cont, cont, say('results'), cont])).toBe(1)
 	expect(states.recoveries([say('a'), cont, end('paused'), cont])).toBe(1)
+})
+
+test('describe says when a retry happens and why', () => {
+	let at = Date.parse('2026-09-26T12:00:12.000Z')
+	let s: SessionState = { type: 'retrying', at: new Date(at).toISOString(), reason: 'connection lost' }
+	expect(states.describe(s, at - 12_000)).toBe('retrying in 12s (connection lost)')
+	expect(states.describe(s, at - 3 * 3600_000 - 5 * 60_000)).toBe('retrying in 3h 5m (connection lost)')
+	expect(states.describe(s, at + 1000)).toBe('retrying now (connection lost)')
+	// Without a clock: the time itself, which never goes stale.
+	expect(states.describe(s)).toContain('connection lost')
+	expect(states.describe({ type: 'blocked', reason: 'log in' })).toBe('blocked: log in')
 })

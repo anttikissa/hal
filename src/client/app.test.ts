@@ -143,9 +143,9 @@ test('a config warning is shown and keeps the transcript', () => {
 })
 
 test('losing the host is shown, and cleared on reconnect', () => {
-	app.onRole(null)
+	app.onState({ type: 'disconnected', retryAt: Date.now() + 100 })
 	expect(app.view().notice).toBeTruthy()
-	app.onRole('client')
+	app.onState({ type: 'connected', role: 'client' })
 	expect(app.view().notice).toBeUndefined()
 })
 

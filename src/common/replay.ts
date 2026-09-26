@@ -11,7 +11,7 @@ export type TurnStatus = 'completed' | 'paused' | 'error' | 'cancelled' | 'inter
 
 export type HistoryRecord =
 	// A submitted prompt, or tool results.
-	| { type: 'user'; blocks: UserBlock[]; ts: string }
+	| { type: 'user'; blocks: UserBlock[]; command?: string; ts: string }
 	// One assistant block, appended as soon as it is complete.
 	| { type: 'assistant'; block: AssistantBlock; ts: string }
 	// Ends one model turn, or pauses it (then `pauseReason` if Hal, not

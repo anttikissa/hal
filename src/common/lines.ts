@@ -5,13 +5,15 @@
 import { ason } from './ason.ts'
 
 // Returns a feeder for chunks as they arrive. Each complete line is
-// parsed and passed to onValue; a line that fails to parse, or grows
-// past maxLine characters, goes to onError and the next line starts
-// afresh, so one bad message never desyncs the stream.
+// parsed (by `parse`, ASON unless given) and passed to onValue; a line
+// that fails to parse, or grows past maxLine characters, goes to
+// onError and the next line starts afresh, so one bad message never
+// desyncs the stream.
 function decoder(
 	onValue: (value: unknown) => void,
 	onError: (error: Error) => void,
 	maxLine = lines.maxLine(),
+	parse: (line: string) => unknown = ason.parse,
 ): (chunk: string | Uint8Array) => void {
 	let text = new TextDecoder()
 	let buf = ''
@@ -30,7 +32,7 @@ function decoder(
 			if (!line.trim()) continue
 			let value: unknown
 			try {
-				value = ason.parse(line)
+				value = parse(line)
 			} catch (e: any) {
 				onError(e instanceof Error ? e : new Error(String(e)))
 				continue

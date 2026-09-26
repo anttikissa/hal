@@ -5,7 +5,8 @@ import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
 import type { Event } from '../common/protocol.ts'
-import { link, type Conn, type Role } from './link.ts'
+import { connection, type Conn, type LinkState, type Role } from '../common/connection.ts'
+import { link } from './link.ts'
 
 // A stand-in host on the socket: records commands and answers every
 // open with a snapshot of that session.
@@ -33,8 +34,10 @@ async function fakeHost(): Promise<FakeHost> {
 			'data',
 			lines.decoder(
 				(c: any) => {
-					h.commands.push(c)
+					let { id, ...command } = c
+					h.commands.push(command)
 					if (c.type === 'open') socket.write(ason.stringifyLine(snapshotOf(c.sessionId)))
+					socket.write(ason.stringifyLine({ type: 'ack', id }))
 				},
 				() => {},
 			),
@@ -57,14 +60,18 @@ function start(): Promise<void> {
 		socketPath: path(),
 		tryHost: async () => hostFree,
 		local: (deliver): Conn => ({
-			send: (c: any) => {
+			send: ({ id: _id, ...c }: any) => {
 				localCommands.push(c)
 				if (c.type === 'open') deliver(snapshotOf(c.sessionId))
 			},
 			close: () => {},
 		}),
 		onEvent: (e) => events.push(e),
-		onRole: (r) => roles.push(r),
+		onState: (s: LinkState) => {
+			// Consecutive repeats (joining, then disconnected) count once.
+			let r = s.type === 'connected' ? s.role : null
+			if (roles.at(-1) !== r) roles.push(r)
+		},
 	})
 }
 
@@ -85,7 +92,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-	link.stop()
+	connection.stop()
 	for (let h of hosts) await kill(h)
 	hosts = []
 	rmSync(dir, { recursive: true, force: true })
@@ -96,12 +103,12 @@ const opened = (h: FakeHost) => h.commands.filter((c) => c.type === 'open').map(
 test('after the host drops, followed sessions are re-opened on the next one', async () => {
 	let first = await fakeHost()
 	await start()
-	expect(roles).toEqual(['client'])
-	link.send({ type: 'open', sessionId: '1-a' })
-	link.send({ type: 'open', sessionId: '2-b' })
-	link.send({ type: 'open', sessionId: '3-c' })
-	await until(() => events.length === 3)
-	link.send({ type: 'close', sessionId: '2-b' })
+	expect(roles).toEqual([null, 'client'])
+	connection.send({ type: 'open', sessionId: '1-a' })
+	connection.send({ type: 'open', sessionId: '2-b' })
+	connection.send({ type: 'open', sessionId: '3-c' })
+	await until(() => events.filter((e) => e.type === 'snapshot').length === 3)
+	connection.send({ type: 'close', sessionId: '2-b' })
 	await until(() => first.commands.length === 4)
 
 	await kill(first)
@@ -109,8 +116,8 @@ test('after the host drops, followed sessions are re-opened on the next one', as
 	let second = await fakeHost()
 	await until(() => opened(second).length === 2)
 	expect(opened(second).sort()).toEqual(['1-a', '3-c'])
-	expect(roles).toEqual(['client', null, 'client'])
-	await until(() => events.length === 5)
+	expect(roles).toEqual([null, 'client', null, 'client'])
+	await until(() => events.filter((e) => e.type === 'snapshot').length === 5)
 })
 
 test('commands sent while disconnected reach the next host once', async () => {
@@ -118,7 +125,7 @@ test('commands sent while disconnected reach the next host once', async () => {
 	await start()
 	await kill(first)
 	await until(() => roles.at(-1) === null)
-	link.send({ type: 'submit', sessionId: '1-a', text: 'hello' })
+	connection.send({ type: 'submit', sessionId: '1-a', text: 'hello' })
 	let second = await fakeHost()
 	await until(() => second.commands.length === 1)
 	await Bun.sleep(50)
@@ -128,11 +135,11 @@ test('commands sent while disconnected reach the next host once', async () => {
 test('when the lock is free the link becomes host and talks in-process', async () => {
 	let first = await fakeHost()
 	await start()
-	link.send({ type: 'open', sessionId: '1-a' })
-	await until(() => events.length === 1)
+	connection.send({ type: 'open', sessionId: '1-a' })
+	await until(() => events.filter((e) => e.type === 'snapshot').length === 1)
 	hostFree = true
 	await kill(first)
 	await until(() => roles.at(-1) === 'host')
 	expect(localCommands).toEqual([{ type: 'open', sessionId: '1-a' }])
-	expect(events.length).toBe(2)
+	expect(events.filter((e) => e.type === 'snapshot').length).toBe(2)
 })

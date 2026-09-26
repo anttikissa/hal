@@ -120,21 +120,25 @@ test('the password is a config function read at call time', async () => {
 	}
 })
 
-test('session and ws need the cookie', async () => {
+test('the login check and ws need the cookie', async () => {
 	await server.serve()
-	expect((await fetch(`${base()}/session`)).status).toBe(401)
-	expect((await fetch(`${base()}/session`, { headers: { cookie: 'hal=wrong' } })).status).toBe(401)
+	expect((await fetch(`${base()}/login`)).status).toBe(401)
+	expect((await fetch(`${base()}/login`, { headers: { cookie: 'hal=wrong' } })).status).toBe(401)
+	expect((await fetch(`${base()}/login`, { headers: { cookie: await cookie() } })).status).toBe(204)
 	expect((await dial()).opened).toBe(false)
 	expect((await dial('hal=wrong')).opened).toBe(false)
 })
 
-test('session names the newest session', async () => {
+test('over ws, open-newest opens the newest session and bad messages are refused', async () => {
 	await server.serve()
-	let c = await cookie()
-	expect((await fetch(`${base()}/session`, { headers: { cookie: c } })).status).toBe(204)
 	sessions.create({ cwd: '/tmp' })
 	let newer = sessions.create({ cwd: '/tmp' }).id
-	expect(await (await fetch(`${base()}/session`, { headers: { cookie: c } })).text()).toBe(newer)
+	let w = await dial(await cookie())
+	w.ws.send('{ not ason')
+	w.send({ type: 'open-newest', id: 'x1' })
+	await until(() => w.events.some((e) => e.type === 'ack'))
+	expect(w.events.map((e) => e.type)).toEqual(['rejected', 'snapshot', 'ack'])
+	expect(w.events[1].sessionId).toBe(newer)
 })
 
 test('a submit streams to both a web and an in-memory client', async () => {
@@ -240,8 +244,8 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 			yield { type: 'text', text: 'hello from fake' }
 			yield { type: 'done', reason: 'end' }
 		})()
-	let origCwd = web.cwd
-	web.cwd = () => '/tmp'
+	let origCwd = host.cwd
+	host.cwd = () => '/tmp'
 	let b = await browser()
 	try {
 		await server.serve()
@@ -251,7 +255,7 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await b.waitFor(`document.querySelector('#notice').textContent === 'wrong password'`)
 		await b.evaluate(`document.querySelector('input').value = 'hello123'; document.querySelector('form').requestSubmit()`)
 		await b.waitFor(`!!document.querySelector('textarea')`)
-		// The page created a session in web.cwd() and opened it.
+		// The page created a session in host.cwd() and opened it.
 		await until(() => sessions.newest())
 		// Later visits skip the form.
 		await b.call('Page.reload', {})
@@ -269,7 +273,7 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		)
 		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('')
 	} finally {
-		web.cwd = origCwd
+		host.cwd = origCwd
 		await b.close()
 	}
 }, 20000)

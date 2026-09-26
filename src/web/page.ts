@@ -6,6 +6,7 @@
 
 import type { Event } from '../common/protocol.ts'
 import { transcript, type Item } from '../common/transcript.ts'
+import { connection, type LinkState } from '../common/connection.ts'
 import { link } from './link.ts'
 import { view, type ViewState } from './view.ts'
 
@@ -68,15 +69,8 @@ function setNotice(notice: string | undefined): void {
 	page.draw()
 }
 
-// Opens the session on screen again after a reconnect, else the newest
-// one, else a new one in the host's working directory.
-async function opening(): Promise<unknown> {
-	let id = page.state.view.transcript?.meta.id
-	if (id) return { type: 'open', sessionId: id }
-	let res = await fetch('/session')
-	if (res.status === 401) location.reload()
-	if (res.status === 200) return { type: 'open', sessionId: await res.text() }
-	return { type: 'create', cwd: res.headers.get('hal-cwd') ?? '/' }
+function onState(state: LinkState): void {
+	page.setNotice(state.type === 'connected' ? undefined : state.type === 'joining' ? 'connecting…' : 'disconnected; reconnecting…')
 }
 
 function fitInput(): void {
@@ -90,14 +84,18 @@ function onKey(e: KeyboardEvent): void {
 	if (e.isComposing) return
 	if (e.key === 'Escape') {
 		let command = view.pause(st.view)
-		if (command) link.send(command)
+		if (command) connection.send(command)
 		return
 	}
 	if (e.key !== 'Enter' || e.shiftKey || e.target !== st.input) return
 	e.preventDefault()
 	let { command, notice, keep } = view.submit(st.view, st.input!.value)
-	if (command && !link.send(command)) notice = 'not connected; try again in a moment'
-	else if (!keep) st.input!.value = ''
+	// Until drafts and pending prompts (task rw), typed text waits here.
+	if (command && !connection.connected()) notice = 'not connected; try again in a moment'
+	else {
+		if (command) connection.send(command)
+		if (!keep) st.input!.value = ''
+	}
 	page.setNotice(notice)
 	page.fitInput()
 }
@@ -118,10 +116,12 @@ function chat(): void {
 	let scheme = location.protocol === 'https:' ? 'wss' : 'ws'
 	link.start({
 		dial: () => new WebSocket(`${scheme}://${location.host}/ws`),
-		opening: () => page.opening(),
 		onEvent: (e) => page.onEvent(e),
-		onConnected: (up) => page.setNotice(up ? undefined : 'disconnected; reconnecting…'),
+		onState: (s) => page.onState(s),
 	})
+	// The newest session, or a new one in the host's working directory;
+	// after a reconnect the connection re-opens the one on screen.
+	connection.send({ type: 'open-newest' })
 }
 
 function loginForm(): void {
@@ -142,12 +142,12 @@ function loginForm(): void {
 
 // Straight to the conversation if the cookie is good, else the form.
 async function init(): Promise<void> {
-	let res = await fetch('/session')
+	let res = await fetch('/login')
 	if (res.status === 401) page.loginForm()
 	else page.chat()
 }
 
-export const page = { state: createState(), draw, onEvent, setNotice, opening, fitInput, onKey, chat, loginForm, init }
+export const page = { state: createState(), draw, onEvent, setNotice, onState, fitInput, onKey, chat, loginForm, init }
 
 // Runs in the browser only; importing it elsewhere does nothing.
 if (typeof document !== 'undefined') void page.init()

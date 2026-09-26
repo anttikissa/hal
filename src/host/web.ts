@@ -5,25 +5,24 @@
 //
 //   GET  /         the browser client (src/web/, bundled by web.page())
 //   POST /login    form field `password`; sets the cookie or answers 401
-//   GET  /session  newest session id as text, or 204 with the host's
-//                  cwd in a hal-cwd header if none (cookie)
-//   GET  /ws       WebSocket, one host.connect() connection (cookie):
+//   GET  /login    204 if the cookie is good, else 401
+//   GET  /ws       WebSocket, one host.adapt() connection (cookie):
 //                  each message is one ASON command, each event one
-//                  ASON message, like a socket client's lines.
+//                  ASON message, like a socket client's lines. The page
+//                  picks its session with the open-newest command.
 
 import type { Server, ServerWebSocket } from 'bun'
-import { ason } from '../common/ason.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import { settings } from '../common/settings.ts'
 import { diag } from './diag.ts'
-import { host, type Connection } from './host.ts'
-import { sessions } from './sessions.ts'
+import { host } from './host.ts'
 
 const cookieName = 'hal'
 const tenYears = 10 * 365 * 24 * 3600
 
-type Socket = ServerWebSocket<{ conn?: Connection }>
+type Data = { conn?: ReturnType<typeof host.adapt> }
+type Socket = ServerWebSocket<Data>
 
 function authorized(req: Request): boolean {
 	return new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName) === web.password()
@@ -83,34 +82,24 @@ async function login(req: Request): Promise<Response> {
 	return new Response(null, { status: 204, headers: { 'set-cookie': cookie.serialize() } })
 }
 
-function fetch(req: Request, srv: Server<{ conn?: Connection }>): Response | Promise<Response> | undefined {
+function fetch(req: Request, srv: Server<Data>): Response | Promise<Response> | undefined {
 	let { pathname } = new URL(req.url)
 	if (pathname === '/' && req.method === 'GET') return web.page()
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
-	if (pathname !== '/session' && pathname !== '/ws') return new Response('not found\n', { status: 404 })
+	let check = pathname === '/login' && req.method === 'GET'
+	if (!check && pathname !== '/ws') return new Response('not found\n', { status: 404 })
 	if (!web.authorized(req)) return new Response('log in first\n', { status: 401 })
-	if (pathname === '/session') {
-		let id = sessions.newest()
-		// With no session yet, the page creates one in the host's cwd.
-		return id ? new Response(id) : new Response(null, { status: 204, headers: { 'hal-cwd': web.cwd() } })
-	}
+	if (check) return new Response(null, { status: 204 })
 	if (srv.upgrade(req, { data: {} })) return undefined
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
 }
 
 const websocket = {
 	open(ws: Socket) {
-		ws.data.conn = host.connect((event) => ws.send(ason.stringify(event, 'short')))
+		ws.data.conn = host.adapt((message) => ws.send(message))
 	},
 	message(ws: Socket, message: string | Buffer) {
-		let command: unknown
-		try {
-			command = ason.parse(String(message))
-		} catch (e: any) {
-			ws.send(ason.stringify({ type: 'rejected', command: '', reason: `unreadable message: ${e.message}` }, 'short'))
-			return
-		}
-		ws.data.conn?.send(command)
+		ws.data.conn?.receive(String(message))
 	},
 	close(ws: Socket) {
 		ws.data.conn?.close()
@@ -137,12 +126,10 @@ async function stop(): Promise<void> {
 }
 
 export const web = {
-	state: { server: null as Server<{ conn?: Connection }> | null, page: null as Promise<string> | null },
+	state: { server: null as Server<Data> | null, page: null as Promise<string> | null },
 	// config.ason's webPort and webPassword; overridable from local.ts.
 	port: (): number => settings.webPort(),
 	password: (): string => settings.webPassword(),
-	// Working directory for a session the page creates.
-	cwd: (): string => process.cwd(),
 	authorized,
 	css,
 	build,

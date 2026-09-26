@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from 'bun:test'
 import { ason } from '../common/ason.ts'
+import { connection, type LinkState } from '../common/connection.ts'
 import type { Event } from '../common/protocol.ts'
 import { link, type Socket } from './link.ts'
 
 class FakeSocket implements Socket {
-	sent: unknown[] = []
+	sent: any[] = []
 	onopen: (() => void) | null = null
 	onmessage: ((m: { data: unknown }) => void) | null = null
 	onclose: (() => void) | null = null
@@ -16,71 +17,54 @@ class FakeSocket implements Socket {
 	}
 }
 
-function setup(opening: () => unknown = () => ({ type: 'open', sessionId: 's' })) {
+const origSchedule = connection.schedule
+afterEach(() => {
+	connection.stop()
+	connection.schedule = origSchedule
+})
+
+function setup() {
 	let sockets: FakeSocket[] = []
-	let timers: { fn: () => void; ms: number }[] = []
+	let timers: (() => void)[] = []
 	let events: Event[] = []
-	let connected: boolean[] = []
+	let states: LinkState[] = []
+	connection.schedule = (fn) => (timers.push(fn), 0 as any)
 	link.start({
 		dial: () => {
 			let s = new FakeSocket()
 			sockets.push(s)
 			return s
 		},
-		opening: async () => opening(),
 		onEvent: (e) => events.push(e),
-		onConnected: (up) => connected.push(up),
-		setTimeout: (fn, ms) => timers.push({ fn, ms }),
+		onState: (s) => states.push(s),
 	})
-	return { sockets, timers, events, connected }
+	return { sockets, timers, events, states }
 }
 
-afterEach(() => link.stop())
-
-test('each connect sends the opening command and events arrive parsed', async () => {
-	let { sockets, events, connected } = setup()
-	expect(link.send({ type: 'cancel', sessionId: 's' })).toBe(false)
+test('commands go out as ASON once open; events arrive parsed, junk is dropped', async () => {
+	let { sockets, events } = setup()
+	connection.send({ type: 'open-newest' })
 	sockets[0]!.onopen!()
 	await Bun.sleep(0)
-	expect(sockets[0]!.sent).toEqual([{ type: 'open', sessionId: 's' }])
+	expect(sockets[0]!.sent).toMatchObject([{ type: 'open-newest', id: expect.any(String) }])
 	sockets[0]!.onmessage!({ data: 'not ason {' })
 	sockets[0]!.onmessage!({ data: ason.stringify({ type: 'rejected', command: 'x', reason: 'y' }, 'short') })
 	expect(events).toEqual([{ type: 'rejected', command: 'x', reason: 'y' }])
-	expect(connected).toEqual([true])
 })
 
-test('a dropped connection redials with growing, capped backoff and reopens', async () => {
-	let n = 0
-	let { sockets, timers, connected } = setup(() => ({ type: 'open', sessionId: `s${n++}` }))
-	sockets[0]!.onopen!()
-	await Bun.sleep(0)
+test('a socket that never opens is a failed attempt; one that closes redials and resends', async () => {
+	let { sockets, timers, states } = setup()
 	sockets[0]!.onclose!()
-	expect(connected).toEqual([true, false])
-	expect(link.send({ type: 'cancel', sessionId: 's' })).toBe(false)
-	// Failed dials back off further, up to the cap.
-	let waits: number[] = []
-	for (let i = 0; i < 10; i++) {
-		let t = timers.shift()!
-		waits.push(t.ms)
-		t.fn()
-		sockets.at(-1)!.onclose!()
-	}
-	expect(waits.slice(0, 3)).toEqual([250, 500, 1000])
-	expect(Math.max(...waits)).toBe(link.maxDelayMs())
-	expect(connected).toEqual([true, false])
-	// A successful connect resets the backoff and asks for the opening again.
-	timers.shift()!.fn()
-	let s = sockets.at(-1)!
-	s.onopen!()
 	await Bun.sleep(0)
-	expect(s.sent).toEqual([{ type: 'open', sessionId: 's1' }])
-	s.onclose!()
-	expect(timers.at(-1)!.ms).toBe(250)
-})
-
-test('stop closes without redialing', () => {
-	let { sockets, timers } = setup()
-	sockets[0]!.onopen!()
-	link.stop()
-	expect(timers).toEqual([])
+	expect(states.at(-1)!.type).toBe('disconnected')
+	timers.shift()!()
+	sockets[1]!.onopen!()
+	await Bun.sleep(0)
+	expect(states.at(-1)).toEqual({ type: 'connected', role: 'client' })
+	connection.send({ type: 'open-newest' })
+	sockets[1]!.onclose!()
+	// Dropped: redials at once, and the unanswered command goes again.
+	sockets[2]!.onopen!()
+	await Bun.sleep(0)
+	expect(sockets[2]!.sent).toEqual(sockets[1]!.sent)
 })

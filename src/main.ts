@@ -3,9 +3,10 @@
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { app } from './client/app.ts'
-import { link, type Role } from './client/link.ts'
+import { link } from './client/link.ts'
 import { render } from './client/render.ts'
 import { terminal } from './client/terminal.ts'
+import { connection, type LinkState } from './common/connection.ts'
 import type { Event } from './common/protocol.ts'
 import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
@@ -14,7 +15,6 @@ import { host } from './host/host.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
 import { server } from './host/server.ts'
-import { sessions } from './host/sessions.ts'
 
 // local.ts lives in the home, so tests (temp home) never pick up the
 // user's real overrides.
@@ -47,16 +47,18 @@ function init(): void {
 }
 
 // Joins this home's host, or becomes it; resolves once connected. Either
-// way the terminal client talks to the host through link.send and gets
-// events through onEvent; the host process uses the in-memory connection.
-function joinHost(onEvent: (event: Event) => void, onRole?: (role: Role | null) => void): Promise<void> {
-	return link.start({
+// way the terminal client talks to the host through connection.send and
+// gets events through onEvent; the host process uses the in-memory
+// connection.
+function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) => void): Promise<void> {
+	let opts: Parameters<typeof link.start>[0] = {
 		socketPath: server.socketPath(),
 		tryHost: () => main.becomeHost(),
 		local: (deliver) => host.connect(deliver),
 		onEvent,
-		onRole,
-	})
+	}
+	if (onState) opts.onState = onState
+	return link.start(opts)
 }
 
 // Becomes host if nobody is, and then continues every turn the previous
@@ -79,10 +81,9 @@ async function start(): Promise<void> {
 	}
 	await main.joinHost(
 		(event) => app.onEvent(event),
-		(role) => app.onRole(role),
+		(state) => app.onState(state),
 	)
-	let id = sessions.newest()
-	link.send(id ? { type: 'open', sessionId: id } : { type: 'create', cwd: process.cwd() })
+	connection.send({ type: 'open-newest', cwd: process.cwd() })
 }
 
 export const main = { localPath, loadLocal, init, becomeHost, joinHost, start }

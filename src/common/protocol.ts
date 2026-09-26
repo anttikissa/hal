@@ -5,6 +5,11 @@
 // A client that opens a session gets one snapshot of it (conversation
 // so far plus any in-progress turn) and then live events. Reconnecting
 // is connecting again: there is no replay and no sequence numbers.
+//
+// Every command may carry an `id`, made by the client (connection.ts
+// always adds one). The host answers it with `ack`, or `rejected`
+// carrying the id, and ignores a repeat of an id it has acted on, so a
+// command resent after a reconnect never acts twice.
 
 import type { AssistantBlock, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
@@ -31,8 +36,11 @@ export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'e
 
 // ── Commands (client → host) ──
 
-export type Command =
+export type Command = (
 	| { type: 'create'; cwd: string; model?: string; name?: string }
+	// Open the newest session, or create one in cwd (the host's own
+	// working directory if none is given) when there is none.
+	| { type: 'open-newest'; cwd?: string }
 	// Start following a session: a snapshot, then live events.
 	| { type: 'open'; sessionId: string }
 	// Stop following it. The session and any running turn carry on.
@@ -42,6 +50,7 @@ export type Command =
 	| { type: 'pause'; sessionId: string }
 	// Bare Enter: continue a paused turn, or retry a failed one.
 	| { type: 'continue'; sessionId: string }
+) & { id?: string }
 
 export type CommandType = Command['type']
 
@@ -62,11 +71,13 @@ export type Event =
 	// Something the user should fix (config.ason); not tied to a session.
 	| { type: 'warning'; text: string }
 	// Sent only to the client whose command was refused.
-	| { type: 'rejected'; sessionId?: string; command: string; reason: string }
+	| { type: 'rejected'; sessionId?: string; command: string; reason: string; id?: string }
+	// Sent only to the sender: the command with this id was carried out.
+	| { type: 'ack'; id: string }
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open', 'close', 'submit', 'pause', 'continue']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'pause', 'continue']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -76,7 +87,10 @@ function invalid(value: unknown): string | undefined {
 	if (!commandTypes.includes(c.type as CommandType)) return `unknown command type ${JSON.stringify(c.type)}`
 	let str = (key: string, optional = false) =>
 		(optional && c[key] === undefined) || typeof c[key] === 'string' ? undefined : `${c.type}: ${key} must be a string`
+	let problem = str('id', true)
+	if (problem) return problem
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
+	if (c.type === 'open-newest') return str('cwd', true)
 	return str('sessionId') ?? (c.type === 'submit' ? str('text') : undefined)
 }
 

@@ -1,0 +1,53 @@
+// Rate limits the providers told us about (429, quota), per model and
+// account, until the time they gave. Kept in state/limits.ason so a
+// restart neither forgets a limit hours away nor hammers the provider
+// for it: account rotation skips a limited account (auth.ts), and a
+// provider without accounts is not asked again before then (provider.ts).
+
+import { liveFiles } from './live-file.ts'
+import { paths } from './paths.ts'
+import { clock } from './clock.ts'
+
+// "provider/model" or "provider/model account".
+function key(modelId: string, account?: string): string {
+	return account ? `${modelId} ${account}` : modelId
+}
+
+// The live file for the current home; reopened if the home changes.
+function store(): Record<string, string> {
+	let path = `${paths.stateDir()}/limits.ason`
+	if (limits.state.store && limits.state.path === path) return limits.state.store
+	limits.close()
+	limits.state.store = liveFiles.liveFile(path, {}, { watch: false, mode: 0o600 })
+	limits.state.path = path
+	return limits.state.store
+}
+
+// Until when (epoch ms) `key` is limited; 0 if it is not.
+function until(key: string): number {
+	let at = Date.parse(limits.store()[key] ?? '')
+	return at > clock.now() ? at : 0
+}
+
+// Records a limit; forgets ones already over.
+function set(key: string, at: number): void {
+	let data = limits.store()
+	for (let [k, v] of Object.entries(data)) if (!(Date.parse(v) > clock.now())) delete data[k]
+	if (at > clock.now()) data[key] = new Date(at).toISOString()
+}
+
+function close(): void {
+	let s = limits.state.store
+	limits.state.store = null
+	limits.state.path = ''
+	if (s) liveFiles.close(s)
+}
+
+export const limits = {
+	key,
+	store,
+	until,
+	set,
+	close,
+	state: { store: null as Record<string, string> | null, path: '' },
+}

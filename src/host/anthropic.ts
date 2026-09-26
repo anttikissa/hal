@@ -79,7 +79,7 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 }
 
 async function request(req: ProviderRequest) {
-	let cred = await auth.anthropic()
+	let cred = await auth.anthropic(req.model)
 	let oauth = cred.type === 'token'
 	let headers: Record<string, string> = oauth
 		? {
@@ -90,7 +90,7 @@ async function request(req: ProviderRequest) {
 			}
 		: { 'x-api-key': cred.value, 'anthropic-beta': TOOL_STREAMING_BETA }
 	headers['anthropic-version'] = '2023-06-01'
-	return { url: anthropic.apiUrl(), headers, body: anthropic.body(req, oauth) }
+	return { url: anthropic.apiUrl(), headers, body: anthropic.body(req, oauth), account: cred.account }
 }
 
 const reasons: Record<string, StopReason> = {
@@ -193,7 +193,7 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 
 // Registers the provider. Idempotent.
 function init(): void {
-	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse })
+	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse, rejected: (account) => auth.rejected(account) })
 }
 
 export const anthropic = {

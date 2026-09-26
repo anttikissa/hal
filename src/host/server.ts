@@ -8,16 +8,14 @@
 // lock on a new file would not exclude the holder of the old one. Our fds
 // are close-on-exec, so child processes never inherit the lock.
 //
-// Each socket connection is one host.connect() connection, both ways as
+// Each socket connection is one host.adapt() connection, both ways as
 // line-delimited ASON (src/common/lines.ts). The host also serves the
 // web endpoint (web.ts) for as long as it is host.
 
 import { dlopen, FFIType } from 'bun:ffi'
 import { closeSync, openSync, rmSync } from 'fs'
 import { createServer, type Server, type Socket } from 'net'
-import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
-import type { Event } from '../common/protocol.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
 import { web } from './web.ts'
@@ -88,15 +86,16 @@ async function listen(path: string): Promise<Server> {
 
 function accept(socket: Socket): void {
 	server.state.sockets.add(socket)
-	let write = (event: Event) => {
-		if (!socket.destroyed) socket.write(ason.stringifyLine(event))
-	}
-	let conn = host.connect(write)
+	let conn = host.adapt((message) => {
+		if (!socket.destroyed) socket.write(`${message}\n`)
+	})
 	socket.on(
 		'data',
 		lines.decoder(
-			(command) => conn.send(command),
-			(e) => write({ type: 'rejected', command: '', reason: `unreadable message: ${e.message}` }),
+			(line) => conn.receive(line as string),
+			(e) => conn.unreadable(e.message),
+			lines.maxLine(),
+			(line) => line,
 		),
 	)
 	// A client that vanishes mid-write is just gone; 'close' follows.

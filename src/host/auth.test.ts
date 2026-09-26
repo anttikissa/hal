@@ -140,8 +140,22 @@ test('failed refresh is a clear error without secrets, and the file is unchanged
 	expect(e.message).toContain('400')
 	expect(e.message).not.toContain('secret-')
 	expect(readFileSync(file(), 'utf8')).toBe(before)
+	expect((e as any).failure).toBe('auth')
 
-	// Not wedged: a later call retries.
+	// A spent refresh token is not tried again...
+	refreshed()
+	expect((await failure()).message).toContain('invalid_grant')
+	expect(requests).toHaveLength(1)
+	// ...until the file holds new credentials (the user logged in).
+	write({ anthropic: { accessToken: 'secret-access', refreshToken: 'fresh-refresh', expires: earlier() } })
+	auth.close()
+	expect((await auth.anthropic()).value).toBe('new-access')
+})
+
+test('a refresh that fails on the server side or the network is temporary, and tried again', async () => {
+	write({ anthropic: { accessToken: 'old', refreshToken: 'r', expires: earlier() } })
+	reply = () => new Response('oops', { status: 503 })
+	expect((await failure() as any).failure).toBe('temporary')
 	refreshed()
 	expect((await auth.anthropic()).value).toBe('new-access')
 })
@@ -199,5 +213,86 @@ test('the file is read from the current home at call time', async () => {
 	} finally {
 		auth.close()
 		rmSync(other, { recursive: true, force: true })
+	}
+})
+
+const now = () => Date.now()
+
+test('accounts rotate: one limited for the model or with a broken login is skipped', async () => {
+	let { limits } = await import('./limits.ts')
+	let { paths } = await import('./paths.ts')
+	paths.init()
+	try {
+		write({
+			anthropic: [
+				{ accessToken: 'a-old', refreshToken: 'a-spent', expires: earlier(), email: 'a@x' },
+				{ accessToken: 'b-token', expires: later(), email: 'b@x' },
+				{ apiKey: 'c-key' },
+			],
+		})
+		// The two-homes case: another copy already rotated a's refresh token.
+		reply = () => Response.json({ error: 'invalid_grant' }, { status: 400 })
+		expect(await auth.anthropic('m')).toMatchObject({ value: 'b-token', account: 'b@x' })
+		expect(requests).toHaveLength(1)
+		limits.set(limits.key('anthropic/m', 'b@x'), now() + 3600_000)
+		expect(await auth.anthropic('m')).toMatchObject({ value: 'c-key', account: 'account 3' })
+		// Another model is not limited on b.
+		expect((await auth.anthropic('n')).value).toBe('b-token')
+		// Every account limited: when the first comes free.
+		limits.set(limits.key('anthropic/m', 'account 3'), now() + 600_000)
+		let e: any = await auth.anthropic('m').catch((x) => x)
+		expect(e.failure).toBe('limited')
+		expect(Math.abs(e.retryAt - (now() + 600_000))).toBeLessThan(1000)
+		expect(requests).toHaveLength(1)
+	} finally {
+		limits.close()
+	}
+})
+
+test('every login broken is an auth failure naming the problem', async () => {
+	write({ anthropic: [{ accessToken: 'x', expires: earlier() }, { accessToken: 'y', refreshToken: 'secret-r', expires: earlier() }] })
+	reply = () => Response.json({ error: 'invalid_grant' }, { status: 400 })
+	let e: any = await failure()
+	expect(e.failure).toBe('auth')
+	expect(e.message).toContain('invalid_grant')
+	expect(e.message).not.toContain('secret-')
+})
+
+test('a rejected token is refreshed once; rejected again soon, the login is broken', async () => {
+	write({ anthropic: { accessToken: 'bad', refreshToken: 'r', expires: later(), email: 'a@x' } })
+	refreshed('new-access', 'r2')
+	expect((await auth.anthropic()).value).toBe('bad')
+	auth.rejected('a@x')
+	expect((await auth.anthropic()).value).toBe('new-access')
+	expect(requests).toHaveLength(1)
+	auth.rejected('a@x')
+	expect(((await failure()) as any).failure).toBe('auth')
+	expect(requests).toHaveLength(1)
+})
+
+test('changed() resolves when the credentials file appears or changes, not before', async () => {
+	let { clock } = await import('./clock.ts')
+	let origSleep = clock.sleep
+	let polls = 0
+	let edit: () => void = () => {}
+	clock.sleep = async () => {
+		polls++
+		if (polls === 3) edit()
+	}
+	try {
+		edit = () => write({ anthropic: { apiKey: 'k' } })
+		await auth.changed()
+		expect(polls).toBe(3)
+		polls = 0
+		edit = () => write({ anthropic: { apiKey: 'k2', email: 'someone@example.com' } })
+		await auth.changed()
+		expect(polls).toBe(3)
+		expect((await auth.anthropic()).value).toBe('k2')
+		// Aborted: returns without a change.
+		let ac = new AbortController()
+		ac.abort()
+		await auth.changed(ac.signal)
+	} finally {
+		clock.sleep = origSleep
 	}
 })

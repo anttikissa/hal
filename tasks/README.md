@@ -25,6 +25,12 @@ owns it; later tasks point to it.
 - One host per home (sessions/ + state/) owns sessions, provider calls and all state
   writes. Every other process is a client over a Unix socket; if the
   host goes away, a client takes over. Reconnect = connect + snapshot.
+- Every client (terminal, peer, browser) uses one connection core,
+  `src/common/connection.ts`, over a small transport: in-process or
+  Unix socket (`src/client/link.ts`), WebSocket (`src/web/link.ts`).
+  It re-opens followed sessions and resends unanswered commands; each
+  command's client-made id lets the host ignore repeats. The host side
+  of every transport is `host.adapt()`.
 - Conversation truth is per-session ASONL history of provider-neutral
   blocks. Provider input is rebuilt from it; display state never is.
 - Providers are small request/stream mappers behind one interface.

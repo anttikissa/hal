@@ -1,17 +1,14 @@
-// The client's connection to its home's host, whoever that is. Joining
-// means becoming host if nobody is (and then talking to the host in this
-// process, through the same protocol), else connecting to its socket.
-// When the connection drops, join again. Reconnecting is connecting plus
-// re-opening: every session this client follows arrives as a fresh
-// snapshot, so nothing is replayed and nothing is missed.
+// The terminal's (and a peer's) transport to its home's host, whoever
+// that is, for the common connection (src/common/connection.ts). Each
+// attempt becomes host if nobody is, and then talks to the host in this
+// process through the same protocol (in-process); else it connects to
+// the host socket (Unix socket, line-delimited ASON).
 
 import { createConnection } from 'net'
 import { ason } from '../common/ason.ts'
+import { connection, type Conn, type LinkState, type Transport } from '../common/connection.ts'
 import { lines } from '../common/lines.ts'
 import type { Event } from '../common/protocol.ts'
-
-export type Conn = { send(command: unknown): void; close(): void }
-export type Role = 'host' | 'client'
 
 export type LinkOptions = {
 	socketPath: string
@@ -20,148 +17,59 @@ export type LinkOptions = {
 	// A connection to the host in this process.
 	local: (deliver: (event: Event) => void) => Conn
 	onEvent: (event: Event) => void
-	// null while disconnected.
-	onRole?: (role: Role | null) => void
+	onState?: (state: LinkState) => void
 }
 
-type LinkState = {
-	opts: LinkOptions | null
-	conn: Conn | null
-	role: Role | null
-	// Sessions to re-open after reconnecting.
-	open: Set<string>
-	// Commands sent while disconnected; nobody has seen them yet.
-	queue: unknown[]
-	stopped: boolean
-	// Has been connected at least once.
-	joined: boolean
-	joining: Promise<void> | null
-}
-
-function createState(): LinkState {
-	return { opts: null, conn: null, role: null, open: new Set(), queue: [], stopped: false, joined: false, joining: null }
-}
-
-// Joins, resolving once connected (as host or client).
-function start(opts: LinkOptions): Promise<void> {
-	link.state = { ...createState(), opts }
-	return link.join()
-}
-
-function join(): Promise<void> {
-	link.state.joining ??= link.joinLoop().finally(() => (link.state.joining = null))
-	return link.state.joining
-}
-
-async function joinLoop(): Promise<void> {
-	let opts = link.state.opts!
-	while (!link.state.stopped) {
-		let host = false
-		try {
-			host = await opts.tryHost()
-		} catch (e) {
-			// Can't serve here (say, the socket path is unusable): fail
-			// the first join loudly; after that keep trying as a client.
-			if (!link.state.joined) throw e
-		}
-		if (host) {
-			let conn: Conn = opts.local((event) => {
-				if (link.state.conn === conn) link.receive(event)
-			})
-			return link.attach(conn, 'host')
-		}
-		let conn = await link.dial(opts.socketPath)
-		if (conn) return link.attach(conn, 'client')
-		// The host is starting or has just died: try again shortly. Jitter
-		// spreads out clients that all lost the same host.
-		await Bun.sleep(link.retryMs() * (0.5 + Math.random()))
+function transport(opts: Omit<LinkOptions, 'onEvent' | 'onState'>): Transport {
+	return {
+		connect: async (on) => {
+			let host = false
+			try {
+				host = await opts.tryHost()
+			} catch (e) {
+				// Can't serve here (say, the socket path is unusable): fail
+				// the first join loudly; after that keep trying as a client.
+				if (!connection.state.joined) throw e
+			}
+			if (host) return { conn: opts.local(on.event), role: 'host' }
+			let conn = await link.dial(opts.socketPath, on)
+			return conn && { conn, role: 'client' }
+		},
 	}
 }
 
 // Connects to the host socket; null if nobody is listening.
-function dial(path: string): Promise<Conn | null> {
+function dial(path: string, on: { event(event: Event): void; dropped(): void }): Promise<Conn | null> {
 	return new Promise((resolve) => {
 		let socket = createConnection(path)
 		let connected = false
-		let conn: Conn = {
-			send: (command) => {
-				socket.write(ason.stringifyLine(command))
-			},
-			close: () => {
-				socket.destroy()
-			},
-		}
 		socket.on(
 			'data',
 			lines.decoder(
-				(event) => {
-					if (link.state.conn === conn) link.receive(event as Event)
-				},
+				(event) => on.event(event as Event),
 				() => {},
 			),
 		)
 		socket.once('connect', () => {
 			connected = true
-			resolve(conn)
+			resolve({ send: (command) => void socket.write(ason.stringifyLine(command)), close: () => void socket.destroy() })
 		})
 		socket.on('error', () => {})
-		socket.on('close', () => {
-			if (!connected) resolve(null)
-			else if (link.state.conn === conn) link.dropped()
-		})
+		socket.on('close', () => (connected ? on.dropped() : resolve(null)))
 	})
 }
 
-function attach(conn: Conn, role: Role): void {
-	let st = link.state
-	if (st.stopped) return conn.close()
-	st.conn = conn
-	st.role = role
-	st.joined = true
-	st.opts!.onRole?.(role)
-	for (let id of st.open) conn.send({ type: 'open', sessionId: id })
-	let queued = st.queue
-	st.queue = []
-	for (let command of queued) conn.send(command)
-}
-
-function dropped(): void {
-	let st = link.state
-	st.conn = null
-	st.role = null
-	st.opts!.onRole?.(null)
-	if (!st.stopped) void link.join()
-}
-
-function receive(event: Event): void {
-	if (event.type === 'snapshot') link.state.open.add(event.sessionId)
-	link.state.opts!.onEvent(event)
-}
-
-function send(command: unknown): void {
-	let c = command as { type?: unknown; sessionId?: unknown }
-	if (c?.type === 'close' && typeof c.sessionId === 'string') link.state.open.delete(c.sessionId)
-	if (link.state.conn) link.state.conn.send(command)
-	else link.state.queue.push(command)
-}
-
-function stop(): void {
-	link.state.stopped = true
-	let conn = link.state.conn
-	link.state.conn = null
-	conn?.close()
+// Joins, resolving once connected (as host or client). Losing the host
+// retries fast: another process is about to take over.
+function start(opts: LinkOptions): Promise<void> {
+	let startOpts: Parameters<typeof connection.start>[0] = { transport: link.transport(opts), onEvent: opts.onEvent, baseMs: link.retryMs(), maxMs: 1000 }
+	if (opts.onState) startOpts.onState = opts.onState
+	return connection.start(startOpts)
 }
 
 export const link = {
-	state: createState(),
 	retryMs: () => 20,
-	start,
-	join,
-	joinLoop,
+	transport,
 	dial,
-	attach,
-	dropped,
-	receive,
-	send,
-	stop,
+	start,
 }

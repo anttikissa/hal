@@ -13,17 +13,18 @@ type Proc = { sub: Bun.Subprocess<'ignore', 'pipe', 'pipe'>; reports: Report[]; 
 // which must not keep the host lock alive after the host dies.
 const script = `
 import { main } from ${JSON.stringify(`${import.meta.dir}/main.ts`)}
-import { link } from ${JSON.stringify(`${import.meta.dir}/client/link.ts`)}
+import { connection } from ${JSON.stringify(`${import.meta.dir}/common/connection.ts`)}
 let say = (r) => process.stdout.write(JSON.stringify(r) + '\\n')
 main.init()
 await main.joinHost(
 	(e) => { if (e.type === 'snapshot') say({ snapshot: e.sessionId }) },
-	(role) => {
+	(state) => {
+		let role = state.type === 'connected' ? state.role : null
 		say({ role })
 		if (role === 'host') say({ child: Bun.spawn(['sleep', '30'], { stdio: ['ignore', 'ignore', 'ignore'] }).pid })
 	},
 )
-link.send({ type: 'create', cwd: '/tmp' })
+connection.send({ type: 'create', cwd: '/tmp' })
 `
 
 let home = ''

@@ -45,9 +45,10 @@ function append(id: string, record: NewRecord): void {
 	appendFileSync(history.file(id), ason.stringifyLine({ ...record, ts: new Date().toISOString() }))
 }
 
-function submit(id: string, prompt: string | UserBlock[]): void {
+// `command`: the client's id for the submit, so a resend is recognised.
+function submit(id: string, prompt: string | UserBlock[], command?: string): void {
 	let content = typeof prompt === 'string' ? [{ type: 'text' as const, text: prompt }] : prompt
-	history.append(id, { type: 'user', blocks: content })
+	history.append(id, command === undefined ? { type: 'user', blocks: content } : { type: 'user', blocks: content, command })
 }
 
 async function load(id: string): Promise<{ records: HistoryRecord[]; partial?: string }> {

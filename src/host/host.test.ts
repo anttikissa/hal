@@ -642,3 +642,81 @@ test('config warnings reach every client: on connect and when announced', () => 
 		config.warnings = origWarnings
 	}
 })
+
+test('open-newest opens the newest session, or creates one in the cwd', async () => {
+	let a = client()
+	a.conn.send({ type: 'open-newest', cwd: '/tmp/first' })
+	let [snap] = a.of('snapshot')
+	expect(snap.snapshot.meta.cwd).toBe('/tmp/first')
+	let older = snap.sessionId
+	let newer = created(a, '/tmp/second')
+	let b = client()
+	b.conn.send({ type: 'open-newest', cwd: '/tmp/ignored' })
+	await until(() => b.of('snapshot').length)
+	expect(b.of('snapshot')[0].sessionId).toBe(newer)
+	expect(sessions.list().map((s) => s.id).sort()).toEqual([older, newer].sort())
+})
+
+test("open-newest without a cwd creates the session in the host's", () => {
+	let orig = host.cwd
+	host.cwd = () => '/tmp/hostcwd'
+	try {
+		let a = client()
+		a.conn.send({ type: 'open-newest' })
+		expect(a.of('snapshot')[0].snapshot.meta.cwd).toBe('/tmp/hostcwd')
+	} finally {
+		host.cwd = orig
+	}
+})
+
+test('a command with an id is acknowledged, and a repeat of it never acts twice', async () => {
+	let a = client()
+	a.conn.send({ type: 'create', cwd: '/tmp/w', model: 'fake/m1', id: 'c1' })
+	let id = a.of('snapshot')[0].sessionId
+	// The resent create follows the same session again; nothing new.
+	let b = client()
+	b.conn.send({ type: 'create', cwd: '/tmp/w', model: 'fake/m1', id: 'c1' })
+	expect(b.of('snapshot').map((e) => e.sessionId)).toEqual([id])
+	expect(sessions.list().length).toBe(1)
+
+	a.conn.send({ type: 'submit', sessionId: id, text: 'once', id: 's1' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length === 1)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'once', id: 's1' })
+	await Bun.sleep(5)
+	expect(calls.length).toBe(1)
+	expect((await records(id)).filter((r) => r.type === 'user').length).toBe(1)
+	expect(a.of('ack').map((e) => e.id)).toEqual(['c1', 's1', 's1'])
+	expect(b.of('ack').map((e) => e.id)).toEqual(['c1'])
+	expect(a.of('rejected')).toEqual([])
+})
+
+test('a refused command is rejected with its id, again when repeated', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'pause', sessionId: id, id: 'p1' })
+	a.conn.send({ type: 'pause', sessionId: id, id: 'p1' })
+	expect(a.of('rejected').map((e) => [e.id, e.command])).toEqual([
+		['p1', 'pause'],
+		['p1', 'pause'],
+	])
+	expect(a.of('ack')).toEqual([])
+})
+
+test('a submit resent to the next host after a restart is not submitted again', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'once', id: 's1' })
+	await until(() => calls.length === 1)
+	// The host goes away before the client hears the ack.
+	restartHost()
+	calls = []
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.of('snapshot').length)
+	b.conn.send({ type: 'submit', sessionId: id, text: 'once', id: 's1' })
+	expect(b.of('ack').map((e) => e.id)).toEqual(['s1'])
+	expect((await records(id)).filter((r) => r.type === 'user').length).toBe(1)
+	expect(calls).toEqual([])
+})

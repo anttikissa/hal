@@ -30,6 +30,12 @@ export type ErrorEvent = {
 	body?: string
 	// Set when the caller aborted; the turn was cancelled, not failed.
 	cancelled?: boolean
+	// What fixes the failure (tasks/j1/states.md, Failures): time
+	// (temporary), time or another account (limited), a login (auth).
+	// Absent: nothing the host can do; the turn ends in error.
+	failure?: 'temporary' | 'limited' | 'auth'
+	// When to try again (epoch ms), if the provider said.
+	retryAt?: number
 }
 
 // A stream ends with exactly one terminal event: done or error.

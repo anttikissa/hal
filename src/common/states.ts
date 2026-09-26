@@ -18,9 +18,8 @@ export type SessionState =
 	// A turn is in progress; ended by the turn itself.
 	| { type: 'running'; phase: Phase }
 	// A failure the host is fixing on its own, again at `at` (ISO time).
-	// Not produced yet: task tf (retries).
 	| { type: 'retrying'; at: string; reason: string }
-	// Needs a human: login now, approval later. Not produced yet.
+	// Needs a human: login now, approval later.
 	| { type: 'blocked'; reason: string }
 	// The user stopped it (or the loop guard did); the turn can continue.
 	| { type: 'paused'; reason?: string }
@@ -42,6 +41,10 @@ export type StateEvent =
 	| { type: 'pause'; reason?: string }
 	// The turn ended: completed, or failed with `error`.
 	| { type: 'end'; error?: string }
+	// A request failed in a way the host fixes itself, trying again at `at`.
+	| { type: 'retry'; at: string; reason: string }
+	// A request failed in a way only a human fixes (log in).
+	| { type: 'block'; reason: string }
 
 // A turn continued this many times in a row by new hosts without
 // finishing a round is paused instead: it may be what kills them.
@@ -63,7 +66,7 @@ function step(state: SessionState, event: StateEvent): SessionState | string {
 		case 'request':
 		case 'stream':
 		case 'tools': {
-			if (state.type !== 'running' && !(event.type === 'request' && state.type === 'retrying')) return state
+			if (state.type !== 'running' && !(event.type === 'request' && (state.type === 'retrying' || state.type === 'blocked'))) return state
 			let phase: Phase = event.type === 'request' ? 'requesting' : event.type === 'stream' ? 'streaming' : 'tools'
 			return state.type === 'running' && state.phase === phase ? state : { type: 'running', phase }
 		}
@@ -73,6 +76,10 @@ function step(state: SessionState, event: StateEvent): SessionState | string {
 			if (event.reason !== undefined) paused.reason = event.reason
 			return paused
 		}
+		case 'retry':
+			return busy(state) ? { type: 'retrying', at: event.at, reason: event.reason } : state
+		case 'block':
+			return busy(state) ? { type: 'blocked', reason: event.reason } : state
 		case 'end':
 			if (!busy(state)) return state
 			return event.error !== undefined ? { type: 'error', message: event.error } : { type: 'idle' }
@@ -122,15 +129,27 @@ function escape(sessionId: string, state: SessionState): unknown {
 	return states.busy(state) ? { type: 'pause', sessionId } : undefined
 }
 
+// A wait in words: 12s, 4m 10s, 3h 5m.
+function duration(ms: number): string {
+	let s = Math.ceil(ms / 1000)
+	if (s < 60) return `${s}s`
+	if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`
+	return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
+}
+
 // One line for the user; undefined when there is nothing to say (idle).
-function describe(state: SessionState): string | undefined {
+// With `now` (epoch ms) a retry says how long until it; without, the
+// time of day it happens, which never goes stale.
+function describe(state: SessionState, now?: number): string | undefined {
 	switch (state.type) {
 		case 'idle':
 			return undefined
 		case 'running':
 			return state.phase === 'tools' ? 'running tools' : state.phase
 		case 'retrying':
-			return `retrying at ${state.at}: ${state.reason}`
+			if (now === undefined) return `retrying at ${new Date(state.at).toLocaleTimeString()} (${state.reason})`
+			let left = Date.parse(state.at) - now
+			return `retrying ${left > 0 ? `in ${duration(left)}` : 'now'} (${state.reason})`
 		case 'blocked':
 			return `blocked: ${state.reason}`
 		case 'paused':

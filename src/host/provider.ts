@@ -4,6 +4,8 @@
 // and abort live here once. Wire mappings: tasks/7f/mapping.md.
 
 import { blocks, type ErrorEvent, type Message, type StreamEvent } from '../common/blocks.ts'
+import { clock } from './clock.ts'
+import { limits } from './limits.ts'
 
 export type ToolDef = { name: string; description: string; inputSchema: Record<string, unknown> }
 
@@ -16,15 +18,22 @@ export type ProviderRequest = {
 	maxTokens?: number
 }
 
-export type HttpRequest = { url: string; headers: Record<string, string>; body: unknown }
+// `account` names the credentials used, for providers with several
+// (rate limits are per account; a 401 is reported back by name).
+export type HttpRequest = { url: string; headers: Record<string, string>; body: unknown; account?: string }
+
+type Failure = NonNullable<ErrorEvent['failure']>
 
 // One server-sent event. `data` stays text: not every stream is all
 // JSON (Chat Completions ends with "[DONE]").
 export type SseMessage = { event: string | undefined; data: string }
 
 export type Provider = {
-	// May be async, e.g. to refresh credentials; throwing becomes an error event.
+	// May be async, e.g. to refresh credentials; throwing becomes an error
+	// event, keeping the error's `failure` and `retryAt` if it has them.
 	request(req: ProviderRequest): HttpRequest | Promise<HttpRequest>
+	// The account's credentials were rejected (401).
+	rejected?(account: string): void
 	// Should end with done or error; shared code adds an error if not.
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
 }
@@ -77,7 +86,11 @@ async function* sse(body: ReadableStream<Uint8Array>, signal?: AbortSignal): Asy
 	}
 	try {
 		while (true) {
-			let { done, value } = await read(reader, signal)
+			let { done, value } = await read(reader, signal).catch((e) => {
+				// A dropped or stalled connection: trying again may work.
+				if (e instanceof Error && !(e instanceof Cancelled)) (e as { failure?: Failure }).failure ??= 'temporary'
+				throw e
+			})
 			buf += done ? decoder.decode() : decoder.decode(value, { stream: true })
 			// A trailing \r may be half of \r\n: keep it until more arrives.
 			let cut = !done && buf.endsWith('\r') ? buf.length - 1 : buf.length
@@ -107,6 +120,66 @@ function errorText(err: unknown): string {
 	return code && !err.message.includes(String(code)) ? `${err.message} (${code})` : err.message
 }
 
+// What fixes an HTTP failure, if anything does.
+function failure(status: number | undefined): Failure | undefined {
+	if (status === 429) return 'limited'
+	if (status === 401) return 'auth'
+	if (status === 408 || (status !== undefined && status >= 500)) return 'temporary'
+	return undefined
+}
+
+// The provider's own words from an error body, for the user.
+function detail(body: string): string {
+	try {
+		let v = JSON.parse(body)
+		let m = v?.error?.message ?? v?.message ?? (typeof v?.error === 'string' ? v.error : undefined)
+		if (typeof m === 'string') return m
+	} catch {}
+	return body.trim().replace(/\s+/g, ' ').slice(0, 300)
+}
+
+// When a rate limit lifts (epoch ms), from whichever of retry-after
+// (seconds or a date), Anthropic's unified reset (unix seconds) or a
+// reset in the body (OpenAI usage limits) says latest.
+function resetAt(headers: Headers, body: string): number | undefined {
+	let now = clock.now()
+	let times: number[] = []
+	let after = headers.get('retry-after')
+	if (after) times.push(/^\d+(\.\d+)?$/.test(after.trim()) ? now + Number(after) * 1000 : Date.parse(after))
+	let unified = Number(headers.get('anthropic-ratelimit-unified-reset') ?? NaN)
+	if (unified > 0) times.push(unified * 1000)
+	try {
+		let e = JSON.parse(body)?.error
+		if (typeof e?.resets_at === 'number') times.push(e.resets_at * 1000)
+		if (typeof e?.resets_in_seconds === 'number') times.push(now + e.resets_in_seconds * 1000)
+	} catch {}
+	let valid = times.filter((t) => Number.isFinite(t))
+	return valid.length ? Math.max(...valid) : undefined
+}
+
+// Classifies a failed round and remembers what it teaches: a rate
+// limit (per account, or per model for providers without accounts)
+// and rejected credentials. With an account, the limit is that
+// account's: retry at once, which picks the next one (auth.ts).
+function failed(p: Provider, modelId: string, account: string | undefined, e: ErrorEvent, reset?: number): ErrorEvent {
+	e.failure ??= provider.failure(e.status)
+	let now = clock.now()
+	if (e.status === 429) {
+		if (account) {
+			limits.set(limits.key(modelId, account), reset ?? now + provider.accountLimitMs())
+			e.retryAt = now
+		} else if (reset !== undefined) {
+			limits.set(limits.key(modelId), reset)
+			e.retryAt = reset
+		}
+	}
+	if (e.status === 401 && account && p.rejected) {
+		p.rejected(account)
+		e.retryAt = now
+	}
+	return e
+}
+
 // Stream one model turn. Always yields exactly one terminal event (done
 // or error) last, and never throws.
 async function* stream(
@@ -126,29 +199,69 @@ async function* stream(
 		yield { type: 'error', message: `Unknown provider '${id.provider}' (known: ${known})` }
 		return
 	}
+	// A connection open while the machine slept is usually dead with no
+	// error to show for it: drop it (guard for laptop sleep).
+	let conn = new AbortController()
+	let slept = false
+	let stopConn = () => conn.abort()
+	signal?.addEventListener('abort', stopConn)
+	let offWake = clock.onWake(() => {
+		slept = true
+		conn.abort()
+	})
 	try {
 		let http = await p.request({ ...input, model: id.model })
 		if (signal?.aborted) throw new Cancelled()
-		let res = await provider.fetch(http.url, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json', ...http.headers },
-			body: JSON.stringify(http.body),
-			signal,
-		})
-		if (!res.ok || !res.body) {
-			let body = await res.text()
-			yield { type: 'error', message: `HTTP ${res.status} from ${id.provider}`, status: res.status, body }
+		let limited = limits.until(limits.key(modelId, http.account))
+		if (limited) {
+			yield { type: 'error', message: `${modelId} is rate limited`, failure: 'limited', retryAt: limited }
 			return
 		}
-		for await (let event of p.parse(provider.sse(res.body, signal))) {
+		let res: Response
+		try {
+			res = await provider.fetch(http.url, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', ...http.headers },
+				body: JSON.stringify(http.body),
+				signal: conn.signal,
+			})
+		} catch (e) {
+			if (e instanceof Error) (e as { failure?: Failure }).failure ??= 'temporary'
+			throw e
+		}
+		if (!res.ok || !res.body) {
+			let body = await res.text()
+			let message = `HTTP ${res.status} from ${id.provider}`
+			let text = provider.detail(body)
+			if (text) message += `: ${text}`
+			yield failed(p, modelId, http.account, { type: 'error', message, status: res.status, body }, provider.resetAt(res.headers, body))
+			return
+		}
+		for await (let event of p.parse(provider.sse(res.body, conn.signal))) {
 			if (signal?.aborted) throw new Cancelled()
+			if (event.type === 'error') {
+				yield failed(p, modelId, http.account, event)
+				return
+			}
 			yield event
-			if (event.type === 'done' || event.type === 'error') return
+			if (event.type === 'done') return
 		}
 		if (signal?.aborted) throw new Cancelled()
-		yield { type: 'error', message: `Stream from ${id.provider} ended without finishing` }
+		yield { type: 'error', message: `Stream from ${id.provider} ended without finishing`, failure: 'temporary' }
 	} catch (err) {
-		yield signal?.aborted || err instanceof Cancelled ? cancelled : { type: 'error', message: errorText(err) }
+		if (signal?.aborted) yield cancelled
+		else if (slept) yield { type: 'error', message: 'connection lost (the computer slept)', failure: 'temporary' }
+		else if (err instanceof Cancelled) yield cancelled
+		else {
+			let e: ErrorEvent = { type: 'error', message: errorText(err) }
+			let { failure, retryAt } = err as { failure?: Failure; retryAt?: number }
+			if (failure) e.failure = failure
+			if (typeof retryAt === 'number') e.retryAt = retryAt
+			yield e
+		}
+	} finally {
+		offWake()
+		signal?.removeEventListener('abort', stopConn)
 	}
 }
 
@@ -160,8 +273,13 @@ export const provider = {
 	state: { providers: {} as Record<string, Provider> },
 	// Longest silence tolerated mid-stream; chunks normally arrive every ~100ms.
 	streamTimeoutMs: () => 120_000,
+	// How long an account that hit 429 without a reset time is skipped.
+	accountLimitMs: () => 60_000,
 	fetch: (url: string, init: RequestInit): Promise<Response> => fetch(url, init),
 	register,
+	failure,
+	detail,
+	resetAt,
 	sse,
 	stream,
 }

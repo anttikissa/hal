@@ -35,6 +35,8 @@ export type Connection = {
 }
 
 type Client = { deliver: (event: Event) => void; open: Set<string> }
+// What a command did: refused (why), or done, naming a created session.
+type Outcome = { refused?: string; sessionId?: string }
 type Running = { provider: string; controller: AbortController }
 
 // The in-memory stand-in for the wire: both directions go through ASON,
@@ -57,6 +59,29 @@ function connect(deliver: (event: Event) => void): Connection {
 	}
 }
 
+// One transport connection (a socket, a WebSocket) as a host
+// connection: each message received is one ASON command, and each event
+// goes to `write` as one short ASON message. Unreadable messages are
+// answered with `rejected`, never thrown.
+function adapt(write: (message: string) => void): { receive(message: string): void; unreadable(reason: string): void; close(): void } {
+	let send = (event: Event) => write(ason.stringify(event, 'short'))
+	let conn = host.connect(send)
+	let unreadable = (reason: string) => send({ type: 'rejected', command: '', reason: `unreadable message: ${reason}` })
+	return {
+		receive: (message) => {
+			let command: unknown
+			try {
+				command = ason.parse(message)
+			} catch (e: any) {
+				return unreadable(String(e?.message ?? e))
+			}
+			conn.send(command)
+		},
+		unreadable,
+		close: () => conn.close(),
+	}
+}
+
 // Tells a client what is wrong with config.ason, if anything.
 function warn(client: Client): void {
 	let text = config.warnings().join('; ')
@@ -69,41 +94,96 @@ function warnAll(): void {
 }
 
 function reject(client: Client, command: unknown, reason: string, sessionId?: unknown): void {
-	let type = (command as { type?: unknown } | null)?.type
+	let c = command as { type?: unknown; id?: unknown } | null
+	let type = c?.type
 	let event: Event = { type: 'rejected', command: typeof type === 'string' ? type : String(type), reason }
 	if (typeof sessionId === 'string') event.sessionId = sessionId
+	if (typeof c?.id === 'string') event.id = c.id
 	client.deliver(event)
+}
+
+// Commands whose effect outlives the connection. A repeat of one of
+// these ids is answered as before and not carried out again. Opening
+// and closing are per connection, so a repeat always acts.
+const once = new Set(['create', 'submit', 'pause', 'continue'])
+
+// Records what a command with an id did, forgetting the oldest beyond
+// host.remembered().
+function remember(id: string, outcome: Outcome): void {
+	let done = host.state.done
+	done.set(id, outcome)
+	for (let old of done.keys()) {
+		if (done.size <= host.remembered()) break
+		done.delete(old)
+	}
 }
 
 function handle(client: Client, command: unknown): void {
 	let problem = protocol.invalid(command)
 	if (problem) return host.reject(client, command, problem, (command as any)?.sessionId)
 	let c = command as Command
+	let repeat = c.id === undefined ? undefined : (host.state.done.get(c.id) ?? host.submitted(c))
+	if (repeat) return host.answer(client, c, repeat)
+	let outcome: Outcome | undefined
 	try {
-		if (c.type === 'create') {
-			let init: { cwd: string; model?: string; name?: string } = { cwd: c.cwd }
-			if (c.model !== undefined) init.model = c.model
-			if (c.name !== undefined) init.name = c.name
-			return host.follow(client, sessions.create(init).id)
-		}
-		if (c.type === 'open') {
-			let ready = host.ready(c.sessionId)
-			if (!ready) return host.follow(client, c.sessionId)
-			// Once open, the same command takes the synchronous path.
-			ready.then(
-				() => host.state.clients.has(client) && host.handle(client, c),
-				(e) => host.reject(client, c, String(e?.message ?? e), c.sessionId),
-			)
-			return
-		}
-		if (!client.open.has(c.sessionId)) return host.reject(client, c, 'session is not open on this connection', c.sessionId)
-		if (c.type === 'close') client.open.delete(c.sessionId)
-		else if (c.type === 'submit') host.submit(client, c.sessionId, c.text)
-		else if (c.type === 'continue') host.resume(client, c.sessionId)
-		else if (c.type === 'pause') host.pause(client, c.sessionId)
+		outcome = host.act(client, c)
 	} catch (e: any) {
-		host.reject(client, c, String(e?.message ?? e), 'sessionId' in c ? c.sessionId : undefined)
+		outcome = { refused: String(e?.message ?? e) }
 	}
+	// Undefined: still opening; act() answers when it is done.
+	if (!outcome) return
+	if (c.id !== undefined && once.has(c.type)) host.remember(c.id, outcome)
+	host.answer(client, c, outcome, false)
+}
+
+// A repeat of a submit the previous host recorded, found in history.
+function submitted(c: Command): Outcome | undefined {
+	if (c.type !== 'submit' || !sessions.state.open.has(c.sessionId)) return undefined
+	return history.readSync(c.sessionId).some((r) => r.type === 'user' && r.command === c.id) ? {} : undefined
+}
+
+// Acknowledges or rejects a command. A repeated create follows its
+// session again, so the resender sees it too.
+function answer(client: Client, c: Command, outcome: Outcome, repeat = true): void {
+	let sessionId = 'sessionId' in c ? c.sessionId : outcome.sessionId
+	if (outcome.refused !== undefined) return host.reject(client, c, outcome.refused, sessionId)
+	if (repeat && outcome.sessionId) host.follow(client, outcome.sessionId)
+	if (c.id !== undefined) client.deliver({ type: 'ack', id: c.id })
+}
+
+// Carries out a valid command: what it did, or undefined if it will
+// answer later.
+function act(client: Client, c: Command): Outcome | undefined {
+	if (c.type === 'create' || c.type === 'open-newest') {
+		let id = c.type === 'open-newest' ? sessions.newest() : undefined
+		if (id) return host.act(client, { type: 'open', sessionId: id, ...(c.id === undefined ? {} : { id: c.id }) })
+		let init: { cwd: string; model?: string; name?: string } = { cwd: c.cwd ?? host.cwd() }
+		if (c.type === 'create' && c.model !== undefined) init.model = c.model
+		if (c.type === 'create' && c.name !== undefined) init.name = c.name
+		id = sessions.create(init).id
+		host.follow(client, id)
+		return { sessionId: id }
+	}
+	if (c.type === 'open') {
+		let ready = host.ready(c.sessionId)
+		if (!ready) {
+			host.follow(client, c.sessionId)
+			return {}
+		}
+		// Once open, the same command takes the synchronous path.
+		ready.then(
+			() => host.state.clients.has(client) && host.handle(client, c),
+			(e) => host.reject(client, c, String(e?.message ?? e), c.sessionId),
+		)
+		return undefined
+	}
+	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
+	let refused: string | undefined
+	if (c.type === 'close') client.open.delete(c.sessionId)
+	else if (c.type === 'submit') refused = host.submit(c.sessionId, c.text, c.id)
+	else if (c.type === 'continue') refused = host.resume(c.sessionId)
+	else if (c.type === 'pause') refused = host.stop(c.sessionId)
+	return refused === undefined ? {} : { refused }
 }
 
 // Undefined if the session is open and its history repaired; otherwise
@@ -157,17 +237,20 @@ function transition(id: string, event: StateEvent): string | undefined {
 	return undefined
 }
 
-function submit(client: Client, id: string, text: string): void {
+// Returns why the submit is refused, if it is. `command` is the
+// client's id for it, kept with the prompt so a later host can tell a
+// resend.
+function submit(id: string, text: string, command?: string): string | undefined {
 	let refused = host.transition(id, { type: 'submit' })
-	if (refused) return host.reject(client, { type: 'submit' }, refused, id)
-	history.submit(id, text)
+	if (refused) return refused
+	history.submit(id, text, command)
 	host.start(id, text)
 }
 
 // Continue: a paused turn goes on, a failed one retries.
-function resume(client: Client, id: string): void {
+function resume(id: string): string | undefined {
 	let refused = host.transition(id, { type: 'continue' })
-	if (refused) return host.reject(client, { type: 'continue' }, refused, id)
+	if (refused) return refused
 	history.append(id, { type: 'continue' })
 	host.start(id)
 }
@@ -181,12 +264,6 @@ function start(id: string, prompt?: string): void {
 	if (prompt !== undefined) event.prompt = prompt
 	host.broadcast(id, event)
 	void host.runTurn(id, model, running)
-}
-
-// Escape.
-function pause(client: Client, id: string): void {
-	let refused = host.stop(id)
-	if (refused) host.reject(client, { type: 'pause' }, refused, id)
 }
 
 // Pauses the session's turn: one running here stops and runTurn records
@@ -327,6 +404,7 @@ function reset(): void {
 	host.state.opening.clear()
 	host.state.clients.clear()
 	host.state.states.clear()
+	host.state.done.clear()
 	host.state.pauseOnExit = false
 }
 
@@ -338,14 +416,25 @@ export const host = {
 		opening: new Map<string, Promise<void>>(),
 		// Each session's state, once this host has moved it.
 		states: new Map<string, SessionState>(),
+		// What each recent command id did, oldest first.
+		done: new Map<string, Outcome>(),
 		pauseOnExit: false,
 		inited: false,
 	},
 	stream: (model: string, input: Omit<ProviderRequest, 'model'>, signal?: AbortSignal): AsyncIterable<StreamEvent> =>
 		provider.stream(model, input, signal),
+	// Working directory for a session created without one.
+	cwd: (): string => process.cwd(),
+	// How many command ids the host remembers for spotting repeats.
+	remembered: () => 1000,
 	init,
 	connect,
+	adapt,
 	handle,
+	remember,
+	submitted,
+	answer,
+	act,
 	warn,
 	warnAll,
 	reject,
@@ -358,7 +447,6 @@ export const host = {
 	submit,
 	resume,
 	start,
-	pause,
 	stop,
 	recover,
 	runTurn,
