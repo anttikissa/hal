@@ -1,0 +1,20 @@
+# Notes from implementing ne
+
+- The snapshot must be built in the same synchronous step as the live
+  events that follow it, but history.read is async (a stream). Hence
+  history.readSync. Anything added to snapshots must stay synchronous.
+- history.open (repair, interrupted turn ends) is async, so the `open`
+  command became async for sessions not yet open. Tests must wait for
+  the snapshot instead of reading it right after send().
+- The live turn in a snapshot must hold only blocks not yet on disk
+  (history.live), or a mid-turn joiner shows finished blocks twice.
+- history.record used to record a stream that throws as `cancelled`
+  (finally with no catch). Check status mapping when wrapping streams.
+- To fake a host crash in tests, clear both host.state.running and
+  history.state.running; otherwise open won't close the turn as
+  interrupted (it skips turns it thinks are running here).
+- The artifact agent-loop.ts is mostly tools, retries and old IPC; for
+  a single turn little of it applies.
+- When others' uncommitted work breaks ./test in the shared tree,
+  verify yours in a `git worktree` of HEAD plus your files, with
+  node_modules symlinked.
