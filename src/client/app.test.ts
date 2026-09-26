@@ -95,6 +95,14 @@ test('a refused command is shown until the next submit', () => {
 	expect(app.view().notice).toBeUndefined()
 })
 
+test('a config warning is shown and keeps the transcript', () => {
+	app.onEvent(snapshot())
+	let before = app.view().transcript
+	app.onEvent({ type: 'warning', text: 'config.ason: webPort: bad' })
+	expect(app.view().notice).toContain('webPort')
+	expect(app.view().transcript).toBe(before)
+})
+
 test('losing the host is shown, and cleared on reconnect', () => {
 	app.onRole(null)
 	expect(app.view().notice).toBeTruthy()

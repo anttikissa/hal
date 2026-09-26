@@ -85,3 +85,28 @@ await main.start()
 		expect(out.stderr).toBe('local-before-init=true')
 	})
 })
+
+test('start reads config.ason before local.ts, which may override any setting', () => {
+	withHome((home) => {
+		writeFileSync(join(home, 'config.ason'), "{ model: 'test/from-config', webPort: 4321 }\n")
+		writeFileSync(
+			join(home, 'local.ts'),
+			`import { settings } from ${JSON.stringify(`${srcDir}/common/settings.ts`)}\n` +
+				`globalThis.seen = settings.model()\n` +
+				`settings.model = () => 'test/from-local'\n`,
+		)
+		let script = `
+let { main } = await import(${JSON.stringify(`${srcDir}/main.ts`)})
+let { models } = await import(${JSON.stringify(`${srcDir}/host/models.ts`)})
+let { web } = await import(${JSON.stringify(`${srcDir}/host/web.ts`)})
+main.init = () => {
+	process.stderr.write(JSON.stringify({ seen: globalThis.seen, model: models.defaultModel(), port: web.port() }))
+	process.exit(0)
+}
+await main.start()
+`
+		let out = run(home, script)
+		expect(out.exitCode).toBe(0)
+		expect(JSON.parse(out.stderr)).toEqual({ seen: 'test/from-config', model: 'test/from-local', port: 4321 })
+	})
+})

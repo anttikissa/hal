@@ -51,6 +51,8 @@ export type Event =
 	// turn goes on with a new provider round, streamed after them.
 	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[] }
 	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string }
+	// Something the user should fix (config.ason); not tied to a session.
+	| { type: 'warning'; text: string }
 	// Sent only to the client whose command was refused.
 	| { type: 'rejected'; sessionId?: string; command: string; reason: string }
 

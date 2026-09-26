@@ -5,6 +5,7 @@ import { ason } from '../common/ason.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
+import { config } from './config.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
@@ -523,4 +524,25 @@ test('cancel between tool rounds ends the turn and keeps the results', async () 
 	expect(view).toEqual(a.views.get(id)!)
 	expect(view.items.map((i) => i.type)).toEqual(['prompt', 'tool', 'tool-result', 'turn-end'])
 	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'user', 'turn_end'])
+})
+
+test('config warnings reach every client: on connect and when announced', () => {
+	let origWarnings = config.warnings
+	let current: string[] = []
+	config.warnings = () => current
+	try {
+		let quiet = client()
+		expect(quiet.of('warning')).toEqual([])
+		current = ['config.ason: webPort: bad']
+		let late = client()
+		expect(late.of('warning').map((e) => e.text)).toEqual(['config.ason: webPort: bad'])
+		host.warnAll()
+		expect(quiet.of('warning').map((e) => e.text)).toEqual(['config.ason: webPort: bad'])
+		expect(late.of('warning').length).toBe(2)
+		current = []
+		host.warnAll()
+		expect(quiet.of('warning').length).toBe(1)
+	} finally {
+		config.warnings = origWarnings
+	}
 })

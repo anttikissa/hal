@@ -83,7 +83,7 @@ function copyTurn(turn: LiveTurn): LiveTurn {
 // concern it. Events before the first snapshot are ignored.
 function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'snapshot') return t && t.meta.id !== event.sessionId ? t : transcript.fromSnapshot(event.snapshot)
-	if (!t || event.type === 'rejected' || event.sessionId !== t.meta.id) return t
+	if (!t || event.type === 'rejected' || event.type === 'warning' || event.sessionId !== t.meta.id) return t
 	if (event.type === 'turn-start') {
 		let items: Item[] = [...t.items, { type: 'prompt', text: event.prompt }]
 		return { meta: t.meta, items, live: { start: items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }

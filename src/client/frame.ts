@@ -7,6 +7,8 @@
 // its tabs expanded, and carries no control characters from the text
 // it shows.
 
+import { colors, type Style } from '../common/colors.ts'
+import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
 import type { PromptState } from './prompt.ts'
@@ -30,6 +32,48 @@ const PROMPT_FIRST = '> '
 const PROMPT_REST = '  '
 const DIM = '\x1b[2m'
 const UNDIM = '\x1b[22m'
+const UNCOLOR = '\x1b[39;49m'
+
+// The escape that switches to a style's fg and bg (truecolor).
+function sgr(style: Style): string {
+	let parts: string[] = []
+	if (style.fg) parts.push(`38;2;${oklch.toRgb(style.fg).join(';')}`)
+	if (style.bg) parts.push(`48;2;${oklch.toRgb(style.bg).join(';')}`)
+	return parts.length ? `\x1b[${parts.join(';')}m` : ''
+}
+
+// A padded row in a style. With a background it is a card filling all
+// `cols` columns; colour always ends with the row.
+function paint(row: string, style: Style | undefined, cols: number): string {
+	let on = style ? frame.sgr(style) : ''
+	if (!on) return PAD + row
+	let fill = style!.bg ? ' '.repeat(Math.max(0, cols - PAD.length - strings.visLen(row))) : ''
+	return on + PAD + row + fill + UNCOLOR
+}
+
+// The style of a tool's name: toolBash for bash, tool for one without its own.
+function toolStyle(name: string): Style {
+	let key = 'tool' + name.charAt(0).toUpperCase() + name.slice(1)
+	let style = (colors as Record<string, unknown>)[key]
+	return typeof style === 'function' ? style() : colors.tool()
+}
+
+function itemStyle(item: Item): Style | undefined {
+	switch (item.type) {
+		case 'prompt':
+			return colors.user()
+		case 'text':
+			return { fg: colors.assistant().fg! }
+		case 'thinking':
+			return { fg: colors.thinking().fg! }
+		case 'tool':
+			return frame.toolStyle(item.name)
+		case 'tool-result':
+			return { fg: (item.isError ? colors.error() : colors.log()).fg! }
+		case 'turn-end':
+			return item.status === 'error' ? colors.error() : { fg: colors.log().fg! }
+	}
+}
 
 // Text from the model, tools or a paste must not drive the terminal:
 // control characters other than newline and tab become visible. Keeps
@@ -50,7 +94,7 @@ function itemLines(item: Item, width: number): string[] {
 		case 'text':
 			return frame.wrap(item.text, width)
 		case 'thinking':
-			return frame.wrap(item.text, width).map((l) => DIM + l + UNDIM)
+			return frame.wrap(item.text, width)
 		case 'tool': {
 			let { command, description } = item.input
 			// A described command: the sentence first, the command dimmed beside it.
@@ -123,17 +167,19 @@ function build(view: View, cols: number): Frame {
 		let rows = frame.itemLines(item, width)
 		if (!rows.length) continue
 		if (lines.length) lines.push('')
-		for (let r of rows) lines.push(PAD + r)
+		let style = frame.itemStyle(item)
+		for (let r of rows) lines.push(frame.paint(r, style, cols))
 	}
 	if (view.notice) {
 		if (lines.length) lines.push('')
-		for (let r of frame.wrap(view.notice, width)) lines.push(PAD + DIM + r + UNDIM)
+		for (let r of frame.wrap(view.notice, width)) lines.push(frame.paint(r, { fg: colors.log().fg! }, cols))
 	}
 	if (lines.length) lines.push('')
 	let promptWidth = Math.max(1, width - PROMPT_FIRST.length)
 	let p = frame.layoutPrompt(view.prompt.text, view.prompt.cursor, promptWidth)
 	let top = lines.length
-	p.rows.forEach((r, i) => lines.push(PAD + (i ? PROMPT_REST : PROMPT_FIRST) + r))
+	let input = colors.input()
+	p.rows.forEach((r, i) => lines.push(frame.paint((i ? PROMPT_REST : PROMPT_FIRST) + r, input, cols)))
 	return { lines, cursor: { row: top + p.row, col: PAD.length + PROMPT_FIRST.length + p.col } }
 }
 
@@ -142,6 +188,10 @@ export const frame = {
 	resultRows: () => 3,
 	clean,
 	wrap,
+	sgr,
+	paint,
+	toolStyle,
+	itemStyle,
 	itemLines,
 	layoutPrompt,
 	build,

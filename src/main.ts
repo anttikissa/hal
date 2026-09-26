@@ -8,6 +8,7 @@ import { render } from './client/render.ts'
 import { terminal } from './client/terminal.ts'
 import type { Event } from './common/protocol.ts'
 import { anthropic } from './host/anthropic.ts'
+import { config } from './host/config.ts'
 import { host } from './host/host.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
@@ -55,6 +56,9 @@ function joinHost(onEvent: (event: Event) => void, onRole?: (role: Role | null) 
 }
 
 async function start(): Promise<void> {
+	// config.ason first, so local.ts sees it and may override settings.*.
+	// Warnings about it reach every client connected to this host.
+	config.init(() => host.warnAll())
 	await main.loadLocal()
 	main.init()
 	if (!terminal.available()) {

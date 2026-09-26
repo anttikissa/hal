@@ -33,6 +33,7 @@ function show(): void {
 function onEvent(event: Event): void {
 	let st = app.state
 	if (event.type === 'rejected') st.notice = `${event.command} refused: ${event.reason}`
+	else if (event.type === 'warning') st.notice = event.text
 	else st.transcript = transcript.fold(st.transcript, event)
 	app.show()
 }

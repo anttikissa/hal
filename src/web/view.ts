@@ -8,12 +8,15 @@ import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 
 export type ViewState = { transcript?: Transcript; notice?: string }
 
-// One transcript item as shown: a CSS class and its text. Null shows
+// One transcript item as shown: CSS classes and its text. The classes
+// are theme style names (src/common/colors.ts in kebab case), whose CSS
+// the host puts in the page. Null shows
 // nothing (a completed turn end).
 export type Shown = { kind: string; text: string } | null
 
 function onEvent(st: ViewState, event: Event): ViewState {
 	if (event.type === 'rejected') return { ...st, notice: `${event.command} refused: ${event.reason}` }
+	if (event.type === 'warning') return { ...st, notice: event.text }
 	let t = transcript.fold(st.transcript, event)
 	return t === st.transcript ? st : { ...st, transcript: t }
 }
@@ -39,27 +42,29 @@ function oneLine(s: string): string {
 function show(item: Item): Shown {
 	switch (item.type) {
 		case 'prompt':
-			return { kind: 'prompt', text: item.text }
+			return { kind: 'user', text: item.text }
 		case 'text':
+			return { kind: 'assistant', text: item.text }
 		case 'thinking':
-			return { kind: item.type, text: item.text }
+			return { kind: 'thinking', text: item.text }
 		case 'tool': {
+			let kind = `tool tool-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 			let { command, description } = item.input
 			if (typeof command === 'string' && typeof description === 'string')
-				return { kind: 'tool', text: `▸ ${oneLine(description)}\n  $ ${command}` }
-			return { kind: 'tool', text: `▸ ${item.name} ${JSON.stringify(item.input)}` }
+				return { kind, text: `▸ ${oneLine(description)}\n  $ ${command}` }
+			return { kind, text: `▸ ${item.name} ${JSON.stringify(item.input)}` }
 		}
 		case 'tool-result': {
 			// A glimpse, like the terminal: the model sees all of it.
 			let rows = item.output.replace(/\n$/, '').split('\n')
 			let shown = rows.slice(0, view.resultRows())
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
-			return { kind: item.isError ? 'result error' : 'result', text: (item.isError ? '✗ ' : '◂ ') + shown.join('\n  ') }
+			return { kind: item.isError ? 'result error' : 'result log', text: (item.isError ? '✗ ' : '◂ ') + shown.join('\n  ') }
 		}
 		case 'turn-end':
 			if (item.status === 'error') return { kind: 'end error', text: `error: ${item.error ?? 'turn failed'}` }
 			if (item.status === 'completed') return null
-			return { kind: 'end', text: `[${item.status}]` }
+			return { kind: 'end log', text: `[${item.status}]` }
 	}
 }
 

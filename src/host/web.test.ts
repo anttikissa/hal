@@ -2,6 +2,8 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
+import { colors } from '../common/colors.ts'
+import { oklch } from '../common/oklch.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { host } from './host.ts'
@@ -77,6 +79,22 @@ test('the host serves the web endpoint and stops it with the host', async () => 
 	await server.stop()
 	expect(web.state.server).toBeNull()
 	await expect(fetch(`${url}/`)).rejects.toThrow()
+})
+
+test('the page carries the theme as CSS, following overrides, without its code', async () => {
+	await server.serve()
+	let saved = colors.fgL
+	try {
+		let html = await (await fetch(`${base()}/`)).text()
+		expect(html).toContain(oklch.toHex(colors.assistant().fg!))
+		expect(html).toMatch(new RegExp(`\\.tool-bash\\s*\\{[^}]*${oklch.toHex(colors.toolBash().bg!)}`))
+		expect(html).not.toContain('fgL')
+		colors.fgL = 0.95
+		let after = await (await fetch(`${base()}/`)).text()
+		expect(after).toContain(oklch.toHex([0.95, colors.fgC, 55]))
+	} finally {
+		colors.fgL = saved
+	}
 })
 
 test('login sets a long-lived HttpOnly cookie; a wrong password gets 401', async () => {
@@ -244,7 +262,11 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 			`(() => { let t = document.querySelector('textarea'); t.value = 'hi'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`,
 		)
 		await b.waitFor(`document.querySelector('main').innerText.includes('hello from fake')`)
-		expect(await b.evaluate(`document.querySelector('.prompt').textContent`)).toBe('hi')
+		expect(await b.evaluate(`document.querySelector('.user').textContent`)).toBe('hi')
+		// The reply wears the theme's assistant colour.
+		expect(await b.evaluate(`getComputedStyle(document.querySelector('.assistant')).color`)).toBe(
+			`rgb(${oklch.toRgb(colors.assistant().fg!).join(', ')})`,
+		)
 		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('')
 	} finally {
 		web.cwd = origCwd

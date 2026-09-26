@@ -10,18 +10,24 @@
 // (the default) external atomic replacements are loaded into the same
 // object. A malformed file is an error, never reset to defaults, and is
 // not overwritten until it is fixed. Merely reading never writes.
+//
+// Options for user-edited files (config.ason): keepBroken starts a
+// malformed file from the defaults (reported, still never overwritten)
+// instead of throwing; onChange hears every external edit, with the
+// error if it left the file malformed.
 
 import { chmodSync, renameSync, unlinkSync, watch, writeFileSync, readFileSync, type FSWatcher } from 'fs'
 import { basename, dirname } from 'path'
 import { ason } from '../common/ason.ts'
 import { diag } from './diag.ts'
 
-type Options = { watch?: boolean; mode?: number }
+type Options = { watch?: boolean; mode?: number; keepBroken?: boolean; onChange?: (error: Error | null) => void }
 type Data = Record<string, any>
 
 interface LiveState {
 	path: string
 	mode: number | undefined
+	onChange: ((error: Error | null) => void) | undefined
 	data: Data
 	// ason.stringify of what is on disk, or null if there is no file yet.
 	synced: string | null
@@ -114,20 +120,26 @@ function reloadExternal(state: LiveState): void {
 	} catch (e) {
 		state.broken = e as Error
 		liveFiles.onError(e as Error)
+		state.onChange?.(e as Error)
 		return
 	}
+	let wasBroken = state.broken !== null
 	state.broken = null
 	// Deleted: keep what we have in memory.
 	if (!next) return
 	let text = ason.stringify(next)
 	// Our own write, or nothing changed.
-	if (text === state.synced) return
+	if (text === state.synced) {
+		if (wasBroken) state.onChange?.(null)
+		return
+	}
 	state.synced = text
 	// In place, so existing references see the new data. External wins
 	// over any change not yet written.
 	for (let key of Object.keys(state.data)) if (!(key in next)) delete state.data[key]
 	Object.assign(state.data, next)
 	state.dirty = false
+	state.onChange?.(null)
 }
 
 function startWatch(state: LiveState): void {
@@ -180,23 +192,32 @@ function proxy(state: LiveState, target: object): any {
 }
 
 function liveFile<T extends Data>(path: string, defaults: T, options: Options = {}): T {
-	let disk = read(path)
+	let disk: Data | null = null
+	let broken: Error | null = null
+	try {
+		disk = read(path)
+	} catch (e) {
+		if (!options.keepBroken) throw e
+		broken = e as Error
+	}
 	let data = copy(defaults)
 	if (disk) Object.assign(data, disk)
 	let state: LiveState = {
 		path,
 		mode: options.mode,
+		onChange: options.onChange,
 		data,
 		synced: disk ? ason.stringify(disk) : null,
 		dirty: false,
 		scheduled: false,
 		closed: false,
-		broken: null,
+		broken,
 		watcher: null,
 		debounce: null,
 		proxies: new WeakMap(),
 		targets: new WeakMap(),
 	}
+	if (broken) liveFiles.onError(broken)
 	if (options.watch !== false) startWatch(state)
 	let root = proxy(state, data)
 	registry.set(root, state)
@@ -212,6 +233,11 @@ function stateOf(data: object): LiveState {
 // Write pending changes now. Throws if the write fails.
 function save(data: object): void {
 	flush(stateOf(data))
+}
+
+// Why the file on disk is unusable (malformed), or null.
+function brokenError(data: object): Error | null {
+	return stateOf(data).broken
 }
 
 // Write pending changes and stop watching; later changes throw.
@@ -236,4 +262,4 @@ function onError(error: Error): void {
 	} catch {}
 }
 
-export const liveFiles = { liveFile, save, close, onError }
+export const liveFiles = { liveFile, save, close, brokenError, onError }

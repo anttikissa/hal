@@ -95,8 +95,8 @@ function chat(): void {
 	let st = page.state
 	document.body.replaceChildren()
 	st.log = el('main', { role: 'log' } as Partial<HTMLElement>)
-	st.notice = el('div', { id: 'notice' })
-	st.input = el('textarea', { rows: 1, autofocus: true, ariaLabel: 'Message' })
+	st.notice = el('div', { id: 'notice', className: 'log' })
+	st.input = el('textarea', { rows: 1, autofocus: true, ariaLabel: 'Message', className: 'input' })
 	st.input.addEventListener('input', () => page.fitInput())
 	let footer = el('footer')
 	footer.append(st.notice, st.input)
@@ -116,7 +116,7 @@ function chat(): void {
 function loginForm(): void {
 	let form = el('form')
 	let input = el('input', { type: 'password', name: 'password', placeholder: 'Password', autofocus: true, ariaLabel: 'Password' })
-	let status = el('div', { id: 'notice' })
+	let status = el('div', { id: 'notice', className: 'log' })
 	form.append(input, el('button', { textContent: 'Log in' }), status)
 	form.addEventListener('submit', async (e) => {
 		e.preventDefault()

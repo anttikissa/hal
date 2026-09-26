@@ -9,7 +9,7 @@ let errors: Error[] = []
 const origOnError = liveFiles.onError
 const open: object[] = []
 
-function live<T extends Record<string, any>>(path: string, defaults: T, opts?: { watch?: boolean; mode?: number }): T {
+function live<T extends Record<string, any>>(path: string, defaults: T, opts?: Parameters<typeof liveFiles.liveFile>[2]): T {
 	let data = liveFiles.liveFile(path, defaults, opts)
 	open.push(data)
 	return data
@@ -201,6 +201,43 @@ test('malformed external edit is reported and never overwritten', async () => {
 	data.v = 4
 	liveFiles.save(data)
 	expect(disk(path)).toEqual({ v: 4 })
+})
+
+test('keepBroken starts a malformed file from defaults and loads it once fixed', async () => {
+	let path = `${dir}/user.ason`
+	writeFileSync(path, "{ token: 'sk-secret-value' oops }")
+	let changes: (Error | null)[] = []
+	let data = live<Record<string, any>>(path, { v: 0 }, { keepBroken: true, onChange: (e) => changes.push(e) })
+	expect(data.v).toBe(0)
+	expect(errors.length).toBe(1)
+	expect(errors[0]!.message).toContain(path)
+	expect(errors[0]!.message).not.toContain('sk-secret-value')
+	expect(liveFiles.brokenError(data)?.message).toContain(path)
+	// Still never written over.
+	data.v = 1
+	await tick()
+	expect(readFileSync(path, 'utf8')).toContain('oops')
+	replace(path, ason.stringify({ v: 3 }) + '\n')
+	await until(() => data.v === 3)
+	expect(data.v).toBe(3)
+	expect(liveFiles.brokenError(data)).toBe(null)
+	expect(changes.at(-1)).toBe(null)
+})
+
+test('onChange hears external edits and breakage, not own writes', async () => {
+	let path = `${dir}/notify.ason`
+	let changes: (Error | null)[] = []
+	let data = live(path, { v: 0 }, { onChange: (e) => changes.push(e) })
+	data.v = 1
+	liveFiles.save(data)
+	await Bun.sleep(200)
+	expect(changes).toEqual([])
+	replace(path, ason.stringify({ v: 2 }) + '\n')
+	await until(() => changes.length > 0)
+	expect(changes).toEqual([null])
+	replace(path, '{ v: ')
+	await until(() => changes.length > 1)
+	expect(changes[1]?.message).toContain(path)
 })
 
 test('close flushes, stops watching and rejects later changes', async () => {

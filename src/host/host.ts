@@ -13,6 +13,7 @@
 import { ason } from '../common/ason.ts'
 import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock } from '../common/blocks.ts'
 import { protocol, type Command, type Event, type Snapshot } from '../common/protocol.ts'
+import { config } from './config.ts'
 import { history } from './history.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
@@ -36,6 +37,7 @@ function wire<T>(value: T): T {
 function connect(deliver: (event: Event) => void): Connection {
 	let client: Client = { deliver: (e) => deliver(wire(e)), open: new Set() }
 	host.state.clients.add(client)
+	host.warn(client)
 	return {
 		send: (command) => {
 			if (host.state.clients.has(client)) host.handle(client, wire(command))
@@ -44,6 +46,17 @@ function connect(deliver: (event: Event) => void): Connection {
 			host.state.clients.delete(client)
 		},
 	}
+}
+
+// Tells a client what is wrong with config.ason, if anything.
+function warn(client: Client): void {
+	let text = config.warnings().join('; ')
+	if (text) client.deliver({ type: 'warning', text })
+}
+
+// After config.ason changed: tells every client what is wrong now.
+function warnAll(): void {
+	for (let client of host.state.clients) host.warn(client)
 }
 
 function reject(client: Client, command: unknown, reason: string, sessionId?: unknown): void {
@@ -227,6 +240,8 @@ export const host = {
 	init,
 	connect,
 	handle,
+	warn,
+	warnAll,
 	reject,
 	ready,
 	follow,

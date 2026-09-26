@@ -1,10 +1,11 @@
 import { expect, test } from 'bun:test'
+import { colors } from '../common/colors.ts'
+import { oklch, type Oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
 import { frame, type View } from './frame.ts'
 
 const DIM = '\x1b[2m'
-const UNDIM = '\x1b[22m'
 
 // Visible text only: escape sequences removed.
 function strip(s: string): string {
@@ -77,7 +78,8 @@ test('a long tool result shows only its first rows', () => {
 test('text cannot send escape sequences to the terminal', () => {
 	let f = frame.build(view([{ type: 'text', text: 'hi\x1b[2J\x1b]0;title\x07\r\nthere' }], 'a\x1bb'), 40)
 	for (let line of f.lines) for (let c of ['\x07', '\r']) expect(line).not.toContain(c)
-	for (let line of f.lines) expect(strip(line)).toBe(line.replaceAll(DIM, '').replaceAll(UNDIM, ''))
+	// Only colour (SGR) sequences are left, which move nothing.
+	for (let line of f.lines) for (let esc of line.split('\x1b').slice(1)) expect(esc).toMatch(/^\[[\d;]*m/)
 	expect(plain(f.lines)).toContain('there')
 })
 
@@ -95,13 +97,13 @@ test('prompt cursor follows newlines and wrapping', () => {
 	let f = frame.build(view([], text), 20)
 	// Two logical lines; the second wraps; the cursor is at its very end.
 	let rows = f.lines.slice(f.lines.findIndex((l) => l.includes('first')))
-	expect(rows.join('').replace(/[ >]/g, '')).toBe(text.replace('\n', ''))
+	expect(rows.map(strip).join('').replace(/[ >]/g, '')).toBe(text.replace('\n', ''))
 	expect(f.cursor.row).toBe(f.lines.length - 1)
 	let lastRow = f.lines.at(-1)!
-	expect(f.cursor.col).toBe(strings.visLen(lastRow.trimEnd()))
+	expect(f.cursor.col).toBe(strip(lastRow).trimEnd().length)
 
 	let start = frame.build(view([], text, 6), 20)
-	expect(start.lines[start.cursor.row]!.slice(start.cursor.col)).toMatch(/^x/)
+	expect(strip(start.lines[start.cursor.row]!).slice(start.cursor.col)).toMatch(/^x/)
 })
 
 test('a cursor after a full prompt row stays inside the terminal', () => {
@@ -131,4 +133,52 @@ test('a notice sits between the transcript and the prompt, wrapped and cleaned',
 		expect(strip(line)).not.toContain('\x1b')
 	}
 	expect(f.cursor.row).toBe(f.lines.length - 1)
+})
+
+// Truecolor SGR parameters for a colour, as the terminal gets them.
+const fgOf = (c: Oklch) => `38;2;${oklch.toRgb(c).join(';')}`
+const bgOf = (c: Oklch) => `48;2;${oklch.toRgb(c).join(';')}`
+const rowWith = (lines: string[], text: string) => lines.find((l) => strip(l).includes(text))!
+
+test('items wear their theme colours', () => {
+	let items: Item[] = [
+		{ type: 'prompt', text: 'ask' },
+		{ type: 'thinking', text: 'ponder' },
+		{ type: 'text', text: 'reply' },
+		{ type: 'tool', id: 't', name: 'bash', input: { command: 'ls' } },
+		{ type: 'tool', id: 'u', name: 'mystery', input: {} },
+		{ type: 'turn-end', status: 'error', error: 'boom' },
+	]
+	let lines = frame.build(view(items, 'typed'), 60).lines
+	expect(rowWith(lines, 'ask')).toContain(fgOf(colors.user().fg!))
+	expect(rowWith(lines, 'ponder')).toContain(fgOf(colors.thinking().fg!))
+	expect(rowWith(lines, 'reply')).toContain(fgOf(colors.assistant().fg!))
+	expect(rowWith(lines, 'ls')).toContain(bgOf(colors.toolBash().bg!))
+	expect(rowWith(lines, 'mystery')).toContain(bgOf(colors.tool().bg!))
+	expect(rowWith(lines, 'boom')).toContain(fgOf(colors.error().fg!))
+	expect(rowWith(lines, 'typed')).toContain(bgOf(colors.input().bg!))
+})
+
+test('a card background fills the whole row and colour ends with the row', () => {
+	let f = frame.build(view([{ type: 'prompt', text: 'short\nlines' }], 'typed'), 30)
+	for (let text of ['short', 'lines', 'typed']) {
+		let row = rowWith(f.lines, text)
+		expect(strings.visLen(row)).toBe(30)
+		expect(row.startsWith('\x1b[')).toBe(true)
+		expect(row.endsWith('\x1b[39;49m')).toBe(true)
+	}
+	// The cursor still sits right after the typed text.
+	let row = f.lines[f.cursor.row]!
+	expect(f.cursor.col).toBe(strings.visLen(row.slice(0, row.indexOf('typed') + 5)))
+})
+
+test('the terminal follows a theme override at the next build', () => {
+	let saved = colors.fgL
+	try {
+		colors.fgL = 0.95
+		let row = rowWith(frame.build(view([{ type: 'text', text: 'reply' }]), 40).lines, 'reply')
+		expect(row).toContain(fgOf([0.95, colors.fgC, 55]))
+	} finally {
+		colors.fgL = saved
+	}
 })

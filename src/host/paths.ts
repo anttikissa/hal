@@ -37,6 +37,11 @@ function authFile(): string {
 	return `${paths.home()}/auth.ason`
 }
 
+// Common settings, user-edited like a dotfile (src/host/config.ts).
+function configFile(): string {
+	return `${paths.home()}/config.ason`
+}
+
 // Idempotent. chmod (unlike mkdir's mode) ignores umask and also tightens
 // a state/ created earlier with looser permissions.
 function init(): void {
@@ -54,4 +59,4 @@ function display(path: string): string {
 	return path
 }
 
-export const paths = { home, sessionsDir, sessionDir, stateDir, authFile, init, display }
+export const paths = { home, sessionsDir, sessionDir, stateDir, authFile, configFile, init, display }

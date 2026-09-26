@@ -164,11 +164,18 @@ function show(list: Item[], text = '', cursor = text.length, force = false) {
 
 // What the renderer believes the whole frame is.
 function frameText(): string[] {
-	return render.state.prev.map((l) => l.trimEnd())
+	// What the fake terminal shows: styling dropped.
+	return render.state.prev.map((l) => {
+		let out = ''
+		strings.walk(l, 0, (i, _w, len) => {
+			out += l.slice(i, i + len)
+		})
+		return out.trimEnd()
+	})
 }
 
 function cursorText(): string {
-	return term.line().slice(term.col).join('')
+	return term.line().slice(term.col).join('').trimEnd()
 }
 
 afterEach(() => render.reset())

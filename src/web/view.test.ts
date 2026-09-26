@@ -25,16 +25,16 @@ test('events fold into what the page shows, like the terminal transcript', () =>
 		{ type: 'turn-end', sessionId, status: 'completed' },
 	] as Event[])
 	expect(shown(st)).toEqual([
-		{ kind: 'prompt', text: 'old' },
-		{ kind: 'prompt', text: 'go' },
+		{ kind: 'user', text: 'old' },
+		{ kind: 'user', text: 'go' },
 		{ kind: 'thinking', text: 'hm' },
-		{ kind: 'text', text: 'hello' },
-		{ kind: 'tool', text: '▸ List files\n  $ ls -l' },
-		{ kind: 'result', text: '◂ a\n  b' },
-		{ kind: 'end', text: '[cancelled]' },
-		{ kind: 'prompt', text: 'again' },
+		{ kind: 'assistant', text: 'hello' },
+		{ kind: 'tool tool-bash', text: '▸ List files\n  $ ls -l' },
+		{ kind: 'result log', text: '◂ a\n  b' },
+		{ kind: 'end log', text: '[cancelled]' },
+		{ kind: 'user', text: 'again' },
 		{ kind: 'end error', text: 'error: boom' },
-		{ kind: 'prompt', text: 'ok' },
+		{ kind: 'user', text: 'ok' },
 	])
 })
 
@@ -54,6 +54,13 @@ test('a rejected command becomes a notice and keeps the transcript', () => {
 	expect(after.transcript).toBe(st.transcript)
 })
 
+test('a config warning becomes a notice and keeps the transcript', () => {
+	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [] } }])
+	let after = view.onEvent(st, { type: 'warning', text: 'config.ason: webPort: bad' })
+	expect(after.notice).toContain('webPort')
+	expect(after.transcript).toBe(st.transcript)
+})
+
 test('submit and cancel follow whether a turn is running', () => {
 	expect(view.submit({}, 'hi')).toEqual({ notice: 'no session yet', keep: true })
 	let idle = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [] } }])
@@ -64,4 +71,10 @@ test('submit and cancel follow whether a turn is running', () => {
 	expect(view.submit(busy, 'more').keep).toBe(true)
 	expect(view.submit(busy, 'more').command).toBeUndefined()
 	expect(view.cancel(busy)).toEqual({ type: 'cancel', sessionId })
+})
+
+test('a tool gets a class for its name that no name can break out of', () => {
+	let kind = view.show({ type: 'tool', id: 't', name: 'My Tool"><x', input: {} })!.kind
+	expect(kind.split(' ')[0]).toBe('tool')
+	expect(kind.split(' ')[1]).toMatch(/^tool-[a-z0-9-]+$/)
 })

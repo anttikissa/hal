@@ -1,6 +1,13 @@
 {
 	title: 'Colours as code',
 	description: 'src/common/colors.ts is the theme: one exported object whose top-level fields are either plain values (fgL: 0.85, fgC: 0.02, ...) or functions computing a style from them at call time (assistant: () => ({ fg: [colors.fgL, colors.fgC, 55] })). local.ts overrides a top-level field (colors.fgL = 0.9) and everything derived follows. No string references like $fgL and no colors.ason. The terminal turns styles into escape codes; the host generates CSS from the same object for the web page, which never sees the functions. A light/dark choice, if any, is a setting. Reference for the palette: the old colors.ason and colors.ts (artifacts); keep its look, not its format.',
-	status: 'planned',
-	needs: ['cc']
+	status: 'done',
+	needs: ['cc'],
+	notes: [
+		'Every function field of colors must take no arguments and return a style ({ part: [L, C, H] }): host/web.ts css() calls each one and makes class .kebab-key (toolBash -> .tool-bash), fg -> color, bg -> background-color, other parts -> custom properties (--link-bg). Put helpers elsewhere (frame.toolStyle).',
+		'Per-tool colours are fields tool + Capitalised name (toolBash); aliases are functions calling another (toolGrep: () => colors.toolRead()). Unknown tools fall back to colors.tool; web view emits "tool tool-<name>" so CSS does the same fallback.',
+		'CSS is substituted into the cached page on every request, so eval/local.ts overrides show on reload. src/web never imports colors.ts.',
+		'Out-of-gamut OKLCH keeps L and hue and loses chroma (binary search in common/oklch.ts), not per-channel clipping.',
+		'Rows with a bg are painted as full-width cards (frame.paint); every styled row ends with SGR 39;49, so tests strip SGR (strings.walk) before comparing text.'
+	]
 }

@@ -13,6 +13,9 @@
 
 import type { Server, ServerWebSocket } from 'bun'
 import { ason } from '../common/ason.ts'
+import { colors, type Style } from '../common/colors.ts'
+import { oklch } from '../common/oklch.ts'
+import { settings } from '../common/settings.ts'
 import { diag } from './diag.ts'
 import { host, type Connection } from './host.ts'
 import { sessions } from './sessions.ts'
@@ -36,6 +39,24 @@ async function build(): Promise<string> {
 	return (await Bun.file(`${dir}/index.html`).text()).replace('/*APP*/', () => js)
 }
 
+const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
+
+// The theme as CSS, computed now so overrides show on the next load:
+// one class per style (toolBash is .tool-bash) with fg as color, bg as
+// background and any other colour as a custom property (--link-bg).
+function css(): string {
+	let rules: string[] = []
+	for (let [key, value] of Object.entries(colors)) {
+		if (typeof value !== 'function') continue
+		let decls = Object.entries(value() as Style).map(([part, c]) => {
+			let prop = part === 'fg' ? 'color' : part === 'bg' ? 'background-color' : `--${kebab(part)}`
+			return `${prop}: ${oklch.toHex(c)}`
+		})
+		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
+	}
+	return rules.join('\n')
+}
+
 async function page(): Promise<Response> {
 	web.state.page ??= web.build()
 	let html: string
@@ -46,6 +67,7 @@ async function page(): Promise<Response> {
 		diag.log(`${e?.message ?? e}: ${e?.errors?.join('\n') ?? ''}`)
 		return new Response('the web client failed to build; see diag.log\n', { status: 500 })
 	}
+	html = html.replace('/*COLORS*/', () => web.css())
 	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 }
 
@@ -116,12 +138,13 @@ async function stop(): Promise<void> {
 
 export const web = {
 	state: { server: null as Server<{ conn?: Connection }> | null, page: null as Promise<string> | null },
-	// Config: overridable from local.ts.
-	port: (): number => 9002,
-	password: (): string => 'hello123',
+	// config.ason's webPort and webPassword; overridable from local.ts.
+	port: (): number => settings.webPort(),
+	password: (): string => settings.webPassword(),
 	// Working directory for a session the page creates.
 	cwd: (): string => process.cwd(),
 	authorized,
+	css,
 	build,
 	page,
 	login,
