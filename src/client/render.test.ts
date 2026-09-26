@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import { modals, type ModalState } from '../common/modals.ts'
 import { strings } from '../common/strings.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
 import { render } from './render.ts'
@@ -383,5 +384,52 @@ describe('request', () => {
 		// The trailing paint shows the latest view.
 		expect(term.content()).toContain(' t49')
 		render.frameMs = () => 16
+	})
+})
+
+describe('modals', () => {
+	const search = { text: 'Models', fields: [{ type: 'text' as const, name: 'q', label: 'Search' }] }
+	const names = Array.from({ length: 100 }, (_, i) => `model ${i}`)
+
+	function withModal(modal: ModalState | undefined) {
+		render.state.view = { transcript: transcript(items(30)), prompt: { text: '', cursor: 0 }, ...(modal ? { modal } : {}) }
+		render.draw()
+	}
+
+	test('open, typed into and closed in place: scrollback untouched, the old screen back', () => {
+		setup(20, 40)
+		withModal(undefined)
+		let before = term.content()
+		let scrollback = before.slice(0, term.top)
+		let written = term.written.length
+		let m = modals.open({ title: 'Models', form: search, items: names })
+		withModal(m)
+		expect(term.screen().some((r) => r.includes('╭─ Models'))).toBe(true)
+		for (let c of 'opus') {
+			m = modals.step(m, { key: c, text: c }).state
+			withModal(m)
+			expect(term.content().slice(0, term.top)).toEqual(scrollback)
+			// The cursor is where the frame says, in the search box.
+			expect(term.line().join('').slice(0, term.col)).toEndWith(`Search: ${'opus'.slice(0, 'opus'.indexOf(c) + 1)}`)
+		}
+		withModal(undefined)
+		expect(term.content()).toEqual(before)
+		expect(term.written.slice(written)).not.toContain('[3J')
+	})
+
+	test('the list scrolls only as far as the selection needs', () => {
+		setup(20, 40)
+		let m = modals.open({ title: 'Models', items: names })
+		let rowOf = (i: number) => term.screen().findIndex((r) => r.includes(`> model ${i}`))
+		withModal(m)
+		for (let i = 0; i < 40; i++) {
+			m = modals.step(m, { key: 'down' }).state
+			withModal(m)
+			m = render.state.view.modal!
+		}
+		let bottom = rowOf(40)
+		m = modals.step(m, { key: 'up' }).state
+		withModal(m)
+		expect(rowOf(39)).toBe(bottom - 1)
 	})
 })

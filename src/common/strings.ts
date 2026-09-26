@@ -255,4 +255,32 @@ function clipVisual(s: string, max: number): string {
 	return s.slice(0, cut) + '…'
 }
 
-export const strings = { charWidth, glyphAt, skipEscape, walk, visLen, expandTabs, containLinks, wordWrap, clipVisual }
+/**
+ * The visible columns [from, to) of s, opening with every escape seen
+ * before `from` so the styling active there carries over. A wide glyph
+ * cut by either edge becomes spaces. Tabs must already be expanded.
+ */
+function sliceVisual(s: string, from: number, to: number): string {
+	let prefix = ''
+	let out = ''
+	let col = 0
+	let i = 0
+	while (i < s.length && col < to) {
+		let j = strings.skipEscape(s, i)
+		if (j > i) {
+			if (col < from) prefix += s.slice(i, j)
+			else out += s.slice(i, j)
+			i = j
+			continue
+		}
+		let g = strings.glyphAt(s, i, col)
+		let end = col + g.width
+		if (col >= from && end <= to) out += s.slice(i, i + g.length)
+		else if (end > from) out += ' '.repeat(Math.min(end, to) - Math.max(col, from))
+		col = end
+		i += g.length
+	}
+	return out ? prefix + out : ''
+}
+
+export const strings = { charWidth, glyphAt, skipEscape, walk, visLen, expandTabs, containLinks, wordWrap, clipVisual, sliceVisual }

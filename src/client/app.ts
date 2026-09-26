@@ -9,6 +9,7 @@ import { amend, type Editing } from '../common/amend.ts'
 import { connection, type LinkState } from '../common/connection.ts'
 import { forms, type FormState } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
+import { modals, type ModalAction, type ModalState } from '../common/modals.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
@@ -22,7 +23,18 @@ import type { View } from './frame.ts'
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
 // `editing`: the last prompt is in the editor (src/common/amend.ts).
-type AppState = { transcript?: Transcript; resumed?: Resumed; prompt: PromptState; notice?: string; form?: FormState; editing?: Editing }
+// `modal`: client-only UI over everything, taking the keys first;
+// `onModal` makes the command its Enter sends.
+type AppState = {
+	transcript?: Transcript
+	resumed?: Resumed
+	prompt: PromptState
+	notice?: string
+	form?: FormState
+	editing?: Editing
+	modal?: ModalState
+	onModal?: (action: Extract<ModalAction, { type: 'submit' }>) => unknown
+}
 
 function createState(): AppState {
 	return { prompt: prompt.empty() }
@@ -36,6 +48,7 @@ function view(): View {
 	let pending = st.transcript ? drafts.pending(st.transcript.meta.id) : []
 	if (pending.length) v.pending = pending
 	if (st.form) v.form = st.form
+	if (st.modal) v.modal = st.modal
 	// A passing notice, else what the session is doing.
 	let notice = st.notice ?? (st.editing ? amend.hint() : st.transcript && states.describe(st.transcript.state))
 	if (notice) v.notice = notice
@@ -140,6 +153,16 @@ function editKey(k: KeyEvent): boolean {
 function onKeys(events: KeyEvent[]): void {
 	let st = app.state
 	for (let k of events) {
+		if (st.modal) {
+			let { state, action } = modals.step(st.modal, k)
+			st.modal = state
+			if (!action) continue
+			let submit = st.onModal
+			app.close()
+			let command = action.type === 'submit' ? submit?.(action) : undefined
+			if (command) app.send(command)
+			continue
+		}
 		if (st.form && st.transcript) {
 			let { state, action } = forms.step(st.form, k)
 			st.form = state
@@ -156,6 +179,20 @@ function onKeys(events: KeyEvent[]): void {
 		if (pause) app.send(pause)
 		if (action?.type === 'quit') return terminal.quit()
 	}
+	app.show()
+}
+
+// Opens `modal` over everything. Enter closes it and sends what
+// `submit` makes of it (nothing if undefined); Escape just closes it.
+function open(modal: ModalState, submit: NonNullable<AppState['onModal']>): void {
+	app.state.modal = modal
+	app.state.onModal = submit
+	app.show()
+}
+
+function close(): void {
+	delete app.state.modal
+	delete app.state.onModal
 	app.show()
 }
 
@@ -181,6 +218,8 @@ export const app = {
 	setPrompt,
 	editKey,
 	onKeys,
+	open,
+	close,
 	init,
 	reset,
 }

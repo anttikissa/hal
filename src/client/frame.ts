@@ -10,6 +10,7 @@
 import { colors, type Style } from '../common/colors.ts'
 import { forms, type FormState, type Quote } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
+import { modals, type ModalState } from '../common/modals.ts'
 import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 import { transcript, type Item, type Resumed, type Transcript } from '../common/transcript.ts'
@@ -26,12 +27,16 @@ export interface View {
 	notice?: string
 	/** The open question being answered here: keys and cursor go to it. */
 	form?: FormState
+	/** A modal drawn over everything: keys and cursor go to it. */
+	modal?: ModalState
 }
 
 export interface Frame {
 	lines: string[]
 	/** Where the terminal cursor belongs; row into lines, 0-based column. */
 	cursor: { row: number; col: number }
+	/** The first list row the modal shows, to keep as its scroll. */
+	modalScroll?: number
 }
 
 // One blank column on each side of every row.
@@ -43,6 +48,8 @@ const UNDIM = '\x1b[22m'
 const INVERSE = '\x1b[7m'
 const UNINVERSE = '\x1b[27m'
 const UNCOLOR = '\x1b[39;49m'
+const RESET = '\x1b[0m'
+const LINK_OFF = '\x1b]8;;\x07'
 
 // The escape that switches to a style's fg and bg (truecolor).
 function sgr(style: Style): string {
@@ -167,6 +174,15 @@ function quoteLines(quote: Quote | undefined, width: number): string[] {
  */
 function formLines(st: FormState, width: number): { rows: string[]; cursor: { row: number; col: number } } {
 	let rows = [...frame.wrap(`? ${st.form.text}`, width), ...frame.quoteLines(st.form.quote, width)]
+	let f = frame.fieldLines(st, width)
+	let hint = st.form.fields.length > 1 ? 'Enter: next · Tab: move · Escape: pause' : 'Enter: answer · Escape: pause'
+	let cursor = { row: rows.length + f.cursor.row, col: f.cursor.col }
+	return { rows: [...rows, ...f.rows, DIM + strings.clipVisual(`  ${hint}`, width) + UNDIM], cursor }
+}
+
+// Rows of a form's fields alone, and the cursor in them.
+function fieldLines(st: FormState, width: number): { rows: string[]; cursor: { row: number; col: number } } {
+	let rows: string[] = []
 	let cursor = { row: 0, col: 0 }
 	st.form.fields.forEach((field, i) => {
 		let head = `  ${field.label ? `${frame.clean(field.label)}: ` : ''}`
@@ -193,9 +209,83 @@ function formLines(st: FormState, width: number): { rows: string[]; cursor: { ro
 		if (focused) cursor = { row: rows.length + p.row, col: indent + p.col }
 		p.rows.forEach((r, j) => rows.push((j ? ' '.repeat(indent) : strings.clipVisual(head, indent)) + r))
 	})
-	let hint = st.form.fields.length > 1 ? 'Enter: next · Tab: move · Escape: pause' : 'Enter: answer · Escape: pause'
-	rows.push(DIM + strings.clipVisual(`  ${hint}`, width) + UNDIM)
 	return { rows, cursor }
+}
+
+/**
+ * Where a modal goes on a terminal of `rows` × `cols`: a fixed height
+ * (80% of the rows, at most 50) and width, centred across. Outside it
+ * on each side: at least one blank column and one of transcript.
+ */
+function modalBox(rows: number, cols: number): { height: number; width: number; left: number } {
+	let height = Math.min(rows, Math.max(3, Math.min(50, Math.floor(rows * 0.8))))
+	let width = cols < 10 ? cols : Math.min(100, cols - 2 * Math.max(2, Math.round(cols * 0.1)))
+	return { height, width, left: Math.floor((cols - width) / 2) }
+}
+
+// A border row: `fill` between the corners, with `text` after its first
+// two columns and `right` before its last two.
+function border(l: string, r: string, text: string, right: string, width: number): string {
+	let inner = width - 2
+	right = right && right.length + 2 <= inner - 2 ? ` ${right} ` : ''
+	text = strings.clipVisual(text ? ` ${frame.clean(text)} ` : '', Math.max(0, inner - 2 - strings.visLen(right)))
+	let fill = Math.max(0, inner - 2 - strings.visLen(text) - strings.visLen(right))
+	return l + (inner > 0 ? '─' : '') + text + '─'.repeat(fill) + right + (inner > 1 ? '─' : '') + r
+}
+
+/**
+ * All rows of a modal box `width` × `height`, outline included, and
+ * where the cursor goes in them: in the focused field, else on the
+ * selected item. The fields stay at the top; the list scrolls below
+ * them, from `scroll` as little as it must to show the selection.
+ */
+function modalLines(m: ModalState, width: number, height: number): { rows: string[]; cursor: { row: number; col: number }; scroll: number } {
+	let inner = Math.max(0, width - 4)
+	let fields = m.form ? frame.fieldLines(m.form, inner) : { rows: [], cursor: undefined }
+	let content = fields.rows.slice(0, height - 2)
+	let visible = Math.max(0, height - 2 - content.length)
+	let scroll = frame.modalScroll(m, visible)
+	let current = colors.popupCurrent()
+	let cursor = fields.cursor ?? { row: content.length, col: 0 }
+	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
+		let row = strings.clipVisual((i === m.selected ? '> ' : '  ') + frame.clean(m.items[i]!).replace(/\s+/g, ' '), inner)
+		if (i === m.selected) {
+			if (!fields.cursor) cursor = { row: content.length, col: 0 }
+			row = frame.sgr(current) + row + ' '.repeat(inner - strings.visLen(row)) + UNCOLOR
+		}
+		content.push(row)
+	}
+	let line = frame.sgr({ fg: colors.popup().neutralFg! })
+	let side = (s: string) => (width >= 2 ? line + s + UNCOLOR : '')
+	let pad = (s: string) => {
+		if (width < 4) return ' '.repeat(Math.max(0, width - 2))
+		let fit = strings.clipVisual(s, inner)
+		return ' ' + fit + RESET + ' '.repeat(inner - strings.visLen(fit)) + ' '
+	}
+	let below = m.items.length - scroll - visible
+	let place = scroll > 0 || below > 0 ? `${m.selected + 1}/${m.items.length}` : ''
+	let rows = [line + frame.border('╭', '╮', m.title, '', width) + UNCOLOR]
+	for (let r = 0; r < height - 2; r++) rows.push(side('│') + pad(content[r] ?? '') + side('│'))
+	rows.push(line + frame.border('╰', '╯', m.hint ?? '', place, width) + UNCOLOR)
+	// A box too small for its fields still keeps the cursor inside it.
+	let at = { row: Math.min(height - 1, 1 + cursor.row), col: Math.max(0, Math.min(width - 1, 2 + cursor.col)) }
+	return { rows: rows.slice(0, height), cursor: at, scroll }
+}
+
+// The first list row a modal shows with `visible` rows for its list.
+function modalScroll(m: ModalState, visible: number): number {
+	return modals.scroll(m.scroll, m.selected, m.items.length, visible)
+}
+
+// `line` with the box row `row` drawn over its columns from `left`, a
+// blank column kept on each side of the box.
+function overlay(line: string, row: string, left: number, width: number, cols: number): string {
+	let before = left > 0 ? strings.sliceVisual(line, 0, left - 1) : ''
+	if (before.includes('\x1b]8;')) before += LINK_OFF
+	let gap = left > 0 ? ' '.repeat(left - strings.visLen(before)) : ''
+	let right = left + width + 1
+	let after = right < cols ? strings.sliceVisual(line, right, cols) : ''
+	return before + RESET + gap + row + RESET + (left + width < cols ? ' ' : '') + after
 }
 
 /**
@@ -238,7 +328,8 @@ function layoutPrompt(text: string, cursor: number, width: number): { rows: stri
 	return { rows, ...at }
 }
 
-function build(view: View, cols: number): Frame {
+// The frame for `view` on a terminal of `rows` × `cols`.
+function build(view: View, cols: number, rows = 24): Frame {
 	let width = Math.max(1, cols - 2 * PAD.length)
 	let lines: string[] = []
 	let block = (rows: string[], style: Style | undefined) => {
@@ -273,7 +364,23 @@ function build(view: View, cols: number): Frame {
 	let top = lines.length
 	let input = colors.input()
 	p.rows.forEach((r, i) => lines.push(frame.paint((i ? PROMPT_REST : PROMPT_FIRST) + r, input, cols)))
-	return { lines, cursor: formCursor ?? { row: top + p.row, col: PAD.length + PROMPT_FIRST.length + p.col } }
+	let cursor = formCursor ?? { row: top + p.row, col: PAD.length + PROMPT_FIRST.length + p.col }
+	if (!view.modal) return { lines, cursor }
+	let m = frame.withModal(lines, view.modal, rows, cols)
+	return { lines, cursor: m.cursor, modalScroll: m.scroll }
+}
+
+// Draws modal `m` over `lines`, centred on the screen (the last `rows`
+// of them), so that it never reaches into scrollback. A short frame
+// grows to hold it. Returns the cursor and the list's scroll.
+function withModal(lines: string[], m: ModalState, rows: number, cols: number): { cursor: Frame['cursor']; scroll: number } {
+	let box = frame.modalBox(rows, cols)
+	while (lines.length < box.height) lines.push('')
+	let screen = Math.min(lines.length, rows)
+	let top = lines.length - screen + Math.floor((screen - box.height) / 2)
+	let drawn = frame.modalLines(m, box.width, box.height)
+	drawn.rows.forEach((r, i) => (lines[top + i] = frame.overlay(lines[top + i]!, r, box.left, box.width, cols)))
+	return { cursor: { row: top + drawn.cursor.row, col: box.left + drawn.cursor.col }, scroll: drawn.scroll }
 }
 
 export const frame = {
@@ -288,6 +395,13 @@ export const frame = {
 	itemLines,
 	quoteLines,
 	formLines,
+	fieldLines,
 	layoutPrompt,
+	modalBox,
+	border,
+	modalLines,
+	modalScroll,
+	overlay,
 	build,
+	withModal,
 }

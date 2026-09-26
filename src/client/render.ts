@@ -152,7 +152,9 @@ function draw(force = false): void {
 	if (!st.out || (st.parked && !force)) return
 	st.parked = false
 	let { rows, cols } = st.out.size()
-	let next = frame.build(st.view, cols)
+	let next = frame.build(st.view, cols, rows)
+	// The modal's list moves only as far as it must from where it was.
+	if (st.view.modal && next.modalScroll !== undefined) st.view.modal.scroll = next.modalScroll
 	st.out.write(render.paint(next, rows, force))
 }
 

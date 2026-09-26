@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { drafts } from '../common/drafts.ts'
+import { modals } from '../common/modals.ts'
 import type { Event, Snapshot } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
 import { app } from './app.ts'
@@ -315,6 +316,33 @@ test('an open question takes the keys until it is answered; the prompt keeps its
 test('Escape on an open question pauses the session', () => {
 	app.onEvent(snapshot('s1', { type: 'blocked', reason: 'question' }))
 	app.onEvent({ type: 'question', sessionId: 's1', id: 'q1', form: { text: 'Go?', fields: [{ type: 'choice', name: 'go', options: ['continue'] }] } })
+	escape()
+	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
+})
+
+test('a modal takes the keys over everything and ends in an ordinary command', () => {
+	app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
+	type('draft')
+	let search = { text: 'Models', fields: [{ type: 'text' as const, name: 'q', label: 'Search' }] }
+	app.open(modals.open({ title: 'Models', form: search, items: ['a', 'b'] }), (action) => ({ type: 'model', sessionId: 's1', item: action.item, q: action.answers.q }))
+	expect(app.view().modal?.title).toBe('Models')
+	type('op')
+	app.onKeys([key('down')])
+	enter()
+	expect(sent).toEqual([{ type: 'model', sessionId: 's1', item: 1, q: 'op' }])
+	expect(app.state.prompt.text).toBe('draft')
+	expect(app.view().modal).toBeUndefined()
+	// Keys are the prompt's again.
+	type('!')
+	expect(app.state.prompt.text).toBe('draft!')
+})
+
+test('Escape closes a modal and nothing else: the running turn goes on', () => {
+	app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
+	app.open(modals.open({ title: 'Models', items: ['a'] }), () => ({ type: 'never' }))
+	escape()
+	expect(sent).toEqual([])
+	expect(app.view().modal).toBeUndefined()
 	escape()
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 })

@@ -169,6 +169,21 @@ Padding = `min(peak, rows - chrome) - activeTab.historyPhysicalHeight`. Physical
 height is derived from the current frame and terminal width; it is never stored
 on history blocks or URL lines. This keeps the prompt stable across tabs.
 
+### Modals
+
+A modal (model picker, /login, /config, find) is composited into the
+frame by `frame.withModal()`; it never replaces whole rows and needs no
+renderer state of its own. Each covered row keeps its transcript to the
+left and right of the box, then one blank column and the outline. The
+right-hand transcript is cut with `strings.sliceVisual()`, which replays
+the escapes active at the cut, so card backgrounds carry on.
+
+The box height is fixed while it is open: 80% of the rows, at most 50,
+whatever it holds or whatever is typed in it; its list scrolls instead.
+It is centred on the writable screen (the frame's last `rows` rows), so
+opening, typing into and closing a modal are ordinary in-place diffs and
+never reach scrollback. A frame shorter than the box grows to hold it.
+
 ### Tab switching
 
 The first actual tab focus transition permanently enters full mode before its

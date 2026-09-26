@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { strings } from './strings.ts'
 
-let { charWidth, clipVisual, expandTabs, visLen, wordWrap } = strings
+let { charWidth, clipVisual, expandTabs, sliceVisual, visLen, wordWrap } = strings
 
 test('plain symbol glyphs match Ghostty single-cell width', () => {
 	for (let glyph of ['▪', '▫', '▶', '◀', '✓', '×', '✗', '✔', '✔️', '✖️', '☀', '❤', '⚠', '➡', '⬅', '⬆', '⬇', '←', '→', '↑', '↓', '…']) {
@@ -78,4 +78,22 @@ test('word wrap contains OSC 8 hyperlinks within each visual line', () => {
 	let open = `\x1b]8;;${url}\x07`
 	let close = '\x1b]8;;\x07'
 	expect(wordWrap(`${open}abcdefghij${close}`, 5)).toEqual([`${open}abcde${close}`, `${open}fghij${close}`])
+})
+
+test('a visual slice keeps the columns asked for and the styling active there', () => {
+	let red = '\x1b[31m'
+	let bg = '\x1b[44m'
+	let s = `ab${red}cd${bg}ef\x1b[0mgh`
+	expect(sliceVisual(s, 0, 3)).toBe(`ab${red}c`)
+	// A slice starting mid-style opens with the styles active there.
+	expect(sliceVisual(s, 3, 5)).toBe(`${red}d${bg}e`)
+	expect(visLen(sliceVisual(s, 5, 99))).toBe(3)
+	expect(sliceVisual('abc', 5, 9)).toBe('')
+	// A wide glyph cut by an edge becomes a space on the side kept.
+	expect(sliceVisual('a漢b', 0, 2)).toBe('a ')
+	expect(sliceVisual('a漢b', 2, 4)).toBe(' b')
+	for (let [from, to] of [[0, 1], [1, 3], [2, 5], [0, 9]] as const) {
+		let cut = sliceVisual('漢字e\u0301👨‍👩‍👧x', from, to)
+		expect(visLen(cut)).toBe(Math.min(to, 8) - from)
+	}
 })
