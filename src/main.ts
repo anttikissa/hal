@@ -14,12 +14,10 @@ import { paths } from './host/paths.ts'
 import { server } from './host/server.ts'
 import { sessions } from './host/sessions.ts'
 
-const repoRoot = join(import.meta.dir, '..')
-
-// local.ts lives in the home (the repo root; HAL_HOME only in tests, so
-// tests never pick up the user's real overrides).
+// local.ts lives in the home, so tests (temp home) never pick up the
+// user's real overrides.
 function localPath(): string {
-	return join(process.env.HAL_HOME || repoRoot, 'local.ts')
+	return join(paths.home(), 'local.ts')
 }
 
 // Imports the optional, gitignored local.ts, which replaces functions on
