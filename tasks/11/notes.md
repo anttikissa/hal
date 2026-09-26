@@ -1,0 +1,15 @@
+# Notes from implementing 11
+
+- The artifacts read `k.char`; the lifted decoder (xk) calls it
+  `k.text`, and a paste is its own `key: 'paste'` event. Don't copy the
+  artifact's key checks verbatim.
+- The cursor is a UTF-16 offset kept on a grapheme boundary, not a
+  grapheme index. Renderers still need their own display-width math.
+- An insert can merge with its neighbour into one cluster (a regional
+  indicator typed before another forms a flag), so after inserting,
+  snap the cursor forward to the next boundary.
+- A bare LF decodes as Shift+Enter, so Shift+Enter inserts '\n' rather
+  than submitting. That keeps pasted-but-unbracketed newlines and
+  terminal shift+enter mappings from sending the prompt.
+- Submit resets the prompt to empty. Escape returns `cancel` and keeps
+  the text, so the caller decides what cancel means.
