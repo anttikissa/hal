@@ -65,3 +65,27 @@ graph (b … sj), for whoever plans next.
 - The no-dependency result came from the lazy ladder and from lifting
   old dependency-free code, not from an explicit rule; AGENTS.md now
   states it.
+
+# Implementer's lessons (sj)
+
+- Turn boundary is a decision later work depends on: one turn = all
+  provider rounds from prompt to final answer, one `turn_end` with
+  usage summed over rounds. `history.record` writes only blocks now;
+  whoever drives rounds must call `history.end` (and `history.results`
+  between rounds). `history.state.running` spans the whole turn, so
+  `open` and `interrupt()` treat a turn between rounds as running.
+- Clients learn a round ended from the `tool-results` event: the fold
+  settles the live round there and starts an empty one. Any new
+  mid-turn event must keep "streamed view == late-joiner snapshot".
+- A missing result after `interrupted` is worded "may or may not have
+  run": with the call recorded before running and the result after,
+  the host can die in between. Read-only tools make that harmless;
+  a first mutating tool (bash, write) needs to face it explicitly.
+- Tools run whenever a round ends `done` with tool calls, whatever the
+  stop reason; there is no round limit (only Escape stops a loop).
+- Cancel landing between rounds: results already computed are still
+  recorded, then the turn ends cancelled (not completed).
+- Gotcha: rewriting a whole function via scripted string replace on a
+  shared file silently dropped a parallel agent's just-committed code
+  (ah's `interrupt()`). Re-read shared files right before editing and
+  diff against HEAD before committing.
