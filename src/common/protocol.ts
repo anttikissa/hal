@@ -12,6 +12,7 @@
 // command resent after a reconnect never acts twice.
 
 import type { AssistantBlock, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
+import type { InboxItem } from './inbox.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
@@ -28,8 +29,10 @@ export type { TurnStatus } from './replay.ts'
 // followed by the turn end match what a later snapshot shows.
 export type LiveTurn = { provider: string; blocks: AssistantBlock[]; usage: Usage }
 
-// `state` is the session's one state (src/common/states.ts).
-export type Snapshot = { meta: SessionMeta; history: HistoryRecord[]; state: SessionState; turn?: LiveTurn }
+// `state` is the session's one state (src/common/states.ts); `inbox` the
+// messages waiting for it (src/common/inbox.ts), also in `history`;
+// the host always sends it, an older one may not.
+export type Snapshot = { meta: SessionMeta; history: HistoryRecord[]; state: SessionState; inbox?: InboxItem[]; turn?: LiveTurn }
 
 // Stream events forwarded live; terminal done/error become `turn-end`.
 export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'error' }>
@@ -45,7 +48,9 @@ export type Command = (
 	| { type: 'open'; sessionId: string }
 	// Stop following it. The session and any running turn carry on.
 	| { type: 'close'; sessionId: string }
-	| { type: 'submit'; sessionId: string; text: string }
+	// A prompt. While a turn is busy it waits in the inbox: steering, sent
+	// before the turn's next request; with `queue`, run after it ends.
+	| { type: 'submit'; sessionId: string; text: string; queue?: boolean }
 	// Escape: pause the running turn; it can continue later.
 	| { type: 'pause'; sessionId: string }
 	// Bare Enter: continue a paused turn, or retry a failed one.
@@ -63,6 +68,11 @@ export type Event =
 	| { type: 'turn-start'; sessionId: string; prompt?: string; provider: string }
 	// The session's state changed.
 	| { type: 'state'; sessionId: string; state: SessionState }
+	// The inbox changed: every message now waiting.
+	| { type: 'inbox'; sessionId: string; inbox: InboxItem[] }
+	// Inbox messages (and maybe a new prompt) are in history as one
+	// prompt, after the running turn's output so far.
+	| { type: 'prompt'; sessionId: string; texts: string[] }
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent }
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
@@ -91,6 +101,7 @@ function invalid(value: unknown): string | undefined {
 	if (problem) return problem
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
+	if (c.type === 'submit' && c.queue !== undefined && typeof c.queue !== 'boolean') return 'submit: queue must be a boolean'
 	return str('sessionId') ?? (c.type === 'submit' ? str('text') : undefined)
 }
 

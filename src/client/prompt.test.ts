@@ -11,7 +11,7 @@ function run(input: string, start: PromptState = prompt.empty()): { shown: strin
 	for (let k of events) {
 		let r = prompt.apply(st, k)
 		st = r.state
-		if (r.action) actions.push(r.action.type === 'submit' ? `submit:${r.action.text}` : r.action.type)
+		if (r.action) actions.push(r.action.type === 'submit' ? `${r.action.queue ? 'queue' : 'submit'}:${r.action.text}` : r.action.type)
 	}
 	return { shown: show(st), actions }
 }
@@ -98,6 +98,12 @@ describe('actions', () => {
 		let r = prompt.apply(at('hi there', 2), key('enter'))
 		expect(r.action).toEqual({ type: 'submit', text: 'hi there' })
 		expect(show(r.state)).toBe('|')
+	})
+	test('Alt-Enter submits to the queue', () => {
+		let r = prompt.apply(at('later', 5), { ...key('enter'), alt: true })
+		expect(r.action).toEqual({ type: 'submit', text: 'later', queue: true })
+		expect(show(r.state)).toBe('|')
+		expect(run('later\x1b\r').actions).toEqual(['queue:later'])
 	})
 	test('Escape cancels and keeps the text', () => {
 		let r = prompt.apply(at('abc', 1), key('escape'))

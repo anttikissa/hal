@@ -13,7 +13,8 @@ export interface PromptState {
 	cursor: number
 }
 
-export type PromptAction = { type: 'submit'; text: string } | { type: 'cancel' } | { type: 'quit' }
+// `queue`: Alt-Enter, run after the turn instead of steering it.
+export type PromptAction = { type: 'submit'; text: string; queue?: true } | { type: 'cancel' } | { type: 'quit' }
 
 export interface PromptResult {
 	state: PromptState
@@ -60,6 +61,7 @@ function apply(st: PromptState, k: KeyEvent): PromptResult {
 	let plain = !k.ctrl && !k.alt && !k.cmd
 	switch (k.key) {
 		case 'enter':
+			if (k.alt && !k.ctrl && !k.cmd && !k.shift) return { state: prompt.empty(), action: { type: 'submit', text: st.text, queue: true } }
 			if (!plain) break
 			if (k.shift) return { state: prompt.insert(st, '\n') }
 			return { state: prompt.empty(), action: { type: 'submit', text: st.text } }

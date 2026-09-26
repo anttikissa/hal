@@ -141,3 +141,13 @@ test('a paused cut-off answer continues with the note; a failed request retries 
 	let failed = replay.toMessages([say('go'), end('error'), cont])
 	expect(failed).toEqual(replay.toMessages([say('go')]))
 })
+
+test('waiting inbox messages are not sent; once delivered they are one prompt, oldest first', () => {
+	let waiting: HistoryRecord[] = [say('go'), block({ type: 'text', text: 'working' }), { type: 'inbox', id: 'a', text: 'one', ts }, { type: 'inbox', id: 'b', text: 'two', queue: true, ts }]
+	let before = replay.toMessages(waiting)
+	expect(prompts(before)).toHaveLength(1)
+	let after = replay.toMessages([...waiting, { type: 'user', blocks: [{ type: 'text', text: 'one' }, { type: 'text', text: 'three' }], inbox: ['a'], ts }])
+	expect(after.slice(0, before.length)).toEqual(before)
+	// One text block: providers join blocks with no separator.
+	expect(after.at(-1)!.blocks).toEqual([{ type: 'text', text: `[${hhmm(ts)}]\none\n\nthree` }])
+})

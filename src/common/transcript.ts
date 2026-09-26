@@ -6,6 +6,7 @@
 // provider needs (thinking signatures, their provider).
 
 import { blocks, type AssistantBlock, type ToolResultBlock, type Usage } from './blocks.ts'
+import type { InboxItem } from './inbox.ts'
 import type { Event, LiveTurn, Snapshot, TurnStatus } from './protocol.ts'
 import { replay, type HistoryRecord } from './replay.ts'
 import type { SessionMeta } from './session.ts'
@@ -23,6 +24,8 @@ export type Transcript = {
 	meta: SessionMeta
 	// The session's state, as the host last said (src/common/states.ts).
 	state: SessionState
+	// Messages waiting for the turn (src/common/inbox.ts); always shown.
+	inbox: InboxItem[]
 	// Everything to show, in order, including the running turn's output.
 	items: Item[]
 	// The running turn: items from `start` on are its output so far, and
@@ -50,7 +53,7 @@ function resultItem(b: ToolResultBlock): Item {
 // Display items for one history record.
 function recordItems(r: HistoryRecord): Item[] {
 	if (r.type === 'assistant') return transcript.blockItems([r.block])
-	if (r.type === 'continue') return []
+	if (r.type === 'continue' || r.type === 'inbox') return []
 	if (r.type === 'user') return r.blocks.map((b): Item => (b.type === 'text' ? { type: 'prompt', text: b.text } : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
@@ -65,7 +68,7 @@ function endItem(end: { status: TurnStatus; usage?: Usage; error?: string }): It
 
 function fromSnapshot(snapshot: Snapshot): Transcript {
 	let items = snapshot.history.flatMap((r) => transcript.recordItems(r))
-	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, items }
+	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
 	if (snapshot.turn) {
 		let turn = transcript.copyTurn(snapshot.turn)
 		t.live = { start: items.length, turn }
@@ -89,13 +92,23 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'snapshot') return t && t.meta.id !== event.sessionId ? t : transcript.fromSnapshot(event.snapshot)
 	if (!t || event.type === 'rejected' || event.type === 'warning' || event.type === 'ack' || event.sessionId !== t.meta.id) return t
 	if (event.type === 'state') return { ...t, state: event.state }
+	if (event.type === 'inbox') return { ...t, inbox: event.inbox }
 	if (event.type === 'turn-start') {
 		let items: Item[] = event.prompt === undefined ? t.items : [...t.items, { type: 'prompt', text: event.prompt }]
 		return { ...t, items, live: { start: items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
 	}
 	// A turn left unfinished by another host ends without running here.
-	if (!t.live) return event.type === 'turn-end' ? { ...t, items: [...t.items, transcript.endItem(event)] } : t
+	if (!t.live) {
+		if (event.type === 'turn-end') return { ...t, items: [...t.items, transcript.endItem(event)] }
+		if (event.type === 'prompt') return { ...t, items: [...t.items, ...event.texts.map((text): Item => ({ type: 'prompt', text }))] }
+		return t
+	}
 	let settled = t.items.slice(0, t.live.start)
+	if (event.type === 'prompt') {
+		// The round's blocks are in history before the prompt.
+		let items = [...settled, ...transcript.blockItems(t.live.turn.blocks), ...event.texts.map((text): Item => ({ type: 'prompt', text }))]
+		return { ...t, items, live: { start: items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
+	}
 	if (event.type === 'stream') {
 		let turn = transcript.copyTurn(t.live.turn)
 		blocks.apply(turn, event.event)
@@ -107,7 +120,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		return { ...t, items, live: { start: items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
 	}
 	let end = transcript.endItem(event)
-	return { meta: t.meta, state: t.state, items: [...settled, ...transcript.blockItems(t.live.turn.blocks), end] }
+	return { meta: t.meta, state: t.state, inbox: t.inbox, items: [...settled, ...transcript.blockItems(t.live.turn.blocks), end] }
 }
 
 // Where the history a client got in a snapshot ends (an index into

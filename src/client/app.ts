@@ -52,16 +52,17 @@ function onState(state: LinkState): void {
 	app.show()
 }
 
-// Enter: a prompt, or a continue on an empty prompt. Refuses (keeping
-// the typed text) what the host would refuse anyway.
-function submit(text: string): boolean {
+// Enter: a prompt (steering a busy turn; `queue`: after it), or a
+// continue on an empty prompt. Refuses (keeping the typed text) what the
+// host would refuse anyway.
+function submit(text: string, queue = false): boolean {
 	let st = app.state
 	if (!st.transcript) {
 		if (!text.trim()) return true
 		st.notice = 'no session yet'
 		return false
 	}
-	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text)
+	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, queue)
 	if (refused) {
 		st.notice = refused
 		return false
@@ -77,7 +78,7 @@ function onKeys(events: KeyEvent[]): void {
 	let st = app.state
 	for (let k of events) {
 		let { state, action } = prompt.apply(st.prompt, k)
-		if (action?.type === 'submit' && !app.submit(action.text)) continue
+		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
 		st.prompt = state
 		let pause = action?.type === 'cancel' && st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 		if (pause) app.send(pause)

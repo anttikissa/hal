@@ -1,7 +1,16 @@
 {
 	title: 'Steering and a visible inbox',
 	description: 'Sending while a turn runs no longer gets rejected. It goes into the session inbox (durable, in history) and the model gets every waiting message together, as one user message after the current round, before the next provider request: steering. Alt-Enter queues instead: the message runs after the turn ends. The inbox is part of the snapshot and every client shows it all the time; queued messages always either run or stay visibly waiting with a reason (paused, blocked), never hidden behind a command. Escape pauses; queued messages run when the user continues. See tasks/j1/states.md (Talking while it works). Check that repeated steering keeps the prompt cache warm (cacheRead in usage).',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Durable form: an `inbox` record { id, text, queue? } per message sent while busy (id = the client's command id, else a random UUID, so host.submitted recognises a resend to a new host), and a `user` prompt record with `inbox: [ids]` delivers them; its text blocks are the messages, then any new prompt. inbox.pending(records) (src/common/inbox.ts) is the inbox. replay skips inbox records and joins a prompt's texts with blank lines into one block after the [HH:MM] line.",
+		'states.step keeps a busy state on submit: steering is not a state. host.submit: busy, or `queue` on a paused or failed session, appends to the inbox; `queue` on idle just submits; a submit that starts a turn delivers waiting steering messages first (oldest first, one prompt: a `prompt` event, then a turn-start without prompt).',
+		'host.runTurn calls host.steer before every request (first round, after tool results, retries), and a round that finished without tool calls loops once more if steering waits. After a completed turn host.next runs the oldest queued message as a turn of its own (one at a time). Paused and error ends leave the inbox waiting; continue delivers the steering, completion then runs the queue.',
+		"Protocol: submit.queue (boolean), Snapshot.inbox (optional so an older host still works), events `inbox` (the whole list) and `prompt` (texts now in history; transcript.fold settles the live round's blocks before them, like tool-results). Transcript.inbox is always an array.",
+		'Clients: states.enter(id, state, text, queue) never refuses text now. Terminal: Alt-Enter (ESC CR or CSI-u alt) is a submit action with queue; frame.build draws each waiting message above the notice as `inbox.label(state, item): text`. Web: e.altKey on Enter queues; view.inbox() fills a #inbox div in the footer.',
+		"Prompt cache: host tests assert each steered request's messages start with the previous request's messages (anthropic caches the whole prefix at the last block), which is what keeps cacheRead up. Not checked live against the API: copying credentials into a test home rotates the refresh token (see tf notes).",
+		'Known edge: a host that dies exactly between a completed turn end and the queued prompt record leaves an idle session with queued messages; recover() only continues unfinished turns, so they show as `waiting` until the next turn the user starts completes.'
+	],
 	needs: ['j1'],
 	foldInto: ['6', 'ne']
 }

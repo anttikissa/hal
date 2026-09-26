@@ -10,8 +10,13 @@ import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserB
 export type TurnStatus = 'completed' | 'paused' | 'error' | 'cancelled' | 'interrupted'
 
 export type HistoryRecord =
-	// A submitted prompt, or tool results.
-	| { type: 'user'; blocks: UserBlock[]; command?: string; ts: string }
+	// A submitted prompt, or tool results. `inbox`: the ids of the inbox
+	// messages it delivers, which are its first text blocks.
+	| { type: 'user'; blocks: UserBlock[]; command?: string; inbox?: string[]; ts: string }
+	// A message sent while the session was busy, waiting in the inbox
+	// (src/common/inbox.ts) until a prompt record delivers it. Not
+	// provider input by itself. `id`: the client's command id, if any.
+	| { type: 'inbox'; id: string; text: string; queue?: true; ts: string }
 	// One assistant block, appended as soon as it is complete.
 	| { type: 'assistant'; block: AssistantBlock; ts: string }
 	// Ends one model turn, or pauses it (then `pauseReason` if Hal, not
@@ -41,6 +46,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	}
 	let prev: HistoryRecord | undefined
 	for (let r of records) {
+		if (r.type === 'inbox') continue
 		let before = prev
 		prev = r
 		if (r.type === 'turn_end') {
@@ -71,8 +77,9 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			if (!texts.length) continue
 			let head = [`[${replay.clock(r.ts)}]`, ...(note ? [note] : [])].join('\n')
 			note = undefined
-			// Never merged: a prompt always starts a message of its own.
-			out.push({ role: 'user', blocks: texts.map((b, i) => (i ? b : { type: 'text', text: `${head}\n${b.text}` })) })
+			// Never merged: a prompt always starts a message of its own. Its
+			// texts (several when it delivers the inbox) are one block.
+			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => b.text).join('\n\n')}` }] })
 		}
 	}
 	return out

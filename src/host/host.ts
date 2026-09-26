@@ -15,8 +15,14 @@
 // states.step as commands and the turn go on, and broadcast when it
 // changes. Only the user pauses a turn. A turn with no end record is
 // unfinished; whichever process becomes host continues it (recover).
+//
+// Sending while a turn is busy puts the message in the session inbox
+// (src/common/inbox.ts), durable in history: steering messages go to
+// the model together before the turn's next request, queued ones run as
+// turns of their own once it has completed.
 
 import { ason } from '../common/ason.ts'
+import { inbox, type InboxItem } from '../common/inbox.ts'
 import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock } from '../common/blocks.ts'
 import { protocol, type Command, type Event, type Snapshot } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
@@ -141,7 +147,8 @@ function handle(client: Client, command: unknown): void {
 // A repeat of a submit the previous host recorded, found in history.
 function submitted(c: Command): Outcome | undefined {
 	if (c.type !== 'submit' || !sessions.state.open.has(c.sessionId)) return undefined
-	return history.readSync(c.sessionId).some((r) => r.type === 'user' && r.command === c.id) ? {} : undefined
+	let seen = (r: HistoryRecord) => (r.type === 'user' && r.command === c.id) || (r.type === 'inbox' && r.id === c.id)
+	return history.readSync(c.sessionId).some(seen) ? {} : undefined
 }
 
 // Acknowledges or rejects a command. A repeated create follows its
@@ -182,7 +189,7 @@ function act(client: Client, c: Command): Outcome | undefined {
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	let refused: string | undefined
 	if (c.type === 'close') client.open.delete(c.sessionId)
-	else if (c.type === 'submit') refused = host.submit(c.sessionId, c.text, c.id)
+	else if (c.type === 'submit') refused = host.submit(c.sessionId, c.text, c.id, c.queue)
 	else if (c.type === 'continue') refused = host.resume(c.sessionId)
 	else if (c.type === 'pause') refused = host.stop(c.sessionId)
 	return refused === undefined ? {} : { refused }
@@ -209,7 +216,7 @@ function follow(client: Client, id: string): void {
 
 function snapshot(id: string): Snapshot {
 	let records = history.readSync(id)
-	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: records, state: host.stateOf(id, records) }
+	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: records, state: host.stateOf(id, records), inbox: host.inboxOf(id, records) }
 	let running = host.state.running.get(id)
 	if (running) {
 		let live = history.live(id)
@@ -239,14 +246,62 @@ function transition(id: string, event: StateEvent): string | undefined {
 	return undefined
 }
 
+// The messages waiting in the session's inbox.
+function inboxOf(id: string, records?: HistoryRecord[]): InboxItem[] {
+	return inbox.pending(records ?? history.readSync(id))
+}
+
 // Returns why the submit is refused, if it is. `command` is the
-// client's id for it, kept with the prompt so a later host can tell a
-// resend.
-function submit(id: string, text: string, command?: string): string | undefined {
+// client's id for it, kept with the prompt (or inbox message) so a
+// later host can tell a resend. While the session is busy the message
+// waits in the inbox; `queue` also makes it wait for a paused or failed
+// turn to finish. Otherwise it starts a turn, delivering any steering
+// messages still waiting (a paused turn's) first.
+function submit(id: string, text: string, command?: string, queue = false): string | undefined {
+	let state = host.stateOf(id)
+	if (states.busy(state) || (queue && state.type !== 'idle')) {
+		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
+		if (queue) record.queue = true
+		history.append(id, record)
+		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: host.inboxOf(id) })
+		return
+	}
 	let refused = host.transition(id, { type: 'submit' })
 	if (refused) return refused
-	history.submit(id, text, command)
-	host.start(id, text)
+	let steering = host.inboxOf(id).filter((m) => !m.queue)
+	if (!steering.length) {
+		history.submit(id, text, command)
+		return void host.start(id, text)
+	}
+	host.deliver(id, steering, text, command)
+	host.start(id)
+}
+
+// Records inbox messages (and a new prompt `text`) as one prompt and
+// tells followers: a `prompt` event, or with `quiet` nothing, as the
+// caller's turn-start carries it.
+function deliver(id: string, items: InboxItem[], text?: string, command?: string, quiet = false): void {
+	let texts = items.map((m) => m.text)
+	if (text !== undefined) texts.push(text)
+	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks: texts.map((t) => ({ type: 'text', text: t })), inbox: items.map((m) => m.id) }
+	if (command !== undefined) record.command = command
+	history.append(id, record)
+	host.broadcast(id, { type: 'inbox', sessionId: id, inbox: host.inboxOf(id) })
+	if (!quiet) host.broadcast(id, { type: 'prompt', sessionId: id, texts })
+}
+
+// Before a request: delivers the steering messages waiting, if any.
+function steer(id: string): void {
+	let steering = host.inboxOf(id).filter((m) => !m.queue)
+	if (steering.length) host.deliver(id, steering)
+}
+
+// After a completed turn: runs the oldest queued message, if any.
+function next(id: string): void {
+	let queued = host.inboxOf(id).find((m) => m.queue)
+	if (!queued || host.transition(id, { type: 'submit' })) return
+	host.deliver(id, [queued], undefined, undefined, true)
+	host.start(id, queued.text)
 }
 
 // Continue: a paused turn goes on, a failed one retries.
@@ -338,6 +393,7 @@ async function runTurn(id: string, model: string, running: Running): Promise<voi
 		while (true) {
 			let round = blocks.newTurn(running.provider)
 			last = undefined
+			host.steer(id)
 			host.transition(id, { type: 'request' })
 			for await (let event of history.record(id, running.provider, stream())) {
 				blocks.apply(round, event)
@@ -360,7 +416,12 @@ async function runTurn(id: string, model: string, running: Running): Promise<voi
 			}
 			if (last?.type === 'done') failures = 0
 			let calls = round.blocks.filter((b) => b.type === 'tool_call')
-			if (last?.type !== 'done' || !calls.length) break
+			if (last?.type !== 'done') break
+			// A finished answer with steering waiting: the model hears it.
+			if (!calls.length) {
+				if (signal.aborted || !host.inboxOf(id).some((m) => !m.queue)) break
+				continue
+			}
 			// The turn wanted to go on: a pause now stops it as paused.
 			let cancelled = () => signal.aborted && ((last = undefined), true)
 			if (cancelled()) break
@@ -396,6 +457,7 @@ async function runTurn(id: string, model: string, running: Running): Promise<voi
 	// Paused already, unless something other than the user aborted it.
 	if (end.status === 'paused') host.transition(id, { type: 'pause' })
 	else host.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
+	if (end.status === 'completed') host.next(id)
 }
 
 // Waits out a failed round (tasks/j1/states.md, Failures) and shows
@@ -487,7 +549,11 @@ export const host = {
 	broadcast,
 	stateOf,
 	transition,
+	inboxOf,
 	submit,
+	deliver,
+	steer,
+	next,
 	resume,
 	start,
 	stop,

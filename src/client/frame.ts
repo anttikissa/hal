@@ -8,6 +8,7 @@
 // it shows.
 
 import { colors, type Style } from '../common/colors.ts'
+import { inbox } from '../common/inbox.ts'
 import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 import { transcript, type Item, type Resumed, type Transcript } from '../common/transcript.ts'
@@ -175,6 +176,9 @@ function build(view: View, cols: number): Frame {
 		if (i === view.resumed?.at) block(frame.wrap(transcript.resumedLabel(view.resumed), width), { fg: colors.log().fg! })
 		if (i < items.length) block(frame.itemLines(items[i]!, width), frame.itemStyle(items[i]!))
 	}
+	// The inbox, always in view above the prompt.
+	let t = view.transcript
+	for (let m of t?.inbox ?? []) block(frame.wrap(`${inbox.label(t!.state, m)}: ${m.text}`, width), { fg: colors.log().fg! })
 	if (view.notice) block(frame.wrap(view.notice, width), { fg: colors.log().fg! })
 	if (lines.length) lines.push('')
 	let promptWidth = Math.max(1, width - PROMPT_FIRST.length)

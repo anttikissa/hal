@@ -35,9 +35,10 @@ const table: [SessionState, StateEvent, SessionState | typeof refused][] = [
 	[idle, { type: 'submit' }, requesting],
 	[paused, { type: 'submit' }, requesting],
 	[error, { type: 'submit' }, requesting],
-	[streaming, { type: 'submit' }, refused],
-	[retrying, { type: 'submit' }, refused],
-	[blocked, { type: 'submit' }, refused],
+	// Sending while busy steers: the turn goes on as it was.
+	[streaming, { type: 'submit' }, streaming],
+	[retrying, { type: 'submit' }, retrying],
+	[blocked, { type: 'submit' }, blocked],
 	[paused, { type: 'continue' }, requesting],
 	[error, { type: 'continue' }, requesting],
 	[idle, { type: 'continue' }, refused],
@@ -106,6 +107,7 @@ const say = (text: string): HistoryRecord => ({ type: 'user', blocks: [{ type: '
 const out = (text: string): HistoryRecord => ({ type: 'assistant', block: { type: 'text', text }, ts })
 const end = (status: TurnStatus, extra = {}): HistoryRecord => ({ type: 'turn_end', status, usage: {}, ts, ...extra })
 const cont: HistoryRecord = { type: 'continue', ts }
+const waiting = (id: string): HistoryRecord => ({ type: 'inbox', id, text: id, ts })
 
 test('history alone: an unfinished turn is running, ends say the rest', () => {
 	expect(states.fromHistory([])).toEqual(idle)
@@ -127,6 +129,8 @@ test('recoveries counts continues since the last finished round, partial output 
 	// A finished round (tool results) or a turn end is progress.
 	expect(states.recoveries([say('a'), cont, cont, say('results'), cont])).toBe(1)
 	expect(states.recoveries([say('a'), cont, end('paused'), cont])).toBe(1)
+	// A message waiting in the inbox is not progress.
+	expect(states.recoveries([say('a'), cont, waiting('m'), cont])).toBe(2)
 })
 
 test('describe says when a retry happens and why', () => {
@@ -138,4 +142,12 @@ test('describe says when a retry happens and why', () => {
 	// Without a clock: the time itself, which never goes stale.
 	expect(states.describe(s)).toContain('connection lost')
 	expect(states.describe({ type: 'blocked', reason: 'log in' })).toBe('blocked: log in')
+})
+
+test('Enter with text always sends: a prompt, or while busy a steer; Alt-Enter queues', () => {
+	for (let s of all) expect(states.enter('s', s, 'hi')).toEqual({ command: { type: 'submit', sessionId: 's', text: 'hi' } })
+	expect(states.enter('s', streaming, 'later', true)).toEqual({ command: { type: 'submit', sessionId: 's', text: 'later', queue: true } })
+	// Bare Enter still only continues.
+	expect(states.enter('s', streaming, '  ')).toEqual({})
+	expect(states.enter('s', paused, '', true)).toEqual({ command: { type: 'continue', sessionId: 's' } })
 })

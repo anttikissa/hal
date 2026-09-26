@@ -269,22 +269,189 @@ test('reconnecting is connecting again: the snapshot carries the running turn', 
 	expect(a.events.length).toBe(seen)
 })
 
-test('a submit while a turn runs is rejected to that client only', async () => {
+// ── Talking while it works: the inbox (tasks/j1/states.md) ──
+
+const texts = (msg: any) => msg.blocks.map((b: any) => b.text)
+const inboxOf = (c: ReturnType<typeof client>, id: string) => c.views.get(id)!.inbox.map((m) => m.text)
+
+test('a message sent while a turn runs steers it: waiting messages reach the model together, before its next request', async () => {
 	let a = client()
 	let id = created(a)
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
-	a.conn.send({ type: 'submit', sessionId: id, text: 'first' })
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	b.conn.send({ type: 'submit', sessionId: id, text: 'second' })
-	let [rej] = b.of('rejected')
-	expect(rej).toMatchObject({ sessionId: id, command: 'submit' })
-	expect(rej.reason).toMatch(/running/)
-	expect(a.of('rejected')).toEqual([])
+	calls[0]!.push({ type: 'text', text: 'work' })
+	await until(() => a.of('stream').length)
+	b.conn.send({ type: 'submit', sessionId: id, text: 'one' })
+	a.conn.send({ type: 'submit', sessionId: id, text: 'two', id: 'x2' })
+	expect([...a.of('rejected'), ...b.of('rejected')]).toEqual([])
+	expect(a.of('ack').map((e) => e.id)).toEqual(['x2'])
+	// Visible to everyone at once, and the round is not cut short.
+	expect(inboxOf(a, id)).toEqual(['one', 'two'])
+	expect(inboxOf(b, id)).toEqual(['one', 'two'])
+	expect((await fresh(id)).inbox.map((m) => m.text)).toEqual(['one', 'two'])
 	expect(calls.length).toBe(1)
 	calls[0]!.push({ type: 'done', reason: 'end' })
-	await until(() => b.of('turn-end').length)
-	expect((await fresh(id)).items.filter((e) => e.type === 'prompt')).toEqual([{ type: 'prompt', text: 'first' }])
+	await until(() => calls.length === 2)
+	expect(a.of('turn-end')).toEqual([])
+	// The earlier request is a prefix of this one: the prompt cache stays warm.
+	let first = calls[0]!.input.messages
+	expect(calls[1]!.input.messages.slice(0, first.length)).toEqual(first)
+	expect(calls[1]!.input.messages.slice(first.length)).toEqual([
+		{ role: 'assistant', blocks: [{ type: 'text', text: 'work' }] },
+		{ role: 'user', blocks: [{ type: 'text', text: stamped('one\n\ntwo') }] },
+	])
+	expect(inboxOf(a, id)).toEqual([])
+	// Again, and again the prefix holds.
+	a.conn.send({ type: 'submit', sessionId: id, text: 'three' })
+	calls[1]!.push({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
+	await until(() => calls.length === 3)
+	let second = calls[1]!.input.messages
+	expect(calls[2]!.input.messages.slice(0, second.length)).toEqual(second)
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([stamped('three')])
+	calls[2]!.push({ type: 'text', text: 'done' }, { type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length && b.of('turn-end').length)
+	let view = await fresh(id)
+	expect(view.items).toEqual([
+		{ type: 'prompt', text: 'go' },
+		{ type: 'text', text: 'work' },
+		{ type: 'prompt', text: 'one' },
+		{ type: 'prompt', text: 'two' },
+		{ type: 'text', text: 'ok' },
+		{ type: 'prompt', text: 'three' },
+		{ type: 'text', text: 'done' },
+		{ type: 'turn-end', status: 'completed' },
+	])
+	expect(a.views.get(id)).toEqual(view)
+	expect(b.views.get(id)).toEqual(view)
+	expect(a.of('turn-end')).toHaveLength(1)
+})
+
+test('steering during a tool round follows its results', async () => {
+	let a = client()
+	let id = toolSession(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'look' })
+	await until(() => calls.length === 1)
+	calls[0]!.push(readCall())
+	await until(() => a.of('stream').length)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'and hurry' })
+	calls[0]!.push({ type: 'done', reason: 'tool_use' })
+	await until(() => calls.length === 2)
+	expect(calls[1]!.input.messages.slice(-2)).toEqual([
+		{ role: 'user', blocks: [{ type: 'tool_result', id: 't1', output: 'remember the milk\n' }] },
+		{ role: 'user', blocks: [{ type: 'text', text: stamped('and hurry') }] },
+	])
+	calls[1]!.push({ type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length)
+	expect(await fresh(id)).toEqual(a.views.get(id)!)
+})
+
+test('a queued message waits for the turn to end, then runs as the next turn', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'later', queue: true })
+	a.conn.send({ type: 'submit', sessionId: id, text: 'now' })
+	expect(a.views.get(id)!.inbox).toEqual([
+		{ id: expect.any(String), text: 'later', queue: true },
+		{ id: expect.any(String), text: 'now' },
+	])
+	calls[0]!.push({ type: 'done', reason: 'end' })
+	await until(() => calls.length === 2)
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([stamped('now')])
+	expect(inboxOf(a, id)).toEqual(['later'])
+	calls[1]!.push({ type: 'text', text: 'first done' }, { type: 'done', reason: 'end' })
+	await until(() => calls.length === 3)
+	expect(a.of('turn-end')).toHaveLength(1)
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([stamped('later')])
+	expect(inboxOf(a, id)).toEqual([])
+	calls[2]!.push({ type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length === 2)
+	let view = await fresh(id)
+	expect(view.items.map((i) => i.type)).toEqual(['prompt', 'prompt', 'text', 'turn-end', 'prompt', 'turn-end'])
+	expect(a.views.get(id)).toEqual(view)
+})
+
+test('a queued message sent to an idle session just runs', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'hi', queue: true })
+	await until(() => calls.length === 1)
+	expect(inboxOf(a, id)).toEqual([])
+})
+
+test('the inbox survives a pause and a restart, and runs when the user continues', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: 'part' })
+	await until(() => a.of('stream').length)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'steer' })
+	a.conn.send({ type: 'submit', sessionId: id, text: 'queued', queue: true })
+	a.conn.send({ type: 'pause', sessionId: id })
+	await until(() => a.of('turn-end').length)
+	expect(calls.length).toBe(1)
+	restartHost()
+	await host.recover()
+	expect(calls.length).toBe(1)
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.views.get(id))
+	expect(b.views.get(id)!.state).toEqual({ type: 'paused' })
+	expect(inboxOf(b, id)).toEqual(['steer', 'queued'])
+	b.conn.send({ type: 'continue', sessionId: id })
+	await until(() => calls.length === 2)
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([stamped('steer')])
+	expect(inboxOf(b, id)).toEqual(['queued'])
+	calls[1]!.push({ type: 'done', reason: 'end' })
+	await until(() => calls.length === 3)
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([stamped('queued')])
+	calls[2]!.push({ type: 'done', reason: 'end' })
+	await until(() => b.of('turn-end').length === 2)
+	expect(await fresh(id)).toEqual(b.views.get(id)!)
+})
+
+test('sending to a paused turn takes the waiting messages along, oldest first', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'first' })
+	a.conn.send({ type: 'pause', sessionId: id })
+	await until(() => a.of('turn-end').length)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'second' })
+	await until(() => calls.length === 2)
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([expect.stringMatching(/paused[^]*\nfirst\n\nsecond$/)])
+	expect(inboxOf(a, id)).toEqual([])
+	calls[1]!.push({ type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length === 2)
+	let view = await fresh(id)
+	expect(view.items.filter((i) => i.type === 'prompt')).toEqual([
+		{ type: 'prompt', text: 'go' },
+		{ type: 'prompt', text: 'first' },
+		{ type: 'prompt', text: 'second' },
+	])
+	expect(a.views.get(id)).toEqual(view)
+})
+
+test('a steer resent to the next host is not added twice', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'more', id: 'm1' })
+	a.conn.send({ type: 'submit', sessionId: id, text: 'more', id: 'm1' })
+	expect(inboxOf(a, id)).toEqual(['more'])
+	restartHost()
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.views.get(id))
+	b.conn.send({ type: 'submit', sessionId: id, text: 'more', id: 'm1' })
+	expect(b.of('ack').map((e) => e.id)).toEqual(['m1'])
+	expect(inboxOf(b, id)).toEqual(['more'])
 })
 
 test('pause stops the turn, keeping partial output, and continue carries it on', async () => {
@@ -386,7 +553,7 @@ test('a stream that throws still ends the turn and frees the session', async () 
 
 test('bad commands are rejected, not thrown', async () => {
 	let a = client()
-	for (let bad of [null, 'open', { type: 'explode' }, { type: 'submit', sessionId: 1, text: 'x' }, { type: 'create' }]) {
+	for (let bad of [null, 'open', { type: 'explode' }, { type: 'submit', sessionId: 1, text: 'x' }, { type: 'create' }, { type: 'submit', sessionId: 's', text: 'x', queue: 'yes' }]) {
 		expect(() => a.conn.send(bad)).not.toThrow()
 	}
 	a.conn.send({ type: 'open', sessionId: '999-zzz' })
@@ -394,7 +561,7 @@ test('bad commands are rejected, not thrown', async () => {
 	let id = created(client())
 	a.conn.send({ type: 'submit', sessionId: id, text: 'not opened here' })
 	a.conn.send({ type: 'pause', sessionId: id })
-	await until(() => a.of('rejected').length === 9)
+	await until(() => a.of('rejected').length === 10)
 	expect(a.events.every((e) => e.type === 'rejected')).toBe(true)
 	expect(calls).toEqual([])
 })

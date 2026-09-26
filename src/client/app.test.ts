@@ -64,16 +64,35 @@ test('a submit before any session arrives keeps the text', () => {
 	expect(app.view().notice).toBeTruthy()
 })
 
-test('while a turn runs, Enter keeps the text and Escape pauses it', () => {
+test('while a turn runs, Enter steers it, Alt-Enter queues, and Escape pauses it', () => {
 	app.onEvent(snapshot())
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'q', provider: 'anthropic' })
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'requesting' } })
-	type('next')
+	type('now')
 	enter()
-	expect(sent).toEqual([])
-	expect(app.view().prompt.text).toBe('next')
+	expect(app.view().prompt.text).toBe('')
+	type('later')
+	app.onKeys([{ ...key('enter'), alt: true }])
 	escape()
-	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
+	expect(sent).toEqual([
+		{ type: 'submit', sessionId: 's1', text: 'now' },
+		{ type: 'submit', sessionId: 's1', text: 'later', queue: true },
+		{ type: 'pause', sessionId: 's1' },
+	])
+})
+
+test('waiting messages stay on screen, each saying why it waits', () => {
+	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
+	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'a', text: 'steer me' }, { id: 'b', text: 'run me later', queue: true }] })
+	let rows = () => frame.build(app.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim())
+	let steer = rows().find((r) => r.includes('steer me'))!
+	let later = rows().find((r) => r.includes('run me later'))!
+	expect(steer).not.toBe(later)
+	expect(steer.replace('steer me', '')).not.toBe(later.replace('run me later', ''))
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'paused' } })
+	expect(rows().find((r) => r.includes('run me later'))).toMatch(/paused/)
+	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [] })
+	expect(rows().join('\n')).not.toContain('steer me')
 })
 
 test('Escape pauses a turn another host is carrying on, too', () => {

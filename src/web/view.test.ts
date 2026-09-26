@@ -68,8 +68,8 @@ test('Enter and Escape follow the session state', () => {
 	expect(view.submit(idle, 'hi')).toEqual({ command: { type: 'submit', sessionId, text: 'hi' }, keep: false })
 	expect(view.pause(idle)).toBeUndefined()
 	let busy = view.onEvent(idle, { type: 'state', sessionId, state: { type: 'running', phase: 'streaming' } })
-	expect(view.submit(busy, 'more').keep).toBe(true)
-	expect(view.submit(busy, 'more').command).toBeUndefined()
+	expect(view.submit(busy, 'more')).toEqual({ command: { type: 'submit', sessionId, text: 'more' }, keep: false })
+	expect(view.submit(busy, 'later', true)).toEqual({ command: { type: 'submit', sessionId, text: 'later', queue: true }, keep: false })
 	expect(view.pause(busy)).toEqual({ type: 'pause', sessionId })
 	let paused = view.onEvent(idle, { type: 'state', sessionId, state: { type: 'paused' } })
 	expect(view.status(paused)).toMatch(/paused/)
@@ -89,4 +89,13 @@ test('a snapshot with history marks where it ends; later events keep the mark', 
 	expect(st.transcript!.items.slice(st.resumed!.at)).toEqual([{ type: 'prompt', text: 'new' }])
 	let empty = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }], st)
 	expect(empty.resumed).toBeUndefined()
+})
+
+test('waiting messages are shown with why they wait', () => {
+	let st = fold([
+		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'paused' }, inbox: [{ id: 'a', text: 'next', queue: true }] } },
+	])
+	expect(view.inbox(st)).toEqual([{ text: 'next', label: expect.stringMatching(/paused/) }])
+	expect(view.inbox(view.onEvent(st, { type: 'inbox', sessionId, inbox: [] }))).toEqual([])
+	expect(view.inbox({})).toEqual([])
 })

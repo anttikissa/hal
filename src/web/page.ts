@@ -1,7 +1,9 @@
 /// <reference lib="dom" />
 // The browser client's page: a password form until the cookie is set,
 // then one session's transcript above a textarea. Enter submits
-// (Shift+Enter is a newline), Escape cancels a running turn. Plain DOM;
+// (steering a running turn; Alt+Enter queues after it, Shift+Enter is a
+// newline), Escape pauses a running turn. Waiting messages (the inbox)
+// always show above the input. Plain DOM;
 // web.ts bundles this file into index.html at request time.
 
 import type { Event } from '../common/protocol.ts'
@@ -18,11 +20,12 @@ type PageState = {
 	// The line marking where replayed history ends.
 	resumed: HTMLElement | null
 	notice: HTMLElement | null
+	inbox: HTMLElement | null
 	input: HTMLTextAreaElement | null
 }
 
 function createState(): PageState {
-	return { view: {}, drawn: [], log: null, resumed: null, notice: null, input: null }
+	return { view: {}, drawn: [], log: null, resumed: null, notice: null, inbox: null, input: null }
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}): HTMLElementTagNameMap[K] {
@@ -53,9 +56,10 @@ function draw(): void {
 		if (next) log.insertBefore(st.resumed, next)
 		else log.append(st.resumed)
 	} else st.resumed?.remove()
+	st.inbox!.replaceChildren(...view.inbox(st.view).map((m) => el('div', { className: 'log', textContent: `${m.label}: ${m.text}` })))
 	st.notice!.textContent = st.view.notice ?? ''
 	let status = view.status(st.view)
-	st.input!.placeholder = status ? `${status}; Escape pauses a running turn` : 'Message Hal (Enter sends, Shift+Enter for a newline)'
+	st.input!.placeholder = status ? `${status}; Enter steers, Alt+Enter queues, Escape pauses` : 'Message Hal (Enter sends, Shift+Enter for a newline)'
 	if (atBottom) log.scrollTop = log.scrollHeight
 }
 
@@ -89,7 +93,7 @@ function onKey(e: KeyboardEvent): void {
 	}
 	if (e.key !== 'Enter' || e.shiftKey || e.target !== st.input) return
 	e.preventDefault()
-	let { command, notice, keep } = view.submit(st.view, st.input!.value)
+	let { command, notice, keep } = view.submit(st.view, st.input!.value, e.altKey)
 	// Until drafts and pending prompts (task rw), typed text waits here.
 	if (command && !connection.connected()) notice = 'not connected; try again in a moment'
 	else {
@@ -105,10 +109,11 @@ function chat(): void {
 	document.body.replaceChildren()
 	st.log = el('main', { role: 'log' } as Partial<HTMLElement>)
 	st.notice = el('div', { id: 'notice', className: 'log' })
+	st.inbox = el('div', { id: 'inbox' })
 	st.input = el('textarea', { rows: 1, autofocus: true, ariaLabel: 'Message', className: 'input' })
 	st.input.addEventListener('input', () => page.fitInput())
 	let footer = el('footer')
-	footer.append(st.notice, st.input)
+	footer.append(st.inbox, st.notice, st.input)
 	document.body.append(st.log, footer)
 	document.addEventListener('keydown', (e) => page.onKey(e))
 	st.input.focus()

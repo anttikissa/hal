@@ -3,6 +3,7 @@
 // passing notice, and what each item looks like as text. page.ts feeds
 // it the events from link.ts and draws it.
 
+import { inbox } from '../common/inbox.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Item, type Resumed, type Transcript } from '../common/transcript.ts'
@@ -25,11 +26,12 @@ function onEvent(st: ViewState, event: Event): ViewState {
 	return { ...st, transcript: t }
 }
 
-// What Enter with `text` does: send a prompt (or a continue, when empty
-// on a paused or failed turn), or show why not (the typed text stays).
-function submit(st: ViewState, text: string): { command?: unknown; notice?: string; keep: boolean } {
+// What Enter with `text` does: send a prompt (steering a busy turn;
+// `queue`, Alt-Enter: after it), a continue (empty, on a paused or
+// failed turn), or show why not (the typed text stays).
+function submit(st: ViewState, text: string, queue = false): { command?: unknown; notice?: string; keep: boolean } {
 	if (!st.transcript) return text.trim() ? { notice: 'no session yet', keep: true } : { keep: false }
-	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text)
+	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, queue)
 	if (refused) return { notice: refused, keep: true }
 	return command ? { command, keep: false } : { keep: false }
 }
@@ -42,6 +44,12 @@ function pause(st: ViewState): unknown {
 // What the session is doing, for the input's placeholder.
 function status(st: ViewState): string | undefined {
 	return st.transcript && states.describe(st.transcript.state)
+}
+
+// The messages waiting for the turn, each with why it waits.
+function waiting(st: ViewState): { text: string; label: string }[] {
+	let t = st.transcript
+	return t ? t.inbox.map((m) => ({ text: m.text, label: inbox.label(t.state, m) })) : []
 }
 
 function oneLine(s: string): string {
@@ -84,5 +92,6 @@ export const view = {
 	submit,
 	pause,
 	status,
+	inbox: waiting,
 	show,
 }

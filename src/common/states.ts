@@ -58,8 +58,8 @@ const busy = (s: SessionState) => s.type === 'running' || s.type === 'retrying' 
 function step(state: SessionState, event: StateEvent): SessionState | string {
 	switch (event.type) {
 		case 'submit':
-			// Steering (task 2r) will accept a submit while busy.
-			return busy(state) ? 'a turn is running' : { type: 'running', phase: 'requesting' }
+			// While busy it steers: the message waits in the inbox.
+			return busy(state) ? state : { type: 'running', phase: 'requesting' }
 		case 'continue':
 			if (state.type === 'paused' || state.type === 'error') return { type: 'running', phase: 'requesting' }
 			return state.type === 'idle' ? 'nothing to continue' : 'a turn is running'
@@ -110,18 +110,18 @@ function recoveries(records: HistoryRecord[]): number {
 	for (let i = records.length - 1; i >= 0; i--) {
 		let r = records[i]!
 		if (r.type === 'continue') n++
-		else if (r.type !== 'assistant') break
+		else if (r.type !== 'assistant' && r.type !== 'inbox') break
 	}
 	return n
 }
 
 // What a client sends for Enter with `text` in a session in `state`:
-// a prompt, a continue (bare Enter on a paused or failed turn), nothing
-// (bare Enter otherwise), or why not (the typed text stays).
-function enter(sessionId: string, state: SessionState, text: string): { command?: unknown; refused?: string } {
+// a prompt (which steers a busy turn; with `queue`, Alt-Enter, it waits
+// for the turn to end), a continue (bare Enter on a paused or failed
+// turn), nothing (bare Enter otherwise), or why not (the text stays).
+function enter(sessionId: string, state: SessionState, text: string, queue = false): { command?: unknown; refused?: string } {
 	if (!text.trim()) return state.type === 'paused' || state.type === 'error' ? { command: { type: 'continue', sessionId } } : {}
-	if (states.busy(state)) return { refused: 'a turn is running; Escape pauses it' }
-	return { command: { type: 'submit', sessionId, text } }
+	return { command: queue ? { type: 'submit', sessionId, text, queue: true } : { type: 'submit', sessionId, text } }
 }
 
 // What a client sends for Escape: a pause, if anything is running.
