@@ -18,7 +18,7 @@ import { sessions, type SessionMeta } from './sessions.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
 
-const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer'])
+const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output'])
 
 // One running turn: its current provider round (`turn`), how many of
 // that round's blocks are on disk, and the usage of earlier rounds.
@@ -135,7 +135,7 @@ function tail(id: string): HistoryRecord[] {
 
 // True if the last turn has no end record.
 function unfinished(id: string): boolean {
-	let last = history.tail(id).at(-1)
+	let last = replay.withoutCommands(history.tail(id)).at(-1)
 	return last !== undefined && last.type !== 'turn_end'
 }
 

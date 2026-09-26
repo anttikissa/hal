@@ -9,7 +9,7 @@
 // a bug.
 
 import { forms } from './forms.ts'
-import type { HistoryRecord } from './replay.ts'
+import { replay, type HistoryRecord } from './replay.ts'
 
 export type Phase = 'requesting' | 'streaming' | 'tools'
 
@@ -93,14 +93,18 @@ function step(state: SessionState, event: StateEvent): SessionState | string {
 	}
 }
 
-// The state durable history alone implies. An unfinished turn (no end
-// record) is blocked on its open question, if it has one, else running:
-// whoever is host must be carrying it on, and a new host continues it. Legacy ends (cancelled: the old Escape;
-// interrupted: the old restart) read as paused, so they can continue.
+// The state durable history alone implies. An open question (a turn's
+// or a slash command's) blocks; otherwise commands change nothing, and
+// an unfinished turn (no end record) is running: whoever is host must be
+// carrying it on, and a new host continues it. Legacy ends (cancelled:
+// the old Escape; interrupted: the old restart) read as paused, so they
+// can continue.
 function fromHistory(records: HistoryRecord[]): SessionState {
-	let last = records.at(-1)
+	if (forms.open(records)) return { type: 'blocked', reason: 'question' }
+	// Messages waiting in the inbox never start or end a turn.
+	let last = replay.withoutCommands(records).findLast((r) => r.type !== 'inbox')
 	if (!last) return { type: 'idle' }
-	if (last.type !== 'turn_end') return forms.open(records) ? { type: 'blocked', reason: 'question' } : { type: 'running', phase: 'requesting' }
+	if (last.type !== 'turn_end') return { type: 'running', phase: 'requesting' }
 	if (last.status === 'completed') return { type: 'idle' }
 	if (last.status === 'error') return { type: 'error', message: last.error ?? 'turn failed' }
 	let paused: SessionState = { type: 'paused' }
@@ -113,6 +117,7 @@ function fromHistory(records: HistoryRecord[]): SessionState {
 // output between them. Partial output counts for nothing, as a turn
 // that crashes its host mid-stream leaves some every time.
 function recoveries(records: HistoryRecord[]): number {
+	records = replay.withoutCommands(records)
 	let n = 0
 	for (let i = records.length - 1; i >= 0; i--) {
 		let r = records[i]!

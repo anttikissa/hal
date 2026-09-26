@@ -239,3 +239,24 @@ test('an edited prompt takes the place of the prompt it replaces and its turn, l
 	let late2 = fold([snap({ history: [...history, edited, said({ type: 'text', text: 'Fixed' }), paused, { ...edited, blocks: [{ type: 'text', text: 'fix it!' }] }] })])!
 	expect(late2).toEqual(t2)
 })
+
+test('a command and its output during a running turn show before the output streaming now, and stay there', () => {
+	let t = fold([
+		snap({ history: [] }),
+		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'wor' } },
+		{ type: 'command', sessionId, text: '/cd x', from: '2-xyz' },
+		{ type: 'output', sessionId, text: 'no such directory', error: true },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'king' } },
+		{ type: 'meta', sessionId, meta: { ...meta, cwd: '/x' } },
+		{ type: 'turn-end', sessionId, status: 'completed' },
+	])!
+	expect(t.items).toEqual([
+		{ type: 'prompt', text: 'go' },
+		{ type: 'command', text: '/cd x', from: '2-xyz' },
+		{ type: 'output', text: 'no such directory', error: true },
+		{ type: 'text', text: 'working' },
+		{ type: 'turn-end', status: 'completed' },
+	])
+	expect(t.meta.cwd).toBe('/x')
+})

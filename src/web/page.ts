@@ -172,6 +172,12 @@ function onEvent(event: Event): void {
 	let st = page.state
 	let changed = drafts.onEvent(event)
 	st.view = view.onEvent(st.view, event)
+	let done = event.type === 'completions' && view.completed(st.view, event, st.input!.value)
+	if (done) {
+		st.input!.value = done.text
+		page.onInput()
+		st.view = { ...st.view, notice: done.notice }
+	}
 	let id = st.view.transcript?.meta.id
 	if (id && (changed || event.type === 'snapshot') && st.input!.value !== drafts.text(id)) {
 		st.input!.value = drafts.text(id)
@@ -254,6 +260,14 @@ function onKey(e: KeyboardEvent): void {
 	if (e.key === 'Escape') {
 		let command = view.pause(st.view)
 		if (command) connection.send(command)
+		return
+	}
+	let input = st.input!
+	let tab = e.key === 'Tab' && !e.shiftKey && e.target === input && input.selectionStart === input.value.length
+	let complete = tab && view.complete(st.view, input.value)
+	if (complete) {
+		e.preventDefault()
+		connection.send(complete)
 		return
 	}
 	if (e.key !== 'Enter' || e.shiftKey || e.target !== st.input) return

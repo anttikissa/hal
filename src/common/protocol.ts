@@ -60,7 +60,12 @@ export type Command = (
 	// before the turn's next request; with `queue`, run after it ends.
 	// With `amend`, an edit of the last prompt: the host decides from
 	// history whether it replaces that prompt or is sent on top.
-	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean }
+	// A slash command (/name args) runs on the host at once instead.
+	// `from`: the session that sent it; without it, the human typed it.
+	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean; from?: string }
+	// Tab: complete the slash command `text` on the host; answered, to
+	// this client only, with `completions`.
+	| { type: 'complete'; sessionId: string; text: string }
 	// Replace the session's draft. `base`: the draft rev the text was
 	// edited from. If another client changed the draft since, the host
 	// keeps both texts rather than lose one.
@@ -100,7 +105,17 @@ export type Event =
 	// with no turn running (the state says blocked).
 	| { type: 'question'; sessionId: string; id: string; form: Form }
 	// The first answer to it, as history keeps it (secrets only named).
-	| { type: 'answer'; sessionId: string; question: string; answers: Answers; secrets?: string[] }
+	// `cancelled`: Escape dismissed a command's question.
+	| { type: 'answer'; sessionId: string; question: string; answers: Answers; secrets?: string[]; cancelled?: true }
+	// A slash command is in history (`from`: as in submit) and runs.
+	| { type: 'command'; sessionId: string; text: string; from?: string }
+	// What a command said, now in history; `error` if it failed.
+	| { type: 'output'; sessionId: string; text: string; error?: true }
+	// The session's metadata changed (a /cd).
+	| { type: 'meta'; sessionId: string; meta: SessionMeta }
+	// Sent only to the client that asked: every full text `text` may
+	// complete to, none if nothing fits.
+	| { type: 'completions'; sessionId: string; text: string; items: string[] }
 	// Something the user should fix (config.ason); not tied to a session.
 	| { type: 'warning'; text: string }
 	// The session's draft changed; `command` is the id of the command
@@ -113,7 +128,7 @@ export type Event =
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue', 'answer']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -134,7 +149,8 @@ function invalid(value: unknown): string | undefined {
 		let strings = a && typeof a === 'object' && !Array.isArray(a) && Object.values(a).every((v) => typeof v === 'string')
 		return str('sessionId') ?? str('question') ?? (strings ? undefined : 'answer: answers must map names to strings')
 	}
-	return str('sessionId') ?? (c.type === 'submit' || c.type === 'draft' ? str('text') : undefined)
+	if (c.type === 'submit') return str('sessionId') ?? str('text') ?? str('from', true)
+	return str('sessionId') ?? (c.type === 'draft' || c.type === 'complete' ? str('text') : undefined)
 }
 
 export const protocol = { commandTypes, invalid }

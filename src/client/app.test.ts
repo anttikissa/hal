@@ -346,3 +346,21 @@ test('Escape closes a modal and nothing else: the running turn goes on', () => {
 	escape()
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 })
+
+test('Tab on a command asks the host to complete it; the answer fills the prompt if it is unchanged', () => {
+	app.onEvent(snapshot())
+	type('hello')
+	app.onKeys([key('tab')])
+	expect(sent).toEqual([])
+	app.onKeys(Array.from({ length: 5 }, () => key('backspace')))
+	type('/cd ~/pro')
+	app.onKeys([key('tab')])
+	expect(sent).toEqual([{ type: 'complete', sessionId: 's1', text: '/cd ~/pro' }])
+	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: ['/cd ~/projects/', '/cd ~/projection/'] })
+	expect(app.state.prompt).toEqual({ text: '/cd ~/project', cursor: 13 })
+	expect(app.view().notice).toContain('projection/')
+	expect(drafts.text('s1')).toBe('/cd ~/project')
+	// Typed on meanwhile: a late answer is dropped.
+	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: ['/cd ~/prof/'] })
+	expect(app.state.prompt.text).toBe('/cd ~/project')
+})

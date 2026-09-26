@@ -91,6 +91,10 @@ function itemStyle(item: Item): Style | undefined {
 			return item.status === 'error' ? colors.error() : { fg: colors.log().fg! }
 		case 'question':
 			return colors.warning()
+		case 'command':
+			return colors.user()
+		case 'output':
+			return { fg: (item.error ? colors.error() : colors.log()).fg! }
 	}
 }
 
@@ -138,9 +142,15 @@ function itemLines(item: Item, width: number): string[] {
 			return [`[${item.status}]`]
 		case 'question': {
 			let rows = [...frame.wrap(`? ${item.form.text}`, width), ...frame.quoteLines(item.form.quote, width)]
-			let said = item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
+			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
 			return [...rows, ...said.flatMap((l) => frame.wrap(l, width - 2).map((r) => `  ${r}`))]
 		}
+		case 'command': {
+			let text = item.from === undefined ? item.text : `${item.text}\n(sent from ${item.from})`
+			return frame.wrap(text, width - PROMPT_FIRST.length).map((l, i) => (i ? PROMPT_REST : PROMPT_FIRST) + l)
+		}
+		case 'output':
+			return frame.wrap(item.text, width)
 	}
 }
 

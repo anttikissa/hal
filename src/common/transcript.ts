@@ -21,7 +21,12 @@ export type Item =
 	| { type: 'tool-result'; id: string; output: string; isError?: boolean }
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string }
 	// A durable question; with `answers` once answered (secrets only named).
-	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[] }
+	// `cancelled`: dismissed with Escape (a command's question).
+	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; cancelled?: true }
+	// A slash command as typed; `from`: the session that sent it.
+	| { type: 'command'; text: string; from?: string }
+	// What a command said.
+	| { type: 'output'; text: string; error?: true }
 
 export type Transcript = {
 	meta: SessionMeta
@@ -61,6 +66,7 @@ function recordItems(r: HistoryRecord): Item[] {
 	if (r.type === 'assistant') return transcript.blockItems([r.block])
 	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer') return []
 	if (r.type === 'question') return [{ type: 'question', id: r.id, form: r.form }]
+	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'user') return r.blocks.map((b): Item => (b.type === 'text' ? { type: 'prompt', text: b.text } : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
@@ -74,13 +80,20 @@ function endItem(end: { status: TurnStatus; usage?: Usage; error?: string }): It
 }
 
 // Items with question `answer.question` shown answered.
-function answered(items: Item[], answer: { question: string; answers: Answers; secrets?: string[] }): Item[] {
+function answered(items: Item[], answer: { question: string; answers: Answers; secrets?: string[]; cancelled?: true }): Item[] {
 	return items.map((item) => {
 		if (item.type !== 'question' || item.id !== answer.question) return item
 		let done: Item = { ...item, answers: answer.answers }
 		if (answer.secrets) done.secrets = answer.secrets
+		if (answer.cancelled) done.cancelled = true
 		return done
 	})
+}
+
+// A command or its output as shown, from a record or an event.
+function aside(r: { type: 'command'; text: string; from?: string } | { type: 'output'; text: string; error?: true }): Item {
+	if (r.type === 'command') return r.from === undefined ? { type: 'command', text: r.text } : { type: 'command', text: r.text, from: r.from }
+	return r.error ? { type: 'output', text: r.text, error: true } : { type: 'output', text: r.text }
 }
 
 // The question waiting for an answer from this transcript, if any.
@@ -124,6 +137,15 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'state') return { ...t, state: event.state }
 	if (event.type === 'inbox') return { ...t, inbox: event.inbox }
 	if (event.type === 'answer') return { ...t, items: transcript.answered(t.items, event) }
+	if (event.type === 'meta') return { ...t, meta: { ...event.meta } }
+	if (event.type === 'completions') return t
+	if (event.type === 'command' || event.type === 'output') {
+		// Beside a running turn: before its live output, which is redrawn.
+		let item = transcript.aside(event)
+		if (!t.live) return { ...t, items: [...t.items, item] }
+		let at = t.live.start
+		return { ...t, items: [...t.items.slice(0, at), item, ...t.items.slice(at)], live: { start: at + 1, turn: t.live.turn } }
+	}
 	if (event.type === 'turn-start') {
 		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
 		let items: Item[] = [...t.items, { type: 'prompt', text: event.prompt }]
@@ -185,4 +207,4 @@ function resumedLabel(r: Resumed, now = new Date()): string {
 	return `resumed · last turn ${when}`
 }
 
-export const transcript = { blockItems, resultItem, recordItems, endItem, answered, question, fromSnapshot, copyTurn, fold, prompted, resumed, resumedLabel }
+export const transcript = { blockItems, resultItem, recordItems, endItem, aside, answered, question, fromSnapshot, copyTurn, fold, prompted, resumed, resumedLabel }

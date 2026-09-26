@@ -146,6 +146,23 @@ test('history alone: an open question blocks the turn until answered or paused',
 	expect(states.fromHistory([say('a'), ask('q1'), end('paused'), cont])).toEqual(requesting)
 })
 
+const typed = (text: string): HistoryRecord => ({ type: 'command', text, ts })
+const said = (text: string): HistoryRecord => ({ type: 'output', text, ts })
+const cmdAsk = (id: string): HistoryRecord => ({ type: 'question', id, form: { text: 'Create?', fields: [{ type: 'choice', name: 'create', options: ['yes', 'no'] }] }, from: { command: 'cd', args: 'x' }, ts })
+const cmdReply = (id: string): HistoryRecord => ({ type: 'answer', question: id, answers: { create: 'no' }, ts })
+
+test('history alone: commands leave the turn state as it was, except while one asks', () => {
+	for (let before of [[], [say('a'), end('completed')], [say('a'), end('paused')], [say('a'), end('error', { error: 'x' })], [say('a'), out('b')]] as HistoryRecord[][]) {
+		let state = states.fromHistory(before)
+		expect(states.fromHistory([...before, typed('/help'), said('help')])).toEqual(state)
+		expect(states.fromHistory([...before, typed('/cd x'), cmdAsk('c1'), cmdReply('c1'), said('ok')])).toEqual(state)
+		if (state.type !== 'running') expect(states.fromHistory([...before, typed('/cd x'), cmdAsk('c1')])).toEqual(asking)
+	}
+	expect(states.recoveries([say('a'), cont, out('x'), typed('/help'), said('h'), cont])).toBe(2)
+	// A message waiting while a command asked starts nothing by itself.
+	expect(states.fromHistory([say('a'), end('completed'), typed('/cd x'), cmdAsk('c1'), waiting('m'), cmdReply('c1')])).toEqual(idle)
+})
+
 test('recoveries counts continues since the last finished round, partial output aside', () => {
 	expect(states.recoveries([say('a')])).toBe(0)
 	expect(states.recoveries([say('a'), cont, out('x'), cont, out('y')])).toBe(2)

@@ -33,10 +33,19 @@ export type HistoryRecord =
 	// `call`: the tool call it asks approval for (host/approval.ts).
 	// `usage`: the turn's usage so far, which the answered turn goes on
 	// from, as nothing of the turn stays in memory while it waits.
-	| { type: 'question'; id: string; form: Form; call?: string; usage?: Usage; ts: string }
+	// `from`: the slash command that asked, re-run with the answer;
+	// without it, the turn asked.
+	| { type: 'question'; id: string; form: Form; call?: string; usage?: Usage; from?: { command: string; args: string }; ts: string }
 	// The first answer to question `question`. Secret fields are left
-	// out of `answers` and only named in `secrets`.
-	| { type: 'answer'; question: string; answers: Answers; secrets?: string[]; ts: string }
+	// out of `answers` and only named in `secrets`. `cancelled`: Escape
+	// dismissed a command's question; nothing was answered.
+	| { type: 'answer'; question: string; answers: Answers; secrets?: string[]; cancelled?: true; ts: string }
+	// A slash command (src/host/commands/), as typed. `from`: the session
+	// that sent it; without it the human typed it. `command`: the
+	// client's id for the submit, so a resend is recognised.
+	| { type: 'command'; text: string; from?: string; command?: string; ts: string }
+	// What a command said; `error` if it failed.
+	| { type: 'output'; text: string; error?: true; ts: string }
 
 // Provider messages from history. Unsigned thinking (a cut-off stream) is
 // not replayable and is left out. Each tool call gets a result before the
@@ -65,7 +74,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		if (r.type === 'question' && r.call !== undefined && pending.includes(r.call)) waiting = r.id
 		if (r.type === 'answer' && r.question === waiting) waiting = undefined
 		// For the human; whoever asked hears the answer another way.
-		if (r.type === 'inbox' || r.type === 'question' || r.type === 'answer') continue
+		if (r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) {
 			note = undefined
@@ -139,6 +148,18 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 	return out
 }
 
+// The records of turns alone: without slash commands, what they said
+// and the questions they asked. Commands run beside turns and never
+// change how one stands.
+function withoutCommands(records: HistoryRecord[]): HistoryRecord[] {
+	let asked = new Set(records.flatMap((r) => (r.type === 'question' && r.from ? [r.id] : [])))
+	return records.filter((r) => {
+		if (r.type === 'command' || r.type === 'output') return false
+		if (r.type === 'question') return !r.from
+		return r.type !== 'answer' || !asked.has(r.question)
+	})
+}
+
 // How a turn ended, told in front of the next prompt; nothing when it
 // completed. A long provider error is clipped: the model needs the gist.
 function endNote(end: Extract<HistoryRecord, { type: 'turn_end' }>): string | undefined {
@@ -174,6 +195,7 @@ export const replay = {
 	isPrompt,
 	lastPrompt,
 	current,
+	withoutCommands,
 	endNote,
 	clock,
 	missingResult,

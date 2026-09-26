@@ -4,6 +4,7 @@
 // it the events from link.ts and draws it.
 
 import { amend, type Editing } from '../common/amend.ts'
+import { completion } from '../common/completion.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
 import type { Event } from '../common/protocol.ts'
@@ -89,6 +90,21 @@ function notice(st: ViewState): string | undefined {
 	return st.notice ?? (st.editing && amend.hint())
 }
 
+// Tab in the message box with `text` (the caret at its end): the
+// command asking the host to complete it, if it is a slash command.
+function complete(st: ViewState, text: string): unknown {
+	return st.transcript && completion.request(st.transcript.meta.id, text)
+}
+
+// The host's completions, if the box still holds `input`, what was
+// sent: its new text and what to tell (the choices, or none found).
+function completed(st: ViewState, event: Event & { type: 'completions' }, input: string): { text: string; notice?: string } | undefined {
+	if (st.transcript?.meta.id !== event.sessionId || input !== event.text) return undefined
+	let { text, choices } = completion.apply(event.text, event.items)
+	let notice = choices ? choices.join('  ') : event.items.length ? undefined : 'no completions'
+	return notice === undefined ? { text } : { text, notice }
+}
+
 // The pause command for Escape, if anything is running.
 function pause(st: ViewState): unknown {
 	return st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
@@ -136,10 +152,14 @@ function show(item: Item): Shown {
 			if (item.status === 'completed') return null
 			return { kind: 'end log', text: `[${item.status}]` }
 		case 'question': {
-			let said = item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
+			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
 			let quote = item.form.quote ? item.form.quote.text.split('\n').map((l) => `    ${l}`) : []
 			return { kind: 'question warning', text: [`? ${item.form.text}`, ...quote, ...said.map((l) => `  ${l}`)].join('\n') }
 		}
+		case 'command':
+			return { kind: 'user', text: item.from === undefined ? item.text : `${item.text}\n(sent from ${item.from})` }
+		case 'output':
+			return { kind: item.error ? 'output error' : 'output log', text: item.text }
 	}
 }
 
@@ -152,6 +172,8 @@ export const view = {
 	submit,
 	editKey,
 	notice,
+	complete,
+	completed,
 	pause,
 	status,
 	inbox: waiting,

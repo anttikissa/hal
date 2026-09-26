@@ -1,0 +1,29 @@
+// Tab completion of slash commands (tasks/w4/forms.md, Commands). The
+// host completes, against its own files and commands, so every client
+// (terminal, web, remote) gets the same answers; this is what a client
+// does with them, the same in both.
+
+// The command asking the host to complete `text`; only a slash command
+// is completed.
+function request(sessionId: string, text: string): unknown {
+	return text.startsWith('/') ? { type: 'complete', sessionId, text } : undefined
+}
+
+// One completion replaces `text`; several extend it as far as they all
+// agree and are listed by their last part (a name, a directory).
+function apply(text: string, items: string[]): { text: string; choices?: string[] } {
+	if (items.length <= 1) return { text: items[0] ?? text }
+	let shared = items.reduce((a, b) => {
+		let n = 0
+		while (n < a.length && a[n] === b[n]) n++
+		return a.slice(0, n)
+	})
+	let choices = items.map((item) => {
+		let s = item.trimEnd()
+		if (!s.includes(' ')) return s
+		return s.slice(Math.max(s.lastIndexOf(' '), s.slice(0, -1).lastIndexOf('/')) + 1)
+	})
+	return { text: shared.length > text.length ? shared : text, choices }
+}
+
+export const completion = { request, apply }

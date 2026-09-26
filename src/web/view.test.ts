@@ -146,3 +146,33 @@ test('a question shows its quote under the text', () => {
 	])
 	expect(shown(st)).toEqual([{ kind: 'question warning', text: '? Run this?\n    rm -rf x\n  no' }])
 })
+
+test('commands show who sent them, and their output; a cancelled question says so', () => {
+	let form = { text: 'Create?', fields: [{ type: 'choice' as const, name: 'create', options: ['yes', 'no'] }] }
+	let st = fold([
+		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } },
+		{ type: 'command', sessionId, text: '/help' },
+		{ type: 'output', sessionId, text: 'Commands' },
+		{ type: 'command', sessionId, text: '/cd x', from: '7-abc' },
+		{ type: 'question', sessionId, id: 'q', form },
+		{ type: 'answer', sessionId, question: 'q', answers: {}, cancelled: true },
+		{ type: 'output', sessionId, text: 'nope', error: true },
+	])
+	let texts = shown(st).map((s) => s!.text)
+	expect(texts[0]).toBe('/help')
+	expect(texts[1]).toBe('Commands')
+	expect(texts[2]).toContain('/cd x')
+	expect(texts[2]).toContain('sent from 7-abc')
+	expect(texts[3]).toContain('(cancelled)')
+	expect(shown(st)[4]!.kind).toContain('error')
+})
+
+test('Tab asks the host to complete a command; its answer fills the box only if unchanged', () => {
+	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
+	expect(view.complete(st, 'hello')).toBeUndefined()
+	expect(view.complete(st, '/cd ~/p')).toEqual({ type: 'complete', sessionId, text: '/cd ~/p' })
+	let event = { type: 'completions' as const, sessionId, text: '/cd ~/p', items: ['/cd ~/projects/'] }
+	expect(view.completed(st, event, '/cd ~/p')).toEqual({ text: '/cd ~/projects/' })
+	expect(view.completed(st, event, '/cd ~/px')).toBeUndefined()
+	expect(view.completed(st, { ...event, items: [] }, '/cd ~/p')).toEqual({ text: '/cd ~/p', notice: 'no completions' })
+})

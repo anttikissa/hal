@@ -36,11 +36,13 @@ import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states, type SessionState, type StateEvent } from '../common/states.ts'
 import { approval } from './approval.ts'
 import { auth } from './auth.ts'
+import { commands, type Context, type Reply } from './commands.ts'
 import { clock } from './clock.ts'
 import { config } from './config.ts'
 import { diag } from './diag.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'
+import { liveFiles } from './live-file.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
@@ -158,7 +160,7 @@ function handle(client: Client, command: unknown): void {
 // A repeat of a submit the previous host recorded, found in history.
 function submitted(c: Command): Outcome | undefined {
 	if (c.type !== 'submit' || !sessions.state.open.has(c.sessionId)) return undefined
-	let seen = (r: HistoryRecord) => (r.type === 'user' && r.command === c.id) || (r.type === 'inbox' && r.id === c.id)
+	let seen = (r: HistoryRecord) => ((r.type === 'user' || r.type === 'command') && r.command === c.id) || (r.type === 'inbox' && r.id === c.id)
 	return history.readSync(c.sessionId).some(seen) ? {} : undefined
 }
 
@@ -208,12 +210,15 @@ function act(client: Client, c: Command): Outcome | undefined {
 	let refused: string | undefined
 	if (c.type === 'close') client.open.delete(c.sessionId)
 	else if (c.type === 'submit') {
-		refused = c.amend && !c.queue ? host.amend(c.sessionId, c.text, c.id) : host.submit(c.sessionId, c.text, c.id, c.queue)
+		// A slash command runs even when typed while editing a prompt.
+		let amending = c.amend && !c.queue && !commands.parse(c.text)
+		refused = amending ? host.amend(c.sessionId, c.text, c.id) : host.submit(c.sessionId, c.text, c.id, c.queue, c.from)
 		if (refused === undefined) host.sent(c.sessionId, c.text, c.id)
 	} else if (c.type === 'draft') host.draft(c.sessionId, drafts.set(c.sessionId, c.text, c.base), c.id)
 	else if (c.type === 'continue') refused = host.resume(c.sessionId)
 	else if (c.type === 'pause') refused = host.stop(c.sessionId)
 	else if (c.type === 'answer') refused = host.reply(c.sessionId, c.question, c.answers)
+	else if (c.type === 'complete') client.deliver({ type: 'completions', sessionId: c.sessionId, text: c.text, items: commands.complete(c.text, host.context(c.sessionId)) })
 	return refused === undefined ? {} : { refused }
 }
 
@@ -285,8 +290,11 @@ function inboxOf(id: string, records?: HistoryRecord[]): InboxItem[] {
 // later host can tell a resend. While the session is busy the message
 // waits in the inbox; `queue` also makes it wait for a paused or failed
 // turn to finish. Otherwise it starts a turn, delivering any steering
-// messages still waiting (a paused turn's) first.
-function submit(id: string, text: string, command?: string, queue = false): string | undefined {
+// messages still waiting (a paused turn's) first. A slash command runs
+// at once, whatever the state (`from`: the session that sent it).
+function submit(id: string, text: string, command?: string, queue = false, from?: string): string | undefined {
+	let call = commands.parse(text)
+	if (call) return host.command(id, text, call, command, from)
 	let state = host.stateOf(id)
 	if (states.busy(state) || (queue && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
@@ -331,6 +339,84 @@ function amend(id: string, text: string, command?: string): string | undefined {
 // tool call except read-only ones (tools.readOnly).
 function harmless(records: HistoryRecord[]): boolean {
 	return records.every((r) => r.type !== 'assistant' || r.block.type !== 'tool_call' || tools.readOnly(r.block.name))
+}
+
+// Records a slash command as typed (by whom: `from`, else the human) and
+// runs it. `command`: the client's id for the submit. Returns why it is
+// refused: no such command.
+function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string): string | undefined {
+	if (!commands.all().has(call.name)) return `unknown command /${call.name} (/help lists them)`
+	let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text }
+	if (from !== undefined) record.from = from
+	if (command !== undefined) record.command = command
+	history.append(id, record)
+	host.broadcast(id, from === undefined ? { type: 'command', sessionId: id, text } : { type: 'command', sessionId: id, text, from })
+	void host.runCommand(id, call.name, call.args)
+}
+
+// What a command runs with: its session, whose cwd it may change.
+function context(id: string): Context {
+	let meta = sessions.open(id)
+	return {
+		sessionId: id,
+		cwd: meta.cwd,
+		setCwd: (cwd) => {
+			meta.cwd = cwd
+			liveFiles.save(meta)
+			host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta } })
+		},
+	}
+}
+
+// Runs command `name` (again, with `answers`, once its question is
+// answered) and records what it said. A command asks only when no turn
+// is busy and no other question is open.
+async function runCommand(id: string, name: string, args: string, answers?: Answers): Promise<void> {
+	let reply: Reply
+	try {
+		let cmd = commands.all().get(name)
+		if (!cmd) throw new Error(`unknown command /${name}`)
+		reply = await cmd.run(args, answers, host.context(id))
+	} catch (e: any) {
+		reply = { error: String(e?.message ?? e) }
+	}
+	if (reply.say !== undefined) host.output(id, reply.say)
+	if (reply.error !== undefined) host.output(id, reply.error, true)
+	if (!reply.ask) return
+	let problem = forms.invalid(reply.ask)
+	if (problem) return host.output(id, `/${name} asked a bad question: ${problem}`, true)
+	if (states.busy(host.stateOf(id))) return host.output(id, `/${name} can't ask while the session is busy; try again when it is done`, true)
+	let question = crypto.randomUUID().slice(0, 8)
+	let before = host.stateOf(id)
+	history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args } })
+	host.broadcast(id, { type: 'question', sessionId: id, id: question, form: reply.ask })
+	host.settle(id, before)
+}
+
+function output(id: string, text: string, error = false): void {
+	history.append(id, error ? { type: 'output', text, error } : { type: 'output', text })
+	host.broadcast(id, error ? { type: 'output', sessionId: id, text, error } : { type: 'output', sessionId: id, text })
+}
+
+// Sets the session's state to what history says, telling followers if
+// it changed: after a command's question opens or closes, the session
+// is as it was before (a command is not a turn). `before`: the state
+// followers know, taken before the change was recorded.
+function settle(id: string, before: SessionState): void {
+	let next = states.fromHistory(history.readSync(id))
+	host.state.states.set(id, next)
+	if (ason.stringify(next) !== ason.stringify(before)) host.broadcast(id, { type: 'state', sessionId: id, state: next })
+}
+
+// After a command's question closed on an idle session: runs what was
+// sent meanwhile, steering first, as submit and next would have.
+function drain(id: string): void {
+	if (host.stateOf(id).type !== 'idle') return
+	let steering = host.inboxOf(id).filter((m) => !m.queue)
+	if (!steering.length) return host.next(id)
+	if (host.transition(id, { type: 'submit' })) return
+	host.deliver(id, steering)
+	host.start(id)
 }
 
 // Records inbox messages (and a new prompt `text`) as one prompt and
@@ -407,7 +493,8 @@ function ask(id: string, form: Form, call?: string): void {
 }
 
 // The first valid answer to the open question: recorded (secrets only
-// named), shown, and the turn that asked runs again with it. Returns
+// named), shown, and the turn or command that asked runs again with it.
+// Returns
 // why it is refused: not the open question (someone answered first),
 // or answers that don't fit the form.
 function reply(id: string, question: string, answers: Answers): string | undefined {
@@ -415,9 +502,18 @@ function reply(id: string, question: string, answers: Answers): string | undefin
 	if (!open || open.id !== question || host.state.running.has(id)) return 'that question is not open (answered already?)'
 	let problem = forms.check(open.form, answers)
 	if (problem) return problem
+	let kept = forms.redact(open.form, answers)
+	if (open.from) {
+		let { command: name, args } = open.from
+		let before = host.stateOf(id)
+		history.append(id, { type: 'answer', question, ...kept })
+		host.broadcast(id, { type: 'answer', sessionId: id, question, ...kept })
+		host.settle(id, before)
+		void host.runCommand(id, name, args, answers).then(() => host.drain(id))
+		return
+	}
 	let refused = host.transition(id, { type: 'answer' })
 	if (refused) return refused
-	let kept = forms.redact(open.form, answers)
 	history.append(id, { type: 'answer', question, ...kept })
 	host.broadcast(id, { type: 'answer', sessionId: id, question, ...kept })
 	host.start(id, undefined, answers)
@@ -437,7 +533,16 @@ function start(id: string, prompt?: string, answers?: Answers): void {
 
 // Pauses the session's turn: one running here stops and runTurn records
 // it paused; one not running here (unfinished on disk) is paused on disk.
+// A command's open question is dismissed instead: nothing ran.
 function stop(id: string, reason?: string): string | undefined {
+	let open = forms.open(history.readSync(id))
+	if (open?.from) {
+		let before = host.stateOf(id)
+		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
+		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, cancelled: true })
+		host.settle(id, before)
+		return void host.drain(id)
+	}
 	let event: StateEvent = { type: 'pause' }
 	if (reason !== undefined) event.reason = reason
 	let refused = host.transition(id, event)
@@ -463,7 +568,7 @@ async function recover(): Promise<void> {
 	for (let listing of sessions.list()) {
 		let id = listing.id
 		if (!listing.meta || host.state.running.has(id)) continue
-		let tail = history.tail(id)
+		let tail = replay.withoutCommands(history.tail(id))
 		let last = tail.at(-1)
 		if (!last) continue
 		// Only the tail is read (all histories would be slow): a queued
@@ -725,6 +830,12 @@ export const host = {
 	submit,
 	amend,
 	harmless,
+	command,
+	context,
+	runCommand,
+	output,
+	settle,
+	drain,
 	deliver,
 	steer,
 	next,

@@ -41,6 +41,9 @@ owns it; later tasks point to it.
 - Small ASON state files (config, metadata, credentials) go through
   `liveFiles.liveFile` in `src/host/live-file.ts`; never hand-roll
   reading, parsing or writing them.
+- Slash commands are files in `src/host/commands/` (one per command,
+  found by listing the directory; `src/host/commands.ts`). They run and
+  complete on the host; a command that asks re-runs with the answer.
 - Settings: common ones in config.ason (home root, declared in one
   table in src/common/settings.ts, task pc); anything else by
   overriding exported functions or fields from gitignored `local.ts`.

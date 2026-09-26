@@ -6,6 +6,7 @@
 // until the host has it.
 
 import { amend, type Editing } from '../common/amend.ts'
+import { completion } from '../common/completion.ts'
 import { connection, type LinkState } from '../common/connection.ts'
 import { forms, type FormState } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
@@ -66,6 +67,7 @@ function onEvent(event: Event): void {
 	if (drafts.onEvent(event) && st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id) app.setPrompt(drafts.text(event.sessionId))
 	if (event.type === 'rejected') st.notice = `${event.command} refused: ${event.reason}`
 	else if (event.type === 'warning') st.notice = event.text
+	else if (event.type === 'completions') app.completed(event)
 	else {
 		let t = transcript.fold(st.transcript, event)
 		if (event.type === 'snapshot' && t && t !== st.transcript) st.resumed = transcript.resumed(event.snapshot, t)
@@ -113,6 +115,16 @@ function submit(text: string, queue = false): boolean {
 		else app.send(command)
 	}
 	return true
+}
+
+// The host's completions for the prompt, if it still says what was sent.
+function completed(event: Event & { type: 'completions' }): void {
+	let st = app.state
+	if (st.transcript?.meta.id !== event.sessionId || st.prompt.text !== event.text) return
+	let { text, choices } = completion.apply(event.text, event.items)
+	app.setPrompt(text)
+	if (text !== event.text) drafts.edit(event.sessionId, text)
+	st.notice = choices ? choices.join('  ') : event.items.length ? undefined : 'no completions'
 }
 
 // Puts `text` in the prompt, unless it is there already (the cursor
@@ -170,6 +182,13 @@ function onKeys(events: KeyEvent[]): void {
 			continue
 		}
 		if (app.editKey(k)) continue
+		// Tab at the end of a slash command: the host completes it.
+		let tab = k.key === 'tab' && !k.shift && st.transcript && st.prompt.cursor === st.prompt.text.length
+		let complete = tab && completion.request(st.transcript!.meta.id, st.prompt.text)
+		if (complete) {
+			app.send(complete)
+			continue
+		}
 		let { state, action } = prompt.apply(st.prompt, k)
 		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
@@ -215,6 +234,7 @@ export const app = {
 	onEvent,
 	onState,
 	submit,
+	completed,
 	setPrompt,
 	editKey,
 	onKeys,
