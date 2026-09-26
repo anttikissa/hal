@@ -1,0 +1,174 @@
+{
+	client: {
+		// Load non-active session histories in the background so tab switches are fast.
+		backgroundLoadTabs: true,
+		// Hydrate blob-backed history content after the initial session load.
+		backgroundLoadBlobs: true,
+		// Redraw the interface when background blob hydration changes visible content.
+		repaintAfterBlobLoad: true,
+		// Delay before showing a paused notice, to avoid flicker during quick resumes.
+		pausedNoticeDelayMs: 50
+	},
+	tabs: {
+		// Maximum number of sessions in the shared open-tab list.
+		maxTabs: 40
+	},
+	blocks: {
+		// Display width for tab characters in rendered blocks.
+		tabWidth: 4,
+		// Number of blob sidecar files to hydrate in one batch while rendering history.
+		blobBatchSize: 64,
+		// Maximum rendered text rows per tool card, including its header.
+		maxToolTextRows: 8,
+		// Maximum diff lines shown inline for edit tool results.
+		maxEditDiffLines: 3
+	},
+	prompt: {
+		// Maximum prompt editor height before the prompt scrolls internally.
+		maxPromptLines: 10
+	},
+	render: {
+		// Delay between fade animation frames; 67ms is about 15fps.
+		halCursorFadeFrameMs: 67
+	},
+	renderHistory: {
+		// Brightness multiplier for inherited fork history; lower values look dimmer.
+		forkHistoryDimFactor: 0.82,
+		// Duration of HAL cursor fade from working to idle after generation ends.
+		halCursorFadeMs: 5000,
+		// Delay between revealing adjacent parallel tool cards.
+		toolRevealDelayMs: 100
+	},
+	renderStatus: {
+		// 04-uki
+		showSession: true,
+		// ~/.hal
+		showCwd: true,
+		// GPT 5.5
+		showModel: true,
+		// 39k/1050k (4%)
+		showContext: true,
+		// server:12345
+		showServer: true,
+		// ↑56k input tokens sent, ↓2.8k output tokens received.
+		showTokenInOut: true,
+		// R1.7M cache tokens read, W42k cache tokens written; W only appears when writing new cache.
+		showTokenCache: false,
+		// Sub 2/3: 5h 23%, 7d 61%
+		showSubscription: true,
+		// Prompt cursor shape: 'block', 'blinking-block', 'underline', 'blinking-underline', 'bar', 'blinking-bar', or 'native'.
+		promptCursorShape: 'block',
+		// Binary chrome visibility for the guided intro. New installs start hidden.
+		tabsOpacity: 0,
+		promptOpacity: 0,
+		statusOpacity: 0,
+		helpOpacity: 0
+	},
+	agentLoop: {
+		// Maximum generate/tool-result cycles before stopping a runaway agent loop.
+		maxIterations: 200,
+		// Maximum local tools to execute concurrently in one cycle.
+		maxToolConcurrency: 5,
+		// Prune consumed tool results and images before calls near this estimated token count.
+		contextPruneThresholdTokens: 180000,
+		// Base retry delay for transient provider errors.
+		retryBaseDelayMs: 5000,
+		// Maximum total retry time for one provider request.
+		retryMaxTotalMs: 7200000,
+		// HTTP statuses treated as transient provider errors.
+		retryableStatuses: [429, 500, 503, 529],
+		// Max lines of a provider error payload printed in the UI; the rest stays in the blob.
+		maxErrorDetailLines: 20
+	},
+	inbox: {
+		// How often to rescan session inboxes even if no filesystem event arrived.
+		// fs.watch drops and coalesces events, so this poll is the delivery guarantee.
+		pollIntervalMs: 2000,
+		// Coalesce a burst of filesystem events into a single rescan.
+		debounceMs: 50
+	},
+	memory: {
+		// RSS threshold for showing a high-memory warning; set to 0 to disable warnings.
+		warnBytes: 1500000000,
+		// RSS threshold for exiting before memory grows without bound; set to 0 to disable exits.
+		killBytes: 5000000000,
+		// How often to check RSS.
+		checkIntervalMs: 1000
+	},
+	models: {
+		// New installations start with HAL's guided intro. The intro changes this to
+		// 'gpt' after it has revealed the interface.
+		default: 'intro',
+		// Fetch fresh model metadata from models.dev at startup. The intro turns this
+		// on when it ends, so its stream is not interrupted by a status line.
+		refresh: false
+	},
+	subscriptionUsage: {
+		// Mask account email addresses in usage and status output.
+		censorEmails: false
+	},
+	accountRotation: {
+		// How to pick an available account after quota exhaustion: 'leastUsed' or 'next'.
+		strategy: 'leastUsed'
+	},
+	anthropicUsage: {
+		// Minimum delay between automatic usage refreshes.
+		minAutoRefreshMs: 60000,
+		// HTTP timeout for Anthropic usage requests.
+		fetchTimeoutMs: 5000,
+		// Width of the usage progress bar in status output.
+		progressBarWidth: 14
+	},
+	openaiUsage: {
+		// Minimum delay between automatic usage refreshes.
+		minAutoRefreshMs: 60000,
+		// HTTP timeout for OpenAI usage requests.
+		fetchTimeoutMs: 10000,
+		// Width of the usage progress bar in status output.
+		progressBarWidth: 14
+	},
+	openai: {
+		// Responses transport for native OpenAI models: 'http', 'ws', or 'auto'.
+		// 'http' is the stable SSE path; 'ws' forces WebSocket; 'auto' tries WS then falls back to HTTP.
+		responsesTransport: 'auto',
+		// Maximum time to wait for the initial WebSocket connection before falling back to HTTP.
+		responsesConnectTimeoutMs: 10000
+	},
+	halProvider: {
+		// Number of words streamed per second by HAL's built-in scripted models.
+		wordsPerSecond: 10,
+		// Number of captured fragments per second in the table-layout reproduction.
+		tableChunksPerSecond: 60
+	},
+	toolRegistry: {
+		// Hard cap for any tool result sent back to the model.
+		maxOutputBytes: 65536
+	},
+	spawnAgent: {
+		// Spawn slots available to each user-created session; recursive limits transfer these slots.
+		initialLimit: 5
+	},
+	ipc: {
+		// Truncate the IPC event/command bus once it exceeds this size (bytes).
+		maxLogBytes: 10000000
+	},
+	log: {
+		// File log level: '', 'off', 'info', 'error', or 'debug'.
+		level: 'info'
+	},
+	clipboard: {
+		// Pasted text at or below this many lines stays inline; longer pastes become temp files.
+		multilinePasteFileLineLimit: 7
+	},
+	web: {
+		// Serve the local browser client. The intro turns this on when it ends, so its
+		// stream is not interrupted by the announcement.
+		enabled: false,
+		// Port for the local browser client.
+		port: 9001,
+		// Public HTTPS hostname for remote browser links, without a scheme or path. Leave empty for local-only use.
+		hostname: '',
+		// Maximum size accepted for images uploaded through the web client's attach button.
+		maxUploadBytes: 8388608
+	}
+}

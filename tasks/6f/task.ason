@@ -1,6 +1,6 @@
 {
 	title: 'Approval for dangerous tool calls',
-	description: 'Before running a tool call, the host checks it against patterns for dangerous commands (rm -rf and friends; not plain rm -f, which models overuse harmlessly). A match asks a durable y/N question showing the call with the offending part highlighted; No returns an error result to the model, Yes runs it. One setting switches the policy: strict, loose or yolo (never ask). See tasks/w4/forms.md (Approval).',
+	description: 'Before running a tool call, the host checks it against patterns for dangerous commands (rm -rf and friends; not plain rm -f, which models overuse harmlessly). A match asks a durable y/N question showing the call with the offending part highlighted; No returns an error result to the model, Yes runs it. The config setting security switches it: best-effort (default: ask on matches) or none (never ask). It is best effort by name: no sandbox, and a determined model gets around patterns. See tasks/w4/forms.md (Approval).',
 	status: 'planned',
-	needs: ['w4', '1r']
+	needs: ['w4', '1r', 'pc']
 }

@@ -1,0 +1,139 @@
+// Color definitions — all values are oklch [lightness, chroma, hue].
+//
+// Same L and C across hues = perceptually equal brightness and vividness.
+// Edit this file while running — colors reload live.
+//
+// Variable references ("$fgL") are resolved from the vars block.
+{
+	vars: {
+		fgL: 0.80,
+		fgC: 0.15,
+		bgL: 0.25,
+		bgC: 0.04,
+	},
+
+	// Hal's responses — warm orange.
+	// fg colors assistant text. cursor colors the active HAL cursor while Hal is
+	// thinking/streaming or shown as a busy tab marker. cursorIdle colors the
+	// idle cursor after Hal has finished its final message.
+	// linkFg/linkBg style Markdown link labels without fighting the terminal's hover underline.
+	assistant: {
+		fg: ["$fgL", "$fgC", 55],
+		cursor: ["$fgL", "$fgC", 55],
+		cursorIdle: [0.56, 0, 55],
+		bg: [0, 0, 55],
+		bold: [0.90, 0.06, 55],
+		code: [0.86, 0.04, 55],
+		linkFg: [0.88, 0.15, 55],
+		linkBg: [0.30, 0.05, 55],
+	},
+
+	// Thinking — muted blue-grey, recedes visually
+	thinking: {
+		fg: [0.72, 0.03, 250],
+		bg: [0, 0, 250],
+		bold: [0.85, 0.02, 250],
+		code: [0.78, 0.03, 250],
+		linkBg: [0.20, 0.02, 250],
+	},
+
+	// User messages and prompt input — the same bright blue card.
+	user: {
+		fg: [0.82, 0.11, 220],
+		bg: [0.29, 0.05, 220],
+	},
+
+	input: {
+		bg: [0.29, 0.05, 220],
+		cursor: [0.82, 0.11, 220],
+	},
+
+	// Log — neutral, moderately dim.
+	log: {
+		fg: [0.66, 0, 0],
+		code: [0.78, 0, 0],
+		linkBg: [0.30, 0, 0],
+	},
+
+	// Warnings — amber, noticeable but not fatal
+	warning: {
+		fg: [0.78, 0.14, 85],
+		bg: [0.28, 0.05, 85],
+		code: [0.88, 0.10, 85],
+		linkBg: [0.35, 0.05, 85],
+	},
+
+	// Errors — hot red
+	error: {
+		fg: [0.70, 0.20, 25],
+		bg: [0.27, 0.08, 25],
+		code: [0.82, 0.14, 25],
+		linkBg: [0.34, 0.08, 25],
+	},
+
+	// Info cards use the same palette as system notices.
+	info: {
+		fg: [0.74, 0.06, 55],
+		bg: [0.22, 0.025, 55],
+		code: [0.86, 0.04, 55],
+		linkBg: [0.30, 0.025, 55],
+	},
+
+	// Fork lineage — vivid purple, distinct from normal info/warning
+	fork: {
+		fg: [0.80, 0.16, 320],
+		bg: [0.28, 0.06, 320],
+	},
+
+	// Status line — neutral base plus a controllable high-importance highlight.
+	status: {
+		fg: [0.64, 0, 0],
+		highlight: [0.90, 0.01, 250],
+	},
+
+	// Tab indicators and labels. Paused tabs use a bright warning foreground.
+	tab: {
+		activeFg: [0.90, 0.01, 250],
+		inactiveFg: [0.58, 0, 0],
+		doneFg: [0.78, 0.14, 145],
+		warningFg: [0.86, 0.16, 95],
+		errorFg: [0.70, 0.20, 25],
+		pausedFg: [0.86, 0.16, 95],
+	},
+
+	// Help bar — keys stand out from descriptions, but stay below prompt input.
+	help: {
+		key: [0.76, 0.008, 250],
+		description: [0.60, 0, 0],
+	},
+
+	popup: {
+		neutralFg: [0.64, 0, 0],
+		dangerFg: [0.86, 0.16, 85],
+		current: {
+			fg: [0.98, 0.04, 55],
+			bg: [0.42, 0.12, 55],
+		},
+		modelCurrent: {
+			fg: [0.88, 0, 0],
+			bg: [0.28, 0, 0],
+		},
+	},
+
+	// Edit diffs — additions are green, removals use the error hue.
+	diff: {
+		addFg: [0.78, 0.14, 145],
+		removeFg: [0.70, 0.20, 25],
+	},
+
+	// Tools — each type gets a distinct hue.
+	// Write/edit use non-error hues; red is reserved for actual failures.
+	tools: {
+		default: { fg: ["$fgL", "$fgC", 250], bg: ["$bgL", "$bgC", 250] },
+		bash:    { fg: ["$fgL", "$fgC", 320], bg: ["$bgL", "$bgC", 320] },
+		eval:    { fg: ["$fgL", "$fgC", 295], bg: ["$bgL", 0.06, 295] },
+		read:    { fg: ["$fgL", "$fgC", 155], bg: ["$bgL", "$bgC", 155] },
+		write:   { fg: [0.78, 0.12, 75],       bg: ["$bgL", 0.04, 75] },
+		edit:    { fg: [0.76, 0.11, 190],      bg: ["$bgL", 0.04, 190] },
+	},
+}

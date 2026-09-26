@@ -31,8 +31,9 @@ owns it; later tasks point to it.
 - Small ASON state files (config, metadata, credentials) go through
   `liveFiles.liveFile` in `src/host/live-file.ts`; never hand-roll
   reading, parsing or writing them.
-- No config file: config values are functions on module objects,
-  overridable from one gitignored `local.ts`.
+- Settings: common ones in config.ason (home root, declared in one
+  table in src/common/settings.ts, task pc); anything else by
+  overriding exported functions or fields from gitignored `local.ts`.
 
 ## Layout and module conventions
 
