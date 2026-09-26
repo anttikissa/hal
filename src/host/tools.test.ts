@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { tools } from './tools.ts'
 
@@ -72,4 +72,47 @@ test('failures are error results, never throws', async () => {
 	}
 	let unknown = await tools.run({ type: 'tool_call', id: 'c2', name: 'nope', input: {} }, { cwd: dir, signal })
 	expect(unknown).toMatchObject({ id: 'c2', isError: true })
+})
+
+const bash = (input: Record<string, unknown>, sig = signal) =>
+	tools.run({ type: 'tool_call', id: 'b1', name: 'bash', input }, { cwd: dir, signal: sig })
+
+test('bash runs in the session cwd and returns exit status with stdout and stderr interleaved', async () => {
+	writeFileSync(`${dir}/a.txt`, 'hello\n')
+	let r = await bash({ command: 'cat a.txt; echo oops >&2; echo after; exit 3', description: 'Show a file then fail' })
+	expect(r.id).toBe('b1')
+	expect(r.output).toMatch(/\b3\b/)
+	expect(r.output).toContain('hello\noops\nafter\n')
+	expect((await bash({ command: 'pwd', description: 'Show the cwd' })).output).toContain(realpathSync(dir))
+})
+
+test('bash without a description is an error and does not run the command', async () => {
+	for (let description of [undefined, '', '   ', 7]) {
+		let r = await bash({ command: 'touch ran', description })
+		expect(r.isError).toBe(true)
+		expect(existsSync(`${dir}/ran`)).toBe(false)
+	}
+	expect((await bash({ description: 'Nothing' })).isError).toBe(true)
+})
+
+test('bash output is bounded, keeping the exit status', async () => {
+	tools.maxChars = () => 1000
+	let r = await bash({ command: 'yes | head -c 100000; exit 5', description: 'Print a lot' })
+	expect(r.output.length).toBeLessThanOrEqual(1200)
+	expect(r.output).toMatch(/\b5\b/)
+})
+
+test('cancel stops a running command, pipelines included, and a cancelled turn runs nothing more', async () => {
+	let ac = new AbortController()
+	let started = Date.now()
+	let pending = bash({ command: 'sleep 30 | cat; touch late', description: 'Wait' }, ac.signal)
+	await Bun.sleep(200)
+	ac.abort()
+	await pending
+	expect(Date.now() - started).toBeLessThan(5000)
+	await Bun.sleep(100)
+	expect(existsSync(`${dir}/late`)).toBe(false)
+	let r = await bash({ command: 'touch ran', description: 'Touch' }, ac.signal)
+	expect(r.isError).toBe(true)
+	expect(existsSync(`${dir}/ran`)).toBe(false)
 })
