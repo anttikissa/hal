@@ -5,6 +5,12 @@ agents. The user starts a fresh-context agent for each task (`tsk ready`,
 `tsk show <id>`), which works test-first, with `tsk done <id>` and a
 `Task: <id>` trailer in the same commit.
 
+Lessons that would help the next implementer (surprises, wrong
+artifacts, decisions later tasks depend on) go in the task's `notes`
+field in task.ason, a list of strings that `tsk show` prints. Never
+put them in separate notes files. Read `tsk help` and the tsk README
+before inventing a convention tsk may already have.
+
 Before changing code, read tasks/README.md: it holds the architecture,
 module conventions and invariants (such as the emergency keys) that
 every change must keep.
