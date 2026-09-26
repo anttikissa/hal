@@ -20,6 +20,7 @@ const allowed: Record<string, string[]> = {
 	common: ['common'],
 	host: ['host', 'common'],
 	client: ['client', 'common'],
+	web: ['web', 'common'],
 }
 
 function violation(file: string, target: string): string | undefined {
@@ -60,6 +61,10 @@ test('layer rules reject cross-layer imports', () => {
 	expect(violation(`${s}/common/a.ts`, `${s}/main.ts`)).toBeDefined()
 	expect(violation(`${s}/host/a.ts`, `${s}/client/b.ts`)).toBeDefined()
 	expect(violation(`${s}/client/a.ts`, `${s}/host/x/b.ts`)).toBeDefined()
+	expect(violation(`${s}/web/a.ts`, `${s}/host/b.ts`)).toBeDefined()
+	expect(violation(`${s}/web/a.ts`, `${s}/client/b.ts`)).toBeDefined()
+	expect(violation(`${s}/host/a.ts`, `${s}/web/b.ts`)).toBeDefined()
+	expect(violation(`${s}/web/a.ts`, `${s}/common/b.ts`)).toBeUndefined()
 	expect(violation(`${s}/host/a.ts`, `${s}/common/b.ts`)).toBeUndefined()
 	expect(violation(`${s}/client/a/b.ts`, `${s}/client/c.ts`)).toBeUndefined()
 	expect(violation(`${s}/main.ts`, `${s}/host/b.ts`)).toBeUndefined()
@@ -76,7 +81,7 @@ test('source files respect layer boundaries', () => {
 	expect(problems).toEqual([])
 })
 
-test('src has only common, host and client directories', () => {
+test('src has only common, host, client and web directories', () => {
 	let dirs = new Set<string>()
 	for (let file of sourceFiles()) {
 		let l = layer(file)

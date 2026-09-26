@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import type { StreamEvent } from '../common/blocks.ts'
@@ -167,3 +167,87 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	await until(() => host.state.clients.size === 1)
 	conn.close()
 })
+
+const chrome = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/chromium', '/usr/bin/google-chrome'].find((p) =>
+	existsSync(p),
+)
+
+// A headless Chrome page driven over the DevTools protocol.
+async function browser() {
+	let dir = mkdtempSync(`${tmpdir()}/hal-chrome-`)
+	let proc = Bun.spawn([chrome!, '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', 'about:blank'], {
+		stdout: 'ignore',
+		stderr: 'ignore',
+	})
+	let port = ''
+	await until(() => existsSync(`${dir}/DevToolsActivePort`) && (port = readFileSync(`${dir}/DevToolsActivePort`, 'utf8').split('\n')[0]!))
+	let targets: any[] = []
+	for (let i = 0; i < 100 && !targets.some((t) => t.type === 'page'); i++) {
+		targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
+		await Bun.sleep(20)
+	}
+	let ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl)
+	await new Promise((r) => (ws.onopen = r))
+	let next = 0
+	let waiting = new Map<number, (m: any) => void>()
+	ws.onmessage = (m) => {
+		let msg = JSON.parse(String(m.data))
+		waiting.get(msg.id)?.(msg)
+	}
+	let call = (method: string, params: object) =>
+		new Promise<any>((resolve) => {
+			waiting.set(++next, resolve)
+			ws.send(JSON.stringify({ id: next, method, params }))
+		})
+	let evaluate = async (expression: string) => (await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result?.result?.value
+	let waitFor = async (expression: string) => {
+		for (let i = 0; i < 250; i++) {
+			if (await evaluate(expression)) return
+			await Bun.sleep(20)
+		}
+		throw new Error(`timed out waiting for ${expression}: ${await evaluate("location.href + document.documentElement.outerHTML.slice(-600)")}`)
+	}
+	let close = async () => {
+		ws.close()
+		proc.kill()
+		await proc.exited
+		rmSync(dir, { recursive: true, force: true })
+	}
+	return { call, evaluate, waitFor, close }
+}
+
+test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a reply', async () => {
+	host.stream = () =>
+		(async function* (): AsyncGenerator<StreamEvent> {
+			yield { type: 'text', text: 'hello from fake' }
+			yield { type: 'done', reason: 'end' }
+		})()
+	let origCwd = web.cwd
+	web.cwd = () => '/tmp'
+	let b = await browser()
+	try {
+		await server.serve()
+		await b.call('Page.navigate', { url: `${base()}/` })
+		await b.waitFor(`!!document.querySelector('input[type=password]')`)
+		await b.evaluate(`document.querySelector('input').value = 'wrong'; document.querySelector('form').requestSubmit()`)
+		await b.waitFor(`document.querySelector('#notice').textContent === 'wrong password'`)
+		await b.evaluate(`document.querySelector('input').value = 'hello123'; document.querySelector('form').requestSubmit()`)
+		await b.waitFor(`!!document.querySelector('textarea')`)
+		// The page created a session in web.cwd() and opened it.
+		await until(() => sessions.newest())
+		// Later visits skip the form.
+		await b.call('Page.reload', {})
+		await b.waitFor(`!!document.querySelector('textarea') && !document.querySelector('form')`)
+		// Enter submits once the session is open (until then it is refused
+		// with a notice and the text stays).
+		await b.waitFor(
+			`(() => { let t = document.querySelector('textarea'); t.value = 'hi'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`,
+		)
+		await b.waitFor(`document.querySelector('main').innerText.includes('hello from fake')`)
+		expect(await b.evaluate(`document.querySelector('.prompt').textContent`)).toBe('hi')
+		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('')
+	} finally {
+		web.cwd = origCwd
+		await b.close()
+	}
+}, 20000)

@@ -24,6 +24,10 @@ Each task lives in a directory named by its ID, with a task.ason record and opti
   No disk, sockets or process globals; imports only common.
 - `src/host/` — sessions, providers, disk. Imports host and common.
 - `src/client/` — terminal. Imports client and common.
+- `src/web/` — browser client (plain DOM, no framework). Imports web
+  and common only; host/web.ts bundles `page.ts` into `index.html`
+  with Bun.build on first request. DOM-free logic (view.ts, link.ts)
+  is unit-tested; page.ts runs its `init()` only when `document` exists.
 - `src/main.ts` — the composition root and the only file that wires
   host and client together. Tests sit next to code as `*.test.ts`.
 - `src/conventions.test.ts` enforces the import rules and that

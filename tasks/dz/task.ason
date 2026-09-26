@@ -1,6 +1,13 @@
 {
 	title: 'Browser client with the terminal features',
 	description: 'One page doing what the terminal client does, served by the p6 endpoint. Without the cookie it shows a password field; after one successful login it goes straight to the conversation on later visits. It connects to /ws, opens the newest session (or creates one), and folds events with the same common transcript.fold the terminal uses, so both show the same transcript: prompts, thinking (dimmed), streamed text, tool calls and results, turn ends ([cancelled], [interrupted], errors) and rejected notices. A textarea submits on Enter (Shift+Enter is a newline); Escape cancels a running turn. On disconnect it reconnects with backoff and takes the fresh snapshot, like a restarted terminal. Keep it tiny: plain DOM, no framework or CSS library, no build step beyond Bun bundling the TS at request time (or at startup). Code lives in src/web/ (browser only; imports web and common, never host or client); extend the conventions test and tasks/README.md for this layer. Test the page logic that is not DOM (view from events, reconnect) with plain unit tests, and one end-to-end check that the served bundle loads and logs in, using a headless browser only if one is already installed.',
-	status: 'planned',
-	needs: ['p6']
+	status: 'done',
+	needs: ['p6'],
+	notes: [
+		'src/web/: view.ts (pure state + item display), link.ts (WebSocket with backoff, injectable dial/timers), page.ts (DOM; runs init() only if document exists), index.html (CSS; /*APP*/ is replaced by the bundle).',
+		'web.page() Bun.builds page.ts with format iife (esm output breaks in a classic inline script) and caches it until server.stop(); edits to src/web need a host restart.',
+		'With no session, GET /session answers 204 with a hal-cwd header (web.cwd(), default process.cwd()) so the page can send create without knowing the host cwd.',
+		'After a reconnect the page reopens the session on screen, not the newest one. Commands typed while disconnected are refused with a notice, not queued.',
+		'page.ts uses /// <reference lib="dom" />; tsconfig lib stays ESNext. The e2e test in host/web.test.ts drives an installed Chrome over CDP and skips without one.'
+	]
 }
