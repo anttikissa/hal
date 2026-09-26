@@ -172,3 +172,23 @@ test('an edited prompt supersedes the prompt it replaces and that turn, as if wr
 	let again: HistoryRecord = { ...replaced, blocks: [{ type: 'text', text: 'fix it now' }] }
 	expect(replay.toMessages([...before, say('fix ti'), end('paused'), replaced, end('paused'), again])).toEqual(replay.toMessages([...before, say('fix it now')]))
 })
+
+test('a /cd or model switch reaches the model as notes on the next prompt, latest value only', () => {
+	let change = (c: { cwd?: string; model?: string }): HistoryRecord => ({ type: 'change', ...c, ts })
+	let before = [say('hi'), block({ type: 'text', text: 'hello' }), end('error', { error: 'boom' })]
+	let msgs = replay.toMessages([...before, change({ cwd: '/a' }), change({ model: 'openai/gpt-5' }), change({ cwd: '/b' }), say('where?'), block({ type: 'text', text: 'there' }), end('completed'), say('and now?')])
+	let [, second, third] = prompts(msgs)
+	expect(second).toMatch(/^\[\d\d:\d\d\]\n<meta>[^<]*boom[^<]*<\/meta>\n/)
+	expect(second).toMatch(/\n<meta>[^<]*\/b[^<]*<\/meta>\n/)
+	expect(second).toMatch(/\n<meta>[^<]*openai\/gpt-5[^<]*<\/meta>\n/)
+	expect(second).not.toMatch(/\/a\b/)
+	expect(second).toMatch(/\nwhere\?$/)
+	expect(third).toMatch(/^\[\d\d:\d\d\]\nand now\?$/)
+	// Nothing else changes: the same history without them, notes aside.
+	expect(msgs.map((m) => m.role)).toEqual(replay.toMessages([...before, say('where?'), block({ type: 'text', text: 'there' }), end('completed'), say('and now?')]).map((m) => m.role))
+})
+
+test('a change is not a turn: withoutCommands drops it', () => {
+	let records: HistoryRecord[] = [say('hi'), end('completed'), { type: 'change', cwd: '/x', ts }]
+	expect(replay.withoutCommands(records).at(-1)).toEqual(end('completed'))
+})

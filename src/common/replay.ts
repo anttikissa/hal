@@ -46,13 +46,17 @@ export type HistoryRecord =
 	| { type: 'command'; text: string; from?: string; command?: string; ts: string }
 	// What a command said; `error` if it failed.
 	| { type: 'output'; text: string; error?: true; ts: string }
+	// The session's cwd (/cd) or model changed. Not a turn; the model is
+	// told in front of its next prompt.
+	| { type: 'change'; cwd?: string; model?: string; ts: string }
 
 // Provider messages from history. Unsigned thinking (a cut-off stream) is
 // not replayable and is left out. Each tool call gets a result before the
 // next user message: a missing one becomes an error result, and results
 // with no call are dropped, so the input stays valid for every provider.
 // Each prompt is its own message, starting with its [HH:MM] line and, if
-// the turn before it failed or was paused, a <meta> note saying so:
+// the turn before it failed or was paused, a <meta> note saying so (and
+// notes for a cwd or model that changed since the last prompt):
 // providers join adjacent text blocks with no separator, so merged
 // prompts read as one ("pong" + "k" became "pongk").
 function toMessages(records: HistoryRecord[]): Message[] {
@@ -61,6 +65,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	let pending: string[] = []
 	let status: TurnStatus | undefined
 	let note: string | undefined
+	let changed: { cwd?: string; model?: string } = {}
 	let push = (msg: Message) => {
 		let last = out.at(-1)
 		if (last?.role === msg.role) (last.blocks as unknown[]).push(...msg.blocks)
@@ -74,6 +79,11 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		if (r.type === 'question' && r.call !== undefined && pending.includes(r.call)) waiting = r.id
 		if (r.type === 'answer' && r.question === waiting) waiting = undefined
 		// For the human; whoever asked hears the answer another way.
+		if (r.type === 'change') {
+			if (r.cwd !== undefined) changed.cwd = r.cwd
+			if (r.model !== undefined) changed.model = r.model
+			continue
+		}
 		if (r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) {
@@ -110,8 +120,9 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			push({ role: 'user', blocks: [...results, ...missing] })
 			let texts = r.blocks.filter((b) => b.type === 'text')
 			if (!texts.length) continue
-			let head = [`[${replay.clock(r.ts)}]`, ...(note ? [note] : [])].join('\n')
+			let head = [`[${replay.clock(r.ts)}]`, ...(note ? [note] : []), ...replay.changeNotes(changed)].join('\n')
 			note = undefined
+			changed = {}
 			// Never merged: a prompt always starts a message of its own. Its
 			// texts (several when it delivers the inbox) are one block.
 			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => b.text).join('\n\n')}` }] })
@@ -132,29 +143,29 @@ function lastPrompt(records: HistoryRecord[]): number {
 }
 
 // History as the conversation now stands: each edited prompt in place
-// of the prompt it replaces and everything after that. Inbox and answer
-// records are kept: the inbox is read from every record, and an answer
-// may be to a question asked before.
+// of the prompt it replaces and everything after that. Inbox, answer
+// and change records are kept: the inbox is read from every record, an
+// answer may be to a question asked before, and a change still holds.
 function current(records: HistoryRecord[]): HistoryRecord[] {
 	if (!records.some((r) => r.type === 'user' && r.replaces)) return records
 	let out: HistoryRecord[] = []
 	for (let r of records) {
 		if (r.type === 'user' && r.replaces) {
 			let at = replay.lastPrompt(out)
-			if (at >= 0) out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer')]
+			if (at >= 0) out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'change')]
 		}
 		out.push(r)
 	}
 	return out
 }
 
-// The records of turns alone: without slash commands, what they said
-// and the questions they asked. Commands run beside turns and never
-// change how one stands.
+// The records of turns alone: without slash commands, what they said,
+// the questions they asked and the changes they made. Commands run
+// beside turns and never change how one stands.
 function withoutCommands(records: HistoryRecord[]): HistoryRecord[] {
 	let asked = new Set(records.flatMap((r) => (r.type === 'question' && r.from ? [r.id] : [])))
 	return records.filter((r) => {
-		if (r.type === 'command' || r.type === 'output') return false
+		if (r.type === 'command' || r.type === 'output' || r.type === 'change') return false
 		if (r.type === 'question') return !r.from
 		return r.type !== 'answer' || !asked.has(r.question)
 	})
@@ -172,6 +183,14 @@ function endNote(end: Extract<HistoryRecord, { type: 'turn_end' }>): string | un
 	if (end.pauseReason !== undefined) return `<meta>Hal paused the previous turn: ${end.pauseReason}</meta>`
 	if (end.status === 'interrupted') return '<meta>The previous turn was interrupted.</meta>'
 	return '<meta>The user paused the previous turn.</meta>'
+}
+
+// What changed since the last prompt, as notes for the next one.
+function changeNotes(changed: { cwd?: string; model?: string }): string[] {
+	let out: string[] = []
+	if (changed.cwd !== undefined) out.push(`<meta>The working directory is now ${changed.cwd}</meta>`)
+	if (changed.model !== undefined) out.push(`<meta>The model is now ${changed.model}</meta>`)
+	return out
 }
 
 // Local wall-clock HH:MM of an ISO timestamp.
@@ -197,6 +216,7 @@ export const replay = {
 	current,
 	withoutCommands,
 	endNote,
+	changeNotes,
 	clock,
 	missingResult,
 }

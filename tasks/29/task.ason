@@ -1,6 +1,11 @@
 {
 	title: 'System prompt: who, where, and what changed',
 	description: 'Every provider request carries a system prompt built by the host at request time: a short identity, the date, the session cwd, the model, and the contents of AGENTS.md files found from the cwd upwards (plus the home AGENTS.md, if any). Changes the model must know about reach it as <meta> notes in front of the next prompt, like turn ends do (tasks/nn): /cd (new cwd), model switch. Keep the system prompt identical between requests of a session unless its inputs changed, so prompt caching keeps working; test that. Reference: the old SYSTEM.md in the Hal home.',
-	status: 'planned',
-	needs: ['et']
+	status: 'done',
+	needs: ['et'],
+	notes: [
+		"src/host/system-prompt.ts: systemPrompt.build({ cwd, model, now }) is pure over its inputs (and the AGENTS.md files it reads): identity, <date> (local YYYY-MM-DD, weekday: changes at midnight, not per request), <cwd>, <model>, then each AGENTS.md as <file path=...>, outermost first. host.runTurn builds it per provider round from sessions.open(id).cwd and the turn's model; synthetic models get none. anthropic.ts puts it after the OAuth identity block with cache_control.",
+		"'Home AGENTS.md' is read as the user's home ($HOME/AGENTS.md, systemPrompt.userHome(), overridable for tests), not paths.home(): in production that is the Hal repo, whose AGENTS.md holds dev rules for Hal itself. It comes first and is not repeated when the cwd is under it. No CLAUDE.md, no templating or conditionals from the old SYSTEM.md.",
+		"Changes: host.change(id, { cwd?, model? }) saves session meta, broadcasts meta and appends a `change` history record only for values that really changed. Context gained `model` and `setModel` beside setCwd, for /model (task 0x). replay.toMessages collects change records (latest value per key) into <meta> lines after the [HH:MM] and end note of the next prompt; replay.withoutCommands drops them (not a turn: states and recover ignore them), replay.current keeps them across an edit, transcript shows nothing for them (the command's output already says it)."
+	]
 }

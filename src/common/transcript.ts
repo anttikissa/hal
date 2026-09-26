@@ -64,7 +64,7 @@ function resultItem(b: ToolResultBlock): Item {
 // Display items for one history record.
 function recordItems(r: HistoryRecord): Item[] {
 	if (r.type === 'assistant') return transcript.blockItems([r.block])
-	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer') return []
+	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change') return []
 	if (r.type === 'question') return [{ type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'user') return r.blocks.map((b): Item => (b.type === 'text' ? { type: 'prompt', text: b.text } : transcript.resultItem(b)))

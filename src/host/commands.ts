@@ -15,7 +15,8 @@ import type { Answers, Form } from '../common/forms.ts'
 export type Reply = { say?: string; error?: string; ask?: Form }
 
 // The session the command runs in.
-export type Context = { sessionId: string; cwd: string; setCwd(cwd: string): void }
+// setCwd and setModel also tell the model, on its next prompt.
+export type Context = { sessionId: string; cwd: string; model: string; setCwd(cwd: string): void; setModel(model: string): void }
 
 export type SlashCommand = {
 	// One line for /help.

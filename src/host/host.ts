@@ -46,6 +46,7 @@ import { liveFiles } from './live-file.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
+import { systemPrompt } from './system-prompt.ts'
 import { tools } from './tools.ts'
 
 export type Connection = {
@@ -354,18 +355,32 @@ function command(id: string, text: string, call: { name: string; args: string },
 	void host.runCommand(id, call.name, call.args)
 }
 
-// What a command runs with: its session, whose cwd it may change.
+// What a command runs with: its session, whose cwd and model it may
+// change.
 function context(id: string): Context {
 	let meta = sessions.open(id)
 	return {
 		sessionId: id,
 		cwd: meta.cwd,
-		setCwd: (cwd) => {
-			meta.cwd = cwd
-			liveFiles.save(meta)
-			host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta } })
-		},
+		model: meta.model,
+		setCwd: (cwd) => host.change(id, { cwd }),
+		setModel: (model) => host.change(id, { model }),
 	}
+}
+
+// Changes the session's cwd or model: saved, told to followers, and
+// recorded for the model's next prompt (replay.changeNotes). The system
+// prompt of the next request follows by itself.
+function change(id: string, patch: { cwd?: string; model?: string }): void {
+	let meta = sessions.open(id)
+	let changed: typeof patch = {}
+	if (patch.cwd !== undefined && patch.cwd !== meta.cwd) changed.cwd = patch.cwd
+	if (patch.model !== undefined && patch.model !== meta.model) changed.model = patch.model
+	if (!Object.keys(changed).length) return
+	Object.assign(meta, changed)
+	liveFiles.save(meta)
+	history.append(id, { type: 'change', ...changed })
+	host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta } })
 }
 
 // Runs command `name` (again, with `answers`, once its question is
@@ -631,7 +646,10 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let asking: Form | undefined
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
-		if (!scripted) return yield* host.stream(model, { messages: await history.messages(id), tools: tools.defs() }, signal)
+		if (!scripted) {
+			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model, now: clock.now() })
+			return yield* host.stream(model, { system, messages: await history.messages(id), tools: tools.defs() }, signal)
+		}
 		let reply = scripted(await history.read(id), answers)
 		answers = undefined
 		asking = reply.ask
@@ -832,6 +850,7 @@ export const host = {
 	harmless,
 	command,
 	context,
+	change,
 	runCommand,
 	output,
 	settle,

@@ -38,6 +38,9 @@ owns it; later tasks point to it.
 - Conversation truth is per-session ASONL history of provider-neutral
   blocks. Provider input is rebuilt from it; display state never is.
 - Providers are small request/stream mappers behind one interface.
+  The system prompt is built per request from its inputs alone
+  (`src/host/system-prompt.ts`) so it stays byte-identical for caching;
+  what changes mid-session (cwd, model) is also told as a <meta> note.
 - Small ASON state files (config, metadata, credentials) go through
   `liveFiles.liveFile` in `src/host/live-file.ts`; never hand-roll
   reading, parsing or writing them.
