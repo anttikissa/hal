@@ -1,0 +1,6 @@
+{
+	title: 'System prompt: who, where, and what changed',
+	description: 'Every provider request carries a system prompt built by the host at request time: a short identity, the date, the session cwd, the model, and the contents of AGENTS.md files found from the cwd upwards (plus the home AGENTS.md, if any). Changes the model must know about reach it as <meta> notes in front of the next prompt, like turn ends do (tasks/nn): /cd (new cwd), model switch. Keep the system prompt identical between requests of a session unless its inputs changed, so prompt caching keeps working; test that. Reference: the old SYSTEM.md in the Hal home.',
+	status: 'planned',
+	needs: ['et']
+}
