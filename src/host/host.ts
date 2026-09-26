@@ -371,11 +371,20 @@ function stop(id: string, reason?: string): string | undefined {
 // Continues every unfinished turn on disk (a new host after a restart or
 // a host that went away). A turn that keeps bringing hosts down would
 // loop forever, so after states.maxRecoveries() continuations without
-// progress it is paused with a reason instead.
+// progress it is paused with a reason instead. An idle session whose
+// inbox still holds queued messages (the host died between a turn end
+// and the next queued prompt) runs the oldest, as host.next would have.
 async function recover(): Promise<void> {
 	for (let listing of sessions.list()) {
 		let id = listing.id
-		if (!listing.meta || host.state.running.has(id) || !history.unfinished(id)) continue
+		if (!listing.meta || host.state.running.has(id)) continue
+		let tail = history.tail(id)
+		let last = tail.at(-1)
+		if (!last) continue
+		// Only the tail is read (all histories would be slow): a queued
+		// message older than both it and the last prompt in it is missed.
+		let queued = last.type === 'turn_end' && last.status === 'completed' && (tail.some((r) => r.type === 'inbox' && r.queue) || !tail.some((r) => r.type === 'user'))
+		if (last.type === 'turn_end' && !queued) continue
 		try {
 			await (host.ready(id) ?? Promise.resolve())
 		} catch (e: any) {
@@ -383,7 +392,13 @@ async function recover(): Promise<void> {
 			continue
 		}
 		let records = history.readSync(id)
-		if (host.state.running.has(id) || host.stateOf(id, records).type !== 'running') continue
+		if (host.state.running.has(id)) continue
+		let state = host.stateOf(id, records)
+		if (state.type === 'idle') {
+			host.next(id)
+			continue
+		}
+		if (state.type !== 'running') continue
 		let n = states.recoveries(records)
 		if (n >= states.maxRecoveries()) {
 			host.stop(id, `continued ${n} times without progress; it may be what stops the host`)

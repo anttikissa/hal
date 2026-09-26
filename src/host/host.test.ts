@@ -414,6 +414,34 @@ test('the inbox survives a pause and a restart, and runs when the user continues
 	expect(await fresh(id)).toEqual(b.views.get(id)!)
 })
 
+test('a queued message left behind by a host dying after a turn end runs on the next host', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'later', queue: true })
+	// The host dies after writing the turn end, before the queued prompt.
+	let next = host.next
+	host.next = () => {}
+	try {
+		calls[0]!.push({ type: 'done', reason: 'end' })
+		await until(() => a.of('turn-end').length)
+	} finally {
+		host.next = next
+	}
+	restartHost()
+	await host.recover()
+	await until(() => calls.length === 2)
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([stamped('later')])
+	calls[1]!.push({ type: 'done', reason: 'end' })
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.views.get(id)?.state.type === 'idle')
+	expect(inboxOf(b, id)).toEqual([])
+	await host.recover()
+	expect(calls.length).toBe(2)
+})
+
 test('sending to a paused turn takes the waiting messages along, oldest first', async () => {
 	let a = client()
 	let id = created(a)

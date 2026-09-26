@@ -106,29 +106,36 @@ function lastByte(path: string): number | undefined {
 	}
 }
 
-// True if the last turn has no end record. Reads only the file's tail
-// unless its last line is longer (or cut off), so a new host can check
-// every session cheaply.
-function unfinished(id: string): boolean {
+// The last records, oldest first: every whole line in the file's last
+// 64 KiB, or the whole history if the last line is longer (or cut off),
+// so a new host can check every session cheaply.
+function tail(id: string): HistoryRecord[] {
 	let path = history.file(id)
-	if (!existsSync(path)) return false
+	if (!existsSync(path)) return []
 	let size = statSync(path).size
 	let fd = openSync(path, 'r')
-	let tail: string
+	let text: string
 	try {
 		let buf = Buffer.alloc(Math.min(size, 65536))
 		readFd(fd, buf, 0, buf.length, size - buf.length)
-		tail = buf.toString('utf8')
+		text = buf.toString('utf8')
 	} finally {
 		closeSync(fd)
 	}
-	let lines = tail.split('\n').filter((l) => l.trim())
-	let whole = lines.length > 1 || size <= 65536
-	let last: HistoryRecord | undefined
+	let lines = text.split('\n').filter((l) => l.trim())
+	if (size > 65536) lines.shift()
+	let out: HistoryRecord[] = []
 	try {
-		if (lines.length && whole) last = history.check(ason.parse(lines.at(-1)!))
-	} catch {}
-	last ??= history.readSync(id).at(-1)
+		for (let line of lines) out.push(history.check(ason.parse(line)))
+	} catch {
+		return history.readSync(id)
+	}
+	return out.length ? out : history.readSync(id)
+}
+
+// True if the last turn has no end record.
+function unfinished(id: string): boolean {
+	let last = history.tail(id).at(-1)
 	return last !== undefined && last.type !== 'turn_end'
 }
 
@@ -267,6 +274,7 @@ export const history = {
 	lastByte,
 	read,
 	readSync,
+	tail,
 	unfinished,
 	open,
 	messages,
