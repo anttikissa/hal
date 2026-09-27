@@ -14,7 +14,8 @@ import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
 
 export type Item =
-	| { type: 'prompt'; text: string }
+	// `from`: the session that sent it; without it, the human.
+	| { type: 'prompt'; text: string; from?: string }
 	// An image attached to the prompt before it (task 2a).
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number }
 	| { type: 'text'; text: string }

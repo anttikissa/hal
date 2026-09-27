@@ -78,10 +78,11 @@ export type Command = (
 	// A prompt. While a turn is busy it waits in the inbox: steering, sent
 	// before the turn's next request; with `queue`, run after it ends.
 	// With `amend`, an edit of the last prompt: the host decides from
-	// history whether it replaces that prompt or is sent on top.
+	// history whether it replaces that prompt or is sent on top; with
+	// `edits` too, an edit of that inbox message while it still waits.
 	// A slash command (/name args) runs on the host at once instead.
 	// `from`: the session that sent it; without it, the human typed it.
-	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean; from?: string }
+	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean; edits?: string; from?: string }
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }
@@ -222,7 +223,7 @@ function invalid(value: unknown): string | undefined {
 		return str('sessionId') ?? str('question') ?? (strings ? undefined : 'answer: answers must map names to strings')
 	}
 	if (c.type === 'attach') return str('sessionId') ?? str('mediaType') ?? str('data') ?? str('name', true)
-	if (c.type === 'submit') return str('sessionId') ?? str('text') ?? str('from', true)
+	if (c.type === 'submit') return str('sessionId') ?? str('text') ?? str('from', true) ?? str('edits', true)
 	return str('sessionId') ?? (c.type === 'draft' || c.type === 'complete' ? str('text') : undefined)
 }
 

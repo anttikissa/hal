@@ -144,7 +144,7 @@ function handle(client: Client, command: unknown): void {
 // A repeat of a submit the previous host recorded, found in history.
 function submitted(c: Command): Outcome | undefined {
 	if (c.type !== 'submit' || !sessions.state.open.has(c.sessionId)) return undefined
-	let seen = (r: HistoryRecord) => ((r.type === 'user' || r.type === 'command') && r.command === c.id) || (r.type === 'inbox' && r.id === c.id)
+	let seen = (r: HistoryRecord) => ((r.type === 'user' || r.type === 'command') && r.command === c.id) || (r.type === 'inbox' && (r.id === c.id || r.command === c.id))
 	return history.readSync(c.sessionId).some(seen) ? {} : undefined
 }
 
@@ -188,6 +188,8 @@ function act(client: Client, c: Command): Outcome | undefined {
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	// An edit waits for the turn it paused to finish stopping, so nothing
 	// that turn still records lands after the edit.
+	// It goes through handle() again, so a resend that arrived meanwhile,
+	// deferred behind it on the same promise, is then seen as a repeat.
 	let stopping = c.type === 'submit' && c.amend && status.stateOf(c.sessionId).type === 'paused' && turns.state.running.get(c.sessionId)?.done
 	if (stopping) {
 		stopping.then(() => host.state.clients.has(client) && host.handle(client, c))
@@ -202,8 +204,10 @@ function act(client: Client, c: Command): Outcome | undefined {
 		let unknown = commands.parse(c.text) ? [] : blobs.unknown(c.sessionId, c.text)
 		if (unknown.length) client.deliver({ type: 'warning', text: `${unknown.join(', ')} names no attachment of this session; sent as text` })
 		// A slash command runs even when typed while editing a prompt.
+		// An edit of a waiting message may become one too (prompts.edit).
 		let amending = c.amend && !c.queue && !commands.parse(c.text)
-		refused = amending ? prompts.amend(c.sessionId, c.text, c.id) : prompts.submit(c.sessionId, c.text, c.id, c.queue, c.from)
+		if (c.amend && !c.queue && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
+		else refused = amending ? prompts.amend(c.sessionId, c.text, c.id) : prompts.submit(c.sessionId, c.text, c.id, c.queue, c.from)
 		if (refused === undefined) prompts.sent(c.sessionId, c.text, c.id)
 	} else if (c.type === 'draft') prompts.draft(c.sessionId, drafts.set(c.sessionId, c.text, c.base), c.id)
 	else if (c.type === 'continue') refused = prompts.resume(c.sessionId)

@@ -80,7 +80,7 @@ function view(): View {
 	if (t && !st.prompt.text) v.placeholder = placeholders.pick(t.meta.cwd, app.halDir(), t.items.filter((i) => i.type === 'prompt').length)
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	// A passing notice, else what the session is doing.
-	let notice = st.notice ?? (st.editing ? amend.hint() : st.transcript && states.describe(st.transcript.state))
+	let notice = st.notice ?? (st.editing ? amend.hint(st.editing) : st.transcript && states.describe(st.transcript.state))
 	if (notice) v.notice = notice
 	return v
 }
@@ -231,8 +231,8 @@ function submit(text: string, queue = false): boolean {
 	st.editing = undefined
 	if (command) {
 		st.notice = undefined
-		let c = command as { type: string; text?: string; queue?: boolean; amend?: boolean }
-		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, c.queue, c.amend)
+		let c = command as { type: string; text?: string; queue?: boolean; amend?: boolean; edits?: string }
+		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, c.queue, c.amend, c.edits)
 		else app.send(command)
 	}
 	return true

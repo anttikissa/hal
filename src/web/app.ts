@@ -294,9 +294,9 @@ function send(queue = false): void {
 		return app.setNotice('sending once the upload is done')
 	}
 	let { command, notice, keep } = view.submit(st.view, st.text, queue)
-	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; amend?: boolean } | undefined
+	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; amend?: boolean; edits?: string } | undefined
 	// A prompt shows at once and waits, pending, for the host.
-	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c.queue, c.amend)
+	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c.queue, c.amend, c.edits)
 	else if (c) connection.send(c)
 	if (!keep) {
 		st.view = { ...st.view, editing: undefined }

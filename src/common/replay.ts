@@ -19,7 +19,11 @@ export type HistoryRecord =
 	// A message sent while the session was busy, waiting in the inbox
 	// (src/common/inbox.ts) until a prompt record delivers it. Not
 	// provider input by itself. `id`: the client's command id, if any.
-	| { type: 'inbox'; id: string; text: string; queue?: true; ts: string }
+	// `from`: the session that sent it; without it, the human. A later
+	// record with the same id is an edit of the waiting message (task
+	// dg): its new text, in the same place; `withdrawn` takes it out
+	// (edited into a slash command). `command`: the edit's command id.
+	| { type: 'inbox'; id: string; text: string; queue?: true; from?: string; withdrawn?: true; command?: string; ts: string }
 	// One assistant block, appended as soon as it is complete.
 	| { type: 'assistant'; block: AssistantBlock; ts: string }
 	// Ends one model turn, or pauses it (then `pauseReason` if Hal, not

@@ -19,7 +19,7 @@ import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
-type Marks = { size: number; question?: number; turnQuestion?: string; close?: number; turn?: number; prompt?: number; inbox: Record<string, number> }
+type Marks = { size: number; question?: number; turnQuestion?: string; close?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]> }
 type Line = { offset: number; bytes: number; record: HistoryRecord }
 export type Page = { records: HistoryRecord[]; start: number }
 // `older`: where `history` starts, when earlier records exist.
@@ -84,7 +84,9 @@ function apply(m: Marks, r: HistoryRecord, offset: number): void {
 	} else if (r.type === 'answer' || r.type === 'turn_end') {
 		m.close = offset
 		if (r.type === 'turn_end' || r.question === m.turnQuestion) m.turn = offset
-	} else if (r.type === 'inbox') m.inbox[r.id] = offset
+	} else if (r.type === 'inbox' && r.withdrawn) delete m.inbox[r.id]
+	// Every record of a message: an edit keeps the place of the first.
+	else if (r.type === 'inbox') m.inbox[r.id] = [...[m.inbox[r.id] ?? []].flat(), offset]
 	else if (r.type === 'user' || r.type === 'assistant' || r.type === 'continue') {
 		m.turn = offset
 		if (replay.isPrompt(r)) m.prompt = offset
@@ -143,7 +145,7 @@ function note(id: string, line: string, record: HistoryRecord): void {
 
 function marked(id: string): Line[] {
 	let m = pages.marks(id)
-	let offsets = new Set([m.question, m.close, m.turn, m.prompt, ...Object.values(m.inbox)].filter((o) => o !== undefined))
+	let offsets = new Set([m.question, m.close, m.turn, m.prompt, ...Object.values(m.inbox).flat()].filter((o) => o !== undefined))
 	let path = history.file(id)
 	return [...offsets].sort((a, b) => a - b).map((o) => pages.lineAt(path, o))
 }

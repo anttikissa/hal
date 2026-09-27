@@ -131,7 +131,7 @@ function markRow(rows: Row[], at: number): number {
 
 // The passing notice, else the hint while editing the last prompt.
 function notice(st: ViewState): string | undefined {
-	return st.notice ?? (st.editing && amend.hint())
+	return st.notice ?? (st.editing && amend.hint(st.editing))
 }
 
 // Tab in the message box with `text` (the caret at its end): the

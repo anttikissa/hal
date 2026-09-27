@@ -47,3 +47,20 @@ test('leaving the edit continues the paused turn, or the one whose pause is on i
 	expect(amend.resume(editing, session({ type: 'error', message: 'x' }))).toBeUndefined()
 	expect(amend.resume({ ...editing, sessionId: 's2' }, session({ type: 'paused' }))).toBeUndefined()
 })
+
+test('Up edits a message still waiting in the inbox in place, without pausing', () => {
+	let t = { ...session({ type: 'paused' }), inbox: [{ id: 'm1', text: 'steer' }, { id: 'm2', text: 'latre', queue: true as const }] }
+	let begun = amend.begin(t, '')
+	expect(begun).toEqual({ editing: { sessionId: 's1', original: 'latre', inbox: 'm2' } })
+	expect(amend.enter(begun!.editing, t, 'later')).toEqual({ type: 'submit', sessionId: 's1', text: 'later', amend: true, edits: 'm2' })
+	// Nothing was paused, so leaving the edit continues nothing.
+	expect(amend.resume(begun!.editing, t)).toBeUndefined()
+})
+
+test('Up never recalls what another session sent', () => {
+	let t = session(running)
+	let peer = { ...t, inbox: [{ id: 'm1', text: 'mine' }, { id: 'm2', text: 'theirs', from: 's9' }] }
+	expect(amend.begin(peer, '')?.editing).toEqual({ sessionId: 's1', original: 'mine', inbox: 'm1' })
+	let delivered = { ...t, items: [...t.items, { type: 'prompt' as const, text: 'theirs', from: 's9' }], inbox: [{ id: 'm2', text: 'theirs', from: 's9' }] }
+	expect(amend.begin(delivered, '')?.editing).toEqual({ sessionId: 's1', original: 'fix ti' })
+})

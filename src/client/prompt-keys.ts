@@ -28,7 +28,7 @@ function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void
 		let { anchor: _, ...rest } = st.prompt
 		st.prompt = { ...rest, text: begun.editing.original, cursor: begun.editing.original.length }
 		drafts.edit(id, st.prompt.text)
-		send(begun.command)
+		if (begun.command) send(begun.command)
 		return true
 	}
 	let editing = st.editing

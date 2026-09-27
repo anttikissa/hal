@@ -43,6 +43,7 @@ function submit(id: string, text: string, command?: string, queue = false, from?
 	if (states.busy(state) || (queue && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
 		if (queue) record.queue = true
+		if (from !== undefined) record.from = from
 		history.append(id, record)
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		return
@@ -80,6 +81,26 @@ function amend(id: string, text: string, command?: string): string | undefined {
 	history.append(id, record)
 	host.broadcast(id, prompts.promptEvent(id, blocks, true))
 	turns.start(id)
+}
+
+// An edit of inbox message `message`. While it waits, the edit takes
+// its place (the model never saw it); one that became a slash command
+// takes it out and runs. Delivered meanwhile, it is an edit of the last
+// prompt (prompts.amend). Messages from other sessions are not the
+// user's to edit.
+function edit(id: string, message: string, text: string, command?: string): string | undefined {
+	let waiting = status.inboxOf(id).find((m) => m.id === message)
+	if (waiting?.from !== undefined) return 'that message was sent by another session'
+	let call = commands.parse(text)
+	if (!waiting) return call ? prompts.submit(id, text, command) : prompts.amend(id, text, command)
+	let refused = call ? slash.command(id, text, call, command) : undefined
+	if (refused) return refused
+	let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: message, text }
+	if (call) record.withdrawn = true
+	else if (waiting.queue) record.queue = true
+	if (command !== undefined) record.command = command
+	history.append(id, record)
+	host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 }
 
 // Whether the records after a prompt leave the world as it was: no
@@ -203,6 +224,7 @@ function reply(id: string, question: string, answers: Answers): string | undefin
 export const prompts = {
 	submit,
 	amend,
+	edit,
 	harmless,
 	drain,
 	deliver,

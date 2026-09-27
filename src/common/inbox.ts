@@ -9,13 +9,21 @@
 import type { HistoryRecord } from './replay.ts'
 import { states, type SessionState } from './states.ts'
 
-export type InboxItem = { id: string; text: string; queue?: true }
+// `from`: the session that sent it; without it, the human.
+export type InboxItem = { id: string; text: string; queue?: true; from?: string }
 
-// Messages sent and not yet delivered, oldest first.
+// Messages sent and not yet delivered, oldest first, as last edited.
 function pending(records: HistoryRecord[]): InboxItem[] {
 	let waiting = new Map<string, InboxItem>()
 	for (let r of records) {
-		if (r.type === 'inbox') waiting.set(r.id, r.queue ? { id: r.id, text: r.text, queue: true } : { id: r.id, text: r.text })
+		if (r.type === 'inbox' && r.withdrawn) waiting.delete(r.id)
+		else if (r.type === 'inbox') {
+			// An edit keeps the message's place: Map.set on a key keeps its order.
+			let item: InboxItem = { id: r.id, text: r.text }
+			if (r.queue) item.queue = true
+			if (r.from !== undefined) item.from = r.from
+			waiting.set(r.id, item)
+		}
 		else if (r.type === 'user') for (let id of r.inbox ?? []) waiting.delete(id)
 	}
 	return [...waiting.values()]
