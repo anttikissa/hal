@@ -7,6 +7,7 @@
 
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
+import { recall } from '../common/recall.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import { app, type KeyInput } from './app.ts'
 import { router } from './router.ts'
@@ -61,7 +62,7 @@ function show(id: string, replace: boolean): void {
 	}
 	st.shown = id
 	st.view = {}
-	st.text = drafts.text(id)
+	st.text = recall.shown(id) ?? drafts.text(id)
 	router.store.save(id)
 	connection.send({ type: 'open', sessionId: id })
 	tabs.seen()

@@ -6,7 +6,10 @@
 //
 // Enter submits (steering a running turn; Alt+Enter queues after it,
 // Shift+Enter is a newline), Escape pauses a running turn, Up on an
-// empty box edits the last prompt (src/common/amend.ts), Tab completes
+// empty box edits the last prompt (src/common/amend.ts), Up on the box's
+// first line and Down on its last browse the prompts sent
+// (src/common/recall.ts; a line ends only at a newline here, as the
+// page cannot know where the textarea wraps), Tab completes
 // a slash command, Ctrl-M opens the model picker. The box is the
 // session's draft (common/drafts.ts, kept in localStorage too); a sent
 // prompt shows at once, pending until the host has it.
@@ -19,6 +22,7 @@ import { drafts, type Local } from '../common/drafts.ts'
 import { forms, type FormAction, type Key } from '../common/forms.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import { prompt } from '../common/prompt.ts'
+import { recall } from '../common/recall.ts'
 import { editor, type Splice } from './editor.ts'
 import { link } from './link.ts'
 import { tabs } from './tabs.ts'
@@ -30,11 +34,11 @@ import { view, type ViewState } from './view.ts'
 export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string }
 
 // Where a key was pressed: the message box (its text, the caret, and
-// `write`, which edits the box natively), a text field of the open
+// `write`, which edits the box natively; `selected`: text is selected), a text field of the open
 // question, a button (`submits`: a form's submit button), or anywhere
 // else.
 export type Target =
-	| { kind: 'message'; text: string; cursor: number; write?: (edit: Splice, cursor: number) => void }
+	| { kind: 'message'; text: string; cursor: number; selected?: boolean; write?: (edit: Splice, cursor: number) => void }
 	| { kind: 'field' }
 	| { kind: 'button'; submits: boolean }
 	| { kind: 'other' }
@@ -91,7 +95,8 @@ function onEvent(event: Event): void {
 		return app.input(done.text)
 	}
 	let id = app.sessionId()
-	if (id && (changed || event.type === 'snapshot')) st.text = drafts.text(id)
+	// A recalled entry stays in the box; the draft changes underneath.
+	if (id && (changed || event.type === 'snapshot')) st.text = recall.shown(id) ?? drafts.text(id)
 	app.changed()
 }
 
@@ -104,7 +109,7 @@ function onState(state: LinkState): void {
 function input(text: string): void {
 	app.state.text = text
 	let id = app.sessionId()
-	if (id) drafts.edit(id, text)
+	if (id && recall.typed(id, text)) drafts.edit(id, text)
 	app.changed()
 }
 
@@ -203,6 +208,7 @@ function key(e: KeyInput, target: Target): boolean {
 		return false
 	}
 	if (target.kind !== 'message') return false
+	if (plain && !target.selected && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && app.recall(e.key === 'ArrowUp' ? -1 : 1, target)) return true
 	if (k && editor.routed(k)) return app.edit(k, target)
 	let complete = e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && view.complete(st.view, st.text)
 	if (complete) {
@@ -225,6 +231,21 @@ function edit(k: Key, target: Extract<Target, { kind: 'message' }>): boolean {
 	return true
 }
 
+// Input history for Up (-1) or Down (1) on the box, through the shared
+// code with logical lines for rows. True if handled; else the key stays
+// native.
+function recallKey(dir: -1 | 1, target: Extract<Target, { kind: 'message' }>): boolean {
+	let st = app.state
+	let t = st.view.transcript
+	if (!t) return false
+	let id = t.meta.id
+	let shown = recall.step(id, recall.entries(t), st.text, target.cursor, dir, Infinity, drafts.text(id))
+	if (!shown) return false
+	target.write?.(editor.splice(st.text, shown.text), shown.cursor)
+	app.input(shown.text)
+	return true
+}
+
 // Sends what the box holds (Enter, or the Send button); `queue`
 // (Alt+Enter) waits for the running turn.
 function send(queue = false): void {
@@ -236,7 +257,9 @@ function send(queue = false): void {
 	else if (c) connection.send(c)
 	if (!keep) {
 		st.view = { ...st.view, editing: undefined }
-		app.input('')
+		// A recalled entry was sent: the user's own text comes back.
+		let back = c?.type === 'submit' && recall.stop(c.sessionId)
+		app.input(back ? drafts.text(c!.sessionId) : '')
 	}
 	app.setNotice(notice)
 }
@@ -291,6 +314,7 @@ async function login(password: string): Promise<string | undefined> {
 
 function reset(): void {
 	app.state = createState()
+	recall.reset()
 }
 
 export const app = {
@@ -316,6 +340,7 @@ export const app = {
 	search,
 	key,
 	edit,
+	recall: recallKey,
 	send,
 	store,
 	start,

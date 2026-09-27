@@ -99,16 +99,20 @@ function flush(id: string): void {
 	drafts.send(command)
 }
 
-// Sends `text` as a prompt: pending, and the editor empties.
+// Sends `text` as a prompt, pending. The draft empties if it was what
+// was sent; a draft that holds more (an entry recalled from history was
+// sent, not the draft) stays, as the host keeps it too.
 function submit(id: string, text: string, queue = false, amend = false): void {
 	let l = drafts.local(id)
 	let sending: Sending = { id: drafts.nextId(), text }
 	if (queue) sending.queue = true
 	if (amend) sending.amend = true
 	l.sending.push(sending)
-	l.text = ''
-	// The host clears its draft when it takes the prompt.
-	l.dirty = false
+	if (!l.text.trim() || text.includes(l.text.trim())) {
+		l.text = ''
+		// The host clears its draft when it takes the prompt.
+		l.dirty = false
+	}
 	drafts.save(id)
 	drafts.send(drafts.command(id, sending))
 }

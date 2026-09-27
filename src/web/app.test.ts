@@ -91,7 +91,8 @@ test('typing is the session draft, and a snapshot brings the kept draft back', (
 
 test('Up on an empty box while the model works edits the last prompt; Down unchanged leaves', () => {
 	app.onEvent(snapshot({ type: 'running', phase: 'streaming' }, [{ type: 'user', blocks: [{ type: 'text', text: 'fix ti' }], ts }]))
-	expect(press('ArrowUp', message('draft'))).toBe(false)
+	expect(press('ArrowUp', message('draft\nmore'))).toBe(false)
+	app.input('')
 	expect(press('ArrowUp', message(''))).toBe(true)
 	expect(app.state.text).toBe('fix ti')
 	expect(sent.at(-1)).toMatchObject({ type: 'pause', sessionId })
@@ -306,4 +307,52 @@ test('Ctrl-T/W/N/P stay the browser\'s off macOS', () => {
 	expect(press('t', message(''), { ctrlKey: true })).toBe(false)
 	expect(press('n', message(''), { ctrlKey: true })).toBe(false)
 	expect(sent).toEqual([])
+})
+
+test('Up on the first line and Down on the last browse the prompts sent; the draft stays the own text', () => {
+	let user = (text: string) => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
+	app.onEvent(snapshot({ type: 'idle' }, [user('first'), user('two\nlines')]))
+	let writes: [string, number][] = []
+	let box = (text: string, cursor = text.length, selected = false): Target => ({
+		kind: 'message',
+		text,
+		cursor,
+		selected,
+		write: (edit, at) => void writes.push([text.slice(0, edit.start) + edit.text + text.slice(edit.end), at]),
+	})
+	app.input('mine')
+	// A selection, or the caret after a newline, keeps the key native.
+	expect(press('ArrowUp', box('mine', 0, true))).toBe(false)
+	expect(press('ArrowUp', box('mine\nx'))).toBe(false)
+	app.input('mine')
+	expect(press('ArrowUp', box('mine', 2))).toBe(true)
+	expect(writes.at(-1)).toEqual(['two\nlines', 9])
+	expect(app.state.text).toBe('two\nlines')
+	expect(stored.get(sessionId)?.text).toBe('mine')
+	expect(press('ArrowUp', box('two\nlines', 3))).toBe(true)
+	expect(writes.at(-1)).toEqual(['first', 5])
+	// The oldest: native Up goes to the start.
+	expect(press('ArrowUp', box('first'))).toBe(false)
+	expect(press('ArrowDown', box('first'))).toBe(true)
+	expect(writes.at(-1)).toEqual(['two\nlines', 3])
+	expect(press('ArrowDown', box('two\nlines', 3))).toBe(false)
+	expect(press('ArrowDown', box('two\nlines'))).toBe(true)
+	expect(writes.at(-1)).toEqual(['mine', 4])
+	expect(app.state.text).toBe('mine')
+})
+
+test('an edited entry becomes the draft; sending an entry brings the own text back', () => {
+	app.onEvent(snapshot({ type: 'idle' }, [{ type: 'user', blocks: [{ type: 'text', text: 'first' }], ts }]))
+	app.input('mine')
+	press('ArrowUp', message('mine'))
+	expect(app.state.text).toBe('first')
+	app.input('first!')
+	expect(stored.get(sessionId)?.text).toBe('first!')
+	expect(press('ArrowDown', message('first!'))).toBe(false)
+	app.input('mine')
+	press('ArrowUp', message('mine'))
+	press('Enter', message('first'))
+	expect(sent.findLast((c) => c.type === 'submit')).toMatchObject({ text: 'first' })
+	expect(app.state.text).toBe('mine')
+	expect(stored.get(sessionId)?.text).toBe('mine')
 })

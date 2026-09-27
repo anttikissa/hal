@@ -49,7 +49,7 @@ function target(e: KeyboardEvent): Target {
 	let t = e.target
 	if (t instanceof HTMLTextAreaElement) {
 		let cursor = t.selectionDirection === 'backward' ? t.selectionStart : t.selectionEnd
-		return { kind: 'message', text: t.value, cursor, write: (edit, at) => editor.write(t, edit, at) }
+		return { kind: 'message', text: t.value, cursor, selected: t.selectionStart !== t.selectionEnd, write: (edit, at) => editor.write(t, edit, at) }
 	}
 	if (t instanceof HTMLInputElement) return { kind: 'field' }
 	if (t instanceof HTMLButtonElement) return { kind: 'button', submits: t.type === 'submit' }

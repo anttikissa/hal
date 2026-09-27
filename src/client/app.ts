@@ -19,9 +19,11 @@ import { states } from '../common/states.ts'
 import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
 import type { KeyEvent } from './keys.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
+import { recall } from '../common/recall.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import { frame, type View } from './frame.ts'
+import { promptKeys } from './prompt-keys.ts'
 import { tabs, type Focus } from './tabs.ts'
 
 // `resumed`: where the history of the last snapshot ends, marked on screen.
@@ -87,7 +89,9 @@ function onEvent(event: Event): void {
 	let st = app.state
 	// Text typed before the first session arrived joins its draft.
 	let early = !st.transcript && event.type === 'snapshot' ? st.prompt.text : ''
-	if (drafts.onEvent(event) && st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id) app.setPrompt(drafts.text(event.sessionId))
+	// A recalled entry stays on screen; the draft changes underneath.
+	let mine = st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id ? event.sessionId : undefined
+	if (drafts.onEvent(event) && mine && !recall.shown(mine)) app.setPrompt(drafts.text(mine))
 	if (event.type === 'tabs') return app.onTabs(event.tabs)
 	if (event.type === 'ack' && event.tab !== undefined) {
 		st.asked = event.tab
@@ -109,7 +113,7 @@ function onEvent(event: Event): void {
 		if (event.type === 'snapshot' && t) {
 			let id = t.meta.id
 			if (early) drafts.edit(id, drafts.text(id) ? `${drafts.text(id)}\n${early}` : early)
-			app.setPrompt(drafts.text(id))
+			app.setPrompt(recall.shown(id) ?? drafts.text(id))
 		}
 		st.form = forms.follow(st.form, transcript.question(t))
 	}
@@ -168,7 +172,7 @@ function focusOn(focus: Focus): void {
 		delete st.onModalKey
 		if (focus.tab !== undefined) {
 			st.hidden.delete(focus.tab)
-			if (!back) app.setPrompt(drafts.text(focus.tab))
+			if (!back) app.setPrompt(recall.shown(focus.tab) ?? drafts.text(focus.tab))
 			app.send({ type: 'open', sessionId: focus.tab })
 		}
 	}
@@ -245,34 +249,6 @@ function setPrompt(text: string): void {
 	if (st.prompt.text !== text) st.prompt = { ...st.prompt, text, cursor: text.length }
 }
 
-// Up, Down and Escape for editing the last prompt; true if handled. The
-// editor text is the draft, as ever.
-function editKey(k: KeyEvent): boolean {
-	let st = app.state
-	let plain = !k.shift && !k.ctrl && !k.alt && !k.cmd
-	if (!plain || !st.transcript) return false
-	let id = st.transcript.meta.id
-	if (k.key === 'up' && !st.editing) {
-		let begun = amend.begin(st.transcript, st.prompt.text)
-		if (!begun) return false
-		st.editing = begun.editing
-		st.prompt = { ...st.prompt, text: begun.editing.original, cursor: begun.editing.original.length }
-		drafts.edit(id, st.prompt.text)
-		app.send(begun.command)
-		return true
-	}
-	let editing = st.editing
-	if (!editing || !(k.key === 'escape' || (k.key === 'down' && st.prompt.text === editing.original))) return false
-	st.editing = undefined
-	if (st.prompt.text === editing.original) {
-		st.prompt = prompt.cleared(st.prompt)
-		drafts.edit(id, '')
-	}
-	let command = amend.resume(editing, st.transcript)
-	if (command) app.send(command)
-	return true
-}
-
 function onKeys(events: KeyEvent[]): void {
 	let st = app.state
 	for (let k of events) {
@@ -299,7 +275,7 @@ function onKeys(events: KeyEvent[]): void {
 			app.send({ type: 'models', sessionId: st.transcript.meta.id })
 			continue
 		}
-		if (app.editKey(k)) continue
+		if (promptKeys.edit(st, k, app.send)) continue
 		// Tab at the end of a slash command: the host completes it.
 		let tab = k.key === 'tab' && !k.shift && st.transcript && st.prompt.cursor === st.prompt.text.length
 		let complete = tab && completion.request(st.transcript!.meta.id, st.prompt.text)
@@ -307,11 +283,15 @@ function onKeys(events: KeyEvent[]): void {
 			app.send(complete)
 			continue
 		}
+		if (promptKeys.history(st, k, frame.promptWidth(app.cols()))) continue
 		let { state, action } = prompt.step(st.prompt, k, frame.promptWidth(app.cols()))
 		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
 		st.prompt = state
-		if (edited && st.transcript) drafts.edit(st.transcript.meta.id, state.text)
+		let id = st.transcript?.meta.id
+		if (edited && id && recall.typed(id, state.text)) drafts.edit(id, state.text)
+		// A recalled entry was sent: the user's own text comes back.
+		if (action?.type === 'submit' && id && recall.stop(id)) app.setPrompt(drafts.text(id))
 		let pause = action?.type === 'cancel' && st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 		if (pause) app.send(pause)
 		if (action?.type === 'quit') return terminal.quit()
@@ -356,6 +336,7 @@ function init(): void {
 function reset(): void {
 	app.state = createState()
 	drafts.reset()
+	recall.reset()
 }
 
 export const app = {
@@ -379,7 +360,6 @@ export const app = {
 	submit,
 	completed,
 	setPrompt,
-	editKey,
 	onKeys,
 	open,
 	close,
