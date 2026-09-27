@@ -1,0 +1,7 @@
+{
+	title: 'Status line never shows internal state names',
+	description: "A session waiting on a question shows the question, nothing else: states.describe returns nothing for blocked on a question, so no client (terminal status, web, tab labels) prints 'blocked: question'. The user saw it and called it meaningless. The same test applies to every describe() text: it must tell the user something they can act on, in plain words, or not exist.",
+	status: 'planned',
+	needs: ['w4'],
+	foldInto: ['w4', 'j1']
+}

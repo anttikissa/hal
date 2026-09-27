@@ -45,6 +45,12 @@ point to it.
 - Small ASON state files (config, metadata, credentials) go through
   `liveFiles.liveFile` in `src/host/live-file.ts`; never hand-roll
   reading, parsing or writing them.
+- Corrupt data is an error, not a case to handle: a malformed history
+  record, metadata or ASON file throws with its path and stops that
+  session (or startup), and nothing is skipped, reset or patched
+  around it. The one exception is a torn last history line, which a
+  crash mid-write leaves and opening a session cuts off. The user
+  prefers this to defensive code.
 - Slash commands are files in `src/host/commands/` (one per command,
   found by listing the directory; `src/host/commands.ts`). They run and
   complete on the host; a command that asks re-runs with the answer.

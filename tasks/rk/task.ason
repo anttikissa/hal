@@ -1,0 +1,7 @@
+{
+	title: 'Transcript order is the order things happened',
+	description: "Prompts, steering messages and slash commands appear in the transcript in the order the host carried them out, on every client, live and after a reload alike: a live fold and a later snapshot never disagree. Order can matter: '/cd ..' typed between two messages saying 'touch x.txt' and 'touch y.txt' must show where it took effect. A client shows what the user sent at once where it was typed (optimistic, pending) and, when the host says where it really landed, moves it there silently: no flash, no remount (web rules in tasks/README.md). Test: a command sent mid-round appears in the same position in the fold as in a snapshot taken after the round.",
+	status: 'planned',
+	needs: ['et'],
+	foldInto: ['et', '6']
+}

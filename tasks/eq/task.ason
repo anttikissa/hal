@@ -1,0 +1,8 @@
+{
+	title: 'Sessions message each other; the user comes first',
+	description: "The user's idea (questions.md item 7), to be designed with him before building. Every message says who sent it: the user, or another session (by id and name); the model and every client can always tell another session from the user, and the user takes priority. Two kinds: (1) advisory: another session's message does not steer; if the recipient is working it arrives attached to its next tool result, if idle the recipient sees it as a message from that session; (2) steering: a session may steer others like the user can, for the user's needs or an emergency ('stop all action in tabs 10-15 immediately'). The sender is set by the host, never trusted from the client. Up never recalls messages from other sessions (task for Up edits).",
+	status: 'planned',
+	notes: ['Not ready to build: the user floated it as "maybe it would be nice". Propose a design (tools, record shape, how advisory messages ride on tool results) and get his approval first. There is no send or spawn tool in hal2 yet.'],
+	needs: ['2r'],
+	foldInto: ['2r', 'et']
+}

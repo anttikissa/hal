@@ -44,7 +44,9 @@ visible data attached to a session in any state.
    on continue (bare Enter) or when the user sends something.
 2. **Ctrl-C** quits this process. If another Hal process remains, it
    becomes host and carries on every running turn: nothing pauses. Only
-   when no process remains are running turns recorded as paused. Reason:
+   when no process remains are running turns recorded as paused (a
+   browser page is not a Hal process: it can't carry turns on).
+   SIGTERM and SIGHUP are the same deliberate quit as Ctrl-C. Reason:
    a runaway (say, sessions spawning sessions in a loop) must stop and
    stay stopped until the user has looked at it.
 3. **Ctrl-R** reloads code and continues exactly where it was: every
