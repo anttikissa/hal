@@ -48,7 +48,7 @@ function itemLines(item: Item, width: number): string[] {
 	switch (item.type) {
 		case 'prompt': {
 			let text = item.from === undefined ? item.text : `${item.text}\n(sent from ${item.label ?? item.from})`
-			return promptView.mark(ansi.wrap(text, promptWidth))
+			return promptView.mark(ansi.wrap(text, promptWidth).map(ansi.links))
 		}
 		case 'image':
 			return [promptView.REST + attachments.label(item)]

@@ -311,3 +311,8 @@ test('the resumed mark goes before the first row at or after where history ends'
 	expect(view.markRow(rows, 4)).toBe(2)
 	expect(view.markRow(rows, 5)).toBe(3)
 })
+
+test('a prompt’s [image/<name>] markers become links; the rest stays text', () => {
+	expect(view.links('see [image/abc123.png] and [image/zz99yy.webp]!')).toEqual(['see ', { href: '/image/abc123.png', text: '[image/abc123.png]' }, ' and ', { href: '/image/zz99yy.webp', text: '[image/zz99yy.webp]' }, '!'])
+	expect(view.links('[image/ABC123.png] [image 0123456789ab]')).toEqual(['[image/ABC123.png] [image 0123456789ab]'])
+})

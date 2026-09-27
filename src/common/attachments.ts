@@ -14,16 +14,43 @@ const types: Record<string, string> = {
 	'text/plain': 'txt',
 }
 
-// Blob ids are made by the host: 12 random lowercase hex digits.
-const blobId = /^[0-9a-f]{12}$/
+// Blob ids: 12 random lowercase hex digits made by the host, or the
+// 6 base36 characters of a pasted image's name (task qy).
+const blobId = /^(?:[0-9a-f]{12}|[0-9a-z]{6})$/
 
-// [image <blob>] or [paste <blob>, N lines].
-const markerPattern = /\[(?:image ([0-9a-f]{12})|paste ([0-9a-f]{12}), \d+ lines?)\]/g
+// A pasted image's name, chosen by the client (task qy): the host keeps
+// it at paths.imageDir()/<name> until a prompt copies it into a blob.
+const imageName = /^[0-9a-z]{6}\.(?:png|jpg|gif|webp)$/
 
-export type Marker = { text: string; kind: 'image' | 'paste'; blob: string; at: number }
+// [image/<name>] alone, as clients link it.
+const imageMarker = /\[image\/([0-9a-z]{6}\.(?:png|jpg|gif|webp))\]/g
+
+// [image/<name>], [image <blob>] or [paste <blob>, N lines].
+const markerPattern = /\[(?:image\/([0-9a-z]{6}\.(?:png|jpg|gif|webp))|image ([0-9a-f]{12})|paste ([0-9a-f]{12}), \d+ lines?)\]/g
+
+// `file`: the image name of an [image/<name>] marker, whose blob is
+// the name without its extension.
+export type Marker = { text: string; kind: 'image' | 'paste'; blob: string; at: number; file?: string }
 
 function markers(text: string): Marker[] {
-	return [...text.matchAll(markerPattern)].map((m) => ({ text: m[0], kind: m[1] ? 'image' : 'paste', blob: (m[1] ?? m[2])!, at: m.index }))
+	return [...text.matchAll(markerPattern)].map((m) => {
+		if (m[1]) return { text: m[0], kind: 'image' as const, blob: m[1].slice(0, 6), at: m.index, file: m[1] }
+		return { text: m[0], kind: m[2] ? ('image' as const) : ('paste' as const), blob: (m[2] ?? m[3])!, at: m.index }
+	})
+}
+
+// A fresh name for a pasted image of `mediaType`: 6 random base36
+// characters and its extension, like frdbn1.png.
+function newName(mediaType: string): string {
+	let chars = [...crypto.getRandomValues(new Uint8Array(6))].map((b) => (b % 36).toString(36)).join('')
+	return `${chars}.${types[mediaType]}`
+}
+
+// The media type of image name `name`, if it is one.
+function nameType(name: string): string | undefined {
+	if (!imageName.test(name)) return undefined
+	let ext = name.slice(7)
+	return Object.keys(types).find((t) => types[t] === ext)
 }
 
 // The marker a prompt uses for a stored blob; `lines` for a paste.
@@ -42,6 +69,10 @@ function label(b: Pick<ImageBlock, 'mediaType' | 'bytes'>): string {
 export const attachments = {
 	types,
 	blobId,
+	imageName,
+	imageMarker,
+	newName,
+	nameType,
 	// Largest attachment, decoded.
 	maxBytes: () => 5 * 1024 * 1024,
 	markers,

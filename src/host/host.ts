@@ -207,7 +207,8 @@ function act(client: Client, c: Command): Outcome | undefined {
 	let refused: string | undefined
 	if (c.type === 'close') client.open.delete(c.sessionId)
 	else if (c.type === 'attach') {
-		let stored = blobs.store(c.sessionId, c.mediaType, c.data)
+		// A named image waits in /tmp for its prompt (task qy).
+		let stored = c.name !== undefined && c.mediaType !== 'text/plain' ? blobs.stage(c.name, c.mediaType, c.data) : blobs.store(c.sessionId, c.mediaType, c.data)
 		return { reply: { type: 'attached', sessionId: c.sessionId, command: c.id ?? '', blob: stored.blob, marker: stored.marker } }
 	} else if (c.type === 'submit') {
 		let unknown = commands.parse(c.text) ? [] : blobs.unknown(c.sessionId, c.text)

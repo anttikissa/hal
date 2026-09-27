@@ -11,27 +11,38 @@ beforeEach(() => {
 const attached = (command: string, marker: string): Event => ({ type: 'attached', sessionId: 's', command, blob: 'b', marker })
 const rejected = (id: string, reason: string): Event => ({ type: 'rejected', sessionId: 's', command: 'attach', reason, id })
 
-test('the placeholder becomes the marker; the caret after it moves with the text', () => {
-	let placeholder = uploads.begin('s', 'c.1', 'image/png')
-	expect(uploads.command('s', 'c.1', 'image/png', new Uint8Array([1, 2]))).toEqual({ type: 'attach', id: 'c.1', sessionId: 's', mediaType: 'image/png', data: 'AQI=' })
+test('an image is its final marker [image/<name>] from the start; the command carries the name', () => {
+	let marker = uploads.begin('s', 'c.1', 'image/png')
+	let name = /^\[image\/([0-9a-z]{6}\.png)\]$/.exec(marker)![1]
+	expect(uploads.command('s', 'c.1', 'image/png', new Uint8Array([1, 2]))).toEqual({ type: 'attach', id: 'c.1', sessionId: 's', mediaType: 'image/png', data: 'AQI=', name })
+	expect(uploads.begin('s', 'c.2', 'image/jpeg')).toMatch(/^\[image\/[0-9a-z]{6}\.jpg\]$/)
+	expect(uploads.pending('s')).toBe(true)
+	let done = uploads.settle(attached('c.1', marker))!
+	expect(uploads.swap({ text: `look ${marker}`, cursor: 0 }, done.placeholder, done.text).text).toBe(`look ${marker}`)
+})
+
+test('a paste placeholder becomes the marker; the caret after it moves with the text', () => {
+	let placeholder = uploads.begin('s', 'c.1', 'text/plain')
+	expect(placeholder).not.toContain('[paste')
+	expect(uploads.command('s', 'c.1', 'text/plain', new Uint8Array([1, 2]))).toEqual({ type: 'attach', id: 'c.1', sessionId: 's', mediaType: 'text/plain', data: 'AQI=' })
 	// Typed around after the paste: the caret is now past it.
 	let text = `look ${placeholder} here and more`
 	let p = { text, cursor: text.length, anchor: 2 }
-	let done = uploads.settle(attached('c.1', '[image 0123456789ab]'))!
+	let done = uploads.settle(attached('c.1', '[paste 0123456789ab, 3 lines]'))!
 	expect(done.sessionId).toBe('s')
 	let out = uploads.swap(p, done.placeholder, done.text)
-	expect(out.text).toBe('look [image 0123456789ab] here and more')
+	expect(out.text).toBe('look [paste 0123456789ab, 3 lines] here and more')
 	expect(out.cursor).toBe(out.text.length)
 	expect(out.anchor).toBe(2)
 	expect(uploads.pending('s')).toBe(false)
 })
 
-test('two uploads with the same kind get their own placeholders', () => {
-	let a = uploads.begin('s', 'c.1', 'image/png')
-	let b = uploads.begin('s', 'c.2', 'image/png')
-	expect(a).not.toBe(b)
-	let second = uploads.settle(attached('c.2', '[image bbbbbbbbbbbb]'))!
-	expect(uploads.swap({ text: `${a} ${b}`, cursor: 0 }, second.placeholder, second.text).text).toBe(`${a} [image bbbbbbbbbbbb]`)
+test('two uploads of the same kind get their own placeholders', () => {
+	for (let type of ['image/png', 'text/plain']) {
+		let a = uploads.begin('s', 'c.1', type)
+		let b = uploads.begin('s', 'c.2', type)
+		expect(a).not.toBe(b)
+	}
 })
 
 test('a refused upload leaves an error text, and answers not about uploads are ignored', () => {

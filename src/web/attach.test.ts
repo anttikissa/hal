@@ -47,19 +47,16 @@ const attaches = () => sent.filter((c) => c.type === 'attach')
 const item = (b: Blob) => ({ kind: 'file', type: b.type, getAsFile: () => b })
 const clip = (items: any[], text = '') => ({ items, getData: (t: string) => (t === 'text/plain' ? text : '') })
 
-test('a pasted image uploads with its placeholder at the caret; the answer puts the marker there', async () => {
+test('a pasted image shows its final marker at the caret at once and uploads under that name', async () => {
 	type('ab')
 	caret = 1
 	expect(attach.paste(clip([{ kind: 'string', type: 'text/html', getAsFile: () => null }, item(new Blob([png], { type: 'image/png' }))]), insert)).toBe(true)
-	expect(app.state.text).toMatch(/^a\[uploading image [^\]]+\]b$/)
+	let name = /^a\[image\/([0-9a-z]{6}\.png)\]b$/.exec(app.state.text)![1]
 	await tick()
 	let [c] = attaches()
-	expect(c).toMatchObject({ sessionId, mediaType: 'image/png', data: Buffer.from(png).toString('base64') })
-	// Typing before it moved it along.
-	caret = 0
-	type('>')
-	app.onEvent({ type: 'attached', sessionId, command: c.id, blob: '0123456789ab', marker: '[image 0123456789ab]' })
-	expect(app.state.text).toBe('>a[image 0123456789ab]b')
+	expect(c).toMatchObject({ sessionId, mediaType: 'image/png', data: Buffer.from(png).toString('base64'), name })
+	app.onEvent({ type: 'attached', sessionId, command: c.id, blob: name!.slice(0, 6), marker: `[image/${name}]` })
+	expect(app.state.text).toBe(`a[image/${name}]b`)
 	expect(drafts.text(sessionId)).toBe(app.state.text)
 })
 
@@ -68,7 +65,7 @@ test('a refused upload leaves an error text', async () => {
 	await tick()
 	expect(attaches()).toHaveLength(1)
 	app.onEvent({ type: 'rejected', sessionId, command: 'attach', reason: 'attachment is not image/png', id: attaches()[0].id })
-	expect(app.state.text).not.toContain('uploading')
+	expect(app.state.text).not.toContain('[image/')
 	expect(app.state.text).toContain('attachment is not image/png')
 })
 
@@ -79,8 +76,9 @@ test('Send during an upload waits and goes with the marker', async () => {
 	expect(sent.filter((c) => c.type === 'submit')).toEqual([])
 	expect(app.notice()).toBeTruthy()
 	await tick()
-	app.onEvent({ type: 'attached', sessionId, command: attaches()[0].id, blob: '0123456789ab', marker: '[image 0123456789ab]' })
-	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ text: 'see [image 0123456789ab]' })
+	let marker = `[image/${attaches()[0].name}]`
+	app.onEvent({ type: 'attached', sessionId, command: attaches()[0].id, blob: 'b', marker })
+	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ text: `see ${marker}` })
 	expect(app.state.text).toBe('')
 })
 

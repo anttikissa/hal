@@ -25,7 +25,7 @@ afterEach(() => {
 
 let reloads = 0
 
-function setup() {
+function setup(authorized?: () => Promise<boolean>) {
 	let sockets: FakeSocket[] = []
 	let timers: (() => void)[] = []
 	let events: Event[] = []
@@ -38,6 +38,7 @@ function setup() {
 			return s
 		},
 		reload: () => reloads++,
+		...(authorized ? { authorized } : {}),
 		onEvent: (e) => events.push(e),
 		onState: (s) => states.push(s),
 	})
@@ -87,4 +88,23 @@ test('a host on other code (4000) or a logout (4001) reloads the page; other clo
 	await Bun.sleep(0)
 	sockets[2]!.onclose!({ code: 4001 })
 	expect(reloads).toBe(2)
+})
+
+test('a socket refused while the login is no longer good reloads onto the gate; a host that is down only redials', async () => {
+	reloads = 0
+	let answer: () => Promise<boolean> = () => Promise.reject(new Error('host down'))
+	let { sockets, timers } = setup(() => answer())
+	sockets[0]!.onclose!({ code: 1006 })
+	await Bun.sleep(0)
+	expect(reloads).toBe(0)
+	answer = async () => true
+	timers.shift()!()
+	sockets[1]!.onclose!({ code: 1006 })
+	await Bun.sleep(0)
+	expect(reloads).toBe(0)
+	answer = async () => false
+	timers.shift()!()
+	sockets[2]!.onclose!({ code: 1006 })
+	await Bun.sleep(0)
+	expect(reloads).toBe(1)
 })

@@ -57,22 +57,34 @@ async function pasteImage(): Promise<{ id: string; placeholder: string }> {
 	app.onKeys([key('v', undefined, { ctrl: true })])
 	await tick()
 	let c = attaches().at(-1)
-	let placeholder = text().match(/\[uploading image [^\]]+\]/)![0]
+	let placeholder = text().match(/\[image\/[0-9a-z]{6}\.png\]/)![0]
 	return { id: c.id, placeholder }
 }
 
-test('Ctrl-V with an image uploads it; the placeholder becomes the marker after typing moved on', async () => {
+test('Ctrl-V with an image uploads it under the name its final marker shows', async () => {
 	app.onEvent(snapshot())
 	type('see ')
-	let { id } = await pasteImage()
-	expect(attaches()).toEqual([{ type: 'attach', id, sessionId: 's1', mediaType: 'image/png', data: Buffer.from(png).toString('base64') }])
+	let { id, placeholder } = await pasteImage()
+	let name = placeholder.slice(7, -1)
+	expect(attaches()).toEqual([{ type: 'attach', id, sessionId: 's1', mediaType: 'image/png', data: Buffer.from(png).toString('base64'), name }])
 	type(' and')
-	app.onKeys([key('home')])
-	type('>')
-	app.onEvent(attached(id, '[image 0123456789ab]'))
-	expect(text()).toBe('>see [image 0123456789ab] and')
-	expect(app.view().prompt.cursor).toBe(1)
+	app.onEvent(attached(id, placeholder))
+	expect(text()).toBe(`see ${placeholder} and`)
 	expect(drafts.text('s1')).toBe(text())
+})
+
+test('a host that answers at once (the host process’s own terminal) still gets its placeholder replaced', async () => {
+	app.onEvent(snapshot())
+	// The in-memory connection delivers `attached` inside send().
+	app.send = (c: any) => {
+		sent.push(c)
+		if (c.type === 'attach') app.onEvent(attached(c.id, '[paste 0123456789ab, 8 lines]'))
+	}
+	app.onKeys([key('paste', Array.from({ length: 8 }, (_, i) => `line ${i}`).join('\n'))])
+	await tick()
+	expect(text()).toBe('[paste 0123456789ab, 8 lines]')
+	app.onKeys([key('enter')])
+	expect(submits()).toEqual(['[paste 0123456789ab, 8 lines]'])
 })
 
 test('a refused upload leaves an error text in place of the placeholder', async () => {
@@ -86,12 +98,11 @@ test('a refused upload leaves an error text in place of the placeholder', async 
 test('Enter during an upload waits, then sends the prompt with the marker', async () => {
 	app.onEvent(snapshot())
 	type('look ')
-	let { id } = await pasteImage()
+	let { id, placeholder } = await pasteImage()
 	app.onKeys([key('enter')])
 	expect(submits()).toEqual([])
-	expect(text()).toContain('look [uploading image')
-	app.onEvent(attached(id, '[image 0123456789ab]'))
-	expect(submits()).toEqual(['look [image 0123456789ab]'])
+	app.onEvent(attached(id, placeholder))
+	expect(submits()).toEqual([`look ${placeholder}`])
 	expect(text()).toBe('')
 })
 
@@ -104,21 +115,24 @@ test('clipboard text wins over an image, and pastes as text', async () => {
 	expect(attaches()).toEqual([])
 })
 
-test('a pasted path of an existing image file attaches the file; other paths stay text', () => {
+test('a pasted path of an existing image file attaches the file; other paths stay text', async () => {
 	writeFileSync(`${dir}/shot one.png`, png)
 	app.onEvent(snapshot())
 	app.onKeys([key('paste', `${dir}/shot\\ one.png`)])
+	await tick()
 	expect(attaches()).toMatchObject([{ mediaType: 'image/png', data: Buffer.from(png).toString('base64') }])
-	expect(text()).toMatch(/^\[uploading image [^\]]+\]$/)
+	expect(text()).toBe(`[image/${attaches()[0].name}]`)
 	app.onKeys([key('paste', ` ${dir}/missing.png`)])
+	await tick()
 	expect(attaches()).toHaveLength(1)
 	expect(text()).toEndWith(`${dir}/missing.png`)
 })
 
-test('a paste longer than the setting becomes a text attachment; a short one stays inline', () => {
+test('a paste longer than the setting becomes a text attachment; a short one stays inline', async () => {
 	app.onEvent(snapshot())
 	let long = Array.from({ length: 8 }, (_, i) => `line ${i}`).join('\r\n')
 	app.onKeys([key('paste', long)])
+	await tick()
 	let [c] = attaches()
 	expect(c).toMatchObject({ mediaType: 'text/plain' })
 	expect(Buffer.from(c.data, 'base64').toString()).toBe(long.replaceAll('\r\n', '\n'))
@@ -128,6 +142,7 @@ test('a paste longer than the setting becomes a text attachment; a short one sta
 
 	settings.state.raw = { pasteLines: 20 }
 	app.onKeys([key('paste', `\n${long}`)])
+	await tick()
 	expect(attaches()).toHaveLength(1)
 	expect(text()).toContain('line 7')
 })

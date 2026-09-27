@@ -299,3 +299,15 @@ test('inside GNU screen the frame has no colour, only reverse video for the sele
 		else process.env.STY = env
 	}
 })
+
+test('an [image/<name>] marker is a link to the image, in the transcript and the prompt; the text stays the same', () => {
+	let url = `http://localhost:${settings.webPort()}/image/abc123.png`
+	let link = `\x1b]8;;${url}\x07[image/abc123.png]\x1b]8;;\x07`
+	let f = frame.build(view([{ type: 'prompt', text: 'see [image/abc123.png] ok' }], 'and [image/abc123.png]'), 60)
+	let rows = f.lines.filter((l) => l.includes('[image/abc123.png]'))
+	expect(rows).toHaveLength(2)
+	for (let row of rows) expect(row).toContain(link)
+	expect(plain(rows)).toEqual(['> see [image/abc123.png] ok', '> and [image/abc123.png]'])
+	// A forged name is not linked.
+	expect(frame.build(view([{ type: 'prompt', text: '[image/../x.png]' }]), 60).lines.join('')).not.toContain('\x1b]8;')
+})

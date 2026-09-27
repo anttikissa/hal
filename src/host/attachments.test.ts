@@ -2,13 +2,14 @@
 // prompt, history, provider bodies, and what clients see.
 
 import { expect, test } from 'bun:test'
-import { readdirSync, readFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { attachments } from '../common/attachments.ts'
 import { anthropic } from './anthropic.ts'
 import { blobs } from './blobs.ts'
 import { calls, client, created, fresh, until, useHost, shown } from './host-fixture.test.ts'
 import { history } from './history.ts'
 import { openaiCompat } from './openai-compat.ts'
+import { paths } from './paths.ts'
 
 useHost()
 
@@ -16,8 +17,8 @@ useHost()
 const png = Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.from('IHDR-and-some-pixels')])
 const png64 = png.toString('base64')
 
-function attach(c: ReturnType<typeof client>, sessionId: string, mediaType: string, data: string, id: string = crypto.randomUUID()) {
-	c.conn.send({ type: 'attach', sessionId, mediaType, data, id })
+function attach(c: ReturnType<typeof client>, sessionId: string, mediaType: string, data: string, id: string = crypto.randomUUID(), name?: string) {
+	c.conn.send({ type: 'attach', sessionId, mediaType, data, id, ...(name ? { name } : {}) })
 	return { attached: c.of('attached').find((e) => e.command === id), rejected: c.of('rejected').find((e) => e.id === id) }
 }
 
@@ -130,4 +131,63 @@ test('image blocks show the same live and after reconnecting, and survive an edi
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.at(-1).blocks).toContainEqual(image)
 	expect(c.views.get(id)!.items.filter((i) => i.type === 'image')).toHaveLength(1)
+})
+
+test('a named image waits in /tmp under its name; its prompt copies it into the session, which outlives /tmp', async () => {
+	let c = client()
+	let id = created(c)
+	let name = attachments.newName('image/png')
+	let { attached } = attach(c, id, 'image/png', png64, undefined, name)
+	expect(attached.marker).toBe(`[image/${name}]`)
+	let staged = `${paths.imageDir()}/${name}`
+	expect(readFileSync(staged)).toEqual(png)
+	expect(existsSync(blobs.dir(id))).toBe(false)
+
+	c.conn.send({ type: 'submit', sessionId: id, text: `what is in [image/${name}]?` })
+	await until(() => calls.length)
+	expect(c.of('warning')).toEqual([])
+	let blocks = calls[0]!.input.messages.at(-1).blocks
+	expect(blocks[0].text).toEndWith(`what is in [image/${name}]?`)
+	expect(blocks[1]).toMatchObject({ type: 'image', mediaType: 'image/png', bytes: png.length })
+	expect(anthropic.toMessages({ model: 'm', ...calls[0]!.input }).at(-1).content[1].source.data).toBe(png64)
+	calls[0]!.push({ type: 'done', reason: 'end' })
+	await until(() => c.of('turn-end').length)
+
+	// /tmp cleaned: an edit keeps the image while its marker stays, and
+	// drops it once the marker is deleted.
+	rmSync(staged)
+	c.conn.send({ type: 'submit', sessionId: id, text: `and now? [image/${name}]`, amend: true })
+	await until(() => calls.length === 2)
+	expect(calls[1]!.input.messages.at(-1).blocks).toContainEqual(blocks[1])
+	expect(calls[1]!.input.image(blocks[1].blob)).toBe(png64)
+	calls[1]!.push({ type: 'done', reason: 'end' })
+	await until(() => c.of('turn-end').length === 2)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'never mind', amend: true })
+	await until(() => calls.length === 3)
+	expect(calls[2]!.input.messages.at(-1).blocks.some((b: any) => b.type === 'image')).toBe(false)
+})
+
+test('a named image is refused under a wrong name or a taken one; a resend of the same bytes is fine', () => {
+	let c = client()
+	let id = created(c)
+	for (let name of ['abc123.jpg', 'ABC123.png', '../x12.png', 'abc1234.png', 'abc12.png']) {
+		expect(attach(c, id, 'image/png', png64, undefined, name).rejected.reason).toBeTruthy()
+	}
+	let name = attachments.newName('image/png')
+	expect(attach(c, id, 'image/png', png64, 'a', name).attached).toBeTruthy()
+	expect(attach(c, id, 'image/png', png64, 'b', name).attached.marker).toBe(`[image/${name}]`)
+	let other = Buffer.concat([png, Buffer.from('more')]).toString('base64')
+	expect(attach(c, id, 'image/png', other, 'c', name).rejected.reason).toContain('taken')
+	expect(readFileSync(`${paths.imageDir()}/${name}`)).toEqual(png)
+})
+
+test('an [image/<name>] marker whose file is gone, or is not an image, stays text and warns', async () => {
+	let c = client()
+	let id = created(c)
+	mkdirSync(paths.imageDir(), { recursive: true })
+	writeFileSync(`${paths.imageDir()}/fake01.png`, 'not a png')
+	c.conn.send({ type: 'submit', sessionId: id, text: 'see [image/gone01.png] [image/fake01.png]' })
+	await until(() => calls.length)
+	expect(calls[0]!.input.messages.at(-1).blocks.every((b: any) => b.type === 'text')).toBe(true)
+	expect(c.of('warning').at(-1).text).toContain('[image/gone01.png], [image/fake01.png]')
 })

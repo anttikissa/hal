@@ -2,7 +2,10 @@
 // the clipboard (Ctrl-V), a pasted line that is the path of an image
 // file, and text longer than settings.pasteLines(). Each is sent with an
 // `attach` command and stands in the prompt as a placeholder until the
-// host answers (common/uploads.ts).
+// host answers (common/uploads.ts). The command goes after the caller
+// has put the placeholder in the prompt: the host process's own
+// connection answers synchronously, and an answer before the
+// placeholder is there would have nothing to replace (task qy).
 
 import { readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -44,7 +47,8 @@ function upload(sessionId: string, mediaType: string, bytes: Uint8Array, send: (
 	if (big) return big
 	let id = connection.nextId()
 	let placeholder = uploads.begin(sessionId, id, mediaType)
-	send(uploads.command(sessionId, id, mediaType, bytes))
+	let command = uploads.command(sessionId, id, mediaType, bytes)
+	queueMicrotask(() => send(command))
 	return placeholder
 }
 

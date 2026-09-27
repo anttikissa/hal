@@ -1,8 +1,10 @@
 // Escape codes and row primitives the frame is built from: styles to
 // SGR, padded and painted rows, and text made safe to show. Pure.
 
+import { attachments } from '../common/attachments.ts'
 import type { Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
+import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
 
 // The escape that switches to a style's fg and bg (truecolor); none
@@ -28,6 +30,13 @@ function wrap(text: string, width: number): string[] {
 	return strings.wordWrap(strings.expandTabs(ansi.clean(text.replace(/\r\n?/g, '\n'))), width)
 }
 
+// A row with each whole [image/<name>] marker made an OSC 8 link to the
+// image on the host's web endpoint (task qy). Each link closes in the
+// row it opens in; the visible text is unchanged.
+function links(row: string): string {
+	return row.replace(attachments.imageMarker, (m, name: string) => `\x1b]8;;${ansi.imageUrl(name)}\x07${m}${ansi.LINK_OFF}`)
+}
+
 export const ansi = {
 	// One blank column on each side of every row.
 	PAD: ' ',
@@ -46,4 +55,8 @@ export const ansi = {
 	paint,
 	clean: (s: string): string => strings.clean(s),
 	wrap,
+	links,
+	// Where a pasted image opens: the web endpoint on this machine
+	// (behind its login). Override from local.ts behind a proxy.
+	imageUrl: (name: string): string => `http://localhost:${settings.webPort()}/image/${name}`,
 }

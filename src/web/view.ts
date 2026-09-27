@@ -289,12 +289,27 @@ function show(item: ItemShown): Shown {
 }
 
 // Where the page loads a session's image from (host/web.ts).
+// A prompt's text in parts, each [image/<name>] marker a link to the
+// image (task qy).
+function links(text: string): (string | { href: string; text: string })[] {
+	let out: (string | { href: string; text: string })[] = []
+	let from = 0
+	for (let m of text.matchAll(attachments.imageMarker)) {
+		if (m.index > from) out.push(text.slice(from, m.index))
+		out.push({ href: `/image/${m[1]}`, text: m[0] })
+		from = m.index + m[0].length
+	}
+	if (from < text.length) out.push(text.slice(from))
+	return out
+}
+
 function blobUrl(sessionId: string, blob: string): string {
 	return `/blob/${encodeURIComponent(sessionId)}/${encodeURIComponent(blob)}`
 }
 
 export const view = {
 	blobUrl,
+	links,
 	// Rows of a tool result shown in the transcript.
 	resultRows: () => 8,
 	onEvent,

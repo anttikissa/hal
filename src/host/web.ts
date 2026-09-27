@@ -24,6 +24,9 @@
 //   GET  /blob/<session>/<blob>  an attachment of that session
 //                  (cookie; host/blobs.ts): the id is matched whole,
 //                  never used as a path.
+//   GET  /image/<name>  a pasted image (cookie; task qy): from /tmp, or
+//                  from the session blob a prompt copied it into; the
+//                  name must be attachments.imageName.
 
 import type { BunPlugin, Server, ServerWebSocket } from 'bun'
 import { colors, type Style } from '../common/colors.ts'
@@ -168,7 +171,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	if ((pathname === '/' || session.isId(pathname.slice(1))) && req.method === 'GET') return url.searchParams.has('auth') ? web.linkLogin(url, req) : web.page()
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
 	let check = pathname === '/login' && req.method === 'GET'
-	let blob = pathname.startsWith('/blob/') && req.method === 'GET'
+	let blob = (pathname.startsWith('/blob/') || pathname.startsWith('/image/')) && req.method === 'GET'
 	if (!check && !blob && pathname !== '/ws') return new Response('not found\n', { status: 404 })
 	if (!web.authorized(req)) return new Response('log in first\n', { status: 401 })
 	if (blob) return web.blob(pathname)
@@ -186,10 +189,12 @@ async function upgrade(req: Request, srv: Server<Data>): Promise<Response | unde
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
 }
 
-// One attachment, by exact session and blob id; anything else is 404.
+// One attachment, by exact session and blob id, or a pasted image by
+// exact name; anything else is 404.
 function blob(pathname: string): Response {
-	let m = /^\/blob\/([\w-]+)\/([0-9a-f]{12})$/.exec(pathname)
-	let found = m ? blobs.read(m[1]!, m[2]!) : undefined
+	let m = /^\/blob\/([\w-]+)\/([0-9a-z]{6}|[0-9a-f]{12})$/.exec(pathname)
+	let name = /^\/image\/([0-9a-z]{6}\.[a-z]{3,4})$/.exec(pathname)?.[1]
+	let found = m ? blobs.read(m[1]!, m[2]!) : name ? blobs.image(name) : undefined
 	if (!found) return new Response('not found\n', { status: 404 })
 	let type = found.mediaType === 'text/plain' ? 'text/plain; charset=utf-8' : found.mediaType
 	return new Response(new Uint8Array(found.bytes), { headers: { 'content-type': type, 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=31536000, immutable' } })

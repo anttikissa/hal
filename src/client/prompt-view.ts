@@ -23,7 +23,7 @@ function layoutPrompt(text: string, cursor: number, width: number, sel?: { start
 		let row = strings.sliceVisual(strings.expandTabs(raw), 0, width)
 		let lo = sel ? Math.max(sel.start, r.start) - r.start : 0
 		let hi = sel ? Math.min(sel.end, r.end) - r.start : 0
-		if (lo >= hi) return row
+		if (lo >= hi) return ansi.links(row)
 		// Tab stops count from the row's start, so expanded prefixes line up.
 		let [a, b] = [lo, hi].map((i) => Math.min(row.length, strings.expandTabs(raw.slice(0, i)).length))
 		return row.slice(0, a) + ansi.INVERSE + row.slice(a, b) + ansi.UNINVERSE + row.slice(b)

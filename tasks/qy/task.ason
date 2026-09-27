@@ -1,7 +1,17 @@
 {
 	title: 'Pasted images: [image/abc123.png] markers that work',
 	description: "Pasting an image into the prompt works on the host terminal, peers and the web (questions.md item 39). Today on the host process the in-memory connection answers attach synchronously, before the placeholder is in the prompt, so the placeholder is never replaced and is sent as text (same for long-text pastes and pasted image paths); a test with a synchronous fake send guards this. The marker is short and final from the start: [image/<name>], where <name> is 6 random lowercase base36 characters plus the extension (e.g. [image/frdbn1.png]), chosen by the client so no 'uploading' text is ever shown; Enter waits for uploads still in flight. The host keeps the file at /tmp/hal/image/<name>, where the model's tools can read it too, and copies the bytes into a session blob when the prompt is submitted, so history and replays stay whole after /tmp is cleaned. In the terminal the marker is an OSC 8 link to the host's web endpoint /image/<name> (behind the web login of task 8a; served from the session blob when the /tmp file is gone); on the web it is a link too. Deleting a marker from the prompt drops that image, also when amending. Old Hal for reference: client/terminal/clipboard.ts and server/session/attachments.ts in ~/.hal.",
-	status: 'planned',
+	status: 'done',
 	needs: ['2a', '8a'],
-	foldInto: ['2a']
+	foldInto: ['2a'],
+	notes: [
+		'The sync fix is one line in client/paste.ts upload: the attach command goes in queueMicrotask, after the caller put the placeholder in the prompt. Web attach.ts was already async (Blob.arrayBuffer).',
+		"Protocol unchanged: attach's optional `name` (attachments.imageName: 6 base36 + png|jpg|gif|webp, the extension must fit mediaType) sends a named image to blobs.stage, which writes paths.imageDir()/<name>; without a name (and for text/plain) blobs.store works as in 2a. Long pastes keep the [uploading paste <id>] placeholder and [paste <blob>, N lines].",
+		"A resend after a host restart finds the file already there: same bytes are accepted, other bytes are refused as 'name taken'.",
+		"The session copy's blob id is the 6-character name base (sessions/<id>/blobs/frdbn1.png), so attachments.blobId accepts both 12 hex and 6 base36, and /blob/<session>/<blob> serves either. blobs.named copies from /tmp on first use, which happens at submit (host.ts calls blobs.unknown first); a queued prompt is therefore safe from a /tmp clean too. Old [image <12hex>] markers still resolve.",
+		'paths.imageDir() is /tmp/hal/image, but <home>/tmp/image when HAL_HOME or NODE_ENV=test, so tests never touch /tmp/hal. Bytes from /tmp are checked (magic number, size) before they are copied, since anyone on the machine can write there.',
+		'GET /image/<name> reads /tmp first, then scans sessions/*/blobs/<name>. An unauthenticated click gets the plain 401, not the gate.',
+		'The terminal link target is ansi.imageUrl(name) = http://localhost:<webPort>/image/<name>; the host does not know a public URL, so behind a proxy override it from local.ts. No ?auth= code is put in it. ansi.links wraps whole markers per row (after ansi.clean), so a marker split by wrapping or cut by a selection is not linked.',
+		'Web Card links markers only in prompt cards, through memos gated on the text string, so snapshots and streaming never rebuild nodes.'
+	]
 }

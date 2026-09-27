@@ -3,6 +3,10 @@
 // ASON command or event. The host closes it with code 4000 when the
 // page was built from other code than the host runs, and with 4001 when
 // /auth revoke logged every browser out: either way the page reloads.
+// A socket refused before it opens may mean the login expired or was
+// revoked while the page was closed or asleep: if the host then says the
+// cookie is no good, the page reloads onto the gate instead of retrying
+// forever.
 
 import { ason } from '../common/ason.ts'
 import { connection, type Conn, type LinkState, type Transport } from '../common/connection.ts'
@@ -22,11 +26,14 @@ export type LinkOptions = {
 	// The host runs other code than this page, or logged it out: load
 	// it again.
 	reload: () => void
+	// Whether the cookie is still good (GET /login); asked after a
+	// socket that never opened.
+	authorized?: () => Promise<boolean>
 	onEvent: (event: Event) => void
 	onState?: (state: LinkState) => void
 }
 
-function transport(dial: () => Socket, reload: () => void = () => {}): Transport {
+function transport(dial: () => Socket, reload: () => void = () => {}, authorized?: () => Promise<boolean>): Transport {
 	return {
 		connect: (on) =>
 			new Promise((resolve) => {
@@ -48,8 +55,13 @@ function transport(dial: () => Socket, reload: () => void = () => {}): Transport
 				}
 				socket.onclose = (ev) => {
 					if (ev?.code === 4000 || ev?.code === 4001) reload()
-					if (open) on.dropped()
-					else resolve(null)
+					if (open) return on.dropped()
+					resolve(null)
+					// A host that is down answers nothing: keep retrying.
+					authorized?.().then(
+						(ok) => ok || reload(),
+						() => {},
+					)
 				}
 			}),
 	}
@@ -58,7 +70,7 @@ function transport(dial: () => Socket, reload: () => void = () => {}): Transport
 // Connects, and reconnects with backoff whenever the socket drops.
 function start(opts: LinkOptions): void {
 	let startOpts: Parameters<typeof connection.start>[0] = {
-		transport: link.transport(opts.dial, opts.reload),
+		transport: link.transport(opts.dial, opts.reload, opts.authorized),
 		onEvent: opts.onEvent,
 		baseMs: link.baseMs(),
 		maxMs: link.maxDelayMs(),

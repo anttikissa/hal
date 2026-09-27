@@ -225,6 +225,29 @@ test('GET /blob serves a session’s attachment by exact id, with the cookie onl
 })
 
 
+test('GET /image serves a pasted image by exact name, from /tmp or once gone from its session blob', async () => {
+	await server.serve()
+	web.start()
+	let id = sessions.create({ cwd: home }).id
+	let png = Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.from('pixels')])
+	blobs.stage('abc123.png', 'image/png', png.toString('base64'))
+	let jar = await cookie()
+	let get = (path: string, auth = true) => fetch(`${base()}${path}`, { headers: auth ? { cookie: jar } : {} })
+
+	expect((await get('/image/abc123.png', false)).status).toBe(401)
+	let res = await get('/image/abc123.png')
+	expect(res.headers.get('content-type')).toBe('image/png')
+	expect(Buffer.from(await res.arrayBuffer())).toEqual(png)
+
+	expect(blobs.resolve(id, ['[image/abc123.png]']).unknown).toEqual([])
+	rmSync(`${paths.imageDir()}/abc123.png`)
+	expect(Buffer.from(await (await get('/image/abc123.png')).arrayBuffer())).toEqual(png)
+	expect((await get(`/blob/${id}/abc123`)).status).toBe(200)
+	for (let path of ['/image/abc123.jpg', '/image/zzz999.png', '/image/abc123', '/image/..%2fabc123.png', '/image/abc123.png/x']) {
+		expect((await get(path)).status).toBe(404)
+	}
+})
+
 test('the login check and ws need the cookie', async () => {
 	await server.serve()
 	web.start()

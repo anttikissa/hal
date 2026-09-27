@@ -1,15 +1,17 @@
 // Attachments on their way to the host (task zc), for terminal and web
-// alike. Starting one puts a placeholder in the prompt that names the
-// attach command's id, so it is found wherever typing has moved it, even
-// if the user typed the same words; the host's `attached` answer turns it
-// into the marker, a refusal into an error text. A submit while a
-// session has uploads pending waits and goes when the last one lands.
+// alike. Starting one puts a placeholder in the prompt, found wherever
+// typing has moved it; the host's `attached` answer turns it into the
+// marker, a refusal into an error text. An image's placeholder is its
+// final marker [image/<name>] from the start, the name chosen here
+// (task qy); a paste's names the attach command's id until answered. A
+// submit while a session has uploads pending waits and goes when the
+// last one lands.
 
 import { attachments } from './attachments.ts'
 import type { Event } from './protocol.ts'
 import { settings } from './settings.ts'
 
-type Upload = { sessionId: string; placeholder: string }
+type Upload = { sessionId: string; placeholder: string; name?: string }
 export type Settled = Upload & { text: string; error?: string; resume?: { queue: boolean } }
 type Spot = { text: string; cursor: number; anchor?: number }
 
@@ -22,14 +24,21 @@ function createState() {
 // Registers upload `id` (the attach command's id) of session
 // `sessionId`: the placeholder that stands for it until the host answers.
 function begin(sessionId: string, id: string, mediaType: string): string {
-	let placeholder = `[uploading ${mediaType === 'text/plain' ? 'paste' : 'image'} ${id}]`
-	uploads.state.pending.set(id, { sessionId, placeholder })
+	if (mediaType === 'text/plain') {
+		let placeholder = `[uploading paste ${id}]`
+		uploads.state.pending.set(id, { sessionId, placeholder })
+		return placeholder
+	}
+	let name = attachments.newName(mediaType)
+	let placeholder = `[image/${name}]`
+	uploads.state.pending.set(id, { sessionId, placeholder, name })
 	return placeholder
 }
 
-// The attach command carrying `bytes`.
+// The attach command carrying `bytes`, with the name begin() chose.
 function command(sessionId: string, id: string, mediaType: string, bytes: Uint8Array): object {
-	return { type: 'attach', id, sessionId, mediaType, data: uploads.base64(bytes) }
+	let name = uploads.state.pending.get(id)?.name
+	return { type: 'attach', id, sessionId, mediaType, data: uploads.base64(bytes), ...(name ? { name } : {}) }
 }
 
 // The error text for something too large to send (the host would refuse
@@ -58,9 +67,9 @@ function settle(event: Event): Settled | undefined {
 	let st = uploads.state
 	if (event.type === 'rejected') {
 		st.waiting.delete(up.sessionId)
-		return { ...up, text: `[upload failed: ${event.reason}]`, error: event.reason }
+		return { sessionId: up.sessionId, placeholder: up.placeholder, text: `[upload failed: ${event.reason}]`, error: event.reason }
 	}
-	let done: Settled = { ...up, text: (event as Event & { type: 'attached' }).marker }
+	let done: Settled = { sessionId: up.sessionId, placeholder: up.placeholder, text: (event as Event & { type: 'attached' }).marker }
 	let queue = st.waiting.get(up.sessionId)
 	if (queue !== undefined && !uploads.pending(up.sessionId)) {
 		st.waiting.delete(up.sessionId)

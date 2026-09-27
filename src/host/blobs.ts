@@ -1,5 +1,8 @@
 // Attachments a client sent (task 2a), stored per session as
 // sessions/<id>/blobs/<blob>.<ext>, and resolved in prompt text.
+// A pasted image (task qy) waits by its client-chosen name in
+// paths.imageDir() and is copied into a blob of the session whose
+// prompt names it with [image/<name>]; that blob then outlives /tmp.
 //
 // Only blobs the host stored for that session resolve: a blob id is
 // checked against its fixed form before it names a file, and is looked
@@ -7,7 +10,7 @@
 // becomes a path of its own. History holds references (ImageBlock),
 // never the bytes; providers read them through base64() per request.
 
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { attachments, type Marker } from '../common/attachments.ts'
 import type { ImageBlock, UserBlock } from '../common/blocks.ts'
 import { paths } from './paths.ts'
@@ -34,10 +37,9 @@ function looksLike(mediaType: string, bytes: Uint8Array): boolean {
 	}
 }
 
-// Checks and stores one attachment; throws the reason it is refused.
-function store(sessionId: string, mediaType: string, data: string): Stored {
-	let ext = attachments.types[mediaType]
-	if (!ext) throw new Error(`unsupported attachment type ${JSON.stringify(mediaType)}; expected png, jpeg, gif, webp or text/plain`)
+// The bytes of an attachment's base64 `data`; throws why it is refused.
+function decode(mediaType: string, data: string): Buffer {
+	if (!attachments.types[mediaType]) throw new Error(`unsupported attachment type ${JSON.stringify(mediaType)}; expected png, jpeg, gif, webp or text/plain`)
 	let max = attachments.maxBytes()
 	// Checked before decoding: base64 is 4 characters per 3 bytes.
 	if (data.length > Math.ceil(max / 3) * 4) throw new Error(`attachment larger than ${max / 1024 / 1024} MB`)
@@ -46,6 +48,13 @@ function store(sessionId: string, mediaType: string, data: string): Stored {
 	if (!bytes.length) throw new Error('attachment is empty')
 	if (bytes.length > max) throw new Error(`attachment larger than ${max / 1024 / 1024} MB`)
 	if (!blobs.looksLike(mediaType, bytes)) throw new Error(`attachment is not ${mediaType}`)
+	return bytes
+}
+
+// Checks and stores one attachment; throws the reason it is refused.
+function store(sessionId: string, mediaType: string, data: string): Stored {
+	let bytes = blobs.decode(mediaType, data)
+	let ext = attachments.types[mediaType]!
 	mkdirSync(blobs.dir(sessionId), { recursive: true })
 	let blob: string
 	do blob = Buffer.from(crypto.getRandomValues(new Uint8Array(6))).toString('hex')
@@ -53,6 +62,46 @@ function store(sessionId: string, mediaType: string, data: string): Stored {
 	writeFileSync(`${blobs.dir(sessionId)}/${blob}.${ext}`, bytes, { mode: 0o600 })
 	let lines = mediaType === 'text/plain' ? bytes.toString('utf8').replace(/\n$/, '').split('\n').length : 0
 	return { blob, mediaType, bytes: bytes.length, marker: attachments.marker(blob, mediaType, lines) }
+}
+
+// Checks a pasted image and keeps it as paths.imageDir()/<name>; throws
+// why it is refused. The same bytes again (a resend) are fine; other
+// bytes under a taken name are not.
+function stage(name: string, mediaType: string, data: string): Stored {
+	if (attachments.nameType(name) !== mediaType) throw new Error(`image name ${JSON.stringify(name)} does not fit ${mediaType}`)
+	let bytes = blobs.decode(mediaType, data)
+	let path = `${paths.imageDir()}/${name}`
+	if (existsSync(path)) {
+		if (!bytes.equals(readFileSync(path))) throw new Error(`image name ${name} is taken`)
+	} else {
+		mkdirSync(paths.imageDir(), { recursive: true, mode: 0o700 })
+		writeFileSync(path, bytes, { mode: 0o600 })
+	}
+	return { blob: name.slice(0, 6), mediaType, bytes: bytes.length, marker: `[image/${name}]` }
+}
+
+// Pasted image `name` still in paths.imageDir(), if its bytes are what
+// its name says and not too large.
+function staged(name: string): { bytes: Buffer; mediaType: string } | undefined {
+	let mediaType = attachments.nameType(name)
+	let path = `${paths.imageDir()}/${name}`
+	if (!mediaType || !statSync(path, { throwIfNoEntry: false })?.isFile()) return undefined
+	let bytes = readFileSync(path)
+	return bytes.length <= attachments.maxBytes() && blobs.looksLike(mediaType, bytes) ? { bytes, mediaType } : undefined
+}
+
+// Pasted image `name` for the web (/image/<name>): from
+// paths.imageDir(), or once /tmp is cleaned from the blob of whichever
+// session a prompt copied it into.
+function image(name: string): { bytes: Buffer; mediaType: string } | undefined {
+	let mediaType = attachments.nameType(name)
+	if (!mediaType) return undefined
+	let found = blobs.staged(name)
+	if (found) return found
+	let file = `blobs/${name}`
+	let dirs = existsSync(paths.sessionsDir()) ? readdirSync(paths.sessionsDir()) : []
+	let id = dirs.find((d) => existsSync(`${paths.sessionsDir()}/${d}/${file}`))
+	return id === undefined ? undefined : { bytes: readFileSync(`${paths.sessionsDir()}/${id}/${file}`), mediaType }
 }
 
 // The session's blob with this exact id: its file and media type.
@@ -75,9 +124,20 @@ function base64(sessionId: string, blob: string): string | undefined {
 	return blobs.read(sessionId, blob)?.bytes.toString('base64')
 }
 
-// The blob a marker names, if it is this session's and of its kind.
+// The blob a marker names, if it is this session's and of its kind. A
+// pasted image's is copied from paths.imageDir() on first use.
 function named(sessionId: string, m: Marker): { path: string; mediaType: string } | undefined {
 	let found = blobs.find(sessionId, m.blob)
+	if (m.file) {
+		let mediaType = attachments.nameType(m.file)
+		if (found) return found.mediaType === mediaType ? found : undefined
+		let fresh = blobs.staged(m.file)
+		if (!fresh) return undefined
+		mkdirSync(blobs.dir(sessionId), { recursive: true })
+		let path = `${blobs.dir(sessionId)}/${m.file}`
+		writeFileSync(path, fresh.bytes, { mode: 0o600 })
+		return { path, mediaType: fresh.mediaType }
+	}
 	return found && (found.mediaType === 'text/plain') === (m.kind === 'paste') ? found : undefined
 }
 
@@ -113,4 +173,4 @@ function resolve(sessionId: string, texts: string[]): { blocks: UserBlock[]; unk
 	return { blocks: [...out, ...images], unknown }
 }
 
-export const blobs = { dir, looksLike, store, find, read, base64, named, unknown, resolve }
+export const blobs = { dir, looksLike, decode, store, stage, staged, image, find, read, base64, named, unknown, resolve }

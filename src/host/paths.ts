@@ -25,6 +25,13 @@ function sessionDir(id: string): string {
 	return `${paths.sessionsDir()}/${id}`
 }
 
+// Pasted images by name until a prompt copies them into a session
+// blob (task qy): /tmp/hal/image, where the model's tools can read them
+// too; inside the home under test, so tests never touch /tmp/hal.
+function imageDir(): string {
+	return process.env.HAL_HOME || process.env.NODE_ENV === 'test' ? `${paths.home()}/tmp/image` : '/tmp/hal/image'
+}
+
 // Everything else: socket, host lock, diagnostics, later peer and access
 // keys. Owner-only.
 function stateDir(): string {
@@ -60,4 +67,4 @@ function display(path: string): string {
 	return path
 }
 
-export const paths = { repoRoot: (): string => repoRoot, home, sessionsDir, sessionDir, stateDir, authFile, configFile, init, display }
+export const paths = { repoRoot: (): string => repoRoot, home, sessionsDir, sessionDir, imageDir, stateDir, authFile, configFile, init, display }

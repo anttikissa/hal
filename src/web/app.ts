@@ -236,6 +236,7 @@ function start(): void {
 	link.start({
 		dial: () => new WebSocket(`${scheme}://${location.host}/ws?v=${document.documentElement.dataset.version}`),
 		reload: () => location.reload(),
+		authorized: () => app.authorized(),
 		onEvent: (e) => app.onEvent(e),
 		onState: (s) => app.onState(s),
 	})

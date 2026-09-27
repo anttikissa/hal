@@ -10,7 +10,7 @@
 // kept by its session and row key (task w5), not by its DOM, so no other
 // item's card ever shows open in its place.
 
-import { createSignal, flush, onSettled, Show } from 'solid-js'
+import { createMemo, createSignal, flush, onSettled, Show } from 'solid-js'
 import { scroll } from '../scroll.ts'
 import { view, type Row } from '../view.ts'
 
@@ -63,11 +63,19 @@ export function Card(props: { row: Row; session: string; cursor?: boolean }) {
 		}, 'track')
 	}
 	let cursor = () => <span class="cursor" aria-hidden="true" />
+	// A prompt's [image/<name>] markers are links (task qy), rebuilt only
+	// when its text changes, not when a snapshot brings a new row object.
+	let text = createMemo(() => shown()?.text ?? '')
+	let linked = createMemo(() => (props.row.item.type === 'prompt' && text().includes('[image/') ? view.links(text()) : text()))
+	let parts = () => {
+		let l = linked()
+		return typeof l === 'string' ? l : l.map((p) => (typeof p === 'string' ? p : <a href={p.href} target="_blank" rel="noopener">{p.text}</a>))
+	}
 	// Built once per card: the bindings follow a new row object, so the
 	// DOM (and its fade-in) stays when a snapshot or stream replaces it.
 	let plain = (s: () => { kind: string; text: string }) => (
 		<div ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '']}>
-			<Show when={props.row.item.type === 'image' && props.row.item} fallback={s().text}>
+			<Show when={props.row.item.type === 'image' && props.row.item} fallback={parts()}>
 				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
 			</Show>
 			<Show when={props.cursor}>{cursor()}</Show>
