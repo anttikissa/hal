@@ -95,6 +95,7 @@ function stop(id: string, reason?: string): string | undefined {
 	let ended: Event = { type: 'turn-end', sessionId: id, status: 'paused', n }
 	if (Object.keys(end.usage).length) ended.usage = end.usage
 	host.broadcast(id, ended)
+	subagents.report(id)
 }
 
 // Continues every unfinished turn on disk (a new host after a restart or
@@ -309,6 +310,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	// Paused already, unless something other than the user aborted it.
 	if (end.status === 'paused') status.transition(id, capped === undefined ? { type: 'pause' } : { type: 'pause', reason: capped })
 	else status.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
+	subagents.report(id)
 	if (end.status === 'completed') {
 		prompts.next(id)
 		subagents.finished(id)

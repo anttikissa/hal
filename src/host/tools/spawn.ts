@@ -22,15 +22,16 @@ function text(input: Record<string, unknown>, key: string): string | undefined {
 export const tool: Tool = {
 	name: 'spawn',
 	description:
-		'Open a session in the tab after this one. A subagent session hands off to this session with send, then its tab ' +
-		'closes; subagent-leave-open hands off and stays open; interactive is a session for the user, blank without a task. ' +
-		'Don’t restate standing instructions in the task; only add task-specific details.',
+		'Open a session in the tab after this one. A subagent session’s last message comes back here when it finishes, then ' +
+		'its tab closes; subagent-leave-open reports back and stays open; interactive is a session for the user, blank ' +
+		'without a task. A fresh session knows only its task: give it clear, task-specific guidance (standing instructions ' +
+		'it has already).',
 	parameters: {
 		type: 'object',
 		properties: {
 			task: { type: 'string', description: 'What the session should do. Required unless kind is interactive.' },
 			kind: { type: 'string', enum: kinds, description: 'Default subagent.' },
-			mode: { type: 'string', enum: ['fork', 'fresh'], description: 'fork (default) copies this session’s history so far; fresh starts empty.' },
+			mode: { type: 'string', enum: ['fork', 'fresh'], description: 'fresh (default) starts with only the task; fork copies this session’s history so far.' },
 			model: { type: 'string', description: 'Model for the session; default this session’s.' },
 			cwd: { type: 'string', description: 'Working directory; default this session’s.' },
 			name: { type: 'string', description: 'Brief, descriptive session name, e.g. "Review rendering regression".' },
@@ -40,7 +41,7 @@ export const tool: Tool = {
 	async run(input, ctx) {
 		let kind = (input.kind ?? 'subagent') as SpawnKind
 		if (!kinds.includes(kind)) throw new Error(`kind must be one of ${kinds.join(', ')}`)
-		let mode = input.mode ?? 'fork'
+		let mode = input.mode ?? 'fresh'
 		if (mode !== 'fork' && mode !== 'fresh') throw new Error('mode must be fork or fresh')
 		let limit = input.limit ?? 0
 		if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 0) throw new Error('limit must be a non-negative integer')
@@ -52,6 +53,6 @@ export const tool: Tool = {
 		if (!statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${cwd} is not a directory`)
 		let id = subagents.spawn(ctx.sessionId, { kind, task, fork: mode === 'fork', cwd, model, name: text(input, 'name'), limit })
 		if (kind === 'interactive') return `Opened ${tabs.label(id)} for the user${task ? ', working on the task' : ''}.`
-		return `Started ${tabs.label(id)}. It sends its handoff here when done; wait ends this turn until then.`
+		return `Started ${tabs.label(id)}. Its last message comes back here when it finishes; wait ends this turn until then.`
 	},
 }

@@ -9,6 +9,6 @@
 		"wait ends the turn through ToolContext.endTurn: after the round's results the turn ends completed (reason tool_use), unless a steering message waits; then the model reads it next round instead. A handoff that arrives while the parent is idle starts its turn (task rj). running() = the parent's open child sessions of a subagent kind in a busy state (running, retrying, blocked).",
 		"Fork copies the parent's history records (not its inbox records) and blobs, then answers the parent's in-flight round's tool calls with a 'this is a fork' result and ends that turn completed, so the copy is a valid, finished conversation before the child's prompt. mode defaults to fork as in the old tool, also for interactive; ask for fresh to get a blank one.",
 		'Auto-close is subagents.finished after every completed turn (turns.ts): only kind subagent, idle, empty inbox and no running subagents of its own (a subagent parked in wait stays). A human submit or amend promotes subagent to subagent-leave-open.',
-		'Open: a subagent that ends in error or paused without a handoff leaves its parent idle forever; nothing tells the parent.'
+		'Task mt replaced the send handoff with host reports (including errors and pauses) and made mode default to fresh.'
 	]
 }
