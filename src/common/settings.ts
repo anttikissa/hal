@@ -10,7 +10,6 @@
 
 export type SettingType =
 	| { kind: 'text' }
-	| { kind: 'secret' }
 	| { kind: 'integer'; min: number; max: number }
 	| { kind: 'choice'; options: string[] }
 
@@ -42,7 +41,6 @@ const table: Setting[] = [
 		default: 200,
 		description: 'Provider rounds one turn may run before it pauses; Enter continues for as many again.',
 	},
-	{ name: 'webPassword', type: { kind: 'secret' }, default: 'hello123', description: 'Password for the browser client.' },
 	{ name: 'webPort', type: { kind: 'integer', min: 1, max: 65535 }, default: 9002, description: 'Port for the browser client (127.0.0.1).' },
 ]
 
@@ -50,7 +48,6 @@ const table: Setting[] = [
 function problem(type: SettingType, value: unknown): string | undefined {
 	switch (type.kind) {
 		case 'text':
-		case 'secret':
 			return typeof value === 'string' && value !== '' ? undefined : 'expected a non-empty string'
 		case 'integer':
 			return Number.isInteger(value) && (value as number) >= type.min && (value as number) <= type.max
@@ -71,11 +68,7 @@ function check(raw: Record<string, unknown>): { values: Record<string, unknown>;
 		if (!(s.name in raw)) continue
 		let why = problem(s.type, raw[s.name])
 		if (!why) values[s.name] = raw[s.name]
-		else {
-			// Secrets are never echoed, not even malformed ones.
-			let got = s.type.kind === 'secret' ? '' : `, got ${JSON.stringify(raw[s.name]) ?? String(raw[s.name])}`
-			warnings.push(`${s.name}: ${why}${got}; using the default`)
-		}
+		else warnings.push(`${s.name}: ${why}, got ${JSON.stringify(raw[s.name]) ?? String(raw[s.name])}; using the default`)
 	}
 	for (let key of Object.keys(raw)) {
 		if (!settings.table.some((s) => s.name === key)) warnings.push(`unknown setting '${key}', ignored`)
@@ -96,7 +89,6 @@ export const settings = {
 	warnings: (): string[] => settings.check(settings.state.raw).warnings,
 	model: (): string => settings.value('model') as string,
 	security: (): 'best-effort' | 'none' => settings.value('security') as 'best-effort' | 'none',
-	webPassword: (): string => settings.value('webPassword') as string,
 	webPort: (): number => settings.value('webPort') as number,
 	promptRows: (): number => settings.value('promptRows') as number,
 	pasteLines: (): number => settings.value('pasteLines') as number,

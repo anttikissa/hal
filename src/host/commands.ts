@@ -14,7 +14,9 @@ import type { Answers, Form } from '../common/forms.ts'
 // What a command did: something to say, a failure, or a question.
 // `open`: a client modal to open on every client following the session
 // (tasks/w4/forms.md, Provenance): 'models' is the model picker.
-export type Reply = { say?: string; error?: string; ask?: Form; open?: 'models' }
+// `show`: said like `say` but never recorded, so it is gone on the next
+// snapshot (a one-time code, /auth).
+export type Reply = { say?: string; show?: string; error?: string; ask?: Form; open?: 'models' }
 
 // The session the command runs in.
 // setCwd and setModel also tell the model, on its next prompt; say

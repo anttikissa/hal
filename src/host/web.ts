@@ -1,21 +1,26 @@
 // Web endpoint, host end: whichever process is host also serves HTTP on
 // 127.0.0.1:web.port() and stops with the host (server.ts starts and
-// stops it). For a trusted test deployment only: one shared password,
-// compared as plain text, is also the cookie value.
+// stops it). A browser logs in with a one-time code (web-auth.ts,
+// task 8a) and keeps a session token in an HttpOnly cookie.
 //
 //   GET  /         the browser client (src/web/, a SolidJS app bundled
 //   GET  /<id>     by web.page() with the JSX compiler, which is loaded
 //                  only then: a host that never serves the page never
 //                  loads it), at / and at any path shaped like a session
-//                  id: the page shows that tab (src/web/router.ts)
-//   POST /login    form field `password`; sets the cookie or answers 401
+//                  id: the page shows that tab (src/web/router.ts).
+//                  With ?auth=<code> (a terminal link's hidden target)
+//                  the code is redeemed and the answer redirects to the
+//                  same address without it, setting the cookie if right.
+//   POST /login    form field `code`: sets the cookie, or answers 401
+//                  (wrong or used code) or 429 (too many wrong codes)
 //   GET  /login    204 if the cookie is good, else 401
-//   GET  /ws       WebSocket, one host.adapt() connection (cookie):
-//                  each message is one ASON command, each event one
-//                  ASON message, like a socket client's lines; the tabs
-//                  come first. A page built from other code than the
-//                  host's (`?v=`, web.version()) is closed with
-//                  code 4000: reload.
+//   GET  /ws       WebSocket, one host.adapt() connection (cookie, and
+//                  an Origin naming this host): each message is one ASON
+//                  command, each event one ASON message, like a socket
+//                  client's lines; the tabs come first. A page built
+//                  from other code than the host's (`?v=`,
+//                  web.version()) is closed with code 4000: reload.
+//                  /auth revoke closes every socket with code 4001.
 //   GET  /blob/<session>/<blob>  an attachment of that session
 //                  (cookie; host/blobs.ts): the id is matched whole,
 //                  never used as a path.
@@ -28,15 +33,35 @@ import { settings } from '../common/settings.ts'
 import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
+import { webAuth } from './web-auth.ts'
 
 const cookieName = 'hal'
-const tenYears = 10 * 365 * 24 * 3600
 
 type Data = { conn?: ReturnType<typeof host.adapt>; stale?: boolean }
 type Socket = ServerWebSocket<Data>
 
 function authorized(req: Request): boolean {
-	return new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName) === web.password()
+	return webAuth.valid(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
+}
+
+// Whether a WebSocket request comes from a page of this host: its
+// Origin names the host the browser asked for (Host, or the proxy's
+// X-Forwarded-Host). A browser sets both; another site can't.
+function sameOrigin(req: Request): boolean {
+	let host = URL.parse(req.headers.get('origin') ?? '')?.host
+	return !!host && (host === req.headers.get('host') || host === req.headers.get('x-forwarded-host'))
+}
+
+// Swaps a code for a session cookie: Secure unless the browser is on
+// this machine over plain HTTP; or why not.
+function redeem(code: unknown, req: Request): { cookie?: string; refused?: 'wrong' | 'limited' } {
+	let out = webAuth.redeem(code)
+	if ('refused' in out) return out
+	let hostname = URL.parse(`http://${req.headers.get('host') ?? ''}`)?.hostname
+	let local = ['localhost', '127.0.0.1', '[::1]'].includes(hostname ?? '') && req.headers.get('x-forwarded-proto') !== 'https'
+	let maxAge = Math.floor(webAuth.tokenMs() / 1000)
+	let cookie = new Bun.Cookie(cookieName, out.token, { path: '/', httpOnly: true, secure: !local, sameSite: 'strict', maxAge })
+	return { cookie: cookie.serialize() }
 }
 
 // The JSX compiler, loaded on first use: nothing else on the host
@@ -115,20 +140,32 @@ async function page(): Promise<Response> {
 }
 
 async function login(req: Request): Promise<Response> {
-	let password: unknown
+	let code: unknown
 	try {
-		password = (await req.formData()).get('password')
+		code = (await req.formData()).get('code')
 	} catch {
-		return new Response('expected a form with a password field\n', { status: 400 })
+		return new Response('expected a form with a code field\n', { status: 400 })
 	}
-	if (password !== web.password()) return new Response('wrong password\n', { status: 401 })
-	let cookie = new Bun.Cookie(cookieName, web.password(), { path: '/', httpOnly: true, sameSite: 'strict', maxAge: tenYears })
-	return new Response(null, { status: 204, headers: { 'set-cookie': cookie.serialize() } })
+	let { cookie, refused } = web.redeem(code, req)
+	if (refused === 'limited') return new Response('too many wrong codes; try again in a minute\n', { status: 429 })
+	if (!cookie) return new Response('wrong or expired code\n', { status: 401 })
+	return new Response(null, { status: 204, headers: { 'set-cookie': cookie } })
+}
+
+// A page address with ?auth=<code>: redeemed, then sent to the same
+// address without it, logged in if the code was right.
+function linkLogin(url: URL, req: Request): Response {
+	let { cookie } = web.redeem(url.searchParams.get('auth'), req)
+	url.searchParams.delete('auth')
+	let headers: Record<string, string> = { location: url.pathname + url.search, 'cache-control': 'no-store' }
+	if (cookie) headers['set-cookie'] = cookie
+	return new Response(null, { status: 303, headers })
 }
 
 function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | undefined> | undefined {
-	let { pathname } = new URL(req.url)
-	if ((pathname === '/' || session.isId(pathname.slice(1))) && req.method === 'GET') return web.page()
+	let url = new URL(req.url)
+	let { pathname } = url
+	if ((pathname === '/' || session.isId(pathname.slice(1))) && req.method === 'GET') return url.searchParams.has('auth') ? web.linkLogin(url, req) : web.page()
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
 	let check = pathname === '/login' && req.method === 'GET'
 	let blob = pathname.startsWith('/blob/') && req.method === 'GET'
@@ -136,6 +173,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	if (!web.authorized(req)) return new Response('log in first\n', { status: 401 })
 	if (blob) return web.blob(pathname)
 	if (check) return new Response(null, { status: 204 })
+	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
 	return web.upgrade(req, srv)
 }
 
@@ -160,12 +198,14 @@ function blob(pathname: string): Response {
 const websocket = {
 	open(ws: Socket) {
 		if (ws.data.stale) return ws.close(4000, 'reload')
+		web.state.sockets.add(ws)
 		ws.data.conn = host.adapt((message) => ws.send(message))
 	},
 	message(ws: Socket, message: string | Buffer) {
 		ws.data.conn?.receive(String(message))
 	},
 	close(ws: Socket) {
+		web.state.sockets.delete(ws)
 		ws.data.conn?.close()
 	},
 }
@@ -186,15 +226,28 @@ async function stop(): Promise<void> {
 	let srv = web.state.server
 	web.state.server = null
 	web.state.page = null
+	web.state.sockets.clear()
+	webAuth.close()
 	await srv?.stop(true)
 }
 
+// /auth revoke: every session token and unused code is void, and every
+// open page is closed with code 4001, on which it reloads to the gate.
+function revoke(): void {
+	webAuth.revoke()
+	for (let ws of web.state.sockets) ws.close(4001, 'logged out')
+	web.state.sockets.clear()
+}
+
 export const web = {
-	state: { server: null as Server<Data> | null, page: null as Promise<{ html: string; version: string }> | null },
-	// config.ason's webPort and webPassword; overridable from local.ts.
+	state: { server: null as Server<Data> | null, page: null as Promise<{ html: string; version: string }> | null, sockets: new Set<Socket>() },
+	// config.ason's webPort; overridable from local.ts.
 	port: (): number => settings.webPort(),
-	password: (): string => settings.webPassword(),
 	authorized,
+	sameOrigin,
+	redeem,
+	linkLogin,
+	revoke,
 	css,
 	compiler,
 	plugin,

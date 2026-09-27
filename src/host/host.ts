@@ -32,6 +32,7 @@ import { slash } from './slash.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
+import { webAuth } from './web-auth.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -192,6 +193,7 @@ function act(client: Client, c: Command): Outcome | undefined {
 		return undefined
 	}
 	if (tabs.is(c)) return tabs.act(c)
+	if (c.type === 'auth') return { reply: { type: 'auth', code: webAuth.issue() } }
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	// An edit waits for the turn it paused to finish stopping, so nothing
 	// that turn still records lands after the edit.

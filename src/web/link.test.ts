@@ -72,7 +72,7 @@ test('a socket that never opens is a failed attempt; one that closes redials and
 	expect(sockets[2]!.sent).toEqual(sockets[1]!.sent)
 })
 
-test('a host on other code than the page closes with 4000 and the page reloads; other closes only redial', async () => {
+test('a host on other code (4000) or a logout (4001) reloads the page; other closes only redial', async () => {
 	reloads = 0
 	let { sockets } = setup()
 	sockets[0]!.onopen!()
@@ -83,4 +83,8 @@ test('a host on other code than the page closes with 4000 and the page reloads; 
 	await Bun.sleep(0)
 	sockets[1]!.onclose!({ code: 4000 })
 	expect(reloads).toBe(1)
+	sockets[2]!.onopen!()
+	await Bun.sleep(0)
+	sockets[2]!.onclose!({ code: 4001 })
+	expect(reloads).toBe(2)
 })

@@ -7,6 +7,7 @@ import { oklch } from '../common/oklch.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { blobs } from './blobs.ts'
+import { clock } from './clock.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { pages } from './pages.ts'
@@ -17,6 +18,7 @@ import { paths } from './paths.ts'
 import { server } from './server.ts'
 import { sessions } from './sessions.ts'
 import { web } from './web.ts'
+import { webAuth } from './web-auth.ts'
 
 const savedHome = process.env.HAL_HOME
 const origPort = web.port
@@ -48,14 +50,14 @@ afterEach(async () => {
 
 const base = () => `http://127.0.0.1:${web.state.server!.port}`
 
-async function login(password: string): Promise<Response> {
+async function login(code: string, headers: Record<string, string> = {}): Promise<Response> {
 	let body = new FormData()
-	body.set('password', password)
-	return fetch(`${base()}/login`, { method: 'POST', body })
+	body.set('code', code)
+	return fetch(`${base()}/login`, { method: 'POST', body, headers })
 }
 
 async function cookie(): Promise<string> {
-	let res = await login('hello123')
+	let res = await login(webAuth.issue())
 	expect(res.ok).toBe(true)
 	return res.headers.get('set-cookie')!.split(';')[0]!
 }
@@ -68,8 +70,10 @@ async function until(check: () => unknown): Promise<void> {
 	throw new Error('timed out')
 }
 
-async function dial(cookieHeader?: string, query = '') {
-	let ws = new WebSocket(`${base().replace('http', 'ws')}/ws${query}`, { headers: cookieHeader ? { cookie: cookieHeader } : {} } as any)
+async function dial(cookieHeader?: string, query = '', origin = base()) {
+	let headers: Record<string, string> = origin ? { origin } : {}
+	if (cookieHeader) headers.cookie = cookieHeader
+	let ws = new WebSocket(`${base().replace('http', 'ws')}/ws${query}`, { headers } as any)
 	sockets.push(ws)
 	let events: any[] = []
 	ws.onmessage = (m) => events.push(ason.parse(String(m.data)))
@@ -122,7 +126,7 @@ test('a missing JSX compiler fails the page with 500 and a diag line, not the ho
 		expect(res.status).toBe(500)
 		expect(readFileSync(diag.file(), 'utf8')).toContain('@dom-expressions/compiler')
 		// The host still answers, and a later request retries the build.
-		expect((await login('hello123')).ok).toBe(true)
+		expect((await login(webAuth.issue())).ok).toBe(true)
 		web.compiler = orig
 		expect((await fetch(`${base()}/`)).status).toBe(200)
 	} finally {
@@ -130,16 +134,70 @@ test('a missing JSX compiler fails the page with 500 and a diag line, not the ho
 	}
 })
 
-test('login sets a long-lived HttpOnly cookie; a wrong password gets 401', async () => {
+test('a code logs in once with a 30-day HttpOnly SameSite=Strict cookie; a wrong one gets 401', async () => {
 	await server.serve()
 	web.start()
-	let bad = await login('nope')
+	let code = webAuth.issue()
+	let bad = await login(code === 'zzzzzz' ? 'yyyyyy' : 'zzzzzz')
 	expect(bad.status).toBe(401)
 	expect(bad.headers.get('set-cookie')).toBeNull()
-	let good = await login('hello123')
+	// Typed in capitals with look-alikes and spaces still counts.
+	let good = await login(` ${code.toUpperCase().replace(/1/g, 'l').replace(/0/g, 'O')} `)
+	expect(good.status).toBe(204)
 	let set = good.headers.get('set-cookie')!
 	expect(set).toMatch(/HttpOnly/i)
-	expect(Number(/Max-Age=(\d+)/i.exec(set)![1])).toBeGreaterThan(365 * 24 * 3600)
+	expect(set).toMatch(/SameSite=Strict/i)
+	// Plain HTTP on this machine: not Secure, or the browser would drop it.
+	expect(set).not.toMatch(/Secure/i)
+	expect(Number(/Max-Age=(\d+)/i.exec(set)![1])).toBe(30 * 24 * 3600)
+	let token = /hal=([^;]+)/.exec(set)![1]!
+	expect(token).toMatch(/^[0-9a-hjkmnp-tv-z]{20}$/)
+	// Used up.
+	expect((await login(code)).status).toBe(401)
+	// Behind a TLS proxy the cookie is Secure.
+	expect((await login(webAuth.issue(), { 'x-forwarded-proto': 'https' })).headers.get('set-cookie')).toMatch(/Secure/i)
+	// Only a hash of each token is on disk.
+	let file = readFileSync(`${home}/state/web-sessions.ason`, 'utf8')
+	expect(file).not.toContain(token)
+	expect(Object.keys(ason.parse(file) as object)).toHaveLength(2)
+})
+
+test('a link with ?auth= logs in and drops the code from the address', async () => {
+	await server.serve()
+	web.start()
+	let id = sessions.create({ cwd: home }).id
+	let res = await fetch(`${base()}/${id}?auth=${webAuth.issue()}&x=1`, { redirect: 'manual' })
+	expect(res.status).toBe(303)
+	expect(res.headers.get('location')).toBe(`/${id}?x=1`)
+	let auth = res.headers.get('set-cookie')!.split(';')[0]!
+	expect((await fetch(`${base()}/login`, { headers: { cookie: auth } })).status).toBe(204)
+	// A used or made-up code is dropped too, but logs nobody in.
+	let stale = await fetch(`${base()}/?auth=abcdef`, { redirect: 'manual' })
+	expect(stale.status).toBe(303)
+	expect(stale.headers.get('location')).toBe('/')
+	expect(stale.headers.get('set-cookie')).toBeNull()
+})
+
+test('a code is good for 10 minutes; wrong ones are limited host-wide to 10 a minute', async () => {
+	await server.serve()
+	web.start()
+	let now = Date.now()
+	let origNow = clock.now
+	clock.now = () => now
+	try {
+		let late = webAuth.issue()
+		now += 10 * 60_000
+		expect((await login(late)).status).toBe(401)
+		let code = webAuth.issue()
+		for (let i = 0; i < 9; i++) expect((await login('000000')).status).toBe(401)
+		// Past the limit even a right code is refused unchecked, so it
+		// is still good a minute later.
+		expect((await login(code)).status).toBe(429)
+		now += 61_000
+		expect((await login(code)).status).toBe(204)
+	} finally {
+		clock.now = origNow
+	}
 })
 
 test('GET /blob serves a session’s attachment by exact id, with the cookie only', async () => {
@@ -166,18 +224,6 @@ test('GET /blob serves a session’s attachment by exact id, with the cookie onl
 	}
 })
 
-test('the password is a config function read at call time', async () => {
-	let orig = web.password
-	web.password = () => 'other'
-	try {
-		await server.serve()
-		web.start()
-		expect((await login('hello123')).status).toBe(401)
-		expect((await login('other')).ok).toBe(true)
-	} finally {
-		web.password = orig
-	}
-})
 
 test('the login check and ws need the cookie', async () => {
 	await server.serve()
@@ -187,6 +233,39 @@ test('the login check and ws need the cookie', async () => {
 	expect((await fetch(`${base()}/login`, { headers: { cookie: await cookie() } })).status).toBe(204)
 	expect((await dial()).opened).toBe(false)
 	expect((await dial('hal=wrong')).opened).toBe(false)
+	// Another site's page can't use the browser's cookie.
+	let auth = await cookie()
+	expect((await dial(auth, '', 'https://evil.example')).opened).toBe(false)
+	expect((await dial(auth, '', '')).opened).toBe(false)
+	expect((await dial(auth)).opened).toBe(true)
+})
+
+test('an expired or revoked token is refused, and revoking closes open pages', async () => {
+	await server.serve()
+	web.start()
+	let now = Date.now()
+	let origNow = clock.now
+	clock.now = () => now
+	try {
+		let old = await cookie()
+		now += 29 * 24 * 3600_000
+		let fresh = await cookie()
+		let check = async (c: string) => (await fetch(`${base()}/login`, { headers: { cookie: c } })).status
+		expect(await check(old)).toBe(204)
+		now += 2 * 24 * 3600_000
+		expect(await check(old)).toBe(401)
+		expect(await check(fresh)).toBe(204)
+		let open = await dial(fresh)
+		expect(open.opened).toBe(true)
+		let unused = webAuth.issue()
+		web.revoke()
+		expect(await open.closed).toBe(4001)
+		expect(await check(fresh)).toBe(401)
+		expect((await dial(fresh)).opened).toBe(false)
+		expect((await login(unused)).status).toBe(401)
+	} finally {
+		clock.now = origNow
+	}
 })
 
 test('over ws, open-newest opens the newest session and bad messages are refused', async () => {
@@ -327,10 +406,10 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await server.serve()
 		web.start()
 		await b.call('Page.navigate', { url: `${base()}/` })
-		await b.waitFor(`!!document.querySelector('input[type=password]')`)
+		await b.waitFor(`!!document.querySelector('input[name=code]')`)
 		await b.evaluate(`document.querySelector('input').value = 'wrong'; document.querySelector('form').requestSubmit()`)
-		await b.waitFor(`document.querySelector('#notice').textContent === 'wrong password'`)
-		await b.evaluate(`document.querySelector('input').value = 'hello123'; document.querySelector('form').requestSubmit()`)
+		await b.waitFor(`document.querySelector('#notice').textContent === 'wrong or expired code'`)
+		await b.evaluate(`document.querySelector('input').value = '${webAuth.issue()}'; document.querySelector('form').requestSubmit()`)
 		await b.waitFor(`!!document.querySelector('textarea')`)
 		// The page created a session in host.cwd() and opened it.
 		await until(() => sessions.newest())
@@ -425,7 +504,7 @@ test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay
 		await server.serve()
 		web.start()
 		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
-		await b.call('Network.setCookie', { name: 'hal', value: 'hello123', url: base() })
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
 		await b.waitFor(`document.querySelector('main').innerText.includes('thought 3') && !document.querySelector('main').innerText.includes('prompt 0')`)
 		// Open the newest thinking card, then read up to the top until the
@@ -478,7 +557,7 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 	try {
 		await server.serve()
 		web.start()
-		await b.call('Network.setCookie', { name: 'hal', value: 'hello123', url: base() })
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
 		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
 		await b.call('Page.navigate', { url: `${base()}/` })
 		// Landing on the first (new) tab rewrites the address.
@@ -529,7 +608,7 @@ test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to 
 	try {
 		await server.serve()
 		web.start()
-		await b.call('Network.setCookie', { name: 'hal', value: 'hello123', url: base() })
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
 		// Commands naming /help wait in the page until let go, so the
 		// pending card is shown (and done fading in) before it lands.

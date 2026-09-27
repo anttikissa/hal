@@ -69,6 +69,7 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 		reply = { error: String(e?.message ?? e) }
 	}
 	if (reply.say !== undefined) slash.output(id, reply.say)
+	if (reply.show !== undefined) host.broadcast(id, { type: 'output', sessionId: id, text: reply.show, ...slash.placed(id) })
 	if (reply.error !== undefined) slash.output(id, reply.error, true)
 	if (reply.open === 'models') void slash.models(id).then((e) => host.broadcast(id, e))
 	if (!reply.ask) return

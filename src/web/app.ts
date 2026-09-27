@@ -248,12 +248,13 @@ async function authorized(): Promise<boolean> {
 	return (await fetch('/login')).status !== 401
 }
 
-async function login(password: string): Promise<string | undefined> {
+async function login(code: string): Promise<string | undefined> {
 	let body = new FormData()
-	body.set('password', password)
+	body.set('code', code)
 	let res = await fetch('/login', { method: 'POST', body })
 	if (res.ok) return undefined
-	return res.status === 401 ? 'wrong password' : `login failed (${res.status})`
+	if (res.status === 401) return 'wrong or expired code'
+	return res.status === 429 ? 'too many wrong codes; try again in a minute' : `login failed (${res.status})`
 }
 
 function reset(): void {

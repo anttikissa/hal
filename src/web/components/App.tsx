@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 // The page: straight to the conversation if the cookie is good, else
-// the password form first.
+// the one-time code gate first.
 
 import { createSignal, Match, onSettled, Switch } from 'solid-js'
 import { app } from '../app.ts'

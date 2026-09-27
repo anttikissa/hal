@@ -10,7 +10,7 @@ import { terminal } from './client/terminal.ts'
 import type { LinkState } from './common/connection.ts'
 import { drafts } from './common/drafts.ts'
 import { perf } from './common/perf.ts'
-import type { Event, Tab } from './common/protocol.ts'
+import { protocol, type Event, type Tab } from './common/protocol.ts'
 import { settings } from './common/settings.ts'
 import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
@@ -25,6 +25,7 @@ import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
 import { server } from './host/server.ts'
 import { web } from './host/web.ts'
+import { webAuth } from './host/web-auth.ts'
 
 // local.ts lives in the home, so tests (temp home) never pick up the
 // user's real overrides.
@@ -148,6 +149,38 @@ function shown(): void {
 	for (let work of st.later.splice(0)) setTimeout(work)
 }
 
+// `./run auth`: asks this home's running host for a one-time web login
+// code (host/web-auth.ts) and prints it. It never becomes host itself:
+// a code from a process about to exit would log nobody in.
+async function auth(): Promise<number> {
+	let answer = await new Promise<{ code?: string; error?: string }>((resolve) => {
+		let timer = setTimeout(() => resolve({ error: 'the host did not answer' }), main.authWaitMs())
+		let done = (out: { code?: string; error?: string }) => {
+			clearTimeout(timer)
+			resolve(out)
+		}
+		void link
+			.dial(server.socketPath(), {
+				event: (e) => {
+					if (protocol.invalidEvent(e)) return
+					if (e.type === 'auth') done({ code: e.code })
+					else if (e.type === 'rejected' && e.command === 'auth') done({ error: `the host refused: ${e.reason}` })
+				},
+				dropped: () => done({ error: 'the host went away' }),
+			})
+			.then((conn) => {
+				if (!conn) return done({ error: `no Hal is running in ${paths.display(paths.home())}; start it with ./run` })
+				conn.send({ type: 'auth' })
+			})
+	})
+	if (answer.code === undefined) {
+		process.stderr.write(`hal2: ${answer.error}\n`)
+		return 1
+	}
+	process.stdout.write(`web login code: ${answer.code} (one login, ${Math.round(webAuth.codeMs() / 60_000)} minutes)\n`)
+	return 0
+}
+
 async function start(): Promise<void> {
 	perf.state.epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || perf.state.epoch
 	perf.mark('imported')
@@ -157,6 +190,7 @@ async function start(): Promise<void> {
 		process.stderr.write(`hal2: ${problem}\n`)
 		process.exit(1)
 	}
+	if (process.argv[2] === 'auth') process.exit(await main.auth())
 	// config.ason first, so local.ts sees it and may override settings.*.
 	// Warnings about it reach every client connected to this host.
 	config.init(() => host.warnAll())
@@ -178,6 +212,7 @@ async function start(): Promise<void> {
 export const main = {
 	state: { kept: '', shown: false, later: [] as (() => void)[], fallback: undefined as Timer | undefined },
 	laterMs: () => 1000,
+	authWaitMs: () => 5000,
 	lastTab,
 	keepTab,
 	localPath,
@@ -188,6 +223,7 @@ export const main = {
 	later,
 	shown,
 	joinHost,
+	auth,
 	start,
 }
 

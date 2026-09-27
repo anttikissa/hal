@@ -127,6 +127,9 @@ export type Command = (
 	// attachments.maxBytes() decoded. Answered, to this client only, with
 	// `attached`; a prompt names it by that event's marker.
 	| { type: 'attach'; sessionId: string; mediaType: string; data: string; name?: string }
+	// A one-time web login code (host/web-auth.ts) for `./run auth`;
+	// answered, to this client only, with `auth`.
+	| { type: 'auth' }
 ) & { id?: string }
 
 export type CommandType = Command['type']
@@ -211,10 +214,12 @@ export type Event =
 	// Sent only to the sender: the command with this id was carried out.
 	// `tab`: the tab a tab command created, reopened or picked.
 	| { type: 'ack'; id: string; tab?: string }
+	// The one-time web login code an `auth` command asked for.
+	| { type: 'auth'; code: string }
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -226,6 +231,7 @@ function invalid(value: unknown): string | undefined {
 		(optional && c[key] === undefined) || typeof c[key] === 'string' ? undefined : `${c.type}: ${key} must be a string`
 	let problem = str('id', true)
 	if (problem) return problem
+	if (c.type === 'auth') return undefined
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
 	if (c.type === 'tab-new') return str('cwd') ?? str('after', true)
@@ -272,6 +278,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },
 	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },
 	ack: { id: 's', tab: 's?' },
+	auth: { code: 's' },
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)

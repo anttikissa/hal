@@ -84,9 +84,9 @@ test('bad values and unknown keys warn, naming the file, and fall back', () => {
 })
 
 test('a malformed file never crashes: defaults, a warning, and fixing it applies', async () => {
-	writeFileSync(paths.configFile(), "{ webPassword: 'sk-secret' oops")
+	writeFileSync(paths.configFile(), "{ model: 'sk-secret' oops")
 	start()
-	expect(settings.webPassword()).toBe(defaults().webPassword as string)
+	expect(settings.model()).toBe(defaults().model as string)
 	let w = config.warnings()
 	expect(w.length).toBe(1)
 	expect(w[0]).toContain('config.ason')
