@@ -13,7 +13,8 @@ import { replay, type HistoryRecord } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
 
-export type Item =
+// An item as shown; Item adds its key.
+export type Shown =
 	// `from`: the session that sent it, `label` naming it; without it,
 	// the human.
 	| { type: 'prompt'; text: string; from?: string; label?: string }
@@ -31,6 +32,13 @@ export type Item =
 	| { type: 'command'; text: string; from?: string }
 	// What a command said.
 	| { type: 'output'; text: string; error?: true }
+
+// `key`: the item's id (task w5), the same live, after a reconnect or
+// reload and in a page of earlier history: its record's number `n`, with
+// `.<i>` for the i-th item after the first of a record that yields
+// several (a prompt's images, a round's tool results). Only a record or
+// event without a number (built by hand) falls back to `~<position>`.
+export type Item = Shown & { key: string }
 
 export type Transcript = {
 	meta: SessionMeta
@@ -53,48 +61,63 @@ export type Transcript = {
 
 // Display items for assistant blocks. Empty thinking (a bare signature,
 // redacted reasoning) shows nothing.
-function blockItems(list: AssistantBlock[]): Item[] {
+// `ns`: the blocks' record numbers; `at`: where the items will go.
+function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number): Item[] {
 	let out: Item[] = []
-	for (let b of list) {
-		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input })
-		else if (b.text) out.push({ type: b.type, text: b.text })
+	for (let [i, b] of list.entries()) {
+		let key = transcript.key(ns?.[i], 0, at + out.length)
+		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, key })
+		else if (b.text) out.push({ type: b.type, text: b.text, key })
 	}
 	return out
 }
 
 // A prompt text as shown, saying who sent it if not the human.
-function promptItem(text: string, s?: Sender): Item {
-	let item: Item = { type: 'prompt', text }
+function promptItem(text: string, s?: Sender): Shown {
+	let item: Shown = { type: 'prompt', text }
 	if (s?.from !== undefined) item.from = s.from
 	if (s?.label !== undefined) item.label = s.label
 	return item
 }
 
-function imageItem(b: ImageBlock): Item {
-	let item: Item = { type: 'image', blob: b.blob, mediaType: b.mediaType }
+function key(n: number | undefined, i: number, at: number): string {
+	return n === undefined ? `~${at}` : i ? `${n}.${i}` : `${n}`
+}
+
+// `shown` as the items of record (or event) number `n`, going at `at`.
+function keyed(shown: Shown[], n: number | undefined, at: number): Item[] {
+	return shown.map((s, i) => ({ ...s, key: transcript.key(n, i, at + i) }) as Item)
+}
+
+function imageItem(b: ImageBlock): Shown {
+	let item: Shown = { type: 'image', blob: b.blob, mediaType: b.mediaType }
 	if (b.bytes !== undefined) item.bytes = b.bytes
 	return item
 }
 
-function resultItem(b: ToolResultBlock): Item {
-	let item: Item = { type: 'tool-result', id: b.id, output: b.output }
+function resultItem(b: ToolResultBlock): Shown {
+	let item: Shown = { type: 'tool-result', id: b.id, output: b.output }
 	if (b.isError) item.isError = true
 	return item
 }
 
-// Display items for one history record.
-function recordItems(r: HistoryRecord): Item[] {
-	if (r.type === 'assistant') return transcript.blockItems([r.block])
-	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change') return []
+// Display items for one history record, going at `at`.
+function recordItems(r: HistoryRecord, at: number): Item[] {
+	if (r.type === 'assistant') return transcript.blockItems([r.block], r.n === undefined ? undefined : [r.n], at)
+	return transcript.keyed(transcript.recordShown(r), r.n, at)
+}
+
+function recordShown(r: HistoryRecord): Shown[] {
+	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
 	if (r.type === 'question') return [{ type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
-	if (r.type === 'user') return r.blocks.map((b): Item => (b.type === 'text' ? transcript.promptItem(b.text, b) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
+	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
 
 // A turn end as shown, the same from a record or a live turn-end event.
-function endItem(end: { status: TurnStatus; usage?: Usage; error?: string }): Item {
-	let item: Item = { type: 'turn-end', status: end.status }
+function endItem(end: { status: TurnStatus; usage?: Usage; error?: string }): Shown {
+	let item: Shown = { type: 'turn-end', status: end.status }
 	if (end.usage && Object.keys(end.usage).length) item.usage = end.usage
 	if (end.error !== undefined) item.error = end.error
 	return item
@@ -112,7 +135,7 @@ function answered(items: Item[], answer: { question: string; answers: Answers; s
 }
 
 // A command or its output as shown, from a record or an event.
-function aside(r: { type: 'command'; text: string; from?: string } | { type: 'output'; text: string; error?: true }): Item {
+function aside(r: { type: 'command'; text: string; from?: string } | { type: 'output'; text: string; error?: true }): Shown {
 	if (r.type === 'command') return r.from === undefined ? { type: 'command', text: r.text } : { type: 'command', text: r.text, from: r.from }
 	return r.error ? { type: 'output', text: r.text, error: true } : { type: 'output', text: r.text }
 }
@@ -141,7 +164,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	for (let r of [...early, ...replay.current(snapshot.history)]) {
 		if (replay.isPrompt(r)) prompt = items.length
 		if (r.type === 'answer') items = transcript.answered(items, r)
-		else items.push(...transcript.recordItems(r))
+		else items.push(...transcript.recordItems(r, items.length))
 	}
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
 	if (prompt !== undefined) t.prompt = prompt
@@ -149,7 +172,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	if (snapshot.turn) {
 		let turn = transcript.copyTurn(snapshot.turn)
 		t.live = { start: items.length, turn }
-		t.items = [...items, ...transcript.blockItems(turn.blocks)]
+		t.items = [...items, ...transcript.blockItems(turn.blocks, turn.ns, items.length)]
 	}
 	return t
 }
@@ -189,7 +212,9 @@ function copyTurn(turn: LiveTurn): LiveTurn {
 	let list = turn.blocks.slice()
 	let last = list.at(-1)
 	if (last) list[list.length - 1] = { ...last }
-	return { provider: turn.provider, blocks: list, usage: { ...turn.usage } }
+	let copy: LiveTurn = { provider: turn.provider, blocks: list, usage: { ...turn.usage } }
+	if (turn.ns) copy.ns = turn.ns.slice()
+	return copy
 }
 
 // The transcript after `event`; the same object if the event does not
@@ -204,43 +229,52 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'completions' || event.type === 'history') return t
 	if (event.type === 'command' || event.type === 'output') {
 		// Beside a running turn: before its live output, which is redrawn.
-		let item = transcript.aside(event)
-		if (!t.live) return { ...t, items: [...t.items, item] }
-		let at = t.live.start
-		return { ...t, items: [...t.items.slice(0, at), item, ...t.items.slice(at)], live: { start: at + 1, turn: t.live.turn } }
+		let at = t.live?.start ?? t.items.length
+		let [item] = transcript.keyed([transcript.aside(event)], event.n, at)
+		if (!t.live) return { ...t, items: [...t.items, item!] }
+		return { ...t, items: [...t.items.slice(0, at), item!, ...t.items.slice(at)], live: { start: at + 1, turn: t.live.turn } }
 	}
 	if (event.type === 'turn-start') {
 		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
-		let items: Item[] = [...t.items, transcript.promptItem(event.prompt, event.sender), ...(event.images ?? []).map((b) => transcript.imageItem(b))]
+		let items: Item[] = [...t.items, ...transcript.keyed([transcript.promptItem(event.prompt, event.sender), ...(event.images ?? []).map((b) => transcript.imageItem(b))], event.n, t.items.length)]
 		return { ...t, items, prompt: t.items.length, live: { start: items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
 	}
-	let question: Item | undefined = event.type === 'question' ? { type: 'question', id: event.id, form: event.form } : undefined
+	let question: Shown | undefined = event.type === 'question' ? { type: 'question', id: event.id, form: event.form } : undefined
+	let ended = (items: Item[], end: Shown): Item[] => [...items, ...transcript.keyed([end], (event as { n?: number }).n, items.length)]
 	// A turn left unfinished by another host ends without running here.
 	if (!t.live) {
-		if (event.type === 'turn-end') return { ...t, items: [...t.items, transcript.endItem(event)] }
+		if (event.type === 'turn-end') return { ...t, items: ended(t.items, transcript.endItem(event)) }
 		if (event.type === 'prompt') return transcript.prompted(t, t.items, event)
-		return question ? { ...t, items: [...t.items, question] } : t
+		return question ? { ...t, items: ended(t.items, question) } : t
 	}
 	let settled = t.items.slice(0, t.live.start)
 	if (event.type === 'prompt') {
 		// The round's blocks are in history before the prompt.
-		let next = transcript.prompted(t, [...settled, ...transcript.blockItems(t.live.turn.blocks)], event)
+		let next = transcript.prompted(t, transcript.settle(t.items, t.live), event)
 		return { ...next, live: { start: next.items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
 	}
 	if (event.type === 'stream') {
 		let turn = transcript.copyTurn(t.live.turn)
 		blocks.apply(turn, event.event)
-		return { ...t, items: [...settled, ...transcript.blockItems(turn.blocks)], live: { start: t.live.start, turn } }
+		while (turn.ns && event.n !== undefined && turn.ns.length < turn.blocks.length) turn.ns.push(event.n)
+		if (!turn.ns && event.n !== undefined && turn.blocks.length) turn.ns = turn.blocks.map(() => event.n!)
+		return { ...t, items: [...settled, ...transcript.blockItems(turn.blocks, turn.ns, settled.length)], live: { start: t.live.start, turn } }
 	}
 	if (event.type === 'tool-results') {
 		// The round's blocks are in history now; the next round starts empty.
-		let items = [...settled, ...transcript.blockItems(t.live.turn.blocks), ...event.results.map((b) => transcript.resultItem(b))]
+		let done = transcript.settle(t.items, t.live)
+		let items = [...done, ...transcript.keyed(event.results.map((b) => transcript.resultItem(b)), event.n, done.length)]
 		return { ...t, items, live: { start: items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
 	}
 	// Asking stops the running turn: its output is in history.
 	let end = question ?? transcript.endItem(event as Event & { type: 'turn-end' })
 	let { live: _live, ...rest } = t
-	return { ...rest, items: [...settled, ...transcript.blockItems(t.live.turn.blocks), end] }
+	return { ...rest, items: ended(transcript.settle(t.items, t.live), end) }
+}
+
+// The items with the live turn's blocks settled as history has them.
+function settle(items: Item[], live: NonNullable<Transcript['live']>): Item[] {
+	return [...items.slice(0, live.start), ...transcript.blockItems(live.turn.blocks, live.turn.ns, live.start)]
 }
 
 // After `items`, a prompt event's texts; an edit (`replaces`) takes
@@ -248,8 +282,8 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' }): Transcript {
 	let keep = event.replaces && t.prompt !== undefined ? items.slice(0, t.prompt) : items
 	let { live: _live, ...rest } = t
-	let images = (event.images ?? []).map((b) => transcript.imageItem(b))
-	return { ...rest, items: [...keep, ...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i])), ...images], prompt: keep.length }
+	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i])), ...(event.images ?? []).map((b) => transcript.imageItem(b))]
+	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 
 // Where the history a client got in a snapshot ends (an index into
@@ -268,4 +302,4 @@ function resumedLabel(r: Resumed, now = new Date()): string {
 	return `resumed · last turn ${replay.clock(r.last, now.toISOString())}`
 }
 
-export const transcript = { blockItems, promptItem, imageItem, resultItem, recordItems, endItem, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted, resumed, resumedLabel }
+export const transcript = { blockItems, promptItem, key, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted, resumed, resumedLabel }

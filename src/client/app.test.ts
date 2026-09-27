@@ -217,7 +217,7 @@ test('streamed output reaches the view', () => {
 	app.onEvent(snapshot())
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'q', provider: 'anthropic' })
 	app.onEvent({ type: 'stream', sessionId: 's1', event: { type: 'text', text: 'answer' } })
-	expect(app.view().transcript?.items).toContainEqual({ type: 'text', text: 'answer' })
+	expect(app.view().transcript?.items).toContainEqual(expect.objectContaining({ type: 'text', text: 'answer' }))
 })
 
 test('history from a snapshot is marked as old; what follows comes after the mark', () => {

@@ -6,6 +6,7 @@ import type { DoneEvent, ErrorEvent, Message, StreamEvent } from '../common/bloc
 import type { HistoryRecord } from '../common/replay.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
+import { pages } from './pages.ts'
 import { liveFiles } from './live-file.ts'
 import { provider } from './provider.ts'
 import { sessions } from './sessions.ts'
@@ -59,7 +60,7 @@ async function* ended(id: string, stream: AsyncIterable<StreamEvent>): AsyncGene
 	}
 }
 
-const strip = (records: HistoryRecord[]) => records.map(({ ts: _ts, ...rest }) => rest)
+const strip = (records: HistoryRecord[]) => records.map(({ ts: _ts, n: _n, ...rest }) => rest)
 const newSession = () => sessions.create({ cwd: '/', model: 'fake/m' }).id
 
 // Lets a test see what a turn sent and script what comes back.
@@ -234,8 +235,7 @@ test('a complete last record missing its newline is kept', async () => {
 test('a corrupt record mid-file is reported when read and the file left untouched', async () => {
 	let id = newSession()
 	history.submit(id, 'a')
-	appendFileSync(history.file(id), '{ type: @@ }\n')
-	history.submit(id, 'b')
+	appendFileSync(history.file(id), '{ type: @@ }\n' + ason.stringifyLine({ type: 'user', blocks: [{ type: 'text', text: 'b' }], ts: new Date().toISOString() }))
 	sessions.closeAll()
 	let before = readFileSync(history.file(id), 'utf8')
 	// Opening reads only the end of the history.
@@ -379,4 +379,63 @@ test('unfinished: a turn with no end record, however long its last line', async 
 	// A record cut off mid-write never happened; open drops it.
 	appendFileSync(history.file(id), "{ type: 'user', blocks: [")
 	expect(history.unfinished(id)).toBe(false)
+})
+
+// A fresh process: nothing of the session's numbers in memory.
+function forget() {
+	history.state.next.clear()
+	history.state.cache.clear()
+	pages.reset()
+}
+
+test('every record is numbered once; a streamed block keeps the number it started with', async () => {
+	let id = newSession()
+	history.submit(id, 'go')
+	let gate = Promise.withResolvers<void>()
+	let it = history.record(id, 'fake', (async function* (): AsyncGenerator<StreamEvent> {
+		yield { type: 'text', text: 'wor' }
+		await gate.promise
+		yield { type: 'text', text: 'king' }
+		yield { type: 'done', reason: 'end' }
+	})())
+	await it.next()
+	let streaming = history.streaming(id)
+	expect(history.live(id)?.ns).toEqual([streaming!])
+	// Written while the block streams: numbered past it.
+	let beside = history.append(id, { type: 'output', text: 'meanwhile' })
+	gate.resolve()
+	await drain(it)
+	history.end(id, { type: 'done', reason: 'end' })
+	let records = history.readSync(id)
+	let block = records.find((r) => r.type === 'assistant')!
+	expect(block.n).toBe(streaming!)
+	expect(beside.n).toBeGreaterThan(streaming!)
+	let ns = records.map((r) => r.n!)
+	expect(new Set(ns).size).toBe(records.length)
+	// A later host numbers past all of them, even the block written last.
+	forget()
+	expect(history.submit(id, 'next').n).toBeGreaterThan(Math.max(...ns))
+})
+
+test('records of an old history without numbers are numbered by place, and new ones past them', async () => {
+	let id = newSession()
+	let line = (text: string) => ason.stringifyLine({ type: 'user', blocks: [{ type: 'text', text }], ts: new Date().toISOString() })
+	writeFileSync(history.file(id), line('a') + line('b'))
+	forget()
+	let old = history.readSync(id).map((r) => r.n)
+	expect(old).toEqual([1, Buffer.byteLength(line('a')) + 1])
+	// Paged reads number them alike.
+	expect(pages.page(id).records.map((r) => r.n)).toEqual(old)
+	let added = history.submit(id, 'c').n!
+	expect(added).toBeGreaterThan(old[1]!)
+	forget()
+	expect(history.readSync(id).map((r) => r.n)).toEqual([...old, added])
+	expect(history.submit(id, 'd').n).toBe(added + 1)
+})
+
+test('a number that is not an integer is corrupt history', async () => {
+	let id = newSession()
+	writeFileSync(history.file(id), ason.stringifyLine({ type: 'continue', n: 'x', ts: new Date().toISOString() }))
+	forget()
+	expect(() => history.readSync(id)).toThrow(new RegExp(id))
 })

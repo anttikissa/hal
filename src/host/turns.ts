@@ -46,23 +46,26 @@ function ask(id: string, form: Form, call?: string): void {
 	let record: Omit<HistoryRecord & { type: 'question' }, 'ts'> = { type: 'question', id: question, form }
 	if (call !== undefined) record.call = call
 	if (Object.keys(usage).length) record.usage = usage
-	history.append(id, record)
-	host.broadcast(id, { type: 'question', sessionId: id, id: question, form })
+	let { n } = history.append(id, record)
+	host.broadcast(id, { type: 'question', sessionId: id, id: question, form, n })
 	status.transition(id, { type: 'block', reason: 'question' })
 }
 
 // Runs a turn whose prompt or `continue` record is in history.
 // `answers`: the fresh answer to its question, secrets included;
-// `images`: the prompt's image blocks, for followers to show; `sender`:
-// who sent the prompt, if not the human.
-function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], sender?: Sender): void {
+// `images`: the prompt's image blocks, for followers to show; `record`:
+// the prompt's, whose number, command id and sender (of its first text)
+// they are told.
+function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender }): void {
 	let model = sessions.open(id).model
 	let running: Running = { provider: blocks.parseModelId(model)?.provider ?? model, controller: new AbortController() }
 	turns.state.running.set(id, running)
 	let event: Event = { type: 'turn-start', sessionId: id, provider: running.provider }
 	if (prompt !== undefined) event.prompt = prompt
 	if (images?.length) event.images = images
-	if (sender?.from !== undefined) event.sender = sender
+	if (prompt !== undefined && record?.sender?.from !== undefined) event.sender = record.sender
+	if (prompt !== undefined && record?.n !== undefined) event.n = record.n
+	if (prompt !== undefined && record?.command !== undefined) event.command = record.command
 	host.broadcast(id, event)
 	running.done = turns.runTurn(id, model, running, answers).catch((e) => diag.log(`turn ${id}: ${e?.message ?? e}`))
 }
@@ -88,8 +91,8 @@ function stop(id: string, reason?: string): string | undefined {
 	// A turn parked at a question has its usage so far there.
 	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = { type: 'turn_end', status: 'paused', usage: forms.open(history.readSync(id))?.usage ?? {} }
 	if (reason !== undefined) end.pauseReason = reason
-	history.append(id, end)
-	let ended: Event = { type: 'turn-end', sessionId: id, status: 'paused' }
+	let { n } = history.append(id, end)
+	let ended: Event = { type: 'turn-end', sessionId: id, status: 'paused', n }
 	if (Object.keys(end.usage).length) ended.usage = end.usage
 	host.broadcast(id, ended)
 }
@@ -235,7 +238,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					}
 					if (signal.aborted) break
 					status.transition(id, { type: 'stream' })
-					host.broadcast(id, { type: 'stream', sessionId: id, event })
+					let n = history.streaming(id)
+					host.broadcast(id, n === undefined ? { type: 'stream', sessionId: id, event } : { type: 'stream', sessionId: id, event, n })
 				}
 				if (last?.type === 'error' && last.failure && !last.cancelled && !signal.aborted) {
 					await turns.waitOut(id, last, failures++, signal)
@@ -272,8 +276,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
 			for (let call of calls) results.push(decided.get(call.id) === false ? approval.declined(call) : await tools.run(call, ctx))
 			if (turns.state.running.get(id) !== running) return
-			history.results(id, results)
-			host.broadcast(id, { type: 'tool-results', sessionId: id, results })
+			let n = history.results(id, results)?.n
+			host.broadcast(id, n === undefined ? { type: 'tool-results', sessionId: id, results } : { type: 'tool-results', sessionId: id, results, n })
 			if (cancelled()) break
 			// A wait: the turn ends, done, unless steering waits to be read.
 			if (ending && !status.inboxOf(id).some((m) => !m.queue)) {
@@ -297,6 +301,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let end: Event & { type: 'turn-end' } = { type: 'turn-end', sessionId: id, status: 'error', error: failure ?? 'turn end was not recorded' }
 	if (recorded?.type === 'turn_end') {
 		end = { type: 'turn-end', sessionId: id, status: recorded.status }
+		if (recorded.n !== undefined) end.n = recorded.n
 		if (Object.keys(recorded.usage).length) end.usage = recorded.usage
 		if (recorded.error !== undefined) end.error = recorded.error
 	}

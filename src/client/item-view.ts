@@ -5,7 +5,7 @@ import { attachments } from '../common/attachments.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { forms, type Quote } from '../common/forms.ts'
 import { strings } from '../common/strings.ts'
-import type { Item } from '../common/transcript.ts'
+import type { Shown as Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { promptView } from './prompt-view.ts'
 

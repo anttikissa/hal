@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { modals, type ModalState } from '../common/modals.ts'
 import { strings } from '../common/strings.ts'
-import type { Item, Transcript } from '../common/transcript.ts'
+import type { Shown as Item, Transcript } from '../common/transcript.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 
@@ -141,7 +141,7 @@ class FakeTerminal {
 const meta = { id: 's', cwd: '/', model: 'm', createdAt: '' }
 
 function transcript(items: Item[]): Transcript {
-	return { meta, state: { type: 'idle' }, inbox: [], items }
+	return { meta, state: { type: 'idle' }, inbox: [], items: items.map((item, i) => ({ ...item, key: `${i}` })) }
 }
 
 // n question/answer pairs.

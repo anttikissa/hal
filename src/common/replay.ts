@@ -10,7 +10,15 @@ import type { Answers, Form } from './forms.ts'
 // (the old Escape and restart) and read as paused.
 export type TurnStatus = 'completed' | 'paused' | 'error' | 'cancelled' | 'interrupted'
 
-export type HistoryRecord =
+// Every record has `n`, its number in the session (task w5): 1, 2, 3...,
+// given by the host, the one writer of a home's histories, so numbers
+// never collide; elsewhere a record is named '<session id>#<n>'. A
+// streamed assistant block is numbered when it starts streaming, so
+// records may be written out of number order. Records of old histories
+// have no `n` on disk and get their byte offset + 1 when read (pages.ts),
+// which no later number reuses. Absent only in records built by hand.
+export type HistoryRecord = Numbered &
+	(
 	// A submitted prompt, or tool results. `inbox`: the ids of the inbox
 	// messages it delivers, which are its first text blocks. `replaces`:
 	// an edit of the last prompt (tasks/j1/states.md, Editing the last
@@ -54,6 +62,9 @@ export type HistoryRecord =
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
 	// told in front of its next prompt.
 	| { type: 'change'; cwd?: string; model?: string; ts: string }
+	)
+
+type Numbered = { n?: number }
 
 // Provider messages from history. Unsigned thinking (a cut-off stream) is
 // not replayable and is left out. Each tool call gets a result before the

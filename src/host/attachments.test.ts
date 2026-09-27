@@ -6,7 +6,7 @@ import { readdirSync, readFileSync } from 'fs'
 import { attachments } from '../common/attachments.ts'
 import { anthropic } from './anthropic.ts'
 import { blobs } from './blobs.ts'
-import { calls, client, created, fresh, until, useHost } from './host-fixture.test.ts'
+import { calls, client, created, fresh, until, useHost, shown } from './host-fixture.test.ts'
 import { history } from './history.ts'
 import { openaiCompat } from './openai-compat.ts'
 
@@ -123,7 +123,7 @@ test('image blocks show the same live and after reconnecting, and survive an edi
 	calls[0]!.push({ type: 'text', text: 'a cat' }, { type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length)
 	let image = { type: 'image' as const, blob: attached.blob as string, mediaType: 'image/png', bytes: png.length }
-	expect(c.views.get(id)!.items).toContainEqual(image)
+	expect(shown(c.views.get(id)!.items)).toContainEqual(image)
 	expect((await fresh(id)).items).toEqual(c.views.get(id)!.items)
 
 	c.conn.send({ type: 'submit', sessionId: id, text: `look again at ${attached.marker}`, amend: true })

@@ -6,15 +6,26 @@
 // ends a text selection. Hidden contents are inert. The height
 // animates in CSS; scroll.ts tracks the bottom meanwhile. `cursor`:
 // the card streams, so Hal's cursor follows its last character (in the
-// header while a folding card is closed).
+// header while a folding card is closed). Whether a card is open is
+// kept by its session and row key (task w5), not by its DOM, so no other
+// item's card ever shows open in its place.
 
 import { createSignal, flush, Show } from 'solid-js'
 import { scroll } from '../scroll.ts'
 import { view, type Row } from '../view.ts'
 
+const [opened, setOpened] = createSignal<ReadonlySet<string>>(new Set())
+
 // An image row shows the image itself, from the session's blob.
 export function Card(props: { row: Row; session: string; cursor?: boolean }) {
-	let [open, setOpen] = createSignal(false)
+	let id = () => `${props.session}#${props.row.key}`
+	let open = () => opened().has(id())
+	let setOpen = (on: boolean) => {
+		let next = new Set(opened())
+		if (on) next.add(id())
+		else next.delete(id())
+		setOpened(next)
+	}
 	let shown = () => view.show(props.row.item)
 	let result = () => props.row.result && view.show(props.row.result)
 	let folds = () => props.row.item.type === 'thinking' || props.row.item.type === 'tool'
@@ -38,7 +49,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean }) {
 	// Built once per card: the bindings follow a new row object, so the
 	// DOM (and its fade-in) stays when a snapshot or stream replaces it.
 	let plain = (s: () => { kind: string; text: string }) => (
-		<div class={['Card', ...s().kind.split(' ')]}>
+		<div class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '']}>
 			<Show when={props.row.item.type === 'image' && props.row.item} fallback={s().text}>
 				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
 			</Show>

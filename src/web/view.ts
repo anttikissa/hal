@@ -12,14 +12,17 @@ import { modals, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
-import { transcript, type Item, type Resumed, type Transcript } from '../common/transcript.ts'
+import { transcript, type Item, type Resumed, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
 
 // `resumed`: where the history of the last snapshot ends, marked on the page.
 // `form`: the open question as filled in on this page.
 // `editing`: the last prompt is in the input (src/common/amend.ts).
 // `modal`: the model picker over the page, taking the keys first;
 // `models` the host's full list it filters.
-export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState; editing?: Editing; modal?: ModalState; models?: string[] }
+// `sent`: the command id of each prompt this client sent, by the
+// prompt item's key, so its row keeps the key it had while pending
+// (showing another tab starts a new view state, and a new map).
+export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState; editing?: Editing; modal?: ModalState; models?: string[]; sent?: Record<string, string> }
 
 // One transcript item as shown: CSS classes and its text. The classes
 // are theme style names (src/common/colors.ts in kebab case), whose CSS
@@ -34,6 +37,10 @@ function onEvent(st: ViewState, event: Event): ViewState {
 	let t = transcript.fold(st.transcript, event)
 	if (t === st.transcript) return st
 	let next: ViewState = { ...st, transcript: t }
+	if ((event.type === 'turn-start' || event.type === 'prompt') && event.command && event.n !== undefined) {
+		let at = event.type === 'prompt' ? event.texts.length - 1 : 0
+		next.sent = { ...st.sent, [transcript.key(event.n, at, 0)]: event.command }
+	}
 	if (event.type === 'snapshot' && t) next.resumed = transcript.resumed(event.snapshot, t)
 	// An edited prompt may have replaced what the mark was after.
 	else if (st.resumed && t && st.resumed.at > t.items.length) next.resumed = { ...st.resumed, at: t.items.length }
@@ -203,9 +210,12 @@ function hints(st: ViewState): [key: string, does: string][] {
 // A transcript row: an item, and for a tool call its result once it
 // came. Rows only grow at the end as items do (a result joins its
 // call's row), so rows keyed by position keep their DOM.
-export type Row = { item: Item; at: number; result?: Item & { type: 'tool-result' } }
+// `key`: what keeps the row's card (task w5): the item's key, or for a
+// prompt this client sent, the command id it had while pending.
+// `pending`: sent, not yet acknowledged.
+export type Row = { item: Item; at: number; key: string; result?: Item & { type: 'tool-result' }; pending?: true }
 
-function rows(items: Item[]): Row[] {
+function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 	let out: Row[] = []
 	let calls = new Map<string, Row>()
 	for (let [at, item] of items.entries()) {
@@ -215,18 +225,28 @@ function rows(items: Item[]): Row[] {
 			call.result = item
 			continue
 		}
-		let row: Row = { item, at }
+		let row: Row = { item, at, key: sent[item.key] ?? item.key }
 		if (item.type === 'tool') calls.set(item.id, row)
 		out.push(row)
 	}
 	return out
 }
 
+// `rows` and after them the prompts still pending (`id`: the submit's
+// command id), but for one the host already put in the transcript: it
+// is a row already, under the same key, so its card stays.
+function withPending(rows: Row[], pending: { id: string; text: string }[]): Row[] {
+	let keys = new Set(rows.map((r) => r.key))
+	let at = (rows.at(-1)?.at ?? -1) + 1
+	let more = pending.filter((s) => !keys.has(s.id)).map((s): Row => ({ item: { type: 'prompt', text: s.text, key: s.id }, at, key: s.id, pending: true }))
+	return more.length ? [...rows, ...more] : rows
+}
+
 function oneLine(s: string): string {
 	return s.replace(/\s+/g, ' ').trim()
 }
 
-function show(item: Item): Shown {
+function show(item: ItemShown): Shown {
 	switch (item.type) {
 		case 'prompt':
 			return { kind: 'user', text: item.from === undefined ? item.text : `${item.text}\n(sent from ${item.label ?? item.from})` }
@@ -294,5 +314,6 @@ export const view = {
 	hints,
 	rows,
 	markRow,
+	withPending,
 	show,
 }

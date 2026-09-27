@@ -14,7 +14,7 @@
 
 import { backfill, type Backfill } from '../common/backfill.ts'
 import { connection, type LinkState } from '../common/connection.ts'
-import { drafts, type Local } from '../common/drafts.ts'
+import { drafts, type Local, type Sending } from '../common/drafts.ts'
 import { forms, type FormAction, type Key } from '../common/forms.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import { recall } from '../common/recall.ts'
@@ -41,7 +41,7 @@ function sessionId(): string | undefined {
 }
 
 // Prompts sent and not acknowledged, shown after the transcript.
-function pending(): string[] {
+function pending(): Sending[] {
 	let id = app.sessionId()
 	return id ? drafts.pending(id) : []
 }

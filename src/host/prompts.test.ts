@@ -4,7 +4,7 @@
 import { expect, test } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
-import { calls, client, created, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost } from './host-fixture.test.ts'
+import { calls, client, created, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
 import { prompts } from './prompts.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
@@ -53,7 +53,7 @@ test('a message sent while a turn runs steers it: waiting messages reach the mod
 	calls[2]!.push({ type: 'text', text: 'done' }, { type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length && b.of('turn-end').length)
 	let view = await fresh(id)
-	expect(view.items).toEqual([
+	expect(shown(view.items)).toEqual([
 		{ type: 'prompt', text: 'go' },
 		{ type: 'text', text: 'work' },
 		{ type: 'prompt', text: 'one' },
@@ -197,7 +197,7 @@ test('sending to a paused turn takes the waiting messages along, oldest first', 
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 2)
 	let view = await fresh(id)
-	expect(view.items.filter((i) => i.type === 'prompt')).toEqual([
+	expect(shown(view.items.filter((i) => i.type === 'prompt'))).toEqual([
 		{ type: 'prompt', text: 'go' },
 		{ type: 'prompt', text: 'first' },
 		{ type: 'prompt', text: 'second' },
@@ -263,7 +263,7 @@ test('an edit after only reading replaces the prompt: the model sees it as if wr
 	await until(() => a.of('turn-end').length === 3)
 	let view = await fresh(id)
 	expect(view).toEqual(a.views.get(id)!)
-	expect(view.items.slice(3)).toEqual([
+	expect(shown(view.items.slice(3))).toEqual([
 		{ type: 'prompt', text: 'what did I note?' },
 		{ type: 'text', text: 'Milk.' },
 		{ type: 'turn-end', status: 'completed' },
@@ -295,7 +295,7 @@ test('an edit after a tool with side effects keeps history and is sent on top', 
 		calls[2]!.push({ type: 'done', reason: 'end' })
 		await until(() => a.of('turn-end').length === 2)
 		expect(await fresh(id)).toEqual(a.views.get(id)!)
-		expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt')).toEqual([
+		expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt'))).toEqual([
 			{ type: 'prompt', text: 'clean up' },
 			{ type: 'prompt', text: 'clean up, but keep x' },
 		])
@@ -319,7 +319,7 @@ test('an edit sent while the paused turn is still stopping waits for it to end',
 	await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
 	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'turn_end', 'user', 'assistant', 'turn_end'])
 	expect(await fresh(id)).toEqual(a.views.get(id)!)
-	expect(a.views.get(id)!.items).toEqual([
+	expect(shown(a.views.get(id)!.items)).toEqual([
 		{ type: 'prompt', text: 'right' },
 		{ type: 'text', text: 'ok' },
 		{ type: 'turn-end', status: 'completed' },
@@ -433,5 +433,5 @@ test('a resend of an edit still waiting for its paused turn to stop acks without
 	await until(() => a.views.get(id)!.state.type === 'idle')
 	expect(calls).toHaveLength(2)
 	expect((await records(id)).filter((r) => r.type === 'user')).toHaveLength(2)
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt')).toEqual([{ type: 'prompt', text: 'right' }])
+	expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt'))).toEqual([{ type: 'prompt', text: 'right' }])
 })

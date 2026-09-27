@@ -85,7 +85,7 @@ test('a snapshot with history marks where it ends; later events keep the mark', 
 	let old = { type: 'snapshot', sessionId, snapshot: { meta, history: [{ type: 'user', blocks: [{ type: 'text', text: 'old' }], ts }], state: { type: 'idle' } } } as Event
 	let st = fold([old, { type: 'turn-start', sessionId, prompt: 'new', provider: 'fake' }])
 	expect(st.resumed).toEqual({ at: 1, last: ts })
-	expect(st.transcript!.items.slice(st.resumed!.at)).toEqual([{ type: 'prompt', text: 'new' }])
+	expect(st.transcript!.items.slice(st.resumed!.at)).toMatchObject([{ type: 'prompt', text: 'new' }])
 	let empty = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }], st)
 	expect(empty.resumed).toBeUndefined()
 })
@@ -264,7 +264,7 @@ test('rows pair each tool call with its result and drop completed turn ends', ()
 	])
 })
 
-test('rows only grow at the end as items arrive, so rows keyed by position keep their place', () => {
+test('rows only grow at the end as items arrive', () => {
 	let items = running(
 		[
 			{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } },
@@ -280,6 +280,17 @@ test('rows only grow at the end as items arrive, so rows keyed by position keep 
 		let some = view.rows(items.slice(0, k))
 		expect(some.map((r) => r.item)).toEqual(all.slice(0, some.length).map((r) => r.item))
 	}
+})
+
+test('a sent prompt shows pending, then as the host’s item under the same key, once', () => {
+	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }] as Event[])
+	let sending = [{ id: 'c7', text: 'go' }]
+	let before = view.withPending(view.rows(st.transcript!.items, st.sent), sending)
+	expect(before.map((r) => [r.key, r.item.type, r.pending])).toEqual([['c7', 'prompt', true]])
+	// The host's item arrives before the ack that ends the pending one.
+	st = fold([{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 4, command: 'c7' }] as Event[], st)
+	let after = view.withPending(view.rows(st.transcript!.items, st.sent), sending)
+	expect(after.map((r) => [r.key, r.item.type, r.pending])).toEqual([['c7', 'prompt', undefined]])
 })
 
 test('the resumed mark goes before the first row at or after where history ends', () => {

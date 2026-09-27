@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
-import { transcript, type Transcript } from '../common/transcript.ts'
+import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
@@ -128,7 +128,11 @@ export function restartHost() {
 // A prompt as replay sends it: its [HH:MM] line, then the text.
 export const stamped = (text: string) => expect.stringMatching(new RegExp(`^\\[[\\d -]+:\\d\\d\\]\\n${text}$`))
 
-export const records = async (id: string) => (await history.read(id)).map(({ ts: _ts, ...r }) => r)
+// Items as shown, without their keys (task w5), for comparing with
+// literals; a live transcript and a fresh one compare keys too.
+export const shown = (items: Item[] | undefined) => items?.map(({ key: _key, ...s }) => s)
+
+export const records = async (id: string) => (await history.read(id)).map(({ ts: _ts, n: _n, ...r }) => r)
 
 // A session whose cwd holds notes.txt, for the read tool.
 export function toolSession(c: ReturnType<typeof client>): string {

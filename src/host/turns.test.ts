@@ -5,9 +5,9 @@ import { expect, test } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
 import { replay } from '../common/replay.ts'
 import { states } from '../common/states.ts'
-import type { Item } from '../common/transcript.ts'
+import type { Shown as Item } from '../common/transcript.ts'
 import { history } from './history.ts'
-import { calls, client, created, fakeStream, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost } from './host-fixture.test.ts'
+import { calls, client, created, fakeStream, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
 import { host } from './host.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
@@ -38,9 +38,10 @@ test('a completed turn reaches every follower and is durable before turn-end', a
 		{ type: 'text', text: 'hello' },
 		{ type: 'turn-end', status: 'completed', usage: { input: 5, output: 2 } },
 	]
-	expect(a.views.get(id)!.items).toEqual(expected)
-	expect(b.views.get(id)!.items).toEqual(expected)
-	expect((await fresh(id)).items).toEqual(expected)
+	expect(shown(a.views.get(id)!.items)).toEqual(expected)
+	// Every client, live or fresh, keys each item alike.
+	expect(b.views.get(id)!.items).toEqual(a.views.get(id)!.items)
+	expect((await fresh(id)).items).toEqual(a.views.get(id)!.items)
 	expect((await records(id)).at(-1)).toEqual({ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 5, output: 2 } })
 })
 
@@ -105,7 +106,7 @@ test('a turn cut off by a host that went away continues on the next host, told w
 		{ type: 'text', text: 'b' },
 		{ type: 'turn-end', status: 'completed' },
 	]
-	expect(b.views.get(id)!.items).toEqual(expected)
+	expect(shown(b.views.get(id)!.items)).toEqual(expected)
 	expect(b.views.get(id)!.state).toEqual({ type: 'idle' })
 	expect(await fresh(id)).toEqual(b.views.get(id)!)
 	// Nothing is left to continue.
@@ -129,7 +130,7 @@ test('pause stops the turn, keeping partial output, and continue carries it on',
 	expect(a.views.get(id)!.state).toEqual({ type: 'paused' })
 	let view = await fresh(id)
 	expect(view).toEqual(a.views.get(id)!)
-	expect(view.items.slice(1)).toEqual([
+	expect(shown(view.items.slice(1))).toEqual([
 		{ type: 'text', text: 'part' },
 		{ type: 'turn-end', status: 'paused' },
 	])
@@ -146,7 +147,7 @@ test('pause stops the turn, keeping partial output, and continue carries it on',
 	expect(calls[1]!.input.messages.at(-1)).toEqual({ role: 'user', blocks: [{ type: 'text', text: replay.continueNote }] })
 	calls[1]!.push({ type: 'text', text: 'rest' }, { type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length)
-	expect(a.views.get(id)!.items.slice(1)).toEqual([
+	expect(shown(a.views.get(id)!.items.slice(1))).toEqual([
 		{ type: 'text', text: 'part' },
 		{ type: 'turn-end', status: 'paused' },
 		{ type: 'text', text: 'rest' },
@@ -226,7 +227,7 @@ test('a tool call runs on the host and the turn continues with its result', asyn
 	await until(() => b.of('turn-end').length && late.of('turn-end').length)
 
 	let view = await fresh(id)
-	expect(view.items).toEqual([
+	expect(shown(view.items)).toEqual([
 		{ type: 'prompt', text: 'what did I note?' },
 		{ type: 'text', text: 'Let me look.' },
 		{ type: 'tool', id: 't1', name: 'read', input: { path: 'notes.txt' } },
@@ -261,7 +262,7 @@ test('a restart after a tool ran keeps its result, continues, and does not run i
 		calls[2]!.push({ type: 'text', text: 'milk' }, { type: 'done', reason: 'end' })
 		await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
 		let view = await fresh(id)
-		expect(view.items.slice(-3)).toEqual([
+		expect(shown(view.items.slice(-3))).toEqual([
 			{ type: 'tool-result', id: 't1', output: 'remember the milk\n' },
 			{ type: 'text', text: 'milk' },
 			{ type: 'turn-end', status: 'completed' },
@@ -336,7 +337,7 @@ test('a turn that keeps bringing hosts down is paused with a reason, not continu
 	expect(calls.length).toBe(states.maxRecoveries() + 1)
 	let view = await fresh(id)
 	expect(view.state).toMatchObject({ type: 'paused', reason: expect.stringMatching(/without progress/) })
-	expect(view.items.at(-1)).toEqual({ type: 'turn-end', status: 'paused' })
+	expect(shown(view.items)!.at(-1)).toEqual({ type: 'turn-end', status: 'paused' })
 	// The user can still continue it by hand.
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })

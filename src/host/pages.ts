@@ -19,7 +19,8 @@ import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
-type Marks = { size: number; question?: number; turnQuestion?: string; close?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]> }
+// `next`: past the highest record number (HistoryRecord `n`).
+type Marks = { size: number; next?: number; question?: number; turnQuestion?: string; close?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]> }
 type Line = { offset: number; bytes: number; record: HistoryRecord }
 export type Page = { records: HistoryRecord[]; start: number }
 // `older`: where `history` starts, when earlier records exist.
@@ -43,9 +44,13 @@ function readBytes(path: string, start: number, end: number): Buffer {
 	}
 }
 
-function parse(path: string, text: string): HistoryRecord {
+// The record on the line at `offset`. One from an old history, without
+// a number, is numbered by its place: offset + 1 (HistoryRecord `n`).
+function parse(path: string, text: string, offset: number): HistoryRecord {
 	try {
-		return history.check(ason.parse(text))
+		let r = history.check(ason.parse(text))
+		r.n ??= offset + 1
+		return r
 	} catch (e: any) {
 		throw new Error(`${path}: malformed history: ${e?.message ?? e}`)
 	}
@@ -59,7 +64,7 @@ function lines(path: string, buf: Buffer, base: number): Line[] {
 		let nl = buf.indexOf(NL, at)
 		if (nl < 0) return out
 		let text = buf.toString('utf8', at, nl)
-		if (text.trim()) out.push({ offset: base + at, bytes: nl + 1 - at, record: pages.parse(path, text) })
+		if (text.trim()) out.push({ offset: base + at, bytes: nl + 1 - at, record: pages.parse(path, text, base + at) })
 		at = nl + 1
 	}
 }
@@ -69,12 +74,13 @@ function lineAt(path: string, offset: number): Line {
 	for (let n = 4096; ; n *= 2) {
 		let buf = pages.readBytes(path, offset, offset + n)
 		let nl = buf.indexOf(NL)
-		if (nl >= 0) return { offset, bytes: nl + 1, record: pages.parse(path, buf.toString('utf8', 0, nl)) }
+		if (nl >= 0) return { offset, bytes: nl + 1, record: pages.parse(path, buf.toString('utf8', 0, nl), offset) }
 		if (buf.length < n) throw new Error(`${path}: no record at ${offset}`)
 	}
 }
 
 function apply(m: Marks, r: HistoryRecord, offset: number): void {
+	m.next = Math.max(m.next ?? 1, (r.n ?? offset + 1) + 1)
 	if (r.type === 'question') {
 		m.question = offset
 		if (!r.from) {
@@ -118,7 +124,7 @@ function marks(id: string): Marks {
 	let path = history.file(id)
 	let size = existsSync(path) ? statSync(path).size : 0
 	let m = pages.load(id)
-	if (m.size < 0 || m.size > size) {
+	if (m.size < 0 || m.size > size || (m.size > 0 && m.next === undefined)) {
 		for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
 		Object.assign(m, { size: 0, inbox: {} })
 	}

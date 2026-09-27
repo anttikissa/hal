@@ -71,7 +71,7 @@ function view(): View {
 	let v: View = { prompt: st.prompt }
 	if (st.transcript) v.transcript = st.transcript
 	if (st.resumed) v.resumed = st.resumed
-	let pending = st.transcript ? drafts.pending(st.transcript.meta.id) : []
+	let pending = st.transcript ? drafts.pending(st.transcript.meta.id).map((s) => s.text) : []
 	if (pending.length) v.pending = pending
 	if (st.form) v.form = st.form
 	if (st.modal) v.modal = st.modal

@@ -62,8 +62,8 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 	let own = { ...inbox.sender(sender ?? {}), advisory: undefined }
 	if (!steering.length) {
 		let list = prompts.blocks(id, [{ text, ...own }])
-		history.submit(id, list, command)
-		return void turns.start(id, prompts.texts(list)[0], undefined, prompts.images(list), prompts.senders(list)[0])
+		let record = history.submit(id, list, command) as HistoryRecord & { type: 'user' }
+		return void turns.start(id, prompts.texts(list)[0], undefined, prompts.images(list), { ...record, sender: prompts.senders(list)[0] })
 	}
 	prompts.deliver(id, steering, { text, ...own }, command)
 	turns.start(id)
@@ -102,8 +102,7 @@ function amend(id: string, text: string, command?: string): string | undefined {
 	let blocks = prompts.blocks(id, parts)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, replaces: true }
 	if (command !== undefined) record.command = command
-	history.append(id, record)
-	host.broadcast(id, prompts.promptEvent(id, blocks, true))
+	host.broadcast(id, prompts.promptEvent(id, history.append(id, record) as HistoryRecord & { type: 'user' }))
 	turns.start(id)
 }
 
@@ -148,15 +147,15 @@ function drain(id: string): void {
 // Records inbox messages (and a new prompt `extra`) as one prompt, its
 // attachment markers resolved (blobs.resolve), and tells followers: a
 // `prompt` event, or with `quiet` nothing, as the caller's turn-start
-// carries it. Returns the prompt's blocks.
-function deliver(id: string, items: InboxItem[], extra?: Sender & { text: string }, command?: string, quiet = false): UserBlock[] {
+// carries it. Returns the prompt's record.
+function deliver(id: string, items: InboxItem[], extra?: Sender & { text: string }, command?: string, quiet = false): HistoryRecord & { type: 'user' } {
 	let blocks = prompts.blocks(id, extra ? [...items, extra] : items)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, inbox: items.map((m) => m.id) }
 	if (command !== undefined) record.command = command
-	history.append(id, record)
+	let written = history.append(id, record) as HistoryRecord & { type: 'user' }
 	host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
-	if (!quiet) host.broadcast(id, prompts.promptEvent(id, blocks))
-	return blocks
+	if (!quiet) host.broadcast(id, prompts.promptEvent(id, written))
+	return written
 }
 
 function texts(list: UserBlock[]): string[] {
@@ -167,14 +166,16 @@ function images(list: UserBlock[]): ImageBlock[] {
 	return list.filter((b): b is ImageBlock => b.type === 'image')
 }
 
-// The `prompt` event telling followers of a prompt record's blocks.
-function promptEvent(id: string, list: UserBlock[], replaces = false): Event {
-	let event: Event & { type: 'prompt' } = { type: 'prompt', sessionId: id, texts: prompts.texts(list) }
-	let who = prompts.senders(list)
+// The `prompt` event telling followers of a prompt record.
+function promptEvent(id: string, record: HistoryRecord & { type: 'user' }): Event {
+	let event: Event & { type: 'prompt' } = { type: 'prompt', sessionId: id, texts: prompts.texts(record.blocks) }
+	let who = prompts.senders(record.blocks)
 	if (who.some((s) => s.from !== undefined)) event.senders = who
-	let shown = prompts.images(list)
+	let shown = prompts.images(record.blocks)
 	if (shown.length) event.images = shown
-	if (replaces) event.replaces = true
+	if (record.replaces) event.replaces = true
+	if (record.n !== undefined) event.n = record.n
+	if (record.command !== undefined) event.command = record.command
 	return event
 }
 
@@ -188,8 +189,8 @@ function steer(id: string): void {
 function next(id: string): void {
 	let queued = status.inboxOf(id).find((m) => m.queue)
 	if (!queued || status.transition(id, { type: 'submit' })) return
-	let list = prompts.deliver(id, [queued], undefined, undefined, true)
-	turns.start(id, prompts.texts(list)[0], undefined, prompts.images(list), prompts.senders(list)[0])
+	let record = prompts.deliver(id, [queued], undefined, undefined, true)
+	turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), { ...record, sender: prompts.senders(record.blocks)[0] })
 }
 
 // After a submit: the draft it was typed in is sent, so it clears

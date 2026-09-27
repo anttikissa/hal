@@ -61,6 +61,6 @@ test('Up never recalls what another session sent', () => {
 	let t = session(running)
 	let peer = { ...t, inbox: [{ id: 'm1', text: 'mine' }, { id: 'm2', text: 'theirs', from: 's9' }] }
 	expect(amend.begin(peer, '')?.editing).toEqual({ sessionId: 's1', original: 'mine', inbox: 'm1' })
-	let delivered = { ...t, items: [...t.items, { type: 'prompt' as const, text: 'theirs', from: 's9' }], inbox: [{ id: 'm2', text: 'theirs', from: 's9' }] }
+	let delivered = { ...t, items: [...t.items, { type: 'prompt' as const, text: 'theirs', from: 's9', key: 'x' }], inbox: [{ id: 'm2', text: 'theirs', from: 's9' }] }
 	expect(amend.begin(delivered, '')?.editing).toEqual({ sessionId: 's1', original: 'fix ti' })
 })

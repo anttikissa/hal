@@ -27,8 +27,10 @@ export type { TurnStatus } from './replay.ts'
 // prompt, every finished block and any tool results already are). Clients continue it by
 // folding later `stream` events with blocks.apply; at `turn-end` the
 // host has recorded its blocks and the turn end, so its blocks, if any,
-// followed by the turn end match what a later snapshot shows.
-export type LiveTurn = { provider: string; blocks: AssistantBlock[]; usage: Usage }
+// followed by the turn end match what a later snapshot shows. `ns`: each
+// block's record number (HistoryRecord `n`), given when it started
+// streaming and kept by its record.
+export type LiveTurn = { provider: string; blocks: AssistantBlock[]; usage: Usage; ns?: number[] }
 
 // Text typed into a session but not sent yet, one per session, shared
 // by every client (tasks/j1/states.md, Drafts and sending). `rev` counts
@@ -135,13 +137,18 @@ export type Tab = { id: string; name: string; cwd: string; model: string; state:
 
 // ── Events (host → client) ──
 
+// `n` on an event that tells of a history record: that record's number
+// (HistoryRecord `n`); on `stream`, the number of the block the event
+// went into. Clients key transcript items by it (task w5).
 export type Event =
 	| { type: 'snapshot'; sessionId: string; snapshot: Snapshot }
 	// The prompt is now in history and a turn is running. No prompt: an
 	// earlier turn continues (a `continue` record). `images`: the
 	// prompt's image blocks, after its text. `sender`: who sent the
-	// prompt, if not the human.
-	| { type: 'turn-start'; sessionId: string; prompt?: string; images?: ImageBlock[]; sender?: Sender; provider: string }
+	// prompt, if not the human. `command`: the client's id for the submit
+	// that sent the prompt, so it can put the prompt in place of the one
+	// it shows pending.
+	| { type: 'turn-start'; sessionId: string; prompt?: string; images?: ImageBlock[]; sender?: Sender; provider: string; n?: number; command?: string }
 	// A page of earlier history, answering the `history` command for
 	// `before`: whole records ending there, oldest first. `older`: where
 	// they start, when there are more before them.
@@ -154,22 +161,23 @@ export type Event =
 	// prompt, after the running turn's output so far. `replaces`: an edit
 	// that takes the place of the last prompt and everything after it.
 	// `senders`: who sent each text ({} the human), when not all the human.
-	| { type: 'prompt'; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; replaces?: true }
-	| { type: 'stream'; sessionId: string; event: LiveStreamEvent }
+	// `command`: as in turn-start, for the last text.
+	| { type: 'prompt'; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; replaces?: true; n?: number; command?: string }
+	| { type: 'stream'; sessionId: string; event: LiveStreamEvent; n?: number }
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
-	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[] }
-	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string }
+	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[]; n?: number }
+	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string; n?: number }
 	// The turn asked a question, now in history; it waits for an answer
 	// with no turn running (the state says blocked).
-	| { type: 'question'; sessionId: string; id: string; form: Form }
+	| { type: 'question'; sessionId: string; id: string; form: Form; n?: number }
 	// The first answer to it, as history keeps it (secrets only named).
 	// `cancelled`: Escape dismissed a command's question.
 	| { type: 'answer'; sessionId: string; question: string; answers: Answers; secrets?: string[]; cancelled?: true }
 	// A slash command is in history (`from`: as in submit) and runs.
-	| { type: 'command'; sessionId: string; text: string; from?: string }
+	| { type: 'command'; sessionId: string; text: string; from?: string; n?: number }
 	// What a command said, now in history; `error` if it failed.
-	| { type: 'output'; sessionId: string; text: string; error?: true }
+	| { type: 'output'; sessionId: string; text: string; error?: true; n?: number }
 	// The session's metadata changed (a /cd).
 	| { type: 'meta'; sessionId: string; meta: SessionMeta }
 	// Sent only to the client that asked: every full text `text` may

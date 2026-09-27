@@ -22,8 +22,8 @@ function command(id: string, text: string, call: { name: string; args: string },
 	let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text }
 	if (from !== undefined) record.from = from
 	if (command !== undefined) record.command = command
-	history.append(id, record)
-	host.broadcast(id, from === undefined ? { type: 'command', sessionId: id, text } : { type: 'command', sessionId: id, text, from })
+	let { n } = history.append(id, record)
+	host.broadcast(id, from === undefined ? { type: 'command', sessionId: id, text, n } : { type: 'command', sessionId: id, text, from, n })
 	void slash.runCommand(id, call.name, call.args)
 }
 
@@ -76,8 +76,8 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 	if (states.busy(status.stateOf(id))) return slash.output(id, `/${name} can't ask while the session is busy; try again when it is done`, true)
 	let question = crypto.randomUUID().slice(0, 8)
 	let before = status.stateOf(id)
-	history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args } })
-	host.broadcast(id, { type: 'question', sessionId: id, id: question, form: reply.ask })
+	let { n } = history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args } })
+	host.broadcast(id, { type: 'question', sessionId: id, id: question, form: reply.ask, n })
 	status.settle(id, before)
 }
 
@@ -88,8 +88,8 @@ async function models(id: string): Promise<Event & { type: 'models' }> {
 }
 
 function output(id: string, text: string, error = false): void {
-	history.append(id, error ? { type: 'output', text, error } : { type: 'output', text })
-	host.broadcast(id, error ? { type: 'output', sessionId: id, text, error } : { type: 'output', sessionId: id, text })
+	let { n } = history.append(id, error ? { type: 'output', text, error } : { type: 'output', text })
+	host.broadcast(id, error ? { type: 'output', sessionId: id, text, error, n } : { type: 'output', sessionId: id, text, n })
 }
 
 export const slash = {

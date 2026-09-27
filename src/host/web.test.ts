@@ -8,7 +8,10 @@ import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
+import { history } from './history.ts'
+import { pages } from './pages.ts'
 import { host } from './host.ts'
+import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
 import { paths } from './paths.ts'
 import { server } from './server.ts'
@@ -18,6 +21,7 @@ import { web } from './web.ts'
 const savedHome = process.env.HAL_HOME
 const origPort = web.port
 const origStream = turns.stream
+const origBudget = pages.budget
 let home = ''
 let sockets: WebSocket[] = []
 
@@ -36,6 +40,7 @@ afterEach(async () => {
 	sessions.closeAll()
 	web.port = origPort
 	turns.stream = origStream
+	pages.budget = origBudget
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome
 	rmSync(home, { recursive: true, force: true })
@@ -386,6 +391,67 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await b.waitFor(`document.activeElement === document.querySelector('textarea') && document.querySelector('textarea').value.split('!').length === 2`)
 	} finally {
 		host.cwd = origCwd
+		await b.close()
+	}
+}, 20000)
+
+test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay, open ones stay open', async () => {
+	// Turns taller than the window, one per page.
+	let id = tabs.create('/tmp')
+	for (let t = 0; t < 4; t++) {
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${t}` }] })
+		history.append(id, { type: 'assistant', block: { type: 'thinking', text: `thought ${t}` } })
+		history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n`.repeat(80) } })
+		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	}
+	pages.budget = () => 1500
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
+		await b.call('Network.setCookie', { name: 'hal', value: 'hello123', url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.waitFor(`document.querySelector('main').innerText.includes('thought 3') && !document.querySelector('main').innerText.includes('prompt 0')`)
+		// Open the newest thinking card, then read up to the top until the
+		// first prompt has arrived.
+		await b.evaluate(`[...document.querySelectorAll('.Card.thinking')].at(-1).click()`)
+		await b.waitFor(`[...document.querySelectorAll('.Card.thinking')].at(-1).classList.contains('open')`)
+		let loaded = await b.evaluate(`(async () => {
+			let main = document.querySelector('main'), cards = [...document.querySelectorAll('.Card')], added = 0
+			let open = cards.filter((c) => c.classList.contains('open'))
+			let seen = new MutationObserver((ms) => { for (let m of ms) for (let n of m.addedNodes) if (n.nodeType === 1 && (n.matches('.Card') || n.querySelector('.Card'))) added++ })
+			seen.observe(main, { childList: true, subtree: true })
+			for (let i = 0; i < 200 && !main.innerText.includes('prompt 0'); i++) {
+				main.scrollTop = 0
+				main.dispatchEvent(new Event('scroll'))
+				await new Promise((r) => setTimeout(r, 20))
+			}
+			seen.disconnect()
+			let now = [...document.querySelectorAll('.Card')]
+			return {
+				kept: cards.every((c) => c.isConnected),
+				stillOpen: open.length === 1 && open[0].classList.contains('open'),
+				opened: now.filter((c) => c.classList.contains('open')).length,
+				grew: now.length - cards.length === added && added > 0,
+				first: main.innerText.includes('prompt 0'),
+			}
+		})()`)
+		expect(loaded).toEqual({ kept: true, stillOpen: true, opened: 1, grew: true, first: true })
+		// A sent prompt's card stays the same node when the host takes it.
+		turns.stream = () =>
+			(async function* (): AsyncGenerator<StreamEvent> {
+				yield { type: 'text', text: 'ok' }
+				yield { type: 'done', reason: 'end' }
+			})()
+		let swapped = await b.evaluate(`(async () => {
+			let t = document.querySelector('textarea'); t.value = 'fresh'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+			let card = document.querySelector('.Card.pending')
+			for (let i = 0; i < 250 && (card?.classList.contains('pending') || !document.querySelector('main').innerText.includes('ok')); i++) await new Promise((r) => setTimeout(r, 20))
+			return { same: !!card && card.isConnected && !card.classList.contains('pending'), text: card?.textContent, count: [...document.querySelectorAll('.Card.user')].filter((c) => c.textContent === 'fresh').length }
+		})()`)
+		expect(swapped).toEqual({ same: true, text: 'fresh', count: 1 })
+	} finally {
 		await b.close()
 	}
 }, 20000)

@@ -174,7 +174,7 @@ test('disconnect then send: pending until acknowledged, submitted once', async (
 	cut!()
 	await tick()
 	drafts.submit(id, 'hello')
-	expect(drafts.pending(id)).toEqual(['hello'])
+	expect(drafts.pending(id).map((s) => s.text)).toEqual(['hello'])
 	expect(drafts.text(id)).toBe('')
 	// Not acknowledged: kept locally, and the host's draft still holds it.
 	expect(JSON.parse(stored.get(id)!).sending).toHaveLength(1)

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { colors } from '../common/colors.ts'
 import { oklch, type Oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
-import type { Item, Transcript } from '../common/transcript.ts'
+import type { Shown as Item, Transcript } from '../common/transcript.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
 import { settings } from '../common/settings.ts'
 import { frame, type Frame, type View } from './frame.ts'
@@ -20,7 +20,7 @@ function strip(s: string): string {
 }
 
 function view(items: Item[], text = '', cursor = text.length): View {
-	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items }
+	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items: items.map((item, i) => ({ ...item, key: `${i}` })) }
 	return { transcript, prompt: { text, cursor } }
 }
 

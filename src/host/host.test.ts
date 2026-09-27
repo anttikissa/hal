@@ -4,7 +4,7 @@
 import { expect, test } from 'bun:test'
 import { ason } from '../common/ason.ts'
 import { config } from './config.ts'
-import { calls, client, created, fresh, records, restartHost, until, useHost } from './host-fixture.test.ts'
+import { calls, client, created, fresh, records, restartHost, until, useHost, shown } from './host-fixture.test.ts'
 import { host } from './host.ts'
 import { sessions } from './sessions.ts'
 
@@ -37,7 +37,7 @@ test('a client connecting mid-turn gets the partial turn, then live events', asy
 	calls[0]!.push({ type: 'text', text: 'tial' }, { type: 'done', reason: 'end' })
 	await until(() => late.of('turn-end').length)
 	expect(late.views.get(id)).toEqual(a.views.get(id)!)
-	expect(late.views.get(id)!.items[1]).toEqual({ type: 'text', text: 'partial' })
+	expect(shown(late.views.get(id)!.items)![1]).toEqual({ type: 'text', text: 'partial' })
 })
 
 test('reconnecting is connecting again: the snapshot carries the running turn', async () => {

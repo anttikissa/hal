@@ -26,7 +26,8 @@ const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox
 // One running turn: its current provider round (`turn`), how many of
 // that round's blocks are on disk, and the usage of earlier rounds.
 // `ended`: stop() has written its last record; nothing more is written.
-type Running = { turn: Turn; written: number; prior: Usage; ended?: boolean }
+// `ns`: each block's record number, given when it started streaming.
+type Running = { turn: Turn; written: number; prior: Usage; ended?: boolean; ns: number[] }
 
 function addUsage(a: Usage, b: Usage): Usage {
 	let sum = { ...a }
@@ -36,7 +37,7 @@ function addUsage(a: Usage, b: Usage): Usage {
 
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
-	if (!r || typeof r !== 'object' || !recordTypes.has(r.type)) throw new Error(`unknown record ${ason.stringify(value, 'short').slice(0, 80)}`)
+	if (!r || typeof r !== 'object' || !recordTypes.has(r.type) || (r.n !== undefined && !Number.isSafeInteger(r.n))) throw new Error(`unknown record ${ason.stringify(value, 'short').slice(0, 80)}`)
 	return r
 }
 
@@ -44,21 +45,35 @@ function file(id: string): string {
 	return `${paths.sessionDir(id)}/history.asonl`
 }
 
-// Keeps the busy list (busy.ts) in step: joined before the record that
-// may leave work, left after a turn end with an empty inbox.
-function append(id: string, record: NewRecord): void {
-	let full = { ...record, ts: new Date().toISOString() } as HistoryRecord
+// The session's next record number (HistoryRecord `n`), taken: past
+// every record in the file and every number given out meanwhile (a
+// block still streaming holds one).
+function number(id: string): number {
+	let path = history.file(id)
+	let n = Math.max(history.state.next.get(path) ?? 1, pages.marks(id).next ?? 1)
+	history.state.next.set(path, n + 1)
+	return n
+}
+
+// Appends the record, numbered (`n`: a number taken before, for a
+// streamed block), and returns it as written. Keeps the busy list
+// (busy.ts) in step: joined before the record that may leave work, left
+// after a turn end with an empty inbox.
+function append(id: string, record: NewRecord): HistoryRecord {
+	let { n, ...rest } = record
+	let full = { ...rest, n: n ?? history.number(id), ts: new Date().toISOString() } as HistoryRecord
 	let line = ason.stringifyLine(full)
 	if (busy.starts(full)) busy.add(id)
 	appendFileSync(history.file(id), line)
 	pages.note(id, line, full)
 	if (full.type === 'turn_end' && !Object.keys(pages.marks(id).inbox).length) busy.drop(id)
+	return full
 }
 
 // `command`: the client's id for the submit, so a resend is recognised.
-function submit(id: string, prompt: string | UserBlock[], command?: string): void {
+function submit(id: string, prompt: string | UserBlock[], command?: string): HistoryRecord {
 	let content = typeof prompt === 'string' ? [{ type: 'text' as const, text: prompt }] : prompt
-	history.append(id, command === undefined ? { type: 'user', blocks: content } : { type: 'user', blocks: content, command })
+	return history.append(id, command === undefined ? { type: 'user', blocks: content } : { type: 'user', blocks: content, command })
 }
 
 async function load(id: string): Promise<{ records: HistoryRecord[]; partial?: string }> {
@@ -100,7 +115,9 @@ function readSync(id: string): HistoryRecord[] {
 	let last = buf.toString('utf8', end)
 	if (last.trim()) {
 		try {
-			return [...records, history.check(ason.parse(last))]
+			let r = history.check(ason.parse(last))
+			r.n ??= cached.size + end + 1
+			return [...records, r]
 		} catch {}
 	}
 	return records.slice()
@@ -166,16 +183,17 @@ async function messages(id: string) {
 async function* record(id: string, providerName: string, events: AsyncIterable<StreamEvent>): AsyncGenerator<StreamEvent> {
 	let before = history.state.running.get(id)
 	let prior = before ? addUsage(before.prior, before.turn.usage) : {}
-	let running: Running = { turn: blocks.newTurn(providerName), written: 0, prior }
+	let running: Running = { turn: blocks.newTurn(providerName), written: 0, prior, ns: [] }
 	let { turn } = running
 	let flush = (upTo: number) => {
 		if (running.ended) return
-		for (; running.written < upTo; running.written++) history.append(id, { type: 'assistant', block: turn.blocks[running.written]! })
+		for (; running.written < upTo; running.written++) history.append(id, { type: 'assistant', block: turn.blocks[running.written]!, n: running.ns[running.written]! })
 	}
 	history.state.running.set(id, running)
 	try {
 		for await (let event of events) {
 			blocks.apply(turn, event)
+			while (running.ns.length < turn.blocks.length) running.ns.push(history.number(id))
 			flush(turn.blocks.length - 1)
 			if (turn.end) break
 			yield event
@@ -190,8 +208,8 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 
 // Records the results of a round's tool calls, unless the turn has
 // already ended (stop()).
-function results(id: string, list: ToolResultBlock[]): void {
-	if (history.state.running.has(id)) history.append(id, { type: 'user', blocks: list })
+function results(id: string, list: ToolResultBlock[]): HistoryRecord | undefined {
+	if (history.state.running.has(id)) return history.append(id, { type: 'user', blocks: list })
 }
 
 // Ends the running turn, with the usage of all its rounds: `last` is
@@ -222,7 +240,7 @@ function park(id: string): Usage {
 // it was parked), so its end counts them. A turn carried but ended
 // before any round (held tool calls, then a pause) still gets its end.
 function carry(id: string, providerName: string, usage: Usage): void {
-	history.state.running.set(id, { turn: blocks.newTurn(providerName), written: 0, prior: { ...usage } })
+	history.state.running.set(id, { turn: blocks.newTurn(providerName), written: 0, prior: { ...usage }, ns: [] })
 }
 
 // For a host about to exit: writes every running turn's output so far
@@ -237,7 +255,7 @@ function stop(pause: boolean): void {
 		running.ended = true
 		let { turn } = running
 		try {
-			for (; running.written < turn.blocks.length; running.written++) history.append(id, { type: 'assistant', block: turn.blocks[running.written]! })
+			for (; running.written < turn.blocks.length; running.written++) history.append(id, { type: 'assistant', block: turn.blocks[running.written]!, n: running.ns[running.written]! })
 			if (pause) history.append(id, { type: 'turn_end', status: 'paused', usage: addUsage(running.prior, turn.usage) })
 		} catch (e: any) {
 			diag.log(`history ${id}: could not record the stopped turn: ${e?.message ?? e}`)
@@ -246,12 +264,18 @@ function stop(pause: boolean): void {
 }
 
 // The running turn's output not yet in history: the current round's
-// last, unfinished block (if any) and that round's usage so far.
-function live(id: string): Turn | undefined {
+// last, unfinished block (if any), its number and that round's usage
+// so far.
+function live(id: string): (Turn & { ns: number[] }) | undefined {
 	let running = history.state.running.get(id)
 	if (!running) return undefined
 	let { turn, written } = running
-	return { provider: turn.provider, blocks: turn.blocks.slice(written), usage: { ...turn.usage } }
+	return { provider: turn.provider, blocks: turn.blocks.slice(written), usage: { ...turn.usage }, ns: running.ns.slice(written) }
+}
+
+// The number of the block the running turn streams into, if any.
+function streaming(id: string): number | undefined {
+	return history.state.running.get(id)?.ns.at(-1)
 }
 
 // One single-round model turn for an open session, from its history
@@ -275,9 +299,11 @@ async function* turn(id: string, opts: Omit<ProviderRequest, 'model' | 'messages
 export const history = {
 	// Sessions with a turn running in this host, and its current round.
 	// `cache`: each open session's complete records and the bytes they
-	// fill, kept while it is open.
-	state: { running: new Map<string, Running>(), cache: new Map<string, { size: number; records: HistoryRecord[] }>() },
+	// fill, kept while it is open. `next`: by history file, the next
+	// record number not given out yet.
+	state: { running: new Map<string, Running>(), cache: new Map<string, { size: number; records: HistoryRecord[] }>(), next: new Map<string, number>() },
 	check,
+	number,
 	file,
 	append,
 	submit,
@@ -295,5 +321,6 @@ export const history = {
 	carry,
 	stop,
 	live,
+	streaming,
 	turn,
 }

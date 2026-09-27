@@ -65,7 +65,7 @@ test('Enter sends the message box as a prompt: it shows pending and the box empt
 	// Text put in the box without an input event is what gets sent.
 	expect(press('Enter', message('hi'))).toBe(true)
 	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ sessionId, text: 'hi' })
-	expect(app.pending()).toEqual(['hi'])
+	expect(app.pending().map((s) => s.text)).toEqual(['hi'])
 	expect(app.state.text).toBe('')
 	expect(redraws).toBeGreaterThan(0)
 	// Acknowledged, it is no longer pending.

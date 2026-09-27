@@ -7,6 +7,7 @@
 
 import { createMemo, createSignal, flush, onSettled } from 'solid-js'
 import { connection } from '../../common/connection.ts'
+import type { Sending } from '../../common/drafts.ts'
 import { app } from '../app.ts'
 import { editor } from '../editor.ts'
 import { keys, type Target } from '../keys.ts'
@@ -73,7 +74,7 @@ function target(e: Event): Target {
 	return { kind: 'other' }
 }
 
-const same = (a: string[], b: string[]) => a.length === b.length && a.every((s, i) => s === b[i])
+const same = (a: Sending[], b: Sending[]) => a.length === b.length && a.every((s, i) => s.id === b[i]!.id && s.text === b[i]!.text)
 
 export function Chat() {
 	let [state, setState] = createSignal(snap())

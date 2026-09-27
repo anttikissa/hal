@@ -6,7 +6,7 @@
 
 import { createEffect, For, Show } from 'solid-js'
 import { forms, type FormState } from '../../common/forms.ts'
-import type { Item } from '../../common/transcript.ts'
+import type { Shown as Item } from '../../common/transcript.ts'
 import { app } from '../app.ts'
 
 export function Question(props: { item: Item & { type: 'question' }; form: FormState }) {

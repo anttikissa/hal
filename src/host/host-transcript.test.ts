@@ -6,6 +6,7 @@ import { tmpdir } from 'os'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
+import { shown } from './host-fixture.test.ts'
 import { host } from './host.ts'
 import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
@@ -103,7 +104,7 @@ test('completed: every client shows the same finished turn', async () => {
 		await until(() => pushes.length === 2)
 		pushes[1]!({ type: 'text', text: 'done' }, { type: 'usage', usage: { output: 1 } }, { type: 'done', reason: 'end' })
 	})
-	expect(late.items).toEqual([
+	expect(shown(late.items)).toEqual([
 		{ type: 'prompt', text: 'go' },
 		{ type: 'thinking', text: 'hm' },
 		{ type: 'text', text: 'partial' },
@@ -118,7 +119,7 @@ test('completed: every client shows the same finished turn', async () => {
 
 test('paused: partial output and the pause look the same everywhere', async () => {
 	let { early, mid, late } = await turn((_push, send, id) => send({ type: 'pause', sessionId: id }))
-	expect(late.items.slice(-2)).toEqual([
+	expect(shown(late.items.slice(-2))).toEqual([
 		{ type: 'text', text: 'par' },
 		{ type: 'turn-end', status: 'paused' },
 	])
@@ -129,7 +130,7 @@ test('paused: partial output and the pause look the same everywhere', async () =
 
 test('error: the error ends the turn the same way everywhere', async () => {
 	let { early, mid, late } = await turn((push) => push({ type: 'text', text: '!' }, { type: 'error', message: 'HTTP 500' }))
-	expect(late.items.slice(-2)).toEqual([
+	expect(shown(late.items.slice(-2))).toEqual([
 		{ type: 'text', text: 'par!' },
 		{ type: 'turn-end', status: 'error', error: 'HTTP 500' },
 	])

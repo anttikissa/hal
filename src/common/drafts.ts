@@ -77,8 +77,8 @@ function text(id: string): string {
 }
 
 // Prompts shown as pending (sent, not acknowledged).
-function pending(id: string): string[] {
-	return drafts.local(id).sending.map((s) => s.text)
+function pending(id: string): Sending[] {
+	return drafts.local(id).sending.slice()
 }
 
 // The user changed the editor text.

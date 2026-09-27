@@ -4,7 +4,7 @@ import { colors } from '../common/colors.ts'
 import { modals } from '../common/modals.ts'
 import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
-import type { Item, Transcript } from '../common/transcript.ts'
+import type { Shown as Item, Transcript } from '../common/transcript.ts'
 import { frame, type View } from './frame.ts'
 
 // Visible text only: escape sequences removed.
@@ -17,7 +17,7 @@ function strip(s: string): string {
 }
 
 function view(items: Item[], text = '', cursor = text.length): View {
-	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items }
+	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items: items.map((item, i) => ({ ...item, key: `${i}` })) }
 	return { transcript, prompt: { text, cursor } }
 }
 
