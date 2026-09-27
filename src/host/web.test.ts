@@ -329,6 +329,19 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 			`rgb(${oklch.toRgb(colors.assistant().fg!).join(', ')})`,
 		)
 		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('')
+		// Typing redraws the message box, not the transcript: the cards keep
+		// their DOM, so none replays its fade-in.
+		let typed = await b.evaluate(`(async () => {
+			let cards = [...document.querySelectorAll('.Card')], added = 0
+			let seen = new MutationObserver((ms) => { for (let m of ms) for (let n of m.addedNodes) if (n.nodeType === 1 && (n.matches('.Card') || n.querySelector('.Card'))) added++ })
+			seen.observe(document.querySelector('main'), { childList: true, subtree: true })
+			let t = document.querySelector('textarea')
+			for (let c of 'abc') { t.value += c; t.dispatchEvent(new InputEvent('input', { bubbles: true })); await new Promise((r) => setTimeout(r, 10)) }
+			seen.disconnect()
+			t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true }))
+			return { cards: cards.length, kept: cards.every((c) => c.isConnected), added }
+		})()`)
+		expect(typed).toEqual({ cards: 2, kept: true, added: 0 })
 		let key = (k: string, ctrl = false) => b.evaluate(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: '${k}', ctrlKey: ${ctrl}, bubbles: true }))`)
 		// A question is a form the keys fill in: Right picks "no", Enter
 		// answers, and the question shows its answer.

@@ -8,17 +8,22 @@
 // bottom reader at the bottom.
 
 import { createMemo, For, onSettled, Show } from 'solid-js'
-import { transcript } from '../../common/transcript.ts'
+import { transcript, type Item } from '../../common/transcript.ts'
 import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
 import { view, type Row, type ViewState } from '../view.ts'
 import { Card } from './Card.tsx'
 import { Question } from './Question.tsx'
 
+const none: Item[] = []
+
 export function Transcript(props: { view: ViewState; pending: string[] }) {
 	let el!: HTMLElement
 	onSettled(() => scroll.init(el, () => app.older()))
-	let rows = createMemo(() => view.rows(props.view.transcript?.items ?? []))
+	// Rows follow the items alone: redraws that leave them be (typing, the
+	// status) keep every row object, so no card binding runs again.
+	let items = createMemo(() => props.view.transcript?.items ?? none)
+	let rows = createMemo(() => view.rows(items()))
 	let markAt = () => (props.view.resumed ? view.markRow(rows(), props.view.resumed.at) : -1)
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
 	let mark = () => <div class="log mark">{transcript.resumedLabel(props.view.resumed!)}</div>

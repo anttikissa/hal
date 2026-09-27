@@ -32,20 +32,19 @@ export function Card(props: { row: Row; session: string }) {
 			flush()
 		}, 'track')
 	}
-	let plain = (s: { kind: string; text: string }) => {
-		let item = props.row.item
-		let classes = ['Card', ...s.kind.split(' ')]
-		if (item.type !== 'image') return <div class={classes}>{s.text}</div>
-		return (
-			<div class={classes}>
-				<img src={view.blobUrl(props.session, item.blob)} alt={s.text} />
-			</div>
-		)
-	}
+	// Built once per card: the bindings follow a new row object, so the
+	// DOM (and its fade-in) stays when a snapshot or stream replaces it.
+	let plain = (s: () => { kind: string; text: string }) => (
+		<div class={['Card', ...s().kind.split(' ')]}>
+			<Show when={props.row.item.type === 'image' && props.row.item} fallback={s().text}>
+				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
+			</Show>
+		</div>
+	)
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<Show when={folds()} fallback={plain(s())}>
+				<Show when={folds()} fallback={plain(s)}>
 					<article class={['Card', 'folds', ...s().kind.split(' '), open() ? 'open' : '']} onClick={toggle}>
 						<button type="button" class="head" aria-expanded={open() ? 'true' : 'false'}>
 							<span class="mark" aria-hidden="true">

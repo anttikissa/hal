@@ -5,7 +5,7 @@
 // reader at the bottom, and each tab's place: src/web/scroll.ts) and
 // routes page keys to app.key.
 
-import { createSignal, flush, onSettled } from 'solid-js'
+import { createMemo, createSignal, flush, onSettled } from 'solid-js'
 import { connection } from '../../common/connection.ts'
 import { app, type Target } from '../app.ts'
 import { editor } from '../editor.ts'
@@ -69,8 +69,15 @@ function target(e: KeyboardEvent): Target {
 	return { kind: 'other' }
 }
 
+const same = (a: string[], b: string[]) => a.length === b.length && a.every((s, i) => s === b[i])
+
 export function Chat() {
 	let [state, setState] = createSignal(snap())
+	// One memo per field, gated on its value, so a redraw reaches only
+	// what changed: typing touches the composer, never the transcript.
+	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
+	let [tabs, shown, view, text, notice, connected] = [field('tabs'), field('shown'), field('view'), field('text'), field('notice'), field('connected')]
+	let pending = createMemo(() => state().pending, { equals: same })
 	onSettled(() => {
 		app.changed = () => redraw(state(), setState)
 		let onKey = (e: KeyboardEvent) => {
@@ -84,10 +91,10 @@ export function Chat() {
 	})
 	return (
 		<div class="Chat">
-			<Tabs tabs={state().tabs} shown={state().shown} />
-			<Transcript view={state().view} pending={state().pending} />
-			<Composer view={state().view} text={state().text} notice={state().notice} connected={state().connected} />
-			<Picker modal={state().view.modal} />
+			<Tabs tabs={tabs()} shown={shown()} />
+			<Transcript view={view()} pending={pending()} />
+			<Composer view={view()} text={text()} notice={notice()} connected={connected()} />
+			<Picker modal={view().modal} />
 		</div>
 	)
 }
