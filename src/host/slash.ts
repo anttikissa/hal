@@ -73,7 +73,11 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 	if (!reply.ask) return
 	let problem = forms.invalid(reply.ask)
 	if (problem) return slash.output(id, `/${name} asked a bad question: ${problem}`, true)
-	if (states.busy(status.stateOf(id))) return slash.output(id, `/${name} can't ask while the session is busy; try again when it is done`, true)
+	// A session blocked on something other than a question (a login)
+	// waits for a human anyway, so /login claude may ask there.
+	let now = status.stateOf(id)
+	if (states.busy(now) && !(now.type === 'blocked' && now.reason !== 'question'))
+		return slash.output(id, `/${name} can't ask while the session is busy; try again when it is done`, true)
 	let question = crypto.randomUUID().slice(0, 8)
 	let before = status.stateOf(id)
 	let { n } = history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args } })

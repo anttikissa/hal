@@ -227,7 +227,8 @@ function resume(id: string): string | undefined {
 // or answers that don't fit the form.
 function reply(id: string, question: string, answers: Answers): string | undefined {
 	let open = forms.open(history.readSync(id))
-	if (!open || open.id !== question || turns.state.running.has(id)) return 'that question is not open (answered already?)'
+	// A command's question may be open beside a turn blocked on login.
+	if (!open || open.id !== question || (!open.from && turns.state.running.has(id))) return 'that question is not open (answered already?)'
 	let problem = forms.check(open.form, answers)
 	if (problem) return problem
 	let kept = forms.redact(open.form, answers)
