@@ -144,7 +144,7 @@ function leftWork(id: string): boolean {
 	let last = m.turn === undefined ? undefined : pages.lineAt(path, m.turn).record
 	if (last && last.type !== 'turn_end') return true
 	if (last && last.status !== 'completed') return false
-	return Object.values(m.inbox).some((at) => {
+	return Object.values(m.inbox).flat().some((at) => {
 		let r = pages.lineAt(path, at).record
 		return r.type === 'inbox' && r.queue === true
 	})
