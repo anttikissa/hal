@@ -41,6 +41,21 @@ function sourceFiles(): string[] {
 	return files
 }
 
+// Packages only the browser may use: the host path stays dependency-free.
+const webOnly = ['solid-js', '@solidjs/web', '@dom-expressions/compiler']
+
+// Static imports of webOnly packages from a module outside src/web. A
+// dynamic import() is allowed: host/web.ts loads the JSX compiler that
+// way, only when it builds the page.
+function webOnlyImports(file: string): string[] {
+	if (layer(file) === 'web') return []
+	let transpiler = new Bun.Transpiler({ loader: file.endsWith('.tsx') ? 'tsx' : 'ts' })
+	return transpiler
+		.scanImports(readFileSync(file, 'utf8'))
+		.filter((imp) => imp.kind !== 'dynamic-import' && webOnly.some((p) => imp.path === p || imp.path.startsWith(`${p}/`)))
+		.map((imp) => `${file.slice(srcDir.length + 1)} imports ${imp.path}`)
+}
+
 function importsOf(file: string): string[] {
 	let transpiler = new Bun.Transpiler({ loader: file.endsWith('.tsx') ? 'tsx' : 'ts' })
 	let code = readFileSync(file, 'utf8')
@@ -81,6 +96,31 @@ test('source files respect layer boundaries', () => {
 	expect(problems).toEqual([])
 })
 
+test('only src/web imports Solid or the JSX compiler', () => {
+	expect(sourceFiles().flatMap(webOnlyImports)).toEqual([])
+})
+
+// The browser's colours come only from the CSS the host generates from
+// src/common/colors.ts, so no colour literal may sit in src/web.
+function colourLiterals(text: string): string[] {
+	return text.match(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\(/gi) ?? []
+}
+
+test('colour literals are found', () => {
+	expect(colourLiterals('a { color: #fff; background: rgb(1, 2, 3) }')).toHaveLength(2)
+	expect(colourLiterals('x = oklch(0.5 0.1 20)')).toHaveLength(1)
+	expect(colourLiterals('color: var(--accent); <a href="#top">')).toEqual([])
+})
+
+test('src/web has no colour literals', () => {
+	let found: string[] = []
+	for (let rel of new Glob('web/**/*.{ts,tsx,html,css}').scanSync(srcDir)) {
+		if (/\.test\.tsx?$/.test(rel)) continue
+		for (let c of colourLiterals(readFileSync(`${srcDir}/${rel}`, 'utf8'))) found.push(`${rel}: ${c}`)
+	}
+	expect(found).toEqual([])
+})
+
 test('src has only common, host, client and web directories', () => {
 	let dirs = new Set<string>()
 	for (let file of sourceFiles()) {
@@ -92,15 +132,20 @@ test('src has only common, host, client and web directories', () => {
 
 // Importing every module, including main.ts, must not print, register
 // signal handlers, or leave timers/watchers that keep the process alive.
+// .tsx files load through host/web.ts's Solid plugin under the browser
+// condition, as the page bundle does (Solid's server build refuses DOM
+// templates).
 test('importing every module has no side effects', () => {
 	let imports = sourceFiles().map((f) => `await import(${JSON.stringify(f)})`)
 	let script = [
+		`let { web } = await import(${JSON.stringify(`${srcDir}/host/web.ts`)})`,
+		`Bun.plugin(await web.plugin())`,
 		...imports,
 		`let signals = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGTSTP', 'SIGCONT', 'SIGWINCH']`,
 		`let n = signals.reduce((sum, s) => sum + process.listenerCount(s), 0)`,
 		`process.stderr.write('signal-listeners=' + n)`,
 	].join('\n')
-	let out = Bun.spawnSync(['bun', '-e', script], { timeout: 5000 })
+	let out = Bun.spawnSync(['bun', '--conditions', 'browser', '-e', script], { timeout: 5000 })
 	expect(out.stdout.toString()).toBe('')
 	expect(out.stderr.toString()).toBe('signal-listeners=0')
 	expect(out.exitCode).toBe(0)
@@ -111,7 +156,6 @@ test('importing every module has no side effects', () => {
 const maxLines = 400
 const sizeExceptions: Record<string, string> = {
 	'common/ason.ts': 'one cohesive format: parser and stringifier belong together',
-	'web/page.ts': 'split planned in task 1b',
 }
 
 // Line count as wc -l reports it: the number of newlines.

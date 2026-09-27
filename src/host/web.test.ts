@@ -6,6 +6,7 @@ import { colors } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
+import { diag } from './diag.ts'
 import { host } from './host.ts'
 import { turns } from './turns.ts'
 import { paths } from './paths.ts'
@@ -95,6 +96,23 @@ test('the page carries the theme as CSS, following overrides, without its code',
 		expect(after).toContain(oklch.toHex([0.95, colors.fgC, 55]))
 	} finally {
 		colors.fgL = saved
+	}
+})
+
+test('a missing JSX compiler fails the page with 500 and a diag line, not the host', async () => {
+	let orig = web.compiler
+	web.compiler = () => Promise.reject(new Error('Cannot find package @dom-expressions/compiler'))
+	try {
+		await server.serve()
+		let res = await fetch(`${base()}/`)
+		expect(res.status).toBe(500)
+		expect(readFileSync(diag.file(), 'utf8')).toContain('@dom-expressions/compiler')
+		// The host still answers, and a later request retries the build.
+		expect((await login('hello123')).ok).toBe(true)
+		web.compiler = orig
+		expect((await fetch(`${base()}/`)).status).toBe(200)
+	} finally {
+		web.compiler = orig
 	}
 })
 
@@ -273,6 +291,27 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 			`rgb(${oklch.toRgb(colors.assistant().fg!).join(', ')})`,
 		)
 		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('')
+		let key = (k: string, ctrl = false) => b.evaluate(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: '${k}', ctrlKey: ${ctrl}, bubbles: true }))`)
+		// A question is a form the keys fill in: Right picks "no", Enter
+		// answers, and the question shows its answer.
+		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/cd ${home}/nope'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
+		await b.waitFor(`document.activeElement?.getAttribute('aria-pressed') === 'true'`)
+		expect(await b.evaluate(`document.querySelector('textarea').disabled`)).toBe(true)
+		await key('ArrowRight')
+		await b.waitFor(`document.querySelector('[aria-pressed=true]')?.textContent === 'no'`)
+		await key('Enter')
+		await b.waitFor(`!document.querySelector('form') && document.querySelector('main').innerText.includes('Create it?\\n  no')`)
+		await b.waitFor(`document.activeElement === document.querySelector('textarea')`)
+		// Ctrl-M opens the model picker, which takes the keys; Escape
+		// closes it and gives the message box the focus back.
+		await key('m', true)
+		await b.waitFor(`document.querySelector('dialog').open && document.querySelectorAll('dialog li').length > 0`)
+		await key('Escape')
+		await b.waitFor(`!document.querySelector('dialog').open && document.activeElement === document.querySelector('textarea')`)
+		// What is typed is the draft: it survives a reload.
+		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'half a thought'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+		await b.call('Page.reload', {})
+		await b.waitFor(`document.querySelector('textarea')?.value === 'half a thought'`)
 	} finally {
 		host.cwd = origCwd
 		await b.close()

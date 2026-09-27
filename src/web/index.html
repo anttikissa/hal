@@ -1,38 +1,41 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="page">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hal</title>
 <style>
-:root { color-scheme: dark; --bg: #16181c; --fg: #d8dade; --accent: #8ab4f8; }
+/* The one stylesheet: layout only. Colours come from the theme below
+   (src/common/colors.ts; .page carries the page's own as variables). */
+:root { color-scheme: dark; }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); }
+html { background: var(--canvas); color: var(--text); }
+html, body { margin: 0; height: 100%; }
 body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-body { display: flex; flex-direction: column; }
-main { flex: 1; overflow-y: auto; padding: 1rem; }
-main > div { max-width: 60rem; margin: 0 auto 0.9rem; padding: 0.2rem 0.6rem; border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
-main > .user::before { content: "> "; }
-main > .pending { opacity: 0.6; }
-main > .pending::after { content: "\A sending…"; font-size: 0.85em; }
-footer { padding: 0.5rem 1rem 1rem; }
-footer > * { display: block; max-width: 60rem; margin: 0 auto; }
-#notice { min-height: 1.5em; }
-textarea, input { width: 100%; background: #1f2227; color: var(--fg); border: 1px solid #33373e; border-radius: 6px; padding: 0.5rem 0.6rem; resize: none; outline: none; }
+.App, .Chat { height: 100%; display: flex; flex-direction: column; }
+.Transcript { flex: 1; overflow-y: auto; padding: 1rem; }
+.Transcript > div { max-width: 60rem; margin: 0 auto 0.9rem; padding: 0.2rem 0.6rem; border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.Transcript > .user::before { content: "> "; }
+.Transcript > .pending { opacity: 0.6; }
+.Transcript > .pending::after { content: "\A sending…"; font-size: 0.85em; }
+.Composer { padding: 0.5rem 1rem 1rem; }
+.Composer > * { display: block; max-width: 60rem; margin: 0 auto; }
+.Composer > #notice { min-height: 1.5em; }
+textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem; resize: none; outline: none; }
 textarea:focus, input:focus { border-color: var(--accent); }
 .input { caret-color: var(--cursor); }
-form { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
-main > form.question { max-width: 60rem; margin: 0 auto 0.9rem; padding: 0.4rem 0.6rem; border-radius: 4px; gap: 0.4rem; }
-form.question button { padding: 0.2rem 0.8rem; }
-form.question pre.quote { margin: 0 0 0 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-form.question mark { background: currentColor; color: var(--bg); }
-button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
-button { background: #2b3a55; color: var(--fg); border: 0; border-radius: 6px; padding: 0.5rem; cursor: pointer; }
-dialog { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--bg); color: var(--fg); border: 1px solid #33373e; border-radius: 6px; padding: 0.6rem; }
-dialog[open] { display: flex; flex-direction: column; gap: 0.4rem; }
-dialog ul { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
-dialog li { padding: 0 0.4rem; cursor: pointer; }
-dialog li[aria-selected="true"] { background: #2b3a55; }
+button { background: var(--button); color: var(--text); border: 0; border-radius: 6px; padding: 0.5rem; cursor: pointer; }
+button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
+.Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
+.Question { max-width: 60rem; margin: 0 auto 0.9rem; padding: 0.4rem 0.6rem; border-radius: 4px; display: flex; flex-direction: column; gap: 0.4rem; }
+.Question button { padding: 0.2rem 0.8rem; }
+.Question pre.quote { margin: 0 0 0 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.Question mark { background: currentColor; color: var(--canvas); }
+.Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--canvas); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem; }
+.Picker[open] { display: flex; flex-direction: column; gap: 0.4rem; }
+.Picker ul { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.Picker li { padding: 0 0.4rem; cursor: pointer; }
+.Picker li[aria-selected="true"] { background: var(--button); }
 /* The theme (src/common/colors.ts), put here by the host. */
 /*COLORS*/
 </style>

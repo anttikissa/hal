@@ -1,7 +1,7 @@
 // The browser client's state, without the DOM: the transcript folded
 // from host events (the same transcript.fold the terminal uses), a
-// passing notice, and what each item looks like as text. page.ts feeds
-// it the events from link.ts and draws it.
+// passing notice, and what each item looks like as text. app.ts feeds
+// it the events from link.ts; the components draw it.
 
 import { amend, type Editing } from '../common/amend.ts'
 import { completion } from '../common/completion.ts'
@@ -153,6 +153,12 @@ function waiting(st: ViewState): { text: string; label: string }[] {
 	return t ? t.inbox.map((m) => ({ text: m.text, label: inbox.label(t.state, m) })) : []
 }
 
+// Whether a scroller is at (within a few lines of) its bottom, so new
+// content should keep it there.
+function atBottom(el: { scrollHeight: number; scrollTop: number; clientHeight: number }): boolean {
+	return el.scrollHeight - el.scrollTop - el.clientHeight < 40
+}
+
 function oneLine(s: string): string {
 	return s.replace(/\s+/g, ' ').trim()
 }
@@ -212,5 +218,6 @@ export const view = {
 	pause,
 	status,
 	inbox: waiting,
+	atBottom,
 	show,
 }

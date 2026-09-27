@@ -3,7 +3,10 @@
 // stops it). For a trusted test deployment only: one shared password,
 // compared as plain text, is also the cookie value.
 //
-//   GET  /         the browser client (src/web/, bundled by web.page())
+//   GET  /         the browser client (src/web/, a SolidJS app bundled
+//                  by web.page() with the JSX compiler, which is loaded
+//                  only then: a host that never serves the page never
+//                  loads it)
 //   POST /login    form field `password`; sets the cookie or answers 401
 //   GET  /login    204 if the cookie is good, else 401
 //   GET  /ws       WebSocket, one host.adapt() connection (cookie):
@@ -11,7 +14,7 @@
 //                  ASON message, like a socket client's lines. The page
 //                  picks its session with the open-newest command.
 
-import type { Server, ServerWebSocket } from 'bun'
+import type { BunPlugin, Server, ServerWebSocket } from 'bun'
 import { colors, type Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import { settings } from '../common/settings.ts'
@@ -28,12 +31,32 @@ function authorized(req: Request): boolean {
 	return new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName) === web.password()
 }
 
-// The browser client (src/web/): index.html with page.ts bundled into
-// it, built on first request and kept for the life of the server.
+// The JSX compiler, loaded on first use: nothing else on the host
+// path needs it. Missing or broken, it fails the page, not the host.
+const compiler = (): Promise<{ transform(source: string, opts: object): { code: string } }> => import('@dom-expressions/compiler')
+
+// A Bun plugin compiling .tsx into Solid's DOM calls.
+async function plugin(): Promise<BunPlugin> {
+	let { transform } = await web.compiler()
+	return {
+		name: 'solid',
+		setup(build) {
+			build.onLoad({ filter: /\.tsx$/ }, async (args) => ({
+				contents: transform(await Bun.file(args.path).text(), { filename: args.path, moduleName: '@solidjs/web', generate: 'dom' }).code,
+				loader: 'ts',
+			}))
+		},
+	}
+}
+
+// The browser client (src/web/): index.html with main.tsx bundled into
+// it, built on first request and kept for the life of the server. The
+// format is iife: esm output breaks an inline classic script.
 async function build(): Promise<string> {
 	let dir = `${import.meta.dir}/../web`
-	let out = await Bun.build({ entrypoints: [`${dir}/page.ts`], target: 'browser', format: 'iife', minify: true })
-	if (!out.success) throw new AggregateError(out.logs, 'web: bundling src/web/page.ts failed')
+	let plugins = [await web.plugin()]
+	let out = await Bun.build({ entrypoints: [`${dir}/main.tsx`], target: 'browser', format: 'iife', minify: true, plugins })
+	if (!out.success) throw new AggregateError(out.logs, 'web: bundling src/web/main.tsx failed')
 	let js = (await out.outputs[0]!.text()).replaceAll('</script', '<\\/script')
 	return (await Bun.file(`${dir}/index.html`).text()).replace('/*APP*/', () => js)
 }
@@ -132,6 +155,8 @@ export const web = {
 	password: (): string => settings.webPassword(),
 	authorized,
 	css,
+	compiler,
+	plugin,
 	build,
 	page,
 	login,

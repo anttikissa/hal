@@ -197,3 +197,11 @@ test('Ctrl-M opens the model picker from the host list; typing filters, Enter sw
 	// Another session's list opens nothing.
 	expect(view.onEvent(r.state, { type: 'models', sessionId: 'x', current: 'a/b', items }).modal).toBeUndefined()
 })
+
+test('the transcript sticks to the bottom only when scrolled to (near) it', () => {
+	expect(view.atBottom({ scrollHeight: 1000, scrollTop: 600, clientHeight: 400 })).toBe(true)
+	expect(view.atBottom({ scrollHeight: 1000, scrollTop: 570, clientHeight: 400 })).toBe(true)
+	expect(view.atBottom({ scrollHeight: 1000, scrollTop: 300, clientHeight: 400 })).toBe(false)
+	// Content shorter than the viewport.
+	expect(view.atBottom({ scrollHeight: 200, scrollTop: 0, clientHeight: 400 })).toBe(true)
+})

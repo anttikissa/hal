@@ -70,6 +70,17 @@ export const colors = {
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
 	// Edit diffs: green additions, removals in the error hue.
 	diff: (): Style => ({ addFg: colors.tab().doneFg!, removeFg: colors.error().fg! }),
+	// The web page's own surfaces (custom properties on .page): canvas
+	// and text, the focus accent, form fields, borders, and buttons (the
+	// picker's selected item too). The terminal has its own.
+	page: (): Style => ({
+		canvas: [0.2, 0.008, 260],
+		text: [0.89, 0.006, 260],
+		accent: [0.77, 0.1, 260],
+		field: [0.235, 0.009, 260],
+		border: [0.33, 0.012, 260],
+		button: [0.35, 0.05, 262],
+	}),
 	// Tools: each kind its own hue. Red is kept for real failures. A
 	// tool without its own entry (tool + capitalised name) uses `tool`.
 	tool: (): Style => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),

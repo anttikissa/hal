@@ -12,6 +12,8 @@
     "strict": true,
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
-    "types": ["bun"]
+    "types": ["bun"],
+    "jsx": "preserve",
+    "jsxImportSource": "@solidjs/web"
   }
 }

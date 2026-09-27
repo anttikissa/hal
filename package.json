@@ -6,5 +6,13 @@
     "@types/bun": "latest",
     "oxlint": "^1.61.0",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@dom-expressions/compiler": "0.50.0-next.44",
+    "@solidjs/web": "2.0.0-rc.8",
+    "solid-js": "2.0.0-rc.8"
+  },
+  "overrides": {
+    "@solidjs/signals": "2.0.0-rc.8"
   }
 }

@@ -57,10 +57,19 @@ owns it; later tasks point to it.
   No disk, sockets or process globals; imports only common.
 - `src/host/` — sessions, providers, disk. Imports host and common.
 - `src/client/` — terminal. Imports client and common.
-- `src/web/` — browser client (plain DOM, no framework). Imports web
-  and common only; host/web.ts bundles `page.ts` into `index.html`
-  with Bun.build on first request. DOM-free logic (view.ts, link.ts)
-  is unit-tested; page.ts runs its `init()` only when `document` exists.
+- `src/web/` — browser client, a SolidJS 2 app (task 1b). Imports web
+  and common only; host/web.ts bundles `main.tsx` into `index.html`
+  with Bun.build on first request, compiling .tsx with the JSX
+  compiler it imports dynamically then. Solid and the compiler are
+  browser-only: no host, client or common module imports them
+  statically. Components are .tsx files in `src/web/components/`, one
+  exported component each, whose root element has a class named after
+  it (`<form class="Question">`). Decisions (keys, view state,
+  reconnect, scroll maths) stay in plain .ts modules (app.ts, view.ts,
+  link.ts), unit-tested without a browser or Solid; main.tsx renders
+  only when `document` exists. Colours come only from the CSS the host
+  generates from src/common/colors.ts (none written in src/web); layout
+  CSS lives in the one stylesheet in index.html.
 - `src/main.ts` — the composition root and the only file that wires
   host and client together. Tests sit next to code as `*.test.ts`.
 - `src/conventions.test.ts` enforces the import rules and that

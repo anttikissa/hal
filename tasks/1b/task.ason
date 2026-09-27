@@ -7,13 +7,9 @@ Why a dependency: the page is about to grow (tabs, collapsible cards, animations
 The host path stays dependency-free. No module in host, client or common imports solid-js, @solidjs/web or the JSX compiler; the conventions test checks that for every non-web layer. host/web.ts bundles the page with Bun.build and compiles .tsx with @dom-expressions/compiler through a Bun plugin (artifact solid-build-excerpt.ts), imported dynamically on the first GET /, so a host that never serves the page never loads it; a missing or broken compiler answers that request with 500 and a diag.log line and never harms the host.
 
 Conventions (update the web section of tasks/README.md): components are .tsx files in src/web/components/, one exported component each, whose root element has a class named after it; decisions (key mapping, view state, reconnect, scroll maths) stay in plain .ts modules unit-tested without a browser; src/web imports only web and common. The browser gets its colours only from the CSS the host generates from src/common/colors.ts (task 1w): no colour literals in src/web or index.html (add fields to colors.ts for what is missing); layout CSS lives in one stylesheet. The conventions test covers .tsx files (layers, side-effect-free import, the 400-line limit); take src/web/page.ts off the size exception list. The CDP end-to-end check in host/web.test.ts still logs in and sees a streamed answer.`,
-	status: 'planned',
-	needs: [
-		'0j'
-	],
-	foldInto: [
-		'dz'
-	],
+	status: 'done',
+	needs: ['0j'],
+	foldInto: ['dz'],
 	notes: [
 		'This reverses dz\'s "plain DOM, no framework" choice (and the README line saying so) on purpose; dz\'s other rules stand.',
 		"Read old-web.md (the previous Hal's Solid 2 guide) before writing a component. Solid 2 is not Solid 1: createEffect takes (compute, apply); onSettled replaces onMount; no createResource or batch (writes are microtask-batched, flush() at imperative boundaries); class arrays, not classList; <For keyed={false}> gives an item accessor and index; writing a signal inside a component body or memo throws REACTIVE_WRITE_IN_OWNED_SCOPE.",
@@ -21,6 +17,11 @@ Conventions (update the web section of tasks/README.md): components are .tsx fil
 		"The old Hal pinned solid-js and @solidjs/web 2.0.0-rc.0 with @dom-expressions/compiler 0.50.0-next.40, compiled with transform(source, { filename, moduleName: '@solidjs/web', generate: 'dom' }). Newer 2.0 prereleases may exist; pin a pair that works together, exact versions, and update them together.",
 		'tsconfig needs jsx: preserve and jsxImportSource: @solidjs/web. Keep DOM types out of host code: page.ts used /// <reference lib="dom" />; a per-file reference or a src/web tsconfig both work.',
 		"Keep dz's notes: format iife (esm output breaks an inline classic script), the /*APP*/ and /*COLORS*/ substitution into index.html, and the bundle cached until server.stop().",
-		"old-main.tsx is the old Hal's app shell, for reference only: its protocol and state differ from hal2's. The previous page's behaviour (view.ts, link.ts and their tests) is the spec."
+		"old-main.tsx is the old Hal's app shell, for reference only: its protocol and state differ from hal2's. The previous page's behaviour (view.ts, link.ts and their tests) is the spec.",
+		'Pinned: solid-js and @solidjs/web 2.0.0-rc.8, @solidjs/signals 2.0.0-rc.8 (package.json overrides), @dom-expressions/compiler 0.50.0-next.44, the newest compiler. rc.9 renamed the delegated-event key from $$ to _$$ while the compiler still emits $$, so onInput/onClick silently never fire; signals rc.10 under solid-js rc.8 blanked the page. Check a delegated event in the browser after any upgrade.',
+		"Bun imports .tsx with its own React-style JSX (jsxDEV), and Solid's server build throws on DOM templates, so the conventions side-effect test loads every module with `bun --conditions browser` after Bun.plugin(await web.plugin()).",
+		'app.ts is the controller: plain state changed synchronously, then app.changed() (Chat.tsx sets it to a signal write). Page keys go through one document keydown listener to app.key with a Target (message box text and caret, field, button); it flush()es afterwards so the DOM shows the outcome before the next event.',
+		'The page\'s own surfaces (canvas, text, accent, field, border, button) are the colors.page style, custom properties on <html class="page">.',
+		'The CDP test in host/web.test.ts also answers a question (/cd to a missing directory), opens and closes the picker, and checks a typed draft survives a reload: that last check is what catches dead delegated events.'
 	]
 }
