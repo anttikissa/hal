@@ -11,6 +11,6 @@
 		'Escape on a command question (the pause command) records a cancelled answer instead of pausing; the command does not re-run.',
 		"Completion: `complete` { sessionId, text } -> `completions` { text, items } with full replacement texts ('/cd ', '/cd ~/projects/'). common/completion.ts applies them (one replaces, several extend to their common prefix and list last parts as a notice); clients drop an answer if the prompt changed since. Terminal and web complete only with the cursor at the end.",
 		"Provenance: submit has optional `from` (sender session id), recorded on command records and shown as '(sent from <id>)'; prompts don't carry it yet. Nothing checks `from`: a later task that lets sessions send to each other must set it host-side, not trust the client.",
-		"Transcript: command/output events during a live turn are inserted before the live output (live.start shifts). A snapshot taken mid-round puts them after the round's already-finished blocks instead, so fold and snapshot can differ in order for that rare case."
+		"Transcript: where command/output events go beside a live turn is decided by task rk (after the round's written blocks, before the one still streaming); fold and snapshot agree."
 	]
 }

@@ -23,7 +23,7 @@ function command(id: string, text: string, call: { name: string; args: string },
 	if (from !== undefined) record.from = from
 	if (command !== undefined) record.command = command
 	let { n } = history.append(id, record)
-	host.broadcast(id, from === undefined ? { type: 'command', sessionId: id, text, n } : { type: 'command', sessionId: id, text, from, n })
+	host.broadcast(id, { type: 'command', sessionId: id, text, ...(from !== undefined && { from }), n, ...(command !== undefined && { command }), ...slash.placed(id) })
 	void slash.runCommand(id, call.name, call.args)
 }
 
@@ -89,7 +89,14 @@ async function models(id: string): Promise<Event & { type: 'models' }> {
 
 function output(id: string, text: string, error = false): void {
 	let { n } = history.append(id, error ? { type: 'output', text, error } : { type: 'output', text })
-	host.broadcast(id, error ? { type: 'output', sessionId: id, text, error, n } : { type: 'output', sessionId: id, text, n })
+	host.broadcast(id, error ? { type: 'output', sessionId: id, text, error, n, ...slash.placed(id) } : { type: 'output', sessionId: id, text, n, ...slash.placed(id) })
+}
+
+// Where a command's record landed beside a running turn: before the
+// block still streaming, if any (it is written when done), so clients
+// fold it where history has it (task rk).
+function placed(id: string): { streaming?: true } {
+	return history.live(id)?.blocks.length ? { streaming: true } : {}
 }
 
 export const slash = {
@@ -99,4 +106,5 @@ export const slash = {
 	runCommand,
 	models,
 	output,
+	placed,
 }

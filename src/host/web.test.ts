@@ -499,3 +499,55 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 		await b.close()
 	}
 }, 20000)
+
+test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to where it ran: same card, no fade again', async () => {
+	let id = tabs.create('/tmp')
+	let release = () => {}
+	let gate = new Promise<void>((r) => (release = r))
+	turns.stream = () =>
+		(async function* (): AsyncGenerator<StreamEvent> {
+			yield { type: 'text', text: 'streaming now' }
+			await gate
+			yield { type: 'done', reason: 'end' }
+		})()
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Network.setCookie', { name: 'hal', value: 'hello123', url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		// Commands naming /help wait in the page until let go, so the
+		// pending card is shown (and done fading in) before it lands.
+		await b.evaluate(`(() => {
+			let send = WebSocket.prototype.send, held = []
+			window.letGo = () => held.splice(0).forEach((f) => f())
+			WebSocket.prototype.send = function (data) { String(data).includes('/help') ? held.push(() => send.call(this, data)) : send.call(this, data) }
+		})()`)
+		let enter = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '${text}'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
+		// Enter is refused with a notice until the session is open.
+		await b.waitFor(`(() => { let t = document.querySelector('textarea'); if (!t) return false; t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`)
+		await b.waitFor(`document.querySelector('main').innerText.includes('streaming now')`)
+		await enter('/help')
+		await b.waitFor(`(() => { let c = document.querySelector('.Card.pending'); return c && c.textContent === '/help' && !c.getAnimations().length })()`)
+		let moved = await b.evaluate(`(async () => {
+			let card = document.querySelector('.Card.pending'), reply = document.querySelector('.Card.assistant')
+			let before = !!(reply.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING)
+			window.letGo()
+			for (let i = 0; i < 250 && (card.classList.contains('pending') || !document.querySelector('.Card.output')); i++) await new Promise((r) => setTimeout(r, 10))
+			let output = document.querySelector('.Card.output')
+			return {
+				wasAfter: before,
+				same: card.isConnected && !card.classList.contains('pending'),
+				nowBefore: !!(card.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING),
+				fading: [card, reply].some((c) => c.getAnimations().length > 0),
+				// The output is new: it fades in.
+				fresh: !!output && output.getAnimations().length > 0,
+				copies: [...document.querySelectorAll('.Card.user')].filter((c) => c.textContent === '/help').length,
+			}
+		})()`)
+		expect(moved).toEqual({ wasAfter: true, same: true, nowBefore: true, fading: false, fresh: true, copies: 1 })
+		release()
+	} finally {
+		await b.close()
+	}
+}, 20000)

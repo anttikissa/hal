@@ -1,7 +1,14 @@
 {
 	title: 'Transcript order is the order things happened',
 	description: "Prompts, steering messages and slash commands appear in the transcript in the order the host carried them out, on every client, live and after a reload alike: a live fold and a later snapshot never disagree. Order can matter: '/cd ..' typed between two messages saying 'touch x.txt' and 'touch y.txt' must show where it took effect. A client shows what the user sent at once where it was typed (optimistic, pending) and, when the host says where it really landed, moves it there silently: no flash, no remount (web rules in tasks/README.md). Test: a command sent mid-round appears in the same position in the fold as in a snapshot taken after the round.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Order rule: history's file order. A streamed block takes its number when it starts but is written when the next block starts or the round ends, so a command run mid-stream is written (and shown) after the round's finished blocks and before the block still streaming; the streaming text keeps growing above the command. Ordering by `n` instead was rejected: pages and snapshots are read in file order.",
+		"The host tells clients where: command and output events carry `streaming: true` when history.live(id) still holds an unwritten block (slash.placed). transcript.fold then settles every live block but that last one, inserts the item and restarts live from it, exactly the shape a snapshot taken then has (its turn holds only unwritten blocks). Without the flag every live block settles first (the round finished streaming; its tools may be running). The client cannot tell alone: the host never broadcasts the round's done event.",
+		'Optimistic moves: the command event carries `command` (the submit id); web view.onEvent maps its key to that id in ViewState.sent, like turn-start/prompt, so the pending card moves by key. Steering prompts are unchanged: acked into the inbox (shown in the composer), they leave the transcript and come back as a new card when delivered.',
+		"Moving a DOM node restarts CSS animations (Chrome), which replayed the Card fade-in as a flash. The fade is now a Web Animation (Card.tsx enter(), reading --fade-ms/--ease-out from :root), started in onSettled: element.animate on a node Solid cloned from a template does nothing, since it belongs to the template's inert document. index.html no longer has the enter keyframes.",
+		"Tests: host-transcript.test.ts runs commands mid-stream and after the round's last block and compares an early, a mid-round and a late client; web.test.ts holds a /help submit in the page (patched WebSocket.send) until its pending card finished fading, then checks the card moved above the streaming reply, is the same node and has no running animation."
+	],
 	needs: ['et'],
 	foldInto: ['et', '6']
 }

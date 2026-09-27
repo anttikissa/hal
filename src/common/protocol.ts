@@ -175,9 +175,14 @@ export type Event =
 	// `cancelled`: Escape dismissed a command's question.
 	| { type: 'answer'; sessionId: string; question: string; answers: Answers; secrets?: string[]; cancelled?: true }
 	// A slash command is in history (`from`: as in submit) and runs.
-	| { type: 'command'; sessionId: string; text: string; from?: string; n?: number }
+	// `command`: the client's id for the submit, as in turn-start.
+	// `streaming`: the running round's last block was still streaming
+	// (not in history yet), so this goes before it; else after all the
+	// round's blocks (task rk).
+	| { type: 'command'; sessionId: string; text: string; from?: string; n?: number; command?: string; streaming?: true }
 	// What a command said, now in history; `error` if it failed.
-	| { type: 'output'; sessionId: string; text: string; error?: true; n?: number }
+	// `streaming`: as in command.
+	| { type: 'output'; sessionId: string; text: string; error?: true; n?: number; streaming?: true }
 	// The session's metadata changed (a /cd).
 	| { type: 'meta'; sessionId: string; meta: SessionMeta }
 	// Sent only to the client that asked: every full text `text` may

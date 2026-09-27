@@ -246,34 +246,47 @@ test('an edited prompt takes the place of the prompt it replaces and its turn, l
 	expect(late2).toEqual(t2)
 })
 
-test('a command and its output during a running turn show before the output streaming now, and stay there', () => {
+test('a command during a running turn goes where history has it: after finished blocks, before the one streaming', () => {
 	let t = fold([
 		snap({ history: [] }),
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1 },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'wor' }, n: 2 },
-		{ type: 'command', sessionId, text: '/cd x', from: '2-xyz', n: 3 },
-		{ type: 'output', sessionId, text: 'no such directory', error: true, n: 4 },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'king' }, n: 2 },
+		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' }, n: 2 },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'wor' }, n: 3 },
+		{ type: 'command', sessionId, text: '/cd x', from: '2-xyz', n: 4, streaming: true },
+		{ type: 'output', sessionId, text: 'no such directory', error: true, n: 5, streaming: true },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'king' }, n: 3 },
+		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'c', name: 'ls', input: {} }, n: 6 },
+		// The round is done: every block is in history before this one.
+		{ type: 'command', sessionId, text: '/help', n: 7 },
 		{ type: 'meta', sessionId, meta: { ...meta, cwd: '/x' } },
-		{ type: 'turn-end', sessionId, status: 'completed', n: 5 },
+		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'c', output: 'ok' }], n: 8 },
+		{ type: 'turn-end', sessionId, status: 'completed', n: 9 },
 	])!
 	// The streaming block keeps the number it started with, written
 	// after the command numbered past it.
 	expect(t.items).toEqual([
 		{ type: 'prompt', text: 'go', key: '1' },
-		{ type: 'command', text: '/cd x', from: '2-xyz', key: '3' },
-		{ type: 'output', text: 'no such directory', error: true, key: '4' },
-		{ type: 'text', text: 'working', key: '2' },
-		{ type: 'turn-end', status: 'completed', key: '5' },
+		{ type: 'thinking', text: 'hm', key: '2' },
+		{ type: 'command', text: '/cd x', from: '2-xyz', key: '4' },
+		{ type: 'output', text: 'no such directory', error: true, key: '5' },
+		{ type: 'text', text: 'working', key: '3' },
+		{ type: 'tool', id: 'c', name: 'ls', input: {}, key: '6' },
+		{ type: 'command', text: '/help', key: '7' },
+		{ type: 'tool-result', id: 'c', output: 'ok', key: '8' },
+		{ type: 'turn-end', status: 'completed', key: '9' },
 	])
 	let late = fold([
 		snap({
 			history: [
 				prompt('go', 1),
-				{ type: 'command', text: '/cd x', from: '2-xyz', ts, n: 3 },
-				{ type: 'output', text: 'no such directory', error: true, ts, n: 4 },
-				said({ type: 'text', text: 'working' }, 2),
-				{ type: 'turn_end', status: 'completed', usage: {}, ts, n: 5 },
+				said({ type: 'thinking', text: 'hm' }, 2),
+				{ type: 'command', text: '/cd x', from: '2-xyz', ts, n: 4 },
+				{ type: 'output', text: 'no such directory', error: true, ts, n: 5 },
+				said({ type: 'text', text: 'working' }, 3),
+				said({ type: 'tool_call', id: 'c', name: 'ls', input: {} }, 6),
+				{ type: 'command', text: '/help', ts, n: 7 },
+				{ type: 'user', blocks: [{ type: 'tool_result', id: 'c', output: 'ok' }], ts, n: 8 },
+				{ type: 'turn_end', status: 'completed', usage: {}, ts, n: 9 },
 			],
 		}),
 	])!

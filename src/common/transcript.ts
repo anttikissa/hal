@@ -228,11 +228,16 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'meta') return { ...t, meta: { ...event.meta } }
 	if (event.type === 'completions' || event.type === 'history') return t
 	if (event.type === 'command' || event.type === 'output') {
-		// Beside a running turn: before its live output, which is redrawn.
-		let at = t.live?.start ?? t.items.length
-		let [item] = transcript.keyed([transcript.aside(event)], event.n, at)
-		if (!t.live) return { ...t, items: [...t.items, item!] }
-		return { ...t, items: [...t.items.slice(0, at), item!, ...t.items.slice(at)], live: { start: at + 1, turn: t.live.turn } }
+		// Where history has it: after the running round's blocks already
+		// written, before the one still streaming (`streaming`), which
+		// stays live; as a snapshot taken now or later shows it.
+		if (!t.live) return { ...t, items: [...t.items, ...transcript.keyed([transcript.aside(event)], event.n, t.items.length)] }
+		let { blocks: list, ns } = t.live.turn
+		let keep = event.streaming ? Math.max(0, list.length - 1) : list.length
+		let done = transcript.settle(t.items, { start: t.live.start, turn: { ...t.live.turn, blocks: list.slice(0, keep) } })
+		let items = [...done, ...transcript.keyed([transcript.aside(event)], event.n, done.length)]
+		let turn = transcript.copyTurn({ ...t.live.turn, blocks: list.slice(keep), ...(ns ? { ns: ns.slice(keep) } : {}) })
+		return { ...t, items: [...items, ...transcript.blockItems(turn.blocks, turn.ns, items.length)], live: { start: items.length, turn } }
 	}
 	if (event.type === 'turn-start') {
 		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }

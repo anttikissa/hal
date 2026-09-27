@@ -19,8 +19,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 /* The one scroller: nothing inside it scrolls; long lines wrap. */
 .Transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem; }
 .Transcript > * { max-width: 60rem; margin: 0 auto 0.6rem; }
-.Card { padding: 0.4rem 0.7rem; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); white-space: pre-wrap; overflow-wrap: anywhere; animation: enter var(--fade-ms) var(--ease-out); }
-@keyframes enter { from { opacity: 0; } }
+.Card { padding: 0.4rem 0.7rem; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); white-space: pre-wrap; overflow-wrap: anywhere; }
 .Card.user::before { content: "> "; }
 .Card.image::before { content: none; }
 .Card.image img { display: block; max-width: 100%; max-height: 24rem; }

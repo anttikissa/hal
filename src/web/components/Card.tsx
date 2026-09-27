@@ -10,15 +10,32 @@
 // kept by its session and row key (task w5), not by its DOM, so no other
 // item's card ever shows open in its place.
 
-import { createSignal, flush, Show } from 'solid-js'
+import { createSignal, flush, onSettled, Show } from 'solid-js'
 import { scroll } from '../scroll.ts'
 import { view, type Row } from '../view.ts'
 
 const [opened, setOpened] = createSignal<ReadonlySet<string>>(new Set())
 
+// A new card fades in (--fade-ms, --ease-out from the page's CSS). A
+// script animation, not a CSS one: moving the card in the list, as when
+// a pending command lands where it ran (task rk), would restart a CSS
+// animation, which reads as the card appearing again. Started once the
+// card is in the page: a node cloned from a template belongs to an inert
+// document, whose animations never run.
+let fade: KeyframeAnimationOptions | undefined
+function enter(el: HTMLElement): void {
+	if (!fade) {
+		let css = getComputedStyle(document.documentElement)
+		fade = { duration: parseFloat(css.getPropertyValue('--fade-ms')) || 0, easing: css.getPropertyValue('--ease-out').trim() || 'ease-out' }
+	}
+	el.animate({ opacity: [0, 1] }, fade)
+}
+
 // An image row shows the image itself, from the session's blob.
 export function Card(props: { row: Row; session: string; cursor?: boolean }) {
 	let id = () => `${props.session}#${props.row.key}`
+	let root: HTMLElement | undefined
+	onSettled(() => root && enter(root))
 	let open = () => opened().has(id())
 	let setOpen = (on: boolean) => {
 		let next = new Set(opened())
@@ -49,7 +66,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean }) {
 	// Built once per card: the bindings follow a new row object, so the
 	// DOM (and its fade-in) stays when a snapshot or stream replaces it.
 	let plain = (s: () => { kind: string; text: string }) => (
-		<div class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '']}>
+		<div ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '']}>
 			<Show when={props.row.item.type === 'image' && props.row.item} fallback={s().text}>
 				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
 			</Show>
@@ -60,7 +77,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean }) {
 		<Show when={shown()}>
 			{(s) => (
 				<Show when={folds()} fallback={plain(s)}>
-					<article class={['Card', 'folds', ...s().kind.split(' '), open() ? 'open' : '']} onClick={toggle}>
+					<article ref={(e) => (root = e)} class={['Card', 'folds', ...s().kind.split(' '), open() ? 'open' : '']} onClick={toggle}>
 						<button type="button" class="head" aria-expanded={open() ? 'true' : 'false'}>
 							<span class="mark" aria-hidden="true">
 								{open() ? '▾' : '▸'}

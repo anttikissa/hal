@@ -137,3 +137,34 @@ test('error: the error ends the turn the same way everywhere', async () => {
 	expect(early).toEqual(late)
 	expect(mid).toEqual(late)
 })
+
+test('a command mid-round shows where history has it, live and after a reload', async () => {
+	let early = viewer()
+	early.send({ type: 'create', cwd: '/tmp/w', model: 'fake/m' })
+	let id = early.t!.meta.id
+	early.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => pushes.length === 1)
+	let push = pushes[0]!
+	// The thinking is finished (in history); the text still streams.
+	push({ type: 'thinking', text: 'hm' }, { type: 'signature', value: 's' }, { type: 'text', text: 'par' })
+	await until(() => early.t!.items.some((i) => i.type === 'text'))
+	early.send({ type: 'submit', sessionId: id, text: '/help' })
+	await until(() => early.t!.items.some((i) => i.type === 'output'))
+	let mid = viewer()
+	mid.send({ type: 'open', sessionId: id })
+	// More text goes into the block above the command.
+	push({ type: 'text', text: 'tial' }, { type: 'tool_call', id: 't', name: 'ls', input: {} })
+	await until(() => early.t!.items.some((i) => i.type === 'tool'))
+	early.send({ type: 'submit', sessionId: id, text: '/help' })
+	await until(() => early.t!.items.filter((i) => i.type === 'output').length === 2)
+	push({ type: 'done', reason: 'tool_use' })
+	await until(() => pushes.length === 2)
+	pushes[1]!({ type: 'text', text: 'done' }, { type: 'done', reason: 'end' })
+	await until(() => early.ends && mid.ends)
+	let late = viewer()
+	late.send({ type: 'open', sessionId: id })
+	let order = (t: Transcript) => t.items.map((i) => (i.type === 'text' ? i.text : i.type))
+	expect(order(late.t!)).toEqual(['prompt', 'thinking', 'command', 'output', 'partial', 'command', 'output', 'tool', 'tool-result', 'done', 'turn-end'])
+	expect(early.t).toEqual(late.t)
+	expect(mid.t).toEqual(late.t)
+})

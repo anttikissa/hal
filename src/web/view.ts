@@ -19,8 +19,9 @@ import { transcript, type Item, type Resumed, type Shown as ItemShown, type Tran
 // `editing`: the last prompt is in the input (src/common/amend.ts).
 // `modal`: the model picker over the page, taking the keys first;
 // `models` the host's full list it filters.
-// `sent`: the command id of each prompt this client sent, by the
-// prompt item's key, so its row keeps the key it had while pending
+// `sent`: the command id of each prompt or slash command this client
+// sent, by its item's key, so its row keeps the key it had while pending
+// (and its card moves, not remounts, to where the host put it, task rk)
 // (showing another tab starts a new view state, and a new map).
 export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState; editing?: Editing; modal?: ModalState; models?: string[]; sent?: Record<string, string> }
 
@@ -37,7 +38,7 @@ function onEvent(st: ViewState, event: Event): ViewState {
 	let t = transcript.fold(st.transcript, event)
 	if (t === st.transcript) return st
 	let next: ViewState = { ...st, transcript: t }
-	if ((event.type === 'turn-start' || event.type === 'prompt') && event.command && event.n !== undefined) {
+	if ((event.type === 'turn-start' || event.type === 'prompt' || event.type === 'command') && event.command && event.n !== undefined) {
 		let at = event.type === 'prompt' ? event.texts.length - 1 : 0
 		next.sent = { ...st.sent, [transcript.key(event.n, at, 0)]: event.command }
 	}
@@ -211,7 +212,7 @@ function hints(st: ViewState): [key: string, does: string][] {
 // came. Rows only grow at the end as items do (a result joins its
 // call's row), so rows keyed by position keep their DOM.
 // `key`: what keeps the row's card (task w5): the item's key, or for a
-// prompt this client sent, the command id it had while pending.
+// prompt or command this client sent, the command id it had while pending.
 // `pending`: sent, not yet acknowledged.
 export type Row = { item: Item; at: number; key: string; result?: Item & { type: 'tool-result' }; pending?: true }
 
