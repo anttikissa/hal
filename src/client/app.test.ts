@@ -104,6 +104,9 @@ test('waiting messages stay on screen, each saying why it waits', () => {
 	let later = rows().find((r) => r.includes('run me later'))!
 	expect(steer).not.toBe(later)
 	expect(steer.replace('steer me', '')).not.toBe(later.replace('run me later', ''))
+	// Drawn as the prompts they will become, kind first.
+	expect(steer).toBe('(steering) > steer me')
+	expect(later).toBe('(queued) > run me later')
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'paused' } })
 	expect(rows().find((r) => r.includes('run me later'))).toMatch(/paused/)
 	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [] })

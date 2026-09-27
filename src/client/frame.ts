@@ -25,6 +25,7 @@ import type { PromptState } from '../common/prompt.ts'
 import type { Tab } from '../common/protocol.ts'
 import { promptView } from './prompt-view.ts'
 import { tabBar } from './tab-bar.ts'
+import { strings } from '../common/strings.ts'
 
 export interface View {
 	transcript?: Transcript
@@ -120,7 +121,13 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	above = history.length > 0 || peak > 0
 	// The inbox, always in view above the prompt.
 	let t = view.transcript
-	for (let m of t?.inbox ?? []) block(ansi.wrap(`${inbox.label(t!.state, m)}: ${m.text}`, width), { fg: colors.log().fg! })
+	// Each drawn as the prompt it will become: (steering) > text.
+	for (let m of t?.inbox ?? []) {
+		let tag = `(${inbox.tag(t!.state, m)}) `
+		let rows = promptView.mark(ansi.wrap(m.text, Math.max(1, width - tag.length - promptView.FIRST.length)))
+		let pad = ' '.repeat(strings.visLen(tag))
+		block(rows.map((r, i) => (i ? pad : ansi.DIM + tag + ansi.UNDIM) + r), colors.user())
+	}
 	if (view.notice) block(ansi.wrap(view.notice, width), { fg: colors.log().fg! })
 	let p = promptView.box(view.prompt, width, view.placeholder)
 	let log = { fg: colors.log().fg! }
