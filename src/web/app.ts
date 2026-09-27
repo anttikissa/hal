@@ -88,9 +88,7 @@ function onEvent(event: Event): void {
 	st.view = view.onEvent(st.view, event)
 	if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
 	if (event.type === 'history' && backfill.onPage(st.older, event) && st.view.transcript?.meta.id === event.sessionId) {
-		let { transcript: t, resumed } = st.view
-		let shown = backfill.apply(st.older, t)
-		st.view = { ...st.view, transcript: shown, ...(resumed ? { resumed: { ...resumed, at: resumed.at + shown.items.length - t.items.length } } : {}) }
+		st.view = { ...st.view, transcript: backfill.apply(st.older, st.view.transcript) }
 		st.pages++
 	}
 	let done = event.type === 'completions' && view.completed(st.view, event, st.text)

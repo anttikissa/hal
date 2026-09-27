@@ -16,7 +16,7 @@ import { colors, type Style } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
 import type { ModalState } from '../common/modals.ts'
-import { transcript, type Shown as Item, type Resumed, type Transcript } from '../common/transcript.ts'
+import type { Shown as Item, Transcript } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
 import { itemView } from './item-view.ts'
@@ -30,7 +30,6 @@ import { strings } from '../common/strings.ts'
 export interface View {
 	transcript?: Transcript
 	/** Where replayed history ends: a line there says it is old. */
-	resumed?: Resumed
 	prompt: PromptState
 	/** Prompts sent but not yet acknowledged by the host. */
 	pending?: string[]
@@ -96,9 +95,7 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	}
 	let items = view.transcript?.items ?? []
 	let formCursor: Frame['cursor'] | undefined
-	for (let i = 0; i <= items.length; i++) {
-		if (i === view.resumed?.at) block(ansi.wrap(transcript.resumedLabel(view.resumed), width), { fg: colors.log().fg! })
-		if (i >= items.length) continue
+	for (let i = 0; i < items.length; i++) {
 		let item = items[i]!
 		if (item.type === 'question' && view.form?.id === item.id) {
 			let f = formView.formLines(view.form, width)

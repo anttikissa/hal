@@ -81,15 +81,6 @@ test('a tool gets a class for its name that no name can break out of', () => {
 	expect(kind.split(' ')[1]).toMatch(/^tool-[a-z0-9-]+$/)
 })
 
-test('a snapshot with history marks where it ends; later events keep the mark', () => {
-	let old = { type: 'snapshot', sessionId, snapshot: { meta, history: [{ type: 'user', blocks: [{ type: 'text', text: 'old' }], ts }], state: { type: 'idle' } } } as Event
-	let st = fold([old, { type: 'turn-start', sessionId, prompt: 'new', provider: 'fake' }])
-	expect(st.resumed).toEqual({ at: 1, last: ts })
-	expect(st.transcript!.items.slice(st.resumed!.at)).toMatchObject([{ type: 'prompt', text: 'new' }])
-	let empty = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }], st)
-	expect(empty.resumed).toBeUndefined()
-})
-
 test('waiting messages are shown with why they wait', () => {
 	let st = fold([
 		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'paused' }, inbox: [{ id: 'a', text: 'next', queue: true }] } },
@@ -291,25 +282,6 @@ test('a sent prompt shows pending, then as the host’s item under the same key,
 	st = fold([{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 4, command: 'c7' }] as Event[], st)
 	let after = view.withPending(view.rows(st.transcript!.items, st.sent), sending)
 	expect(after.map((r) => [r.key, r.item.type, r.pending])).toEqual([['c7', 'prompt', undefined]])
-})
-
-test('the resumed mark goes before the first row at or after where history ends', () => {
-	let items = running(
-		[
-			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
-			{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'a', output: 'A' }] },
-			{ type: 'turn-end', sessionId, status: 'completed' },
-			{ type: 'turn-start', sessionId, prompt: 'next', provider: 'fake' },
-		] as Event[],
-		{ type: 'idle' },
-	).transcript!.items
-	let rows = view.rows(items)
-	// Items: prompt, tool, result, turn-end, prompt; rows: prompt, tool, prompt.
-	expect(view.markRow(rows, 0)).toBe(0)
-	expect(view.markRow(rows, 2)).toBe(2)
-	expect(view.markRow(rows, 3)).toBe(2)
-	expect(view.markRow(rows, 4)).toBe(2)
-	expect(view.markRow(rows, 5)).toBe(3)
 })
 
 test('a prompt’s [image/<name>] markers become links; the rest stays text', () => {

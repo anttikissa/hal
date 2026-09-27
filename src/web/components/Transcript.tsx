@@ -10,7 +10,7 @@
 
 import { createMemo, For, onSettled, Show } from 'solid-js'
 import type { Sending } from '../../common/drafts.ts'
-import { transcript, type Item } from '../../common/transcript.ts'
+import type { Item } from '../../common/transcript.ts'
 import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
 import { view, type Row, type ViewState } from '../view.ts'
@@ -30,22 +30,16 @@ export function Transcript(props: { view: ViewState; pending: Sending[] }) {
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorAt = () => (streaming() ? rows().length - 1 : -1)
-	let markAt = () => (props.view.resumed ? view.markRow(rows(), props.view.resumed.at) : -1)
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
-	let mark = () => <div class="log mark">{transcript.resumedLabel(props.view.resumed!)}</div>
 	return (
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
 			<For each={all()} keyed={(row) => row.key}>
 				{(row, i) => (
-					<>
-						<Show when={markAt() === i()}>{mark()}</Show>
-						<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorAt() === i()} />}>
-							{(q) => <Question item={q()} form={props.view.form!} />}
-						</Show>
-					</>
+					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorAt() === i()} />}>
+						{(q) => <Question item={q()} form={props.view.form!} />}
+					</Show>
 				)}
 			</For>
-			<Show when={markAt() === all().length}>{mark()}</Show>
 			<Show when={!streaming()}>
 				<div class="cursor-line" aria-hidden="true">
 					<span />

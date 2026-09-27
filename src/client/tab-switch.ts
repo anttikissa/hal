@@ -12,8 +12,8 @@ import type { KeyEvent } from './keys.ts'
 import { tabs, type Focus } from './tabs.ts'
 
 // What each tab keeps while another is shown.
-export type TabView = Pick<AppState, 'transcript' | 'resumed' | 'prompt' | 'notice' | 'form' | 'editing'>
-const tabFields = ['transcript', 'resumed', 'prompt', 'notice', 'form', 'editing'] as const
+export type TabView = Pick<AppState, 'transcript' | 'prompt' | 'notice' | 'form' | 'editing'>
+const tabFields = ['transcript', 'prompt', 'notice', 'form', 'editing'] as const
 
 function focusedTab(): Tab | undefined {
 	return app.state.tabs.find((t) => t.id === app.state.focus.tab)

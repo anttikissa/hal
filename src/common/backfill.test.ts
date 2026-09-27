@@ -66,7 +66,7 @@ test('a stand-in answered meanwhile stays answered once the real history is in',
 
 test('the terminal asks page after page and shows them all at once', () => {
 	let { sessions, t } = start()
-	let view = { transcript: t, resumed: { at: t.items.length } }
+	let view = { transcript: t }
 	let first = backfill.fetchAll(sessions, view, { type: 'snapshot', sessionId: 's', snapshot: { meta, history: all.slice(6), state: t.state, older: 6, earlier: [all[2]!, question] } })
 	let asked = first.command!
 	for (let n = 0; ; n++) {
@@ -79,7 +79,6 @@ test('the terminal asks page after page and shows them all at once', () => {
 		}
 		expect(n).toBe(2)
 		expect(out.view!.transcript).toEqual(transcript.fromSnapshot({ meta, history: all, state: t.state }))
-		expect(out.view!.resumed!.at).toBe(all.length)
 		break
 	}
 })

@@ -224,7 +224,7 @@ test('streamed output reaches the view', () => {
 	expect(app.view().transcript?.items).toContainEqual(expect.objectContaining({ type: 'text', text: 'answer' }))
 })
 
-test('history from a snapshot is marked as old; what follows comes after the mark', () => {
+test('replayed history carries no mark: it reads like one followed live', () => {
 	let history: Snapshot['history'] = [
 		{ type: 'user', blocks: [{ type: 'text', text: 'old question' }], ts: '2026-09-26T00:50:00Z' },
 		{ type: 'turn_end', status: 'error', error: 'overloaded', usage: {}, ts: '2026-09-26T00:51:00Z' },
@@ -233,12 +233,19 @@ test('history from a snapshot is marked as old; what follows comes after the mar
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'new question', provider: 'anthropic' })
 	let rows = frame.build(app.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim()).filter(Boolean)
 	let at = (s: string) => rows.findIndex((r) => r.includes(s))
-	expect(at('error: overloaded')).toBeLessThan(at('resumed · last turn'))
-	expect(at('resumed · last turn')).toBeLessThan(at('new question'))
-	// A session that starts empty has nothing old to mark.
+	expect(at('error: overloaded')).toBeLessThan(at('new question'))
+	expect(rows.join('\n')).not.toMatch(/resumed|last turn/)
+	// A client that followed the same session live draws the same lines.
+	let live = frame.build(app.view(), 80).lines
 	app.reset()
-	app.onEvent(snapshot())
-	expect(frame.build(app.view(), 80).lines.join('')).not.toContain('resumed')
+	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, history: [], state: { type: 'idle' } } })
+	for (let e of [
+		{ type: 'turn-start', sessionId: 's1', prompt: 'old question', provider: 'anthropic' },
+		{ type: 'turn-end', sessionId: 's1', status: 'error', error: 'overloaded' },
+		{ type: 'turn-start', sessionId: 's1', prompt: 'new question', provider: 'anthropic' },
+	] as Event[])
+		app.onEvent(e)
+	expect(frame.build(app.view(), 80).lines).toEqual(live)
 })
 
 test('a refused command is shown until the next submit', () => {

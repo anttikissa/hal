@@ -12,9 +12,8 @@ import { modals, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
-import { transcript, type Item, type Resumed, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
+import { transcript, type Item, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
 
-// `resumed`: where the history of the last snapshot ends, marked on the page.
 // `form`: the open question as filled in on this page.
 // `editing`: the last prompt is in the input (src/common/amend.ts).
 // `modal`: the model picker over the page, taking the keys first;
@@ -23,7 +22,7 @@ import { transcript, type Item, type Resumed, type Shown as ItemShown, type Tran
 // sent, by its item's key, so its row keeps the key it had while pending
 // (and its card moves, not remounts, to where the host put it, task rk)
 // (showing another tab starts a new view state, and a new map).
-export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState; editing?: Editing; modal?: ModalState; models?: string[]; names?: Record<string, string>; sent?: Record<string, string> }
+export type ViewState = { transcript?: Transcript; notice?: string; form?: FormState; editing?: Editing; modal?: ModalState; models?: string[]; names?: Record<string, string>; sent?: Record<string, string> }
 
 // One transcript item as shown: CSS classes and its text. The classes
 // are theme style names (src/common/colors.ts in kebab case), whose CSS
@@ -42,9 +41,6 @@ function onEvent(st: ViewState, event: Event): ViewState {
 		let at = event.type === 'prompt' ? event.texts.length - 1 : 0
 		next.sent = { ...st.sent, [transcript.key(event.n, at, 0)]: event.command }
 	}
-	if (event.type === 'snapshot' && t) next.resumed = transcript.resumed(event.snapshot, t)
-	// An edited prompt may have replaced what the mark was after.
-	else if (st.resumed && t && st.resumed.at > t.items.length) next.resumed = { ...st.resumed, at: t.items.length }
 	let form = forms.follow(st.form, transcript.question(t))
 	if (form) next.form = form
 	else delete next.form
@@ -128,13 +124,6 @@ function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { 
 	let out: { view: ViewState; command?: unknown; text: string } = { view: { ...st, editing: undefined }, text: text === editing.original ? '' : text }
 	if (command) out.command = command
 	return out
-}
-
-// The row the resumed mark goes before (rows.length: after the last),
-// given the item index where replayed history ends.
-function markRow(rows: Row[], at: number): number {
-	let i = rows.findIndex((r) => r.at >= at)
-	return i < 0 ? rows.length : i
 }
 
 // The passing notice, else the hint while editing the last prompt.
@@ -329,7 +318,6 @@ export const view = {
 	line,
 	hints,
 	rows,
-	markRow,
 	withPending,
 	show,
 }

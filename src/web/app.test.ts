@@ -399,7 +399,7 @@ test('an edited entry becomes the draft; sending an entry brings the own text ba
 	expect(stored.get(sessionId)?.text).toBe('mine')
 })
 
-test('scrolling near the top fetches the page before; it goes in front, keeping the resumed mark after the same items', () => {
+test('scrolling near the top fetches the page before; it goes in front', () => {
 	let turn = (n: number) => [
 		{ type: 'user', blocks: [{ type: 'text', text: `p${n}` }], ts },
 		{ type: 'assistant', block: { type: 'text', text: `a${n}` }, ts },
@@ -408,7 +408,6 @@ test('scrolling near the top fetches the page before; it goes in front, keeping 
 	let open = { type: 'question', id: 'q', form: { text: 'Ok?', fields: [{ type: 'text', name: 'x' }] }, ts }
 	// The tail is turn 3; the open question and the last prompt are further back.
 	app.onEvent({ type: 'snapshot', sessionId, snapshot: { meta, history: [...turn(3)], state: { type: 'idle' }, older: 200, earlier: [] } } as Event)
-	let before = app.state.view.resumed!.at
 	app.older()
 	app.older()
 	expect(sent.filter((c) => c.type === 'history')).toEqual([expect.objectContaining({ sessionId, before: 200 })])
@@ -418,7 +417,6 @@ test('scrolling near the top fetches the page before; it goes in front, keeping 
 	app.onEvent({ type: 'history', sessionId, before: 200, records: turn(2), older: 100 } as Event)
 	expect(app.state.pages).toBe(1)
 	expect(app.state.view.transcript!.items.map((i: any) => i.text ?? i.type)).toEqual(['p2', 'a2', 'turn-end', 'p3', 'a3', 'turn-end'])
-	expect(app.state.view.resumed!.at).toBe(before + 3)
 	app.older()
 	app.onEvent({ type: 'history', sessionId, before: 100, records: [...turn(1), open] } as Event)
 	expect(app.state.view.transcript!.items.map((i: any) => i.text ?? i.type).slice(0, 4)).toEqual(['p1', 'a1', 'turn-end', 'question'])

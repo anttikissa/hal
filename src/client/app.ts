@@ -17,7 +17,7 @@ import { picker } from '../common/picker.ts'
 import { placeholders } from '../common/placeholders.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
-import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
+import { transcript, type Transcript } from '../common/transcript.ts'
 import { uploads } from '../common/uploads.ts'
 import type { KeyEvent } from './keys.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
@@ -30,7 +30,6 @@ import { promptKeys, type Clip } from './prompt-keys.ts'
 import type { Focus } from './tabs.ts'
 import { tabSwitch, type TabView } from './tab-switch.ts'
 
-// `resumed`: where the history of the last snapshot ends, marked on screen.
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
 // `editing`: the last prompt is in the editor (src/common/amend.ts).
@@ -49,7 +48,6 @@ export type AppState = {
 	hidden: Map<string, TabView>
 	start: { cwd: string; last?: string }
 	transcript?: Transcript
-	resumed?: Resumed
 	prompt: PromptState
 	notice?: string
 	form?: FormState
@@ -69,7 +67,6 @@ function view(): View {
 	let st = app.state
 	let v: View = { prompt: st.prompt }
 	if (st.transcript) v.transcript = st.transcript
-	if (st.resumed) v.resumed = st.resumed
 	let pending = st.transcript ? drafts.pending(st.transcript.meta.id).map((s) => s.text) : []
 	if (pending.length) v.pending = pending
 	if (st.form) v.form = st.form
@@ -111,9 +108,6 @@ function onEvent(event: Event): void {
 	else if (event.type === 'models') app.pick(event)
 	else {
 		let t = transcript.fold(st.transcript, event)
-		if (event.type === 'snapshot' && t && t !== st.transcript) st.resumed = transcript.resumed(event.snapshot, t)
-		// An edited prompt may have replaced what the mark was after.
-		if (st.resumed && t && st.resumed.at > t.items.length) st.resumed = { ...st.resumed, at: t.items.length }
 		st.transcript = t
 		if (event.type === 'snapshot' || event.type === 'history') app.backfilled(event)
 		if (event.type === 'snapshot' && t) app.setPrompt(recall.shown(t.meta.id) ?? drafts.text(t.meta.id))

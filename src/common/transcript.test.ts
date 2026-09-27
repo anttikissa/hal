@@ -174,24 +174,6 @@ test('state events and a continued turn fold like the snapshot that follows them
 	expect(later).toEqual(t)
 })
 
-test('a snapshot marks where replayed history ends and when it was last written', () => {
-	let history = [prompt('old', 1), said({ type: 'text', text: 'answer' }, 2), { type: 'turn_end' as const, status: 'error' as const, error: 'boom', usage: {}, ts: '2026-09-26T00:51:00Z', n: 3 }]
-	let event = snap({ history, turn: { provider: 'fake', blocks: [{ type: 'text', text: 'new' }], usage: {}, ns: [4] } }) as Extract<Event, { type: 'snapshot' }>
-	let t = fold([event])!
-	let r = transcript.resumed(event.snapshot, t)!
-	// The running turn's output comes after the mark, the old error before it.
-	expect(t.items.slice(0, r.at).at(-1)).toMatchObject({ type: 'turn-end', status: 'error' })
-	expect(t.items.slice(r.at)).toEqual([{ type: 'text', text: 'new', key: '4' }])
-	expect(r.last).toBe('2026-09-26T00:51:00Z')
-	let empty = snap({ history: [] }) as Extract<Event, { type: 'snapshot' }>
-	expect(transcript.resumed(empty.snapshot, fold([empty])!)).toBeUndefined()
-})
-
-test('the resumed mark names the last turn time, and its date when not today', () => {
-	let last = new Date(2026, 8, 26, 0, 51).toISOString()
-	expect(transcript.resumedLabel({ at: 0, last }, new Date(2026, 8, 26, 9, 0))).toBe('resumed · last turn 00:51')
-	expect(transcript.resumedLabel({ at: 0, last }, new Date(2026, 8, 27, 0, 10))).toBe('resumed · last turn 2026-09-26 00:51')
-})
 
 test('a question and its answer fold like the snapshot that follows them, and only the waiting one is open', () => {
 	let form = { text: 'Name?', fields: [{ type: 'secret' as const, name: 'key' }] }

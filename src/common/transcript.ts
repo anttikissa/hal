@@ -291,20 +291,4 @@ function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' 
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 
-// Where the history a client got in a snapshot ends (an index into
-// items) and when it was last written. Clients mark that spot, so an old
-// error redrawn at startup does not look like a new one. Kept out of the
-// transcript: a client that followed the events has no such spot.
-export type Resumed = { at: number; last: string }
-
-function resumed(snapshot: Snapshot, t: Transcript): Resumed | undefined {
-	let last = snapshot.history.at(-1)
-	return last && { at: t.live?.start ?? t.items.length, last: last.ts }
-}
-
-// "resumed · last turn 00:51", with the date when it was not today.
-function resumedLabel(r: Resumed, now = new Date()): string {
-	return `resumed · last turn ${replay.clock(r.last, now.toISOString())}`
-}
-
-export const transcript = { blockItems, promptItem, key, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted, resumed, resumedLabel }
+export const transcript = { blockItems, promptItem, key, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }

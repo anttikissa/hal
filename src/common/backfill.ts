@@ -65,18 +65,15 @@ function apply(all: Sessions, t: Transcript): Transcript {
 }
 
 // The terminal's way: after a snapshot or a page, the command asking
-// for the next page, and once the last is in, the view (transcript and
-// the resumed mark after it) with all of them in front.
-function fetchAll<V extends { transcript?: Transcript; resumed?: { at: number } }>(all: Sessions, view: V, event: Event & { type: 'snapshot' | 'history' }): { command?: ReturnType<typeof next>; view?: Partial<V> } {
+// for the next page, and once the last is in, the transcript with all
+// of them in front.
+function fetchAll<V extends { transcript?: Transcript }>(all: Sessions, view: V, event: Event & { type: 'snapshot' | 'history' }): { command?: ReturnType<typeof next>; view?: Partial<V> } {
 	if (event.type === 'snapshot') backfill.onSnapshot(all, event)
 	else if (!backfill.onPage(all, event)) return {}
 	let command = backfill.next(all, event.sessionId)
 	let t = view.transcript
 	if (command || event.type === 'snapshot' || t?.meta.id !== event.sessionId) return command ? { command } : {}
-	let shown = backfill.apply(all, t)
-	let out: Partial<V> = { transcript: shown } as Partial<V>
-	if (view.resumed) out.resumed = { ...view.resumed, at: view.resumed.at + shown.items.length - t.items.length } as V['resumed']
-	return { view: out }
+	return { view: { transcript: backfill.apply(all, t) } as Partial<V> }
 }
 
 export const backfill = { onSnapshot, next, onPage, complete, apply, fetchAll }
