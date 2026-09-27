@@ -2,12 +2,15 @@
 // local.ts can replace them (see tasks/README.md).
 //
 // The model picker's list (tasks/w4/forms.md, Model picker) comes from
-// here: every registered provider that can list its models, asked at
-// most once per ttlMs, plus Hal's synthetic models. A provider that
-// fails or is slow is left out this time and asked again next time.
+// here: every registered provider, plus Hal's synthetic models. A
+// provider that can list its models is asked, at most once per ttlMs;
+// one that cannot, or fails or is slow (asked again next time), gets
+// its list from the models.dev cache (task qq), and failing that its
+// built-in one.
 
 import { settings } from '../common/settings.ts'
 import { diag } from './diag.ts'
+import { modelsDev } from './models-dev.ts'
 import { provider } from './provider.ts'
 import { synthetic } from './synthetic.ts'
 
@@ -16,14 +19,23 @@ type Listing = { at: number; ids: string[] }
 
 async function fetchList(name: string): Promise<string[] | undefined> {
 	let p = provider.state.providers[name]
-	if (!p?.models) return undefined
+	if (!p) return undefined
 	let cached = models.state.lists.get(name)
 	if (cached && Date.now() - cached.at < models.ttlMs()) return cached.ids
+	let own = p.models ? await models.ask(name, (signal) => p.models!(signal)) : undefined
+	if (own) return own
+	let fallback = modelsDev.ids(name)
+	if (!fallback.length) fallback = p.known?.() ?? []
+	return fallback.length ? fallback.map((m) => `${name}/${m}`) : undefined
+}
+
+// The provider's own list, or undefined if it failed or took too long.
+async function ask(name: string, list: (signal: AbortSignal) => Promise<string[]>): Promise<string[] | undefined> {
 	let controller = new AbortController()
 	let timer = setTimeout(() => controller.abort(), models.timeoutMs())
 	try {
 		let ids = (await Promise.race([
-			p.models(controller.signal),
+			list(controller.signal),
 			new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error('timed out')))),
 		])).map((m) => `${name}/${m}`)
 		models.state.lists.set(name, { at: Date.now(), ids })
@@ -44,9 +56,26 @@ async function list(current: string): Promise<string[]> {
 	return [...new Set([current, models.defaultModel(), ...hal, ...lists.flatMap((l) => l ?? [])])]
 }
 
-// The ids known without asking anyone: synthetic ones and cached lists.
+// The ids known without asking anyone: synthetic ones, and each
+// provider's cached list, else its models.dev or built-in one.
 function known(): string[] {
-	return [...Object.keys(synthetic.models).map((m) => `hal/${m}`), ...[...models.state.lists.values()].flatMap((l) => l.ids)]
+	let lists = Object.entries(provider.state.providers).map(([name, p]) => {
+		let ids = models.state.lists.get(name)?.ids
+		if (ids) return ids
+		let fallback = modelsDev.ids(name)
+		return (fallback.length ? fallback : (p.known?.() ?? [])).map((m) => `${name}/${m}`)
+	})
+	return [...Object.keys(synthetic.models).map((m) => `hal/${m}`), ...lists.flat()]
+}
+
+// Display names models.dev gives the ids it knows.
+function names(ids: string[]): Record<string, string> {
+	let out: Record<string, string> = {}
+	for (let id of ids) {
+		let name = modelsDev.info(id)?.name
+		if (name) out[id] = name
+	}
+	return out
 }
 
 // Whether a session may switch to `id`: a synthetic model, or any
@@ -70,7 +99,11 @@ export const models = {
 	ttlMs: () => 3_600_000,
 	timeoutMs: () => 3000,
 	fetchList,
+	ask,
 	list,
+	names,
+	// Tokens `id` can take in, if known: for the context meter.
+	contextWindow: (id: string): number | undefined => modelsDev.contextWindow(id),
 	known,
 	valid,
 }

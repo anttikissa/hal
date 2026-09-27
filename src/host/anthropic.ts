@@ -108,19 +108,18 @@ async function request(req: ProviderRequest) {
 	return { url: anthropic.apiUrl(), headers, body: anthropic.body(req, oauth), account }
 }
 
-// The models the account may use (GET /v1/models), else the known ones.
+// The models the account may use (GET /v1/models). On failure the
+// picker falls back to models.dev, then knownModels (host/models.ts).
 async function models(signal: AbortSignal): Promise<string[]> {
-	try {
-		let url = new URL(anthropic.apiUrl())
-		url.pathname = url.pathname.replace(/\/messages$/, '/models')
-		url.searchParams.set('limit', '1000')
-		let res = await provider.fetch(String(url), { headers: (await anthropic.headers()).headers, signal })
-		if (!res.ok) throw new Error(`HTTP ${res.status}`)
-		let body = (await res.json()) as { data?: { id?: unknown }[] }
-		let ids = (body.data ?? []).flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))
-		if (ids.length) return ids
-	} catch {}
-	return anthropic.knownModels()
+	let url = new URL(anthropic.apiUrl())
+	url.pathname = url.pathname.replace(/\/messages$/, '/models')
+	url.searchParams.set('limit', '1000')
+	let res = await provider.fetch(String(url), { headers: (await anthropic.headers()).headers, signal })
+	if (!res.ok) throw new Error(`HTTP ${res.status} listing models`)
+	let body = (await res.json()) as { data?: { id?: unknown }[] }
+	let ids = (body.data ?? []).flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))
+	if (!ids.length) throw new Error('no models listed')
+	return ids
 }
 
 const reasons: Record<string, StopReason> = {
@@ -233,7 +232,7 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 
 // Registers the provider. Idempotent.
 function init(): void {
-	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse, rejected: (account) => auth.rejected(account), models: (signal) => anthropic.models(signal) })
+	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse, rejected: (account) => auth.rejected(account), models: (signal) => anthropic.models(signal), known: () => anthropic.knownModels() })
 }
 
 export const anthropic = {
@@ -243,7 +242,7 @@ export const anthropic = {
 	// Current Claude models allow at least 64k output: big file writes.
 	maxTokens: () => 64_000,
 	thinkingBudget: () => 10_000,
-	// Offered when the account's list can't be read.
+	// Offered when neither the account's list nor models.dev has any.
 	knownModels: () => ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5', 'claude-sonnet-5'],
 	toMessages,
 	body,

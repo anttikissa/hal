@@ -190,8 +190,9 @@ export type Event =
 	| { type: 'completions'; sessionId: string; text: string; items: string[] }
 	// Open the model picker: the session's model and every model id to
 	// offer. Sent to the client that asked (`models`), or to every
-	// follower when /model runs alone.
-	| { type: 'models'; sessionId: string; current: string; items: string[] }
+	// follower when /model runs alone. `names`: display names models.dev
+	// gives some of them, which the search matches too.
+	| { type: 'models'; sessionId: string; current: string; items: string[]; names?: Record<string, string> }
 	// Sent only to the client that attached: the command `command` (its
 	// id) stored blob `blob`, which a prompt names with `marker`.
 	| { type: 'attached'; sessionId: string; command: string; blob: string; marker: string }

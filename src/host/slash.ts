@@ -84,7 +84,8 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 // The model picker's content for session `id`.
 async function models(id: string): Promise<Event & { type: 'models' }> {
 	let current = sessions.open(id).model
-	return { type: 'models', sessionId: id, current, items: await modelList.list(current) }
+	let items = await modelList.list(current)
+	return { type: 'models', sessionId: id, current, items, names: modelList.names(items) }
 }
 
 function output(id: string, text: string, error = false): void {

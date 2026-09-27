@@ -11,10 +11,13 @@ import type { LinkState } from './common/connection.ts'
 import { drafts } from './common/drafts.ts'
 import { perf } from './common/perf.ts'
 import type { Event, Tab } from './common/protocol.ts'
+import { settings } from './common/settings.ts'
 import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
 import { diag } from './host/diag.ts'
 import { host } from './host/host.ts'
+import { modelsDev } from './host/models-dev.ts'
+import { sessions } from './host/sessions.ts'
 import { turns } from './host/turns.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
@@ -106,8 +109,19 @@ async function becomeHost(): Promise<boolean> {
 	main.later(() => {
 		web.start()
 		turns.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
+		void main.refreshModels()
 	})
 	return true
+}
+
+// Refreshes the models.dev cache (task qq). The user hears of it only
+// if a model in use (the default or an open session's) has vanished.
+async function refreshModels(): Promise<void> {
+	let picked = [settings.model(), ...sessions.openIds().map((id) => sessions.open(id).model)]
+	let gone = await modelsDev.refresh([...new Set(picked)])
+	if (!gone.length) return
+	let text = `models.dev no longer lists ${gone.join(', ')}`
+	for (let client of host.state.clients) client.deliver({ type: 'warning', text })
 }
 
 // Runs `work` once the first frame showing a tab is painted (at once
@@ -160,6 +174,7 @@ export const main = {
 	loadLocal,
 	init,
 	becomeHost,
+	refreshModels,
 	later,
 	shown,
 	joinHost,

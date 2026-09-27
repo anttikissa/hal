@@ -41,6 +41,9 @@ export type Provider = {
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
 	// The model names it offers (without "provider/"), for the picker.
 	models?(signal: AbortSignal): Promise<string[]>
+	// Built-in model names, offered when neither the provider's own list
+	// nor the models.dev cache has any.
+	known?(): string[]
 }
 
 class Cancelled extends Error {}

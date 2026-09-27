@@ -286,11 +286,11 @@ test('errors: HTTP status, error event mid-stream, bad tool JSON, stream cut sho
 	expect((await run()).map((e) => e.type)).toEqual(['error'])
 })
 
-test('models are listed with the same credentials; a failed listing falls back to the known models', async () => {
+test('models are listed with the same credentials; a failed listing is an error', async () => {
 	let signal = new AbortController().signal
 	expect(await provider.state.providers.anthropic!.models!(signal)).toEqual(['claude-new-9', 'claude-old-1'])
 	expect(seen.at(-1)!.path).toBe('/v1/models')
 	expect(seen.at(-1)!.headers.get('authorization')).toBe('Bearer fake-oauth-token')
 	models = () => new Response('nope', { status: 403 })
-	expect(await provider.state.providers.anthropic!.models!(signal)).toEqual(anthropic.knownModels())
+	await expect(provider.state.providers.anthropic!.models!(signal)).rejects.toThrow('403')
 })

@@ -49,13 +49,14 @@ function score(id: string, query: string[]): number | undefined {
 }
 
 // The ids matching `query`, best first; ties keep the given order,
-// shorter ids first. An empty query keeps every id in order.
-function rank(ids: string[], query: string): string[] {
+// shorter ids first. An empty query keeps every id in order. An id's
+// display name in `names` matches too, after the id itself.
+function rank(ids: string[], query: string, names: Record<string, string> = {}): string[] {
 	let q = words(query)
 	if (!q.length) return ids
 	let scored: { id: string; score: number; i: number }[] = []
 	ids.forEach((id, i) => {
-		let s = score(id, q)
+		let s = score(names[id] ? `${id} ${names[id]}` : id, q)
 		if (s !== undefined) scored.push({ id, score: s, i })
 	})
 	scored.sort((a, b) => b.score - a.score || a.id.length - b.id.length || a.i - b.i)
@@ -74,9 +75,9 @@ function open(current: string, ids: string[]): ModalState {
 }
 
 // The list again for what the search box says now.
-function refilter(st: ModalState, ids: string[]): ModalState {
+function refilter(st: ModalState, ids: string[], names?: Record<string, string>): ModalState {
 	let query = st.form?.values[0] ?? ''
-	return { ...st, items: picker.rank(ids, query) }
+	return { ...st, items: picker.rank(ids, query, names) }
 }
 
 // The command Enter sends: switch the session to the selected model.

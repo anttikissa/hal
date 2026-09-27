@@ -1,7 +1,14 @@
 {
 	title: 'Model metadata from models.dev',
 	description: "Hal knows models from models.dev as the old Hal did (artifact old-models.ts): the host fetches https://models.dev/api.json in the background at each start and caches it under the state dir, so it works offline from the cache and nothing waits on the fetch. The cache supplies context windows (the context meter) and the model list and names for providers that cannot list their own models; a provider's own list, when it has one, wins. With neither cache nor network, the built-in list is the last resort. Diagnostics note failed fetches; the user sees nothing unless a model he picked disappeared (questions.md item 24).",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'host/models-dev.ts keeps state/models-dev.json: provider -> model id -> { name, context }, all ~220 models.dev providers (~570 kB). JSON, not ASON: ASON took ~80 ms to write and ~40 ms to parse it, JSON ~3 ms. Written tmp+rename; read lazily on first use (never on the startup path); a cache that does not parse throws with its path.',
+		"main.becomeHost runs main.refreshModels in main.later (after the first frame). It passes the default model and open sessions' models; ids the old cache listed and the new one does not become one `warning` event to every client. Failures (HTTP, network, bad JSON, empty answer) only go to diag.log and keep the old cache.",
+		'modelsDev.offline() is true under NODE_ENV=test, which bun test sets and ./run subprocesses of tests inherit, so no test reaches models.dev; unit tests replace offline() and fake provider.fetch (the refresh uses it).',
+		'Picker list order per provider (models.fetchList): its own models() (cached ttlMs), else modelsDev.ids(provider name), else the new optional Provider.known() (anthropic: knownModels). anthropic.models now throws on failure instead of returning knownModels. Provider names match models.dev ids (anthropic, openrouter, openai...); an openai-compat endpoint named otherwise gets no models.dev list.',
+		'models.contextWindow(id) (via modelsDev.contextWindow) is ready for the context meter, which does not exist yet: the provider\'s entry first, else any provider listing the same model id. The `models` event carries optional `names` (models.dev display names); picker.rank matches them after the id, so the search finds "Claude Opus 4.5". The picker does not show names yet (tree picker task).'
+	],
 	needs: ['0x'],
 	foldInto: ['0x']
 }

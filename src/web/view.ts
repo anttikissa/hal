@@ -23,7 +23,7 @@ import { transcript, type Item, type Resumed, type Shown as ItemShown, type Tran
 // sent, by its item's key, so its row keeps the key it had while pending
 // (and its card moves, not remounts, to where the host put it, task rk)
 // (showing another tab starts a new view state, and a new map).
-export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState; editing?: Editing; modal?: ModalState; models?: string[]; sent?: Record<string, string> }
+export type ViewState = { transcript?: Transcript; resumed?: Resumed; notice?: string; form?: FormState; editing?: Editing; modal?: ModalState; models?: string[]; names?: Record<string, string>; sent?: Record<string, string> }
 
 // One transcript item as shown: CSS classes and its text. The classes
 // are theme style names (src/common/colors.ts in kebab case), whose CSS
@@ -34,7 +34,7 @@ export type Shown = { kind: string; text: string } | null
 function onEvent(st: ViewState, event: Event): ViewState {
 	if (event.type === 'rejected') return { ...st, notice: `${event.command} refused: ${event.reason}` }
 	if (event.type === 'warning') return { ...st, notice: event.text }
-	if (event.type === 'models') return event.sessionId === st.transcript?.meta.id ? { ...st, modal: picker.open(event.current, event.items), models: event.items } : st
+	if (event.type === 'models') return event.sessionId === st.transcript?.meta.id ? { ...st, modal: picker.open(event.current, event.items), models: event.items, names: event.names ?? {} } : st
 	let t = transcript.fold(st.transcript, event)
 	if (t === st.transcript) return st
 	let next: ViewState = { ...st, transcript: t }
@@ -79,7 +79,7 @@ function modelsKey(st: ViewState, k: Key): unknown {
 }
 
 function closed(st: ViewState): ViewState {
-	let { modal: _m, models: _l, ...rest } = st
+	let { modal: _m, models: _l, names: _n, ...rest } = st
 	return rest
 }
 
@@ -87,7 +87,7 @@ function closed(st: ViewState): ViewState {
 function modalKey(st: ViewState, k: Key): { state: ViewState; command?: unknown } {
 	if (!st.modal || !st.transcript) return { state: st }
 	let { state, action } = modals.step(st.modal, k)
-	if (!action) return { state: { ...st, modal: picker.refilter(state, st.models ?? []) } }
+	if (!action) return { state: { ...st, modal: picker.refilter(state, st.models ?? [], st.names) } }
 	let command = action.type === 'submit' ? picker.command(st.transcript.meta.id, state, action) : undefined
 	return command ? { state: closed(st), command } : { state: closed(st) }
 }
@@ -96,7 +96,7 @@ function modalKey(st: ViewState, k: Key): { state: ViewState; command?: unknown 
 function search(st: ViewState, text: string): ViewState {
 	if (!st.modal?.form) return st
 	let modal = { ...st.modal, form: forms.set(st.modal.form, 0, text), selected: 0, scroll: 0 }
-	return { ...st, modal: picker.refilter(modal, st.models ?? []) }
+	return { ...st, modal: picker.refilter(modal, st.models ?? [], st.names) }
 }
 
 // What Enter with `text` does: send a prompt (steering a busy turn;

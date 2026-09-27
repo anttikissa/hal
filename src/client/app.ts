@@ -349,7 +349,7 @@ function pick(event: Event & { type: 'models' }): void {
 	app.open(
 		picker.open(event.current, event.items),
 		(action, modal) => picker.command(id, modal, action),
-		(modal) => picker.refilter(modal, event.items),
+		(modal) => picker.refilter(modal, event.items, event.names),
 	)
 }
 
