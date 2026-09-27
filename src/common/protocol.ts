@@ -80,9 +80,30 @@ export type Command = (
 	// Answers the open question `question` (src/common/forms.ts), secrets
 	// included; refused if it is not open (someone answered first).
 	| { type: 'answer'; sessionId: string; question: string; answers: Answers }
+	// Tabs (src/host/tabs.ts): the sessions open as tabs, in order, shared
+	// by every client; unlike open/close, which follow a session. A tab
+	// command that creates, reopens or picks a tab names it in its ack.
+	// A new session in cwd with the default model, after `after` (else last).
+	| { type: 'tab-new'; cwd: string; after?: string }
+	// Out of the tabs, remembering its position; the session and any
+	// running turn carry on. Closing the last tab is refused.
+	| { type: 'tab-close'; sessionId: string }
+	// Reopen that closed session, or the most recently closed one, where
+	// it was.
+	| { type: 'tab-resume'; sessionId?: string }
+	| { type: 'tab-move'; sessionId: string; index: number }
+	// The tab a starting client shows: `last` if still open and in cwd,
+	// else the first open tab in cwd, else a new tab in cwd.
+	| { type: 'tab-start'; cwd: string; last?: string }
+	// A client showed the tab: it no longer wants attention.
+	| { type: 'tab-seen'; sessionId: string }
 ) & { id?: string }
 
 export type CommandType = Command['type']
+
+// One tab as the tab bar needs it, without opening the session.
+// `attention`: its turn ended, failed or asked since a client showed it.
+export type Tab = { id: string; name: string; cwd: string; model: string; state: SessionState; attention?: true }
 
 // ── Events (host → client) ──
 
@@ -125,17 +146,21 @@ export type Event =
 	| { type: 'models'; sessionId: string; current: string; items: string[] }
 	// Something the user should fix (config.ason); not tied to a session.
 	| { type: 'warning'; text: string }
+	// The tabs changed (or a client started): every tab, in order. Sent
+	// to every client; which one a client shows is its own business.
+	| { type: 'tabs'; tabs: Tab[] }
 	// The session's draft changed; `command` is the id of the command
 	// that changed it (a draft, or a submit that sent it).
 	| { type: 'draft'; sessionId: string; draft: Draft; command?: string }
 	// Sent only to the client whose command was refused.
 	| { type: 'rejected'; sessionId?: string; command: string; reason: string; id?: string }
 	// Sent only to the sender: the command with this id was carried out.
-	| { type: 'ack'; id: string }
+	// `tab`: the tab a tab command created, reopened or picked.
+	| { type: 'ack'; id: string; tab?: string }
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -149,6 +174,10 @@ function invalid(value: unknown): string | undefined {
 	if (problem) return problem
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
+	if (c.type === 'tab-new') return str('cwd') ?? str('after', true)
+	if (c.type === 'tab-start') return str('cwd') ?? str('last', true)
+	if (c.type === 'tab-resume') return str('sessionId', true)
+	if (c.type === 'tab-move' && !Number.isInteger(c.index)) return 'tab-move: index must be an integer'
 	for (let flag of ['queue', 'amend']) if (c.type === 'submit' && c[flag] !== undefined && typeof c[flag] !== 'boolean') return `submit: ${flag} must be a boolean`
 	if (c.type === 'draft' && c.base !== undefined && !Number.isInteger(c.base)) return 'draft: base must be an integer'
 	if (c.type === 'answer') {

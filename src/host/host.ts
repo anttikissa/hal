@@ -26,6 +26,7 @@ import { sessions } from './sessions.ts'
 import { prompts } from './prompts.ts'
 import { slash } from './slash.ts'
 import { status } from './status.ts'
+import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
 
 export type Connection = {
@@ -35,8 +36,9 @@ export type Connection = {
 }
 
 type Client = { deliver: (event: Event) => void; open: Set<string> }
-// What a command did: refused (why), or done, naming a created session.
-type Outcome = { refused?: string; sessionId?: string }
+// What a command did: refused (why), or done, naming a created session
+// (followed) or the tab a tab command created, reopened or picked.
+type Outcome = { refused?: string; sessionId?: string; tab?: string }
 
 // The in-memory stand-in for the wire: both directions go through ASON,
 // so nothing non-serializable or shared by reference crosses it.
@@ -104,7 +106,7 @@ function reject(client: Client, command: unknown, reason: string, sessionId?: un
 // Commands whose effect outlives the connection. A repeat of one of
 // these ids is answered as before and not carried out again. Opening
 // and closing are per connection, so a repeat always acts.
-const once = new Set(['create', 'submit', 'draft', 'pause', 'continue', 'answer'])
+const once = new Set(['create', 'submit', 'draft', 'pause', 'continue', 'answer', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start'])
 
 // Records what a command with an id did, forgetting the oldest beyond
 // host.remembered().
@@ -148,7 +150,7 @@ function answer(client: Client, c: Command, outcome: Outcome, repeat = true): vo
 	let sessionId = 'sessionId' in c ? c.sessionId : outcome.sessionId
 	if (outcome.refused !== undefined) return host.reject(client, c, outcome.refused, sessionId)
 	if (repeat && outcome.sessionId) host.follow(client, outcome.sessionId)
-	if (c.id !== undefined) client.deliver({ type: 'ack', id: c.id })
+	if (c.id !== undefined) client.deliver({ type: 'ack', id: c.id, ...(outcome.tab ? { tab: outcome.tab } : {}) })
 }
 
 // Carries out a valid command: what it did, or undefined if it will
@@ -177,6 +179,7 @@ function act(client: Client, c: Command): Outcome | undefined {
 		)
 		return undefined
 	}
+	if (tabs.is(c)) return tabs.act(c, client.deliver)
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	// An edit waits for the turn it paused to finish stopping, so nothing
 	// that turn still records lands after the edit.
@@ -240,6 +243,7 @@ function snapshot(id: string): Snapshot {
 
 function broadcast(id: string, event: Event): void {
 	for (let client of host.state.clients) if (client.open.has(id)) client.deliver(event)
+	tabs.observe(id, event)
 }
 
 // Whenever this process exits while it is host, writes the output of
@@ -268,6 +272,7 @@ function reset(): void {
 	host.state.clients.clear()
 	status.state.states.clear()
 	host.state.done.clear()
+	tabs.reset()
 	drafts.reset()
 	host.state.pauseOnExit = false
 }

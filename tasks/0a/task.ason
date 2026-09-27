@@ -4,13 +4,12 @@
 Every change broadcasts \`tabs\` { tabs } to every client, each entry { id, name, cwd, model, state, attention? }: enough for a tab bar without opening the session. A tab gets attention when its turn ends, fails or asks a question; \`tab-seen\` { sessionId } clears it, sent by a client when it shows the tab. Following a session (open/close in the protocol) stays separate from tabs.
 With no tabs.ason, tabs start empty and the first tab-start creates one. Reading tabs never reads every session on disk.
 Test with in-memory clients: two clients see the same order after new, move, close and resume; a close keeps a running turn going; resume puts a tab back where it was; tab-start prefers last, then cwd.`,
-	status: 'planned',
-	needs: [
-		'yq'
-	],
+	status: 'done',
+	needs: ['yq'],
 	notes: [
 		"hal2's protocol already has `open` and `close`, meaning follow and unfollow a session. Tabs are a different thing; keep the names apart.",
 		"old-tabs.ts is the old host's tab module (openSessionIds in runtime state, focus on the host). In hal2 focus belongs to each client, not the host. Old features left out on purpose: fork (Ctrl-F), a tab limit, opening summaries.",
-		'main.ts sends open-newest at startup, and the web asks GET /session for the newest id. tab-start replaces the first; the web switches in task ng.'
+		'main.ts sends open-newest at startup, and the web asks GET /session for the newest id. tab-start replaces the first; the web switches in task ng.',
+		'Implemented in src/host/tabs.ts. The tab a command created, reopened or picked comes back as `tab` in its ack (not a snapshot: tab commands never follow). `tabs` is sent to every client on a change, and to the starter alone on a tab-start that changed nothing; a client gets no tabs until it sends tab-start. Attention lives in tabs.ason too, set on turn-end completed/error and question (not on a user pause). main.ts still sends open-newest; the terminal switches to tab-start in task 7w.'
 	]
 }
