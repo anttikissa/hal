@@ -17,6 +17,7 @@ import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
 import { history } from './history.ts'
+import { jobs } from './jobs.ts'
 import { prompts } from './prompts.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
@@ -89,7 +90,7 @@ function running(parent: string): string[] {
 // Whether the session's last turn reports to its parent: the parent
 // started it (its first task or a later message), or continued work of
 // one it started (a continue, or a turn woken by the session's own
-// subagent). A human's prompt or another session's starts work that
+// subagent or background command). A human's prompt or another session's starts work that
 // reports nothing.
 function owed(id: string, records: HistoryRecord[]): boolean {
 	let parent = sessions.open(id).parent
@@ -105,7 +106,7 @@ function owed(id: string, records: HistoryRecord[]): boolean {
 			starts = false
 			if (first.from === parent) owned = reports = true
 			else if (first.from === undefined) owned = reports = false
-			else reports = owned && sessions.open(first.from).parent === id
+			else reports = owned && (first.from === id || sessions.open(first.from).parent === id)
 		}
 	}
 	return reports
@@ -145,7 +146,7 @@ function report(id: string): void {
 // is not done.
 function finished(id: string): void {
 	if (sessions.open(id).spawn !== 'subagent' || status.stateOf(id).type !== 'idle') return
-	if (status.inboxOf(id).length || subagents.running(id).length) return
+	if (status.inboxOf(id).length || subagents.running(id).length || jobs.running(id).length) return
 	if (tabs.close(id) === undefined) tabs.publish()
 }
 

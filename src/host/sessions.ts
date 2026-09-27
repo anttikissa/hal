@@ -26,6 +26,8 @@ function validate(id: string, data: Record<string, any>): void {
 		if (typeof data[key] !== 'string') throw new Error(`${path}: missing or invalid ${key}`)
 	}
 	if (data.name !== undefined && typeof data.name !== 'string') throw new Error(`${path}: invalid name`)
+	let bg = data.background
+	if (bg !== undefined && !(Array.isArray(bg) && bg.every((b) => typeof b === 'string'))) throw new Error(`${path}: background must be a list of ids`)
 }
 
 // Loads and validates metadata as a liveFile. Throws if missing/invalid.

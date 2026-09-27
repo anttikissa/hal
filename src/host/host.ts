@@ -24,6 +24,7 @@ import { diag } from './diag.ts'
 import { busy } from './busy.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'
+import { jobs } from './jobs.ts'
 import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 import { prompts } from './prompts.ts'
@@ -275,8 +276,8 @@ function broadcast(id: string, event: Event): void {
 
 // Whenever this process exits while it is host (quit, restart, SIGTERM,
 // SIGHUP), writes the output of running turns so far and aborts them,
-// which kills their bash process groups: no command outlives the Hal
-// that ran it. The turns stay unfinished for the next host to continue
+// which kills their bash process groups, and kills background commands
+// (jobs.ts): no command outlives the Hal that ran it. The turns stay unfinished for the next host to continue
 // as interrupted; or, if the user quit the last Hal process
 // (quitting()), they are recorded paused. Idempotent.
 function init(): void {
@@ -285,6 +286,7 @@ function init(): void {
 	process.on('exit', () => {
 		history.stop(host.state.pauseOnExit)
 		for (let r of turns.state.running.values()) r.controller.abort()
+		jobs.killAll()
 	})
 	clock.init()
 }
@@ -300,6 +302,7 @@ function quitting(last: boolean): void {
 function reset(): void {
 	for (let r of turns.state.running.values()) r.controller.abort()
 	turns.state.running.clear()
+	jobs.killAll()
 	host.state.opening.clear()
 	host.state.clients.clear()
 	status.state.states.clear()

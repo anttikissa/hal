@@ -80,9 +80,14 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	} catch (e: any) {
 		result = { type: 'tool_result', id: call.id, output: `Error: ${e?.message ?? e}`, isError: true }
 	}
-	let max = tools.maxChars()
-	if (result.output.length > max) result.output = `${result.output.slice(0, max)}\n[output truncated: ${result.output.length - max} more characters]`
+	result.output = tools.cap(result.output)
 	return result
+}
+
+// Output cut to tools.maxChars(), saying how much was left out.
+function cap(output: string): string {
+	let max = tools.maxChars()
+	return output.length > max ? `${output.slice(0, max)}\n[output truncated: ${output.length - max} more characters]` : output
 }
 
 // Stops a tool's process group: SIGTERM now, SIGKILL killAfterMs later
@@ -114,5 +119,6 @@ export const tools = {
 	killAfterMs: () => 2000,
 	page,
 	run,
+	cap,
 	killGroup,
 }

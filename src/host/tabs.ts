@@ -12,6 +12,7 @@ import { mkdirSync } from 'fs'
 import { resolve } from 'path'
 import type { Command, Event, Tab } from '../common/protocol.ts'
 import { host } from './host.ts'
+import { jobs } from './jobs.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
@@ -87,6 +88,7 @@ function close(id: string): string | undefined {
 	if (index < 0) return 'not a tab'
 	if (f.open.length === 1) return 'cannot close the last tab'
 	f.open.splice(index, 1)
+	jobs.kill(id)
 	let closed = f.closed.filter((c) => c.id !== id)
 	closed.push({ id, index })
 	f.closed = closed.slice(-tabs.closedKept())

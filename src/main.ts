@@ -16,6 +16,7 @@ import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
 import { diag } from './host/diag.ts'
 import { host } from './host/host.ts'
+import { jobs } from './host/jobs.ts'
 import { modelsDev } from './host/models-dev.ts'
 import { sessions } from './host/sessions.ts'
 import { turns } from './host/turns.ts'
@@ -111,6 +112,7 @@ async function becomeHost(): Promise<boolean> {
 	main.later(() => {
 		web.start()
 		turns.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
+		jobs.lost().catch((e) => diag.log(`lost jobs: ${e?.message ?? e}`))
 		void main.refreshModels()
 	})
 	return true

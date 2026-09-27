@@ -15,6 +15,8 @@ export interface SessionMeta {
 	spawn?: SpawnKind
 	// Spawn slots left; none yet means the first session's allowance.
 	slots?: number
+	// Ids of background bash commands still running (task v0).
+	background?: string[]
 }
 
 export type SpawnKind = 'subagent' | 'subagent-leave-open' | 'interactive'
