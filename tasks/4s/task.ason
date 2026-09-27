@@ -11,13 +11,15 @@
 - One scroller: the transcript scrolls and nothing inside it does; long tool output and code wrap.
 Not in scope: ID links, deep links and the target outline [F2, F3, F9] need short block ids that hal2 items do not have yet; the demo's debug controls (slow motion, step key, offline toggle).
 Test the scroll maths (gap, whether to follow, glide target) and the status line as pure functions. Check the rest in a real browser at phone and desktop widths and say in the commit what you checked.`,
-	status: 'planned',
-	needs: [
-		'1b'
-	],
+	status: 'done',
+	needs: ['1b'],
 	notes: [
 		'demo.tsx is self-contained and runs as is under Solid 2; its comments explain each decision, including the failures behind them (why keyed-by-id rows closed and flashed; why only scroll keys cancel a glide; why the send glide is `forced`). Its CSS uses hand-picked hex colours: take the layout and motion, but colours come from colors.ts (task 1w).',
 		'keepBottom() calls flush() before measuring because Solid 2 applies DOM updates in a microtask.',
-		"old-scroll.ts and old-viewport.ts are the old client's near-bottom check and mobile keyboard handling (visualViewport); reference only. old-frontend-design.md is the design guidance the old Hal used for UI work."
+		"old-scroll.ts and old-viewport.ts are the old client's near-bottom check and mobile keyboard handling (visualViewport); reference only. old-frontend-design.md is the design guidance the old Hal used for UI work.",
+		"Built as: scroll.ts (pure gap/keep/target/at plus the one glide runner; the caller's change must flush()), Chat.tsx redraw() picks the mode per app.changed(): pending grew = forced glide, items grew = glide, same items = jump, nothing transcript-side = plain redraw (so typing never cancels a glide). A jump during a glide lets the glide go on; it re-aims at the moving bottom every frame.",
+		"Rows are view.rows(items): a tool result joins its call's row and completed turn ends drop out, so rows are not items; the resumed mark maps item index to row with view.markRow.",
+		'Setting scrollTop from a script does not cancel a glide (only wheel, touch and scroll keys do); a browser check of the 20 px follow must dispatch a wheel event after scrolling or the running glide pulls it back to 0.',
+		'Default <For> passes the value, not an accessor: calling it threw inside Chat and left the login form up; only the CDP test in host/web.test.ts caught it.'
 	]
 }

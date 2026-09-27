@@ -191,7 +191,15 @@ function key(e: KeyInput, target: Target): boolean {
 		return true
 	}
 	if (e.key !== 'Enter' || e.shiftKey) return false
-	let { command, notice, keep } = view.submit(st.view, st.text, e.altKey)
+	app.send(e.altKey)
+	return true
+}
+
+// Sends what the box holds (Enter, or the Send button); `queue`
+// (Alt+Enter) waits for the running turn.
+function send(queue = false): void {
+	let st = app.state
+	let { command, notice, keep } = view.submit(st.view, st.text, queue)
 	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; amend?: boolean } | undefined
 	// A prompt shows at once and waits, pending, for the host.
 	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c.queue, c.amend)
@@ -201,7 +209,6 @@ function key(e: KeyInput, target: Target): boolean {
 		app.input('')
 	}
 	app.setNotice(notice)
-	return true
 }
 
 // The browser's local copy of drafts, for typing while disconnected
@@ -278,6 +285,7 @@ export const app = {
 	modalPick,
 	search,
 	key,
+	send,
 	store,
 	start,
 	authorized,

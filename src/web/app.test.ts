@@ -137,3 +137,11 @@ test('the link state shows as a notice until connected', () => {
 	app.onState({ type: 'connected', role: 'client' })
 	expect(app.notice()).toBeUndefined()
 })
+
+test('the Send button sends what the box holds, like Enter', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	app.input('from the button')
+	app.send()
+	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ sessionId, text: 'from the button' })
+	expect(app.state.text).toBe('')
+})

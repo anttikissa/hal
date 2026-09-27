@@ -1,45 +1,43 @@
 /// <reference lib="dom" />
-// The session's transcript: one block per shown item (settled items
-// keep their nodes across folds), the open question as a form, the
-// mark where replayed history ends, then the prompts still pending.
-// Stays at the bottom while the user has it scrolled there.
+// The session's transcript: one card per row (view.rows), keyed by
+// position so a row keeps its DOM and whether it is open when a
+// snapshot replaces every item or a streaming item grows; the open
+// question as a form; the mark where replayed history ends; the
+// prompts still pending; and Hal's cursor on a line of its own, dimmed
+// while thinking streams. The one scroller: Chat and scroll.ts keep a
+// bottom reader at the bottom.
 
-import { createEffect, For, Show } from 'solid-js'
-import { transcript, type Item } from '../../common/transcript.ts'
-import { view, type ViewState } from '../view.ts'
+import { createMemo, For, onSettled, Show } from 'solid-js'
+import { transcript } from '../../common/transcript.ts'
+import { scroll } from '../scroll.ts'
+import { view, type Row, type ViewState } from '../view.ts'
+import { Card } from './Card.tsx'
 import { Question } from './Question.tsx'
 
 export function Transcript(props: { view: ViewState; pending: string[] }) {
 	let el!: HTMLElement
-	let stuck = true
-	let items = () => props.view.transcript?.items ?? []
-	let open = (item: Item) => (item.type === 'question' && props.view.form?.id === item.id ? item : undefined)
-	let resumedAt = (i: number) => props.view.resumed?.at === i
-	createEffect(
-		() => [items(), props.pending, props.view.resumed, props.view.form],
-		() => {
-			if (stuck) el.scrollTop = el.scrollHeight
-		},
-	)
-	let entry = (item: Item) => {
-		let shown = view.show(item)
-		return shown && <div class={shown.kind}>{shown.text}</div>
-	}
-	let mark = () => <div class="log">{transcript.resumedLabel(props.view.resumed!)}</div>
+	onSettled(() => scroll.init(el))
+	let rows = createMemo(() => view.rows(props.view.transcript?.items ?? []))
+	let markAt = () => (props.view.resumed ? view.markRow(rows(), props.view.resumed.at) : -1)
+	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
+	let mark = () => <div class="log mark">{transcript.resumedLabel(props.view.resumed!)}</div>
 	return (
-		<main class="Transcript" role="log" ref={(e) => (el = e)} onScroll={() => (stuck = view.atBottom(el))}>
-			<For each={items()}>
-				{(item, i) => (
+		<main class="Transcript" role="log" ref={(e) => (el = e)}>
+			<For each={rows()} keyed={false}>
+				{(row, i) => (
 					<>
-						<Show when={resumedAt(i())}>{mark()}</Show>
-						<Show when={open(item)} fallback={entry(item)}>
+						<Show when={markAt() === i}>{mark()}</Show>
+						<Show when={open(row())} fallback={<Card row={row()} />}>
 							{(q) => <Question item={q()} form={props.view.form!} />}
 						</Show>
 					</>
 				)}
 			</For>
-			<Show when={resumedAt(items().length)}>{mark()}</Show>
-			<For each={props.pending}>{(text) => <div class="user pending">{text}</div>}</For>
+			<Show when={markAt() === rows().length}>{mark()}</Show>
+			<For each={props.pending}>{(text) => <div class="Card user pending">{text}</div>}</For>
+			<div class={['cursor-line', view.thinking(props.view) ? 'thinking' : 'assistant']} aria-hidden="true">
+				<span />
+			</div>
 		</main>
 	)
 }

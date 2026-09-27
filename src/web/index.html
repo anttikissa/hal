@@ -7,27 +7,64 @@
 <style>
 /* The one stylesheet: layout only. Colours come from the theme below
    (src/common/colors.ts; .page carries the page's own as variables). */
-:root { color-scheme: dark; }
+:root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --fade-ms: 300ms; --toggle-ms: 250ms; }
 * { box-sizing: border-box; }
 html { background: var(--canvas); color: var(--text); }
 html, body { margin: 0; height: 100%; }
+body { height: 100dvh; overflow: hidden; }
 body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .App, .Chat { height: 100%; display: flex; flex-direction: column; }
-.Transcript { flex: 1; overflow-y: auto; padding: 1rem; }
-.Transcript > div { max-width: 60rem; margin: 0 auto 0.9rem; padding: 0.2rem 0.6rem; border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.Transcript > .user::before { content: "> "; }
-.Transcript > .pending { opacity: 0.6; }
-.Transcript > .pending::after { content: "\A sending…"; font-size: 0.85em; }
-.Composer { padding: 0.5rem 1rem 1rem; }
-.Composer > * { display: block; max-width: 60rem; margin: 0 auto; }
-.Composer > #notice { min-height: 1.5em; }
+/* The one scroller: nothing inside it scrolls; long lines wrap. */
+.Transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem; }
+.Transcript > * { max-width: 60rem; margin: 0 auto 0.6rem; }
+.Card { padding: 0.4rem 0.7rem; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); white-space: pre-wrap; overflow-wrap: anywhere; animation: enter var(--fade-ms) var(--ease-out); }
+@keyframes enter { from { opacity: 0; } }
+.Card.user::before { content: "> "; }
+.Card.pending { opacity: 0.6; }
+.Card.pending::after { content: "\A sending…"; font-size: 0.85em; }
+.Card.folds { padding: 0; cursor: pointer; }
+.Card .head { display: flex; gap: 0.6ch; width: 100%; padding: 0.4rem 0.7rem; background: none; color: inherit; text-align: left; border-radius: 0; }
+.Card .head:focus-visible { outline: 1px solid currentColor; outline-offset: -2px; }
+.Card .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.Card .head .error { background: none; }
+/* Open and close animate the height (a one-row grid, 0fr to 1fr);
+   closing is faster. Padding sits inside so closed is truly 0 high. */
+.Card .body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows calc(var(--toggle-ms) * 0.7) var(--ease-out); }
+.Card.open .body { grid-template-rows: 1fr; transition-duration: var(--toggle-ms); }
+.Card .contents { min-height: 0; overflow: hidden; padding: 0 0.7rem 0 calc(0.7rem + 2ch); }
+.Card .contents::after { content: ""; display: block; height: 0.4rem; }
+.mark.log { text-align: center; }
+/* Hal's cursor, on a line after the last item. */
+.cursor-line { min-height: 2.5rem; padding: 0.2rem 0 0.6rem; }
+.cursor-line.assistant { color: var(--cursor); }
+.cursor-line span { display: block; width: 1ch; height: 1lh; background: currentColor; animation: blink 1s steps(1, end) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.Composer { flex: none; padding: 0.4rem 1rem max(0.8rem, env(safe-area-inset-bottom)); }
+.Composer > * { max-width: 60rem; margin: 0 auto; }
+.Composer > #notice:empty { display: none; }
+.Composer .status { padding: 0.2rem 0; }
+.status .busy { color: var(--highlight); }
+.status .warning, .status .error { background: none; }
+.status .dot.busy { animation: pulse 1s steps(2) infinite; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+.entry { display: flex; align-items: stretch; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); }
+.entry:focus-within { border-left-color: var(--cursor); }
+.entry textarea { flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; border-radius: 0; padding: 0.5rem 0.7rem; }
+.entry button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; border-radius: 0; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor 35%, transparent); transition: background-color 120ms var(--ease-out); }
+.entry button:hover:not(:disabled) { background: color-mix(in oklab, currentColor 14%, transparent); }
+.entry button:disabled { opacity: 0.45; cursor: default; }
+.help { display: flex; flex-wrap: wrap; gap: 0 1.5ch; padding-top: 0.3rem; color: var(--description); }
+.help b { color: var(--key); font-weight: 600; }
 textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem; resize: none; outline: none; }
 textarea:focus, input:focus { border-color: var(--accent); }
-.input { caret-color: var(--cursor); }
+.input textarea { caret-color: var(--cursor); }
 button { background: var(--button); color: var(--text); border: 0; border-radius: 6px; padding: 0.5rem; cursor: pointer; }
 button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
+/* Phones: 16px fields, or iOS zooms in on focus. */
+@media (max-width: 40rem) { textarea, input { font-size: 16px; } .Transcript { padding: 0.6rem; } .Composer { padding-inline: 0.6rem; } }
+@media (prefers-reduced-motion: reduce) { .Card .body { transition: none; } .cursor-line span, .status .dot { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
-.Question { max-width: 60rem; margin: 0 auto 0.9rem; padding: 0.4rem 0.6rem; border-radius: 4px; display: flex; flex-direction: column; gap: 0.4rem; }
+.Question { max-width: 60rem; margin: 0 auto 0.6rem; padding: 0.4rem 0.6rem; border-radius: 4px; display: flex; flex-direction: column; gap: 0.4rem; }
 .Question button { padding: 0.2rem 0.8rem; }
 .Question pre.quote { margin: 0 0 0 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .Question mark { background: currentColor; color: var(--canvas); }

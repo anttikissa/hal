@@ -117,6 +117,13 @@ function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { 
 	return out
 }
 
+// The row the resumed mark goes before (rows.length: after the last),
+// given the item index where replayed history ends.
+function markRow(rows: Row[], at: number): number {
+	let i = rows.findIndex((r) => r.at >= at)
+	return i < 0 ? rows.length : i
+}
+
 // The passing notice, else the hint while editing the last prompt.
 function notice(st: ViewState): string | undefined {
 	return st.notice ?? (st.editing && amend.hint())
@@ -142,21 +149,69 @@ function pause(st: ViewState): unknown {
 	return st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 }
 
-// What the session is doing, for the input's placeholder.
-function status(st: ViewState): string | undefined {
-	return st.transcript && states.describe(st.transcript.state)
-}
-
 // The messages waiting for the turn, each with why it waits.
 function waiting(st: ViewState): { text: string; label: string }[] {
 	let t = st.transcript
 	return t ? t.inbox.map((m) => ({ text: m.text, label: inbox.label(t.state, m) })) : []
 }
 
-// Whether a scroller is at (within a few lines of) its bottom, so new
-// content should keep it there.
-function atBottom(el: { scrollHeight: number; scrollTop: number; clientHeight: number }): boolean {
-	return el.scrollHeight - el.scrollTop - el.clientHeight < 40
+// Whether the model is streaming its thinking (Hal's cursor dims).
+function thinking(st: ViewState): boolean {
+	let t = st.transcript
+	return t?.state.type === 'running' && t.state.phase === 'streaming' && t.items.at(-1)?.type === 'thinking'
+}
+
+// The composer's status line, like the terminal's: what the session is
+// doing in a word or two, and its tone (busy pulses; warn and error
+// need the user).
+export type Line = { text: string; tone: 'idle' | 'busy' | 'warn' | 'error' }
+
+function line(st: ViewState, connected: boolean): Line {
+	let t = st.transcript
+	if (!connected) return { text: 'reconnecting', tone: 'error' }
+	if (!t) return { text: 'connecting', tone: 'busy' }
+	let s = t.state
+	if (s.type === 'idle') return { text: 'idle', tone: 'idle' }
+	if (s.type === 'running') {
+		if (s.phase === 'tools') {
+			let done = new Set(t.items.flatMap((i) => (i.type === 'tool-result' ? [i.id] : [])))
+			let names = t.items.flatMap((i) => (i.type === 'tool' && !done.has(i.id) ? [i.name] : []))
+			return { text: names.length ? `running ${names.join(', ')}` : 'running tools', tone: 'busy' }
+		}
+		let writing = s.phase === 'streaming' && !view.thinking(st)
+		return { text: writing ? 'writing' : 'thinking', tone: 'busy' }
+	}
+	let text = states.describe(s)!
+	return { text, tone: s.type === 'error' ? 'error' : s.type === 'retrying' ? 'busy' : 'warn' }
+}
+
+// The key hints under the message box, for what Enter does now.
+function hints(st: ViewState): [key: string, does: string][] {
+	if (st.transcript && states.busy(st.transcript.state))
+		return [['enter', 'steer'], ['alt+enter', 'queue'], ['shift+enter', 'newline'], ['esc', 'pause']]
+	return [['enter', 'send'], ['shift+enter', 'newline'], ['↑', 'edit last'], ['tab', 'complete'], ['ctrl+m', 'model']]
+}
+
+// A transcript row: an item, and for a tool call its result once it
+// came. Rows only grow at the end as items do (a result joins its
+// call's row), so rows keyed by position keep their DOM.
+export type Row = { item: Item; at: number; result?: Item & { type: 'tool-result' } }
+
+function rows(items: Item[]): Row[] {
+	let out: Row[] = []
+	let calls = new Map<string, Row>()
+	for (let [at, item] of items.entries()) {
+		if (item.type === 'turn-end' && item.status === 'completed') continue
+		let call = item.type === 'tool-result' ? calls.get(item.id) : undefined
+		if (call && item.type === 'tool-result') {
+			call.result = item
+			continue
+		}
+		let row: Row = { item, at }
+		if (item.type === 'tool') calls.set(item.id, row)
+		out.push(row)
+	}
+	return out
 }
 
 function oneLine(s: string): string {
@@ -216,8 +271,11 @@ export const view = {
 	complete,
 	completed,
 	pause,
-	status,
 	inbox: waiting,
-	atBottom,
+	thinking,
+	line,
+	hints,
+	rows,
+	markRow,
 	show,
 }

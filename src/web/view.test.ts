@@ -72,7 +72,6 @@ test('Enter and Escape follow the session state', () => {
 	expect(view.submit(busy, 'later', true)).toEqual({ command: { type: 'submit', sessionId, text: 'later', queue: true }, keep: false })
 	expect(view.pause(busy)).toEqual({ type: 'pause', sessionId })
 	let paused = view.onEvent(idle, { type: 'state', sessionId, state: { type: 'paused' } })
-	expect(view.status(paused)).toMatch(/paused/)
 	expect(view.submit(paused, '')).toEqual({ command: { type: 'continue', sessionId }, keep: false })
 })
 
@@ -198,10 +197,99 @@ test('Ctrl-M opens the model picker from the host list; typing filters, Enter sw
 	expect(view.onEvent(r.state, { type: 'models', sessionId: 'x', current: 'a/b', items }).modal).toBeUndefined()
 })
 
-test('the transcript sticks to the bottom only when scrolled to (near) it', () => {
-	expect(view.atBottom({ scrollHeight: 1000, scrollTop: 600, clientHeight: 400 })).toBe(true)
-	expect(view.atBottom({ scrollHeight: 1000, scrollTop: 570, clientHeight: 400 })).toBe(true)
-	expect(view.atBottom({ scrollHeight: 1000, scrollTop: 300, clientHeight: 400 })).toBe(false)
-	// Content shorter than the viewport.
-	expect(view.atBottom({ scrollHeight: 200, scrollTop: 0, clientHeight: 400 })).toBe(true)
+const running = (items: Event[], state: object) =>
+	fold([
+		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } },
+		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
+		...items, { type: 'state', sessionId, state } as Event] as Event[])
+
+test('the status line says what the session is doing, like the terminal', () => {
+	let line = (st: ViewState, connected = true) => view.line(st, connected)
+	let idle = running([], { type: 'idle' })
+	expect(line(idle)).toEqual({ text: 'idle', tone: 'idle' })
+	let asking = running([], { type: 'running', phase: 'requesting' })
+	expect(line(asking)).toEqual({ text: 'thinking', tone: 'busy' })
+	let thinking = running([{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } }] as Event[], { type: 'running', phase: 'streaming' })
+	expect(line(thinking)).toEqual({ text: 'thinking', tone: 'busy' })
+	expect(view.thinking(thinking)).toBe(true)
+	let writing = running(
+		[
+			{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } },
+			{ type: 'stream', sessionId, event: { type: 'text', text: 'hi' } },
+		] as Event[],
+		{ type: 'running', phase: 'streaming' },
+	)
+	expect(line(writing)).toEqual({ text: 'writing', tone: 'busy' })
+	expect(view.thinking(writing)).toBe(false)
+	// The tools still waiting for their results, by name.
+	let calls = [
+		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
+		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'b', name: 'read', input: {} } },
+	] as Event[]
+	expect(line(running(calls, { type: 'running', phase: 'tools' }))).toEqual({ text: 'running bash, read', tone: 'busy' })
+	let one = running([...calls, { type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'a', output: '' }] }] as Event[], { type: 'running', phase: 'tools' })
+	expect(line(one)).toEqual({ text: 'running read', tone: 'busy' })
+	let paused = running([], { type: 'paused' })
+	expect(line(paused).text).toMatch(/^paused/)
+	expect(line(paused).tone).toBe('warn')
+	expect(line(running([], { type: 'error', message: 'boom' })).tone).toBe('error')
+	// Losing the host outranks whatever the session last said.
+	expect(line(writing, false)).toEqual({ text: 'reconnecting', tone: 'error' })
+})
+
+test('rows pair each tool call with its result and drop completed turn ends', () => {
+	let st = running(
+		[
+			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
+			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'b', name: 'read', input: {} } },
+			{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'b', output: 'B' }, { type: 'tool_result', id: 'a', output: 'A' }] },
+			{ type: 'stream', sessionId, event: { type: 'text', text: 'done' } },
+			{ type: 'turn-end', sessionId, status: 'completed' },
+		] as Event[],
+		{ type: 'idle' },
+	)
+	let rows = view.rows(st.transcript!.items)
+	expect(rows.map((r) => [r.item.type, r.result?.type === 'tool-result' ? r.result.output : undefined])).toEqual([
+		['prompt', undefined],
+		['tool', 'A'],
+		['tool', 'B'],
+		['text', undefined],
+	])
+})
+
+test('rows only grow at the end as items arrive, so rows keyed by position keep their place', () => {
+	let items = running(
+		[
+			{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } },
+			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
+			{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'a', output: 'A' }] },
+			{ type: 'stream', sessionId, event: { type: 'text', text: 'ok' } },
+			{ type: 'turn-end', sessionId, status: 'paused' },
+		] as Event[],
+		{ type: 'idle' },
+	).transcript!.items
+	let all = view.rows(items)
+	for (let k = 0; k <= items.length; k++) {
+		let some = view.rows(items.slice(0, k))
+		expect(some.map((r) => r.item)).toEqual(all.slice(0, some.length).map((r) => r.item))
+	}
+})
+
+test('the resumed mark goes before the first row at or after where history ends', () => {
+	let items = running(
+		[
+			{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
+			{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'a', output: 'A' }] },
+			{ type: 'turn-end', sessionId, status: 'completed' },
+			{ type: 'turn-start', sessionId, prompt: 'next', provider: 'fake' },
+		] as Event[],
+		{ type: 'idle' },
+	).transcript!.items
+	let rows = view.rows(items)
+	// Items: prompt, tool, result, turn-end, prompt; rows: prompt, tool, prompt.
+	expect(view.markRow(rows, 0)).toBe(0)
+	expect(view.markRow(rows, 2)).toBe(2)
+	expect(view.markRow(rows, 3)).toBe(2)
+	expect(view.markRow(rows, 4)).toBe(2)
+	expect(view.markRow(rows, 5)).toBe(3)
 })
