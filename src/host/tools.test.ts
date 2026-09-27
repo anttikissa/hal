@@ -7,6 +7,7 @@ let dir = ''
 const signal = new AbortController().signal
 const origMaxLines = tools.maxLines
 const origMaxChars = tools.maxChars
+const origKillAfter = tools.killAfterMs
 const origDir = tools.dir
 
 beforeEach(() => {
@@ -16,6 +17,7 @@ beforeEach(() => {
 afterEach(() => {
 	tools.maxLines = origMaxLines
 	tools.maxChars = origMaxChars
+	tools.killAfterMs = origKillAfter
 	tools.dir = origDir
 	rmSync(dir, { recursive: true, force: true })
 })
@@ -150,4 +152,20 @@ test('cancel stops a running command, pipelines included, and a cancelled turn r
 	let r = await bash({ command: 'touch ran', description: 'Touch' }, ac.signal)
 	expect(r.isError).toBe(true)
 	expect(existsSync(`${dir}/ran`)).toBe(false)
+})
+
+test('a stopped command is asked to end, then killed: a background job that ignores SIGTERM does not survive', async () => {
+	tools.killAfterMs = () => 300
+	let marker = `31.${process.pid}2`
+	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
+	let ac = new AbortController()
+	let pending = bash({ command: `trap '' TERM; sleep ${marker} >/dev/null & sleep ${marker}`, description: 'Leave a stubborn job' }, ac.signal)
+	for (let i = 0; i < 100 && !alive(); i++) await Bun.sleep(20)
+	expect(alive()).toBe(true)
+	ac.abort()
+	await Bun.sleep(100)
+	expect(alive()).toBe(true)
+	expect((await pending).output).toContain('stopped')
+	for (let i = 0; i < 100 && alive(); i++) await Bun.sleep(20)
+	expect(alive()).toBe(false)
 })

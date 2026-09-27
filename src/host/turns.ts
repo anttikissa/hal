@@ -7,6 +7,7 @@ import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type Sender, 
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
+import { settings } from '../common/settings.ts'
 import { states, type StateEvent } from '../common/states.ts'
 import { existsSync } from 'fs'
 import { approval } from './approval.ts'
@@ -176,6 +177,11 @@ function leftWork(id: string): boolean {
 // the turn, run again, finds the calls held (approval.held) and runs
 // them, or gives the declined ones an error result, before its next
 // round. A parked turn's usage so far is in its question and carried on.
+//
+// A turn never spirals: after settings.maxRounds() finished rounds it
+// pauses with a reason, and continuing gives it as many again. A round
+// cut off at max_tokens or refused runs none of its calls and ends the
+// turn in error (stopped).
 async function runTurn(id: string, model: string, running: Running, answers?: Answers): Promise<void> {
 	let { signal } = running.controller
 	let records = history.readSync(id)
@@ -198,6 +204,9 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let failure: string | undefined
 	// Failed rounds in a row, for the backoff.
 	let failures = 0
+	// Finished rounds, and why Hal paused the turn if it did.
+	let rounds = 0
+	let capped: string | undefined
 	try {
 		while (true) {
 			// The turn wanted to go on: a pause now stops it as paused.
@@ -208,6 +217,11 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				calls = held.calls
 				held = undefined
 			} else {
+				if (rounds >= settings.maxRounds()) {
+					capped = `it ran ${rounds} rounds, the most one turn may (maxRounds)`
+					last = undefined
+					break
+				}
 				let round = blocks.newTurn(running.provider)
 				last = undefined
 				prompts.steer(id)
@@ -231,7 +245,11 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					}
 					continue
 				}
-				if (last?.type === 'done') failures = 0
+				if (last?.type === 'done') {
+					failures = 0
+					rounds++
+					last = turns.stopped(last)
+				}
 				if (asking && last?.type === 'done' && !signal.aborted) return turns.ask(id, asking)
 				calls = round.blocks.filter((b) => b.type === 'tool_call')
 				if (last?.type !== 'done') break
@@ -263,7 +281,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	turns.state.running.delete(id)
 	let recorded: ReturnType<typeof history.readSync>[number] | undefined
 	try {
-		history.end(id, failure !== undefined ? { type: 'error', message: failure } : last)
+		history.end(id, failure !== undefined ? { type: 'error', message: failure } : last, capped)
 		recorded = history.readSync(id).at(-1)
 	} catch (e: any) {
 		failure ??= String(e?.message ?? e)
@@ -276,9 +294,18 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	}
 	host.broadcast(id, end)
 	// Paused already, unless something other than the user aborted it.
-	if (end.status === 'paused') status.transition(id, { type: 'pause' })
+	if (end.status === 'paused') status.transition(id, capped === undefined ? { type: 'pause' } : { type: 'pause', reason: capped })
 	else status.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
 	if (end.status === 'completed') prompts.next(id)
+}
+
+// A round's end as the turn takes it: one cut off (max_tokens, or the
+// context window) or refused is an error saying why, so none of its
+// tool calls runs; any other end stands.
+function stopped(done: DoneEvent): DoneEvent | ErrorEvent {
+	if (done.reason === 'max_tokens') return { type: 'error', message: 'Response stopped: max_tokens' }
+	if (done.reason === 'refusal') return { type: 'error', message: `Refused: ${done.explanation ?? 'the provider gave no explanation'}` }
+	return done
 }
 
 // The usage an unfinished turn had when it was last parked at a
@@ -329,6 +356,7 @@ export const turns = {
 	leftWork,
 	runTurn,
 	parkedUsage,
+	stopped,
 	waitOut,
 	backoffMs,
 }

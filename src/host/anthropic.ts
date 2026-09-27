@@ -158,6 +158,10 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 	// Tool input arrives as JSON fragments per content block index.
 	let tools = new Map<number, { id: string; name: string; json: string; input: unknown }>()
 	let reason: StopReason | undefined
+	let explanation: string | undefined
+	// A call whose input is not JSON: cut off by max_tokens (then it is
+	// no call) or broken (an error once the stop reason says which).
+	let broken: { name: string; json: string } | undefined
 	for await (let m of messages) {
 		let ev = JSON.parse(m.data)
 		switch (ev.type) {
@@ -197,8 +201,8 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 					}
 				}
 				if (!input || typeof input !== 'object' || Array.isArray(input)) {
-					yield { type: 'error', message: `Invalid JSON input for tool call '${t.name}'`, body: t.json }
-					return
+					broken ??= { name: t.name, json: t.json }
+					break
 				}
 				yield { type: 'tool_call', id: t.id, name: t.name, input: input as Record<string, unknown> }
 				break
@@ -207,11 +211,17 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 				let u = usage(ev.usage)
 				if (u) yield { type: 'usage', usage: u }
 				if (ev.delta?.stop_reason) reason = reasons[ev.delta.stop_reason] ?? 'end'
+				if (typeof ev.delta?.stop_details?.explanation === 'string') explanation = ev.delta.stop_details.explanation
 				break
 			}
-			case 'message_stop':
-				yield { type: 'done', reason: reason ?? 'end' }
+			case 'message_stop': {
+				if (broken && reason !== 'max_tokens') {
+					yield { type: 'error', message: `Invalid JSON input for tool call '${broken.name}'`, body: broken.json }
+					return
+				}
+				yield { type: 'done', reason: reason ?? 'end', ...(explanation !== undefined && { explanation }) }
 				return
+			}
 			case 'error': {
 				let e = ev.error ?? {}
 				yield { type: 'error', message: e.message ?? 'Stream error', status: errorStatus[e.type], body: m.data }

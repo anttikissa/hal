@@ -47,6 +47,15 @@ const toolUse = (path: string) => [
 	sseEvent({ type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 3 } }),
 	sseEvent({ type: 'message_stop' }),
 ]
+// "bash <command>" asks for the bash tool.
+const bashUse = (command: string) => [
+	sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }),
+	sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_b', name: 'bash', input: {} } }),
+	sseEvent({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ command, description: 'Run it' }) } }),
+	sseEvent({ type: 'content_block_stop', index: 0 }),
+	sseEvent({ type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 3 } }),
+	sseEvent({ type: 'message_stop' }),
+]
 const toolAnswer = (result: any) => [
 	sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }),
 	textDelta(`SAW(${String(result.content).split('\n')[0]})`),
@@ -67,6 +76,7 @@ function reply(req: Request, body: any): Response {
 	if (lastBlock.type === 'tool_result') return sse([sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }), ...toolAnswer(lastBlock)])
 	let prompt: string = bare(lastBlock.text)
 	if (prompt.startsWith('read ')) return sse(toolUse(prompt.slice(5)))
+	if (prompt.startsWith('bash ')) return sse(bashUse(prompt.slice(5)))
 	let stream = new ReadableStream<Uint8Array>({
 		start(c) {
 			c.enqueue(sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }))
@@ -254,6 +264,19 @@ test('Ctrl-C of the last Hal process pauses the turn, and the next start leaves 
 	await until('the paused turn', () => seen(b, 'PART1') && seen(b, 'Enter continues'))
 	await Bun.sleep(200)
 	expect(requests).toHaveLength(1)
+}, 30_000)
+
+test('Ctrl-C of the last Hal process kills a running command, background jobs included', async () => {
+	let marker = `32.${process.pid}3`
+	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
+	let a = run()
+	await until('a session', () => sessionCount() === 1)
+	type(a, `bash sleep ${marker} & sleep ${marker}\r`)
+	await until('the command to run', alive)
+	type(a, '\x03')
+	await until('quit', () => a.exit !== undefined)
+	await until('no sleep left', () => !alive())
+	expect(ends()).toEqual(['paused'])
 }, 30_000)
 
 test('a host restarted mid-turn continues it, and everyone rejoins', async () => {

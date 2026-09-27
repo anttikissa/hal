@@ -25,13 +25,9 @@ export const tool: Tool = {
 		if (typeof input.command !== 'string' || !input.command.trim()) throw new Error('command must be a non-empty string')
 		if (typeof input.description !== 'string' || !input.description.trim()) throw new Error('description must be a non-empty sentence; the command did not run')
 		if (ctx.signal.aborted) throw new Error('cancelled; the command did not run')
-		// Its own process group, so cancel stops pipelines and children too.
+		// Its own process group, so a stop reaches pipelines and background jobs too.
 		let child = spawn('bash', ['-c', `exec 2>&1\n${input.command}`], { cwd: ctx.cwd, detached: true, stdio: ['ignore', 'pipe', 'ignore'] })
-		let kill = () => {
-			try {
-				process.kill(-child.pid!, 'SIGKILL')
-			} catch {}
-		}
+		let kill = () => tools.killGroup(child.pid!)
 		ctx.signal.addEventListener('abort', kill, { once: true })
 		// Keep only what can be shown; drain the rest so the command is not blocked.
 		let out = ''
@@ -42,7 +38,7 @@ export const tool: Tool = {
 			child.on('error', fail)
 			child.on('close', (code, sig) => {
 				ctx.signal.removeEventListener('abort', kill)
-				let status = ctx.signal.aborted ? 'cancelled' : sig ? `killed by ${sig}` : `exit ${code}`
+				let status = ctx.signal.aborted ? 'stopped by the user' : sig ? `killed by ${sig}` : `exit ${code}`
 				done(`[${status}]\n${out}`)
 			})
 		})

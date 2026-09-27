@@ -270,11 +270,15 @@ function broadcast(id: string, event: Event): void {
 // Whenever this process exits while it is host, writes the output of
 // running turns so far and leaves them unfinished, for the next host to
 // continue; or, if the user quit the last Hal process (quitting()),
-// records them paused. Idempotent.
+// records them paused and stops their tools (a running bash is killed).
+// Idempotent.
 function init(): void {
 	if (host.state.inited) return
 	host.state.inited = true
-	process.on('exit', () => history.stop(host.state.pauseOnExit))
+	process.on('exit', () => {
+		history.stop(host.state.pauseOnExit)
+		if (host.state.pauseOnExit) for (let r of turns.state.running.values()) r.controller.abort()
+	})
 	clock.init()
 }
 

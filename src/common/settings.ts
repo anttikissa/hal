@@ -36,6 +36,12 @@ const table: Setting[] = [
 		default: 7,
 		description: 'Pasted text longer than this many lines becomes an attachment.',
 	},
+	{
+		name: 'maxRounds',
+		type: { kind: 'integer', min: 1, max: 100000 },
+		default: 200,
+		description: 'Provider rounds one turn may run before it pauses; Enter continues for as many again.',
+	},
 	{ name: 'webPassword', type: { kind: 'secret' }, default: 'hello123', description: 'Password for the browser client.' },
 	{ name: 'webPort', type: { kind: 'integer', min: 1, max: 65535 }, default: 9002, description: 'Port for the browser client (127.0.0.1).' },
 ]
@@ -94,4 +100,5 @@ export const settings = {
 	webPort: (): number => settings.value('webPort') as number,
 	promptRows: (): number => settings.value('promptRows') as number,
 	pasteLines: (): number => settings.value('pasteLines') as number,
+	maxRounds: (): number => settings.value('maxRounds') as number,
 }

@@ -163,6 +163,11 @@ test('finish reasons map to neutral stop reasons; a server that omits [DONE] sti
 	}
 })
 
+test('a tool call cut off by the length limit is no call', async () => {
+	reply = () => sse({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'a', function: { name: 'ls', arguments: '{"pa' } }] } }] }, finish('length'), '[DONE]')
+	expect(await run('fake/m')).toEqual([{ type: 'done', reason: 'max_tokens' }])
+})
+
 test('errors: HTTP status, error chunk, bad tool JSON, stream cut before finish', async () => {
 	reply = () => new Response('{"error":{"message":"bad key"}}', { status: 401 })
 	expect(await run('fake/m')).toEqual([expect.objectContaining({ type: 'error', status: 401, body: expect.stringContaining('bad key') })])

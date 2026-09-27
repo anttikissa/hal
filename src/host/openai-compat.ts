@@ -111,6 +111,8 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 					input = JSON.parse(call.args || '{}')
 				} catch {}
 				if (!input || typeof input !== 'object' || Array.isArray(input)) {
+					// Cut off by the length limit: no call at all.
+					if (reason === 'max_tokens') continue
 					yield { type: 'error', message: `Invalid JSON arguments for tool call '${call.name}'`, body: call.args }
 					return
 				}

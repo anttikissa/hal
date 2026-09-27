@@ -197,14 +197,15 @@ function results(id: string, list: ToolResultBlock[]): void {
 // Ends the running turn, with the usage of all its rounds: `last` is
 // how its last round ended (none, or cancelled: the user paused it).
 // Does nothing for a turn not running here, or already ended.
-function end(id: string, last: DoneEvent | ErrorEvent | undefined): void {
+// `pauseReason`: why Hal, not the user, paused a turn that ended paused.
+function end(id: string, last: DoneEvent | ErrorEvent | undefined, pauseReason?: string): void {
 	let running = history.state.running.get(id)
 	if (!running) return
 	history.state.running.delete(id)
 	let usage = addUsage(running.prior, running.turn.usage)
 	if (last?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: last.reason, usage })
 	else if (last?.type === 'error' && !last.cancelled) history.append(id, { type: 'turn_end', status: 'error', error: last.message, usage })
-	else history.append(id, { type: 'turn_end', status: 'paused', usage })
+	else history.append(id, { type: 'turn_end', status: 'paused', usage, ...(pauseReason !== undefined && { pauseReason }) })
 }
 
 // Stops recording the running turn without ending it: it asked a

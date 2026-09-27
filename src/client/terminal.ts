@@ -67,8 +67,9 @@ function realIO(): TerminalIO {
 		onExit(fn) {
 			// Uncaught errors still emit 'exit'; these signals do not.
 			process.on('exit', fn)
-			process.on('SIGTERM', () => process.exit(143))
-			process.on('SIGHUP', () => process.exit(129))
+			// A deliberate quit, like Ctrl-C (tasks/j1/states.md).
+			process.on('SIGTERM', () => terminal.quit(143))
+			process.on('SIGHUP', () => terminal.quit(129))
 		},
 		size: () => ({ rows: process.stdout.rows || 24, cols: process.stdout.columns || 80 }),
 		onResize: (fn) => process.stdout.on('resize', fn),
@@ -95,12 +96,12 @@ function leave(): void {
 	io.setRawMode(false)
 }
 
-function quit(): void {
+function quit(code = 0): void {
 	try {
 		terminal.onQuit()
 	} catch {}
 	terminal.leave()
-	terminal.state.io!.exit(0)
+	terminal.state.io!.exit(code)
 }
 
 function restart(): void {
@@ -167,7 +168,7 @@ function deliver(events: KeyEvent[]): void {
 function init(io: TerminalIO = terminal.realIO()): void {
 	if (terminal.state.io) return
 	terminal.state.io = io
-	// Safety net for exits that skip quit(): uncaught errors, SIGTERM.
+	// Safety net for exits that skip quit(): uncaught errors.
 	io.onExit(() => terminal.leave())
 	// Raw first: read in cooked mode, Bun loses a key typed at startup.
 	terminal.enter()

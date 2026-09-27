@@ -243,6 +243,18 @@ test('stop reasons map to neutral ones', async () => {
 	}
 })
 
+test('a tool call cut off by max_tokens is no call; a refusal keeps its explanation', async () => {
+	let tool = (json: string) => [
+		{ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 't', name: 'ls', input: {} } },
+		{ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: json } },
+		{ type: 'content_block_stop', index: 0 },
+	]
+	reply = () => sse(start(), ...tool('{"pa'), ...stop('max_tokens'))
+	expect(await run()).toEqual([{ type: 'done', reason: 'max_tokens' }])
+	reply = () => sse(start(), { type: 'message_delta', delta: { stop_reason: 'refusal', stop_details: { explanation: 'No.' } }, usage: {} }, { type: 'message_stop' })
+	expect(await run()).toEqual([{ type: 'done', reason: 'refusal', explanation: 'No.' }])
+})
+
 test('errors: HTTP status, error event mid-stream, bad tool JSON, stream cut short', async () => {
 	reply = () => new Response('{"type":"error","error":{"type":"authentication_error","message":"bad token"}}', { status: 401 })
 	expect(await run()).toEqual([expect.objectContaining({ type: 'error', status: 401, failure: 'auth', body: expect.stringContaining('bad token') })])

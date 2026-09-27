@@ -11,6 +11,7 @@
 // Calls run one after another in call order (turns.ts), never in
 // parallel: a later call may rely on an earlier one (spawn, then wait).
 
+import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import type { ToolDef } from './provider.ts'
@@ -82,6 +83,20 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	return result
 }
 
+// Stops a tool's process group: SIGTERM now, SIGKILL killAfterMs later
+// for whatever ignored it (a background job outlives bash itself). The
+// SIGKILL comes from a detached sh, so it still arrives when Hal exits
+// first: quitting the last Hal process aborts every turn in its exit
+// handler (host.ts).
+function killGroup(pgid: number): void {
+	try {
+		process.kill(-pgid, 'SIGTERM')
+	} catch {
+		return
+	}
+	spawn('sh', ['-c', `sleep ${tools.killAfterMs() / 1000}; kill -9 -${pgid} 2>/dev/null`], { detached: true, stdio: 'ignore' }).unref()
+}
+
 export const tools = {
 	dir,
 	all,
@@ -94,6 +109,8 @@ export const tools = {
 	// Unknown tools count as having side effects.
 	readOnly: (name: string): boolean => tools.all().get(name)?.readOnly === true,
 	defs: (): ToolDef[] => [...tools.all().values()].map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
+	killAfterMs: () => 2000,
 	page,
 	run,
+	killGroup,
 }

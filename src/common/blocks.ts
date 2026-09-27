@@ -36,7 +36,8 @@ export type Usage = { input?: number; output?: number; cacheRead?: number; cache
 
 export type StopReason = 'end' | 'tool_use' | 'max_tokens' | 'refusal'
 
-export type DoneEvent = { type: 'done'; reason: StopReason }
+// `explanation`: why the provider refused, if it said.
+export type DoneEvent = { type: 'done'; reason: StopReason; explanation?: string }
 export type ErrorEvent = {
 	type: 'error'
 	message: string
