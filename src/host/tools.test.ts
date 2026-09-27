@@ -7,6 +7,7 @@ let dir = ''
 const signal = new AbortController().signal
 const origMaxLines = tools.maxLines
 const origMaxChars = tools.maxChars
+const origDir = tools.dir
 
 beforeEach(() => {
 	dir = mkdtempSync(`${tmpdir()}/hal-tools-`)
@@ -15,6 +16,7 @@ beforeEach(() => {
 afterEach(() => {
 	tools.maxLines = origMaxLines
 	tools.maxChars = origMaxChars
+	tools.dir = origDir
 	rmSync(dir, { recursive: true, force: true })
 })
 
@@ -24,6 +26,39 @@ test('every tool is offered to the model with an object schema', () => {
 	let defs = tools.defs()
 	expect(defs.map((d) => d.name)).toContain('read')
 	for (let d of defs) expect(d.inputSchema.type).toBe('object')
+})
+
+const echo = (name: string, readOnly: boolean) => `export const tool = {
+	name: '${name}', description: 'echo', parameters: { type: 'object', properties: {} }, ${readOnly ? 'readOnly: true,' : ''}
+	run: async (input) => 'echo ' + JSON.stringify(input),
+}
+`
+
+test('a tool file dropped into the tools directory is offered and run, nothing else changed', async () => {
+	let toolDir = `${dir}/tools`
+	mkdirSync(toolDir)
+	writeFileSync(`${toolDir}/echo.ts`, echo('echo', true))
+	writeFileSync(`${toolDir}/echo.test.ts`, 'throw new Error("tests are not tools")')
+	writeFileSync(`${toolDir}/notes.md`, 'not a tool')
+	tools.dir = () => toolDir
+	expect(tools.defs()).toEqual([{ name: 'echo', description: 'echo', inputSchema: { type: 'object', properties: {} } }])
+	expect(tools.readOnly('echo')).toBe(true)
+	let result = await tools.run({ type: 'tool_call', id: 'e1', name: 'echo', input: { a: 1 } }, { cwd: dir, signal })
+	expect(result).toEqual({ type: 'tool_result', id: 'e1', output: 'echo {"a":1}' })
+})
+
+test('a tool file must be named like its tool', () => {
+	let toolDir = `${dir}/tools`
+	mkdirSync(toolDir)
+	writeFileSync(`${toolDir}/wrong.ts`, echo('other', false))
+	tools.dir = () => toolDir
+	expect(() => tools.defs()).toThrow('wrong.ts')
+})
+
+test('only tools that change nothing count as read-only; unknown ones do not', () => {
+	expect(tools.readOnly('read')).toBe(true)
+	expect(tools.readOnly('bash')).toBe(false)
+	expect(tools.readOnly('nope')).toBe(false)
 })
 
 test('read returns a file relative to the session cwd, answering the call id', async () => {

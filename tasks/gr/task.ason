@@ -1,7 +1,13 @@
 {
 	title: 'Tools as files',
 	description: 'Every model tool is one file in src/host/tools/, named like the tool (read.ts, bash.ts), found by listing the directory the way src/host/commands.ts finds slash commands, so adding a tool touches nothing else. Each file exports `tool`: its definition (name, description, parameters), readOnly when running it changes nothing (task wb), and run(input, ctx). src/host/tools.ts keeps only the registry: listing, provider definitions, dispatch, readOnly lookup. Tools run one after another in call order, as now: later tools (spawn then wait) rely on it.',
-	status: 'planned',
+	status: 'done',
 	needs: ['1r'],
+	notes: [
+		'Tool is flat: { name, description, parameters, readOnly?, run }. tools.defs() maps parameters to the provider ToolDef inputSchema; providers are unchanged.',
+		'tools.all() re-lists src/host/tools/ on every call (require caches the modules), skips *.test.ts and throws when a file names a different tool. Tests point tools.dir at a temp directory holding a self-contained tool file to test discovery.',
+		'Shared helpers (page, maxChars, maxLines, maxFileBytes) stay on the tools object in tools.ts; tool files import { tools } from ../tools.ts and call them through it, so overrides still apply.',
+		"Lookup happens inside tools.run's try, so a broken tool file becomes an error result rather than an exception in the turn."
+	],
 	foldInto: ['sj', '1r']
 }

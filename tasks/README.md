@@ -54,6 +54,9 @@ point to it.
 - Slash commands are files in `src/host/commands/` (one per command,
   found by listing the directory; `src/host/commands.ts`). They run and
   complete on the host; a command that asks re-runs with the answer.
+- Model tools are files in `src/host/tools/` the same way (one per
+  tool, exporting `tool`; `src/host/tools.ts` is the registry). Calls
+  run one after another in call order, never in parallel.
 - Settings: common ones in config.ason (home root, declared in one
   table in src/common/settings.ts, task pc); anything else by
   overriding exported functions or fields from gitignored `local.ts`.
