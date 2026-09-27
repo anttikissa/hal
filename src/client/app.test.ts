@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { drafts } from '../common/drafts.ts'
+import { drafts, type Local } from '../common/drafts.ts'
 import { modals } from '../common/modals.ts'
 import { placeholders } from '../common/placeholders.ts'
 import type { Event, Snapshot, Tab } from '../common/protocol.ts'
@@ -437,7 +437,7 @@ const shown = () => app.view().tabs?.focused
 
 test('a saved draft shown on starting is not doubled; text typed before it follows it', () => {
 	let store = drafts.store
-	let stored = new Map([['a', { text: 'saved', base: 0, dirty: true, sending: [] }]])
+	let stored = new Map<string, Local>([['a', { text: 'saved', base: 0, dirty: true, sending: [] }]])
 	drafts.store = { load: (id) => stored.get(id) && structuredClone(stored.get(id)), save: (id, l) => void stored.set(id, structuredClone(l)) }
 	try {
 		app.onEvent(tabsEvent('a', 'b'))
