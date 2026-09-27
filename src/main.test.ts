@@ -3,6 +3,21 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 
+test('a home too deep for a Unix socket is one clear error, not a stack', () => {
+	let home = join(mkdtempSync(join(tmpdir(), 'hal2-main-')), 'x'.repeat(100))
+	try {
+		let out = Bun.spawnSync(['./run'], { cwd: `${import.meta.dir}/..`, env: { ...process.env, HAL_HOME: home } })
+		let err = out.stderr.toString()
+		expect(out.exitCode).toBe(1)
+		expect(err).toContain(`${home}/state/host.sock`)
+		expect(err).toContain('103')
+		expect(err).toContain('HAL_HOME')
+		expect(err).not.toMatch(/^\s+at /m)
+	} finally {
+		rmSync(join(home, '..'), { recursive: true, force: true })
+	}
+})
+
 test('./run without a terminal says so and fails', () => {
 	// A temp home keeps the user's real local.ts out of the test.
 	let home = mkdtempSync(join(tmpdir(), 'hal2-main-'))

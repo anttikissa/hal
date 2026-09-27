@@ -69,9 +69,17 @@ async function serve(): Promise<boolean> {
 	return true
 }
 
+// Why this home can't have a host socket, or undefined: sockaddr_un
+// holds 104 bytes on macOS (108 on Linux), NUL included.
+function pathProblem(path = server.socketPath()): string | undefined {
+	let bytes = Buffer.byteLength(path)
+	if (bytes > 103) return `the socket path ${path} is ${bytes} bytes, over the 103-byte limit for Unix sockets; use a shorter HAL_HOME`
+	return undefined
+}
+
 async function listen(path: string): Promise<Server> {
-	// sockaddr_un holds 104 bytes on macOS (108 on Linux), NUL included.
-	if (Buffer.byteLength(path) > 103) throw new Error(`socket path too long: ${path}`)
+	let problem = server.pathProblem(path)
+	if (problem) throw new Error(problem)
 	rmSync(path, { force: true })
 	let listener = createServer((socket) => server.accept(socket))
 	await new Promise<void>((resolve, reject) => {
@@ -129,6 +137,7 @@ export const server = {
 	},
 	lockPath,
 	socketPath,
+	pathProblem,
 	tryLock,
 	serve,
 	listen,

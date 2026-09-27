@@ -121,8 +121,8 @@ function is(c: Command): c is TabCommand {
 	return c.type.startsWith('tab-')
 }
 
-// Carries out a tab command. `deliver` answers the client that sent it.
-function act(c: TabCommand, deliver: (event: Event) => void): Outcome {
+// Carries out a tab command; a change goes to every client.
+function act(c: TabCommand): Outcome {
 	let f = tabs.file()
 	let before = JSON.stringify(f)
 	let outcome: Outcome = {}
@@ -139,7 +139,6 @@ function act(c: TabCommand, deliver: (event: Event) => void): Outcome {
 	}
 	if (outcome.refused !== undefined) return outcome
 	if (JSON.stringify(tabs.file()) !== before) tabs.publish()
-	else if (c.type === 'tab-start') deliver({ type: 'tabs', tabs: tabs.list() })
 	return outcome
 }
 

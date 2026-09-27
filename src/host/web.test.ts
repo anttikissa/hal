@@ -68,8 +68,8 @@ async function until(check: () => unknown): Promise<void> {
 	throw new Error('timed out')
 }
 
-async function dial(cookieHeader?: string) {
-	let ws = new WebSocket(`${base().replace('http', 'ws')}/ws`, { headers: cookieHeader ? { cookie: cookieHeader } : {} } as any)
+async function dial(cookieHeader?: string, query = '') {
+	let ws = new WebSocket(`${base().replace('http', 'ws')}/ws${query}`, { headers: cookieHeader ? { cookie: cookieHeader } : {} } as any)
 	sockets.push(ws)
 	let events: any[] = []
 	ws.onmessage = (m) => events.push(ason.parse(String(m.data)))
@@ -77,7 +77,8 @@ async function dial(cookieHeader?: string) {
 		ws.onopen = () => resolve(true)
 		ws.onerror = () => resolve(false)
 	})
-	return { ws, events, opened, send: (c: unknown) => ws.send(ason.stringify(c, 'short')) }
+	let closed = new Promise<number>((resolve) => ws.addEventListener('close', (e) => resolve(e.code)))
+	return { ws, events, opened, closed, send: (c: unknown) => ws.send(ason.stringify(c, 'short')) }
 }
 
 test('the host serves the web endpoint and stops it with the host', async () => {
@@ -197,8 +198,22 @@ test('over ws, open-newest opens the newest session and bad messages are refused
 	w.ws.send('{ not ason')
 	w.send({ type: 'open-newest', id: 'x1' })
 	await until(() => w.events.some((e) => e.type === 'ack'))
-	expect(w.events.map((e) => e.type)).toEqual(['rejected', 'snapshot', 'ack'])
-	expect(w.events[1].sessionId).toBe(newer)
+	expect(w.events.map((e) => e.type)).toEqual(['tabs', 'rejected', 'snapshot', 'ack'])
+	expect(w.events[2].sessionId).toBe(newer)
+})
+
+test('a page built from other code than the host serves is told to reload; its own is served', async () => {
+	await server.serve()
+	web.start()
+	let html = await (await fetch(`${base()}/`)).text()
+	let version = /data-version="([^"]+)"/.exec(html)![1]!
+	let auth = await cookie()
+	let old = await dial(auth, '?v=older')
+	expect(await old.closed).toBe(4000)
+	expect(old.events).toEqual([])
+	let current = await dial(auth, `?v=${version}`)
+	await until(() => current.events.length)
+	expect(current.events[0].type).toBe('tabs')
 })
 
 test('a submit streams to both a web and an in-memory client', async () => {
@@ -226,7 +241,7 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	let local: Event[] = []
 	let conn = host.connect((e) => local.push(e))
 	conn.send({ type: 'create', cwd: '/tmp', model: 'fake/m' })
-	let id = (local[0] as any).sessionId
+	let id = (local.find((e) => e.type === 'snapshot') as any).sessionId
 
 	let w = await dial(await cookie())
 	expect(w.opened).toBe(true)
@@ -234,14 +249,14 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	w.ws.send('{ not ason')
 	w.send({ type: 'submit', sessionId: id, text: 'hi' })
 	w.send({ type: 'open', sessionId: id })
-	await until(() => w.events.length === 3)
-	expect(w.events.map((e) => e.type)).toEqual(['rejected', 'rejected', 'snapshot'])
+	await until(() => w.events.length === 4)
+	expect(w.events.map((e) => e.type)).toEqual(['tabs', 'rejected', 'rejected', 'snapshot'])
 
 	w.send({ type: 'submit', sessionId: id, text: 'hi' })
 	await until(() => pushes.length === 1)
 	pushes[0]!({ type: 'text', text: 'hello' }, { type: 'done', reason: 'end' })
 	await until(() => w.events.some((e) => e.type === 'turn-end') && local.some((e) => e.type === 'turn-end'))
-	let seen = (events: any[]) => events.filter((e) => e.type !== 'snapshot' && e.type !== 'rejected')
+	let seen = (events: any[]) => events.filter((e) => !['snapshot', 'rejected', 'tabs'].includes(e.type))
 	expect(seen(w.events)).toEqual(seen(local))
 	expect(seen(w.events).map((e) => e.type)).toEqual(['state', 'turn-start', 'state', 'stream', 'turn-end', 'state'])
 

@@ -225,7 +225,8 @@ function start(): void {
 	drafts.store = app.store
 	let scheme = location.protocol === 'https:' ? 'wss' : 'ws'
 	link.start({
-		dial: () => new WebSocket(`${scheme}://${location.host}/ws`),
+		dial: () => new WebSocket(`${scheme}://${location.host}/ws?v=${document.documentElement.dataset.version}`),
+		reload: () => location.reload(),
 		onEvent: (e) => app.onEvent(e),
 		onState: (s) => app.onState(s),
 	})

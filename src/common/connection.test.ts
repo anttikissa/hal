@@ -185,3 +185,27 @@ test('events and drops from a replaced connection are ignored; stop ends retryin
 	await tick()
 	expect(timers).toEqual([])
 })
+
+test('an event that fails its check is not applied: the client gets one plain warning naming it', async () => {
+	answers = ['client']
+	await start()
+	connection.send({ type: 'pause', sessionId: 's' })
+	let id = conns[0]!.sent[0].id
+	events = []
+	// A host on newer code: an ack without its id, a draft shaped differently,
+	// an event type this client doesn't know, and junk.
+	for (let bad of [{ type: 'ack', tab: 3 }, { type: 'draft', sessionId: 's', draft: { text: 1, rev: 0 } }, { type: 'explode', sessionId: 's' }, 'x']) conns[0]!.deliver(bad as any)
+	expect(events.map((e) => e.type)).toEqual(['warning', 'warning', 'warning', 'warning'])
+	let texts = events.map((e) => (e as any).text as string)
+	expect(texts[0]).toContain('ack')
+	expect(texts[1]).toContain('draft')
+	expect(texts[1]).toContain('draft.text')
+	expect(texts[2]).toContain('explode')
+	expect(texts.every((t) => /reload|restart/.test(t))).toBe(true)
+	// The bad ack answered nothing: the command is still pending.
+	expect(connection.state.pending.has(id)).toBe(true)
+	events = []
+	conns[0]!.deliver({ type: 'ack', id })
+	expect(events).toEqual([{ type: 'ack', id }])
+	expect(connection.state.pending.has(id)).toBe(false)
+})

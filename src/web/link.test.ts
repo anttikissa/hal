@@ -8,7 +8,7 @@ class FakeSocket implements Socket {
 	sent: any[] = []
 	onopen: (() => void) | null = null
 	onmessage: ((m: { data: unknown }) => void) | null = null
-	onclose: (() => void) | null = null
+	onclose: ((ev?: { code: number }) => void) | null = null
 	send(data: string) {
 		this.sent.push(ason.parse(data))
 	}
@@ -23,6 +23,8 @@ afterEach(() => {
 	connection.schedule = origSchedule
 })
 
+let reloads = 0
+
 function setup() {
 	let sockets: FakeSocket[] = []
 	let timers: (() => void)[] = []
@@ -35,6 +37,7 @@ function setup() {
 			sockets.push(s)
 			return s
 		},
+		reload: () => reloads++,
 		onEvent: (e) => events.push(e),
 		onState: (s) => states.push(s),
 	})
@@ -67,4 +70,17 @@ test('a socket that never opens is a failed attempt; one that closes redials and
 	sockets[2]!.onopen!()
 	await Bun.sleep(0)
 	expect(sockets[2]!.sent).toEqual(sockets[1]!.sent)
+})
+
+test('a host on other code than the page closes with 4000 and the page reloads; other closes only redial', async () => {
+	reloads = 0
+	let { sockets } = setup()
+	sockets[0]!.onopen!()
+	await Bun.sleep(0)
+	sockets[0]!.onclose!({ code: 1006 })
+	expect(reloads).toBe(0)
+	sockets[1]!.onopen!()
+	await Bun.sleep(0)
+	sockets[1]!.onclose!({ code: 4000 })
+	expect(reloads).toBe(1)
 })

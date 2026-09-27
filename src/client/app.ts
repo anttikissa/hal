@@ -130,8 +130,8 @@ function backfilled(event: Event & { type: 'snapshot' | 'history' }): void {
 	Object.assign(app.state, out.view)
 }
 
-// On every connection the host names the tab to show and sends the tabs:
-// the focused one if any, else the start's.
+// Every connection brings the tabs; tab-start asks the host to name the
+// tab to show: the focused one if any, else the start's.
 function onState(state: LinkState): void {
 	let st = app.state
 	st.notice = state.type === 'connected' ? undefined : 'host lost; reconnecting…'

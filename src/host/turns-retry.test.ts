@@ -141,7 +141,7 @@ test('a rate limit waits for the time the provider gave, visible in snapshots; E
 	expect(status.stateOf(id)).toEqual({ type: 'retrying', at: new Date(at).toISOString(), reason: 'HTTP 429 from fake: quota' })
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
-	expect((b.events[0] as any).snapshot.state).toMatchObject({ type: 'retrying', at: new Date(at).toISOString() })
+	expect((b.events.find((e) => e.type === 'snapshot') as any).snapshot.state).toMatchObject({ type: 'retrying', at: new Date(at).toISOString() })
 	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.ends().length)
 	expect(a.ends()[0]).toMatchObject({ status: 'paused' })

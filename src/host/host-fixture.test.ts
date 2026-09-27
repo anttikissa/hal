@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect } from 'bun:test'
 import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import type { StreamEvent } from '../common/blocks.ts'
-import type { Event } from '../common/protocol.ts'
+import { protocol, type Event } from '../common/protocol.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
@@ -85,6 +85,8 @@ export function client() {
 	let events: Event[] = []
 	let views = new Map<string, Transcript>()
 	let conn = host.connect((e) => {
+		// Every event the host sends passes the check clients make.
+		expect(protocol.invalidEvent(e)).toBeUndefined()
 		events.push(e)
 		let id = 'sessionId' in e ? e.sessionId : undefined
 		if (id) {

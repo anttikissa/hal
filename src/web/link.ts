@@ -1,6 +1,7 @@
 // The browser's transport to the host for the common connection
 // (src/common/connection.ts): one WebSocket at /ws, each message one
-// ASON command or event.
+// ASON command or event. The host closes it with code 4000 when the
+// page was built from other code than the host runs: the page reloads.
 
 import { ason } from '../common/ason.ts'
 import { connection, type Conn, type LinkState, type Transport } from '../common/connection.ts'
@@ -17,11 +18,13 @@ export type Socket = {
 
 export type LinkOptions = {
 	dial: () => Socket
+	// The host runs other code than this page: load it again.
+	reload: () => void
 	onEvent: (event: Event) => void
 	onState?: (state: LinkState) => void
 }
 
-function transport(dial: () => Socket): Transport {
+function transport(dial: () => Socket, reload: () => void = () => {}): Transport {
 	return {
 		connect: (on) =>
 			new Promise((resolve) => {
@@ -41,7 +44,11 @@ function transport(dial: () => Socket): Transport {
 					}
 					on.event(event)
 				}
-				socket.onclose = () => (open ? on.dropped() : resolve(null))
+				socket.onclose = (ev) => {
+					if (ev?.code === 4000) reload()
+					if (open) on.dropped()
+					else resolve(null)
+				}
 			}),
 	}
 }
@@ -49,7 +56,7 @@ function transport(dial: () => Socket): Transport {
 // Connects, and reconnects with backoff whenever the socket drops.
 function start(opts: LinkOptions): void {
 	let startOpts: Parameters<typeof connection.start>[0] = {
-		transport: link.transport(opts.dial),
+		transport: link.transport(opts.dial, opts.reload),
 		onEvent: opts.onEvent,
 		baseMs: link.baseMs(),
 		maxMs: link.maxDelayMs(),

@@ -147,6 +147,12 @@ function shown(): void {
 async function start(): Promise<void> {
 	perf.state.epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || perf.state.epoch
 	perf.mark('imported')
+	// A home too deep for a Unix socket can neither host nor join.
+	let problem = server.pathProblem()
+	if (problem) {
+		process.stderr.write(`hal2: ${problem}\n`)
+		process.exit(1)
+	}
 	// config.ason first, so local.ts sees it and may override settings.*.
 	// Warnings about it reach every client connected to this host.
 	config.init(() => host.warnAll())

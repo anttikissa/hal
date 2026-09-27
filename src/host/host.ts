@@ -54,6 +54,12 @@ function connect(deliver: (event: Event) => void): Connection {
 	let client: Client = { deliver: (e) => deliver(wire(e)), open: new Set() }
 	host.state.clients.add(client)
 	host.warn(client)
+	// The tabs come with the first events, so no client has to ask.
+	try {
+		client.deliver({ type: 'tabs', tabs: tabs.list() })
+	} catch (e: any) {
+		client.deliver({ type: 'warning', text: String(e?.message ?? e) })
+	}
 	return {
 		send: (command) => {
 			if (host.state.clients.has(client)) host.handle(client, wire(command))
@@ -184,7 +190,7 @@ function act(client: Client, c: Command): Outcome | undefined {
 		)
 		return undefined
 	}
-	if (tabs.is(c)) return tabs.act(c, client.deliver)
+	if (tabs.is(c)) return tabs.act(c)
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	// An edit waits for the turn it paused to finish stopping, so nothing
 	// that turn still records lands after the edit.

@@ -10,7 +10,7 @@
 // pending command is sent again on the next connection, and the host
 // ignores repeats, so it never acts twice.
 
-import type { Event } from './protocol.ts'
+import { protocol, type Event } from './protocol.ts'
 import { perf } from './perf.ts'
 
 export type Role = 'host' | 'client'
@@ -154,8 +154,17 @@ function delay(failures: number): number {
 	return Math.min(maxMs, baseMs * 2 ** failures) * (0.5 + connection.random())
 }
 
+// An event the host sent. One that fails its check (a host restarted
+// onto different code) is not applied: the client hears a warning
+// instead.
 function receive(event: Event): void {
 	let st = connection.state
+	let problem = protocol.invalidEvent(event)
+	if (problem) {
+		let type = typeof (event as any)?.type === 'string' ? (event as any).type : 'unknown'
+		let text = `the host sent a ${type} event this client can't read (${problem}); reload the page or restart Hal`
+		return st.opts?.onEvent({ type: 'warning', text })
+	}
 	if (event.type === 'snapshot') st.followed.add(event.sessionId)
 	if (event.type === 'ack') st.pending.delete(event.id)
 	if (event.type === 'rejected' && event.id !== undefined) {

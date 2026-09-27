@@ -12,8 +12,10 @@
 //   GET  /login    204 if the cookie is good, else 401
 //   GET  /ws       WebSocket, one host.adapt() connection (cookie):
 //                  each message is one ASON command, each event one
-//                  ASON message, like a socket client's lines. The page
-//                  gets the tabs with tab-start.
+//                  ASON message, like a socket client's lines; the tabs
+//                  come first. A page built from other code than the
+//                  host's (`?v=`, web.version()) is closed with
+//                  code 4000: reload.
 //   GET  /blob/<session>/<blob>  an attachment of that session
 //                  (cookie; host/blobs.ts): the id is matched whole,
 //                  never used as a path.
@@ -30,7 +32,7 @@ import { host } from './host.ts'
 const cookieName = 'hal'
 const tenYears = 10 * 365 * 24 * 3600
 
-type Data = { conn?: ReturnType<typeof host.adapt> }
+type Data = { conn?: ReturnType<typeof host.adapt>; stale?: boolean }
 type Socket = ServerWebSocket<Data>
 
 function authorized(req: Request): boolean {
@@ -57,14 +59,27 @@ async function plugin(): Promise<BunPlugin> {
 
 // The browser client (src/web/): index.html with main.tsx bundled into
 // it, built on first request and kept for the life of the server. The
-// format is iife: esm output breaks an inline classic script.
-async function build(): Promise<string> {
+// format is iife: esm output breaks an inline classic script. `version`,
+// a hash of the page, is also in it, so a page can tell whether it was
+// built from the host's code.
+async function build(): Promise<{ html: string; version: string }> {
 	let dir = `${import.meta.dir}/../web`
 	let plugins = [await web.plugin()]
 	let out = await Bun.build({ entrypoints: [`${dir}/main.tsx`], target: 'browser', format: 'iife', minify: true, plugins })
 	if (!out.success) throw new AggregateError(out.logs, 'web: bundling src/web/main.tsx failed')
 	let js = (await out.outputs[0]!.text()).replaceAll('</script', '<\\/script')
-	return (await Bun.file(`${dir}/index.html`).text()).replace('/*APP*/', () => js)
+	let html = (await Bun.file(`${dir}/index.html`).text()).replace('/*APP*/', () => js)
+	let version = Bun.hash(html).toString(36)
+	return { html: html.replace('/*VERSION*/', version), version }
+}
+
+// The version of the page this host serves; undefined if it can't build.
+async function version(): Promise<string | undefined> {
+	web.state.page ??= web.build()
+	return web.state.page.then(
+		(p) => p.version,
+		() => undefined,
+	)
 }
 
 const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
@@ -89,7 +104,7 @@ async function page(): Promise<Response> {
 	web.state.page ??= web.build()
 	let html: string
 	try {
-		html = await web.state.page
+		html = (await web.state.page).html
 	} catch (e: any) {
 		web.state.page = null
 		diag.log(`${e?.message ?? e}: ${e?.errors?.join('\n') ?? ''}`)
@@ -111,7 +126,7 @@ async function login(req: Request): Promise<Response> {
 	return new Response(null, { status: 204, headers: { 'set-cookie': cookie.serialize() } })
 }
 
-function fetch(req: Request, srv: Server<Data>): Response | Promise<Response> | undefined {
+function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | undefined> | undefined {
 	let { pathname } = new URL(req.url)
 	if ((pathname === '/' || session.isId(pathname.slice(1))) && req.method === 'GET') return web.page()
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
@@ -121,7 +136,15 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response> | 
 	if (!web.authorized(req)) return new Response('log in first\n', { status: 401 })
 	if (blob) return web.blob(pathname)
 	if (check) return new Response(null, { status: 204 })
-	if (srv.upgrade(req, { data: {} })) return undefined
+	return web.upgrade(req, srv)
+}
+
+// A page built from other code than the host's (a restart onto newer
+// code) is told to reload: opened, then closed with code 4000.
+async function upgrade(req: Request, srv: Server<Data>): Promise<Response | undefined> {
+	let v = new URL(req.url).searchParams.get('v')
+	let stale = v !== null && v !== (await web.version())
+	if (srv.upgrade(req, { data: { stale } })) return undefined
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
 }
 
@@ -136,6 +159,7 @@ function blob(pathname: string): Response {
 
 const websocket = {
 	open(ws: Socket) {
+		if (ws.data.stale) return ws.close(4000, 'reload')
 		ws.data.conn = host.adapt((message) => ws.send(message))
 	},
 	message(ws: Socket, message: string | Buffer) {
@@ -166,7 +190,7 @@ async function stop(): Promise<void> {
 }
 
 export const web = {
-	state: { server: null as Server<Data> | null, page: null as Promise<string> | null },
+	state: { server: null as Server<Data> | null, page: null as Promise<{ html: string; version: string }> | null },
 	// config.ason's webPort and webPassword; overridable from local.ts.
 	port: (): number => settings.webPort(),
 	password: (): string => settings.webPassword(),
@@ -175,7 +199,9 @@ export const web = {
 	compiler,
 	plugin,
 	build,
+	version,
 	page,
+	upgrade,
 	login,
 	blob,
 	fetch,

@@ -26,7 +26,7 @@ function onEvent(event: Event): boolean {
 	return true
 }
 
-// The host sends tabs to a client that starts; each connection does.
+// Each connection brings the tabs; tab-start picks the one to show.
 function connected(): void {
 	let last = app.state.shown ?? router.parse(router.href()) ?? router.store.load()
 	connection.send(last ? { type: 'tab-start', last } : { type: 'tab-start' })

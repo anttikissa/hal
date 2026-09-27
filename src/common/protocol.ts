@@ -118,7 +118,7 @@ export type Command = (
 	// The tab a starting client shows: `last` if still open and in cwd,
 	// else the first open tab in cwd, else a new tab in cwd. With no cwd
 	// (the browser) any tab counts, and a new one goes in the host's
-	// working directory.
+	// working directory. The tabs themselves come on connecting.
 	| { type: 'tab-start'; cwd?: string; last?: string }
 	// A client showed the tab: it no longer wants attention.
 	| { type: 'tab-seen'; sessionId: string }
@@ -199,8 +199,8 @@ export type Event =
 	// Something the user should fix (config.ason, a marker naming no
 	// attachment of the session); not tied to a session.
 	| { type: 'warning'; text: string }
-	// The tabs changed (or a client started): every tab, in order. Sent
-	// to every client; which one a client shows is its own business.
+	// The tabs changed, or the client just connected: every tab, in
+	// order. Sent to every client; which one a client shows is its own business.
 	| { type: 'tabs'; tabs: Tab[] }
 	// The session's draft changed; `command` is the id of the command
 	// that changed it (a draft, or a submit that sent it).
@@ -244,4 +244,56 @@ function invalid(value: unknown): string | undefined {
 	return str('sessionId') ?? (c.type === 'draft' || c.type === 'complete' ? str('text') : undefined)
 }
 
-export const protocol = { commandTypes, invalid }
+// What each event carries, checked by clients (connection.ts) before
+// use: a page or terminal can outlive a host restart onto newer code.
+// s: string, i: integer, o: object, a: list, S: list of strings, with
+// ? for optional. Nested fields are named with a dot.
+const eventFields: Record<EventType, Record<string, string>> = {
+	snapshot: { sessionId: 's', snapshot: 'o', 'snapshot.meta': 'o', 'snapshot.history': 'a', 'snapshot.state': 'o' },
+	'turn-start': { sessionId: 's', provider: 's', prompt: 's?', images: 'a?', command: 's?' },
+	history: { sessionId: 's', before: 'i', records: 'a', older: 'i?' },
+	state: { sessionId: 's', state: 'o', 'state.type': 's' },
+	inbox: { sessionId: 's', inbox: 'a' },
+	prompt: { sessionId: 's', texts: 'S', senders: 'a?', images: 'a?', command: 's?' },
+	stream: { sessionId: 's', event: 'o', 'event.type': 's' },
+	'tool-results': { sessionId: 's', results: 'a' },
+	'turn-end': { sessionId: 's', status: 's', usage: 'o?', error: 's?' },
+	question: { sessionId: 's', id: 's', form: 'o' },
+	answer: { sessionId: 's', question: 's', answers: 'o', secrets: 'S?' },
+	command: { sessionId: 's', text: 's', from: 's?', command: 's?' },
+	output: { sessionId: 's', text: 's' },
+	meta: { sessionId: 's', meta: 'o' },
+	completions: { sessionId: 's', text: 's', items: 'S' },
+	models: { sessionId: 's', current: 's', items: 'S' },
+	attached: { sessionId: 's', command: 's', blob: 's', marker: 's' },
+	warning: { text: 's' },
+	tabs: { tabs: 'a' },
+	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },
+	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },
+	ack: { id: 's', tab: 's?' },
+}
+
+const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+const kinds: Record<string, (v: unknown) => boolean> = {
+	s: (v) => typeof v === 'string',
+	i: (v) => Number.isInteger(v),
+	o: isObject,
+	a: Array.isArray,
+	S: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
+}
+const kindNames: Record<string, string> = { s: 'a string', i: 'an integer', o: 'an object', a: 'a list', S: 'a list of strings' }
+
+// Why `value` is not an event this client understands, or undefined.
+function invalidEvent(value: unknown): string | undefined {
+	if (!isObject(value)) return 'event must be an object'
+	if (typeof value.type !== 'string' || !Object.hasOwn(eventFields, value.type)) return `unknown event type ${JSON.stringify(value.type)}`
+	for (let [path, kind] of Object.entries({ ...eventFields[value.type as EventType], n: 'i?' })) {
+		let v = path.split('.').reduce<unknown>((o, key) => (isObject(o) ? o[key] : undefined), value)
+		if (v === undefined && kind.endsWith('?')) continue
+		if (!kinds[kind[0]!]!(v)) return `${value.type}: ${path} must be ${kindNames[kind[0]!]}`
+	}
+	if (value.type === 'tabs' && !(value.tabs as unknown[]).every((t) => isObject(t) && ['id', 'name', 'cwd'].every((k) => typeof t[k] === 'string'))) return 'tabs: every tab needs an id, name and cwd'
+	return undefined
+}
+
+export const protocol = { commandTypes, invalid, invalidEvent }
