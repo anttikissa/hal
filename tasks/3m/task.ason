@@ -1,10 +1,8 @@
 {
 	title: 'frame.ts split into cohesive modules',
 	description: 'src/client/frame.ts is no longer than 400 lines (task 0j); what it holds is split by job into client modules, each with its own exported object (tasks/README.md), with frame.test.ts following the split. Decide the cut from the code as it is when this task runs; do not plan a module map ahead. Rendering output does not change: every existing frame and render test passes unchanged except for imports. Take frame.ts off the size exception list.',
-	status: 'planned',
-	needs: [
-		'0j'
-	],
+	status: 'done',
+	needs: ['0j'],
 	foldInto: [
 		'cc',
 		'b3',
@@ -21,6 +19,7 @@
 	],
 	notes: [
 		'At planning time frame.ts had 417 lines, built by tasks cc, b3, sj, 1r, 1w, nn, 2r, rw, w4, 6f, kv and et. Obvious seams then: modal compositing (withModal, modalBox; task kv), forms rendering (formLines; w4), per-item transcript rendering and styling (paint, toolStyle; 1w). Check they still are.',
-		'Prompt editing tasks (1x, 8m) and terminal tabs (7w, vq) will add prompt-box and tab-bar rendering next; leave room for them rather than filling one new module to 399 lines.'
+		'Prompt editing tasks (1x, 8m) and terminal tabs (7w, vq) will add prompt-box and tab-bar rendering next; leave room for them rather than filling one new module to 399 lines.',
+		'Cut made: ansi.ts (escape constants, sgr, paint, clean, wrap), item-view.ts (item rows and styles, quoteLines, resultRows), form-view.ts (formLines, fieldLines), prompt-view.ts (layoutPrompt, prompt markers FIRST/REST and mark), modal-view.ts (box, border, list, overlay, withModal); frame.ts keeps View, Frame and build. Only frame.build is used outside; tests go through it, with form and modal tests in form-view.test.ts and modal-view.test.ts. Prompt-box rendering belongs in prompt-view.ts, a tab bar in a new module.'
 	]
 }

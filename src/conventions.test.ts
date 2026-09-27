@@ -112,7 +112,6 @@ const maxLines = 400
 const sizeExceptions: Record<string, string> = {
 	'common/ason.ts': 'one cohesive format: parser and stringifier belong together',
 	'host/host.ts': 'split planned in task yq',
-	'client/frame.ts': 'split planned in task 3m',
 	'web/page.ts': 'split planned in task 1b',
 }
 

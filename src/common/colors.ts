@@ -6,7 +6,7 @@
 // OKLCH [lightness, chroma, hue]: equal L and C across hues look equally
 // bright and vivid.
 //
-// The terminal turns styles into escape codes (client/frame.ts); the
+// The terminal turns styles into escape codes (client/ansi.ts); the
 // host turns them into CSS for the web page (host/web.ts), which never
 // sees these functions. A style key becomes a CSS class in kebab case:
 // toolBash is .tool-bash.
