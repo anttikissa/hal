@@ -83,11 +83,14 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Question mark { background: currentColor; color: var(--canvas); }
 .Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--canvas); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem; }
 .Picker[open] { display: flex; flex-direction: column; gap: 0.4rem; }
+.Picker .top { display: flex; align-items: center; gap: 0.6ch; }
+.Picker .title { flex: 1; min-width: 0; }
+.Picker .close { background: transparent; color: inherit; padding: 0.2rem 0.6rem; }
 .Picker ul { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
 .Picker li { padding: 0 0.4rem; cursor: pointer; }
 .Picker li[aria-selected="true"] { background: var(--button); }
 /* Apple HIG: touch targets at least 44x44pt. */
-@media (pointer: coarse) { .Picker li { min-height: 44px; display: flex; align-items: center; } }
+@media (pointer: coarse) { .Picker li { min-height: 44px; display: flex; align-items: center; } .Picker .close { min-width: 44px; min-height: 44px; } }
 /* Tabs: a strip that wraps (never scrolls sideways: that fights the
    back-swipe), or on phones one button opening a sheet. */
 .Tabs { flex: none; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }

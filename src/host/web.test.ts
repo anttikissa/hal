@@ -368,14 +368,14 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	conn.close()
 })
 
-const chrome = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/chromium', '/usr/bin/google-chrome'].find((p) =>
+const chrome = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].find((p) =>
 	existsSync(p),
 )
 
 // A headless Chrome page driven over the DevTools protocol.
 async function browser() {
 	let dir = mkdtempSync(`${tmpdir()}/hal-chrome-`)
-	let proc = Bun.spawn([chrome!, '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', 'about:blank'], {
+	let proc = Bun.spawn([chrome!, '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], {
 		stdout: 'ignore',
 		stderr: 'ignore',
 	})
@@ -496,6 +496,17 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await b.waitFor(`document.querySelector('dialog.Picker').open && document.querySelectorAll('dialog.Picker li').length > 0`)
 		await key('Escape')
 		await b.waitFor(`!document.querySelector('dialog.Picker').open && document.activeElement === document.querySelector('textarea')`)
+		// A tap outside it closes it too (a real click, on the backdrop), and
+		// so does its close button.
+		let closed = `!document.querySelector('dialog.Picker').open && document.activeElement === document.querySelector('textarea')`
+		await key('m', true)
+		await b.waitFor(`document.querySelector('dialog.Picker').open`)
+		for (let type of ['mousePressed', 'mouseReleased']) await b.call('Input.dispatchMouseEvent', { type, x: 2, y: 2, button: 'left', clickCount: 1 })
+		await b.waitFor(closed)
+		await key('m', true)
+		await b.waitFor(`document.querySelector('dialog.Picker').open`)
+		await b.evaluate(`document.querySelector('dialog.Picker .close').click()`)
+		await b.waitFor(closed)
 		// What is typed is the draft: it survives a reload.
 		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'half a thought'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
 		await b.call('Page.reload', {})
