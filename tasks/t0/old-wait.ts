@@ -1,0 +1,24 @@
+import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
+import { agentLoop } from '../runtime/agent-loop.ts'
+import { sessionLabel } from '../../common/session-label.ts'
+
+async function execute(_input: unknown, ctx: ToolContext): Promise<string> {
+	const active = agentLoop.runningSubagents(ctx.sessionId)
+	// The model reads this mid-turn: an empty wait no longer parks the turn, so
+	// this text is what steers it back on track.
+	if (active.length === 0) return 'No subagents running. Either you didn\'t spawn them or they finished. Act accordingly.'
+	return `Waiting for the next subagent. Active: ${active.map(sessionLabel.format).join(', ')}`
+}
+
+const waitTool: Tool = {
+	name: 'wait',
+	description: 'Wait for the next subagent to finish. Ends the current turn; the subagent’s inbox message will start a new turn when it arrives.',
+	parameters: {},
+	execute,
+}
+
+function init(): void {
+	toolRegistry.registerTool(waitTool)
+}
+
+export const wait = { execute, init }

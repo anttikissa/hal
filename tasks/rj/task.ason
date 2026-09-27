@@ -1,0 +1,6 @@
+{
+	title: 'Messages carry their sender; the send tool',
+	description: "A message says who sent it: the user, or another session. The host sets the sender from the sending session, never from what a client claims. The model sees a session's message prefixed with who sent it (tab, id and name, like the old Hal's '[Inbox · <id>]' line) and every client shows the sender on the message, so nobody mistakes an agent for the user. The user's messages steer by default (task 2r). A `send` tool (one file under src/host/tools/) lets a session message another by tab number or id: advisory by default, `steer: true` to steer as the user would, `queue: true` to run it after the target's current turn. An advisory message is delivered as soon as possible, at the same point as steering (with the next tool results, or right after a round that had none), framed so the recipient reads it now but needn't drop its work for it; an idle recipient gets it as a turn of its own and gives it full attention. Sending to itself or to an unknown session is an error result. Up never recalls a message from another session (task dg). Artifacts: old-send.ts (the old tool), old-api-messages-excerpt.ts (how the old Hal framed inbox messages).",
+	status: 'planned',
+	needs: ['gr', 'dg', '2r']
+}
