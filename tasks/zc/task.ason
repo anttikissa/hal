@@ -13,6 +13,7 @@ Tests: the placeholder is replaced even after typing moved the cursor, a failed 
 		'Size is checked before reading or sending (uploads.tooBig, File.size / stat): a command over the WebSocket 16 MB payload limit would drop the connection and be resent forever by the connection core.',
 		'Clipboard text wins over an image (Finder copies put the file name as text too); the image is read only when the text is empty or unreadable (xclip fails on an image-only clipboard). pasteboard.png(name) takes a named pasteboard so tests never touch the real clipboard.',
 		'The long-paste limit is the pasteLines setting (default 7); the browser has no config.ason, so it uses the default.',
-		'client/app.ts and web/app.ts sit at the 400-line limit; the terminal tab keys moved to tabs.key to make room. Next additions there need another split.'
+		'client/app.ts and web/app.ts sit at the 400-line limit; the terminal tab keys moved to tabs.key to make room. Next additions there need another split.',
+		"Image paste obeys the caret like text paste: the marker goes at the caret and replaces a selection (the old Hal appended it to the end and the user had to ask twice). Pastes and typing with focus outside any field go to the message box (task 4s), so an image pasted anywhere on the page attaches."
 	]
 }

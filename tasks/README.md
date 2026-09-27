@@ -90,6 +90,38 @@ owns it; later tasks point to it.
 - Config values are plain functions on these objects, such as
   `models.defaultModel()`, read at call time — never captured at import.
 
+## Web client (Solid)
+
+Solid 2 is a prerelease and not Solid 1: read tasks/1b/old-web.md
+and the notes of 1b and 4s before writing a component.
+
+- Render only what changed. A change costs DOM work for what it
+  touched: typing reaches the composer alone, a streamed delta one
+  card's text, a new item one new card; reconnecting, switching tabs
+  and loading earlier history rebuild nothing that stays. The CDP test
+  in host/web.test.ts asserts it with a MutationObserver (task 4s).
+- Keep identity. Update data in place or gate it (a memo per field
+  with a real equality, or a store merged with reconcile(data, key));
+  never rebuild objects every redraw that bindings then chase. Never
+  build DOM inside a Show fallback or getter that reads such a value:
+  it re-creates the node. An entrance animation that replays means a
+  remount, which the user sees as a flash.
+- List keys survive every change the list sees (position only while
+  it only appends; an id only if it exists from the first streamed
+  byte). UI state such as open or closed belongs to the item, not to
+  the DOM slot, so it never moves to another item or tab.
+- One scroller, the transcript; nothing scrolls inside it, and an
+  overlay scrolls itself, never the page behind it.
+- Anything that navigates is an `<a href>` (Cmd-click, middle-click,
+  copy link keep working). The browser never polls: the host pushes.
+- Phones: fields at least 16px, touch targets at least 44px, touch
+  behaviour keyed on `pointer: coarse` rather than width, the page
+  sized from visualViewport (iOS keyboard), no sideways-scrolling strip.
+- Decisions live in .ts modules with unit tests; looks are checked by
+  hand in a real browser at phone and desktop widths. No tests that
+  read source or copy CSS; CDP tests assert structure (nodes kept,
+  one scroller, delegated events firing).
+
 ## Emergency keys (invariants)
 
 - Ctrl-C quits, Ctrl-Z suspends, Ctrl-R restarts — in every state,

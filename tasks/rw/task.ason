@@ -9,6 +9,7 @@
 		"Client: src/common/drafts.ts is shared by terminal and page (defaults: connection.send, nextId, pending). One draft command in flight per session; edits meanwhile go in the next after the ack. Local { text, base, dirty, sending[] }: on a snapshot a dirty local copy wins and is sent; otherwise the host's replaces it.",
 		'Optimistic send: drafts.submit empties the editor at once and keeps { id, text } in `sending` (and in the store) until ack; a crashed client resends it on the next snapshot with the same id, and the host (host.submitted, history `command`) acks without a second submit. A rejected submit goes back into the editor, before text typed since.',
 		"Stores: terminal src/client/draft-file.ts, state/drafts/<id>.ason (dir set in main.ts); page localStorage `hal-draft:<id>`. Several terminals on one machine write the same file (temp file per pid); their content comes from the same host draft, but one terminal's unacknowledged prompt can be overwritten by another's save before a crash. Rare; per-process files would fix it.",
-		'transcript.fold must ignore `draft` events (else they fall through to the turn-end branch); new event types need adding there.'
+		'transcript.fold must ignore `draft` events (else they fall through to the turn-end branch); new event types need adding there.',
+		"Web drafts, from the old Hal (commit ae57750, docs/web.md 'Drafts are sacred', artifact tasks/1b/old-web.md): write localStorage synchronously on every input event and again on pagehide and visibilitychange (iOS evicts backgrounded pages without warning); if a write throws (quota, private mode) keep the text in memory and show it is not saved; after a send clears only when the box still holds exactly what was sent."
 	]
 }

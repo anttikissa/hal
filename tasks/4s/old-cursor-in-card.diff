@@ -1,0 +1,65 @@
+old Hal commit 1363b4a: Place Hal cursor inside the active streaming card
+
+
+diff --git a/src/web-client/components/TranscriptItem.tsx b/src/web-client/components/TranscriptItem.tsx
+index 1c5ad33..3c344c4 100644
+--- a/src/web-client/components/TranscriptItem.tsx
++++ b/src/web-client/components/TranscriptItem.tsx
+@@ -13,6 +13,7 @@ type TranscriptItemProps = {
+ 	item: RenderedTranscriptItem
+ 	token: string
+ 	onAnswer: (questionId: string, value: AnswerValue) => Promise<boolean>
++	cursor?: boolean
+ }
+ 
+ export function TranscriptItem(props: TranscriptItemProps) {
+@@ -20,7 +21,7 @@ export function TranscriptItem(props: TranscriptItemProps) {
+ 		when={webQuestion.projected(props.item.entry)}
+ 		fallback={<Show
+ 			when={props.item.entry.type === 'tool' ? props.item.entry : undefined}
+-			fallback={<article class={['TranscriptItem', props.item.entry.type]} id={webTranscript.blockId(props.item.entry) || undefined}>
++			fallback={<article class={['TranscriptItem', props.item.entry.type, { streaming: !!props.cursor }]} id={webTranscript.blockId(props.item.entry) || undefined}>
+ 				<header><strong>{transcriptTitles.label(props.item.entry)}</strong>
+ 					<Show when={router.blockHash(webTranscript.blockId(props.item.entry))}>
+ 						{(hash) => <a class="Transcript-blockLink" href={hash()}>{webTranscript.blockId(props.item.entry)}</a>}
+@@ -42,6 +43,7 @@ export function TranscriptItem(props: TranscriptItemProps) {
+ 								</Show>}</For>}
+ 						</Show>
+ 					</div>
++					<Show when={props.cursor}><span class={['Transcript-cursor', { thinking: props.item.entry.type === 'thinking' }, 'inline']} aria-label="Hal cursor"><span aria-hidden="true" /></span></Show>
+ 					<Show when={webTranscript.interruption(props.item.entry)}>
+ 						{(interruption) => <span class="TranscriptItem-interruption"> {interruption()}</span>}
+ 					</Show>
+diff --git a/src/web-client/styles.css b/src/web-client/styles.css
+index f4712cc..01e18f3 100644
+--- a/src/web-client/styles.css
++++ b/src/web-client/styles.css
+@@ -171,6 +171,10 @@ button { touch-action: manipulation; }
+ .Transcript-cursor { min-height: 2lh; padding: 6px 0; color: var(--assistant-cursorIdle, var(--assistant-fg, var(--text))); }
+ .Transcript-cursor.thinking { color: var(--thinking-fg, var(--muted)); }
+ .Transcript-cursor > span { display: block; width: 1ch; height: 1lh; background: currentColor; animation: Transcript-blink 1s steps(1, end) infinite; }
++.Transcript-cursor.inline { display: inline-flex; vertical-align: -.12em; min-height: 0; padding: 0; margin-left: .2ch; }
++.Transcript-cursor.inline:not(.thinking) { color: var(--assistant-cursor, var(--assistant-fg, var(--text))); }
++.TranscriptItem.streaming .TranscriptItem-content > div:has(> p:last-child) { display: contents; }
++.TranscriptItem.streaming .TranscriptItem-content > div > p:last-child { display: inline; }
+ @keyframes Transcript-blink { 50% { opacity: 0; } }
+ @media (prefers-reduced-motion: reduce) { .Transcript-cursor > span { animation: none; } }
+ /* Colored rails are the demo's visual identity; history remains fully readable by default. */
+diff --git a/src/web-client/utils/transcript.ts b/src/web-client/utils/transcript.ts
+index 1c7672c..d9d587e 100644
+--- a/src/web-client/utils/transcript.ts
++++ b/src/web-client/utils/transcript.ts
+@@ -147,8 +147,10 @@ function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[]
+ 	return result
+ }
+ 
+-function thinkingCursor(items: RenderedTranscriptItem[]): boolean {
+-	return items.some((item) => item.entry.type === 'thinking' && 'streaming' in item.entry && item.entry.streaming === true)
++function activeCursorEntry(items: RenderedTranscriptItem[]): TranscriptEntry | undefined {
++	for (const item of [...items].reverse()) {
++		if ((item.entry.type === 'thinking' || item.entry.type === 'assistant') && 'streaming' in item.entry && item.entry.streaming) return item.entry
++	}
+ }
+ 
+-export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker, blockId, rowKey, thinkingCursor }
++export const webTranscript = { valueText, toolText, historyItems, interruption, items, imageHref, pastedText, pasteSegments, isPasteMarker, blockId, rowKey, activeCursorEntry }
