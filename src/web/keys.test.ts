@@ -1,0 +1,76 @@
+import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { connection } from '../common/connection.ts'
+import { drafts } from '../common/drafts.ts'
+import type { Event } from '../common/protocol.ts'
+import { app } from './app.ts'
+import { keys, type KeyInput, type Target } from './keys.ts'
+
+const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
+const sessionId = meta.id
+
+let sent: any[] = []
+let typed: string[] = []
+const orig = { send: connection.send, connected: connection.connected, store: drafts.store, insert: keys.insert }
+
+beforeEach(() => {
+	sent = []
+	typed = []
+	app.reset()
+	drafts.reset()
+	connection.send = (c: any) => void sent.push(c)
+	connection.connected = () => true
+	drafts.store = { load: () => undefined, save: () => {} }
+	keys.insert = (text) => void typed.push(text)
+	app.onEvent({ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } } as Event)
+})
+
+afterEach(() => {
+	Object.assign(connection, { send: orig.send, connected: orig.connected })
+	drafts.store = orig.store
+	keys.insert = orig.insert
+	drafts.reset()
+	app.reset()
+})
+
+const press = (key: string, target: Target, mods: Partial<KeyInput> = {}) =>
+	keys.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods }, target)
+const other: Target = { kind: 'other' }
+const clip = (text: string) => ({ items: [], getData: (t: string) => (t === 'text/plain' ? text : '') })
+
+test('on a touch keyboard Enter is a newline and the Send button sends', () => {
+	let touch: Target = { kind: 'message', text: 'hi', cursor: 2, coarse: true }
+	expect(press('Enter', touch)).toBe(false)
+	expect(sent.some((c) => c.type === 'submit')).toBe(false)
+	app.send()
+	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ text: 'hi' })
+})
+
+test('a printable key outside any field types into the box, keeping the key', () => {
+	expect(press('h', other)).toBe(true)
+	expect(press('H', other, { shiftKey: true })).toBe(true)
+	expect(press('ä', { kind: 'button', submits: false })).toBe(true)
+	expect(typed).toEqual(['h', 'H', 'ä'])
+})
+
+test('keys that do not type, fields, and Space on a button stay where they are', () => {
+	for (let [key, mods] of [['a', { ctrlKey: true }], ['a', { metaKey: true }], ['ArrowDown', {}], ['Enter', {}], ['F5', {}]] as const) expect(press(key, other, mods)).toBe(false)
+	expect(press('a', { kind: 'field' })).toBe(false)
+	expect(press(' ', { kind: 'button', submits: false })).toBe(false)
+	expect(press('a', other, { isComposing: true })).toBe(false)
+	expect(typed).toEqual([])
+})
+
+test('with the model picker open, typing goes to its search box, not the message box', () => {
+	app.setView({ ...app.state.view, modal: { items: ['a/b'], selected: 0, search: '' } as any })
+	expect(press('a', other)).toBe(false)
+	expect(keys.paste(clip('x'), other)).toBe(false)
+	expect(typed).toEqual([])
+})
+
+test('a paste outside any field goes into the box; in a field it stays native', () => {
+	expect(keys.paste(clip('pasted'), other)).toBe(true)
+	expect(typed).toEqual(['pasted'])
+	expect(keys.paste(clip('x'), { kind: 'field' })).toBe(false)
+	expect(keys.paste(clip('x'), { kind: 'message', text: '', cursor: 0 })).toBe(false)
+	expect(typed).toEqual(['pasted'])
+})

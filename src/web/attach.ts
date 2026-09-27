@@ -12,7 +12,7 @@ import { app } from './app.ts'
 
 type Insert = (text: string) => void
 // What a paste event's clipboardData offers.
-type Pasted = { items?: ArrayLike<{ kind: string; type: string; getAsFile(): Blob | null }>; getData(type: string): string }
+export type Pasted = { items?: ArrayLike<{ kind: string; type: string; getAsFile(): Blob | null }>; getData(type: string): string }
 
 // Starts uploading `blob` for the session shown.
 function blob(b: Blob, mediaType: string, insert: Insert): void {

@@ -3,11 +3,11 @@
 // IME, selection, clipboard, undo and the moves that already match
 // Hal's (arrows, Option/Alt word moves, Home/End, Backspace). The keys
 // in `table` mean something else in Hal (readline kills and yank, which
-// the browser either lacks or binds elsewhere), so app.key runs them
+// the browser either lacks or binds elsewhere), so keys.key runs them
 // through the shared editor (src/common/prompt.ts) and `write` puts the
 // result back, selection included. So do Tab and Shift-Tab on a
-// selection across lines (app.key). Enter, Alt-Enter and Escape are
-// app.key's own; the textarea's undo stays native.
+// selection across lines (keys.key). Enter, Alt-Enter and Escape are
+// keys.key's own; the textarea's undo stays native.
 //
 // Write-back uses execCommand('insertText'), which keeps the edit on the
 // browser's undo stack (Cmd-Z undoes a kill); setting .value would wipe

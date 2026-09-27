@@ -160,10 +160,13 @@ function waiting(st: ViewState): { text: string; label: string }[] {
 	return t ? t.inbox.map((m) => ({ text: m.text, label: inbox.label(t.state, m) })) : []
 }
 
-// Whether the model is streaming its thinking (Hal's cursor dims).
-function thinking(st: ViewState): boolean {
+// What the model is streaming into the last item, thinking or text:
+// Hal's cursor sits in that item's card (dimmed while thinking).
+function streaming(st: ViewState): 'thinking' | 'text' | undefined {
 	let t = st.transcript
-	return t?.state.type === 'running' && t.state.phase === 'streaming' && t.items.at(-1)?.type === 'thinking'
+	let last = t?.items.at(-1)?.type
+	if (t?.state.type !== 'running' || t.state.phase !== 'streaming') return undefined
+	return last === 'thinking' || last === 'text' ? last : undefined
 }
 
 // The composer's status line, like the terminal's: what the session is
@@ -183,7 +186,7 @@ function line(st: ViewState, connected: boolean): Line {
 			let names = t.items.flatMap((i) => (i.type === 'tool' && !done.has(i.id) ? [i.name] : []))
 			return { text: names.length ? `running ${names.join(', ')}` : 'running tools', tone: 'busy' }
 		}
-		let writing = s.phase === 'streaming' && !view.thinking(st)
+		let writing = s.phase === 'streaming' && view.streaming(st) !== 'thinking'
 		return { text: writing ? 'writing' : 'thinking', tone: 'busy' }
 	}
 	let text = states.describe(s) ?? ''
@@ -286,7 +289,7 @@ export const view = {
 	completed,
 	pause,
 	inbox: waiting,
-	thinking,
+	streaming,
 	line,
 	hints,
 	rows,

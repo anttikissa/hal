@@ -4,14 +4,16 @@
 // first: its header is a button naming what is inside, and a click
 // anywhere on the card toggles it, except on a link or a click that
 // ends a text selection. Hidden contents are inert. The height
-// animates in CSS; scroll.ts tracks the bottom meanwhile.
+// animates in CSS; scroll.ts tracks the bottom meanwhile. `cursor`:
+// the card streams, so Hal's cursor follows its last character (in the
+// header while a folding card is closed).
 
 import { createSignal, flush, Show } from 'solid-js'
 import { scroll } from '../scroll.ts'
 import { view, type Row } from '../view.ts'
 
 // An image row shows the image itself, from the session's blob.
-export function Card(props: { row: Row; session: string }) {
+export function Card(props: { row: Row; session: string; cursor?: boolean }) {
 	let [open, setOpen] = createSignal(false)
 	let shown = () => view.show(props.row.item)
 	let result = () => props.row.result && view.show(props.row.result)
@@ -32,6 +34,7 @@ export function Card(props: { row: Row; session: string }) {
 			flush()
 		}, 'track')
 	}
+	let cursor = () => <span class="cursor" aria-hidden="true" />
 	// Built once per card: the bindings follow a new row object, so the
 	// DOM (and its fade-in) stays when a snapshot or stream replaces it.
 	let plain = (s: () => { kind: string; text: string }) => (
@@ -39,6 +42,7 @@ export function Card(props: { row: Row; session: string }) {
 			<Show when={props.row.item.type === 'image' && props.row.item} fallback={s().text}>
 				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
 			</Show>
+			<Show when={props.cursor}>{cursor()}</Show>
 		</div>
 	)
 	return (
@@ -51,12 +55,16 @@ export function Card(props: { row: Row; session: string }) {
 								{open() ? '▾' : '▸'}
 							</span>
 							<span class="title">{head()}</span>
+							<Show when={props.cursor && !open()}>{cursor()}</Show>
 							<Show when={failed()}>
 								<span class="error">✗</span>
 							</Show>
 						</button>
 						<div class="body" inert={!open()}>
-							<div class="contents">{body()}</div>
+							<div class="contents">
+								{body()}
+								<Show when={props.cursor}>{cursor()}</Show>
+							</div>
 						</div>
 					</article>
 				</Show>

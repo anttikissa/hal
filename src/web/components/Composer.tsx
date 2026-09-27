@@ -5,7 +5,7 @@
 // button, and the key hints. The box grows with its text up to 40% of
 // the window. An open question or the model picker owns the keys
 // meanwhile; the box keeps its text and takes the focus back when they
-// close. Enter is handled by app.key (none during IME composition).
+// close. Enter is handled by keys.key (none during IME composition).
 // Images pasted, dropped or picked with the attach button, and long
 // pasted text, become attachments (attach.ts): a placeholder at the
 // caret, then the marker.
@@ -14,6 +14,7 @@ import { createEffect, For } from 'solid-js'
 import { app } from '../app.ts'
 import { attach } from '../attach.ts'
 import { editor } from '../editor.ts'
+import { keys } from '../keys.ts'
 import { view, type ViewState } from '../view.ts'
 
 export function Composer(props: { view: ViewState; text: string; notice: string | undefined; connected: boolean }) {
@@ -25,6 +26,7 @@ export function Composer(props: { view: ViewState; text: string; notice: string 
 	// the caret stays where the user is typing.
 	let box = (e: HTMLTextAreaElement) => {
 		input = e
+		keys.insert = insert
 		app.rewrite = (change) => {
 			if (document.activeElement !== e) return app.input(change({ text: e.value, cursor: e.value.length }).text)
 			let back = e.selectionDirection === 'backward'

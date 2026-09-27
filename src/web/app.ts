@@ -2,17 +2,12 @@
 // The browser client's controller, without Solid or the DOM tree: the
 // view (view.ts) and the message box's text as plain state, changed
 // synchronously by host events and user input, then handed to the
-// components through `changed` (main.tsx points it at a signal).
+// components through `changed` (main.tsx points it at a signal). Keys
+// are keys.ts's job.
 //
-// Enter submits (steering a running turn; Alt+Enter queues after it,
-// Shift+Enter is a newline), Escape pauses a running turn, Up on an
-// empty box edits the last prompt (src/common/amend.ts), Up on the box's
-// first line and Down on its last browse the prompts sent
-// (src/common/recall.ts; a line ends only at a newline here, as the
-// page cannot know where the textarea wraps), Tab completes
-// a slash command, Ctrl-M opens the model picker. The box is the
-// session's draft (common/drafts.ts, kept in localStorage too); a sent
-// prompt shows at once, pending until the host has it.
+// The box is the session's draft (common/drafts.ts, kept in
+// localStorage too); a sent prompt shows at once, pending until the
+// host has it.
 //
 // Tabs are the host's (task 0a); which one shows is this page's, named
 // by the address (tabs.ts, router.ts).
@@ -22,10 +17,8 @@ import { connection, type LinkState } from '../common/connection.ts'
 import { drafts, type Local } from '../common/drafts.ts'
 import { forms, type FormAction, type Key } from '../common/forms.ts'
 import type { Event, Tab } from '../common/protocol.ts'
-import { prompt } from '../common/prompt.ts'
 import { recall } from '../common/recall.ts'
 import { uploads, type Settled } from '../common/uploads.ts'
-import { editor, type Splice } from './editor.ts'
 import { link } from './link.ts'
 import { tabs } from './tabs.ts'
 import { view, type ViewState } from './view.ts'
@@ -38,19 +31,6 @@ import { view, type ViewState } from './view.ts'
 // the page can keep what the reader was reading in place.
 export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number }
 
-// Where a key was pressed: the message box (its text, the caret, and
-// `write`, which edits the box natively and leaves the selection from
-// `anchor` to `cursor`; `anchor`: the selection's other end), a text field of the open
-// question, a button (`submits`: a form's submit button), or anywhere
-// else.
-export type Target =
-	| { kind: 'message'; text: string; cursor: number; anchor?: number; write?: (edit: Splice, cursor: number, anchor: number) => void }
-	| { kind: 'field' }
-	| { kind: 'button'; submits: boolean }
-	| { kind: 'other' }
-
-// `code`: the physical key (KeyD), for Option-letters on macOS.
-export type KeyInput = { key: string; code?: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean; isComposing?: boolean }
 
 function createState(): AppState {
 	return { view: {}, text: '', tabs: [], asked: new Set(), older: new Map(), pages: 0 }
@@ -195,95 +175,6 @@ function search(text: string): void {
 	app.setView(view.search(app.state.view, text))
 }
 
-const arrows: Record<string, 'up' | 'down' | 'escape'> = { ArrowUp: 'up', ArrowDown: 'down', Escape: 'escape' }
-
-// A key pressed on the page. True if handled here (the caller then
-// prevents the browser's default).
-function key(e: KeyInput, target: Target): boolean {
-	let st = app.state
-	if (e.isComposing) return false
-	if (tabs.key(e)) return true
-	// The message box may hold text no input event told us about.
-	if (target.kind === 'message' && target.text !== st.text) app.input(target.text)
-	let k = view.key(e)
-	// The modal takes the keys first; its search box edits natively.
-	if (st.view.modal) {
-		if (!k || !['enter', 'escape', 'up', 'down'].includes(k.key)) return false
-		app.modalKey(k)
-		return true
-	}
-	let models = k && view.modelsKey(st.view, k)
-	if (models) {
-		connection.send(models)
-		return true
-	}
-	if (st.view.form) {
-		// Text fields edit natively, a submit button submits; the shared
-		// form keys decide the rest.
-		let native = target.kind === 'field' && !['enter', 'escape', 'tab', 'up', 'down'].includes(k?.key ?? '')
-		if (!k || native || (target.kind === 'button' && target.submits && e.key === 'Enter')) return false
-		let { state, command } = view.formKey(st.view, k)
-		app.setView(state)
-		if (command) app.sendNow(command)
-		return true
-	}
-	let plain = !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey
-	let edit = plain && target.kind === 'message' && arrows[e.key] ? view.editKey(st.view, arrows[e.key]!, st.text) : undefined
-	if (edit) {
-		st.view = edit.view
-		if (edit.command) connection.send(edit.command)
-		app.input(edit.text)
-		return true
-	}
-	if (e.key === 'Escape') {
-		let command = view.pause(st.view)
-		if (command) connection.send(command)
-		return false
-	}
-	if (target.kind !== 'message') return false
-	let sel = target.anchor === undefined ? '' : st.text.slice(Math.min(target.anchor, target.cursor), Math.max(target.anchor, target.cursor))
-	if (plain && !sel && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && app.recall(e.key === 'ArrowUp' ? -1 : 1, target)) return true
-	if (k && editor.routed(k)) return app.edit(k, target)
-	let complete = e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && view.complete(st.view, st.text)
-	if (complete) {
-		connection.send(complete)
-		return true
-	}
-	// Tab and Shift-Tab indent a selection across lines; else they move
-	// focus, keeping the page keyboard-accessible.
-	if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && sel.includes('\n')) return app.edit({ key: 'tab', shift: e.shiftKey }, target)
-	if (e.key !== 'Enter' || e.shiftKey) return false
-	app.send(e.altKey)
-	return true
-}
-
-// A key from editor.table on the message box: the shared editor's step
-// on its text and caret, written back as a native edit.
-function edit(k: Key, target: Extract<Target, { kind: 'message' }>): boolean {
-	let st = app.state
-	let at = { text: st.text, cursor: target.cursor, kill: st.kill }
-	let { state } = prompt.step(target.anchor === undefined ? at : { ...at, anchor: target.anchor }, k)
-	st.kill = state.kill
-	if (state.text !== st.text) target.write?.(editor.splice(st.text, state.text), state.cursor, state.anchor ?? state.cursor)
-	app.input(state.text)
-	return true
-}
-
-// Input history for Up (-1) or Down (1) on the box, through the shared
-// code with logical lines for rows. True if handled; else the key stays
-// native.
-function recallKey(dir: -1 | 1, target: Extract<Target, { kind: 'message' }>): boolean {
-	let st = app.state
-	let t = st.view.transcript
-	if (!t) return false
-	let id = t.meta.id
-	let shown = recall.step(id, recall.entries(t), st.text, target.cursor, dir, Infinity, drafts.text(id))
-	if (!shown) return false
-	target.write?.(editor.splice(st.text, shown.text), shown.cursor, shown.cursor)
-	app.input(shown.text)
-	return true
-}
-
 // Sends what the box holds (Enter, or the Send button); `queue`
 // (Alt+Enter) waits for the running turn.
 function send(queue = false): void {
@@ -388,9 +279,6 @@ export const app = {
 	modalKey,
 	modalPick,
 	search,
-	key,
-	edit,
-	recall: recallKey,
 	send,
 	store,
 	start,

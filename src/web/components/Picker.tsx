@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // The model picker: a native modal <dialog> with a title, a search box
 // that filters as typed, the list (click or Enter picks) and a hint.
-// app.key gives it Up, Down, Enter and Escape first.
+// keys.key gives it Up, Down, Enter and Escape first.
 
 import { createEffect, For } from 'solid-js'
 import type { ModalState } from '../../common/modals.ts'

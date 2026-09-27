@@ -342,6 +342,21 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 			return { cards: cards.length, kept: cards.every((c) => c.isConnected), added }
 		})()`)
 		expect(typed).toEqual({ cards: 2, kept: true, added: 0 })
+		// Hal's cursor sits inside the card that streams, after its text,
+		// and back on its own line once the turn ends.
+		let release = () => {}
+		let gate = new Promise<void>((r) => (release = r))
+		turns.stream = () =>
+			(async function* (): AsyncGenerator<StreamEvent> {
+				yield { type: 'text', text: 'partial' }
+				await gate
+				yield { type: 'done', reason: 'end' }
+			})()
+		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'more'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
+		await b.waitFor(`[...document.querySelectorAll('.Card.assistant')].at(-1)?.lastElementChild?.matches('.cursor') && !document.querySelector('.cursor-line')`)
+		expect(await b.evaluate(`document.querySelectorAll('.cursor').length`)).toBe(1)
+		release()
+		await b.waitFor(`!!document.querySelector('.cursor-line') && !document.querySelector('.Card .cursor')`)
 		let key = (k: string, ctrl = false) => b.evaluate(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: '${k}', ctrlKey: ${ctrl}, bubbles: true }))`)
 		// A question is a form the keys fill in: Right picks "no", Enter
 		// answers, and the question shows its answer.
@@ -363,6 +378,12 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'half a thought'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
 		await b.call('Page.reload', {})
 		await b.waitFor(`document.querySelector('textarea')?.value === 'half a thought'`)
+		// A key typed with the focus outside any field lands in the box,
+		// once (a real key event: keydown, then the text).
+		await b.evaluate(`document.activeElement.blur()`)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: '!', text: '!' })
+		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: '!' })
+		await b.waitFor(`document.activeElement === document.querySelector('textarea') && document.querySelector('textarea').value.split('!').length === 2`)
 	} finally {
 		host.cwd = origCwd
 		await b.close()

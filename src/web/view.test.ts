@@ -211,7 +211,7 @@ test('the status line says what the session is doing, like the terminal', () => 
 	expect(line(asking)).toEqual({ text: 'thinking', tone: 'busy' })
 	let thinking = running([{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } }] as Event[], { type: 'running', phase: 'streaming' })
 	expect(line(thinking)).toEqual({ text: 'thinking', tone: 'busy' })
-	expect(view.thinking(thinking)).toBe(true)
+	expect(view.streaming(thinking)).toBe('thinking')
 	let writing = running(
 		[
 			{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } },
@@ -220,13 +220,17 @@ test('the status line says what the session is doing, like the terminal', () => 
 		{ type: 'running', phase: 'streaming' },
 	)
 	expect(line(writing)).toEqual({ text: 'writing', tone: 'busy' })
-	expect(view.thinking(writing)).toBe(false)
+	expect(view.streaming(writing)).toBe('text')
 	// The tools still waiting for their results, by name.
 	let calls = [
 		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'a', name: 'bash', input: {} } },
 		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'b', name: 'read', input: {} } },
 	] as Event[]
 	expect(line(running(calls, { type: 'running', phase: 'tools' }))).toEqual({ text: 'running bash, read', tone: 'busy' })
+	// Nothing streams into a tool call or while idle: the cursor has a
+	// line of its own.
+	expect(view.streaming(running(calls, { type: 'running', phase: 'streaming' }))).toBeUndefined()
+	expect(view.streaming(running([{ type: 'stream', sessionId, event: { type: 'text', text: 'hi' } }] as Event[], { type: 'idle' }))).toBeUndefined()
 	let one = running([...calls, { type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'a', output: '' }] }] as Event[], { type: 'running', phase: 'tools' })
 	expect(line(one)).toEqual({ text: 'running read', tone: 'busy' })
 	let paused = running([], { type: 'paused' })

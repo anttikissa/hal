@@ -2,7 +2,7 @@
 <html lang="en" class="page">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <title>Hal</title>
 <style>
 /* The one stylesheet: layout only. Colours come from the theme below
@@ -10,8 +10,10 @@
 :root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --fade-ms: 300ms; --toggle-ms: 250ms; }
 * { box-sizing: border-box; }
 html { background: var(--canvas); color: var(--text); }
-html, body { margin: 0; height: 100%; }
-body { height: 100dvh; overflow: hidden; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+/* Sized and placed from the visual viewport (src/web/viewport.ts), so
+   the phone keyboard never hides the composer or pans the page. */
+body { position: fixed; left: 0; right: 0; top: var(--app-top, 0); height: var(--app-height, 100dvh); }
 body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .App, .Chat { height: 100%; display: flex; flex-direction: column; }
 /* The one scroller: nothing inside it scrolls; long lines wrap. */
@@ -27,8 +29,8 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card.folds { padding: 0; cursor: pointer; }
 .Card .head { display: flex; gap: 0.6ch; width: 100%; padding: 0.4rem 0.7rem; background: none; color: inherit; text-align: left; border-radius: 0; }
 .Card .head:focus-visible { outline: 1px solid currentColor; outline-offset: -2px; }
-.Card .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.Card .head .error { background: none; }
+.Card .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.Card .head .error { background: none; margin-left: auto; }
 /* Open and close animate the height (a one-row grid, 0fr to 1fr);
    closing is faster. Padding sits inside so closed is truly 0 high. */
 .Card .body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows calc(var(--toggle-ms) * 0.7) var(--ease-out); }
@@ -36,10 +38,14 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card .contents { min-height: 0; overflow: hidden; padding: 0 0.7rem 0 calc(0.7rem + 2ch); }
 .Card .contents::after { content: ""; display: block; height: 0.4rem; }
 .mark.log { text-align: center; }
-/* Hal's cursor, on a line after the last item. */
-.cursor-line { min-height: 2.5rem; padding: 0.2rem 0 0.6rem; }
-.cursor-line.assistant { color: var(--cursor); }
-.cursor-line span { display: block; width: 1ch; height: 1lh; background: currentColor; animation: blink 1s steps(1, end) infinite; }
+/* Hal's cursor: inside the card that streams, right after its last
+   character (dimmed while thinking), else on a line after the last
+   item. */
+.cursor-line { min-height: 2.5rem; padding: 0.2rem 0 0.6rem; color: var(--cursor); }
+.cursor-line span, .Card .cursor { display: block; width: 1ch; height: 1lh; background: currentColor; animation: blink 1s steps(1, end) infinite; }
+.Card .cursor { display: inline-block; vertical-align: text-bottom; margin-left: 0.2ch; background: var(--cursor); }
+.Card.thinking .cursor { background: currentColor; opacity: 0.6; }
+.Card .head .cursor { flex: none; align-self: center; }
 @keyframes blink { 50% { opacity: 0; } }
 .Composer { flex: none; padding: 0.4rem 1rem max(0.8rem, env(safe-area-inset-bottom)); }
 .Composer > * { max-width: 60rem; margin: 0 auto; }
@@ -63,8 +69,11 @@ textarea:focus, input:focus { border-color: var(--accent); }
 button { background: var(--button); color: var(--text); border: 0; border-radius: 6px; padding: 0.5rem; cursor: pointer; }
 button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 /* Phones: 16px fields, or iOS zooms in on focus. */
+/* Touch keyboards: Enter is a newline and Send sends, so the key hints
+   do not apply. */
+@media (pointer: coarse) { .help { display: none; } textarea, input { font-size: 16px; } }
 @media (max-width: 40rem) { textarea, input { font-size: 16px; } .Transcript { padding: 0.6rem; } .Composer { padding-inline: 0.6rem; } }
-@media (prefers-reduced-motion: reduce) { .Card .body { transition: none; } .cursor-line span, .status .dot, .Tabs .marker { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .Card .body { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
 .Question { max-width: 60rem; margin: 0 auto 0.6rem; padding: 0.4rem 0.6rem; border-radius: 4px; display: flex; flex-direction: column; gap: 0.4rem; }
 .Question button { padding: 0.2rem 0.8rem; }

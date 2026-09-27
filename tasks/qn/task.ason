@@ -1,7 +1,14 @@
 {
 	title: 'Web input as 4s specifies: cursor, touch Enter, typing anywhere, phone keyboard',
 	description: 'The web client meets the requirements task 4s gained after it was built (see its description and artifacts old-cursor-in-card.diff, old-viewport.ts): the cursor shows inside the card that is streaming; on a touch keyboard (pointer: coarse) Enter inserts a newline and sending is the send button; typing a printable key anywhere on the page goes to the prompt without losing the key; the page is sized from visualViewport so the iOS keyboard never hides the prompt or scrolls the page behind it. src/web/app.ts is at the 400-line limit: split it by job first (decisions stay in plain .ts modules with unit tests). Checked by hand in a real browser at phone and desktop widths as tasks/README.md says; CDP tests assert structure only.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Split: keys.ts holds every key decision (key, edit, recall, paste, and the Target/KeyInput types); app.ts keeps state, host events and sending, and never imports keys.ts (keys imports app). Chat.tsx builds the Target from the DOM (coarse from matchMedia, links count as buttons, anything inside an open <dialog> as a field) and prevents the default when keys says so.',
+		'Typing anywhere: keys.key calls keys.insert(e.key) for one-code-point keys without Ctrl/Alt/Cmd when the target is not a field (Space on a button or link stays native); Composer points keys.insert at editor.write on the textarea, so the key lands at the saved caret, on the undo stack, once (the default is prevented). A document paste listener does the same through keys.paste (attach.paste first). The CDP test checks it with a real Input.dispatchKeyEvent after blur(): synthetic KeyboardEvents never type text.',
+		"Cursor: view.streaming(st) is 'thinking' or 'text' while the running turn streams into its last item; Transcript passes cursor to that last row's Card and drops the .cursor-line meanwhile. A closed thinking card shows the cursor in its header, after the title (.title is no longer flex: 1 so the cursor sits right after it).",
+		'Viewport: viewport.sync mirrors visualViewport into --app-height/--app-top on <html>; the body is position: fixed at those, so iOS panning never scrolls a page behind. Checked in headless Chrome only (shrinking the emulated viewport moves the composer up); real iOS Safari with its keyboard was not available to the implementer, so check it there first if the prompt hides.',
+		'Touch: key hints are hidden under (pointer: coarse), where Enter is a newline and there is no Esc; fields are 16px there too, not only under 40rem.'
+	],
 	needs: ['4s'],
 	foldInto: ['4s']
 }

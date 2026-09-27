@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { connection } from '../common/connection.ts'
 import { drafts, type Local } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
-import { app, type Target } from './app.ts'
+import { app } from './app.ts'
+import { keys, type Target } from './keys.ts'
 import { router } from './router.ts'
 import { tabs } from './tabs.ts'
 
@@ -54,7 +55,7 @@ afterEach(() => {
 })
 
 const press = (key: string, target: Target, mods: Partial<Record<'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey', boolean>> = {}) =>
-	app.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods }, target)
+	keys.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods }, target)
 const message = (text: string, cursor = text.length): Target => ({ kind: 'message', text, cursor })
 const snapshot = (state: object, history: object[] = [], draft?: object): Event =>
 	({ type: 'snapshot', sessionId, snapshot: { meta, history, state, ...(draft ? { draft } : {}) } }) as Event
@@ -180,7 +181,7 @@ test('Ctrl-K, Ctrl-U, Alt-D and Ctrl-Y edit the box through the shared editor, a
 	// The draft follows the box.
 	expect(drafts.text(sessionId)).toBe(' worldhello')
 	// macOS Option-D types ∂; the physical key still makes it Alt-D.
-	app.key({ key: '∂', code: 'KeyD', shiftKey: false, ctrlKey: false, altKey: true, metaKey: false }, box('ab cd', 2))
+	keys.key({ key: '∂', code: 'KeyD', shiftKey: false, ctrlKey: false, altKey: true, metaKey: false }, box('ab cd', 2))
 	expect(app.state.text).toBe('ab')
 	press('u', box('ab', 1), { ctrlKey: true })
 	expect(app.state.text).toBe('b')

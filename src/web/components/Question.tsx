@@ -2,7 +2,7 @@
 // The open question as a form: its text, the quote (a command to
 // approve) with marked parts highlighted, a text or password input per
 // text field and a button per option. Values and focus follow the
-// shared form state; keys go through app.key (forms.step).
+// shared form state; keys go through keys.key (forms.step).
 
 import { createEffect, For, Show } from 'solid-js'
 import { forms, type FormState } from '../../common/forms.ts'

@@ -3,8 +3,8 @@
 // position so a row keeps its DOM and whether it is open when a
 // snapshot replaces every item or a streaming item grows; the open
 // question as a form; the mark where replayed history ends; the
-// prompts still pending; and Hal's cursor on a line of its own, dimmed
-// while thinking streams. The one scroller: Chat and scroll.ts keep a
+// prompts still pending; and Hal's cursor, inside the card that
+// streams (Card.tsx), else on a line of its own. The one scroller: Chat and scroll.ts keep a
 // bottom reader at the bottom.
 
 import { createMemo, For, onSettled, Show } from 'solid-js'
@@ -24,6 +24,9 @@ export function Transcript(props: { view: ViewState; pending: string[] }) {
 	// status) keep every row object, so no card binding runs again.
 	let items = createMemo(() => props.view.transcript?.items ?? none)
 	let rows = createMemo(() => view.rows(items()))
+	// The row Hal's cursor sits in: the last, while it streams.
+	let streaming = createMemo(() => view.streaming(props.view))
+	let cursorAt = () => (streaming() ? rows().length - 1 : -1)
 	let markAt = () => (props.view.resumed ? view.markRow(rows(), props.view.resumed.at) : -1)
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
 	let mark = () => <div class="log mark">{transcript.resumedLabel(props.view.resumed!)}</div>
@@ -33,7 +36,7 @@ export function Transcript(props: { view: ViewState; pending: string[] }) {
 				{(row, i) => (
 					<>
 						<Show when={markAt() === i}>{mark()}</Show>
-						<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} />}>
+						<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorAt() === i} />}>
 							{(q) => <Question item={q()} form={props.view.form!} />}
 						</Show>
 					</>
@@ -41,9 +44,11 @@ export function Transcript(props: { view: ViewState; pending: string[] }) {
 			</For>
 			<Show when={markAt() === rows().length}>{mark()}</Show>
 			<For each={props.pending}>{(text) => <div class="Card user pending">{text}</div>}</For>
-			<div class={['cursor-line', view.thinking(props.view) ? 'thinking' : 'assistant']} aria-hidden="true">
-				<span />
-			</div>
+			<Show when={!streaming()}>
+				<div class="cursor-line" aria-hidden="true">
+					<span />
+				</div>
+			</Show>
 		</main>
 	)
 }
