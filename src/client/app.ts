@@ -294,7 +294,7 @@ function onKeys(events: KeyEvent[]): void {
 		}
 		if (promptKeys.edit(st, k, app.send)) continue
 		let shown = st.transcript?.meta.id
-		if (promptKeys.clip(st, k, (text) => app.pasted(shown, text), app.tell)) continue
+		if (promptKeys.clip(st, k, (r) => app.pasted(shown, r))) continue
 		// Tab at the end of a slash command: the host completes it.
 		let tab = k.key === 'tab' && !k.shift && st.transcript && st.prompt.cursor === st.prompt.text.length && !prompt.selection(st.prompt)
 		let complete = tab && completion.request(st.transcript!.meta.id, st.prompt.text)
@@ -318,15 +318,11 @@ function onKeys(events: KeyEvent[]): void {
 	app.show()
 }
 
-// Clipboard text read for session `id`: pasted if it is still shown.
-function pasted(id: string | undefined, text: string): void {
-	if (app.state.transcript?.meta.id !== id) return
-	app.onKeys([{ key: 'paste', text, shift: false, alt: false, ctrl: false, cmd: false }])
-}
-
-function tell(notice: string): void {
-	app.state.notice = notice
-	app.show()
+// The clipboard for session `id`: text pasted if the session is still
+// shown, a failure told.
+function pasted(id: string | undefined, r: { text: string } | { notice: string }): void {
+	if ('notice' in r) return ((app.state.notice = r.notice), app.show())
+	if (app.state.transcript?.meta.id === id) app.onKeys([{ key: 'paste', text: r.text, shift: false, alt: false, ctrl: false, cmd: false }])
 }
 
 // Opens `modal` over everything. Enter closes it and sends what
@@ -396,7 +392,6 @@ export const app = {
 	close,
 	pick,
 	pasted,
-	tell,
 	init,
 	reset,
 }
