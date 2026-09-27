@@ -12,8 +12,8 @@
 // provider (replay.current), history staying append-only. Otherwise it
 // is sent on top like any prompt.
 
-import type { ImageBlock, UserBlock } from '../common/blocks.ts'
-import type { InboxItem } from '../common/inbox.ts'
+import type { ImageBlock, Sender, UserBlock, UserText } from '../common/blocks.ts'
+import { inbox, type InboxItem } from '../common/inbox.ts'
 import { forms, type Answers } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
@@ -35,15 +35,21 @@ import { turns } from './turns.ts'
 // waits in the inbox; `queue` also makes it wait for a paused or failed
 // turn to finish. Otherwise it starts a turn, delivering any steering
 // messages still waiting (a paused turn's) first. A slash command runs
-// at once, whatever the state (`from`: the session that sent it).
-function submit(id: string, text: string, command?: string, queue = false, from?: string): string | undefined {
+// at once, whatever the state.
+//
+// `sender`: another session sent it (task rj), set by the host from the
+// sending session, never by a client. Such a message never ends a
+// pause or a failure the user has to see to: it waits in the inbox
+// unless the session is idle, where it runs as a turn of its own and
+// so gets full attention (no longer advisory).
+function submit(id: string, text: string, command?: string, queue = false, sender?: Sender): string | undefined {
 	let call = commands.parse(text)
-	if (call) return slash.command(id, text, call, command, from)
+	if (call) return slash.command(id, text, call, command, sender?.from)
 	let state = status.stateOf(id)
-	if (states.busy(state) || (queue && state.type !== 'idle')) {
+	if (states.busy(state) || ((queue || sender?.from !== undefined) && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
 		if (queue) record.queue = true
-		if (from !== undefined) record.from = from
+		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
 		history.append(id, record)
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		return
@@ -51,31 +57,46 @@ function submit(id: string, text: string, command?: string, queue = false, from?
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return refused
 	let steering = status.inboxOf(id).filter((m) => !m.queue)
+	let own = { ...inbox.sender(sender ?? {}), advisory: undefined }
 	if (!steering.length) {
-		let { blocks } = blobs.resolve(id, [text])
-		history.submit(id, blocks, command)
-		return void turns.start(id, prompts.texts(blocks)[0], undefined, prompts.images(blocks))
+		let list = prompts.blocks(id, [{ text, ...own }])
+		history.submit(id, list, command)
+		return void turns.start(id, prompts.texts(list)[0], undefined, prompts.images(list), prompts.senders(list)[0])
 	}
-	prompts.deliver(id, steering, text, command)
+	prompts.deliver(id, steering, { text, ...own }, command)
 	turns.start(id)
+}
+
+// A prompt's blocks from its texts, each keeping who sent it, attachment
+// markers resolved (blobs.resolve).
+function blocksOf(id: string, parts: (Sender & { text: string })[]): UserBlock[] {
+	let { blocks } = blobs.resolve(id, parts.map((p) => p.text))
+	return blocks.map((b, i) => (b.type === 'text' && parts[i] ? { ...b, ...inbox.sender(parts[i]) } : b))
+}
+
+// Who sent each text of a prompt's blocks.
+function senders(list: UserBlock[]): Sender[] {
+	return list.flatMap((b) => (b.type === 'text' ? [inbox.sender(b)] : []))
 }
 
 // An edit of the last prompt. If only reading happened since it, the
 // edit replaces it and the turn runs again as if it had been written
 // that way; otherwise, or while the turn is still busy, it is a prompt
-// like any other. The edit is of the prompt's last text: messages it
-// delivered from the inbox before that stay.
+// like any other. The edit is of the human's last text in the prompt:
+// the other texts it delivered from the inbox stay. A prompt with no
+// text of the human's is not theirs to edit: the edit goes on top.
 function amend(id: string, text: string, command?: string): string | undefined {
 	let records = history.readSync(id)
 	let at = replay.lastPrompt(records)
 	let old = records[at]
-	if (states.busy(status.stateOf(id, records)) || old?.type !== 'user' || !prompts.harmless(records.slice(at + 1))) return prompts.submit(id, text, command)
+	let parts = old?.type === 'user' ? old.blocks.filter((b): b is UserText => b.type === 'text') : []
+	let mine = parts.findLastIndex((b) => b.from === undefined)
+	if (states.busy(status.stateOf(id, records)) || mine < 0 || !prompts.harmless(records.slice(at + 1))) return prompts.submit(id, text, command)
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return refused
-	let texts = prompts.texts(old.blocks)
-	texts[texts.length - 1] = text
+	parts[mine] = { type: 'text', text }
 	// Images stay while their markers do: the texts are resolved again.
-	let { blocks } = blobs.resolve(id, texts)
+	let blocks = prompts.blocks(id, parts)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, replaces: true }
 	if (command !== undefined) record.command = command
 	history.append(id, record)
@@ -110,24 +131,23 @@ function harmless(records: HistoryRecord[]): boolean {
 }
 
 // After a command's question closed on an idle session: runs what was
-// sent meanwhile, steering first, as submit and next would have.
+// sent meanwhile, steering first, as submit and next would have. A
+// turn of their own: advisory messages get full attention.
 function drain(id: string): void {
 	if (status.stateOf(id).type !== 'idle') return
 	let steering = status.inboxOf(id).filter((m) => !m.queue)
 	if (!steering.length) return prompts.next(id)
 	if (status.transition(id, { type: 'submit' })) return
-	prompts.deliver(id, steering)
+	prompts.deliver(id, steering.map((m) => ({ ...m, advisory: undefined })))
 	turns.start(id)
 }
 
-// Records inbox messages (and a new prompt `text`) as one prompt, its
+// Records inbox messages (and a new prompt `extra`) as one prompt, its
 // attachment markers resolved (blobs.resolve), and tells followers: a
 // `prompt` event, or with `quiet` nothing, as the caller's turn-start
 // carries it. Returns the prompt's blocks.
-function deliver(id: string, items: InboxItem[], text?: string, command?: string, quiet = false): UserBlock[] {
-	let texts = items.map((m) => m.text)
-	if (text !== undefined) texts.push(text)
-	let { blocks } = blobs.resolve(id, texts)
+function deliver(id: string, items: InboxItem[], extra?: Sender & { text: string }, command?: string, quiet = false): UserBlock[] {
+	let blocks = prompts.blocks(id, extra ? [...items, extra] : items)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, inbox: items.map((m) => m.id) }
 	if (command !== undefined) record.command = command
 	history.append(id, record)
@@ -147,6 +167,8 @@ function images(list: UserBlock[]): ImageBlock[] {
 // The `prompt` event telling followers of a prompt record's blocks.
 function promptEvent(id: string, list: UserBlock[], replaces = false): Event {
 	let event: Event & { type: 'prompt' } = { type: 'prompt', sessionId: id, texts: prompts.texts(list) }
+	let who = prompts.senders(list)
+	if (who.some((s) => s.from !== undefined)) event.senders = who
 	let shown = prompts.images(list)
 	if (shown.length) event.images = shown
 	if (replaces) event.replaces = true
@@ -164,7 +186,7 @@ function next(id: string): void {
 	let queued = status.inboxOf(id).find((m) => m.queue)
 	if (!queued || status.transition(id, { type: 'submit' })) return
 	let list = prompts.deliver(id, [queued], undefined, undefined, true)
-	turns.start(id, prompts.texts(list)[0], undefined, prompts.images(list))
+	turns.start(id, prompts.texts(list)[0], undefined, prompts.images(list), prompts.senders(list)[0])
 }
 
 // After a submit: the draft it was typed in is sent, so it clears
@@ -228,6 +250,8 @@ export const prompts = {
 	harmless,
 	drain,
 	deliver,
+	blocks: blocksOf,
+	senders,
 	texts,
 	images,
 	promptEvent,

@@ -7,6 +7,7 @@ import { keyHelp } from '../common/key-help.ts'
 import { commands } from './commands.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { prompts } from './prompts.ts'
 import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
@@ -206,7 +207,7 @@ test('a command runs while a turn is busy instead of waiting in the inbox', asyn
 test('history records who sent a command', async () => {
 	let a = client()
 	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: '/help', from: '7-abc' })
+	prompts.submit(id, '/help', undefined, false, { from: '7-abc' })
 	a.conn.send({ type: 'submit', sessionId: id, text: '/help cd' })
 	let cmds = history.readSync(id).filter((r) => r.type === 'command')
 	expect(cmds.map((r: any) => r.from)).toEqual(['7-abc', undefined])

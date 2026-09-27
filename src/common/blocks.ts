@@ -17,7 +17,16 @@ export type ToolResultBlock = { type: 'tool_result'; id: string; output: string;
 // its decoded size, for display.
 export type ImageBlock = { type: 'image'; blob: string; mediaType: string; bytes?: number }
 
-export type UserBlock = TextBlock | ToolResultBlock | ImageBlock
+// Who sent a prompt's text (task rj): `from` is the session that sent
+// it, `label` names it for people and the model (tab, id and name as
+// they were then); none, the human. `advisory`: the model may read it
+// without dropping its work (the send tool's default).
+export type Sender = { from?: string; label?: string; advisory?: true }
+
+// A prompt's text, saying who sent it.
+export type UserText = TextBlock & Sender
+
+export type UserBlock = UserText | ToolResultBlock | ImageBlock
 export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock
 
 export type Message = { role: 'user'; blocks: UserBlock[] } | { role: 'assistant'; blocks: AssistantBlock[] }

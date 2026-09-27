@@ -6,11 +6,12 @@
 // Not a state: every client shows the inbox beside any state, each
 // message saying why it waits.
 
+import type { Sender } from './blocks.ts'
 import type { HistoryRecord } from './replay.ts'
 import { states, type SessionState } from './states.ts'
 
-// `from`: the session that sent it; without it, the human.
-export type InboxItem = { id: string; text: string; queue?: true; from?: string }
+// Sender fields: another session sent it (task rj); none, the human.
+export type InboxItem = { id: string; text: string; queue?: true } & Sender
 
 // Messages sent and not yet delivered, oldest first, as last edited.
 function pending(records: HistoryRecord[]): InboxItem[] {
@@ -21,7 +22,7 @@ function pending(records: HistoryRecord[]): InboxItem[] {
 			// An edit keeps the message's place: Map.set on a key keeps its order.
 			let item: InboxItem = { id: r.id, text: r.text }
 			if (r.queue) item.queue = true
-			if (r.from !== undefined) item.from = r.from
+			Object.assign(item, inbox.sender(r))
 			waiting.set(r.id, item)
 		}
 		else if (r.type === 'user') for (let id of r.inbox ?? []) waiting.delete(id)
@@ -29,13 +30,24 @@ function pending(records: HistoryRecord[]): InboxItem[] {
 	return [...waiting.values()]
 }
 
-// Why the message waits and what ends the wait, in a few words.
-function label(state: SessionState, item: InboxItem): string {
-	if (state.type === 'running') return item.queue ? 'queued: runs after this turn' : 'steering: sent before the next request'
-	if (state.type === 'idle') return 'waiting'
-	let kind = item.queue ? 'queued' : 'steering'
-	let why = states.describe(state)
-	return why ? `${kind}, waiting: ${why}` : `${kind}, waiting for an answer`
+// The sender fields of a record or item, and nothing else.
+function sender(s: Sender): Sender {
+	let out: Sender = {}
+	if (s.from !== undefined) out.from = s.from
+	if (s.label !== undefined) out.label = s.label
+	if (s.advisory) out.advisory = true
+	return out
 }
 
-export const inbox = { pending, label }
+// Why the message waits and what ends the wait, in a few words, and
+// who sent it if not the human.
+function label(state: SessionState, item: InboxItem): string {
+	let by = item.from === undefined ? '' : ` (from ${item.label ?? item.from})`
+	let kind = item.queue ? 'queued' : item.advisory ? 'advisory' : 'steering'
+	if (state.type === 'running') return (item.queue ? 'queued: runs after this turn' : `${kind}: sent before the next request`) + by
+	if (state.type === 'idle') return `waiting${by}`
+	let why = states.describe(state)
+	return (why ? `${kind}, waiting: ${why}` : `${kind}, waiting for an answer`) + by
+}
+
+export const inbox = { pending, sender, label }

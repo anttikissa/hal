@@ -3,7 +3,7 @@
 // unfinished on disk. A turn with no end record is unfinished; whichever
 // process becomes host continues it (recover).
 
-import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type StreamEvent, type ToolCallBlock, type ToolResultBlock, type Usage } from '../common/blocks.ts'
+import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type Sender, type StreamEvent, type ToolCallBlock, type ToolResultBlock, type Usage } from '../common/blocks.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
@@ -51,14 +51,16 @@ function ask(id: string, form: Form, call?: string): void {
 
 // Runs a turn whose prompt or `continue` record is in history.
 // `answers`: the fresh answer to its question, secrets included;
-// `images`: the prompt's image blocks, for followers to show.
-function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[]): void {
+// `images`: the prompt's image blocks, for followers to show; `sender`:
+// who sent the prompt, if not the human.
+function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], sender?: Sender): void {
 	let model = sessions.open(id).model
 	let running: Running = { provider: blocks.parseModelId(model)?.provider ?? model, controller: new AbortController() }
 	turns.state.running.set(id, running)
 	let event: Event = { type: 'turn-start', sessionId: id, provider: running.provider }
 	if (prompt !== undefined) event.prompt = prompt
 	if (images?.length) event.images = images
+	if (sender?.from !== undefined) event.sender = sender
 	host.broadcast(id, event)
 	running.done = turns.runTurn(id, model, running, answers).catch((e) => diag.log(`turn ${id}: ${e?.message ?? e}`))
 }
@@ -247,7 +249,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let cwd = sessions.open(id).cwd
 			status.transition(id, { type: 'tools' })
 			let results: ToolResultBlock[] = []
-			for (let call of calls) results.push(decided.get(call.id) === false ? approval.declined(call) : await tools.run(call, { cwd, signal }))
+			for (let call of calls) results.push(decided.get(call.id) === false ? approval.declined(call) : await tools.run(call, { cwd, signal, sessionId: id }))
 			if (turns.state.running.get(id) !== running) return
 			history.results(id, results)
 			host.broadcast(id, { type: 'tool-results', sessionId: id, results })

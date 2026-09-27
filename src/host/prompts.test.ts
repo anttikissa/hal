@@ -384,7 +384,7 @@ test('a message another session sent waits unedited', async () => {
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'from a peer', from: 'other', id: 'p1' })
+	prompts.submit(id, 'from a peer', 'p1', false, { from: 'other' })
 	a.conn.send({ type: 'submit', sessionId: id, text: 'mine now', amend: true, edits: 'p1' })
 	expect(a.of('rejected')).toHaveLength(1)
 	expect(a.views.get(id)!.inbox).toEqual([{ id: 'p1', text: 'from a peer', from: 'other' }])

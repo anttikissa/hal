@@ -2,7 +2,7 @@
 // and the rebuild of provider input from them. Provider input comes from
 // these records alone, never from display state.
 
-import type { AssistantBlock, Message, TextBlock, StopReason, ToolResultBlock, Usage, UserBlock } from './blocks.ts'
+import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
 
 // `paused`: the user stopped the turn (tasks/j1/states.md); it can
@@ -19,11 +19,12 @@ export type HistoryRecord =
 	// A message sent while the session was busy, waiting in the inbox
 	// (src/common/inbox.ts) until a prompt record delivers it. Not
 	// provider input by itself. `id`: the client's command id, if any.
-	// `from`: the session that sent it; without it, the human. A later
+	// Sender fields (from, label, advisory): another session sent it
+	// (task rj); none, the human. A later
 	// record with the same id is an edit of the waiting message (task
 	// dg): its new text, in the same place; `withdrawn` takes it out
 	// (edited into a slash command). `command`: the edit's command id.
-	| { type: 'inbox'; id: string; text: string; queue?: true; from?: string; withdrawn?: true; command?: string; ts: string }
+	| { type: 'inbox'; id: string; text: string; queue?: true; from?: string; label?: string; advisory?: true; withdrawn?: true; command?: string; ts: string }
 	// One assistant block, appended as soon as it is complete.
 	| { type: 'assistant'; block: AssistantBlock; ts: string }
 	// Ends one model turn, or pauses it (then `pauseReason` if Hal, not
@@ -124,7 +125,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			pending = []
 			waiting = undefined
 			push({ role: 'user', blocks: [...results, ...missing] })
-			let texts = r.blocks.filter((b): b is TextBlock => b.type === 'text')
+			let texts = r.blocks.filter((b): b is UserText => b.type === 'text')
 			if (!texts.length) continue
 			let head = [`[${replay.clock(r.ts, stamped)}]`, ...(note ? [note] : []), ...replay.changeNotes(changed)].join('\n')
 			stamped = r.ts
@@ -134,10 +135,19 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			// texts (several when it delivers the inbox) are one block.
 			// Its images (task 2a) follow the text.
 			let images = r.blocks.filter((b) => b.type === 'image')
-			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => b.text).join('\n\n')}` }, ...images.map((b) => ({ ...b }))] })
+			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => replay.framed(b)).join('\n\n')}` }, ...images.map((b) => ({ ...b }))] })
 		}
 	}
 	return out
+}
+
+// A prompt text as the model reads it: another session's message under
+// an [Inbox · sender] line (tab, id and name), an advisory one also
+// saying it needn't drop its work for it.
+function framed(b: UserText): string {
+	if (b.from === undefined) return b.text
+	let head = `[Inbox · ${b.label ?? b.from}]`
+	return b.advisory ? `${head}\n${replay.advisoryNote}\n${b.text}` : `${head}\n${b.text}`
 }
 
 // Whether the record is a prompt: a user record with text.
@@ -223,7 +233,10 @@ function missingResult(status: TurnStatus | undefined): string {
 export const replay = {
 	// Told to the model when a cut-off answer continues.
 	continueNote: '<meta>The previous response was interrupted. Continue without repeating completed work.</meta>',
+	// Told with an advisory message delivered while the model works.
+	advisoryNote: '<meta>Another session sent this while you work: read it now, but you need not drop your current task for it.</meta>',
 	toMessages,
+	framed,
 	isPrompt,
 	lastPrompt,
 	current,

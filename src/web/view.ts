@@ -229,7 +229,7 @@ function oneLine(s: string): string {
 function show(item: Item): Shown {
 	switch (item.type) {
 		case 'prompt':
-			return { kind: 'user', text: item.text }
+			return { kind: 'user', text: item.from === undefined ? item.text : `${item.text}\n(sent from ${item.label ?? item.from})` }
 		case 'image':
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }

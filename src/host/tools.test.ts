@@ -20,7 +20,7 @@ afterEach(() => {
 	rmSync(dir, { recursive: true, force: true })
 })
 
-const read = (input: Record<string, unknown>) => tools.run({ type: 'tool_call', id: 'c1', name: 'read', input }, { cwd: dir, signal })
+const read = (input: Record<string, unknown>) => tools.run({ type: 'tool_call', id: 'c1', name: 'read', input }, { cwd: dir, signal, sessionId: 's' })
 
 test('every tool is offered to the model with an object schema', () => {
 	let defs = tools.defs()
@@ -43,7 +43,7 @@ test('a tool file dropped into the tools directory is offered and run, nothing e
 	tools.dir = () => toolDir
 	expect(tools.defs()).toEqual([{ name: 'echo', description: 'echo', inputSchema: { type: 'object', properties: {} } }])
 	expect(tools.readOnly('echo')).toBe(true)
-	let result = await tools.run({ type: 'tool_call', id: 'e1', name: 'echo', input: { a: 1 } }, { cwd: dir, signal })
+	let result = await tools.run({ type: 'tool_call', id: 'e1', name: 'echo', input: { a: 1 } }, { cwd: dir, signal, sessionId: 's' })
 	expect(result).toEqual({ type: 'tool_result', id: 'e1', output: 'echo {"a":1}' })
 })
 
@@ -105,12 +105,12 @@ test('failures are error results, never throws', async () => {
 		expect(r.isError).toBe(true)
 		expect(r.output.length).toBeGreaterThan(0)
 	}
-	let unknown = await tools.run({ type: 'tool_call', id: 'c2', name: 'nope', input: {} }, { cwd: dir, signal })
+	let unknown = await tools.run({ type: 'tool_call', id: 'c2', name: 'nope', input: {} }, { cwd: dir, signal, sessionId: 's' })
 	expect(unknown).toMatchObject({ id: 'c2', isError: true })
 })
 
 const bash = (input: Record<string, unknown>, sig = signal) =>
-	tools.run({ type: 'tool_call', id: 'b1', name: 'bash', input }, { cwd: dir, signal: sig })
+	tools.run({ type: 'tool_call', id: 'b1', name: 'bash', input }, { cwd: dir, signal: sig, sessionId: 's' })
 
 test('bash runs in the session cwd and returns exit status with stdout and stderr interleaved', async () => {
 	writeFileSync(`${dir}/a.txt`, 'hello\n')

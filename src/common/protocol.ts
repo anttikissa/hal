@@ -11,7 +11,7 @@
 // carrying the id, and ignores a repeat of an id it has acted on, so a
 // command resent after a reconnect never acts twice.
 
-import type { AssistantBlock, ImageBlock, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
+import type { AssistantBlock, ImageBlock, Sender, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
 import type { InboxItem } from './inbox.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
@@ -81,8 +81,9 @@ export type Command = (
 	// history whether it replaces that prompt or is sent on top; with
 	// `edits` too, an edit of that inbox message while it still waits.
 	// A slash command (/name args) runs on the host at once instead.
-	// `from`: the session that sent it; without it, the human typed it.
-	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean; edits?: string; from?: string }
+	// Always the human's: another session's messages come from the host
+	// (the send tool), never from what a client claims (task rj).
+	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean; edits?: string }
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }
@@ -138,8 +139,9 @@ export type Event =
 	| { type: 'snapshot'; sessionId: string; snapshot: Snapshot }
 	// The prompt is now in history and a turn is running. No prompt: an
 	// earlier turn continues (a `continue` record). `images`: the
-	// prompt's image blocks, after its text.
-	| { type: 'turn-start'; sessionId: string; prompt?: string; images?: ImageBlock[]; provider: string }
+	// prompt's image blocks, after its text. `sender`: who sent the
+	// prompt, if not the human.
+	| { type: 'turn-start'; sessionId: string; prompt?: string; images?: ImageBlock[]; sender?: Sender; provider: string }
 	// A page of earlier history, answering the `history` command for
 	// `before`: whole records ending there, oldest first. `older`: where
 	// they start, when there are more before them.
@@ -151,7 +153,8 @@ export type Event =
 	// Inbox messages (and maybe a new prompt) are in history as one
 	// prompt, after the running turn's output so far. `replaces`: an edit
 	// that takes the place of the last prompt and everything after it.
-	| { type: 'prompt'; sessionId: string; texts: string[]; images?: ImageBlock[]; replaces?: true }
+	// `senders`: who sent each text ({} the human), when not all the human.
+	| { type: 'prompt'; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; replaces?: true }
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent }
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
@@ -223,7 +226,7 @@ function invalid(value: unknown): string | undefined {
 		return str('sessionId') ?? str('question') ?? (strings ? undefined : 'answer: answers must map names to strings')
 	}
 	if (c.type === 'attach') return str('sessionId') ?? str('mediaType') ?? str('data') ?? str('name', true)
-	if (c.type === 'submit') return str('sessionId') ?? str('text') ?? str('from', true) ?? str('edits', true)
+	if (c.type === 'submit') return str('sessionId') ?? str('text') ?? str('edits', true)
 	return str('sessionId') ?? (c.type === 'draft' || c.type === 'complete' ? str('text') : undefined)
 }
 

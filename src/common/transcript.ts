@@ -5,7 +5,7 @@
 // from history on the host, never from here, so items drop what only a
 // provider needs (thinking signatures, their provider).
 
-import { blocks, type AssistantBlock, type ImageBlock, type ToolResultBlock, type Usage } from './blocks.ts'
+import { blocks, type AssistantBlock, type ImageBlock, type Sender, type ToolResultBlock, type Usage } from './blocks.ts'
 import { forms, type Answers, type Form } from './forms.ts'
 import type { InboxItem } from './inbox.ts'
 import type { Event, LiveTurn, Snapshot, TurnStatus } from './protocol.ts'
@@ -14,8 +14,9 @@ import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
 
 export type Item =
-	// `from`: the session that sent it; without it, the human.
-	| { type: 'prompt'; text: string; from?: string }
+	// `from`: the session that sent it, `label` naming it; without it,
+	// the human.
+	| { type: 'prompt'; text: string; from?: string; label?: string }
 	// An image attached to the prompt before it (task 2a).
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number }
 	| { type: 'text'; text: string }
@@ -61,6 +62,14 @@ function blockItems(list: AssistantBlock[]): Item[] {
 	return out
 }
 
+// A prompt text as shown, saying who sent it if not the human.
+function promptItem(text: string, s?: Sender): Item {
+	let item: Item = { type: 'prompt', text }
+	if (s?.from !== undefined) item.from = s.from
+	if (s?.label !== undefined) item.label = s.label
+	return item
+}
+
 function imageItem(b: ImageBlock): Item {
 	let item: Item = { type: 'image', blob: b.blob, mediaType: b.mediaType }
 	if (b.bytes !== undefined) item.bytes = b.bytes
@@ -79,7 +88,7 @@ function recordItems(r: HistoryRecord): Item[] {
 	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change') return []
 	if (r.type === 'question') return [{ type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
-	if (r.type === 'user') return r.blocks.map((b): Item => (b.type === 'text' ? { type: 'prompt', text: b.text } : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
+	if (r.type === 'user') return r.blocks.map((b): Item => (b.type === 'text' ? transcript.promptItem(b.text, b) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
 
@@ -202,7 +211,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	}
 	if (event.type === 'turn-start') {
 		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
-		let items: Item[] = [...t.items, { type: 'prompt', text: event.prompt }, ...(event.images ?? []).map((b) => transcript.imageItem(b))]
+		let items: Item[] = [...t.items, transcript.promptItem(event.prompt, event.sender), ...(event.images ?? []).map((b) => transcript.imageItem(b))]
 		return { ...t, items, prompt: t.items.length, live: { start: items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
 	}
 	let question: Item | undefined = event.type === 'question' ? { type: 'question', id: event.id, form: event.form } : undefined
@@ -240,7 +249,7 @@ function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' 
 	let keep = event.replaces && t.prompt !== undefined ? items.slice(0, t.prompt) : items
 	let { live: _live, ...rest } = t
 	let images = (event.images ?? []).map((b) => transcript.imageItem(b))
-	return { ...rest, items: [...keep, ...event.texts.map((text): Item => ({ type: 'prompt', text })), ...images], prompt: keep.length }
+	return { ...rest, items: [...keep, ...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i])), ...images], prompt: keep.length }
 }
 
 // Where the history a client got in a snapshot ends (an index into
@@ -259,4 +268,4 @@ function resumedLabel(r: Resumed, now = new Date()): string {
 	return `resumed · last turn ${replay.clock(r.last, now.toISOString())}`
 }
 
-export const transcript = { blockItems, imageItem, resultItem, recordItems, endItem, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted, resumed, resumedLabel }
+export const transcript = { blockItems, promptItem, imageItem, resultItem, recordItems, endItem, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted, resumed, resumedLabel }

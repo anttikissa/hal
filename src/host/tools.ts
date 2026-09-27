@@ -15,7 +15,8 @@ import { readdirSync } from 'fs'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import type { ToolDef } from './provider.ts'
 
-export type ToolContext = { cwd: string; signal: AbortSignal }
+// `sessionId`: the session whose turn runs the call.
+export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string }
 
 // One file per tool in src/host/tools/, named like it (read.ts is
 // read), exporting `tool`, so adding a tool touches nothing else.

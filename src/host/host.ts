@@ -207,7 +207,7 @@ function act(client: Client, c: Command): Outcome | undefined {
 		// An edit of a waiting message may become one too (prompts.edit).
 		let amending = c.amend && !c.queue && !commands.parse(c.text)
 		if (c.amend && !c.queue && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
-		else refused = amending ? prompts.amend(c.sessionId, c.text, c.id) : prompts.submit(c.sessionId, c.text, c.id, c.queue, c.from)
+		else refused = amending ? prompts.amend(c.sessionId, c.text, c.id) : prompts.submit(c.sessionId, c.text, c.id, c.queue)
 		if (refused === undefined) prompts.sent(c.sessionId, c.text, c.id)
 	} else if (c.type === 'draft') prompts.draft(c.sessionId, drafts.set(c.sessionId, c.text, c.base), c.id)
 	else if (c.type === 'continue') refused = prompts.resume(c.sessionId)
