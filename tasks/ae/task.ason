@@ -1,0 +1,7 @@
+{
+	title: "'processing' until the first streamed byte",
+	description: "While a turn waits for the provider's first streamed byte (phase requesting) every client says 'processing', never 'thinking' (questions.md item 55; the old Hal said processing). 'thinking' shows only while thinking text streams, 'writing' while answer text streams, 'running tools' while tools run. The same words in the terminal status line and the web; the words come from one place in src/common.",
+	status: 'planned',
+	needs: [],
+	foldInto: ['4s']
+}

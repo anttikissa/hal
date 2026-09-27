@@ -1,0 +1,352 @@
+// OpenAI ChatGPT subscription usage via chatgpt.com/backend-api/wham/usage.
+
+import { auth, type Credential } from './auth.ts'
+import { STATE_DIR } from './state.ts'
+import { liveFiles } from '../utils/live-file.ts'
+import { subscriptionUsage } from '../common/subscription-usage.ts'
+import { time } from '../utils/time.ts'
+import { subscriptionLog, type SubscriptionWindow } from './subscription-log.ts'
+
+const CACHE_PATH = `${STATE_DIR}/openai-usage.ason`
+const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
+export interface UsageWindow {
+	usedPercent: number
+	windowMinutes: number
+	resetAt: number
+}
+
+export interface AccountUsage {
+	key: string
+	email?: string
+	index?: number
+	total?: number
+	planType?: string
+	fetchedAt?: string
+	primary?: UsageWindow
+	secondary?: UsageWindow
+	// Present when OpenAI rejected this account's bearer token during refresh.
+	error?: string
+}
+
+interface UsageState {
+	currentKey: string
+	updatedAt: string
+	accounts: Record<string, AccountUsage>
+}
+
+const config = {
+	minAutoRefreshMs: 60_000,
+	fetchTimeoutMs: 10_000,
+	progressBarWidth: 14,
+}
+
+const runtime = {
+	initialized: false,
+}
+
+function defaultState(): UsageState {
+	return { currentKey: '', updatedAt: '', accounts: {} }
+}
+
+let state: UsageState = defaultState()
+
+function fix(): void {
+	if (typeof openaiUsage.state.currentKey !== 'string') openaiUsage.state.currentKey = ''
+	if (typeof openaiUsage.state.updatedAt !== 'string') openaiUsage.state.updatedAt = ''
+	if (!openaiUsage.state.accounts || typeof openaiUsage.state.accounts !== 'object') openaiUsage.state.accounts = {}
+	for (const [key, account] of Object.entries(openaiUsage.state.accounts)) {
+		if (!account || typeof account !== 'object') {
+			delete openaiUsage.state.accounts[key]
+			continue
+		}
+		if (typeof account.key !== 'string') account.key = key
+	}
+}
+
+function init(): void {
+	if (runtime.initialized) return
+	runtime.initialized = true
+	openaiUsage.state = liveFiles.liveFile(CACHE_PATH, defaultState()) as UsageState
+	fix()
+}
+
+function save(): void {
+	openaiUsage.init()
+	fix()
+	openaiUsage.state.updatedAt = new Date().toISOString()
+	liveFiles.save(openaiUsage.state)
+}
+
+function onChange(cb: () => void): void {
+	openaiUsage.init()
+	liveFiles.onChange(openaiUsage.state, () => {
+		fix()
+		cb()
+	})
+}
+
+function keyOf(credential: Pick<Credential, '_key' | 'index'>): string {
+	return credential._key ?? `openai:${credential.index ?? 0}`
+}
+
+function credentials(): Credential[] {
+	return auth.listCredentials('openai').filter((credential) => credential.type === 'token')
+}
+
+function hasCredentials(): boolean {
+	return credentials().length > 0
+}
+
+function parseWindow(raw: any): UsageWindow | undefined {
+	const usedPercent = Number(raw?.used_percent)
+	const windowSeconds = Number(raw?.limit_window_seconds)
+	const resetAt = Number(raw?.reset_at)
+	if (!Number.isFinite(usedPercent) || !Number.isFinite(windowSeconds) || !Number.isFinite(resetAt)) return
+	return { usedPercent, windowMinutes: Math.round(windowSeconds / 60), resetAt }
+}
+
+function parsePayload(credential: Credential, raw: any): AccountUsage {
+	return {
+		key: keyOf(credential),
+		email: raw?.email || credential.email,
+		index: credential.index,
+		total: credential.total,
+		planType: typeof raw?.plan_type === 'string' ? raw.plan_type : undefined,
+		fetchedAt: new Date().toISOString(),
+		primary: parseWindow(raw?.rate_limit?.primary_window),
+		secondary: parseWindow(raw?.rate_limit?.secondary_window),
+	}
+}
+
+function current(): AccountUsage | null {
+	openaiUsage.init()
+	fix()
+	return openaiUsage.state.currentKey ? openaiUsage.state.accounts[openaiUsage.state.currentKey] ?? null : null
+}
+
+function all(): AccountUsage[] {
+	openaiUsage.init()
+	fix()
+	return Object.values(openaiUsage.state.accounts).sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+}
+
+function setCurrentCredential(credential: Credential | undefined): void {
+	openaiUsage.init()
+	if (!credential || credential.type !== 'token') return
+	const key = keyOf(credential)
+	if (openaiUsage.state.currentKey === key) return
+	openaiUsage.state.currentKey = key
+	save()
+}
+
+function formatResetAt(resetAt: number, now = new Date()): string {
+	return time.formatResetAt(resetAt * 1000, now)
+}
+
+function displayAccount(account: AccountUsage): string {
+	const raw = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)
+	const who = subscriptionUsage.config.censorEmails && account.email ? subscriptionUsage.censorEmail(account.email) : raw
+	const plan = account.planType ? ` (${account.planType})` : ''
+	return `${who}${plan}${account.error ? `<br>${account.error}` : ''}`
+}
+
+function displaySlot(account: AccountUsage): string {
+	const slot = account.index != null && account.total ? `${account.index + 1}/${account.total}` : '-'
+	return openaiUsage.state.currentKey === account.key ? `${slot} *` : slot
+}
+
+function usageBar(usedPercent: number): string {
+	return subscriptionUsage.usageBarMarker(usedPercent, config.progressBarWidth)
+}
+
+function formatWindowText(window: UsageWindow | undefined): string {
+	if (!window) return '?'
+	return `${Math.round(window.usedPercent)}% used (resets ${formatResetAt(window.resetAt)})`
+}
+
+function formatWindowCell(window: UsageWindow | undefined): string {
+	if (!window) return '?'
+	return `${usageBar(window.usedPercent)}<br>${formatWindowText(window)}`
+}
+
+function windowLabel(window: UsageWindow): string {
+	return time.formatQuotaWindow(window.windowMinutes)
+}
+
+/** A shorter window cannot make an account usable while a longer one is exhausted. */
+function displayWindows(account: AccountUsage): { label: string; window: UsageWindow }[] {
+	const result: { label: string; window: UsageWindow }[] = []
+	if (account.primary) result.push({ label: windowLabel(account.primary), window: account.primary })
+	if (account.secondary) result.push({ label: windowLabel(account.secondary), window: account.secondary })
+	result.sort((a, b) => a.window.windowMinutes - b.window.windowMinutes)
+	for (let index = result.length - 2; index >= 0; index--) {
+		if (result[index + 1]!.window.usedPercent >= 100) result.splice(index, 1)
+	}
+	return result
+}
+
+function statusColumns(accounts: AccountUsage[]): string[] {
+	const labels = new Map<string, number>()
+	for (const account of accounts) {
+		for (const item of displayWindows(account)) {
+			if (!labels.has(item.label)) labels.set(item.label, item.window.windowMinutes)
+		}
+	}
+	const entries = [...labels.entries()].sort((a, b) => a[1] - b[1])
+	const columns: string[] = []
+	for (const [label] of entries) columns.push(label)
+	return columns.length > 0 ? columns : ['5h', '7d']
+}
+
+function windowForLabel(account: AccountUsage, label: string): UsageWindow | undefined {
+	for (const item of displayWindows(account)) {
+		if (item.label === label) return item.window
+	}
+}
+
+function formatStatusText(): string {
+	const accounts = all()
+	if (accounts.length === 0) return 'No cached OpenAI subscription usage. Run /status again after logging in with ChatGPT.'
+	const columns = statusColumns(accounts)
+	const separatorCells = ['---', '---']
+	for (const _column of columns) separatorCells.push('---')
+	const lines = [
+		'OpenAI subscriptions:',
+		'',
+		`| Slot | Account | ${columns.join(' | ')} |`,
+		`|${separatorCells.join('|')}|`,
+	]
+	for (const account of accounts) {
+		const cells = [displaySlot(account), displayAccount(account)]
+		for (const column of columns) {
+			const window = windowForLabel(account, column)
+			if (window) cells.push(formatWindowCell(window))
+			else if (account.primary && windowLabel(account.primary) === column || account.secondary && windowLabel(account.secondary) === column) cells.push('')
+			else cells.push(formatWindowCell(undefined))
+		}
+		lines.push(`| ${cells.join(' | ')} |`)
+	}
+	return lines.join('\n')
+}
+
+function expiredAccount(credential: Credential): AccountUsage {
+	return {
+		key: keyOf(credential),
+		email: credential.email,
+		index: credential.index,
+		total: credential.total,
+		fetchedAt: new Date().toISOString(),
+		error: 'Token expired — sign in again with /login chatgpt',
+	}
+}
+
+async function fetchUsage(credential: Credential): Promise<AccountUsage> {
+	await auth.ensureFresh('openai')
+	const res = await fetch(USAGE_URL, {
+		headers: { Authorization: `Bearer ${credential.value}` },
+		signal: AbortSignal.timeout(config.fetchTimeoutMs),
+	})
+	if (!res.ok) {
+		const text = await res.text().catch(() => '')
+		if (res.status === 401) {
+			try {
+				if (JSON.parse(text)?.error?.code === 'token_expired') return expiredAccount(credential)
+			} catch {}
+		}
+		throw new Error(`/wham/usage ${res.status}: ${text.slice(0, 200)}`)
+	}
+	return parsePayload(credential, await res.json())
+}
+
+function hasRemainingQuota(account: AccountUsage): boolean {
+	const windows = [account.primary, account.secondary].filter(Boolean) as UsageWindow[]
+	return windows.length > 0 && windows.every((window) => window.usedPercent < 100)
+}
+
+function observationWindows(account: AccountUsage): SubscriptionWindow[] {
+	const windows: SubscriptionWindow[] = []
+	for (const window of [account.primary, account.secondary]) {
+		if (!window) continue
+		windows.push({
+			label: time.formatQuotaWindow(window.windowMinutes),
+			durationMinutes: window.windowMinutes,
+			usedPercent: window.usedPercent,
+			resetAt: window.resetAt * 1000,
+		})
+	}
+	return windows
+}
+
+function pruneUnconfiguredAccounts(items: Credential[]): void {
+	if (items.length === 0) return
+	const keys = new Set<string>()
+	for (const credential of items) keys.add(keyOf(credential))
+	let changed = false
+	for (const key of Object.keys(openaiUsage.state.accounts)) {
+		if (keys.has(key)) continue
+		delete openaiUsage.state.accounts[key]
+		changed = true
+	}
+	if (changed) save()
+}
+
+async function refreshCredential(credential: Credential, force = false): Promise<AccountUsage> {
+	openaiUsage.init()
+	const key = keyOf(credential)
+	const existing = openaiUsage.state.accounts[key]
+	const lastFetch = existing?.fetchedAt ? Date.parse(existing.fetchedAt) : 0
+	if (!force && existing && lastFetch && Date.now() - lastFetch < config.minAutoRefreshMs) return existing
+	const account = await fetchUsage(credential)
+	if (!account.email) account.email = existing?.email
+	subscriptionLog.observe(
+		'openai',
+		key,
+		openaiUsage.observationWindows(account),
+		existing ? openaiUsage.observationWindows(existing) : undefined,
+	)
+	openaiUsage.state.accounts[key] = account
+	if (hasRemainingQuota(account)) auth.clearCooldown(credential)
+	if (!openaiUsage.state.currentKey) openaiUsage.state.currentKey = key
+	save()
+	return openaiUsage.state.accounts[key]!
+}
+
+async function refreshAll(force = false): Promise<AccountUsage[]> {
+	openaiUsage.init()
+	const items = credentials()
+	pruneUnconfiguredAccounts(items)
+	for (const credential of items) await refreshCredential(credential, force)
+	return all()
+}
+
+async function renderStatus(force = true): Promise<string> {
+	openaiUsage.init()
+	if (credentials().length === 0) return 'No OpenAI ChatGPT subscriptions configured.'
+	try {
+		await refreshAll(force)
+		return formatStatusText()
+	} catch (err: any) {
+		const suffix = err?.message ? String(err.message) : String(err)
+		return all().length > 0 ? `${formatStatusText()}\n\nRefresh failed: OpenAI: ${suffix}` : `OpenAI subscription usage unavailable: ${suffix}`
+	}
+}
+
+export const openaiUsage = {
+	config,
+	runtime,
+	state,
+	init,
+	onChange,
+	save,
+	hasCredentials,
+	all,
+	current,
+	setCurrentCredential,
+	refreshAll,
+	formatResetAt,
+	formatStatusText,
+	displayWindows,
+	observationWindows,
+	renderStatus,
+	parsePayload,
+}

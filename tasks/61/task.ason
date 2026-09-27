@@ -1,0 +1,7 @@
+{
+	title: 'Account usage windows; rotation picks the least used',
+	description: "The host tracks each subscription account's usage windows (questions.md item 81; artifacts old-anthropic-usage.ts, old-openai-usage.ts and task tf's account-rotation.ts): the percentage used and reset time of each window the provider reports (Anthropic's 5-hour and weekly unified limits from response headers, OpenAI Codex's primary and secondary windows), updated from every response, kept per provider and account in a state file through liveFiles. When a request needs an account (a new turn or a rotation after 429 or quota), it takes the least-used account the old way (leastUsed: compare the tightest window, prefer a window that resets sooner when tied) instead of the next in order; an account without data counts as unused. /model or a status line may show the numbers later; not required here. Tests: headers from each provider are parsed into windows; rotation picks the least used account; a limited account is still skipped.",
+	status: 'planned',
+	needs: [],
+	foldInto: ['tf']
+}

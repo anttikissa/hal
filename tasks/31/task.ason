@@ -1,0 +1,7 @@
+{
+	title: 'Paste markers and pages that show where the file lives',
+	description: "A long text paste becomes a marker shaped like an image marker: [paste/<name>.txt] (the user's example: [paste/0005.txt]; the name is chosen by the client like image names, so the marker is final from the start), and the text lives on the host at /tmp/hal/paste/<name>.txt (the same place rules as images: tools can read it, the session keeps a blob copy on submit, tests use the home's tmp). The model receives the text as it does today. Clicking an image or paste marker, in the terminal (OSC 8 with a code, task e3) or on the web, opens a page on the host, /image/<name> or /paste/<name>, that shows the content (the image, or the text in a monospace block) under a header naming where the file really is on the host (the /tmp path, and the session blob path once the prompt was sent), so it is obvious which file to open in one's own tools; the raw bytes have their own address that the page uses. While an upload is in flight the marker may look slightly different (for example dimmed and not yet a link) and becomes the normal marker when the host acknowledges it; no '[uploading ...]' text is ever shown. Old [paste <blob>, N lines] markers in history still display and replay. Tests: a pasted long text yields the final marker at once, the file exists at the stated path, the page names that path and shows the text, and an in-flight marker changes only its look.",
+	status: 'planned',
+	needs: ['e3'],
+	foldInto: ['qy', '2a']
+}

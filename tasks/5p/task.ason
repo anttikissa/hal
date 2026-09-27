@@ -1,0 +1,7 @@
+{
+	title: 'The blinking Hal cursor in the terminal',
+	description: "The terminal shows the Hal cursor as the old Hal did (questions.md item 53; artifacts old-render-history.ts, old-blocks.ts around hasStreamingHalCursor/addInlineCursor, old-cursor.ts, old-render-status.ts halCursorColor). While an assistant or thinking block streams, a blinking Hal cursor (a block in the Hal cursor colour) sits right after its last character, thinking in the thinking colour. When the focused session is not streaming, the transcript ends with a blank row, a row holding the blinking Hal cursor, and a blank row; a working session's idle cursor differs from a finished one as in the old Hal. Only the focused tab's current stream has a cursor. One shared pulse drives every blink in the client; its timer runs only while something on screen blinks, and a blink phase repaints only the rows that changed, never the whole frame. The terminal's own text cursor stays in the prompt. Tests: the cursor follows the streamed text, disappears when the block ends, the idle rows appear, no timer runs when nothing blinks.",
+	status: 'planned',
+	needs: [],
+	foldInto: ['cc']
+}

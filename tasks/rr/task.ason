@@ -1,0 +1,7 @@
+{
+	title: 'The web page gets config settings when it loads',
+	description: "Settings the browser needs (at least pasteLines and promptRows; whatever the settings table marks for the browser) come from the host's config.ason, not browser defaults (questions.md item 62). The host puts them in the page it serves, as a JSON script element written per request, and the page reads them before its first render; a config change reaches a page when it next loads. The WebSocket stays for short realtime messages, not bootstrap data. Tests: a changed pasteLines in config.ason decides which web paste becomes an attachment.",
+	status: 'planned',
+	needs: [],
+	foldInto: ['zc', 'pc']
+}

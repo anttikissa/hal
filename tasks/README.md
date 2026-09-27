@@ -4,6 +4,14 @@ Shared context for implementing every task in this project: goals, constraints, 
 
 Each task lives in a directory named by its ID, with a task.ason record and optional supporting files. Use `tsk ready` to find work, `tsk show <id>` for details, and `tsk done <id>` when it is implemented.
 
+## Goal
+
+hal2 rebuilds Hal (the old one lives in ~/.hal) from scratch with tsk.
+Not an identical clone, but: smaller, better architected, more capable
+where possible, and it leaves behind a set of tasks with implementation
+notes from which Hal can be rewritten again and again by more capable
+models. The tasks are the product as much as the code.
+
 ## Terms
 
 - **host**: the one process that owns a home (sessions, provider
@@ -124,6 +132,10 @@ and the notes of 1b and 4s before writing a component.
   the DOM slot, so it never moves to another item or tab.
 - One scroller, the transcript; nothing scrolls inside it, and an
   overlay scrolls itself, never the page behind it.
+- Links are cross-cutting: anything one client can link to (a session,
+  a block, an image, a paste), the other can too, at the same address
+  under the host's webUrl (task e3), and a terminal link carries a
+  one-time code only in its hidden OSC 8 target.
 - Anything that navigates is an `<a href>` (Cmd-click, middle-click,
   copy link keep working). The browser never polls: the host pushes.
 - Phones: fields at least 16px, touch targets at least 44px, touch
