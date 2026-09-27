@@ -199,7 +199,7 @@ test('the status line says what the session is doing, like the terminal', () => 
 	let idle = running([], { type: 'idle' })
 	expect(line(idle)).toEqual({ text: 'idle', tone: 'idle' })
 	let asking = running([], { type: 'running', phase: 'requesting' })
-	expect(line(asking)).toEqual({ text: 'thinking', tone: 'busy' })
+	expect(line(asking)).toEqual({ text: 'processing', tone: 'busy' })
 	let thinking = running([{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' } }] as Event[], { type: 'running', phase: 'streaming' })
 	expect(line(thinking)).toEqual({ text: 'thinking', tone: 'busy' })
 	expect(view.streaming(thinking)).toBe('thinking')

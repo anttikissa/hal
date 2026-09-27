@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 import { states, type SessionState, type StateEvent } from './states.ts'
+import type { Shown } from './transcript.ts'
 
 const idle: SessionState = { type: 'idle' }
 const requesting: SessionState = { type: 'running', phase: 'requesting' }
@@ -181,6 +182,16 @@ test('describe says when a retry happens and why', () => {
 	expect(states.describe(s, at + 1000)).toBe('retrying now (connection lost)')
 	// Without a clock: the time itself, which never goes stale.
 	expect(states.describe(s)).toContain('connection lost')
+})
+
+test('a turn says processing until the first streamed byte, then thinking or writing', () => {
+	let say = (phase: 'requesting' | 'streaming' | 'tools', items: Shown[] = []) => states.describe({ type: 'running', phase }, undefined, items)
+	// Waiting for the provider: the model is not thinking yet.
+	expect(say('requesting')).toBe('processing')
+	expect(say('requesting', [{ type: 'thinking', text: 'earlier round' }])).toBe('processing')
+	expect(say('streaming', [{ type: 'thinking', text: 'hm' }])).toBe('thinking')
+	expect(say('streaming', [{ type: 'thinking', text: 'hm' }, { type: 'text', text: 'hi' }])).toBe('writing')
+	expect(say('tools', [{ type: 'tool', id: 'a', name: 'bash', input: {} }])).toBe('running bash')
 })
 
 test('describe speaks plain words, never internal state or phase names', () => {

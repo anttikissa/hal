@@ -177,17 +177,8 @@ function line(st: ViewState, connected: boolean): Line {
 	if (!t) return { text: 'connecting', tone: 'busy' }
 	let s = t.state
 	if (s.type === 'idle') return { text: 'idle', tone: 'idle' }
-	if (s.type === 'running') {
-		if (s.phase === 'tools') {
-			let done = new Set(t.items.flatMap((i) => (i.type === 'tool-result' ? [i.id] : [])))
-			let names = t.items.flatMap((i) => (i.type === 'tool' && !done.has(i.id) ? [i.name] : []))
-			return { text: names.length ? `running ${names.join(', ')}` : 'running tools', tone: 'busy' }
-		}
-		let writing = s.phase === 'streaming' && view.streaming(st) !== 'thinking'
-		return { text: writing ? 'writing' : 'thinking', tone: 'busy' }
-	}
-	let text = states.describe(s) ?? ''
-	return { text, tone: s.type === 'error' ? 'error' : s.type === 'retrying' ? 'busy' : 'warn' }
+	let text = states.describe(s, undefined, t.items) ?? ''
+	return { text, tone: s.type === 'error' ? 'error' : s.type === 'running' || s.type === 'retrying' ? 'busy' : 'warn' }
 }
 
 // The key hints under the message box, for what Enter does now.

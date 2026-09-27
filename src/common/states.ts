@@ -10,6 +10,7 @@
 
 import { forms } from './forms.ts'
 import { replay, type HistoryRecord } from './replay.ts'
+import type { Shown } from './transcript.ts'
 
 export type Phase = 'requesting' | 'streaming' | 'tools'
 
@@ -153,13 +154,15 @@ function duration(ms: number): string {
 // what the session is doing or what the user can do about it. Undefined
 // when there is nothing to add: idle, or blocked on a question (the
 // question itself is on screen). With `now` (epoch ms) a retry says how long until it; without, the
-// time of day it happens, which never goes stale.
-function describe(state: SessionState, now?: number): string | undefined {
+// time of day it happens, which never goes stale. `items`, the
+// transcript so far, sharpens a running turn: whether the model thinks
+// or writes, and which tools still run.
+function describe(state: SessionState, now?: number, items: readonly Shown[] = []): string | undefined {
 	switch (state.type) {
 		case 'idle':
 			return undefined
 		case 'running':
-			return { requesting: 'thinking', streaming: 'writing', tools: 'running tools' }[state.phase]
+			return states.doing(state.phase, items)
 		case 'retrying':
 			if (now === undefined) return `retrying at ${new Date(state.at).toLocaleTimeString()} (${state.reason})`
 			let left = Date.parse(state.at) - now
@@ -174,4 +177,15 @@ function describe(state: SessionState, now?: number): string | undefined {
 	}
 }
 
-export const states = { maxRecoveries: () => MAX_RECOVERIES, busy, step, fromHistory, recoveries, enter, escape, describe }
+// A running turn in a word or two. Until the first streamed byte the
+// model has not started thinking, so it is only 'processing'; after it,
+// 'thinking' while thinking text streams, else 'writing'.
+function doing(phase: Phase, items: readonly Shown[]): string {
+	if (phase === 'requesting') return 'processing'
+	if (phase === 'streaming') return items.at(-1)?.type === 'thinking' ? 'thinking' : 'writing'
+	let done = new Set(items.flatMap((i) => (i.type === 'tool-result' ? [i.id] : [])))
+	let names = items.flatMap((i) => (i.type === 'tool' && !done.has(i.id) ? [i.name] : []))
+	return names.length ? `running ${names.join(', ')}` : 'running tools'
+}
+
+export const states = { maxRecoveries: () => MAX_RECOVERIES, busy, step, fromHistory, recoveries, enter, escape, describe, doing }
