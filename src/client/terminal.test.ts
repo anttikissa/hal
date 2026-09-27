@@ -90,6 +90,27 @@ describe('start', () => {
 		expect(t.keys.map((k) => k.key)).toEqual(['h', 'i', 'up'])
 	})
 
+	test('asks for the kitty keyboard protocol, except inside GNU screen', () => {
+		let env = { STY: process.env.STY, TERM: process.env.TERM }
+		try {
+			delete process.env.STY
+			process.env.TERM = 'xterm-256color'
+			expect(fixture().out).toContain('\x1b[>1u')
+			for (let [sty, term] of [['1.pts-0.host', 'xterm-256color'], [undefined, 'screen.xterm-256color']]) {
+				terminal.reset()
+				if (sty) process.env.STY = sty
+				else delete process.env.STY
+				process.env.TERM = term
+				let t = fixture()
+				expect(t.out).not.toContain('\x1b[>1u')
+				terminal.leave()
+				expect(t.out).not.toContain('\x1b[<u')
+			}
+		} finally {
+			for (let [k, v] of Object.entries(env)) v === undefined ? delete process.env[k] : (process.env[k] = v)
+		}
+	})
+
 	// Bun loses a key typed during startup (still in the cooked line
 	// buffer) if stdin is read before raw mode is on.
 	test('is in raw mode before it reads', () => {

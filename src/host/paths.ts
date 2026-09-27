@@ -60,4 +60,4 @@ function display(path: string): string {
 	return path
 }
 
-export const paths = { home, sessionsDir, sessionDir, stateDir, authFile, configFile, init, display }
+export const paths = { repoRoot: (): string => repoRoot, home, sessionsDir, sessionDir, stateDir, authFile, configFile, init, display }

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { connection } from '../common/connection.ts'
 import { drafts, type Local } from '../common/drafts.ts'
+import { placeholders } from '../common/placeholders.ts'
 import type { Event } from '../common/protocol.ts'
 import { app } from './app.ts'
 import { keys, type Target } from './keys.ts'
@@ -232,6 +233,17 @@ const tabsEvent = (...tabs: object[]) => ({ type: 'tabs', tabs }) as Event
 const snapOf = (id: string, draft?: string): Event =>
 	({ type: 'snapshot', sessionId: id, snapshot: { meta: { ...meta, id }, history: [], state: { type: 'idle' }, ...(draft ? { draft: { text: draft, rev: 1 } } : {}) } }) as Event
 const alt = (digit: number) => press(String(digit), message(app.state.text), { altKey: true, code: `Digit${digit}` } as any)
+
+test('the empty box shows an example request, from the Hal list in a tab the host marks hal', () => {
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb', { hal: true })))
+	expect(app.state.shown).toBe('1-aaa')
+	expect(app.placeholder()).toBeUndefined()
+	app.onEvent(snapOf('1-aaa'))
+	expect(app.placeholder()).toBe(placeholders.general[0])
+	tabs.show('2-bbb', false)
+	app.onEvent(snapOf('2-bbb'))
+	expect(app.placeholder()).toBe(placeholders.hal[0])
+})
 
 test('a page opened at a tab address asks tab-start for it and shows it without a new history entry', () => {
 	address = 'http://h/2-bbb'

@@ -18,7 +18,7 @@ import { Picker } from './Picker.tsx'
 import { Tabs } from './Tabs.tsx'
 import { Transcript } from './Transcript.tsx'
 
-const snap = () => ({ pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, pending: app.pending(), notice: app.notice(), connected: connection.connected() })
+const snap = () => ({ pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected() })
 type Snap = ReturnType<typeof snap>
 
 // A change to the transcript follows the bottom: a new prompt pending
@@ -81,7 +81,7 @@ export function Chat() {
 	// One memo per field, gated on its value, so a redraw reaches only
 	// what changed: typing touches the composer, never the transcript.
 	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
-	let [tabs, shown, view, text, notice, connected] = [field('tabs'), field('shown'), field('view'), field('text'), field('notice'), field('connected')]
+	let [tabs, shown, view, text, notice, placeholder, connected] = [field('tabs'), field('shown'), field('view'), field('text'), field('notice'), field('placeholder'), field('connected')]
 	let pending = createMemo(() => state().pending, { equals: same })
 	onSettled(() => {
 		app.changed = () => redraw(state(), setState)
@@ -108,7 +108,7 @@ export function Chat() {
 		<div class="Chat">
 			<Tabs tabs={tabs()} shown={shown()} />
 			<Transcript view={view()} pending={pending()} />
-			<Composer view={view()} text={text()} notice={notice()} connected={connected()} />
+			<Composer view={view()} text={text()} notice={notice()} placeholder={placeholder()} connected={connected()} />
 			<Picker modal={view().modal} />
 		</div>
 	)

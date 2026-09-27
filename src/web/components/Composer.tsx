@@ -17,7 +17,7 @@ import { editor } from '../editor.ts'
 import { keys } from '../keys.ts'
 import { view, type ViewState } from '../view.ts'
 
-export function Composer(props: { view: ViewState; text: string; notice: string | undefined; connected: boolean }) {
+export function Composer(props: { view: ViewState; text: string; notice: string | undefined; placeholder: string | undefined; connected: boolean }) {
 	let input!: HTMLTextAreaElement
 	let picker!: HTMLInputElement
 	// Text at the caret, replacing the selection, as if typed.
@@ -73,6 +73,7 @@ export function Composer(props: { view: ViewState; text: string; notice: string 
 					ref={box}
 					rows={1}
 					aria-label="Message"
+					placeholder={props.placeholder}
 					value={props.text}
 					disabled={!!props.view.form}
 					onInput={(e) => app.input(e.currentTarget.value)}

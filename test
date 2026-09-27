@@ -4,6 +4,9 @@ cd "$(dirname "$0")"
 status=0
 # Tests never use real API keys from the environment.
 unset ANTHROPIC_API_KEY OPENROUTER_API_KEY OPENCODE_API_KEY OPENAI_API_KEY
+# Inside GNU screen the terminal client is monochrome; tests expect colour.
+unset STY
+if [[ $TERM == screen* ]]; then export TERM=xterm-256color; fi
 bun test src || status=1
 ./node_modules/.bin/tsc --noEmit || status=1
 ./node_modules/.bin/oxlint src || status=1

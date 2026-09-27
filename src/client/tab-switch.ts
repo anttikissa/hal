@@ -52,6 +52,7 @@ function focusOn(focus: Focus): void {
 		let back = focus.tab === undefined ? undefined : st.hidden.get(focus.tab)
 		Object.assign(st, { prompt: prompt.empty() }, back)
 		delete st.modal
+		delete st.choices
 		delete st.onModal
 		delete st.onModalKey
 		if (focus.tab !== undefined) {

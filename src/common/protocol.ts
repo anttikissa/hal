@@ -133,7 +133,8 @@ export type CommandType = Command['type']
 
 // One tab as the tab bar needs it, without opening the session.
 // `attention`: its turn ended, failed or asked since a client showed it.
-export type Tab = { id: string; name: string; cwd: string; model: string; state: SessionState; attention?: true }
+// `hal`: its cwd is the Hal repo, which has its own prompt placeholders.
+export type Tab = { id: string; name: string; cwd: string; model: string; state: SessionState; attention?: true; hal?: true }
 
 // ── Events (host → client) ──
 

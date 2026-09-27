@@ -46,6 +46,7 @@ function list(): Tab[] {
 			let meta = sessions.open(id)
 			let tab: Tab = { id, name: meta.name ?? id, cwd: meta.cwd, model: meta.model, state: status.stateOf(id) }
 			if (f.attention.includes(id)) tab.attention = true
+			if (meta.cwd.replace(/\/+$/, '') === paths.repoRoot()) tab.hal = true
 			return [tab]
 		} catch {
 			return []

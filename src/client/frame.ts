@@ -43,6 +43,8 @@ export interface View {
 	modal?: ModalState
 	/** The host's tabs and the one shown: a tab bar row above the prompt. */
 	tabs?: { list: Tab[]; focused?: string }
+	/** Tab completion's choices: a list below the prompt. */
+	choices?: string[]
 }
 
 export interface Frame {
@@ -130,6 +132,7 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	let input = colors.input()
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))
 	if (p.below) lines.push(ansi.paint(p.below, log, cols))
+	for (let r of view.choices ? ansi.wrap(view.choices.join('  '), width) : []) lines.push(ansi.paint(r, log, cols))
 	let pad = Math.max(0, Math.min(peak, rows - lines.length) - history.length)
 	let chrome = lines
 	lines = [...history, ...Array<string>(pad).fill(''), ...chrome]

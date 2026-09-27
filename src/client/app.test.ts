@@ -4,6 +4,7 @@ import { modals } from '../common/modals.ts'
 import { placeholders } from '../common/placeholders.ts'
 import type { Event, Snapshot, Tab } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
+import { strings } from '../common/strings.ts'
 import { app } from './app.ts'
 import { frame } from './frame.ts'
 import type { KeyEvent } from './keys.ts'
@@ -357,11 +358,33 @@ test('Tab on a command asks the host to complete it; the answer fills the prompt
 	expect(sent).toEqual([{ type: 'complete', sessionId: 's1', text: '/cd ~/pro' }])
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: ['/cd ~/projects/', '/cd ~/projection/'] })
 	expect(app.state.prompt).toMatchObject({ text: '/cd ~/project', cursor: 13 })
-	expect(app.view().notice).toContain('projection/')
 	expect(drafts.text('s1')).toBe('/cd ~/project')
 	// Typed on meanwhile: a late answer is dropped.
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: ['/cd ~/prof/'] })
 	expect(app.state.prompt.text).toBe('/cd ~/project')
+})
+
+test('several completions are listed below the prompt until the next key, and Up still recalls history', () => {
+	app.onEvent(snapshot())
+	type('earlier')
+	enter()
+	app.onEvent({ type: 'prompt', sessionId: 's1', texts: ['earlier'] })
+	type('/cd ~/pro')
+	app.onKeys([key('tab')])
+	let names = Array.from({ length: 12 }, (_, i) => `project-${i}/`)
+	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: names.map((n) => `/cd ~/${n}`) })
+	let f = frame.build(app.view(), 40)
+	let below = f.lines.slice(f.cursor.row + 1).map((l) => l.replace(/\x1b\[[0-9;]*m/g, ''))
+	// Every name, in order, wrapped over rows that fit.
+	expect(below.join(' ').split(/\s+/).filter(Boolean)).toEqual(names)
+	expect(below.length).toBeGreaterThan(1)
+	for (let row of f.lines.slice(f.cursor.row + 1)) expect(strings.visLen(row)).toBeLessThanOrEqual(40)
+	expect(app.view().notice).toBeUndefined()
+	app.onKeys([key('up')])
+	expect(app.view().choices).toBeUndefined()
+	expect(app.state.prompt.text).toBe('earlier')
+	let after = frame.build(app.view(), 40)
+	expect(after.lines.slice(after.cursor.row + 1).join('')).not.toContain('project-')
 })
 
 test('Ctrl-M asks the host for the models; the picker filters as you type and Enter switches', () => {
@@ -412,13 +435,6 @@ test('an empty prompt shows an example that changes each turn, with its own list
 	app.onEvent({ type: 'prompt', sessionId: 's1', texts: ['hi'] })
 	expect(app.view().placeholder).not.toBe(first)
 	expect(app.view().placeholder).toBe(placeholders.general[1])
-	let halDir = app.halDir
-	try {
-		app.halDir = () => '/'
-		expect(app.view().placeholder).toBe(placeholders.hal[1])
-	} finally {
-		app.halDir = halDir
-	}
 })
 
 // ── Tabs ──
@@ -436,6 +452,13 @@ const startOn = (ids: string[], at = 'a') => {
 	sent = []
 }
 const shown = () => app.view().tabs?.focused
+
+test('the example on an empty prompt comes from the Hal list when the host marks the tab hal', () => {
+	startOn(['a', 'b'])
+	expect(app.view().placeholder).toBe(placeholders.general[0])
+	app.onEvent(tabsEvent(tabOf('a', { hal: true }), 'b'))
+	expect(app.view().placeholder).toBe(placeholders.hal[0])
+})
 
 test('a saved draft shown on starting is not doubled; text typed before it follows it', () => {
 	let store = drafts.store

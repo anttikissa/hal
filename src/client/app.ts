@@ -37,6 +37,7 @@ import { tabSwitch, type TabView } from './tab-switch.ts'
 // `modal`: client-only UI over everything, taking the keys first;
 // `onModal` makes the command its Enter sends; `onModalKey` updates it
 // after a key (the picker refilters its list).
+// `choices`: tab completion's, listed below the prompt until a key.
 // `tabs`: the host's, in order; `focus`: the one shown; `asked`: the tab
 // this client's own tab command named, focused once it is in the list;
 // `hidden`: the client state of tabs not shown. `start`: where a
@@ -57,6 +58,7 @@ export type AppState = {
 	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
 	onModalKey?: (modal: ModalState) => ModalState
 	older: Map<string, Backfill>
+	choices?: string[]
 }
 
 function createState(): AppState {
@@ -72,9 +74,10 @@ function view(): View {
 	if (pending.length) v.pending = pending
 	if (st.form) v.form = st.form
 	if (st.modal) v.modal = st.modal
+	if (st.choices) v.choices = st.choices
 	// An example request for an empty prompt, another each turn.
 	let t = st.transcript
-	if (t && !st.prompt.text) v.placeholder = placeholders.pick(t.meta.cwd, app.halDir(), t.items.filter((i) => i.type === 'prompt').length)
+	if (t && !st.prompt.text) v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	// A passing notice, else what the session is doing.
 	let notice = st.notice ?? (st.editing ? amend.hint(st.editing) : st.transcript && states.describe(st.transcript.state))
@@ -180,7 +183,8 @@ function completed(event: Event & { type: 'completions' }): void {
 	let { text, choices } = completion.apply(event.text, event.items)
 	app.setPrompt(text)
 	if (text !== event.text) drafts.edit(event.sessionId, text)
-	st.notice = choices ? choices.join('  ') : event.items.length ? undefined : 'no completions'
+	st.notice = event.items.length ? undefined : 'no completions'
+	st.choices = choices
 }
 
 // Puts `text` in the prompt, unless it is there already (the cursor
@@ -195,6 +199,7 @@ function setPrompt(text: string): void {
 function onKeys(events: KeyEvent[]): void {
 	let st = app.state
 	for (let k of events) {
+		delete st.choices
 		if (app.tabKey(k)) continue
 		// Ctrl-L: repaint everything, whatever has the keys.
 		if (k.key === 'l' && k.ctrl && !k.alt && !k.shift && !k.cmd) {
@@ -306,8 +311,6 @@ export const app = {
 	send: (command: unknown): void => connection.send(command),
 	/** The terminal's width, which Up/Down move by. */
 	cols: (): number => render.state.out?.size().cols ?? 80,
-	/** The Hal repo's root, which has its own placeholders. */
-	halDir: (): string => import.meta.dir.replace(/\/src\/client$/, ''),
 	view,
 	show,
 	onEvent,

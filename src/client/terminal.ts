@@ -8,6 +8,7 @@
 // again. See the invariants in tasks/README.md.
 import { emergency, type EmergencyAction, type EmergencyState } from './emergency.ts'
 import { keys, type DecoderState, type KeyEvent } from './keys.ts'
+import { ansi } from './ansi.ts'
 
 /** The process and tty operations the terminal needs; faked in tests. */
 export interface TerminalIO {
@@ -187,8 +188,8 @@ export const terminal = {
 	state: createState(),
 	/** ./run restarts Hal when it exits with this code. */
 	restartCode: 100,
-	/** Enable the kitty keyboard protocol. */
-	kitty: () => true,
+	/** Enable the kitty keyboard protocol; screen gets no query. */
+	kitty: (): boolean => !ansi.mono(),
 	/** How long a lone ESC waits for the rest of a sequence. */
 	escapeMs: () => 50,
 	/** Whether there is a terminal to take over; tests replace it. */

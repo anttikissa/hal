@@ -4,6 +4,7 @@
 import { expect, test } from 'bun:test'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { calls, client, restartHost, testHome, until, useHost } from './host-fixture.test.ts'
+import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 
 useHost()
@@ -28,6 +29,14 @@ test('tabs start empty; the first tab-start creates one in cwd', () => {
 	let tab = ack(a, id).tab
 	expect(tabsOf(a)).toEqual([expect.objectContaining({ id: tab, cwd: '/tmp/p', state: { type: 'idle' } })])
 	expect(sessions.list().map((s) => s.id)).toEqual([tab])
+})
+
+test('a tab whose cwd is the Hal repo is marked hal, for its own prompt examples', () => {
+	let a = client()
+	let hal = newTab(a, paths.repoRoot())
+	let other = newTab(a)
+	expect(tabsOf(a)?.find((t) => t.id === hal)?.hal).toBe(true)
+	expect(tabsOf(a)?.find((t) => t.id === other)?.hal).toBeUndefined()
 })
 
 test('two clients see the same order after new, move, close and resume', () => {

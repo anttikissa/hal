@@ -5,8 +5,10 @@ import type { Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 
-// The escape that switches to a style's fg and bg (truecolor).
+// The escape that switches to a style's fg and bg (truecolor); none
+// in a monochrome terminal.
 function sgr(style: Style): string {
+	if (ansi.mono()) return ''
 	let parts: string[] = []
 	if (style.fg) parts.push(`38;2;${oklch.toRgb(style.fg).join(';')}`)
 	if (style.bg) parts.push(`48;2;${oklch.toRgb(style.bg).join(';')}`)
@@ -36,6 +38,10 @@ export const ansi = {
 	UNCOLOR: '\x1b[39;49m',
 	RESET: '\x1b[0m',
 	LINK_OFF: '\x1b]8;;\x07',
+	// GNU screen (STY set, or a TERM of screen*) mangles truecolor, so
+	// there the terminal is monochrome: no colour escapes at all, only
+	// bold, dim and reverse video. Read on every call.
+	mono: (): boolean => !!process.env.STY || (process.env.TERM ?? '').startsWith('screen'),
 	sgr,
 	paint,
 	clean: (s: string): string => strings.clean(s),

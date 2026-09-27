@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { colors } from '../common/colors.ts'
+import { modals } from '../common/modals.ts'
 import { oklch, type Oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 import type { Shown as Item, Transcript } from '../common/transcript.ts'
@@ -279,4 +280,22 @@ describe('prompt box', () => {
 		expect(wrapped).toEqual(['> \x1b[7mabc\x1b[27m', '  \x1b[7mdef\x1b[27m'])
 		expect(row({ text: 'abc', cursor: 1, anchor: 1 })).toEqual(['> abc'])
 	})
+})
+
+test('inside GNU screen the frame has no colour, only reverse video for the selection', () => {
+	let env = process.env.STY
+	process.env.STY = '1.pts-0.host'
+	try {
+		let v = view([{ type: 'prompt', text: 'hi' }, { type: 'text', text: 'hello' }, { type: 'output', text: 'boom', error: true }, { type: 'tool', id: 't', name: 'bash', input: { command: 'ls' } }], 'draft')
+		v.tabs = { list: [{ id: 's', name: 's', cwd: '/', model: 'm', state: { type: 'running', phase: 'requesting' } }], focused: 's' }
+		v.notice = 'note'
+		let out = frame.build(v, 40).lines.join('\n')
+		expect(strip(out)).toContain('hello')
+		let modal = frame.build({ ...v, modal: modals.open({ title: 'Models', items: ['a', 'b'] }) }, 40).lines.join('\n')
+		for (let s of [out, modal]) expect(s).not.toMatch(/\x1b\[[0-9;]*[34]8;/)
+		expect(modal).toContain('\x1b[7m')
+	} finally {
+		if (env === undefined) delete process.env.STY
+		else process.env.STY = env
+	}
 })

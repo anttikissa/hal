@@ -13,6 +13,6 @@ Web: the textarea wraps and moves natively.`,
 		'The layout is src/common/prompt-layout.ts: wordWrap rows kept as source offset ranges (a dropped break space is skipped; a dropped space at a line end gets its own empty row so the cursor after it sits on a new row). promptView.layoutPrompt (frame and form fields) draws from those ranges, so drawing and Up/Down share one layout.',
 		'A row broken mid-word ends at the offset the next row starts at, which shows on the next row; offsetAt stops before its last glyph so Up from a row end stays on the row above.',
 		'Box height (rows) and viewport (scroll) live in PromptState; cleared() drops them on send. frame.build returns promptScroll and render.draw writes it back into view.prompt, like modalScroll. Rules replace the blank separator above the box and add a row below only when rows are hidden.',
-		'Placeholders: common/placeholders.ts; app.halDir() is src/client/../.. from import.meta.dir and is compared to the session cwd as text (no realpath), so a symlinked path such as /tmp vs /private/tmp shows the general list.'
+		'Placeholders: common/placeholders.ts. Since task tz the host marks a Tab `hal` when its cwd equals paths.repoRoot() as text (no realpath, so a symlinked path such as /tmp vs /private/tmp shows the general list); terminal and web both pick from that flag.'
 	]
 }

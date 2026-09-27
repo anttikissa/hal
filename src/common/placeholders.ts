@@ -20,9 +20,9 @@ const hal = [
 	'Explain the git history of the last week',
 ]
 
-// The example for `turn` in `cwd`; `halDir` is the Hal repo's root.
-function pick(cwd: string, halDir: string, turn: number): string {
-	let list = cwd.replace(/\/+$/, '') === halDir.replace(/\/+$/, '') ? placeholders.hal : placeholders.general
+// The example for `turn`; `hal`: in the Hal repo (the host tells, Tab).
+function pick(hal: boolean, turn: number): string {
+	let list = hal ? placeholders.hal : placeholders.general
 	return list[turn % list.length]!
 }
 

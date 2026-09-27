@@ -50,7 +50,8 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		let row = strings.clipVisual((i === m.selected ? '> ' : '  ') + ansi.clean(m.items[i]!).replace(/\s+/g, ' '), inner)
 		if (i === m.selected) {
 			if (!fields.cursor) cursor = { row: content.length, col: 0 }
-			row = ansi.sgr(current) + row + ' '.repeat(inner - strings.visLen(row)) + UNCOLOR
+			// Monochrome: reverse video instead of the highlight colour.
+			row = (ansi.sgr(current) || ansi.INVERSE) + row + ' '.repeat(inner - strings.visLen(row)) + UNCOLOR + ansi.UNINVERSE
 		}
 		content.push(row)
 	}
