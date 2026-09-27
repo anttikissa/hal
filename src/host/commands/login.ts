@@ -2,22 +2,35 @@
 // The pasted code is a secret field, so history records only that it
 // was given. Users subscribe to Claude, not to "Anthropic", so claude is
 // the name; anthropic, the provider prefix in model ids, is an alias.
+// /login opencode stores an OpenCode Go API key (api-keys.ts): the key
+// is the whole credential, so there is no OAuth round trip.
 
 import type { SlashCommand } from '../commands.ts'
+import { apiKeys } from '../api-keys.ts'
 import { login } from '../login.ts'
 
-const PROVIDERS = ['claude']
-const ALIASES: Record<string, string> = { claude: 'claude', anthropic: 'claude' }
+const PROVIDERS = ['claude', 'opencode']
+const ALIASES: Record<string, string> = { claude: 'claude', anthropic: 'claude', opencode: 'opencode', 'opencode-go': 'opencode' }
+const KEYS = 'API keys: set ANTHROPIC_API_KEY, OPENCODE_API_KEY or OPENROUTER_API_KEY'
 
 export const command: SlashCommand = {
 	description: 'log in to a provider',
 	category: 'session',
-	help: () => '/login claude: log this home in to a Claude subscription; the tokens go to its credentials file. An API key in ANTHROPIC_API_KEY (or OPENROUTER_API_KEY for openrouter) works without logging in.',
+	help: () =>
+		"/login claude: log this home in to a Claude subscription; the tokens go to its credentials file. /login opencode: store an OpenCode Go API key there. An API key in ANTHROPIC_API_KEY, OPENCODE_API_KEY (or OPENROUTER_API_KEY for openrouter) works without logging in.",
 	complete: (args) => PROVIDERS.filter((p) => p.startsWith(args)),
 	async run(args, answers) {
-		if (ALIASES[args.trim()] !== 'claude') {
+		let which = ALIASES[args.trim()]
+		if (!which) {
 			let what = args.trim() ? `${args.trim()}: no such provider` : 'which provider?'
-			return { error: `${what} /login ${PROVIDERS.join(' | ')} (API keys: set ANTHROPIC_API_KEY or OPENROUTER_API_KEY)` }
+			return { error: `${what} /login ${PROVIDERS.join(' | ')} (${KEYS})` }
+		}
+		if (which === 'opencode') {
+			if (!answers) return { ask: { text: 'Paste your OpenCode Go API key.', fields: [{ type: 'secret', name: 'key', label: 'API key' }] } }
+			let key = answers.key?.trim() ?? ''
+			if (!key) return { error: 'no key given; /login opencode to try again' }
+			apiKeys.save('opencode-go', key)
+			return { say: 'logged in to OpenCode Go' }
 		}
 		if (!answers) {
 			let url = await login.url()

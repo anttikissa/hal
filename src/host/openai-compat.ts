@@ -1,14 +1,26 @@
-// OpenAI-compatible Chat Completions provider (OpenRouter, Ollama and
-// other local servers). Wire mapping: tasks/7f/mapping.md.
+// OpenAI-compatible Chat Completions provider (OpenRouter, OpenCode Go,
+// Ollama and other local servers). Wire mapping: tasks/7f/mapping.md.
 
 import type { StopReason, StreamEvent, Usage } from '../common/blocks.ts'
+import { apiKeys } from './api-keys.ts'
 import { provider, type Provider, type ProviderRequest, type SseMessage } from './provider.ts'
 
-// keyEnv names the environment variable holding the API key; without
-// one (local servers) no Authorization header is sent.
+// keyEnv names the environment variable holding the API key, used when
+// the credentials file stores none for the endpoint (api-keys.ts);
+// without keyEnv (local servers) no Authorization header is sent.
+// `login`: the /login argument that stores the key, named in messages.
 // `images: false`: the server rejects image input, so the model is told
 // in text that one was attached instead.
-export type Endpoint = { baseUrl: string; keyEnv?: string; images?: false }
+// `models: false`: no GET /models; the picker lists models.dev's.
+// `headers`: extra headers for each chat request.
+export type Endpoint = {
+	baseUrl: string
+	keyEnv?: string
+	login?: string
+	images?: false
+	models?: false
+	headers?: (req: ProviderRequest) => Record<string, string>
+}
 
 // `images`: whether the endpoint takes image input.
 function toMessages(req: ProviderRequest, images = true): unknown[] {
@@ -131,19 +143,22 @@ function endpoint(name: string): { base: string; headers: Record<string, string>
 	if (!ep) throw new Error(`No endpoint configured for '${name}'`)
 	let headers: Record<string, string> = {}
 	if (ep.keyEnv) {
-		let key = process.env[ep.keyEnv]
-		if (!key) throw new Error(`No API key for '${name}': set ${ep.keyEnv}`)
+		let key = apiKeys.get(name) ?? process.env[ep.keyEnv]
+		if (!key) {
+			let how = ep.login ? `run /login ${ep.login} or set ${ep.keyEnv}` : `set ${ep.keyEnv}`
+			throw Object.assign(new Error(`No API key for '${name}': ${how}`), { failure: 'auth' })
+		}
 		headers.authorization = `Bearer ${key}`
 	}
 	return { base: ep.baseUrl.replace(/\/+$/, ''), headers }
 }
 
 function create(name: string): Provider {
-	return {
+	let p: Provider = {
 		request(req) {
 			let { base, headers } = openaiCompat.endpoint(name)
-			let images = openaiCompat.endpoints()[name]?.images !== false
-			return { url: `${base}/chat/completions`, headers, body: openaiCompat.body(req, images) }
+			let ep = openaiCompat.endpoints()[name]
+			return { url: `${base}/chat/completions`, headers: { ...headers, ...ep?.headers?.(req) }, body: openaiCompat.body(req, ep?.images !== false) }
 		},
 		parse: openaiCompat.parse,
 		// GET /models, which OpenRouter, Ollama and most servers offer.
@@ -155,6 +170,8 @@ function create(name: string): Provider {
 			return (body.data ?? []).flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))
 		},
 	}
+	if (openaiCompat.endpoints()[name]?.models === false) delete p.models
+	return p
 }
 
 // Registers one provider per configured endpoint. Idempotent.
@@ -168,6 +185,14 @@ export const openaiCompat = {
 	endpoints(): Record<string, Endpoint> {
 		return {
 			openrouter: { baseUrl: 'https://openrouter.ai/api/v1', keyEnv: 'OPENROUTER_API_KEY' },
+			// OpenCode asks clients to name themselves and the session.
+			'opencode-go': {
+				baseUrl: 'https://opencode.ai/zen/go/v1',
+				keyEnv: 'OPENCODE_API_KEY',
+				login: 'opencode',
+				models: false,
+				headers: (req) => ({ 'user-agent': 'hal', ...(req.sessionId && { 'x-opencode-session': req.sessionId }) }),
+			},
 			ollama: { baseUrl: 'http://localhost:11434/v1' },
 		}
 	},

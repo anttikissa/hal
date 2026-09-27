@@ -1,6 +1,12 @@
 {
 	title: 'OpenCode Go: /login opencode',
 	description: "OpenCode Go subscribers can use Hal (questions.md item 21). OpenCode Go is an OpenAI-compatible Chat Completions endpoint that authenticates with an API key (models.dev: opencode-go, https://opencode.ai/zen/go/v1, env OPENCODE_API_KEY), so it is one more openai-compat endpoint, not new provider code. `/login opencode` (alias opencode-go) asks for the key through a secret form question and stores it in this home's credentials file; OPENCODE_API_KEY also works (task nd's rule: stored login first). Requests send User-Agent 'hal' and x-opencode-session with the session id, as the old Hal did (artifact old-openai.ts in task q7: compatHeaders). The model list comes from models.dev. Showing the subscription's usage (old Hal's opencode-usage.ts) is not part of this task.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"host/api-keys.ts keeps keys stored by /login in the credentials file as `<provider>: { apiKey }` (here 'opencode-go'), beside the anthropic logins; save() creates the file 0600 and bumps auth.state.logins so a session blocked on login retries. An entry without apiKey is corrupt and throws.",
+		"Every openai-compat endpoint with keyEnv now looks for a stored key first (apiKeys.get(endpoint name)), then the variable. A missing key is failure 'auth', so the session blocks (reason names /login <Endpoint.login> and the variable) and resumes after the login instead of ending in error.",
+		'Endpoint gained login (the /login argument named in messages), models: false (no GET /models: the picker falls back to modelsDev.ids, which works because the endpoint is named opencode-go like the models.dev id) and headers(req) (extra chat headers). ProviderRequest gained sessionId, which turns.runTurn passes, for x-opencode-session.',
+		'./test also unsets OPENCODE_API_KEY. opencode.test.ts reuses the real opencode-go endpoint with baseUrl pointed at a fake server, so the headers under test are the shipped ones.'
+	],
 	needs: ['nd', 'qq']
 }

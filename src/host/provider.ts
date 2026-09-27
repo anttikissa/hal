@@ -19,6 +19,8 @@ export type ProviderRequest = {
 	// An image block's bytes as base64 (the session's blob, task 2a),
 	// read as the request is built; undefined if they are gone.
 	image?: (blob: string) => string | undefined
+	// The session the request is for, for providers that want it.
+	sessionId?: string
 }
 
 // `account` names the credentials used, for providers with several
