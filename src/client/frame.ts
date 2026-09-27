@@ -42,8 +42,9 @@ export interface View {
 	placeholder?: string
 	/** A modal drawn over everything: keys and cursor go to it. */
 	modal?: ModalState
-	/** The host's tabs and the one shown: a tab bar row above the prompt. */
-	tabs?: { list: Tab[]; focused?: string }
+	/** The host's tabs and the one shown: a tab bar row above the prompt;
+	 * `lit` is the blink phase while an indicator blinks. */
+	tabs?: { list: Tab[]; focused?: string; lit?: boolean }
 	/** Tab completion's choices: a list below the prompt. */
 	choices?: string[]
 	/** The Hal cursor: after the streaming last item, or on its own row. */
@@ -157,7 +158,7 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	let log = { fg: colors.log().fg! }
 	let bar = !!view.tabs?.list.length
 	if ((lines.length || above) && (bar || !p.above)) lines.push('')
-	if (bar) lines.push(tabBar.row(view.tabs!.list, view.tabs!.focused, cols))
+	if (bar) lines.push(tabBar.row(view.tabs!.list, view.tabs!.focused, cols, view.tabs!.lit ?? true))
 	if (p.above) lines.push(ansi.paint(p.above, log, cols))
 	let top = lines.length
 	let input = colors.input()

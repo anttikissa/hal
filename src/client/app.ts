@@ -31,6 +31,7 @@ import { pulse } from './pulse.ts'
 import { halCursor } from './hal-cursor.ts'
 import { promptKeys, type Clip } from './prompt-keys.ts'
 import type { Focus } from './tabs.ts'
+import { tabBar } from './tab-bar.ts'
 import { tabSwitch, type TabView } from './tab-switch.ts'
 
 // `form`: the session's open question as filled in here; while there is
@@ -79,6 +80,7 @@ function view(): View {
 	let t = st.transcript
 	if (t && !st.prompt.text) v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
+	if (v.tabs && tabBar.blinks(st.tabs)) v.tabs.lit = pulse.slow(pulse.beat())
 	// A passing notice, else what the session is doing.
 	let notice = st.notice ?? (st.editing ? amend.hint(st.editing) : st.transcript && states.describe(st.transcript.state))
 	if (notice) v.notice = notice
@@ -89,7 +91,8 @@ function view(): View {
 
 // What blinks in `view`, as a key that changes with every blink phase.
 function blinks(view: View): string {
-	return view.hal ? JSON.stringify(view.hal) : ''
+	let lit = view.tabs?.lit
+	return view.hal || lit !== undefined ? JSON.stringify([view.hal, lit]) : ''
 }
 
 // Paints the view; the pulse beats while something in it blinks.

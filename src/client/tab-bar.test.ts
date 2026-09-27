@@ -1,8 +1,14 @@
-import { expect, test } from 'bun:test'
+import { afterEach, expect, test } from 'bun:test'
 import type { Tab } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
 import { strings } from '../common/strings.ts'
+import { ansi } from './ansi.ts'
 import { tabBar } from './tab-bar.ts'
+
+const saved: { mono?: () => boolean } = {}
+afterEach(() => {
+	if (saved.mono) ansi.mono = saved.mono
+})
 
 const tab = (id: string, state: SessionState = { type: 'idle' }, attention = false): Tab => ({
 	id,
@@ -26,13 +32,56 @@ test('one tab shows creation hints, several show navigation hints', () => {
 
 test('each tab shows at most one indicator for what it needs', () => {
 	let list = [
-		tab('a', { type: 'running', phase: 'streaming' }, true),
-		tab('b', { type: 'blocked', reason: 'question' }),
-		tab('c', { type: 'error', message: 'x' }, true),
-		tab('d', { type: 'idle' }, true),
-		tab('e', { type: 'paused' }),
+		tab('a', { type: 'running', phase: 'streaming' }),
+		tab('b', { type: 'running', phase: 'tools' }, true),
+		tab('c', { type: 'blocked', reason: 'question' }, true),
+		tab('d', { type: 'retrying', at: '', reason: 'x' }),
+		tab('e', { type: 'error', message: 'x' }, true),
+		tab('f', { type: 'paused' }),
+		tab('g', { type: 'idle' }, true),
+		tab('h', { type: 'idle' }),
 	]
-	expect(bar(list, 'e', 200)).toStartWith(' Tabs:  1▪  2!  3✗  4◆ [5] ')
+	expect(bar(list, 'h', 200)).toStartWith(' Tabs:  1▪  2◆  3!  4✗  5✗  6!  7✓ [8] ')
+})
+
+// A tab's indicator as drawn: its glyph and SGR, lit or dark.
+const mark = (state: SessionState, attention: boolean, lit: boolean) => {
+	let row = tabBar.row([tab('x', state, attention)], 'y', 80, lit)
+	return row.slice(row.indexOf('1\x1b]8;;\x07') + 7).split('\x1b[')[1]!
+}
+
+test('working and failing indicators blink; the others stay', () => {
+	saved.mono = ansi.mono
+	ansi.mono = () => false
+	let blinking: [SessionState, boolean][] = [
+		[{ type: 'running', phase: 'streaming' }, false],
+		[{ type: 'running', phase: 'requesting' }, true],
+		[{ type: 'retrying', at: '', reason: 'x' }, false],
+		[{ type: 'error', message: 'x' }, false],
+	]
+	let steady: [SessionState, boolean][] = [
+		[{ type: 'blocked', reason: 'question' }, false],
+		[{ type: 'paused' }, false],
+		[{ type: 'idle' }, true],
+		[{ type: 'idle' }, false],
+	]
+	for (let [s, a] of blinking) {
+		expect(mark(s, a, true)).not.toBe(mark(s, a, false))
+		expect(tabBar.blinks([tab('a'), tab('x', s, a)])).toBe(true)
+	}
+	for (let [s, a] of steady) {
+		expect(mark(s, a, true)).toBe(mark(s, a, false))
+		expect(tabBar.blinks([tab('x', s, a)])).toBe(false)
+	}
+})
+
+test('without colours a blinking indicator comes and goes', () => {
+	saved.mono = ansi.mono
+	ansi.mono = () => true
+	let list = [tab('a', { type: 'running', phase: 'streaming' }), tab('b', { type: 'paused' })]
+	expect(text(tabBar.row(list, 'b', 80, true))).toStartWith(' Tabs:  1▪ [2!]')
+	// The same width dark, so nothing after it moves.
+	expect(text(tabBar.row(list, 'b', 80, false))).toStartWith(' Tabs:  1  [2!]')
 })
 
 test('the bar stays one row, dropping hints, then the label, then padding', () => {

@@ -149,3 +149,22 @@ test('the pulse beats on wall-clock beats until nobody keeps it', async () => {
 	expect(beats.length).toBe(n)
 	for (let i = 1; i < n; i++) expect(beats[i]).toBe(beats[i - 1]! + 1)
 })
+
+test('a blinking tab indicator keeps the pulse and blinks with it', () => {
+	let shown: string[] = []
+	render.show = (v) => void shown.push(JSON.stringify(v.tabs))
+	let tab = (state: SessionState) => ({ id: 't1', name: 't1', cwd: '/', model: 'm', state })
+	app.onEvent({ type: 'tabs', tabs: [tab({ type: 'idle' })] })
+	expect(pulse.running()).toBe(false)
+	app.onEvent({ type: 'tabs', tabs: [tab({ type: 'running', phase: 'tools' })] })
+	expect(pulse.running()).toBe(true)
+	let bar = () => frame.build(app.view(), 40).lines.find((l) => l.includes('Tabs:'))
+	let lit = bar()
+	now = 2 * pulse.ms()
+	let count = shown.length
+	app.beat()
+	expect(shown.length).toBe(count + 1)
+	expect(bar()).not.toBe(lit)
+	now = 4 * pulse.ms()
+	expect(bar()).toBe(lit)
+})
