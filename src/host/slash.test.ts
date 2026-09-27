@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } f
 import { tmpdir } from 'os'
 import type { Event } from '../common/protocol.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
+import { keyHelp } from '../common/key-help.ts'
 import { commands } from './commands.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
@@ -169,6 +170,17 @@ test('/help lists every command by category and /help <name> shows its detail', 
 	expect(outputs(a.views.get(id)!)[1]).toBe(commands.all().get('cd')!.help!(''))
 	a.conn.send({ type: 'submit', sessionId: id, text: '/help nope' })
 	await until(() => a.views.get(id)!.items.some((i) => i.type === 'output' && i.error))
+})
+
+test('/keys shows every key the table lists, with what it does', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: '/keys' })
+	await until(() => outputs(a.views.get(id)!).length)
+	let lines = outputs(a.views.get(id)!)[0]!.split('\n')
+	for (let row of keyHelp.sections().flatMap((s) => s.rows)) {
+		expect(lines.some((l) => l.includes(row.keys) && l.endsWith(row.description))).toBe(true)
+	}
 })
 
 test('an unknown command is refused; text that only starts with a path is a prompt', async () => {

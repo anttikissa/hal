@@ -365,3 +365,29 @@ describe('tab', () => {
 		expect(show(press(text, 'S-tab', 'C-/'))).toBe(text)
 	})
 })
+
+describe('paste and cut', () => {
+	const paste = (st: PromptState, text: string) => prompt.step(st, { key: 'paste', text }).state
+
+	test('pasted text becomes LF lines without control characters, keeping tabs', () => {
+		expect(show(paste(at('x|'), 'a\r\nb\rc\x1b[31m\x07\td\x7f\u009be'))).toBe('xa\nb\nc[31m\tde|')
+	})
+
+	test('a paste replaces the selection and is one undo step', () => {
+		let st = paste(at('ab^cd|e'), 'XY')
+		expect(show(st)).toBe('abXY|e')
+		expect(show(prompt.step(st, key('C-/')).state)).toBe('ab^cd|e')
+	})
+
+	test('a paste of nothing but control characters changes nothing', () => {
+		expect(show(paste(at('a^b|'), '\x1b\x00'))).toBe('a^b|')
+	})
+
+	test('Cmd-X removes the selection as one undo step; Cmd-C keeps it', () => {
+		let st = press('ab^cd|e', 's-x')
+		expect(show(st)).toBe('ab|e')
+		expect(show(prompt.step(st, key('C-/')).state)).toBe('ab^cd|e')
+		expect(show(press('ab^cd|e', 's-c'))).toBe('ab^cd|e')
+		expect(show(press('ab|cde', 's-x'))).toBe('ab|cde')
+	})
+})

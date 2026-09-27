@@ -4,12 +4,12 @@
 Pasted text, from either source, is cleaned: CRLF and CR become LF, control characters other than tab and newline are dropped. A paste is one undo step and replaces the selection.
 Web: the browser's own copy, cut and paste stay native.
 One table in src/common lists every prompt, editing, clipboard and app key with a description, and /keys shows it in both clients (artifact old-key-help.ts in task 1x), so the list cannot drift from what the keys do: a test checks that each listed binding is handled.`,
-	status: 'planned',
-	needs: [
-		'9x'
-	],
+	status: 'done',
+	needs: ['9x'],
 	notes: [
 		'old-clipboard.ts: the text half (readClipboardText, cleanPaste) is what this task needs; the image half (NSPasteboard via FFI) and saved pastes belong to task zc.',
-		'Reading the clipboard spawns a process; do it only on the key, never on a timer or at startup.'
+		'Reading the clipboard spawns a process; do it only on the key, never on a timer or at startup.',
+		'The key table is src/common/key-help.ts; labels parse into bindings. src/client/keys-handled.test.ts presses every binding in a few fixtures and fails on any that changes nothing: a new key row needs a handler (or a fixture where it acts).',
+		'Cmd-X: the editor (prompt.ts s-x) removes the selection as one undo step; prompt-keys.clip copies it first. Paste cleaning is prompt.clean, in the paste key, so bracketed and clipboard pastes share it.'
 	]
 }

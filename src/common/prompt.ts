@@ -20,7 +20,8 @@
 // Escape cancels, Ctrl-D on empty text quits.
 //
 // Shift with any move extends a selection from `anchor`; Cmd-A selects
-// all. Typing, pasting, Shift-Enter and Ctrl-Y replace it, Backspace
+// all; Cmd-X removes the selection (the client copies it first).
+// Typing, pasting, Shift-Enter and Ctrl-Y replace it, Backspace
 // and Delete delete it, plain Left/Right collapse it. Tab inserts a
 // tab, or indents the selected lines; Shift-Tab outdents. Ctrl-/, Cmd-Z
 // and Cmd-U undo, with Shift redo (prompt-undo.ts).
@@ -141,6 +142,12 @@ function remove(st: PromptState, from: number, to: number): PromptState {
 // Removes [from, to) into the kill buffer; an empty range keeps it.
 function kill(st: PromptState, from: number, to: number): PromptState {
 	return from === to ? st : { ...prompt.remove(st, from, to), kill: st.text.slice(from, to) }
+}
+
+// Pasted text as typed: CRLF and CR become LF, and control characters
+// other than tab and newline go.
+function clean(text: string): string {
+	return text.replace(/\r\n?/g, '\n').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '')
 }
 
 // Sending empties the prompt and resets the box; the kill buffer stays.
@@ -314,8 +321,12 @@ function apply(st: PromptState, k: Key, width: number): PromptResult {
 			return { state: prompt.kill(base, cursor, prompt.wordRight(text, cursor)) }
 		case 'C-y':
 			return { state: st.kill ? prompt.insert(cut, st.kill) : st }
-		case '-paste':
-			return { state: k.text ? prompt.insert(cut, k.text) : st }
+		case '-paste': {
+			let pasted = prompt.clean(k.text ?? '')
+			return { state: pasted ? prompt.insert(cut, pasted) : st }
+		}
+		case 's-x':
+			return { state: sel ? cut : st }
 		case '-tab':
 			if (k.shift || sel) return { state: prompt.indent(st, !!k.shift) }
 			return { state: prompt.insert(base, '\t') }
@@ -338,6 +349,7 @@ export const prompt = {
 	remove,
 	kill,
 	cleared,
+	clean,
 	boundaries,
 	prevBoundary,
 	nextBoundary,

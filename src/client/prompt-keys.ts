@@ -1,11 +1,12 @@
 // The terminal prompt's Up, Down and Escape before the editor's own:
 // editing the last prompt (common/amend.ts), then input history
-// (common/recall.ts). Each takes the app's state and changes it in
+// (common/recall.ts); and the system clipboard's keys (clipboard.ts). Each takes the app's state and changes it in
 // place; true if the key was handled.
 
 import { amend, type Editing } from '../common/amend.ts'
 import { drafts } from '../common/drafts.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
+import { clipboard } from './clipboard.ts'
 import { recall } from '../common/recall.ts'
 import type { Transcript } from '../common/transcript.ts'
 import type { KeyEvent } from './keys.ts'
@@ -56,4 +57,20 @@ function history(st: PromptKeysState, k: KeyEvent, width: number): boolean {
 	return true
 }
 
-export const promptKeys = { edit, history }
+// Cmd-C copies the selection and Cmd-X too, leaving the editor to
+// remove it. Ctrl-V and Cmd-V read the clipboard and hand its text to
+// `paste` when it comes; the read never holds up the keys after it.
+// Failures go to `notice`. True if the editor needs the key no more.
+function clip(st: PromptKeysState, k: KeyEvent, paste: (text: string) => void, notice: (text: string) => void): boolean {
+	let only = (mod: 'ctrl' | 'cmd') => k[mod] && !k.shift && !k.alt && !k[mod === 'ctrl' ? 'cmd' : 'ctrl']
+	if ((k.key === 'c' || k.key === 'x') && only('cmd')) {
+		let sel = prompt.selection(st.prompt)
+		if (sel) void clipboard.write(st.prompt.text.slice(sel.start, sel.end)).then((n) => n && notice(n))
+		return k.key === 'c'
+	}
+	if (k.key !== 'v' || !(only('ctrl') || only('cmd'))) return false
+	void clipboard.read().then((r) => ('text' in r ? paste(r.text) : notice(r.notice)))
+	return true
+}
+
+export const promptKeys = { edit, history, clip }

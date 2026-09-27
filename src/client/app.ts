@@ -293,6 +293,8 @@ function onKeys(events: KeyEvent[]): void {
 			continue
 		}
 		if (promptKeys.edit(st, k, app.send)) continue
+		let shown = st.transcript?.meta.id
+		if (promptKeys.clip(st, k, (text) => app.pasted(shown, text), app.tell)) continue
 		// Tab at the end of a slash command: the host completes it.
 		let tab = k.key === 'tab' && !k.shift && st.transcript && st.prompt.cursor === st.prompt.text.length && !prompt.selection(st.prompt)
 		let complete = tab && completion.request(st.transcript!.meta.id, st.prompt.text)
@@ -313,6 +315,17 @@ function onKeys(events: KeyEvent[]): void {
 		if (pause) app.send(pause)
 		if (action?.type === 'quit') return terminal.quit()
 	}
+	app.show()
+}
+
+// Clipboard text read for session `id`: pasted if it is still shown.
+function pasted(id: string | undefined, text: string): void {
+	if (app.state.transcript?.meta.id !== id) return
+	app.onKeys([{ key: 'paste', text, shift: false, alt: false, ctrl: false, cmd: false }])
+}
+
+function tell(notice: string): void {
+	app.state.notice = notice
 	app.show()
 }
 
@@ -382,6 +395,8 @@ export const app = {
 	open,
 	close,
 	pick,
+	pasted,
+	tell,
 	init,
 	reset,
 }
