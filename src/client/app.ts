@@ -27,7 +27,8 @@ import { terminal } from './terminal.ts'
 import { frame, type View } from './frame.ts'
 import { paste } from './paste.ts'
 import { promptKeys, type Clip } from './prompt-keys.ts'
-import { tabs, type Focus } from './tabs.ts'
+import type { Focus } from './tabs.ts'
+import { tabSwitch, type TabView } from './tab-switch.ts'
 
 // `resumed`: where the history of the last snapshot ends, marked on screen.
 // `form`: the session's open question as filled in here; while there is
@@ -40,7 +41,7 @@ import { tabs, type Focus } from './tabs.ts'
 // this client's own tab command named, focused once it is in the list;
 // `hidden`: the client state of tabs not shown. `start`: where a
 // starting client looks for its tab (a restart: the one it left).
-type AppState = {
+export type AppState = {
 	tabs: Tab[]
 	focus: Focus
 	asked?: string
@@ -57,10 +58,6 @@ type AppState = {
 	onModalKey?: (modal: ModalState) => ModalState
 	older: Map<string, Backfill>
 }
-
-// What each tab keeps while another is shown.
-type TabView = Pick<AppState, 'transcript' | 'resumed' | 'prompt' | 'notice' | 'form' | 'editing'>
-const tabFields = ['transcript', 'resumed', 'prompt', 'notice', 'form', 'editing'] as const
 
 function createState(): AppState {
 	return { tabs: [], focus: {}, hidden: new Map(), start: { cwd: '/' }, prompt: prompt.empty(), older: new Map() }
@@ -141,68 +138,6 @@ function onState(state: LinkState): void {
 		app.send({ type: 'tab-start', cwd: tab?.cwd ?? st.start.cwd, ...(last === undefined ? {} : { last }) })
 	}
 	app.show()
-}
-
-function focusedTab(): Tab | undefined {
-	return app.state.tabs.find((t) => t.id === app.state.focus.tab)
-}
-
-// The host's tabs changed, or named the tab this client asked for.
-function onTabs(list: Tab[]): void {
-	let st = app.state
-	let old = st.tabs.map((t) => t.id)
-	let ids = list.map((t) => t.id)
-	st.tabs = list
-	let asked = st.asked
-	if (asked !== undefined && ids.includes(asked)) delete st.asked
-	for (let id of st.hidden.keys()) if (!ids.includes(id)) st.hidden.delete(id)
-	app.focusOn(tabs.focus(old, ids, st.focus, asked))
-	app.show()
-}
-
-// Shows `focus`: the tab left keeps its client state and is no longer
-// followed, the tab shown is followed and its state comes back. A modal
-// closes. A tab shown that wants attention is told seen.
-function focusOn(focus: Focus): void {
-	let st = app.state
-	let from = st.focus.tab
-	st.focus = focus
-	if (focus.tab !== from) {
-		// Typed before any tab was shown: it joins the draft.
-		let early = from === undefined ? st.prompt.text : ''
-		if (from !== undefined) {
-			let kept = {} as TabView
-			for (let f of tabFields) if (st[f] !== undefined) Object.assign(kept, { [f]: st[f] })
-			st.hidden.set(from, kept)
-			app.send({ type: 'close', sessionId: from })
-		}
-		for (let f of tabFields) delete st[f]
-		let back = focus.tab === undefined ? undefined : st.hidden.get(focus.tab)
-		Object.assign(st, { prompt: prompt.empty() }, back)
-		delete st.modal
-		delete st.onModal
-		delete st.onModalKey
-		if (focus.tab !== undefined) {
-			st.hidden.delete(focus.tab)
-			if (!back) drafts.join(focus.tab, early)
-			if (!back) app.setPrompt(recall.shown(focus.tab) ?? drafts.text(focus.tab))
-			app.send({ type: 'open', sessionId: focus.tab })
-		}
-	}
-	let tab = app.focusedTab()
-	if (tab) app.focused(tab)
-	if (tab?.attention) app.send({ type: 'tab-seen', sessionId: tab.id })
-}
-
-// Tab keys: new, reopen, close, next, previous, go to 1-10. True if
-// handled.
-function tabKey(k: KeyEvent): boolean {
-	let tab = app.focusedTab()
-	let r = tab && tabs.key(k, tab, app.state.tabs.map((t) => t.id))
-	if (!r) return false
-	if (r.command) app.send(r.command)
-	if (r.focus !== undefined && r.focus !== tab!.id) app.focusOn({ tab: r.focus })
-	return true
 }
 
 // Enter: a prompt (steering a busy turn; `queue`: after it), an edit
@@ -378,10 +313,10 @@ export const app = {
 	onEvent,
 	backfilled,
 	onState,
-	focusedTab,
-	onTabs,
-	focusOn,
-	tabKey,
+	focusedTab: tabSwitch.focusedTab,
+	onTabs: tabSwitch.onTabs,
+	focusOn: tabSwitch.focusOn,
+	tabKey: tabSwitch.tabKey,
 	// Told the tab shown after every change (main.ts keeps it for a
 	// restart).
 	focused: (_tab: Tab): void => {},
