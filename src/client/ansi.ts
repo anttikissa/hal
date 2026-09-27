@@ -6,6 +6,7 @@ import type { Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
+import { uploads } from '../common/uploads.ts'
 
 // The escape that switches to a style's fg and bg (truecolor); none
 // in a monochrome terminal.
@@ -30,11 +31,14 @@ function wrap(text: string, width: number): string[] {
 	return strings.wordWrap(strings.expandTabs(ansi.clean(text.replace(/\r\n?/g, '\n'))), width)
 }
 
-// A row with each whole [image/<name>] marker made an OSC 8 link to the
-// image on the host's web endpoint (task qy). Each link closes in the
-// row it opens in; the visible text is unchanged.
+// A row with each whole [image/<name>] or [paste/<name>] marker made an
+// OSC 8 link to its page on the host's web endpoint (tasks qy, 31); a
+// marker still uploading is dim and not yet a link. Each link closes in
+// the row it opens in; the visible text is unchanged.
 function links(row: string): string {
-	return row.replace(attachments.imageMarker, (m, name: string) => `\x1b]8;;${ansi.imageUrl(name)}\x07${m}${ansi.LINK_OFF}`)
+	return row.replace(attachments.fileMarker, (m, path: string) =>
+		uploads.inFlight(m) ? `${ansi.DIM}${m}${ansi.UNDIM}` : `\x1b]8;;${ansi.webUrl(`/${path}`)}\x07${m}${ansi.LINK_OFF}`,
+	)
 }
 
 // The hidden target of a link to `path` on the host's web address: it
@@ -68,5 +72,4 @@ export const ansi = {
 	wrap,
 	links,
 	webUrl,
-	imageUrl: (name: string): string => ansi.webUrl(`/image/${name}`),
 }

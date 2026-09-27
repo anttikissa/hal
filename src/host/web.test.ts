@@ -225,7 +225,7 @@ test('GET /blob serves a session’s attachment by exact id, with the cookie onl
 })
 
 
-test('GET /image serves a pasted image by exact name, from /tmp or once gone from its session blob', async () => {
+test('GET /image/<name> is a page naming where the image lives; /raw/<name> its bytes, from /tmp or once gone from its session blob', async () => {
 	await server.serve()
 	web.start()
 	let id = sessions.create({ cwd: home }).id
@@ -233,19 +233,50 @@ test('GET /image serves a pasted image by exact name, from /tmp or once gone fro
 	blobs.stage('abc123.png', 'image/png', png.toString('base64'))
 	let jar = await cookie()
 	let get = (path: string, auth = true) => fetch(`${base()}${path}`, { headers: auth ? { cookie: jar } : {} })
+	let tmp = `${paths.imageDir()}/abc123.png`
 
 	expect((await get('/image/abc123.png', false)).status).toBe(401)
-	let res = await get('/image/abc123.png')
+	expect((await get('/raw/abc123.png', false)).status).toBe(401)
+	let page = await (await get('/image/abc123.png')).text()
+	expect(page).toContain(tmp)
+	expect(page).toContain('src="/raw/abc123.png"')
+	let res = await get('/raw/abc123.png')
 	expect(res.headers.get('content-type')).toBe('image/png')
 	expect(Buffer.from(await res.arrayBuffer())).toEqual(png)
 
 	expect(blobs.resolve(id, ['[image/abc123.png]']).unknown).toEqual([])
-	rmSync(`${paths.imageDir()}/abc123.png`)
-	expect(Buffer.from(await (await get('/image/abc123.png')).arrayBuffer())).toEqual(png)
+	let copy = `${paths.sessionDir(id)}/blobs/abc123.png`
+	expect(await (await get('/image/abc123.png')).text()).toContain(copy)
+	rmSync(tmp)
+	page = await (await get('/image/abc123.png')).text()
+	expect(page).toContain(copy)
+	expect(page).not.toContain(tmp)
+	expect(Buffer.from(await (await get('/raw/abc123.png')).arrayBuffer())).toEqual(png)
 	expect((await get(`/blob/${id}/abc123`)).status).toBe(200)
-	for (let path of ['/image/abc123.jpg', '/image/zzz999.png', '/image/abc123', '/image/..%2fabc123.png', '/image/abc123.png/x']) {
+	for (let path of ['/image/abc123.jpg', '/image/zzz999.png', '/image/abc123', '/image/..%2fabc123.png', '/image/abc123.png/x', '/paste/abc123.png', '/raw/abc123']) {
 		expect((await get(path)).status).toBe(404)
 	}
+})
+
+test('a pasted long text lands at the stated /tmp path; its page names that path and shows the text escaped', async () => {
+	await server.serve()
+	web.start()
+	let id = sessions.create({ cwd: home }).id
+	let text = 'line 1 <b>&amp;</b>\nline 2\n'
+	let stored = blobs.stage('0005ab.txt', 'text/plain', Buffer.from(text).toString('base64'))
+	expect(stored.marker).toBe('[paste/0005ab.txt]')
+	let tmp = `${paths.tmpDir()}/paste/0005ab.txt`
+	expect(readFileSync(tmp, 'utf8')).toBe(text)
+	let jar = await cookie()
+	let get = (path: string) => fetch(`${base()}${path}`, { headers: { cookie: jar } })
+	let page = await (await get('/paste/0005ab.txt')).text()
+	expect(page).toContain(tmp)
+	expect(page).toContain('line 1 &#60;b&#62;&#38;amp;&#60;/b&#62;\nline 2')
+	expect(await (await get('/raw/0005ab.txt')).text()).toBe(text)
+	expect((await get('/image/0005ab.txt')).status).toBe(404)
+	// The model gets the text itself; the session keeps its own copy.
+	expect(blobs.resolve(id, ['see [paste/0005ab.txt]']).blocks).toEqual([{ type: 'text', text: `see ${text}` }])
+	expect(await (await get('/paste/0005ab.txt')).text()).toContain(`${paths.sessionDir(id)}/blobs/0005ab.txt`)
 })
 
 test('a file address takes a link code; a used or expired one gets the gate, which leads back there', async () => {
@@ -269,7 +300,7 @@ test('a file address takes a link code; a used or expired one gets the gate, whi
 		expect(first.status).toBe(303)
 		expect(first.headers.get('location')).toBe('/image/abc123.png')
 		let jar = first.headers.get('set-cookie')!.split(';')[0]!
-		expect(Buffer.from(await (await open('/image/abc123.png', jar)).arrayBuffer())).toEqual(png)
+		expect(await (await open('/image/abc123.png', jar)).text()).toContain('/raw/abc123.png')
 		// Clicked again in another browser: used, so no cookie, and the
 		// address it lands on shows the gate.
 		let again = await open(`/image/abc123.png?auth=${code}`)

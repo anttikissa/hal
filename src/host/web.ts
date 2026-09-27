@@ -24,9 +24,12 @@
 //   GET  /blob/<session>/<blob>  an attachment of that session
 //                  (cookie; host/blobs.ts): the id is matched whole,
 //                  never used as a path.
-//   GET  /image/<name>  a pasted image (cookie; task qy): from /tmp, or
-//                  from the session blob a prompt copied it into; the
-//                  name must be attachments.imageName.
+//   GET  /image/<name>, /paste/<name>  the page of a pasted image or
+//                  long text (cookie; tasks qy, 31, host/file-page.ts):
+//                  its content under the paths where it lives, from
+//                  /tmp or the session blob a prompt copied it into;
+//                  the name must be attachments.fileName.
+//   GET  /raw/<name>  that file's bytes (cookie).
 //   Any page or file above asked for without a login gets the gate (the
 //   page at that address), which comes back to it once logged in; with
 //   ?auth=<code> a file address redeems the code like a page (task e3).
@@ -38,6 +41,7 @@ import { session } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
 import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
+import { filePage } from './file-page.ts'
 import { host } from './host.ts'
 import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
@@ -182,7 +186,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	let url = new URL(req.url)
 	let { pathname } = url
 	let get = req.method === 'GET'
-	let blob = get && (pathname.startsWith('/blob/') || pathname.startsWith('/image/'))
+	let blob = get && (pathname.startsWith('/blob/') || filePage.owns(pathname))
 	if (get && url.searchParams.has('auth') && (blob || pathname === '/' || session.isId(pathname.slice(1)))) return web.linkLogin(url, req)
 	if (get && (pathname === '/' || session.isId(pathname.slice(1)))) return web.page()
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
@@ -206,12 +210,12 @@ async function upgrade(req: Request, srv: Server<Data>): Promise<Response | unde
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
 }
 
-// One attachment, by exact session and blob id, or a pasted image by
-// exact name; anything else is 404.
+// One attachment, by exact session and blob id, or a pasted file's page
+// or bytes by exact name; anything else is 404.
 function blob(pathname: string): Response {
+	if (filePage.owns(pathname)) return filePage.serve(pathname, web.css())
 	let m = /^\/blob\/([\w-]+)\/([0-9a-z]{6}|[0-9a-f]{12})$/.exec(pathname)
-	let name = /^\/image\/([0-9a-z]{6}\.[a-z]{3,4})$/.exec(pathname)?.[1]
-	let found = m ? blobs.read(m[1]!, m[2]!) : name ? blobs.image(name) : undefined
+	let found = m ? blobs.read(m[1]!, m[2]!) : undefined
 	if (!found) return new Response('not found\n', { status: 404 })
 	let type = found.mediaType === 'text/plain' ? 'text/plain; charset=utf-8' : found.mediaType
 	return new Response(new Uint8Array(found.bytes), { headers: { 'content-type': type, 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=31536000, immutable' } })

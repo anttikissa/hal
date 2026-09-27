@@ -21,20 +21,30 @@ test('an image is its final marker [image/<name>] from the start; the command ca
 	expect(uploads.swap({ text: `look ${marker}`, cursor: 0 }, done.placeholder, done.text).text).toBe(`look ${marker}`)
 })
 
-test('a paste placeholder becomes the marker; the caret after it moves with the text', () => {
+test('a long paste is its final marker [paste/<name>.txt] from the start, in flight until answered', () => {
+	let marker = uploads.begin('s', 'c.1', 'text/plain')
+	let name = /^\[paste\/([0-9a-z]{6}\.txt)\]$/.exec(marker)![1]
+	expect(uploads.command('s', 'c.1', 'text/plain', new Uint8Array([1, 2]))).toEqual({ type: 'attach', id: 'c.1', sessionId: 's', mediaType: 'text/plain', data: 'AQI=', name })
+	expect(uploads.inFlight(marker)).toBe(true)
+	let text = `look ${marker} here and more`
+	let p = { text, cursor: text.length, anchor: 2 }
+	let done = uploads.settle(attached('c.1', marker))!
+	expect(done.sessionId).toBe('s')
+	expect(uploads.swap(p, done.placeholder, done.text)).toEqual(p)
+	expect(uploads.inFlight(marker)).toBe(false)
+	expect(uploads.pending('s')).toBe(false)
+})
+
+test('a placeholder the host answers differently is swapped; the caret after it moves with the text', () => {
 	let placeholder = uploads.begin('s', 'c.1', 'text/plain')
-	expect(placeholder).not.toContain('[paste')
-	expect(uploads.command('s', 'c.1', 'text/plain', new Uint8Array([1, 2]))).toEqual({ type: 'attach', id: 'c.1', sessionId: 's', mediaType: 'text/plain', data: 'AQI=' })
 	// Typed around after the paste: the caret is now past it.
 	let text = `look ${placeholder} here and more`
 	let p = { text, cursor: text.length, anchor: 2 }
-	let done = uploads.settle(attached('c.1', '[paste 0123456789ab, 3 lines]'))!
-	expect(done.sessionId).toBe('s')
+	let done = uploads.settle(rejected('c.1', 'too big'))!
 	let out = uploads.swap(p, done.placeholder, done.text)
-	expect(out.text).toBe('look [paste 0123456789ab, 3 lines] here and more')
+	expect(out.text).toBe('look [upload failed: too big] here and more')
 	expect(out.cursor).toBe(out.text.length)
 	expect(out.anchor).toBe(2)
-	expect(uploads.pending('s')).toBe(false)
 })
 
 test('two uploads of the same kind get their own placeholders', () => {

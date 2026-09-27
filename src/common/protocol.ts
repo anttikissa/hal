@@ -125,9 +125,9 @@ export type Command = (
 	// An attachment for a later prompt (task 2a): `data` is base64 of a
 	// png, jpeg, gif or webp image or of text/plain, at most
 	// attachments.maxBytes() decoded. Answered, to this client only, with
-	// `attached`; a prompt names it by that event's marker. An image's
-	// `name` (attachments.imageName, chosen by the client) makes its
-	// marker [image/<name>] (task qy).
+	// `attached`; a prompt names it by that event's marker. A paste's
+	// `name` (attachments.fileName, chosen by the client) makes its
+	// marker [image/<name>] or [paste/<name>] (tasks qy, 31).
 	| { type: 'attach'; sessionId: string; mediaType: string; data: string; name?: string }
 	// A one-time web login code (host/web-auth.ts) for `./run auth`;
 	// answered, to this client only, with `auth`. With `link` (a

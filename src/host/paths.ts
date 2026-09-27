@@ -25,11 +25,21 @@ function sessionDir(id: string): string {
 	return `${paths.sessionsDir()}/${id}`
 }
 
-// Pasted images by name until a prompt copies them into a session
-// blob (task qy): /tmp/hal/image, where the model's tools can read them
-// too; inside the home under test, so tests never touch /tmp/hal.
+// Pasted images and long texts by name until a prompt copies them into
+// a session blob (tasks qy, 31): /tmp/hal/image and /tmp/hal/paste,
+// where the model's tools can read them too; inside the home under
+// test, so tests never touch /tmp/hal.
+function tmpDir(): string {
+	return process.env.HAL_HOME || process.env.NODE_ENV === 'test' ? `${paths.home()}/tmp` : '/tmp/hal'
+}
+
 function imageDir(): string {
-	return process.env.HAL_HOME || process.env.NODE_ENV === 'test' ? `${paths.home()}/tmp/image` : '/tmp/hal/image'
+	return `${paths.tmpDir()}/image`
+}
+
+// Where pasted file `name` (attachments.fileName) waits.
+function fileDir(name: string): string {
+	return name.endsWith('.txt') ? `${paths.tmpDir()}/paste` : paths.imageDir()
 }
 
 // Everything else: socket, host lock, diagnostics, later peer and access
@@ -67,4 +77,4 @@ function display(path: string): string {
 	return path
 }
 
-export const paths = { repoRoot: (): string => repoRoot, home, sessionsDir, sessionDir, imageDir, stateDir, authFile, configFile, init, display }
+export const paths = { repoRoot: (): string => repoRoot, home, sessionsDir, sessionDir, tmpDir, imageDir, fileDir, stateDir, authFile, configFile, init, display }

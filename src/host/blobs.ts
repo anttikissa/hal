@@ -1,8 +1,9 @@
 // Attachments a client sent (task 2a), stored per session as
 // sessions/<id>/blobs/<blob>.<ext>, and resolved in prompt text.
-// A pasted image (task qy) waits by its client-chosen name in
-// paths.imageDir() and is copied into a blob of the session whose
-// prompt names it with [image/<name>]; that blob then outlives /tmp.
+// A pasted image or long text (tasks qy, 31) waits by its client-chosen
+// name in paths.fileDir(name) and is copied into a blob of the session
+// whose prompt names it with [image/<name>] or [paste/<name>]; that
+// blob then outlives /tmp.
 //
 // Only blobs the host stored for that session resolve: a blob id is
 // checked against its fixed form before it names a file, and is looked
@@ -64,44 +65,45 @@ function store(sessionId: string, mediaType: string, data: string): Stored {
 	return { blob, mediaType, bytes: bytes.length, marker: attachments.marker(blob, mediaType, lines) }
 }
 
-// Checks a pasted image and keeps it as paths.imageDir()/<name>; throws
-// why it is refused. The same bytes again (a resend) are fine; other
-// bytes under a taken name are not.
+// Checks a pasted image or text and keeps it as
+// paths.fileDir(name)/<name>; throws why it is refused. The same bytes
+// again (a resend) are fine; other bytes under a taken name are not.
 function stage(name: string, mediaType: string, data: string): Stored {
-	if (attachments.nameType(name) !== mediaType) throw new Error(`image name ${JSON.stringify(name)} does not fit ${mediaType}`)
+	if (attachments.nameType(name) !== mediaType) throw new Error(`file name ${JSON.stringify(name)} does not fit ${mediaType}`)
 	let bytes = blobs.decode(mediaType, data)
-	let path = `${paths.imageDir()}/${name}`
+	let path = `${paths.fileDir(name)}/${name}`
 	if (existsSync(path)) {
-		if (!bytes.equals(readFileSync(path))) throw new Error(`image name ${name} is taken`)
+		if (!bytes.equals(readFileSync(path))) throw new Error(`file name ${name} is taken`)
 	} else {
-		mkdirSync(paths.imageDir(), { recursive: true, mode: 0o700 })
+		mkdirSync(paths.fileDir(name), { recursive: true, mode: 0o700 })
 		writeFileSync(path, bytes, { mode: 0o600 })
 	}
-	return { blob: name.slice(0, 6), mediaType, bytes: bytes.length, marker: `[image/${name}]` }
+	return { blob: name.slice(0, 6), mediaType, bytes: bytes.length, marker: attachments.named(name) }
 }
 
-// Pasted image `name` still in paths.imageDir(), if its bytes are what
-// its name says and not too large.
+// Pasted file `name` still in paths.fileDir(name), if its bytes are
+// what its name says and not too large.
 function staged(name: string): { bytes: Buffer; mediaType: string } | undefined {
 	let mediaType = attachments.nameType(name)
-	let path = `${paths.imageDir()}/${name}`
-	if (!mediaType || !statSync(path, { throwIfNoEntry: false })?.isFile()) return undefined
+	if (!mediaType) return undefined
+	let path = `${paths.fileDir(name)}/${name}`
+	if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return undefined
 	let bytes = readFileSync(path)
 	return bytes.length <= attachments.maxBytes() && blobs.looksLike(mediaType, bytes) ? { bytes, mediaType } : undefined
 }
 
-// Pasted image `name` for the web (/image/<name>): from
-// paths.imageDir(), or once /tmp is cleaned from the blob of whichever
-// session a prompt copied it into.
-function image(name: string): { bytes: Buffer; mediaType: string } | undefined {
+// Pasted file `name` for the web (/image/<name>, /paste/<name>): its
+// bytes, from paths.fileDir(name) or once /tmp is cleaned from a
+// session blob a prompt copied it into, and where it lives on disk:
+// `tmp` if still there, `blobs` for each session copy.
+function file(name: string): { bytes: Buffer; mediaType: string; tmp?: string; blobs: string[] } | undefined {
 	let mediaType = attachments.nameType(name)
 	if (!mediaType) return undefined
-	let found = blobs.staged(name)
-	if (found) return found
-	let file = `blobs/${name}`
 	let dirs = existsSync(paths.sessionsDir()) ? readdirSync(paths.sessionsDir()) : []
-	let id = dirs.find((d) => existsSync(`${paths.sessionsDir()}/${d}/${file}`))
-	return id === undefined ? undefined : { bytes: readFileSync(`${paths.sessionsDir()}/${id}/${file}`), mediaType }
+	let copies = dirs.map((d) => `${paths.sessionsDir()}/${d}/blobs/${name}`).filter((p) => existsSync(p))
+	let found = blobs.staged(name)
+	if (found) return { ...found, tmp: `${paths.fileDir(name)}/${name}`, blobs: copies }
+	return copies.length ? { bytes: readFileSync(copies[0]!), mediaType, blobs: copies } : undefined
 }
 
 // The session's blob with this exact id: its file and media type.
@@ -125,7 +127,7 @@ function base64(sessionId: string, blob: string): string | undefined {
 }
 
 // The blob a marker names, if it is this session's and of its kind. A
-// pasted image's is copied from paths.imageDir() on first use.
+// pasted file's is copied from paths.fileDir() on first use.
 function named(sessionId: string, m: Marker): { path: string; mediaType: string } | undefined {
 	let found = blobs.find(sessionId, m.blob)
 	if (m.file) {
@@ -173,4 +175,4 @@ function resolve(sessionId: string, texts: string[]): { blocks: UserBlock[]; unk
 	return { blocks: [...out, ...images], unknown }
 }
 
-export const blobs = { dir, looksLike, decode, store, stage, staged, image, find, read, base64, named, unknown, resolve }
+export const blobs = { dir, looksLike, decode, store, stage, staged, file, find, read, base64, named, unknown, resolve }

@@ -1,18 +1,18 @@
 // Attachments on their way to the host (task zc), for terminal and web
 // alike. Starting one puts a placeholder in the prompt, found wherever
 // typing has moved it; the host's `attached` answer turns it into the
-// marker, a refusal into an error text. An image's placeholder is its
-// final marker [image/<name>] from the start, the name chosen here
-// (task qy); a paste's names the attach command's id until answered. A
-// submit while a session has uploads pending waits and goes when the
-// last one lands.
+// marker, a refusal into an error text. The placeholder is the final
+// marker from the start, [image/<name>] or [paste/<name>.txt], the name
+// chosen here (tasks qy, 31); clients only draw it differently while it
+// is in flight (inFlight). A submit while a session has uploads pending
+// waits and goes when the last one lands.
 
 import { attachments } from './attachments.ts'
 import type { Event } from './protocol.ts'
 import { settings } from './settings.ts'
 
-type Upload = { sessionId: string; placeholder: string; name?: string }
-export type Settled = Upload & { text: string; error?: string; resume?: { queue: boolean } }
+type Upload = { sessionId: string; placeholder: string; name: string }
+export type Settled = Omit<Upload, 'name'> & { text: string; error?: string; resume?: { queue: boolean } }
 type Spot = { text: string; cursor: number; anchor?: number }
 
 function createState() {
@@ -24,13 +24,8 @@ function createState() {
 // Registers upload `id` (the attach command's id) of session
 // `sessionId`: the placeholder that stands for it until the host answers.
 function begin(sessionId: string, id: string, mediaType: string): string {
-	if (mediaType === 'text/plain') {
-		let placeholder = `[uploading paste ${id}]`
-		uploads.state.pending.set(id, { sessionId, placeholder })
-		return placeholder
-	}
 	let name = attachments.newName(mediaType)
-	let placeholder = `[image/${name}]`
+	let placeholder = attachments.named(name)
 	uploads.state.pending.set(id, { sessionId, placeholder, name })
 	return placeholder
 }
@@ -46,6 +41,11 @@ function command(sessionId: string, id: string, mediaType: string, bytes: Uint8A
 function tooBig(size: number): string | undefined {
 	let max = attachments.maxBytes()
 	return size > max ? `[upload failed: larger than ${max / 1024 / 1024} MB]` : undefined
+}
+
+// Whether `marker` stands for an upload the host has not answered yet.
+function inFlight(marker: string): boolean {
+	return [...uploads.state.pending.values()].some((u) => u.placeholder === marker)
 }
 
 function pending(sessionId: string): boolean {
@@ -105,4 +105,4 @@ function reset(): void {
 	uploads.state = createState()
 }
 
-export const uploads = { state: createState(), begin, command, tooBig, pending, wait, settle, swap, long, base64, reset }
+export const uploads = { state: createState(), begin, command, tooBig, inFlight, pending, wait, settle, swap, long, base64, reset }

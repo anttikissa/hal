@@ -167,6 +167,22 @@ test('a named image waits in /tmp under its name; its prompt copies it into the 
 	expect(calls[2]!.input.messages.at(-1).blocks.some((b: any) => b.type === 'image')).toBe(false)
 })
 
+test('a named paste waits in /tmp as [paste/<name>]; its prompt gives the model the text and the session a copy', async () => {
+	let c = client()
+	let id = created(c)
+	let text = 'line one\nline two\n'
+	let name = attachments.newName('text/plain')
+	let { attached } = attach(c, id, 'text/plain', Buffer.from(text).toString('base64'), undefined, name)
+	expect(attached.marker).toBe(`[paste/${name}]`)
+	expect(readFileSync(`${paths.fileDir(name)}/${name}`, 'utf8')).toBe(text)
+	c.conn.send({ type: 'submit', sessionId: id, text: `summarise: ${attached.marker} thanks` })
+	await until(() => calls.length)
+	expect(c.of('warning')).toEqual([])
+	expect(calls[0]!.input.messages.at(-1).blocks[0].text).toEndWith(`summarise: ${text} thanks`)
+	expect(readFileSync(`${blobs.dir(id)}/${name}`, 'utf8')).toBe(text)
+	expect(attach(c, id, 'text/plain', Buffer.from('other').toString('base64'), undefined, name).rejected.reason).toContain('taken')
+})
+
 test('a named image is refused under a wrong name or a taken one; a resend of the same bytes is fine', () => {
 	let c = client()
 	let id = created(c)

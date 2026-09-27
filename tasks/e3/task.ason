@@ -7,7 +7,7 @@
 		'The client keeps the address and code in ansi.state.web; ansi.webUrl(path) builds every link target, falling back to http://localhost:<webPort> until the first code arrives. Peers get the address from the host, so they need no config.',
 		"Transcript rows are cached per item (frame.state.rows) and keep the code they were first painted with: putting the code in the cache key would change rows in scrollback every 4.5 minutes, and render.ts answers that with a canonical repaint that clears scrollback. So only live rows (prompt, tab bar) follow the newest code; an old row's link works for 10 minutes, then (if that browser has no cookie yet) lands on the gate. Rebuilding for width changes picks up the current code.",
 		'The gate at a file address (/image/<name>, /blob/<session>/<blob>) is the page itself with status 401 and cache-control no-store (web.gate); App.tsx reloads instead of opening the chat when router.isApp says the address is not / or /<id>, so a login lands on the file. ?auth= on a file address redirects like on a page. /login and /ws still answer a bare 401.',
-		"Paste markers are not linked yet: today's [paste <blob>, N lines] names a session blob, and task 31 renames them to [paste/<name>.txt] served at /paste/<name>; link them there through ansi.webUrl and add /paste/ to web.fetch's file addresses (gate and ?auth=).",
+		"Paste markers are linked since task 31: [paste/<name>.txt] to /paste/<name>, through ansi.webUrl like images; /paste/ and /raw/ are file addresses in web.fetch (gate and ?auth=).",
 		'src/startup.test.ts fails its 100 ms budget on a loaded machine (several agents testing at once), on the base commit too.'
 	],
 	needs: [],

@@ -6,6 +6,7 @@ import { strings } from '../common/strings.ts'
 import type { Shown as Item, Transcript } from '../common/transcript.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
 import { settings } from '../common/settings.ts'
+import { uploads } from '../common/uploads.ts'
 import { frame, type Frame, type View } from './frame.ts'
 import { promptView } from './prompt-view.ts'
 
@@ -310,4 +311,21 @@ test('an [image/<name>] marker is a link to the image, in the transcript and the
 	expect(plain(rows)).toEqual(['> see [image/abc123.png] ok', '> and [image/abc123.png]'])
 	// A forged name is not linked.
 	expect(frame.build(view([{ type: 'prompt', text: '[image/../x.png]' }]), 60).lines.join('')).not.toContain('\x1b]8;')
+})
+
+test('a [paste/<name>] marker links to its page; while its upload is in flight it is dim and no link, with the same text', () => {
+	let marker = uploads.begin('s', 'c.1', 'text/plain')
+	let path = marker.slice(1, -1)
+	let build = () => frame.build(view([], `see ${marker}`), 60).lines.filter((l) => l.includes(marker))
+	try {
+		let flying = build()
+		expect(flying.join('')).not.toContain('\x1b]8;')
+		expect(flying.join('')).toContain(`\x1b[2m${marker}`)
+		uploads.settle({ type: 'attached', sessionId: 's', command: 'c.1', blob: 'b', marker })
+		let landed = build()
+		expect(landed.join('')).toContain(`\x1b]8;;http://localhost:${settings.webPort()}/${path}\x07${marker}\x1b]8;;\x07`)
+		expect(plain(landed)).toEqual(plain(flying))
+	} finally {
+		uploads.reset()
+	}
 })

@@ -136,9 +136,11 @@ test('a paste longer than the setting becomes a text attachment; a short one sta
 	let [c] = attaches()
 	expect(c).toMatchObject({ mediaType: 'text/plain' })
 	expect(Buffer.from(c.data, 'base64').toString()).toBe(long.replaceAll('\r\n', '\n'))
-	expect(text()).toMatch(/^\[uploading paste [^\]]+\]$/)
-	app.onEvent(attached(c.id, '[paste 0123456789ab, 8 lines]'))
-	expect(text()).toBe('[paste 0123456789ab, 8 lines]')
+	let marker = `[paste/${c.name}]`
+	expect(c.name).toMatch(/^[0-9a-z]{6}\.txt$/)
+	expect(text()).toBe(marker)
+	app.onEvent(attached(c.id, marker))
+	expect(text()).toBe(marker)
 
 	settings.state.raw = { pasteLines: 20 }
 	app.onKeys([key('paste', `\n${long}`)])

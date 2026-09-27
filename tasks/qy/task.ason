@@ -6,7 +6,7 @@
 	foldInto: ['2a'],
 	notes: [
 		'The sync fix is one line in client/paste.ts upload: the attach command goes in queueMicrotask, after the caller put the placeholder in the prompt. Web attach.ts was already async (Blob.arrayBuffer).',
-		"Protocol unchanged: attach's optional `name` (attachments.imageName: 6 base36 + png|jpg|gif|webp, the extension must fit mediaType) sends a named image to blobs.stage, which writes paths.imageDir()/<name>; without a name (and for text/plain) blobs.store works as in 2a. Long pastes keep the [uploading paste <id>] placeholder and [paste <blob>, N lines].",
+		"Protocol unchanged: attach's optional `name` (attachments.fileName since task 31: 6 base36 + png|jpg|gif|webp, the extension must fit mediaType) sends a named image to blobs.stage, which writes paths.imageDir()/<name>; without a name (and for text/plain) blobs.store works as in 2a. Task 31 extended this to long pastes (attachments.fileName adds .txt; paths.fileDir).",
 		"A resend after a host restart finds the file already there: same bytes are accepted, other bytes are refused as 'name taken'.",
 		"The session copy's blob id is the 6-character name base (sessions/<id>/blobs/frdbn1.png), so attachments.blobId accepts both 12 hex and 6 base36, and /blob/<session>/<blob> serves either. blobs.named copies from /tmp on first use, which happens at submit (host.ts calls blobs.unknown first); a queued prompt is therefore safe from a /tmp clean too. Old [image <12hex>] markers still resolve.",
 		'paths.imageDir() is /tmp/hal/image, but <home>/tmp/image when HAL_HOME or NODE_ENV=test, so tests never touch /tmp/hal. Bytes from /tmp are checked (magic number, size) before they are copied, since anyone on the machine can write there.',
