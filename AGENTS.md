@@ -43,3 +43,11 @@ check `git diff --cached --stat` first) so files another agent staged
 don't ride along in your commit. Avoid parallel work that would touch
 the same files; if you are in such a hurry that such parallel work is a must,
 use worktrees and handle possible merge conflicts.
+
+Orchestrating: give each implementer a fresh subagent and its own
+worktree; it rebases onto origin/main and re-runs ./test before
+pushing. Size tasks to finish in ~40–70 requests and under ~150k
+context (about $2–4 each); split bigger ones. A coordinator needs one
+spawn slot per task it will start: slots don't come back. Measure
+with scripts/sloc (non-blank, non-comment, non-test lines) and
+scripts/cost <session-id>... (Opus 5.5 list prices).
