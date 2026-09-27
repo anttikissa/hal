@@ -11,6 +11,11 @@ the current version: 0.1.0 at first, later the latest release in git
 history". Avoid `once`; old files a rebuild needs belong in the task's
 artifacts.
 
+Unless you are implementing a task: whenever you change any file for
+any reason, update the task that covers that file, so a rebuild keeps
+the change. Bug fixes especially must not be forgotten: write the rule
+the fix restores into the task's description.
+
 Lessons that would help the next implementer (surprises, wrong
 artifacts, decisions later tasks depend on) go in the task's `notes`
 field in task.ason, a list of strings that `tsk show` prints. Never
