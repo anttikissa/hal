@@ -34,15 +34,15 @@ function violation(file: string, target: string): string | undefined {
 
 function sourceFiles(): string[] {
 	let files: string[] = []
-	for (let rel of new Glob('**/*.ts').scanSync(srcDir)) {
-		if (rel.endsWith('.test.ts')) continue
+	for (let rel of new Glob('**/*.{ts,tsx}').scanSync(srcDir)) {
+		if (/\.test\.tsx?$/.test(rel)) continue
 		files.push(`${srcDir}/${rel}`)
 	}
 	return files
 }
 
 function importsOf(file: string): string[] {
-	let transpiler = new Bun.Transpiler({ loader: 'ts' })
+	let transpiler = new Bun.Transpiler({ loader: file.endsWith('.tsx') ? 'tsx' : 'ts' })
 	let code = readFileSync(file, 'utf8')
 	let out: string[] = []
 	for (let imp of transpiler.scanImports(code)) {
@@ -104,4 +104,58 @@ test('importing every module has no side effects', () => {
 	expect(out.stdout.toString()).toBe('')
 	expect(out.stderr.toString()).toBe('signal-listeners=0')
 	expect(out.exitCode).toBe(0)
+})
+
+// Modules stay under maxLines so each fits one read and has one job.
+// Exceptions carry a reason; a planned split names its task.
+const maxLines = 400
+const sizeExceptions: Record<string, string> = {
+	'common/ason.ts': 'one cohesive format: parser and stringifier belong together',
+	'host/host.ts': 'split planned in task yq',
+	'client/frame.ts': 'split planned in task 3m',
+	'web/page.ts': 'split planned in task 1b',
+}
+
+// Line count as wc -l reports it: the number of newlines.
+function lineCount(text: string): number {
+	let n = 0
+	for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1)) n++
+	return n
+}
+
+// sizes maps src-relative paths to line counts. Returns one message per
+// oversized unlisted file and per listed file that is small or missing.
+function sizeProblems(sizes: Record<string, number>, exceptions: Record<string, string>): string[] {
+	let problems: string[] = []
+	for (let [rel, n] of Object.entries(sizes)) {
+		if (n > maxLines && !(rel in exceptions)) problems.push(`${rel} has ${n} lines (max ${maxLines})`)
+	}
+	for (let rel of Object.keys(exceptions)) {
+		if (!(rel in sizes)) problems.push(`${rel} is listed as an exception but does not exist`)
+		else if (sizes[rel]! <= maxLines) problems.push(`${rel} is listed as an exception but has only ${sizes[rel]} lines`)
+	}
+	return problems
+}
+
+test('lineCount matches wc -l', () => {
+	expect(lineCount('')).toBe(0)
+	expect(lineCount('a')).toBe(0)
+	expect(lineCount('a\nb\n')).toBe(2)
+})
+
+test('size check flags oversized files and stale exceptions', () => {
+	expect(sizeProblems({ 'a.ts': 400 }, {})).toEqual([])
+	let over = sizeProblems({ 'a.ts': 401 }, {})
+	expect(over).toHaveLength(1)
+	expect(over[0]).toContain('a.ts')
+	expect(over[0]).toContain('401')
+	expect(sizeProblems({ 'a.ts': 401 }, { 'a.ts': 'reason' })).toEqual([])
+	expect(sizeProblems({ 'a.ts': 400 }, { 'a.ts': 'reason' })).toHaveLength(1)
+	expect(sizeProblems({}, { 'gone.ts': 'reason' })).toHaveLength(1)
+})
+
+test('source modules stay under the line limit', () => {
+	let sizes: Record<string, number> = {}
+	for (let file of sourceFiles()) sizes[file.slice(srcDir.length + 1)] = lineCount(readFileSync(file, 'utf8'))
+	expect(sizeProblems(sizes, sizeExceptions)).toEqual([])
 })

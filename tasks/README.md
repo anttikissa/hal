@@ -66,6 +66,11 @@ owns it; later tasks point to it.
 - `src/conventions.test.ts` enforces the import rules and that
   importing every module (main.ts included) prints nothing, registers
   no signal handlers and leaves no timers or watchers running.
+- Non-test modules under src/ stay at or under 400 lines (`wc -l`), so
+  each fits one read and has one job. conventions.test.ts enforces it;
+  its short exception list gives each entry a reason (ason.ts is one
+  cohesive format; others name the task that splits them) and fails
+  when a listed file shrinks or disappears. Tests have no limit.
 - Importing a module does no I/O, timers, watchers or signal setup.
   Startup work lives in an idempotent `init()`; `main.start()` calls
   them in order, and runs only when main.ts is the entry point.
