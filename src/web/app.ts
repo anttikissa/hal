@@ -15,17 +15,26 @@ import { connection, type LinkState } from '../common/connection.ts'
 import { drafts, type Local } from '../common/drafts.ts'
 import { forms, type FormAction, type Key } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
+import { prompt } from '../common/prompt.ts'
+import { editor, type Splice } from './editor.ts'
 import { link } from './link.ts'
 import { view, type ViewState } from './view.ts'
 
-export type AppState = { view: ViewState; text: string }
+// `kill`: the last text Ctrl-K/U or Alt-D killed, for Ctrl-Y.
+export type AppState = { view: ViewState; text: string; kill?: string }
 
-// Where a key was pressed: the message box (its text and whether the
-// caret is at its end), a text field of the open question, a button
-// (`submits`: a form's submit button), or anywhere else.
-export type Target = { kind: 'message'; text: string; caretAtEnd: boolean } | { kind: 'field' } | { kind: 'button'; submits: boolean } | { kind: 'other' }
+// Where a key was pressed: the message box (its text, the caret, and
+// `write`, which edits the box natively), a text field of the open
+// question, a button (`submits`: a form's submit button), or anywhere
+// else.
+export type Target =
+	| { kind: 'message'; text: string; cursor: number; write?: (edit: Splice, cursor: number) => void }
+	| { kind: 'field' }
+	| { kind: 'button'; submits: boolean }
+	| { kind: 'other' }
 
-export type KeyInput = { key: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean; isComposing?: boolean }
+// `code`: the physical key (KeyD), for Option-letters on macOS.
+export type KeyInput = { key: string; code?: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean; isComposing?: boolean }
 
 function createState(): AppState {
 	return { view: {}, text: '' }
@@ -185,13 +194,25 @@ function key(e: KeyInput, target: Target): boolean {
 		return false
 	}
 	if (target.kind !== 'message') return false
-	let complete = e.key === 'Tab' && !e.shiftKey && target.caretAtEnd && view.complete(st.view, st.text)
+	if (k && editor.routed(k)) return app.edit(k, target)
+	let complete = e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && view.complete(st.view, st.text)
 	if (complete) {
 		connection.send(complete)
 		return true
 	}
 	if (e.key !== 'Enter' || e.shiftKey) return false
 	app.send(e.altKey)
+	return true
+}
+
+// A key from editor.table on the message box: the shared editor's step
+// on its text and caret, written back as a native edit.
+function edit(k: Key, target: Extract<Target, { kind: 'message' }>): boolean {
+	let st = app.state
+	let { state } = prompt.step({ text: st.text, cursor: target.cursor, kill: st.kill }, k)
+	st.kill = state.kill
+	if (state.text !== st.text) target.write?.(editor.splice(st.text, state.text), state.cursor)
+	app.input(state.text)
 	return true
 }
 
@@ -285,6 +306,7 @@ export const app = {
 	modalPick,
 	search,
 	key,
+	edit,
 	send,
 	store,
 	start,

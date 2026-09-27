@@ -43,10 +43,14 @@ function onEvent(st: ViewState, event: Event): ViewState {
 }
 
 // A browser key as a form key, or undefined for keys forms ignore.
-function key(e: { key: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean }): Key | undefined {
+// With Alt, macOS types a symbol (Option-D is ∂): the physical key's
+// letter names it then.
+function key(e: { key: string; code?: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean }): Key | undefined {
 	let names: Record<string, string> = { Enter: 'enter', Escape: 'escape', Tab: 'tab', ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Backspace: 'backspace', Delete: 'delete', Home: 'home', End: 'end' }
 	let mods = { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey }
 	if (names[e.key]) return { key: names[e.key]!, ...mods }
+	let letter = e.altKey && !/^[a-z]$/i.test(e.key) && /^Key([A-Z])$/.exec(e.code ?? '')?.[1]
+	if (letter) return { key: letter.toLowerCase(), ...mods }
 	return [...e.key].length === 1 ? { key: e.key, text: e.key, ...mods } : undefined
 }
 

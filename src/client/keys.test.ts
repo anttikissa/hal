@@ -13,7 +13,7 @@ function decode(...chunks: (string | Uint8Array)[]): string[] {
 function show(k: KeyEvent): string {
 	if (k.key === 'paste') return `paste:${JSON.stringify(k.text)}`
 	if (k.text !== undefined && !k.ctrl && !k.alt) return `text:${k.text}`
-	return (k.ctrl ? 'C-' : '') + (k.alt ? 'M-' : '') + (k.shift ? 'S-' : '') + k.key
+	return (k.cmd ? 's-' : '') + (k.ctrl ? 'C-' : '') + (k.alt ? 'M-' : '') + (k.shift ? 'S-' : '') + k.key
 }
 
 const bytes = (s: string) => new TextEncoder().encode(s)
@@ -36,6 +36,20 @@ describe('single chunks', () => {
 	test('Alt keys', () => {
 		expect(decode('\x1bx')).toEqual(['M-x'])
 		expect(decode('\x1b\x7f')).toEqual(['M-backspace'])
+	})
+
+	test('editor keys in legacy and kitty forms', () => {
+		// Home/End: xterm, SS3, vt220 and rxvt forms, and with modifiers.
+		expect(decode('\x1b[H\x1b[F\x1bOH\x1bOF\x1b[1~\x1b[4~\x1b[7~\x1b[8~')).toEqual(['home', 'end', 'home', 'end', 'home', 'end', 'home', 'end'])
+		expect(decode('\x1b[1;2H', '\x1b[1;5F')).toEqual(['S-home', 'C-end'])
+		expect(decode('\x1b[3~', '\x1b[3;3~')).toEqual(['delete', 'M-delete'])
+		// Alt-arrows: xterm modifiers, ESC-prefixed CSI, readline ESC b / ESC f.
+		expect(decode('\x1b[1;3D\x1b[1;3C', '\x1b\x1b[D\x1b\x1b[C', '\x1bb\x1bf')).toEqual(['M-left', 'M-right', 'M-left', 'M-right', 'M-left', 'M-right'])
+		expect(decode('\x1b\x7f', '\x1b\b', '\x1b[127;3u')).toEqual(['M-backspace', 'M-backspace', 'M-backspace'])
+		// Cmd only exists in kitty's modifier bits.
+		expect(decode('\x1b[1;9D\x1b[1;9C')).toEqual(['s-left', 's-right'])
+		expect(decode('\x0b\x15\x19\x01\x05\x04', '\x1bd')).toEqual(['C-k', 'C-u', 'C-y', 'C-a', 'C-e', 'C-d', 'M-d'])
+		expect(decode('\x1b[107;5u\x1b[117;5u\x1b[121;5u\x1b[100;3u')).toEqual(['C-k', 'C-u', 'C-y', 'M-d'])
 	})
 
 	test('kitty CSI-u keys', () => {

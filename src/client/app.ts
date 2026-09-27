@@ -16,7 +16,7 @@ import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
 import type { KeyEvent } from './keys.ts'
-import { prompt, type PromptState } from './prompt.ts'
+import { prompt, type PromptState } from '../common/prompt.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import type { View } from './frame.ts'
@@ -135,7 +135,7 @@ function completed(event: Event & { type: 'completions' }): void {
 // stays where the user left it).
 function setPrompt(text: string): void {
 	let st = app.state
-	if (st.prompt.text !== text) st.prompt = { text, cursor: text.length }
+	if (st.prompt.text !== text) st.prompt = { ...st.prompt, text, cursor: text.length }
 }
 
 // Up, Down and Escape for editing the last prompt; true if handled. The
@@ -149,7 +149,7 @@ function editKey(k: KeyEvent): boolean {
 		let begun = amend.begin(st.transcript, st.prompt.text)
 		if (!begun) return false
 		st.editing = begun.editing
-		st.prompt = { text: begun.editing.original, cursor: begun.editing.original.length }
+		st.prompt = { ...st.prompt, text: begun.editing.original, cursor: begun.editing.original.length }
 		drafts.edit(id, st.prompt.text)
 		app.send(begun.command)
 		return true
@@ -158,7 +158,7 @@ function editKey(k: KeyEvent): boolean {
 	if (!editing || !(k.key === 'escape' || (k.key === 'down' && st.prompt.text === editing.original))) return false
 	st.editing = undefined
 	if (st.prompt.text === editing.original) {
-		st.prompt = prompt.empty()
+		st.prompt = prompt.cleared(st.prompt)
 		drafts.edit(id, '')
 	}
 	let command = amend.resume(editing, st.transcript)
@@ -199,7 +199,7 @@ function onKeys(events: KeyEvent[]): void {
 			app.send(complete)
 			continue
 		}
-		let { state, action } = prompt.apply(st.prompt, k)
+		let { state, action } = prompt.step(st.prompt, k)
 		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
 		st.prompt = state

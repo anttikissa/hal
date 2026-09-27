@@ -7,6 +7,7 @@
 import { createSignal, flush, onSettled } from 'solid-js'
 import { connection } from '../../common/connection.ts'
 import { app, type Target } from '../app.ts'
+import { editor } from '../editor.ts'
 import { scroll } from '../scroll.ts'
 import { Composer } from './Composer.tsx'
 import { Picker } from './Picker.tsx'
@@ -36,7 +37,10 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 
 function target(e: KeyboardEvent): Target {
 	let t = e.target
-	if (t instanceof HTMLTextAreaElement) return { kind: 'message', text: t.value, caretAtEnd: t.selectionStart === t.value.length }
+	if (t instanceof HTMLTextAreaElement) {
+		let cursor = t.selectionDirection === 'backward' ? t.selectionStart : t.selectionEnd
+		return { kind: 'message', text: t.value, cursor, write: (edit, at) => editor.write(t, edit, at) }
+	}
 	if (t instanceof HTMLInputElement) return { kind: 'field' }
 	if (t instanceof HTMLButtonElement) return { kind: 'button', submits: t.type === 'submit' }
 	return { kind: 'other' }

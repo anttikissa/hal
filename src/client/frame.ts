@@ -20,7 +20,7 @@ import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
 import { itemView } from './item-view.ts'
 import { modalView } from './modal-view.ts'
-import type { PromptState } from './prompt.ts'
+import type { PromptState } from '../common/prompt.ts'
 import { promptView } from './prompt-view.ts'
 
 export interface View {

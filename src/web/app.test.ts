@@ -35,7 +35,7 @@ afterEach(() => {
 
 const press = (key: string, target: Target, mods: Partial<Record<'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey', boolean>> = {}) =>
 	app.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods }, target)
-const message = (text: string, caretAtEnd = true): Target => ({ kind: 'message', text, caretAtEnd })
+const message = (text: string, cursor = text.length): Target => ({ kind: 'message', text, cursor })
 const snapshot = (state: object, history: object[] = [], draft?: object): Event =>
 	({ type: 'snapshot', sessionId, snapshot: { meta, history, state, ...(draft ? { draft } : {}) } }) as Event
 
@@ -83,7 +83,7 @@ test('Up on an empty box while the model works edits the last prompt; Down uncha
 
 test('Tab at the end of a slash command asks the host, and its answer fills the box', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
-	expect(press('Tab', message('/cd ~/p', false))).toBe(false)
+	expect(press('Tab', message('/cd ~/p', 0))).toBe(false)
 	expect(press('Tab', message('/cd ~/p'))).toBe(true)
 	expect(sent.at(-1)).toMatchObject({ type: 'complete', sessionId, text: '/cd ~/p' })
 	app.onEvent({ type: 'completions', sessionId, text: '/cd ~/p', items: ['/cd ~/projects/'] })
@@ -144,4 +144,32 @@ test('the Send button sends what the box holds, like Enter', () => {
 	app.send()
 	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ sessionId, text: 'from the button' })
 	expect(app.state.text).toBe('')
+})
+
+test('Ctrl-K, Ctrl-U, Alt-D and Ctrl-Y edit the box through the shared editor, as native edits', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	let edits: unknown[] = []
+	let box = (text: string, cursor: number): Target => ({ kind: 'message', text, cursor, write: (e, at) => void edits.push([e, at]) })
+	expect(press('k', box('hello world', 5), { ctrlKey: true })).toBe(true)
+	expect(app.state.text).toBe('hello')
+	expect(edits).toEqual([[{ start: 5, end: 11, text: '' }, 5]])
+	expect(press('y', box('hello', 0), { ctrlKey: true })).toBe(true)
+	expect(app.state.text).toBe(' worldhello')
+	expect(edits[1]).toEqual([{ start: 0, end: 0, text: ' world' }, 6])
+	// The draft follows the box.
+	expect(drafts.text(sessionId)).toBe(' worldhello')
+	// macOS Option-D types ∂; the physical key still makes it Alt-D.
+	app.key({ key: '∂', code: 'KeyD', shiftKey: false, ctrlKey: false, altKey: true, metaKey: false }, box('ab cd', 2))
+	expect(app.state.text).toBe('ab')
+	press('u', box('ab', 1), { ctrlKey: true })
+	expect(app.state.text).toBe('b')
+	press('y', box('b', 1), { ctrlKey: true })
+	expect(app.state.text).toBe('ba')
+})
+
+test('keys the browser already handles stay native in the box', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	for (let [key, mods] of [['ArrowLeft', { altKey: true }], ['Backspace', { altKey: true }], ['a', { ctrlKey: true }], ['e', { ctrlKey: true }], ['z', { metaKey: true }]] as const)
+		expect(press(key, message('hello world', 5), mods)).toBe(false)
+	expect(app.state.text).toBe('hello world')
 })

@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test'
 import { keys, type KeyEvent } from './keys.ts'
-import { prompt, type PromptState } from './prompt.ts'
+import { prompt, type PromptState } from '../common/prompt.ts'
 
 // Run raw terminal input through the real decoder and the prompt; returns
 // the final state (text with '|' at the cursor) and the actions seen.
@@ -9,7 +9,7 @@ function run(input: string, start: PromptState = prompt.empty()): { shown: strin
 	let st = start
 	let actions: string[] = []
 	for (let k of events) {
-		let r = prompt.apply(st, k)
+		let r = prompt.step(st, k)
 		st = r.state
 		if (r.action) actions.push(r.action.type === 'submit' ? `${r.action.queue ? 'queue' : 'submit'}:${r.action.text}` : r.action.type)
 	}
@@ -41,7 +41,7 @@ describe('insert', () => {
 		expect(run(`ad${LEFT}${paste('b\r\nc')}`).shown).toBe('ab\nc|d')
 	})
 	test('control and modified keys insert nothing', () => {
-		expect(run('a\x01\x1bx\x1b[1;5C').shown).toBe('a|')
+		expect(run('a\x07\x1bx\x1b[1;5C').shown).toBe('a|')
 	})
 })
 
@@ -67,9 +67,9 @@ describe('graphemes are the unit', () => {
 
 	test.each(clusters)('left/right step over %s whole', (g) => {
 		let st = at(`a${g}b`, 1)
-		st = prompt.apply(st, key('right')).state
+		st = prompt.step(st, key('right')).state
 		expect(show(st)).toBe(`a${g}|b`)
-		st = prompt.apply(st, key('left')).state
+		st = prompt.step(st, key('left')).state
 		expect(show(st)).toBe(`a|${g}b`)
 	})
 
@@ -85,7 +85,7 @@ describe('graphemes are the unit', () => {
 	test('cursor never lands inside a cluster after an insert', () => {
 		// Typing the second regional indicator in front of an existing one
 		// forms a flag with it; the cursor must end up on a boundary.
-		let r = prompt.apply(at('🇮', 0), { ...key('x'), key: '🇫', text: '🇫' })
+		let r = prompt.step(at('🇮', 0), { ...key('x'), key: '🇫', text: '🇫' })
 		let bounds = [...new Intl.Segmenter().segment(r.state.text)].map((s) => s.index)
 		bounds.push(r.state.text.length)
 		expect(r.state.text).toBe('🇫🇮')
@@ -95,18 +95,18 @@ describe('graphemes are the unit', () => {
 
 describe('actions', () => {
 	test('Enter submits the text and clears the prompt', () => {
-		let r = prompt.apply(at('hi there', 2), key('enter'))
+		let r = prompt.step(at('hi there', 2), key('enter'))
 		expect(r.action).toEqual({ type: 'submit', text: 'hi there' })
 		expect(show(r.state)).toBe('|')
 	})
 	test('Alt-Enter submits to the queue', () => {
-		let r = prompt.apply(at('later', 5), { ...key('enter'), alt: true })
+		let r = prompt.step(at('later', 5), { ...key('enter'), alt: true })
 		expect(r.action).toEqual({ type: 'submit', text: 'later', queue: true })
 		expect(show(r.state)).toBe('|')
 		expect(run('later\x1b\r').actions).toEqual(['queue:later'])
 	})
 	test('Escape cancels and keeps the text', () => {
-		let r = prompt.apply(at('abc', 1), key('escape'))
+		let r = prompt.step(at('abc', 1), key('escape'))
 		expect(r.action).toEqual({ type: 'cancel' })
 		expect(show(r.state)).toBe('a|bc')
 	})
@@ -122,10 +122,10 @@ describe('actions', () => {
 	})
 })
 
-test('apply does not mutate its input state', () => {
+test('step does not mutate its input state', () => {
 	let st = at('abc', 3)
-	prompt.apply(st, key('backspace'))
-	prompt.apply(st, key('enter'))
+	prompt.step(st, key('backspace'))
+	prompt.step(st, key('enter'))
 	expect(st).toEqual({ text: 'abc', cursor: 3 })
 })
 
