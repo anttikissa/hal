@@ -33,6 +33,9 @@ test('dangerous commands are caught and their offending part marked; harmless on
 		['rm -rf /tmp/hal-test-1', []],
 		['D=$(mktemp -d); rm -rf $D', []],
 		['git checkout -b feature', []],
+		// v followed by a digit is a version tag, not a file.
+		['git checkout v1.2', []],
+		['git checkout v1.2 -- src/a.ts', ['git checkout v1.2 -- src/a.ts']],
 		['git push origin main', []],
 		['git reset HEAD a.ts', []],
 		['ls -rf', []],

@@ -50,7 +50,7 @@ const git: RegExp[] = [
 	/\bgit\s+clean\b.*\s-[a-z]*[fxd].*/,
 	/\bgit\s+stash\s+(drop|clear)\b.*/,
 	/\bgit\s+push\b.*\s(--force(-with-lease)?|-f)\b.*/,
-	/\bgit\s+(checkout|restore)\b(?=.*\s--\s+\S|.*\s(\.|\S+\.[A-Za-z0-9]+)(\s|$)).*/,
+	/\bgit\s+(checkout|restore)\b(?=.*\s--\s+\S|.*\s(\.|(?!v\d)\S+\.[A-Za-z0-9]+)(\s|$)).*/,
 ]
 
 // The offending parts of a shell command, as [start, end) offsets.

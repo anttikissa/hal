@@ -279,6 +279,20 @@ test('Ctrl-C of the last Hal process kills a running command, background jobs in
 	expect(ends()).toEqual(['paused'])
 }, 30_000)
 
+test('a restarted host kills its running command; the next host continues the turn', async () => {
+	let marker = `34.${process.pid}5`
+	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
+	let a = run()
+	await until('a session', () => sessionCount() === 1)
+	let b = run()
+	type(a, `bash sleep ${marker} & sleep ${marker}\r`)
+	await until('the command to run', alive)
+	type(a, '\x12') // Ctrl-R: not the last Hal process, so nothing pauses
+	await until('no sleep left', () => !alive())
+	await until('the turn to end', () => ends().length === 1)
+	expect(ends()).toEqual(['completed'])
+}, 30_000)
+
 test('a host restarted mid-turn continues it, and everyone rejoins', async () => {
 	let a = run()
 	await until('a session', () => sessionCount() === 1)

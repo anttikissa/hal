@@ -273,17 +273,18 @@ function broadcast(id: string, event: Event): void {
 	tabs.observe(id, event)
 }
 
-// Whenever this process exits while it is host, writes the output of
-// running turns so far and leaves them unfinished, for the next host to
-// continue; or, if the user quit the last Hal process (quitting()),
-// records them paused and stops their tools (a running bash is killed).
-// Idempotent.
+// Whenever this process exits while it is host (quit, restart, SIGTERM,
+// SIGHUP), writes the output of running turns so far and aborts them,
+// which kills their bash process groups: no command outlives the Hal
+// that ran it. The turns stay unfinished for the next host to continue
+// as interrupted; or, if the user quit the last Hal process
+// (quitting()), they are recorded paused. Idempotent.
 function init(): void {
 	if (host.state.inited) return
 	host.state.inited = true
 	process.on('exit', () => {
 		history.stop(host.state.pauseOnExit)
-		if (host.state.pauseOnExit) for (let r of turns.state.running.values()) r.controller.abort()
+		for (let r of turns.state.running.values()) r.controller.abort()
 	})
 	clock.init()
 }

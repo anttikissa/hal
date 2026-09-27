@@ -9,7 +9,7 @@ export const tool: Tool = {
 	name: 'bash',
 	description:
 		'Run a command with bash -c in the working directory. Returns the exit status and stdout and stderr combined. ' +
-		'No stdin; long output is cut.',
+		'No stdin; long output is cut. After the timeout the command and its children are killed.',
 	parameters: {
 		type: 'object',
 		properties: {
@@ -18,6 +18,7 @@ export const tool: Tool = {
 				type: 'string',
 				description: 'One short plain-language sentence for the user: what the command does and why, e.g. "Show the first 40 lines of the config"',
 			},
+			timeout: { type: 'integer', description: 'Timeout in ms (default: 120000)' },
 		},
 		required: ['command', 'description'],
 	},
@@ -29,6 +30,13 @@ export const tool: Tool = {
 		let child = spawn('bash', ['-c', `exec 2>&1\n${input.command}`], { cwd: ctx.cwd, detached: true, stdio: ['ignore', 'pipe', 'ignore'] })
 		let kill = () => tools.killGroup(child.pid!)
 		ctx.signal.addEventListener('abort', kill, { once: true })
+		// Kills the whole group, so a background job holding stdout ends the call too.
+		let ms = Number(input.timeout) > 0 ? Number(input.timeout) : 120_000
+		let timedOut = false
+		let timer = setTimeout(() => {
+			timedOut = true
+			kill()
+		}, ms)
 		// Keep only what can be shown; drain the rest so the command is not blocked.
 		let out = ''
 		child.stdout!.setEncoding('utf8').on('data', (d: string) => {
@@ -38,7 +46,8 @@ export const tool: Tool = {
 			child.on('error', fail)
 			child.on('close', (code, sig) => {
 				ctx.signal.removeEventListener('abort', kill)
-				let status = ctx.signal.aborted ? 'stopped by the user' : sig ? `killed by ${sig}` : `exit ${code}`
+				clearTimeout(timer)
+				let status = ctx.signal.aborted ? 'stopped by the user' : timedOut ? `timed out after ${ms / 1000}s` : sig ? `killed by ${sig}` : `exit ${code}`
 				done(`[${status}]\n${out}`)
 			})
 		})

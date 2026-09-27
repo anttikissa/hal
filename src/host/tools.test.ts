@@ -169,3 +169,16 @@ test('a stopped command is asked to end, then killed: a background job that igno
 	for (let i = 0; i < 100 && alive(); i++) await Bun.sleep(20)
 	expect(alive()).toBe(false)
 })
+
+test('a command past its timeout is killed with its background jobs, keeping the output so far', async () => {
+	let marker = `33.${process.pid}4`
+	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
+	let started = Date.now()
+	// The background job holds stdout open: without the timeout the call would wait for it.
+	let r = await bash({ command: `echo before; sleep ${marker} &`, description: 'Leave a job holding stdout', timeout: 300 })
+	expect(Date.now() - started).toBeLessThan(3000)
+	expect(r.output).toContain('timed out after 0.3s')
+	expect(r.output).toContain('before')
+	for (let i = 0; i < 100 && alive(); i++) await Bun.sleep(20)
+	expect(alive()).toBe(false)
+})
