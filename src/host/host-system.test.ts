@@ -13,7 +13,6 @@ import { systemPrompt } from './system-prompt.ts'
 const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
 const origStream = host.stream
-const origUserHome = systemPrompt.userHome
 let home = ''
 let work = ''
 let requests: Omit<ProviderRequest, 'model'>[] = []
@@ -26,7 +25,6 @@ beforeEach(() => {
 	writeFileSync(`${work}/sub/AGENTS.md`, 'SUB RULE')
 	process.env.HAL_HOME = home
 	liveFiles.onError = () => {}
-	systemPrompt.userHome = () => `${home}/nohome`
 	requests = []
 	host.stream = (_model, input) => {
 		requests.push(input)
@@ -42,7 +40,6 @@ afterEach(() => {
 	sessions.closeAll()
 	history.state.running.clear()
 	host.stream = origStream
-	systemPrompt.userHome = origUserHome
 	liveFiles.onError = origOnError
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome

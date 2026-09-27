@@ -3,16 +3,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { systemPrompt } from './system-prompt.ts'
 
-const saved = { userHome: systemPrompt.userHome }
 let root = ''
 
 beforeEach(() => {
 	root = mkdtempSync(`${tmpdir()}/hal-system-`)
-	systemPrompt.userHome = () => `${root}/home`
 })
 
 afterEach(() => {
-	Object.assign(systemPrompt, saved)
 	rmSync(root, { recursive: true, force: true })
 })
 
@@ -27,21 +24,18 @@ test('says who, when and where: date, cwd and model', () => {
 	expect(text).toMatch(/Hal/)
 })
 
-test('AGENTS.md files from the cwd upwards and the home one, outermost first, each once', () => {
-	mkdirSync(`${root}/home`)
+test('AGENTS.md files from the cwd upwards, outermost first; none from elsewhere', () => {
 	mkdirSync(`${root}/a/b/c`, { recursive: true })
-	writeFileSync(`${root}/home/AGENTS.md`, 'HOME RULE')
+	mkdirSync(`${root}/elsewhere`)
+	writeFileSync(`${root}/elsewhere/AGENTS.md`, 'OTHER RULE')
 	writeFileSync(`${root}/a/AGENTS.md`, 'OUTER RULE')
 	writeFileSync(`${root}/a/b/c/AGENTS.md`, 'INNER RULE')
 	let text = systemPrompt.build({ cwd: `${root}/a/b/c`, model: 'm/x', now: at })
-	let order = ['HOME RULE', 'OUTER RULE', 'INNER RULE'].map((s) => text.indexOf(s))
-	expect(order.every((i) => i >= 0)).toBe(true)
-	expect([...order].sort((x, y) => x - y)).toEqual(order)
+	let outer = text.indexOf('OUTER RULE'), inner = text.indexOf('INNER RULE')
+	expect(outer).toBeGreaterThanOrEqual(0)
+	expect(inner).toBeGreaterThan(outer)
 	expect(text).toContain(`${root}/a/AGENTS.md`)
-	// The home on the cwd's path is not read twice.
-	mkdirSync(`${root}/home/proj`)
-	let inside = systemPrompt.build({ cwd: `${root}/home/proj`, model: 'm/x', now: at })
-	expect(inside.split('HOME RULE')).toHaveLength(2)
+	expect(text).not.toContain('OTHER RULE')
 })
 
 test('the same inputs give the same text; a changed input changes it', () => {

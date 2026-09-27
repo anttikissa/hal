@@ -1,7 +1,7 @@
 // The system prompt, built by the host for every provider request from
 // its inputs alone: identity, the local date, the session's cwd and
-// model, and the AGENTS.md files that apply (the user's home one, then
-// from the filesystem root down to the cwd, most specific last). The
+// model, and the AGENTS.md files from the filesystem root down to the
+// cwd, most specific last. The
 // same inputs give the same text, byte for byte, so prompt caching keeps
 // working; changes during a session also reach the model as <meta>
 // notes on the next prompt (replay.ts).
@@ -26,8 +26,6 @@ function candidates(cwd: string): string[] {
 		dirs.unshift(dir)
 		if (dirname(dir) === dir) break
 	}
-	let home = systemPrompt.userHome()
-	if (home) dirs = [resolve(home), ...dirs.filter((d) => d !== resolve(home))]
 	return dirs.map((d) => `${d === '/' ? '' : d}/AGENTS.md`)
 }
 
@@ -50,8 +48,6 @@ function build(input: { cwd: string; model: string; now: number }): string {
 
 export const systemPrompt = {
 	identity: () => identity,
-	// Whose AGENTS.md applies wherever the cwd is.
-	userHome: (): string | undefined => process.env.HOME,
 	candidates,
 	build,
 }
