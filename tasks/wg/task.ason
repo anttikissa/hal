@@ -1,0 +1,7 @@
+{
+	title: 'A session stays on its account until it is limited',
+	description: 'Least-used rotation (task 61) picks an account only when a session has none yet or its account is limited, broken or out of quota; otherwise every turn stays on the account the session used last, as the old Hal did, so the prompt cache (which is per account) survives. Re-picking every turn would flip between evenly used accounts, because the one just used is then the busier one. The choice is kept per session in memory; a restart may pick again. Tests: two evenly used accounts, several turns in a row use the same one; a 429 on it moves the session to the least used other.',
+	status: 'planned',
+	needs: ['61'],
+	foldInto: ['61']
+}
