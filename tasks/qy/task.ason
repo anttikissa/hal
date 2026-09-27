@@ -1,0 +1,7 @@
+{
+	title: 'Pasted images: [image/abc123.png] markers that work',
+	description: "Pasting an image into the prompt works on the host terminal, peers and the web (questions.md item 39). Today on the host process the in-memory connection answers attach synchronously, before the placeholder is in the prompt, so the placeholder is never replaced and is sent as text (same for long-text pastes and pasted image paths); a test with a synchronous fake send guards this. The marker is short and final from the start: [image/<name>], where <name> is 6 random lowercase base36 characters plus the extension (e.g. [image/frdbn1.png]), chosen by the client so no 'uploading' text is ever shown; Enter waits for uploads still in flight. The host keeps the file at /tmp/hal/image/<name>, where the model's tools can read it too, and copies the bytes into a session blob when the prompt is submitted, so history and replays stay whole after /tmp is cleaned. In the terminal the marker is an OSC 8 link to the host's web endpoint /image/<name> (behind the web login of task 8a; served from the session blob when the /tmp file is gone); on the web it is a link too. Deleting a marker from the prompt drops that image, also when amending. Old Hal for reference: client/terminal/clipboard.ts and server/session/attachments.ts in ~/.hal.",
+	status: 'planned',
+	needs: ['2a', '8a'],
+	foldInto: ['2a']
+}

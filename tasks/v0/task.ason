@@ -1,0 +1,7 @@
+{
+	title: 'Background bash: result arrives as a message',
+	description: "The bash tool takes an optional background: true (questions.md item 29). The command starts at once in its own process group; the call waits at most 100 ms, so a command that fails at once (not found, syntax error, exit within 100 ms) returns its output and exit code as a normal result; otherwise it returns 'started in background as <id>' and the turn goes on. When the command exits, its output (capped and saved like a normal bash result) and exit code reach the session as an advisory message from 'bash <id>', delivered like messages from other sessions (task rj): into the running turn at the next tool result, or starting a turn when the session is idle, except while the user has it paused. Escape does not kill background commands; closing the session or quitting the last Hal process does, as for foreground ones. Background commands survive neither a host restart nor a takeover: after one, the session gets 'bash <id> was lost when Hal restarted'.",
+	status: 'planned',
+	needs: ['1r', 'rj'],
+	foldInto: ['1r']
+}

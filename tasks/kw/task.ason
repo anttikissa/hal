@@ -1,0 +1,7 @@
+{
+	title: 'Bash lifecycle as in the old Hal: timeout, kill on exit',
+	description: "Bash commands never outlive the Hal that ran them, as in the old Hal (questions.md items 28-29, 32): every clean host exit (quit, Ctrl-R restart, SIGTERM or SIGHUP, giving up the host role) aborts running turns, which kills their bash process groups (SIGTERM, SIGKILL 2 s later), not only when the last Hal process quits; the next host continues those turns as interrupted. Only a hard crash or kill -9 can leave orphans. The bash tool takes an optional timeout in ms (default 120000) after which the whole group is killed and the result is the output so far plus 'timed out after Ns', so a background child holding stdout ('cmd &') ends the call within the timeout. Approval treats a word like v1.2 (v followed by a digit) as a version, not a path, so 'git checkout v1.2' needs no approval.",
+	status: 'planned',
+	needs: ['1r', 'xz', '6f'],
+	foldInto: ['1r', 'xz', '6f']
+}

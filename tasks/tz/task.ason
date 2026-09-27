@@ -1,0 +1,7 @@
+{
+	title: 'Terminal: completion list below the prompt, monochrome in screen',
+	description: "Tab completion shows its choices as a list below the prompt, as the old Hal did (questions.md item 40): one line of names separated by spaces (directories with a trailing /), wrapping to more lines as needed, gone after the next key; choices are not browsed, so Up and Down keep recalling history. Inside GNU screen (STY set, or TERM starting with 'screen') the terminal is monochrome (item 44): no colours at all and no kitty keyboard query, keeping only bold, dim and reverse video for the cursor, selection and status; no emulated palette. Prompt placeholders (task 8m) also show on the web prompt, where they are missing today (item 43).",
+	status: 'planned',
+	needs: ['91', 'vq', '8m'],
+	foldInto: ['91', 'vq', '8m']
+}
