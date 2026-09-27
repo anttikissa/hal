@@ -60,6 +60,8 @@ function show(id: string, replace: boolean): void {
 	if (st.shown) {
 		scroll.save(st.shown)
 		connection.send({ type: 'close', sessionId: st.shown })
+		// The address no longer names a block.
+		delete st.target
 	}
 	st.shown = id
 	st.view = {}

@@ -227,7 +227,8 @@ function oneLine(s: string): string {
 	return s.replace(/\s+/g, ' ').trim()
 }
 
-function show(item: ItemShown): Shown {
+// `full`: a tool result's whole output, not its glimpse.
+function show(item: ItemShown, full = false): Shown {
 	switch (item.type) {
 		case 'prompt':
 			return { kind: 'user', text: item.from === undefined ? item.text : `${item.text}\n(sent from ${item.label ?? item.from})` }
@@ -248,7 +249,7 @@ function show(item: ItemShown): Shown {
 		case 'tool-result': {
 			// A glimpse, like the terminal: the model sees all of it.
 			let rows = item.output.replace(/\n$/, '').split('\n')
-			let shown = rows.slice(0, view.resultRows())
+			let shown = full ? rows : rows.slice(0, view.resultRows())
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
 			return { kind: item.isError ? 'result error' : 'result log', text: (item.isError ? '✗ ' : '◂ ') + shown.join('\n  ') }
 		}

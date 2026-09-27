@@ -655,6 +655,39 @@ test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay
 	}
 }, 20000)
 
+test.skipIf(!chrome)('in a browser a block address loads its page, marks its card and opens the whole output', async () => {
+	// The linked tool result sits in the first turn, pages away from the tail.
+	let id = tabs.create('/tmp')
+	let output = Array.from({ length: 40 }, (_, i) => `row ${i + 1}`).join('\n')
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'prompt 0' }] })
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'c0', name: 'bash', input: { command: 'seq 40' } } })
+	let result = history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'c0', output }] })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	for (let t = 1; t < 4; t++) {
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${t}` }] })
+		history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n`.repeat(80) } })
+		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	}
+	pages.budget = () => 1500
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}#${result.n}` })
+		await b.waitFor(`!!document.querySelector('.Card.target.open')?.innerText.includes('row 40')`)
+		let seen = await b.evaluate(`(() => {
+			let card = document.querySelector('.Card.target'), box = card.getBoundingClientRect(), main = document.querySelector('main').getBoundingClientRect()
+			let link = card.querySelector(':scope > a.link')
+			return { targets: document.querySelectorAll('.Card.target').length, visible: box.top < main.bottom && box.bottom > main.top, link: link && new URL(link.href).pathname + new URL(link.href).hash }
+		})()`)
+		expect(seen).toEqual({ targets: 1, visible: true, link: `/${id}#${result.n! - 1}` })
+	} finally {
+		await b.close()
+	}
+}, 20000)
+
 test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the address; phones get a sheet', async () => {
 	let origCwd = host.cwd
 	host.cwd = () => '/tmp'

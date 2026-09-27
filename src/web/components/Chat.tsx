@@ -18,7 +18,7 @@ import { Picker } from './Picker.tsx'
 import { Tabs } from './Tabs.tsx'
 import { Transcript } from './Transcript.tsx'
 
-const snap = () => ({ pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected() })
+const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected() })
 type Snap = ReturnType<typeof snap>
 
 // A change to the transcript follows the bottom: a new prompt pending
@@ -60,6 +60,19 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 	)
 }
 
+// The linked block's card came: scroll to it once (the redraw that
+// brought it may have moved the view, as a tab's first snapshot does).
+function reveal(): void {
+	let t = app.state.target
+	if (!t?.found || t.shown) return
+	flush()
+	let card = document.querySelector('.Transcript .Card.target')
+	if (!card) return
+	t.shown = true
+	scroll.stop()
+	card.scrollIntoView({ block: 'start' })
+}
+
 function target(e: Event): Target {
 	let t = e.target
 	if (t instanceof HTMLTextAreaElement) {
@@ -81,10 +94,13 @@ export function Chat() {
 	// One memo per field, gated on its value, so a redraw reaches only
 	// what changed: typing touches the composer, never the transcript.
 	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
-	let [tabs, shown, view, text, notice, placeholder, connected] = [field('tabs'), field('shown'), field('view'), field('text'), field('notice'), field('placeholder'), field('connected')]
+	let [tabs, shown, view, text, notice, placeholder, connected, linked] = [field('tabs'), field('shown'), field('view'), field('text'), field('notice'), field('placeholder'), field('connected'), field('target')]
 	let pending = createMemo(() => state().pending, { equals: same })
 	onSettled(() => {
-		app.changed = () => redraw(state(), setState)
+		app.changed = () => {
+			redraw(state(), setState)
+			reveal()
+		}
 		let onKey = (e: KeyboardEvent) => {
 			if (keys.key(e, target(e))) e.preventDefault()
 			// Show the outcome now, not a microtask later.
@@ -107,7 +123,7 @@ export function Chat() {
 	return (
 		<div class="Chat">
 			<Tabs tabs={tabs()} shown={shown()} />
-			<Transcript view={view()} pending={pending()} />
+			<Transcript view={view()} pending={pending()} target={linked() || undefined} />
 			<Composer view={view()} text={text()} notice={notice()} placeholder={placeholder()} connected={connected()} />
 			<Picker modal={view().modal} />
 		</div>

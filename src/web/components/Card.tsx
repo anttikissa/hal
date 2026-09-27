@@ -9,12 +9,27 @@
 // header while a folding card is closed). Whether a card is open is
 // kept by its session and row key (task w5), not by its DOM, so no other
 // item's card ever shows open in its place.
+// Every card links to itself (target.ts, task 0z); `target`: the
+// address links here, so the card is marked and opens, a tool card
+// with its whole output. An open tool card shows a glimpse of its
+// result and can show all of it; the transcript holds all of it
+// (host tools cap what they keep), so nothing is fetched.
 
-import { createMemo, createSignal, flush, onSettled, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, flush, onSettled, Show } from 'solid-js'
 import { scroll } from '../scroll.ts'
+import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
 
 const [opened, setOpened] = createSignal<ReadonlySet<string>>(new Set())
+// Tool cards showing their whole result, by the same key.
+const [whole, setWhole] = createSignal<ReadonlySet<string>>(new Set())
+
+function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
+	let next = new Set(set)
+	if (on) next.add(id)
+	else next.delete(id)
+	return next
+}
 
 // A new card fades in (--fade-ms, --ease-out from the page's CSS). A
 // script animation, not a CSS one: moving the card in the list, as when
@@ -32,19 +47,35 @@ function enter(el: HTMLElement): void {
 }
 
 // An image row shows the image itself, from the session's blob.
-export function Card(props: { row: Row; session: string; cursor?: boolean }) {
+export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean }) {
 	let id = () => `${props.session}#${props.row.key}`
 	let root: HTMLElement | undefined
 	onSettled(() => root && enter(root))
 	let open = () => opened().has(id())
-	let setOpen = (on: boolean) => {
-		let next = new Set(opened())
-		if (on) next.add(id())
-		else next.delete(id())
-		setOpened(next)
-	}
+	let setOpen = (on: boolean) => setOpened(toggled(opened(), id(), on))
+	let full = () => whole().has(id())
+	let setFull = (on: boolean) => setWhole(toggled(whole(), id(), on))
+	createEffect(
+		() => props.target,
+		(on) => {
+			if (!on) return
+			setOpen(true)
+			setFull(true)
+		},
+	)
 	let shown = () => view.show(props.row.item)
-	let result = () => props.row.result && view.show(props.row.result)
+	let result = () => props.row.result && view.show(props.row.result, full())
+	// Whether the result is longer than its glimpse.
+	let long = () => (props.row.result?.output.replace(/\n$/, '').split('\n').length ?? 0) > view.resultRows()
+	// The link's # is drawn by CSS, so the card's text stays its own.
+	let href = () => (props.row.pending ? undefined : target.href(props.session, props.row.item.key))
+	let link = () => (
+		<Show when={href()}>
+			{(h) => (
+				<a class="link" href={h()} title="Link to this block" aria-label="Link to this block" />
+			)}
+		</Show>
+	)
 	let folds = () => props.row.item.type === 'thinking' || props.row.item.type === 'tool'
 	// A tool's first line (its description or call) heads the card;
 	// thinking is headed by its first line.
@@ -56,11 +87,21 @@ export function Card(props: { row: Row; session: string; cursor?: boolean }) {
 	}
 	let failed = () => !!props.row.result?.isError
 	let toggle = (e: MouseEvent) => {
-		if (!folds() || (e.target as Element).closest('a') || !getSelection()?.isCollapsed) return
+		if (!folds() || (e.target as Element).closest('a, .more') || !getSelection()?.isCollapsed) return
 		scroll.follow(() => {
 			setOpen(!open())
 			flush()
 		}, 'track')
+	}
+	// Show all of a tool's result, or its glimpse again, keeping the
+	// button (the card's end) in view as the card shrinks.
+	let more = (e: MouseEvent) => {
+		let button = e.currentTarget as HTMLElement
+		scroll.follow(() => {
+			setFull(!full())
+			flush()
+		}, 'track')
+		if (!full()) button.scrollIntoView({ block: 'nearest' })
 	}
 	let cursor = () => <span class="cursor" aria-hidden="true" />
 	// A prompt's [image/<name>] markers are links (task qy), rebuilt only
@@ -74,7 +115,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean }) {
 	// Built once per card: the bindings follow a new row object, so the
 	// DOM (and its fade-in) stays when a snapshot or stream replaces it.
 	let plain = (s: () => { kind: string; text: string }) => (
-		<div ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '']}>
+		<div ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.target ? 'target' : '']}>
+			{link()}
 			<Show when={props.row.item.type === 'image' && props.row.item} fallback={parts()}>
 				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
 			</Show>
@@ -85,7 +127,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean }) {
 		<Show when={shown()}>
 			{(s) => (
 				<Show when={folds()} fallback={plain(s)}>
-					<article ref={(e) => (root = e)} class={['Card', 'folds', ...s().kind.split(' '), open() ? 'open' : '']} onClick={toggle}>
+					<article ref={(e) => (root = e)} class={['Card', 'folds', ...s().kind.split(' '), open() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
+						{link()}
 						<button type="button" class="head" aria-expanded={open() ? 'true' : 'false'}>
 							<span class="mark" aria-hidden="true">
 								{open() ? '▾' : '▸'}
@@ -100,6 +143,11 @@ export function Card(props: { row: Row; session: string; cursor?: boolean }) {
 							<div class="contents">
 								{body()}
 								<Show when={props.cursor}>{cursor()}</Show>
+								<Show when={long()}>
+									<button type="button" class="more" onClick={more}>
+										{full() ? 'show less' : 'show all'}
+									</button>
+								</Show>
 							</div>
 						</div>
 					</article>

@@ -1,7 +1,16 @@
 {
 	title: 'Link to any block; tool results in full on the web',
 	description: 'Every card on the web page has a stable address, <webUrl>/<session id>#<block id>: the id comes from history, so it is the same in every client, after a reload and in the terminal (questions.md items 53 and 75). A card offers its link (Cmd-click or copy works, it is an <a href>). Opening such an address scrolls to that card, marks it and unfolds it, loading earlier history pages if needed. A tool card shows a short glimpse of its result when unfolded and can expand to the full output, fetched from the host when the snapshot holds only the glimpse; a linked tool card opens expanded. Tests: ids are stable across snapshot, reconnect and paging; an address for a block in an older page loads that page and shows the card; the full output of a long tool result is reachable.',
-	status: 'planned',
+	status: 'done',
 	needs: [],
-	foldInto: ['4s']
+	foldInto: ['4s'],
+	notes: [
+		"Built as: src/web/target.ts (parse the address's #<block id>, href, the row holding a block: a tool result's id maps to its call's card, seek decides show / fetch an earlier page / give up). app.aim() runs at start and on hashchange; app.seek() after every event sets target.found or calls app.older() until backfill.complete, then gives up with a notice. Chat.reveal() scrolls to the .Card.target once (after the redraw, since a tab's first redraw calls scroll.restore and would undo an earlier scroll). tabs.show drops the target when switching away.",
+		'Block id = the item key of task w5 (`<n>` or `<n>.<i>`); `~<pos>` keys and pending rows get no link. The address is /<session>#<id>, relative to the page until e3 brings webUrl to the browser; router.go keeps no hash, so a tab switch drops it.',
+		'No fetch for full output: the snapshot and pages carry each tool result whole (host tools.cap already limits what history keeps), so the glimpse is only view.show(item) vs view.show(item, true). If snapshots ever send glimpses only, add the fetch here.',
+		"The link's # is drawn by CSS (::before) so a card's textContent stays its text (a CDP test compares it), and the link sits first in the card: the streaming test wants Hal's cursor as the card's last element child.",
+		'`items.map(view.show)` passes the index as the second argument: with show(item, full) that silently showed every result in full; call it through a lambda.',
+		'--cursor is defined only on the .input element (host CSS puts non-fg colours on their style class), so a card outline uses currentColor.',
+		'Checked in headless Chrome at 1200x800 and 390x800 (coarse pointer): linked card scrolled to the top with its outline, all 40 lines and show less; show less keeps the button in view. Not checked on a real phone.'
+	]
 }

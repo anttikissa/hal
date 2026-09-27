@@ -13,13 +13,16 @@ import type { Sending } from '../../common/drafts.ts'
 import type { Item } from '../../common/transcript.ts'
 import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
+import { target } from '../target.ts'
 import { view, type Row, type ViewState } from '../view.ts'
 import { Card } from './Card.tsx'
 import { Question } from './Question.tsx'
 
 const none: Item[] = []
 
-export function Transcript(props: { view: ViewState; pending: Sending[] }) {
+// `target`: the block the address links to (target.ts), whose card is
+// marked and opens.
+export function Transcript(props: { view: ViewState; pending: Sending[]; target?: string }) {
 	let el!: HTMLElement
 	onSettled(() => scroll.init(el, () => app.older()))
 	// Rows follow the items alone: redraws that leave them be (typing, the
@@ -30,12 +33,13 @@ export function Transcript(props: { view: ViewState; pending: Sending[] }) {
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorAt = () => (streaming() ? rows().length - 1 : -1)
+	let hit = createMemo(() => props.target && target.row(rows(), props.target)?.key)
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
 	return (
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
 			<For each={all()} keyed={(row) => row.key}>
 				{(row, i) => (
-					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorAt() === i()} />}>
+					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorAt() === i()} target={hit() === row().key} />}>
 						{(q) => <Question item={q()} form={props.view.form!} />}
 					</Show>
 				)}

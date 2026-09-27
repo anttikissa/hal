@@ -21,7 +21,9 @@ import type { Event, Tab } from '../common/protocol.ts'
 import { recall } from '../common/recall.ts'
 import { uploads, type Settled } from '../common/uploads.ts'
 import { link } from './link.ts'
+import { router } from './router.ts'
 import { tabs } from './tabs.ts'
+import { target, type Target } from './target.ts'
 import { view, type ViewState } from './view.ts'
 
 // `kill`: the last text Ctrl-K/U or Alt-D killed, for Ctrl-Y.
@@ -30,7 +32,9 @@ import { view, type ViewState } from './view.ts'
 // `older`: each session's earlier history being fetched as the reader
 // scrolls up (common/backfill.ts); `pages` counts the pages shown, so
 // the page can keep what the reader was reading in place.
-export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number }
+// `target`: the block the address links to (target.ts), `found` once
+// its card is in the transcript, `shown` once scrolled to.
+export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true } }
 
 
 function createState(): AppState {
@@ -99,7 +103,32 @@ function onEvent(event: Event): void {
 	let id = app.sessionId()
 	// A recalled entry stays in the box; the draft changes underneath.
 	if (id && (changed || event.type === 'snapshot')) st.text = recall.shown(id) ?? drafts.text(id)
+	app.seek()
 	app.changed()
+}
+
+// The address changed (loaded, a card's link followed, Back): aim at
+// the block it names, if any.
+function aim(): void {
+	let url = router.href()
+	app.state.target = target.parse(url, router.parse(url))
+	app.seek()
+	app.changed()
+}
+
+// Looks for the linked block's card until found, fetching earlier
+// pages while it is not in the transcript; gives up with a notice.
+function seek(): void {
+	let st = app.state
+	let t = st.target
+	if (!t || t.found) return
+	let rows = view.rows(st.view.transcript?.items ?? [])
+	let s = target.seek(t, app.sessionId(), rows, !backfill.complete(st.older, t.session))
+	if (s === 'older') app.older()
+	else if (s === 'missing') {
+		st.target = undefined
+		st.view = { ...st.view, notice: `no block #${t.key} in this session` }
+	} else if (s !== 'wait') t.found = true
 }
 
 // An upload landed or failed (common/uploads.ts): its placeholder
@@ -239,6 +268,8 @@ function start(): void {
 		onState: (s) => app.onState(s),
 	})
 	addEventListener('popstate', () => tabs.onPopState())
+	addEventListener('hashchange', () => app.aim())
+	app.aim()
 }
 
 // Whether the cookie is good; logging in sets it. login answers the
@@ -275,6 +306,8 @@ export const app = {
 	sendNow,
 	onEvent,
 	settled,
+	aim,
+	seek,
 	// Changes the box's text (and caret) by `change`; the Composer edits
 	// the textarea in place instead.
 	rewrite: (change: (p: { text: string; cursor: number; anchor?: number }) => { text: string }): void =>

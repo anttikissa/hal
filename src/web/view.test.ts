@@ -7,7 +7,7 @@ const sessionId = meta.id
 const ts = '2026-09-26T00:00:01Z'
 
 const fold = (events: Event[], st: ViewState = {}) => events.reduce(view.onEvent, st)
-const shown = (st: ViewState) => st.transcript!.items.map(view.show).filter(Boolean)
+const shown = (st: ViewState) => st.transcript!.items.map((i) => view.show(i)).filter(Boolean)
 
 test('events fold into what the page shows, like the terminal transcript', () => {
 	let st = fold([
