@@ -1,9 +1,8 @@
 Commit automatically. 72-column commit messages.
 
-The planning agent only writes tasks; it never implements or spawns
-agents. The user starts a fresh-context agent for each task (`tsk ready`,
-`tsk show <id>`), which works test-first, with `tsk done <id>` and a
-`Task: <id>` trailer in the same commit.
+Push and pull (with rabase and autostash - config git to use those by default) all the time; this is being developed on two hosts, connected by github only, and we want latest codes on both.
+
+The user works with planning agent (writes tasks) and one or more agents (possibly spawned by the planner) that implement them.
 
 Tasks are living specs for a rebuild from scratch, not one-time
 actions. Describe the state a task keeps true, not a step to take: not
@@ -41,4 +40,6 @@ changes (never `git add -A` or a whole file holding others' edits), and
 never `git checkout`, `git restore` or `git stash` over uncommitted work.
 The index is shared too: commit with `git commit <your paths>` (or
 check `git diff --cached --stat` first) so files another agent staged
-don't ride along in your commit.
+don't ride along in your commit. Avoid parallel work that would touch
+the same files; if you are in such a hurry that such parallel work is a must,
+use worktrees and handle possible merge conflicts.
