@@ -181,6 +181,7 @@ function draw(force = false): void {
 	// So does the prompt box.
 	st.view.prompt.scroll = next.promptScroll
 	st.out.write(render.paint(next, rows, force))
+	render.painted(st.view)
 }
 
 /**
@@ -241,6 +242,8 @@ export const render = {
 	state: createState(),
 	/** Minimum time between two paints. */
 	frameMs: () => 16,
+	/** Told every view painted (main.ts waits for the first tab's). */
+	painted: (_view: View): void => {},
 	paint,
 	column,
 	draw,

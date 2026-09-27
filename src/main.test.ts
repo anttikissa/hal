@@ -66,3 +66,33 @@ process.exit(n < 3 ? terminal.restartCode : 7)
 		rmSync(home, { recursive: true, force: true })
 	}
 })
+
+test('work held for the first tab runs after it is shown, or after laterMs without it', async () => {
+	let { main } = await import('./main.ts')
+	let saved = { ...main.state, later: [...main.state.later] }
+	let savedMs = main.laterMs
+	try {
+		let ran: string[] = []
+		Object.assign(main.state, { shown: false, later: [], fallback: undefined })
+		main.laterMs = () => 5_000
+		main.later(() => ran.push('web'))
+		await Bun.sleep(5)
+		expect(ran).toEqual([])
+		main.shown()
+		await Bun.sleep(5)
+		expect(ran).toEqual(['web'])
+		main.later(() => ran.push('after'))
+		await Bun.sleep(5)
+		expect(ran).toEqual(['web', 'after'])
+
+		Object.assign(main.state, { shown: false, later: [], fallback: undefined })
+		main.laterMs = () => 10
+		main.later(() => ran.push('late'))
+		await Bun.sleep(40)
+		expect(ran.at(-1)).toBe('late')
+	} finally {
+		if (main.state.fallback) clearTimeout(main.state.fallback)
+		Object.assign(main.state, saved)
+		main.laterMs = savedMs
+	}
+})

@@ -81,6 +81,10 @@ function charWidth(cp: number): number {
  * and over ZWJ-joined code points, which draw inside the first one.
  */
 function glyphAt(s: string, i: number, column = 0): { width: number; length: number } {
+	// Printable ASCII not followed by anything that could join it (all
+	// of that starts at U+0300): most text, and the hot path of layout.
+	let c = s.charCodeAt(i)
+	if (c >= 0x20 && c < 0x7f && !(s.charCodeAt(i + 1) >= 0x300)) return { width: 1, length: 1 }
 	let cp = s.codePointAt(i)!
 	let length = codePointLength(cp)
 	if (cp === 0x09) return { width: TAB_WIDTH - (column % TAB_WIDTH), length }

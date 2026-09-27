@@ -66,7 +66,7 @@ function longSession(): string {
 }
 
 // The terminal following the session through an in-process connection.
-function terminalShowing(id: string): { lines: string[]; events: Event[] } {
+async function terminalShowing(id: string): Promise<{ lines: string[]; events: Event[] }> {
 	app.reset()
 	let events: Event[] = []
 	let conn = host.connect((e) => {
@@ -75,6 +75,8 @@ function terminalShowing(id: string): { lines: string[]; events: Event[] } {
 	})
 	app.send = (c: any) => conn.send(c)
 	conn.send({ type: 'open', sessionId: id })
+	// Pages are asked for a macrotask apart; wait until they stop.
+	for (let seen = -1; seen !== events.length; await Bun.sleep(1)) seen = events.length
 	conn.close()
 	return { lines: frame.build(app.view(), 80, 24).lines, events }
 }
@@ -83,10 +85,10 @@ test("the terminal's frame after the background load equals the frame from a ful
 	let id = longSession()
 	await history.open(id)
 	pages.budget = () => 10_000_000
-	let full = terminalShowing(id)
+	let full = await terminalShowing(id)
 	expect(full.events.filter((e) => e.type === 'history')).toHaveLength(0)
 	pages.budget = () => 8_000
-	let lazy = terminalShowing(id)
+	let lazy = await terminalShowing(id)
 	let asked = lazy.events.filter((e) => e.type === 'history')
 	expect(asked.length).toBeGreaterThan(3)
 	expect(lazy.lines).toEqual(full.lines)

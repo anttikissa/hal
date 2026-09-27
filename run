@@ -7,7 +7,11 @@ export HAL_TAB_FILE="$(mktemp "${TMPDIR:-/tmp}/hal-tab.XXXXXX")"
 trap 'rm -f "$HAL_TAB_FILE"' EXIT
 main="$(dirname "$(readlink -f "$0")")/src/main.ts"
 while true; do
-	bun "$main" "$@"
+	# This start's time in ms since the epoch, for perf marks (src/common/
+	# perf.ts). Bash 3.2 (macOS) lacks EPOCHREALTIME: then it is empty
+	# and main.ts counts from Bun's own start instead.
+	t="${EPOCHREALTIME/[.,]/}"
+	HAL_STARTUP_TIMESTAMP="${t:0:13}" bun "$main" "$@"
 	code=$?
 	[ "$code" -eq 100 ] || exit "$code"
 done

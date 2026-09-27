@@ -90,6 +90,11 @@ function edit(id: string, text: string): void {
 	drafts.flush(id)
 }
 
+// Adds `early`, text typed before the session was shown, to its draft.
+function join(id: string, early: string): void {
+	if (early) drafts.edit(id, drafts.text(id) ? `${drafts.text(id)}\n${early}` : early)
+}
+
 // Sends the local draft if the host lacks it and none is in flight.
 function flush(id: string): void {
 	let l = drafts.local(id)
@@ -209,6 +214,7 @@ export const drafts = {
 	text,
 	pending,
 	edit,
+	join,
 	flush,
 	submit,
 	command,

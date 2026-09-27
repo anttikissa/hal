@@ -11,6 +11,7 @@
 // ignores repeats, so it never acts twice.
 
 import type { Event } from './protocol.ts'
+import { perf } from './perf.ts'
 
 export type Role = 'host' | 'client'
 export type Conn = { send(command: object): void; close(): void }
@@ -120,12 +121,15 @@ function attach(conn: Conn, role: Role): void {
 	let st = connection.state
 	st.conn = conn
 	st.failures = 0
-	connection.setLink({ type: 'connected', role })
+	perf.mark('connected', role)
 	for (let id of st.followed) conn.send({ type: 'open', sessionId: id, id: connection.nextId() })
 	for (let command of st.pending.values()) {
 		if (command.type === 'open' && st.followed.has(command.sessionId!)) st.pending.delete(command.id!)
 		else conn.send(command)
 	}
+	// Last: what the client sends on hearing it is sent once, not again
+	// by the loops above.
+	connection.setLink({ type: 'connected', role })
 	if (!st.joined) {
 		st.joined = true
 		st.first?.resolve()

@@ -26,7 +26,18 @@ function gamma(x: number): number {
 	return Math.round(255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055))
 }
 
-function toRgb([L, C, h]: Oklch): [number, number, number] {
+// Every frame paints the same few colours: each is converted once. The
+// cache is dropped when full, so animated colours cannot grow it.
+function toRgb(c: Oklch): [number, number, number] {
+	let st = oklch.state
+	let key = c.join()
+	let rgb = st.rgb.get(key)
+	if (st.rgb.size >= 4096) st.rgb.clear()
+	if (!rgb) st.rgb.set(key, (rgb = oklch.convert(c)))
+	return [...rgb]
+}
+
+function convert([L, C, h]: Oklch): [number, number, number] {
 	L = Math.min(1, Math.max(0, L))
 	let rgb = linear([L, C, h])
 	if (!fits(rgb)) {
@@ -46,4 +57,4 @@ function toHex(c: Oklch): string {
 	return '#' + oklch.toRgb(c).map((x) => x.toString(16).padStart(2, '0')).join('')
 }
 
-export const oklch = { toRgb, toHex }
+export const oklch = { state: { rgb: new Map<string, [number, number, number]>() }, toRgb, convert, toHex }

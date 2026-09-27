@@ -10,7 +10,8 @@
 //
 // Each socket connection is one host.adapt() connection, both ways as
 // line-delimited ASON (src/common/lines.ts). The host also serves the
-// web endpoint (web.ts) for as long as it is host.
+// web endpoint (web.ts), started by main.ts after the first frame and
+// stopped here with the host.
 
 import { dlopen, FFIType } from 'bun:ffi'
 import { closeSync, openSync, rmSync } from 'fs'
@@ -65,7 +66,6 @@ async function serve(): Promise<boolean> {
 		server.state.lockFd = null
 		throw e
 	}
-	web.start()
 	return true
 }
 

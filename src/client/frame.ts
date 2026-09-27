@@ -16,7 +16,7 @@ import { colors, type Style } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
 import type { ModalState } from '../common/modals.ts'
-import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
+import { transcript, type Item, type Resumed, type Transcript } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
 import { itemView } from './item-view.ts'
@@ -63,6 +63,20 @@ function promptWidth(cols: number): number {
 	return Math.max(1, Math.max(1, cols - 2 * ansi.PAD.length) - promptView.FIRST.length)
 }
 
+// An item's painted rows on a terminal `cols` wide. Items never change
+// in place (a change is a new item), so each is laid out once per width
+// and look, not on every frame: a long history stays cheap to redraw.
+function itemRows(item: Item, cols: number): string[] {
+	let style = itemView.itemStyle(item)
+	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''}`
+	let kept = frame.state.rows.get(item)
+	if (kept?.key === key) return kept.rows
+	let width = Math.max(1, cols - 2 * ansi.PAD.length)
+	let rows = itemView.itemLines(item, width).map((r) => ansi.paint(r, style, cols))
+	frame.state.rows.set(item, { key, rows })
+	return rows
+}
+
 // The frame for `view` on a terminal of `rows` × `cols`. Blank rows after
 // the history lift it to `peak` rows (as far as the screen allows), so
 // the prompt stays on one row between tabs (tasks/cc/terminal.md, Height
@@ -87,7 +101,11 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 			let f = formView.formLines(view.form, width)
 			block(f.rows, itemView.itemStyle(item))
 			formCursor = { row: lines.length - f.rows.length + f.cursor.row, col: ansi.PAD.length + f.cursor.col }
-		} else block(itemView.itemLines(item, width), itemView.itemStyle(item))
+		} else {
+			let rows = frame.itemRows(item, cols)
+			if (rows.length && (lines.length || above)) lines.push('')
+			for (let r of rows) lines.push(r)
+		}
 	}
 	for (let text of view.pending ?? []) {
 		let rows = itemView.itemLines({ type: 'prompt', text }, width)
@@ -123,4 +141,4 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	return { ...out, cursor: m.cursor, modalScroll: m.scroll }
 }
 
-export const frame = { build, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>() }, build, itemRows, promptWidth }

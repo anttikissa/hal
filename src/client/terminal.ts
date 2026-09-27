@@ -167,12 +167,13 @@ function deliver(events: KeyEvent[]): void {
 function init(io: TerminalIO = terminal.realIO()): void {
 	if (terminal.state.io) return
 	terminal.state.io = io
+	// Safety net for exits that skip quit(): uncaught errors, SIGTERM.
+	io.onExit(() => terminal.leave())
+	// Raw first: read in cooked mode, Bun loses a key typed at startup.
+	terminal.enter()
 	io.onData((chunk) => terminal.onData(chunk))
 	io.onContinue(() => terminal.resumed())
 	io.onResize(() => terminal.resized())
-	// Safety net for exits that skip quit(): uncaught errors, SIGTERM.
-	io.onExit(() => terminal.leave())
-	terminal.enter()
 }
 
 /** Forget the terminal (tests). Does not restore it. */

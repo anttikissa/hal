@@ -128,6 +128,17 @@ test('commands sent while disconnected go out once, in order, on connecting', as
 	expect(conns[1]!.sent.map((c) => c.text)).toEqual(['one', 'two'])
 })
 
+test('what the client sends on hearing it is connected goes out once', async () => {
+	answers = ['client']
+	let onState = (s: LinkState) => {
+		if (s.type !== 'connected') return
+		connection.send({ type: 'tab-start', cwd: '/' })
+		connection.send({ type: 'open', sessionId: 's' })
+	}
+	await connection.start({ transport, onEvent: () => {}, onState, baseMs: 100, maxMs: 1000 })
+	expect(conns[0]!.sent.map(without)).toEqual([{ type: 'tab-start', cwd: '/' }, { type: 'open', sessionId: 's' }])
+})
+
 test('retries back off, capped, and a connection resets the backoff', async () => {
 	answers = ['client']
 	await start()

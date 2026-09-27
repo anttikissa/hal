@@ -19,6 +19,7 @@ function fixture() {
 		},
 		onData(fn) {
 			onData = fn
+			log.push('read')
 		},
 		write(s) {
 			out += s
@@ -87,6 +88,13 @@ describe('start', () => {
 		expect(t.out).toContain(BRACKETED_PASTE_ON)
 		t.type('hi\x1b[A')
 		expect(t.keys.map((k) => k.key)).toEqual(['h', 'i', 'up'])
+	})
+
+	// Bun loses a key typed during startup (still in the cooked line
+	// buffer) if stdin is read before raw mode is on.
+	test('is in raw mode before it reads', () => {
+		let t = fixture()
+		expect(t.log.indexOf('raw')).toBeLessThan(t.log.indexOf('read'))
 	})
 
 	test('init is idempotent', () => {

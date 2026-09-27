@@ -91,8 +91,6 @@ function show(): void {
 
 function onEvent(event: Event): void {
 	let st = app.state
-	// Text typed before the first session arrived joins its draft.
-	let early = !st.transcript && event.type === 'snapshot' ? st.prompt.text : ''
 	// A recalled entry stays on screen; the draft changes underneath.
 	let mine = st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id ? event.sessionId : undefined
 	if (drafts.onEvent(event) && mine && !recall.shown(mine)) app.setPrompt(drafts.text(mine))
@@ -118,11 +116,7 @@ function onEvent(event: Event): void {
 		if (st.resumed && t && st.resumed.at > t.items.length) st.resumed = { ...st.resumed, at: t.items.length }
 		st.transcript = t
 		if (event.type === 'snapshot' || event.type === 'history') app.backfilled(event)
-		if (event.type === 'snapshot' && t) {
-			let id = t.meta.id
-			if (early) drafts.edit(id, drafts.text(id) ? `${drafts.text(id)}\n${early}` : early)
-			app.setPrompt(recall.shown(id) ?? drafts.text(id))
-		}
+		if (event.type === 'snapshot' && t) app.setPrompt(recall.shown(t.meta.id) ?? drafts.text(t.meta.id))
 		st.form = forms.follow(st.form, transcript.question(t))
 	}
 	app.show()
@@ -131,7 +125,8 @@ function onEvent(event: Event): void {
 // Earlier history is fetched in the background, shown all at once.
 function backfilled(event: Event & { type: 'snapshot' | 'history' }): void {
 	let out = backfill.fetchAll(app.state.older, app.state, event)
-	if (out.command) app.send(out.command)
+	// A task apart: an in-process host answers at once, holding off keys.
+	if (out.command) setTimeout(app.send, 0, out.command)
 	Object.assign(app.state, out.view)
 }
 
@@ -173,6 +168,8 @@ function focusOn(focus: Focus): void {
 	let from = st.focus.tab
 	st.focus = focus
 	if (focus.tab !== from) {
+		// Typed before any tab was shown: it joins the draft.
+		let early = from === undefined ? st.prompt.text : ''
 		if (from !== undefined) {
 			let kept = {} as TabView
 			for (let f of tabFields) if (st[f] !== undefined) Object.assign(kept, { [f]: st[f] })
@@ -187,6 +184,7 @@ function focusOn(focus: Focus): void {
 		delete st.onModalKey
 		if (focus.tab !== undefined) {
 			st.hidden.delete(focus.tab)
+			if (!back) drafts.join(focus.tab, early)
 			if (!back) app.setPrompt(recall.shown(focus.tab) ?? drafts.text(focus.tab))
 			app.send({ type: 'open', sessionId: focus.tab })
 		}

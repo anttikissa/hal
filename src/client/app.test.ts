@@ -292,13 +292,6 @@ test('typing updates the shared draft; a draft from elsewhere fills the prompt',
 	expect(app.view().prompt.text).toBe('typed elsewhere')
 })
 
-test('text typed before the session arrives is kept in its draft', () => {
-	type('early')
-	app.onEvent(snapshot('s1', { type: 'idle' }, { text: 'saved', rev: 1 }))
-	expect(app.view().prompt.text).toBe('saved\nearly')
-	expect(drafted.at(-1)?.text).toBe('saved\nearly')
-})
-
 test('an open question takes the keys until it is answered; the prompt keeps its text', () => {
 	app.onEvent(snapshot())
 	type('draft')
@@ -441,6 +434,28 @@ const startOn = (ids: string[], at = 'a') => {
 	sent = []
 }
 const shown = () => app.view().tabs?.focused
+
+test('a saved draft shown on starting is not doubled; text typed before it follows it', () => {
+	let store = drafts.store
+	let stored = new Map([['a', { text: 'saved', base: 0, dirty: true, sending: [] }]])
+	drafts.store = { load: (id) => stored.get(id) && structuredClone(stored.get(id)), save: (id, l) => void stored.set(id, structuredClone(l)) }
+	try {
+		app.onEvent(tabsEvent('a', 'b'))
+		acked('a')
+		app.onEvent(snapshot('a'))
+		expect(app.view().prompt.text).toBe('saved')
+		app.reset()
+		type('early')
+		app.onEvent(tabsEvent('a', 'b'))
+		acked('a')
+		expect(app.view().prompt.text).toBe('saved\nearly')
+		app.onEvent(snapshot('a'))
+		expect(app.view().prompt.text).toBe('saved\nearly')
+		expect(stored.get('a')?.text).toBe('saved\nearly')
+	} finally {
+		drafts.store = store
+	}
+})
 
 test('connecting asks the host for the tab to show; its ack focuses and follows it', () => {
 	app.state.start = { cwd: '/w', last: 'b' }

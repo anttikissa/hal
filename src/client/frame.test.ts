@@ -39,6 +39,21 @@ test('shows every item, however long the history', () => {
 	expect(lines.filter((l) => l.startsWith('answer')).length).toBe(300)
 })
 
+test('the same items drawn again follow a new width and colour', () => {
+	let v = view([{ type: 'text', text: 'one two three four five six' }])
+	let wide = frame.build(v, 40).lines
+	expect(frame.build(v, 40).lines).toEqual(wide)
+	expect(plain(frame.build(v, 12).lines).slice(0, 3)).toEqual(['one two', 'three four', 'five six'])
+	let saved = colors.assistant
+	try {
+		colors.assistant = () => ({ fg: [0.5, 0.1, 30] })
+		let fg = `38;2;${oklch.toRgb([0.5, 0.1, 30]).join(';')}`
+		expect(frame.build(v, 40).lines[0]).toContain(fg)
+	} finally {
+		colors.assistant = saved
+	}
+})
+
 test('no row is wider than the terminal, whatever the text', () => {
 	let text = 'wide 漢字漢字漢字 and e\u0301 combining, 👨‍👩‍👧 emoji,\ttabs\tand a verylongwordthatcannotfitanywhere at all'
 	let items: Item[] = [

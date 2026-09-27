@@ -2,14 +2,17 @@
 	title: 'Startup budget: UI in 100 ms, typing in 200 ms',
 	description: `\`./run\` in a terminal draws the UI (tab bar, prompt with the local draft, the focused tab's tail) within 100 ms of starting and accepts typed input within 200 ms, with 50 open tabs and sessions with long histories (at least one 20 MB), whether it becomes host or joins one. The first frame does not wait for anything it does not show: recovering unfinished turns, provider model lists, the web endpoint, credential refresh and background tabs run after it. Keys typed before the host answers go into the editor and are sent when connected (drafts already allow that). ./run passes its start time (HAL_STARTUP_TIMESTAMP, milliseconds since the epoch) so measurements include Bun's own start, and a small perf module keeps timestamped marks in memory, shown by /perf (artifact old-perf.ts).
 A test enforces the budget: it builds a temp home with the tabs and histories above, starts ./run under a pseudo-terminal (Bun.Terminal), and fails if the first prompt frame arrives after 100 ms or a typed character is not echoed in the frame within 200 ms; it takes the median of several starts, both as host and joining a running host. The test states its machine assumption and is skipped, with a printed reason, where no PTY exists; it is never loosened to pass.`,
-	status: 'planned',
-	needs: [
-		'bq',
-		'vq'
-	],
+	status: 'done',
+	needs: ['bq', 'vq'],
 	notes: [
 		'Bun 1.4.2 (installed at planning time) has Bun.Terminal for PTYs; check its API before reaching for `script` or node-pty.',
 		'Budget eaters to check first: importing every provider and host module on the client path (dynamic import what the first frame does not need), synchronous directory scans of sessions/, JSON/ASON parsing of whole histories, and awaiting server.serve() before drawing.',
-		'Keep the conventions: startup work still lives in init() functions called in order by main.start(); the budget test measures, it does not change what importing a module does.'
+		'Keep the conventions: startup work still lives in init() functions called in order by main.start(); the budget test measures, it does not change what importing a module does.',
+		'Measured on an M-series Mac (2026-09): host ui 76-80 ms, typing 76-80 ms; joining ui 95-99 ms, typing 54-57 ms. About 40 ms of that is Bun start plus importing every module; dynamic imports were not needed.',
+		'The big eater was backfill: the in-process host answers each history page synchronously, so the client fetched all 20 MB in one task before painting (1150 ms). Pages are now asked for a macrotask apart (client/app.ts backfilled); lazy-history.test.ts waits for them.',
+		'Bun drops a key typed at startup if stdin is read (onData) before raw mode is on: terminal.init() enters raw mode first.',
+		'Typed-before-first-tab text joins the draft (drafts.join) when the tab is focused in app.focusOn: tabs + ack arrive before the snapshot, and the focused tab shows its draft at once, so joining on the snapshot lost the typing.',
+		"Redraws stay cheap with long histories because frame.ts caches each item's painted rows (WeakMap, keyed by width, result rows and style); items must never change in place.",
+		'main.later() holds web.start() and turns.recover() until render.painted reports the first tab (or laterMs). The startup test runs ./run detached and kills the process group, or the bun child outlives it.'
 	]
 }

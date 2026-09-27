@@ -77,6 +77,7 @@ async function dial(cookieHeader?: string) {
 
 test('the host serves the web endpoint and stops it with the host', async () => {
 	await server.serve()
+	web.start()
 	expect((await fetch(`${base()}/`)).status).toBe(200)
 	// A tab's address is the page too; other paths are not.
 	expect((await fetch(`${base()}/12-abc`)).status).toBe(200)
@@ -90,6 +91,7 @@ test('the host serves the web endpoint and stops it with the host', async () => 
 
 test('the page carries the theme as CSS, following overrides, without its code', async () => {
 	await server.serve()
+	web.start()
 	let saved = colors.fgL
 	try {
 		let html = await (await fetch(`${base()}/`)).text()
@@ -109,6 +111,7 @@ test('a missing JSX compiler fails the page with 500 and a diag line, not the ho
 	web.compiler = () => Promise.reject(new Error('Cannot find package @dom-expressions/compiler'))
 	try {
 		await server.serve()
+		web.start()
 		let res = await fetch(`${base()}/`)
 		expect(res.status).toBe(500)
 		expect(readFileSync(diag.file(), 'utf8')).toContain('@dom-expressions/compiler')
@@ -123,6 +126,7 @@ test('a missing JSX compiler fails the page with 500 and a diag line, not the ho
 
 test('login sets a long-lived HttpOnly cookie; a wrong password gets 401', async () => {
 	await server.serve()
+	web.start()
 	let bad = await login('nope')
 	expect(bad.status).toBe(401)
 	expect(bad.headers.get('set-cookie')).toBeNull()
@@ -134,6 +138,7 @@ test('login sets a long-lived HttpOnly cookie; a wrong password gets 401', async
 
 test('GET /blob serves a session’s attachment by exact id, with the cookie only', async () => {
 	await server.serve()
+	web.start()
 	let id = sessions.create({ cwd: home }).id
 	let other = sessions.create({ cwd: home }).id
 	let png = Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.from('pixels')])
@@ -160,6 +165,7 @@ test('the password is a config function read at call time', async () => {
 	web.password = () => 'other'
 	try {
 		await server.serve()
+		web.start()
 		expect((await login('hello123')).status).toBe(401)
 		expect((await login('other')).ok).toBe(true)
 	} finally {
@@ -169,6 +175,7 @@ test('the password is a config function read at call time', async () => {
 
 test('the login check and ws need the cookie', async () => {
 	await server.serve()
+	web.start()
 	expect((await fetch(`${base()}/login`)).status).toBe(401)
 	expect((await fetch(`${base()}/login`, { headers: { cookie: 'hal=wrong' } })).status).toBe(401)
 	expect((await fetch(`${base()}/login`, { headers: { cookie: await cookie() } })).status).toBe(204)
@@ -178,6 +185,7 @@ test('the login check and ws need the cookie', async () => {
 
 test('over ws, open-newest opens the newest session and bad messages are refused', async () => {
 	await server.serve()
+	web.start()
 	sessions.create({ cwd: '/tmp' })
 	let newer = sessions.create({ cwd: '/tmp' }).id
 	let w = await dial(await cookie())
@@ -209,6 +217,7 @@ test('a submit streams to both a web and an in-memory client', async () => {
 			}
 		})()
 	await server.serve()
+	web.start()
 	let local: Event[] = []
 	let conn = host.connect((e) => local.push(e))
 	conn.send({ type: 'create', cwd: '/tmp', model: 'fake/m' })
@@ -296,6 +305,7 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 	let b = await browser()
 	try {
 		await server.serve()
+		web.start()
 		await b.call('Page.navigate', { url: `${base()}/` })
 		await b.waitFor(`!!document.querySelector('input[type=password]')`)
 		await b.evaluate(`document.querySelector('input').value = 'wrong'; document.querySelector('form').requestSubmit()`)
@@ -352,6 +362,7 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 	let b = await browser()
 	try {
 		await server.serve()
+		web.start()
 		await b.call('Network.setCookie', { name: 'hal', value: 'hello123', url: base() })
 		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
 		await b.call('Page.navigate', { url: `${base()}/` })

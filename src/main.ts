@@ -9,6 +9,7 @@ import { render } from './client/render.ts'
 import { terminal } from './client/terminal.ts'
 import type { LinkState } from './common/connection.ts'
 import { drafts } from './common/drafts.ts'
+import { perf } from './common/perf.ts'
 import type { Event, Tab } from './common/protocol.ts'
 import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
@@ -18,6 +19,7 @@ import { turns } from './host/turns.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
 import { server } from './host/server.ts'
+import { web } from './host/web.ts'
 
 // local.ts lives in the home, so tests (temp home) never pick up the
 // user's real overrides.
@@ -67,6 +69,11 @@ function init(): void {
 		// on the host socket) can carry them on (tasks/j1/states.md).
 		terminal.onQuit = () => host.quitting(server.state.sockets.size === 0)
 		render.init()
+		render.painted = (view) => {
+			if (main.state.shown) return
+			perf.mark('frame', view.transcript ? view.transcript.meta.id : 'no tab yet')
+			if (view.transcript) main.shown()
+		}
 		// Drafts are kept on this machine too, for when the host is gone.
 		draftFile.dir = () => join(paths.stateDir(), 'drafts')
 		drafts.store = draftFile
@@ -91,20 +98,48 @@ function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) 
 	return link.start(opts)
 }
 
-// Becomes host if nobody is, and then continues every turn the previous
-// host left unfinished.
+// Becomes host if nobody is. Then, once the first frame is up, serves
+// the web and continues every turn the previous host left unfinished.
 async function becomeHost(): Promise<boolean> {
 	if (!(await server.serve())) return false
-	turns.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
+	perf.mark('host')
+	main.later(() => {
+		web.start()
+		turns.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
+	})
 	return true
 }
 
+// Runs `work` once the first frame showing a tab is painted (at once
+// if it was), so startup draws before anything it does not show. A
+// frame that never comes (the tab won't open) holds it for laterMs.
+function later(work: () => void): void {
+	let st = main.state
+	if (st.shown) return void setTimeout(work)
+	st.later.push(work)
+	st.fallback ??= setTimeout(() => main.shown(), main.laterMs())
+}
+
+// The first tab is on screen: the work held for it runs, one task each.
+function shown(): void {
+	let st = main.state
+	if (st.shown) return
+	st.shown = true
+	perf.mark('shown')
+	if (st.fallback) clearTimeout(st.fallback)
+	for (let work of st.later.splice(0)) setTimeout(work)
+}
+
 async function start(): Promise<void> {
+	perf.state.epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || perf.state.epoch
+	perf.mark('imported')
 	// config.ason first, so local.ts sees it and may override settings.*.
 	// Warnings about it reach every client connected to this host.
 	config.init(() => host.warnAll())
 	await main.loadLocal()
+	perf.mark('local.ts')
 	main.init()
+	perf.mark('init')
 	if (!terminal.available()) {
 		process.stderr.write('hal2 needs a terminal\n')
 		process.exit(1)
@@ -113,9 +148,23 @@ async function start(): Promise<void> {
 		(event) => app.onEvent(event),
 		(state) => app.onState(state),
 	)
+	perf.mark('joined')
 }
 
-export const main = { state: { kept: '' }, lastTab, keepTab, localPath, loadLocal, init, becomeHost, joinHost, start }
+export const main = {
+	state: { kept: '', shown: false, later: [] as (() => void)[], fallback: undefined as Timer | undefined },
+	laterMs: () => 1000,
+	lastTab,
+	keepTab,
+	localPath,
+	loadLocal,
+	init,
+	becomeHost,
+	later,
+	shown,
+	joinHost,
+	start,
+}
 
 // Only ./run starts Hal; importing this file (tests, eval) does nothing.
 if (import.meta.main) await main.start()

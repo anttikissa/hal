@@ -130,7 +130,8 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	let early = transcript.standIns(snapshot.earlier ?? [], snapshot.history)
 	for (let r of [...early, ...replay.current(snapshot.history)]) {
 		if (replay.isPrompt(r)) prompt = items.length
-		items = r.type === 'answer' ? transcript.answered(items, r) : [...items, ...transcript.recordItems(r)]
+		if (r.type === 'answer') items = transcript.answered(items, r)
+		else items.push(...transcript.recordItems(r))
 	}
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
 	if (prompt !== undefined) t.prompt = prompt
