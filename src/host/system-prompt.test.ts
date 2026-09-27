@@ -80,3 +80,27 @@ test('the same inputs give the same text; a changed input changes it', () => {
 test('a missing cwd still gives a prompt', () => {
 	expect(systemPrompt.build({ cwd: `${root}/gone`, model: 'm/x', now: at })).toContain(`${root}/gone`)
 })
+
+test('the checkout SYSTEM.md opens the prompt: it says who Hal is', () => {
+	expect(systemPrompt.build({ cwd: root, model: 'm/x', now: at })).toMatch(/^You are Hal\b/)
+})
+
+test('SYSTEM.md is read per build: an edit shows on the next one, no edit keeps the text', () => {
+	let orig = systemPrompt.file
+	try {
+		systemPrompt.file = () => `${root}/SYSTEM.md`
+		writeFileSync(`${root}/SYSTEM.md`, 'You are Hal.\n- FIRST RULE\n')
+		let input = { cwd: `${root}/gone`, model: 'm/x', now: at }
+		let first = systemPrompt.build(input)
+		expect(first.startsWith('You are Hal.\n- FIRST RULE')).toBe(true)
+		expect(systemPrompt.build(input)).toBe(first)
+		writeFileSync(`${root}/SYSTEM.md`, 'You are Hal.\n- SECOND RULE\n')
+		let second = systemPrompt.build(input)
+		expect(second).toContain('SECOND RULE')
+		expect(second).not.toContain('FIRST RULE')
+		rmSync(`${root}/SYSTEM.md`)
+		expect(() => systemPrompt.build(input)).toThrow(`${root}/SYSTEM.md`)
+	} finally {
+		systemPrompt.file = orig
+	}
+})

@@ -1,5 +1,7 @@
 // The system prompt, built by the host for every provider request from
-// its inputs alone: identity, the local date and UTC offset, the
+// its inputs alone: SYSTEM.md at the checkout root (who Hal is and its
+// rules, edited by the user, read per request so an edit applies on the
+// next one), the local date and UTC offset, the
 // session's cwd and model, and the AGENTS.md files from the nearest Git
 // root down to the cwd (only the cwd's outside Git), most specific
 // last. The
@@ -10,7 +12,7 @@
 import { existsSync, readFileSync } from 'fs'
 import { dirname, resolve } from 'path'
 
-const identity = 'You are Hal, an assistant for coding and other work. You work in the current directory (cwd); relative paths are relative to it.'
+const systemFile = resolve(import.meta.dir, '../../SYSTEM.md')
 
 // Local YYYY-MM-DD, weekday, UTC offset: the clock the [HH:MM] prompt
 // stamps (replay.clock) use, named so the two can't be misread.
@@ -44,7 +46,8 @@ function read(path: string): string | undefined {
 }
 
 function build(input: { cwd: string; model: string; now: number }): string {
-	let parts = [systemPrompt.identity(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
+	// Missing SYSTEM.md is a broken checkout: throw with the path.
+	let parts = [readFileSync(systemPrompt.file(), 'utf8').trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
 	for (let dir of systemPrompt.candidates(input.cwd)) {
 		// One file per directory: AGENTS.md, else CLAUDE.md.
 		for (let name of ['AGENTS.md', 'CLAUDE.md']) {
@@ -59,7 +62,7 @@ function build(input: { cwd: string; model: string; now: number }): string {
 }
 
 export const systemPrompt = {
-	identity: () => identity,
+	file: () => systemFile,
 	candidates,
 	build,
 }
