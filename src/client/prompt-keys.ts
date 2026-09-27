@@ -24,7 +24,8 @@ function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void
 		let begun = amend.begin(st.transcript, st.prompt.text)
 		if (!begun) return false
 		st.editing = begun.editing
-		st.prompt = { ...st.prompt, text: begun.editing.original, cursor: begun.editing.original.length }
+		let { anchor: _, ...rest } = st.prompt
+		st.prompt = { ...rest, text: begun.editing.original, cursor: begun.editing.original.length }
 		drafts.edit(id, st.prompt.text)
 		send(begun.command)
 		return true
@@ -50,7 +51,7 @@ function history(st: PromptKeysState, k: KeyEvent, width: number): boolean {
 	let { text, cursor } = st.prompt
 	let shown = recall.step(id, recall.entries(t), text, cursor, k.key === 'up' ? -1 : 1, width, drafts.text(id))
 	if (!shown) return false
-	let { goal: _, ...rest } = st.prompt
+	let { goal: _, anchor: _a, typed: _t, ...rest } = st.prompt
 	st.prompt = { ...rest, ...shown }
 	return true
 }

@@ -18,9 +18,16 @@
 // terminal's box by a row, Ctrl--/Ctrl-Down shrink it back towards its
 // automatic height; sending resets it. Enter submits, Shift-Enter is a newline, Alt-Enter queues,
 // Escape cancels, Ctrl-D on empty text quits.
+//
+// Shift with any move extends a selection from `anchor`; Cmd-A selects
+// all. Typing, pasting, Shift-Enter and Ctrl-Y replace it, Backspace
+// and Delete delete it, plain Left/Right collapse it. Tab inserts a
+// tab, or indents the selected lines; Shift-Tab outdents. Ctrl-/, Cmd-Z
+// and Cmd-U undo, with Shift redo (prompt-undo.ts).
 
 import type { Key } from './forms.ts'
 import { promptLayout } from './prompt-layout.ts'
+import { promptUndo } from './prompt-undo.ts'
 import { settings } from './settings.ts'
 
 export interface PromptState {
@@ -35,7 +42,16 @@ export interface PromptState {
 	rows?: number
 	/** The terminal box's first visible row. */
 	scroll?: number
+	/** The selection's fixed end; selected is anchor..cursor. */
+	anchor?: number
+	/** Undo and redo steps (prompt-undo.ts); sending clears them. */
+	undo?: PromptSnapshot[]
+	redo?: PromptSnapshot[]
+	/** The last key typed a character: the next one joins its undo step. */
+	typed?: true
 }
+
+export type PromptSnapshot = { text: string; cursor: number; anchor?: number }
 
 // `queue`: Alt-Enter, run after the turn instead of steering it.
 export type PromptAction = { type: 'submit'; text: string; queue?: true } | { type: 'cancel' } | { type: 'quit' }
@@ -154,15 +170,77 @@ function resize(st: PromptState, dir: -1 | 1, width: number): PromptState {
 	return rows === auto ? rest : { ...rest, rows }
 }
 
+// Shift-Tab (`out`) removes one indent level (a tab, one to four
+// spaces, or up to three spaces and a tab) from the selected lines or
+// the cursor's; Tab adds a tab to the selected ones and the selection
+// grows to take in the first. A line the selection end touches only at
+// its first column is left out, unless the cursor rests there.
+function indent(st: PromptState, out: boolean): PromptState {
+	let { text, cursor } = st
+	let sel = prompt.selection(st)
+	let first = prompt.lineStart(text, sel?.start ?? cursor)
+	let end = sel?.end ?? cursor
+	if (sel && text[end - 1] === '\n' && end !== cursor) end--
+	let last = prompt.lineEnd(text, end)
+	let before = text.slice(first, last)
+	let pattern = out ? /^(?: {1,3}\t| {1,4}|\t)/gm : /^/gm
+	let put = out ? '' : '\t'
+	let after = before.replace(pattern, put)
+	if (after === before) return st
+	let map = (o: number) =>
+		o < first ? o : o >= last ? o + after.length - before.length : first + before.slice(0, o - first).replace(pattern, put).length
+	let next: PromptState = { ...st, text: text.slice(0, first) + after + text.slice(last), cursor: map(cursor) }
+	if (st.anchor !== undefined) next.anchor = map(st.anchor)
+	if (!out && sel) {
+		if (next.anchor! < next.cursor) next.anchor = first
+		else next.cursor = first
+	}
+	return next
+}
+
+// The selected range, if the anchor and cursor differ.
+function selection(st: PromptState): { start: number; end: number } | undefined {
+	let a = st.anchor
+	if (a === undefined || a === st.cursor || a > st.text.length) return undefined
+	return { start: Math.min(a, st.cursor), end: Math.max(a, st.cursor) }
+}
+
+function withoutTyped(st: PromptState): PromptState {
+	if (!st.typed) return st
+	let { typed: _, ...rest } = st
+	return rest
+}
+
 // `width`: the terminal prompt's content width, for moving by visual
-// row; without it (the web) rows are the logical lines.
+// row; without it (the web) rows are the logical lines. Every edit is
+// one undo step (promptUndo), except that typed characters in a row
+// make one.
 function step(st: PromptState, k: Key, width = Infinity): PromptResult {
 	let mod = (k.ctrl ? 'C' : '') + (k.alt ? 'M' : '') + (k.cmd ? 's' : '')
+	let name = `${mod}-${k.key}`
+	if (name === 'C-/' || name === 's-z' || name === 's-u') return { state: prompt.withoutTyped(promptUndo.undo(st, !!k.shift)) }
+	let r = prompt.apply(st, k, width)
+	if (r.action?.type === 'submit') return r
+	let typed = k.text !== undefined && mod === '' && k.key !== 'paste'
+	let state = r.state
+	if (state.text !== st.text && !(typed && st.typed)) state = promptUndo.record(state, st)
+	state = typed && state.text !== st.text ? { ...state, typed: true } : prompt.withoutTyped(state)
+	return r.action ? { state, action: r.action } : { state }
+}
+
+// One key without undo: moves (Shift extends the selection from its
+// anchor), edits (replacing or deleting the selection) and actions.
+function apply(st: PromptState, k: Key, width: number): PromptResult {
+	let mod = (k.ctrl ? 'C' : '') + (k.alt ? 'M' : '') + (k.cmd ? 's' : '')
+	let move = (s: PromptState): PromptState => {
+		let { anchor: _, ...rest } = s
+		return k.shift ? { ...rest, anchor: st.anchor ?? st.cursor } : rest
+	}
 	switch (`${mod}-${k.key}`) {
 		case '-up':
-			return { state: prompt.vertical(st, -1, width) }
+			return { state: move(prompt.vertical(st, -1, width)) }
 		case '-down':
-			return { state: prompt.vertical(st, 1, width) }
+			return { state: move(prompt.vertical(st, 1, width)) }
 		case 'C-=':
 		case 'C-up':
 			return { state: prompt.resize(st, 1, width) }
@@ -176,7 +254,12 @@ function step(st: PromptState, k: Key, width = Infinity): PromptResult {
 		st = rest
 	}
 	let { text, cursor } = st
-	let to = (c: number): PromptResult => ({ state: { ...st, cursor: c } })
+	let sel = prompt.selection(st)
+	let { anchor: _, ...base } = st
+	// What typing, pasting and deleting start from: the selection gone.
+	let cut = sel ? prompt.remove(base, sel.start, sel.end) : base
+	let to = (c: number): PromptResult => ({ state: move({ ...st, cursor: c }) })
+	let del = (from: number, until: number): PromptResult => ({ state: sel ? cut : prompt.remove(base, from, until) })
 	switch (`${mod}-${k.key}`) {
 		case 'M-up':
 			return to(0)
@@ -186,23 +269,23 @@ function step(st: PromptState, k: Key, width = Infinity): PromptResult {
 			if (k.shift) break
 			return { state: prompt.cleared(st), action: { type: 'submit', text, queue: true } }
 		case '-enter':
-			if (k.shift) return { state: prompt.insert(st, '\n') }
+			if (k.shift) return { state: prompt.insert(cut, '\n') }
 			return { state: prompt.cleared(st), action: { type: 'submit', text } }
 		case '-escape':
 			return { state: st, action: { type: 'cancel' } }
 		case 'C-d':
 			if (text === '') return { state: st, action: { type: 'quit' } }
-			return { state: prompt.remove(st, cursor, prompt.nextBoundary(text, cursor)) }
+			return del(cursor, prompt.nextBoundary(text, cursor))
 		case '-delete':
-			return { state: prompt.remove(st, cursor, prompt.nextBoundary(text, cursor)) }
+			return del(cursor, prompt.nextBoundary(text, cursor))
 		case '-backspace':
-			return { state: prompt.remove(st, prompt.prevBoundary(text, cursor), cursor) }
+			return del(prompt.prevBoundary(text, cursor), cursor)
 		case 'M-backspace':
-			return { state: prompt.remove(st, prompt.wordLeft(text, cursor), cursor) }
+			return del(prompt.wordLeft(text, cursor), cursor)
 		case '-left':
-			return to(prompt.prevBoundary(text, cursor))
+			return sel && !k.shift ? { state: { ...base, cursor: sel.start } } : to(prompt.prevBoundary(text, cursor))
 		case '-right':
-			return to(prompt.nextBoundary(text, cursor))
+			return sel && !k.shift ? { state: { ...base, cursor: sel.end } } : to(prompt.nextBoundary(text, cursor))
 		case 'M-left':
 			return to(prompt.wordLeft(text, cursor))
 		case 'M-right':
@@ -211,6 +294,8 @@ function step(st: PromptState, k: Key, width = Infinity): PromptResult {
 			return to(0)
 		case 's-right':
 			return to(text.length)
+		case 's-a':
+			return { state: { ...base, anchor: 0, cursor: text.length } }
 		case '-home':
 		case 'C-a':
 			return to(prompt.lineStart(text, cursor))
@@ -219,26 +304,33 @@ function step(st: PromptState, k: Key, width = Infinity): PromptResult {
 			return to(prompt.lineEnd(text, cursor))
 		case 'C-k': {
 			let end = prompt.lineEnd(text, cursor)
-			return { state: prompt.kill(st, cursor, end === cursor ? Math.min(end + 1, text.length) : end) }
+			return { state: prompt.kill(base, cursor, end === cursor ? Math.min(end + 1, text.length) : end) }
 		}
 		case 'C-u': {
 			let start = prompt.lineStart(text, cursor)
-			return { state: prompt.kill(st, start === cursor ? Math.max(start - 1, 0) : start, cursor) }
+			return { state: prompt.kill(base, start === cursor ? Math.max(start - 1, 0) : start, cursor) }
 		}
 		case 'M-d':
-			return { state: prompt.kill(st, cursor, prompt.wordRight(text, cursor)) }
+			return { state: prompt.kill(base, cursor, prompt.wordRight(text, cursor)) }
 		case 'C-y':
-			return { state: st.kill ? prompt.insert(st, st.kill) : st }
+			return { state: st.kill ? prompt.insert(cut, st.kill) : st }
 		case '-paste':
-			return { state: k.text ? prompt.insert(st, k.text) : st }
+			return { state: k.text ? prompt.insert(cut, k.text) : st }
+		case '-tab':
+			if (k.shift || sel) return { state: prompt.indent(st, !!k.shift) }
+			return { state: prompt.insert(base, '\t') }
 	}
-	if (k.text !== undefined && mod === '') return { state: prompt.insert(st, k.text) }
+	if (k.text !== undefined && mod === '') return { state: prompt.insert(cut, k.text) }
 	return { state: st }
 }
 
 export const prompt = {
 	empty,
 	step,
+	apply,
+	selection,
+	indent,
+	withoutTyped,
 	vertical,
 	autoRows,
 	resize,

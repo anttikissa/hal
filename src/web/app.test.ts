@@ -188,6 +188,32 @@ test('Ctrl-K, Ctrl-U, Alt-D and Ctrl-Y edit the box through the shared editor, a
 	expect(app.state.text).toBe('ba')
 })
 
+test('Tab and Shift-Tab indent a selection that spans lines; otherwise they move focus', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	let edits: unknown[] = []
+	let box = (text: string, cursor: number, anchor?: number): Target => ({ kind: 'message', text, cursor, anchor, write: (...a) => void edits.push(a) })
+	expect(press('Tab', box('one two', 2))).toBe(false)
+	expect(press('Tab', box('one two', 2, 5))).toBe(false)
+	expect(press('Tab', box('one\ntwo', 0), { shiftKey: true })).toBe(false)
+	expect(edits).toEqual([])
+	// The selection grows to take in the first line's tab, as a native edit.
+	expect(press('Tab', box('one\ntwo', 6, 1))).toBe(true)
+	expect(app.state.text).toBe('\tone\n\ttwo')
+	expect(edits).toEqual([[{ start: 0, end: 4, text: '\tone\n\t' }, 8, 0]])
+	expect(press('Tab', box('\tone\n\ttwo', 8, 0), { shiftKey: true })).toBe(true)
+	expect(app.state.text).toBe('one\ntwo')
+	expect(edits[1]).toEqual([{ start: 0, end: 6, text: 'one\n' }, 6, 0])
+})
+
+test('Ctrl-Y replaces the selection in the box', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	press('k', { kind: 'message', text: 'ab', cursor: 1 }, { ctrlKey: true })
+	let edits: unknown[] = []
+	press('y', { kind: 'message', text: 'a', cursor: 0, anchor: 1, write: (...a) => void edits.push(a) }, { ctrlKey: true })
+	expect(app.state.text).toBe('b')
+	expect(edits).toEqual([[{ start: 0, end: 1, text: 'b' }, 1, 1]])
+})
+
 test('keys the browser already handles stay native in the box', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
 	for (let [key, mods] of [['ArrowLeft', { altKey: true }], ['Backspace', { altKey: true }], ['a', { ctrlKey: true }], ['e', { ctrlKey: true }], ['z', { metaKey: true }]] as const)
@@ -313,16 +339,16 @@ test('Up on the first line and Down on the last browse the prompts sent; the dra
 	let user = (text: string) => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
 	app.onEvent(snapshot({ type: 'idle' }, [user('first'), user('two\nlines')]))
 	let writes: [string, number][] = []
-	let box = (text: string, cursor = text.length, selected = false): Target => ({
+	let box = (text: string, cursor = text.length, anchor?: number): Target => ({
 		kind: 'message',
 		text,
 		cursor,
-		selected,
+		anchor,
 		write: (edit, at) => void writes.push([text.slice(0, edit.start) + edit.text + text.slice(edit.end), at]),
 	})
 	app.input('mine')
 	// A selection, or the caret after a newline, keeps the key native.
-	expect(press('ArrowUp', box('mine', 0, true))).toBe(false)
+	expect(press('ArrowUp', box('mine', 0, 4))).toBe(false)
 	expect(press('ArrowUp', box('mine\nx'))).toBe(false)
 	app.input('mine')
 	expect(press('ArrowUp', box('mine', 2))).toBe(true)

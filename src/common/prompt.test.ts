@@ -5,25 +5,34 @@ import { promptLayout } from './prompt-layout.ts'
 import { settings } from './settings.ts'
 import { strings } from './strings.ts'
 
-// '|' marks the cursor in both the input and the expected text.
+// '|' marks the cursor and '^' the selection's anchor, in both the
+// input and the expected text.
 function at(marked: string, kill?: string): PromptState {
-	let cursor = marked.indexOf('|')
-	let st: PromptState = { text: marked.slice(0, cursor) + marked.slice(cursor + 1), cursor }
+	let text = marked.replace(/[|^]/g, '')
+	let cursor = marked.replace('^', '').indexOf('|')
+	let anchor = marked.includes('^') ? marked.replace('|', '').indexOf('^') : undefined
+	let st: PromptState = anchor === undefined ? { text, cursor } : { text, cursor, anchor }
 	return kill === undefined ? st : { ...st, kill }
 }
 
 function show(st: PromptState): string {
-	return st.text.slice(0, st.cursor) + '|' + st.text.slice(st.cursor)
+	let marks: [number, string][] = [[st.cursor, '|']]
+	if (st.anchor !== undefined && st.anchor !== st.cursor) marks.push([st.anchor, '^'])
+	let out = st.text
+	for (let [at, mark] of marks.sort((a, b) => b[0] - a[0])) out = out.slice(0, at) + mark + out.slice(at)
+	return out
 }
 
-// Key names with emacs-style prefixes: C- ctrl, M- alt, s- cmd.
+// Key names with emacs-style prefixes: C- ctrl, M- alt, s- cmd, S- shift.
+// A lone character without ctrl, alt or cmd is typed.
 function key(name: string): Key {
 	let k: Key = { key: name }
 	for (;;) {
-		let m = /^([CMs])-(.+)$/.exec(k.key)
-		if (!m) return k
-		k = { ...k, key: m[2]!, ...(m[1] === 'C' ? { ctrl: true } : m[1] === 'M' ? { alt: true } : { cmd: true }) }
+		let m = /^([CMsS])-(.+)$/.exec(k.key)
+		if (!m) break
+		k = { ...k, key: m[2]!, ...({ C: { ctrl: true }, M: { alt: true }, s: { cmd: true }, S: { shift: true } } as const)[m[1] as 'C'] }
 	}
+	return [...k.key].length === 1 && !k.ctrl && !k.alt && !k.cmd ? { ...k, text: k.key } : k
 }
 
 function press(marked: string, ...names: string[]): PromptState {
@@ -231,5 +240,128 @@ describe('viewport', () => {
 		expect(promptLayout.viewport(4, 3, 8, 7)).toEqual({ top: 5, height: 3, above: 5, below: 0 })
 		expect(promptLayout.viewport(4, 3, 8, 2)).toEqual({ top: 1, height: 3, above: 1, below: 4 })
 		expect(promptLayout.viewport(0, 10, 3, 2)).toEqual({ top: 0, height: 10, above: 0, below: 0 })
+	})
+})
+
+describe('selection', () => {
+	const moves: [string, string[], string][] = [
+		// Shift with any movement extends from the anchor.
+		['a|bc', ['S-right', 'S-right'], 'a^bc|'],
+		['ab|c', ['S-left', 'S-left'], '|ab^c'],
+		['a^b|c', ['S-left'], 'a|bc'],
+		['foo |bar baz', ['S-M-right'], 'foo ^bar| baz'],
+		['foo bar| baz', ['S-M-left'], 'foo |bar^ baz'],
+		['ab\nc|d', ['S-home'], 'ab\n|c^d'],
+		['ab\nc|d', ['S-C-a'], 'ab\n|c^d'],
+		['a|b\ncd', ['S-end'], 'a^b|\ncd'],
+		['a|b\ncd', ['S-s-right'], 'a^b\ncd|'],
+		['ab\nc|d', ['S-s-left'], '|ab\nc^d'],
+		['abc\nd|ef', ['S-up'], 'a|bc\nd^ef'],
+		['a|bc\ndef', ['S-down', 'S-down'], 'a^bc\ndef|'],
+		['abc\nd|ef\nghi', ['S-M-up'], '|abc\nd^ef\nghi'],
+		['a|b', ['s-a'], '^ab|'],
+		// Plain Left/Right collapse to the start or end; other moves drop it.
+		['^ab|c', ['left'], '|abc'],
+		['|ab^c', ['right'], 'ab|c'],
+		['^ab|c', ['end'], 'abc|'],
+		['a^b|c', ['up'], '|abc'],
+		// Edits replace or delete the selection.
+		['^ab|c', ['x'], 'x|c'],
+		['a|bc^', ['backspace'], 'a|'],
+		['a|bc^', ['delete'], 'a|'],
+		['a|bc^', ['C-d'], 'a|'],
+		['^ab|c', ['S-enter'], '\n|c'],
+	]
+	test.each(moves)('%p + %p -> %p', (before, names, after) => {
+		expect(show(press(before, ...names))).toBe(after)
+	})
+	test('paste and Ctrl-Y replace it', () => {
+		expect(show(prompt.step(at('x^ab|c'), { key: 'paste', text: 'P' }).state)).toBe('xP|c')
+		let st = { ...at('x^ab|c'), kill: 'K' }
+		expect(show(prompt.step(st, key('C-y')).state)).toBe('xK|c')
+	})
+	test('keys that are not edits or moves keep it', () => {
+		expect(show(press('^ab|c', 'escape'))).toBe('^ab|c')
+		expect(show(pressAt(80, '^ab|c', 'C-='))).toBe('^ab|c')
+	})
+})
+
+describe('undo', () => {
+	const type = (st: PromptState, s: string) => [...s].reduce((st, c) => prompt.step(st, key(c)).state, st)
+	test('consecutive typed characters are one step; any other key ends it', () => {
+		let st = type(at('|'), 'ab')
+		st = prompt.step(st, key('left')).state
+		st = type(st, 'xy')
+		expect(show(st)).toBe('axy|b')
+		st = prompt.step(st, key('C-/')).state
+		expect(show(st)).toBe('a|b')
+		st = prompt.step(st, key('C-/')).state
+		expect(show(st)).toBe('|')
+	})
+	test('each other edit is a step of its own', () => {
+		expect(show(press('abc|', 'backspace', 'backspace', 'C-/'))).toBe('ab|')
+		expect(show(press('abc|', 'backspace', 'backspace', 'C-/', 'C-/'))).toBe('abc|')
+		expect(show(press('ab|', 'tab', 'tab', 'C-/'))).toBe('ab\t|')
+	})
+	test('a step restores text, cursor and selection', () => {
+		expect(show(press('x^ab|c', 'y', 'C-/'))).toBe('x^ab|c')
+		expect(show(press('x^ab|c', 'y', 'C-/', 'S-C-/'))).toBe('xy|c')
+	})
+	test('Cmd-Z and Cmd-U undo too, with Shift they redo', () => {
+		for (let k of ['s-z', 's-u']) {
+			expect(show(press('ab|', 'backspace', k))).toBe('ab|')
+			expect(show(press('ab|', 'backspace', k, `S-${k}`))).toBe('a|')
+		}
+	})
+	test('a new edit forgets what could be redone', () => {
+		expect(show(press('ab|', 'backspace', 'C-/', 'x', 'S-C-/'))).toBe('abx|')
+	})
+	test('nothing to undo or redo changes nothing', () => {
+		expect(show(press('a|b', 'C-/', 'S-C-/'))).toBe('a|b')
+	})
+	test('moves alone are not steps', () => {
+		expect(show(press('ab|', 'backspace', 'left', 'S-right', 'C-/'))).toBe('ab|')
+	})
+	test('at most 200 steps are kept', () => {
+		let st = at('|')
+		for (let i = 0; i < 250; i++) st = prompt.step(st, { key: 'paste', text: 'x' }).state
+		for (let i = 0; i < 300; i++) st = prompt.step(st, key('C-/')).state
+		expect(st.text).toBe('x'.repeat(50))
+	})
+	test('sending clears the stacks', () => {
+		let st = prompt.step(press('ab|', 'backspace'), key('enter')).state
+		expect(show(prompt.step(st, key('C-/')).state)).toBe('|')
+		expect(show(prompt.step(st, key('S-C-/')).state)).toBe('|')
+	})
+})
+
+describe('tab', () => {
+	const cases: [string, string, string][] = [
+		['ab|', 'tab', 'ab\t|'],
+		['a|b', 'tab', 'a\t|b'],
+		// Indents every line the selection touches; the selection takes in
+		// the first line's new tab.
+		['o^ne\ntw|o\nthree', 'tab', '^\tone\n\ttw|o\nthree'],
+		['o|ne\ntw^o\nthree', 'tab', '|\tone\n\ttw^o\nthree'],
+		['o^n|e', 'tab', '^\ton|e'],
+		// A line touched only at its first column by the selection end is
+		// left out, unless the cursor rests there.
+		['o|ne\n^two', 'tab', '|\tone\n^two'],
+		['o^ne\n|two', 'tab', '^\tone\n\t|two'],
+		// Shift-Tab removes one level from the selected or current line.
+		['one\n  tw|o', 'S-tab', 'one\ntw|o'],
+		['\t\tx|', 'S-tab', '\tx|'],
+		['        x|', 'S-tab', '    x|'],
+		['   \tx|', 'S-tab', 'x|'],
+		['|x', 'S-tab', '|x'],
+		['|\tone\n  \ttwo\n   three\nfour^', 'S-tab', '|one\ntwo\nthree\nfour^'],
+	]
+	test.each(cases)('%p + %s -> %p', (before, name, after) => {
+		expect(show(press(before, name))).toBe(after)
+	})
+	test('an indent is one step', () => {
+		expect(show(press('o^ne\ntw|o\nthree', 'tab', 'C-/'))).toBe('o^ne\ntw|o\nthree')
+		let text = '|\tone\n  \ttwo\n   three\nfour^'
+		expect(show(press(text, 'S-tab', 'C-/'))).toBe(text)
 	})
 })

@@ -5,7 +5,9 @@
 // in `table` mean something else in Hal (readline kills and yank, which
 // the browser either lacks or binds elsewhere), so app.key runs them
 // through the shared editor (src/common/prompt.ts) and `write` puts the
-// result back. Enter, Alt-Enter and Escape are app.key's own.
+// result back, selection included. So do Tab and Shift-Tab on a
+// selection across lines (app.key). Enter, Alt-Enter and Escape are
+// app.key's own; the textarea's undo stays native.
 //
 // Write-back uses execCommand('insertText'), which keeps the edit on the
 // browser's undo stack (Cmd-Z undoes a kill); setting .value would wipe
@@ -42,8 +44,9 @@ function splice(before: string, after: string): Splice {
 	return { start: p, end: before.length - s, text: after.slice(p, after.length - s) }
 }
 
-// Applies an edit to the textarea as if typed, then puts the caret at `cursor`.
-function write(box: HTMLTextAreaElement, edit: Splice, cursor: number): void {
+// Applies an edit to the textarea as if typed, then selects from
+// `anchor` to the caret at `cursor` (none when they are equal).
+function write(box: HTMLTextAreaElement, edit: Splice, cursor: number, anchor = cursor): void {
 	box.focus()
 	box.setSelectionRange(edit.start, edit.end)
 	let done = document.execCommand(edit.text ? 'insertText' : 'delete', false, edit.text)
@@ -51,7 +54,7 @@ function write(box: HTMLTextAreaElement, edit: Splice, cursor: number): void {
 		box.setRangeText(edit.text, edit.start, edit.end)
 		box.dispatchEvent(new Event('input', { bubbles: true }))
 	}
-	box.setSelectionRange(cursor, cursor)
+	box.setSelectionRange(Math.min(anchor, cursor), Math.max(anchor, cursor), anchor > cursor ? 'backward' : 'forward')
 }
 
 export const editor = {

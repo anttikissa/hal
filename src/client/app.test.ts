@@ -354,12 +354,14 @@ test('Tab on a command asks the host to complete it; the answer fills the prompt
 	type('hello')
 	app.onKeys([key('tab')])
 	expect(sent).toEqual([])
-	app.onKeys(Array.from({ length: 5 }, () => key('backspace')))
+	// Elsewhere it is a literal tab.
+	expect(app.state.prompt.text).toBe('hello\t')
+	app.onKeys(Array.from({ length: 6 }, () => key('backspace')))
 	type('/cd ~/pro')
 	app.onKeys([key('tab')])
 	expect(sent).toEqual([{ type: 'complete', sessionId: 's1', text: '/cd ~/pro' }])
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: ['/cd ~/projects/', '/cd ~/projection/'] })
-	expect(app.state.prompt).toEqual({ text: '/cd ~/project', cursor: 13 })
+	expect(app.state.prompt).toMatchObject({ text: '/cd ~/project', cursor: 13 })
 	expect(app.view().notice).toContain('projection/')
 	expect(drafts.text('s1')).toBe('/cd ~/project')
 	// Typed on meanwhile: a late answer is dropped.
@@ -564,7 +566,7 @@ test('Up and Down browse the prompts sent; the draft stays the text being writte
 	type('mine')
 	drafted = []
 	up()
-	expect(app.view().prompt).toEqual({ text: 'second', cursor: 6 })
+	expect(app.view().prompt).toMatchObject({ text: 'second', cursor: 6 })
 	up()
 	expect(app.view().prompt.text).toBe('first')
 	// The oldest: Up goes to the start.
@@ -574,7 +576,7 @@ test('Up and Down browse the prompts sent; the draft stays the text being writte
 	expect(app.view().prompt.text).toBe('second')
 	expect(drafts.text('s1')).toBe('mine')
 	down()
-	expect(app.view().prompt).toEqual({ text: 'mine', cursor: 4 })
+	expect(app.view().prompt).toMatchObject({ text: 'mine', cursor: 4 })
 	expect(drafted).toEqual([])
 })
 

@@ -243,10 +243,12 @@ function completed(event: Event & { type: 'completions' }): void {
 }
 
 // Puts `text` in the prompt, unless it is there already (the cursor
-// stays where the user left it).
+// stays where the user left it); a selection goes.
 function setPrompt(text: string): void {
 	let st = app.state
-	if (st.prompt.text !== text) st.prompt = { ...st.prompt, text, cursor: text.length }
+	if (st.prompt.text === text) return
+	let { anchor: _, typed: _t, ...rest } = st.prompt
+	st.prompt = { ...rest, text, cursor: text.length }
 }
 
 function onKeys(events: KeyEvent[]): void {
@@ -282,7 +284,7 @@ function onKeys(events: KeyEvent[]): void {
 		}
 		if (promptKeys.edit(st, k, app.send)) continue
 		// Tab at the end of a slash command: the host completes it.
-		let tab = k.key === 'tab' && !k.shift && st.transcript && st.prompt.cursor === st.prompt.text.length
+		let tab = k.key === 'tab' && !k.shift && st.transcript && st.prompt.cursor === st.prompt.text.length && !prompt.selection(st.prompt)
 		let complete = tab && completion.request(st.transcript!.meta.id, st.prompt.text)
 		if (complete) {
 			app.send(complete)

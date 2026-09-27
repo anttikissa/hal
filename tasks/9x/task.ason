@@ -4,12 +4,12 @@
 Undo and redo: Ctrl-/, Cmd-Z and Cmd-U undo, the same with Shift redo. Each edit is one step, except that consecutive typed characters form one step, which any other key ends; at most 200 steps; a step restores text, cursor and selection. The stacks belong to the session's editor state and are cleared by sending.
 Tab: at the end of a slash command Tab asks for completion as now. Otherwise Tab inserts a literal tab; with a selection it indents every line the selection touches with one tab (a line touched only at its first column by the selection end is left out, unless the cursor rests there), and the selection grows to include the inserted tab of its first line. Shift-Tab removes one level (a tab, one to four spaces, or up to three spaces and a tab) from the selected lines or the current line.
 Web: the textarea's selection is the editor's selection and its undo stays native (edits Hal makes go through the write-back chosen in task 1x). Tab and Shift-Tab are taken only for completion or when a selection spans lines; otherwise they move focus as usual, so the page stays keyboard-accessible.`,
-	status: 'planned',
-	needs: [
-		'91'
-	],
+	status: 'done',
+	needs: ['91'],
 	notes: [
 		"old-prompt.test.ts (task 1x) covers indentation: 'tab indents selected rows and includes the first inserted tab in the selection', 'tab excludes a row touched only by the selection endpoint', 'tab indents a row the cursor rests on at column 0', 'shift-tab deindents selected rows by one four-column level', 'shift-tab deindents the current logical row without a selection', 'selected tabs render as styled spaces through the next tab stop'.",
-		'Cmd-keys reach a terminal only through the kitty keyboard protocol and only if the terminal does not use them itself; Ctrl-/ is the undo that works everywhere.'
+		'Cmd-keys reach a terminal only through the kitty keyboard protocol and only if the terminal does not use them itself; Ctrl-/ is the undo that works everywhere.',
+		'Done in src/common/prompt.ts (PromptState.anchor; step wraps apply with undo) and src/common/prompt-undo.ts (undo/redo stacks, `typed` flag groups typed characters). Undo steps are recorded generically: any key whose result changes the text is one step, so new edit keys get undo for free. Kills (Ctrl-K/U, Alt-D) ignore a selection and act from the cursor, dropping it. Text Hal puts in the prompt (app.setPrompt for completions and synced drafts, recall, amend) drops the selection but is not an undo step.',
+		'Terminal: Tab completes only with no selection. Web: Target carries `anchor` (the far end of the textarea selection) instead of `selected`; editor.write sets the selection back with its direction.'
 	]
 }

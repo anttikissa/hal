@@ -48,8 +48,9 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 function target(e: KeyboardEvent): Target {
 	let t = e.target
 	if (t instanceof HTMLTextAreaElement) {
-		let cursor = t.selectionDirection === 'backward' ? t.selectionStart : t.selectionEnd
-		return { kind: 'message', text: t.value, cursor, selected: t.selectionStart !== t.selectionEnd, write: (edit, at) => editor.write(t, edit, at) }
+		let back = t.selectionDirection === 'backward'
+		let [cursor, anchor] = back ? [t.selectionStart, t.selectionEnd] : [t.selectionEnd, t.selectionStart]
+		return { kind: 'message', text: t.value, cursor, anchor, write: (edit, at, from) => editor.write(t, edit, at, from) }
 	}
 	if (t instanceof HTMLInputElement) return { kind: 'field' }
 	if (t instanceof HTMLButtonElement) return { kind: 'button', submits: t.type === 'submit' }

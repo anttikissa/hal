@@ -132,3 +132,18 @@ test('step does not mutate its input state', () => {
 function key(name: string): KeyEvent {
 	return { key: name, shift: false, alt: false, ctrl: false, cmd: false }
 }
+
+describe('selection, undo and tab from terminal bytes', () => {
+	const SHIFT_LEFT = '\x1b[1;2D'
+	test('Shift-arrows select, typing replaces, Ctrl-/ undoes', () => {
+		expect(run(`abc${SHIFT_LEFT}${SHIFT_LEFT}x`).shown).toBe('ax|')
+		expect(run(`abc${SHIFT_LEFT}${SHIFT_LEFT}x\x1f`).shown).toBe('a|bc')
+		// Kitty: Ctrl-Shift-/ redoes, Cmd-A selects all.
+		expect(run(`ab${BS}\x1f\x1b[47;6u`).shown).toBe('a|')
+		expect(run(`ab\x1b[97;9ux`).shown).toBe('x|')
+	})
+	test('Tab inserts a tab; Shift-Tab takes it back out', () => {
+		expect(run('a\tb').shown).toBe('a\tb|')
+		expect(run('\tab\x1b[Z').shown).toBe('ab|')
+	})
+})

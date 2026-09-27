@@ -34,11 +34,12 @@ import { view, type ViewState } from './view.ts'
 export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string }
 
 // Where a key was pressed: the message box (its text, the caret, and
-// `write`, which edits the box natively; `selected`: text is selected), a text field of the open
+// `write`, which edits the box natively and leaves the selection from
+// `anchor` to `cursor`; `anchor`: the selection's other end), a text field of the open
 // question, a button (`submits`: a form's submit button), or anywhere
 // else.
 export type Target =
-	| { kind: 'message'; text: string; cursor: number; selected?: boolean; write?: (edit: Splice, cursor: number) => void }
+	| { kind: 'message'; text: string; cursor: number; anchor?: number; write?: (edit: Splice, cursor: number, anchor: number) => void }
 	| { kind: 'field' }
 	| { kind: 'button'; submits: boolean }
 	| { kind: 'other' }
@@ -208,13 +209,17 @@ function key(e: KeyInput, target: Target): boolean {
 		return false
 	}
 	if (target.kind !== 'message') return false
-	if (plain && !target.selected && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && app.recall(e.key === 'ArrowUp' ? -1 : 1, target)) return true
+	let sel = target.anchor === undefined ? '' : st.text.slice(Math.min(target.anchor, target.cursor), Math.max(target.anchor, target.cursor))
+	if (plain && !sel && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && app.recall(e.key === 'ArrowUp' ? -1 : 1, target)) return true
 	if (k && editor.routed(k)) return app.edit(k, target)
 	let complete = e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && view.complete(st.view, st.text)
 	if (complete) {
 		connection.send(complete)
 		return true
 	}
+	// Tab and Shift-Tab indent a selection across lines; else they move
+	// focus, keeping the page keyboard-accessible.
+	if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && sel.includes('\n')) return app.edit({ key: 'tab', shift: e.shiftKey }, target)
 	if (e.key !== 'Enter' || e.shiftKey) return false
 	app.send(e.altKey)
 	return true
@@ -224,9 +229,10 @@ function key(e: KeyInput, target: Target): boolean {
 // on its text and caret, written back as a native edit.
 function edit(k: Key, target: Extract<Target, { kind: 'message' }>): boolean {
 	let st = app.state
-	let { state } = prompt.step({ text: st.text, cursor: target.cursor, kill: st.kill }, k)
+	let at = { text: st.text, cursor: target.cursor, kill: st.kill }
+	let { state } = prompt.step(target.anchor === undefined ? at : { ...at, anchor: target.anchor }, k)
 	st.kill = state.kill
-	if (state.text !== st.text) target.write?.(editor.splice(st.text, state.text), state.cursor)
+	if (state.text !== st.text) target.write?.(editor.splice(st.text, state.text), state.cursor, state.anchor ?? state.cursor)
 	app.input(state.text)
 	return true
 }
@@ -241,7 +247,7 @@ function recallKey(dir: -1 | 1, target: Extract<Target, { kind: 'message' }>): b
 	let id = t.meta.id
 	let shown = recall.step(id, recall.entries(t), st.text, target.cursor, dir, Infinity, drafts.text(id))
 	if (!shown) return false
-	target.write?.(editor.splice(st.text, shown.text), shown.cursor)
+	target.write?.(editor.splice(st.text, shown.text), shown.cursor, shown.cursor)
 	app.input(shown.text)
 	return true
 }

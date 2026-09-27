@@ -4,20 +4,30 @@
 
 import { ansi } from './ansi.ts'
 import { promptLayout } from '../common/prompt-layout.ts'
-import type { PromptState } from '../common/prompt.ts'
+import { prompt, type PromptState } from '../common/prompt.ts'
 import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
 
 /**
  * Lay out prompt text in rows of `width` columns, as Up/Down see it
  * (common/prompt-layout.ts), tabs drawn as spaces, and find the row and
- * column of the cursor offset.
+ * column of the cursor offset. The selection `sel` shows in reverse
+ * video; a selected tab is reverse spaces to its stop.
  */
-function layoutPrompt(text: string, cursor: number, width: number): { rows: string[]; row: number; col: number } {
+function layoutPrompt(text: string, cursor: number, width: number, sel?: { start: number; end: number }): { rows: string[]; row: number; col: number } {
 	let list = promptLayout.rows(text, width)
 	let clean = ansi.clean(text)
 	// A tab or wide glyph alone on a row narrower than itself is cut.
-	let rows = list.map((r) => strings.sliceVisual(strings.expandTabs(clean.slice(r.start, r.end)), 0, width))
+	let rows = list.map((r) => {
+		let raw = clean.slice(r.start, r.end)
+		let row = strings.sliceVisual(strings.expandTabs(raw), 0, width)
+		let lo = sel ? Math.max(sel.start, r.start) - r.start : 0
+		let hi = sel ? Math.min(sel.end, r.end) - r.start : 0
+		if (lo >= hi) return row
+		// Tab stops count from the row's start, so expanded prefixes line up.
+		let [a, b] = [lo, hi].map((i) => Math.min(row.length, strings.expandTabs(raw.slice(0, i)).length))
+		return row.slice(0, a) + ansi.INVERSE + row.slice(a, b) + ansi.UNINVERSE + row.slice(b)
+	})
 	let at = promptLayout.position(text, list, cursor)
 	return { rows, row: at.row, col: Math.min(at.col, width) }
 }
@@ -37,7 +47,7 @@ function box(
 	placeholder?: string,
 ): { above?: string; rows: string[]; below?: string; row: number; col: number; scroll: number } {
 	let textWidth = Math.max(1, width - promptView.FIRST.length)
-	let p = promptView.layoutPrompt(st.text, st.cursor, textWidth)
+	let p = promptView.layoutPrompt(st.text, st.cursor, textWidth, prompt.selection(st))
 	let height = st.rows ?? promptLayout.autoHeight(p.rows.length, settings.promptRows())
 	let vp = promptLayout.viewport(st.scroll ?? 0, height, p.rows.length, p.row)
 	let shown = promptView.mark(p.rows).slice(vp.top, vp.top + height)

@@ -6,6 +6,7 @@ import type { Item, Transcript } from '../common/transcript.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
 import { settings } from '../common/settings.ts'
 import { frame, type Frame, type View } from './frame.ts'
+import { promptView } from './prompt-view.ts'
 
 const DIM = '\x1b[2m'
 
@@ -252,5 +253,15 @@ describe('prompt box', () => {
 		expect(f.lines[0]).not.toContain('\t')
 		expect(plain(f.lines)).toEqual(['> ab  c'])
 		expect(f.cursor.col).toBe(3 + 4)
+	})
+
+	test('the selection shows in reverse video, a selected tab as spaces to its stop', () => {
+		let row = (st: PromptState, cols = 40) => promptView.box(st, cols).rows
+		expect(row({ text: 'a\tb', cursor: 2, anchor: 1 })).toEqual(['> a\x1b[7m   \x1b[27mb'])
+		expect(row({ text: '\tone\n\ttwo\nthree', cursor: 8, anchor: 0 })).toEqual(['> \x1b[7m    one\x1b[27m', '  \x1b[7m    tw\x1b[27mo', '  three'])
+		// Across a wrapped row, and ending inside the box's width.
+		let wrapped = row({ text: 'abcdef', cursor: 0, anchor: 6 }, 2 + 3)
+		expect(wrapped).toEqual(['> \x1b[7mabc\x1b[27m', '  \x1b[7mdef\x1b[27m'])
+		expect(row({ text: 'abc', cursor: 1, anchor: 1 })).toEqual(['> abc'])
 	})
 })
