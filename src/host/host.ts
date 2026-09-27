@@ -21,6 +21,7 @@ import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
 import { config } from './config.ts'
 import { diag } from './diag.ts'
+import { busy } from './busy.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { pages } from './pages.ts'
@@ -290,6 +291,7 @@ function reset(): void {
 	pages.reset()
 	host.state.done.clear()
 	tabs.reset()
+	busy.reset()
 	drafts.reset()
 	host.state.pauseOnExit = false
 }

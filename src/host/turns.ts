@@ -8,9 +8,11 @@ import { forms, type Answers, type Form } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states, type StateEvent } from '../common/states.ts'
+import { existsSync } from 'fs'
 import { approval } from './approval.ts'
 import { auth } from './auth.ts'
 import { blobs } from './blobs.ts'
+import { busy } from './busy.ts'
 import { clock } from './clock.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
@@ -20,6 +22,8 @@ import { synthetic } from './synthetic.ts'
 import { systemPrompt } from './system-prompt.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
+import { pages } from './pages.ts'
+import { tabs } from './tabs.ts'
 import { prompts } from './prompts.ts'
 import { status } from './status.ts'
 
@@ -92,17 +96,21 @@ function stop(id: string, reason?: string): string | undefined {
 // progress it is paused with a reason instead. An idle session whose
 // inbox still holds queued messages (the host died between a turn end
 // and the next queued prompt) runs the oldest, as prompts.next would have.
+//
+// It costs what the open tabs and busy sessions (busy.ts) cost, never
+// what is on disk: only their marks (pages.ts) are read, and a whole
+// history only for a session with work left.
 async function recover(): Promise<void> {
-	for (let listing of sessions.list()) {
-		let id = listing.id
-		if (!listing.meta || turns.state.running.has(id)) continue
-		let tail = replay.withoutCommands(history.tail(id))
-		let last = tail.at(-1)
-		if (!last) continue
-		// Only the tail is read (all histories would be slow): a queued
-		// message older than both it and the last prompt in it is missed.
-		let queued = last.type === 'turn_end' && last.status === 'completed' && (tail.some((r) => r.type === 'inbox' && r.queue) || !tail.some((r) => r.type === 'user'))
-		if (last.type === 'turn_end' && !queued) continue
+	for (let id of new Set([...tabs.file().open, ...busy.list()])) {
+		if (turns.state.running.has(id)) continue
+		if (!existsSync(history.file(id))) {
+			busy.drop(id)
+			continue
+		}
+		if (!turns.leftWork(id)) {
+			busy.drop(id)
+			continue
+		}
 		try {
 			await (host.ready(id) ?? Promise.resolve())
 		} catch (e: any) {
@@ -125,6 +133,21 @@ async function recover(): Promise<void> {
 		history.append(id, { type: 'continue' })
 		turns.start(id)
 	}
+}
+
+// Whether a session may have a turn to continue or a queued message to
+// run, from its marks alone: its last turn record is no end, or a queued
+// message waits after a completed turn (or before any turn).
+function leftWork(id: string): boolean {
+	let m = pages.marks(id)
+	let path = history.file(id)
+	let last = m.turn === undefined ? undefined : pages.lineAt(path, m.turn).record
+	if (last && last.type !== 'turn_end') return true
+	if (last && last.status !== 'completed') return false
+	return Object.values(m.inbox).some((at) => {
+		let r = pages.lineAt(path, at).record
+		return r.type === 'inbox' && r.queue === true
+	})
 }
 
 // Runs one turn and always ends it. A turn is every provider round from
@@ -301,6 +324,7 @@ export const turns = {
 	start,
 	stop,
 	recover,
+	leftWork,
 	runTurn,
 	parkedUsage,
 	waitOut,

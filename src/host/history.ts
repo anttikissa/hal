@@ -12,6 +12,7 @@ import { ason } from '../common/ason.ts'
 import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock, type Turn, type Usage, type UserBlock } from '../common/blocks.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { blobs } from './blobs.ts'
+import { busy } from './busy.ts'
 import { diag } from './diag.ts'
 import { pages } from './pages.ts'
 import { paths } from './paths.ts'
@@ -43,11 +44,15 @@ function file(id: string): string {
 	return `${paths.sessionDir(id)}/history.asonl`
 }
 
+// Keeps the busy list (busy.ts) in step: joined before the record that
+// may leave work, left after a turn end with an empty inbox.
 function append(id: string, record: NewRecord): void {
 	let full = { ...record, ts: new Date().toISOString() } as HistoryRecord
 	let line = ason.stringifyLine(full)
+	if (busy.starts(full)) busy.add(id)
 	appendFileSync(history.file(id), line)
 	pages.note(id, line, full)
+	if (full.type === 'turn_end' && !Object.keys(pages.marks(id).inbox).length) busy.drop(id)
 }
 
 // `command`: the client's id for the submit, so a resend is recognised.
@@ -114,37 +119,11 @@ function lastByte(path: string): number | undefined {
 	}
 }
 
-// The last records, oldest first: every whole line in the file's last
-// 64 KiB, or the whole history if the last line is longer (or cut off),
-// so a new host can check every session cheaply.
-function tail(id: string): HistoryRecord[] {
-	let path = history.file(id)
-	if (!existsSync(path)) return []
-	let size = statSync(path).size
-	let fd = openSync(path, 'r')
-	let text: string
-	try {
-		let buf = Buffer.alloc(Math.min(size, 65536))
-		readFd(fd, buf, 0, buf.length, size - buf.length)
-		text = buf.toString('utf8')
-	} finally {
-		closeSync(fd)
-	}
-	let lines = text.split('\n').filter((l) => l.trim())
-	if (size > 65536) lines.shift()
-	let out: HistoryRecord[] = []
-	try {
-		for (let line of lines) out.push(history.check(ason.parse(line)))
-	} catch {
-		return history.readSync(id)
-	}
-	return out.length ? out : history.readSync(id)
-}
-
-// True if the last turn has no end record.
+// True if the last turn has no end record. Reads the marks (pages.ts),
+// not the history, so it costs the same however long the session is.
 function unfinished(id: string): boolean {
-	let last = replay.withoutCommands(history.tail(id)).at(-1)
-	return last !== undefined && last.type !== 'turn_end'
+	let at = pages.marks(id).turn
+	return at !== undefined && pages.lineAt(history.file(id), at).record.type !== 'turn_end'
 }
 
 // Opens the session and repairs its history so appends land cleanly:
@@ -305,7 +284,6 @@ export const history = {
 	lastByte,
 	read,
 	readSync,
-	tail,
 	unfinished,
 	open,
 	messages,
