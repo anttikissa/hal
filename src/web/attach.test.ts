@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
 import { settings } from '../common/settings.ts'
+import { config } from '../host/config.ts'
+import { paths } from '../host/paths.ts'
+import { web } from '../host/web.ts'
 import { app } from './app.ts'
 import { attach } from './attach.ts'
 
@@ -96,4 +101,36 @@ test('an image too large to send is refused before reading it', () => {
 	attach.files([new Blob([new Uint8Array(5 * 1024 * 1024 + 1)], { type: 'image/png' })], insert)
 	expect(attaches()).toEqual([])
 	expect(app.state.text).toContain('5 MB')
+})
+
+// What the page does on load (main.tsx): read the settings the host
+// wrote into it. The host and page share `settings` here, so the host's
+// config is dropped first.
+async function loadPage(): Promise<void> {
+	let html = await (await web.page()).text()
+	config.reset()
+	settings.load(/<script type="application\/json" id="settings">(.*?)<\/script>/s.exec(html)?.[1])
+}
+
+test('pasteLines from config.ason reaches the page and decides which paste attaches', async () => {
+	let savedHome = process.env.HAL_HOME
+	let home = mkdtempSync(`${tmpdir()}/hal-attach-`)
+	process.env.HAL_HOME = home
+	try {
+		let three = 'a\nb\nc'
+		config.init()
+		await loadPage()
+		expect(attach.paste(clip([], three), insert)).toBe(false)
+		writeFileSync(paths.configFile(), '{ pasteLines: 2 }\n')
+		config.init()
+		await loadPage()
+		expect(attach.paste(clip([], three), insert)).toBe(true)
+		await tick()
+		expect(Buffer.from(attaches()[0].data, 'base64').toString()).toBe(three)
+	} finally {
+		config.reset()
+		if (savedHome === undefined) delete process.env.HAL_HOME
+		else process.env.HAL_HOME = savedHome
+		rmSync(home, { recursive: true, force: true })
+	}
 })

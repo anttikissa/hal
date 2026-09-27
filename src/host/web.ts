@@ -143,7 +143,7 @@ async function page(): Promise<Response> {
 		diag.log(`${e?.message ?? e}: ${e?.errors?.join('\n') ?? ''}`)
 		return new Response('the web client failed to build; see diag.log\n', { status: 500 })
 	}
-	html = html.replace('/*COLORS*/', () => web.css())
+	html = html.replace('/*COLORS*/', () => web.css()).replace('/*SETTINGS*/', () => settings.forPage())
 	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 }
 

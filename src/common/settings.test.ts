@@ -63,3 +63,16 @@ test('webUrl is an http(s) address links can carry; empty means localhost at web
 	settings.state.raw = { webUrl: 'https://h2.example/hal/' }
 	expect(settings.webUrl()).toBe('https://h2.example/hal')
 })
+
+test('the page gets only browser settings, and bad page JSON means defaults', () => {
+	settings.state.raw = { pasteLines: 3, model: 'secret/not-for-page' }
+	let json = settings.forPage()
+	expect(json).not.toContain('model')
+	settings.state.raw = {}
+	settings.load(json)
+	expect(settings.pasteLines()).toBe(3)
+	for (let bad of ['{', '[1]', 'null', '', undefined]) {
+		settings.load(bad)
+		expect(settings.pasteLines()).toBe(settings.check({}).values.pasteLines as number)
+	}
+})

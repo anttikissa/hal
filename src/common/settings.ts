@@ -13,7 +13,9 @@ export type SettingType =
 	| { kind: 'integer'; min: number; max: number }
 	| { kind: 'choice'; options: string[] }
 
-export type Setting = { name: string; type: SettingType; default: unknown; description: string }
+// `browser`: the web page needs it too, so the host writes it into the
+// page it serves (host/web.ts); the page reads it with settings.load.
+export type Setting = { name: string; type: SettingType; default: unknown; description: string; browser?: true }
 
 const table: Setting[] = [
 	{ name: 'model', type: { kind: 'text' }, default: 'anthropic/claude-opus-5-5', description: 'Default model (provider/id) for new sessions.' },
@@ -28,12 +30,14 @@ const table: Setting[] = [
 		type: { kind: 'integer', min: 1, max: 100 },
 		default: 10,
 		description: 'Rows the terminal prompt box shows before it scrolls.',
+		browser: true,
 	},
 	{
 		name: 'pasteLines',
 		type: { kind: 'integer', min: 1, max: 10000 },
 		default: 7,
 		description: 'Pasted text longer than this many lines becomes an attachment.',
+		browser: true,
 	},
 	{
 		name: 'maxRounds',
@@ -89,12 +93,34 @@ function value(name: string): unknown {
 	return settings.check(settings.state.raw).values[name]
 }
 
+// The effective values of the settings marked `browser`, as the JSON the
+// host puts in the page, with < escaped so it cannot end the script.
+function forPage(): string {
+	let values = settings.check(settings.state.raw).values
+	let out = Object.fromEntries(settings.table.filter((s) => s.browser).map((s) => [s.name, values[s.name]]))
+	return JSON.stringify(out).replaceAll('<', '\\u003c')
+}
+
+// The page's side of forPage: `json` becomes the raw settings, checked
+// like config.ason; unreadable JSON means defaults.
+function load(json: string | null | undefined): void {
+	let raw: unknown
+	try {
+		raw = JSON.parse(json || '{}')
+	} catch {
+		raw = {}
+	}
+	settings.state.raw = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+}
+
 export const settings = {
 	// The parsed config file (a live object on the host); {} means defaults.
 	state: { raw: {} as Record<string, unknown> },
 	table,
 	check,
 	value,
+	forPage,
+	load,
 	warnings: (): string[] => settings.check(settings.state.raw).warnings,
 	model: (): string => settings.value('model') as string,
 	security: (): 'best-effort' | 'none' => settings.value('security') as 'best-effort' | 'none',

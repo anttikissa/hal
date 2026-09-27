@@ -1,7 +1,13 @@
 {
 	title: 'The web page gets config settings when it loads',
 	description: "Settings the browser needs (at least pasteLines and promptRows; whatever the settings table marks for the browser) come from the host's config.ason, not browser defaults (questions.md item 62). The host puts them in the page it serves, as a JSON script element written per request, and the page reads them before its first render; a config change reaches a page when it next loads. The WebSocket stays for short realtime messages, not bootstrap data. Tests: a changed pasteLines in config.ason decides which web paste becomes an attachment.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Settings rows carry `browser: true`; settings.forPage() is their JSON (< escaped as \\u003c) and settings.load(text) is the page's side, checked like config.ason, bad JSON meaning defaults. host/web.ts page() swaps /*SETTINGS*/ in index.html's <script type=application/json id=settings> per request, after the build, so the cached bundle and its version hash never depend on config.",
+		'The placeholder must sit before the /*APP*/ script: String.replace swaps only the first match and the minified bundle could contain the same text.',
+		"The test (src/web/attach.test.ts) runs host and page in one process sharing `settings`, so it calls config.reset() before settings.load to drop the host's live file; the browser has no such sharing.",
+		'The web Composer does not use promptRows yet (it grows to 40% of the window); it is sent because the task names it.'
+	],
 	needs: [],
 	foldInto: ['zc', 'pc']
 }
