@@ -61,7 +61,7 @@ afterEach(() => {
 	rmSync(home, { recursive: true, force: true })
 })
 
-const ctx = { sessionId: 's', cwd: '/tmp', model: 'opencode-go/m', setCwd() {}, setModel() {} }
+const ctx = { sessionId: 's', cwd: '/tmp', model: 'opencode-go/m', setCwd() {}, setModel() {}, say() {} }
 const file = () => `${home}/auth.ason`
 
 async function send(sessionId?: string): Promise<{ events: string[]; message?: string }> {

@@ -68,7 +68,7 @@ afterEach(() => {
 
 const file = () => `${home}/auth.ason`
 const disk = () => ason.parse(readFileSync(file(), 'utf8')) as any
-const ctx = { sessionId: 's', cwd: '/tmp', model: 'anthropic/m', setCwd() {}, setModel() {} }
+const ctx = { sessionId: 's', cwd: '/tmp', model: 'anthropic/m', setCwd() {}, setModel() {}, say() {} }
 
 // The code#state value the Claude page would show for the URL asked with.
 async function pastedCode(code = 'the-code'): Promise<string> {

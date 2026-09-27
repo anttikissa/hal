@@ -1,6 +1,7 @@
-// Anthropic credentials: this home's <home>/auth.ason (the old Hal's
-// file, single-entry or array shape, copied in or written by /login
-// claude: login.ts), then ANTHROPIC_API_KEY from the environment as the
+// Anthropic and OpenAI credentials: this home's <home>/auth.ason (the
+// old Hal's file, single-entry or array shape per provider, copied in or
+// written by /login claude or /login chatgpt: login.ts, login-chatgpt.ts),
+// then ANTHROPIC_API_KEY or OPENAI_API_KEY from the environment as the
 // last account, so a key alone needs no file. Read through liveFile;
 // an expired OAuth token is refreshed and written back to this home's
 // file only, 0600. ~/.hal/auth.ason is never read or written.
@@ -26,19 +27,38 @@ import { limits } from './limits.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
-export type Credential = { type: 'token' | 'api-key'; value: string; email?: string; account: string }
+// `accountId`: the ChatGPT account an OpenAI entry was saved with.
+export type Credential = { type: 'token' | 'api-key'; value: string; email?: string; account: string; accountId?: string }
 type Failure = 'auth' | 'temporary' | 'limited'
+// The providers whose logins live in the credentials file.
+export type Kind = 'anthropic' | 'openai'
 
 type Entry = Record<string, any>
 
 // Shared with the old Hal's /login claude (login.ts).
 export const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
+// The Codex CLI's, which the old Hal's /login chatgpt used too.
+export const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
 
 // What every message asking the user to log in says.
 export const LOG_IN = 'run /login claude or set ANTHROPIC_API_KEY'
+const LOG_INS: Record<Kind, string> = { anthropic: LOG_IN, openai: 'run /login chatgpt or set OPENAI_API_KEY' }
+const ENV: Record<Kind, string> = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY' }
 
-function tokenUrl(): string {
-	return 'https://console.anthropic.com/v1/oauth/token'
+function tokenUrl(kind: Kind = 'anthropic'): string {
+	return kind === 'openai' ? 'https://auth.openai.com/oauth/token' : 'https://console.anthropic.com/v1/oauth/token'
+}
+
+// A JWT's claims (OpenAI tokens carry the ChatGPT account and scopes);
+// null if it is not one. Never verified: only read for routing.
+export function jwtClaims(token: string): Record<string, any> | null {
+	try {
+		let part = token.split('.')[1]!
+		let v = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')))
+		return v && typeof v === 'object' ? v : null
+	} catch {
+		return null
+	}
 }
 
 // Refresh this long before expiry, so a token cannot lapse mid-request.
@@ -78,20 +98,20 @@ function store(): Entry {
 
 type Account = { entry: Entry; name: string; replace: (next: Entry) => void }
 
-// Every account in order: the file's (if there is one), then the
-// environment's key. Throws when there is none.
-function all(): { data: Entry; list: Account[] } {
+// Every account of `kind` in order: the file's (if there is one), then
+// the environment's key. Throws when there is none.
+function all(kind: Kind = 'anthropic'): { data: Entry; list: Account[] } {
 	let data = existsSync(paths.authFile()) ? auth.store() : {}
-	let list = auth.accounts(data)
-	let key = auth.envKey()
-	if (usable(key)) list.push({ entry: { apiKey: key }, name: 'ANTHROPIC_API_KEY', replace: () => {} })
-	if (!list.length) throw fail(`no anthropic login; ${LOG_IN}`)
+	let list = auth.accounts(data, kind)
+	let key = auth.envKey(kind)
+	if (usable(key)) list.push({ entry: { apiKey: key }, name: ENV[kind], replace: () => {} })
+	if (!list.length) throw fail(`no ${kind} login; ${LOG_INS[kind]}`)
 	return { data, list }
 }
 
-// Every anthropic entry in the file holding a credential, in order.
-function accounts(data: Entry): Account[] {
-	let raw = data.anthropic
+// Every entry of `kind` in the file holding a credential, in order.
+function accounts(data: Entry, kind: Kind = 'anthropic'): Account[] {
+	let raw = data[kind]
 	if (raw === undefined) return []
 	let list = Array.isArray(raw) ? raw : [raw]
 	let out: Account[] = []
@@ -99,11 +119,11 @@ function accounts(data: Entry): Account[] {
 		let entry = list[i]
 		if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue
 		if (!usable(entry.accessToken) && !usable(entry.apiKey)) continue
-		let replace = Array.isArray(raw) ? (next: Entry) => (raw[i] = next) : (next: Entry) => (data.anthropic = next)
+		let replace = Array.isArray(raw) ? (next: Entry) => (raw[i] = next) : (next: Entry) => (data[kind] = next)
 		let name = usable(entry.email) ? entry.email : `account ${i + 1}`
 		out.push({ entry, name, replace })
 	}
-	if (!out.length) throw fail('anthropic entry has no accessToken or apiKey')
+	if (!out.length) throw fail(`${kind} entry has no accessToken or apiKey`)
 	return out
 }
 
@@ -116,11 +136,11 @@ function fingerprint(entry: Entry): string {
 	return String(Bun.hash(`${entry.refreshToken ?? ''}\n${entry.accessToken ?? ''}\n${entry.apiKey ?? ''}`))
 }
 
-// A valid anthropic credential, refreshing an expired token first, from
+// A valid credential of `kind`, refreshing an expired token first, from
 // the first account neither broken nor limited for `model`. Concurrent
 // callers share one refresh.
-async function anthropic(model?: string): Promise<Credential> {
-	let { data, list } = auth.all()
+async function pick(kind: Kind, model?: string): Promise<Credential> {
+	let { data, list } = auth.all(kind)
 	let limitedUntil = Infinity
 	let problems: string[] = []
 	for (let account of list) {
@@ -129,13 +149,13 @@ async function anthropic(model?: string): Promise<Credential> {
 			problems.push(why)
 			continue
 		}
-		let until = model ? limits.until(limits.key(`anthropic/${model}`, account.name)) : 0
+		let until = model ? limits.until(limits.key(`${kind}/${model}`, account.name)) : 0
 		if (until) {
 			limitedUntil = Math.min(limitedUntil, until)
 			continue
 		}
 		try {
-			return await auth.credential(data, account)
+			return await auth.credential(data, account, kind)
 		} catch (e: any) {
 			if (e?.failure !== 'auth') throw e
 			auth.state.broken.set(fingerprint(account.entry), e.message)
@@ -143,40 +163,42 @@ async function anthropic(model?: string): Promise<Credential> {
 		}
 	}
 	if (limitedUntil < Infinity) {
-		throw Object.assign(fail(`every usable anthropic account is rate limited for ${model}`, 'limited'), { retryAt: limitedUntil })
+		throw Object.assign(fail(`every usable ${kind} account is rate limited for ${model}`, 'limited'), { retryAt: limitedUntil })
 	}
 	throw Object.assign(new Error(problems.join('; ')), { failure: 'auth' })
 }
 
-async function credential(data: Entry, { entry, name, replace }: Account): Promise<Credential> {
+async function credential(data: Entry, { entry, name, replace }: Account, kind: Kind = 'anthropic'): Promise<Credential> {
 	let email = typeof entry.email === 'string' ? entry.email : undefined
-	let account = name
-	if (!usable(entry.accessToken)) return { type: 'api-key', value: entry.apiKey, email, account }
-	if (entry.expires !== undefined && typeof entry.expires !== 'number') throw fail('anthropic expires is not a number')
+	let base = { email, account: name, ...(usable(entry.accountId) && { accountId: entry.accountId }) }
+	if (!usable(entry.accessToken)) return { type: 'api-key', value: entry.apiKey, ...base }
+	if (entry.expires !== undefined && typeof entry.expires !== 'number') throw fail(`${kind} expires is not a number`)
 	let stale = auth.state.stale.has(fingerprint(entry))
 	if (!stale && (entry.expires === undefined || clock.now() < entry.expires - auth.refreshMarginMs())) {
-		return { type: 'token', value: entry.accessToken, email, account }
+		return { type: 'token', value: entry.accessToken, ...base }
 	}
-	if (!usable(entry.refreshToken)) throw fail(`anthropic token ${stale ? 'rejected' : 'expired'} and there is no refreshToken; ${LOG_IN}`)
-	let pending = auth.state.refreshing.get(name)
+	if (!usable(entry.refreshToken)) throw fail(`${kind} token ${stale ? 'rejected' : 'expired'} and there is no refreshToken; ${LOG_INS[kind]}`)
+	let key = `${kind}:${name}`
+	let pending = auth.state.refreshing.get(key)
 	if (!pending) {
-		pending = auth.refresh(data, entry, replace).finally(() => auth.state.refreshing.delete(name))
-		auth.state.refreshing.set(name, pending)
+		pending = auth.refresh(data, entry, replace, kind).finally(() => auth.state.refreshing.delete(key))
+		auth.state.refreshing.set(key, pending)
 	}
-	return { type: 'token', value: await pending, email, account }
+	return { type: 'token', value: await pending, ...base }
 }
 
 // The API rejected the account's token (401). Refresh it once; if that
 // already happened lately, the login is broken.
-function rejected(name: string): void {
-	let account = auth.all().list.find((a) => a.name === name)
+function rejected(name: string, kind: Kind = 'anthropic'): void {
+	let account = auth.all(kind).list.find((a) => a.name === name)
 	if (!account) return
 	let fp = fingerprint(account.entry)
-	let last = auth.state.retried.get(name)
+	let key = `${kind}:${name}`
+	let last = auth.state.retried.get(key)
 	if (usable(account.entry.refreshToken) && (last === undefined || clock.now() - last > auth.retryRejectedMs())) {
-		auth.state.retried.set(name, clock.now())
+		auth.state.retried.set(key, clock.now())
 		auth.state.stale.add(fp)
-	} else auth.state.broken.set(fp, fail(`anthropic credentials for ${name} were rejected (401); ${LOG_IN}`).message)
+	} else auth.state.broken.set(fp, fail(`${kind} credentials for ${name} were rejected (401); ${LOG_INS[kind]}`).message)
 }
 
 // Resolves when the credentials file changes (appears, is replaced or
@@ -203,17 +225,19 @@ async function changed(signal?: AbortSignal): Promise<void> {
 	}
 }
 
-async function refresh(data: Entry, entry: Entry, replace: (next: Entry) => void): Promise<string> {
+async function refresh(data: Entry, entry: Entry, replace: (next: Entry) => void, kind: Kind = 'anthropic'): Promise<string> {
 	let res: Response
+	// OpenAI's is the Codex CLI's refresh request.
+	let request = kind === 'openai' ? { client_id: OPENAI_CLIENT_ID, grant_type: 'refresh_token', refresh_token: entry.refreshToken, scope: 'openid profile email' } : { grant_type: 'refresh_token', refresh_token: entry.refreshToken, client_id: CLIENT_ID }
 	try {
-		res = await fetch(auth.tokenUrl(), {
+		res = await fetch(auth.tokenUrl(kind), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: entry.refreshToken, client_id: CLIENT_ID }),
+			body: JSON.stringify(request),
 			signal: AbortSignal.timeout(auth.refreshTimeoutMs()),
 		})
 	} catch (e: any) {
-		throw fail(`anthropic token refresh failed: ${e?.name === 'TimeoutError' ? 'timed out' : (e?.message ?? e)}`, 'temporary')
+		throw fail(`${kind} token refresh failed: ${e?.name === 'TimeoutError' ? 'timed out' : (e?.message ?? e)}`, 'temporary')
 	}
 	let body: any = await res.json().catch(() => null)
 	if (!res.ok) {
@@ -222,15 +246,17 @@ async function refresh(data: Entry, entry: Entry, replace: (next: Entry) => void
 		// 4xx (invalid_grant): the refresh token is spent; only a new
 		// login fixes it. Anything else may pass.
 		let failure: Failure = res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429 ? 'auth' : 'temporary'
-		throw fail(`anthropic token refresh failed: HTTP ${res.status}${code}; if this persists, ${LOG_IN}`, failure)
+		throw fail(`${kind} token refresh failed: HTTP ${res.status}${code}; if this persists, ${LOG_INS[kind]}`, failure)
 	}
-	if (!usable(body?.access_token)) throw fail('anthropic token refresh returned no access token', 'temporary')
+	if (!usable(body?.access_token)) throw fail(`${kind} token refresh returned no access token`, 'temporary')
+	let accountId = jwtClaims(body.access_token)?.['https://api.openai.com/auth']?.chatgpt_account_id
 	let expiresIn = typeof body.expires_in === 'number' ? body.expires_in : 3600
 	replace({
 		...entry,
 		accessToken: body.access_token,
 		refreshToken: usable(body.refresh_token) ? body.refresh_token : entry.refreshToken,
 		expires: clock.now() + expiresIn * 1000,
+		...(kind === 'openai' && usable(accountId) && { accountId }),
 	})
 	// Write now, so a crash cannot lose a rotated refresh token.
 	liveFiles.save(data)
@@ -253,12 +279,15 @@ export const auth = {
 	pollMs: () => 2000,
 	// A rejected token is refreshed at most this often per account.
 	retryRejectedMs: () => 10 * 60_000,
-	// The environment's anthropic API key: the account after the file's.
-	envKey: (): string | undefined => process.env.ANTHROPIC_API_KEY,
+	// The environment's API key: the account after the file's.
+	envKey: (kind: Kind = 'anthropic'): string | undefined => process.env[ENV[kind]],
+	logIn: (kind: Kind): string => LOG_INS[kind],
 	store,
 	all,
 	accounts,
-	anthropic,
+	pick,
+	anthropic: (model?: string) => auth.pick('anthropic', model),
+	openai: (model?: string) => auth.pick('openai', model),
 	credential,
 	rejected,
 	changed,

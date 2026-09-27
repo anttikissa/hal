@@ -9,7 +9,7 @@
 // the code or a token: only HTTP statuses and sanitized error codes.
 
 import { existsSync } from 'fs'
-import { auth, CLIENT_ID } from './auth.ts'
+import { auth, CLIENT_ID, type Kind } from './auth.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
@@ -80,18 +80,20 @@ async function email(token: string): Promise<string | undefined> {
 	}
 }
 
-// Adds the login to this home's credentials file, replacing the entry
-// with the same email; creates the file (0600) if there is none.
-function save(entry: Entry): void {
+// Adds the login to this home's credentials file as a `kind` account,
+// replacing the entry with the same identity (anthropic: email, openai:
+// ChatGPT accountId); creates the file (0600) if there is none.
+function save(entry: Entry, kind: Kind = 'anthropic'): void {
 	let path = paths.authFile()
 	let created = !existsSync(path)
 	let data: Entry = created ? liveFiles.liveFile(path, {}, { mode: 0o600, watch: false }) : auth.store()
-	let old = data.anthropic
+	let old = data[kind]
 	let list: Entry[] = old === undefined ? [] : Array.isArray(old) ? old : [old]
-	let same = entry.email ? list.findIndex((e) => e?.email === entry.email) : -1
+	let id = kind === 'openai' ? 'accountId' : 'email'
+	let same = entry[id] ? list.findIndex((e) => e?.[id] === entry[id]) : -1
 	if (same >= 0) list[same] = { ...list[same], ...entry }
 	else list.push(entry)
-	data.anthropic = list.length === 1 ? list[0] : list
+	data[kind] = list.length === 1 ? list[0] : list
 	liveFiles.save(data)
 	if (created) liveFiles.close(data)
 }

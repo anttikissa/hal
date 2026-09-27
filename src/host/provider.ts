@@ -43,9 +43,12 @@ export type Provider = {
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
 	// The model names it offers (without "provider/"), for the picker.
 	models?(signal: AbortSignal): Promise<string[]>
-	// Built-in model names, offered when neither the provider's own list
-	// nor the models.dev cache has any.
+	// Built-in model names, offered beside the models.dev cache's when
+	// the provider's own list is unavailable.
 	known?(): string[]
+	// Input tokens `model` takes here, when the account caps it below
+	// what models.dev says (a ChatGPT subscription).
+	contextWindow?(model: string): number | undefined
 }
 
 class Cancelled extends Error {}

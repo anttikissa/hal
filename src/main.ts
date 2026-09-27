@@ -19,6 +19,7 @@ import { host } from './host/host.ts'
 import { modelsDev } from './host/models-dev.ts'
 import { sessions } from './host/sessions.ts'
 import { turns } from './host/turns.ts'
+import { openai } from './host/openai.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
 import { server } from './host/server.ts'
@@ -64,6 +65,7 @@ function init(): void {
 	paths.init()
 	host.init()
 	anthropic.init()
+	openai.init()
 	openaiCompat.init()
 	// Piped stdin (tests, scripts) has no raw mode and no emergency keys.
 	if (terminal.available()) {

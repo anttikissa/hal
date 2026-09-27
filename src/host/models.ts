@@ -5,9 +5,9 @@
 // here: every registered provider, plus Hal's synthetic models. A
 // provider that can list its models is asked, at most once per ttlMs;
 // one that cannot, or fails or is slow (asked again next time), gets
-// its list from the models.dev cache (task qq), and failing that its
-// built-in one.
+// its list from the models.dev cache (task qq) plus its built-in one.
 
+import { blocks } from '../common/blocks.ts'
 import { settings } from '../common/settings.ts'
 import { diag } from './diag.ts'
 import { modelsDev } from './models-dev.ts'
@@ -24,9 +24,13 @@ async function fetchList(name: string): Promise<string[] | undefined> {
 	if (cached && Date.now() - cached.at < models.ttlMs()) return cached.ids
 	let own = p.models ? await models.ask(name, (signal) => p.models!(signal)) : undefined
 	if (own) return own
-	let fallback = modelsDev.ids(name)
-	if (!fallback.length) fallback = p.known?.() ?? []
+	let fallback = models.fallback(name)
 	return fallback.length ? fallback.map((m) => `${name}/${m}`) : undefined
+}
+
+// models.dev's ids for provider `name`, then its built-in ones.
+function fallback(name: string): string[] {
+	return [...new Set([...modelsDev.ids(name), ...(provider.state.providers[name]?.known?.() ?? [])])]
 }
 
 // The provider's own list, or undefined if it failed or took too long.
@@ -57,13 +61,12 @@ async function list(current: string): Promise<string[]> {
 }
 
 // The ids known without asking anyone: synthetic ones, and each
-// provider's cached list, else its models.dev or built-in one.
+// provider's cached list, else its models.dev and built-in ones.
 function known(): string[] {
-	let lists = Object.entries(provider.state.providers).map(([name, p]) => {
+	let lists = Object.keys(provider.state.providers).map((name) => {
 		let ids = models.state.lists.get(name)?.ids
 		if (ids) return ids
-		let fallback = modelsDev.ids(name)
-		return (fallback.length ? fallback : (p.known?.() ?? [])).map((m) => `${name}/${m}`)
+		return models.fallback(name).map((m) => `${name}/${m}`)
 	})
 	return [...Object.keys(synthetic.models).map((m) => `hal/${m}`), ...lists.flat()]
 }
@@ -103,7 +106,12 @@ export const models = {
 	list,
 	names,
 	// Tokens `id` can take in, if known: for the context meter.
-	contextWindow: (id: string): number | undefined => modelsDev.contextWindow(id),
+	contextWindow(id: string): number | undefined {
+		let parsed = blocks.parseModelId(id)
+		let own = parsed && provider.state.providers[parsed.provider]?.contextWindow?.(parsed.model)
+		return own ?? modelsDev.contextWindow(id)
+	},
+	fallback,
 	known,
 	valid,
 }

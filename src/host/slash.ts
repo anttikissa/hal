@@ -37,6 +37,7 @@ function context(id: string): Context {
 		model: meta.model,
 		setCwd: (cwd) => slash.change(id, { cwd }),
 		setModel: (model) => slash.change(id, { model }),
+		say: (text) => slash.output(id, text),
 	}
 }
 

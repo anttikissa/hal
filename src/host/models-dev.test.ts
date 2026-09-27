@@ -104,7 +104,7 @@ test('a corrupt cache is an error naming its file', () => {
 	expect(() => modelsDev.ids('anthropic')).toThrow(modelsDev.file())
 })
 
-test('the picker lists a provider’s own models first, else models.dev, else its built-in ones', async () => {
+test('the picker lists a provider’s own models first, else models.dev plus its built-in ones', async () => {
 	provider.state.providers = {
 		anthropic: fake(async () => ['claude-own-3'], ['claude-builtin-1']),
 		openrouter: fake(),
@@ -124,7 +124,7 @@ test('the picker lists a provider’s own models first, else models.dev, else it
 		throw new Error('invalid_grant')
 	}, ['claude-builtin-1'])
 	models.state.lists.clear()
-	expect((await models.fetchList('anthropic'))?.sort()).toEqual(['anthropic/claude-big-2', 'anthropic/claude-old-1'])
+	expect((await models.fetchList('anthropic'))?.sort()).toEqual(['anthropic/claude-big-2', 'anthropic/claude-builtin-1', 'anthropic/claude-old-1'])
 	// Completion knows them without asking anyone.
 	expect(models.known()).toEqual(expect.arrayContaining(['anthropic/claude-old-1', 'openrouter/acme/solo-1', 'broken/builtin-1']))
 	expect(existsSync(modelsDev.file())).toBe(true)
