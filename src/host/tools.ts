@@ -16,8 +16,10 @@ import { readdirSync } from 'fs'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import type { ToolDef } from './provider.ts'
 
-// `sessionId`: the session whose turn runs the call.
-export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string }
+// `sessionId`: the session whose turn runs the call. `endTurn`: the
+// turn ends once this round's results are in, unless messages wait to
+// be read (the wait tool).
+export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string; endTurn?: () => void }
 
 // One file per tool in src/host/tools/, named like it (read.ts is
 // read), exporting `tool`, so adding a tool touches nothing else.

@@ -12,7 +12,6 @@ import { session } from '../../common/session.ts'
 import { host } from '../host.ts'
 import { paths } from '../paths.ts'
 import { prompts } from '../prompts.ts'
-import { sessions } from '../sessions.ts'
 import { tabs } from '../tabs.ts'
 import type { Tool } from '../tools.ts'
 
@@ -20,13 +19,6 @@ import type { Tool } from '../tools.ts'
 function target(to: string): string | undefined {
 	if (/^\d+$/.test(to)) return tabs.file().open[Number(to) - 1]
 	return session.isId(to) && existsSync(`${paths.sessionDir(to)}/session.ason`) ? to : undefined
-}
-
-// A session as people and models tell it apart: tab, id and name.
-function label(id: string): string {
-	let tab = tabs.file().open.indexOf(id)
-	let name = sessions.open(id).name
-	return [...(tab < 0 ? [] : [`tab ${tab + 1}`]), id, ...(name ? [name] : [])].join(' · ')
 }
 
 export const tool: Tool = {
@@ -54,10 +46,10 @@ export const tool: Tool = {
 		if (!id) throw new Error(`no session ${to}`)
 		if (id === ctx.sessionId) throw new Error('cannot send to this session itself')
 		await (host.ready(id) ?? Promise.resolve())
-		let sender: Sender = { from: ctx.sessionId, label: label(ctx.sessionId) }
+		let sender: Sender = { from: ctx.sessionId, label: tabs.label(ctx.sessionId) }
 		if (!steer && !queue) sender.advisory = true
 		let refused = prompts.submit(id, text, undefined, queue === true, sender)
 		if (refused) throw new Error(refused)
-		return `Sent to ${label(id)}`
+		return `Sent to ${tabs.label(id)}`
 	},
 }

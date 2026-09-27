@@ -27,6 +27,7 @@ import { pages } from './pages.ts'
 import { tabs } from './tabs.ts'
 import { prompts } from './prompts.ts'
 import { status } from './status.ts'
+import { subagents } from './subagents.ts'
 
 // `done`: settles when runTurn has returned.
 type Running = { provider: string; controller: AbortController; done?: Promise<void> }
@@ -267,11 +268,18 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let cwd = sessions.open(id).cwd
 			status.transition(id, { type: 'tools' })
 			let results: ToolResultBlock[] = []
-			for (let call of calls) results.push(decided.get(call.id) === false ? approval.declined(call) : await tools.run(call, { cwd, signal, sessionId: id }))
+			let ending = false
+			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
+			for (let call of calls) results.push(decided.get(call.id) === false ? approval.declined(call) : await tools.run(call, ctx))
 			if (turns.state.running.get(id) !== running) return
 			history.results(id, results)
 			host.broadcast(id, { type: 'tool-results', sessionId: id, results })
 			if (cancelled()) break
+			// A wait: the turn ends, done, unless steering waits to be read.
+			if (ending && !status.inboxOf(id).some((m) => !m.queue)) {
+				last = { type: 'done', reason: 'tool_use' }
+				break
+			}
 		}
 	} catch (e: any) {
 		failure = String(e?.message ?? e)
@@ -296,7 +304,10 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	// Paused already, unless something other than the user aborted it.
 	if (end.status === 'paused') status.transition(id, capped === undefined ? { type: 'pause' } : { type: 'pause', reason: capped })
 	else status.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
-	if (end.status === 'completed') prompts.next(id)
+	if (end.status === 'completed') {
+		prompts.next(id)
+		subagents.finished(id)
+	}
 }
 
 // A round's end as the turn takes it: one cut off (max_tokens, or the

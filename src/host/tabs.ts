@@ -53,6 +53,13 @@ function list(): Tab[] {
 	})
 }
 
+// A session as people and models tell it apart: tab, id and name.
+function label(id: string): string {
+	let tab = tabs.file().open.indexOf(id)
+	let name = sessions.open(id).name
+	return [...(tab < 0 ? [] : [`tab ${tab + 1}`]), id, ...(name ? [name] : [])].join(' · ')
+}
+
 // Writes the change and tells every client.
 function publish(): void {
 	liveFiles.save(tabs.file())
@@ -166,6 +173,7 @@ export const tabs = {
 	file,
 	is,
 	list,
+	label,
 	publish,
 	insert,
 	create,

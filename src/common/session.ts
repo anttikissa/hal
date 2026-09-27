@@ -8,7 +8,16 @@ export interface SessionMeta {
 	// ISO timestamp.
 	createdAt: string
 	name?: string
+	// Spawned by session `parent` (task t0) as `spawn`: a `subagent`
+	// closes its tab after a clean finish, `subagent-leave-open` stays,
+	// `interactive` is the user's.
+	parent?: string
+	spawn?: SpawnKind
+	// Spawn slots left; none yet means the first session's allowance.
+	slots?: number
 }
+
+export type SpawnKind = 'subagent' | 'subagent-leave-open' | 'interactive'
 
 // Whether `s` is shaped like a session id ("<n>-<abc>", as the host
 // makes them): the web address /<id> names a tab only then.

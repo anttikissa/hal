@@ -27,6 +27,7 @@ import { tools } from './tools.ts'
 import { host } from './host.ts'
 import { slash } from './slash.ts'
 import { status } from './status.ts'
+import { subagents } from './subagents.ts'
 import { turns } from './turns.ts'
 
 // Returns why the submit is refused, if it is. `command` is the
@@ -43,6 +44,7 @@ import { turns } from './turns.ts'
 // unless the session is idle, where it runs as a turn of its own and
 // so gets full attention (no longer advisory).
 function submit(id: string, text: string, command?: string, queue = false, sender?: Sender): string | undefined {
+	if (sender?.from === undefined) subagents.promote(id)
 	let call = commands.parse(text)
 	if (call) return slash.command(id, text, call, command, sender?.from)
 	let state = status.stateOf(id)
@@ -86,6 +88,7 @@ function senders(list: UserBlock[]): Sender[] {
 // the other texts it delivered from the inbox stay. A prompt with no
 // text of the human's is not theirs to edit: the edit goes on top.
 function amend(id: string, text: string, command?: string): string | undefined {
+	subagents.promote(id)
 	let records = history.readSync(id)
 	let at = replay.lastPrompt(records)
 	let old = records[at]
