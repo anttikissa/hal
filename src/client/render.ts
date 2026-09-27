@@ -9,7 +9,8 @@
 // - Grow mode: the frame has always fitted on the screen, so a full
 //   repaint moves to its top and clears down; shell output above Hal
 //   survives.
-// - Full mode, entered one-way when a frame first outgrows the screen:
+// - Full mode, entered one-way when a frame first outgrows the screen
+//   or another tab is shown (canonically: scrollback is that tab only):
 //   when a changed row is already in scrollback, or the frame shrinks,
 //   there is no correct in-place update, so the canonical repaint
 //   clears screen and scrollback and writes the whole frame again.
@@ -32,6 +33,11 @@ interface RenderState {
 	prev: string[]
 	cursorRow: number
 	fullscreen: boolean
+	/** The tallest history painted at `peakCols` wide; only grows. */
+	peak: number
+	peakCols: number
+	/** The tab painted last. */
+	tab: string | undefined
 	/** Parked for the shell (suspend, quit); only a forced draw paints. */
 	parked: boolean
 	timer: ReturnType<typeof setTimeout> | null
@@ -52,6 +58,9 @@ function createState(): RenderState {
 		prev: [],
 		cursorRow: 0,
 		fullscreen: false,
+		peak: 0,
+		peakCols: 0,
+		tab: undefined,
 		parked: false,
 		timer: null,
 		dirty: false,
@@ -146,13 +155,27 @@ function column(col: number): string {
 	return col > 0 ? `\r${CSI}${col + 1}G` : '\r'
 }
 
-/** Paint the current view now. Force repaints everything (resize, resume). */
+/**
+ * Paint the current view now. Force repaints everything (Ctrl-L, resize,
+ * resume). Showing another tab than last time enters full mode for good
+ * and repaints canonically: scrollback holds only the tab shown.
+ */
 function draw(force = false): void {
 	let st = render.state
 	if (!st.out || (st.parked && !force)) return
 	st.parked = false
 	let { rows, cols } = st.out.size()
-	let next = frame.build(st.view, cols, rows)
+	let tab = st.view.tabs?.focused
+	if (tab !== undefined) {
+		if (st.tab !== undefined && st.tab !== tab) st.fullscreen = force = true
+		st.tab = tab
+	}
+	if (cols !== st.peakCols) {
+		st.peak = 0
+		st.peakCols = cols
+	}
+	let next = frame.build(st.view, cols, rows, st.peak)
+	st.peak = Math.max(st.peak, next.history)
 	// The modal's list moves only as far as it must from where it was.
 	if (st.view.modal && next.modalScroll !== undefined) st.view.modal.scroll = next.modalScroll
 	// So does the prompt box.

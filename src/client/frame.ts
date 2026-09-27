@@ -53,6 +53,8 @@ export interface Frame {
 	modalScroll?: number
 	/** The prompt box's first visible row, to keep as its scroll. */
 	promptScroll: number
+	/** Rows of history (transcript and pending prompts) at the top. */
+	history: number
 }
 
 // The prompt's content width on a terminal `cols` wide: what Up/Down
@@ -61,13 +63,18 @@ function promptWidth(cols: number): number {
 	return Math.max(1, Math.max(1, cols - 2 * ansi.PAD.length) - promptView.FIRST.length)
 }
 
-// The frame for `view` on a terminal of `rows` × `cols`.
-function build(view: View, cols: number, rows = 24): Frame {
+// The frame for `view` on a terminal of `rows` × `cols`. Blank rows after
+// the history lift it to `peak` rows (as far as the screen allows), so
+// the prompt stays on one row between tabs (tasks/cc/terminal.md, Height
+// management).
+function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let lines: string[] = []
+	// Whether something is above `lines` (the history, above the chrome).
+	let above = false
 	let block = (rows: string[], style: Style | undefined) => {
 		if (!rows.length) return
-		if (lines.length) lines.push('')
+		if (lines.length || above) lines.push('')
 		for (let r of rows) lines.push(ansi.paint(r, style, cols))
 	}
 	let items = view.transcript?.items ?? []
@@ -87,6 +94,10 @@ function build(view: View, cols: number, rows = 24): Frame {
 		rows.push(`${promptView.REST}${ansi.DIM}sending…${ansi.UNDIM}`)
 		block(rows, colors.user())
 	}
+	// The chrome, built apart to know its height for the padding.
+	let history = lines
+	lines = []
+	above = history.length > 0 || peak > 0
 	// The inbox, always in view above the prompt.
 	let t = view.transcript
 	for (let m of t?.inbox ?? []) block(ansi.wrap(`${inbox.label(t!.state, m)}: ${m.text}`, width), { fg: colors.log().fg! })
@@ -94,17 +105,22 @@ function build(view: View, cols: number, rows = 24): Frame {
 	let p = promptView.box(view.prompt, width, view.placeholder)
 	let log = { fg: colors.log().fg! }
 	let bar = !!view.tabs?.list.length
-	if (lines.length && (bar || !p.above)) lines.push('')
+	if ((lines.length || above) && (bar || !p.above)) lines.push('')
 	if (bar) lines.push(tabBar.row(view.tabs!.list, view.tabs!.focused, cols))
 	if (p.above) lines.push(ansi.paint(p.above, log, cols))
 	let top = lines.length
 	let input = colors.input()
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))
 	if (p.below) lines.push(ansi.paint(p.below, log, cols))
+	let pad = Math.max(0, Math.min(peak, rows - lines.length) - history.length)
+	let chrome = lines
+	lines = [...history, ...Array<string>(pad).fill(''), ...chrome]
+	top += history.length + pad
 	let cursor = formCursor ?? { row: top + p.row, col: ansi.PAD.length + p.col }
-	if (!view.modal) return { lines, cursor, promptScroll: p.scroll }
+	let out = { lines, cursor, promptScroll: p.scroll, history: history.length }
+	if (!view.modal) return out
 	let m = modalView.withModal(lines, view.modal, rows, cols)
-	return { lines, cursor: m.cursor, modalScroll: m.scroll, promptScroll: p.scroll }
+	return { ...out, cursor: m.cursor, modalScroll: m.scroll }
 }
 
 export const frame = { build, promptWidth }

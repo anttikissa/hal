@@ -253,6 +253,11 @@ function onKeys(events: KeyEvent[]): void {
 	let st = app.state
 	for (let k of events) {
 		if (app.tabKey(k)) continue
+		// Ctrl-L: repaint everything, whatever has the keys.
+		if (k.key === 'l' && k.ctrl && !k.alt && !k.shift && !k.cmd) {
+			terminal.redraw()
+			continue
+		}
 		if (st.modal) {
 			let { state, action } = modals.step(st.modal, k)
 			st.modal = state

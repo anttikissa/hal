@@ -441,3 +441,75 @@ test('an attached image shows as one line naming its size and type under its pro
 	let at = lines.findIndex((l) => l.includes('look'))
 	expect(lines.slice(at + 1).find((l) => l.trim())).toMatch(/^\s*\[image 12 kB png\]$/)
 })
+
+describe('tabs', () => {
+	const tab = (id: string) => ({ id, name: id, cwd: '/', model: 'm', state: { type: 'idle' as const } })
+	const list = [tab('a'), tab('b'), tab('c')]
+	function showTab(focused: string, history: Item[], text = '') {
+		render.state.view = { transcript: transcript(history), prompt: { text, cursor: text.length }, tabs: { list, focused } }
+		render.draw()
+	}
+	const promptRow = () => term.screen().findIndex((r) => r.includes('typed'))
+
+	test('after switching, scrollback and screen hold exactly the focused tab', () => {
+		setup(10, 30, ['$ hal'])
+		let short = [{ type: 'text', text: 'short tab' } as Item]
+		let long = items(100, 1000)
+		showTab('a', short)
+		showTab('b', long)
+		expect(term.content()).toEqual(frameText())
+		expect(frameText()).toContain(' a1000')
+		expect(frameText()).toContain(' a1099')
+		showTab('a', short)
+		expect(term.content()).toEqual(frameText())
+		expect(term.content().join('\n')).not.toContain('a10')
+		showTab('b', long)
+		expect(term.content()).toEqual(frameText())
+	})
+
+	test('the prompt stays on its row between two short tabs once peak is set', () => {
+		setup(20, 30)
+		showTab('a', items(3), 'typed')
+		showTab('b', items(1), 'typed')
+		let row = promptRow()
+		showTab('c', [], 'typed')
+		expect(promptRow()).toBe(row)
+		showTab('a', items(3), 'typed')
+		expect(promptRow()).toBe(row)
+		showTab('b', items(1), 'typed')
+		expect(promptRow()).toBe(row)
+	})
+
+	test('a single tab that fits keeps grow mode and never clears scrollback', () => {
+		setup(20, 30, ['$ hal'])
+		for (let n = 0; n <= 3; n++) showTab('a', items(n), 'typed')
+		term.resize(22, 30)
+		render.draw(true)
+		render.draw(true)
+		showTab('a', items(2))
+		expect(term.written).not.toContain('\x1b[3J')
+		expect(term.content()).toEqual(['$ hal', ...frameText()])
+	})
+
+	test('a tab switch, Ctrl-L redraw and resize are canonical repaints once in full mode', () => {
+		setup(10, 30, ['$ hal'])
+		showTab('a', items(1))
+		showTab('b', items(2))
+		for (let again of [() => render.draw(true), () => (term.resize(12, 30), render.draw(true))]) {
+			term.written = ''
+			again()
+			expect(term.written).toContain('\x1b[3J')
+			expect(term.content()).toEqual(frameText())
+		}
+	})
+
+	test('a narrower terminal starts peak again', () => {
+		setup(20, 30)
+		showTab('a', items(5), 'typed')
+		showTab('b', [], 'typed')
+		let padded = promptRow()
+		term.resize(20, 25)
+		render.draw(true)
+		expect(promptRow()).toBeLessThan(padded)
+	})
+})

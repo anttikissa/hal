@@ -641,3 +641,30 @@ test('browsing belongs to the tab: switching away and back keeps the recalled en
 	down()
 	expect(app.view().prompt.text).toBe('mine')
 })
+
+test('Ctrl-L repaints everything', () => {
+	let saved = terminal.redraw
+	let redraws = 0
+	terminal.redraw = () => void redraws++
+	try {
+		app.onKeys([ctrl('l')])
+		expect(redraws).toBe(1)
+	} finally {
+		terminal.redraw = saved
+	}
+})
+
+test('output in a tab not shown paints nothing', () => {
+	let written = ''
+	render.show = saved.show
+	render.init({ write: (s) => void (written += s), size: () => ({ rows: 20, cols: 60 }) })
+	try {
+		startOn(['a', 'b'])
+		written = ''
+		app.onEvent(snapshot('b', { type: 'running', phase: 'streaming' }))
+		app.onEvent({ type: 'state', sessionId: 'b', state: { type: 'error', message: 'x' } })
+		expect(written).toBe('')
+	} finally {
+		render.reset()
+	}
+})
