@@ -24,6 +24,7 @@ import { modalView } from './modal-view.ts'
 import type { PromptState } from '../common/prompt.ts'
 import type { Tab } from '../common/protocol.ts'
 import { promptView } from './prompt-view.ts'
+import type { HalCursor } from './hal-cursor.ts'
 import { tabBar } from './tab-bar.ts'
 import { strings } from '../common/strings.ts'
 
@@ -45,6 +46,8 @@ export interface View {
 	tabs?: { list: Tab[]; focused?: string }
 	/** Tab completion's choices: a list below the prompt. */
 	choices?: string[]
+	/** The Hal cursor: after the streaming last item, or on its own row. */
+	hal?: HalCursor
 }
 
 export interface Frame {
@@ -79,6 +82,23 @@ function itemRows(item: Item, cols: number): string[] {
 	return rows
 }
 
+// The Hal cursor's block, or nothing in its dark phase.
+function glyph(hal: HalCursor): string {
+	if (!hal.lit) return ''
+	let on = ansi.sgr({ fg: hal.color })
+	return on + '█' + (on && ansi.UNCOLOR)
+}
+
+// An item's rows with the Hal cursor after its last character, on a
+// row of its own if that one is full: the last column stays unused.
+function withCursor(rows: string[], hal: HalCursor, cols: number): string[] {
+	let last = rows.at(-1)
+	if (last === undefined) return rows
+	let g = frame.glyph(hal)
+	if (strings.visLen(last) < cols - 1) return [...rows.slice(0, -1), last + g]
+	return [...rows, ansi.PAD + g]
+}
+
 // The frame for `view` on a terminal of `rows` × `cols`. Blank rows after
 // the history lift it to `peak` rows (as far as the screen allows), so
 // the prompt stays on one row between tabs (tasks/cc/terminal.md, Height
@@ -103,6 +123,7 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 			formCursor = { row: lines.length - f.rows.length + f.cursor.row, col: ansi.PAD.length + f.cursor.col }
 		} else {
 			let rows = frame.itemRows(item, cols)
+			if (i === items.length - 1 && view.hal?.at === 'stream') rows = frame.withCursor(rows, view.hal, cols)
 			if (rows.length && (lines.length || above)) lines.push('')
 			for (let r of rows) lines.push(r)
 		}
@@ -111,6 +132,12 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 		let rows = itemView.itemLines({ type: 'prompt', text }, width)
 		rows.push(`${promptView.REST}${ansi.DIM}sending…${ansi.UNDIM}`)
 		block(rows, colors.user())
+	}
+	// The idle Hal cursor: a blank row, its row, and the blank row that
+	// comes before the chrome. A question being answered has the cursor.
+	if (view.hal?.at === 'idle' && !formCursor) {
+		if (lines.length || above) lines.push('')
+		lines.push(ansi.PAD + frame.glyph(view.hal))
 	}
 	// The chrome, built apart to know its height for the padding.
 	let history = lines
@@ -148,4 +175,4 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	return { ...out, cursor: m.cursor, modalScroll: m.scroll }
 }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>() }, build, itemRows, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>() }, build, itemRows, glyph, withCursor, promptWidth }

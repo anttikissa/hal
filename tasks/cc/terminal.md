@@ -200,7 +200,8 @@ Instead:
 1. Build the full frame: all history logical lines + padding + chrome.
 2. Diff its logical strings against the previously-painted frame.
 3. Find the first changed logical line.
-4. Derive its physical row from the unchanged prefix and rewrite to the end.
+4. Derive its physical row from the unchanged prefix and rewrite, from there to
+   the end, only the rows that differ (a blink repaints one row, not the frame).
 
 New logical lines are appended with `\r\n`, which lets the terminal scroll
 naturally. A standalone URL may occupy several physical rows without internal

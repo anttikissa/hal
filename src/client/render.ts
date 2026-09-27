@@ -1,6 +1,6 @@
 // Gets frames onto the terminal like a REPL: the first paint starts at
-// the cursor without clearing, later paints rewrite only from the first
-// changed row, and quitting leaves the last frame on screen. The rules
+// the cursor without clearing, later paints rewrite only the rows that
+// changed, and quitting leaves the last frame on screen. The rules
 // are in tasks/cc/terminal.md; the short version:
 //
 // - Every frame holds all history. Rows that scroll off the top enter
@@ -123,24 +123,24 @@ function paint(next: Frame, rows: number, force = false): string {
 			body = move(st.cursorRow, first) + `\r${CSI}J`
 			row = first
 		} else {
-			// Rewrite from the first change; CRLF past the old end scrolls
-			// new rows in naturally.
+			// Rewrite the rows that changed from the first change on (a
+			// blink rewrites one row, not the frame); CRLF past the old
+			// end scrolls new rows in naturally.
 			let parts: string[] = []
+			let at = st.cursorRow
 			for (let i = first; i < lines.length; i++) {
-				if (i >= prev.length) {
-					// Appending: step to the last existing row first.
-					if (i === first) parts.push(move(st.cursorRow, prev.length - 1))
-					parts.push(`\r\n${CSI}2K${lines[i]}`)
-				} else {
-					parts.push(i === first ? move(st.cursorRow, first) + '\r' : '\r\n', `${CSI}2K${lines[i]}`)
-				}
+				if (i < prev.length && lines[i] === prev[i]) continue
+				// Appending: from the row above, which exists.
+				if (i >= prev.length) parts.push(move(at, i - 1), `\r\n${CSI}2K${lines[i]}`)
+				else parts.push(move(at, i), `\r${CSI}2K${lines[i]}`)
+				at = i
 			}
-			row = lines.length - 1
+			row = at
 			if (lines.length < prev.length) {
 				// Erase the leftover rows below. CSI B, not CRLF: at the
 				// bottom of the screen CRLF would scroll in a blank row.
-				parts.push(`\r${CSI}1B${CSI}J`)
-				row++
+				parts.push(move(at, lines.length - 1), `\r${CSI}1B${CSI}J`)
+				row = lines.length
 			}
 			body = parts.join('')
 		}

@@ -26,6 +26,8 @@ import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import { frame, type View } from './frame.ts'
 import { paste } from './paste.ts'
+import { pulse } from './pulse.ts'
+import { halCursor } from './hal-cursor.ts'
 import { promptKeys, type Clip } from './prompt-keys.ts'
 import type { Focus } from './tabs.ts'
 import { tabSwitch, type TabView } from './tab-switch.ts'
@@ -79,11 +81,27 @@ function view(): View {
 	// A passing notice, else what the session is doing.
 	let notice = st.notice ?? (st.editing ? amend.hint(st.editing) : st.transcript && states.describe(st.transcript.state))
 	if (notice) v.notice = notice
+	let hal = halCursor.of(st.transcript, pulse.beat())
+	if (hal) v.hal = hal
 	return v
 }
 
+// What blinks in `view`, as a key that changes with every blink phase.
+function blinks(view: View): string {
+	return view.hal ? JSON.stringify(view.hal) : ''
+}
+
+// Paints the view; the pulse beats while something in it blinks.
 function show(): void {
-	render.show(app.view())
+	let v = app.view()
+	pulse.keep(app.blinks(v) ? app.beat : null)
+	render.show(v)
+}
+
+// A beat of the pulse: a repaint, if a blink changed.
+function beat(): void {
+	let v = app.view()
+	if (app.blinks(v) !== app.blinks(render.state.view)) render.show(v)
 }
 
 function onEvent(event: Event): void {
@@ -295,6 +313,8 @@ function init(): void {
 
 function reset(): void {
 	app.state = createState()
+	pulse.reset()
+	halCursor.reset()
 	drafts.reset()
 	recall.reset()
 	uploads.reset()
@@ -306,7 +326,9 @@ export const app = {
 	/** The terminal's width, which Up/Down move by. */
 	cols: (): number => render.state.out?.size().cols ?? 80,
 	view,
+	blinks,
 	show,
+	beat,
 	onEvent,
 	backfilled,
 	onState,

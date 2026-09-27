@@ -1,7 +1,16 @@
 {
 	title: 'The blinking Hal cursor in the terminal',
 	description: "The terminal shows the Hal cursor as the old Hal did (questions.md item 53; artifacts old-render-history.ts, old-blocks.ts around hasStreamingHalCursor/addInlineCursor, old-cursor.ts, old-render-status.ts halCursorColor). While an assistant or thinking block streams, a blinking Hal cursor (a block in the Hal cursor colour) sits right after its last character, thinking in the thinking colour. When the focused session is not streaming, the transcript ends with a blank row, a row holding the blinking Hal cursor, and a blank row; a working session's idle cursor differs from a finished one as in the old Hal. Only the focused tab's current stream has a cursor. One shared pulse drives every blink in the client; its timer runs only while something on screen blinks, and a blink phase repaints only the rows that changed, never the whole frame. The terminal's own text cursor stays in the prompt. Tests: the cursor follows the streamed text, disappears when the block ends, the idle rows appear, no timer runs when nothing blinks.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Shape: client/pulse.ts is the shared pulse (250 ms wall-clock beats; pulse.fast lit every other beat for the streaming cursor, pulse.slow two on, two off for the idle cursor). client/hal-cursor.ts decides the View's `hal` field ({ at: 'stream' | 'idle', lit, color }); frame.ts only draws it (frame.withCursor, frame.glyph), so frame stays pure.",
+		'The timer: app.show() calls pulse.keep(app.beat) when app.blinks(view) is non-empty, else pulse.keep(null). app.beat rebuilds the view and repaints only when app.blinks() changed, so a beat that changes nothing builds no frame and writes nothing. Task fr: add blinking tab indicators to app.blinks() (the key) and draw them from pulse.slow(pulse.beat()); nothing else needs a timer.',
+		"Streaming means: t.live, state running, the last item is the live turn's last block, and that block is text or thinking without a signature. A signed thinking block is closed even though the turn streams on.",
+		"Idle colour: bright (assistant cursor) while states.busy(state); after this client saw it busy and then not, it fades to cursorIdle over halCursor.fadeMs() (5 s) in ten steps (few distinct colours, so oklch's rgb cache stays small). A session never seen working here is grey at once.",
+		"The idle rows are a blank row plus the cursor row appended to the history part of the frame; the chrome's own leading blank row is the third. They are skipped while a question form is open (it owns the cursor). Dark phases keep the row (empty), so the frame height never blinks; a full last text row puts the cursor on a row of its own (the last column stays unused), dark or lit.",
+		'render.paint used to rewrite from the first changed row to the end; it now skips unchanged rows after it, so a blink writes one row. Appended rows still come in with CRLF from the row above, and a shrink erases below the new last row.',
+		"startup.test.ts's joining-UI budget (100 ms) was already borderline on the base commit under load (99-103 ms); it can fail on a busy machine without any change."
+	],
 	needs: [],
 	foldInto: ['cc']
 }
