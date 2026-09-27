@@ -1,0 +1,7 @@
+{
+	title: 'Every transcript item has an id; web rows keyed by it',
+	description: "Every history record carries an id: the session's next number (1, 2, 3, ...), written by the host, the one writer of a home's histories, so numbers never collide; elsewhere a record is named '<session id>#<n>'. A transcript item's id comes from its record (plus its index when one record yields several items, such as a prompt with images) and exists from the item's first streamed byte: the host numbers a record when its block starts streaming, and the saved record keeps that number, so a live item and the same item after reconnect, reload or a page of earlier history have the same id. Old histories without ids get them from their position when read. A client's optimistic item (a pending prompt) has a temporary id until the host's arrives, and the swap must not remount it. The web transcript keys its rows by item id (Solid's keyed <For>, never keyed={false}), and a card's open state is stored by item id, so loading earlier history or switching tabs never shows another item's card open (questions.md item 117). The 4s render test loads a page of earlier history and asserts the cards already shown stay connected and keep their open state.",
+	status: 'planned',
+	needs: ['4s', 'bq', 'qn'],
+	foldInto: ['7', 'ca', '4s']
+}
