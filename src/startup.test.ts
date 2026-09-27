@@ -49,7 +49,7 @@ function session(n: number, bytes: number, last: string): string {
 	let turn = (i: number, answer: string) =>
 		ason.stringifyLine({ type: 'user', blocks: [{ type: 'text', text: `question ${i}: ${'why '.repeat(40)}` }], ts }) +
 		ason.stringifyLine({ type: 'assistant', block: { type: 'text', text: answer }, ts }) +
-		ason.stringifyLine({ type: 'turn_end', status: 'done', usage: { input: 10, output: 10 }, ts })
+		ason.stringifyLine({ type: 'turn_end', status: 'completed', usage: { input: 10, output: 10 }, ts })
 	let one = turn(0, `answer: ${'lorem ipsum '.repeat(150)}`)
 	let chunks = Array.from({ length: Math.max(1, Math.floor(bytes / one.length)) }, () => one)
 	chunks.push(turn(1, `the end. ${last}`))
@@ -101,10 +101,12 @@ function start(): Run {
 			// process falls behind and holds up the one it measures.
 			if (run.echo !== undefined && run.ui !== undefined) return
 			let text = rest + decoder.decode(bytes, { stream: true })
-			let plain = text.replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]/g, '')
+			// Drop CSI and OSC (hyperlinks wrap tab numbers and blocks).
+			let plain = text.replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
 			rest = text.slice(-10_000)
 			let ms = Date.now() - t0
-			seen.bar ||= /\b1 2 3 4 5\b/.test(plain)
+			// Tab numbers, each maybe with its state glyph (task fr).
+			seen.bar ||= /\b1\S? +2\S? +3\S? +4\S? +5\b/.test(plain)
 			seen.tail ||= plain.includes(tail)
 			seen.draft ||= plain.includes(draft)
 			if (run.ui === undefined && seen.bar && seen.tail && seen.draft) run.ui = ms
