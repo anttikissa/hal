@@ -2,4 +2,4 @@
 # usage: scripts/cost <session-id>... -> per-session cost at Opus 5.5 list prices, plus total
 cd ~/.hal/state/sessions
 for s in "$@"; do grep -h "type: 'usage'" $s/history*.asonl 2>/dev/null | awk -v s=$s '{ for(i=1;i<=NF;i++){ v=$(i+1); gsub(/[,}]/,"",v); if($i=="input:")a+=v; if($i=="output:")b+=v; if($i=="cacheRead:")c+=v; if($i=="cacheCreation:")d+=v; if($i=="requests:")r+=v } } END { printf "%-10s $%6.2f req %4d out %5dk read %6.1fM write %5dk\n", s, a*4e-6+b*20e-6+c*0.2e-6+d*5e-6, r, b/1000, c/1e6, d/1000 }'; done | tee "${TMPDIR:-/tmp}/cost-out.txt"
-awk '{ gsub(/\$/,"",$2); t+=$2 } END { printf "TOTAL      $%6.2f\n", t }' "${TMPDIR:-/tmp}/cost-out.txt"
+awk '{ v=$0; sub(/^[^$]*\$ */,"",v); t+=v+0 } END { printf "TOTAL      $%6.2f\n", t }' "${TMPDIR:-/tmp}/cost-out.txt"
