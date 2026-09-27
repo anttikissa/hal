@@ -161,6 +161,16 @@ describe('lone Escape', () => {
 		expect(keys.feed(s, 'd\x1b[201~').map(show)).toEqual(['paste:"abcd"'])
 	})
 
+	test('a paste idle for 5 s is dropped and the next input read as keys', () => {
+		let s = keys.createState()
+		keys.feed(s, '\x1b[200~lost', 1000)
+		keys.feed(s, ' more', 5000)
+		// Still open 4.9 s after it last grew.
+		expect(keys.feed(s, '!', 9900)).toEqual([])
+		expect(keys.feed(s, 'hi\r', 14900).map(show)).toEqual(['text:h', 'text:i', 'enter'])
+		expect(keys.feed(s, '\x1b[200~ok\x1b[201~', 14901).map(show)).toEqual(['paste:"ok"'])
+	})
+
 	test('double ESC at end flushes as one Alt-Escape', () => {
 		let s = keys.createState()
 		expect(keys.feed(s, '\x1b\x1b')).toEqual([])

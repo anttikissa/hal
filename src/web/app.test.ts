@@ -168,7 +168,7 @@ test('the Send button sends what the box holds, like Enter', () => {
 	expect(app.state.text).toBe('')
 })
 
-test('Ctrl-K, Ctrl-U, Alt-D and Ctrl-Y edit the box through the shared editor, as native edits', () => {
+test('Ctrl-K, Ctrl-U, Alt-D, Alt-Backspace and Ctrl-Y edit the box through the shared editor, as native edits', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
 	let edits: unknown[] = []
 	let box = (text: string, cursor: number): Target => ({ kind: 'message', text, cursor, write: (e, at) => void edits.push([e, at]) })
@@ -187,6 +187,9 @@ test('Ctrl-K, Ctrl-U, Alt-D and Ctrl-Y edit the box through the shared editor, a
 	expect(app.state.text).toBe('b')
 	press('y', box('b', 1), { ctrlKey: true })
 	expect(app.state.text).toBe('ba')
+	// Alt-Backspace deletes a whitespace word, past the punctuation.
+	expect(press('Backspace', box('cat src/a.ts', 12), { altKey: true })).toBe(true)
+	expect(app.state.text).toBe('cat ')
 })
 
 test('Tab and Shift-Tab indent a selection that spans lines; otherwise they move focus', () => {
@@ -217,7 +220,7 @@ test('Ctrl-Y replaces the selection in the box', () => {
 
 test('keys the browser already handles stay native in the box', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
-	for (let [key, mods] of [['ArrowLeft', { altKey: true }], ['Backspace', { altKey: true }], ['a', { ctrlKey: true }], ['e', { ctrlKey: true }], ['z', { metaKey: true }]] as const)
+	for (let [key, mods] of [['ArrowLeft', { altKey: true }], ['Backspace', {}], ['a', { ctrlKey: true }], ['e', { ctrlKey: true }], ['z', { metaKey: true }]] as const)
 		expect(press(key, message('hello world', 5), mods)).toBe(false)
 	expect(app.state.text).toBe('hello world')
 })

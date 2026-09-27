@@ -91,8 +91,14 @@ function kind(g: string): 'space' | 'word' | 'punct' {
 	return /^\s/u.test(g) ? 'space' : /^[\p{L}\p{N}\p{M}_]/u.test(g) ? 'word' : 'punct'
 }
 
+// Whitespace words: any run of non-space graphemes. Alt-Backspace and
+// Alt-D delete by these, as in the old Hal; moves use tokens.
+function bigKind(g: string): 'space' | 'word' {
+	return kind(g) === 'space' ? 'space' : 'word'
+}
+
 /** Start of the token before pos (spaces skipped). */
-function wordLeft(text: string, pos: number): number {
+function wordLeft(text: string, pos: number, kind: (g: string) => string = prompt.kind): number {
 	let segs = [...segmenter.segment(text.slice(0, pos))]
 	let i = segs.length
 	while (i > 0 && kind(segs[i - 1]!.segment) === 'space') i--
@@ -103,7 +109,7 @@ function wordLeft(text: string, pos: number): number {
 }
 
 /** End of the token after pos (spaces skipped). */
-function wordRight(text: string, pos: number): number {
+function wordRight(text: string, pos: number, kind: (g: string) => string = prompt.kind): number {
 	let segs = [...segmenter.segment(text.slice(pos))]
 	let i = 0
 	while (i < segs.length && kind(segs[i]!.segment) === 'space') i++
@@ -288,7 +294,7 @@ function apply(st: PromptState, k: Key, width: number): PromptResult {
 		case '-backspace':
 			return del(prompt.prevBoundary(text, cursor), cursor)
 		case 'M-backspace':
-			return del(prompt.wordLeft(text, cursor), cursor)
+			return del(prompt.wordLeft(text, cursor, prompt.bigKind), cursor)
 		case '-left':
 			return sel && !k.shift ? { state: { ...base, cursor: sel.start } } : to(prompt.prevBoundary(text, cursor))
 		case '-right':
@@ -318,7 +324,8 @@ function apply(st: PromptState, k: Key, width: number): PromptResult {
 			return { state: prompt.kill(base, start === cursor ? Math.max(start - 1, 0) : start, cursor) }
 		}
 		case 'M-d':
-			return { state: prompt.kill(base, cursor, prompt.wordRight(text, cursor)) }
+			// Alt-D deletes a selection (not into the kill buffer).
+			return { state: sel ? cut : prompt.kill(base, cursor, prompt.wordRight(text, cursor, prompt.bigKind)) }
 		case 'C-y':
 			return { state: st.kill ? prompt.insert(cut, st.kill) : st }
 		case '-paste': {
@@ -354,6 +361,8 @@ export const prompt = {
 	prevBoundary,
 	nextBoundary,
 	wordLeft,
+	kind,
+	bigKind,
 	wordRight,
 	lineStart,
 	lineEnd,

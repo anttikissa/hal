@@ -30,13 +30,18 @@ export interface DecoderState {
 	pending: string
 	/** Pasted text so far while inside ESC[200~ ... ESC[201~, else null. */
 	paste: string | null
+	/** When the open paste last grew (ms). */
+	pasteAt: number
 }
 
 const PASTE_START = '\x1b[200~'
 const PASTE_END = '\x1b[201~'
+// A paste idle this long lost its end marker: the next input drops it
+// and is read as keys again, so the prompt is not swallowed for good.
+const PASTE_IDLE_MS = 5000
 
 function createState(): DecoderState {
-	return { utf8: new TextDecoder(), pending: '', paste: null }
+	return { utf8: new TextDecoder(), pending: '', paste: null, pasteAt: 0 }
 }
 
 function ke(key: string, mods?: Partial<KeyEvent>): KeyEvent {
@@ -170,7 +175,8 @@ function endPaste(text: string): KeyEvent | null {
 	return text ? ke('paste', { text }) : null
 }
 
-function feed(st: DecoderState, chunk: string | Uint8Array): KeyEvent[] {
+function feed(st: DecoderState, chunk: string | Uint8Array, now = Date.now()): KeyEvent[] {
+	if (st.paste !== null && now - st.pasteAt >= PASTE_IDLE_MS) st.paste = null
 	let data = typeof chunk === 'string' ? chunk : st.utf8.decode(chunk, { stream: true })
 	let out: KeyEvent[] = []
 	let s = st.pending + data
@@ -181,6 +187,7 @@ function feed(st: DecoderState, chunk: string | Uint8Array): KeyEvent[] {
 			// Search only where a new end marker could start.
 			let from = Math.max(0, st.paste.length - PASTE_END.length + 1)
 			st.paste += s.slice(i)
+			st.pasteAt = now
 			i = s.length
 			let end = st.paste.indexOf(PASTE_END, from)
 			if (end < 0) break
@@ -194,6 +201,7 @@ function feed(st: DecoderState, chunk: string | Uint8Array): KeyEvent[] {
 		}
 		if (s.startsWith(PASTE_START, i)) {
 			st.paste = ''
+			st.pasteAt = now
 			i += PASTE_START.length
 			continue
 		}

@@ -1,7 +1,12 @@
 {
 	title: 'Prompt keys as in the old Hal: delete by words, Alt-D, lost paste',
 	description: "Editing keys match the old Hal (questions.md items 35, 37, 41). Alt-Left and Alt-Right move by tokens (a run of letters, digits and _ or a run of punctuation), but Alt-Backspace and Alt-D delete by whitespace words: with 'cat src/host/tools.ts' and the cursor at the end, one Alt-Backspace leaves 'cat '. Alt-D deletes the selection when there is one (not into the kill ring), else kills to the end of the next whitespace word; Ctrl-K and Ctrl-U ignore a selection and drop it. Both the terminal and the web get this through the shared editor step. A bracketed paste whose end marker never arrives is dropped once it has been idle for 5 s, checked on the next input, and that input is read as keys again, so a lost marker cannot swallow the prompt.",
-	status: 'planned',
+	status: 'done',
 	needs: ['1x', '9x', 'xk'],
-	foldInto: ['1x', '9x', 'xk']
+	foldInto: ['1x', '9x', 'xk'],
+	notes: [
+		'Done in src/common/prompt.ts: wordLeft/wordRight take the grapheme classifier as a parameter; prompt.bigKind (space or not) makes them whitespace words for Alt-Backspace and Alt-D, prompt.kind (tokens) stays the default for moves. Still grapheme-safe, unlike the old per-code-unit loops.',
+		'Web: Alt-Backspace had been left native (browsers stop at punctuation); it is now in the routed table of src/web/editor.ts, so it goes through step() like Alt-D.',
+		'Lost paste: keys.feed(st, chunk, now = Date.now()) drops an open paste whose last growth (DecoderState.pasteAt) is 5 s old before decoding the chunk; tests pass `now` instead of faking the clock. No timer: a paste idle with no further input stays open, harmlessly. The partial text is discarded, not inserted, as in the old Hal.'
+	]
 }

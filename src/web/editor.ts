@@ -2,8 +2,9 @@
 // The message box's editing keys. The textarea keeps native typing,
 // IME, selection, clipboard, undo and the moves that already match
 // Hal's (arrows, Option/Alt word moves, Home/End, Backspace). The keys
-// in `table` mean something else in Hal (readline kills and yank, which
-// the browser either lacks or binds elsewhere), so keys.key runs them
+// in `table` mean something else in Hal (readline kills and yank, and
+// Alt-Backspace, which deletes a whitespace word; the browser lacks,
+// stops elsewhere or binds these), so keys.key runs them
 // through the shared editor (src/common/prompt.ts) and `write` puts the
 // result back, selection included. So do Tab and Shift-Tab on a
 // selection across lines (keys.key). Enter, Alt-Enter and Escape are
@@ -21,6 +22,8 @@ const table: { key: string; ctrl?: true; alt?: true }[] = [
 	{ key: 'u', ctrl: true },
 	{ key: 'y', ctrl: true },
 	{ key: 'd', alt: true },
+	// Deletes a whitespace word; browsers stop at punctuation.
+	{ key: 'backspace', alt: true },
 ]
 
 function routed(k: Key): boolean {

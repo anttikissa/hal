@@ -66,6 +66,12 @@ const cases: [string, string, string][] = [
 	['hello wor|ld', 'M-backspace', 'hello |ld'],
 	['hello |', 'M-backspace', '|'],
 	['|abc', 'M-backspace', '|abc'],
+	// Deletes go by whitespace words, moves by tokens.
+	['cat src/host/tools.ts|', 'M-backspace', 'cat |'],
+	['cat src/host/tools.ts|', 'M-left', 'cat src/host/tools.|ts'],
+	['a  foo.ba|r x', 'M-backspace', 'a  |r x'],
+	['a b\n  |x', 'M-backspace', 'a |x'],
+	['a cafe\u0301👍🏽|', 'M-backspace', 'a |'],
 	// Line and text edges.
 	['ab\nc|d\nef', 'home', 'ab\n|cd\nef'],
 	['ab\nc|d\nef', 'C-a', 'ab\n|cd\nef'],
@@ -83,7 +89,10 @@ const cases: [string, string, string][] = [
 	['ab\ncd|ef', 'C-u', 'ab\n|ef'],
 	['ab\n|ef', 'C-u', 'ab|ef'],
 	['|ab', 'C-u', '|ab'],
-	['a |foo.bar', 'M-d', 'a |.bar'],
+	['a |foo.bar', 'M-d', 'a |'],
+	['|cat src/host x', 'M-right', 'cat| src/host x'],
+	['cat| src/host x', 'M-d', 'cat| x'],
+	['a|\n foo x', 'M-d', 'a| x'],
 	['a|   foo x', 'M-d', 'a| x'],
 	['ab|', 'M-d', 'ab|'],
 ]
@@ -102,6 +111,7 @@ describe('kill and yank', () => {
 		['ab|cd', 'C-u', '|cd', 'cdab|'],
 		['x\n|cd', 'C-u', 'x|cd', 'xcd\n|'],
 		['|foo bar', 'M-d', '| bar', ' barfoo|'],
+		['|a/b.c d', 'M-d', '| d', ' da/b.c|'],
 		['|🇫🇮 x', 'M-d', '| x', ' x🇫🇮|'],
 	]
 	test.each(kills)('%p + %s, then yank at the end', (before, name, killed, yanked) => {
@@ -274,6 +284,17 @@ describe('selection', () => {
 	]
 	test.each(moves)('%p + %p -> %p', (before, names, after) => {
 		expect(show(press(before, ...names))).toBe(after)
+	})
+	test('Alt-D deletes it without killing', () => {
+		let st = { ...at('x^ab|c d'), kill: 'K' }
+		let out = prompt.step(st, key('M-d')).state
+		expect(show(out)).toBe('x|c d')
+		expect(out.kill).toBe('K')
+	})
+	test('Ctrl-K and Ctrl-U ignore it, kill from the cursor and drop it', () => {
+		expect(show(press('x^ab|c\nd', 'C-k'))).toBe('xab|\nd')
+		expect(show(press('x^ab|c\nd', 'C-u'))).toBe('|c\nd')
+		expect(press('x^ab|c', 'C-k').anchor).toBeUndefined()
 	})
 	test('paste and Ctrl-Y replace it', () => {
 		expect(show(prompt.step(at('x^ab|c'), { key: 'paste', text: 'P' }).state)).toBe('xP|c')
