@@ -7,12 +7,13 @@ import { settings } from '../common/settings.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
 
 const savedHome = process.env.HAL_HOME
-const origStream = host.stream
+const origStream = turns.stream
 const origOnError = liveFiles.onError
 const origRun = tools.run
 let home = ''
@@ -45,7 +46,7 @@ beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-approval-`)
 	process.env.HAL_HOME = home
 	liveFiles.onError = () => {}
-	host.stream = fakeStream
+	turns.stream = fakeStream
 	calls = []
 	ran = []
 	tools.run = (call, ctx) => (ran.push(call.id), origRun(call, ctx))
@@ -57,7 +58,7 @@ afterEach(() => {
 	host.reset()
 	sessions.closeAll()
 	history.state.running.clear()
-	host.stream = origStream
+	turns.stream = origStream
 	tools.run = origRun
 	settings.state.raw = {}
 	liveFiles.onError = origOnError
@@ -150,7 +151,7 @@ test('each dangerous call is asked once, harmless ones not at all; answers survi
 	host.reset()
 	sessions.closeAll()
 	history.state.running.clear()
-	await host.recover()
+	await turns.recover()
 	let b = await opened(id)
 	expect(transcript.question(b.views.get(id))?.id).toBe(second.id)
 	b.conn.send({ type: 'answer', sessionId: id, question: second.id, answers: { run: 'no' } })

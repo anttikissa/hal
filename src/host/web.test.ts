@@ -7,6 +7,7 @@ import { oklch } from '../common/oklch.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { host } from './host.ts'
+import { turns } from './turns.ts'
 import { paths } from './paths.ts'
 import { server } from './server.ts'
 import { sessions } from './sessions.ts'
@@ -14,7 +15,7 @@ import { web } from './web.ts'
 
 const savedHome = process.env.HAL_HOME
 const origPort = web.port
-const origStream = host.stream
+const origStream = turns.stream
 let home = ''
 let sockets: WebSocket[] = []
 
@@ -32,7 +33,7 @@ afterEach(async () => {
 	host.reset()
 	sessions.closeAll()
 	web.port = origPort
-	host.stream = origStream
+	turns.stream = origStream
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome
 	rmSync(home, { recursive: true, force: true })
@@ -143,7 +144,7 @@ test('over ws, open-newest opens the newest session and bad messages are refused
 
 test('a submit streams to both a web and an in-memory client', async () => {
 	let pushes: ((...e: StreamEvent[]) => void)[] = []
-	host.stream = () =>
+	turns.stream = () =>
 		(async function* () {
 			let queue: StreamEvent[] = []
 			let wake = () => {}
@@ -239,7 +240,7 @@ async function browser() {
 }
 
 test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a reply', async () => {
-	host.stream = () =>
+	turns.stream = () =>
 		(async function* (): AsyncGenerator<StreamEvent> {
 			yield { type: 'text', text: 'hello from fake' }
 			yield { type: 'done', reason: 'end' }

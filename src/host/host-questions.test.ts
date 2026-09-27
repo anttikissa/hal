@@ -6,6 +6,7 @@ import type { Event } from '../common/protocol.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
@@ -107,7 +108,7 @@ test('an open question survives a restart, is not continued by the new host, and
 	host.reset()
 	sessions.closeAll()
 	history.state.running.clear()
-	await host.recover()
+	await turns.recover()
 	let b = await opened(id)
 	expect(b.views.get(id)!.state).toEqual({ type: 'blocked', reason: 'question' })
 	expect(transcript.question(b.views.get(id))?.id).toBe(q.id)

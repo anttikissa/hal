@@ -5,6 +5,8 @@ import type { Message, StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { slash } from './slash.ts'
+import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import type { ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
@@ -12,7 +14,7 @@ import { systemPrompt } from './system-prompt.ts'
 
 const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
-const origStream = host.stream
+const origStream = turns.stream
 let home = ''
 let work = ''
 let requests: Omit<ProviderRequest, 'model'>[] = []
@@ -26,7 +28,7 @@ beforeEach(() => {
 	process.env.HAL_HOME = home
 	liveFiles.onError = () => {}
 	requests = []
-	host.stream = (_model, input) => {
+	turns.stream = (_model, input) => {
 		requests.push(input)
 		return (async function* (): AsyncGenerator<StreamEvent> {
 			yield { type: 'text', text: 'ok' }
@@ -39,7 +41,7 @@ afterEach(() => {
 	host.reset()
 	sessions.closeAll()
 	history.state.running.clear()
-	host.stream = origStream
+	turns.stream = origStream
 	liveFiles.onError = origOnError
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome
@@ -108,12 +110,12 @@ test('/cd changes the system prompt and tells the model on its next prompt', asy
 test('a model switch reaches the model as a note and in the system prompt', async () => {
 	let s = start()
 	await s.prompt('one')
-	host.context(s.id).setModel('openai/gpt-test')
+	slash.context(s.id).setModel('openai/gpt-test')
 	await s.prompt('two')
 	expect(requests[1]!.system).toContain('openai/gpt-test')
 	expect(lastPrompt(requests[1]!.messages)).toMatch(/<meta>[^<]*openai\/gpt-test[^<]*<\/meta>\ntwo$/)
 	// Setting what it already is changes nothing.
-	host.context(s.id).setModel('openai/gpt-test')
+	slash.context(s.id).setModel('openai/gpt-test')
 	await s.prompt('three')
 	expect(lastPrompt(requests[2]!.messages)).not.toContain('<meta>')
 })

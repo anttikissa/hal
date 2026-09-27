@@ -11,11 +11,13 @@ import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { status } from './status.ts'
+import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 
 const savedHome = process.env.HAL_HOME
-const orig = { stream: host.stream, now: clock.now, sleep: clock.sleep, changed: auth.changed, onError: liveFiles.onError }
+const orig = { stream: turns.stream, now: clock.now, sleep: clock.sleep, changed: auth.changed, onError: liveFiles.onError }
 let home = ''
 let now = 0
 // Every wait the host asked the clock for, in ms.
@@ -39,7 +41,7 @@ beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-retry-`)
 	process.env.HAL_HOME = home
 	liveFiles.onError = () => {}
-	host.stream = fakeStream
+	turns.stream = fakeStream
 	now = 1_800_000_000_000
 	slept = []
 	hold = false
@@ -114,7 +116,7 @@ test('a temporary failure retries at once, then backs off, and never gives up', 
 	for (let i = 2; i < gaps.length; i++) expect(gaps[i]!).toBeGreaterThanOrEqual(gaps[i - 1]!)
 	expect(gaps.at(-1)!).toBeGreaterThan(gaps[1]!)
 	expect(Math.max(...gaps)).toBeLessThanOrEqual(60_000)
-	expect(host.stateOf(id)).toEqual({ type: 'idle' })
+	expect(status.stateOf(id)).toEqual({ type: 'idle' })
 	expect((await history.read(id)).filter((r) => r.type === 'turn_end')).toHaveLength(1)
 })
 
@@ -126,7 +128,7 @@ test('a stream cut off mid-answer continues, and the model is told', async () =>
 	let messages = calls[1]!.input.messages
 	expect(messages.at(-2)).toEqual({ role: 'assistant', blocks: [{ type: 'text', text: 'half' }] })
 	expect(JSON.stringify(messages.at(-1))).toContain(replay.continueNote)
-	expect(host.stateOf(id).type).toBe('idle')
+	expect(status.stateOf(id).type).toBe('idle')
 })
 
 test('a rate limit waits for the time the provider gave, visible in snapshots; Escape pauses it', async () => {
@@ -135,15 +137,15 @@ test('a rate limit waits for the time the provider gave, visible in snapshots; E
 	script = [[{ type: 'error', message: 'HTTP 429 from fake: quota', status: 429, failure: 'limited', retryAt: at }]]
 	hold = true
 	let id = start(a)
-	await until(() => host.stateOf(id).type === 'retrying')
-	expect(host.stateOf(id)).toEqual({ type: 'retrying', at: new Date(at).toISOString(), reason: 'HTTP 429 from fake: quota' })
+	await until(() => status.stateOf(id).type === 'retrying')
+	expect(status.stateOf(id)).toEqual({ type: 'retrying', at: new Date(at).toISOString(), reason: 'HTTP 429 from fake: quota' })
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
 	expect((b.events[0] as any).snapshot.state).toMatchObject({ type: 'retrying', at: new Date(at).toISOString() })
 	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.ends().length)
 	expect(a.ends()[0]).toMatchObject({ status: 'paused' })
-	expect(host.stateOf(id)).toEqual({ type: 'paused' })
+	expect(status.stateOf(id)).toEqual({ type: 'paused' })
 	expect(calls).toHaveLength(1)
 })
 
@@ -163,8 +165,8 @@ test('broken login blocks until the credentials file changes, then continues by 
 	let login: StreamEvent = { type: 'error', message: 'auth.ason: refresh failed: invalid_grant', failure: 'auth' }
 	script = [[login], done]
 	let id = start(a)
-	await until(() => host.stateOf(id).type === 'blocked')
-	expect(host.stateOf(id)).toEqual({ type: 'blocked', reason: expect.stringMatching(/log in.*invalid_grant/) })
+	await until(() => status.stateOf(id).type === 'blocked')
+	expect(status.stateOf(id)).toEqual({ type: 'blocked', reason: expect.stringMatching(/log in.*invalid_grant/) })
 	expect(calls).toHaveLength(1)
 	changed()
 	await until(() => a.ends().length)
@@ -177,7 +179,7 @@ test('a rejected token (auth with a retry time) retries instead of blocking', as
 	let id = start(a)
 	await until(() => a.ends().length)
 	expect(a.states().some((s) => s.type === 'blocked')).toBe(false)
-	expect(host.stateOf(id).type).toBe('idle')
+	expect(status.stateOf(id).type).toBe('idle')
 })
 
 test('Escape while blocked pauses', async () => {
@@ -185,10 +187,10 @@ test('Escape while blocked pauses', async () => {
 	auth.changed = (signal) => new Promise<void>((r) => signal?.addEventListener('abort', () => r()))
 	script = [[{ type: 'error', message: 'no credentials', failure: 'auth' }]]
 	let id = start(a)
-	await until(() => host.stateOf(id).type === 'blocked')
+	await until(() => status.stateOf(id).type === 'blocked')
 	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.ends().length)
-	expect(host.stateOf(id)).toEqual({ type: 'paused' })
+	expect(status.stateOf(id)).toEqual({ type: 'paused' })
 })
 
 test('a bad request ends the turn in error with the provider message; continue retries it', async () => {
@@ -196,10 +198,10 @@ test('a bad request ends the turn in error with the provider message; continue r
 	script = [[{ type: 'error', message: 'HTTP 400 from fake: image input not supported', status: 400 }], done]
 	let id = start(a)
 	await until(() => a.ends().length)
-	expect(host.stateOf(id)).toEqual({ type: 'error', message: 'HTTP 400 from fake: image input not supported' })
+	expect(status.stateOf(id)).toEqual({ type: 'error', message: 'HTTP 400 from fake: image input not supported' })
 	expect(calls).toHaveLength(1)
 	a.conn.send({ type: 'continue', sessionId: id })
 	await until(() => a.ends().length === 2)
-	expect(host.stateOf(id).type).toBe('idle')
+	expect(status.stateOf(id).type).toBe('idle')
 	expect(calls[1]!.input.messages).toEqual(calls[0]!.input.messages)
 })

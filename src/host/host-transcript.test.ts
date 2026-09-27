@@ -7,11 +7,12 @@ import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
 import { host } from './host.ts'
+import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 
 const savedHome = process.env.HAL_HOME
-const origStream = host.stream
+const origStream = turns.stream
 const origOnError = liveFiles.onError
 let home = ''
 
@@ -45,14 +46,14 @@ beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-transcript-`)
 	process.env.HAL_HOME = home
 	liveFiles.onError = () => {}
-	host.stream = scripted
+	turns.stream = scripted
 	pushes = []
 })
 
 afterEach(() => {
 	host.reset()
 	sessions.closeAll()
-	host.stream = origStream
+	turns.stream = origStream
 	liveFiles.onError = origOnError
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome

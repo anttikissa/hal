@@ -11,11 +11,13 @@ import { drafts, type Local } from '../common/drafts.ts'
 import type { Draft, Event } from '../common/protocol.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { prompts } from './prompts.ts'
+import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 
 const savedHome = process.env.HAL_HOME
-const origStream = host.stream
+const origStream = turns.stream
 const origStore = drafts.store
 const origSchedule = connection.schedule
 const origOnError = liveFiles.onError
@@ -90,13 +92,13 @@ function phone() {
 	return p
 }
 
-const prompts = () => history.readSync(id).filter((r) => r.type === 'user')
+const userRecords = () => history.readSync(id).filter((r) => r.type === 'user')
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-drafts-`)
 	process.env.HAL_HOME = home
 	liveFiles.onError = () => {}
-	host.stream = async function* (): AsyncGenerator<StreamEvent> {
+	turns.stream = async function* (): AsyncGenerator<StreamEvent> {
 		yield { type: 'text', text: 'ok' }
 		yield { type: 'done', reason: 'end' }
 	}
@@ -119,7 +121,7 @@ afterEach(() => {
 	sessions.closeAll()
 	drafts.reset()
 	drafts.store = origStore
-	host.stream = origStream
+	turns.stream = origStream
 	connection.schedule = origSchedule
 	liveFiles.onError = origOnError
 	if (savedHome === undefined) delete process.env.HAL_HOME
@@ -180,7 +182,7 @@ test('disconnect then send: pending until acknowledged, submitted once', async (
 	up = true
 	retries.shift()!()
 	await until(() => drafts.pending(id).length === 0)
-	expect(prompts()).toHaveLength(1)
+	expect(userRecords()).toHaveLength(1)
 	expect(phone().draft?.text).toBe('')
 	expect(JSON.parse(stored.get(id)!).sending).toEqual([])
 })
@@ -192,14 +194,14 @@ test('client crash before the acknowledgement: resent once, never twice', async 
 	// The host takes the prompt, but the ack never arrives.
 	loseAfter = (e) => e.type === 'ack'
 	drafts.submit(id, 'important')
-	await until(() => prompts().length === 1)
+	await until(() => userRecords().length === 1)
 	// Crash: memory gone, the local store survives.
 	connection.stop()
 	loseAfter = null
 	events = []
 	await client()
 	await until(() => drafts.pending(id).length === 0)
-	expect(prompts()).toHaveLength(1)
+	expect(userRecords()).toHaveLength(1)
 	expect(drafts.text(id)).toBe('')
 })
 
@@ -214,13 +216,13 @@ test('client crash before the host had the prompt: sent after restart', async ()
 	events = []
 	await client()
 	await until(() => drafts.pending(id).length === 0)
-	expect(prompts().map((r) => (r.type === 'user' && r.blocks[0]?.type === 'text' ? r.blocks[0].text : ''))).toEqual(['never arrived'])
+	expect(userRecords().map((r) => (r.type === 'user' && r.blocks[0]?.type === 'text' ? r.blocks[0].text : ''))).toEqual(['never arrived'])
 })
 
 test('a refused prompt goes back into the editor, before text typed since', async () => {
 	await client()
-	let origSubmit = host.submit
-	host.submit = () => 'disk full'
+	let origSubmit = prompts.submit
+	prompts.submit = () => 'disk full'
 	try {
 		up = false
 		cut!()
@@ -231,7 +233,7 @@ test('a refused prompt goes back into the editor, before text typed since', asyn
 		retries.shift()!()
 		await until(() => events.some((e) => e.type === 'rejected'))
 	} finally {
-		host.submit = origSubmit
+		prompts.submit = origSubmit
 	}
 	expect(drafts.pending(id)).toEqual([])
 	expect(drafts.text(id)).toBe('lost?\ntyped on')
@@ -240,7 +242,7 @@ test('a refused prompt goes back into the editor, before text typed since', asyn
 
 test('a prompt sent while a turn runs steers it, and is pending until the host has it', async () => {
 	await client()
-	host.stream = () => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise<IteratorResult<StreamEvent>>(() => {}) }) })
+	turns.stream = () => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise<IteratorResult<StreamEvent>>(() => {}) }) })
 	drafts.submit(id, 'first')
 	drafts.submit(id, 'later', true)
 	await until(() => drafts.pending(id).length === 0)

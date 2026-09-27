@@ -5,7 +5,7 @@
 // Opening a session repairs its history: a partially written last record
 // (the host died mid-write) is cut off. Any other malformed record is
 // reported and the file is left untouched. A turn with no end record is
-// unfinished, not broken: the host continues it (host.recover).
+// unfinished, not broken: the host continues it (turns.recover).
 
 import { appendFileSync, existsSync, openSync, readFileSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
 import { ason } from '../common/ason.ts'

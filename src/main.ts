@@ -14,6 +14,7 @@ import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
 import { diag } from './host/diag.ts'
 import { host } from './host/host.ts'
+import { turns } from './host/turns.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
 import { server } from './host/server.ts'
@@ -70,7 +71,7 @@ function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) 
 // host left unfinished.
 async function becomeHost(): Promise<boolean> {
 	if (!(await server.serve())) return false
-	host.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
+	turns.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
 	return true
 }
 

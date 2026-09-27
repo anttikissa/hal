@@ -6,6 +6,7 @@ import { transcript, type Transcript } from '../common/transcript.ts'
 import { commands } from './commands.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
@@ -124,7 +125,7 @@ test('a command question survives a restart; no answers it and nothing changes',
 	host.reset()
 	sessions.closeAll()
 	history.state.running.clear()
-	await host.recover()
+	await turns.recover()
 	let b = await opened(id)
 	expect(b.views.get(id)!.state).toEqual({ type: 'blocked', reason: 'question' })
 	expect(b.of('turn-start')).toEqual([])

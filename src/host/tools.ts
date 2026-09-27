@@ -19,7 +19,7 @@ export type ToolContext = { cwd: string; signal: AbortSignal }
 
 // Returns the output; throwing makes an error result with the message.
 // `readOnly`: running it changes nothing, so an edited prompt may
-// replace the turn that ran it (host.amend).
+// replace the turn that ran it (prompts.amend).
 export type Tool = { def: ToolDef; readOnly?: true; run(input: Record<string, unknown>, ctx: ToolContext): Promise<string> }
 
 function positive(input: Record<string, unknown>, key: string): number | undefined {
