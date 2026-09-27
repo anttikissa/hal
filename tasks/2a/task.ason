@@ -3,14 +3,18 @@
 	description: `A prompt can carry attachments. A client sends each once with an \`attach\` command { sessionId, mediaType, data (base64), name? }; the host checks it (png, jpeg, gif or webp images, or text/plain; at most 5 MB decoded; refused otherwise with a reason), stores it as sessions/<id>/blobs/<blobId>.<ext> with a random blob id, and answers that client with an \`attached\` event naming the command and the blob. The prompt text holds a marker for it: [image <blobId>] or [paste <blobId>, N lines]. When a prompt is submitted, the host resolves the markers of that session's blobs: an image becomes an image block { type: 'image', blob, mediaType } in the user record, and a paste becomes its text. History holds blob references, never the bytes. Providers read the bytes when they build a request: Anthropic as a base64 image source, OpenAI-compatible as an image_url data URL; replay and amend keep image blocks. A marker naming no blob of the session stays text, and the host tells the client.
 Clients show an image block as a line like [image 12 kB png] in the terminal and as the image in the web, served by an authenticated GET /blob/<sessionId>/<blobId> (the login cookie; only blobs of that session, only by exact id; no path from the request reaches the file system).
 Tests: an attached png reaches both providers' request bodies as an image; history has no base64; a forged marker or a blob of another session is not resolved; the web route refuses a missing cookie and a path with slashes or dots.`,
-	status: 'planned',
-	needs: [
-		'yq',
-		'1b'
-	],
+	status: 'done',
+	needs: ['yq', '1b'],
 	notes: [
 		'old-attachments.ts resolved [path.png] markers pointing anywhere on disk and let .txt markers read files under /tmp/hal. hal2 must not: only blobs the host stored for that session resolve. old-blob.ts and old-web-upload.ts are reference for storage and upload limits.',
 		'The Anthropic API limits images to about 5 MB each and some OpenAI-compatible endpoints reject images; a provider without image support should get a text note in place of the image, not a failed request.',
-		'Protocol messages are ASON over the socket and the WebSocket; a 5 MB base64 string is one large message. Measure that the socket framing and ason.parse handle it before choosing a smaller cap or chunking.'
+		'Protocol messages are ASON over the socket and the WebSocket; a 5 MB base64 string is one large message. Measure that the socket framing and ason.parse handle it before choosing a smaller cap or chunking.',
+		"Measured: a 5 MB attachment is ~7 MB of base64; ason.stringify takes ~4 ms and ason.parse ~16 ms, the socket line limit is 256 MB and Bun's WebSocket default maxPayloadLength 16 MB, so one attach message holds it without chunking.",
+		'Image markers stay in the prompt text (the model can tell which image the words mean); the image blocks follow the texts in the user record. A paste marker is replaced by its text when the prompt is recorded, so history holds pasted text but never image bytes.',
+		"An edit (amend) resolves the prompt's texts again: an image stays while its marker does, and deleting the marker drops it (what task zc wants). Resolution dedupes by blob id.",
+		"ImageBlock carries an optional `bytes` (decoded size) so clients can label it without reaching the blob; turn-start and prompt events carry `images` so a live transcript equals a snapshot's.",
+		'Providers get bytes through ProviderRequest.image(blob) (base64, read per request by blobs.base64); a missing file or an OpenAI-compatible endpoint with `images: false` becomes a <meta> text note (provider.imageNote).',
+		"A marker naming no blob of the session is answered with a `warning` event to the submitting client only. attach is in host's `once` set: a resend gets the same `attached` event, nothing stored twice. The attach `name` is accepted but not stored.",
+		'Blob ids are 12 lowercase hex digits; blobs.find tries each known extension, so the id is never joined to anything taken from a request. Stored bytes are checked against the media type (magic numbers, or valid UTF-8 for text/plain).'
 	]
 }

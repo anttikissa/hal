@@ -12,7 +12,12 @@ export type ToolCallBlock = { type: 'tool_call'; id: string; name: string; input
 
 export type ToolResultBlock = { type: 'tool_result'; id: string; output: string; isError?: boolean }
 
-export type UserBlock = TextBlock | ToolResultBlock
+// An attached image (task 2a): a reference to the session's blob, never
+// its bytes; providers read those when they build a request. `bytes`:
+// its decoded size, for display.
+export type ImageBlock = { type: 'image'; blob: string; mediaType: string; bytes?: number }
+
+export type UserBlock = TextBlock | ToolResultBlock | ImageBlock
 export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock
 
 export type Message = { role: 'user'; blocks: UserBlock[] } | { role: 'assistant'; blocks: AssistantBlock[] }

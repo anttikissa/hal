@@ -17,6 +17,7 @@ import { ason } from '../common/ason.ts'
 import { protocol, type Command, type Event, type Snapshot } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { commands } from './commands.ts'
+import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
 import { config } from './config.ts'
 import { diag } from './diag.ts'
@@ -37,8 +38,9 @@ export type Connection = {
 
 type Client = { deliver: (event: Event) => void; open: Set<string> }
 // What a command did: refused (why), or done, naming a created session
-// (followed) or the tab a tab command created, reopened or picked.
-type Outcome = { refused?: string; sessionId?: string; tab?: string }
+// (followed) or the tab a tab command created, reopened or picked, or
+// with the event that answered it (attached), sent again on a repeat.
+type Outcome = { refused?: string; sessionId?: string; tab?: string; reply?: Event }
 
 // The in-memory stand-in for the wire: both directions go through ASON,
 // so nothing non-serializable or shared by reference crosses it.
@@ -106,7 +108,7 @@ function reject(client: Client, command: unknown, reason: string, sessionId?: un
 // Commands whose effect outlives the connection. A repeat of one of
 // these ids is answered as before and not carried out again. Opening
 // and closing are per connection, so a repeat always acts.
-const once = new Set(['create', 'submit', 'draft', 'pause', 'continue', 'answer', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start'])
+const once = new Set(['create', 'submit', 'draft', 'pause', 'continue', 'answer', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start'])
 
 // Records what a command with an id did, forgetting the oldest beyond
 // host.remembered().
@@ -150,6 +152,7 @@ function answer(client: Client, c: Command, outcome: Outcome, repeat = true): vo
 	let sessionId = 'sessionId' in c ? c.sessionId : outcome.sessionId
 	if (outcome.refused !== undefined) return host.reject(client, c, outcome.refused, sessionId)
 	if (repeat && outcome.sessionId) host.follow(client, outcome.sessionId)
+	if (outcome.reply) client.deliver(outcome.reply)
 	if (c.id !== undefined) client.deliver({ type: 'ack', id: c.id, ...(outcome.tab ? { tab: outcome.tab } : {}) })
 }
 
@@ -190,7 +193,12 @@ function act(client: Client, c: Command): Outcome | undefined {
 	}
 	let refused: string | undefined
 	if (c.type === 'close') client.open.delete(c.sessionId)
-	else if (c.type === 'submit') {
+	else if (c.type === 'attach') {
+		let stored = blobs.store(c.sessionId, c.mediaType, c.data)
+		return { reply: { type: 'attached', sessionId: c.sessionId, command: c.id ?? '', blob: stored.blob, marker: stored.marker } }
+	} else if (c.type === 'submit') {
+		let unknown = commands.parse(c.text) ? [] : blobs.unknown(c.sessionId, c.text)
+		if (unknown.length) client.deliver({ type: 'warning', text: `${unknown.join(', ')} names no attachment of this session; sent as text` })
 		// A slash command runs even when typed while editing a prompt.
 		let amending = c.amend && !c.queue && !commands.parse(c.text)
 		refused = amending ? prompts.amend(c.sessionId, c.text, c.id) : prompts.submit(c.sessionId, c.text, c.id, c.queue, c.from)

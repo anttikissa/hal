@@ -433,3 +433,11 @@ describe('modals', () => {
 		expect(rowOf(39)).toBe(bottom - 1)
 	})
 })
+
+test('an attached image shows as one line naming its size and type under its prompt', () => {
+	setup(10, 40)
+	show([{ type: 'prompt', text: 'look' }, { type: 'image', blob: '0123456789ab', mediaType: 'image/png', bytes: 12_345 }])
+	let lines = frameText()
+	let at = lines.findIndex((l) => l.includes('look'))
+	expect(lines.slice(at + 1).find((l) => l.trim())).toMatch(/^\s*\[image 12 kB png\]$/)
+})

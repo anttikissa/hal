@@ -5,7 +5,7 @@
 // from history on the host, never from here, so items drop what only a
 // provider needs (thinking signatures, their provider).
 
-import { blocks, type AssistantBlock, type ToolResultBlock, type Usage } from './blocks.ts'
+import { blocks, type AssistantBlock, type ImageBlock, type ToolResultBlock, type Usage } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
 import type { InboxItem } from './inbox.ts'
 import type { Event, LiveTurn, Snapshot, TurnStatus } from './protocol.ts'
@@ -15,6 +15,8 @@ import type { SessionState } from './states.ts'
 
 export type Item =
 	| { type: 'prompt'; text: string }
+	// An image attached to the prompt before it (task 2a).
+	| { type: 'image'; blob: string; mediaType: string; bytes?: number }
 	| { type: 'text'; text: string }
 	| { type: 'thinking'; text: string }
 	| { type: 'tool'; id: string; name: string; input: Record<string, unknown> }
@@ -55,6 +57,12 @@ function blockItems(list: AssistantBlock[]): Item[] {
 	return out
 }
 
+function imageItem(b: ImageBlock): Item {
+	let item: Item = { type: 'image', blob: b.blob, mediaType: b.mediaType }
+	if (b.bytes !== undefined) item.bytes = b.bytes
+	return item
+}
+
 function resultItem(b: ToolResultBlock): Item {
 	let item: Item = { type: 'tool-result', id: b.id, output: b.output }
 	if (b.isError) item.isError = true
@@ -67,7 +75,7 @@ function recordItems(r: HistoryRecord): Item[] {
 	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change') return []
 	if (r.type === 'question') return [{ type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
-	if (r.type === 'user') return r.blocks.map((b): Item => (b.type === 'text' ? { type: 'prompt', text: b.text } : transcript.resultItem(b)))
+	if (r.type === 'user') return r.blocks.map((b): Item => (b.type === 'text' ? { type: 'prompt', text: b.text } : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
 
@@ -148,7 +156,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	}
 	if (event.type === 'turn-start') {
 		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
-		let items: Item[] = [...t.items, { type: 'prompt', text: event.prompt }]
+		let items: Item[] = [...t.items, { type: 'prompt', text: event.prompt }, ...(event.images ?? []).map((b) => transcript.imageItem(b))]
 		return { ...t, items, prompt: t.items.length, live: { start: items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
 	}
 	let question: Item | undefined = event.type === 'question' ? { type: 'question', id: event.id, form: event.form } : undefined
@@ -185,7 +193,8 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' }): Transcript {
 	let keep = event.replaces && t.prompt !== undefined ? items.slice(0, t.prompt) : items
 	let { live: _live, ...rest } = t
-	return { ...rest, items: [...keep, ...event.texts.map((text): Item => ({ type: 'prompt', text }))], prompt: keep.length }
+	let images = (event.images ?? []).map((b) => transcript.imageItem(b))
+	return { ...rest, items: [...keep, ...event.texts.map((text): Item => ({ type: 'prompt', text })), ...images], prompt: keep.length }
 }
 
 // Where the history a client got in a snapshot ends (an index into
@@ -204,4 +213,4 @@ function resumedLabel(r: Resumed, now = new Date()): string {
 	return `resumed · last turn ${replay.clock(r.last, now.toISOString())}`
 }
 
-export const transcript = { blockItems, resultItem, recordItems, endItem, aside, answered, question, fromSnapshot, copyTurn, fold, prompted, resumed, resumedLabel }
+export const transcript = { blockItems, imageItem, resultItem, recordItems, endItem, aside, answered, question, fromSnapshot, copyTurn, fold, prompted, resumed, resumedLabel }

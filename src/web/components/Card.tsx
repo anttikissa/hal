@@ -10,7 +10,8 @@ import { createSignal, flush, Show } from 'solid-js'
 import { scroll } from '../scroll.ts'
 import { view, type Row } from '../view.ts'
 
-export function Card(props: { row: Row }) {
+// An image row shows the image itself, from the session's blob.
+export function Card(props: { row: Row; session: string }) {
 	let [open, setOpen] = createSignal(false)
 	let shown = () => view.show(props.row.item)
 	let result = () => props.row.result && view.show(props.row.result)
@@ -31,10 +32,20 @@ export function Card(props: { row: Row }) {
 			flush()
 		}, 'track')
 	}
+	let plain = (s: { kind: string; text: string }) => {
+		let item = props.row.item
+		let classes = ['Card', ...s.kind.split(' ')]
+		if (item.type !== 'image') return <div class={classes}>{s.text}</div>
+		return (
+			<div class={classes}>
+				<img src={view.blobUrl(props.session, item.blob)} alt={s.text} />
+			</div>
+		)
+	}
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<Show when={folds()} fallback={<div class={['Card', ...s().kind.split(' ')]}>{s().text}</div>}>
+				<Show when={folds()} fallback={plain(s())}>
 					<article class={['Card', 'folds', ...s().kind.split(' '), open() ? 'open' : '']} onClick={toggle}>
 						<button type="button" class="head" aria-expanded={open() ? 'true' : 'false'}>
 							<span class="mark" aria-hidden="true">

@@ -6,20 +6,31 @@ import { provider, type Provider, type ProviderRequest, type SseMessage } from '
 
 // keyEnv names the environment variable holding the API key; without
 // one (local servers) no Authorization header is sent.
-export type Endpoint = { baseUrl: string; keyEnv?: string }
+// `images: false`: the server rejects image input, so the model is told
+// in text that one was attached instead.
+export type Endpoint = { baseUrl: string; keyEnv?: string; images?: false }
 
-function toMessages(req: ProviderRequest): unknown[] {
+// `images`: whether the endpoint takes image input.
+function toMessages(req: ProviderRequest, images = true): unknown[] {
 	let out: unknown[] = []
 	if (req.system) out.push({ role: 'system', content: req.system })
 	for (let msg of req.messages) {
 		if (msg.role === 'user') {
 			// Tool results must directly follow the assistant's tool_calls.
 			let texts: string[] = []
+			let parts: unknown[] = []
 			for (let b of msg.blocks) {
 				if (b.type === 'text') texts.push(b.text)
-				else out.push({ role: 'tool', tool_call_id: b.id, content: b.isError ? `Error: ${b.output}` : b.output })
+				else if (b.type === 'tool_result') out.push({ role: 'tool', tool_call_id: b.id, content: b.isError ? `Error: ${b.output}` : b.output })
+				else {
+					let data = images ? req.image?.(b.blob) : undefined
+					if (data !== undefined) parts.push({ type: 'image_url', image_url: { url: `data:${b.mediaType};base64,${data}` } })
+					else texts.push(provider.imageNote(images ? 'its file is gone' : 'this model cannot see images'))
+				}
 			}
-			if (texts.length) out.push({ role: 'user', content: texts.join('\n\n') })
+			let text = texts.join('\n\n')
+			if (parts.length) out.push({ role: 'user', content: [...(text ? [{ type: 'text', text }] : []), ...parts] })
+			else if (texts.length) out.push({ role: 'user', content: text })
 			continue
 		}
 		// Thinking is dropped: Chat Completions has no reasoning input.
@@ -34,10 +45,10 @@ function toMessages(req: ProviderRequest): unknown[] {
 	return out
 }
 
-function body(req: ProviderRequest): Record<string, unknown> {
+function body(req: ProviderRequest, images = true): Record<string, unknown> {
 	let b: Record<string, unknown> = {
 		model: req.model,
-		messages: openaiCompat.toMessages(req),
+		messages: openaiCompat.toMessages(req, images),
 		stream: true,
 		stream_options: { include_usage: true },
 	}
@@ -129,7 +140,8 @@ function create(name: string): Provider {
 	return {
 		request(req) {
 			let { base, headers } = openaiCompat.endpoint(name)
-			return { url: `${base}/chat/completions`, headers, body: openaiCompat.body(req) }
+			let images = openaiCompat.endpoints()[name]?.images !== false
+			return { url: `${base}/chat/completions`, headers, body: openaiCompat.body(req, images) }
 		},
 		parse: openaiCompat.parse,
 		// GET /models, which OpenRouter, Ollama and most servers offer.

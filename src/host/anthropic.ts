@@ -29,8 +29,14 @@ function redactedData(signature: string): string | undefined {
 	}
 }
 
-function userBlock(b: UserBlock): unknown {
+// An image goes as a base64 source, read now from the session's blob.
+function userBlock(b: UserBlock, req: ProviderRequest): unknown {
 	if (b.type === 'text') return { type: 'text', text: b.text }
+	if (b.type === 'image') {
+		let data = req.image?.(b.blob)
+		if (data === undefined) return { type: 'text', text: provider.imageNote('its file is gone') }
+		return { type: 'image', source: { type: 'base64', media_type: b.mediaType, data } }
+	}
 	return { type: 'tool_result', tool_use_id: b.id, content: b.output, ...(b.isError ? { is_error: true } : {}) }
 }
 
@@ -47,7 +53,7 @@ function assistantBlock(b: AssistantBlock): unknown {
 function toMessages(req: ProviderRequest): any[] {
 	let out: any[] = []
 	for (let m of req.messages) {
-		let content = m.role === 'user' ? m.blocks.map(userBlock) : m.blocks.map(assistantBlock).filter(Boolean)
+		let content = m.role === 'user' ? m.blocks.map((b) => userBlock(b, req)) : m.blocks.map(assistantBlock).filter(Boolean)
 		// The API rejects empty text blocks and empty messages.
 		content = content.filter((b: any) => b.type !== 'text' || b.text !== '')
 		if (content.length) out.push({ role: m.role, content })

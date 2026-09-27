@@ -3,13 +3,14 @@
 // unfinished on disk. A turn with no end record is unfinished; whichever
 // process becomes host continues it (recover).
 
-import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolCallBlock, type ToolResultBlock, type Usage } from '../common/blocks.ts'
+import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type StreamEvent, type ToolCallBlock, type ToolResultBlock, type Usage } from '../common/blocks.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states, type StateEvent } from '../common/states.ts'
 import { approval } from './approval.ts'
 import { auth } from './auth.ts'
+import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
@@ -45,13 +46,15 @@ function ask(id: string, form: Form, call?: string): void {
 }
 
 // Runs a turn whose prompt or `continue` record is in history.
-// `answers`: the fresh answer to its question, secrets included.
-function start(id: string, prompt?: string, answers?: Answers): void {
+// `answers`: the fresh answer to its question, secrets included;
+// `images`: the prompt's image blocks, for followers to show.
+function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[]): void {
 	let model = sessions.open(id).model
 	let running: Running = { provider: blocks.parseModelId(model)?.provider ?? model, controller: new AbortController() }
 	turns.state.running.set(id, running)
 	let event: Event = { type: 'turn-start', sessionId: id, provider: running.provider }
 	if (prompt !== undefined) event.prompt = prompt
+	if (images?.length) event.images = images
 	host.broadcast(id, event)
 	running.done = turns.runTurn(id, model, running, answers).catch((e) => diag.log(`turn ${id}: ${e?.message ?? e}`))
 }
@@ -158,7 +161,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		let scripted = synthetic.find(model)
 		if (!scripted) {
 			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model, now: clock.now() })
-			return yield* turns.stream(model, { system, messages: await history.messages(id), tools: tools.defs() }, signal)
+			return yield* turns.stream(model, { system, messages: await history.messages(id), tools: tools.defs(), image: (blob) => blobs.base64(id, blob) }, signal)
 		}
 		let reply = scripted(await history.read(id), answers)
 		answers = undefined

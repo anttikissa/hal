@@ -12,11 +12,13 @@
 // provider (replay.current), history staying append-only. Otherwise it
 // is sent on top like any prompt.
 
+import type { ImageBlock, UserBlock } from '../common/blocks.ts'
 import type { InboxItem } from '../common/inbox.ts'
 import { forms, type Answers } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states } from '../common/states.ts'
+import { blobs } from './blobs.ts'
 import { commands } from './commands.ts'
 import { diag } from './diag.ts'
 import { drafts } from './drafts.ts'
@@ -49,8 +51,9 @@ function submit(id: string, text: string, command?: string, queue = false, from?
 	if (refused) return refused
 	let steering = status.inboxOf(id).filter((m) => !m.queue)
 	if (!steering.length) {
-		history.submit(id, text, command)
-		return void turns.start(id, text)
+		let { blocks } = blobs.resolve(id, [text])
+		history.submit(id, blocks, command)
+		return void turns.start(id, prompts.texts(blocks)[0], undefined, prompts.images(blocks))
 	}
 	prompts.deliver(id, steering, text, command)
 	turns.start(id)
@@ -68,12 +71,14 @@ function amend(id: string, text: string, command?: string): string | undefined {
 	if (states.busy(status.stateOf(id, records)) || old?.type !== 'user' || !prompts.harmless(records.slice(at + 1))) return prompts.submit(id, text, command)
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return refused
-	let texts = old.blocks.flatMap((b) => (b.type === 'text' ? [b.text] : []))
+	let texts = prompts.texts(old.blocks)
 	texts[texts.length - 1] = text
-	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks: texts.map((t) => ({ type: 'text', text: t })), replaces: true }
+	// Images stay while their markers do: the texts are resolved again.
+	let { blocks } = blobs.resolve(id, texts)
+	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, replaces: true }
 	if (command !== undefined) record.command = command
 	history.append(id, record)
-	host.broadcast(id, { type: 'prompt', sessionId: id, texts, replaces: true })
+	host.broadcast(id, prompts.promptEvent(id, blocks, true))
 	turns.start(id)
 }
 
@@ -94,17 +99,37 @@ function drain(id: string): void {
 	turns.start(id)
 }
 
-// Records inbox messages (and a new prompt `text`) as one prompt and
-// tells followers: a `prompt` event, or with `quiet` nothing, as the
-// caller's turn-start carries it.
-function deliver(id: string, items: InboxItem[], text?: string, command?: string, quiet = false): void {
+// Records inbox messages (and a new prompt `text`) as one prompt, its
+// attachment markers resolved (blobs.resolve), and tells followers: a
+// `prompt` event, or with `quiet` nothing, as the caller's turn-start
+// carries it. Returns the prompt's blocks.
+function deliver(id: string, items: InboxItem[], text?: string, command?: string, quiet = false): UserBlock[] {
 	let texts = items.map((m) => m.text)
 	if (text !== undefined) texts.push(text)
-	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks: texts.map((t) => ({ type: 'text', text: t })), inbox: items.map((m) => m.id) }
+	let { blocks } = blobs.resolve(id, texts)
+	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, inbox: items.map((m) => m.id) }
 	if (command !== undefined) record.command = command
 	history.append(id, record)
 	host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
-	if (!quiet) host.broadcast(id, { type: 'prompt', sessionId: id, texts })
+	if (!quiet) host.broadcast(id, prompts.promptEvent(id, blocks))
+	return blocks
+}
+
+function texts(list: UserBlock[]): string[] {
+	return list.flatMap((b) => (b.type === 'text' ? [b.text] : []))
+}
+
+function images(list: UserBlock[]): ImageBlock[] {
+	return list.filter((b): b is ImageBlock => b.type === 'image')
+}
+
+// The `prompt` event telling followers of a prompt record's blocks.
+function promptEvent(id: string, list: UserBlock[], replaces = false): Event {
+	let event: Event & { type: 'prompt' } = { type: 'prompt', sessionId: id, texts: prompts.texts(list) }
+	let shown = prompts.images(list)
+	if (shown.length) event.images = shown
+	if (replaces) event.replaces = true
+	return event
 }
 
 // Before a request: delivers the steering messages waiting, if any.
@@ -117,8 +142,8 @@ function steer(id: string): void {
 function next(id: string): void {
 	let queued = status.inboxOf(id).find((m) => m.queue)
 	if (!queued || status.transition(id, { type: 'submit' })) return
-	prompts.deliver(id, [queued], undefined, undefined, true)
-	turns.start(id, queued.text)
+	let list = prompts.deliver(id, [queued], undefined, undefined, true)
+	turns.start(id, prompts.texts(list)[0], undefined, prompts.images(list))
 }
 
 // After a submit: the draft it was typed in is sent, so it clears
@@ -181,6 +206,9 @@ export const prompts = {
 	harmless,
 	drain,
 	deliver,
+	texts,
+	images,
+	promptEvent,
 	steer,
 	next,
 	sent,

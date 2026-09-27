@@ -4,6 +4,7 @@
 // it the events from link.ts; the components draw it.
 
 import { amend, type Editing } from '../common/amend.ts'
+import { attachments } from '../common/attachments.ts'
 import { completion } from '../common/completion.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
@@ -226,6 +227,9 @@ function show(item: Item): Shown {
 	switch (item.type) {
 		case 'prompt':
 			return { kind: 'user', text: item.text }
+		case 'image':
+			// The text is the image's alt text; Card shows the image.
+			return { kind: 'user image', text: attachments.label(item) }
 		case 'text':
 			return { kind: 'assistant', text: item.text }
 		case 'thinking':
@@ -260,7 +264,13 @@ function show(item: Item): Shown {
 	}
 }
 
+// Where the page loads a session's image from (host/web.ts).
+function blobUrl(sessionId: string, blob: string): string {
+	return `/blob/${encodeURIComponent(sessionId)}/${encodeURIComponent(blob)}`
+}
+
 export const view = {
+	blobUrl,
 	// Rows of a tool result shown in the transcript.
 	resultRows: () => 8,
 	onEvent,

@@ -13,11 +13,15 @@
 //                  each message is one ASON command, each event one
 //                  ASON message, like a socket client's lines. The page
 //                  picks its session with the open-newest command.
+//   GET  /blob/<session>/<blob>  an attachment of that session
+//                  (cookie; host/blobs.ts): the id is matched whole,
+//                  never used as a path.
 
 import type { BunPlugin, Server, ServerWebSocket } from 'bun'
 import { colors, type Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import { settings } from '../common/settings.ts'
+import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
 
@@ -110,11 +114,22 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response> | 
 	if (pathname === '/' && req.method === 'GET') return web.page()
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
 	let check = pathname === '/login' && req.method === 'GET'
-	if (!check && pathname !== '/ws') return new Response('not found\n', { status: 404 })
+	let blob = pathname.startsWith('/blob/') && req.method === 'GET'
+	if (!check && !blob && pathname !== '/ws') return new Response('not found\n', { status: 404 })
 	if (!web.authorized(req)) return new Response('log in first\n', { status: 401 })
+	if (blob) return web.blob(pathname)
 	if (check) return new Response(null, { status: 204 })
 	if (srv.upgrade(req, { data: {} })) return undefined
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
+}
+
+// One attachment, by exact session and blob id; anything else is 404.
+function blob(pathname: string): Response {
+	let m = /^\/blob\/([\w-]+)\/([0-9a-f]{12})$/.exec(pathname)
+	let found = m ? blobs.read(m[1]!, m[2]!) : undefined
+	if (!found) return new Response('not found\n', { status: 404 })
+	let type = found.mediaType === 'text/plain' ? 'text/plain; charset=utf-8' : found.mediaType
+	return new Response(new Uint8Array(found.bytes), { headers: { 'content-type': type, 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=31536000, immutable' } })
 }
 
 const websocket = {
@@ -160,6 +175,7 @@ export const web = {
 	build,
 	page,
 	login,
+	blob,
 	fetch,
 	start,
 	stop,

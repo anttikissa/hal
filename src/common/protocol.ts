@@ -11,7 +11,7 @@
 // carrying the id, and ignores a repeat of an id it has acted on, so a
 // command resent after a reconnect never acts twice.
 
-import type { AssistantBlock, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
+import type { AssistantBlock, ImageBlock, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
 import type { InboxItem } from './inbox.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
@@ -97,6 +97,11 @@ export type Command = (
 	| { type: 'tab-start'; cwd: string; last?: string }
 	// A client showed the tab: it no longer wants attention.
 	| { type: 'tab-seen'; sessionId: string }
+	// An attachment for a later prompt (task 2a): `data` is base64 of a
+	// png, jpeg, gif or webp image or of text/plain, at most
+	// attachments.maxBytes() decoded. Answered, to this client only, with
+	// `attached`; a prompt names it by that event's marker.
+	| { type: 'attach'; sessionId: string; mediaType: string; data: string; name?: string }
 ) & { id?: string }
 
 export type CommandType = Command['type']
@@ -110,8 +115,9 @@ export type Tab = { id: string; name: string; cwd: string; model: string; state:
 export type Event =
 	| { type: 'snapshot'; sessionId: string; snapshot: Snapshot }
 	// The prompt is now in history and a turn is running. No prompt: an
-	// earlier turn continues (a `continue` record).
-	| { type: 'turn-start'; sessionId: string; prompt?: string; provider: string }
+	// earlier turn continues (a `continue` record). `images`: the
+	// prompt's image blocks, after its text.
+	| { type: 'turn-start'; sessionId: string; prompt?: string; images?: ImageBlock[]; provider: string }
 	// The session's state changed.
 	| { type: 'state'; sessionId: string; state: SessionState }
 	// The inbox changed: every message now waiting.
@@ -119,7 +125,7 @@ export type Event =
 	// Inbox messages (and maybe a new prompt) are in history as one
 	// prompt, after the running turn's output so far. `replaces`: an edit
 	// that takes the place of the last prompt and everything after it.
-	| { type: 'prompt'; sessionId: string; texts: string[]; replaces?: true }
+	| { type: 'prompt'; sessionId: string; texts: string[]; images?: ImageBlock[]; replaces?: true }
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent }
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
@@ -144,7 +150,11 @@ export type Event =
 	// offer. Sent to the client that asked (`models`), or to every
 	// follower when /model runs alone.
 	| { type: 'models'; sessionId: string; current: string; items: string[] }
-	// Something the user should fix (config.ason); not tied to a session.
+	// Sent only to the client that attached: the command `command` (its
+	// id) stored blob `blob`, which a prompt names with `marker`.
+	| { type: 'attached'; sessionId: string; command: string; blob: string; marker: string }
+	// Something the user should fix (config.ason, a marker naming no
+	// attachment of the session); not tied to a session.
 	| { type: 'warning'; text: string }
 	// The tabs changed (or a client started): every tab, in order. Sent
 	// to every client; which one a client shows is its own business.
@@ -160,7 +170,7 @@ export type Event =
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -185,6 +195,7 @@ function invalid(value: unknown): string | undefined {
 		let strings = a && typeof a === 'object' && !Array.isArray(a) && Object.values(a).every((v) => typeof v === 'string')
 		return str('sessionId') ?? str('question') ?? (strings ? undefined : 'answer: answers must map names to strings')
 	}
+	if (c.type === 'attach') return str('sessionId') ?? str('mediaType') ?? str('data') ?? str('name', true)
 	if (c.type === 'submit') return str('sessionId') ?? str('text') ?? str('from', true)
 	return str('sessionId') ?? (c.type === 'draft' || c.type === 'complete' ? str('text') : undefined)
 }

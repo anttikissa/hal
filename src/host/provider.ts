@@ -16,6 +16,9 @@ export type ProviderRequest = {
 	messages: Message[]
 	tools?: ToolDef[]
 	maxTokens?: number
+	// An image block's bytes as base64 (the session's blob, task 2a),
+	// read as the request is built; undefined if they are gone.
+	image?: (blob: string) => string | undefined
 }
 
 // `account` names the credentials used, for providers with several
@@ -272,6 +275,8 @@ function register(name: string, p: Provider): void {
 }
 
 export const provider = {
+	// Told to the model in place of an image a request cannot carry.
+	imageNote: (why: string): string => `<meta>An image was attached here, but ${why}.</meta>`,
 	state: { providers: {} as Record<string, Provider> },
 	// Longest silence tolerated mid-stream; chunks normally arrive every ~100ms.
 	streamTimeoutMs: () => 120_000,

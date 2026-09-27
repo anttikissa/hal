@@ -25,6 +25,7 @@ interface and shared HTTP/SSE code in `src/host/provider.ts`.
 | neutral block            | Anthropic                                  | Responses                                        | Chat Completions |
 |--------------------------|--------------------------------------------|--------------------------------------------------|------------------|
 | user `text`              | user `{type:'text'}`                       | `{role:'user', content:[{type:'input_text'}]}`   | `{role:'user', content}` |
+| user `image` (task 2a)  | user `{type:'image', source:{type:'base64', media_type, data}}` | `{type:'input_image', image_url: data URL}` | `content:[{type:'text'}, {type:'image_url', image_url:{url: data URL}}]`; an endpoint with `images: false` gets a text note |
 | user `tool_result`       | user `{type:'tool_result', tool_use_id, content, is_error}` | item `{type:'function_call_output', call_id, output}` (no error flag: prefix text) | `{role:'tool', tool_call_id, content}` (no error flag) |
 | assistant `text`         | assistant `{type:'text'}`                  | `{role:'assistant', content:[{type:'output_text'}]}` | assistant `content` (texts joined) |
 | assistant `thinking`     | `{type:'thinking', thinking, signature}`; replay only own signature | reasoning item from signature (`{type:'reasoning', id, encrypted_content}`, summary rebuilt from text) | dropped (no reasoning input) |

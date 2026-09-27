@@ -11,6 +11,7 @@ import { appendFileSync, existsSync, openSync, readFileSync, readSync as readFd,
 import { ason } from '../common/ason.ts'
 import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock, type Turn, type Usage, type UserBlock } from '../common/blocks.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
+import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
 import { paths } from './paths.ts'
 import { provider, type ProviderRequest } from './provider.ts'
@@ -267,7 +268,7 @@ function live(id: string): Turn | undefined {
 // unanswered; the host's turns run them (host.ts).
 async function* turn(id: string, opts: Omit<ProviderRequest, 'model' | 'messages'> = {}, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
 	let modelId = sessions.open(id).model
-	let input = { ...opts, messages: await history.messages(id) }
+	let input = { ...opts, messages: await history.messages(id), image: (blob: string) => blobs.base64(id, blob) }
 	let providerName = blocks.parseModelId(modelId)?.provider ?? modelId
 	let last: DoneEvent | ErrorEvent | undefined
 	try {

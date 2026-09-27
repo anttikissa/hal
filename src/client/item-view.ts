@@ -1,6 +1,7 @@
 // Transcript items as the frame shows them: the rows of each item and
 // the style it wears. Pure.
 
+import { attachments } from '../common/attachments.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { forms, type Quote } from '../common/forms.ts'
 import { strings } from '../common/strings.ts'
@@ -20,6 +21,7 @@ function toolStyle(name: string): Style {
 function itemStyle(item: Item): Style | undefined {
 	switch (item.type) {
 		case 'prompt':
+		case 'image':
 			return colors.user()
 		case 'text':
 			return { fg: colors.assistant().fg! }
@@ -46,6 +48,8 @@ function itemLines(item: Item, width: number): string[] {
 	switch (item.type) {
 		case 'prompt':
 			return promptView.mark(ansi.wrap(item.text, promptWidth))
+		case 'image':
+			return [promptView.REST + attachments.label(item)]
 		case 'text':
 			return ansi.wrap(item.text, width)
 		case 'thinking':

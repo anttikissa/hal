@@ -6,6 +6,7 @@ import { colors } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
+import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
 import { turns } from './turns.ts'
@@ -125,6 +126,29 @@ test('login sets a long-lived HttpOnly cookie; a wrong password gets 401', async
 	let set = good.headers.get('set-cookie')!
 	expect(set).toMatch(/HttpOnly/i)
 	expect(Number(/Max-Age=(\d+)/i.exec(set)![1])).toBeGreaterThan(365 * 24 * 3600)
+})
+
+test('GET /blob serves a session’s attachment by exact id, with the cookie only', async () => {
+	await server.serve()
+	let id = sessions.create({ cwd: home }).id
+	let other = sessions.create({ cwd: home }).id
+	let png = Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.from('pixels')])
+	let { blob } = blobs.store(id, 'image/png', png.toString('base64'))
+	let jar = await cookie()
+	let get = (path: string, auth = true) => fetch(`${base()}${path}`, { headers: auth ? { cookie: jar } : {} })
+
+	let res = await get(`/blob/${id}/${blob}`)
+	expect(res.status).toBe(200)
+	expect(res.headers.get('content-type')).toBe('image/png')
+	expect(Buffer.from(await res.arrayBuffer())).toEqual(png)
+
+	expect((await get(`/blob/${id}/${blob}`, false)).status).toBe(401)
+	expect((await get(`/blob/${other}/${blob}`)).status).toBe(404)
+	expect((await get(`/blob/${id}/${blob.slice(0, -1)}`)).status).toBe(404)
+	expect((await get(`/blob/${id}/${blob}.png`)).status).toBe(404)
+	for (let path of [`/blob/${id}/..%2f..%2fconfig.ason`, `/blob/${id}/%2e%2e`, `/blob/${id}/blobs%2f${blob}`, `/blob/..%2f${id}/${blob}`, `/blob/${id}/${blob}/x`]) {
+		expect((await get(path)).status).toBe(404)
+	}
 })
 
 test('the password is a config function read at call time', async () => {

@@ -2,7 +2,7 @@
 // and the rebuild of provider input from them. Provider input comes from
 // these records alone, never from display state.
 
-import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock } from './blocks.ts'
+import type { AssistantBlock, Message, TextBlock, StopReason, ToolResultBlock, Usage, UserBlock } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
 
 // `paused`: the user stopped the turn (tasks/j1/states.md); it can
@@ -120,7 +120,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			pending = []
 			waiting = undefined
 			push({ role: 'user', blocks: [...results, ...missing] })
-			let texts = r.blocks.filter((b) => b.type === 'text')
+			let texts = r.blocks.filter((b): b is TextBlock => b.type === 'text')
 			if (!texts.length) continue
 			let head = [`[${replay.clock(r.ts, stamped)}]`, ...(note ? [note] : []), ...replay.changeNotes(changed)].join('\n')
 			stamped = r.ts
@@ -128,7 +128,9 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			changed = {}
 			// Never merged: a prompt always starts a message of its own. Its
 			// texts (several when it delivers the inbox) are one block.
-			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => b.text).join('\n\n')}` }] })
+			// Its images (task 2a) follow the text.
+			let images = r.blocks.filter((b) => b.type === 'image')
+			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => b.text).join('\n\n')}` }, ...images.map((b) => ({ ...b }))] })
 		}
 	}
 	return out

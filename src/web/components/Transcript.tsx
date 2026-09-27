@@ -27,7 +27,7 @@ export function Transcript(props: { view: ViewState; pending: string[] }) {
 				{(row, i) => (
 					<>
 						<Show when={markAt() === i}>{mark()}</Show>
-						<Show when={open(row())} fallback={<Card row={row()} />}>
+						<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} />}>
 							{(q) => <Question item={q()} form={props.view.form!} />}
 						</Show>
 					</>
