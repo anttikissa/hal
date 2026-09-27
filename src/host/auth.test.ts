@@ -296,3 +296,39 @@ test('changed() resolves when the credentials file appears or changes, not befor
 		clock.sleep = origSleep
 	}
 })
+
+test('rotation takes the least used subscription, skips a limited one, and keeps a turn on its account', async () => {
+	let { limits } = await import('./limits.ts')
+	let { usage } = await import('./usage.ts')
+	let { paths } = await import('./paths.ts')
+	paths.init()
+	let used = (account: string, fraction: number) =>
+		usage.observe('anthropic', account, new Headers({ 'anthropic-ratelimit-unified-5h-utilization': String(fraction), 'anthropic-ratelimit-unified-5h-reset': String(Math.floor(later() / 1000)) }))
+	try {
+		write({
+			anthropic: [
+				{ apiKey: 'k-key' },
+				{ accessToken: 'a-token', expires: later(), email: 'a@x' },
+				{ accessToken: 'b-token', expires: later(), email: 'b@x' },
+				{ accessToken: 'c-token', expires: later(), email: 'c@x' },
+			],
+		})
+		used('a@x', 0.9)
+		used('b@x', 0.3)
+		// c has no data yet: unused. The API key, which costs money, comes last.
+		expect((await auth.anthropic('m', { session: 's', newTurn: true })).account).toBe('c@x')
+		used('c@x', 0.5)
+		// Later rounds of the turn stay on c (its prompt cache); a new turn moves.
+		expect((await auth.anthropic('m', { session: 's' })).account).toBe('c@x')
+		expect((await auth.anthropic('m', { session: 's', newTurn: true })).account).toBe('b@x')
+		// A limited account is still skipped, even mid-turn.
+		limits.set(limits.key('anthropic/m', 'b@x'), now() + 3600_000)
+		expect((await auth.anthropic('m', { session: 's' })).account).toBe('c@x')
+		limits.set(limits.key('anthropic/m', 'c@x'), now() + 3600_000)
+		limits.set(limits.key('anthropic/m', 'a@x'), now() + 3600_000)
+		expect((await auth.anthropic('m', { session: 's' })).value).toBe('k-key')
+	} finally {
+		limits.close()
+		usage.close()
+	}
+})

@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { clock } from './clock.ts'
 import { limits } from './limits.ts'
+import { usage } from './usage.ts'
 import { paths } from './paths.ts'
 import { provider, type Provider, type ProviderRequest, type SseMessage } from './provider.ts'
 
@@ -64,6 +65,7 @@ afterEach(() => {
 	provider.fetch = originalFetch
 	provider.state.providers = {}
 	limits.close()
+	usage.close()
 	clock.now = origNow
 	clock.state.listeners.clear()
 	if (savedHome === undefined) delete process.env.HAL_HOME
@@ -290,6 +292,16 @@ test('an account that hits 429 is limited, and the host may rotate at once', asy
 	let [e] = (await all(provider.stream('fake/m1', req))) as any[]
 	expect(e).toMatchObject({ failure: 'limited', retryAt: now })
 	expect(limits.until(limits.key('fake/m1', 'a@x'))).toBe(now + 3600_000)
+})
+
+test("every response's usage windows are kept for its account, a 429's too", async () => {
+	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'a@x' }) })
+	fakeFetch(() => new Response(body([sse({ type: 'done', reason: 'end' })]), { headers: { 'x-codex-primary-used-percent': '10', 'x-codex-primary-window-minutes': '300' } }))
+	await all(provider.stream('fake/m1', req))
+	expect(usage.windows('fake', 'a@x')['5h']?.used).toBe(10)
+	fakeFetch(() => new Response('{}', { status: 429, headers: { 'x-codex-primary-used-percent': '100', 'x-codex-primary-window-minutes': '300' } }))
+	await all(provider.stream('fake/m1', req))
+	expect(usage.windows('fake', 'a@x')['5h']?.used).toBe(100)
 })
 
 test('a 401 tells the provider which account was rejected', async () => {

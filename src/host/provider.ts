@@ -6,6 +6,7 @@
 import { blocks, type ErrorEvent, type Message, type StreamEvent } from '../common/blocks.ts'
 import { clock } from './clock.ts'
 import { limits } from './limits.ts'
+import { usage } from './usage.ts'
 
 export type ToolDef = { name: string; description: string; inputSchema: Record<string, unknown> }
 
@@ -21,6 +22,8 @@ export type ProviderRequest = {
 	image?: (blob: string) => string | undefined
 	// The session the request is for, for providers that want it.
 	sessionId?: string
+	// The turn's first round: accounts are picked afresh (auth.order).
+	newTurn?: boolean
 }
 
 // `account` names the credentials used, for providers with several
@@ -242,6 +245,7 @@ async function* stream(
 			if (e instanceof Error) (e as { failure?: Failure }).failure ??= 'temporary'
 			throw e
 		}
+		usage.observe(id.provider, http.account, res.headers)
 		if (!res.ok || !res.body) {
 			let body = await res.text()
 			let message = `HTTP ${res.status} from ${id.provider}`

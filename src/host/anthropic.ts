@@ -88,8 +88,8 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 
 // Headers for the next usable account (auth.ts), which may be chosen
 // for `model`.
-async function headers(model?: string): Promise<{ headers: Record<string, string>; oauth: boolean; account: string }> {
-	let cred = await auth.anthropic(model)
+async function headers(model?: string, req?: ProviderRequest): Promise<{ headers: Record<string, string>; oauth: boolean; account: string }> {
+	let cred = await auth.anthropic(model, { session: req?.sessionId, newTurn: req?.newTurn })
 	let oauth = cred.type === 'token'
 	let headers: Record<string, string> = oauth
 		? {
@@ -104,7 +104,7 @@ async function headers(model?: string): Promise<{ headers: Record<string, string
 }
 
 async function request(req: ProviderRequest) {
-	let { headers, oauth, account } = await anthropic.headers(req.model)
+	let { headers, oauth, account } = await anthropic.headers(req.model, req)
 	return { url: anthropic.apiUrl(), headers, body: anthropic.body(req, oauth), account }
 }
 

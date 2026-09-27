@@ -11,7 +11,8 @@
 // (log in, fix the file), 'temporary' when trying again may work,
 // 'limited' (with retryAt) when every account is rate limited.
 //
-// Several anthropic entries are accounts, used in order: one limited
+// Several entries of a provider are accounts, least used first
+// (usage.ts, then API keys in order), a turn staying on one: one limited
 // for the model (limits.ts) or whose login is broken is skipped, so a
 // 429 rotates to the next account for the same model. A login is
 // broken when its refresh token is rejected (invalid_grant: typically
@@ -26,6 +27,7 @@ import { clock } from './clock.ts'
 import { limits } from './limits.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
+import { usage } from './usage.ts'
 
 // `accountId`: the ChatGPT account an OpenAI entry was saved with.
 export type Credential = { type: 'token' | 'api-key'; value: string; email?: string; account: string; accountId?: string }
@@ -84,6 +86,7 @@ function store(): Entry {
 		auth.state.broken.clear()
 		auth.state.stale.clear()
 		auth.state.retried.clear()
+		auth.state.chosen.clear()
 	}
 	if (!existsSync(path)) throw fail(`missing; ${LOG_IN}`)
 	// liveFile's own errors name the file and never quote its content.
@@ -136,11 +139,29 @@ function fingerprint(entry: Entry): string {
 	return String(Bun.hash(`${entry.refreshToken ?? ''}\n${entry.accessToken ?? ''}\n${entry.apiKey ?? ''}`))
 }
 
+// Whom a request is for: a session's rounds stay on its account within
+// a turn (the prompt cache is per account); a new turn takes the least
+// used again.
+export type For = { session?: string; newTurn?: boolean }
+
+// The order accounts are tried in: subscriptions least used first
+// (usage.ts), then API keys, which cost money, in file order; but a
+// turn's later rounds try its account first.
+function order(kind: Kind, list: Account[], who: For = {}): Account[] {
+	let subs = list.filter((a) => usable(a.entry.accessToken))
+	let out = [...usage.order(kind, subs, (a) => a.name), ...list.filter((a) => !subs.includes(a))]
+	let mine = who.session && !who.newTurn ? auth.state.chosen.get(`${kind} ${who.session}`) : undefined
+	let i = out.findIndex((a) => a.name === mine)
+	if (i > 0) out.unshift(...out.splice(i, 1))
+	return out
+}
+
 // A valid credential of `kind`, refreshing an expired token first, from
-// the first account neither broken nor limited for `model`. Concurrent
-// callers share one refresh.
-async function pick(kind: Kind, model?: string): Promise<Credential> {
+// the first account (in order()) neither broken nor limited for
+// `model`. Concurrent callers share one refresh.
+async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credential> {
 	let { data, list } = auth.all(kind)
+	list = auth.order(kind, list, who)
 	let limitedUntil = Infinity
 	let problems: string[] = []
 	for (let account of list) {
@@ -155,7 +176,9 @@ async function pick(kind: Kind, model?: string): Promise<Credential> {
 			continue
 		}
 		try {
-			return await auth.credential(data, account, kind)
+			let cred = await auth.credential(data, account, kind)
+			if (who.session) auth.state.chosen.set(`${kind} ${who.session}`, account.name)
+			return cred
 		} catch (e: any) {
 			if (e?.failure !== 'auth') throw e
 			auth.state.broken.set(fingerprint(account.entry), e.message)
@@ -285,9 +308,10 @@ export const auth = {
 	store,
 	all,
 	accounts,
+	order,
 	pick,
-	anthropic: (model?: string) => auth.pick('anthropic', model),
-	openai: (model?: string) => auth.pick('openai', model),
+	anthropic: (model?: string, who?: For) => auth.pick('anthropic', model, who),
+	openai: (model?: string, who?: For) => auth.pick('openai', model, who),
 	credential,
 	rejected,
 	changed,
@@ -305,6 +329,8 @@ export const auth = {
 		stale: new Set<string>(),
 		// When each account's rejected token was last refreshed.
 		retried: new Map<string, number>(),
+		// "kind session" -> the account the session's turn is on.
+		chosen: new Map<string, string>(),
 		// Counts ended /login attempts, so blocked sessions look again.
 		logins: 0,
 	},
