@@ -1,7 +1,13 @@
 {
 	title: 'Dropping files on the web page attaches them',
 	description: "Dragging files onto the web page attaches them exactly as pasting them would: images become [image/...] markers, text files [paste/...] markers (task 31), inserted at the prompt's caret, several files in drop order (questions.md item 58: a drop did nothing, and a PDF opened in the tab). The page never navigates to a dropped file: dragover and drop are handled on the whole page, and while files are dragged over it the prompt shows it will take them. A file that is neither image nor text is refused with a short notice naming it; it is not uploaded. The attach button takes the same path. Decide in web modules (.ts, unit-tested) which files are accepted; a CDP test drops an image and a text file and sees both markers.",
-	status: 'planned',
+	status: 'done',
 	needs: ['31'],
-	foldInto: ['zc']
+	foldInto: ['zc'],
+	notes: [
+		"attach.kind(file) decides: an image the host takes (png, jpeg, gif, webp by media type) keeps its type; text is sent as text/plain when the extension is in attach.ts's list (checked before the type: macOS Chrome types .ts as video/mp2t, most browsers give .md or .toml no type), the type is text/* or a JSON/XML/script application type, or the file has neither extension nor type (Makefile, README). The rest (PDF, HEIC, zip, an unknown extension with no text type) is refused with one notice naming them all. SVG counts as text by extension. A text file always becomes a [paste/...] marker, however short; the host still checks UTF-8.",
+		'Chat.tsx listens for dragover, dragleave and drop on the document (only drags whose types include Files; a text drag into the box stays native) and routes drops to keys.drop, which ignores them while a question or the picker is open. The dragging flag is a Chat signal passed to Composer as `dropping` (class on .entry, a dashed outline in index.html); it clears on drop or on a dragleave without relatedTarget, which is leaving the window.',
+		'CDP: Input.dispatchDragEvent with data.files (real paths) drives a genuine OS-style file drop in headless Chrome, dragEnter/dragOver/drop at a point outside the textarea; the old textarea-only handler would let the page navigate there.',
+		'Not checked by hand in a real browser: the dashed outline while dragging, at phone and desktop widths.'
+	]
 }

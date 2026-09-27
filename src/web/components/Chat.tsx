@@ -3,7 +3,8 @@
 // the message box, the model picker over both. app.ts holds the state;
 // this mirrors it into a signal on every change (keeping a bottom
 // reader at the bottom, and each tab's place: src/web/scroll.ts) and
-// routes page keys and pastes to keys.ts.
+// routes page keys, pastes and file drops to keys.ts. The page takes
+// every file drag, so a dropped file never replaces it (task n5).
 
 import { createMemo, createSignal, flush, onSettled } from 'solid-js'
 import { connection } from '../../common/connection.ts'
@@ -96,6 +97,8 @@ export function Chat() {
 	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
 	let [tabs, shown, view, text, notice, placeholder, connected, linked] = [field('tabs'), field('shown'), field('view'), field('text'), field('notice'), field('placeholder'), field('connected'), field('target')]
 	let pending = createMemo(() => state().pending, { equals: same })
+	// Files are dragged over the page: the box shows it takes them.
+	let [dropping, setDropping] = createSignal(false)
 	onSettled(() => {
 		app.changed = () => {
 			redraw(state(), setState)
@@ -110,6 +113,24 @@ export function Chat() {
 			if (e.clipboardData && keys.paste(e.clipboardData, target(e))) e.preventDefault()
 			flush()
 		}
+		let files = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files')
+		let onDrag = (e: DragEvent) => {
+			if (!files(e)) return
+			e.preventDefault()
+			e.dataTransfer!.dropEffect = 'copy'
+			setDropping(true)
+		}
+		// Only leaving the window has no relatedTarget.
+		let onLeave = (e: DragEvent) => !e.relatedTarget && setDropping(false)
+		let onDrop = (e: DragEvent) => {
+			setDropping(false)
+			if (!files(e)) return
+			e.preventDefault()
+			keys.drop(e.dataTransfer!.files)
+			flush()
+		}
+		let drags = [['dragover', onDrag], ['dragleave', onLeave], ['drop', onDrop]] as const
+		for (let [k, f] of drags) document.addEventListener(k, f)
 		document.addEventListener('keydown', onKey)
 		document.addEventListener('paste', onPaste)
 		let stop = viewport.sync(visualViewport ?? undefined, document.documentElement.style)
@@ -117,6 +138,7 @@ export function Chat() {
 		return () => {
 			document.removeEventListener('keydown', onKey)
 			document.removeEventListener('paste', onPaste)
+			for (let [k, f] of drags) document.removeEventListener(k, f)
 			stop()
 		}
 	})
@@ -124,7 +146,7 @@ export function Chat() {
 		<div class="Chat">
 			<Tabs tabs={tabs()} shown={shown()} />
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} />
-			<Composer view={view()} text={text()} notice={notice()} placeholder={placeholder()} connected={connected()} />
+			<Composer view={view()} text={text()} notice={notice()} placeholder={placeholder()} connected={connected()} dropping={dropping()} />
 			<Picker modal={view().modal} />
 		</div>
 	)

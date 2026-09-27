@@ -150,9 +150,17 @@ function paste(data: Pasted, target: Target): boolean {
 	return true
 }
 
+// Files dropped anywhere on the page go into the box at its caret
+// (attach.files), unless a question or the picker owns the keys.
+function drop(list: ArrayLike<File>): void {
+	if (app.state.view.modal || app.state.view.form) return
+	attach.files(list, keys.insert)
+}
+
 export const keys = {
 	key,
 	paste,
+	drop,
 	edit,
 	recall: recallKey,
 	// Types text into the message box at its caret, focusing it

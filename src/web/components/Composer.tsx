@@ -6,9 +6,10 @@
 // the window. An open question or the model picker owns the keys
 // meanwhile; the box keeps its text and takes the focus back when they
 // close. Enter is handled by keys.key (none during IME composition).
-// Images pasted, dropped or picked with the attach button, and long
-// pasted text, become attachments (attach.ts): a placeholder at the
-// caret, then the marker.
+// Images pasted, image and text files dropped on the page (Chat.tsx)
+// or picked with the attach button, and long pasted text, become
+// attachments (attach.ts): a placeholder at the caret, then the marker.
+// While files are dragged over the page the box is outlined.
 
 import { createEffect, For } from 'solid-js'
 import { app } from '../app.ts'
@@ -17,7 +18,7 @@ import { editor } from '../editor.ts'
 import { keys } from '../keys.ts'
 import { view, type ViewState } from '../view.ts'
 
-export function Composer(props: { view: ViewState; text: string; notice: string | undefined; placeholder: string | undefined; connected: boolean }) {
+export function Composer(props: { view: ViewState; text: string; notice: string | undefined; placeholder: string | undefined; connected: boolean; dropping: boolean }) {
 	let input!: HTMLTextAreaElement
 	let picker!: HTMLInputElement
 	// Text at the caret, replacing the selection, as if typed.
@@ -68,7 +69,7 @@ export function Composer(props: { view: ViewState; text: string; notice: string 
 				</span>{' '}
 				<span class={tone()}>{line().text}</span>
 			</div>
-			<div class="entry input">
+			<div class={['entry input', { dropping: props.dropping }]}>
 				<textarea
 					ref={box}
 					rows={1}
@@ -78,13 +79,11 @@ export function Composer(props: { view: ViewState; text: string; notice: string 
 					disabled={!!props.view.form}
 					onInput={(e) => app.input(e.currentTarget.value)}
 					onPaste={(e) => e.clipboardData && attach.paste(e.clipboardData, insert) && e.preventDefault()}
-					onDragOver={(e) => e.dataTransfer?.types.includes('Files') && e.preventDefault()}
-					onDrop={(e) => e.dataTransfer && attach.files(e.dataTransfer.files, insert) && e.preventDefault()}
 				/>
 				<input
 					ref={(e) => (picker = e)}
 					type="file"
-					accept="image/*"
+					accept={attach.accept}
 					multiple
 					hidden
 					onChange={(e) => {
@@ -93,7 +92,7 @@ export function Composer(props: { view: ViewState; text: string; notice: string 
 						e.currentTarget.value = ''
 					}}
 				/>
-				<button type="button" aria-label="Attach image" title="Attach image" disabled={!!props.view.form} onClick={() => picker.click()}>
+				<button type="button" aria-label="Attach file" title="Attach image or text file" disabled={!!props.view.form} onClick={() => picker.click()}>
 					+
 				</button>
 				<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={send}>

@@ -68,6 +68,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 @keyframes pulse { 50% { opacity: 0.3; } }
 .entry { display: flex; align-items: stretch; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); }
 .entry:focus-within { border-left-color: var(--cursor); }
+.entry.dropping { outline: 2px dashed var(--cursor); outline-offset: 2px; }
 .entry textarea { flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; border-radius: 0; padding: 0.5rem 0.7rem; }
 .entry button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; border-radius: 0; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor 35%, transparent); transition: background-color 120ms var(--ease-out); }
 .entry button:hover:not(:disabled) { background: color-mix(in oklab, currentColor 14%, transparent); }

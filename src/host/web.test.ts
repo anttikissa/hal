@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import { colors } from '../common/colors.ts'
@@ -588,6 +588,25 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: '!', text: '!' })
 		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: '!' })
 		await b.waitFor(`document.activeElement === document.querySelector('textarea') && document.querySelector('textarea').value.split('!').length === 2`)
+		// Files dropped on the page attach at the caret in drop order; a PDF
+		// is named and refused, and the page stays where it is (task n5).
+		mkdirSync(`${home}/drop`, { recursive: true })
+		writeFileSync(`${home}/drop/shot.png`, Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.from('pixels')]))
+		writeFileSync(`${home}/drop/notes.md`, '# dropped\n')
+		writeFileSync(`${home}/drop/paper.pdf`, '%PDF-1.4\n')
+		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.setSelectionRange(0, 0) })()`)
+		let href = await b.evaluate(`location.href`)
+		let data = { items: [], files: ['shot.png', 'notes.md', 'paper.pdf'].map((f) => `${home}/drop/${f}`), dragOperationsMask: 1 }
+		for (let type of ['dragEnter', 'dragOver']) await b.call('Input.dispatchDragEvent', { type, x: 100, y: 100, data })
+		await b.waitFor(`!!document.querySelector('.entry.dropping')`)
+		await b.call('Input.dispatchDragEvent', { type: 'drop', x: 100, y: 100, data })
+		await b.waitFor(`/^\\[image\\/[0-9a-z]{6}\\.png\\]\\[paste\\/[0-9a-z]{6}\\.txt\\]half/.test(document.querySelector('textarea').value)`)
+		expect(await b.evaluate(`document.querySelector('#notice').textContent`)).toContain('paper.pdf')
+		expect(await b.evaluate(`!!document.querySelector('.entry.dropping')`)).toBe(false)
+		let [image, paste] = [...(await b.evaluate(`document.querySelector('textarea').value`)).matchAll(/\/([0-9a-z]{6}\.(?:png|txt))\]/g)].map((m) => m[1]!)
+		await until(() => existsSync(`${paths.fileDir(paste!)}/${paste}`) && existsSync(`${paths.fileDir(image!)}/${image}`))
+		expect(readFileSync(`${paths.fileDir(paste!)}/${paste}`, 'utf8')).toBe('# dropped\n')
+		expect(await b.evaluate(`location.href`)).toBe(href)
 	} finally {
 		host.cwd = origCwd
 		await b.close()

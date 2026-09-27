@@ -66,7 +66,7 @@ test('a pasted image shows its final marker at the caret at once and uploads und
 })
 
 test('a refused upload leaves an error text', async () => {
-	attach.files([new Blob([png], { type: 'image/png' }), new Blob(['x'], { type: 'text/plain' })], insert)
+	attach.files([new File([png], 'a.png', { type: 'image/png' })], insert)
 	await tick()
 	expect(attaches()).toHaveLength(1)
 	app.onEvent({ type: 'rejected', sessionId, command: 'attach', reason: 'attachment is not image/png', id: attaches()[0].id })
@@ -76,7 +76,7 @@ test('a refused upload leaves an error text', async () => {
 
 test('Send during an upload waits and goes with the marker', async () => {
 	type('see ')
-	attach.files([new Blob([png], { type: 'image/png' })], insert)
+	attach.files([new File([png], 'a.png', { type: 'image/png' })], insert)
 	app.send()
 	expect(sent.filter((c) => c.type === 'submit')).toEqual([])
 	expect(app.notice()).toBeTruthy()
@@ -98,8 +98,35 @@ test('long pasted text becomes a text attachment; short text pastes natively', a
 	expect(attaches()[0].mediaType).toBe('text/plain')
 })
 
+test('dropped files become markers at the caret in drop order; others are named, never sent', async () => {
+	type('ab')
+	caret = 1
+	let files = [new File([png], 'shot.png', { type: 'image/png' }), new File(['%PDF-1.4'], 'paper.pdf', { type: 'application/pdf' }), new File(['# hi\n'], 'notes.md', { type: '' })]
+	attach.files(files, insert)
+	let [, image, paste] = /^a\[image\/([0-9a-z]{6}\.png)\]\[paste\/([0-9a-z]{6}\.txt)\]b$/.exec(app.state.text)!
+	await tick()
+	expect(attaches().map((c) => [c.name, c.mediaType, Buffer.from(c.data, 'base64').toString()])).toEqual([
+		[image, 'image/png', Buffer.from(png).toString()],
+		[paste, 'text/plain', '# hi\n'],
+	])
+	expect(app.notice()).toContain('paper.pdf')
+	expect(app.notice()).not.toContain('notes.md')
+})
+
+test('a file is an image the host takes, text by extension or type, or refused', () => {
+	let kind = (name: string, type = '') => attach.kind({ name, type })
+	expect(kind('a.jpg', 'image/jpeg')).toBe('image/jpeg')
+	// macOS Chrome types TypeScript as video.
+	expect(kind('main.ts', 'video/mp2t')).toBe('text/plain')
+	expect(kind('data.json', 'application/json')).toBe('text/plain')
+	expect(kind('weird', 'text/x-custom')).toBe('text/plain')
+	expect(kind('Makefile')).toBe('text/plain')
+	expect(kind('logo.svg', 'image/svg+xml')).toBe('text/plain')
+	for (let [name, type] of [['paper.pdf', 'application/pdf'], ['photo.heic', 'image/heic'], ['a.zip', 'application/zip'], ['blob.bin', ''], ['movie.mp4', 'video/mp4']]) expect(kind(name!, type)).toBeUndefined()
+})
+
 test('an image too large to send is refused before reading it', () => {
-	attach.files([new Blob([new Uint8Array(5 * 1024 * 1024 + 1)], { type: 'image/png' })], insert)
+	attach.files([new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' })], insert)
 	expect(attaches()).toEqual([])
 	expect(app.state.text).toContain('5 MB')
 })
