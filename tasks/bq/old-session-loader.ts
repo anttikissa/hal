@@ -1,0 +1,90 @@
+import type { SharedSessionInfo } from '../common/ipc.ts'
+import { clientBackend } from './backend.ts'
+import type { HistoryEntry } from '../common/history.ts'
+import type { Block } from './block-data.ts'
+import { time } from '../utils/time.ts'
+
+const LAST_ACTIVE_THRESHOLD_MS = 24 * 60 * 60 * 1000
+const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
+
+function emptyUsage() {
+	return { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
+}
+
+function entryActivityTs(entry: HistoryEntry): number | null {
+	if (entry.type === 'input_history') return null
+	if (entry.type === 'log') {
+		if (entry.level !== 'error') return null
+		return entry.ts ? Date.parse(entry.ts) : null
+	}
+	if (entry.type === 'info' || entry.type === 'warning') return null
+	if (entry.type === 'cwd' || entry.type === 'model') return null
+	return entry.ts ? Date.parse(entry.ts) : null
+}
+
+function blockActivityTs(block: Block): number | null {
+	if (block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'fork') return null
+	return block.ts ?? null
+}
+
+function lastActiveTs(entries: HistoryEntry[]): number | undefined {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const ts = entryActivityTs(entries[i]!)
+		if (ts != null && Number.isFinite(ts)) return ts
+	}
+	return undefined
+}
+
+function removeLastActiveNotice(tab: any): void {
+	tab.history = tab.history.filter((block: Block) => !(block.type === 'log' && block.text.startsWith(LAST_ACTIVE_NOTICE_PREFIX)))
+}
+
+function addLastActiveNotice(tab: any): void {
+	removeLastActiveNotice(tab)
+	let lastTs = tab.lastActiveTs
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		const ts = blockActivityTs(tab.history[i]!)
+		if (ts != null) {
+			lastTs = lastTs ? Math.max(lastTs, ts) : ts
+			break
+		}
+	}
+	if (!lastTs) return
+	if (Date.now() - lastTs <= LAST_ACTIVE_THRESHOLD_MS) return
+	tab.history.push({ type: 'log', text: time.formatLastActiveNotice(lastTs), ts: Date.now() })
+}
+
+function load(info: SharedSessionInfo, opts: { logName?: string; entryLimit?: number; includeLive?: boolean } = {}) {
+	const meta = clientBackend.sessions.loadSessionMeta(info.id)
+	let loaded: { entries: HistoryEntry[]; parentCount: number; parentId?: string }
+	if (opts.logName || opts.entryLimit !== undefined) {
+		loaded = { entries: clientBackend.sessions.loadHistoryLog(info.id, opts.logName, opts.entryLimit), parentCount: 0 }
+	} else {
+		loaded = clientBackend.sessions.loadAllHistoryWithOrigin(info.id)
+	}
+	const first = loaded.entries[0]
+	if ((opts.logName || opts.entryLimit !== undefined) && first?.type === 'forked_from' && first.parent) {
+		const parent = clientBackend.sessions.loadAllHistoryWithOrigin(first.parent)
+		const before = first.ts ? parent.entries.filter((entry) => !entry.ts || entry.ts < first.ts!) : parent.entries
+		loaded = { entries: [...before, first, ...loaded.entries.slice(1)], parentCount: before.length, parentId: first.parent }
+	}
+	const { entries: history, parentCount, parentId } = loaded
+	const usage = emptyUsage()
+	for (const entry of history) {
+		if ((entry.type !== 'assistant' && entry.type !== 'usage') || !entry.usage) continue
+		usage.input += entry.usage.input ?? 0
+		usage.output += entry.usage.output ?? 0
+		usage.cacheRead += entry.usage.cacheRead ?? 0
+		usage.cacheCreation += entry.usage.cacheCreation ?? 0
+	}
+	let liveHistory: Block[] = []
+	if (opts.includeLive !== false) liveHistory = clientBackend.sessions.loadLive(info.id).blocks as Block[]
+	return {
+		id: info.id, name: meta?.name ?? info.name ?? info.id, cwd: info.cwd || meta?.workingDir, model: info.model || meta?.model,
+		currentLog: meta?.currentLog ?? info.currentLog ?? 'history.asonl',
+		history, parentEntryCount: parentCount, liveHistory, usage,
+		contextUsed: meta?.context?.used ?? 0, contextMax: meta?.context?.max ?? 0, forkedFrom: meta?.forkedFrom ?? parentId, lastActiveTs: lastActiveTs(history),
+	}
+}
+
+export const sessionLoader = { addLastActiveNotice, load }

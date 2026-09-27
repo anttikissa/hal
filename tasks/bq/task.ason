@@ -1,0 +1,16 @@
+{
+	title: 'Lazy history: the tail first, the rest on demand',
+	description: `Opening a session costs what is shown, not the size of its history. A snapshot carries the transcript of the history's tail only (the last records up to a byte budget, about 256 KB, never cutting a turn in two) plus everything the state needs from earlier (an open question, the last prompt for editing, inbox, draft, usage), and says whether earlier records exist. A client gets earlier records with a \`history\` command { sessionId, before } answered in pages. The terminal paints the tail at once and then fetches the rest in the background, repainting once when it has all of it (full-mode rules of tasks/cc/terminal.md hold: the frame still ends up with every history line). The web prepends earlier pages when the reader scrolls near the top, keeping what they were reading in place. Background tabs are not loaded until shown; their tab bar entries come from the tabs event.
+On the host nothing reads every session or every history eagerly: listing tabs reads only tabs.ason and the open sessions' metadata; the newest session is found from directory names; recovering unfinished turns reads tails (history.tail already does); provider input is rebuilt from the full history only when a turn runs, then kept in memory while the session is open.
+Tests: a snapshot of a 20 MB history reads at most the budget from disk (count bytes read), holds the tail items and an open question from far back; paging back yields every record exactly once and in order; the terminal's frame after the background load equals the frame from a full load.`,
+	status: 'planned',
+	needs: [
+		'7w',
+		'4s'
+	],
+	notes: [
+		'history.tail() reads the last 64 KiB and falls back to a full readSync when the last line is longer; with images in history (task 2a stores blob refs, not bytes) lines stay small, but a single huge tool result can still trigger the fallback. Page by byte offsets from the end, not by record counts from the start.',
+		'replay.current(records) applies prompt replacement (task wb): an edited prompt supersedes records before the tail boundary too. The snapshot must fold through current() over enough history to be right, or send the replacement as part of the tail.',
+		'old-session-loader.ts and old-background-loader.ts show the old approach (entryLimit for the focused tab, background loading of the others). The old Hal loaded all open tabs in the background after the first paint; hal2 loads a tab when it is shown.'
+	]
+}

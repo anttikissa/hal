@@ -1,0 +1,13 @@
+{
+	title: 'Source modules stay under 400 lines',
+	description: 'No non-test source module under src/ (.ts or .tsx) is longer than 400 lines (as wc -l counts them), so every module fits one read and has one job. src/conventions.test.ts enforces it and names each offender with its line count. A short list in that test allows exceptions, each with a one-line reason; normally it holds only src/common/ason.ts (one cohesive format: its parser and stringifier belong together). While a planned split has not landed, an oversized file may sit on the list with the task that splits it as its reason (src/host/host.ts: yq, src/client/frame.ts: 3m, src/web/page.ts: 1b); those tasks take their entry off. A listed file that is no longer over the limit, or no longer exists, fails the test, so the list never goes stale. Tests (*.test.ts) have no limit. Record the rule in tasks/README.md (Layout and module conventions).',
+	status: 'planned',
+	needs: [],
+	foldInto: [
+		'b'
+	],
+	notes: [
+		'The glob in conventions.test.ts is **/*.ts today; the Solid rewrite (1b) adds .tsx. Write the size check over the same file list sourceFiles() returns, so widening it once covers both.',
+		'Test for behaviour, not text: a fixture of a 401-line file under a temp dir (or the check function called with a line count) should fail, and a stale exception should fail. Do not assert the current list of exceptions.'
+	]
+}

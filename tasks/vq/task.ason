@@ -1,0 +1,13 @@
+{
+	title: 'Full-screen terminal across tabs',
+	description: `Switching tabs behaves as tasks/cc/terminal.md says (Height management, Tab switching, Force repaint). The prompt stays on the same row between tabs: padding = min(peak, rows - chrome) - the focused tab's history height, where peak is the tallest any tab's history has been at the current width; it only grows (a width change starts it again). The first real change of the focused tab permanently enters full mode before its repaint, so single-tab use keeps grow mode and the shell's own scrollback. In full mode every tab switch, Ctrl-L and resize is a canonical force repaint: clear scrollback with CSI 3J, then write the focused tab's whole frame, every history line, never a viewport slice. Output of tabs not shown never paints. The emergency keys and the last frame on quit keep their rules (tasks/README.md).
+Test with the terminal emulator in render.test.ts: after switching between a 3-line tab and a 200-line tab, scrollback plus screen hold exactly the focused tab's lines; the prompt row does not move between two short tabs once peak is set; a single-tab session never writes CSI 3J; output arriving in a background tab changes nothing on screen.`,
+	status: 'planned',
+	needs: [
+		'7w'
+	],
+	notes: [
+		"hal2's tasks/cc/terminal.md is newer than the old Hal's docs/terminal.md (it adds Modals); nothing is missing from it, so no newer copy is attached.",
+		"old-render.ts is the old renderer: peak and peakCols (around its line 220), fullscreen recovery after shrink, and why draw(true) must not run from a resize handler that fires repeatedly (CSI 3J each time). Reference only; hal2's render.ts already has one-way full mode (task cc notes)."
+	]
+}

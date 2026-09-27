@@ -1,0 +1,16 @@
+{
+	title: 'Tabs: open sessions kept by the host',
+	description: `The host keeps which sessions are open as tabs, in order, for the whole home, in state/tabs.ason (a liveFile): the open ids, and recently closed ids with the position they had (most recent last, at most 50). Every client sees the same tabs; which tab a client shows is its own business. Commands: \`tab-new\` { cwd, after? } creates a session in cwd with the default model and opens it after \`after\` (else last); \`tab-close\` { sessionId } takes it out of the tabs and remembers its position, while the session and any running turn carry on (closing the last tab is refused); \`tab-resume\` { sessionId? } reopens that closed session, or the most recently closed one, at its old position; \`tab-move\` { sessionId, index }; \`tab-start\` { cwd, last? } picks the tab a starting client shows: \`last\` if it is still open and in cwd, else the first open tab in cwd, else a new tab in cwd, and answers that client. The command that created or reopened a tab is named in the answer, so its client can focus it.
+Every change broadcasts \`tabs\` { tabs } to every client, each entry { id, name, cwd, model, state, attention? }: enough for a tab bar without opening the session. A tab gets attention when its turn ends, fails or asks a question; \`tab-seen\` { sessionId } clears it, sent by a client when it shows the tab. Following a session (open/close in the protocol) stays separate from tabs.
+With no tabs.ason, tabs start empty and the first tab-start creates one. Reading tabs never reads every session on disk.
+Test with in-memory clients: two clients see the same order after new, move, close and resume; a close keeps a running turn going; resume puts a tab back where it was; tab-start prefers last, then cwd.`,
+	status: 'planned',
+	needs: [
+		'yq'
+	],
+	notes: [
+		"hal2's protocol already has `open` and `close`, meaning follow and unfollow a session. Tabs are a different thing; keep the names apart.",
+		"old-tabs.ts is the old host's tab module (openSessionIds in runtime state, focus on the host). In hal2 focus belongs to each client, not the host. Old features left out on purpose: fork (Ctrl-F), a tab limit, opening summaries.",
+		'main.ts sends open-newest at startup, and the web asks GET /session for the newest id. tab-start replaces the first; the web switches in task ng.'
+	]
+}

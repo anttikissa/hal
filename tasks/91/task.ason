@@ -1,0 +1,14 @@
+{
+	title: 'Input history: Up and Down recall sent prompts',
+	description: `Each session has one list of the prompts sent to it from any client, oldest first, taken from its transcript (so terminal and web prompts are both in it, and an edited prompt shows as edited). Up on the top row of the prompt recalls the previous entry and Down on the bottom row the next; past the newest, Down brings back the text that was being written before browsing. That text is never lost: while browsing, the session's draft (task rw) stays the user's own composition, not the recalled entry, until the user edits a recalled entry, which then becomes the draft. A recalled entry puts the cursor at the end of its bottom row when going up and at the end of its top row when going down, as in bash. At the oldest entry Up goes to the start of the text; with no history Up and Down just move to the text edges.
+Precedence for Up and Down, in order: an open modal, an open question form, completion choices, editing the last prompt (Up on an empty prompt while the session works, task wb), row movement inside the text (task 8m), then history. Browsing state belongs to the session, so it survives switching tabs.
+Web: Up with the caret on the textarea's first line and no selection, and Down on its last line, do the same through the shared code; elsewhere they stay native.`,
+	status: 'planned',
+	needs: [
+		'8m'
+	],
+	notes: [
+		"Old behaviour to keep (old-prompt.ts in task 1x, browseHistory): when the just-sent prompt is still in the editor (edit mode), the first Up skips the entry equal to the current text. Old commits: 81c0440 'Unify up-arrow recall: one per-tab list, web prompts included', 8ac5f72 'Keep edited prompts on down'.",
+		'The web cannot know where the textarea wraps; "first line" there means no newline before the caret. That differs from the terminal\'s visual rows on purpose.'
+	]
+}

@@ -1,0 +1,23 @@
+{
+	title: 'Web transcript that reads like the demo',
+	description: `The web transcript has the improvements the old Hal tried in its Solid demo (artifact demo.tsx, tags [F1]..[F16]) and never shipped:
+- Stable rows [F1, F8]: the item list is keyed by position (<For keyed={false}>). Items only append, except an edit of the last prompt cutting the tail, so a row keeps its DOM and local state (open or closed) when a snapshot replaces every item object or a streaming item gains fields.
+- Cards [F11, F12]: every item is a card coloured like the terminal (prompt, assistant text, thinking, tool call with its result, command output, turn end). Thinking and tool cards collapse, closed by default. A click anywhere on a card toggles it, except on links and a click that ends a text selection; the header is a real <button> with aria-expanded, hidden contents are inert. Opening and closing animate the height (CSS grid 0fr to 1fr); closing is faster.
+- Bottom follow [F4-F7]: a reader within 50 px of the bottom stays at the same distance from it as content grows (new items, streamed text, a card opening); one scrolled further up is left alone. Measure before the change.
+- Smooth follow [F10]: a new item fades in while the view glides (strong ease-out, about 200 ms, fade about 300 ms) to the new bottom; streamed lines jump; wheel, touch or scroll keys cancel a glide; prefers-reduced-motion jumps.
+- Sending [F15] glides to the very bottom even when scrolled far up, and trackpad momentum does not cancel that glide.
+- Composer [F13, F14]: one bottom panel holds a status line like the terminal's (idle, thinking, writing, running <tool>, paused, reconnecting; a pulsing dot while busy; aria-live polite), the textarea (grows with its content up to 40% of the height) with a Send button disabled while empty, and a line of key hints. Enter sends, Shift+Enter is a newline, nothing sends during IME composition.
+- Hal's cursor [F16]: a line after the last item holds a blinking block cursor in the assistant colour, dimmed while thinking streams; the textarea keeps its native caret.
+- One scroller: the transcript scrolls and nothing inside it does; long tool output and code wrap.
+Not in scope: ID links, deep links and the target outline [F2, F3, F9] need short block ids that hal2 items do not have yet; the demo's debug controls (slow motion, step key, offline toggle).
+Test the scroll maths (gap, whether to follow, glide target) and the status line as pure functions. Check the rest in a real browser at phone and desktop widths and say in the commit what you checked.`,
+	status: 'planned',
+	needs: [
+		'1b'
+	],
+	notes: [
+		'demo.tsx is self-contained and runs as is under Solid 2; its comments explain each decision, including the failures behind them (why keyed-by-id rows closed and flashed; why only scroll keys cancel a glide; why the send glide is `forced`). Its CSS uses hand-picked hex colours: take the layout and motion, but colours come from colors.ts (task 1w).',
+		'keepBottom() calls flush() before measuring because Solid 2 applies DOM updates in a microtask.',
+		"old-scroll.ts and old-viewport.ts are the old client's near-bottom check and mobile keyboard handling (visualViewport); reference only. old-frontend-design.md is the design guidance the old Hal used for UI work."
+	]
+}

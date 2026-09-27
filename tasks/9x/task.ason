@@ -1,0 +1,15 @@
+{
+	title: 'Selection, undo and Tab in the prompt',
+	description: `Shift with any movement (grapheme, word, line edges, text edges, Up/Down rows) extends a selection from an anchor; Cmd-A selects all. Typing, pasting, Shift-Enter and Ctrl-Y replace the selection; Backspace and Delete delete it; plain Left/Right collapse it to its start/end. The terminal draws the selection in reverse video, a selected tab as reverse spaces to its stop.
+Undo and redo: Ctrl-/, Cmd-Z and Cmd-U undo, the same with Shift redo. Each edit is one step, except that consecutive typed characters form one step, which any other key ends; at most 200 steps; a step restores text, cursor and selection. The stacks belong to the session's editor state and are cleared by sending.
+Tab: at the end of a slash command Tab asks for completion as now. Otherwise Tab inserts a literal tab; with a selection it indents every line the selection touches with one tab (a line touched only at its first column by the selection end is left out, unless the cursor rests there), and the selection grows to include the inserted tab of its first line. Shift-Tab removes one level (a tab, one to four spaces, or up to three spaces and a tab) from the selected lines or the current line.
+Web: the textarea's selection is the editor's selection and its undo stays native (edits Hal makes go through the write-back chosen in task 1x). Tab and Shift-Tab are taken only for completion or when a selection spans lines; otherwise they move focus as usual, so the page stays keyboard-accessible.`,
+	status: 'planned',
+	needs: [
+		'91'
+	],
+	notes: [
+		"old-prompt.test.ts (task 1x) covers indentation: 'tab indents selected rows and includes the first inserted tab in the selection', 'tab excludes a row touched only by the selection endpoint', 'tab indents a row the cursor rests on at column 0', 'shift-tab deindents selected rows by one four-column level', 'shift-tab deindents the current logical row without a selection', 'selected tabs render as styled spaces through the next tab stop'.",
+		'Cmd-keys reach a terminal only through the kitty keyboard protocol and only if the terminal does not use them itself; Ctrl-/ is the undo that works everywhere.'
+	]
+}

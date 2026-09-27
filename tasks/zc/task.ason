@@ -1,0 +1,16 @@
+{
+	title: 'Pasting images and long text into the prompt',
+	description: `Terminal: Ctrl-V (and Cmd-V where the terminal passes it on) with an image on the system clipboard attaches it (task 2a): on macOS the client reads public.png from NSPasteboard through Bun FFI, converting public.tiff to PNG when that is all there is (artifact old-clipboard.ts in task kr); on Linux wl-paste or xclip with -t image/png. While the upload runs, the prompt shows a placeholder at the cursor that becomes the marker when the host answers, or an error text if it fails; Enter does not send while an upload is pending. A pasted single line that is the path of an existing image file attaches that file instead of inserting the path. A paste longer than 7 lines (a setting) becomes a text attachment and the prompt shows its marker; the model gets the whole text.
+Web: pasting or dropping an image into the composer, or choosing one with an attach button (a file input accepting images), attaches it the same way and puts the marker at the caret; long pasted text becomes an attachment by the same rule. A marker is edited as ordinary text; deleting it drops the attachment from the prompt.
+Tests: the placeholder is replaced even after typing moved the cursor, a failed upload leaves an error text rather than a stuck placeholder, and a submit during an upload waits.`,
+	status: 'planned',
+	needs: [
+		'kr',
+		'2a'
+	],
+	notes: [
+		"old-prompt.test.ts (task 1x) has 'waits for a pasted image upload before it can submit'. The old placeholder was found by lastIndexOf on its text; a user who typed the same text breaks that. Tie the placeholder to the command id instead.",
+		'old-PromptComposer.tsx and old-composer.ts are the old web paste, drop and attach-button code (pastedImage picks the first image/* item); reference only.',
+		'Bun FFI into AppKit loads a framework: load it lazily on the first image paste, never at import (conventions test).'
+	]
+}
