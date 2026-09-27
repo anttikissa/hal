@@ -13,15 +13,20 @@ const cont: HistoryRecord = { type: 'continue', ts }
 // The prompt texts the model gets, one per user message with text.
 const prompts = (msgs: Message[]) => msgs.filter((m) => m.role === 'user' && m.blocks.some((b) => b.type === 'text')).map((m) => m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join(''))
 
-// Local wall-clock time of an ISO timestamp, as a person would read it.
+// Local wall-clock time and date of an ISO timestamp, as a person would read them.
+const two = (n: number) => String(n).padStart(2, '0')
 const hhmm = (iso: string) => {
 	let d = new Date(iso)
-	return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+	return `${two(d.getHours())}:${two(d.getMinutes())}`
+}
+const day = (iso: string) => {
+	let d = new Date(iso)
+	return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`
 }
 
 test('a normal two-turn history: each prompt its own message, stamped with its time, no notes', () => {
-	let first = '2026-01-01T09:07:00.000Z'
-	let second = '2026-01-01T10:42:00.000Z'
+	let first = new Date(2026, 0, 1, 9, 7).toISOString()
+	let second = new Date(2026, 0, 1, 10, 42).toISOString()
 	let msgs = replay.toMessages([
 		say('hi', first),
 		block({ type: 'thinking', text: 'hmm', signature: 'sig', provider: 'anthropic' }),
@@ -37,7 +42,19 @@ test('a normal two-turn history: each prompt its own message, stamped with its t
 		{ type: 'text', text: 'hello' },
 	])
 	expect(msgs[3]!.blocks).toEqual([{ type: 'text', text: 'yes' }])
-	expect(prompts(msgs)).toEqual([`[${hhmm(first)}]\nhi`, `[${hhmm(second)}]\nagain`])
+	expect(prompts(msgs)).toEqual([`[${day(first)} ${hhmm(first)}]\nhi`, `[${hhmm(second)}]\nagain`])
+})
+
+test('the stamp names the date on the first prompt and whenever the date changed since the last one', () => {
+	let late = new Date(2026, 0, 1, 23, 1).toISOString()
+	let early = new Date(2026, 0, 2, 0, 36).toISOString()
+	let later = new Date(2026, 0, 2, 9, 0).toISOString()
+	let weekOn = new Date(2026, 0, 9, 9, 0).toISOString()
+	let msgs = replay.toMessages([say('a', late), end('completed'), say('b', early), end('completed'), say('c', later), end('completed'), say('d', weekOn)])
+	expect(prompts(msgs)).toEqual([`[2026-01-01 23:01]\na`, `[2026-01-02 00:36]\nb`, `[09:00]\nc`, `[2026-01-09 09:00]\nd`])
+	// A later prompt never changes how earlier ones read (prompt caching).
+	let more = replay.toMessages([say('a', late), end('completed'), say('b', early), end('completed'), say('c', later), end('completed'), say('d', weekOn), end('completed'), say('e', weekOn)])
+	expect(prompts(more).slice(0, 4)).toEqual(prompts(msgs))
 })
 
 test('a prompt after an errored turn stays separate and says the turn failed', () => {
@@ -45,13 +62,13 @@ test('a prompt after an errored turn stays separate and says the turn failed', (
 	let [one, two] = prompts(msgs)
 	expect(msgs).toHaveLength(2)
 	expect(one).toMatch(/\nSay just the word pong$/)
-	expect(two).toMatch(/^\[\d\d:\d\d\]\n<meta>[^<]*fail[^<]*HTTP 400: prompt too long[^<]*<\/meta>\nk$/)
+	expect(two).toMatch(/^\[[\d -]+:\d\d\]\n<meta>[^<]*fail[^<]*HTTP 400: prompt too long[^<]*<\/meta>\nk$/)
 })
 
 test('a prompt after a paused turn says it was paused, and by whom', () => {
 	let byUser = prompts(replay.toMessages([say('go'), block({ type: 'text', text: 'hal' }), end('paused'), say('stop that')]))
 	expect(byUser).toHaveLength(2)
-	expect(byUser[1]).toMatch(/^\[\d\d:\d\d\]\n<meta>[^<]*user paused[^<]*<\/meta>\nstop that$/)
+	expect(byUser[1]).toMatch(/^\[[\d -]+:\d\d\]\n<meta>[^<]*user paused[^<]*<\/meta>\nstop that$/)
 	let byHal = prompts(replay.toMessages([say('go'), end('paused', { pauseReason: 'kept crashing' }), say('why?')]))
 	expect(byHal).toHaveLength(2)
 	expect(byHal[1]).toMatch(/<meta>[^<]*paused[^<]*kept crashing[^<]*<\/meta>\nwhy\?$/)
@@ -178,12 +195,12 @@ test('a /cd or model switch reaches the model as notes on the next prompt, lates
 	let before = [say('hi'), block({ type: 'text', text: 'hello' }), end('error', { error: 'boom' })]
 	let msgs = replay.toMessages([...before, change({ cwd: '/a' }), change({ model: 'openai/gpt-5' }), change({ cwd: '/b' }), say('where?'), block({ type: 'text', text: 'there' }), end('completed'), say('and now?')])
 	let [, second, third] = prompts(msgs)
-	expect(second).toMatch(/^\[\d\d:\d\d\]\n<meta>[^<]*boom[^<]*<\/meta>\n/)
+	expect(second).toMatch(/^\[[\d -]+:\d\d\]\n<meta>[^<]*boom[^<]*<\/meta>\n/)
 	expect(second).toMatch(/\n<meta>[^<]*\/b[^<]*<\/meta>\n/)
 	expect(second).toMatch(/\n<meta>[^<]*openai\/gpt-5[^<]*<\/meta>\n/)
 	expect(second).not.toMatch(/\/a\b/)
 	expect(second).toMatch(/\nwhere\?$/)
-	expect(third).toMatch(/^\[\d\d:\d\d\]\nand now\?$/)
+	expect(third).toMatch(/^\[[\d -]+:\d\d\]\nand now\?$/)
 	// Nothing else changes: the same history without them, notes aside.
 	expect(msgs.map((m) => m.role)).toEqual(replay.toMessages([...before, say('where?'), block({ type: 'text', text: 'there' }), end('completed'), say('and now?')]).map((m) => m.role))
 })

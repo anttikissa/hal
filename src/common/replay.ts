@@ -54,7 +54,8 @@ export type HistoryRecord =
 // not replayable and is left out. Each tool call gets a result before the
 // next user message: a missing one becomes an error result, and results
 // with no call are dropped, so the input stays valid for every provider.
-// Each prompt is its own message, starting with its [HH:MM] line and, if
+// Each prompt is its own message, starting with its [HH:MM] line (with
+// the date on the first prompt and when it changed; replay.clock) and, if
 // the turn before it failed or was paused, a <meta> note saying so (and
 // notes for a cwd or model that changed since the last prompt):
 // providers join adjacent text blocks with no separator, so merged
@@ -72,6 +73,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		else if (msg.blocks.length) out.push(msg)
 	}
 	let prev: HistoryRecord | undefined
+	let stamped: string | undefined
 	// The approval question the pending calls wait on, while unanswered:
 	// none of them has run, and a continue runs them (host/approval.ts).
 	let waiting: string | undefined
@@ -120,7 +122,8 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			push({ role: 'user', blocks: [...results, ...missing] })
 			let texts = r.blocks.filter((b) => b.type === 'text')
 			if (!texts.length) continue
-			let head = [`[${replay.clock(r.ts)}]`, ...(note ? [note] : []), ...replay.changeNotes(changed)].join('\n')
+			let head = [`[${replay.clock(r.ts, stamped)}]`, ...(note ? [note] : []), ...replay.changeNotes(changed)].join('\n')
+			stamped = r.ts
 			note = undefined
 			changed = {}
 			// Never merged: a prompt always starts a message of its own. Its
@@ -193,11 +196,15 @@ function changeNotes(changed: { cwd?: string; model?: string }): string[] {
 	return out
 }
 
-// Local wall-clock HH:MM of an ISO timestamp.
-function clock(ts: string): string {
-	let d = new Date(ts)
+// Local wall-clock HH:MM of an ISO timestamp, as YYYY-MM-DD HH:MM if
+// its date differs from that of `prev`, the last stamped prompt's (or
+// there is none), so a stamp past midnight isn't read as a stale date.
+function clock(ts: string, prev?: string): string {
 	let two = (n: number) => String(n).padStart(2, '0')
-	return `${two(d.getHours())}:${two(d.getMinutes())}`
+	let day = (d: Date) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`
+	let d = new Date(ts)
+	let time = `${two(d.getHours())}:${two(d.getMinutes())}`
+	return prev !== undefined && day(new Date(prev)) === day(d) ? time : `${day(d)} ${time}`
 }
 
 // What the model is told about a call with no recorded result. A host

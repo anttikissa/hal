@@ -127,9 +127,9 @@ test('cancellation keeps the partial reply and records the turn as paused', asyn
 	await drain(history.turn(id))
 	// The model is told the turn was paused, in front of the new prompt.
 	expect(sent[1]).toEqual([
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[\d\d:\d\d\]\nfirst$/) }] },
+		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d\]\nfirst$/) }] },
 		{ role: 'assistant', blocks: [{ type: 'text', text: 'partial' }] },
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[\d\d:\d\d\]\n<meta>[^<]*paused[^<]*<\/meta>\nsecond$/) }] },
+		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d\]\n<meta>[^<]*paused[^<]*<\/meta>\nsecond$/) }] },
 	])
 })
 
@@ -159,8 +159,8 @@ test('a prompt after a failed turn is its own message, told of the failure', asy
 	history.submit(id, 'k')
 	await drain(history.turn(id))
 	expect(sent[1]).toEqual([
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[\d\d:\d\d\]\nSay just the word pong$/) }] },
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[\d\d:\d\d\]\n<meta>[^<]*failed[^<]*HTTP 400 from fake<\/meta>\nk$/) }] },
+		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d\]\nSay just the word pong$/) }] },
+		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d\]\n<meta>[^<]*failed[^<]*HTTP 400 from fake<\/meta>\nk$/) }] },
 	])
 })
 

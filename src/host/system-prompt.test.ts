@@ -24,18 +24,47 @@ test('says who, when and where: date, cwd and model', () => {
 	expect(text).toMatch(/Hal/)
 })
 
-test('AGENTS.md files from the cwd upwards, outermost first; none from elsewhere', () => {
-	mkdirSync(`${root}/a/b/c`, { recursive: true })
-	mkdirSync(`${root}/elsewhere`)
-	writeFileSync(`${root}/elsewhere/AGENTS.md`, 'OTHER RULE')
-	writeFileSync(`${root}/a/AGENTS.md`, 'OUTER RULE')
-	writeFileSync(`${root}/a/b/c/AGENTS.md`, 'INNER RULE')
-	let text = systemPrompt.build({ cwd: `${root}/a/b/c`, model: 'm/x', now: at })
-	let outer = text.indexOf('OUTER RULE'), inner = text.indexOf('INNER RULE')
+test('in Git, one file per directory from the repo root down to the cwd, outermost first', () => {
+	mkdirSync(`${root}/repo/.git`, { recursive: true })
+	mkdirSync(`${root}/repo/b/c`, { recursive: true })
+	writeFileSync(`${root}/AGENTS.md`, 'ABOVE REPO')
+	writeFileSync(`${root}/repo/AGENTS.md`, 'OUTER RULE')
+	writeFileSync(`${root}/repo/b/CLAUDE.md`, 'MIDDLE CLAUDE')
+	writeFileSync(`${root}/repo/b/c/AGENTS.md`, 'INNER RULE')
+	writeFileSync(`${root}/repo/b/c/CLAUDE.md`, 'INNER CLAUDE')
+	let text = systemPrompt.build({ cwd: `${root}/repo/b/c`, model: 'm/x', now: at })
+	let outer = text.indexOf('OUTER RULE'), middle = text.indexOf('MIDDLE CLAUDE'), inner = text.indexOf('INNER RULE')
 	expect(outer).toBeGreaterThanOrEqual(0)
-	expect(inner).toBeGreaterThan(outer)
-	expect(text).toContain(`${root}/a/AGENTS.md`)
-	expect(text).not.toContain('OTHER RULE')
+	expect(middle).toBeGreaterThan(outer)
+	expect(inner).toBeGreaterThan(middle)
+	expect(text).toContain(`${root}/repo/AGENTS.md`)
+	expect(text).toContain(`${root}/repo/b/CLAUDE.md`)
+	// AGENTS.md wins over CLAUDE.md in the same directory; nothing above the repo.
+	expect(text).not.toContain('INNER CLAUDE')
+	expect(text).not.toContain('ABOVE REPO')
+})
+
+test('outside Git only the cwd itself is read', () => {
+	mkdirSync(`${root}/a/b`, { recursive: true })
+	writeFileSync(`${root}/a/AGENTS.md`, 'PARENT RULE')
+	writeFileSync(`${root}/a/b/CLAUDE.md`, 'HERE RULE')
+	let text = systemPrompt.build({ cwd: `${root}/a/b`, model: 'm/x', now: at })
+	expect(text).toContain('HERE RULE')
+	expect(text).not.toContain('PARENT RULE')
+})
+
+test('the date names the UTC offset of the clock prompt stamps use', () => {
+	let tz = process.env.TZ
+	try {
+		let noon = Date.UTC(2026, 8, 26, 21, 30)
+		process.env.TZ = 'UTC'
+		expect(systemPrompt.build({ cwd: root, model: 'm/x', now: noon })).toMatch(/2026-09-26, Saturday\b.*UTC(?![+-])/)
+		process.env.TZ = 'Asia/Kolkata'
+		expect(systemPrompt.build({ cwd: root, model: 'm/x', now: noon })).toMatch(/2026-09-27, Sunday\b.*UTC\+05:30/)
+	} finally {
+		if (tz === undefined) delete process.env.TZ
+		else process.env.TZ = tz
+	}
 })
 
 test('the same inputs give the same text; a changed input changes it', () => {

@@ -117,7 +117,7 @@ function restartHost() {
 }
 
 // A prompt as replay sends it: its [HH:MM] line, then the text.
-const stamped = (text: string) => expect.stringMatching(new RegExp(`^\\[\\d\\d:\\d\\d\\]\\n${text}$`))
+const stamped = (text: string) => expect.stringMatching(new RegExp(`^\\[[\\d -]+:\\d\\d\\]\\n${text}$`))
 
 const records = async (id: string) => (await history.read(id)).map(({ ts: _ts, ...r }) => r)
 

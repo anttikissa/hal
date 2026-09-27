@@ -201,10 +201,7 @@ function resumed(snapshot: Snapshot, t: Transcript): Resumed | undefined {
 
 // "resumed · last turn 00:51", with the date when it was not today.
 function resumedLabel(r: Resumed, now = new Date()): string {
-	let d = new Date(r.last)
-	let day = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
-	let when = day(d) === day(now) ? replay.clock(r.last) : `${day(d)} ${replay.clock(r.last)}`
-	return `resumed · last turn ${when}`
+	return `resumed · last turn ${replay.clock(r.last, now.toISOString())}`
 }
 
 export const transcript = { blockItems, resultItem, recordItems, endItem, aside, answered, question, fromSnapshot, copyTurn, fold, prompted, resumed, resumedLabel }

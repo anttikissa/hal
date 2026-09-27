@@ -88,7 +88,10 @@ test('OAuth request: endpoint, headers and the required Claude Code system ident
 	expect(s.headers.get('x-app')).toBe('cli')
 	// The identity must be the first system block, on its own.
 	expect(s.body.system[0]).toEqual({ type: 'text', text: "You are Claude Code, Anthropic's official CLI for Claude." })
-	expect(s.body.system.slice(1).map((b: any) => b.text)).toEqual(['Be brief.'])
+	expect(s.body.system.slice(1).map((b: any) => b.text.trim())).toEqual(['Be brief.'])
+	// The model reads the blocks joined with no separator: they must
+	// still read as separate paragraphs.
+	expect(s.body.system.map((b: any) => b.text).join('')).toContain('for Claude.\n\nBe brief.')
 	expect(s.body).toMatchObject({ model: 'claude-opus-4-5', stream: true })
 	expect(s.body.max_tokens).toBeGreaterThan(0)
 })

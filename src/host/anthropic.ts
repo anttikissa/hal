@@ -67,7 +67,9 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 	let maxTokens = req.maxTokens ?? anthropic.maxTokens()
 	let system: unknown[] = []
 	if (oauth) system.push({ type: 'text', text: IDENTITY })
-	if (req.system) system.push({ type: 'text', text: req.system, cache_control: ephemeral })
+	// The model reads the blocks joined with no separator; a blank line
+	// keeps ours a paragraph of its own (constant, so caching holds).
+	if (req.system) system.push({ type: 'text', text: oauth ? `\n\n${req.system}` : req.system, cache_control: ephemeral })
 	let b: Record<string, unknown> = { model: req.model, max_tokens: maxTokens, stream: true, messages: anthropic.toMessages(req) }
 	if (system.length) b.system = system
 	if (req.tools?.length) b.tools = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }))
