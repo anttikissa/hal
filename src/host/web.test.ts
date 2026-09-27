@@ -134,7 +134,7 @@ test('a missing JSX compiler fails the page with 500 and a diag line, not the ho
 	}
 })
 
-test('a code logs in once with a 30-day HttpOnly SameSite=Strict cookie; a wrong one gets 401', async () => {
+test('a code logs in once with a 10-year HttpOnly SameSite=Strict cookie; a wrong one gets 401', async () => {
 	await server.serve()
 	web.start()
 	let code = webAuth.issue()
@@ -149,7 +149,7 @@ test('a code logs in once with a 30-day HttpOnly SameSite=Strict cookie; a wrong
 	expect(set).toMatch(/SameSite=Strict/i)
 	// Plain HTTP on this machine: not Secure, or the browser would drop it.
 	expect(set).not.toMatch(/Secure/i)
-	expect(Number(/Max-Age=(\d+)/i.exec(set)![1])).toBe(30 * 24 * 3600)
+	expect(Number(/Max-Age=(\d+)/i.exec(set)![1])).toBe(10 * 365 * 24 * 3600)
 	let token = /hal=([^;]+)/.exec(set)![1]!
 	expect(token).toMatch(/^[0-9a-hjkmnp-tv-z]{20}$/)
 	// Used up.
@@ -248,6 +248,45 @@ test('GET /image serves a pasted image by exact name, from /tmp or once gone fro
 	}
 })
 
+test('a file address takes a link code; a used or expired one gets the gate, which leads back there', async () => {
+	await server.serve()
+	web.start()
+	let now = Date.now()
+	let origNow = clock.now
+	clock.now = () => now
+	try {
+		let png = Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.from('pixels')])
+		blobs.stage('abc123.png', 'image/png', png.toString('base64'))
+		let open = (path: string, cookie?: string) => fetch(`${base()}${path}`, { redirect: 'manual', headers: cookie ? { cookie } : {} })
+		let gate = async (res: Response) => {
+			expect(res.status).toBe(401)
+			expect(res.headers.get('content-type')).toContain('text/html')
+			expect(res.headers.get('cache-control')).toBe('no-store')
+			expect(await res.text()).toContain('</html>')
+		}
+		let code = webAuth.issue()
+		let first = await open(`/image/abc123.png?auth=${code}`)
+		expect(first.status).toBe(303)
+		expect(first.headers.get('location')).toBe('/image/abc123.png')
+		let jar = first.headers.get('set-cookie')!.split(';')[0]!
+		expect(Buffer.from(await (await open('/image/abc123.png', jar)).arrayBuffer())).toEqual(png)
+		// Clicked again in another browser: used, so no cookie, and the
+		// address it lands on shows the gate.
+		let again = await open(`/image/abc123.png?auth=${code}`)
+		expect(again.headers.get('location')).toBe('/image/abc123.png')
+		expect(again.headers.get('set-cookie')).toBeNull()
+		await gate(await open('/image/abc123.png'))
+		let late = webAuth.issue()
+		now += 10 * 60_000
+		expect((await open(`/image/abc123.png?auth=${late}`)).headers.get('set-cookie')).toBeNull()
+		await gate(await open(`/blob/1-abc/abc123`))
+		// The API still answers a bare 401.
+		expect((await open('/login')).status).toBe(401)
+	} finally {
+		clock.now = origNow
+	}
+})
+
 test('the login check and ws need the cookie', async () => {
 	await server.serve()
 	web.start()
@@ -271,11 +310,12 @@ test('an expired or revoked token is refused, and revoking closes open pages', a
 	clock.now = () => now
 	try {
 		let old = await cookie()
-		now += 29 * 24 * 3600_000
+		const day = 24 * 3600_000
+		now += 3649 * day
 		let fresh = await cookie()
 		let check = async (c: string) => (await fetch(`${base()}/login`, { headers: { cookie: c } })).status
 		expect(await check(old)).toBe(204)
-		now += 2 * 24 * 3600_000
+		now += 2 * day
 		expect(await check(old)).toBe(401)
 		expect(await check(fresh)).toBe(204)
 		let open = await dial(fresh)

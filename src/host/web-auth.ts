@@ -115,7 +115,7 @@ export const webAuth = {
 		path: '',
 	},
 	codeMs: (): number => 10 * minute,
-	tokenMs: (): number => 30 * 24 * 60 * minute,
+	tokenMs: (): number => 10 * 365 * 24 * 60 * minute,
 	maxWrong: (): number => 10,
 	random,
 	normalize,

@@ -5,6 +5,7 @@ import { placeholders } from '../common/placeholders.ts'
 import type { Event, Snapshot, Tab } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
 import { strings } from '../common/strings.ts'
+import { ansi } from './ansi.ts'
 import { app } from './app.ts'
 import { frame } from './frame.ts'
 import type { KeyEvent } from './keys.ts'
@@ -495,7 +496,8 @@ test('a saved draft shown on starting is not doubled; text typed before it follo
 test('connecting asks the host for the tab to show; its ack focuses and follows it', () => {
 	app.state.start = { cwd: '/w', last: 'b' }
 	app.onState({ type: 'connected', role: 'host' })
-	expect(sent).toEqual([{ type: 'tab-start', cwd: '/w', last: 'b' }])
+	// It also asks for a code for its web links.
+	expect(sent).toEqual([{ type: 'tab-start', cwd: '/w', last: 'b' }, { type: 'auth', link: true }])
 	app.onEvent(tabsEvent('a', 'b'))
 	expect(shown()).toBeUndefined()
 	acked('b')
@@ -503,7 +505,7 @@ test('connecting asks the host for the tab to show; its ack focuses and follows 
 	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: 'b' })
 	// A reconnect asks for the tab shown, in its own cwd.
 	app.onState({ type: 'connected', role: 'client' })
-	expect(sent.at(-1)).toEqual({ type: 'tab-start', cwd: '/b', last: 'b' })
+	expect(sent.at(-2)).toEqual({ type: 'tab-start', cwd: '/b', last: 'b' })
 })
 
 test('Ctrl-T opens a tab after the focused one and shows it once the host names it', () => {
@@ -598,9 +600,29 @@ test('a shown tab that wants attention is told seen', () => {
 	expect(sent.at(-1)).toEqual({ type: 'tab-seen', sessionId: 'b' })
 })
 
+test('web links carry the latest link code only in their hidden target', () => {
+	startOn(['a', 'b'])
+	try {
+		app.onEvent({ type: 'auth', code: 'k3x9qa', link: 'https://h.example' })
+		type('see [image/frdbn1.png]')
+		let lines = frame.build(app.view(), 60).lines
+		let targets = lines.flatMap((l) => [...l.matchAll(/\x1b\]8;;([^\x07]+)\x07/g)].map((m) => m[1]))
+		expect(targets).toEqual(expect.arrayContaining(['https://h.example/a?auth=k3x9qa', 'https://h.example/b?auth=k3x9qa', 'https://h.example/image/frdbn1.png?auth=k3x9qa']))
+		expect(lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, '')).join('\n')).not.toContain('k3x9qa')
+		// A replaced code is what the next paint links with.
+		app.onEvent({ type: 'auth', code: 'm2p7rt', link: 'https://h.example' })
+		expect(frame.build(app.view(), 60).lines.join('\n')).toContain('https://h.example/a?auth=m2p7rt')
+		// A plain `auth` reply (./run auth) is not a link code.
+		app.onEvent({ type: 'auth', code: 'zzzzzz' })
+		expect(frame.build(app.view(), 60).lines.join('\n')).not.toContain('zzzzzz')
+	} finally {
+		ansi.state.web = { url: '', code: '' }
+	}
+})
+
 test('the tab bar shows the tabs with the focused one', () => {
 	startOn(['a', 'b'])
-	let lines = frame.build(app.view(), 60).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ''))
+	let lines = frame.build(app.view(), 60).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, ''))
 	expect(lines.at(-2)).toContain('Tabs: [1] 2 ')
 })
 

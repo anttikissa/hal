@@ -10,8 +10,8 @@
 		"A resend after a host restart finds the file already there: same bytes are accepted, other bytes are refused as 'name taken'.",
 		"The session copy's blob id is the 6-character name base (sessions/<id>/blobs/frdbn1.png), so attachments.blobId accepts both 12 hex and 6 base36, and /blob/<session>/<blob> serves either. blobs.named copies from /tmp on first use, which happens at submit (host.ts calls blobs.unknown first); a queued prompt is therefore safe from a /tmp clean too. Old [image <12hex>] markers still resolve.",
 		'paths.imageDir() is /tmp/hal/image, but <home>/tmp/image when HAL_HOME or NODE_ENV=test, so tests never touch /tmp/hal. Bytes from /tmp are checked (magic number, size) before they are copied, since anyone on the machine can write there.',
-		'GET /image/<name> reads /tmp first, then scans sessions/*/blobs/<name>. An unauthenticated click gets the plain 401, not the gate.',
-		'The terminal link target is ansi.imageUrl(name) = http://localhost:<webPort>/image/<name>; the host does not know a public URL, so behind a proxy override it from local.ts. No ?auth= code is put in it. ansi.links wraps whole markers per row (after ansi.clean), so a marker split by wrapping or cut by a selection is not linked.',
+		'GET /image/<name> reads /tmp first, then scans sessions/*/blobs/<name>. An unauthenticated click gets the login gate (task e3).',
+		'The terminal link target is ansi.imageUrl(name) = <webUrl>/image/<name>?auth=<link code> (task e3 added the webUrl setting and the code). ansi.links wraps whole markers per row (after ansi.clean), so a marker split by wrapping or cut by a selection is not linked.',
 		'Web Card links markers only in prompt cards, through memos gated on the text string, so snapshots and streaming never rebuild nodes.'
 	]
 }

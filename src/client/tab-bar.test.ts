@@ -12,7 +12,7 @@ const tab = (id: string, state: SessionState = { type: 'idle' }, attention = fal
 	state,
 	...(attention ? { attention: true as const } : {}),
 })
-const text = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '')
+const text = (s: string) => s.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '')
 const bar = (list: Tab[], focused: string, cols: number) => text(tabBar.row(list, focused, cols))
 
 test('one tab shows creation hints, several show navigation hints', () => {

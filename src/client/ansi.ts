@@ -1,5 +1,5 @@
 // Escape codes and row primitives the frame is built from: styles to
-// SGR, padded and painted rows, and text made safe to show. Pure.
+// SGR, padded and painted rows, links, and text made safe to show.
 
 import { attachments } from '../common/attachments.ts'
 import type { Style } from '../common/colors.ts'
@@ -37,7 +37,18 @@ function links(row: string): string {
 	return row.replace(attachments.imageMarker, (m, name: string) => `\x1b]8;;${ansi.imageUrl(name)}\x07${m}${ansi.LINK_OFF}`)
 }
 
+// The hidden target of a link to `path` on the host's web address: it
+// carries the link code, so a click logs a browser in (task e3). Never
+// visible text.
+function webUrl(path: string): string {
+	let { url, code } = ansi.state.web
+	return `${url || `http://localhost:${settings.webPort()}`}${path}${code ? `?auth=${code}` : ''}`
+}
+
 export const ansi = {
+	// The host's web address and this client's link code, from its
+	// latest `auth` event (task e3); empty until one came.
+	state: { web: { url: '', code: '' } },
 	// One blank column on each side of every row.
 	PAD: ' ',
 	DIM: '\x1b[2m',
@@ -56,7 +67,6 @@ export const ansi = {
 	clean: (s: string): string => strings.clean(s),
 	wrap,
 	links,
-	// Where a pasted image opens: the web endpoint on this machine
-	// (behind its login). Override from local.ts behind a proxy.
-	imageUrl: (name: string): string => `http://localhost:${settings.webPort()}/image/${name}`,
+	webUrl,
+	imageUrl: (name: string): string => ansi.webUrl(`/image/${name}`),
 }

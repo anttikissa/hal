@@ -9,7 +9,7 @@
 // value or unknown key is a warning and that setting uses its default.
 
 export type SettingType =
-	| { kind: 'text' }
+	| { kind: 'text'; url?: true }
 	| { kind: 'integer'; min: number; max: number }
 	| { kind: 'choice'; options: string[] }
 
@@ -42,13 +42,22 @@ const table: Setting[] = [
 		description: 'Provider rounds one turn may run before it pauses; Enter continues for as many again.',
 	},
 	{ name: 'webPort', type: { kind: 'integer', min: 1, max: 65535 }, default: 9002, description: 'Port for the browser client (127.0.0.1).' },
+	{
+		name: 'webUrl',
+		type: { kind: 'text', url: true },
+		default: '',
+		description: 'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
+	},
 ]
 
 // Why `value` doesn't fit `type`, or undefined if it does.
 function problem(type: SettingType, value: unknown): string | undefined {
 	switch (type.kind) {
 		case 'text':
-			return typeof value === 'string' && value !== '' ? undefined : 'expected a non-empty string'
+			// An empty address means the default (localhost).
+			if (typeof value !== 'string' || (value === '' && !type.url)) return 'expected a non-empty string'
+			if (value === '') return undefined
+			return !type.url || /^https?:\/\/[^\s\p{Cc}/?#]+(\/[^\s\p{Cc}?#]*)?$/u.test(value) ? undefined : 'expected an http(s) address without ? or #'
 		case 'integer':
 			return Number.isInteger(value) && (value as number) >= type.min && (value as number) <= type.max
 				? undefined
@@ -90,6 +99,8 @@ export const settings = {
 	model: (): string => settings.value('model') as string,
 	security: (): 'best-effort' | 'none' => settings.value('security') as 'best-effort' | 'none',
 	webPort: (): number => settings.value('webPort') as number,
+	// Where web links point, without a trailing slash (task e3).
+	webUrl: (): string => ((settings.value('webUrl') as string) || `http://localhost:${settings.webPort()}`).replace(/\/+$/, ''),
 	promptRows: (): number => settings.value('promptRows') as number,
 	pasteLines: (): number => settings.value('pasteLines') as number,
 	maxRounds: (): number => settings.value('maxRounds') as number,

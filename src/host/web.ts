@@ -27,6 +27,9 @@
 //   GET  /image/<name>  a pasted image (cookie; task qy): from /tmp, or
 //                  from the session blob a prompt copied it into; the
 //                  name must be attachments.imageName.
+//   Any page or file above asked for without a login gets the gate (the
+//   page at that address), which comes back to it once logged in; with
+//   ?auth=<code> a file address redeems the code like a page (task e3).
 
 import type { BunPlugin, Server, ServerWebSocket } from 'bun'
 import { colors, type Style } from '../common/colors.ts'
@@ -37,6 +40,7 @@ import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
 import { webAuth } from './web-auth.ts'
+import { webLinks } from './web-links.ts'
 
 const cookieName = 'hal'
 
@@ -60,6 +64,7 @@ function sameOrigin(req: Request): boolean {
 function redeem(code: unknown, req: Request): { cookie?: string; refused?: 'wrong' | 'limited' } {
 	let out = webAuth.redeem(code)
 	if ('refused' in out) return out
+	webLinks.used(webAuth.normalize(code as string))
 	let hostname = URL.parse(`http://${req.headers.get('host') ?? ''}`)?.hostname
 	let local = ['localhost', '127.0.0.1', '[::1]'].includes(hostname ?? '') && req.headers.get('x-forwarded-proto') !== 'https'
 	let maxAge = Math.floor(webAuth.tokenMs() / 1000)
@@ -142,6 +147,14 @@ async function page(): Promise<Response> {
 	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 }
 
+// The login gate at a file's address: the page, which shows the gate
+// and reloads the address once logged in. Never cached, unlike the file.
+async function gate(): Promise<Response> {
+	let res = await web.page()
+	if (!res.ok) return res
+	return new Response(res.body, { status: 401, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
+}
+
 async function login(req: Request): Promise<Response> {
 	let code: unknown
 	try {
@@ -168,12 +181,16 @@ function linkLogin(url: URL, req: Request): Response {
 function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | undefined> | undefined {
 	let url = new URL(req.url)
 	let { pathname } = url
-	if ((pathname === '/' || session.isId(pathname.slice(1))) && req.method === 'GET') return url.searchParams.has('auth') ? web.linkLogin(url, req) : web.page()
+	let get = req.method === 'GET'
+	let blob = get && (pathname.startsWith('/blob/') || pathname.startsWith('/image/'))
+	if (get && url.searchParams.has('auth') && (blob || pathname === '/' || session.isId(pathname.slice(1)))) return web.linkLogin(url, req)
+	if (get && (pathname === '/' || session.isId(pathname.slice(1)))) return web.page()
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
-	let check = pathname === '/login' && req.method === 'GET'
-	let blob = (pathname.startsWith('/blob/') || pathname.startsWith('/image/')) && req.method === 'GET'
+	let check = pathname === '/login' && get
 	if (!check && !blob && pathname !== '/ws') return new Response('not found\n', { status: 404 })
-	if (!web.authorized(req)) return new Response('log in first\n', { status: 401 })
+	// A page asked for without a login gets the gate, which reloads it
+	// after the login; the API gets a bare 401.
+	if (!web.authorized(req)) return blob ? web.gate() : new Response('log in first\n', { status: 401 })
 	if (blob) return web.blob(pathname)
 	if (check) return new Response(null, { status: 204 })
 	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
@@ -259,6 +276,7 @@ export const web = {
 	build,
 	version,
 	page,
+	gate,
 	upgrade,
 	login,
 	blob,

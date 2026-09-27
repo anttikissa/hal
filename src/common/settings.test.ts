@@ -21,9 +21,9 @@ test('every declared default passes its own validation', () => {
 })
 
 test('valid values are taken', () => {
-	let { values, warnings } = settings.check({ model: 'openai/gpt-5', security: 'none', webPort: 8080, promptRows: 4, pasteLines: 20, maxRounds: 50 })
+	let { values, warnings } = settings.check({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50 })
 	expect(warnings).toEqual([])
-	expect(values).toEqual({ model: 'openai/gpt-5', security: 'none', webPort: 8080, promptRows: 4, pasteLines: 20, maxRounds: 50 })
+	expect(values).toEqual({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50 })
 })
 
 test('an unknown key is a warning and changes nothing else', () => {
@@ -52,4 +52,14 @@ test('getters read the current raw settings at call time', () => {
 	settings.state.raw = { model: 42 }
 	expect(settings.model()).toBe(before)
 	expect(settings.warnings()[0]).toContain('model')
+})
+
+test('webUrl is an http(s) address links can carry; empty means localhost at webPort', () => {
+	for (let bad of ['h.example', 'ftp://h.example', 'https://h.example/?x=1', 'https://h.example/#a', 'https://h.example/\x07x', 'https://h .example']) {
+		expect(settings.check({ webUrl: bad }).warnings).toHaveLength(1)
+	}
+	settings.state.raw = { webPort: 4321 }
+	expect(settings.webUrl()).toBe('http://localhost:4321')
+	settings.state.raw = { webUrl: 'https://h2.example/hal/' }
+	expect(settings.webUrl()).toBe('https://h2.example/hal')
 })

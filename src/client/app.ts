@@ -19,6 +19,7 @@ import type { Event, Tab } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
 import { uploads } from '../common/uploads.ts'
+import { ansi } from './ansi.ts'
 import type { KeyEvent } from './keys.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
 import { recall } from '../common/recall.ts'
@@ -112,6 +113,7 @@ function onEvent(event: Event): void {
 	// An upload landed; a submit waiting for it goes now.
 	let resume = paste.settled(st, event)?.resume
 	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: resume.queue, ctrl: false, cmd: false }])
+	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
 	if (event.type === 'tabs') return app.onTabs(event.tabs)
 	if (event.type === 'ack' && event.tab !== undefined) {
 		st.asked = event.tab
@@ -151,6 +153,8 @@ function onState(state: LinkState): void {
 		let tab = app.focusedTab()
 		let last = tab?.id ?? st.start.last
 		app.send({ type: 'tab-start', cwd: tab?.cwd ?? st.start.cwd, ...(last === undefined ? {} : { last }) })
+		// A code for the web links this terminal prints (task e3).
+		app.send({ type: 'auth', link: true })
 	}
 	app.show()
 }

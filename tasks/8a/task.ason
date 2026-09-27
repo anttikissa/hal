@@ -5,10 +5,10 @@
 	needs: ['p6'],
 	foldInto: ['p6'],
 	notes: [
-		'Host side is src/host/web-auth.ts (codes in memory, token hashes in state/web-sessions.ason as SHA-256 hex → ISO expiry, pruned on each login) and web.ts (POST /login field `code`: 204 + cookie, 401 wrong/used/expired, 429 limited). The cookie is still named hal.',
+		'Tokens last 10 years (webAuth.tokenMs); built first with 30 days. Host side is src/host/web-auth.ts (codes in memory, token hashes in state/web-sessions.ason as SHA-256 hex → ISO expiry, pruned on each login) and web.ts (POST /login field `code`: 204 + cookie, 401 wrong/used/expired, 429 limited). The cookie is still named hal.',
 		'Past 10 wrong codes a minute every attempt, right ones too, is refused unchecked with 429: otherwise the limit would not bound guessing. The price is that anyone reaching the port can keep the gate shut; a note in the handoff, not solved.',
 		'?auth=<code> is redeemed on the host, not in the page: GET / or /<id> with it answers 303 to the same address without auth (other params kept), with Set-Cookie if right. That both logs in and drops the code from the address bar before any script runs.',
-		'No terminal link to the web page exists yet (the host does not know its public URL). Whoever adds one must put a fresh webAuth.issue() only in the OSC 8 target, and note that ansi.clean strips OSC 8 from output text today.',
+		'Terminal links to the web page are task e3: the link code goes only in the OSC 8 target (ansi.webUrl). ansi.clean strips OSC 8 from output text.',
 		'The /auth reply is Reply.show (commands.ts): broadcast as an output event without n and never appended to history, so a reopen or reconnect no longer shows it. Anything else that must not persist can use it.',
 		"`./run auth` is main.auth(): link.dial to the socket, command {type: 'auth'}, event {type: 'auth', code}. It never tries to become host. The web client may send the command too; that is no more than typing /auth.",
 		"Origin check on /ws accepts Origin's host equal to Host or X-Forwarded-Host (Caddy preserves Host by default). Cookie is Secure unless Host is localhost/127.0.0.1/[::1] and X-Forwarded-Proto is not https.",

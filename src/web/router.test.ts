@@ -65,3 +65,11 @@ test('choosing a tab pushes an entry, landing replaces it, the same address writ
 	])
 	expect(router.parse(router.href())).toBe('2-bbb')
 })
+
+test('only / and /<id> are the app; a file address such as /image/<name> reloads after login', () => {
+	expect(router.isApp('http://h/')).toBe(true)
+	expect(router.isApp('http://h/?x=1')).toBe(true)
+	expect(router.isApp('http://h/12-abc')).toBe(true)
+	expect(router.isApp('http://h/image/frdbn1.png')).toBe(false)
+	expect(router.isApp('http://h/blob/12-abc/frdbn1')).toBe(false)
+})

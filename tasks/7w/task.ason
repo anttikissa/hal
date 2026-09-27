@@ -12,6 +12,6 @@ Test the focus rules as a pure function over (old list, new list, focused, what 
 		'Switching tabs repaints the frame; the full-screen rules for that (peak padding, CSI 3J) are task vq. Until then a switch may use the existing force repaint.',
 		'Decisions: the client follows only the focused tab (close the old, open the new on a switch) and ignores late events of other sessions; a tab shown again keeps its old transcript until the fresh snapshot replaces it (no mark where replayed history ends, task 66). The host publishes the tab list before the ack naming a tab, so focus moves on the ack (asked), not on the list. On every connection the client sends tab-start (cwd and last of the focused tab), which is also how it gets the list after a reconnect; open-newest is no longer used by the terminal.',
 		'Restart: ./run exports HAL_TAB_FILE (mktemp, removed on exit); main.keepTab writes the focused tab id and cwd there on every change, main.lastTab reads it into app.state.start. The cwd matters: tab-start only honours last when it is in the given cwd.',
-		'Not done here: OSC 8 links on tab labels (tasks/cc/terminal.md) and blinking indicators.'
+		'Not done here: OSC 8 links on tab labels (task e3 did them) and blinking indicators (task fr).'
 	]
 }

@@ -130,8 +130,10 @@ export type Command = (
 	// marker [image/<name>] (task qy).
 	| { type: 'attach'; sessionId: string; mediaType: string; data: string; name?: string }
 	// A one-time web login code (host/web-auth.ts) for `./run auth`;
-	// answered, to this client only, with `auth`.
-	| { type: 'auth' }
+	// answered, to this client only, with `auth`. With `link` (a
+	// terminal, task e3): a code for its web links, replaced by a new
+	// `auth` event whenever it is used and before it grows old.
+	| { type: 'auth'; link?: boolean }
 ) & { id?: string }
 
 export type CommandType = Command['type']
@@ -216,8 +218,9 @@ export type Event =
 	// Sent only to the sender: the command with this id was carried out.
 	// `tab`: the tab a tab command created, reopened or picked.
 	| { type: 'ack'; id: string; tab?: string }
-	// The one-time web login code an `auth` command asked for.
-	| { type: 'auth'; code: string }
+	// The one-time web login code an `auth` command asked for; `link`,
+	// the host's web address, if it is meant for links (task e3).
+	| { type: 'auth'; code: string; link?: string }
 
 export type EventType = Event['type']
 
@@ -233,7 +236,7 @@ function invalid(value: unknown): string | undefined {
 		(optional && c[key] === undefined) || typeof c[key] === 'string' ? undefined : `${c.type}: ${key} must be a string`
 	let problem = str('id', true)
 	if (problem) return problem
-	if (c.type === 'auth') return undefined
+	if (c.type === 'auth') return c.link === undefined || typeof c.link === 'boolean' ? undefined : 'auth: link must be a boolean'
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
 	if (c.type === 'tab-new') return str('cwd') ?? str('after', true)
@@ -280,7 +283,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },
 	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },
 	ack: { id: 's', tab: 's?' },
-	auth: { code: 's' },
+	auth: { code: 's', link: 's?' },
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)

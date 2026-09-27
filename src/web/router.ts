@@ -47,6 +47,13 @@ function parse(url: string): string | undefined {
 	return session.isId(id) ? id : undefined
 }
 
+// Whether the address is the app's own (/ or /<id>), not a file such
+// as /image/<name> that shows the login gate only until logged in.
+function isApp(url: string): boolean {
+	let path = new URL(url).pathname
+	return path === '/' || router.parse(url) !== undefined
+}
+
 function format(id: string): string {
 	return `/${id}`
 }
@@ -71,4 +78,4 @@ function go(id: string, replace: boolean): void {
 	router.write(`${router.format(id)}${url.search}`, replace)
 }
 
-export const router = { href, write, store, parse, format, pick, go }
+export const router = { href, write, store, parse, isApp, format, pick, go }

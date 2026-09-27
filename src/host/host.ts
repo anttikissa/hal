@@ -33,6 +33,7 @@ import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
 import { webAuth } from './web-auth.ts'
+import { webLinks } from './web-links.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -68,6 +69,7 @@ function connect(deliver: (event: Event) => void): Connection {
 		},
 		close: () => {
 			host.state.clients.delete(client)
+			webLinks.drop(client)
 		},
 	}
 }
@@ -193,7 +195,8 @@ function act(client: Client, c: Command): Outcome | undefined {
 		return undefined
 	}
 	if (tabs.is(c)) return tabs.act(c)
-	if (c.type === 'auth') return { reply: { type: 'auth', code: webAuth.issue() } }
+	if (c.type === 'auth' && c.link) webLinks.follow(client, client.deliver)
+	if (c.type === 'auth') return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } }
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	// An edit waits for the turn it paused to finish stopping, so nothing
 	// that turn still records lands after the edit.
@@ -319,6 +322,7 @@ function reset(): void {
 	tabs.reset()
 	busy.reset()
 	drafts.reset()
+	webLinks.reset()
 	host.state.pauseOnExit = false
 }
 

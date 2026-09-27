@@ -3,6 +3,7 @@
 // one indicator character when the tab needs a look, then key hints.
 // It stays one row: hints go from the lowest priority up, then the
 // label, then the padding between tabs, and only then is it clipped.
+// Each number is an OSC 8 link to that tab's web page.
 
 import { colors } from '../common/colors.ts'
 import type { Oklch } from '../common/oklch.ts'
@@ -10,7 +11,7 @@ import type { Tab } from '../common/protocol.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 
-type Part = { text: string; fg?: Oklch }
+type Part = { text: string; fg?: Oklch; link?: string }
 type Hint = { text: string; priority: number }
 
 // The one character after a tab's number, if any, and its colour.
@@ -42,7 +43,7 @@ function labels(list: Tab[], focused: string | undefined, compact: boolean): Par
 		let fg = on ? c.activeFg! : c.inactiveFg!
 		let mark = indicator(tab)
 		if (compact && i > 0) parts.push({ text: ' ' })
-		parts.push({ text: on ? '[' : compact ? '' : ' ', fg }, { text: String(i + 1), fg })
+		parts.push({ text: on ? '[' : compact ? '' : ' ', fg }, { text: String(i + 1), fg, link: `/${tab.id}` })
 		if (mark) parts.push(mark)
 		parts.push({ text: on ? ']' : compact ? '' : ' ', fg })
 	})
@@ -77,7 +78,11 @@ function fit(list: Tab[], focused: string | undefined, width: number): Part[] {
 // The painted row for a terminal `cols` wide.
 function row(list: Tab[], focused: string | undefined, cols: number): string {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
-	let out = fit(list, focused, width).map((p) => (p.fg ? ansi.sgr({ fg: p.fg }) : '') + p.text)
+	// A tab's number links to its web page (task e3).
+	let out = fit(list, focused, width).map((p) => {
+		let text = p.link ? `\x1b]8;;${ansi.webUrl(p.link)}\x07${p.text}${ansi.LINK_OFF}` : p.text
+		return (p.fg ? ansi.sgr({ fg: p.fg }) : '') + text
+	})
 	return ansi.PAD + out.join('') + ansi.UNCOLOR
 }
 
