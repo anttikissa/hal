@@ -3,7 +3,8 @@
 // event from the host is folded into the transcript and shown. Nothing
 // here waits on the host. The prompt is the session's draft, kept and
 // shared through common/drafts.ts; a sent prompt shows at once, pending
-// until the host has it.
+// until the host has it. It shows the host's tabs and one focused tab
+// (src/client/tabs.ts); each tab keeps its own client state meanwhile.
 
 import { amend, type Editing } from '../common/amend.ts'
 import { completion } from '../common/completion.ts'
@@ -13,7 +14,7 @@ import { drafts } from '../common/drafts.ts'
 import { modals, type ModalAction, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
 import { placeholders } from '../common/placeholders.ts'
-import type { Event } from '../common/protocol.ts'
+import type { Event, Tab } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
 import type { KeyEvent } from './keys.ts'
@@ -21,6 +22,7 @@ import { prompt, type PromptState } from '../common/prompt.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import { frame, type View } from './frame.ts'
+import { tabs, type Focus } from './tabs.ts'
 
 // `resumed`: where the history of the last snapshot ends, marked on screen.
 // `form`: the session's open question as filled in here; while there is
@@ -29,7 +31,16 @@ import { frame, type View } from './frame.ts'
 // `modal`: client-only UI over everything, taking the keys first;
 // `onModal` makes the command its Enter sends; `onModalKey` updates it
 // after a key (the picker refilters its list).
+// `tabs`: the host's, in order; `focus`: the one shown; `asked`: the tab
+// this client's own tab command named, focused once it is in the list;
+// `hidden`: the client state of tabs not shown. `start`: where a
+// starting client looks for its tab (a restart: the one it left).
 type AppState = {
+	tabs: Tab[]
+	focus: Focus
+	asked?: string
+	hidden: Map<string, TabView>
+	start: { cwd: string; last?: string }
 	transcript?: Transcript
 	resumed?: Resumed
 	prompt: PromptState
@@ -41,8 +52,12 @@ type AppState = {
 	onModalKey?: (modal: ModalState) => ModalState
 }
 
+// What each tab keeps while another is shown.
+type TabView = Pick<AppState, 'transcript' | 'resumed' | 'prompt' | 'notice' | 'form' | 'editing'>
+const tabFields = ['transcript', 'resumed', 'prompt', 'notice', 'form', 'editing'] as const
+
 function createState(): AppState {
-	return { prompt: prompt.empty() }
+	return { tabs: [], focus: {}, hidden: new Map(), start: { cwd: '/' }, prompt: prompt.empty() }
 }
 
 function view(): View {
@@ -57,6 +72,7 @@ function view(): View {
 	// An example request for an empty prompt, another each turn.
 	let t = st.transcript
 	if (t && !st.prompt.text) v.placeholder = placeholders.pick(t.meta.cwd, app.halDir(), t.items.filter((i) => i.type === 'prompt').length)
+	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	// A passing notice, else what the session is doing.
 	let notice = st.notice ?? (st.editing ? amend.hint() : st.transcript && states.describe(st.transcript.state))
 	if (notice) v.notice = notice
@@ -72,6 +88,14 @@ function onEvent(event: Event): void {
 	// Text typed before the first session arrived joins its draft.
 	let early = !st.transcript && event.type === 'snapshot' ? st.prompt.text : ''
 	if (drafts.onEvent(event) && st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id) app.setPrompt(drafts.text(event.sessionId))
+	if (event.type === 'tabs') return app.onTabs(event.tabs)
+	if (event.type === 'ack' && event.tab !== undefined) {
+		st.asked = event.tab
+		return app.onTabs(st.tabs)
+	}
+	// Late events of a tab just left are not this view's.
+	let shown = st.focus.tab
+	if (shown !== undefined && 'sessionId' in event && event.sessionId !== undefined && event.sessionId !== shown) return
 	if (event.type === 'rejected') st.notice = `${event.command} refused: ${event.reason}`
 	else if (event.type === 'warning') st.notice = event.text
 	else if (event.type === 'completions') app.completed(event)
@@ -92,9 +116,88 @@ function onEvent(event: Event): void {
 	app.show()
 }
 
+// On every connection the host names the tab to show and sends the tabs:
+// the focused one if any, else the start's.
 function onState(state: LinkState): void {
-	app.state.notice = state.type === 'connected' ? undefined : 'host lost; reconnecting…'
+	let st = app.state
+	st.notice = state.type === 'connected' ? undefined : 'host lost; reconnecting…'
+	if (state.type === 'connected') {
+		let tab = app.focusedTab()
+		let last = tab?.id ?? st.start.last
+		app.send({ type: 'tab-start', cwd: tab?.cwd ?? st.start.cwd, ...(last === undefined ? {} : { last }) })
+	}
 	app.show()
+}
+
+function focusedTab(): Tab | undefined {
+	return app.state.tabs.find((t) => t.id === app.state.focus.tab)
+}
+
+// The host's tabs changed, or named the tab this client asked for.
+function onTabs(list: Tab[]): void {
+	let st = app.state
+	let old = st.tabs.map((t) => t.id)
+	let ids = list.map((t) => t.id)
+	st.tabs = list
+	let asked = st.asked
+	if (asked !== undefined && ids.includes(asked)) delete st.asked
+	for (let id of st.hidden.keys()) if (!ids.includes(id)) st.hidden.delete(id)
+	app.focusOn(tabs.focus(old, ids, st.focus, asked))
+	app.show()
+}
+
+// Shows `focus`: the tab left keeps its client state and is no longer
+// followed, the tab shown is followed and its state comes back. A modal
+// closes. A tab shown that wants attention is told seen.
+function focusOn(focus: Focus): void {
+	let st = app.state
+	let from = st.focus.tab
+	st.focus = focus
+	if (focus.tab !== from) {
+		if (from !== undefined) {
+			let kept = {} as TabView
+			for (let f of tabFields) if (st[f] !== undefined) Object.assign(kept, { [f]: st[f] })
+			st.hidden.set(from, kept)
+			app.send({ type: 'close', sessionId: from })
+		}
+		for (let f of tabFields) delete st[f]
+		let back = focus.tab === undefined ? undefined : st.hidden.get(focus.tab)
+		Object.assign(st, { prompt: prompt.empty() }, back)
+		delete st.modal
+		delete st.onModal
+		delete st.onModalKey
+		if (focus.tab !== undefined) {
+			st.hidden.delete(focus.tab)
+			if (!back) app.setPrompt(drafts.text(focus.tab))
+			app.send({ type: 'open', sessionId: focus.tab })
+		}
+	}
+	let tab = app.focusedTab()
+	if (tab) app.focused(tab)
+	if (tab?.attention) app.send({ type: 'tab-seen', sessionId: tab.id })
+}
+
+// Tab keys: new, reopen, close, next, previous, go to 1-10. True if
+// handled.
+function tabKey(k: KeyEvent): boolean {
+	let st = app.state
+	let tab = app.focusedTab()
+	if (k.cmd || !tab) return false
+	let go = (id: string | undefined) => {
+		if (id !== undefined && id !== tab.id) app.focusOn({ tab: id })
+		return true
+	}
+	let ids = st.tabs.map((t) => t.id)
+	if (k.ctrl && !k.alt) {
+		if (k.key === 't') app.send(k.shift ? { type: 'tab-resume' } : { type: 'tab-new', cwd: tab.cwd, after: tab.id })
+		else if (k.shift) return false
+		else if (k.key === 'w') app.send({ type: 'tab-close', sessionId: tab.id })
+		else if (k.key === 'n' || k.key === 'p') return go(tabs.step(ids, tab.id, k.key === 'n' ? 1 : -1))
+		else return false
+		return true
+	}
+	if (k.alt && !k.ctrl && !k.shift && /^[0-9]$/.test(k.key)) return go(ids[(Number(k.key) + 9) % 10])
+	return false
 }
 
 // Enter: a prompt (steering a busy turn; `queue`: after it), an edit
@@ -173,6 +276,7 @@ function editKey(k: KeyEvent): boolean {
 function onKeys(events: KeyEvent[]): void {
 	let st = app.state
 	for (let k of events) {
+		if (app.tabKey(k)) continue
 		if (st.modal) {
 			let { state, action } = modals.step(st.modal, k)
 			st.modal = state
@@ -265,6 +369,13 @@ export const app = {
 	show,
 	onEvent,
 	onState,
+	focusedTab,
+	onTabs,
+	focusOn,
+	tabKey,
+	// Told the tab shown after every change (main.ts keeps it for a
+	// restart).
+	focused: (_tab: Tab): void => {},
 	submit,
 	completed,
 	setPrompt,

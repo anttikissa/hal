@@ -1,15 +1,15 @@
 // Composition root: the one explicit startup path. Other modules do no
 // work on import; start() calls their init() functions in order.
-import { existsSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { app } from './client/app.ts'
 import { draftFile } from './client/draft-file.ts'
 import { link } from './client/link.ts'
 import { render } from './client/render.ts'
 import { terminal } from './client/terminal.ts'
-import { connection, type LinkState } from './common/connection.ts'
+import type { LinkState } from './common/connection.ts'
 import { drafts } from './common/drafts.ts'
-import type { Event } from './common/protocol.ts'
+import type { Event, Tab } from './common/protocol.ts'
 import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
 import { diag } from './host/diag.ts'
@@ -32,6 +32,28 @@ async function loadLocal(): Promise<void> {
 	if (existsSync(path)) await import(path)
 }
 
+// A restart comes back to the tab it left: ./run gives every start of
+// one run the same file (HAL_TAB_FILE), holding the tab shown and its
+// cwd. A fresh ./run starts empty, so it goes to its cwd's tab.
+function lastTab(): { last?: string; cwd?: string } {
+	try {
+		let [last, cwd] = readFileSync(process.env.HAL_TAB_FILE ?? '', 'utf8').split('\n')
+		return last && cwd ? { last, cwd } : {}
+	} catch {
+		return {}
+	}
+}
+
+function keepTab(tab: Tab): void {
+	let file = process.env.HAL_TAB_FILE
+	let text = `${tab.id}\n${tab.cwd}`
+	if (!file || main.state.kept === text) return
+	main.state.kept = text
+	try {
+		writeFileSync(file, text)
+	} catch {}
+}
+
 // Module init() calls go here, in order, once modules have them.
 function init(): void {
 	paths.init()
@@ -48,6 +70,8 @@ function init(): void {
 		// Drafts are kept on this machine too, for when the host is gone.
 		draftFile.dir = () => join(paths.stateDir(), 'drafts')
 		drafts.store = draftFile
+		app.state.start = { cwd: process.cwd(), ...main.lastTab() }
+		app.focused = (tab) => main.keepTab(tab)
 		app.init()
 	}
 }
@@ -89,10 +113,9 @@ async function start(): Promise<void> {
 		(event) => app.onEvent(event),
 		(state) => app.onState(state),
 	)
-	connection.send({ type: 'open-newest', cwd: process.cwd() })
 }
 
-export const main = { localPath, loadLocal, init, becomeHost, joinHost, start }
+export const main = { state: { kept: '' }, lastTab, keepTab, localPath, loadLocal, init, becomeHost, joinHost, start }
 
 // Only ./run starts Hal; importing this file (tests, eval) does nothing.
 if (import.meta.main) await main.start()

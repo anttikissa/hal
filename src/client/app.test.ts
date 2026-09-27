@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { drafts } from '../common/drafts.ts'
 import { modals } from '../common/modals.ts'
 import { placeholders } from '../common/placeholders.ts'
-import type { Event, Snapshot } from '../common/protocol.ts'
+import type { Event, Snapshot, Tab } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
 import { app } from './app.ts'
 import { frame } from './frame.ts'
@@ -421,4 +421,132 @@ test('an empty prompt shows an example that changes each turn, with its own list
 	} finally {
 		app.halDir = halDir
 	}
+})
+
+// ── Tabs ──
+
+const tabOf = (id: string, extra: Partial<Tab> = {}): Tab => ({ id, name: id, cwd: `/${id}`, model: 'm', state: { type: 'idle' }, ...extra })
+const tabsEvent = (...list: (string | Tab)[]): Event => ({ type: 'tabs', tabs: list.map((t) => (typeof t === 'string' ? tabOf(t) : t)) })
+const ctrl = (k: string, shift = false): KeyEvent => ({ key: k, shift, alt: false, ctrl: true, cmd: false })
+const alt = (k: string): KeyEvent => ({ key: k, shift: false, alt: true, ctrl: false, cmd: false })
+const acked = (tab: string) => app.onEvent({ type: 'ack', id: 'x', tab })
+// Starts on tab `a` of `ids`, with its snapshot in.
+const startOn = (ids: string[], at = 'a') => {
+	app.onEvent(tabsEvent(...ids))
+	acked(at)
+	app.onEvent(snapshot(at))
+	sent = []
+}
+const shown = () => app.view().tabs?.focused
+
+test('connecting asks the host for the tab to show; its ack focuses and follows it', () => {
+	app.state.start = { cwd: '/w', last: 'b' }
+	app.onState({ type: 'connected', role: 'host' })
+	expect(sent).toEqual([{ type: 'tab-start', cwd: '/w', last: 'b' }])
+	app.onEvent(tabsEvent('a', 'b'))
+	expect(shown()).toBeUndefined()
+	acked('b')
+	expect(shown()).toBe('b')
+	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: 'b' })
+	// A reconnect asks for the tab shown, in its own cwd.
+	app.onState({ type: 'connected', role: 'client' })
+	expect(sent.at(-1)).toEqual({ type: 'tab-start', cwd: '/b', last: 'b' })
+})
+
+test('Ctrl-T opens a tab after the focused one and shows it once the host names it', () => {
+	startOn(['a', 'b'])
+	app.onKeys([ctrl('t')])
+	expect(sent).toEqual([{ type: 'tab-new', cwd: '/a', after: 'a' }])
+	// The list comes first: until the ack it could be anyone's new tab.
+	app.onEvent(tabsEvent('a', 'n', 'b'))
+	expect(shown()).toBe('a')
+	acked('n')
+	expect(shown()).toBe('n')
+	expect(sent.slice(1)).toEqual([
+		{ type: 'close', sessionId: 'a' },
+		{ type: 'open', sessionId: 'n' },
+	])
+	// Closing it goes back to where it was opened from.
+	app.onKeys([ctrl('w')])
+	expect(sent.at(-1)).toEqual({ type: 'tab-close', sessionId: 'n' })
+	app.onEvent(tabsEvent('a', 'b'))
+	expect(shown()).toBe('a')
+})
+
+test('Ctrl-Shift-T reopens the last closed tab and shows it', () => {
+	startOn(['a', 'b'])
+	app.onKeys([ctrl('t', true)])
+	expect(sent).toEqual([{ type: 'tab-resume' }])
+	app.onEvent(tabsEvent('a', 'b', 'c'))
+	acked('c')
+	expect(shown()).toBe('c')
+})
+
+test("tabs opened or closed elsewhere don't move focus, unless the focused one closes", () => {
+	startOn(['a', 'b', 'c'], 'b')
+	app.onEvent(tabsEvent('x', 'a', 'b', 'c'))
+	app.onEvent(tabsEvent('x', 'b', 'c'))
+	expect(shown()).toBe('b')
+	app.onEvent(tabsEvent('x', 'c'))
+	expect(shown()).toBe('c')
+})
+
+test('Ctrl-N, Ctrl-P and Alt-digits switch tabs, wrapping', () => {
+	startOn(['a', 'b', 'c'])
+	app.onKeys([ctrl('p')])
+	expect(shown()).toBe('c')
+	app.onKeys([ctrl('n')])
+	expect(shown()).toBe('a')
+	app.onKeys([alt('2')])
+	expect(shown()).toBe('b')
+	// No tab 9: nothing happens.
+	app.onKeys([alt('9')])
+	expect(shown()).toBe('b')
+	expect(sent.filter((c) => c.type === 'open').map((c) => c.sessionId)).toEqual(['c', 'a', 'b'])
+})
+
+test('each tab keeps its editor state while another is shown; a modal closes on switch', () => {
+	startOn(['a', 'b'])
+	type('hello')
+	app.onKeys([key('left'), key('left')])
+	app.onKeys([ctrl('n')])
+	expect(app.view().prompt.text).toBe('')
+	app.onEvent(snapshot('b'))
+	type('x')
+	app.open(modals.open({ title: 'Models', items: ['m'] }), () => undefined)
+	app.onKeys([ctrl('p')])
+	expect(app.view().modal).toBeUndefined()
+	expect(app.view().prompt).toMatchObject({ text: 'hello', cursor: 3 })
+	// Its transcript shows until the fresh snapshot replaces it.
+	expect(app.view().transcript?.meta.id).toBe('a')
+	app.onEvent(snapshot('a'))
+	expect(app.view().prompt).toMatchObject({ text: 'hello', cursor: 3 })
+	app.onKeys([ctrl('n')])
+	expect(app.view().prompt.text).toBe('x')
+})
+
+test('late events of a tab just left do not reach the view', () => {
+	startOn(['a', 'b'])
+	app.onKeys([ctrl('n')])
+	app.onEvent(snapshot('a', { type: 'running', phase: 'streaming' }))
+	expect(app.view().transcript).toBeUndefined()
+	app.onEvent(snapshot('b'))
+	app.onEvent({ type: 'state', sessionId: 'a', state: { type: 'error', message: 'x' } })
+	expect(app.view().transcript?.state).toEqual({ type: 'idle' })
+})
+
+test('a shown tab that wants attention is told seen', () => {
+	startOn(['a', 'b'])
+	app.onEvent(tabsEvent('a', tabOf('b', { attention: true })))
+	expect(sent).toEqual([])
+	app.onEvent(tabsEvent(tabOf('a', { attention: true }), tabOf('b', { attention: true })))
+	expect(sent).toEqual([{ type: 'tab-seen', sessionId: 'a' }])
+	app.onKeys([ctrl('n')])
+	expect(sent.at(-1)).toEqual({ type: 'tab-seen', sessionId: 'b' })
+})
+
+test('the tab bar shows the tabs with the focused one', () => {
+	startOn(['a', 'b'])
+	let lines = frame.build(app.view(), 60).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ''))
+	expect(lines.at(-2)).toContain('Tabs: [1] 2 ')
 })

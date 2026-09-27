@@ -9,7 +9,8 @@
 //
 // Its parts are drawn by ansi.ts (escapes, painted rows), item-view.ts
 // (transcript items), form-view.ts (open questions), prompt-view.ts
-// (the prompt) and modal-view.ts (modals over it all).
+// (the prompt), tab-bar.ts (the tabs) and modal-view.ts (modals over
+// it all).
 
 import { colors, type Style } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
@@ -21,7 +22,9 @@ import { formView } from './form-view.ts'
 import { itemView } from './item-view.ts'
 import { modalView } from './modal-view.ts'
 import type { PromptState } from '../common/prompt.ts'
+import type { Tab } from '../common/protocol.ts'
 import { promptView } from './prompt-view.ts'
+import { tabBar } from './tab-bar.ts'
 
 export interface View {
 	transcript?: Transcript
@@ -38,6 +41,8 @@ export interface View {
 	placeholder?: string
 	/** A modal drawn over everything: keys and cursor go to it. */
 	modal?: ModalState
+	/** The host's tabs and the one shown: a tab bar row above the prompt. */
+	tabs?: { list: Tab[]; focused?: string }
 }
 
 export interface Frame {
@@ -88,8 +93,10 @@ function build(view: View, cols: number, rows = 24): Frame {
 	if (view.notice) block(ansi.wrap(view.notice, width), { fg: colors.log().fg! })
 	let p = promptView.box(view.prompt, width, view.placeholder)
 	let log = { fg: colors.log().fg! }
+	let bar = !!view.tabs?.list.length
+	if (lines.length && (bar || !p.above)) lines.push('')
+	if (bar) lines.push(tabBar.row(view.tabs!.list, view.tabs!.focused, cols))
 	if (p.above) lines.push(ansi.paint(p.above, log, cols))
-	else if (lines.length) lines.push('')
 	let top = lines.length
 	let input = colors.input()
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))

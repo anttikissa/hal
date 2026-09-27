@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Starts Hal, and starts it again whenever it exits with 100 (Ctrl-R;
 # terminal.restartCode in src/client/terminal.ts).
+# Every start of one run shares HAL_TAB_FILE, so a restart comes back
+# to the tab it left (src/main.ts).
+export HAL_TAB_FILE="$(mktemp "${TMPDIR:-/tmp}/hal-tab.XXXXXX")"
+trap 'rm -f "$HAL_TAB_FILE"' EXIT
 main="$(dirname "$(readlink -f "$0")")/src/main.ts"
 while true; do
 	bun "$main" "$@"
