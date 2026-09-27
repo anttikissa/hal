@@ -25,7 +25,9 @@ function pending(records: HistoryRecord[]): InboxItem[] {
 function label(state: SessionState, item: InboxItem): string {
 	if (state.type === 'running') return item.queue ? 'queued: runs after this turn' : 'steering: sent before the next request'
 	if (state.type === 'idle') return 'waiting'
-	return `${item.queue ? 'queued' : 'steering'}, waiting: ${states.describe(state)}`
+	let kind = item.queue ? 'queued' : 'steering'
+	let why = states.describe(state)
+	return why ? `${kind}, waiting: ${why}` : `${kind}, waiting for an answer`
 }
 
 export const inbox = { pending, label }

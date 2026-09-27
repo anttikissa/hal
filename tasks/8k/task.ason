@@ -1,7 +1,12 @@
 {
 	title: 'Status line never shows internal state names',
 	description: "A session waiting on a question shows the question, nothing else: states.describe returns nothing for blocked on a question, so no client (terminal status, web, tab labels) prints 'blocked: question'. The user saw it and called it meaningless. The same test applies to every describe() text: it must tell the user something they can act on, in plain words, or not exist.",
-	status: 'planned',
+	status: 'done',
 	needs: ['w4'],
-	foldInto: ['w4', 'j1']
+	foldInto: ['w4', 'j1'],
+	notes: [
+		'describe() now says running phases as thinking / writing / running tools (the web line refines these per item), and a blocked reason other than question verbatim: the host already words it for the user (`log in: <error>` in host/turns.ts). Any new block reason must be plain words too.',
+		'describe() may return undefined for a non-idle state (blocked on a question), so callers must not assume text: web view.line shows an empty line, inbox.label says "waiting for an answer".',
+		'startup.test.ts (typing echo within 100ms) flakes over budget when several worktrees run ./test at once; rerun before blaming a change.'
+	]
 }

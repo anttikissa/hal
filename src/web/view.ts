@@ -186,7 +186,7 @@ function line(st: ViewState, connected: boolean): Line {
 		let writing = s.phase === 'streaming' && !view.thinking(st)
 		return { text: writing ? 'writing' : 'thinking', tone: 'busy' }
 	}
-	let text = states.describe(s)!
+	let text = states.describe(s) ?? ''
 	return { text, tone: s.type === 'error' ? 'error' : s.type === 'retrying' ? 'busy' : 'warn' }
 }
 

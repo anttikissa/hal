@@ -149,21 +149,24 @@ function duration(ms: number): string {
 	return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
 }
 
-// One line for the user; undefined when there is nothing to say (idle).
-// With `now` (epoch ms) a retry says how long until it; without, the
+// One line for the user in plain words, never a state or phase name:
+// what the session is doing or what the user can do about it. Undefined
+// when there is nothing to add: idle, or blocked on a question (the
+// question itself is on screen). With `now` (epoch ms) a retry says how long until it; without, the
 // time of day it happens, which never goes stale.
 function describe(state: SessionState, now?: number): string | undefined {
 	switch (state.type) {
 		case 'idle':
 			return undefined
 		case 'running':
-			return state.phase === 'tools' ? 'running tools' : state.phase
+			return { requesting: 'thinking', streaming: 'writing', tools: 'running tools' }[state.phase]
 		case 'retrying':
 			if (now === undefined) return `retrying at ${new Date(state.at).toLocaleTimeString()} (${state.reason})`
 			let left = Date.parse(state.at) - now
 			return `retrying ${left > 0 ? `in ${duration(left)}` : 'now'} (${state.reason})`
 		case 'blocked':
-			return `blocked: ${state.reason}`
+			// Any other reason is already the words the user acts on.
+			return state.reason === 'question' ? undefined : state.reason
 		case 'paused':
 			return (state.reason ? `paused: ${state.reason}` : 'paused') + ' (Enter continues)'
 		case 'error':

@@ -233,6 +233,9 @@ test('the status line says what the session is doing, like the terminal', () => 
 	expect(line(paused).text).toMatch(/^paused/)
 	expect(line(paused).tone).toBe('warn')
 	expect(line(running([], { type: 'error', message: 'boom' })).tone).toBe('error')
+	// An open question speaks for itself; a login says what to do.
+	expect(line(running([], { type: 'blocked', reason: 'question' })).text).toBe('')
+	expect(line(running([], { type: 'blocked', reason: 'log in: expired' })).text).toBe('log in: expired')
 	// Losing the host outranks whatever the session last said.
 	expect(line(writing, false)).toEqual({ text: 'reconnecting', tone: 'error' })
 })

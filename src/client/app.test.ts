@@ -298,6 +298,8 @@ test('an open question takes the keys until it is answered; the prompt keeps its
 	let form = { text: 'How should I call you?', fields: [{ type: 'text' as const, name: 'name' }] }
 	app.onEvent({ type: 'question', sessionId: 's1', id: 'q1', form })
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'blocked', reason: 'question' } })
+	// The question is all it shows: no status naming the state.
+	expect(app.view().notice).toBeUndefined()
 	type('Dave')
 	enter()
 	expect(sent).toEqual([{ type: 'answer', sessionId: 's1', question: 'q1', answers: { name: 'Dave' } }])

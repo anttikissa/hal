@@ -181,7 +181,23 @@ test('describe says when a retry happens and why', () => {
 	expect(states.describe(s, at + 1000)).toBe('retrying now (connection lost)')
 	// Without a clock: the time itself, which never goes stale.
 	expect(states.describe(s)).toContain('connection lost')
-	expect(states.describe({ type: 'blocked', reason: 'log in' })).toBe('blocked: log in')
+})
+
+test('describe speaks plain words, never internal state or phase names', () => {
+	let internal = /\b(blocked|requesting|streaming|question)\b/
+	let shown: SessionState[] = [
+		{ type: 'running', phase: 'requesting' },
+		{ type: 'running', phase: 'streaming' },
+		{ type: 'running', phase: 'tools' },
+		{ type: 'blocked', reason: 'log in: token expired' },
+		{ type: 'paused' },
+		{ type: 'error', message: 'boom' },
+	]
+	for (let s of shown) expect(states.describe(s)).not.toMatch(internal)
+	// A login says what to do; an open question is on screen already.
+	expect(states.describe({ type: 'blocked', reason: 'log in: token expired' })).toContain('log in')
+	expect(states.describe({ type: 'blocked', reason: 'question' })).toBeUndefined()
+	expect(states.describe({ type: 'idle' })).toBeUndefined()
 })
 
 test('Enter with text always sends: a prompt, or while busy a steer; Alt-Enter queues', () => {
