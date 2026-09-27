@@ -277,3 +277,21 @@ test('a repeated draft command changes nothing', async () => {
 	expect(p.draft).toEqual({ text: 'once, and more', rev: 2 })
 	expect(seen.filter((e) => e.type === 'ack')).toHaveLength(2)
 })
+
+test('a draft the host already holds settles instead of being resent forever', async () => {
+	await client()
+	let p = phone()
+	up = false
+	cut!()
+	await tick()
+	drafts.edit(id, '/statu')
+	p.send({ type: 'draft', sessionId: id, text: '/statu', base: 0 })
+	up = true
+	retries.shift()!()
+	await until(() => events.some((e) => e.type === 'ack'))
+	await tick()
+	let sent = events.filter((e) => e.type === 'ack').length
+	drafts.edit(id, '/status')
+	expect(p.draft?.text).toBe('/status')
+	expect(events.filter((e) => e.type === 'ack').length).toBe(sent + 1)
+})

@@ -218,8 +218,13 @@ function act(client: Client, c: Command): Outcome | undefined {
 		if (c.amend && !c.queue && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
 		else refused = amending ? prompts.amend(c.sessionId, c.text, c.id) : prompts.submit(c.sessionId, c.text, c.id, c.queue)
 		if (refused === undefined) prompts.sent(c.sessionId, c.text, c.id)
-	} else if (c.type === 'draft') prompts.draft(c.sessionId, drafts.set(c.sessionId, c.text, c.base), c.id)
-	else if (c.type === 'continue') refused = prompts.resume(c.sessionId)
+	} else if (c.type === 'draft') {
+		let changed = drafts.set(c.sessionId, c.text, c.base)
+		if (changed) prompts.draft(c.sessionId, changed, c.id)
+		// Unchanged (the host already held this text): only the sender
+		// hears the draft, so its edit settles instead of being resent.
+		else return { reply: { type: 'draft', sessionId: c.sessionId, draft: drafts.get(c.sessionId), ...(c.id !== undefined ? { command: c.id } : {}) } }
+	} else if (c.type === 'continue') refused = prompts.resume(c.sessionId)
 	else if (c.type === 'pause') refused = turns.stop(c.sessionId)
 	else if (c.type === 'answer') refused = prompts.reply(c.sessionId, c.question, c.answers)
 	else if (c.type === 'models') void slash.models(c.sessionId).then((e) => host.state.clients.has(client) && client.deliver(e))
