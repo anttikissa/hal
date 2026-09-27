@@ -128,7 +128,9 @@ and the notes of 1b and 4s before writing a component.
   copy link keep working). The browser never polls: the host pushes.
 - Phones: fields at least 16px, touch targets at least 44px, touch
   behaviour keyed on `pointer: coarse` rather than width, the page
-  sized from visualViewport (iOS keyboard), no sideways-scrolling strip.
+  sized from visualViewport (iOS keyboard), no sideways-scrolling strip,
+  and text kept out of the safe area: viewport-fit=cover (else every
+  env(safe-area-inset-*) is 0) and edge rows padded with them (4s).
 - Decisions live in .ts modules with unit tests; looks are checked by
   hand in a real browser at phone and desktop widths. No tests that
   read source or copy CSS; CDP tests assert structure (nodes kept,
