@@ -64,7 +64,7 @@ button { background: var(--button); color: var(--text); border: 0; border-radius
 button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 /* Phones: 16px fields, or iOS zooms in on focus. */
 @media (max-width: 40rem) { textarea, input { font-size: 16px; } .Transcript { padding: 0.6rem; } .Composer { padding-inline: 0.6rem; } }
-@media (prefers-reduced-motion: reduce) { .Card .body { transition: none; } .cursor-line span, .status .dot { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .Card .body { transition: none; } .cursor-line span, .status .dot, .Tabs .marker { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
 .Question { max-width: 60rem; margin: 0 auto 0.6rem; padding: 0.4rem 0.6rem; border-radius: 4px; display: flex; flex-direction: column; gap: 0.4rem; }
 .Question button { padding: 0.2rem 0.8rem; }
@@ -75,6 +75,36 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker ul { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
 .Picker li { padding: 0 0.4rem; cursor: pointer; }
 .Picker li[aria-selected="true"] { background: var(--button); }
+/* Tabs: a strip that wraps (never scrolls sideways: that fights the
+   back-swipe), or on phones one button opening a sheet. */
+.Tabs { flex: none; border-bottom: 1px solid var(--border); }
+.Tabs .strip { display: flex; flex-wrap: wrap; gap: 0.2rem; padding: 0.3rem 0.6rem; }
+.Tabs .item, .Tabs li { display: flex; align-items: stretch; min-width: 0; border-radius: 6px; }
+.Tabs .item:has([aria-current]), .Tabs li:has([aria-current]) { background: var(--button); }
+.Tabs .tab { display: flex; background: none; gap: 0.6ch; align-items: baseline; min-width: 0; padding: 0.2rem 0.3rem 0.2rem 0.6rem; text-decoration: none; }
+.Tabs .item .name { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.Tabs .tab { color: var(--inactive-fg); }
+.Tabs .tab[aria-current] { color: var(--active-fg); }
+.Tabs [aria-current] .n { font-weight: 600; }
+.Tabs .marker { font-size: 0.85em; }
+.Tabs .marker.working { color: var(--active-fg); animation: pulse 1s steps(2) infinite; }
+.Tabs .marker.asking { color: var(--warning-fg); font-weight: 600; }
+.Tabs button { background: transparent; color: inherit; padding: 0.2rem 0.5rem; }
+.Tabs button:hover, .Tabs .tab:hover { background: color-mix(in oklab, currentColor 14%, transparent); }
+.Tabs .close { color: var(--inactive-fg); }
+.Tabs .menu { display: none; width: 100%; gap: 0.6ch; align-items: baseline; text-align: left; padding: 0.5rem 0.8rem; border-radius: 0; }
+.Tabs .menu .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.Tabs .menu .count { color: var(--inactive-fg); }
+.Tabs .sheet { width: 100%; max-width: 100%; max-height: 80dvh; margin: auto 0 0; padding: 0.6rem 0.6rem max(0.6rem, env(safe-area-inset-bottom)); background: var(--canvas); color: var(--text); border: 0; border-top: 1px solid var(--border); border-radius: 10px 10px 0 0; }
+.Tabs .sheet[open] { display: flex; flex-direction: column; gap: 0.4rem; }
+.Tabs .sheet ul { margin: 0; padding: 0; list-style: none; overflow-y: auto; }
+.Tabs .sheet li { justify-content: space-between; }
+.Tabs .sheet .tab { flex: 1; padding: 0.6rem; }
+.Tabs .sheet .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.Tabs .sheet .close { padding: 0.6rem 1rem; }
+.Tabs .sheet .new { padding: 0.6rem; background: var(--button); }
+.Tabs .sheet::backdrop { background: color-mix(in oklab, var(--canvas) 60%, transparent); }
+@media (max-width: 40rem) { .Tabs .strip { display: none; } .Tabs .menu { display: flex; } }
 /* The theme (src/common/colors.ts), put here by the host. */
 /*COLORS*/
 </style>

@@ -93,8 +93,10 @@ export type Command = (
 	| { type: 'tab-resume'; sessionId?: string }
 	| { type: 'tab-move'; sessionId: string; index: number }
 	// The tab a starting client shows: `last` if still open and in cwd,
-	// else the first open tab in cwd, else a new tab in cwd.
-	| { type: 'tab-start'; cwd: string; last?: string }
+	// else the first open tab in cwd, else a new tab in cwd. With no cwd
+	// (the browser) any tab counts, and a new one goes in the host's
+	// working directory.
+	| { type: 'tab-start'; cwd?: string; last?: string }
 	// A client showed the tab: it no longer wants attention.
 	| { type: 'tab-seen'; sessionId: string }
 	// An attachment for a later prompt (task 2a): `data` is base64 of a
@@ -185,7 +187,7 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
 	if (c.type === 'tab-new') return str('cwd') ?? str('after', true)
-	if (c.type === 'tab-start') return str('cwd') ?? str('last', true)
+	if (c.type === 'tab-start') return str('cwd', true) ?? str('last', true)
 	if (c.type === 'tab-resume') return str('sessionId', true)
 	if (c.type === 'tab-move' && !Number.isInteger(c.index)) return 'tab-move: index must be an integer'
 	for (let flag of ['queue', 'amend']) if (c.type === 'submit' && c[flag] !== undefined && typeof c[flag] !== 'boolean') return `submit: ${flag} must be a boolean`

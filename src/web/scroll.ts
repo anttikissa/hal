@@ -45,7 +45,7 @@ function at(from: number, to: number, t: number): number {
 const scrollKeys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '])
 
 function stop(): void {
-	cancelAnimationFrame(scroll.state.frame)
+	if (scroll.state.frame) cancelAnimationFrame(scroll.state.frame)
 	scroll.state.frame = 0
 }
 
@@ -104,12 +104,30 @@ function follow(change: () => void, mode: Mode = 'glide', force = false): void {
 	st.frame = requestAnimationFrame(step)
 }
 
+// Each tab keeps its place while another is shown: a reader near the
+// bottom comes back to the bottom (it may have grown), one further up
+// to the same spot; a tab never shown here opens at the bottom.
+function save(id: string): void {
+	let el = scroll.state.el
+	if (!el) return
+	scroll.stop()
+	let near = scroll.keep(scroll.gap(el)) !== undefined
+	scroll.state.places.set(id, near ? { gap: scroll.gap(el) } : { top: el.scrollTop })
+}
+
+function restore(id: string): void {
+	let el = scroll.state.el
+	if (!el) return
+	let place = scroll.state.places.get(id) ?? { gap: 0 }
+	el.scrollTop = 'top' in place ? place.top : scroll.target(el, place.gap)
+}
+
 export const scroll = {
 	near: () => 50,
 	glideMs: () => 200,
 	// A card's open and close animation (CSS --toggle-ms matches).
 	toggleMs: () => 250,
-	state: { el: null as HTMLElement | null, frame: 0, gap: 0, forced: false },
+	state: { el: null as Box | null, frame: 0, gap: 0, forced: false, places: new Map<string, { top: number } | { gap: number }>() },
 	gap,
 	keep,
 	target,
@@ -119,4 +137,6 @@ export const scroll = {
 	onKey,
 	init,
 	follow,
+	save,
+	restore,
 }

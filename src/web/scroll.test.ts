@@ -44,3 +44,26 @@ test('a glide eases out: starts fast, lands exactly', () => {
 	expect(b).toBeGreaterThan(a)
 	expect(b).toBeLessThan(100)
 })
+
+test('each tab keeps its place: a bottom reader returns to the (grown) bottom, others to their spot', () => {
+	let el = box(1000, 600, 400)
+	scroll.state.el = el
+	try {
+		scroll.save('1-aaa')
+		el.scrollTop = 100
+		scroll.save('2-bbb')
+		// Another tab shows, then each comes back, longer than before.
+		el.scrollHeight = 1500
+		scroll.restore('1-aaa')
+		expect(el.scrollTop).toBe(1100)
+		scroll.restore('2-bbb')
+		expect(el.scrollTop).toBe(100)
+		// A tab never shown here opens at the bottom.
+		el.scrollTop = 0
+		scroll.restore('3-ccc')
+		expect(el.scrollTop).toBe(1100)
+	} finally {
+		scroll.state.el = null
+		scroll.state.places.clear()
+	}
+})

@@ -3,6 +3,8 @@ import { connection } from '../common/connection.ts'
 import { drafts, type Local } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
 import { app, type Target } from './app.ts'
+import { router } from './router.ts'
+import { tabs } from './tabs.ts'
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id
@@ -11,7 +13,10 @@ const ts = '2026-09-26T00:00:01Z'
 let sent: any[] = []
 let stored = new Map<string, Local>()
 let redraws = 0
-const orig = { send: connection.send, connected: connection.connected, store: drafts.store }
+const orig = { send: connection.send, connected: connection.connected, store: drafts.store, href: router.href, write: router.write, tabStore: { ...router.store }, mac: tabs.mac }
+let address = 'http://h/'
+let history: string[] = []
+let lastTab = undefined as string | undefined
 
 beforeEach(() => {
 	sent = []
@@ -23,12 +28,27 @@ beforeEach(() => {
 	connection.connected = () => true
 	drafts.store = { load: (id) => stored.get(id), save: (id, l) => void stored.set(id, structuredClone(l)) }
 	app.changed = () => void redraws++
+	address = 'http://h/'
+	history = [address]
+	lastTab = undefined
+	router.href = () => address
+	router.write = (url, replace) => {
+		address = new URL(url, address).href
+		if (replace) history[history.length - 1] = address
+		else history.push(address)
+	}
+	router.store.load = () => lastTab
+	router.store.save = (id) => void (lastTab = id)
+	tabs.mac = () => true
 })
 
 afterEach(() => {
 	connection.send = orig.send
 	connection.connected = orig.connected
 	drafts.store = orig.store
+	Object.assign(router, { href: orig.href, write: orig.write })
+	Object.assign(router.store, orig.tabStore)
+	tabs.mac = orig.mac
 	drafts.reset()
 	app.reset()
 })
@@ -172,4 +192,118 @@ test('keys the browser already handles stay native in the box', () => {
 	for (let [key, mods] of [['ArrowLeft', { altKey: true }], ['Backspace', { altKey: true }], ['a', { ctrlKey: true }], ['e', { ctrlKey: true }], ['z', { metaKey: true }]] as const)
 		expect(press(key, message('hello world', 5), mods)).toBe(false)
 	expect(app.state.text).toBe('hello world')
+})
+
+// ── Tabs ──
+
+const tab = (id: string, extra: object = {}) => ({ id, name: `name ${id}`, cwd: `/cwd/${id}`, model: 'fake/m', state: { type: 'idle' }, ...extra })
+const tabsEvent = (...tabs: object[]) => ({ type: 'tabs', tabs }) as Event
+const snapOf = (id: string, draft?: string): Event =>
+	({ type: 'snapshot', sessionId: id, snapshot: { meta: { ...meta, id }, history: [], state: { type: 'idle' }, ...(draft ? { draft: { text: draft, rev: 1 } } : {}) } }) as Event
+const alt = (digit: number) => press(String(digit), message(app.state.text), { altKey: true, code: `Digit${digit}` } as any)
+
+test('a page opened at a tab address asks tab-start for it and shows it without a new history entry', () => {
+	address = 'http://h/2-bbb'
+	history = [address]
+	app.onState({ type: 'connected', role: 'client' })
+	expect(sent).toContainEqual({ type: 'tab-start', last: '2-bbb' })
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
+	expect(app.state.shown).toBe('2-bbb')
+	expect(sent).toContainEqual({ type: 'open', sessionId: '2-bbb' })
+	expect(history).toEqual(['http://h/2-bbb'])
+	// A snapshot of another session is not this page's transcript.
+	app.onEvent(snapOf('1-aaa'))
+	expect(app.sessionId()).toBeUndefined()
+	app.onEvent(snapOf('2-bbb'))
+	expect(app.sessionId()).toBe('2-bbb')
+})
+
+test('with no valid id the page lands on the tab shown last, else the first, replacing the entry', () => {
+	address = 'http://h/9-zzz'
+	history = [address]
+	lastTab = '2-bbb'
+	app.onState({ type: 'connected', role: 'client' })
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
+	expect(history).toEqual(['http://h/2-bbb'])
+	app.reset()
+	address = 'http://h/'
+	history = [address]
+	lastTab = undefined
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
+	expect(history).toEqual(['http://h/1-aaa'])
+	expect(router.store.load()).toBe('1-aaa')
+})
+
+test('choosing a tab pushes an entry, moves the following, and each tab keeps its draft; Back returns', () => {
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc')))
+	app.onEvent(snapOf('1-aaa'))
+	app.input('draft one')
+	sent = []
+	expect(alt(3)).toBe(true)
+	expect(app.state.shown).toBe('3-ccc')
+	expect(sent).toContainEqual({ type: 'close', sessionId: '1-aaa' })
+	expect(sent).toContainEqual({ type: 'open', sessionId: '3-ccc' })
+	expect(app.state.text).toBe('')
+	expect(history).toEqual(['http://h/1-aaa', 'http://h/3-ccc'])
+	// Ctrl-N wraps to the first, Ctrl-P back to the last.
+	press('n', message(''), { ctrlKey: true })
+	expect(app.state.shown).toBe('1-aaa')
+	expect(app.state.text).toBe('draft one')
+	press('p', message('draft one'), { ctrlKey: true })
+	expect(app.state.shown).toBe('3-ccc')
+	// Back: the address names tab 1 again; nothing is written.
+	history.pop()
+	address = history.at(-1)!
+	let entries = history.length
+	tabs.onPopState()
+	expect(app.state.shown).toBe('1-aaa')
+	expect(history.length).toBe(entries)
+	// Alt with no such tab does nothing.
+	alt(9)
+	expect(app.state.shown).toBe('1-aaa')
+})
+
+test('when the shown tab closes, the page lands on its neighbour, replacing the entry', () => {
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc')))
+	alt(2)
+	sent = []
+	press('w', message(''), { ctrlKey: true })
+	expect(sent).toContainEqual({ type: 'tab-close', sessionId: '2-bbb' })
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('3-ccc')))
+	expect(app.state.shown).toBe('3-ccc')
+	expect(history).toEqual(['http://h/1-aaa', 'http://h/3-ccc'])
+})
+
+test('a new tab opens in the shown tab cwd, after it, and shows once the host names it', () => {
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
+	sent = []
+	press('t', message(''), { ctrlKey: true })
+	let c = sent.find((c) => c.type === 'tab-new')
+	expect(c).toMatchObject({ cwd: '/cwd/1-aaa', after: '1-aaa' })
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('4-ddd'), tab('2-bbb')))
+	expect(app.state.shown).toBe('1-aaa')
+	// Another client's new tab does not steal the page.
+	app.onEvent({ type: 'ack', id: 'someone-else', tab: '2-bbb' } as Event)
+	expect(app.state.shown).toBe('1-aaa')
+	app.onEvent({ type: 'ack', id: c.id, tab: '4-ddd' } as Event)
+	expect(app.state.shown).toBe('4-ddd')
+	expect(history.at(-1)).toBe('http://h/4-ddd')
+})
+
+test('the shown tab wanting attention is marked seen; other tabs keep theirs', () => {
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb', { attention: true })))
+	expect(sent.filter((c) => c.type === 'tab-seen')).toEqual([])
+	app.onEvent(tabsEvent(tab('1-aaa', { attention: true }), tab('2-bbb', { attention: true })))
+	expect(sent.filter((c) => c.type === 'tab-seen')).toEqual([{ type: 'tab-seen', sessionId: '1-aaa' }])
+	alt(2)
+	expect(sent.filter((c) => c.type === 'tab-seen').at(-1)).toEqual({ type: 'tab-seen', sessionId: '2-bbb' })
+})
+
+test('Ctrl-T/W/N/P stay the browser\'s off macOS', () => {
+	tabs.mac = () => false
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
+	sent = []
+	expect(press('t', message(''), { ctrlKey: true })).toBe(false)
+	expect(press('n', message(''), { ctrlKey: true })).toBe(false)
+	expect(sent).toEqual([])
 })

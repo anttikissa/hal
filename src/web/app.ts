@@ -10,18 +10,24 @@
 // a slash command, Ctrl-M opens the model picker. The box is the
 // session's draft (common/drafts.ts, kept in localStorage too); a sent
 // prompt shows at once, pending until the host has it.
+//
+// Tabs are the host's (task 0a); which one shows is this page's, named
+// by the address (tabs.ts, router.ts).
 
 import { connection, type LinkState } from '../common/connection.ts'
 import { drafts, type Local } from '../common/drafts.ts'
 import { forms, type FormAction, type Key } from '../common/forms.ts'
-import type { Event } from '../common/protocol.ts'
+import type { Event, Tab } from '../common/protocol.ts'
 import { prompt } from '../common/prompt.ts'
 import { editor, type Splice } from './editor.ts'
 import { link } from './link.ts'
+import { tabs } from './tabs.ts'
 import { view, type ViewState } from './view.ts'
 
 // `kill`: the last text Ctrl-K/U or Alt-D killed, for Ctrl-Y.
-export type AppState = { view: ViewState; text: string; kill?: string }
+// `tabs`: the host's, in order; `shown`: the tab this page shows;
+// `asked`: ids of tab-new commands sent here, whose tab then shows.
+export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string }
 
 // Where a key was pressed: the message box (its text, the caret, and
 // `write`, which edits the box natively), a text field of the open
@@ -37,7 +43,7 @@ export type Target =
 export type KeyInput = { key: string; code?: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean; isComposing?: boolean }
 
 function createState(): AppState {
-	return { view: {}, text: '' }
+	return { view: {}, text: '', tabs: [], asked: new Set() }
 }
 
 function sessionId(): string | undefined {
@@ -76,6 +82,7 @@ function sendNow(command: unknown): boolean {
 
 function onEvent(event: Event): void {
 	let st = app.state
+	if (tabs.onEvent(event)) return
 	let changed = drafts.onEvent(event)
 	st.view = view.onEvent(st.view, event)
 	let done = event.type === 'completions' && view.completed(st.view, event, st.text)
@@ -89,6 +96,7 @@ function onEvent(event: Event): void {
 }
 
 function onState(state: LinkState): void {
+	if (state.type === 'connected') tabs.connected()
 	app.setNotice(state.type === 'connected' ? undefined : state.type === 'joining' ? 'connecting…' : 'disconnected; reconnecting…')
 }
 
@@ -156,6 +164,7 @@ const arrows: Record<string, 'up' | 'down' | 'escape'> = { ArrowUp: 'up', ArrowD
 function key(e: KeyInput, target: Target): boolean {
 	let st = app.state
 	if (e.isComposing) return false
+	if (tabs.key(e)) return true
 	// The message box may hold text no input event told us about.
 	if (target.kind === 'message' && target.text !== st.text) app.input(target.text)
 	let k = view.key(e)
@@ -253,8 +262,8 @@ const store = {
 }
 
 // Connects to the host (reconnecting with backoff; each connection
-// brings a fresh snapshot) and opens the newest session, or a new one
-// in the host's working directory.
+// brings the tabs and a fresh snapshot of the shown one) and follows
+// Back and Forward.
 function start(): void {
 	drafts.store = app.store
 	let scheme = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -263,7 +272,7 @@ function start(): void {
 		onEvent: (e) => app.onEvent(e),
 		onState: (s) => app.onState(s),
 	})
-	connection.send({ type: 'open-newest' })
+	addEventListener('popstate', () => tabs.onPopState())
 }
 
 // Whether the cookie is good; logging in sets it. login answers the

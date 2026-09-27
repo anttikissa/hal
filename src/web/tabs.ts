@@ -1,0 +1,119 @@
+/// <reference lib="dom" />
+// Which of the host's tabs (task 0a) this page shows, named by the
+// address (router.ts): the tabs as they arrive, switching (following
+// the new tab's session, no longer the old one; each keeps its draft
+// and scroll place), Back and Forward, and the tab keys (shortcuts.ts).
+// The state lives in app.state (tabs, shown, asked).
+
+import { connection } from '../common/connection.ts'
+import { drafts } from '../common/drafts.ts'
+import type { Event, Tab } from '../common/protocol.ts'
+import { app, type KeyInput } from './app.ts'
+import { router } from './router.ts'
+import { scroll } from './scroll.ts'
+import { shortcuts, type TabAction } from './shortcuts.ts'
+
+// Tab events, and a late snapshot of a tab shown before: handled here
+// (true), or left to app.onEvent.
+function onEvent(event: Event): boolean {
+	let st = app.state
+	if (event.type === 'tabs') tabs.onTabs(event.tabs)
+	else if (event.type === 'ack' && st.asked.delete(event.id) && event.tab) tabs.show(event.tab, false)
+	else if (event.type === 'snapshot' && st.shown && event.sessionId !== st.shown) drafts.onEvent(event)
+	else return false
+	return true
+}
+
+// The host sends tabs to a client that starts; each connection does.
+function connected(): void {
+	let last = app.state.shown ?? router.parse(router.href()) ?? router.store.load()
+	connection.send(last ? { type: 'tab-start', last } : { type: 'tab-start' })
+}
+
+// A tab key: true if it was one (and is done).
+function key(e: KeyInput): boolean {
+	let a = shortcuts.action(e, tabs.mac())
+	if (a) tabs.tabAction(a)
+	return !!a
+}
+
+// The tabs changed. If the shown one is gone (or none shows yet), the
+// page lands on another, rewriting the address.
+function onTabs(list: Tab[]): void {
+	let st = app.state
+	let before = st.tabs
+	st.tabs = list
+	let target = router.pick(list, st.shown ?? router.parse(router.href()), before)
+	if (target && target !== st.shown) return tabs.show(target, true)
+	tabs.seen()
+	app.changed()
+}
+
+// Show tab `id`, the address naming it: a new history entry, or with
+// `replace` (a tab the page landed on) the current one rewritten.
+function show(id: string, replace: boolean): void {
+	let st = app.state
+	router.go(id, replace)
+	if (id === st.shown) return
+	if (st.shown) {
+		scroll.save(st.shown)
+		connection.send({ type: 'close', sessionId: st.shown })
+	}
+	st.shown = id
+	st.view = {}
+	st.text = drafts.text(id)
+	router.store.save(id)
+	connection.send({ type: 'open', sessionId: id })
+	tabs.seen()
+	app.changed()
+}
+
+// Back or Forward: the tab the address names, if it is one.
+function onPopState(): void {
+	let st = app.state
+	if (st.tabs.length) tabs.show(router.pick(st.tabs, router.parse(router.href()))!, true)
+}
+
+// The shown tab no longer wants attention.
+function seen(): void {
+	let { tabs, shown } = app.state
+	if (tabs.find((t) => t.id === shown)?.attention) connection.send({ type: 'tab-seen', sessionId: shown })
+}
+
+// A new tab in the shown tab's cwd, after it; it shows once made.
+function newTab(): void {
+	let tab = app.state.tabs.find((t) => t.id === app.state.shown)
+	if (!tab) return app.setNotice('no tab to open one beside yet')
+	let id = connection.nextId()
+	app.state.asked.add(id)
+	connection.send({ type: 'tab-new', id, cwd: tab.cwd, after: tab.id })
+}
+
+function closeTab(id: string): void {
+	connection.send({ type: 'tab-close', sessionId: id })
+}
+
+function tabAction(a: TabAction): void {
+	let { tabs: list, shown } = app.state
+	if (a.type === 'new') return tabs.newTab()
+	if (a.type === 'close') return shown ? tabs.closeTab(shown) : undefined
+	let at = list.findIndex((t) => t.id === shown)
+	let to = a.type === 'go' ? a.index : (at + (a.type === 'next' ? 1 : -1) + list.length) % list.length
+	let tab = list[to]
+	if (tab) tabs.show(tab.id, false)
+}
+
+export const tabs = {
+	onEvent,
+	connected,
+	key,
+	onTabs,
+	show,
+	onPopState,
+	seen,
+	newTab,
+	closeTab,
+	tabAction,
+	// Whether Ctrl-T/W/N/P are the page's (shortcuts.ts).
+	mac: (): boolean => /Mac|iPhone|iPad/.test(navigator.platform),
+}

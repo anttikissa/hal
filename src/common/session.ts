@@ -9,3 +9,11 @@ export interface SessionMeta {
 	createdAt: string
 	name?: string
 }
+
+// Whether `s` is shaped like a session id ("<n>-<abc>", as the host
+// makes them): the web address /<id> names a tab only then.
+function isId(s: string): boolean {
+	return /^\d+-[a-z]{3}$/.test(s)
+}
+
+export const session = { isId }

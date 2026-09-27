@@ -96,9 +96,10 @@ function resume(id?: string): Outcome {
 	return { tab: entry.id }
 }
 
-function start(cwd: string, last?: string): Outcome {
+function start(cwd?: string, last?: string): Outcome {
 	let open = tabs.file().open
 	let inCwd = (id: string) => {
+		if (cwd === undefined) return true
 		try {
 			return resolve(sessions.open(id).cwd) === resolve(cwd)
 		} catch {
@@ -106,7 +107,7 @@ function start(cwd: string, last?: string): Outcome {
 		}
 	}
 	let found = last !== undefined && open.includes(last) && inCwd(last) ? last : open.find(inCwd)
-	return found ? { tab: found } : { tab: tabs.create(cwd) }
+	return found ? { tab: found } : { tab: tabs.create(cwd ?? host.cwd()) }
 }
 
 function is(c: Command): c is TabCommand {

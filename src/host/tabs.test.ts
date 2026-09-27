@@ -157,3 +157,14 @@ test('a malformed tabs.ason is refused and left untouched', () => {
 	expect(rejected(b, send(b, { type: 'tab-start', cwd: '/tmp/w' }))).toBeDefined()
 	expect(readFileSync(`${testHome()}/state/tabs.ason`, 'utf8')).toBe('{ open: [')
 })
+
+test('tab-start without a cwd (the browser) takes last if open, else the first tab, else a new one in the host cwd', () => {
+	let a = client()
+	let first = ack(a, send(a, { type: 'tab-start' })).tab as string
+	expect(sessions.open(first).cwd).toBe(process.cwd())
+	let p = newTab(a, '/tmp/p')
+	expect(ack(a, send(a, { type: 'tab-start', last: p })).tab).toBe(p)
+	send(a, { type: 'tab-close', sessionId: p })
+	expect(ack(a, send(a, { type: 'tab-start', last: p })).tab).toBe(first)
+	expect(ids(a)).toEqual([first])
+})

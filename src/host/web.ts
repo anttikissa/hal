@@ -4,15 +4,16 @@
 // compared as plain text, is also the cookie value.
 //
 //   GET  /         the browser client (src/web/, a SolidJS app bundled
-//                  by web.page() with the JSX compiler, which is loaded
+//   GET  /<id>     by web.page() with the JSX compiler, which is loaded
 //                  only then: a host that never serves the page never
-//                  loads it)
+//                  loads it), at / and at any path shaped like a session
+//                  id: the page shows that tab (src/web/router.ts)
 //   POST /login    form field `password`; sets the cookie or answers 401
 //   GET  /login    204 if the cookie is good, else 401
 //   GET  /ws       WebSocket, one host.adapt() connection (cookie):
 //                  each message is one ASON command, each event one
 //                  ASON message, like a socket client's lines. The page
-//                  picks its session with the open-newest command.
+//                  gets the tabs with tab-start.
 //   GET  /blob/<session>/<blob>  an attachment of that session
 //                  (cookie; host/blobs.ts): the id is matched whole,
 //                  never used as a path.
@@ -20,6 +21,7 @@
 import type { BunPlugin, Server, ServerWebSocket } from 'bun'
 import { colors, type Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
+import { session } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
 import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
@@ -111,7 +113,7 @@ async function login(req: Request): Promise<Response> {
 
 function fetch(req: Request, srv: Server<Data>): Response | Promise<Response> | undefined {
 	let { pathname } = new URL(req.url)
-	if (pathname === '/' && req.method === 'GET') return web.page()
+	if ((pathname === '/' || session.isId(pathname.slice(1))) && req.method === 'GET') return web.page()
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
 	let check = pathname === '/login' && req.method === 'GET'
 	let blob = pathname.startsWith('/blob/') && req.method === 'GET'

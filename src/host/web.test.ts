@@ -78,6 +78,10 @@ async function dial(cookieHeader?: string) {
 test('the host serves the web endpoint and stops it with the host', async () => {
 	await server.serve()
 	expect((await fetch(`${base()}/`)).status).toBe(200)
+	// A tab's address is the page too; other paths are not.
+	expect((await fetch(`${base()}/12-abc`)).status).toBe(200)
+	expect((await fetch(`${base()}/12-abc/x`)).status).toBe(404)
+	expect((await fetch(`${base()}/session`)).status).toBe(404)
 	let url = base()
 	await server.stop()
 	expect(web.state.server).toBeNull()
@@ -329,13 +333,56 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		// Ctrl-M opens the model picker, which takes the keys; Escape
 		// closes it and gives the message box the focus back.
 		await key('m', true)
-		await b.waitFor(`document.querySelector('dialog').open && document.querySelectorAll('dialog li').length > 0`)
+		await b.waitFor(`document.querySelector('dialog.Picker').open && document.querySelectorAll('dialog.Picker li').length > 0`)
 		await key('Escape')
-		await b.waitFor(`!document.querySelector('dialog').open && document.activeElement === document.querySelector('textarea')`)
+		await b.waitFor(`!document.querySelector('dialog.Picker').open && document.activeElement === document.querySelector('textarea')`)
 		// What is typed is the draft: it survives a reload.
 		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'half a thought'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
 		await b.call('Page.reload', {})
 		await b.waitFor(`document.querySelector('textarea')?.value === 'half a thought'`)
+	} finally {
+		host.cwd = origCwd
+		await b.close()
+	}
+}, 20000)
+
+test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the address; phones get a sheet', async () => {
+	let origCwd = host.cwd
+	host.cwd = () => '/tmp'
+	let b = await browser()
+	try {
+		await server.serve()
+		await b.call('Network.setCookie', { name: 'hal', value: 'hello123', url: base() })
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
+		await b.call('Page.navigate', { url: `${base()}/` })
+		// Landing on the first (new) tab rewrites the address.
+		await b.waitFor(`document.querySelectorAll('.Tabs .strip a').length === 1 && /\\/\\d+-[a-z]{3}$/.test(location.pathname)`)
+		let first = await b.evaluate(`location.pathname`)
+		expect(await b.evaluate(`document.querySelector('.Tabs .strip a').getAttribute('href')`)).toBe(first)
+		await b.evaluate(`document.querySelector('.Tabs .strip .new').click()`)
+		await b.waitFor(`document.querySelectorAll('.Tabs .strip a').length === 2 && location.pathname !== '${first}'`)
+		let second = await b.evaluate(`location.pathname`)
+		expect(await b.evaluate(`document.querySelector('.Tabs .strip [aria-current]').getAttribute('href')`)).toBe(second)
+		// The strip never scrolls sideways.
+		expect(await b.evaluate(`(() => { let s = document.querySelector('.Tabs .strip'); return s.scrollWidth <= s.clientWidth })()`)).toBe(true)
+		// Back shows the first tab again; a click on a tab link pushes.
+		await b.evaluate(`history.back()`)
+		await b.waitFor(`location.pathname === '${first}' && document.querySelector('.Tabs .strip [aria-current]')?.getAttribute('href') === '${first}'`)
+		await b.evaluate(`document.querySelector('.Tabs .strip a[href="${second}"]').click()`)
+		await b.waitFor(`location.pathname === '${second}'`)
+		// Closing the shown tab lands on its neighbour, replacing the entry.
+		let entries = await b.evaluate(`history.length`)
+		await b.evaluate(`document.querySelector('.Tabs .strip .item:has([aria-current]) .close').click()`)
+		await b.waitFor(`document.querySelectorAll('.Tabs .strip a').length === 1 && location.pathname === '${first}'`)
+		expect(await b.evaluate(`history.length`)).toBe(entries)
+		// A phone: one button opening a sheet with the same tabs.
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true })
+		await b.waitFor(`getComputedStyle(document.querySelector('.Tabs .strip')).display === 'none'`)
+		await b.evaluate(`document.querySelector('.Tabs .menu').click()`)
+		await b.waitFor(`document.querySelector('.Tabs .sheet').open && document.querySelectorAll('.Tabs .sheet a').length === 1`)
+		await b.evaluate(`document.querySelector('.Tabs .sheet .new').click()`)
+		await b.waitFor(`!document.querySelector('.Tabs .sheet').open && location.pathname !== '${first}'`)
+		expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
 	} finally {
 		host.cwd = origCwd
 		await b.close()
