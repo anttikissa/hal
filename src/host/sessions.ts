@@ -129,10 +129,19 @@ function list(): SessionListing[] {
 }
 
 // The newest readable session, so a restart or another client comes
-// back to the same conversation.
+// back to the same conversation. Found from directory names: only the
+// metadata of the newest (and of broken ones newer than it) is read.
 function newest(): string | undefined {
-	let ids = sessions.list().flatMap((s) => (s.meta ? [s.id] : []))
-	return ids.sort((a, b) => parseInt(b) - parseInt(a))[0]
+	if (!existsSync(paths.sessionsDir())) return undefined
+	let dirs = readdirSync(paths.sessionsDir(), { withFileTypes: true }).filter((e) => e.isDirectory() && /^\d+-/.test(e.name))
+	for (let id of dirs.map((e) => e.name).sort((a, b) => parseInt(b) - parseInt(a))) {
+		if (sessions.state.open.has(id)) return id
+		try {
+			liveFiles.close(sessions.load(id, false))
+			return id
+		} catch {}
+	}
+	return undefined
 }
 
 export const sessions = {

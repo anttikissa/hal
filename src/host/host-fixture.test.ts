@@ -119,9 +119,10 @@ export async function fresh(id: string): Promise<Transcript> {
 
 // The host process goes away and a new one starts on the same home.
 export function restartHost() {
+	// As the exiting host does (host.init): output so far is written.
+	history.stop(false)
 	host.reset()
 	sessions.closeAll()
-	history.state.running.clear()
 }
 
 // A prompt as replay sends it: its [HH:MM] line, then the text.

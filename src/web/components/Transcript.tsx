@@ -9,6 +9,7 @@
 
 import { createMemo, For, onSettled, Show } from 'solid-js'
 import { transcript } from '../../common/transcript.ts'
+import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
 import { view, type Row, type ViewState } from '../view.ts'
 import { Card } from './Card.tsx'
@@ -16,7 +17,7 @@ import { Question } from './Question.tsx'
 
 export function Transcript(props: { view: ViewState; pending: string[] }) {
 	let el!: HTMLElement
-	onSettled(() => scroll.init(el))
+	onSettled(() => scroll.init(el, () => app.older()))
 	let rows = createMemo(() => view.rows(props.view.transcript?.items ?? []))
 	let markAt = () => (props.view.resumed ? view.markRow(rows(), props.view.resumed.at) : -1)
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)

@@ -3,14 +3,14 @@
 	description: `Opening a session costs what is shown, not the size of its history. A snapshot carries the transcript of the history's tail only (the last records up to a byte budget, about 256 KB, never cutting a turn in two) plus everything the state needs from earlier (an open question, the last prompt for editing, inbox, draft, usage), and says whether earlier records exist. A client gets earlier records with a \`history\` command { sessionId, before } answered in pages. The terminal paints the tail at once and then fetches the rest in the background, repainting once when it has all of it (full-mode rules of tasks/cc/terminal.md hold: the frame still ends up with every history line). The web prepends earlier pages when the reader scrolls near the top, keeping what they were reading in place. Background tabs are not loaded until shown; their tab bar entries come from the tabs event.
 On the host nothing reads every session or every history eagerly: listing tabs reads only tabs.ason and the open sessions' metadata; the newest session is found from directory names; recovering unfinished turns reads tails (history.tail already does); provider input is rebuilt from the full history only when a turn runs, then kept in memory while the session is open.
 Tests: a snapshot of a 20 MB history reads at most the budget from disk (count bytes read), holds the tail items and an open question from far back; paging back yields every record exactly once and in order; the terminal's frame after the background load equals the frame from a full load.`,
-	status: 'planned',
-	needs: [
-		'7w',
-		'4s'
-	],
+	status: 'done',
+	needs: ['7w', '4s'],
 	notes: [
 		'history.tail() reads the last 64 KiB and falls back to a full readSync when the last line is longer; with images in history (task 2a stores blob refs, not bytes) lines stay small, but a single huge tool result can still trigger the fallback. Page by byte offsets from the end, not by record counts from the start.',
 		'replay.current(records) applies prompt replacement (task wb): an edited prompt supersedes records before the tail boundary too. The snapshot must fold through current() over enough history to be right, or send the replacement as part of the tail.',
-		'old-session-loader.ts and old-background-loader.ts show the old approach (entryLimit for the focused tab, background loading of the others). The old Hal loaded all open tabs in the background after the first paint; hal2 loads a tab when it is shown.'
+		'old-session-loader.ts and old-background-loader.ts show the old approach (entryLimit for the focused tab, background loading of the others). The old Hal loaded all open tabs in the background after the first paint; hal2 loads a tab when it is shown.',
+		'Built: src/host/pages.ts (tail, pages by byte offset, marks), src/common/backfill.ts (client paging), transcript.standIns/prepend. An open question can sit behind megabytes of command output, so reading back from the end cannot stay within the budget: sessions/<id>/marks.ason keeps the offsets of the last question, answer or turn end, turn record, prompt and undelivered inbox messages. It is a cache: its `size` says how much history it covers, the rest is read and folded in, and a missing or too-long one is rebuilt from the whole file.',
+		'Pages (and the snapshot tail) start at a non-replacing prompt when one is in reach. That makes chunks fold independently (an answer always comes before the next prompt; an edit sits with the prompt it replaces), so transcript.prepend can put page items in front of a live transcript. Stand-ins (the open question, the prompt of a turn the tail cuts) stay on top until a page holds them.',
+		"history.open no longer reads the whole file: it repairs only the end, so a corrupt record further back is reported when read (readSync, a snapshot), not at open. readSync keeps each open session's records in memory and reads only what was appended since; tests that simulate a host restart must call history.stop(false) as the real exit handler does, or the in-memory turn never reaches disk."
 	]
 }

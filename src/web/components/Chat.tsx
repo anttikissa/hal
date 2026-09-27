@@ -15,7 +15,7 @@ import { Picker } from './Picker.tsx'
 import { Tabs } from './Tabs.tsx'
 import { Transcript } from './Transcript.tsx'
 
-const snap = () => ({ tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, pending: app.pending(), notice: app.notice(), connected: connection.connected() })
+const snap = () => ({ pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, pending: app.pending(), notice: app.notice(), connected: connection.connected() })
 type Snap = ReturnType<typeof snap>
 
 // A change to the transcript follows the bottom: a new prompt pending
@@ -30,6 +30,18 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 		set(next)
 		flush()
 		if (id) scroll.restore(id)
+		// A short transcript can't be scrolled up: fill the view first.
+		if (scroll.atTop()) app.older()
+		return
+	}
+	// Earlier history arrived above: what was being read stays put, and
+	// a reader still near the top gets the page before.
+	if (next.pages !== before.pages) {
+		scroll.anchor(() => {
+			set(next)
+			flush()
+		})
+		if (scroll.atTop()) app.older()
 		return
 	}
 	if (items(next) === items(before) && next.pending.length === before.pending.length) return set(next)

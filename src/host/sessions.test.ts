@@ -124,3 +124,20 @@ test('list reads every session on disk, open or not, and reports broken ones', (
 test('list on a fresh home is empty', () => {
 	expect(sessions.list()).toEqual([])
 })
+
+test('newest is found from directory names, reading only the metadata it needs', () => {
+	let ids = Array.from({ length: 12 }, (_, i) => sessions.create({ cwd: `/s${i}` }).id)
+	sessions.closeAll()
+	// A newer session whose metadata is broken is skipped.
+	mkdirSync(paths.sessionDir('99-bad'), { recursive: true })
+	writeFileSync(metaFile('99-bad'), 'not ason {')
+	let loaded: string[] = []
+	let load = sessions.load
+	sessions.load = (id, watch) => (loaded.push(id), load(id, watch))
+	try {
+		expect(sessions.newest()).toBe(ids.at(-1))
+		expect(loaded).toEqual(['99-bad', ids.at(-1)!])
+	} finally {
+		sessions.load = load
+	}
+})

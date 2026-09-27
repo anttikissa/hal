@@ -6,7 +6,7 @@
 // provider needs (thinking signatures, their provider).
 
 import { blocks, type AssistantBlock, type ImageBlock, type ToolResultBlock, type Usage } from './blocks.ts'
-import type { Answers, Form } from './forms.ts'
+import { forms, type Answers, type Form } from './forms.ts'
 import type { InboxItem } from './inbox.ts'
 import type { Event, LiveTurn, Snapshot, TurnStatus } from './protocol.ts'
 import { replay, type HistoryRecord } from './replay.ts'
@@ -44,6 +44,9 @@ export type Transcript = {
 	// The running turn: items from `start` on are its output so far, and
 	// `turn` is the raw fold they are drawn from.
 	live?: { start: number; turn: LiveTurn }
+	// How many items at the start stand in for history not loaded yet
+	// (standIns); loading it (prepend) replaces them.
+	earlier?: number
 }
 
 // Display items for assistant blocks. Empty thinking (a bare signature,
@@ -111,21 +114,62 @@ function question(t: Transcript | undefined): (Item & { type: 'question' }) | un
 	return last?.type === 'question' && !last.answers ? last : undefined
 }
 
+// Earlier records (a snapshot's `earlier`) to show before the tail
+// until the history before it is loaded: the open question, and the
+// prompt of a turn the tail starts in the middle of.
+function standIns(earlier: HistoryRecord[], tail: HistoryRecord[]): HistoryRecord[] {
+	let open = forms.open([...earlier, ...tail])
+	let cut = !tail.some((r) => replay.isPrompt(r))
+	let prompt = cut ? earlier.findLast((r) => replay.isPrompt(r)) : undefined
+	return earlier.filter((r) => r === open || r === prompt)
+}
+
 function fromSnapshot(snapshot: Snapshot): Transcript {
 	let items: Item[] = []
 	let prompt: number | undefined
-	for (let r of replay.current(snapshot.history)) {
+	let early = transcript.standIns(snapshot.earlier ?? [], snapshot.history)
+	for (let r of [...early, ...replay.current(snapshot.history)]) {
 		if (replay.isPrompt(r)) prompt = items.length
 		items = r.type === 'answer' ? transcript.answered(items, r) : [...items, ...transcript.recordItems(r)]
 	}
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
 	if (prompt !== undefined) t.prompt = prompt
+	if (early.length) t.earlier = transcript.fromSnapshot({ ...snapshot, history: early, earlier: [], turn: undefined }).items.length
 	if (snapshot.turn) {
 		let turn = transcript.copyTurn(snapshot.turn)
 		t.live = { start: items.length, turn }
 		t.items = [...items, ...transcript.blockItems(turn.blocks)]
 	}
 	return t
+}
+
+// `t` with the items of `page`, the history just before `loaded` (the
+// records `t` was folded from so far), in front, in place of any stand-
+// ins for it: as if the snapshot had held page and loaded together.
+// With `keep`, the stand-ins are from further back: they stay on top.
+function prepend(t: Transcript, loaded: HistoryRecord[], page: HistoryRecord[], keep = false): Transcript {
+	let base = { meta: t.meta, state: t.state }
+	let full = transcript.fromSnapshot({ ...base, history: [...page, ...loaded] })
+	let prefix: Item[] = full.items.slice(0, Math.max(0, full.items.length - transcript.fromSnapshot({ ...base, history: loaded }).items.length))
+	if (keep && t.earlier) {
+		let at = t.earlier
+		let out: Transcript = { ...t, items: [...t.items.slice(0, at), ...prefix, ...t.items.slice(at)] }
+		if (t.prompt !== undefined && t.prompt >= at) out.prompt = t.prompt + prefix.length
+		if (t.live) out.live = { start: t.live.start + prefix.length, turn: t.live.turn }
+		return out
+	}
+	let drop = t.earlier ?? 0
+	// A stand-in question answered meanwhile is answered in its place.
+	for (let item of t.items.slice(0, drop)) {
+		if (item.type === 'question' && item.answers) prefix = transcript.answered(prefix, { question: item.id, answers: item.answers, ...(item.secrets ? { secrets: item.secrets } : {}), ...(item.cancelled ? { cancelled: true as const } : {}) })
+	}
+	let shift = prefix.length - drop
+	let { earlier: _earlier, ...out }: Transcript = { ...t, items: [...prefix, ...t.items.slice(drop)] }
+	if (t.prompt !== undefined && t.prompt >= drop) out.prompt = t.prompt + shift
+	else if (full.prompt !== undefined && full.prompt < prefix.length) out.prompt = full.prompt
+	else delete out.prompt
+	if (t.live) out.live = { start: t.live.start + shift, turn: t.live.turn }
+	return out
 }
 
 // A copy that blocks.apply may mutate without touching the original:
@@ -146,7 +190,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'inbox') return { ...t, inbox: event.inbox }
 	if (event.type === 'answer') return { ...t, items: transcript.answered(t.items, event) }
 	if (event.type === 'meta') return { ...t, meta: { ...event.meta } }
-	if (event.type === 'completions') return t
+	if (event.type === 'completions' || event.type === 'history') return t
 	if (event.type === 'command' || event.type === 'output') {
 		// Beside a running turn: before its live output, which is redrawn.
 		let item = transcript.aside(event)
@@ -213,4 +257,4 @@ function resumedLabel(r: Resumed, now = new Date()): string {
 	return `resumed · last turn ${replay.clock(r.last, now.toISOString())}`
 }
 
-export const transcript = { blockItems, imageItem, resultItem, recordItems, endItem, aside, answered, question, fromSnapshot, copyTurn, fold, prompted, resumed, resumedLabel }
+export const transcript = { blockItems, imageItem, resultItem, recordItems, endItem, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted, resumed, resumedLabel }

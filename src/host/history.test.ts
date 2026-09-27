@@ -231,17 +231,18 @@ test('a complete last record missing its newline is kept', async () => {
 	expect(strip(await history.read(id)).map((r) => r.type)).toEqual(['user', 'user', 'user'])
 })
 
-test('a corrupt record mid-file is reported and the file left untouched', async () => {
+test('a corrupt record mid-file is reported when read and the file left untouched', async () => {
 	let id = newSession()
 	history.submit(id, 'a')
 	appendFileSync(history.file(id), '{ type: @@ }\n')
 	history.submit(id, 'b')
 	sessions.closeAll()
 	let before = readFileSync(history.file(id), 'utf8')
-	await expect(history.open(id)).rejects.toThrow(new RegExp(id))
+	// Opening reads only the end of the history.
+	await history.open(id)
+	expect(() => history.readSync(id)).toThrow(new RegExp(id))
 	await expect(history.read(id)).rejects.toThrow()
 	expect(readFileSync(history.file(id), 'utf8')).toBe(before)
-	expect(sessions.openIds()).toEqual([])
 })
 
 test('open leaves an unfinished turn unfinished, for the host to continue', async () => {

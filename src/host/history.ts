@@ -7,12 +7,13 @@
 // reported and the file is left untouched. A turn with no end record is
 // unfinished, not broken: the host continues it (turns.recover).
 
-import { appendFileSync, existsSync, openSync, readFileSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
+import { appendFileSync, existsSync, openSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
 import { ason } from '../common/ason.ts'
 import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock, type Turn, type Usage, type UserBlock } from '../common/blocks.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
+import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
@@ -43,7 +44,10 @@ function file(id: string): string {
 }
 
 function append(id: string, record: NewRecord): void {
-	appendFileSync(history.file(id), ason.stringifyLine({ ...record, ts: new Date().toISOString() }))
+	let full = { ...record, ts: new Date().toISOString() } as HistoryRecord
+	let line = ason.stringifyLine(full)
+	appendFileSync(history.file(id), line)
+	pages.note(id, line, full)
 }
 
 // `command`: the client's id for the submit, so a resend is recognised.
@@ -74,24 +78,27 @@ async function read(id: string): Promise<HistoryRecord[]> {
 
 // read() for callers that must not yield, such as a snapshot taken in
 // the same step as its live events. Appends are synchronous, so within
-// this process only a crash leaves a partial line; it is skipped.
+// this process only a crash leaves a partial line; it is skipped. An
+// open session's records stay in memory (provider input is rebuilt from
+// them every round): only what was appended since is read.
 function readSync(id: string): HistoryRecord[] {
 	let path = history.file(id)
+	for (let key of history.state.cache.keys()) if (!sessions.state.open.has(key)) history.state.cache.delete(key)
 	if (!existsSync(path)) return []
-	let lines = readFileSync(path, 'utf8').split('\n')
-	let last = lines.pop()!
-	let records: HistoryRecord[] = []
-	try {
-		for (let line of lines) if (line.trim()) records.push(history.check(ason.parse(line)))
-		if (last.trim()) {
-			try {
-				records.push(history.check(ason.parse(last)))
-			} catch {}
-		}
-	} catch (e: any) {
-		throw new Error(`${path}: malformed history: ${e?.message ?? e}`)
+	let size = statSync(path).size
+	let cached = history.state.cache.get(id)
+	if (!cached || cached.size > size) cached = { size: 0, records: [] }
+	let buf = pages.readBytes(path, cached.size, size)
+	let end = buf.lastIndexOf(10) + 1
+	let records = [...cached.records, ...pages.lines(path, buf.subarray(0, end), cached.size).map((l) => l.record)]
+	if (sessions.state.open.has(id)) history.state.cache.set(id, { size: cached.size + end, records })
+	let last = buf.toString('utf8', end)
+	if (last.trim()) {
+		try {
+			return [...records, history.check(ason.parse(last))]
+		} catch {}
 	}
-	return records
+	return records.slice()
 }
 
 function lastByte(path: string): number | undefined {
@@ -140,32 +147,36 @@ function unfinished(id: string): boolean {
 	return last !== undefined && last.type !== 'turn_end'
 }
 
-// Opens the session and repairs its history so appends land cleanly.
+// Opens the session and repairs its history so appends land cleanly:
+// only its end is read. A malformed record further back is reported
+// when it is read, and the file left untouched.
 async function open(id: string): Promise<SessionMeta> {
 	let meta = sessions.open(id)
 	let path = history.file(id)
-	let loaded: Awaited<ReturnType<typeof load>>
-	try {
-		loaded = await history.load(id)
-	} catch (e) {
-		sessions.close(id)
-		throw e
+	let size = existsSync(path) ? statSync(path).size : 0
+	if (!size || history.lastByte(path) === 10) return meta
+	let from = size
+	let buf = Buffer.alloc(0)
+	while (from > 0 && buf.indexOf(10) < 0) {
+		let n = Math.min(from, Math.max(65536, buf.length))
+		buf = Buffer.concat([pages.readBytes(path, from - n, from), buf])
+		from -= n
 	}
-	if (loaded.partial !== undefined) {
-		let bytes = Buffer.byteLength(loaded.partial)
-		// The fragment may end in a cut-off character the decoder dropped.
-		let text = await Bun.file(path).bytes()
-		truncateSync(path, text.lastIndexOf(10) + 1)
-		diag.log(`history ${id}: dropped partial last record (~${bytes} bytes)`)
-	} else if (existsSync(path)) {
-		let last = history.lastByte(path)
-		if (last !== undefined && last !== 10) appendFileSync(path, '\n')
+	let nl = buf.lastIndexOf(10)
+	let last = buf.toString('utf8', nl + 1)
+	try {
+		history.check(ason.parse(last))
+		appendFileSync(path, '\n')
+	} catch {
+		truncateSync(path, from + nl + 1)
+		history.state.cache.delete(id)
+		diag.log(`history ${id}: dropped partial last record (~${Buffer.byteLength(last)} bytes)`)
 	}
 	return meta
 }
 
 async function messages(id: string) {
-	return replay.toMessages(await history.read(id))
+	return replay.toMessages(history.readSync(id))
 }
 
 // One provider round of a turn. Passes stream events through,
@@ -283,7 +294,9 @@ async function* turn(id: string, opts: Omit<ProviderRequest, 'model' | 'messages
 
 export const history = {
 	// Sessions with a turn running in this host, and its current round.
-	state: { running: new Map<string, Running>() },
+	// `cache`: each open session's complete records and the bytes they
+	// fill, kept while it is open.
+	state: { running: new Map<string, Running>(), cache: new Map<string, { size: number; records: HistoryRecord[] }>() },
 	check,
 	file,
 	append,

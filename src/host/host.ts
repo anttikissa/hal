@@ -23,6 +23,7 @@ import { config } from './config.ts'
 import { diag } from './diag.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'
+import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 import { prompts } from './prompts.ts'
 import { slash } from './slash.ts'
@@ -208,7 +209,12 @@ function act(client: Client, c: Command): Outcome | undefined {
 	else if (c.type === 'pause') refused = turns.stop(c.sessionId)
 	else if (c.type === 'answer') refused = prompts.reply(c.sessionId, c.question, c.answers)
 	else if (c.type === 'models') void slash.models(c.sessionId).then((e) => host.state.clients.has(client) && client.deliver(e))
-	else if (c.type === 'complete') client.deliver({ type: 'completions', sessionId: c.sessionId, text: c.text, items: commands.complete(c.text, slash.context(c.sessionId)) })
+	else if (c.type === 'history') {
+		let page = pages.page(c.sessionId, c.before)
+		let reply: Event = { type: 'history', sessionId: c.sessionId, before: c.before, records: page.records }
+		if (page.start > 0) reply.older = page.start
+		return { reply }
+	} else if (c.type === 'complete') client.deliver({ type: 'completions', sessionId: c.sessionId, text: c.text, items: commands.complete(c.text, slash.context(c.sessionId)) })
 	return refused === undefined ? {} : { refused }
 }
 
@@ -232,8 +238,10 @@ function follow(client: Client, id: string): void {
 }
 
 function snapshot(id: string): Snapshot {
-	let records = history.readSync(id)
-	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: records, state: status.stateOf(id, records), inbox: status.inboxOf(id, records) }
+	let tail = pages.snapshot(id)
+	let records = [...tail.earlier, ...tail.history]
+	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records) }
+	if (tail.older !== undefined) Object.assign(snap, { older: tail.older, earlier: tail.earlier })
 	try {
 		let draft = drafts.get(id)
 		if (draft.rev) snap.draft = draft
@@ -279,6 +287,7 @@ function reset(): void {
 	host.state.opening.clear()
 	host.state.clients.clear()
 	status.state.states.clear()
+	pages.reset()
 	host.state.done.clear()
 	tabs.reset()
 	drafts.reset()

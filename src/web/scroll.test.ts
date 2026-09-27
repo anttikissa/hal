@@ -67,3 +67,18 @@ test('each tab keeps its place: a bottom reader returns to the (grown) bottom, o
 		scroll.state.places.clear()
 	}
 })
+
+test('earlier history put above keeps what the reader was reading in place', () => {
+	let el = box(1000, 300, 400)
+	let saved = scroll.state.el
+	scroll.state.el = el
+	try {
+		scroll.anchor(() => (el.scrollHeight = 1700))
+		expect(el.scrollTop).toBe(1000)
+		expect(scroll.atTop()).toBe(false)
+		el.scrollTop = 10
+		expect(scroll.atTop()).toBe(true)
+	} finally {
+		scroll.state.el = saved
+	}
+})

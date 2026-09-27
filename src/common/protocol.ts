@@ -40,7 +40,22 @@ export type Draft = { text: string; rev: number }
 // messages waiting for it (src/common/inbox.ts), also in `history`;
 // the host always sends it, an older one may not. No draft: empty,
 // never changed.
-export type Snapshot = { meta: SessionMeta; history: HistoryRecord[]; state: SessionState; inbox?: InboxItem[]; turn?: LiveTurn; draft?: Draft }
+// `history` is the tail of the session's history (task bq): whole
+// records within a byte budget, starting at a prompt when one is in
+// reach. `older`: where it starts (a byte offset), when earlier records
+// exist; a client asks for them with `history` commands. `earlier`: the
+// records from before the tail that the state needs, such as an open
+// question or the last prompt of a turn the tail cuts.
+export type Snapshot = {
+	meta: SessionMeta
+	history: HistoryRecord[]
+	state: SessionState
+	inbox?: InboxItem[]
+	turn?: LiveTurn
+	draft?: Draft
+	older?: number
+	earlier?: HistoryRecord[]
+}
 
 // Stream events forwarded live; terminal done/error become `turn-end`.
 export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'error' }>
@@ -54,6 +69,10 @@ export type Command = (
 	| { type: 'open-newest'; cwd?: string }
 	// Start following a session: a snapshot, then live events.
 	| { type: 'open'; sessionId: string }
+	// History records ending at byte offset `before` (a snapshot's or
+	// page's `older`), about one snapshot's worth; answered, to this
+	// client only, with `history`.
+	| { type: 'history'; sessionId: string; before: number }
 	// Stop following it. The session and any running turn carry on.
 	| { type: 'close'; sessionId: string }
 	// A prompt. While a turn is busy it waits in the inbox: steering, sent
@@ -120,6 +139,10 @@ export type Event =
 	// earlier turn continues (a `continue` record). `images`: the
 	// prompt's image blocks, after its text.
 	| { type: 'turn-start'; sessionId: string; prompt?: string; images?: ImageBlock[]; provider: string }
+	// A page of earlier history, answering the `history` command for
+	// `before`: whole records ending there, oldest first. `older`: where
+	// they start, when there are more before them.
+	| { type: 'history'; sessionId: string; before: number; records: HistoryRecord[]; older?: number }
 	// The session's state changed.
 	| { type: 'state'; sessionId: string; state: SessionState }
 	// The inbox changed: every message now waiting.
@@ -172,7 +195,7 @@ export type Event =
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -189,6 +212,7 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'tab-new') return str('cwd') ?? str('after', true)
 	if (c.type === 'tab-start') return str('cwd', true) ?? str('last', true)
 	if (c.type === 'tab-resume') return str('sessionId', true)
+	if (c.type === 'history' && !(Number.isInteger(c.before) && (c.before as number) >= 0)) return 'history: before must be an offset'
 	if (c.type === 'tab-move' && !Number.isInteger(c.index)) return 'tab-move: index must be an integer'
 	for (let flag of ['queue', 'amend']) if (c.type === 'submit' && c[flag] !== undefined && typeof c[flag] !== 'boolean') return `submit: ${flag} must be a boolean`
 	if (c.type === 'draft' && c.base !== undefined && !Number.isInteger(c.base)) return 'draft: base must be an integer'

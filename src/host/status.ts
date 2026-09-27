@@ -7,13 +7,13 @@ import { ason } from '../common/ason.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { states, type SessionState, type StateEvent } from '../common/states.ts'
-import { history } from './history.ts'
 import { host } from './host.ts'
+import { pages } from './pages.ts'
 
 // The session's state: what this host last made it, else what its
-// history says.
-function stateOf(id: string, records?: ReturnType<typeof history.readSync>): SessionState {
-	return status.state.states.get(id) ?? states.fromHistory(records ?? history.readSync(id))
+// history says (the few records that decide it: pages.essentials).
+function stateOf(id: string, records?: HistoryRecord[]): SessionState {
+	return status.state.states.get(id) ?? states.fromHistory(records ?? pages.essentials(id))
 }
 
 // Moves the session's state on `event`, telling followers if it changed.
@@ -29,7 +29,7 @@ function transition(id: string, event: StateEvent): string | undefined {
 
 // The messages waiting in the session's inbox.
 function inboxOf(id: string, records?: HistoryRecord[]): InboxItem[] {
-	return inbox.pending(records ?? history.readSync(id))
+	return inbox.pending(records ?? pages.essentials(id))
 }
 
 // Sets the session's state to what history says, telling followers if
@@ -37,7 +37,7 @@ function inboxOf(id: string, records?: HistoryRecord[]): InboxItem[] {
 // is as it was before (a command is not a turn). `before`: the state
 // followers know, taken before the change was recorded.
 function settle(id: string, before: SessionState): void {
-	let next = states.fromHistory(history.readSync(id))
+	let next = states.fromHistory(pages.essentials(id))
 	status.state.states.set(id, next)
 	if (ason.stringify(next) !== ason.stringify(before)) host.broadcast(id, { type: 'state', sessionId: id, state: next })
 }

@@ -17,6 +17,7 @@
 // Tabs are the host's (task 0a); which one shows is this page's, named
 // by the address (tabs.ts, router.ts).
 
+import { backfill, type Backfill } from '../common/backfill.ts'
 import { connection, type LinkState } from '../common/connection.ts'
 import { drafts, type Local } from '../common/drafts.ts'
 import { forms, type FormAction, type Key } from '../common/forms.ts'
@@ -31,7 +32,10 @@ import { view, type ViewState } from './view.ts'
 // `kill`: the last text Ctrl-K/U or Alt-D killed, for Ctrl-Y.
 // `tabs`: the host's, in order; `shown`: the tab this page shows;
 // `asked`: ids of tab-new commands sent here, whose tab then shows.
-export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string }
+// `older`: each session's earlier history being fetched as the reader
+// scrolls up (common/backfill.ts); `pages` counts the pages shown, so
+// the page can keep what the reader was reading in place.
+export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number }
 
 // Where a key was pressed: the message box (its text, the caret, and
 // `write`, which edits the box natively and leaves the selection from
@@ -48,7 +52,7 @@ export type Target =
 export type KeyInput = { key: string; code?: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean; isComposing?: boolean }
 
 function createState(): AppState {
-	return { view: {}, text: '', tabs: [], asked: new Set() }
+	return { view: {}, text: '', tabs: [], asked: new Set(), older: new Map(), pages: 0 }
 }
 
 function sessionId(): string | undefined {
@@ -90,6 +94,13 @@ function onEvent(event: Event): void {
 	if (tabs.onEvent(event)) return
 	let changed = drafts.onEvent(event)
 	st.view = view.onEvent(st.view, event)
+	if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
+	if (event.type === 'history' && backfill.onPage(st.older, event) && st.view.transcript?.meta.id === event.sessionId) {
+		let { transcript: t, resumed } = st.view
+		let shown = backfill.apply(st.older, t)
+		st.view = { ...st.view, transcript: shown, ...(resumed ? { resumed: { ...resumed, at: resumed.at + shown.items.length - t.items.length } } : {}) }
+		st.pages++
+	}
 	let done = event.type === 'completions' && view.completed(st.view, event, st.text)
 	if (done) {
 		st.view = { ...st.view, notice: done.notice }
@@ -99,6 +110,13 @@ function onEvent(event: Event): void {
 	// A recalled entry stays in the box; the draft changes underneath.
 	if (id && (changed || event.type === 'snapshot')) st.text = recall.shown(id) ?? drafts.text(id)
 	app.changed()
+}
+
+// The reader is near the top: ask for the page before it, if any.
+function older(): void {
+	let id = app.sessionId()
+	let command = id && backfill.next(app.state.older, id)
+	if (command) connection.send(command)
 }
 
 function onState(state: LinkState): void {
@@ -334,6 +352,7 @@ export const app = {
 	setNotice,
 	sendNow,
 	onEvent,
+	older,
 	onState,
 	input,
 	formInput,

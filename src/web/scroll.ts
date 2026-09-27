@@ -58,15 +58,38 @@ function onKey(e: KeyboardEvent): void {
 	if (scrollKeys.has(e.key) && !t?.closest?.('textarea, input')) scroll.userScroll()
 }
 
-// Follow `el`; returns the cleanup.
-function init(el: HTMLElement): () => void {
+// Whether the reader is within `nearTop` px of the top, where earlier
+// history is fetched (common/backfill.ts).
+function atTop(): boolean {
+	let el = scroll.state.el
+	return !!el && el.scrollTop < scroll.nearTop()
+}
+
+// Runs `change`, which puts earlier history above what is shown and
+// leaves the DOM updated, keeping what the reader was reading in place:
+// the same distance from the bottom, since only the top grew.
+function anchor(change: () => void): void {
+	let el = scroll.state.el
+	if (!el) return change()
+	let below = el.scrollHeight - el.scrollTop
+	scroll.stop()
+	change()
+	el.scrollTop = Math.max(0, el.scrollHeight - below)
+}
+
+// Follow `el`; returns the cleanup. `onTop`: the reader scrolled near
+// the top.
+function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	scroll.state.el = el
+	let scrolled = () => scroll.atTop() && onTop()
+	el.addEventListener('scroll', scrolled, { passive: true })
 	addEventListener('wheel', scroll.userScroll, { passive: true })
 	addEventListener('touchstart', scroll.userScroll, { passive: true })
 	addEventListener('keydown', scroll.onKey)
 	return () => {
 		scroll.stop()
 		scroll.state.el = null
+		el.removeEventListener('scroll', scrolled)
 		removeEventListener('wheel', scroll.userScroll)
 		removeEventListener('touchstart', scroll.userScroll)
 		removeEventListener('keydown', scroll.onKey)
@@ -124,6 +147,7 @@ function restore(id: string): void {
 
 export const scroll = {
 	near: () => 50,
+	nearTop: () => 800,
 	glideMs: () => 200,
 	// A card's open and close animation (CSS --toggle-ms matches).
 	toggleMs: () => 250,
@@ -135,6 +159,8 @@ export const scroll = {
 	stop,
 	userScroll,
 	onKey,
+	atTop,
+	anchor,
 	init,
 	follow,
 	save,

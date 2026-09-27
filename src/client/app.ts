@@ -7,6 +7,7 @@
 // (src/client/tabs.ts); each tab keeps its own client state meanwhile.
 
 import { amend, type Editing } from '../common/amend.ts'
+import { backfill, type Backfill } from '../common/backfill.ts'
 import { completion } from '../common/completion.ts'
 import { connection, type LinkState } from '../common/connection.ts'
 import { forms, type FormState } from '../common/forms.ts'
@@ -52,6 +53,7 @@ type AppState = {
 	modal?: ModalState
 	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
 	onModalKey?: (modal: ModalState) => ModalState
+	older: Map<string, Backfill>
 }
 
 // What each tab keeps while another is shown.
@@ -59,7 +61,7 @@ type TabView = Pick<AppState, 'transcript' | 'resumed' | 'prompt' | 'notice' | '
 const tabFields = ['transcript', 'resumed', 'prompt', 'notice', 'form', 'editing'] as const
 
 function createState(): AppState {
-	return { tabs: [], focus: {}, hidden: new Map(), start: { cwd: '/' }, prompt: prompt.empty() }
+	return { tabs: [], focus: {}, hidden: new Map(), start: { cwd: '/' }, prompt: prompt.empty(), older: new Map() }
 }
 
 function view(): View {
@@ -110,6 +112,7 @@ function onEvent(event: Event): void {
 		// An edited prompt may have replaced what the mark was after.
 		if (st.resumed && t && st.resumed.at > t.items.length) st.resumed = { ...st.resumed, at: t.items.length }
 		st.transcript = t
+		if (event.type === 'snapshot' || event.type === 'history') app.backfilled(event)
 		if (event.type === 'snapshot' && t) {
 			let id = t.meta.id
 			if (early) drafts.edit(id, drafts.text(id) ? `${drafts.text(id)}\n${early}` : early)
@@ -118,6 +121,13 @@ function onEvent(event: Event): void {
 		st.form = forms.follow(st.form, transcript.question(t))
 	}
 	app.show()
+}
+
+// Earlier history is fetched in the background, shown all at once.
+function backfilled(event: Event & { type: 'snapshot' | 'history' }): void {
+	let out = backfill.fetchAll(app.state.older, app.state, event)
+	if (out.command) app.send(out.command)
+	Object.assign(app.state, out.view)
 }
 
 // On every connection the host names the tab to show and sends the tabs:
@@ -356,6 +366,7 @@ export const app = {
 	view,
 	show,
 	onEvent,
+	backfilled,
 	onState,
 	focusedTab,
 	onTabs,
