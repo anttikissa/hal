@@ -2,7 +2,7 @@
 <html lang="en" class="page" data-version="/*VERSION*/">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Hal</title>
 <style>
 /* The one stylesheet: layout only. Colours come from the theme below
@@ -17,7 +17,10 @@ body { position: fixed; left: 0; right: 0; top: var(--app-top, 0); height: var(-
 body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .App, .Chat { height: 100%; display: flex; flex-direction: column; }
 /* The one scroller: nothing inside it scrolls; long lines wrap. */
-.Transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem; }
+/* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
+   is 0 without it, yet iOS still draws the page under the rounded
+   corners and home indicator), so the edge rows pad themselves. */
+.Transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left)); }
 .Transcript > * { max-width: 60rem; margin: 0 auto 0.6rem; }
 .Card { padding: 0.4rem 0.7rem; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); white-space: pre-wrap; overflow-wrap: anywhere; }
 .Card.user::before { content: "> "; }
@@ -46,7 +49,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card.thinking .cursor { background: currentColor; opacity: 0.6; }
 .Card .head .cursor { flex: none; align-self: center; }
 @keyframes blink { 50% { opacity: 0; } }
-.Composer { flex: none; padding: 0.4rem 1rem max(0.8rem, env(safe-area-inset-bottom)); }
+.Composer { flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
 .Composer > * { max-width: 60rem; margin: 0 auto; }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.2rem 0; }
@@ -71,7 +74,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 /* Touch keyboards: Enter is a newline and Send sends, so the key hints
    do not apply. */
 @media (pointer: coarse) { .help { display: none; } textarea, input { font-size: 16px; } }
-@media (max-width: 40rem) { textarea, input { font-size: 16px; } .Transcript { padding: 0.6rem; } .Composer { padding-inline: 0.6rem; } }
+@media (max-width: 40rem) { textarea, input { font-size: 16px; } .Transcript, .Composer { padding-left: max(0.6rem, env(safe-area-inset-left)); padding-right: max(0.6rem, env(safe-area-inset-right)); } .Transcript { padding-block: 0.6rem; } }
 @media (prefers-reduced-motion: reduce) { .Card .body { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
 .Question { max-width: 60rem; margin: 0 auto 0.6rem; padding: 0.4rem 0.6rem; border-radius: 4px; display: flex; flex-direction: column; gap: 0.4rem; }
@@ -87,7 +90,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 @media (pointer: coarse) { .Picker li { min-height: 44px; display: flex; align-items: center; } }
 /* Tabs: a strip that wraps (never scrolls sideways: that fights the
    back-swipe), or on phones one button opening a sheet. */
-.Tabs { flex: none; border-bottom: 1px solid var(--border); }
+.Tabs { flex: none; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .Tabs .strip { display: flex; flex-wrap: wrap; gap: 0.2rem; padding: 0.3rem 0.6rem; }
 .Tabs .item, .Tabs li { display: flex; align-items: stretch; min-width: 0; border-radius: 6px; }
 .Tabs .item:has([aria-current]), .Tabs li:has([aria-current]) { background: var(--button); }
