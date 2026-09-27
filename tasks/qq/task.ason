@@ -1,0 +1,7 @@
+{
+	title: 'Model metadata from models.dev',
+	description: "Hal knows models from models.dev as the old Hal did (artifact old-models.ts): the host fetches https://models.dev/api.json in the background at each start and caches it under the state dir, so it works offline from the cache and nothing waits on the fetch. The cache supplies context windows (the context meter) and the model list and names for providers that cannot list their own models; a provider's own list, when it has one, wins. With neither cache nor network, the built-in list is the last resort. Diagnostics note failed fetches; the user sees nothing unless a model he picked disappeared (questions.md item 24).",
+	status: 'planned',
+	needs: ['0x'],
+	foldInto: ['0x']
+}

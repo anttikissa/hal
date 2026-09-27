@@ -4,7 +4,7 @@
 	status: 'done',
 	needs: ['j1'],
 	foldInto: ['ja', 'p6', 'dz'],
-	notes: [
+	notes: ['Known corner case, accepted (questions.md item 17): a client sends `create` (make a new session, as for a new tab), the host dies before answering, another process takes over as host, and the client resends the `create` there. The new host has not seen that command id, so two sessions get created; the extra one is an empty tab the user can close.', 
 		'Core: src/common/connection.ts (singleton `connection`; send, connected, state.link). Transports implement one connect attempt returning { conn, role } or null, then call dropped() once. A first attempt that throws fails start(); later throws just retry. Retry waits min(maxMs, baseMs * 2^n) with jitter: terminal 20ms/1s (takeover must be quick), web 250ms/10s. A drop redials at once; only a failed attempt waits.',
 		'Command ids: connection.send adds `<random client>.<n>`; the command stays in state.pending until an `ack` or a `rejected` with that id, and is resent on every new connection. Host tests send commands without ids: then no ack is sent and nothing is deduplicated.',
 		'Host dedup (host.handle): create, submit, pause and continue are remembered in host.state.done (last host.remembered() = 1000) with their outcome; a repeat is answered the same way (a repeated create re-follows its session) without acting. open, close and open-newest act on every repeat: they are per connection. A submit prompt record carries `command: <id>`, so a new host also recognises a resend of a submit the old host recorded (host.submitted). Create across a host change is not deduplicated (rare; could store the id in session meta).',

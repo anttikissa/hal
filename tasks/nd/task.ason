@@ -1,0 +1,7 @@
+{
+	title: '/login claude, API keys from the environment',
+	description: "Each home has its own login (questions.md item 21): `/login claude` runs the Claude subscription OAuth flow as the old Hal did (artifacts old-auth-login.ts, old-login-command.ts): it shows the authorize URL, asks for the code#state value through a secret form question (never stored in history or shown), exchanges it, and writes the tokens to this home's credentials file (paths.authFile, 0600), adding an account or replacing the one with the same email. Copied credentials still work; after /login this home refreshes its own tokens, so two homes no longer rotate each other's refresh token away. `/login` with an unknown or missing provider says which ones exist. A session blocked on login (task tf) resumes by itself once the login succeeds. API keys from the environment work for every provider that has one (ANTHROPIC_API_KEY for anthropic, as OPENROUTER_API_KEY already does for openrouter) (item 22): a subscription login in the credentials file comes first and the key is the next account, so a user with only a key needs no file at all. Messages that tell the user to log in name /login claude and the variable.",
+	status: 'planned',
+	needs: ['b8', 'tf', '0x'],
+	foldInto: ['b8']
+}

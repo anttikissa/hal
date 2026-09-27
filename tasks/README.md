@@ -23,6 +23,8 @@ point to it.
 
 ## Architecture
 
+- Runs on macOS and Linux only: the host lock uses flock through bun:ffi
+  and clients talk over Unix sockets. Windows is left to its first user.
 - One host per home (sessions/ + state/) owns sessions, provider calls and all state
   writes. Every other process is a client over a Unix socket; if the
   host goes away, a client takes over. Reconnect = connect + snapshot.
