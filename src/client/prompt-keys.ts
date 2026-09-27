@@ -58,11 +58,14 @@ function history(st: PromptKeysState, k: KeyEvent, width: number): boolean {
 }
 
 // Cmd-C copies the selection and Cmd-X too, leaving the editor to
-// remove it. Ctrl-V and Cmd-V read the clipboard and hand its text to
-// `done` when it comes; the read never holds up the keys after it.
+// remove it. Ctrl-V and Cmd-V read the clipboard and hand its text, or
+// its image if it has no text, to `done` when it comes; the read never
+// holds up the keys after it.
 // Failures go to `done` as a notice. True if the editor needs the key
 // no more.
-function clip(st: PromptKeysState, k: KeyEvent, done: (r: { text: string } | { notice: string }) => void): boolean {
+export type Clip = { text: string } | { image: Uint8Array } | { notice: string }
+
+function clip(st: PromptKeysState, k: KeyEvent, done: (r: Clip) => void): boolean {
 	let only = (mod: 'ctrl' | 'cmd') => k[mod] && !k.shift && !k.alt && !k[mod === 'ctrl' ? 'cmd' : 'ctrl']
 	if ((k.key === 'c' || k.key === 'x') && only('cmd')) {
 		let sel = prompt.selection(st.prompt)
@@ -70,7 +73,10 @@ function clip(st: PromptKeysState, k: KeyEvent, done: (r: { text: string } | { n
 		return k.key === 'c'
 	}
 	if (k.key !== 'v' || !(only('ctrl') || only('cmd'))) return false
-	void clipboard.read().then(done)
+	void clipboard.read().then(async (r): Promise<Clip> => {
+		let image = 'text' in r && r.text ? null : await clipboard.image()
+		return image ? { image } : r
+	}).then(done)
 	return true
 }
 

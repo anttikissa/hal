@@ -18,13 +18,15 @@ import { placeholders } from '../common/placeholders.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
+import { uploads } from '../common/uploads.ts'
 import type { KeyEvent } from './keys.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
 import { recall } from '../common/recall.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 import { frame, type View } from './frame.ts'
-import { promptKeys } from './prompt-keys.ts'
+import { paste } from './paste.ts'
+import { promptKeys, type Clip } from './prompt-keys.ts'
 import { tabs, type Focus } from './tabs.ts'
 
 // `resumed`: where the history of the last snapshot ends, marked on screen.
@@ -94,6 +96,9 @@ function onEvent(event: Event): void {
 	// A recalled entry stays on screen; the draft changes underneath.
 	let mine = st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id ? event.sessionId : undefined
 	if (drafts.onEvent(event) && mine && !recall.shown(mine)) app.setPrompt(drafts.text(mine))
+	// An upload landed; a submit waiting for it goes now.
+	let resume = paste.settled(st, event)?.resume
+	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: resume.queue, ctrl: false, cmd: false }])
 	if (event.type === 'tabs') return app.onTabs(event.tabs)
 	if (event.type === 'ack' && event.tab !== undefined) {
 		st.asked = event.tab
@@ -194,24 +199,12 @@ function focusOn(focus: Focus): void {
 // Tab keys: new, reopen, close, next, previous, go to 1-10. True if
 // handled.
 function tabKey(k: KeyEvent): boolean {
-	let st = app.state
 	let tab = app.focusedTab()
-	if (k.cmd || !tab) return false
-	let go = (id: string | undefined) => {
-		if (id !== undefined && id !== tab.id) app.focusOn({ tab: id })
-		return true
-	}
-	let ids = st.tabs.map((t) => t.id)
-	if (k.ctrl && !k.alt) {
-		if (k.key === 't') app.send(k.shift ? { type: 'tab-resume' } : { type: 'tab-new', cwd: tab.cwd, after: tab.id })
-		else if (k.shift) return false
-		else if (k.key === 'w') app.send({ type: 'tab-close', sessionId: tab.id })
-		else if (k.key === 'n' || k.key === 'p') return go(tabs.step(ids, tab.id, k.key === 'n' ? 1 : -1))
-		else return false
-		return true
-	}
-	if (k.alt && !k.ctrl && !k.shift && /^[0-9]$/.test(k.key)) return go(ids[(Number(k.key) + 9) % 10])
-	return false
+	let r = tab && tabs.key(k, tab, app.state.tabs.map((t) => t.id))
+	if (!r) return false
+	if (r.command) app.send(r.command)
+	if (r.focus !== undefined && r.focus !== tab!.id) app.focusOn({ tab: r.focus })
+	return true
 }
 
 // Enter: a prompt (steering a busy turn; `queue`: after it), an edit
@@ -222,6 +215,11 @@ function submit(text: string, queue = false): boolean {
 	if (!st.transcript) {
 		if (!text.trim()) return true
 		st.notice = 'no session yet'
+		return false
+	}
+	if (uploads.pending(st.transcript.meta.id)) {
+		uploads.wait(st.transcript.meta.id, queue)
+		st.notice = 'sending once the upload is done'
 		return false
 	}
 	// While editing the last prompt, Enter sends the edit.
@@ -303,7 +301,9 @@ function onKeys(events: KeyEvent[]): void {
 			continue
 		}
 		if (promptKeys.history(st, k, frame.promptWidth(app.cols()))) continue
-		let { state, action } = prompt.step(st.prompt, k, frame.promptWidth(app.cols()))
+		// A pasted image path or long text: its upload's placeholder.
+		let key = st.transcript ? paste.key(st.transcript.meta.id, k, app.send) : k
+		let { state, action } = prompt.step(st.prompt, key, frame.promptWidth(app.cols()))
 		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
 		st.prompt = state
@@ -318,11 +318,13 @@ function onKeys(events: KeyEvent[]): void {
 	app.show()
 }
 
-// The clipboard for session `id`: text pasted if the session is still
-// shown, a failure told.
-function pasted(id: string | undefined, r: { text: string } | { notice: string }): void {
+// The clipboard for session `id`: text or an image's upload pasted if
+// the session is still shown, a failure told.
+function pasted(id: string | undefined, r: Clip): void {
 	if ('notice' in r) return ((app.state.notice = r.notice), app.show())
-	if (app.state.transcript?.meta.id === id) app.onKeys([{ key: 'paste', text: r.text, shift: false, alt: false, ctrl: false, cmd: false }])
+	if (!id || app.state.transcript?.meta.id !== id) return
+	let text = 'image' in r ? paste.upload(id, 'image/png', r.image, app.send) : r.text
+	app.onKeys([{ key: 'paste', text, shift: false, alt: false, ctrl: false, cmd: false }])
 }
 
 // Opens `modal` over everything. Enter closes it and sends what
@@ -363,6 +365,7 @@ function reset(): void {
 	app.state = createState()
 	drafts.reset()
 	recall.reset()
+	uploads.reset()
 }
 
 export const app = {

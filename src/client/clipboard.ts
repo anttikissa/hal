@@ -1,4 +1,5 @@
-// The system clipboard's text, for Cmd-C, Cmd-X and Ctrl-V. Writes go
+// The system clipboard's text, for Cmd-C, Cmd-X and Ctrl-V, and its
+// image for Ctrl-V (task zc). Writes go
 // to pbcopy on macOS and wl-copy or xclip on Linux; over SSH (SSH_TTY
 // set) they go as OSC 52 to the terminal instead, which puts them on
 // the user's own machine. Reads use pbpaste, wl-paste or xclip, and
@@ -33,6 +34,11 @@ function readers(e: Env): string[][] {
 // Runs `cmd` with `input` on stdin; its stdout, or null if it could not
 // run or failed.
 async function run(cmd: string[], input?: string): Promise<string | null> {
+	let out = await clipboard.exec(cmd, input)
+	return out && new TextDecoder().decode(out)
+}
+
+async function exec(cmd: string[], input?: string): Promise<Uint8Array | null> {
 	try {
 		let p = Bun.spawn(cmd, { stdin: input === undefined ? 'ignore' : 'pipe', stdout: 'pipe', stderr: 'ignore' })
 		if (input !== undefined) {
@@ -40,7 +46,7 @@ async function run(cmd: string[], input?: string): Promise<string | null> {
 			stdin.write(input)
 			await stdin.end()
 		}
-		let out = await new Response(p.stdout).text()
+		let out = new Uint8Array(await new Response(p.stdout).arrayBuffer())
 		return (await p.exited) === 0 ? out : null
 	} catch {
 		return null
@@ -73,4 +79,19 @@ async function read(): Promise<{ text: string } | { notice: string }> {
 	return { notice: missing('paste') }
 }
 
-export const clipboard = { env, writers, readers, run, osc52, write, read }
+// A PNG image on the clipboard, or null: NSPasteboard on macOS
+// (pasteboard.ts), wl-paste or xclip on Linux.
+async function image(): Promise<Uint8Array | null> {
+	let e = clipboard.env()
+	if (e.platform === 'darwin') return (await import('./pasteboard.ts')).pasteboard.png()
+	if (e.platform !== 'linux') return null
+	let x = ['xclip', '-selection', 'clipboard', '-t', 'image/png', '-o']
+	let w = ['wl-paste', '--type', 'image/png']
+	for (let cmd of e.wayland ? [w, x] : [x, w]) {
+		let out = await clipboard.exec(cmd)
+		if (out?.length) return out
+	}
+	return null
+}
+
+export const clipboard = { env, writers, readers, run, exec, osc52, write, read, image }

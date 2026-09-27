@@ -62,3 +62,19 @@ test('a command that runs gives its output, and gets its input', async () => {
 	expect(await clipboard.run(['cat'], 'round trip')).toBe('round trip')
 	expect(await clipboard.run(['false'])).toBeNull()
 })
+
+test('on Linux the image comes as PNG from the session tool first, else the other', async () => {
+	let asked: string[] = []
+	let png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
+	clipboard.exec = async (cmd) => {
+		asked.push(cmd[0]!)
+		return cmd.includes('image/png') && cmd[0] === 'xclip' ? png : null
+	}
+	clipboard.env = () => ({ platform: 'linux', ssh: false, wayland: true })
+	expect(await clipboard.image()).toEqual(png)
+	expect(asked).toEqual(['wl-paste', 'xclip'])
+	clipboard.exec = async () => new Uint8Array()
+	expect(await clipboard.image()).toBeNull()
+	clipboard.env = () => ({ platform: 'win32', ssh: false, wayland: false })
+	expect(await clipboard.image()).toBeNull()
+})

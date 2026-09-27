@@ -64,7 +64,7 @@ function sections(): KeySection[] {
 				row('cmd-a', 'select all'),
 				row('cmd-c', 'copy the selection'),
 				row('cmd-x', 'cut the selection'),
-				row('ctrl-v / cmd-v', 'paste'),
+				row('ctrl-v / cmd-v', 'paste text, or attach an image'),
 			],
 		},
 		{

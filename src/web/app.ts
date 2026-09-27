@@ -24,6 +24,7 @@ import { forms, type FormAction, type Key } from '../common/forms.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import { prompt } from '../common/prompt.ts'
 import { recall } from '../common/recall.ts'
+import { uploads, type Settled } from '../common/uploads.ts'
 import { editor, type Splice } from './editor.ts'
 import { link } from './link.ts'
 import { tabs } from './tabs.ts'
@@ -93,6 +94,8 @@ function onEvent(event: Event): void {
 	let st = app.state
 	if (tabs.onEvent(event)) return
 	let changed = drafts.onEvent(event)
+	let landed = uploads.settle(event)
+	if (landed) app.settled(landed)
 	st.view = view.onEvent(st.view, event)
 	if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
 	if (event.type === 'history' && backfill.onPage(st.older, event) && st.view.transcript?.meta.id === event.sessionId) {
@@ -110,6 +113,17 @@ function onEvent(event: Event): void {
 	// A recalled entry stays in the box; the draft changes underneath.
 	if (id && (changed || event.type === 'snapshot')) st.text = recall.shown(id) ?? drafts.text(id)
 	app.changed()
+}
+
+// An upload landed or failed (common/uploads.ts): its placeholder
+// becomes the marker or an error text, in the box if it shows the
+// session and in the draft; a send waiting for it goes now.
+function settled(done: Settled): void {
+	let shown = app.sessionId() === done.sessionId
+	if (shown) app.rewrite((p) => uploads.swap(p, done.placeholder, done.text))
+	let draft = drafts.text(done.sessionId)
+	if (draft.includes(done.placeholder)) drafts.edit(done.sessionId, draft.replace(done.placeholder, () => done.text))
+	if (shown && done.resume) app.send(done.resume.queue)
 }
 
 // The reader is near the top: ask for the page before it, if any.
@@ -274,6 +288,11 @@ function recallKey(dir: -1 | 1, target: Extract<Target, { kind: 'message' }>): b
 // (Alt+Enter) waits for the running turn.
 function send(queue = false): void {
 	let st = app.state
+	let id = app.sessionId()
+	if (id && uploads.pending(id)) {
+		uploads.wait(id, queue)
+		return app.setNotice('sending once the upload is done')
+	}
 	let { command, notice, keep } = view.submit(st.view, st.text, queue)
 	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; amend?: boolean } | undefined
 	// A prompt shows at once and waits, pending, for the host.
@@ -339,6 +358,7 @@ async function login(password: string): Promise<string | undefined> {
 function reset(): void {
 	app.state = createState()
 	recall.reset()
+	uploads.reset()
 }
 
 export const app = {
@@ -352,6 +372,11 @@ export const app = {
 	setNotice,
 	sendNow,
 	onEvent,
+	settled,
+	// Changes the box's text (and caret) by `change`; the Composer edits
+	// the textarea in place instead.
+	rewrite: (change: (p: { text: string; cursor: number; anchor?: number }) => { text: string }): void =>
+		app.input(change({ text: app.state.text, cursor: app.state.text.length }).text),
 	older,
 	onState,
 	input,

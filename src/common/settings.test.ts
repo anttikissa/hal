@@ -21,9 +21,9 @@ test('every declared default passes its own validation', () => {
 })
 
 test('valid values are taken', () => {
-	let { values, warnings } = settings.check({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webPassword: 's3cret', promptRows: 4 })
+	let { values, warnings } = settings.check({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webPassword: 's3cret', promptRows: 4, pasteLines: 20 })
 	expect(warnings).toEqual([])
-	expect(values).toEqual({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webPassword: 's3cret', promptRows: 4 })
+	expect(values).toEqual({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webPassword: 's3cret', promptRows: 4, pasteLines: 20 })
 })
 
 test('an unknown key is a warning and changes nothing else', () => {
