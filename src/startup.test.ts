@@ -5,8 +5,11 @@
 //
 // Machine assumption: a developer machine at least as fast as an Apple
 // M1, not otherwise busy, with a warm file cache (a warm-up start runs
-// first). Each figure is the median of several starts. On a slower or
-// loaded machine this test fails; that is its job. Never loosen it.
+// first). Each figure is the fastest of several starts: other load only
+// ever adds time, while work added to the startup path slows every
+// start, the fastest too. On a slower machine, or one so busy that no
+// start runs undisturbed, this test fails; that is its job. Never
+// loosen it.
 import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
@@ -112,7 +115,8 @@ function start(): Run {
 	})
 	run.proc = Bun.spawn([`${import.meta.dir}/../run`], {
 		cwd,
-		env: { ...process.env, HAL_HOME: home, HAL_STARTUP_TIMESTAMP: String(t0) },
+		// SIGKILL skips ./run's trap, so its tab file goes in the home.
+		env: { ...process.env, HAL_HOME: home, HAL_STARTUP_TIMESTAMP: String(t0), TMPDIR: home },
 		terminal: run.term,
 		// Its own process group, so stop() takes ./run and its bun child.
 		detached: true,
@@ -135,9 +139,7 @@ async function settle(run: Run): Promise<void> {
 	while ((run.ui === undefined || run.echo === undefined) && Date.now() < deadline) await Bun.sleep(10)
 }
 
-const median = (xs: number[]) => xs.toSorted((a, b) => a - b)[Math.floor(xs.length / 2)]!
-
-// Median ui and echo times of `starts` starts, each stopped before the next.
+// Fastest ui and echo times of `starts` starts, each stopped before the next.
 async function measure(): Promise<{ ui: number; echo: number }> {
 	let ui: number[] = []
 	let echo: number[] = []
@@ -148,7 +150,7 @@ async function measure(): Promise<{ ui: number; echo: number }> {
 		ui.push(run.ui ?? Infinity)
 		echo.push(run.echo ?? Infinity)
 	}
-	return { ui: median(ui), echo: median(echo) }
+	return { ui: Math.min(...ui), echo: Math.min(...echo) }
 }
 
 test.skipIf(!!noPty)(

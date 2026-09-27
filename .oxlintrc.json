@@ -1,0 +1,4 @@
+{
+	// A terminal program matches escape and control bytes on purpose.
+	"rules": { "no-control-regex": "off" }
+}

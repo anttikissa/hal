@@ -107,7 +107,10 @@ describe('start', () => {
 				expect(t.out).not.toContain('\x1b[<u')
 			}
 		} finally {
-			for (let [k, v] of Object.entries(env)) v === undefined ? delete process.env[k] : (process.env[k] = v)
+			for (let [k, v] of Object.entries(env)) {
+				if (v === undefined) delete process.env[k]
+				else process.env[k] = v
+			}
 		}
 	})
 
@@ -143,10 +146,6 @@ describe('quit and restart', () => {
 		expect(t.out).toContain(BRACKETED_PASTE_OFF)
 		// The last frame stays: no clearing, no alternate screen.
 		expect(t.out).not.toMatch(/\x1b\[[23]?J|\x1b\[\?1049|\x1bc/)
-	})
-
-	test('restart and quit use different exit codes', () => {
-		expect(terminal.restartCode).not.toBe(0)
 	})
 
 	test('keys after the emergency key are not delivered', () => {

@@ -98,7 +98,7 @@ function close(id: string): void {
 }
 
 function closeAll(): void {
-	for (let id of [...sessions.state.open.keys()]) sessions.close(id)
+	for (let id of sessions.state.open.keys()) sessions.close(id)
 }
 
 // Open ids in the order they were opened.

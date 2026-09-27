@@ -146,7 +146,8 @@ afterEach(async () => {
 function run(): Proc {
 	let sub = Bun.spawn(['./run'], {
 		cwd: `${import.meta.dir}/..`,
-		env: { ...process.env, HAL_HOME: home },
+		// SIGKILL skips ./run's trap, so its tab file goes in the home.
+		env: { ...process.env, HAL_HOME: home, TMPDIR: home },
 		// Its own process group, so afterEach can kill ./run with its child.
 		detached: true,
 		stdin: 'pipe',
@@ -284,7 +285,7 @@ test('a restarted host kills its running command; the next host continues the tu
 	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
 	let a = run()
 	await until('a session', () => sessionCount() === 1)
-	let b = run()
+	run() // a second Hal process, so the restart pauses nothing
 	type(a, `bash sleep ${marker} & sleep ${marker}\r`)
 	await until('the command to run', alive)
 	type(a, '\x12') // Ctrl-R: not the last Hal process, so nothing pauses

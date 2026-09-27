@@ -10,7 +10,6 @@ import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import type { ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
-import { systemPrompt } from './system-prompt.ts'
 
 const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError

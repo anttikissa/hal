@@ -6,7 +6,7 @@
 import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type Sender, type StreamEvent, type ToolCallBlock, type ToolResultBlock, type Usage } from '../common/blocks.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
-import { replay, type HistoryRecord } from '../common/replay.ts'
+import type { HistoryRecord } from '../common/replay.ts'
 import { settings } from '../common/settings.ts'
 import { states, type StateEvent } from '../common/states.ts'
 import { existsSync } from 'fs'

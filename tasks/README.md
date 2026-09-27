@@ -100,6 +100,14 @@ point to it.
   its short exception list gives each entry a reason (ason.ts is one
   cohesive format; others name the task that splits them) and fails
   when a listed file shrinks or disappears. Tests have no limit.
+- `./test` runs bun test, tsc and oxlint, and fails on any lint
+  warning (.oxlintrc.json turns off only no-control-regex: a terminal
+  program matches control bytes on purpose). No tautological tests:
+  none that restates a one-line function, repeats a constant, or
+  checks the test file's own helper; delete such a test rather than
+  keep it. A test run leaves nothing in the temp dir: tests delete the
+  homes they make, and a test that spawns ./run sets HAL_HOME and
+  TMPDIR to such a home (SIGKILL skips ./run's cleanup trap).
 - Importing a module does no I/O, timers, watchers or signal setup.
   Startup work lives in an idempotent `init()`; `main.start()` calls
   them in order, and runs only when main.ts is the entry point.

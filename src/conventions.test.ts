@@ -69,22 +69,6 @@ function importsOf(file: string): string[] {
 	return out
 }
 
-test('layer rules reject cross-layer imports', () => {
-	let s = srcDir
-	expect(violation(`${s}/common/a.ts`, `${s}/host/b.ts`)).toBeDefined()
-	expect(violation(`${s}/common/a.ts`, `${s}/client/b.ts`)).toBeDefined()
-	expect(violation(`${s}/common/a.ts`, `${s}/main.ts`)).toBeDefined()
-	expect(violation(`${s}/host/a.ts`, `${s}/client/b.ts`)).toBeDefined()
-	expect(violation(`${s}/client/a.ts`, `${s}/host/x/b.ts`)).toBeDefined()
-	expect(violation(`${s}/web/a.ts`, `${s}/host/b.ts`)).toBeDefined()
-	expect(violation(`${s}/web/a.ts`, `${s}/client/b.ts`)).toBeDefined()
-	expect(violation(`${s}/host/a.ts`, `${s}/web/b.ts`)).toBeDefined()
-	expect(violation(`${s}/web/a.ts`, `${s}/common/b.ts`)).toBeUndefined()
-	expect(violation(`${s}/host/a.ts`, `${s}/common/b.ts`)).toBeUndefined()
-	expect(violation(`${s}/client/a/b.ts`, `${s}/client/c.ts`)).toBeUndefined()
-	expect(violation(`${s}/main.ts`, `${s}/host/b.ts`)).toBeUndefined()
-})
-
 test('source files respect layer boundaries', () => {
 	let problems: string[] = []
 	for (let file of sourceFiles()) {
@@ -105,12 +89,6 @@ test('only src/web imports Solid or the JSX compiler', () => {
 function colourLiterals(text: string): string[] {
 	return text.match(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\(/gi) ?? []
 }
-
-test('colour literals are found', () => {
-	expect(colourLiterals('a { color: #fff; background: rgb(1, 2, 3) }')).toHaveLength(2)
-	expect(colourLiterals('x = oklch(0.5 0.1 20)')).toHaveLength(1)
-	expect(colourLiterals('color: var(--accent); <a href="#top">')).toEqual([])
-})
 
 test('src/web has no colour literals', () => {
 	let found: string[] = []
@@ -178,23 +156,6 @@ function sizeProblems(sizes: Record<string, number>, exceptions: Record<string, 
 	}
 	return problems
 }
-
-test('lineCount matches wc -l', () => {
-	expect(lineCount('')).toBe(0)
-	expect(lineCount('a')).toBe(0)
-	expect(lineCount('a\nb\n')).toBe(2)
-})
-
-test('size check flags oversized files and stale exceptions', () => {
-	expect(sizeProblems({ 'a.ts': 400 }, {})).toEqual([])
-	let over = sizeProblems({ 'a.ts': 401 }, {})
-	expect(over).toHaveLength(1)
-	expect(over[0]).toContain('a.ts')
-	expect(over[0]).toContain('401')
-	expect(sizeProblems({ 'a.ts': 401 }, { 'a.ts': 'reason' })).toEqual([])
-	expect(sizeProblems({ 'a.ts': 400 }, { 'a.ts': 'reason' })).toHaveLength(1)
-	expect(sizeProblems({}, { 'gone.ts': 'reason' })).toHaveLength(1)
-})
 
 test('source modules stay under the line limit', () => {
 	let sizes: Record<string, number> = {}
