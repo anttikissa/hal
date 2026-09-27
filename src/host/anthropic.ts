@@ -89,7 +89,7 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 // Headers for the next usable account (auth.ts), which may be chosen
 // for `model`.
 async function headers(model?: string, req?: ProviderRequest): Promise<{ headers: Record<string, string>; oauth: boolean; account: string }> {
-	let cred = await auth.anthropic(model, { session: req?.sessionId, newTurn: req?.newTurn })
+	let cred = await auth.anthropic(model, { session: req?.sessionId })
 	let oauth = cred.type === 'token'
 	let headers: Record<string, string> = oauth
 		? {

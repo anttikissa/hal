@@ -297,7 +297,7 @@ test('changed() resolves when the credentials file appears or changes, not befor
 	}
 })
 
-test('rotation takes the least used subscription, skips a limited one, and keeps a turn on its account', async () => {
+test('rotation takes the least used subscription, skips a limited one, and keeps a session on its account', async () => {
 	let { limits } = await import('./limits.ts')
 	let { usage } = await import('./usage.ts')
 	let { paths } = await import('./paths.ts')
@@ -316,16 +316,25 @@ test('rotation takes the least used subscription, skips a limited one, and keeps
 		used('a@x', 0.9)
 		used('b@x', 0.3)
 		// c has no data yet: unused. The API key, which costs money, comes last.
-		expect((await auth.anthropic('m', { session: 's', newTurn: true })).account).toBe('c@x')
+		expect((await auth.anthropic('m', { session: 's' })).account).toBe('c@x')
+		// Another session with no account yet also takes the least used.
 		used('c@x', 0.5)
-		// Later rounds of the turn stay on c (its prompt cache); a new turn moves.
-		expect((await auth.anthropic('m', { session: 's' })).account).toBe('c@x')
-		expect((await auth.anthropic('m', { session: 's', newTurn: true })).account).toBe('b@x')
-		// A limited account is still skipped, even mid-turn.
-		limits.set(limits.key('anthropic/m', 'b@x'), now() + 3600_000)
-		expect((await auth.anthropic('m', { session: 's' })).account).toBe('c@x')
+		expect((await auth.anthropic('m', { session: 't' })).account).toBe('b@x')
+		// Evenly used, turn after turn: s stays on c (its prompt cache)
+		// even when c is the busier one after each turn.
+		for (let turn = 0; turn < 4; turn++) {
+			expect((await auth.anthropic('m', { session: 's' })).account).toBe('c@x')
+			used('c@x', 0.31 + turn * 0.01)
+			used('b@x', 0.3 + turn * 0.01)
+		}
+		// A 429 limits c: s moves to the least used other, and stays there.
+		used('a@x', 0.2)
 		limits.set(limits.key('anthropic/m', 'c@x'), now() + 3600_000)
+		expect((await auth.anthropic('m', { session: 's' })).account).toBe('a@x')
+		used('a@x', 0.8)
+		expect((await auth.anthropic('m', { session: 's' })).account).toBe('a@x')
 		limits.set(limits.key('anthropic/m', 'a@x'), now() + 3600_000)
+		limits.set(limits.key('anthropic/m', 'b@x'), now() + 3600_000)
 		expect((await auth.anthropic('m', { session: 's' })).value).toBe('k-key')
 	} finally {
 		limits.close()

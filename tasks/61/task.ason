@@ -5,7 +5,7 @@
 	notes: [
 		'usage.ts parses windows from response headers only, no usage endpoint: Anthropic anthropic-ratelimit-unified-<span>-utilization (a fraction 0..1, so x100) and -<span>-reset (unix seconds), any span-named window (5h, 7d, 7d_sonnet ...); Codex x-codex-primary|secondary-used-percent (already percent), -window-minutes (named 5h/7d from it) and -reset-at (unix s) or -reset-after-seconds. provider.stream calls usage.observe after every fetch, error responses (429) included. state/usage.ason: provider -> account name -> window -> { used, resets (ISO) }; a window past its reset counts as unused.',
 		"The artifacts' old code fetched /api/oauth/usage and /wham/usage and compared the longest window; this task says tightest window from headers, which needs no extra requests. Model-specific weeks (7d_sonnet) count for every model: a known simplification (see the TODO in account-rotation.ts).",
-		"Stickiness: switching account loses the prompt cache, so auth.order picks afresh only on a turn's first round (ProviderRequest.newTurn, set by turns.ts from rounds === 0); later rounds of the session try its account (auth.state.chosen) first, unless limited or broken. The old Hal stuck to the current account until it was limited; per-turn re-picking may flip balanced accounts every turn.",
+		"Stickiness is task wg: a session always tries its last account (auth.state.chosen) first; auth.order re-picks only when it is limited or broken.",
 		"Accounts with only an apiKey (and the environment's key) rank after every subscription account, in file order: without usage data they would otherwise count as unused and win, spending money."
 	],
 	needs: [],

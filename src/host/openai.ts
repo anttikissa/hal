@@ -90,7 +90,7 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 }
 
 async function request(req: ProviderRequest) {
-	let cred = await auth.openai(req.model, { session: req.sessionId, newTurn: req.newTurn })
+	let cred = await auth.openai(req.model, { session: req.sessionId })
 	let headers: Record<string, string> = { authorization: `Bearer ${cred.value}`, accept: 'text/event-stream' }
 	let codex = false
 	if (cred.type === 'token') {

@@ -22,8 +22,6 @@ export type ProviderRequest = {
 	image?: (blob: string) => string | undefined
 	// The session the request is for, for providers that want it.
 	sessionId?: string
-	// The turn's first round: accounts are picked afresh (auth.order).
-	newTurn?: boolean
 }
 
 // `account` names the credentials used, for providers with several

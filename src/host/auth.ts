@@ -139,18 +139,20 @@ function fingerprint(entry: Entry): string {
 	return String(Bun.hash(`${entry.refreshToken ?? ''}\n${entry.accessToken ?? ''}\n${entry.apiKey ?? ''}`))
 }
 
-// Whom a request is for: a session's rounds stay on its account within
-// a turn (the prompt cache is per account); a new turn takes the least
-// used again.
-export type For = { session?: string; newTurn?: boolean }
+// Whom a request is for: a session stays on the account it used last
+// (the prompt cache is per account) until that one is limited or
+// broken. Re-picking the least used every turn would flip between
+// evenly used accounts, since the one just used is then the busier.
+// Kept in memory only: a restart may pick again.
+export type For = { session?: string }
 
 // The order accounts are tried in: subscriptions least used first
 // (usage.ts), then API keys, which cost money, in file order; but a
-// turn's later rounds try its account first.
+// session tries its own account first.
 function order(kind: Kind, list: Account[], who: For = {}): Account[] {
 	let subs = list.filter((a) => usable(a.entry.accessToken))
 	let out = [...usage.order(kind, subs, (a) => a.name), ...list.filter((a) => !subs.includes(a))]
-	let mine = who.session && !who.newTurn ? auth.state.chosen.get(`${kind} ${who.session}`) : undefined
+	let mine = who.session ? auth.state.chosen.get(`${kind} ${who.session}`) : undefined
 	let i = out.findIndex((a) => a.name === mine)
 	if (i > 0) out.unshift(...out.splice(i, 1))
 	return out
