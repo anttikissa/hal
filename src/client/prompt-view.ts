@@ -1,47 +1,52 @@
-// The prompt as the frame shows it: its markers and how its text lays
-// out in rows with the cursor among them. Pure.
+// The prompt as the frame shows it: its markers, how its text lays out
+// in rows with the cursor among them, and the scrolling box around
+// them. Pure.
 
 import { ansi } from './ansi.ts'
+import { promptLayout } from '../common/prompt-layout.ts'
+import type { PromptState } from '../common/prompt.ts'
+import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
 
 /**
- * Lay out prompt text in rows of `width` columns, hard-wrapped, and find
- * the row and column of the cursor offset. A cursor after a full row
- * sits in the column just past it, which is the right padding.
+ * Lay out prompt text in rows of `width` columns, as Up/Down see it
+ * (common/prompt-layout.ts), tabs drawn as spaces, and find the row and
+ * column of the cursor offset.
  */
 function layoutPrompt(text: string, cursor: number, width: number): { rows: string[]; row: number; col: number } {
-	text = ansi.clean(text)
-	let rows: string[] = []
-	let row = ''
-	let col = 0
-	let at: { row: number; col: number } | undefined
-	let i = 0
-	while (i < text.length) {
-		if (text[i] === '\n') {
-			if (!at && i >= cursor) at = { row: rows.length, col }
-			rows.push(row)
-			row = ''
-			col = 0
-			i++
-			continue
-		}
-		let g = strings.glyphAt(text, i, col)
-		if (col + g.width > width && col > 0) {
-			rows.push(row)
-			row = ''
-			col = 0
-			g = strings.glyphAt(text, i, col)
-		}
-		// A tab never reaches past the row.
-		if (text[i] === '\t') g = { width: Math.max(1, Math.min(g.width, width - col)), length: 1 }
-		if (!at && i >= cursor) at = { row: rows.length, col }
-		row += text[i] === '\t' ? ' '.repeat(g.width) : text.slice(i, i + g.length)
-		col += g.width
-		i += g.length
-	}
-	at ??= { row: rows.length, col }
-	rows.push(row)
-	return { rows, ...at }
+	let list = promptLayout.rows(text, width)
+	let clean = ansi.clean(text)
+	// A tab or wide glyph alone on a row narrower than itself is cut.
+	let rows = list.map((r) => strings.sliceVisual(strings.expandTabs(clean.slice(r.start, r.end)), 0, width))
+	let at = promptLayout.position(text, list, cursor)
+	return { rows, row: at.row, col: Math.min(at.col, width) }
+}
+
+// A dim rule across the box's edge, saying how many rows it hides.
+function rule(label: string, width: number): string {
+	let head = strings.clipVisual(`── ${label} `, width)
+	return ansi.DIM + head + '─'.repeat(Math.max(0, width - strings.visLen(head))) + ansi.UNDIM
+}
+
+// The prompt box: its rows scrolled to show the cursor (`scroll` is
+// where it was), rules above and below saying what it hides, and a
+// dim example on an empty prompt. Rows are marked, not yet painted.
+function box(
+	st: PromptState,
+	width: number,
+	placeholder?: string,
+): { above?: string; rows: string[]; below?: string; row: number; col: number; scroll: number } {
+	let textWidth = Math.max(1, width - promptView.FIRST.length)
+	let p = promptView.layoutPrompt(st.text, st.cursor, textWidth)
+	let height = st.rows ?? promptLayout.autoHeight(p.rows.length, settings.promptRows())
+	let vp = promptLayout.viewport(st.scroll ?? 0, height, p.rows.length, p.row)
+	let shown = promptView.mark(p.rows).slice(vp.top, vp.top + height)
+	while (shown.length < height) shown.push(promptView.REST)
+	if (!st.text && placeholder) shown[0] = promptView.FIRST + ansi.DIM + strings.clipVisual(ansi.clean(placeholder), textWidth) + ansi.UNDIM
+	let out: ReturnType<typeof box> = { rows: shown, row: p.row - vp.top, col: promptView.FIRST.length + p.col, scroll: vp.top }
+	if (vp.above) out.above = promptView.rule(`up ${vp.above}`, width)
+	if (vp.below) out.below = promptView.rule(`down ${vp.below}`, width)
+	return out
 }
 
 // Text rows marked as a prompt: the first with `FIRST`, the rest indented.
@@ -53,5 +58,7 @@ export const promptView = {
 	FIRST: '> ',
 	REST: '  ',
 	layoutPrompt,
+	rule,
+	box,
 	mark,
 }

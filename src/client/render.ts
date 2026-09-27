@@ -155,6 +155,8 @@ function draw(force = false): void {
 	let next = frame.build(st.view, cols, rows)
 	// The modal's list moves only as far as it must from where it was.
 	if (st.view.modal && next.modalScroll !== undefined) st.view.modal.scroll = next.modalScroll
+	// So does the prompt box.
+	st.view.prompt.scroll = next.promptScroll
 	st.out.write(render.paint(next, rows, force))
 }
 

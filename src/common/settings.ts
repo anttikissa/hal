@@ -24,6 +24,12 @@ const table: Setting[] = [
 		default: 'best-effort',
 		description: 'Ask before tool calls matching dangerous patterns (best-effort), or never (none).',
 	},
+	{
+		name: 'promptRows',
+		type: { kind: 'integer', min: 1, max: 100 },
+		default: 10,
+		description: 'Rows the terminal prompt box shows before it scrolls.',
+	},
 	{ name: 'webPassword', type: { kind: 'secret' }, default: 'hello123', description: 'Password for the browser client.' },
 	{ name: 'webPort', type: { kind: 'integer', min: 1, max: 65535 }, default: 9002, description: 'Port for the browser client (127.0.0.1).' },
 ]
@@ -80,4 +86,5 @@ export const settings = {
 	security: (): 'best-effort' | 'none' => settings.value('security') as 'best-effort' | 'none',
 	webPassword: (): string => settings.value('webPassword') as string,
 	webPort: (): number => settings.value('webPort') as number,
+	promptRows: (): number => settings.value('promptRows') as number,
 }

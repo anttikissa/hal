@@ -22,13 +22,6 @@ function paint(row: string, style: Style | undefined, cols: number): string {
 	return on + ansi.PAD + row + fill + ansi.UNCOLOR
 }
 
-// Text from the model, tools or a paste must not drive the terminal:
-// control characters other than newline and tab become visible. Keeps
-// offsets, so a prompt cursor still points at the same place.
-function clean(s: string): string {
-	return s.replace(/(?![\n\t])\p{Cc}/gu, '\ufffd')
-}
-
 function wrap(text: string, width: number): string[] {
 	return strings.wordWrap(strings.expandTabs(ansi.clean(text.replace(/\r\n?/g, '\n'))), width)
 }
@@ -45,6 +38,6 @@ export const ansi = {
 	LINK_OFF: '\x1b]8;;\x07',
 	sgr,
 	paint,
-	clean,
+	clean: (s: string): string => strings.clean(s),
 	wrap,
 }

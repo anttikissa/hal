@@ -11,10 +11,17 @@
 // Backspace/Delete/Ctrl-D delete a grapheme, Alt-Backspace a word.
 // Ctrl-K/Ctrl-U/Alt-D kill (to line end / line start / word end) into
 // `kill`, the client's own buffer (never the system clipboard); Ctrl-Y
-// yanks it. Enter submits, Shift-Enter is a newline, Alt-Enter queues,
+// yanks it. Up/Down move by visual row of the layout the terminal
+// draws (prompt-layout.ts) at the `width` it passes, keeping a goal
+// column; past the top or bottom row they go to the text's start or
+// end. Alt-Up/Down go there at once. Ctrl-=/Ctrl-Up grow the
+// terminal's box by a row, Ctrl--/Ctrl-Down shrink it back towards its
+// automatic height; sending resets it. Enter submits, Shift-Enter is a newline, Alt-Enter queues,
 // Escape cancels, Ctrl-D on empty text quits.
 
 import type { Key } from './forms.ts'
+import { promptLayout } from './prompt-layout.ts'
+import { settings } from './settings.ts'
 
 export interface PromptState {
 	text: string
@@ -22,6 +29,12 @@ export interface PromptState {
 	cursor: number
 	/** The last killed text, for Ctrl-Y. */
 	kill?: string
+	/** The display column Up/Down aim for, kept across vertical moves. */
+	goal?: number
+	/** The terminal box's height when resized by hand; else automatic. */
+	rows?: number
+	/** The terminal box's first visible row. */
+	scroll?: number
 }
 
 // `queue`: Alt-Enter, run after the turn instead of steering it.
@@ -114,15 +127,61 @@ function kill(st: PromptState, from: number, to: number): PromptState {
 	return from === to ? st : { ...prompt.remove(st, from, to), kill: st.text.slice(from, to) }
 }
 
+// Sending empties the prompt and resets the box; the kill buffer stays.
 function cleared(st: PromptState): PromptState {
 	return st.kill === undefined ? prompt.empty() : { ...prompt.empty(), kill: st.kill }
 }
 
-function step(st: PromptState, k: Key): PromptResult {
-	let { text, cursor } = st
+// Up (-1) or Down (1) one visual row, aiming for the goal column.
+function vertical(st: PromptState, dir: -1 | 1, width: number): PromptState {
+	let rows = promptLayout.rows(st.text, width)
+	let { row, col } = promptLayout.position(st.text, rows, st.cursor)
+	let goal = st.goal ?? col
+	let target = row + dir
+	let cursor = target < 0 ? 0 : target >= rows.length ? st.text.length : promptLayout.offsetAt(st.text, rows, target, goal)
+	return { ...st, cursor, goal }
+}
+
+// The box's height at `width` unless resized: all rows, up to the setting.
+function autoRows(st: PromptState, width: number): number {
+	return promptLayout.autoHeight(promptLayout.rows(st.text, width).length, settings.promptRows())
+}
+
+function resize(st: PromptState, dir: -1 | 1, width: number): PromptState {
+	let auto = prompt.autoRows(st, width)
+	let rows = Math.max(auto, (st.rows ?? auto) + dir)
+	let { rows: _, ...rest } = st
+	return rows === auto ? rest : { ...rest, rows }
+}
+
+// `width`: the terminal prompt's content width, for moving by visual
+// row; without it (the web) rows are the logical lines.
+function step(st: PromptState, k: Key, width = Infinity): PromptResult {
 	let mod = (k.ctrl ? 'C' : '') + (k.alt ? 'M' : '') + (k.cmd ? 's' : '')
+	switch (`${mod}-${k.key}`) {
+		case '-up':
+			return { state: prompt.vertical(st, -1, width) }
+		case '-down':
+			return { state: prompt.vertical(st, 1, width) }
+		case 'C-=':
+		case 'C-up':
+			return { state: prompt.resize(st, 1, width) }
+		case 'C--':
+		case 'C-down':
+			return { state: prompt.resize(st, -1, width) }
+	}
+	// Any other key forgets the goal column.
+	if (st.goal !== undefined) {
+		let { goal: _, ...rest } = st
+		st = rest
+	}
+	let { text, cursor } = st
 	let to = (c: number): PromptResult => ({ state: { ...st, cursor: c } })
 	switch (`${mod}-${k.key}`) {
+		case 'M-up':
+			return to(0)
+		case 'M-down':
+			return to(text.length)
 		case 'M-enter':
 			if (k.shift) break
 			return { state: prompt.cleared(st), action: { type: 'submit', text, queue: true } }
@@ -180,6 +239,9 @@ function step(st: PromptState, k: Key): PromptResult {
 export const prompt = {
 	empty,
 	step,
+	vertical,
+	autoRows,
+	resize,
 	insert,
 	remove,
 	kill,

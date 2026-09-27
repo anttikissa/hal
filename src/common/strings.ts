@@ -247,6 +247,13 @@ function wordWrap(text: string, width: number): string[] {
 	return strings.containLinks(out)
 }
 
+// Text from the model, tools or a paste must not drive the terminal:
+// control characters other than newline and tab become visible. Keeps
+// offsets, so a prompt cursor still points at the same place.
+function clean(s: string): string {
+	return s.replace(/(?![\n\t])\p{Cc}/gu, '\ufffd')
+}
+
 /** Clip to at most `max` columns, ending with '…' if anything was cut. */
 function clipVisual(s: string, max: number): string {
 	if (max <= 0) return ''
@@ -283,4 +290,4 @@ function sliceVisual(s: string, from: number, to: number): string {
 	return out ? prefix + out : ''
 }
 
-export const strings = { charWidth, glyphAt, skipEscape, walk, visLen, expandTabs, containLinks, wordWrap, clipVisual, sliceVisual }
+export const strings = { clean, charWidth, glyphAt, skipEscape, walk, visLen, expandTabs, containLinks, wordWrap, clipVisual, sliceVisual }

@@ -34,6 +34,8 @@ export interface View {
 	notice?: string
 	/** The open question being answered here: keys and cursor go to it. */
 	form?: FormState
+	/** A dim example request shown while the prompt is empty. */
+	placeholder?: string
 	/** A modal drawn over everything: keys and cursor go to it. */
 	modal?: ModalState
 }
@@ -44,6 +46,14 @@ export interface Frame {
 	cursor: { row: number; col: number }
 	/** The first list row the modal shows, to keep as its scroll. */
 	modalScroll?: number
+	/** The prompt box's first visible row, to keep as its scroll. */
+	promptScroll: number
+}
+
+// The prompt's content width on a terminal `cols` wide: what Up/Down
+// move through.
+function promptWidth(cols: number): number {
+	return Math.max(1, Math.max(1, cols - 2 * ansi.PAD.length) - promptView.FIRST.length)
 }
 
 // The frame for `view` on a terminal of `rows` × `cols`.
@@ -76,16 +86,18 @@ function build(view: View, cols: number, rows = 24): Frame {
 	let t = view.transcript
 	for (let m of t?.inbox ?? []) block(ansi.wrap(`${inbox.label(t!.state, m)}: ${m.text}`, width), { fg: colors.log().fg! })
 	if (view.notice) block(ansi.wrap(view.notice, width), { fg: colors.log().fg! })
-	if (lines.length) lines.push('')
-	let promptWidth = Math.max(1, width - promptView.FIRST.length)
-	let p = promptView.layoutPrompt(view.prompt.text, view.prompt.cursor, promptWidth)
+	let p = promptView.box(view.prompt, width, view.placeholder)
+	let log = { fg: colors.log().fg! }
+	if (p.above) lines.push(ansi.paint(p.above, log, cols))
+	else if (lines.length) lines.push('')
 	let top = lines.length
 	let input = colors.input()
-	for (let r of promptView.mark(p.rows)) lines.push(ansi.paint(r, input, cols))
-	let cursor = formCursor ?? { row: top + p.row, col: ansi.PAD.length + promptView.FIRST.length + p.col }
-	if (!view.modal) return { lines, cursor }
+	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))
+	if (p.below) lines.push(ansi.paint(p.below, log, cols))
+	let cursor = formCursor ?? { row: top + p.row, col: ansi.PAD.length + p.col }
+	if (!view.modal) return { lines, cursor, promptScroll: p.scroll }
 	let m = modalView.withModal(lines, view.modal, rows, cols)
-	return { lines, cursor: m.cursor, modalScroll: m.scroll }
+	return { lines, cursor: m.cursor, modalScroll: m.scroll, promptScroll: p.scroll }
 }
 
-export const frame = { build }
+export const frame = { build, promptWidth }

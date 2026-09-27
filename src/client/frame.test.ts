@@ -1,9 +1,11 @@
-import { expect, test } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import { colors } from '../common/colors.ts'
 import { oklch, type Oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 import type { Item, Transcript } from '../common/transcript.ts'
-import { frame, type View } from './frame.ts'
+import { prompt, type PromptState } from '../common/prompt.ts'
+import { settings } from '../common/settings.ts'
+import { frame, type Frame, type View } from './frame.ts'
 
 const DIM = '\x1b[2m'
 
@@ -181,4 +183,74 @@ test('the terminal follows a theme override at the next build', () => {
 	} finally {
 		colors.fgL = saved
 	}
+})
+
+describe('prompt box', () => {
+	let eight = 'one\ntwo\nthree\nfour\nfive\nsix\nseven\neight'
+	// The frame's text rows, as typed, and the row the cursor is on.
+	let box = (f: Frame) => plain(f.lines).map((l) => l.replace(/^> /, ''))
+
+	test('moving the cursor through the box and the frame agree', () => {
+		// Word-wrapped rows: Up from the end lands where the frame draws above it.
+		let text = 'the quick brown fox jumps over the lazy dog'
+		let st = { text, cursor: text.length }
+		for (let i = 0; i < 4; i++) {
+			let f = frame.build({ prompt: st }, 20)
+			let next = prompt.step(st, { key: 'up' }, frame.promptWidth(20)).state
+			let g = frame.build({ prompt: next }, 20)
+			if (f.cursor.row === 0) break
+			expect(g.cursor.row).toBe(f.cursor.row - 1)
+			st = next
+		}
+	})
+
+	test('shows at most the setting, scrolls with the cursor and says what it hides', () => {
+		let long = Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\n')
+		let f = frame.build({ prompt: { text: long, cursor: long.length } }, 40)
+		let rows = box(f)
+		expect(rows.length).toBe(settings.promptRows() + 1)
+		expect(rows[0]).toMatch(/up 20/)
+		expect(rows.at(-1)).toBe('line 29')
+		expect(strip(f.lines[f.cursor.row]!)).toContain('line 29')
+		let top = frame.build({ prompt: { text: long, cursor: 0 } }, 40)
+		expect(box(top)[0]).toBe('line 0')
+		expect(box(top).at(-1)).toMatch(/down 20/)
+		expect(top.promptScroll).toBe(0)
+	})
+
+	test('down keeps the viewport while the cursor stays in it', () => {
+		let st: PromptState = { text: eight, cursor: 'one\ntwo\nthree\nfour\n'.length, rows: 3, scroll: 4 }
+		let before = frame.build({ prompt: st }, 80)
+		expect(box(before)[1]).toBe('five')
+		let next = { ...prompt.step(st, { key: 'down' }, frame.promptWidth(80)).state, scroll: before.promptScroll }
+		let after = frame.build({ prompt: next }, 80)
+		expect(box(after)[1]).toBe('five')
+		expect(after.cursor.row).toBe(before.cursor.row + 1)
+	})
+
+	test('Ctrl-= and Ctrl-- resize the box, never below what it needs', () => {
+		let st: PromptState = { text: 'one\ntwo', cursor: 7 }
+		let rows = (s: PromptState) => frame.build({ prompt: s }, 80).lines.length
+		expect(rows(st)).toBe(2)
+		let grown = prompt.step(st, { key: '=', ctrl: true }, frame.promptWidth(80)).state
+		expect(rows(grown)).toBe(3)
+		expect(rows(prompt.step(grown, { key: '-', ctrl: true }, frame.promptWidth(80)).state)).toBe(2)
+		expect(rows(prompt.step(st, { key: '-', ctrl: true }, frame.promptWidth(80)).state)).toBe(2)
+	})
+
+	test('an empty prompt shows its placeholder dimmed, cursor at its start', () => {
+		let f = frame.build({ prompt: { text: '', cursor: 0 }, placeholder: 'Try this' }, 40)
+		expect(plain(f.lines)).toEqual(['> Try this'])
+		expect(f.lines[0]).toContain(DIM)
+		expect(f.cursor).toEqual({ row: 0, col: 3 })
+		let typed = frame.build({ prompt: { text: 'x', cursor: 1 }, placeholder: 'Try this' }, 40)
+		expect(plain(typed.lines)).toEqual(['> x'])
+	})
+
+	test('tabs are drawn as spaces to the next stop', () => {
+		let f = frame.build({ prompt: { text: 'ab\tc', cursor: 3 } }, 40)
+		expect(f.lines[0]).not.toContain('\t')
+		expect(plain(f.lines)).toEqual(['> ab  c'])
+		expect(f.cursor.col).toBe(3 + 4)
+	})
 })

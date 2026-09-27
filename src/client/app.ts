@@ -12,6 +12,7 @@ import { forms, type FormState } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
 import { modals, type ModalAction, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
+import { placeholders } from '../common/placeholders.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Resumed, type Transcript } from '../common/transcript.ts'
@@ -19,7 +20,7 @@ import type { KeyEvent } from './keys.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
-import type { View } from './frame.ts'
+import { frame, type View } from './frame.ts'
 
 // `resumed`: where the history of the last snapshot ends, marked on screen.
 // `form`: the session's open question as filled in here; while there is
@@ -53,6 +54,9 @@ function view(): View {
 	if (pending.length) v.pending = pending
 	if (st.form) v.form = st.form
 	if (st.modal) v.modal = st.modal
+	// An example request for an empty prompt, another each turn.
+	let t = st.transcript
+	if (t && !st.prompt.text) v.placeholder = placeholders.pick(t.meta.cwd, app.halDir(), t.items.filter((i) => i.type === 'prompt').length)
 	// A passing notice, else what the session is doing.
 	let notice = st.notice ?? (st.editing ? amend.hint() : st.transcript && states.describe(st.transcript.state))
 	if (notice) v.notice = notice
@@ -199,7 +203,7 @@ function onKeys(events: KeyEvent[]): void {
 			app.send(complete)
 			continue
 		}
-		let { state, action } = prompt.step(st.prompt, k)
+		let { state, action } = prompt.step(st.prompt, k, frame.promptWidth(app.cols()))
 		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
 		st.prompt = state
@@ -253,6 +257,10 @@ function reset(): void {
 export const app = {
 	state: createState(),
 	send: (command: unknown): void => connection.send(command),
+	/** The terminal's width, which Up/Down move by. */
+	cols: (): number => render.state.out?.size().cols ?? 80,
+	/** The Hal repo's root, which has its own placeholders. */
+	halDir: (): string => import.meta.dir.replace(/\/src\/client$/, ''),
 	view,
 	show,
 	onEvent,

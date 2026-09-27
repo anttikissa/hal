@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { drafts } from '../common/drafts.ts'
 import { modals } from '../common/modals.ts'
+import { placeholders } from '../common/placeholders.ts'
 import type { Event, Snapshot } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
 import { app } from './app.ts'
@@ -198,7 +199,7 @@ test('Up does nothing with text typed or when nothing works', () => {
 	working()
 	type('x')
 	up()
-	app.onKeys([key('backspace')])
+	app.onKeys([key('end'), key('backspace')])
 	paused()
 	up()
 	expect(sent).toEqual([])
@@ -386,4 +387,38 @@ test('a model list for another session opens nothing', () => {
 	app.onEvent(snapshot())
 	app.onEvent({ type: 'models', sessionId: 's2', current: 'a/b', items: ['a/b'] })
 	expect(app.view().modal).toBeUndefined()
+})
+
+test('Up moves by the rows the terminal draws, at its width', () => {
+	let cols = app.cols
+	try {
+		app.onEvent(snapshot())
+		type('x'.repeat(30))
+		app.cols = () => 20
+		app.onKeys([key('up')])
+		let f = frame.build(app.view(), 20)
+		expect(f.cursor.row).toBe(f.lines.length - 2)
+		expect(app.view().prompt.cursor).toBe(30 - frame.promptWidth(20))
+	} finally {
+		app.cols = cols
+	}
+})
+
+test('an empty prompt shows an example that changes each turn, with its own list for the Hal repo', () => {
+	app.onEvent(snapshot())
+	let first = app.view().placeholder
+	expect(first).toBeTruthy()
+	type('hi')
+	expect(app.view().placeholder).toBeUndefined()
+	enter()
+	app.onEvent({ type: 'prompt', sessionId: 's1', texts: ['hi'] })
+	expect(app.view().placeholder).not.toBe(first)
+	expect(app.view().placeholder).toBe(placeholders.general[1])
+	let halDir = app.halDir
+	try {
+		app.halDir = () => '/'
+		expect(app.view().placeholder).toBe(placeholders.hal[1])
+	} finally {
+		app.halDir = halDir
+	}
 })
