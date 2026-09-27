@@ -1,0 +1,6 @@
+{
+	title: 'ChatGPT subscription: /login chatgpt and the OpenAI provider',
+	description: "ChatGPT subscribers can use Hal (questions.md item 21): `/login chatgpt` (alias openai) runs the old Hal's device-code flow (artifact old-auth-login.ts in task nd), which works on remote and headless hosts: it shows the URL and code, waits up to 15 min without blocking the host, and writes the tokens to this home's credentials file as an openai account; tokens refresh like anthropic's. An `openai` provider speaks the Responses API as the old Hal did (artifact old-openai.ts): a ChatGPT OAuth token without api.responses.write goes to the Codex backend (chatgpt.com/backend-api/codex/responses) with its account id; an OPENAI_API_KEY goes to api.openai.com. Streaming text, reasoning, tool calls, images, usage and stop reasons map to hal2's provider events like anthropic's do; failures carry the same failure kinds (auth, temporary, limited with retryAt from resets_in_seconds), so rotation and blocked-on-login work unchanged. The model list comes from models.dev (task qq) plus the old Hal's known GPT ids. HTTP streaming (SSE) only; the old WebSocket transport is a later optimisation. A ChatGPT subscription token's context window is 272k input (old Hal: subscriptionContextWindow).",
+	status: 'planned',
+	needs: ['nd', 'qq']
+}
