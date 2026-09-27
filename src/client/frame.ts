@@ -16,7 +16,7 @@ import { colors, type Style } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
 import type { ModalState } from '../common/modals.ts'
-import type { Shown as Item, Transcript } from '../common/transcript.ts'
+import type { Item, Transcript } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
 import { itemView } from './item-view.ts'
@@ -69,16 +69,18 @@ function promptWidth(cols: number): number {
 	return Math.max(1, Math.max(1, cols - 2 * ansi.PAD.length) - promptView.FIRST.length)
 }
 
-// An item's painted rows on a terminal `cols` wide. Items never change
-// in place (a change is a new item), so each is laid out once per width
+// An item's painted rows on a terminal `cols` wide, its header linked
+// to its block in session `session` on the web. Items never change in
+// place (a change is a new item), so each is laid out once per width
 // and look, not on every frame: a long history stays cheap to redraw.
-function itemRows(item: Item, cols: number): string[] {
+// A kept row keeps the link code it was painted with (task e3 notes).
+function itemRows(item: Item, cols: number, session?: string): string[] {
 	let style = itemView.itemStyle(item)
-	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''}`
+	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key}`
 	let kept = frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
-	let rows = itemView.itemLines(item, width).map((r) => ansi.paint(r, style, cols))
+	let rows = itemView.linked(itemView.itemLines(item, width), item, session).map((r) => ansi.paint(r, style, cols))
 	frame.state.rows.set(item, { key, rows })
 	return rows
 }
@@ -123,7 +125,7 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 			block(f.rows, itemView.itemStyle(item))
 			formCursor = { row: lines.length - f.rows.length + f.cursor.row, col: ansi.PAD.length + f.cursor.col }
 		} else {
-			let rows = frame.itemRows(item, cols)
+			let rows = frame.itemRows(item, cols, view.transcript?.meta.id)
 			if (i === items.length - 1 && view.hal?.at === 'stream') rows = frame.withCursor(rows, view.hal, cols)
 			if (rows.length && (lines.length || above)) lines.push('')
 			for (let r of rows) lines.push(r)

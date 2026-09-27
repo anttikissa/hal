@@ -6,25 +6,16 @@
 // pages until the block shows. Addresses are relative to the page until
 // the host's webUrl reaches the browser (task e3).
 
+import { transcript } from '../common/transcript.ts'
 import type { Row } from './view.ts'
 
 // The block the address points at in session `session`.
 export type Target = { session: string; key: string }
 
-// A block id: a record number, with `.<i>` for a later item of it.
-// Keys of hand-built items (`~<position>`) are not linkable.
-const blockId = /^\d+(\.\d+)?$/
-
 // The target an address names, if it names a session and a block.
 function parse(url: string, session: string | undefined): Target | undefined {
 	let key = decodeURIComponent(new URL(url).hash.slice(1))
-	return session && blockId.test(key) ? { session, key } : undefined
-}
-
-// The address of block `key` of session `session`, or undefined for a
-// key that is no block id.
-function href(session: string, key: string): string | undefined {
-	return blockId.test(key) ? `/${session}#${key}` : undefined
+	return session && transcript.href(session, key) ? { session, key } : undefined
 }
 
 // The row showing block `key`: its own, or a tool result's call.
@@ -41,4 +32,4 @@ function seek(t: Target, session: string | undefined, rows: Row[], more: boolean
 	return more ? 'older' : 'missing'
 }
 
-export const target = { parse, href, row, seek }
+export const target = { parse, href: (session: string, key: string) => transcript.href(session, key), row, seek }

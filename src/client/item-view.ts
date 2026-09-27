@@ -5,7 +5,7 @@ import { attachments } from '../common/attachments.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { forms, type Quote } from '../common/forms.ts'
 import { strings } from '../common/strings.ts'
-import type { Shown as Item } from '../common/transcript.ts'
+import { transcript, type Item as Keyed, type Shown as Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { promptView } from './prompt-view.ts'
 
@@ -92,6 +92,21 @@ function itemLines(item: Item, width: number): string[] {
 	}
 }
 
+// `rows` of `item` with its header made an OSC 8 link to the same
+// block on the web, /<session>#<key> (tasks wc, 0z): a tool call's
+// whole row (the terminal shows a glimpse, the card all of it), else
+// the leading marker (>, ?, error:). Only prompts, tool calls,
+// questions and errors have a header; an item whose key is no block
+// id is not linked. The code rides in the hidden target only.
+function linked(rows: string[], item: Keyed, session: string | undefined): string[] {
+	let href = session && transcript.href(session, item.key)
+	let headed = item.type === 'prompt' || item.type === 'tool' || item.type === 'question' || (item.type === 'turn-end' && item.status === 'error')
+	if (!href || !headed || !rows.length) return rows
+	let [, head, rest] = item.type === 'tool' ? ['', rows[0]!, ''] : (/^(\S*)(.*)$/s.exec(rows[0]!) ?? [])
+	if (!head) return rows
+	return [`\x1b]8;;${ansi.webUrl(href)}\x07${head}${ansi.LINK_OFF}${rest}`, ...rows.slice(1)]
+}
+
 // Rows of a question's quote, indented, its marked parts in inverse.
 // Each row closes what it opens and reopens what it continues, so a
 // repaint of one row never leaks inverse into another.
@@ -121,5 +136,6 @@ export const itemView = {
 	toolStyle,
 	itemStyle,
 	itemLines,
+	linked,
 	quoteLines,
 }

@@ -9,6 +9,8 @@ import { settings } from '../common/settings.ts'
 import { uploads } from '../common/uploads.ts'
 import { frame, type Frame, type View } from './frame.ts'
 import { promptView } from './prompt-view.ts'
+import { ansi } from './ansi.ts'
+import { target } from '../web/target.ts'
 
 const DIM = '\x1b[2m'
 
@@ -310,7 +312,44 @@ test('an [image/<name>] marker is a link to the image, in the transcript and the
 	for (let row of rows) expect(row).toContain(link)
 	expect(plain(rows)).toEqual(['> see [image/abc123.png] ok', '> and [image/abc123.png]'])
 	// A forged name is not linked.
-	expect(frame.build(view([{ type: 'prompt', text: '[image/../x.png]' }]), 60).lines.join('')).not.toContain('\x1b]8;')
+	expect(frame.build(view([{ type: 'prompt', text: '[image/../x.png]' }]), 60).lines.join('')).not.toMatch(/\x1b\]8;;[^\x07]*x\.png/)
+})
+
+// OSC 8 targets in `lines`, in order.
+function targets(lines: string[]): string[] {
+	return lines.flatMap((l) => [...l.matchAll(/\x1b\]8;;([^\x07]+)\x07/g)].map((m) => m[1]!))
+}
+
+test('headers link to their block on the web, with the code hidden; items without a block id are not linked', () => {
+	ansi.state.web = { url: 'https://h.example', code: 'k3x9qa' }
+	try {
+		let items: Item[] = [
+			{ type: 'prompt', text: 'list files' },
+			{ type: 'text', text: 'Looking.' },
+			{ type: 'tool', id: 't1', name: 'bash', input: { command: 'ls' } },
+			{ type: 'tool-result', id: 't1', output: 'a\nb' },
+			{ type: 'question', id: 'q', form: { text: 'Delete?', fields: [] }, cancelled: true },
+			{ type: 'turn-end', status: 'error', error: 'boom' },
+		]
+		let v = view(items)
+		v.transcript!.items = v.transcript!.items.map((it, i) => ({ ...it, key: ['4', '5', '6', '6.1', '7', '8'][i]! }))
+		let lines = frame.build(v, 60).lines
+		let links = targets(lines).map((u) => new URL(u))
+		// Each resolves on the web to the card of that block (task 0z).
+		let blocks = links.map((u) => target.parse(u.href, u.pathname.slice(1)))
+		expect(blocks).toEqual(['4', '6', '7', '8'].map((key) => ({ session: 's', key })))
+		for (let u of links) expect(u.searchParams.get('auth')).toBe('k3x9qa')
+		let shown = lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, ''))
+		expect(shown.join('\n')).not.toContain('k3x9qa')
+		expect(plain(lines)).toContain('▸ bash {"command":"ls"}')
+		expect(plain(lines)).toContain('error: boom')
+		// A block still streaming before it has a number is not linked.
+		let streaming = view([{ type: 'tool', id: 't2', name: 'bash', input: {} }])
+		streaming.transcript!.items[0]!.key = '~0'
+		expect(targets(frame.build(streaming, 60).lines)).toEqual([])
+	} finally {
+		ansi.state.web = { url: '', code: '' }
+	}
 })
 
 test('a [paste/<name>] marker links to its page; while its upload is in flight it is dim and no link, with the same text', () => {

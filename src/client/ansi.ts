@@ -43,10 +43,12 @@ function links(row: string): string {
 
 // The hidden target of a link to `path` on the host's web address: it
 // carries the link code, so a click logs a browser in (task e3). Never
-// visible text.
+// visible text. The code goes before a #fragment, so the fragment
+// (a block id, task wc) still reaches the page.
 function webUrl(path: string): string {
 	let { url, code } = ansi.state.web
-	return `${url || `http://localhost:${settings.webPort()}`}${path}${code ? `?auth=${code}` : ''}`
+	let [page, hash] = path.split(/(?=#)/)
+	return `${url || `http://localhost:${settings.webPort()}`}${page}${code ? `?auth=${code}` : ''}${hash ?? ''}`
 }
 
 export const ansi = {

@@ -84,6 +84,13 @@ function key(n: number | undefined, i: number, at: number): string {
 	return n === undefined ? `~${at}` : i ? `${n}.${i}` : `${n}`
 }
 
+// The address of block `key` of session `session`, the same in every
+// client (task 0z): /<session>#<key>. Undefined for a key that is no
+// block id (a `~<position>` key of a hand-built item).
+function href(session: string, key: string): string | undefined {
+	return /^\d+(\.\d+)?$/.test(key) ? `/${session}#${key}` : undefined
+}
+
 // `shown` as the items of record (or event) number `n`, going at `at`.
 function keyed(shown: Shown[], n: number | undefined, at: number): Item[] {
 	return shown.map((s, i) => ({ ...s, key: transcript.key(n, i, at + i) }) as Item)
@@ -291,4 +298,4 @@ function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' 
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 
-export const transcript = { blockItems, promptItem, key, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }
+export const transcript = { blockItems, promptItem, key, href, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }

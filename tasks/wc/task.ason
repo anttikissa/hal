@@ -1,7 +1,13 @@
 {
 	title: 'Terminal blocks link to their web card',
 	description: "Every block the terminal draws with a header (prompt, tool call, question, error; as in the old Hal's buildHeader, which showed a short ref at the right of the header, e.g. 04-fyx/0gdec4) carries an OSC 8 link to the same block on the web: <webUrl>/<session id>#<block id>, the id that task 0z uses, with the hidden ?auth= link code of task e3. The link sits on the header's ref or time text; the visible text shows no code. tasks/README.md's rule: anything linkable in one client is linkable in the other. Tests: a tool block's header links to the address the web resolves to that card; the visible row shows no code; a block without an id (streaming before its first byte has one) is not linked.",
-	status: 'planned',
+	status: 'done',
 	needs: ['0z', 'e3'],
-	foldInto: ['0z']
+	foldInto: ['0z'],
+	notes: [
+		"hal2's terminal draws no header rows, ref or time (items start with a marker: '> ', '▸ ', '? ', 'error:'), so the link sits on what stands in for the header: a tool call's whole row (the terminal shows a glimpse, the card all of it), else the leading marker token. No visible ref was added: it would steal columns from wrapped prompt text. itemView.linked does it after itemLines; frame.itemRows takes the session id (transcript.meta.id) and caches per session and key.",
+		'ansi.webUrl puts ?auth= before a #fragment: appended after it, the code would land in the hash and the page would get neither the code nor the block id.',
+		'The block-id rule (digits, optional .<i>; `~` keys are not linkable) lives in common transcript.href, shared by web target.ts and the terminal. The frame test resolves terminal links with web target.parse (tests may cross layers).',
+		'Tool results, text, thinking and command output are not linked; a result links through its call row, which the web maps to the same card.'
+	]
 }
