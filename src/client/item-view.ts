@@ -52,10 +52,11 @@ function itemLines(item: Item, width: number): string[] {
 		}
 		case 'image':
 			return [promptView.REST + attachments.label(item)]
+		// Trailing blank lines the model streamed are not drawn: the one
+		// blank row between items (frame.build) is the only gap.
 		case 'text':
-			return ansi.wrap(item.text, width)
 		case 'thinking':
-			return ansi.wrap(item.text, width)
+			return ansi.wrap(item.text.trimEnd(), width)
 		case 'tool': {
 			let { command, description } = item.input
 			// A described command: the sentence first, the command dimmed beside it.

@@ -107,11 +107,8 @@ function status(t: Transcript): StatusInfo {
 	return s
 }
 
-// What the session is doing in a word or two, for the prompt's top
-// rule: states.describe's words, except that the help row already says
-// which key continues, and the question on screen needs its answer.
-// The activity in the rule above the prompt: a word or two, never a
-// message clipped to the row; the whole sentence is the notice (why).
+// The activity in the prompt's top rule: a word or two, never a message
+// clipped to the row; the whole sentence is the notice (why).
 function activity(t: Transcript): string | undefined {
 	let s = t.state
 	if (s.type === 'blocked') return s.reason === 'question' ? 'waiting for answer' : `blocked: ${s.reason.split(':')[0]}`
@@ -125,6 +122,8 @@ function activity(t: Transcript): string | undefined {
 function why(t: Transcript): string | undefined {
 	let s = t.state
 	if (s.type === 'running' || s.type === 'idle' || (s.type === 'blocked' && s.reason === 'question')) return undefined
+	// [paused] and the help row's enter: continue say the rest.
+	if (s.type === 'paused') return s.reason || undefined
 	return states.describe(s, Date.now(), t.items)
 }
 

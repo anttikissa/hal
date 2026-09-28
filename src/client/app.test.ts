@@ -146,6 +146,10 @@ test('a login block says so in a word above the prompt; the whole message is the
 test('bare Enter continues a paused or failed turn, and says so', () => {
 	app.onEvent(snapshot('s1', { type: 'paused' }))
 	expect(app.view().activity).toBe('paused')
+	// [paused] in the transcript and the help row's enter: continue say it all.
+	expect(app.view().notice).toBeUndefined()
+	app.onEvent(snapshot('s1', { type: 'paused', reason: 'reached 200 rounds' }))
+	expect(app.view().notice).toBe('reached 200 rounds')
 	enter()
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'error', message: '400 nope' } })
 	// The rule says it in a word; the notice has the whole message.
