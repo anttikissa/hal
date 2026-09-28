@@ -1,7 +1,6 @@
 import { expect, test } from 'bun:test'
 import { inbox } from './inbox.ts'
 import type { HistoryRecord } from './replay.ts'
-import type { SessionState } from './states.ts'
 
 const ts = '2026-01-01T00:00:00.000Z'
 const waiting = (id: string, queue = false): HistoryRecord => ({ type: 'inbox', id, text: `text ${id}`, ...(queue ? { queue: true as const } : {}), ts })
