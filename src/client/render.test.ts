@@ -482,13 +482,27 @@ describe('tabs', () => {
 
 	test('a single tab that fits keeps grow mode and never clears scrollback', () => {
 		setup(20, 30, ['$ hal'])
-		for (let n = 0; n <= 3; n++) showTab('a', items(n), 'typed')
+		let one = [tab('a')]
+		let showOne = (history: Item[], text = '') => {
+			render.state.view = { transcript: transcript(history), prompt: { text, cursor: text.length }, tabs: { list: one, focused: 'a' } }
+			render.draw()
+		}
+		for (let n = 0; n <= 3; n++) showOne(items(n), 'typed')
 		term.resize(22, 30)
 		render.draw(true)
 		render.draw(true)
-		showTab('a', items(2))
+		showOne(items(2))
 		expect(term.written).not.toContain('\x1b[3J')
 		expect(term.content()).toEqual(['$ hal', ...frameText()])
+	})
+
+	test('with two or more tabs the first paint is full mode: what was on screen goes', () => {
+		// A restart on tab 2: the last run's frame is still on screen.
+		setup(10, 30, ['$ hal', 'old tab 1 row', 'old prompt'])
+		showTab('b', items(1), 'typed')
+		expect(render.state.fullscreen).toBe(true)
+		expect(term.written).toContain('\x1b[3J')
+		expect(term.content()).toEqual(frameText())
 	})
 
 	test('a tab switch, Ctrl-L redraw and resize are canonical repaints once in full mode', () => {

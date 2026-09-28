@@ -10,7 +10,8 @@
 //   repaint moves to its top and clears down; shell output above Hal
 //   survives.
 // - Full mode, entered one-way when a frame first outgrows the screen
-//   or another tab is shown (canonically: scrollback is that tab only):
+//   or there are two or more tabs (canonically: scrollback is the
+//   shown tab only):
 //   when a changed row is already in scrollback, or the frame shrinks,
 //   there is no correct in-place update, so the canonical repaint
 //   clears screen and scrollback and writes the whole frame again.
@@ -157,14 +158,19 @@ function column(col: number): string {
 
 /**
  * Paint the current view now. Force repaints everything (Ctrl-L, resize,
- * resume). Showing another tab than last time enters full mode for good
- * and repaints canonically: scrollback holds only the tab shown.
+ * resume). Having two or more tabs enters full mode for good, and
+ * showing another tab than last time repaints canonically: scrollback
+ * holds only the tab shown.
  */
 function draw(force = false): void {
 	let st = render.state
 	if (!st.out || (st.parked && !force)) return
 	st.parked = false
 	let { rows, cols } = st.out.size()
+	// Two or more tabs means full mode for good, from the first paint
+	// that sees them: a restart on tab 2 then clears what the last run
+	// left on screen instead of painting under it.
+	if (!st.fullscreen && (st.view.tabs?.list.length ?? 0) > 1) st.fullscreen = force = true
 	let tab = st.view.tabs?.focused
 	if (tab !== undefined) {
 		if (st.tab !== undefined && st.tab !== tab) st.fullscreen = force = true

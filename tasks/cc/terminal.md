@@ -186,10 +186,12 @@ never reach scrollback. A frame shorter than the box grows to hold it.
 
 ### Tab switching
 
-The first actual tab focus transition permanently enters full mode before its
-canonical force repaint. This deliberately gives ordinary single-tab REPL use
-normal shell scrollback, but makes every tab-switch repaint authoritative: it
-clears native scrollback and rebuilds the focused tab's complete frame.
+Going from one tab to two or more permanently enters full mode, at the first
+paint that sees the second tab (a start or restart with several tabs included),
+with a canonical force repaint, however few rows the focused tab has. This
+deliberately gives ordinary single-tab REPL use normal shell scrollback, but
+makes every multi-tab repaint authoritative: each tab switch clears native
+scrollback and rebuilds the focused tab's complete frame.
 
 ## Rendering: differential
 
