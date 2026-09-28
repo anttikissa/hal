@@ -1,0 +1,6 @@
+{
+	title: '/clear: fresh context in the same tab',
+	spec: '/clear (src/host/commands/clear.ts) writes a history record {type: reset} on an idle session: provider input rebuilds from the records after the latest reset alone, with no summary, so the model starts fresh with the same system prompt, cwd and model. The transcript is kept and shows a one-row divider "context cleared"; drafts, the session name and the tab stay. A running turn answers that it is busy. Tests: provider input after /clear holds only later records; a compact after a reset summarises only records after the reset.',
+	status: 'planned',
+	needs: ['bc']
+}

@@ -1,0 +1,6 @@
+{
+	title: '/move: reorder tabs',
+	spec: "/move <n> moves the current tab to position n (1-based; beyond the end means last). The order is the host's tab list, so every client sees it at once and it survives a restart; focus stays on the moved tab. Tests: moving first, middle and past the end; another client sees the order; restart keeps it.",
+	status: 'planned',
+	needs: ['x0', '7w']
+}

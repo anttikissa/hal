@@ -1,0 +1,6 @@
+{
+	title: '/rename: name the session',
+	spec: '/rename <name> sets the session name (the one the status row and tab titles show, task 1g); /rename with no argument clears it. The name is stored in the session metadata through liveFile and pushed to every client at once. A name is one line, trimmed, at most 60 chars; longer is refused with the reason. Tests: rename reaches another client; clearing; the length refusal; the name survives a restart.',
+	status: 'planned',
+	needs: ['x0']
+}

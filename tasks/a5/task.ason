@@ -1,0 +1,6 @@
+{
+	title: 'Bash output streams live while the command runs',
+	spec: "While a foreground bash call runs, its combined output reaches every client live: the host sends the growing output (throttled to at most ~10 updates a second, and only the new bytes) as an event of the running tool call, so a late joiner's snapshot shows the same partial output as a client that watched it stream. The terminal shows the last few lines (at most 5) of the running call under its row, replaced by the normal result when the call ends; the web tool card shows the output growing. Live output is display state only: the model still gets the one final result, and history records only that (streamed view == snapshot rule from task sj). A background job (task v0) does not stream. Artifact old-bash.ts (reference; see its onOutput). Tests: events arrive before the result; the final result is unchanged; a late joiner sees partial output; the throttle bounds the event count for a chatty command.",
+	status: 'planned',
+	needs: ['1r']
+}

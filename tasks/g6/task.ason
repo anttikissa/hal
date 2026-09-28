@@ -1,0 +1,6 @@
+{
+	title: 'google tool: web search through Serper',
+	spec: 'A `google` model tool (src/host/tools/google.ts) searches the web through Serper (POST https://google.serper.dev/search). Input: query (required, non-empty), num (default 5, at most 10). The result is plain text: an answer-box line and a knowledge-graph line when Serper gives them, then one "title\\nlink\\nsnippet" entry per organic hit, entries separated by a blank line; "No results found." when empty. The key comes from the credentials file (a serper entry with an apiKey, same file and liveFile handling as provider accounts) or else SERPER_API_KEY; with neither the tool is still offered and returns an error result naming both places. A non-2xx answer is an error result with the status and at most 500 chars of the body. The turn abort signal cancels the request. Artifact old-google.ts is the old Hal version (reference). Tests use a fake Serper server: formatting, the num cap, the missing-key error, a non-2xx error.',
+	status: 'planned',
+	needs: ['sj']
+}
