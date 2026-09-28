@@ -32,8 +32,8 @@ import { turns } from './turns.ts'
 
 // Returns why the submit is refused, if it is. `command` is the
 // client's id for it, kept with the prompt (or inbox message) so a
-// later host can tell a resend. While the session is busy the message
-// waits in the inbox; `queue` also makes it wait for a paused or failed
+// later host can tell a resend. While a turn streams the message waits
+// in the inbox; `queue` also makes it wait for a paused or failed
 // turn to finish. Otherwise it starts a turn, delivering any steering
 // messages still waiting (a paused turn's) first. A slash command runs
 // at once, whatever the state.
@@ -48,6 +48,11 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 	let call = commands.parse(text)
 	if (call) return slash.command(id, text, call, command, sender?.from)
 	let state = status.stateOf(id)
+	// A stalled turn (retrying, or blocked on a login) streams nothing:
+	// the user's message joins the transcript now, and its next round
+	// takes it in. Only a streaming turn has something to steer.
+	let stalled = state.type === 'retrying' || (state.type === 'blocked' && state.reason !== 'question')
+	if (stalled && !queue && sender?.from === undefined) return void prompts.deliver(id, [], { text }, command)
 	if (states.busy(state) || ((queue || sender?.from !== undefined) && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
 		if (queue) record.queue = true

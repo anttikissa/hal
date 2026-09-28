@@ -109,15 +109,7 @@ test('waiting messages stay on screen, each saying why it waits', () => {
 	expect(steer).toBe('(steering) > steer me')
 	expect(later).toBe('(queued) > run me later')
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'paused' } })
-	expect(rows().find((r) => r.includes('run me later'))).toBe('(queued, waiting) > run me later')
 	expect(rows().join('\n')).toMatch(/paused/)
-	// A long reason (a login error) stays in the status line: every row
-	// fits the terminal and the message text is not squeezed apart.
-	let why = 'log in: anthropic token refresh failed: HTTP 400 invalid_grant; run /login claude. '.repeat(3)
-	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'blocked', reason: why } })
-	let lines = frame.build(app.view(), 80).lines.map((l) => l.replace(/\x1b\][^\x07]*\x07|\x1b\[[0-9;]*m/g, ''))
-	for (let l of lines) expect(l.length).toBeLessThanOrEqual(80)
-	expect(rows().find((r) => r.includes('steer me'))).toBe('(steering, waiting) > steer me')
 	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [] })
 	expect(rows().join('\n')).not.toContain('steer me')
 })
@@ -305,33 +297,6 @@ test('losing the host is shown, and cleared on reconnect', () => {
 test('Ctrl-D on an empty prompt quits', () => {
 	app.onKeys([{ ...key('d'), ctrl: true }])
 	expect(quits).toBe(1)
-})
-
-test('a sent prompt shows at once, in the place and shape it keeps, never twice', () => {
-	let rows = () => frame.build(app.view(), 80).lines.map((l) => l.replace(new RegExp(`${'\x1b'}\\[[0-9;]*m`, 'g'), '').trim())
-	let ids: string[] = []
-	drafts.send = (c: any) => (c.type === 'submit' && ids.push(c.id), record(c))
-	// Taken into history: the pending row becomes the prompt.
-	app.onEvent(snapshot())
-	type('hello')
-	enter()
-	expect(rows()).toContain('(sending) > hello')
-	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'hello', provider: 'anthropic', command: ids[0]! })
-	// Before the ack: one copy, the host's.
-	expect(rows().filter((r) => r.includes('hello'))).toEqual(['> hello'])
-	app.onEvent({ type: 'ack', id: ids[0]! })
-	expect(rows().filter((r) => r.includes('hello'))).toEqual(['> hello'])
-	// Taken into the inbox of a busy session: same row, the label changes.
-	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'streaming' } })
-	type('FAAAA')
-	enter()
-	let before = rows()
-	let at = before.indexOf('(sending) > FAAAA')
-	expect(at).toBeGreaterThan(0)
-	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: ids[1]!, text: 'FAAAA' }] })
-	let after = rows()
-	expect(after.filter((r) => r.includes('FAAAA'))).toEqual(['(steering) > FAAAA'])
-	expect(after.indexOf('(steering) > FAAAA')).toBe(at)
 })
 
 test('typing updates the shared draft; a draft from elsewhere fills the prompt', () => {

@@ -57,7 +57,7 @@ function ask(id: string, form: Form, call?: string): void {
 // `images`: the prompt's image blocks, for followers to show; `record`:
 // the prompt's, whose number, command id and sender (of its first text)
 // they are told.
-function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender }, blocked?: string): void {
+function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender }): void {
 	let model = sessions.open(id).model
 	let running: Running = { provider: blocks.parseModelId(model)?.provider ?? model, controller: new AbortController() }
 	turns.state.running.set(id, running)
@@ -68,7 +68,7 @@ function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlo
 	if (prompt !== undefined && record?.n !== undefined) event.n = record.n
 	if (prompt !== undefined && record?.command !== undefined) event.command = record.command
 	host.broadcast(id, event)
-	running.done = turns.runTurn(id, model, running, answers, blocked).catch((e) => diag.log(`turn ${id}: ${e?.message ?? e}`))
+	running.done = turns.runTurn(id, model, running, answers).catch((e) => diag.log(`turn ${id}: ${e?.message ?? e}`))
 }
 
 // Pauses the session's turn: one running here stops and runTurn records
@@ -133,11 +133,6 @@ async function recover(): Promise<void> {
 			prompts.next(id)
 			continue
 		}
-		// Blocked on a login: go on waiting, as the old host did.
-		if (state.type === 'blocked' && state.reason !== 'question') {
-			turns.start(id, undefined, undefined, undefined, undefined, state.reason)
-			continue
-		}
 		if (state.type !== 'running') continue
 		let n = states.recoveries(records)
 		if (n >= states.maxRecoveries()) {
@@ -193,9 +188,7 @@ function leftWork(id: string): boolean {
 // pauses with a reason, and continuing gives it as many again. A round
 // cut off at max_tokens or refused runs none of its calls and ends the
 // turn in error (stopped).
-// `blocked`: the turn was waiting for a login when the last host went
-// away; it waits again before its first round.
-async function runTurn(id: string, model: string, running: Running, answers?: Answers, blocked?: string): Promise<void> {
+async function runTurn(id: string, model: string, running: Running, answers?: Answers): Promise<void> {
 	let { signal } = running.controller
 	let records = history.readSync(id)
 	history.carry(id, running.provider, turns.parkedUsage(records))
@@ -221,13 +214,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let rounds = 0
 	let capped: string | undefined
 	try {
-		let paused = false
-		if (blocked !== undefined) {
-			status.transition(id, { type: 'block', reason: blocked })
-			await auth.changed(signal)
-			paused = signal.aborted
-		}
-		while (!paused) {
+		while (true) {
 			// The turn wanted to go on: a pause now stops it as paused.
 			let cancelled = () => signal.aborted && ((last = undefined), true)
 			let calls: ToolCallBlock[]
@@ -361,10 +348,7 @@ async function waitOut(id: string, error: ErrorEvent, failures: number, signal: 
 	// Output cut off mid-answer: the model hears it was interrupted.
 	if (history.readSync(id).at(-1)?.type === 'assistant') history.append(id, { type: 'continue' })
 	if (error.failure === 'auth' && error.retryAt === undefined) {
-		let reason = `log in: ${error.message}`
-		let last = history.readSync(id).findLast((r) => r.type !== 'inbox')
-		if (last?.type !== 'blocked' || last.reason !== reason) history.append(id, { type: 'blocked', reason })
-		status.transition(id, { type: 'block', reason })
+		status.transition(id, { type: 'block', reason: `log in: ${error.message}` })
 		await auth.changed(signal)
 		return
 	}

@@ -48,7 +48,7 @@ test('an advisory message reaches a working session with its next request, frame
 	// Waiting, visibly from the other session.
 	let waiting = c.views.get(a)!.inbox
 	expect(waiting).toMatchObject([{ text: 'check the tests', from: b, label: by, advisory: true }])
-	expect(inbox.label(c.views.get(a)!.state, waiting[0]!)).toContain(by)
+	expect(inbox.tag(waiting[0]!)).toContain(by)
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === next + 2)
 	let text = lastText(next + 1)

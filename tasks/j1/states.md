@@ -82,11 +82,6 @@ progress, pause it with a reason.
   time in the body), which can be hours away. Must survive restart.
 - Auth broken (401, refresh token rejected, e.g. a copied credentials
   file): blocked on login; continue by itself once credentials work.
-  The block is durable (a `blocked` history record): a restart shows
-  the same blocked state and goes on waiting for the credentials
-  without trying the request again, and messages sent meanwhile stay in
-  the inbox until the round that follows the login takes them in. A
-  restart never changes what the user sees (Ctrl-R keeps the screen).
 - Laptop sleep: after wake it must just work, as if the lid had never
   closed. This is hard to test, so defensive code is allowed here (and
   only here): detect the wake (timer gap, clock jump) and treat every
@@ -102,6 +97,11 @@ The user talks to models like a chat: several messages while the model
 is still working. Sending while a turn runs steers it: the messages go
 into the session inbox and the model gets them together at the next
 round boundary. Alt-Enter queues instead: it runs after the turn ends.
+A turn that streams nothing (retrying, blocked on a login) has nothing
+to steer: a message then joins the transcript at once, in the order
+typed, and the round after the wait takes it in. The user is just
+typing into the transcript; no (steering, waiting) labels.
+A restart (Ctrl-R) never changes what the user sees.
 The inbox is always visible; nothing hides behind a command. The old
 queue told the user "1 message in the queue, use /queue" and sometimes
 never ran it: every queued message must either run or stay visibly

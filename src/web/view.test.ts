@@ -81,11 +81,11 @@ test('a tool gets a class for its name that no name can break out of', () => {
 	expect(kind.split(' ')[1]).toMatch(/^tool-[a-z0-9-]+$/)
 })
 
-test('waiting messages are shown with why they wait', () => {
+test('waiting messages are shown with their kind', () => {
 	let st = fold([
 		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'paused' }, inbox: [{ id: 'a', text: 'next', queue: true }] } },
 	])
-	expect(view.inbox(st)).toEqual([{ text: 'next', label: expect.stringMatching(/paused/) }])
+	expect(view.inbox(st)).toEqual([{ text: 'next', label: 'queued' }])
 	expect(view.inbox(view.onEvent(st, { type: 'inbox', sessionId, inbox: [] }))).toEqual([])
 	expect(view.inbox({})).toEqual([])
 })

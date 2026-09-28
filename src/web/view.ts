@@ -154,7 +154,7 @@ function pause(st: ViewState): unknown {
 // The messages waiting for the turn, each with why it waits.
 function waiting(st: ViewState): { text: string; label: string }[] {
 	let t = st.transcript
-	return t ? t.inbox.map((m) => ({ text: m.text, label: inbox.label(t.state, m) })) : []
+	return t ? t.inbox.map((m) => ({ text: m.text, label: inbox.tag(m) })) : []
 }
 
 // What the model is streaming into the last item, thinking or text:

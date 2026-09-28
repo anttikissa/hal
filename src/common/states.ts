@@ -105,7 +105,6 @@ function fromHistory(records: HistoryRecord[]): SessionState {
 	// Messages waiting in the inbox never start or end a turn.
 	let last = replay.withoutCommands(records).findLast((r) => r.type !== 'inbox')
 	if (!last) return { type: 'idle' }
-	if (last.type === 'blocked') return { type: 'blocked', reason: last.reason }
 	if (last.type !== 'turn_end') return { type: 'running', phase: 'requesting' }
 	if (last.status === 'completed') return { type: 'idle' }
 	if (last.status === 'error') return { type: 'error', message: last.error ?? 'turn failed' }

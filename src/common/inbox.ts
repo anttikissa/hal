@@ -8,7 +8,6 @@
 
 import type { Sender } from './blocks.ts'
 import type { HistoryRecord } from './replay.ts'
-import { states, type SessionState } from './states.ts'
 
 // Sender fields: another session sent it (task rj); none, the human.
 export type InboxItem = { id: string; text: string; queue?: true } & Sender
@@ -39,25 +38,12 @@ function sender(s: Sender): Sender {
 	return out
 }
 
-// Why the message waits and what ends the wait, in a few words, and
-// who sent it if not the human.
-function label(state: SessionState, item: InboxItem): string {
-	let by = item.from === undefined ? '' : ` (from ${item.label ?? item.from})`
-	let kind = item.queue ? 'queued' : item.advisory ? 'advisory' : 'steering'
-	if (state.type === 'running') return (item.queue ? 'queued: runs after this turn' : `${kind}: sent before the next request`) + by
-	if (state.type === 'idle') return `waiting${by}`
-	let why = states.describe(state)
-	return (why ? `${kind}, waiting: ${why}` : `${kind}, waiting for an answer`) + by
-}
-
-// The label in a word or two, for a message drawn as a prompt: its
-// kind, and "waiting" when the turn does not run. Why it waits (which
-// can be a long error) is the client's status line, never the tag.
-function tag(state: SessionState, item: InboxItem): string {
+// The label in a word or two, for a message drawn as a prompt: its kind
+// and sender. Never why the session stalls: that is the status line.
+function tag(item: InboxItem): string {
 	let by = item.from === undefined ? '' : ` from ${item.label ?? item.from}`
 	let kind = item.queue ? 'queued' : item.advisory ? 'advisory' : 'steering'
-	if (state.type === 'idle') return `waiting${by}`
-	return kind + (state.type === 'running' ? '' : ', waiting') + by
+	return kind + by
 }
 
-export const inbox = { pending, sender, label, tag }
+export const inbox = { pending, sender, tag }

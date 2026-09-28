@@ -155,16 +155,14 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 			for (let r of rows) lines.push(r)
 		}
 	}
-	// The transcript's tail: what is not in history yet, right after
-	// it (never across the full-mode padding), where it will land. The
-	// inbox first, each drawn as the prompt it will become: (steering)
-	// > text; then prompts still on their way to the host, which join
-	// the inbox or history at the same place, so nothing jumps.
-	let t = view.transcript
-	let tail = [...(t?.inbox ?? []).map((m) => ({ text: m.text, label: inbox.tag(t!.state, m) })), ...(view.pending ?? []).map((text) => ({ text, label: 'sending' }))]
+	// The transcript's tail, right after it (never across the full-mode
+	// padding): the inbox, each message drawn as the prompt it will
+	// become, (steering) > text, then prompts on their way to the host,
+	// plain > text, where the host's copy will replace them.
+	let tail = [...(view.transcript?.inbox ?? []).map((m) => ({ text: m.text, label: `(${inbox.tag(m)}) ` })), ...(view.pending ?? []).map((text) => ({ text, label: '' }))]
 	for (let m of tail) {
 		// The tag takes at most half the row, so the text keeps room.
-		let tag = strings.clipVisual(`(${m.label})`, Math.max(1, Math.floor(width / 2))) + ' '
+		let tag = strings.clipVisual(m.label, Math.max(1, Math.floor(width / 2)))
 		let rows = promptView.mark(ansi.wrap(m.text, Math.max(1, width - strings.visLen(tag) - promptView.FIRST.length)))
 		let pad = ' '.repeat(strings.visLen(tag))
 		block(rows.map((r, i) => (i ? pad : ansi.DIM + tag + ansi.UNDIM) + r), colors.user())

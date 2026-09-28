@@ -15,14 +15,3 @@ test('the inbox is every message not yet delivered, in the order sent', () => {
 	expect(inbox.pending([...records, delivered('b')])).toEqual([])
 })
 
-test('every waiting message says why it waits, naming what ends the wait', () => {
-	let steer = { id: 'a', text: 'x' }
-	let queued = { id: 'b', text: 'y', queue: true as const }
-	let running: SessionState = { type: 'running', phase: 'streaming' }
-	expect(inbox.label(running, steer)).not.toEqual(inbox.label(running, queued))
-	expect(inbox.label({ type: 'paused' }, queued)).toMatch(/paused.*Enter/)
-	expect(inbox.label({ type: 'blocked', reason: 'log in' }, steer)).toMatch(/log in/)
-	expect(inbox.label({ type: 'blocked', reason: 'question' }, steer)).toBe('steering, waiting for an answer')
-	expect(inbox.label({ type: 'error', message: '400' }, queued)).toMatch(/400/)
-	expect(inbox.label({ type: 'retrying', at: ts, reason: '529' }, steer)).toMatch(/529/)
-})

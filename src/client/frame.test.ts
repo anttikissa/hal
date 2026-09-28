@@ -402,16 +402,3 @@ test('a [paste/<name>] marker links to its page; while its upload is in flight i
 	}
 })
 
-test('in full mode, waiting and sending prompts follow the history, not the padding', () => {
-	let v = view([{ type: 'prompt', text: 'testing' }])
-	v.transcript!.state = { type: 'blocked', reason: 'log in: no token' }
-	v.transcript!.inbox = [{ id: 'a', text: 'yo bro' }]
-	v.pending = ['Whaaat']
-	let lines = plain(frame.build(v, 60, 40, true).lines)
-	let at = (s: string) => lines.findIndex((l) => l.includes(s))
-	// Each a blank row below the one before: nothing jumps across
-	// the blank rows that pad the frame to the bottom.
-	expect(at('yo bro')).toBe(at('> testing') + 2)
-	expect(at('> Whaaat')).toBe(at('yo bro') + 2)
-	expect(lines.length).toBe(40)
-})
