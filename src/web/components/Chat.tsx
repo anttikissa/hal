@@ -18,6 +18,7 @@ import { viewport } from '../viewport.ts'
 import { Composer } from './Composer.tsx'
 import { Picker } from './Picker.tsx'
 import { Tabs } from './Tabs.tsx'
+import { StatusRow } from './StatusRow.tsx'
 import { Transcript } from './Transcript.tsx'
 
 const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration })
@@ -147,6 +148,7 @@ export function Chat() {
 		<div class="Chat">
 			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} />
+			<StatusRow view={view()} />
 			<Composer view={view()} text={text()} notice={notice()} placeholder={placeholder()} connected={connected()} dropping={dropping()} />
 			<Picker modal={view().modal} />
 		</div>

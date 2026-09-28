@@ -1,6 +1,9 @@
 {
 	title: 'Web status row',
 	spec: 'The web client shows the facts of the terminal status row (task 1g): session id and name, cwd, model, context used with its percentage heat-coloured, tokens this run, and subscription usage windows. It sits just above the composer as one line that wraps into two on phones instead of dropping parts; the same Stats shape feeds it (transcript.stats), so nothing new is sent. Colours come from the generated CSS; readable-text invariant applies. Tests: a view-module unit test that the parts and percentage come out of a Stats value; looks checked by hand at phone and desktop widths.',
-	status: 'planned',
-	needs: ['1g']
+	status: 'done',
+	needs: ['1g'],
+	notes: [
+		'StatusRow uses transcript.meta plus transcript.stats (snapshot and turn-end), pure view.status groups, titles.modelName and compact token counts. Heat steps come from generated theme classes statusCool/Warm/Hot at <60, 60–84 and >=85 percent; CSS uses flex on desktop and three-column/two-row phone grid without dropping a fact. Checked representative generated-CSS previews in headless Chrome at desktop 1280x800 and emulated phone 390x844 via CDP: all groups visible, no horizontal overflow; long name/cwd and windows each wrap within their phone grid cells. A live authenticated browser was not available for a manual app check.'
+	]
 }

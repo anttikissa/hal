@@ -87,6 +87,13 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 @property --fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @keyframes md-fade { from { --fade: 2.5rem; } 99% { --fade: 2.5rem; } to { --fade: 0px; } }
 @keyframes blink { 50% { opacity: 0; } }
+/* A complete status row above the composer: on phones six groups become
+   two rows of three; nothing is omitted to fit a narrow screen. */
+.StatusRow { flex: none; display: flex; gap: 0 1.5ch; padding: 0.2rem max(1rem, env(safe-area-inset-right)) 0.2rem max(1rem, env(safe-area-inset-left)); font-size: 0.85em; border-top: 1px solid var(--border); }
+.StatusRow .group { min-width: 0; overflow-wrap: anywhere; }
+.StatusRow .group:first-child { white-space: nowrap; }
+.StatusRow .separator { white-space: pre; }
+@media (max-width: 40rem) { .StatusRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding-inline: max(0.6rem, env(safe-area-inset-left)) max(0.6rem, env(safe-area-inset-right)); } .StatusRow .separator { display: none; } .StatusRow .group:first-child { white-space: normal; } }
 .Composer { flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
 .Composer > * { max-width: 60rem; margin: 0 auto; }
 .Composer > #notice:empty { display: none; }

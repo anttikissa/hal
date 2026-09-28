@@ -9,6 +9,23 @@ const ts = '2026-09-26T00:00:01Z'
 const fold = (events: Event[], st: ViewState = {}) => events.reduce(view.onEvent, st)
 const shown = (st: ViewState) => st.transcript!.items.map((i) => view.show(i)).filter(Boolean)
 
+test('status shows all session facts and percentages from pushed Stats, including refreshed turn-end data', () => {
+	let st = fold([{ type: 'snapshot', sessionId, snapshot: {
+		meta: { ...meta, name: 'Work', cwd: '/w/project', model: 'anthropic/claude-opus-5-5' }, history: [], state: { type: 'idle' },
+		stats: { context: 87000, window: 1000000, sent: 252, received: 41000, plan: { account: 2, accounts: 3, windows: { '5h': 18, '7d': 92 } } },
+	} }])
+	let groups = view.status(st)
+	expect(groups.map((g) => g.parts.map((p) => p.text).join(''))).toEqual([
+		'1-abc: Work', '/w/project', 'Opus 5.5', '87k/1000k (9%)', '↑252 ↓41k', 'Sub 2/3: 5h 18%, 7d 92%',
+	])
+	expect(groups.flatMap((g) => g.parts).filter((p) => p.heat)).toEqual([
+		{ text: '9%', heat: 'cool' }, { text: '18%', heat: 'cool' }, { text: '92%', heat: 'hot' },
+	])
+	st = view.onEvent(st, { type: 'turn-end', sessionId, status: 'completed', stats: { context: 810000, window: 1000000, sent: 1000, received: 10 } })
+	expect(view.status(st).flatMap((g) => g.parts).find((p) => p.text === '81%')).toEqual({ text: '81%', heat: 'warm' })
+	expect(view.status(st).map((g) => g.parts.map((p) => p.text).join(''))).toContain('↑1.0k ↓10')
+})
+
 test('events fold into what the page shows, like the terminal transcript', () => {
 	let st = fold([
 		{ type: 'snapshot', sessionId, snapshot: { meta, history: [{ type: 'user', blocks: [{ type: 'text', text: 'old' }], ts }], state: { type: 'idle' } } },

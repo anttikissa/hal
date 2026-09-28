@@ -58,6 +58,10 @@ export const colors = {
 	fork: (): Style => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),
 	// Status line: neutral, with a highlight for what matters.
 	status: (): Style => ({ fg: [0.68, 0, 0], highlight: [0.9, 0.01, 250] }),
+	// Distinct readable heat steps for the web's status percentages.
+	statusCool: (): Style => ({ fg: [0.78, 0.14, 145] }),
+	statusWarm: (): Style => ({ fg: [0.86, 0.16, 95] }),
+	statusHot: (): Style => ({ fg: [0.76, 0.16, 25] }),
 	// Tab labels.
 	tab: (): Style => ({
 		activeFg: [0.9, 0.01, 250],
