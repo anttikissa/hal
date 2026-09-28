@@ -287,7 +287,8 @@ test('a pasted long text lands at the stated /tmp path; its page names that path
 	expect(await (await get('/raw/0005ab.txt')).text()).toBe(text)
 	expect((await get('/image/0005ab.txt')).status).toBe(404)
 	// The model gets the text itself; the session keeps its own copy.
-	expect(blobs.resolve(id, ['see [paste/0005ab.txt]']).blocks).toEqual([{ type: 'text', text: `see ${text}` }])
+	expect(blobs.resolve(id, ['see [paste/0005ab.txt]'])).toEqual({ blocks: [{ type: 'text', text: 'see [paste/0005ab.txt]' }], unknown: [] })
+	expect(blobs.expand(id, 'see [paste/0005ab.txt]')).toBe(`see ${text}`)
 	expect(await (await get('/paste/0005ab.txt')).text()).toContain(`${paths.sessionDir(id)}/blobs/0005ab.txt`)
 })
 
@@ -612,10 +613,10 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		for (let type of ['dragEnter', 'dragOver']) await b.call('Input.dispatchDragEvent', { type, x: 100, y: 100, data })
 		await b.waitFor(`!!document.querySelector('.entry.dropping')`)
 		await b.call('Input.dispatchDragEvent', { type: 'drop', x: 100, y: 100, data })
-		await b.waitFor(`/^\\[image\\/[0-9a-z]{6}\\.png\\]\\[paste\\/[0-9a-z]{6}\\.txt\\]half/.test(document.querySelector('textarea').value)`)
+		await b.waitFor(`/^\\[image\\/[0-9a-z]{6}\\.png\\]\\[paste\\/[0-9a-z]{6}\\.md\\]half/.test(document.querySelector('textarea').value)`)
 		expect(await b.evaluate(`document.querySelector('#notice').textContent`)).toContain('paper.pdf')
 		expect(await b.evaluate(`!!document.querySelector('.entry.dropping')`)).toBe(false)
-		let [image, paste] = [...(await b.evaluate(`document.querySelector('textarea').value`)).matchAll(/\/([0-9a-z]{6}\.(?:png|txt))\]/g)].map((m) => m[1]!)
+		let [image, paste] = [...(await b.evaluate(`document.querySelector('textarea').value`)).matchAll(/\/([0-9a-z]{6}\.(?:png|md))\]/g)].map((m) => m[1]!)
 		await until(() => existsSync(`${paths.fileDir(paste!)}/${paste}`) && existsSync(`${paths.fileDir(image!)}/${image}`))
 		expect(readFileSync(`${paths.fileDir(paste!)}/${paste}`, 'utf8')).toBe('# dropped\n')
 		expect(await b.evaluate(`location.href`)).toBe(href)

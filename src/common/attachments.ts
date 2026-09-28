@@ -40,18 +40,22 @@ function fileKind(name: string, type = ''): string | undefined {
 // 6 base36 characters of a pasted image's name (task qy).
 const blobId = /^(?:[0-9a-f]{12}|[0-9a-z]{6})$/
 
-// A pasted image's or long text's name, chosen by the client (tasks qy,
-// 31): the host keeps it at paths.fileDir(name)/<name> until a prompt
-// copies it into a blob.
-const fileName = /^[0-9a-z]{6}\.(?:png|jpg|gif|webp|txt)$/
+// A pasted image's or text's name, chosen by the client (tasks qy,
+// 31): 6 base36 characters and an extension, the image's or the text
+// file's own (.md, .csv; .txt for a pasted text or a file without one).
+// The host keeps it at paths.fileDir(name)/<name> until a prompt copies
+// it into a blob.
+const imageExt = '(?:png|jpg|gif|webp)'
+const textExt = `(?:${[...textExts].sort((a, b) => b.length - a.length).join('|')})`
+const fileName = new RegExp(`^[0-9a-z]{6}\\.(?:${imageExt.slice(3, -1)}|${textExt.slice(3, -1)})$`)
 
-// [image/<name>] or [paste/<name>.txt] alone, as clients link them:
-// group 1 is the address of its page on the host (/image/<name>).
-const fileMarker = /\[(image\/[0-9a-z]{6}\.(?:png|jpg|gif|webp)|paste\/[0-9a-z]{6}\.txt)\]/g
+// [image/<name>] or [paste/<name>] alone, as clients link them: group 1
+// is the address of its page on the host (/image/<name>).
+const fileMarker = new RegExp(`\\[(image\\/[0-9a-z]{6}\\.${imageExt}|paste\\/[0-9a-z]{6}\\.${textExt})\\]`, 'g')
 
-// [image/<name>], [paste/<name>.txt], and the older [image <blob>] and
+// [image/<name>], [paste/<name>], and the older [image <blob>] and
 // [paste <blob>, N lines] that history may still hold.
-const markerPattern = /\[(?:(image|paste)\/([0-9a-z]{6}\.(?:png|jpg|gif|webp|txt))|image ([0-9a-f]{12})|paste ([0-9a-f]{12}), \d+ lines?)\]/g
+const markerPattern = new RegExp(`\\[(?:(image|paste)\\/([0-9a-z]{6}\\.(?:${imageExt.slice(3, -1)}|${textExt.slice(3, -1)}))|image ([0-9a-f]{12})|paste ([0-9a-f]{12}), \\d+ lines?)\\]`, 'g')
 
 // `file`: the name of an [image/<name>] or [paste/<name>] marker, whose
 // blob is the name without its extension.
@@ -65,22 +69,25 @@ function markers(text: string): Marker[] {
 }
 
 // A fresh name for a paste of `mediaType`: 6 random base36 characters
-// and its extension, like frdbn1.png or 0005ab.txt.
-function newName(mediaType: string): string {
+// and its extension, like frdbn1.png or 0005ab.txt. A text file keeps
+// its own extension if it is a known text one (`from`: its file name).
+function newName(mediaType: string, from = ''): string {
 	let chars = [...crypto.getRandomValues(new Uint8Array(6))].map((b) => (b % 36).toString(36)).join('')
-	return `${chars}.${types[mediaType]}`
+	let own = /\.([^./]+)$/.exec(from)?.[1]?.toLowerCase()
+	let ext = mediaType === 'text/plain' && own && textExts.has(own) ? own : types[mediaType]
+	return `${chars}.${ext}`
 }
 
 // The media type of pasted file name `name`, if it is one.
 function nameType(name: string): string | undefined {
 	if (!fileName.test(name)) return undefined
 	let ext = name.slice(7)
-	return Object.keys(types).find((t) => types[t] === ext)
+	return textExts.has(ext) ? 'text/plain' : Object.keys(types).find((t) => types[t] === ext)
 }
 
 // The marker of pasted file `name`: [image/<name>] or [paste/<name>].
 function named(name: string): string {
-	return `[${name.endsWith('.txt') ? 'paste' : 'image'}/${name}]`
+	return `[${nameType(name) === 'text/plain' ? 'paste' : 'image'}/${name}]`
 }
 
 // The marker a prompt uses for a stored blob; `lines` for a paste.

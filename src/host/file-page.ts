@@ -9,8 +9,8 @@
 import { attachments } from '../common/attachments.ts'
 import { blobs } from './blobs.ts'
 
-const pagePath = /^\/(image|paste)\/([0-9a-z]{6})(?:\.([a-z]{3,4}))?$/
-const rawPath = /^\/raw\/([0-9a-z]{6}\.[a-z]{3,4})$/
+const pagePath = /^\/(image|paste)\/([0-9a-z]{6})(?:\.([a-z0-9]{1,8}))?$/
+const rawPath = /^\/raw\/([0-9a-z]{6}\.[a-z0-9]{1,8})$/
 
 function escape(s: string): string {
 	return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
@@ -43,7 +43,8 @@ function serve(pathname: string, css: string): Response {
 	let stem = m?.[2]
 	// An extensionless page has exactly one matching file; never guess if
 	// different formats happen to share the same six-character stem.
-	let names = stem && !m?.[3] ? Object.entries(attachments.types).filter(([type]) => (m![1] === 'paste') === (type === 'text/plain')).map(([, ext]) => `${stem}.${ext}`).filter((n) => !!blobs.file(n)) : []
+	let exts = m?.[1] === 'paste' ? [...attachments.textExts] : Object.entries(attachments.types).filter(([type]) => type !== 'text/plain').map(([, ext]) => ext)
+	let names = stem && !m?.[3] ? exts.map((ext) => `${stem}.${ext}`).filter((n) => !!blobs.file(n)) : []
 	let name = raw ?? (m?.[3] ? `${stem}.${m[3]}` : names.length === 1 ? names[0] : undefined)
 	let found = name === undefined ? undefined : blobs.file(name)
 	if (!found || (m && (m[1] === 'paste') !== (found.mediaType === 'text/plain'))) return notFound()

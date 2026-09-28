@@ -183,6 +183,27 @@ test('a named paste waits in /tmp as [paste/<name>]; its prompt gives the model 
 	expect(attach(c, id, 'text/plain', Buffer.from('other').toString('base64'), undefined, name).rejected.reason).toContain('taken')
 })
 
+test('a dropped .md keeps its extension; history and clients keep the marker, the model gets the text every round', async () => {
+	let c = client()
+	let id = created(c)
+	let text = '# notes\n' + 'row\n'.repeat(1000)
+	let name = attachments.newName('text/plain', 'notes.md')
+	expect(name).toMatch(/^[0-9a-z]{6}\.md$/)
+	expect(attachments.newName('text/plain', 'Makefile')).toMatch(/\.txt$/)
+	let { attached } = attach(c, id, 'text/plain', Buffer.from(text).toString('base64'), undefined, name)
+	expect(attached.marker).toBe(`[paste/${name}]`)
+	c.conn.send({ type: 'submit', sessionId: id, text: `read ${attached.marker}` })
+	await until(() => calls.length)
+	// Transcripts and recall (both read history) show the marker.
+	let saved = JSON.stringify(history.readSync(id).filter((r) => r.type === 'user'))
+	expect(saved).toContain(`read ${attached.marker}`)
+	expect(saved).not.toContain('row\\nrow')
+	expect(calls[0]!.input.messages.at(-1).blocks[0].text).toEndWith(`read ${text}`)
+	// Once /tmp is cleaned, the session's copy still gives the text.
+	rmSync(`${paths.fileDir(name)}/${name}`)
+	expect((await history.messages(id)).find((m) => m.role === 'user')!.blocks.some((b: any) => b.type === 'text' && b.text.endsWith(`read ${text}`))).toBe(true)
+})
+
 test('a named image is refused under a wrong name or a taken one; a resend of the same bytes is fine', () => {
 	let c = client()
 	let id = created(c)

@@ -2,7 +2,7 @@
 // alike. Starting one puts a placeholder in the prompt, found wherever
 // typing has moved it; the host's `attached` answer turns it into the
 // marker, a refusal into an error text. The placeholder is the final
-// marker from the start, [image/<name>] or [paste/<name>.txt], the name
+// marker from the start, [image/<name>] or [paste/<name>] (.txt, .md, .csv…), the name
 // chosen here (tasks qy, 31); clients only draw it differently while it
 // is in flight (inFlight). A submit while a session has uploads pending
 // waits and goes when the last one lands.
@@ -23,8 +23,9 @@ function createState() {
 
 // Registers upload `id` (the attach command's id) of session
 // `sessionId`: the placeholder that stands for it until the host answers.
-function begin(sessionId: string, id: string, mediaType: string): string {
-	let name = attachments.newName(mediaType)
+// `from`: the file's own name, whose text extension the name keeps.
+function begin(sessionId: string, id: string, mediaType: string, from = ''): string {
+	let name = attachments.newName(mediaType, from)
 	let placeholder = attachments.named(name)
 	uploads.state.pending.set(id, { sessionId, placeholder, name })
 	return placeholder

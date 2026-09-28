@@ -103,7 +103,7 @@ test('dropped files become markers at the caret in drop order; others are named,
 	caret = 1
 	let files = [new File([png], 'shot.png', { type: 'image/png' }), new File(['%PDF-1.4'], 'paper.pdf', { type: 'application/pdf' }), new File(['# hi\n'], 'notes.md', { type: '' })]
 	attach.files(files, insert)
-	let [, image, paste] = /^a\[image\/([0-9a-z]{6}\.png)\]\[paste\/([0-9a-z]{6}\.txt)\]b$/.exec(app.state.text)!
+	let [, image, paste] = /^a\[image\/([0-9a-z]{6}\.png)\]\[paste\/([0-9a-z]{6}\.md)\]b$/.exec(app.state.text)!
 	await tick()
 	expect(attaches().map((c) => [c.name, c.mediaType, Buffer.from(c.data, 'base64').toString()])).toEqual([
 		[image, 'image/png', Buffer.from(png).toString()],

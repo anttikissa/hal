@@ -42,10 +42,11 @@ function files(text: string): string[] | undefined {
 // The image or text file a pasted single path names, or undefined:
 // its bytes, or the error text to paste instead. A 'text' file that is
 // not UTF-8 (or holds NUL bytes) stays a path.
-function file(text: string): { mediaType: string; bytes: Uint8Array } | { error: string } | undefined {
+function file(text: string): { mediaType: string; bytes: Uint8Array; name: string } | { error: string } | undefined {
 	if (!text.trim() || text.includes('\n')) return undefined
 	let p = paste.path(text)
-	let mediaType = attachments.fileKind(p.slice(p.lastIndexOf('/') + 1))
+	let name = p.slice(p.lastIndexOf('/') + 1)
+	let mediaType = attachments.fileKind(name)
 	if (!mediaType || !p.startsWith('/')) return undefined
 	let stat = statSync(p, { throwIfNoEntry: false })
 	if (!stat?.isFile()) return undefined
@@ -58,21 +59,22 @@ function file(text: string): { mediaType: string; bytes: Uint8Array } | { error:
 	} catch (e: any) {
 		return { error: `[upload failed: ${e?.message ?? e}]` }
 	}
-	if (mediaType !== 'text/plain') return { mediaType, bytes }
+	if (mediaType !== 'text/plain') return { mediaType, bytes, name }
 	try {
 		let text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-		return text.includes('\0') ? undefined : { mediaType, bytes }
+		return text.includes('\0') ? undefined : { mediaType, bytes, name }
 	} catch {
 		return undefined
 	}
 }
 
 // Sends `bytes` for session `sessionId`; the placeholder to insert.
-function upload(sessionId: string, mediaType: string, bytes: Uint8Array, send: (command: unknown) => void): string {
+// `from`: the file's own name (uploads.begin).
+function upload(sessionId: string, mediaType: string, bytes: Uint8Array, send: (command: unknown) => void, from = ''): string {
 	let big = uploads.tooBig(bytes.length)
 	if (big) return big
 	let id = connection.nextId()
-	let placeholder = uploads.begin(sessionId, id, mediaType)
+	let placeholder = uploads.begin(sessionId, id, mediaType, from)
 	let command = uploads.command(sessionId, id, mediaType, bytes)
 	queueMicrotask(() => send(command))
 	return placeholder
@@ -88,7 +90,7 @@ function key(sessionId: string, k: KeyEvent, send: (command: unknown) => void): 
 	let attach = (t: string): string | undefined => {
 		let image = paste.file(t)
 		if (image && 'error' in image) return image.error
-		if (image) return paste.upload(sessionId, image.mediaType, image.bytes, send)
+		if (image) return paste.upload(sessionId, image.mediaType, image.bytes, send, image.name)
 		return undefined
 	}
 	let many = paste.files(text)

@@ -132,6 +132,9 @@ function named(sessionId: string, m: Marker): { path: string; mediaType: string 
 	let found = blobs.find(sessionId, m.blob)
 	if (m.file) {
 		let mediaType = attachments.nameType(m.file)
+		// A text file keeps its own extension (.md): its copy is by name.
+		let own = `${blobs.dir(sessionId)}/${m.file}`
+		if (mediaType && existsSync(own)) found = { path: own, mediaType }
 		if (found) return found.mediaType === mediaType ? found : undefined
 		let fresh = blobs.staged(m.file)
 		if (!fresh) return undefined
@@ -148,31 +151,42 @@ function unknown(sessionId: string, text: string): string[] {
 	return attachments.markers(text).flatMap((m) => (blobs.named(sessionId, m) ? [] : [m.text]))
 }
 
-// Prompt texts as user blocks: each paste marker replaced by its text,
-// then one image block per image marker (each blob once). Markers that
-// name no blob of this session (or the wrong kind) stay text and are
-// listed in `unknown`. Image markers stay in the text, so the model can
-// tell which image the words are about.
+// Prompt texts as user blocks: the texts as written, then one image
+// block per image marker (each blob once). Paste markers stay markers
+// in history, so transcripts and recalled prompts show [paste/…], not
+// a 5 MB file; the model gets the text through expand(). Markers that
+// name no blob of this session (or the wrong kind) are listed in
+// `unknown`. Image markers stay in the text too, so the model can tell
+// which image the words are about. A paste is copied into the session
+// here (blobs.named), before /tmp can lose it.
 function resolve(sessionId: string, texts: string[]): { blocks: UserBlock[]; unknown: string[] } {
 	let images: ImageBlock[] = []
 	let unknown: string[] = []
-	let out = texts.map((text) => {
-		let parts: string[] = []
-		let from = 0
+	for (let text of texts) {
 		for (let m of attachments.markers(text)) {
 			let found = blobs.named(sessionId, m)
 			if (!found) unknown.push(m.text)
-			else if (m.kind === 'image') {
-				if (!images.some((b) => b.blob === m.blob)) images.push({ type: 'image', blob: m.blob, mediaType: found.mediaType, bytes: statSync(found.path).size })
-			} else {
-				parts.push(text.slice(from, m.at), readFileSync(found.path, 'utf8'))
-				from = m.at + m.text.length
-			}
+			else if (m.kind === 'image' && !images.some((b) => b.blob === m.blob)) images.push({ type: 'image', blob: m.blob, mediaType: found.mediaType, bytes: statSync(found.path).size })
 		}
-		parts.push(text.slice(from))
-		return { type: 'text' as const, text: parts.join('') }
-	})
-	return { blocks: [...out, ...images], unknown }
+	}
+	return { blocks: [...texts.map((text) => ({ type: 'text' as const, text })), ...images], unknown }
 }
 
-export const blobs = { dir, looksLike, decode, store, stage, staged, file, find, read, base64, named, unknown, resolve }
+// `text` as the model reads it: each paste marker naming a paste of
+// this session replaced by the paste's text. Other markers stay.
+function expand(sessionId: string, text: string): string {
+	let parts: string[] = []
+	let from = 0
+	for (let m of attachments.markers(text)) {
+		if (m.kind !== 'paste') continue
+		let found = blobs.named(sessionId, m)
+		if (!found || found.mediaType !== 'text/plain') continue
+		parts.push(text.slice(from, m.at), readFileSync(found.path, 'utf8'))
+		from = m.at + m.text.length
+	}
+	if (!from) return text
+	parts.push(text.slice(from))
+	return parts.join('')
+}
+
+export const blobs = { dir, looksLike, decode, store, stage, staged, file, find, read, base64, named, unknown, resolve, expand }

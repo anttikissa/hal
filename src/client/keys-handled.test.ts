@@ -28,6 +28,8 @@ beforeEach(() => {
 	terminal.redraw = () => effects.push('redraw')
 	clipboard.write = async (text) => (effects.push(`copy ${text}`), undefined)
 	clipboard.read = async () => (effects.push('read'), clip)
+	// Never the real pasteboard: an image the user copied would win.
+	clipboard.image = async () => null
 })
 
 afterEach(() => {

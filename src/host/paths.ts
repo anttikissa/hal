@@ -5,6 +5,7 @@
 import { chmodSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
+import { attachments } from '../common/attachments.ts'
 
 const repoRoot = resolve(import.meta.dir, '../..')
 
@@ -39,7 +40,7 @@ function imageDir(): string {
 
 // Where pasted file `name` (attachments.fileName) waits.
 function fileDir(name: string): string {
-	return name.endsWith('.txt') ? `${paths.tmpDir()}/paste` : paths.imageDir()
+	return attachments.nameType(name) === 'text/plain' ? `${paths.tmpDir()}/paste` : paths.imageDir()
 }
 
 // Everything else: socket, host lock, diagnostics, later peer and access

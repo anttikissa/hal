@@ -16,14 +16,14 @@ type Insert = (text: string) => void
 // What a paste event's clipboardData offers.
 export type Pasted = { items?: ArrayLike<{ kind: string; type: string; getAsFile(): Blob | null }>; getData(type: string): string }
 
-// Starts uploading `blob` for the session shown.
-function blob(b: Blob, mediaType: string, insert: Insert): void {
+// Starts uploading `blob` for the session shown; `from`: its file name.
+function blob(b: Blob, mediaType: string, insert: Insert, from = ''): void {
 	let id = app.sessionId()
 	if (!id) return
 	let big = uploads.tooBig(b.size)
 	if (big) return insert(big)
 	let command = connection.nextId()
-	insert(uploads.begin(id, command, mediaType))
+	insert(uploads.begin(id, command, mediaType, from))
 	b.arrayBuffer().then(
 		(bytes) => connection.send(uploads.command(id, command, mediaType, new Uint8Array(bytes))),
 		(e) => app.onEvent({ type: 'rejected', sessionId: id, command: 'attach', reason: String(e?.message ?? e), id: command }),
@@ -42,7 +42,7 @@ function files(list: ArrayLike<File>, insert: Insert): void {
 	let refused: string[] = []
 	for (let f of Array.from(list)) {
 		let type = attach.kind(f)
-		if (type) attach.blob(f, type, insert)
+		if (type) attach.blob(f, type, insert, f.name)
 		else refused.push(f.name)
 	}
 	if (refused.length) app.setNotice(`not attached (neither image nor text): ${refused.join(', ')}`)
