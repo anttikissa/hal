@@ -290,8 +290,9 @@ test('a restarted host kills its running command; the next host continues the tu
 	let marker = `34.${process.pid}5`
 	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
 	let a = run()
-	await until('a session', () => sessionCount() === 1)
-	run() // a second Hal process, so the restart pauses nothing
+	await until('the first host', hostReady)
+	let peer = run() // a second Hal process, so the restart pauses nothing
+	await until('the joining peer', () => seen(peer, 'peer'))
 	type(a, `bash sleep ${marker} & sleep ${marker}\r`)
 	await until('the command to run', alive)
 	type(a, '\x12') // Ctrl-R: not the last Hal process, so nothing pauses
