@@ -67,12 +67,14 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let result = () => props.row.result && view.show(props.row.result, full())
 	// Whether the result is longer than its glimpse.
 	let long = () => (props.row.result?.output.replace(/\n$/, '').split('\n').length ?? 0) > view.resultRows()
-	// The link's # is drawn by CSS, so the card's text stays its own.
+	// The link shows the block's id, #35, as the terminal does. Its
+	// text is drawn by CSS from data-ref, so copying the card's text
+	// leaves it out.
 	let href = () => (props.row.pending ? undefined : target.href(props.session, props.row.item.key))
 	let link = () => (
 		<Show when={href()}>
 			{(h) => (
-				<a class="link" href={h()} title="Link to this block" aria-label="Link to this block" />
+				<a class="link" href={h()} data-ref={`#${props.row.item.key}`} title="Link to this block" aria-label={`Link to block ${props.row.item.key}`} />
 			)}
 		</Show>
 	)

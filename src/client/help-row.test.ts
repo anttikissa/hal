@@ -16,7 +16,7 @@ function strip(s: string): string {
 }
 
 function view(state: SessionState, text = '', items: Item[] = []): View {
-	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state, inbox: [], items: items.map((item, i) => ({ ...item, key: `${i}` })) }
+	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state, inbox: [], items: items.map((item, i) => ({ ...item, key: `~${i}` })) }
 	return { transcript, prompt: { text, cursor: text.length } }
 }
 

@@ -77,19 +77,35 @@ function promptWidth(cols: number): number {
 	return Math.max(1, Math.max(1, cols - 2 * ansi.PAD.length) - promptView.FIRST.length)
 }
 
-// An item's painted rows on a terminal `cols` wide, its header linked
-// to its block in session `session` on the web. Items never change in
-// place (a change is a new item), so each is laid out once per width
-// and look, not on every frame: a long history stays cheap to redraw.
-// A kept row keeps the link code it was painted with (task e3 notes).
-function itemRows(item: Item, cols: number, session?: string): string[] {
+// An item's painted rows on a terminal `cols` wide. An item with a
+// block id shows it dim at the right of its first row, `#35`, an OSC 8
+// link to the same block on the web (tasks wc, 0z); a gutter as wide
+// as the id is kept free on every row, as the web keeps a column for
+// it. `hal`: the item streams, so the Hal cursor follows its last
+// character. Items never change in place (a change is a new item), so
+// each is laid out once per width and look, not on every frame: a long
+// history stays cheap to redraw. A kept row keeps the link code it was
+// painted with (task e3 notes).
+function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor): string[] {
 	let style = itemView.itemStyle(item)
 	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key}`
-	let kept = frame.state.rows.get(item)
+	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
-	let rows = itemView.linked(itemView.itemLines(item, width), item, session).map((r) => ansi.paint(r, style, cols))
-	frame.state.rows.set(item, { key, rows })
+	let ref = itemView.ref(item, session)
+	// On a very narrow terminal the text needs every column.
+	if (ref && width < 4 * strings.visLen(ref.text)) ref = undefined
+	let inner = ref ? Math.max(1, width - strings.visLen(ref.text) - 1) : width
+	let lines = itemView.itemLines(item, inner)
+	if (hal) lines = frame.withCursor(lines, hal, inner)
+	if (ref && lines.length) {
+		let gap = ' '.repeat(Math.max(1, width - strings.visLen(lines[0]!) - strings.visLen(ref.text)))
+		// The glyph may have ended the item's colour: take it up again.
+		let fg = style?.fg ? ansi.sgr({ fg: style.fg }) : ''
+		lines[0] += `${gap}${fg}${ansi.DIM}\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}${ansi.UNDIM}`
+	}
+	let rows = lines.map((r) => ansi.paint(r, style, cols))
+	if (!hal) frame.state.rows.set(item, { key, rows })
 	return rows
 }
 
@@ -100,14 +116,14 @@ function glyph(hal: HalCursor): string {
 	return on + '█' + (on && ansi.UNCOLOR)
 }
 
-// An item's rows with the Hal cursor after its last character, on a
-// row of its own if that one is full: the last column stays unused.
-function withCursor(rows: string[], hal: HalCursor, cols: number): string[] {
+// Rows `width` wide with the Hal cursor after the last character, on
+// a row of its own if that one is full.
+function withCursor(rows: string[], hal: HalCursor, width: number): string[] {
 	let last = rows.at(-1)
 	if (last === undefined) return rows
 	let g = frame.glyph(hal)
-	if (strings.visLen(last) < cols - 1) return [...rows.slice(0, -1), last + g]
-	return [...rows, ansi.PAD + g]
+	if (strings.visLen(last) < width) return [...rows.slice(0, -1), last + g]
+	return [...rows, g]
 }
 
 // The frame for `view` on a terminal of `rows` × `cols`. Blank rows after
@@ -133,8 +149,8 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 			block(f.rows, itemView.itemStyle(item))
 			formCursor = { row: lines.length - f.rows.length + f.cursor.row, col: ansi.PAD.length + f.cursor.col }
 		} else {
-			let rows = frame.itemRows(item, cols, view.transcript?.meta.id)
-			if (i === items.length - 1 && view.hal?.at === 'stream') rows = frame.withCursor(rows, view.hal, cols)
+			let streams = i === items.length - 1 && view.hal?.at === 'stream'
+			let rows = frame.itemRows(item, cols, view.transcript?.meta.id, streams ? view.hal : undefined)
 			if (rows.length && (lines.length || above)) lines.push('')
 			for (let r of rows) lines.push(r)
 		}

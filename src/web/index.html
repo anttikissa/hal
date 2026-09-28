@@ -35,14 +35,14 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card .head .error { background: none; margin-left: auto; }
 /* Each card links to itself (task 0z): a # in its top right corner,
    shown on hover or focus; the linked card is outlined. */
-.Card { position: relative; padding-right: 2.2rem; }
-.Card .head { padding-right: 2.2rem; }
-.Card > .link { position: absolute; top: 0; right: 0; min-width: 2.2rem; padding: 0.4rem 0; text-align: center; color: inherit; text-decoration: none; user-select: none; opacity: 0; }
-.Card > .link::before { content: "#"; }
-.Card:hover > .link, .Card > .link:focus-visible, .Card.target > .link { opacity: 0.6; }
+.Card { position: relative; padding-right: 7ch; }
+.Card .head { padding-right: 7ch; }
+.Card > .link { position: absolute; top: 0; right: 0; padding: 0.4rem 0.7rem 0.4rem 0.5ch; color: inherit; text-decoration: none; user-select: none; opacity: 0.5; }
+.Card > .link::before { content: attr(data-ref); }
+.Card > .link:hover, .Card > .link:focus-visible { opacity: 1; text-decoration: underline; }
 .Card.target { outline: 1px solid currentColor; outline-offset: 2px; scroll-margin-top: 0.5rem; }
 .Card .more { display: block; margin-top: 0.3rem; background: none; color: inherit; text-decoration: underline; padding: 0; }
-@media (pointer: coarse) { .Card > .link { opacity: 0.4; min-width: 44px; min-height: 44px; } .Card .more { min-height: 44px; } }
+@media (pointer: coarse) { .Card > .link { min-width: 44px; min-height: 44px; text-align: right; } .Card .more { min-height: 44px; } }
 /* Open and close animate the height (a one-row grid, 0fr to 1fr);
    closing is faster. Padding sits inside so closed is truly 0 high. */
 .Card .body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows calc(var(--toggle-ms) * 0.7) var(--ease-out); }

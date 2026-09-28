@@ -24,7 +24,7 @@ function strip(s: string): string {
 }
 
 function view(items: Item[], text = '', cursor = text.length): View {
-	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items: items.map((item, i) => ({ ...item, key: `${i}` })) }
+	let transcript: Transcript = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, state: { type: 'idle' }, inbox: [], items: items.map((item, i) => ({ ...item, key: `~${i}` })) }
 	return { transcript, prompt: { text, cursor } }
 }
 
@@ -335,7 +335,7 @@ function targets(lines: string[]): string[] {
 	return lines.flatMap((l) => [...l.matchAll(/\x1b\]8;;([^\x07]+)\x07/g)].map((m) => m[1]!))
 }
 
-test('headers link to their block on the web, with the code hidden; items without a block id are not linked', () => {
+test('every block shows its id at the right of its first row, linked to the block on the web with the code hidden; a tool result and an item without a block id show none', () => {
 	ansi.state.web = { url: 'https://h.example', code: 'k3x9qa' }
 	try {
 		let items: Item[] = [
@@ -352,12 +352,20 @@ test('headers link to their block on the web, with the code hidden; items withou
 		let links = targets(lines).map((u) => new URL(u))
 		// Each resolves on the web to the card of that block (task 0z).
 		let blocks = links.map((u) => target.parse(u.href, u.pathname.slice(1)))
-		expect(blocks).toEqual(['4', '6', '7', '8'].map((key) => ({ session: 's', key })))
+		expect(blocks).toEqual(['4', '5', '6', '7', '8'].map((key) => ({ session: 's', key })))
+		// The id is the link's text, at the right edge of the row.
+		for (let key of ['4', '5', '6', '7', '8']) expect(plain(lines).some((l) => l.endsWith(` #${key}`) && l.length === 58)).toBe(true)
+		expect(plain(lines)).not.toContain('#6.1')
 		for (let u of links) expect(u.searchParams.get('auth')).toBe('k3x9qa')
 		let shown = lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, ''))
 		expect(shown.join('\n')).not.toContain('k3x9qa')
-		expect(plain(lines)).toContain('▸ bash {"command":"ls"}')
-		expect(plain(lines)).toContain('error: boom')
+		expect(plain(lines).join('\n')).toContain('▸ bash {"command":"ls"}')
+		expect(plain(lines).join('\n')).toContain('error: boom')
+		// A streaming block's Hal cursor follows its text, not its id.
+		let stream = view([{ type: 'text', text: 'Hel' }])
+		stream.transcript!.items[0]!.key = '9'
+		stream.hal = { at: 'stream', lit: true, color: colors.assistant().fg! }
+		expect(plain(frame.build(stream, 60).lines)[0]).toMatch(/^Hel█ +#9$/)
 		// A block still streaming before it has a number is not linked.
 		let streaming = view([{ type: 'tool', id: 't2', name: 'bash', input: {} }])
 		streaming.transcript!.items[0]!.key = '~0'

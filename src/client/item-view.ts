@@ -92,19 +92,13 @@ function itemLines(item: Item, width: number): string[] {
 	}
 }
 
-// `rows` of `item` with its header made an OSC 8 link to the same
-// block on the web, /<session>#<key> (tasks wc, 0z): a tool call's
-// whole row (the terminal shows a glimpse, the card all of it), else
-// the leading marker (>, ?, error:). Only prompts, tool calls,
-// questions and errors have a header; an item whose key is no block
-// id is not linked. The code rides in the hidden target only.
-function linked(rows: string[], item: Keyed, session: string | undefined): string[] {
-	let href = session && transcript.href(session, item.key)
-	let headed = item.type === 'prompt' || item.type === 'tool' || item.type === 'question' || (item.type === 'turn-end' && item.status === 'error')
-	if (!href || !headed || !rows.length) return rows
-	let [, head, rest] = item.type === 'tool' ? ['', rows[0]!, ''] : (/^(\S*)(.*)$/s.exec(rows[0]!) ?? [])
-	if (!head) return rows
-	return [`\x1b]8;;${ansi.webUrl(href)}\x07${head}${ansi.LINK_OFF}${rest}`, ...rows.slice(1)]
+// The id `item` shows, `#35`, and where it links: the same block on
+// the web, /<session>#<key> (tasks wc, 0z). Every block with a block
+// id has one, except a tool result, which the web shows in its call's
+// block; an item whose key is no block id has none.
+function ref(item: Keyed, session: string | undefined): { text: string; href: string } | undefined {
+	let href = session && item.type !== 'tool-result' ? transcript.href(session, item.key) : undefined
+	return href ? { text: `#${item.key}`, href } : undefined
 }
 
 // Rows of a question's quote, indented, its marked parts in inverse.
@@ -136,6 +130,6 @@ export const itemView = {
 	toolStyle,
 	itemStyle,
 	itemLines,
-	linked,
+	ref,
 	quoteLines,
 }
