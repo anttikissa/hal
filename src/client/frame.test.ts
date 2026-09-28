@@ -285,9 +285,9 @@ describe('prompt box', () => {
 
 	test('an empty prompt shows its placeholder quieter, cursor at its start', () => {
 		let f = frame.build({ prompt: { text: '', cursor: 0 }, placeholder: 'Try this' }, 40)
-		expect(boxOf(f).rows).toEqual(['> Try this'])
+		expect(boxOf(f).rows).toEqual(['Try this'])
 		expect(f.lines[1]).toContain(quietOn(colors.input()) + 'Try this')
-		expect(f.cursor).toEqual({ row: 1, col: 3 })
+		expect(f.cursor).toEqual({ row: 1, col: 1 })
 		let typed = frame.build({ prompt: { text: 'x', cursor: 1 }, placeholder: 'Try this' }, 40)
 		expect(boxOf(typed).rows).toEqual(['> x'])
 	})

@@ -1,7 +1,10 @@
 {
 	title: 'Prompt placeholder without the prompt indent',
 	spec: "The empty prompt's rotating example placeholder starts at the prompt box's first column: no '> ' marker and no two-space indent before it (questions.md 102).",
-	status: 'planned',
+	status: 'done',
 	needs: [],
-	foldInto: ['8m']
+	foldInto: ['8m'],
+	notes: [
+		'The empty terminal prompt uses the full inside width for the quiet placeholder and leaves its cursor at column one (after the outer padding); typing restores the normal > marker. Browser textarea already has no prompt marker.'
+	]
 }

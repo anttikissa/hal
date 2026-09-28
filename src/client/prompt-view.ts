@@ -60,8 +60,8 @@ function box(
 	let vp = promptLayout.viewport(st.scroll ?? 0, height, p.rows.length, p.row)
 	let shown = promptView.mark(p.rows).slice(vp.top, vp.top + height)
 	while (shown.length < height) shown.push(promptView.REST)
-	if (!st.text && placeholder) shown[0] = promptView.FIRST + ansi.quiet(strings.clipVisual(ansi.clean(placeholder), textWidth), colors.input())
-	return { above: vp.above, rows: shown, below: vp.below, row: p.row - vp.top, col: promptView.FIRST.length + p.col, scroll: vp.top }
+	if (!st.text && placeholder) shown[0] = ansi.quiet(strings.clipVisual(ansi.clean(placeholder), width), colors.input())
+	return { above: vp.above, rows: shown, below: vp.below, row: p.row - vp.top, col: !st.text && placeholder ? 0 : promptView.FIRST.length + p.col, scroll: vp.top }
 }
 
 // Text rows marked as a prompt: the first with `FIRST`, the rest indented.
