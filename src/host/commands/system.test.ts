@@ -24,7 +24,7 @@ test('/system names included source files and prints the same assembled prompt a
 		for (let file of ['SYSTEM.md', 'extra.md', 'AGENTS.md']) expect(output).toMatch(new RegExp(`\\d+ bytes +[^\\n]*${file}`))
 		let expected = systemPrompt.build({ cwd: `${testHome()}/repo`, model: 'fake/m1', now: clock.now(), sessionId: id })
 		expect(output.slice(output.indexOf('\n\n') + 2)).toBe(expected)
-		expect(output).toContain('Included text: fake/m1')
+		expect(output).toContain('Included text: ${model}')
 		expect(output).toContain('Stay in scope. <!-- literal -->')
 		writeFileSync(`${testHome()}/SYSTEM.md`, '::: if model="fake/*"\nUnclosed')
 		c.conn.send({ type: 'submit', sessionId: id, text: '/system' })
