@@ -31,7 +31,13 @@ function boundary(id: string, record: { type: 'compact'; summary: string; prompt
 function run(id: string, protect = false): number | undefined {
 	let records = history.readSync(id)
 	if (!compact.anything(records)) return undefined
-	let start = records.findLastIndex((r) => r.type === 'turn_end') + 1
+	let start = 0, edge = records.length
+	for (let i = records.length - 1; i >= 0; i--) {
+		let r = records[i]!
+		if (r.type !== 'turn_end') continue
+		if (r.status === 'completed' || !records.slice(i + 1, edge).some((next) => next.type === 'continue')) { start = i + 1; break }
+		edge = i
+	}
 	let keep = protect ? records.slice(start).filter((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text')).map((r) => r.n!) : []
 	let made = compaction.summary(records.filter((r) => !keep.includes(r.n!)), history.file(id))
 	if (!made) return undefined

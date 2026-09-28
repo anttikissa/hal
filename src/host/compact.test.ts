@@ -180,6 +180,53 @@ describe('automatic compaction (task mq)', () => {
 		history.open(id)
 		expect(await history.messages(id)).toEqual(messages)
 	})
+
+	test('a paused turn keeps its original prompt verbatim when Enter resumes and auto-compacts', async () => {
+		let c = client(), id = created(c)
+		await ask(c, id, 'earlier turn')
+		settings.state.raw = { compactAt: 0 }
+		c.conn.send({ type: 'submit', sessionId: id, text: 'original prompt of this turn' })
+		await until(() => calls.length === 2)
+		calls[1]!.push({ type: 'usage', usage: { input: 900 } })
+		await until(() => history.state.running.get(id)?.turn.usage.input === 900)
+		c.conn.send({ type: 'pause', sessionId: id })
+		await until(() => c.of('turn-end').length === 2)
+		settings.state.raw = {}
+		// Enter resumes the same turn; its prompt predates the paused turn_end.
+		c.conn.send({ type: 'continue', sessionId: id })
+		await until(() => calls.length === 3)
+		let input = calls[2]!.input.messages
+		expect(input[0].blocks[0].text).toStartWith('Context was compacted')
+		expect(input[0].blocks[0].text).toContain('earlier turn')
+		expect(input[0].blocks[0].text).not.toContain('original prompt of this turn')
+		expect(input.at(-1).blocks[0].text).toContain('original prompt of this turn')
+		let onDisk = history.readSync(id)
+		let compacted = onDisk.findLast((r) => r.type === 'compact')
+		if (compacted?.type !== 'compact') throw new Error('expected a compact boundary')
+		expect(compacted.keep).toContain(onDisk.find((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.text.includes('original prompt of this turn')))?.n)
+		calls[2]!.push({ type: 'done', reason: 'end' })
+	})
+
+	test('multiple prompts across pauses stay verbatim after the automatic boundary', async () => {
+		let id = created(client())
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'old turn' }] })
+		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+		let originals = []
+		for (let text of ['first prompt', 'steered prompt', 'after second pause']) {
+			originals.push(history.append(id, { type: 'user', blocks: [{ type: 'text', text }] }).n!)
+			if (text !== 'after second pause') {
+				history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
+				history.append(id, { type: 'continue' })
+			}
+		}
+		expect(compact.run(id, true)).toBeDefined()
+		let boundary = history.readSync(id).at(-1)
+		if (boundary?.type !== 'compact') throw new Error('expected compact')
+		expect(boundary.keep).toEqual(originals)
+		let messages = await history.messages(id)
+		expect(JSON.stringify(messages[0])).toContain('old turn')
+		for (let [i, prompt] of ['first prompt', 'steered prompt', 'after second pause'].entries()) expect(JSON.stringify(messages[i + 1])).toContain(prompt)
+	})
 	test('a prompt too long compacts and retries once, then the turn fails with the provider message', async () => {
 		let c = client()
 		let id = created(c)
