@@ -77,16 +77,20 @@ function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlo
 // Pauses the session's turn: one running here stops and runTurn records
 // it paused; one not running here (unfinished on disk) is paused on disk.
 // A command's open question is dismissed instead: nothing ran.
-function stop(id: string, reason?: string): string | undefined {
+function stop(id: string, reason?: string, closing = false): string | undefined {
 	let records = history.readSync(id)
 	let open = forms.open(records)
-	if (open?.call && records.some((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === open.call && r.block.name === 'ask')) {
+	if (!closing && open?.call && records.some((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === open.call && r.block.name === 'ask')) {
 		let refused = status.transition(id, { type: 'answer' })
 		if (refused) return refused
 		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
 		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, cancelled: true })
 		turns.start(id)
 		return
+	}
+	if (closing && open && !open.from) {
+		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
+		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, cancelled: true })
 	}
 	if (open?.from) {
 		let before = status.stateOf(id)

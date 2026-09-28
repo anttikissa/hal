@@ -6,6 +6,9 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { calls, client, restartHost, testHome, until, useHost } from './host-fixture.test.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
+import { subagents } from './subagents.ts'
+import { status } from './status.ts'
+import { history } from './history.ts'
 
 useHost()
 
@@ -78,7 +81,7 @@ test('resume puts each closed tab back where it was, most recent first', () => {
 	expect(rejected(a, send(a, { type: 'tab-resume' }))).toBeDefined()
 })
 
-test('closing the last tab is refused; closing a tab keeps its running turn going', async () => {
+test('closing a tab aborts its running turn and it cannot continue unseen', async () => {
 	let a = client()
 	let x = newTab(a)
 	expect(rejected(a, send(a, { type: 'tab-close', sessionId: x }))).toBeDefined()
@@ -88,9 +91,59 @@ test('closing the last tab is refused; closing a tab keeps its running turn goin
 	await until(() => calls.length === 1)
 	send(a, { type: 'tab-close', sessionId: y })
 	expect(ids(a)).toEqual([x])
-	calls[0]!.push({ type: 'text', text: 'still here' }, { type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length)
-	expect(a.views.get(y)!.items.some((i: any) => i.text === 'still here')).toBe(true)
+	expect(a.of('turn-end')[0].status).toBe('paused')
+	calls[0]!.push({ type: 'text', text: 'should not appear' }, { type: 'done', reason: 'end' })
+	await Bun.sleep(20)
+	expect(a.views.get(y)!.items.some((i: any) => i.text === 'should not appear')).toBe(false)
+	expect(ack(a, send(a, { type: 'tab-resume' })).tab).toBe(y)
+	expect(tabsOf(a)?.find((t) => t.id === y)?.state.type).toBe('paused')
+})
+
+test('closing a parent stops owned subagent turns, but leaves an interactive child working', async () => {
+	let a = client()
+	newTab(a)
+	let parent = newTab(a)
+	sessions.open(parent).model = 'fake/m1'
+	let owned = subagents.spawn(parent, { kind: 'subagent', task: 'work', fork: false, cwd: '/tmp/w', limit: 0 })
+	let interactive = subagents.spawn(parent, { kind: 'interactive', task: 'independent', fork: false, cwd: '/tmp/w', limit: 0 })
+	await until(() => calls.length === 2)
+	send(a, { type: 'tab-close', sessionId: parent })
+	await until(() => history.readSync(owned).some((r) => r.type === 'turn_end'))
+	expect(history.readSync(owned).findLast((r) => r.type === 'turn_end')).toMatchObject({ status: 'paused' })
+	expect(status.stateOf(interactive).type).toBe('running')
+	calls[1]!.push({ type: 'done', reason: 'end' })
+	await until(() => status.stateOf(interactive).type === 'idle')
+})
+
+test('a child stopped by closing an idle parent cannot restart its closed tab', async () => {
+	let a = client()
+	newTab(a)
+	let parent = newTab(a)
+	let child = subagents.spawn(parent, { kind: 'subagent', task: 'work', fork: false, cwd: '/tmp/w', model: 'fake/m1', limit: 0 })
+	await until(() => calls.length === 1)
+	send(a, { type: 'tab-close', sessionId: parent })
+	await until(() => history.readSync(child).some((r) => r.type === 'turn_end'))
+	await Bun.sleep(20)
+	expect(status.stateOf(parent).type).toBe('idle')
+	expect(calls.length).toBe(1)
+})
+
+test('closing a tab blocked on a question cancels it instead of restarting the turn', async () => {
+	let a = client()
+	newTab(a)
+	let id = newTab(a)
+	sessions.open(id).model = 'fake/m1'
+	a.conn.send({ type: 'open', sessionId: id })
+	send(a, { type: 'submit', sessionId: id, text: 'ask' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'tool_call', id: 'ask1', name: 'ask', input: { text: 'Why?' } }, { type: 'done', reason: 'tool_use' })
+	await until(() => a.of('question').length)
+	send(a, { type: 'tab-close', sessionId: id })
+	expect(status.stateOf(id).type).toBe('paused')
+	expect(history.readSync(id).some((r) => r.type === 'answer' && r.cancelled)).toBe(true)
+	expect(history.readSync(id).at(-1)).toMatchObject({ type: 'turn_end', status: 'paused' })
+	expect(calls.length).toBe(1)
 })
 
 test('tab-start prefers last if open in cwd, then the first tab in cwd, then a new one', () => {

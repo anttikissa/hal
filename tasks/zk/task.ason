@@ -1,13 +1,20 @@
 {
 	title: 'Startup cost follows open tabs, not sessions on disk',
-	spec: 'Every startup that becomes host runs recovery (continue unfinished turns, run queued messages an old host left behind). Its cost grows with the open tabs, never with the number of sessions on disk: it reads no metadata or history of closed sessions (closing a tab does not stop its turn today; if a closed session can hold an unfinished turn or queued messages, the host keeps a small durable list of such sessions rather than scanning), and for open ones it reads marks.ason (task bq) rather than history tails wherever the marks cover the file. Queued messages are found from the durable record of undelivered inbox messages (marks.ason keeps their offsets), so a queued message is never missed however far back it sits; the old 64 KiB-tail guess goes. Budget: with 2,000 closed sessions and 100 open idle tabs on disk, recovery finishes in under 10 ms on an M1-class machine; a test measures it (counting files and bytes read, not only time). Tests: a queued message written 1 MB before the end of history runs after a host restart; a turn still running in a closed tab is continued after a restart.',
+	spec: 'Every startup that becomes host recovers unfinished turns and queued messages in open tabs and in non-tab sessions marked busy. Its cost grows with open tabs and the durable busy list, never with every session on disk: it reads no metadata or history of unrelated closed sessions, and for idle tabs it reads marks.ason instead of history tails. Closing a tab pauses its turn before removing it; a closed tab never resumes work unseen after restart. Queued messages are found from the durable inbox marks even if far back in history. Budget: with 2,000 closed sessions and 100 open idle tabs on disk, recovery finishes in under 10 ms on an M1-class machine; a test measures files and bytes read as well as time. Tests cover a queued message written 1 MB before the end of history and a turn closed mid-stream staying paused after restart.',
 	status: 'done',
-	needs: ['bq'],
 	notes: [
 		'Built: src/host/busy.ts keeps state/busy.ason, the ids of sessions that may hold work. history.append adds the session before writing a user, continue or inbox record (saved at once, so a crash leaves an extra entry, never a missing one) and drops it after a turn_end when marks.inbox is empty; recover drops idle ones it checks. recover walks tabs.ason open ids plus busy ids, decides from marks alone (turns.leftWork: the record at marks.turn is no turn_end, or a queued inbox after a completed turn) and reads the whole history only for sessions with work.',
 		"Sessions made with the 'create' command (most host tests) are not tabs: without the busy list recovery would never see them. Anything new that writes work into history must go through history.append, or it bypasses the busy list.",
 		'history.tail (the 64 KiB guess) is gone; history.unfinished reads marks.turn and one line. sessions.list still reads every metadata file; nothing on the startup path may call it.',
-		'The 10 ms budget test takes the best of three cold runs (host reset between) so a loaded machine does not fail it; it measured about 5 ms with the machine under load 10. The startup.test.ts timing test also fails under such load regardless of this task.'
+		'The 10 ms budget test takes the best of three cold runs (host reset between) so a loaded machine does not fail it; it measured about 5 ms with the machine under load 10. The startup.test.ts timing test also fails under such load regardless of this task.',
+		'The older recovery test expected closed running tabs to continue; task 8v reversed that rule. Recovery still handles non-tab busy sessions and queued work.'
 	],
-	foldInto: ['2r', 'bq', 'j1']
+	needs: [
+		'bq'
+	],
+	foldInto: [
+		'2r',
+		'bq',
+		'j1'
+	]
 }

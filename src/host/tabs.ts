@@ -1,8 +1,7 @@
 // Tabs: which sessions are open as tabs, in order, for the whole home,
 // kept in state/tabs.ason. Every client sees the same tabs; which one a
-// client shows (focus) is its own business. Tabs are not following: a
-// client follows a session with open/close (host.ts), and closing a tab
-// leaves the session and any running turn going.
+// client shows (focus) is its own business. Closing a tab pauses its turn
+// and the turns it owns, rather than leaving work running unseen.
 //
 // The file holds the open ids in order, recently closed ids with the
 // index they had (most recent last) and the tabs that want attention.
@@ -12,10 +11,14 @@ import { mkdirSync } from 'fs'
 import { resolve } from 'path'
 import type { Command, Event, Tab } from '../common/protocol.ts'
 import { host } from './host.ts'
+import { history } from './history.ts'
 import { jobs } from './jobs.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
+import { states } from '../common/states.ts'
+import { subagents } from './subagents.ts'
+import { turns } from './turns.ts'
 import { status } from './status.ts'
 
 type TabsFile = { open: string[]; closed: { id: string; index: number }[]; attention: string[] }
@@ -91,13 +94,27 @@ function create(cwd: string, after?: string): string {
 	return id
 }
 
+// A child is owned only while doing its parent's work; a human's later
+// prompt in a leave-open subagent belongs to the human, not its old parent.
+function stopOwned(id: string): void {
+	for (let child of sessions.openIds()) {
+		let meta = sessions.open(child)
+		if (meta.parent === id && meta.spawn !== 'interactive' && subagents.owed(child, history.readSync(child))) tabs.stopOwned(child)
+	}
+	jobs.kill(id)
+	if (states.busy(status.stateOf(id))) {
+		let refused = turns.stop(id, 'tab closed', true)
+		if (refused) throw new Error(`cannot stop ${id}: ${refused}`)
+	}
+}
+
 function close(id: string): string | undefined {
 	let f = tabs.file()
 	let index = f.open.indexOf(id)
 	if (index < 0) return 'not a tab'
 	if (f.open.length === 1) return 'cannot close the last tab'
+	tabs.stopOwned(id)
 	f.open.splice(index, 1)
-	jobs.kill(id)
 	let closed = f.closed.filter((c) => c.id !== id)
 	closed.push({ id, index })
 	f.closed = closed.slice(-tabs.closedKept())
@@ -181,6 +198,7 @@ export const tabs = {
 	publish,
 	insert,
 	create,
+	stopOwned,
 	close,
 	resume,
 	start,

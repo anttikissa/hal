@@ -105,27 +105,23 @@ test('a queued message written 1 MB before the end of history runs after a host 
 	expect(busy.list()).toEqual([])
 })
 
-test('a turn still running in a closed tab is continued after a restart', async () => {
+test('a turn in a closed tab stays paused after a restart', async () => {
 	let a = client()
-	let n = 0
-	let tab = () => {
-		let cmd = `c${++n}`
-		a.conn.send({ type: 'tab-new', cwd: testHome(), id: cmd } as any)
-		return (a.events.find((e: any) => e.type === 'ack' && e.id === cmd) as any).tab as string
+	let tab = (id: string) => {
+		a.conn.send({ type: 'tab-new', cwd: testHome(), id } as any)
+		return (a.events.find((e: any) => e.type === 'ack' && e.id === id) as any).tab as string
 	}
-	let keep = tab()
-	let id = tab()
+	let keep = tab('keep')
+	let id = tab('work')
 	sessions.open(id).model = 'fake/m1'
 	a.conn.send({ type: 'open', sessionId: id })
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'text', text: 'part' })
-	await until(() => a.of('stream').length)
 	a.conn.send({ type: 'tab-close', sessionId: id, id: 'close' } as any)
+	await until(() => history.readSync(id).some((r) => r.type === 'turn_end'))
 	expect(tabs.file().open).toEqual([keep])
-	history.stop(false)
 	restartHost()
 	await turns.recover()
-	await until(() => calls.length === 2)
-	expect(calls[1]!.input.messages.at(-2)).toEqual({ role: 'assistant', blocks: [{ type: 'text', text: 'part' }] })
+	expect(calls.length).toBe(1)
+	expect(history.readSync(id).findLast((r) => r.type === 'turn_end')).toMatchObject({ status: 'paused' })
 })

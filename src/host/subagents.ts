@@ -133,6 +133,8 @@ function report(id: string): void {
 	}
 	let parent = meta.parent
 	let deliver = () => {
+		// A child stopped by tab close must not wake an idle, now unseen parent.
+		if (tabs.file().closed.some((tab) => tab.id === parent) && !tabs.file().open.includes(parent)) return
 		let refused = prompts.submit(parent, text, undefined, false, { from: id, label, advisory: true })
 		if (refused) diag.log(`report ${id} to ${parent}: ${refused}`)
 	}
