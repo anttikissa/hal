@@ -13,6 +13,25 @@ function entities(text: string): string {
 	})
 }
 
+// At most `limit` bytes of the body; `cut` when there were more, so a
+// huge or endless response never fills the host's memory.
+async function body(res: Response, limit: number): Promise<{ bytes: Uint8Array; cut: boolean }> {
+	let parts: Uint8Array[] = []
+	let size = 0
+	let reader = res.body?.getReader()
+	while (reader) {
+		let { done, value } = await reader.read()
+		if (done || !value) break
+		parts.push(value)
+		size += value.length
+		if (size > limit) {
+			await reader.cancel()
+			return { bytes: Buffer.concat(parts).subarray(0, limit), cut: true }
+		}
+	}
+	return { bytes: Buffer.concat(parts), cut: false }
+}
+
 function htmlText(html: string): string {
 	let title = entities((html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1] ?? '').replace(/<[^>]*>/g, '').trim())
 	let body = html.replace(/<!--[^]*?-->/g, '').replace(/<(script|style|noscript|template|head)\b[^>]*>[^]*?<\/\1\s*>/gi, '')
@@ -21,11 +40,13 @@ function htmlText(html: string): string {
 	return [title, body].filter(Boolean).join('\n\n')
 }
 
-export const tool: Tool<ToolOutput> = {
+export const tool: Tool<ToolOutput> & { maxTextBytes: () => number } = {
 	name: 'read_url',
 	description: 'Read a web page or text file, extracting readable text from HTML. Images are attached; other files are saved under /tmp.',
 	parameters: { type: 'object', properties: { url: { type: 'string', description: 'HTTP or HTTPS URL to read' } }, required: ['url'] },
 	readOnly: true,
+	// The most of a text or HTML body read before converting it.
+	maxTextBytes: () => 10_000_000,
 	async run(input, ctx) {
 		if (typeof input.url !== 'string') throw new Error('url must be an http(s) URL')
 		let url: URL
@@ -38,22 +59,25 @@ export const tool: Tool<ToolOutput> = {
 		if (type.startsWith('image/') && attachments.types[type] && type !== 'text/plain') {
 			let size = Number(res.headers.get('content-length'))
 			if (size > attachments.maxBytes()) throw new Error(`image larger than ${attachments.maxBytes()} bytes`)
-			let bytes = new Uint8Array(await res.arrayBuffer())
-			if (bytes.length > attachments.maxBytes()) throw new Error(`image larger than ${attachments.maxBytes()} bytes`)
+			let { bytes, cut } = await body(res, attachments.maxBytes())
+			if (cut) throw new Error(`image larger than ${attachments.maxBytes()} bytes`)
 			return { text: `Image from ${res.url} (${type}, ${bytes.length} bytes)`, image: { mediaType: type, data: Buffer.from(bytes).toString('base64') } }
 		}
-		let bytes = new Uint8Array(await res.arrayBuffer())
 		if (type === 'text/html' || type === 'application/xhtml+xml' || type.startsWith('text/') || type === 'application/json' || type.endsWith('+json')) {
+			let { bytes, cut } = await body(res, tool.maxTextBytes())
 			let text = new TextDecoder().decode(bytes)
 			let readable = type === 'text/html' || type === 'application/xhtml+xml' ? htmlText(text) : text
 			let max = tools.maxChars() - 100
-			return readable.length > max ? `${readable.slice(0, max)}\n[output truncated: ${readable.length - max} more characters]` : readable
+			let more = cut ? `more than ${tool.maxTextBytes()} bytes; ` : ''
+			if (readable.length > max) return `${readable.slice(0, max)}\n[output truncated: ${more}${readable.length - max} more characters]`
+			return cut ? `${readable}\n[output truncated: the page is ${more.slice(0, -2)}]` : readable
 		}
 		let dir = paths.fileDir()
 		mkdirSync(dir, { recursive: true, mode: 0o700 })
 		let name = `${crypto.randomUUID()}${/\.[a-z0-9]{1,12}$/i.exec(new URL(res.url).pathname)?.[0] ?? ''}`
 		let path = `${dir}/${name}`
-		await Bun.write(path, bytes)
-		return `Saved ${res.url} to ${path} (${type}, ${bytes.length} bytes)`
+		// Streamed to disk, never held in memory whole.
+		let size = await Bun.write(path, res)
+		return `Saved ${res.url} to ${path} (${type}, ${size} bytes)`
 	},
 }

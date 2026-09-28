@@ -82,3 +82,17 @@ test('binary downloads go in the download directory with path, type and size', a
 	expect(existsSync(path!)).toBe(true)
 	expect(readFileSync(path!)).toEqual(Buffer.from([0, 1, 2]))
 })
+
+test('an endless text body is read only up to its limit, and the cut is said', async () => {
+	let limit = tool.maxTextBytes
+	tool.maxTextBytes = () => 100_000
+	let pulls = 0
+	response = () => new Response(new ReadableStream({ pull: (c) => { pulls++; c.enqueue(new TextEncoder().encode('y'.repeat(10_000))) } }), { headers: { 'content-type': 'text/plain' } })
+	try {
+		let out = await tool.run({ url: url() }, ctx())
+		expect(out).toContain('more than 100000 bytes')
+		expect(pulls).toBeLessThan(1000)
+	} finally {
+		tool.maxTextBytes = limit
+	}
+})
