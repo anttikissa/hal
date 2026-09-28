@@ -1,4 +1,6 @@
 {
 	// A terminal program matches escape and control bytes on purpose.
-	"rules": { "no-control-regex": "off" }
+	"rules": { "no-control-regex": "off" },
+	// Verbatim copy of the old Hal's test (task mw): never edited, so not linted.
+	"ignorePatterns": ["src/common/ason.test.ts"]
 }
