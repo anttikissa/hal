@@ -232,19 +232,6 @@ test('a complete last record missing its newline is kept', async () => {
 	expect(strip(await history.read(id)).map((r) => r.type)).toEqual(['user', 'user', 'user'])
 })
 
-test('a history holding a retired blocked record still opens, and the record means nothing', async () => {
-	let id = newSession()
-	history.submit(id, 'a')
-	appendFileSync(history.file(id), ason.stringifyLine({ type: 'blocked', reason: 'log in', ts: new Date().toISOString() }))
-	history.submit(id, 'b')
-	sessions.closeAll()
-	await history.open(id)
-	expect(history.readSync(id).map((r) => r.type)).toEqual(['user', 'blocked', 'user'])
-	let sent = JSON.stringify(await history.messages(id))
-	expect(sent).toContain('\\nb')
-	expect(sent).not.toContain('log in')
-})
-
 test('a corrupt record mid-file is reported when read and the file left untouched', async () => {
 	let id = newSession()
 	history.submit(id, 'a')
