@@ -3,8 +3,11 @@
 	spec: "On the web, typing a slash command or path shows its completions as a list above the prompt, like Slack's (each row: name, and a quieter description line), without pressing Tab (phones have none). Tap or click a row to take it; Up/Down and Enter pick on a keyboard; Escape or typing past the choices hides it. It uses the same completion source as the terminal (common/completion). Replaces the notice line that listed choices (questions.md 104, 125).",
 	status: 'done',
 	needs: [],
-	foldInto: ['kr'],
+	foldInto: [
+		'kr'
+	],
 	notes: [
-		'Browser menu uses the host complete event and the shared completion formatter; replies for stale drafts are ignored and selecting a choice keeps the full host-supplied command/path. Chrome/CDP tested at 390px and 1280px. Completion descriptions for slash names come from common/commands/list.ts.'
+		'Browser menu uses the host complete event and the shared completion formatter; replies for stale drafts are ignored and selecting a choice keeps the full host-supplied command/path. Chrome/CDP tested at 390px and 1280px. Completion descriptions for slash names come from common/commands/list.ts.',
+		"Browser tests must wait for the first snapshot (placeholder filled, tabs known) before typing: the textarea exists earlier, and '/c' typed before the snapshot gets no completions (race found 29 Sep by the a7 agent)."
 	]
 }
