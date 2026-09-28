@@ -36,10 +36,10 @@ import { view, type ViewState } from './view.ts'
 // the page can keep what the reader was reading in place.
 // `target`: the block the address links to (target.ts), `found` once
 // its card is in the transcript, `shown` once scrolled to.
-export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; completedByTab?: string; suppressed?: string }
+export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; completedByTab?: string; suppressed?: string; cached: Map<string, ViewState>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout> }
 
 function createState(): AppState {
-	return { view: {}, text: '', tabs: [], asked: new Set(), older: new Map(), pages: 0 }
+	return { view: {}, text: '', tabs: [], asked: new Set(), older: new Map(), pages: 0, cached: new Map(), background: new Set(), painted: false }
 }
 
 function sessionId(): string | undefined {
@@ -91,6 +91,7 @@ function onEvent(event: Event): void {
 	let changed = drafts.onEvent(event)
 	let landed = uploads.settle(event)
 	if (landed) app.settled(landed)
+	if (st.shown && 'sessionId' in event && event.sessionId && event.sessionId !== st.shown) return tabs.hiddenEvent(event)
 	st.view = view.onEvent(st.view, event)
 	if (event.type === 'snapshot') { st.menu = undefined; st.completedByTab = undefined; st.suppressed = undefined }
 	if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
@@ -118,6 +119,15 @@ function onEvent(event: Event): void {
 	if (id && (changed || event.type === 'snapshot')) st.text = recall.shown(id) ?? drafts.text(id)
 	app.seek()
 	app.changed()
+	if (event.type === 'snapshot' && event.sessionId === st.shown) {
+		if (st.loading === st.shown) delete st.loading
+		if (!st.painted) {
+			let current = st
+			let afterPaint = () => { if (app.state === current) { st.painted = true; app.backgroundStep() } }
+			if (typeof requestAnimationFrame === 'function') requestAnimationFrame(afterPaint)
+			else setTimeout(afterPaint, 0)
+		} else app.backgroundStep()
+	}
 }
 
 // The address changed (loaded, a card's link followed, Back): aim at
@@ -339,6 +349,7 @@ async function login(code: string): Promise<string | undefined> {
 }
 
 function reset(): void {
+	if (app.state.timer) clearTimeout(app.state.timer)
 	app.state = createState()
 	recall.reset()
 	uploads.reset()
@@ -357,6 +368,7 @@ export const app = {
 	setView,
 	setNotice,
 	sendNow,
+	backgroundStep: tabs.backgroundStep,
 	onEvent,
 	settled,
 	aim,

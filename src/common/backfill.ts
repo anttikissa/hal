@@ -64,6 +64,14 @@ function apply(all: Sessions, t: Transcript): Transcript {
 	return out
 }
 
+// Background tabs are fetched nearest the shown one first. With no shown
+// tab yet there is no first paint to protect, so wait for its snapshot.
+function nearby(ids: string[], shown: string): string[] {
+	let at = ids.indexOf(shown)
+	if (at < 0) return []
+	return ids.filter((id) => id !== shown).sort((a, b) => Math.abs(ids.indexOf(a) - at) - Math.abs(ids.indexOf(b) - at))
+}
+
 // The terminal's way: after a snapshot or a page, the command asking
 // for the next page, and once the last is in, the transcript with all
 // of them in front.
@@ -76,4 +84,4 @@ function fetchAll<V extends { transcript?: Transcript }>(all: Sessions, view: V,
 	return { view: { transcript: backfill.apply(all, t) } as Partial<V> }
 }
 
-export const backfill = { onSnapshot, next, onPage, complete, apply, fetchAll }
+export const backfill = { onSnapshot, next, onPage, complete, apply, fetchAll, nearby }

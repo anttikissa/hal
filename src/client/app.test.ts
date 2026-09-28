@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { connection } from '../common/connection.ts'
 import { drafts, type Local } from '../common/drafts.ts'
 import { modals } from '../common/modals.ts'
 import { placeholders } from '../common/placeholders.ts'
@@ -20,6 +21,7 @@ let sent: any[] = []
 let drafted: any[] = []
 let quits = 0
 const saved = { send: app.send, show: render.show, quit: terminal.quit, draftSend: drafts.send }
+const wasConnected = connection.connected
 const record = (c: any) => {
 	let { id: _id, ...rest } = c
 	if (c.type === 'draft') drafted.push(rest)
@@ -32,6 +34,7 @@ beforeEach(() => {
 	quits = 0
 	app.reset()
 	app.send = record
+	connection.connected = () => true
 	drafts.send = record
 	render.show = () => {}
 	terminal.quit = () => {
@@ -41,6 +44,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	Object.assign(app, { send: saved.send })
+	connection.connected = wasConnected
 	drafts.send = saved.draftSend
 	render.show = saved.show
 	terminal.quit = saved.quit
@@ -473,6 +477,25 @@ const startOn = (ids: string[], at = 'a') => {
 }
 const shown = () => app.view().tabs?.focused
 
+test('after the focused paint, nearby tabs load in slices and switching uses their cached tails', async () => {
+	startOn(['a', 'b', 'c', 'd'], 'c')
+	// Starting does not hold up the focused snapshot for background work.
+	expect(sent).toEqual([])
+	await Bun.sleep(5)
+	expect(sent).toEqual([{ type: 'open', sessionId: 'b' }])
+	app.onEvent(snapshot('b'))
+	await Bun.sleep(5)
+	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: 'd' })
+	app.onEvent(snapshot('d'))
+	await Bun.sleep(5)
+	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: 'a' })
+	app.onEvent(snapshot('a'))
+	app.onKeys([alt('2')])
+	expect(shown()).toBe('b')
+	expect(app.view().transcript?.meta.id).toBe('b')
+	expect(sent.filter((c) => c.type === 'open').map((c) => c.sessionId)).toEqual(['b', 'd', 'a'])
+})
+
 test('the example on an empty prompt comes from the Hal list when the host marks the tab hal', () => {
 	startOn(['a', 'b'])
 	expect(app.view().placeholder).toBe(placeholders.general[0])
@@ -526,10 +549,7 @@ test('Ctrl-T opens a tab after the focused one and shows it once the host names 
 	expect(shown()).toBe('a')
 	acked('n')
 	expect(shown()).toBe('n')
-	expect(sent.slice(1)).toEqual([
-		{ type: 'close', sessionId: 'a' },
-		{ type: 'open', sessionId: 'n' },
-	])
+	expect(sent.slice(1)).toEqual([{ type: 'open', sessionId: 'n' }])
 	// Closing it goes back to where it was opened from.
 	app.onKeys([ctrl('w')])
 	expect(sent.at(-1)).toEqual({ type: 'tab-close', sessionId: 'n' })
@@ -566,7 +586,7 @@ test('Ctrl-N, Ctrl-P and Alt-digits switch tabs, wrapping', () => {
 	// No tab 9: nothing happens.
 	app.onKeys([alt('9')])
 	expect(shown()).toBe('b')
-	expect(sent.filter((c) => c.type === 'open').map((c) => c.sessionId)).toEqual(['c', 'a', 'b'])
+	expect(sent.filter((c) => c.type === 'open').map((c) => c.sessionId)).toEqual(['c', 'b'])
 })
 
 test('/go changes this terminal only while it shows the source session', () => {

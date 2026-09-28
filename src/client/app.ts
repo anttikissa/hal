@@ -64,11 +64,15 @@ export type AppState = {
 	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
 	onModalKey?: (modal: ModalState) => ModalState
 	older: Map<string, Backfill>
+	background: Set<string>
+	painted: boolean
+	loading?: string
+	timer?: ReturnType<typeof setTimeout>
 	choices?: string[]
 }
 
 function createState(): AppState {
-	return { tabs: [], focus: {}, hidden: new Map(), start: { cwd: '/' }, prompt: prompt.empty(), older: new Map() }
+	return { tabs: [], focus: {}, hidden: new Map(), start: { cwd: '/' }, prompt: prompt.empty(), older: new Map(), background: new Set(), painted: false }
 }
 
 function view(): View {
@@ -169,9 +173,8 @@ function onEvent(event: Event): void {
 		st.asked = event.tab
 		return app.onTabs(st.tabs)
 	}
-	// Late events of a tab just left are not this view's.
 	let shown = st.focus.tab
-	if (shown !== undefined && 'sessionId' in event && event.sessionId !== undefined && event.sessionId !== shown) return
+	if (shown !== undefined && 'sessionId' in event && event.sessionId !== undefined && event.sessionId !== shown) return tabSwitch.hiddenEvent(event)
 	if (event.type === 'rejected') st.notice = `${event.command} refused: ${event.reason}`
 	else if (event.type === 'warning') st.notice = event.text
 	else if (event.type === 'completions') app.completed(event)
@@ -184,6 +187,9 @@ function onEvent(event: Event): void {
 		st.form = forms.follow(st.form, transcript.question(t))
 	}
 	app.show()
+	if (event.type === 'snapshot' && event.sessionId === shown) st.painted = true
+	if (st.loading === shown && event.type === 'snapshot') delete st.loading
+	app.backgroundStep()
 }
 
 // Earlier history is fetched in the background, shown all at once.
@@ -357,6 +363,7 @@ function init(): void {
 }
 
 function reset(): void {
+	if (app.state.timer) clearTimeout(app.state.timer)
 	app.state = createState()
 	pulse.reset()
 	halCursor.reset()
@@ -377,6 +384,7 @@ export const app = {
 	show,
 	beat,
 	onEvent,
+	backgroundStep: tabSwitch.backgroundStep,
 	backfilled,
 	onState,
 	focusedTab: tabSwitch.focusedTab,

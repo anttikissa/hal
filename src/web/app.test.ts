@@ -296,6 +296,26 @@ test('with no valid id the page lands on the tab shown last, else the first, rep
 	expect(router.store.load()).toBe('1-aaa')
 })
 
+test('background neighbours fetch after paint and switching reuses their in-memory transcripts', async () => {
+	address = 'http://h/2-bbb'
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc'), tab('4-ddd')))
+	app.onEvent(snapOf('2-bbb'))
+	expect(sent.filter((c) => c.type === 'open').map((c) => c.sessionId)).toEqual(['2-bbb'])
+	await Bun.sleep(10)
+	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: '1-aaa' })
+	app.onEvent(snapOf('1-aaa'))
+	await Bun.sleep(10)
+	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: '3-ccc' })
+	app.onEvent(snapOf('3-ccc'))
+	await Bun.sleep(10)
+	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: '4-ddd' })
+	app.onEvent(snapOf('4-ddd'))
+	let opens = sent.filter((c) => c.type === 'open').length
+	tabs.show('3-ccc', false)
+	expect(app.sessionId()).toBe('3-ccc')
+	expect(sent.filter((c) => c.type === 'open').length).toBe(opens)
+})
+
 test('choosing a tab pushes an entry, moves the following, and each tab keeps its draft; Back returns', () => {
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc')))
 	app.onEvent(snapOf('1-aaa'))
@@ -303,7 +323,7 @@ test('choosing a tab pushes an entry, moves the following, and each tab keeps it
 	sent = []
 	expect(alt(3)).toBe(true)
 	expect(app.state.shown).toBe('3-ccc')
-	expect(sent).toContainEqual({ type: 'close', sessionId: '1-aaa' })
+	expect(sent).not.toContainEqual({ type: 'close', sessionId: '1-aaa' })
 	expect(sent).toContainEqual({ type: 'open', sessionId: '3-ccc' })
 	expect(app.state.text).toBe('')
 	expect(history).toEqual(['http://h/1-aaa', 'http://h/3-ccc'])
