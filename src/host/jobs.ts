@@ -33,18 +33,38 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 	let stopped = false
 	let timedOut = false
 	let timer = ms === undefined ? undefined : setTimeout(() => ((timedOut = true), kill()), ms)
-	// Keep the whole result so the cap can retain it in a blob.
-	let out = ''
+	// Keep the whole result so the cap can retain it in a blob, up to
+	// jobs.keepChars(): past that only both ends stay (an endless command
+	// must not exhaust the host), the middle counted in a note.
+	let half = Math.floor(jobs.keepChars() / 2)
+	let head = ''
+	let tail = ''
+	let dropped = 0
 	child.stdout!.setEncoding('utf8').on('data', (d: string) => {
-		out += d
 		onOutput?.(d)
+		if (head.length < half) {
+			let take = d.slice(0, half - head.length)
+			head += take
+			d = d.slice(take.length)
+		}
+		tail += d
+		// Trim only once twice over, so trimming costs O(1) per byte.
+		if (tail.length > 2 * half) {
+			dropped += tail.length - half
+			tail = tail.slice(-half)
+		}
 	})
 	let done = new Promise<string>((resolve, reject) => {
 		child.on('error', (e) => (clearTimeout(timer), reject(e)))
 		child.on('close', (code, sig) => {
 			clearTimeout(timer)
 			let status = stopped ? 'stopped by the user' : timedOut ? `timed out after ${ms! / 1000}s` : sig ? `killed by ${sig}` : `exit ${code}`
-			resolve(`[${status}]\n${out}`)
+			if (tail.length > half) {
+				dropped += tail.length - half
+				tail = tail.slice(-half)
+			}
+			let gap = dropped ? `\n[${dropped} characters dropped: over ${jobs.keepChars()} kept in memory]\n` : ''
+			resolve(`[${status}]\n${head}${gap}${tail}`)
 		})
 	})
 	return { done, stop: () => ((stopped = true), kill()) }
@@ -147,6 +167,8 @@ export const jobs = {
 	state: { running: new Map<string, Job>() },
 	// How long a background call waits for a command that fails at once.
 	graceMs: () => 100,
+	// The most output one command keeps in memory (both ends past it).
+	keepChars: () => 32_000_000,
 	exec,
 	start,
 	newId,

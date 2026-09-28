@@ -105,3 +105,18 @@ test('after a restart the session hears the command was lost, and it no longer r
 	expect(existsSync(`${testHome()}/ran`)).toBe(false)
 	expect(sessions.open(id).background).toBeUndefined()
 })
+
+test('an endless command keeps only both ends of its output in memory, counting the rest', async () => {
+	let keep = jobs.keepChars
+	jobs.keepChars = () => 1000
+	try {
+		let out = await jobs.exec("printf 'START'; yes middle | head -c 100000; printf 'END'", '/tmp').done
+		expect(out.length).toBeLessThan(1200)
+		expect(out).toStartWith('[exit 0]\nSTART')
+		expect(out).toEndWith('END')
+		let dropped = Number(/\[(\d+) characters dropped/.exec(out)?.[1])
+		expect(dropped + 1000).toBe(100_000 + 'STARTEND'.length)
+	} finally {
+		jobs.keepChars = keep
+	}
+})
