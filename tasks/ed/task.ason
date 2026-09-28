@@ -1,6 +1,9 @@
 {
 	title: 'inspect tool: what Hal is doing now',
 	spec: "An inspect tool, read-only, answers what the model otherwise needed eval for: the open tabs in order (number, session id, name, state such as running/idle/paused/asking, model, cwd, which one is the caller), the host's pid, git version, start time and uptime, and connected clients. Optional argument 'models' lists the models each provider offers with the configured default. Output is short plain text; no secrets (research 29 Sep, questions.md 119).",
-	status: 'planned',
-	needs: []
+	status: 'done',
+	needs: [],
+	notes: [
+		'The shared tabs list is the authoritative order; sessions.openIds() includes non-tab sessions. models.known() exposes cached/fallback and synthetic ids without HTTP or secrets; provider registration occurs at startup. Host uptime derives from process.uptime().'
+	]
 }
