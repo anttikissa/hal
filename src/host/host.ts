@@ -29,6 +29,7 @@ import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 import { prompts } from './prompts.ts'
 import { slash } from './slash.ts'
+import { stats } from './stats.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
@@ -263,7 +264,7 @@ function follow(client: Client, id: string): void {
 function snapshot(id: string): Snapshot {
 	let tail = pages.snapshot(id)
 	let records = [...tail.earlier, ...tail.history]
-	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records) }
+	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records), stats: stats.of(id, records) }
 	if (tail.older !== undefined) Object.assign(snap, { older: tail.older, earlier: tail.earlier })
 	try {
 		let draft = drafts.get(id)
@@ -317,6 +318,8 @@ function reset(): void {
 	host.state.opening.clear()
 	host.state.clients.clear()
 	status.state.states.clear()
+	stats.state.tokens.clear()
+	stats.state.context.clear()
 	pages.reset()
 	host.state.done.clear()
 	tabs.reset()

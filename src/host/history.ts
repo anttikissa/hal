@@ -27,7 +27,19 @@ const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox
 // that round's blocks are on disk, and the usage of earlier rounds.
 // `ended`: stop() has written its last record; nothing more is written.
 // `ns`: each block's record number, given when it started streaming.
-type Running = { turn: Turn; written: number; prior: Usage; ended?: boolean; ns: number[] }
+// `context`: what the latest earlier round with usage took in.
+type Running = { turn: Turn; written: number; prior: Usage; ended?: boolean; ns: number[]; context?: number }
+
+// The tokens a round took in: input, cache read and cache write.
+function taken(u: Usage): number {
+	return (u.input ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0)
+}
+
+// What the running turn's latest round with usage took in, if any.
+function contextOf(r: Running): { context?: number } {
+	let c = taken(r.turn.usage) || r.context
+	return c ? { context: c } : {}
+}
 
 function addUsage(a: Usage, b: Usage): Usage {
 	let sum = { ...a }
@@ -187,7 +199,7 @@ async function messages(id: string) {
 async function* record(id: string, providerName: string, events: AsyncIterable<StreamEvent>): AsyncGenerator<StreamEvent> {
 	let before = history.state.running.get(id)
 	let prior = before ? addUsage(before.prior, before.turn.usage) : {}
-	let running: Running = { turn: blocks.newTurn(providerName), written: 0, prior, ns: [] }
+	let running: Running = { turn: blocks.newTurn(providerName), written: 0, prior, ns: [], ...(before && contextOf(before)) }
 	let { turn } = running
 	let flush = (upTo: number) => {
 		if (running.ended) return
@@ -225,9 +237,10 @@ function end(id: string, last: DoneEvent | ErrorEvent | undefined, pauseReason?:
 	if (!running) return
 	history.state.running.delete(id)
 	let usage = addUsage(running.prior, running.turn.usage)
-	if (last?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: last.reason, usage })
-	else if (last?.type === 'error' && !last.cancelled) history.append(id, { type: 'turn_end', status: 'error', error: last.message, usage })
-	else history.append(id, { type: 'turn_end', status: 'paused', usage, ...(pauseReason !== undefined && { pauseReason }) })
+	let context = contextOf(running)
+	if (last?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: last.reason, usage, ...context })
+	else if (last?.type === 'error' && !last.cancelled) history.append(id, { type: 'turn_end', status: 'error', error: last.message, usage, ...context })
+	else history.append(id, { type: 'turn_end', status: 'paused', usage, ...context, ...(pauseReason !== undefined && { pauseReason }) })
 }
 
 // Stops recording the running turn without ending it: it asked a
@@ -260,7 +273,7 @@ function stop(pause: boolean): void {
 		let { turn } = running
 		try {
 			for (; running.written < turn.blocks.length; running.written++) history.append(id, { type: 'assistant', block: turn.blocks[running.written]!, n: running.ns[running.written]! })
-			if (pause) history.append(id, { type: 'turn_end', status: 'paused', usage: addUsage(running.prior, turn.usage) })
+			if (pause) history.append(id, { type: 'turn_end', status: 'paused', usage: addUsage(running.prior, turn.usage), ...contextOf(running) })
 		} catch (e: any) {
 			diag.log(`history ${id}: could not record the stopped turn: ${e?.message ?? e}`)
 		}

@@ -12,6 +12,7 @@ import { liveFiles } from './live-file.ts'
 import { models as modelList } from './models.ts'
 import { sessions } from './sessions.ts'
 import { host } from './host.ts'
+import { stats } from './stats.ts'
 import { status } from './status.ts'
 
 // Records a slash command as typed (by whom: `from`, else the human) and
@@ -53,7 +54,7 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 	Object.assign(meta, changed)
 	liveFiles.save(meta)
 	history.append(id, { type: 'change', ...changed })
-	host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta } })
+	host.broadcast(id, changed.model === undefined ? { type: 'meta', sessionId: id, meta: { ...meta } } : { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
 }
 
 // Runs command `name` (again, with `answers`, once its question is

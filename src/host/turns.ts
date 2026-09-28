@@ -26,6 +26,7 @@ import { host } from './host.ts'
 import { pages } from './pages.ts'
 import { tabs } from './tabs.ts'
 import { prompts } from './prompts.ts'
+import { stats } from './stats.ts'
 import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 
@@ -91,8 +92,8 @@ function stop(id: string, reason?: string): string | undefined {
 	// A turn parked at a question has its usage so far there.
 	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = { type: 'turn_end', status: 'paused', usage: forms.open(history.readSync(id))?.usage ?? {} }
 	if (reason !== undefined) end.pauseReason = reason
-	let { n } = history.append(id, end)
-	let ended: Event = { type: 'turn-end', sessionId: id, status: 'paused', n }
+	let recorded = history.append(id, end) as HistoryRecord & { type: 'turn_end' }
+	let ended: Event = { type: 'turn-end', sessionId: id, status: 'paused', n: recorded.n, stats: stats.ended(id, recorded) }
 	if (Object.keys(end.usage).length) ended.usage = end.usage
 	host.broadcast(id, ended)
 	subagents.report(id)
@@ -305,6 +306,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		if (recorded.n !== undefined) end.n = recorded.n
 		if (Object.keys(recorded.usage).length) end.usage = recorded.usage
 		if (recorded.error !== undefined) end.error = recorded.error
+		end.stats = stats.ended(id, recorded)
 	}
 	host.broadcast(id, end)
 	// Paused already, unless something other than the user aborted it.

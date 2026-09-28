@@ -36,9 +36,11 @@ export type HistoryRecord = Numbered &
 	// One assistant block, appended as soon as it is complete.
 	| { type: 'assistant'; block: AssistantBlock; ts: string }
 	// Ends one model turn, or pauses it (then `pauseReason` if Hal, not
-	// the user, paused it). A turn with no end is unfinished: the host
+	// the user, paused it). `usage`: all its rounds'; `context`: the
+	// tokens its last round with usage took in (status row, task 1g).
+	// A turn with no end is unfinished: the host
 	// died or restarted mid-turn, and the next host continues it.
-	| { type: 'turn_end'; status: TurnStatus; reason?: StopReason; error?: string; pauseReason?: string; usage: Usage; ts: string }
+	| { type: 'turn_end'; status: TurnStatus; reason?: StopReason; error?: string; pauseReason?: string; usage: Usage; context?: number; ts: string }
 	// The turn goes on after a pause, a failure or a host that went away.
 	| { type: 'continue'; ts: string }
 	// A durable question (tasks/w4/forms.md): the turn waits, blocked,

@@ -42,7 +42,7 @@ test('a completed turn reaches every follower and is durable before turn-end', a
 	// Every client, live or fresh, keys each item alike.
 	expect(b.views.get(id)!.items).toEqual(a.views.get(id)!.items)
 	expect((await fresh(id)).items).toEqual(a.views.get(id)!.items)
-	expect((await records(id)).at(-1)).toEqual({ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 5, output: 2 } })
+	expect((await records(id)).at(-1)).toEqual({ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 5, output: 2 }, context: 5 })
 })
 
 test('the next turn replays durable history, even after a host restart', async () => {

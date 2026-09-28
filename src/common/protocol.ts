@@ -57,7 +57,20 @@ export type Snapshot = {
 	draft?: Draft
 	older?: number
 	earlier?: HistoryRecord[]
+	stats?: Stats
 }
+
+// What a session's status row shows that a client cannot work out
+// (task 1g), as of the snapshot, the last turn end or model change;
+// the host sends it with those, nothing polls. `context`: the tokens
+// the last round took in (input, cache read and cache write);
+// `window`: the model's context window, when known. `sent`, `received`:
+// input and output tokens of the session's turns since this host
+// started. `plan`: the subscription account the session's next request
+// goes to: its place among the provider's subscription accounts
+// (1-based) and each usage window's percent used ("5h": 18).
+export type Stats = { context?: number; window?: number; sent: number; received: number; plan?: Plan }
+export type Plan = { account: number; accounts: number; windows: Record<string, number> }
 
 // Stream events forwarded live; terminal done/error become `turn-end`.
 export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'error' }>
@@ -175,7 +188,7 @@ export type Event =
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
 	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[]; n?: number }
-	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string; n?: number }
+	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string; n?: number; stats?: Stats }
 	// The turn asked a question, now in history; it waits for an answer
 	// with no turn running (the state says blocked).
 	| { type: 'question'; sessionId: string; id: string; form: Form; n?: number }
@@ -191,8 +204,8 @@ export type Event =
 	// What a command said, now in history; `error` if it failed.
 	// `streaming`: as in command.
 	| { type: 'output'; sessionId: string; text: string; error?: true; n?: number; streaming?: true }
-	// The session's metadata changed (a /cd).
-	| { type: 'meta'; sessionId: string; meta: SessionMeta }
+	// The session's metadata changed (a /cd, a /model: then `stats` too).
+	| { type: 'meta'; sessionId: string; meta: SessionMeta; stats?: Stats }
 	// Sent only to the client that asked: every full text `text` may
 	// complete to, none if nothing fits.
 	| { type: 'completions'; sessionId: string; text: string; items: string[] }
@@ -261,7 +274,7 @@ function invalid(value: unknown): string | undefined {
 // s: string, i: integer, o: object, a: list, S: list of strings, with
 // ? for optional. Nested fields are named with a dot.
 const eventFields: Record<EventType, Record<string, string>> = {
-	snapshot: { sessionId: 's', snapshot: 'o', 'snapshot.meta': 'o', 'snapshot.history': 'a', 'snapshot.state': 'o' },
+	snapshot: { sessionId: 's', snapshot: 'o', 'snapshot.meta': 'o', 'snapshot.history': 'a', 'snapshot.state': 'o', 'snapshot.stats': 'o?' },
 	'turn-start': { sessionId: 's', provider: 's', prompt: 's?', images: 'a?', command: 's?' },
 	history: { sessionId: 's', before: 'i', records: 'a', older: 'i?' },
 	state: { sessionId: 's', state: 'o', 'state.type': 's' },
@@ -269,12 +282,12 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	prompt: { sessionId: 's', texts: 'S', senders: 'a?', images: 'a?', command: 's?' },
 	stream: { sessionId: 's', event: 'o', 'event.type': 's' },
 	'tool-results': { sessionId: 's', results: 'a' },
-	'turn-end': { sessionId: 's', status: 's', usage: 'o?', error: 's?' },
+	'turn-end': { sessionId: 's', status: 's', usage: 'o?', error: 's?', stats: 'o?' },
 	question: { sessionId: 's', id: 's', form: 'o' },
 	answer: { sessionId: 's', question: 's', answers: 'o', secrets: 'S?' },
 	command: { sessionId: 's', text: 's', from: 's?', command: 's?' },
 	output: { sessionId: 's', text: 's' },
-	meta: { sessionId: 's', meta: 'o' },
+	meta: { sessionId: 's', meta: 'o', stats: 'o?' },
 	completions: { sessionId: 's', text: 's', items: 'S' },
 	models: { sessionId: 's', current: 's', items: 'S' },
 	attached: { sessionId: 's', command: 's', blob: 's', marker: 's' },

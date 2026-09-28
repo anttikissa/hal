@@ -8,7 +8,7 @@
 import { blocks, type AssistantBlock, type ImageBlock, type Sender, type ToolResultBlock, type Usage } from './blocks.ts'
 import { forms, type Answers, type Form } from './forms.ts'
 import type { InboxItem } from './inbox.ts'
-import type { Event, LiveTurn, Snapshot, TurnStatus } from './protocol.ts'
+import type { Event, LiveTurn, Snapshot, Stats, TurnStatus } from './protocol.ts'
 import { replay, type HistoryRecord } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
@@ -57,6 +57,8 @@ export type Transcript = {
 	// How many items at the start stand in for history not loaded yet
 	// (standIns); loading it (prepend) replaces them.
 	earlier?: number
+	// For the status row (task 1g): the latest the host sent.
+	stats?: Stats
 }
 
 // Display items for assistant blocks. Empty thinking (a bare signature,
@@ -175,6 +177,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	}
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
 	if (prompt !== undefined) t.prompt = prompt
+	if (snapshot.stats) t.stats = snapshot.stats
 	if (early.length) t.earlier = transcript.fromSnapshot({ ...snapshot, history: early, earlier: [], turn: undefined }).items.length
 	if (snapshot.turn) {
 		let turn = transcript.copyTurn(snapshot.turn)
@@ -232,7 +235,8 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'state') return { ...t, state: event.state }
 	if (event.type === 'inbox') return { ...t, inbox: event.inbox }
 	if (event.type === 'answer') return { ...t, items: transcript.answered(t.items, event) }
-	if (event.type === 'meta') return { ...t, meta: { ...event.meta } }
+	if (event.type === 'meta') return { ...t, meta: { ...event.meta }, ...(event.stats && { stats: event.stats }) }
+	if (event.type === 'turn-end' && event.stats) t = { ...t, stats: event.stats }
 	if (event.type === 'completions' || event.type === 'history') return t
 	if (event.type === 'command' || event.type === 'output') {
 		// Where history has it: after the running round's blocks already

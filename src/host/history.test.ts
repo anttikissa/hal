@@ -96,7 +96,7 @@ test('a completed turn is stored as prompt, blocks and a turn end with usage', a
 		{ type: 'user', blocks: [{ type: 'text', text: 'hello' }] },
 		{ type: 'assistant', block: { type: 'thinking', text: 'hm', signature: 'sig', provider: 'fake' } },
 		{ type: 'assistant', block: { type: 'text', text: 'hi there' } },
-		{ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 10, output: 3 } },
+		{ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 10, output: 3 }, context: 10 },
 	])
 	for (let r of records) expect(Date.parse(r.ts)).not.toBeNaN()
 })
@@ -350,7 +350,8 @@ test('a turn spans tool rounds: one turn end with the usage of all rounds', asyn
 	expect(strip(await history.read(id)).slice(1)).toEqual([
 		{ type: 'assistant', block: call },
 		{ type: 'user', blocks: [{ type: 'tool_result', id: 't1', output: 'x' }] },
-		{ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 22, output: 3 } },
+		// The context is the last round's input alone, not the sum.
+		{ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 22, output: 3 }, context: 12 },
 	])
 })
 
