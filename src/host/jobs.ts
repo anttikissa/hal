@@ -33,10 +33,10 @@ function exec(command: string, cwd: string, ms?: number): Run {
 	let stopped = false
 	let timedOut = false
 	let timer = ms === undefined ? undefined : setTimeout(() => ((timedOut = true), kill()), ms)
-	// Keep only what can be shown; drain the rest so the command is not blocked.
+	// Keep the whole result so the cap can retain it in a blob.
 	let out = ''
 	child.stdout!.setEncoding('utf8').on('data', (d: string) => {
-		if (out.length <= tools.maxChars()) out += d
+		out += d
 	})
 	let done = new Promise<string>((resolve, reject) => {
 		child.on('error', (e) => (clearTimeout(timer), reject(e)))
@@ -87,7 +87,7 @@ function finish(id: string, out: string): void {
 	if (!job) return
 	jobs.state.running.delete(id)
 	jobs.forget(job.sessionId, id)
-	jobs.tell(job.sessionId, id, tools.cap(out))
+	jobs.tell(job.sessionId, id, tools.cap(out, job.sessionId))
 }
 
 // Sends `text` to the session as an advisory message from 'bash <id>'.

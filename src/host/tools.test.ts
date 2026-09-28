@@ -182,3 +182,57 @@ test('a command past its timeout is killed with its background jobs, keeping the
 	for (let i = 0; i < 100 && alive(); i++) await Bun.sleep(20)
 	expect(alive()).toBe(false)
 })
+
+// The persisted blob is the source of truth, not the preview returned
+// to the model. Use a private home so images and history are isolated.
+import { paths } from './paths.ts'
+import { blobs } from './blobs.ts'
+import { history } from './history.ts'
+
+const originalHome = paths.home
+const blobRun = (id: string) => tools.run({ type: 'tool_call', id: 'rb', name: 'read_blob', input: { id } }, { cwd: dir, signal, sessionId: 's' })
+
+test('large bash output preserves both ends and the whole result in a session blob', async () => {
+	paths.home = () => dir
+	try {
+		tools.maxChars = () => 1000
+		let result = await bash({ command: "printf 'START\\n'; yes middle | head -c 80000; printf '\\nEND\\n'; exit 7", description: 'Produce long output and fail' })
+		expect(result.output).toContain('START')
+		expect(result.output).toContain('END')
+		expect(result.output).toContain('exit 7')
+		let id = result.output.match(/whole output in blob ([0-9a-f]{12})/)?.[1]
+		expect(id).toBeDefined()
+		let full = (await blobRun(id!)).output
+		expect(full).toContain('START')
+		expect(full).toContain('END')
+		expect(full.length).toBeGreaterThan(80_000)
+	} finally { paths.home = originalHome }
+})
+
+test('read_blob resolves text and images and rejects unknown or escaping references', async () => {
+	paths.home = () => dir
+	try {
+		let text = blobs.storeOutput('s', 'unaltered text')
+		expect((await blobRun(text.blob)).output).toBe('unaltered text')
+		expect((await blobRun(`s/${text.blob}`)).output).toBe('unaltered text')
+		let image = blobs.store('s', 'image/png', Buffer.from('89504e470d0a1a0a0000', 'hex').toString('base64'))
+		let r = await blobRun(image.blob)
+		expect(r.image?.mediaType).toBe('image/png')
+		expect(blobs.base64('s', r.image!.blob)).toBe(blobs.base64('s', image.blob))
+		for (let id of ['unknown', '../etc/passwd', 's/../../etc/passwd', 's/missing', 'aaaaaaaaaaaa']) {
+			expect((await blobRun(id)).isError).toBe(true)
+		}
+	} finally { paths.home = originalHome }
+})
+
+test('read_blob fetches a numbered tool call and its result from history', async () => {
+	paths.home = () => dir
+	try {
+		mkdirSync(paths.sessionDir('s'), { recursive: true })
+		let call = history.append('s', { type: 'assistant', block: { type: 'tool_call', id: 't', name: 'read', input: { path: 'example.txt' } } })
+		let result = history.append('s', { type: 'user', blocks: [{ type: 'tool_result', id: 't', output: 'file contents' }] })
+		expect((await blobRun(`#${call.n}`)).output).toContain('example.txt')
+		expect((await blobRun(`s#${result.n}`)).output).toContain('file contents')
+		expect((await blobRun('#999999')).isError).toBe(true)
+	} finally { paths.home = originalHome }
+})

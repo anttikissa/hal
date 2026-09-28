@@ -1,7 +1,5 @@
-// Local tools the model may call. The host runs them between provider
-// rounds of one turn (host.ts); each call gets exactly one result, and
-// no result is larger than tools.maxChars(). Tool input comes from the
-// model, so it is checked like any untrusted data.
+// Local tools the model may call. Calls run in order (turns.ts).
+// Long results stay in session blobs; the model sees their head and tail.
 //
 // A call is recorded before it runs and its result after, so a host
 // that dies in between never runs it again; replay tells the model it
@@ -87,14 +85,20 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	} catch (e: any) {
 		result = { type: 'tool_result', id: call.id, output: `Error: ${e?.message ?? e}`, isError: true }
 	}
-	result.output = tools.cap(result.output)
+	result.output = call.name === 'read_blob' ? result.output : tools.cap(result.output, ctx.sessionId)
 	return result
 }
 
-// Output cut to tools.maxChars(), saying how much was left out.
-function cap(output: string): string {
+// Retain the whole result when cut, and show both ends: a bash failure
+// usually says why at the end. Leave room for the recoverable reference.
+function cap(output: string, sessionId?: string): string {
 	let max = tools.maxChars()
-	return output.length > max ? `${output.slice(0, max)}\n[output truncated: ${output.length - max} more characters]` : output
+	if (output.length <= max) return output
+	let saved = sessionId && blobs.storeOutput(sessionId, output)
+	let note = saved ? `\n[cut: ${Buffer.byteLength(output)} bytes total, whole output in blob ${saved.blob}; read_blob or cat ${saved.path}]` : `\n[output truncated: ${output.length - max} more characters]`
+	let room = Math.max(0, max - note.length)
+	let head = Math.ceil(room / 2)
+	return `${output.slice(0, head)}${output.slice(-Math.floor(room / 2))}${note}`
 }
 
 // Stops a tool's process group: SIGTERM now, SIGKILL killAfterMs later

@@ -189,4 +189,16 @@ function expand(sessionId: string, text: string): string {
 	return parts.join('')
 }
 
-export const blobs = { dir, looksLike, decode, store, stage, staged, file, find, read, base64, named, unknown, resolve, expand }
+// Raw tool output is not an attachment: no 5 MB upload limit applies.
+// Store it under the same checked, session-owned blob naming scheme.
+function storeOutput(sessionId: string, text: string): { blob: string; path: string } {
+	mkdirSync(blobs.dir(sessionId), { recursive: true, mode: 0o700 })
+	let blob: string
+	do blob = Buffer.from(crypto.getRandomValues(new Uint8Array(6))).toString('hex')
+	while (blobs.find(sessionId, blob))
+	let path = `${blobs.dir(sessionId)}/${blob}.txt`
+	writeFileSync(path, text, { mode: 0o600, flag: 'wx' })
+	return { blob, path }
+}
+
+export const blobs = { dir, looksLike, decode, store, storeOutput, stage, staged, file, find, read, base64, named, unknown, resolve, expand }
