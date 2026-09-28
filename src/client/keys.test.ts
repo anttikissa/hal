@@ -82,10 +82,14 @@ describe('unsupported sequences are dropped whole', () => {
 		['OSC reply with BEL', '\x1b]11;rgb:ffff/0000/0000\x07'],
 		['OSC reply with ST', '\x1b]11;rgb:ffff/0000/0000\x1b\\'],
 		['DCS', '\x1bP>|kitty\x1b\\'],
-		['function key via SS3', '\x1bOP'],
+		['function key via SS3', '\x1bOQ'],
 		['kitty private-use key', '\x1b[57441u'],
 	])('%s', (_name, seq) => {
 		expect(decode(`a${seq}b`)).toEqual(['text:a', 'text:b'])
+	})
+
+	test('F1 in its legacy and CSI forms', () => {
+		for (let seq of ['\x1bOP', '\x1b[P', '\x1b[1;1P', '\x1b[11~']) expect(decode(seq)).toEqual(['f1'])
 	})
 
 	test('malformed CSI does not swallow the following key', () => {

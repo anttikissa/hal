@@ -9,7 +9,7 @@
 // prompt (src/common/amend.ts), Up on the box's first line and Down on
 // its last browse the prompts sent (src/common/recall.ts; a line ends
 // only at a newline here, as the page cannot know where the textarea
-// wraps), Tab completes a slash command, Ctrl-M opens the model picker,
+// wraps), Tab completes a slash command, command keys (Ctrl-M, F1) run theirs,
 // the readline keys in editor.table edit the box. A printable key
 // pressed outside any field types into the box.
 
@@ -62,9 +62,9 @@ function key(e: KeyInput, target: Target): boolean {
 		app.modalKey(k)
 		return true
 	}
-	let models = k && view.modelsKey(st.view, k)
-	if (models) {
-		connection.send(models)
+	let command = k && view.commandKey(st.view, k, tabs.mac())
+	if (command) {
+		connection.send(command)
 		return true
 	}
 	if (st.view.form) {

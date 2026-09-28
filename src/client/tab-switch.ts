@@ -67,13 +67,11 @@ function focusOn(focus: Focus): void {
 	if (tab?.attention) app.send({ type: 'tab-seen', sessionId: tab.id })
 }
 
-// Tab keys: new, reopen, close, next, previous, go to 1-10. True if
-// handled.
+// Tab keys: next, previous, go to 1-10. True if handled.
 function tabKey(k: KeyEvent): boolean {
 	let tab = app.focusedTab()
 	let r = tab && tabs.key(k, tab, app.state.tabs.map((t) => t.id))
 	if (!r) return false
-	if (r.command) app.send(r.command)
 	if (r.focus !== undefined && r.focus !== tab!.id) app.focusOn({ tab: r.focus })
 	return true
 }

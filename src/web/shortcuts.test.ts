@@ -1,5 +1,8 @@
 import { expect, test } from 'bun:test'
+import { commandList } from '../common/commands/list.ts'
+import { keyHelp } from '../common/key-help.ts'
 import { shortcuts, type TabKey } from './shortcuts.ts'
+import { view } from './view.ts'
 
 const press = (key: string, mods: Partial<TabKey> = {}, mac = true) =>
 	shortcuts.action({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...mods }, mac)
@@ -23,4 +26,23 @@ test('Ctrl-T/W/N/P are tab keys on macOS only; Cmd, Shift and IME composition ar
 	expect(press('T', { ctrlKey: true, shiftKey: true })).toBeUndefined()
 	expect(press('m', { ctrlKey: true })).toBeUndefined()
 	expect(press('1', { altKey: true, code: 'Digit1', isComposing: true })).toBeUndefined()
+})
+
+test('a command key the browser takes is not bound on the web; the others are', () => {
+	let snapshot = { meta: { id: 's', cwd: '/', model: 'm', createdAt: '' }, history: [], state: { type: 'idle' as const } }
+	let st = view.onEvent({}, { type: 'snapshot', sessionId: 's', snapshot })
+	let event = (label: string) => {
+		let b = keyHelp.parse(label)
+		return { key: b.key === 'f1' ? 'F1' : b.key, shiftKey: b.shift, ctrlKey: b.ctrl, altKey: b.alt, metaKey: b.cmd }
+	}
+	let bound = (label: string, mac: boolean) => {
+		let e = event(label)
+		return !!shortcuts.action(e, mac) || !!view.commandKey(st, view.key(e)!, mac)
+	}
+	let taken = commandList.all().filter((c) => c.key && !commandList.onWeb(c.key, false))
+	expect(taken.map((c) => c.key)).toContain('ctrl-t')
+	for (let c of taken) expect(bound(c.key!, false)).toBe(false)
+	expect(bound('ctrl-t', true)).toBe(true)
+	expect(bound('ctrl-m', false)).toBe(true)
+	expect(bound('f1', false)).toBe(true)
 })

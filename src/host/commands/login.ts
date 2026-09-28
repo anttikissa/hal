@@ -17,8 +17,6 @@ const ALIASES: Record<string, string> = { claude: 'claude', anthropic: 'claude',
 const KEYS = 'API keys: set ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENCODE_API_KEY or OPENROUTER_API_KEY'
 
 export const command: SlashCommand = {
-	description: 'log in to a provider',
-	category: 'session',
 	help: () =>
 		'/login claude | chatgpt: log this home in to a Claude or ChatGPT subscription; the tokens go to its credentials file. /login opencode: store an OpenCode Go API key there. An API key in ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENCODE_API_KEY (or OPENROUTER_API_KEY for openrouter) works without logging in.',
 	complete: (args) => PROVIDERS.filter((p) => p.startsWith(args)),

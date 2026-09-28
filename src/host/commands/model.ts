@@ -5,8 +5,6 @@ import type { SlashCommand } from '../commands.ts'
 import { models } from '../models.ts'
 
 export const command: SlashCommand = {
-	description: 'switch the model',
-	category: 'session',
 	help: () => '/model <provider/model>: switch this session to that model from its next request on. /model alone opens the picker (Ctrl-M opens it too).',
 	complete: (args) => [...new Set(models.known())].filter((id) => id.startsWith(args)),
 	run(args, _answers, ctx) {

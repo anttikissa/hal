@@ -2,6 +2,7 @@
 // run on the host, their output recorded and broadcast, and a question
 // they ask kept in history until answered (prompts.reply).
 
+import { commandList } from '../common/commands/list.ts'
 import { forms, type Answers } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
@@ -17,8 +18,10 @@ import { status } from './status.ts'
 
 // Records a slash command as typed (by whom: `from`, else the human) and
 // runs it. `command`: the client's id for the submit. Returns why it is
-// refused: no such command.
+// refused: no such command, or one only a client may run (a session may
+// not quit or restart the user's terminal).
 function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string): string | undefined {
+	if (commandList.byName(call.name)?.clientOnly) return `only a client can run /${call.name}`
 	if (!commands.all().has(call.name)) return `unknown command /${call.name} (/help lists them)`
 	let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text }
 	if (from !== undefined) record.from = from

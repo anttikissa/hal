@@ -2,13 +2,16 @@
 // src/host/commands/, named like it (cd.ts is /cd), found by listing the
 // directory, so adding a command touches nothing else. Each exports
 // `command`, a SlashCommand. They run on the host, completion included,
-// so every client gets the same. Nothing waits in memory: a command
+// so every client gets the same. Name, description, category and key
+// are in the shared list (common/commands/list.ts), which also names the
+// client-only commands the host never runs. Nothing waits in memory: a command
 // that needs to ask returns a form, and the answer runs it again with
 // `answers`.
 
 import { readdirSync } from 'fs'
 import { homedir } from 'os'
 import { resolve } from 'path'
+import { commandList } from '../common/commands/list.ts'
 import type { Answers, Form } from '../common/forms.ts'
 
 // What a command did: something to say, a failure, or a question.
@@ -24,10 +27,6 @@ export type Reply = { say?: string; show?: string; error?: string; ask?: Form; o
 export type Context = { sessionId: string; cwd: string; model: string; setCwd(cwd: string): void; setModel(model: string): void; say(text: string): void }
 
 export type SlashCommand = {
-	// One line for /help.
-	description: string
-	// /help groups commands by it.
-	category: string
 	// The detail /help <name> shows; `args` follow the name.
 	help?(args: string): string
 	// Full argument texts `args` may complete to.
@@ -60,7 +59,7 @@ function parse(text: string): { name: string; args: string } | undefined {
 // command completes its arguments to.
 function complete(text: string, ctx: Context): string[] {
 	let bare = /^\/([a-z0-9-]*)$/.exec(text)
-	if (bare) return [...commands.all().keys()].filter((n) => n.startsWith(bare[1]!)).map((n) => `/${n} `)
+	if (bare) return commandList.all().map((c) => c.name).filter((n) => n.startsWith(bare[1]!)).map((n) => `/${n} `)
 	let m = /^\/([a-z][a-z0-9-]*)\s([\s\S]*)$/.exec(text)
 	let cmd = m && commands.all().get(m[1]!)
 	if (!m || !cmd?.complete) return []

@@ -34,18 +34,12 @@ function step(ids: string[], tab: string | undefined, by: number): string | unde
 
 type TabKey = { key: string; shift: boolean; alt: boolean; ctrl: boolean; cmd: boolean }
 
-// What a tab key does from tab `tab` (with its cwd) among `ids`: a
-// command for the host (new, reopen, close) or a tab to focus (next,
-// previous, go to 1-10). Undefined if `k` is no tab key.
-function key(k: TabKey, tab: { id: string; cwd: string }, ids: string[]): { command?: object; focus?: string } | undefined {
+// The tab a tab key focuses from tab `tab` among `ids`: next, previous,
+// go to 1-10. Undefined if `k` is no tab key. New, reopen and close are
+// commands (client/commands/).
+function key(k: TabKey, tab: { id: string }, ids: string[]): { focus?: string } | undefined {
 	if (k.cmd) return undefined
-	if (k.ctrl && !k.alt) {
-		if (k.key === 't') return { command: k.shift ? { type: 'tab-resume' } : { type: 'tab-new', cwd: tab.cwd, after: tab.id } }
-		if (k.shift) return undefined
-		if (k.key === 'w') return { command: { type: 'tab-close', sessionId: tab.id } }
-		if (k.key === 'n' || k.key === 'p') return { focus: tabs.step(ids, tab.id, k.key === 'n' ? 1 : -1) }
-		return undefined
-	}
+	if (k.ctrl && !k.alt && !k.shift && (k.key === 'n' || k.key === 'p')) return { focus: tabs.step(ids, tab.id, k.key === 'n' ? 1 : -1) }
 	if (k.alt && !k.ctrl && !k.shift && /^[0-9]$/.test(k.key)) return { focus: ids[(Number(k.key) + 9) % 10] }
 	return undefined
 }

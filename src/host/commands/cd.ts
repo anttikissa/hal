@@ -9,8 +9,6 @@ function isDir(path: string): boolean {
 }
 
 export const command: SlashCommand = {
-	description: 'change the working directory',
-	category: 'session',
 	help: () => '/cd <dir>: change the working directory of this session (~ is home; relative to the current one). Offers to create a missing directory. /cd alone shows it.',
 	complete(args: string, ctx: Context): string[] {
 		if (args === '~') return ['~/']

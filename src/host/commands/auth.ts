@@ -7,8 +7,6 @@ import { webAuth } from '../web-auth.ts'
 import { web } from '../web.ts'
 
 export const command: SlashCommand = {
-	description: 'one-time code for the web client',
-	category: 'session',
 	help: () =>
 		'/auth shows a one-time code for logging a browser in to the web client: good for 10 minutes and one login, and never saved in the transcript. `./run auth` in a shell prints one too. /auth revoke logs every browser out.',
 	complete: (args) => ('revoke'.startsWith(args) ? ['revoke'] : []),

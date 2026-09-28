@@ -54,8 +54,8 @@ function parseMods(raw: number): Pick<KeyEvent, 'shift' | 'alt' | 'ctrl' | 'cmd'
 	return { shift: (m & 1) !== 0, alt: (m & 2) !== 0, ctrl: (m & 4) !== 0, cmd: (m & 8) !== 0 }
 }
 
-const FINAL_KEYS: Record<string, string> = { A: 'up', B: 'down', C: 'right', D: 'left', H: 'home', F: 'end' }
-const TILDE_KEYS: Record<number, string> = { 1: 'home', 2: 'insert', 3: 'delete', 4: 'end', 5: 'pageup', 6: 'pagedown', 7: 'home', 8: 'end' }
+const FINAL_KEYS: Record<string, string> = { A: 'up', B: 'down', C: 'right', D: 'left', H: 'home', F: 'end', P: 'f1' }
+const TILDE_KEYS: Record<number, string> = { 1: 'home', 2: 'insert', 3: 'delete', 4: 'end', 5: 'pageup', 6: 'pagedown', 7: 'home', 8: 'end', 11: 'f1' }
 
 // Legacy control bytes. 0x0A is absent: raw-mode Enter sends CR, so a bare
 // LF is Ctrl-J or a terminal's shift+enter mapping; see controlKey().

@@ -25,6 +25,7 @@ import { prompt, type PromptState } from '../common/prompt.ts'
 import { recall } from '../common/recall.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
+import { clientCommands } from './commands.ts'
 import { frame, type View } from './frame.ts'
 import { paste } from './paste.ts'
 import { pulse } from './pulse.ts'
@@ -206,6 +207,7 @@ function onState(state: LinkState): void {
 // or a continue on an empty prompt. Refuses (keeping the typed text) what the host would refuse anyway.
 function submit(text: string, queue = false): boolean {
 	let st = app.state
+	if (clientCommands.typed(text)) return true
 	if (!st.transcript) {
 		if (!text.trim()) return true
 		st.notice = 'no session yet'
@@ -258,12 +260,8 @@ function onKeys(events: KeyEvent[]): void {
 	let st = app.state
 	for (let k of events) {
 		delete st.choices
-		if (app.tabKey(k)) continue
-		// Ctrl-L: repaint everything, whatever has the keys.
-		if (k.key === 'l' && k.ctrl && !k.alt && !k.shift && !k.cmd) {
-			terminal.redraw()
-			continue
-		}
+		// Tab and command keys, whatever has the keys.
+		if (app.tabKey(k) || clientCommands.key(k)) continue
 		if (st.modal) {
 			let { state, action } = modals.step(st.modal, k)
 			st.modal = state
@@ -279,11 +277,6 @@ function onKeys(events: KeyEvent[]): void {
 			let { state, action } = forms.step(st.form, k)
 			st.form = state
 			if (action) app.send(forms.command(st.transcript.meta.id, state, action))
-			continue
-		}
-		// Ctrl-M: the model picker, once the host has sent the list.
-		if (k.key === 'm' && k.ctrl && !k.alt && !k.cmd && st.transcript) {
-			app.send({ type: 'models', sessionId: st.transcript.meta.id })
 			continue
 		}
 		if (promptKeys.edit(st, k, app.send)) continue

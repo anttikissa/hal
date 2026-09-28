@@ -169,8 +169,8 @@ test('Tab asks the host to complete a command; its answer fills the box only if 
 
 test('Ctrl-M opens the model picker from the host list; typing filters, Enter switches, Escape closes', () => {
 	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
-	expect(view.modelsKey(st, view.key({ key: 'm', ctrlKey: true, shiftKey: false, altKey: false, metaKey: false })!)).toEqual({ type: 'models', sessionId })
-	expect(view.modelsKey(st, view.key({ key: 'm', ctrlKey: false, shiftKey: false, altKey: false, metaKey: false })!)).toBeUndefined()
+	expect(view.commandKey(st, view.key({ key: 'm', ctrlKey: true, shiftKey: false, altKey: false, metaKey: false })!, false)).toEqual({ type: 'models', sessionId })
+	expect(view.commandKey(st, view.key({ key: 'm', ctrlKey: false, shiftKey: false, altKey: false, metaKey: false })!, false)).toBeUndefined()
 	let items = ['fake/m', 'x/step-3.5-flash', 'anthropic/claude-opus-5-5']
 	st = view.onEvent(st, { type: 'models', sessionId, current: 'fake/m', items })
 	expect(st.modal?.items).toEqual(items)

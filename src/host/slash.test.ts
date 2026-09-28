@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } f
 import { tmpdir } from 'os'
 import type { Event } from '../common/protocol.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
+import { commandList } from '../common/commands/list.ts'
 import { keyHelp } from '../common/key-help.ts'
 import { commands } from './commands.ts'
 import { history } from './history.ts'
@@ -161,10 +162,11 @@ test('/help lists every command by category and /help <name> shows its detail', 
 	a.conn.send({ type: 'submit', sessionId: id, text: '/help' })
 	await until(() => outputs(a.views.get(id)!).length)
 	let list = outputs(a.views.get(id)!)[0]!
-	for (let [name, c] of commands.all()) {
-		expect(list).toContain(`/${name}`)
-		expect(list).toContain(c.description)
-		expect(list).toContain(c.category)
+	for (let c of commandList.all()) {
+		let line = list.split('\n').find((l) => l.trim().startsWith(`/${c.name} `))
+		expect(line).toEndWith(c.description)
+		if (c.key) expect(line).toContain(` ${c.key} `)
+		expect(list).toContain(`${c.category}:`)
 	}
 	a.conn.send({ type: 'submit', sessionId: id, text: '/help cd' })
 	await until(() => outputs(a.views.get(id)!).length === 2)
@@ -182,6 +184,31 @@ test('/keys shows every key the table lists, with what it does', async () => {
 	for (let row of keyHelp.sections().flatMap((s) => s.rows)) {
 		expect(lines.some((l) => l.includes(row.keys) && l.endsWith(row.description))).toBe(true)
 	}
+	// Every command key shows, with its command; descriptions line up
+	// across sections.
+	for (let c of commandList.all().filter((c) => c.key)) expect(lines.some((l) => l.includes(`${c.key}  `) && l.includes(`/${c.name} `))).toBe(true)
+	let rows = lines.filter((l) => l.startsWith('  '))
+	let at = (l: string, d: string) => l.length - d.length
+	let cols = new Set(keyHelp.sections().flatMap((s) => s.rows).map((r) => at(rows.find((l) => l.includes(r.keys) && l.endsWith(r.description))!, r.description)))
+	expect(cols.size).toBe(1)
+})
+
+test('the host refuses a client-only command, whoever sent it, and runs nothing', async () => {
+	let a = client()
+	let id = created(a)
+	expect(prompts.submit(id, '/restart', undefined, false, { from: '7-abc' })).toBe('only a client can run /restart')
+	a.conn.send({ type: 'submit', sessionId: id, text: '/quit' })
+	expect(a.of('rejected').at(-1)).toMatchObject({ command: 'submit', reason: 'only a client can run /quit' })
+	expect(history.readSync(id).filter((r) => r.type === 'command')).toEqual([])
+})
+
+test('/pause pauses a busy session', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
+	await until(() => transcript.question(a.views.get(id)))
+	a.conn.send({ type: 'submit', sessionId: id, text: '/pause' })
+	await until(() => a.views.get(id)!.state.type === 'paused')
 })
 
 test('an unknown command is refused; text that only starts with a path is a prompt', async () => {
@@ -223,12 +250,12 @@ test('completion runs on the host against its files, answering only the asker', 
 		a.conn.send({ type: 'complete', sessionId: id, text })
 		return a.of('completions').at(-1)
 	}
-	expect(ask('/c').items).toEqual(['/cd '])
+	expect(ask('/c').items).toEqual(['/cd ', '/close '])
 	expect(ask('/cd ~/projec').items.sort()).toEqual(['/cd ~/projection/', '/cd ~/projects/'])
 	expect(ask('/cd projects/').items).toEqual(['/cd projects/a/'])
 	expect(ask('/cd ~/.h').items).toEqual(['/cd ~/.hidden/'])
 	expect(ask('/cd ~/').items.sort()).toEqual(['/cd ~/projection/', '/cd ~/projects/'])
-	expect(ask('/help c').items).toEqual(['/help cd'])
+	expect(ask('/help c').items).toEqual(['/help cd', '/help close'])
 	expect(ask('/nope x').items).toEqual([])
 	expect(ask('/cd ~/projec')).toMatchObject({ sessionId: id, text: '/cd ~/projec' })
 	expect(b.of('completions')).toEqual([])
@@ -244,11 +271,14 @@ test('commands are the files in the commands directory', () => {
 	expect(commands.parse('/hello-there  a b')).toEqual({ name: 'hello-there', args: 'a b' })
 })
 
-test('every shipped command has a description, a category and run', () => {
-	expect(commands.all().size).toBeGreaterThanOrEqual(2)
-	for (let c of commands.all().values()) {
-		expect(c.description).toBeString()
-		expect(c.category).toBeString()
-		expect(c.run).toBeFunction()
-	}
+test('each listed command is run by exactly one side: a host file unless client-only', () => {
+	let files = [...commands.all().keys()].sort()
+	expect(files).toEqual(commandList.all().filter((c) => !c.clientOnly).map((c) => c.name).sort())
+	for (let c of commands.all().values()) expect(c.run).toBeFunction()
+})
+
+test('no two commands share a key', () => {
+	let keys = commandList.all().flatMap((c) => (c.key ? [JSON.stringify(keyHelp.parse(c.key))] : []))
+	expect(keys.length).toBeGreaterThan(5)
+	expect(new Set(keys).size).toBe(keys.length)
 })

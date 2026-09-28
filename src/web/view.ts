@@ -5,6 +5,7 @@
 
 import { amend, type Editing } from '../common/amend.ts'
 import { attachments } from '../common/attachments.ts'
+import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
@@ -51,7 +52,7 @@ function onEvent(st: ViewState, event: Event): ViewState {
 // With Alt, macOS types a symbol (Option-D is ∂): the physical key's
 // letter names it then.
 function key(e: { key: string; code?: string; shiftKey: boolean; ctrlKey: boolean; altKey: boolean; metaKey: boolean }): Key | undefined {
-	let names: Record<string, string> = { Enter: 'enter', Escape: 'escape', Tab: 'tab', ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Backspace: 'backspace', Delete: 'delete', Home: 'home', End: 'end' }
+	let names: Record<string, string> = { F1: 'f1', Enter: 'enter', Escape: 'escape', Tab: 'tab', ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Backspace: 'backspace', Delete: 'delete', Home: 'home', End: 'end' }
 	let mods = { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey }
 	if (names[e.key]) return { key: names[e.key]!, ...mods }
 	let letter = e.altKey && !/^[a-z]$/i.test(e.key) && /^Key([A-Z])$/.exec(e.code ?? '')?.[1]
@@ -68,10 +69,15 @@ function formKey(st: ViewState, k: Key): { state: ViewState; command?: unknown }
 	return action ? { state: next, command: forms.command(st.transcript.meta.id, state, action) } : { state: next }
 }
 
-// Ctrl-M: the command asking the host for the model list.
-function modelsKey(st: ViewState, k: Key): unknown {
-	let ctrlM = k.key === 'm' && k.ctrl && !k.alt && !k.cmd
-	return ctrlM && st.transcript ? { type: 'models', sessionId: st.transcript.meta.id } : undefined
+// A host command's key (common/commands/list.ts), if the browser gives
+// it to the page: what to send. Ctrl-M only asks for the model picker;
+// others send `/<name>` as typed. Client-only commands are the
+// terminal's (the web's tab keys are shortcuts.ts).
+function commandKey(st: ViewState, k: Key, mac: boolean): unknown {
+	let c = commandList.byKey({ key: k.key, shift: !!k.shift, alt: !!k.alt, ctrl: !!k.ctrl, cmd: !!k.cmd })
+	if (!c || c.clientOnly || !commandList.onWeb(c.key!, mac) || !st.transcript) return undefined
+	let sessionId = st.transcript.meta.id
+	return c.name === 'model' ? { type: 'models', sessionId } : { type: 'submit', sessionId, text: `/${c.name}` }
 }
 
 function closed(st: ViewState): ViewState {
@@ -296,7 +302,7 @@ export const view = {
 	onEvent,
 	key,
 	formKey,
-	modelsKey,
+	commandKey,
 	modalKey,
 	search,
 	submit,

@@ -1,10 +1,13 @@
 // Every prompt, editing, clipboard and app key, with what it does: the
 // one list /keys shows in both clients. Labels are the bindings
 // themselves ("shift-ctrl-t", "ctrl--" for Ctrl and minus), parsed into
-// Key-shaped bindings so a test can check each one is handled.
+// Key-shaped bindings so a test can check each one is handled. Rows of
+// commands with a key come from the command list (common/commands/).
+
+import { commandList } from './commands/list.ts'
 
 export type Binding = { key: string; shift: boolean; alt: boolean; ctrl: boolean; cmd: boolean }
-export type KeyRow = { keys: string; description: string; bindings: Binding[] }
+export type KeyRow = { keys: string; description: string; bindings: Binding[]; command?: string }
 export type KeySection = { title: string; rows: KeyRow[] }
 
 // "shift-ctrl-t" → t with Shift and Ctrl; the key is what follows the
@@ -21,6 +24,12 @@ function parse(label: string): Binding {
 function row(keys: string, description: string, sums?: string[]): KeyRow {
 	let labels = sums ?? keys.split(' / ')
 	return { keys, description, bindings: labels.map((l) => keyHelp.parse(l)) }
+}
+
+// The row of command `name`, which has a key.
+function command(name: string): KeyRow {
+	let c = commandList.byName(name)!
+	return { ...row(c.key!, c.description), command: name }
 }
 
 const digits = [...'1234567890'].map((d) => `alt-${d}`)
@@ -70,27 +79,32 @@ function sections(): KeySection[] {
 		{
 			title: 'Tabs and app',
 			rows: [
-				row('ctrl-t', 'new tab'),
-				row('shift-ctrl-t', 'reopen the last closed tab'),
-				row('ctrl-w', 'close the tab'),
+				command('new'),
+				command('resume'),
+				command('close'),
 				row('ctrl-n / ctrl-p', 'next or previous tab'),
 				row('alt-1 … alt-0', 'tab 1 to 10', digits),
-				row('ctrl-m', 'model picker'),
-				row('ctrl-l', 'redraw'),
-				row('ctrl-c', 'quit'),
-				row('ctrl-z', 'suspend'),
-				row('ctrl-r', 'restart'),
+				command('model'),
+				command('redraw'),
+				command('quit'),
+				command('suspend'),
+				command('restart'),
+				command('keys'),
 			],
 		},
 	]
 }
 
+// One keys column and one command column across all sections, so the
+// descriptions line up.
 function render(): string {
+	let rows = keyHelp.sections().flatMap((s) => s.rows)
+	let keys = Math.max(...rows.map((r) => r.keys.length))
+	let names = Math.max(...rows.map((r) => (r.command ? r.command.length + 1 : 0)))
 	let parts = ['Keys:']
 	for (let section of keyHelp.sections()) {
 		parts.push('', `${section.title}:`)
-		let width = Math.max(...section.rows.map((r) => r.keys.length))
-		for (let r of section.rows) parts.push(`  ${r.keys.padEnd(width)}  ${r.description}`)
+		for (let r of section.rows) parts.push(`  ${r.keys.padEnd(keys)}  ${(r.command ? `/${r.command}` : '').padEnd(names)}  ${r.description}`)
 	}
 	return parts.join('\n')
 }
