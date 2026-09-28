@@ -41,9 +41,7 @@ import { titles } from '../common/titles.ts'
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
 // `editing`: the last prompt is in the editor (src/common/amend.ts).
-// `modal`: client-only UI over everything, taking the keys first;
-// `onModal` makes the command its Enter sends; `onModalKey` updates it
-// after a key (the picker refilters its list).
+// `modal`: client-only UI; onModal submits, onModalKey refilters.
 // `choices`: tab completion's, listed below the prompt until a key.
 // `tabs`: the host's, in order; `focus`: the one shown; `asked`: the tab
 // this client's own tab command named, focused once it is in the list;
@@ -63,8 +61,7 @@ export type AppState = {
 	modal?: ModalState
 	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
 	onModalKey?: (modal: ModalState) => ModalState
-	older: Map<string, Backfill>; background: Set<string>; painted: boolean; loading?: string
-	timer?: ReturnType<typeof setTimeout>; choices?: string[]
+	older: Map<string, Backfill>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout>; choices?: string[]
 }
 
 function createState(): AppState {
