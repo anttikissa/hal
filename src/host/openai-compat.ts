@@ -33,7 +33,14 @@ function toMessages(req: ProviderRequest, images = true): unknown[] {
 			let parts: unknown[] = []
 			for (let b of msg.blocks) {
 				if (b.type === 'text') texts.push(b.text)
-				else if (b.type === 'tool_result') out.push({ role: 'tool', tool_call_id: b.id, content: b.isError ? `Error: ${b.output}` : b.output })
+				else if (b.type === 'tool_result') {
+					out.push({ role: 'tool', tool_call_id: b.id, content: b.isError ? `Error: ${b.output}` : b.output })
+					if (b.image) {
+						let data = images ? req.image?.(b.image.blob) : undefined
+						if (data !== undefined) parts.push({ type: 'image_url', image_url: { url: `data:${b.image.mediaType};base64,${data}` } })
+						else texts.push(provider.imageNote(images ? 'its file is gone' : 'this model cannot see images'))
+					}
+				}
 				else {
 					let data = images ? req.image?.(b.blob) : undefined
 					if (data !== undefined) parts.push({ type: 'image_url', image_url: { url: `data:${b.mediaType};base64,${data}` } })

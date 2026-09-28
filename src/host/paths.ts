@@ -39,7 +39,8 @@ function imageDir(): string {
 }
 
 // Where pasted file `name` (attachments.fileName) waits.
-function fileDir(name: string): string {
+function fileDir(name?: string): string {
+	if (name === undefined) return `${paths.tmpDir()}/file`
 	return attachments.nameType(name) === 'text/plain' ? `${paths.tmpDir()}/paste` : paths.imageDir()
 }
 

@@ -10,7 +10,7 @@ export type ThinkingBlock = { type: 'thinking'; text: string; signature?: string
 
 export type ToolCallBlock = { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
 
-export type ToolResultBlock = { type: 'tool_result'; id: string; output: string; isError?: boolean }
+export type ToolResultBlock = { type: 'tool_result'; id: string; output: string; isError?: boolean; image?: ImageBlock }
 
 // An attached image (task 2a): a reference to the session's blob, never
 // its bytes; providers read those when they build a request. `bytes`:

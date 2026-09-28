@@ -14,12 +14,14 @@
 import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
+import { blobs } from './blobs.ts'
 import type { ToolDef } from './provider.ts'
 
 // `sessionId`: the session whose turn runs the call. `endTurn`: the
 // turn ends once this round's results are in, unless messages wait to
 // be read (the wait tool).
 export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string; endTurn?: () => void }
+export type ToolOutput = string | { text: string; image: { mediaType: string; data: string } }
 
 // One file per tool in src/host/tools/, named like it (read.ts is
 // read), exporting `tool`, so adding a tool touches nothing else.
@@ -27,12 +29,12 @@ export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string;
 // changes nothing, so an edited prompt may replace the turn that ran it
 // (prompts.amend). run returns the output; throwing makes an error
 // result with the message.
-export type Tool = {
+export type Tool<Output = string> = {
 	name: string
 	description: string
 	parameters: ToolDef['inputSchema']
 	readOnly?: true
-	run(input: Record<string, unknown>, ctx: ToolContext): Promise<string>
+	run(input: Record<string, unknown>, ctx: ToolContext): Promise<Output>
 }
 
 function dir(): string {
@@ -40,7 +42,7 @@ function dir(): string {
 }
 
 // Every tool by name, sorted, read from the directory each time.
-function all(): Map<string, Tool> {
+function all(): Map<string, Tool<ToolOutput>> {
 	let found = new Map<string, Tool>()
 	for (let file of readdirSync(tools.dir()).sort()) {
 		if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue
@@ -76,7 +78,12 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	try {
 		let tool = tools.all().get(call.name)
 		if (!tool) throw new Error(`unknown tool '${call.name}'`)
-		result = { type: 'tool_result', id: call.id, output: await tool.run(call.input, ctx) }
+		let out = await tool.run(call.input, ctx)
+		if (typeof out === 'string') result = { type: 'tool_result', id: call.id, output: out }
+		else {
+			let image = blobs.store(ctx.sessionId, out.image.mediaType, out.image.data)
+			result = { type: 'tool_result', id: call.id, output: out.text, image: { type: 'image', blob: image.blob, mediaType: image.mediaType, bytes: image.bytes } }
+		}
 	} catch (e: any) {
 		result = { type: 'tool_result', id: call.id, output: `Error: ${e?.message ?? e}`, isError: true }
 	}

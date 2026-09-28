@@ -32,7 +32,13 @@ function input(req: ProviderRequest): unknown[] {
 		if (m.role === 'user') {
 			let parts: unknown[] = []
 			for (let b of m.blocks) {
-				if (b.type === 'tool_result') out.push({ type: 'function_call_output', call_id: b.id, output: b.isError ? `Error: ${b.output}` : b.output })
+				if (b.type === 'tool_result') {
+					out.push({ type: 'function_call_output', call_id: b.id, output: b.isError ? `Error: ${b.output}` : b.output })
+					if (b.image) {
+						let data = req.image?.(b.image.blob)
+						parts.push(data === undefined ? { type: 'input_text', text: provider.imageNote('its file is gone') } : { type: 'input_image', detail: 'auto', image_url: `data:${b.image.mediaType};base64,${data}` })
+					}
+				}
 				else if (b.type === 'text') parts.push({ type: 'input_text', text: b.text })
 				else {
 					let data = req.image?.(b.blob)

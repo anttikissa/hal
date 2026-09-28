@@ -37,7 +37,8 @@ function userBlock(b: UserBlock, req: ProviderRequest): unknown {
 		if (data === undefined) return { type: 'text', text: provider.imageNote('its file is gone') }
 		return { type: 'image', source: { type: 'base64', media_type: b.mediaType, data } }
 	}
-	return { type: 'tool_result', tool_use_id: b.id, content: b.output, ...(b.isError ? { is_error: true } : {}) }
+	let content = b.image ? [{ type: 'text', text: b.output }, userBlock(b.image, req)] : b.output
+	return { type: 'tool_result', tool_use_id: b.id, content, ...(b.isError ? { is_error: true } : {}) }
 }
 
 // Only thinking signed by this provider can be sent back; foreign or
