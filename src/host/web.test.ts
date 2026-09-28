@@ -241,7 +241,7 @@ test('GET /image/<name> is a page naming where the image lives; /raw/<name> its 
 	let page = await (await get('/image/abc123.png')).text()
 	expect(page).toContain(tmp)
 	expect(page).toContain('src="/raw/abc123.png"')
-	expect(page).toContain('PNG · 312 × 216 · 30 B')
+	expect(page).toContain(`<code>${tmp}</code> (312 × 216, 30 B)`)
 	expect(page).toContain('href="/raw/abc123.png" download="abc123.png"')
 	expect(page).toContain('>Open original</a>')
 	expect((await get('/image/abc123')).status).toBe(200)

@@ -82,7 +82,8 @@ function view(): View {
 	if (t && !st.prompt.text) v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	if (v.tabs && tabBar.blinks(st.tabs)) v.tabs.lit = pulse.slow(pulse.beat())
-	if (st.notice) v.notice = st.notice
+	let notice = st.notice ?? (t && why(t))
+	if (notice) v.notice = notice
 	if (st.editing) v.editing = amend.hint(st.editing)
 	let activity = t && app.activity(t)
 	if (activity) v.activity = activity
@@ -109,11 +110,21 @@ function status(t: Transcript): StatusInfo {
 // What the session is doing in a word or two, for the prompt's top
 // rule: states.describe's words, except that the help row already says
 // which key continues, and the question on screen needs its answer.
+// The activity in the rule above the prompt: a word or two, never a
+// message clipped to the row; the whole sentence is the notice (why).
 function activity(t: Transcript): string | undefined {
 	let s = t.state
-	if (s.type === 'blocked' && s.reason === 'question') return 'waiting for answer'
-	if (s.type === 'paused') return s.reason ? `paused: ${s.reason}` : 'paused'
-	if (s.type === 'error') return `error: ${s.message}`
+	if (s.type === 'blocked') return s.reason === 'question' ? 'waiting for answer' : `blocked: ${s.reason.split(':')[0]}`
+	if (s.type === 'paused') return 'paused'
+	if (s.type === 'error') return 'error'
+	if (s.type === 'retrying') return (states.describe(s, Date.now()) ?? '').replace(/ \(.*$/s, '')
+	return states.describe(s, Date.now(), t.items)
+}
+
+// Why a stopped session waits and what the user can do, in full.
+function why(t: Transcript): string | undefined {
+	let s = t.state
+	if (s.type === 'running' || s.type === 'idle' || (s.type === 'blocked' && s.reason === 'question')) return undefined
 	return states.describe(s, Date.now(), t.items)
 }
 

@@ -137,12 +137,20 @@ test('the activity says what the session does, and waiting for answer on a quest
 	expect(app.view().activity).toBeUndefined()
 })
 
+test('a login block says so in a word above the prompt; the whole message is the notice', () => {
+	app.onEvent(snapshot('s1', { type: 'blocked', reason: 'log in: token refresh failed: HTTP 400 invalid_grant' }))
+	expect(app.view().activity).toBe('blocked: log in')
+	expect(app.view().notice).toContain('invalid_grant')
+})
+
 test('bare Enter continues a paused or failed turn, and says so', () => {
 	app.onEvent(snapshot('s1', { type: 'paused' }))
 	expect(app.view().activity).toBe('paused')
 	enter()
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'error', message: '400 nope' } })
-	expect(app.view().activity).toMatch(/400 nope/)
+	// The rule says it in a word; the notice has the whole message.
+	expect(app.view().activity).toBe('error')
+	expect(app.view().notice).toMatch(/400 nope.*Enter/)
 	enter()
 	expect(sent).toEqual([
 		{ type: 'continue', sessionId: 's1' },
@@ -626,7 +634,7 @@ test('web links carry the latest link code only in their hidden target', () => {
 		type('see [image/frdbn1.png]')
 		let lines = frame.build(app.view(), 60).lines
 		let targets = lines.flatMap((l) => [...l.matchAll(/\x1b\]8;;([^\x07]+)\x07/g)].map((m) => m[1]))
-		expect(targets).toEqual(expect.arrayContaining(['https://h.example/a?auth=k3x9qa', 'https://h.example/b?auth=k3x9qa', 'https://h.example/image/frdbn1?auth=k3x9qa']))
+		expect(targets).toEqual(expect.arrayContaining(['https://h.example/a?auth=k3x9qa', 'https://h.example/b?auth=k3x9qa', 'https://h.example/image/frdbn1.png?auth=k3x9qa']))
 		expect(lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, '')).join('\n')).not.toContain('k3x9qa')
 		// A replaced code is what the next paint links with.
 		app.onEvent({ type: 'auth', code: 'm2p7rt', link: 'https://h.example' })

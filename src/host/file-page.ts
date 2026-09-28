@@ -52,10 +52,11 @@ function serve(pathname: string, css: string): Response {
 		let type = found.mediaType === 'text/plain' ? 'text/plain; charset=utf-8' : found.mediaType
 		return new Response(new Uint8Array(found.bytes), { headers: { 'content-type': type, 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=31536000, immutable' } })
 	}
+	// "file /tmp/hal/image/ain96g.png (384 x 298, 50.4 kB)": no format,
+	// the extension already says it.
+	let detail = [found.mediaType !== 'text/plain' && dimensions(found.bytes, found.mediaType), size(found.bytes.length)].filter(Boolean).join(', ')
 	let where = [...(found.tmp ? [['file', found.tmp]] : []), ...found.blobs.map((p) => ['session copy', p])]
-	let header = where.map(([label, path]) => `<div><span class="label">${label}</span> <code>${escape(path!)}</code></div>`).join('')
-	let detail = found.mediaType !== 'text/plain' ? [name!.split('.').at(-1)!.toUpperCase(), dimensions(found.bytes, found.mediaType), size(found.bytes.length)].filter(Boolean).join(' · ') : size(found.bytes.length)
-	header = `<div>${escape(detail)}</div>` + header
+	let header = where.map(([label, path], i) => `<div><span class="label">${label}</span> <code>${escape(path!)}</code>${i ? '' : ` (${escape(detail)})`}</div>`).join('')
 	let body =
 		found.mediaType === 'text/plain'
 			? `<pre>${escape(found.bytes.toString('utf8'))}</pre>`

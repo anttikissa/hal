@@ -276,7 +276,7 @@ function links(text: string): (string | { href: string; text: string })[] {
 	let from = 0
 	for (let m of text.matchAll(attachments.fileMarker)) {
 		if (m.index > from) out.push(text.slice(from, m.index))
-		out.push({ href: `/${m[1]!.slice(0, m[1]!.lastIndexOf('.'))}`, text: m[0] })
+		out.push({ href: `/${m[1]!}`, text: m[0] })
 		from = m.index + m[0].length
 	}
 	if (from < text.length) out.push(text.slice(from))
