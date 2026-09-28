@@ -1,6 +1,9 @@
 {
 	title: 'System prompt: bash is the main tool',
 	spec: 'hal2 deliberately has no read-modify tools beyond read and bash (no write, edit, grep, glob): the experiment is how far a model gets with bash alone. The system prompt (src/host/system-prompt.ts, byte-stable for caching) holds a short section, under 15 lines, that tells the model so and how to use bash well: search with rg (or grep -rn), view parts of files with sed -n or the read tool, create files with a quoted heredoc, make small edits with a script whose failure is visible (python3 or perl replacing an exact string and exiting non-zero when the old text is missing, or git apply of a unified diff), then check the result (git diff). It names the description field as what the user reads. Keep it tool-agnostic of the model vendor. Tests: none beyond the existing byte-stability test; wording is not tested.',
-	status: 'planned',
-	needs: ['1r']
+	status: 'done',
+	needs: ['1r'],
+	notes: [
+		'SYSTEM.md keeps the bash guidance in a short vendor-neutral Tools section; read is optional, bash is primary, and descriptions are user-visible.'
+	]
 }
