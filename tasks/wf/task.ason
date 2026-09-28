@@ -1,7 +1,10 @@
 {
 	title: 'Account choice is a local.ts hook',
 	spec: "The choice of account per request is one replaceable function on the auth object (pickAccount), which local.ts can override, e.g. to prefer one OpenAI account until it runs out. The default is least-used: it ranks all accounts, API keys included, by their usage windows, not by file order. Model-specific windows such as Anthropic's 7d_sonnet don't affect the choice (all Claude models share one quota) and /status doesn't show them (questions.md 128, 129).",
-	status: 'planned',
+	status: 'done',
 	needs: [],
-	foldInto: ['61']
+	foldInto: ['61'],
+	notes: [
+		'auth.pickAccount is the single local.ts override for per-request routing; returns ordered accounts and preserves session affinity by default. Usage ranking now includes API keys; account-specific windows (7d_sonnet and 7d-sonnet) are ignored by ranking, terminal/web plan, and /status, while raw observations remain cached.'
+	]
 }

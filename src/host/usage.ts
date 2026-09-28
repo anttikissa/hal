@@ -96,7 +96,9 @@ function windows(provider: string, account: string): Windows {
 // resetting soonest. An account without data is unused.
 function tightest(provider: string, account: string): { used: number; resets: number } {
 	let best = { used: 0, resets: Infinity }
-	for (let w of Object.values(usage.windows(provider, account))) {
+	for (let [name, w] of Object.entries(usage.windows(provider, account))) {
+		// Model-specific windows do not constrain another model's quota.
+		if (/^\d+[a-z]+[-_]/.test(name)) continue
 		let resets = w.resets ? Date.parse(w.resets) : Infinity
 		if (w.used > best.used || (w.used === best.used && resets < best.resets)) best = { used: w.used, resets }
 	}

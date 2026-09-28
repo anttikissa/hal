@@ -33,7 +33,7 @@ function plan(id: string, model: string): Plan | undefined {
 	try {
 		let { list } = auth.all(kind as Kind)
 		let subs = list.filter((a) => typeof a.entry.accessToken === 'string' && a.entry.accessToken)
-		let next = auth.order(kind as Kind, list, { session: id })[0]
+		let next = auth.pickAccount(kind as Kind, list, { session: id })[0]
 		if (!next || !subs.includes(next)) return undefined
 		let key = `${kind}:${next.name}`
 		let previous = stats.state.windows.get(key)
@@ -41,7 +41,7 @@ function plan(id: string, model: string): Plan | undefined {
 		if (previous && clock.now() - previous.at < 60_000) windows = previous.windows
 		else {
 			windows = {}
-			for (let [name, w] of Object.entries(usage.windows(kind, next.name))) windows[name] = Math.round(w.used)
+			for (let [name, w] of Object.entries(usage.windows(kind, next.name))) if (!/^\d+[a-z]+[-_]/.test(name)) windows[name] = Math.round(w.used)
 			stats.state.windows.set(key, { at: clock.now(), windows })
 		}
 		return { account: subs.indexOf(next) + 1, accounts: subs.length, windows }

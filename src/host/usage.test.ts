@@ -85,3 +85,14 @@ test('least used first: tightest window, then sooner reset; no data is unused; a
 	// Another provider's data is its own.
 	expect(usage.order('openai', ['a', 'd'], (x) => x)).toEqual(['a', 'd'])
 })
+
+test('a Sonnet-only week does not steer another Claude model to a busier account', () => {
+	usage.observe('anthropic', 'a', new Headers({
+		'anthropic-ratelimit-unified-7d_sonnet-utilization': '0.99',
+		'anthropic-ratelimit-unified-7d_sonnet-reset': secs(now + 86400_000),
+		'anthropic-ratelimit-unified-5h-utilization': '0.1',
+		'anthropic-ratelimit-unified-5h-reset': secs(now + 3600_000),
+	}))
+	usage.observe('anthropic', 'b', new Headers({ 'anthropic-ratelimit-unified-5h-utilization': '0.4' }))
+	expect(usage.order('anthropic', ['a', 'b'], (x) => x)).toEqual(['a', 'b'])
+})

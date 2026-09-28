@@ -34,7 +34,7 @@ function table(rows: UsageRow[]): string {
 	for (let kind of ['anthropic', 'openai'] as const) {
 		let accounts = rows.filter((row) => row.provider === kind)
 		if (!accounts.length) continue
-		let names = [...new Set(accounts.flatMap((row) => Object.keys(row.windows)))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+		let names = [...new Set(accounts.flatMap((row) => Object.keys(row.windows).filter((name) => !/^\d+[a-z]+[-_]/.test(name))))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
 		let cols = names.length ? names : ['5h', '7d']
 		let lines = [`${kind === 'anthropic' ? 'Anthropic' : 'OpenAI'} subscriptions:`, '', `| Slot | Account | ${cols.join(' | ')} |`, `|${Array(cols.length + 2).fill('---').join('|')}|`]
 		for (let row of accounts) {
@@ -143,7 +143,7 @@ async function show(sessionId: string, model: string): Promise<string> {
 			if (e?.message?.includes('no ' + kind + ' login')) continue
 			throw e
 		}
-		let selected = model.startsWith(`${kind}/`) ? auth.state.chosen.get(`${kind} ${sessionId}`) ?? auth.order(kind, list, { session: sessionId })[0]?.name : undefined
+		let selected = model.startsWith(`${kind}/`) ? auth.state.chosen.get(`${kind} ${sessionId}`) ?? auth.pickAccount(kind, list, { session: sessionId })[0]?.name : undefined
 		for (let [i, account] of list.entries()) {
 			let apiKey = !auth.usable(account.entry.accessToken)
 			let data = usage.store()[kind]?.[account.name] ?? {}

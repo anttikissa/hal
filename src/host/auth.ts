@@ -11,11 +11,10 @@
 // (log in, fix the file), 'temporary' when trying again may work,
 // 'limited' (with retryAt) when every account is rate limited.
 //
-// Several entries of a provider are accounts, least used first
-// (usage.ts, then API keys in order), a turn staying on one: one limited
-// for the model (limits.ts) or whose login is broken is skipped, so a
-// 429 rotates to the next account for the same model. A login is
-// broken when its refresh token is rejected (invalid_grant: typically
+// Several entries of a provider are accounts, ranked by provider-wide
+// usage (including API keys); a turn stays on one account until limited
+// for the model (limits.ts) or its login breaks, so a 429 rotates. A
+// login is broken when its refresh token is rejected (invalid_grant: typically
 // a copied file where another home already rotated the token) or its
 // fresh token is rejected again. Broken is remembered by a hash of the
 // credentials, so it ends by itself when the file gets new ones; while
@@ -146,12 +145,11 @@ function fingerprint(entry: Entry): string {
 // Kept in memory only: a restart may pick again.
 export type For = { session?: string }
 
-// The order accounts are tried in: subscriptions least used first
-// (usage.ts), then API keys, which cost money, in file order; but a
-// session tries its own account first.
-function order(kind: Kind, list: Account[], who: For = {}): Account[] {
-	let subs = list.filter((a) => usable(a.entry.accessToken))
-	let out = [...usage.order(kind, subs, (a) => a.name), ...list.filter((a) => !subs.includes(a))]
+// One replaceable account chooser for local.ts. Its default ranks every
+// account (including API keys) by provider-wide usage, while retaining the
+// session's chosen account first for its prompt cache.
+function pickAccount(kind: Kind, list: Account[], who: For = {}): Account[] {
+	let out = usage.order(kind, list, (a) => a.name)
 	let mine = who.session ? auth.state.chosen.get(`${kind} ${who.session}`) : undefined
 	let i = out.findIndex((a) => a.name === mine)
 	if (i > 0) out.unshift(...out.splice(i, 1))
@@ -163,7 +161,7 @@ function order(kind: Kind, list: Account[], who: For = {}): Account[] {
 // `model`. Concurrent callers share one refresh.
 async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credential> {
 	let { data, list } = auth.all(kind)
-	list = auth.order(kind, list, who)
+	list = auth.pickAccount(kind, list, who)
 	let limitedUntil = Infinity
 	let problems: string[] = []
 	for (let account of list) {
@@ -320,7 +318,7 @@ export const auth = {
 	store,
 	all,
 	accounts,
-	order,
+	pickAccount,
 	pick,
 	anthropic: (model?: string, who?: For) => auth.pick('anthropic', model, who),
 	openai: (model?: string, who?: For) => auth.pick('openai', model, who),

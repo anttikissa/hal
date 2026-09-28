@@ -258,6 +258,23 @@ test('every login broken is an auth failure naming the problem', async () => {
 	expect(e.message).not.toContain('secret-')
 })
 
+test('pickAccount is the per-request override point and ranks keys with tokens', async () => {
+	write({ anthropic: [
+		{ accessToken: 'token', email: 'sub@x', expires: later() },
+		{ apiKey: 'key', email: 'key@x' },
+	] })
+	let { usage } = await import('./usage.ts')
+	let { paths } = await import('./paths.ts')
+	paths.init()
+	let reset = String(Math.floor(later() / 1000))
+	usage.observe('anthropic', 'sub@x', new Headers({ 'anthropic-ratelimit-unified-5h-utilization': '0.8', 'anthropic-ratelimit-unified-5h-reset': reset }))
+	expect((await auth.anthropic()).account).toBe('key@x')
+	let original = auth.pickAccount
+	auth.pickAccount = (_kind, list) => [list.find((a) => a.name === 'sub@x')!, ...list.filter((a) => a.name !== 'sub@x')]
+	try { expect((await auth.anthropic()).account).toBe('sub@x') }
+	finally { auth.pickAccount = original; usage.close() }
+})
+
 test('a rejected token is refreshed once; rejected again soon, the login is broken', async () => {
 	write({ anthropic: { accessToken: 'bad', refreshToken: 'r', expires: later(), email: 'a@x' } })
 	refreshed('new-access', 'r2')
@@ -315,9 +332,10 @@ test('rotation takes the least used subscription, skips a limited one, and keeps
 		})
 		used('a@x', 0.9)
 		used('b@x', 0.3)
-		// c has no data yet: unused. The API key, which costs money, comes last.
+		// A metered key with heavier usage comes after subscriptions.
+		used('account 1', 0.95)
+		// c has no data yet: unused.
 		expect((await auth.anthropic('m', { session: 's' })).account).toBe('c@x')
-		// Another session with no account yet also takes the least used.
 		used('c@x', 0.5)
 		expect((await auth.anthropic('m', { session: 't' })).account).toBe('b@x')
 		// Evenly used, turn after turn: s stays on c (its prompt cache)
