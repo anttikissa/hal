@@ -1,0 +1,7 @@
+{
+	title: 'Any small file can be dropped or pasted',
+	spec: 'A dropped or pasted file that is neither image nor text (PDF, archives, audio) up to 5 MB is uploaded to /tmp/hal/file/<random>.<ext> and the prompt gets a marker for it, so the model can read it with bash. Works on the web (drop, paste) and in the terminal (a dropped path to such a file). Bigger files are refused with a notice naming the limit (questions.md 127).',
+	status: 'planned',
+	needs: [],
+	foldInto: ['n5']
+}

@@ -1,0 +1,7 @@
+{
+	title: 'Background tabs load in the background',
+	spec: "After the first paint the terminal and web clients fetch the other open tabs' tails in the background, the tabs nearest the focused one first, a slice at a time so the focused tab never stutters; within about 10 s of start, switching to any tab draws from memory without a wait. Background loading never throttles itself deliberately later on (questions.md 98).",
+	status: 'planned',
+	needs: [],
+	foldInto: ['bq']
+}

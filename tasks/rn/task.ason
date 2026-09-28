@@ -1,0 +1,7 @@
+{
+	title: 'Background bash times out after 10 minutes',
+	spec: 'A background bash command without its own timeout is killed after 10 minutes, and its result message says it timed out; the model can give a longer timeout per command (questions.md 122).',
+	status: 'planned',
+	needs: [],
+	foldInto: ['v0']
+}

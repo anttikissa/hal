@@ -1,0 +1,7 @@
+{
+	title: 'Closing a tab stops its turn',
+	spec: "Closing a tab does what Escape does first: aborts its running turn, kills its bash process groups and background commands, and stops its subagents' turns if the closed tab owns them, before the tab closes (as the old Hal did). A turn never runs on unseen in a closed tab (questions.md 121).",
+	status: 'planned',
+	needs: [],
+	foldInto: ['7w']
+}

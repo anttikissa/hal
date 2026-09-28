@@ -10,3 +10,13 @@ a task and remove it here.
 - Linux and Windows browsers: Ctrl-P and Ctrl-T/W/N go to the browser,
   so only Alt-digits switch web tabs there, and there is no button to
   reopen a closed tab (item 52). Wait for the first user to complain.
+- Linux browsers could get Alt-T/W/N/P for tabs (item 106); the user
+  only has a Mac.
+- Side-channel chatter between agents in one directory: tool results
+  carry short notes like "157-abc is editing turns.ts" (item 116).
+- A context graph: cmd-click the status row's context number to open a
+  web page plotting context size per block; each drop is a compaction
+  or pruning, later also cache misses (item 135).
+- Tools for what agents used eval for (item 119): a research subagent
+  is listing the ten most common purposes; the first candidate is an
+  `inspect` tool (tabs, states, models, cwds, pid, version, uptime).

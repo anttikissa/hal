@@ -1,0 +1,7 @@
+{
+	title: 'Model names and version badge like the old Hal',
+	spec: "The status row shows every model by its models.dev display name (GPT-6 Sol, Kimi K2, Opus 5.5), as the old Hal did, falling back to the id only when models.dev has none. The host-vs-peer notice names each version by its git hash plus, when there are local changes, a short hash of them (git stash create), never the word 'dirty' (questions.md 136).",
+	status: 'planned',
+	needs: [],
+	foldInto: ['1g']
+}

@@ -1,0 +1,7 @@
+{
+	title: "ASON is the old Hal's ason.ts, verbatim",
+	spec: "src/common/ason.ts and its test are verbatim copies of the old Hal's (tasks/8/ason.ts and ason.test.ts, identical to ~/.hal/src/utils/ason.ts); nobody edits them, and hal2 adapts to their API instead (the ason object: stringify, parse, parseAll, parseStream, COMMENTS). Comments round-trip: live ASON files that a person edits by hand (config.ason, the credentials file, any liveFile) are parsed with comments kept and written back with them, so a hand-written comment survives every save. Test: a config file with comments on keys and array items keeps them after hal2 changes a value and saves (questions.md 115; the user never allowed dropping comment preservation).",
+	status: 'planned',
+	needs: [],
+	foldInto: ['8']
+}

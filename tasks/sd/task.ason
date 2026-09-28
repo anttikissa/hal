@@ -1,0 +1,7 @@
+{
+	title: 'Approval sees rm -rf after cd into /tmp',
+	spec: 'Approval\'s allowance for rm -rf inside /tmp or a mktemp dir follows the shell\'s working directory through the command: `cd /tmp; rm -rf build`, `cd /tmp/x && rm -rf y`, `cd "$(mktemp -d)" && ... rm -rf out` need no approval, while `cd /tmp; cd ~; rm -rf x`, `cd /tmp/../home && rm -rf x` and `rm -rf /tmp/../x` still ask. Relative targets resolve against the tracked directory; anything the parser cannot follow (variables other than a mktemp result, subshells, eval) keeps asking, the safe default (questions.md 90: needless approvals wasted the user\'s time).',
+	status: 'planned',
+	needs: [],
+	foldInto: ['6f']
+}

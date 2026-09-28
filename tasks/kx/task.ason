@@ -1,0 +1,7 @@
+{
+	title: 'Web completion list you can tap',
+	spec: "On the web, typing a slash command or path shows its completions as a list above the prompt, like Slack's (each row: name, and a quieter description line), without pressing Tab (phones have none). Tap or click a row to take it; Up/Down and Enter pick on a keyboard; Escape or typing past the choices hides it. It uses the same completion source as the terminal (common/completion). Replaces the notice line that listed choices (questions.md 104, 125).",
+	status: 'planned',
+	needs: [],
+	foldInto: ['kr']
+}

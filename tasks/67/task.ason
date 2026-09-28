@@ -1,0 +1,7 @@
+{
+	title: 'Solid on the newest 2.0 release',
+	spec: "The web client uses the newest SolidJS 2.0 release (2.0.0-rc.11 or later, with its matching compiler), not a pin to an old rc. Before bumping, the event bug that made rc.9 unusable is checked again with a test that fails if events silently stop (the one 1b's notes describe); if it still breaks, the pin stays with a note naming the broken version (questions.md 86).",
+	status: 'planned',
+	needs: [],
+	foldInto: ['1b']
+}
