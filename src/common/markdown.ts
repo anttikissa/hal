@@ -101,10 +101,20 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 				continue
 			}
 		}
+		// A bare URL ends at whitespace, <, the enclosing closer, or before
+		// sentence punctuation and an unmatched ).
+		let bare = c === 'h' && !WORD.test(s[i - 1] ?? '') ? /^https?:\/\/[^\s<]+/.exec(s.slice(i))?.[0] : undefined
+		if (bare && until && bare.includes(until)) bare = bare.slice(0, bare.indexOf(until))
+		while (bare && (/[.,;:!?]$/.test(bare) || (bare.endsWith(')') && bare.split('(').length < bare.split(')').length)))
+			bare = bare.slice(0, -1)
+		if (bare && /^https?:\/\/./.test(bare)) {
+			add(bare, { ...st, href: bare })
+			i += bare.length
+			continue
+		}
 		let entity = c === '&' ? /^&(nbsp|amp|lt|gt|quot);/.exec(s.slice(i)) : null
 		add(entity ? ENTITIES[entity[1]!]! : c, st)
 		i += entity ? entity[0].length : 1
-		// Bare URLs as links (task hb) would be matched here.
 	}
 	return until && !open ? undefined : { runs, end: i, closed: !until }
 }

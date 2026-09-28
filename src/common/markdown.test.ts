@@ -41,6 +41,14 @@ describe('inline', () => {
 		expect(markdown.inline('[x](javascript:alert(1))', true).some((r) => r.href)).toBe(false)
 	})
 
+	test('bare http(s) URLs are links, without sentence punctuation', () => {
+		expect(done('see https://x.dev/a.')).toBe('see https://x.dev/a<https://x.dev/a>.')
+		expect(done('(https://x.dev/b), ok')).toBe('(https://x.dev/b<https://x.dev/b>), ok')
+		expect(done('https://w.org/F_(x)?')).toBe('https://w.org/F_(x)<https://w.org/F_(x)>?')
+		expect(done('**at http://a.b/c**<d')).toBe('**at ****http://a.b/c**<http://a.b/c><d')
+		expect(done('`https://x.dev` ftp://x javascript:alert(1) xhttps://x')).toBe('`https://x.dev` ftp://x javascript:alert(1) xhttps://x')
+	})
+
 	test('entities decode outside code, backslash escapes', () => {
 		expect(done('a &amp; &lt;b&gt; `&amp;` \\*x\\*')).toBe('a & <b> `&amp;` *x*')
 	})
