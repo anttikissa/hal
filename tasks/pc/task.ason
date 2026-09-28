@@ -5,7 +5,7 @@
 	needs: [],
 	foldInto: ['9'],
 	notes: [
-		'Settings keys are flat: model, security, webPassword, webPort (defaults anthropic/claude-opus-4-5, best-effort, hello123, 9002 — the values the code had before). models.defaultModel() and web.port()/password() delegate to settings, so old local.ts overrides still work.',
+		'Settings keys are flat: model, security, webPassword, webPort (defaults anthropic/claude-opus-4-5, best-effort, a test password, 9002 — the values the code had before). models.defaultModel() and web.port()/password() delegate to settings, so old local.ts overrides still work.',
 		'config.ason sits in the home root, which is the repo root: it is gitignored like the credentials file and local.ts.',
 		'liveFile gained keepBroken (a malformed file starts from defaults instead of throwing, still never overwritten) and onChange (external edits and breakage, not own writes). Deleting the file while running keeps the last values, as for every live file.',
 		"Warnings reach clients as a session-less protocol event { type: 'warning', text }: sent on connect and after every edit (main.start wires config.init to host.warnAll). Clients show it as their notice. Secrets are never echoed in warnings.",
