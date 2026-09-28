@@ -1,6 +1,9 @@
 {
 	title: '/system: show the assembled system prompt',
 	spec: "/system shows the system prompt this session would send right now: first one line per source file (SYSTEM.md, each included file, each AGENTS.md or CLAUDE.md) with its size and path, then the total size, then the full text after preprocessing (task q5). It is read-only and works in any state. A preprocessing error (unclosed block, missing @ include) is shown as the command's error with the line it names. Tests: the header lists included files; the text equals what a provider request gets.",
-	status: 'planned',
-	needs: ['q5', 'x0']
+	status: 'done',
+	needs: ['q5', 'x0'],
+	notes: [
+		'systemPrompt.inspect and systemPrompt.build call the same assemble path; inspect alone collects source paths and raw UTF-8 byte sizes, including recursive SYSTEM includes and literal project AGENTS/CLAUDE files. Command prints each source, summed raw source bytes, blank line, and the exact assembled text; it reuses clock.now and sessionId as turns.runTurn does. A preprocessing failure is caught by slash.runCommand and returned as an output error with its source line.'
+	]
 }

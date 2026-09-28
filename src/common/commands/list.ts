@@ -40,6 +40,7 @@ const list: CommandInfo[] = [
 	{ name: 'send', description: 'send a prompt or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
 	{ name: 'status', description: 'show account usage windows', category: 'session' },
+	{ name: 'system', description: 'show the assembled system prompt', category: 'session' },
 	{ name: 'version', description: 'show which code the host runs', category: 'debug' },
 ]
 

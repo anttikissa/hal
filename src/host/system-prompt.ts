@@ -48,10 +48,13 @@ function read(path: string): string | undefined {
 }
 
 // SYSTEM.md alone is a template; project instructions remain verbatim.
-function preprocess(file: string, vars: Record<string, string>, stack: string[] = []): string {
+export type PromptSource = { path: string; bytes: number }
+function preprocess(file: string, vars: Record<string, string>, stack: string[] = [], sources?: PromptSource[]): string {
 	let path = resolve(file)
 	if (stack.includes(path)) throw new Error(`${path}: include loop (${[...stack, path].join(' -> ')})`)
-	let text = readFileSync(path, 'utf8').replace(/<!--[\s\S]*?-->/g, '')
+	let raw = readFileSync(path, 'utf8')
+	sources?.push({ path, bytes: Buffer.byteLength(raw) })
+	let text = raw.replace(/<!--[\s\S]*?-->/g, '')
 	let lines = text.split('\n'), output: string[] = []
 	let active: boolean | undefined
 	let opened = 0
@@ -82,14 +85,14 @@ function preprocess(file: string, vars: Record<string, string>, stack: string[] 
 			if (name.startsWith('~/')) name = resolve(homedir(), name.slice(2))
 			let target = resolve(dirname(path), name)
 			if (include[1] && !existsSync(target)) continue
-			output.push(systemPrompt.preprocess(target, vars, [...stack, path]))
+			output.push(systemPrompt.preprocess(target, vars, [...stack, path], sources))
 		} else output.push(line)
 	}
 	if (active !== undefined) throw new Error(`${path}:${opened}: unclosed if block`)
 	return substitute(output.join('\n'))
 }
 
-function build(input: { cwd: string; model: string; now: number; sessionId?: string }): string {
+function assemble(input: { cwd: string; model: string; now: number; sessionId?: string }, sources?: PromptSource[]): string {
 	let fromSource = relative(paths.repoRoot(), resolve(input.cwd))
 	let vars = {
 		harness: 'hal', model: input.model, date: date(input.now), cwd: paths.display(input.cwd),
@@ -98,13 +101,14 @@ function build(input: { cwd: string; model: string; now: number; sessionId?: str
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
 	}
 	// Missing SYSTEM.md is a broken checkout: throw with the path.
-	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
+	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars, [], sources).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
 	for (let dir of systemPrompt.candidates(input.cwd)) {
 		// One file per directory: AGENTS.md, else CLAUDE.md.
 		for (let name of ['AGENTS.md', 'CLAUDE.md']) {
 			let path = `${dir === '/' ? '' : dir}/${name}`
 			let text = read(path)
 			if (text === undefined) continue
+			sources?.push({ path, bytes: Buffer.byteLength(text) })
 			parts.push(`<file path="${path}">\n${text.trim()}\n</file>`)
 			break
 		}
@@ -112,9 +116,22 @@ function build(input: { cwd: string; model: string; now: number; sessionId?: str
 	return parts.join('\n\n')
 }
 
+// One assembly path for /system and actual provider requests, so the
+// displayed text cannot diverge from what the next request would send.
+export type PromptInput = { cwd: string; model: string; now: number; sessionId?: string }
+function build(input: PromptInput): string {
+	return systemPrompt.assemble(input)
+}
+function inspect(input: PromptInput): { sources: PromptSource[]; text: string } {
+	let sources: PromptSource[] = []
+	return { sources, text: systemPrompt.assemble(input, sources) }
+}
+
 export const systemPrompt = {
 	file: () => systemFile,
 	preprocess,
 	candidates,
+	assemble,
+	inspect,
 	build,
 }
