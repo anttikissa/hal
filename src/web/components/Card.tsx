@@ -17,6 +17,7 @@
 
 import { createEffect, createMemo, createSignal, flush, onSettled, Show } from 'solid-js'
 import { titles } from '../../common/titles.ts'
+import { Markdown } from './Markdown.tsx'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
@@ -111,6 +112,14 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (!full()) button.scrollIntoView({ block: 'nearest' })
 	}
 	let cursor = () => <span class="cursor" aria-hidden="true" />
+	// Model text is markdown (task fn), Hal's cursor after its last line.
+	// A memo, so a new row object while streaming rebuilds nothing.
+	let md = createMemo(() => props.row.item.type === 'text' || props.row.item.type === 'thinking')
+	let markdown = () => (
+		<Markdown text={shown()?.text ?? ''} streaming={props.cursor}>
+			<Show when={props.cursor}>{cursor()}</Show>
+		</Markdown>
+	)
 	// A prompt's [image/<name>] markers are links (task qy), rebuilt only
 	// when its text changes, not when a snapshot brings a new row object.
 	let text = createMemo(() => shown()?.text ?? '')
@@ -125,10 +134,10 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<div ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.target ? 'target' : '']}>
 			{link()}
 			<Show when={!props.row.pending && title()}>{(t) => <div class="who">{t()}</div>}</Show>
-			<Show when={props.row.item.type === 'image' && props.row.item} fallback={parts()}>
+			<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : parts()}>
 				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
 			</Show>
-			<Show when={props.cursor}>{cursor()}</Show>
+			<Show when={props.cursor && !md()}>{cursor()}</Show>
 		</div>
 	)
 	return (
@@ -149,8 +158,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						</button>
 						<div class="body" inert={!open()}>
 							<div class="contents">
-								{body()}
-								<Show when={props.cursor}>{cursor()}</Show>
+								{md() ? markdown() : body()}
+								<Show when={props.cursor && !md()}>{cursor()}</Show>
 								<Show when={long()}>
 									<button type="button" class="more" onClick={more}>
 										{full() ? 'show less' : 'show all'}

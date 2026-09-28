@@ -98,7 +98,7 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor): 
 	// On a very narrow terminal the text needs every column.
 	if (ref && width < 4 * strings.visLen(ref.text)) ref = undefined
 	let inner = ref ? Math.max(1, width - strings.visLen(ref.text) - 1) : width
-	let lines = itemView.itemLines(item, inner)
+	let lines = itemView.itemLines(item, inner, !!hal)
 	if (hal) lines = frame.withCursor(lines, hal, inner)
 	if (ref && lines.length) {
 		let gap = ' '.repeat(Math.max(1, width - strings.visLen(lines[0]!) - strings.visLen(ref.text)))
@@ -109,6 +109,22 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor): 
 	let rows = lines.map((r) => ansi.paint(r, style, cols))
 	if (!hal) frame.state.rows.set(item, { key, rows })
 	return rows
+}
+
+// A streaming block never shrinks (task fn): the tallest it was drawn
+// at, from its first render here, pads it with blank rows at its end,
+// also after it stops streaming, until the next full redraw (render.draw
+// forgets them all). In memory only, per block and width.
+function highWater(rows: string[], item: Item, cols: number, session: string | undefined, streams: boolean): string[] {
+	let id = `${cols} ${session} ${item.key}`
+	let peaks = frame.state.peaks
+	let peak = peaks.get(id)
+	if (peak === undefined && !streams) return rows
+	if (rows.length >= (peak ?? 0)) {
+		peaks.set(id, rows.length)
+		return rows
+	}
+	return [...rows, ...Array<string>(peak! - rows.length).fill(ansi.paint('', itemView.itemStyle(item), cols))]
 }
 
 // The Hal cursor's block, or nothing in its dark phase.
@@ -153,6 +169,7 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 		} else {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
 			let rows = frame.itemRows(item, cols, view.transcript?.meta.id, streams ? view.hal : undefined)
+			rows = frame.highWater(rows, item, cols, view.transcript?.meta.id, streams)
 			if (rows.length && (lines.length || above)) lines.push('')
 			for (let r of rows) lines.push(r)
 		}
@@ -205,4 +222,4 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	return { ...out, cursor: m.cursor, modalScroll: m.scroll }
 }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>() }, build, itemRows, glyph, withCursor, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>() }, build, itemRows, highWater, glyph, withCursor, promptWidth }

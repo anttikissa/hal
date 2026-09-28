@@ -171,6 +171,8 @@ function draw(force = false): void {
 		if (st.tab !== undefined && st.tab !== tab) st.fullscreen = force = true
 		st.tab = tab
 	}
+	// A full redraw drops what kept blocks from shrinking (task fn).
+	if (force) frame.state.peaks.clear()
 	let next = frame.build(st.view, cols, rows, st.fullscreen)
 	// The modal's list moves only as far as it must from where it was.
 	if (st.view.modal && next.modalScroll !== undefined) st.view.modal.scroll = next.modalScroll
@@ -232,6 +234,7 @@ function init(out: Output | null = terminal.state.io): void {
 function reset(): void {
 	if (render.state.timer) clearTimeout(render.state.timer)
 	render.state = createState()
+	frame.state.peaks.clear()
 }
 
 export const render = {

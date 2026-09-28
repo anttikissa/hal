@@ -8,6 +8,7 @@ import { strings } from '../common/strings.ts'
 import { titles } from '../common/titles.ts'
 import { transcript, type Item as Keyed, type Shown as Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
+import { markdownView } from './markdown-view.ts'
 import { promptView } from './prompt-view.ts'
 
 const { DIM, UNDIM, INVERSE, UNINVERSE } = ansi
@@ -49,8 +50,9 @@ function headed(item: Item, body: string[], width: number): string[] {
 	return [strings.clipVisual(ansi.clean(titles.title(item) ?? ''), width), '', ...body]
 }
 
-// Rows for one item at `width` columns, without the side padding.
-function itemLines(item: Item, width: number): string[] {
+// Rows for one item at `width` columns, without the side padding;
+// `streaming`: the item is still growing.
+function itemLines(item: Item, width: number, streaming = false): string[] {
 	let promptWidth = width - promptView.FIRST.length
 	switch (item.type) {
 		// A prompt card ends with a row of its background, as it starts
@@ -60,10 +62,11 @@ function itemLines(item: Item, width: number): string[] {
 		case 'image':
 			return [attachments.label(item)]
 		// Trailing blank lines the model streamed are not drawn: the one
-		// blank row between items (frame.build) is the only gap.
+		// blank row between items (frame.build) is the only gap. Model
+		// text is markdown (task fn).
 		case 'text':
 		case 'thinking':
-			return itemView.headed(item, ansi.wrap(item.text.trimEnd(), width), width)
+			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming), width)
 		case 'tool': {
 			let { command, description } = item.input
 			// A described command: the sentence first, the command dimmed beside it.

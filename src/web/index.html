@@ -59,6 +59,27 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card .cursor { display: inline-block; vertical-align: text-bottom; margin-left: 0.2ch; background: var(--cursor); }
 .Card.thinking .cursor { background: currentColor; opacity: 0.6; }
 .Card .head .cursor { flex: none; align-self: center; }
+/* Model text as markdown (task fn). Each source line is a row, a blank
+   one as tall as text; the last is inline so Hal's cursor follows it. A
+   table too wide scrolls sideways in its own box, and while more of it
+   is off to the right, that edge fades (a scroll-driven --fade). */
+.Markdown .line { min-height: 1lh; }
+.Markdown .line:has(+ .cursor) { display: inline; }
+.Markdown .h { margin-top: 0.3rem; }
+.Markdown .li { display: flex; }
+.Markdown .li .marker { flex: none; }
+.Markdown .quote { border-left: 2px solid color-mix(in oklab, currentColor 40%, transparent); padding-left: 1ch; }
+.Markdown .b { font-weight: bold; }
+.Markdown .i { font-style: italic; }
+.Markdown .code, .Markdown pre { font-family: ui-monospace, monospace; }
+.Markdown a { color: inherit; }
+.Markdown pre { margin: 0.3rem 0; white-space: pre-wrap; }
+.Markdown pre[data-lang]::before { content: attr(data-lang); display: block; opacity: 0.6; }
+.Markdown .table { overflow-x: auto; margin: 0.3rem 0; white-space: normal; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
+.Markdown table { border-collapse: collapse; }
+.Markdown th, .Markdown td { border: 1px solid color-mix(in oklab, currentColor 30%, transparent); padding: 0.15rem 0.5rem; text-align: left; vertical-align: top; overflow-wrap: normal; min-width: 6ch; }
+@property --fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@keyframes md-fade { from { --fade: 2.5rem; } 99% { --fade: 2.5rem; } to { --fade: 0px; } }
 @keyframes blink { 50% { opacity: 0; } }
 .Composer { flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
 .Composer > * { max-width: 60rem; margin: 0 auto; }

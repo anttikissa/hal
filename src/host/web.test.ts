@@ -559,10 +559,40 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 				yield { type: 'done', reason: 'end' }
 			})()
 		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'more'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
-		await b.waitFor(`[...document.querySelectorAll('.Card.assistant')].at(-1)?.lastElementChild?.matches('.cursor') && !document.querySelector('.cursor-line')`)
+		await b.waitFor(`[...document.querySelectorAll('.Card.assistant')].at(-1)?.querySelector('.Markdown')?.lastElementChild?.matches('.cursor') && !document.querySelector('.cursor-line')`)
 		expect(await b.evaluate(`document.querySelectorAll('.cursor').length`)).toBe(1)
 		release()
 		await b.waitFor(`!!document.querySelector('.cursor-line') && !document.querySelector('.Card .cursor')`)
+		// Model text is markdown (task fn): streamed a character at a time,
+		// its card never gets shorter, and HTML or a javascript: link in it
+		// stays inert text.
+		let reply = '**Plan** <script>window.pwned=1</script> <img src=x onerror="window.pwned=2"> [x](javascript:window.pwned=3)\n\n| Name | What |\n|---|---|\n| parser | turns **text** into blocks |\n| renderer | draws them, with a longer cell that wraps |\n\n```ts\nlet x = 2**3\n```\nEND'
+		turns.stream = () =>
+			(async function* (): AsyncGenerator<StreamEvent> {
+				for (let c of reply) {
+					yield { type: 'text', text: c }
+					await Bun.sleep(2)
+				}
+				yield { type: 'done', reason: 'end' }
+			})()
+		let heights = b.evaluate(`(async () => {
+			let n = document.querySelectorAll('.Card.assistant').length, seen = []
+			for (let i = 0; i < 2000; i++) {
+				let card = document.querySelectorAll('.Card.assistant')[n]
+				if (card) seen.push(card.getBoundingClientRect().height)
+				if (card && document.querySelector('.cursor-line') && card.innerText.includes('END')) return { seen, card: card.innerHTML, active: card.querySelectorAll('script, img, a[href^="javascript"]').length }
+				await new Promise((r) => requestAnimationFrame(r))
+			}
+			return { seen, card: '' }
+		})()`)
+		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'md'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
+		let md = (await heights) as { seen: number[]; card: string; active: number }
+		expect(md.seen.length).toBeGreaterThan(10)
+		expect(md.seen.every((h, i) => i === 0 || h >= md.seen[i - 1]!)).toBe(true)
+		expect(md.card).toContain('<table>')
+		expect(md.card).toContain('&lt;script&gt;')
+		expect(md.active).toBe(0)
+		expect(await b.evaluate(`window.pwned`)).toBeUndefined()
 		let key = (k: string, ctrl = false) => b.evaluate(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: '${k}', ctrlKey: ${ctrl}, bubbles: true }))`)
 		// A question is a form the keys fill in: Right picks "no", Enter
 		// answers, and the question shows its answer.
