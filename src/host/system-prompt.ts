@@ -47,13 +47,17 @@ function read(path: string): string | undefined {
 	}
 }
 
-// SYSTEM.md alone is a template; project instructions remain verbatim.
+// HTML comments are notes for humans: stripped from every prompt file.
+const uncomment = (text: string) => text.replace(/<!--[\s\S]*?-->/g, '')
+
+// SYSTEM.md alone is a template (if blocks, variables, includes); the
+// files it includes and AGENTS.md only lose their comments.
 export type PromptSource = { path: string; bytes: number }
 function preprocess(file: string, vars: Record<string, string>, sources?: PromptSource[]): string {
 	let path = resolve(file)
 	let raw = readFileSync(path, 'utf8')
 	sources?.push({ path, bytes: Buffer.byteLength(raw) })
-	let text = raw.replace(/<!--[\s\S]*?-->/g, '')
+	let text = uncomment(raw)
 	let lines = text.split('\n'), output: string[] = []
 	let active: boolean | undefined
 	let opened = 0
@@ -86,7 +90,7 @@ function preprocess(file: string, vars: Record<string, string>, sources?: Prompt
 			if (include[1] && !existsSync(target)) continue
 			let raw = readFileSync(target, 'utf8')
 			sources?.push({ path: target, bytes: Buffer.byteLength(raw) })
-			output.push(raw)
+			output.push(uncomment(raw))
 		} else output.push(substitute(line))
 	}
 	if (active !== undefined) throw new Error(`${path}:${opened}: unclosed if block`)
@@ -110,7 +114,7 @@ function assemble(input: { cwd: string; model: string; now: number; sessionId?: 
 			let text = read(path)
 			if (text === undefined) continue
 			sources?.push({ path, bytes: Buffer.byteLength(text) })
-			parts.push(`<file path="${path}">\n${text.trim()}\n</file>`)
+			parts.push(`<file path="${path}">\n${uncomment(text).trim()}\n</file>`)
 			break
 		}
 	}

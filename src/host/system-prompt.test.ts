@@ -106,18 +106,19 @@ test('SYSTEM.md is read per build: an edit shows on the next one, no edit keeps 
 })
 
 
-test('SYSTEM preprocessing removes comments and selects every matching condition; project files stay literal', () => {
+test('SYSTEM preprocessing removes comments and selects every matching condition; project files only lose comments', () => {
 	let old = systemPrompt.file
 	try {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
 		writeFileSync(`${root}/SYSTEM.md`, 'You are Hal.<!-- secret\non another line -->\n::: if model="anthropic/*" harness="hal"\nCLAUDE ONLY\n:::\n::: if model="openai/*"\nOPENAI ONLY\n:::\n${model} ${unknown}')
-		writeFileSync(`${root}/AGENTS.md`, '<!-- untouched -->\n::: if model="openai/*"')
+		writeFileSync(`${root}/AGENTS.md`, '<!-- gone -->kept\n::: if model="openai/*"')
 		let text = systemPrompt.build({ cwd: root, model: 'anthropic/claude-x', now: at })
 		expect(text).toContain('CLAUDE ONLY')
 		expect(text).not.toContain('OPENAI ONLY')
 		expect(text).not.toContain('secret')
 		expect(text).toContain('anthropic/claude-x ${unknown}')
-		expect(text).toContain('<!-- untouched -->')
+		expect(text).not.toContain('gone')
+		expect(text).toContain('kept')
 		expect(text).toContain('::: if model="openai/*"')
 		expect(systemPrompt.build({ cwd: root, model: 'openai/gpt', now: at })).toContain('OPENAI ONLY')
 	} finally { systemPrompt.file = old }
@@ -134,16 +135,17 @@ test('bad SYSTEM directives fail with the line number, even for unknown conditio
 	} finally { systemPrompt.file = old }
 })
 
-test('SYSTEM includes are literal text, even directives, nested includes, comments and variables', () => {
+test('SYSTEM includes lose comments but keep directives, nested includes and variables literally', () => {
 	let old = systemPrompt.file
 	try {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
 		mkdirSync(`${root}/more`)
-		let raw = '<!-- keep -->\n::: if model="wrong/*"\n@../SYSTEM.md\n${model}\n:::\n@?missing.md\n'
-		writeFileSync(`${root}/more/part.md`, raw)
+		let raw = '::: if model="wrong/*"\n@../SYSTEM.md\n${model}\n:::\n@?missing.md\n'
+		writeFileSync(`${root}/more/part.md`, `<!-- note\nfor me -->${raw}`)
 		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n@more/part.md\n@?absent.md')
 		let text = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
 		expect(text).toContain(raw)
+		expect(text).not.toContain('for me')
 		expect(text).not.toContain('@?absent.md')
 		writeFileSync(`${root}/SYSTEM.md`, '@missing.md')
 		expect(() => systemPrompt.build({ cwd: root, model: 'm/x', now: at })).toThrow(/missing.md/)

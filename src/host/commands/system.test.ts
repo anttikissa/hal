@@ -9,7 +9,7 @@ useHost()
 test('/system names included source files and prints the same assembled prompt a provider request gets', async () => {
 	let c = client()
 	mkdirSync(`${testHome()}/repo/.git`, { recursive: true })
-	writeFileSync(`${testHome()}/repo/AGENTS.md`, 'Stay in scope. <!-- literal -->')
+	writeFileSync(`${testHome()}/repo/AGENTS.md`, 'Stay in scope. <!-- hidden -->')
 	writeFileSync(`${testHome()}/extra.md`, 'Included text: ${model}')
 	let orig = systemPrompt.file
 	let now = clock.now
@@ -25,7 +25,8 @@ test('/system names included source files and prints the same assembled prompt a
 		let expected = systemPrompt.build({ cwd: `${testHome()}/repo`, model: 'fake/m1', now: clock.now(), sessionId: id })
 		expect(output.slice(output.indexOf('\n\n') + 2)).toBe(expected)
 		expect(output).toContain('Included text: ${model}')
-		expect(output).toContain('Stay in scope. <!-- literal -->')
+		expect(output).toContain('Stay in scope.')
+		expect(output).not.toContain('hidden')
 		writeFileSync(`${testHome()}/SYSTEM.md`, '::: if model="fake/*"\nUnclosed')
 		c.conn.send({ type: 'submit', sessionId: id, text: '/system' })
 		await until(() => c.of('output').at(-1)?.error)
