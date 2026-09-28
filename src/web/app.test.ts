@@ -325,6 +325,17 @@ test('choosing a tab pushes an entry, moves the following, and each tab keeps it
 	expect(app.state.shown).toBe('1-aaa')
 })
 
+test('/go changes this page only if it currently shows the source tab', () => {
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc')))
+	app.onEvent({ type: 'go', sessionId: '2-bbb', tab: '3-ccc' })
+	expect(app.state.shown).toBe('1-aaa')
+	app.onEvent({ type: 'go', sessionId: '1-aaa', tab: '2-bbb' })
+	expect(app.state.shown).toBe('2-bbb')
+	expect(history).toEqual(['http://h/1-aaa', 'http://h/2-bbb'])
+	app.onEvent({ type: 'go', sessionId: '1-aaa', tab: '3-ccc' })
+	expect(app.state.shown).toBe('2-bbb')
+})
+
 test('when the shown tab closes, the page lands on its neighbour, replacing the entry', () => {
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc')))
 	alt(2)

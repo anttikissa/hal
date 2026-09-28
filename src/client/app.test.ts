@@ -569,6 +569,17 @@ test('Ctrl-N, Ctrl-P and Alt-digits switch tabs, wrapping', () => {
 	expect(sent.filter((c) => c.type === 'open').map((c) => c.sessionId)).toEqual(['c', 'a', 'b'])
 })
 
+test('/go changes this terminal only while it shows the source session', () => {
+	startOn(['a', 'b', 'c'])
+	app.onEvent({ type: 'go', sessionId: 'b', tab: 'c' })
+	expect(shown()).toBe('a')
+	app.onEvent({ type: 'go', sessionId: 'a', tab: 'b' })
+	expect(shown()).toBe('b')
+	expect(sent).toEqual([{ type: 'close', sessionId: 'a' }, { type: 'open', sessionId: 'b' }])
+	app.onEvent({ type: 'go', sessionId: 'a', tab: 'c' })
+	expect(shown()).toBe('b')
+})
+
 test('each tab keeps its editor state while another is shown; a modal closes on switch', () => {
 	startOn(['a', 'b'])
 	type('hello')

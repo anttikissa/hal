@@ -21,6 +21,9 @@ import { shortcuts, type TabAction } from './shortcuts.ts'
 function onEvent(event: Event): boolean {
 	let st = app.state
 	if (event.type === 'tabs') tabs.onTabs(event.tabs)
+	else if (event.type === 'go') {
+		if (st.shown === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) tabs.show(event.tab, false)
+	}
 	else if (event.type === 'ack' && st.asked.delete(event.id) && event.tab) tabs.show(event.tab, false)
 	else if (event.type === 'snapshot' && st.shown && event.sessionId !== st.shown) drafts.onEvent(event)
 	else return false

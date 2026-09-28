@@ -19,6 +19,7 @@ const list: CommandInfo[] = [
 	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session' },
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w', clientOnly: true },
 	{ name: 'compact', description: 'summarise the context so far', category: 'session' },
+	{ name: 'go', description: 'show a tab in windows watching this session', category: 'tabs' },
 	{ name: 'help', description: 'list commands, or show one in detail', category: 'help' },
 	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1' },
 	{ name: 'login', description: 'log in to a provider', category: 'session' },

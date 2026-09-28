@@ -235,6 +235,8 @@ export type Event =
 	// The tabs changed, or the client just connected: every tab, in
 	// order. Sent to every client; which one a client shows is its own business.
 	| { type: 'tabs'; tabs: Tab[] }
+	// /go in this session changes only windows currently showing/following it.
+	| { type: 'go'; sessionId: string; tab: string }
 	// The session's draft changed; `command` is the id of the command
 	// that changed it (a draft, or a submit that sent it).
 	| { type: 'draft'; sessionId: string; draft: Draft; command?: string }
@@ -317,6 +319,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	warning: { text: 's' },
 	version: { version: 's' },
 	tabs: { tabs: 'a' },
+	go: { sessionId: 's', tab: 's' },
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },
 	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },
 	ack: { id: 's', tab: 's?' },

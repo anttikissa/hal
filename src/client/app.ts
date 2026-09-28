@@ -159,6 +159,10 @@ function onEvent(event: Event): void {
 	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: resume.queue, ctrl: false, cmd: false }])
 	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
 	if (event.type === 'tabs') return app.onTabs(event.tabs)
+	if (event.type === 'go') {
+		if (st.focus.tab === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) app.focusOn({ tab: event.tab })
+		return
+	}
 	if (event.type === 'ack' && event.tab !== undefined) {
 		st.asked = event.tab
 		return app.onTabs(st.tabs)
