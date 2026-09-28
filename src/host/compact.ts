@@ -39,9 +39,12 @@ function run(id: string, protect = false): number | undefined {
 	return made.prompts
 }
 
-// Starts the session's context afresh; false when it is fresh already.
+// Starts the session's context afresh; false when it is fresh already
+// (a compact's summary is context: /clear after /compact drops it).
 function reset(id: string): boolean {
-	if (!compact.anything(history.readSync(id))) return false
+	let records = history.readSync(id)
+	let last = records.findLast((r) => r.type === 'compact' || r.type === 'reset')
+	if (last?.type !== 'compact' && !compact.anything(records)) return false
 	compact.boundary(id, { type: 'reset' })
 	return true
 }

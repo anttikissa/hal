@@ -94,6 +94,17 @@ test('/clear: the next request holds only later records; a compact after it summ
 	expect(summary).not.toContain('after')
 })
 
+test('/clear right after /compact drops the summary too', async () => {
+	let c = client()
+	let id = created(c)
+	await ask(c, id, 'before')
+	await command(c, id, '/compact')
+	await command(c, id, '/clear')
+	expect(c.of('output').filter((o: any) => o.text === 'the context is already empty')).toEqual([])
+	await ask(c, id, 'after')
+	expect(text(calls.at(-1)!.input.messages)).not.toContain('before')
+})
+
 describe('automatic compaction (task mq)', () => {
 	let window = models.contextWindow
 	beforeEach(() => {
