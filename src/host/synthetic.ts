@@ -61,7 +61,7 @@ function intro(records: HistoryRecord[], answers?: Answers, sessionId?: string):
 	let name = user.match(/^Name:\s*(.+)$/m)?.[1]?.trim()
 	let saidName = synthetic.answered(records, 'name')
 	if (!name && saidName === undefined) return {
-		say: 'Hello, I am Hal. Let us get acquainted; every question can be skipped.',
+		say: 'Hello. I am HAL 9001. I have learned from my predecessor that opening the pod bay doors is best handled as a form question. Let us get acquainted; every question can be skipped.',
 		ask: { text: 'How should I call you?', fields: [{ type: 'text', name: 'name', placeholder: 'leave empty to stay nameless' }] },
 	}
 	if (!name && saidName?.trim()) {

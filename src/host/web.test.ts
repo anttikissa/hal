@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { createServer, type Server as NetServer } from 'net'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
@@ -6,6 +7,7 @@ import { colors } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
+import { settings } from '../common/settings.ts'
 import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
 import { diag } from './diag.ts'
@@ -16,6 +18,7 @@ import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
 import { paths } from './paths.ts'
 import { server } from './server.ts'
+import { statusUsage } from './status-usage.ts'
 import { sessions } from './sessions.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
@@ -97,6 +100,27 @@ test('the host serves the web endpoint and stops it with the host', async () => 
 	await server.stop()
 	expect(web.state.server).toBeNull()
 	await expect(fetch(`${url}/`)).rejects.toThrow()
+})
+
+test('busy preferred web port falls back; the advertised URL follows the listening port', async () => {
+	let occupied: NetServer | undefined
+	for (let port = 9020; port < 9100; port++) {
+		let candidate = createServer()
+		try {
+			await new Promise<void>((resolve, reject) => candidate.once('error', reject).listen(port, '127.0.0.1', resolve))
+			occupied = candidate
+			web.port = () => port
+			break
+		} catch { candidate.close() }
+	}
+	if (!occupied) throw new Error('no test port available')
+	try {
+		web.start()
+		expect(web.state.server?.port).toBeGreaterThan(web.port())
+		expect((await fetch(`${base()}/`)).status).toBe(200)
+		expect(settings.webUrl()).toBe(`http://localhost:${web.state.server!.port}`)
+		expect(statusUsage.runtime()).toContain(`Web: port ${web.state.server!.port}`)
+	} finally { await new Promise<void>((resolve) => occupied.close(() => resolve())) }
 })
 
 test('the installable app serves its manifest, PNG icons and service worker', async () => {

@@ -457,7 +457,7 @@ test('Bash results link to the call, hide a successful exit, and colour only a f
 	expect(printed).not.toContain('[exit 0]')
 	expect(printed).toContain('◂ #1813>  M questions.md')
 	expect(printed).toContain('◂ #1813> [exit 123]')
-	expect(targets(lines)).toContain('http://localhost:9002/s#1813')
+	expect(targets(lines)).toContain(`${settings.webUrl()}/s#1813`)
 	let failure = lines.find((line) => line.includes('[exit 123]'))!
 	let errorColor = ansi.sgr({ fg: colors.error().fg! })
 	expect(failure).toContain(errorColor + '[exit 123]')

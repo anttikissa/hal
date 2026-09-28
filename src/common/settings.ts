@@ -46,7 +46,7 @@ const table: Setting[] = [
 		default: 200,
 		description: 'Provider rounds one turn may run before it pauses; Enter continues for as many again.',
 	},
-	{ name: 'webPort', type: { kind: 'integer', min: 1, max: 65535 }, default: 9002, description: 'Port for the browser client (127.0.0.1).' },
+	{ name: 'webPort', type: { kind: 'integer', min: 1, max: 65535 }, default: 9001, description: 'Preferred port for the browser client (127.0.0.1); tries through 9100 if busy.' },
 	{
 		name: 'webUrl',
 		type: { kind: 'text', url: true },
@@ -120,7 +120,7 @@ function load(json: string | null | undefined): void {
 
 export const settings = {
 	// The parsed config file (a live object on the host); {} means defaults.
-	state: { raw: {} as Record<string, unknown> },
+	state: { raw: {} as Record<string, unknown>, listeningPort: undefined as number | undefined },
 	table,
 	check,
 	value,
@@ -131,7 +131,7 @@ export const settings = {
 	security: (): 'best-effort' | 'none' => settings.value('security') as 'best-effort' | 'none',
 	webPort: (): number => settings.value('webPort') as number,
 	// Where web links point, without a trailing slash (task e3).
-	webUrl: (): string => ((settings.value('webUrl') as string) || `http://localhost:${settings.webPort()}`).replace(/\/+$/, ''),
+	webUrl: (): string => ((settings.value('webUrl') as string) || `http://localhost:${settings.state.listeningPort ?? settings.webPort()}`).replace(/\/+$/, ''),
 	promptRows: (): number => settings.value('promptRows') as number,
 	pasteLines: (): number => settings.value('pasteLines') as number,
 	maxRounds: (): number => settings.value('maxRounds') as number,

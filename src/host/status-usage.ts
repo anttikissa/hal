@@ -6,6 +6,7 @@ import { clock } from './clock.ts'
 import { usage, type Windows } from './usage.ts'
 import { liveFiles } from './live-file.ts'
 import { version } from './version.ts'
+import { web } from './web.ts'
 
 type Account = ReturnType<typeof auth.all>['list'][number]
 export type UsageRow = { provider: Kind; slot: string; account: string; plan?: string; error?: string; windows: Windows; apiKey: boolean }
@@ -130,7 +131,7 @@ function runtime(): string {
 	let started = new Date(clock.now() - process.uptime() * 1000)
 	let uptime = Math.floor(process.uptime())
 	let date = `${started.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })} on ${started.getDate()} ${started.toLocaleString(undefined, { month: 'short' })} ${started.getFullYear()}`
-	return `Runtime:\nPID: ${process.pid} · version: ${version.state.loaded ?? 'unknown'}\nStarted: ${date} (${Math.floor(uptime / 3600)}h ${Math.floor(uptime % 3600 / 60)}m ago)`
+	return `Runtime:\nPID: ${process.pid} · version: ${version.state.loaded ?? 'unknown'}\nStarted: ${date} (${Math.floor(uptime / 3600)}h ${Math.floor(uptime % 3600 / 60)}m ago)${web.state.server ? `\nWeb: port ${web.state.server.port}${web.state.server.port !== web.port() ? ` (preferred ${web.port()} busy)` : ''}` : ''}`
 }
 
 async function show(sessionId: string, model: string): Promise<string> {

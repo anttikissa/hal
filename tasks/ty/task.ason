@@ -1,7 +1,9 @@
 {
 	title: 'HAL 9001 on port 9001',
 	spec: 'The web listens on port 9001 by default (HAL 9001). If the port is taken it tries the next ones up to 9100 and uses the first free one; a non-default port is reported once in the terminal (a notice at start) and in /status. hal/intro introduces itself as HAL 9001 and is entertaining about it (questions.md 111).',
-	status: 'planned',
+	status: 'done',
 	needs: [],
-	foldInto: ['p6']
+	foldInto: ['p6'],
+	notes: [
+	]
 }

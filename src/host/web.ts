@@ -249,14 +249,21 @@ const websocket = {
 	},
 }
 
-// Starts listening. A busy port is noted in the diag log, not fatal:
-// the host still serves its socket clients. Idempotent.
+// Try the preferred port and the next free port through 9100. Other
+// failures (and an exhausted range) leave socket clients available.
 function start(): void {
 	if (web.state.server) return
-	try {
-		web.state.server = Bun.serve({ hostname: '127.0.0.1', port: web.port(), fetch: web.fetch, websocket })
-	} catch (e: any) {
-		diag.log(`web: cannot listen on 127.0.0.1:${web.port()}: ${e?.message ?? e}`)
+	let preferred = web.port()
+	for (let port = preferred; port <= Math.max(preferred, 9100); port++) {
+		try {
+			web.state.server = Bun.serve({ hostname: '127.0.0.1', port, fetch: web.fetch, websocket })
+			settings.state.listeningPort = web.state.server.port
+			return
+		} catch (e: any) {
+			if (e?.code === 'EADDRINUSE' && port < 9100) continue
+			diag.log(`web: cannot listen on 127.0.0.1:${port}: ${e?.message ?? e}`)
+			return
+		}
 	}
 }
 
@@ -265,6 +272,7 @@ async function stop(): Promise<void> {
 	let srv = web.state.server
 	web.state.server = null
 	web.state.page = null
+	settings.state.listeningPort = undefined
 	web.state.sockets.clear()
 	webAuth.close()
 	await srv?.stop(true)

@@ -109,7 +109,8 @@ test('hal/intro asks a name, any client answers, the first answer wins and the m
 	await until(() => transcript.question(a.views.get(id))?.form.fields[0]?.name === 'about')
 	let view = a.views.get(id)!
 	expect(view.state).toEqual({ type: 'blocked', reason: 'question' })
-	expect(texts(view)).toEqual(['Hello, I am Hal. Let us get acquainted; every question can be skipped.', 'Nice to meet you, Dave.'])
+	expect(texts(view)[0]).toContain('HAL 9001')
+	expect(texts(view)[1]).toBe('Nice to meet you, Dave.')
 	expect(readFileSync(`${home}/USER.md`, 'utf8')).toContain('Name: Dave')
 	expect(view.items.find((i) => i.type === 'question')).toMatchObject({ answers: { name: 'Dave' } })
 	expect((await opened(id)).views.get(id)).toEqual(view)

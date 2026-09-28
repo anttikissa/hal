@@ -131,6 +131,10 @@ async function becomeHost(): Promise<boolean> {
 	perf.mark('host')
 	main.later(() => {
 		web.start()
+		if (web.state.server && web.state.server.port !== settings.webPort() && terminal.available()) {
+			app.state.notice = `Web is on port ${web.state.server.port} (preferred ${settings.webPort()} is busy)`
+			app.show()
+		}
 		turns.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
 		jobs.lost().catch((e) => diag.log(`lost jobs: ${e?.message ?? e}`))
 		void main.refreshModels()
