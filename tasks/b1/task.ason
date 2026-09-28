@@ -1,6 +1,6 @@
 {
 	title: 'OpenAI-compatible provider',
-	description: 'Implement Chat Completions on the provider interface with an API key from the environment and an overridable base URL, so OpenRouter, local servers and similar work. Test against a local fake server.',
+	spec: 'Implement Chat Completions on the provider interface with an API key from the environment and an overridable base URL, so OpenRouter, local servers and similar work. Test against a local fake server.',
 	status: 'done',
 	notes: [
 		'Usage comes in its own chunk *after* `finish_reason`, with empty `choices` (only with `stream_options.include_usage`). So `done` must wait for `[DONE]`, not fire at `finish_reason`. Some servers leave out `[DONE]`: if a finish_reason was seen, the end of the stream counts as done.',

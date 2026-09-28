@@ -1,6 +1,6 @@
 {
 	title: 'frame.ts split into cohesive modules',
-	description: 'src/client/frame.ts is no longer than 400 lines (task 0j); what it holds is split by job into client modules, each with its own exported object (tasks/README.md), with frame.test.ts following the split. Decide the cut from the code as it is when this task runs; do not plan a module map ahead. Rendering output does not change: every existing frame and render test passes unchanged except for imports. Take frame.ts off the size exception list.',
+	spec: 'src/client/frame.ts is no longer than 400 lines (task 0j); what it holds is split by job into client modules, each with its own exported object (tasks/README.md), with frame.test.ts following the split. Decide the cut from the code as it is when this task runs; do not plan a module map ahead. Rendering output does not change: every existing frame and render test passes unchanged except for imports. Take frame.ts off the size exception list.',
 	status: 'done',
 	needs: ['0j'],
 	foldInto: [

@@ -1,6 +1,6 @@
 {
 	title: 'Durable session history',
-	description: 'Each session appends its conversation to ASONL as neutral blocks: submitted prompts, assistant blocks, and a turn end recording completed, cancelled or error, plus usage. Provider input is rebuilt from this history alone, never from display state or client messages, and thinking signatures replay exactly. A partially written last record is recovered, and a turn that never ended (host died) is closed as interrupted when the session opens. Tests cover cancellation, truncation and replay.',
+	spec: 'Each session appends its conversation to ASONL as neutral blocks: submitted prompts, assistant blocks, and a turn end recording completed, cancelled or error, plus usage. Provider input is rebuilt from this history alone, never from display state or client messages, and thinking signatures replay exactly. A partially written last record is recovered, and a turn that never ended (host died) is closed as interrupted when the session opens. Tests cover cancellation, truncation and replay.',
 	status: 'done',
 	notes: [
 		"The artifacts can't be lifted: api-messages.ts and replay.ts are built on the old HistoryEntry shape (blobs, pending_tools, pruning, meta injection). Only repairToolPairing's idea carried over: every tool call needs a result before the next user message, and results with no call must be dropped, or providers reject the input.",

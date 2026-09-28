@@ -1,6 +1,6 @@
 {
 	title: 'State paths and safe diagnostics',
-	description: 'Everything Hal writes lives under its home, which is the repo root: git clone is the only install. HAL_HOME exists only so tests use a temp home and never touch live data. The home has two gitignored directories, both persistent: sessions/ (conversations, one directory per session) and state/ (everything else, including socket, host lock and later peer and access keys, so it is created with owner-only permissions). The copied ./auth.ason is input. Diagnostics never print tokens or appear in the model transcript.',
+	spec: 'Everything Hal writes lives under its home, which is the repo root: git clone is the only install. HAL_HOME exists only so tests use a temp home and never touch live data. The home has two gitignored directories, both persistent: sessions/ (conversations, one directory per session) and state/ (everything else, including socket, host lock and later peer and access keys, so it is created with owner-only permissions). The copied ./auth.ason is input. Diagnostics never print tokens or appear in the model transcript.',
 	status: 'done',
 	notes: [
 		'The artifacts predate the task wording: they use HAL_DIR, HAL_STATE_DIR, an ipc/ dir and paths captured as constants at import. The task wants one HAL_HOME, sessions/ + state/, and README wants config read at call time (tests flip HAL_HOME per test). Take only the chmod-not-mkdir-mode idea (mode is masked by umask; chmod also tightens an old loose dir) and formatHomePath.',

@@ -1,6 +1,6 @@
 {
 	title: 'First end-to-end model conversation',
-	description: './run joins or becomes the host, opens a session, accepts edited input, streams a real model answer, cancels on Escape, and reloads the conversation after restart. A second ./run on the same home attaches as a client and sees the same stream; quitting the host leaves the other one running as host. Tests use a fake Anthropic server with a temp home and auth; one manual TTY check documents limitations.',
+	spec: './run joins or becomes the host, opens a session, accepts edited input, streams a real model answer, cancels on Escape, and reloads the conversation after restart. A second ./run on the same home attaches as a client and sees the same stream; quitting the host leaves the other one running as host. Tests use a fake Anthropic server with a temp home and auth; one manual TTY check documents limitations.',
 	status: 'done',
 	notes: [
 		'E2E pattern for real ./run processes: write a local.ts into the temp HAL_HOME that sets `terminal.available = () => true`, replaces `terminal.realIO` with a pipe-backed TerminalIO (stdin in, stdout out, fixed size) and points `anthropic.apiUrl` at a fake server. Nothing in src needs a test hook for this; reuse it (src/e2e.test.ts).',

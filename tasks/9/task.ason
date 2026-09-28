@@ -1,6 +1,6 @@
 {
 	title: 'Local overrides',
-	description: 'An optional, gitignored local.ts in the repo root imports module objects and replaces their functions; startup loads it after modules are imported and before initialization. A missing local.ts is normal. ./test typechecks it and smoke-imports it in a separate process, but ordinary tests run without it. Prove it with one real config function, such as the default model.',
+	spec: 'An optional, gitignored local.ts in the repo root imports module objects and replaces their functions; startup loads it after modules are imported and before initialization. A missing local.ts is normal. ./test typechecks it and smoke-imports it in a separate process, but ordinary tests run without it. Prove it with one real config function, such as the default model.',
 	status: 'done',
 	notes: [
 		'tsc typechecks local.ts only because tsconfig.json has no `include` (it picks up every .ts in the root). Adding `include: ["src"]` would silently stop checking it; ./test would then only smoke-import it.',

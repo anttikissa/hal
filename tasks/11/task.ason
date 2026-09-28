@@ -1,6 +1,6 @@
 {
 	title: 'Editable prompt state',
-	description: 'A pure state transition for text, cursor and key events: insert and paste, left/right, Backspace, Enter submits, Escape cancels, Ctrl-D on empty input quits. Unicode graphemes are the unit. Test edits in the middle and at both ends.',
+	spec: 'A pure state transition for text, cursor and key events: insert and paste, left/right, Backspace, Enter submits, Escape cancels, Ctrl-D on empty input quits. Unicode graphemes are the unit. Test edits in the middle and at both ends.',
 	status: 'done',
 	notes: [
 		"The artifacts read `k.char`; the lifted decoder (xk) calls it `k.text`, and a paste is its own `key: 'paste'` event. Don't copy the artifact's key checks verbatim.",

@@ -1,6 +1,6 @@
 {
 	title: 'First tool round trip',
-	description: 'Add one safe, useful local tool: the model calls it, the host runs it with a bounded result, and the turn continues. Calls and results are persisted, so a restart neither loses nor silently repeats execution.',
+	spec: 'Add one safe, useful local tool: the model calls it, the host runs it with a bounded result, and the turn continues. Calls and results are persisted, so a restart neither loses nor silently repeats execution.',
 	status: 'done',
 	notes: [
 		'Functional state: Works for real: `./run` talks to Opus over the copied OAuth credentials (after the user refreshed them), streams thinking and text, and the model uses the `read` tool on its own ("Can you read tsconfig.json" → tool call → answer). A second `./run` follows the same stream; killing the host hands over to it.',

@@ -1,6 +1,6 @@
 {
 	title: 'Project setup',
-	description: 'Bun + TypeScript project. ./run starts the app; ./test runs tests, typecheck and lint, and fails if any of them fails.',
+	spec: 'Bun + TypeScript project. ./run starts the app; ./test runs tests, typecheck and lint, and fails if any of them fails.',
 	status: 'done',
 	needs: []
 }

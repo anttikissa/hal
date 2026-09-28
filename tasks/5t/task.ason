@@ -1,6 +1,6 @@
 {
 	title: './test stays clean: no lint warnings, tautologies or leftovers',
-	description: "./test fails on any oxlint warning, and the tree has none (questions.md item 65). No tautological tests: a test that restates a one-line function, repeats a constant, or checks its own helper is deleted, starting with the list in task sj's notes (item 64); tasks/README.md says so next to the test rules. Tests that spawn ./run or make temporary homes (/tmp/hal-test-home-<pid> and the like) remove them when they finish, so a test run leaves nothing in /tmp (item 67).",
+	spec: "./test fails on any oxlint warning, and the tree has none (questions.md item 65). No tautological tests: a test that restates a one-line function, repeats a constant, or checks its own helper is deleted, starting with the list in task sj's notes (item 64); tasks/README.md says so next to the test rules. Tests that spawn ./run or make temporary homes (/tmp/hal-test-home-<pid> and the like) remove them when they finish, so a test run leaves nothing in /tmp (item 67).",
 	status: 'done',
 	needs: [],
 	foldInto: ['sj', 'kn', 'p'],

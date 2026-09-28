@@ -1,6 +1,6 @@
 {
 	title: 'Anthropic provider',
-	description: 'Implement Anthropic Messages on the provider interface with OAuth credentials, following the OAuth contract in the anthropic.ts artifact (endpoint, headers, required system identity); verify it still works before relying on it. Include thinking blocks and their signatures. Tests use a local fake server; ./test never needs real credentials.',
+	spec: 'Implement Anthropic Messages on the provider interface with OAuth credentials, following the OAuth contract in the anthropic.ts artifact (endpoint, headers, required system identity); verify it still works before relying on it. Include thinking blocks and their signatures. Tests use a local fake server; ./test never needs real credentials.',
 	status: 'done',
 	notes: [
 		"The live check did not run at implementation time: the copied auth.ason's token had expired, and the refresh got HTTP 400 invalid_grant. Refresh tokens rotate and can be used only once, so a copy shared with the old Hal breaks as soon as either side refreshes. The OAuth contract (headers, identity block, ?beta=true) is still unverified against the real API. Copy fresh credentials right before the first real request. Later (2026-09-26) the user refreshed the copy and real conversations with thinking and tool calls worked, so the OAuth contract is verified.",

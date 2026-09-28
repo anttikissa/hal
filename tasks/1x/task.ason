@@ -1,6 +1,6 @@
 {
 	title: 'Prompt editor keys shared by terminal and web',
-	description: `The prompt editor is one pure module in src/common (the terminal's src/client/prompt.ts moves there): an editor state { text, cursor, and later fields } and a step(state, key) -> { state, action? } over the same key type forms use. The cursor stays a UTF-16 offset on a grapheme boundary (task 11 notes). Keys, as in the old Hal (artifacts old-prompt.ts, old-key-help.ts, old-cli-keys-excerpt.ts):
+	spec: `The prompt editor is one pure module in src/common (the terminal's src/client/prompt.ts moves there): an editor state { text, cursor, and later fields } and a step(state, key) -> { state, action? } over the same key type forms use. The cursor stays a UTF-16 offset on a grapheme boundary (task 11 notes). Keys, as in the old Hal (artifacts old-prompt.ts, old-key-help.ts, old-cli-keys-excerpt.ts):
 - Left/Right move one grapheme. Alt-Left/Right move by word token: letters, digits, marks and _ form words, runs of punctuation are tokens of their own, spaces are skipped; right lands at token ends, left at token starts.
 - Home/End and Ctrl-A/Ctrl-E go to the start/end of the current line; Cmd-Left/Right to the start/end of the whole text.
 - Backspace deletes the grapheme before the cursor, Delete the one after; Alt-Backspace deletes the previous word. Ctrl-D deletes forward, and quits only when the text is empty.

@@ -1,6 +1,6 @@
 {
 	title: 'Web client on SolidJS 2',
-	description: `src/web is a SolidJS 2 app with every feature the plain-DOM page had: password login, one session's transcript folded by common transcript.fold, streamed output, pending prompts and the inbox, drafts kept in localStorage (common/drafts.ts), questions answered through forms.step, the model picker modal, editing the last prompt (common/amend.ts), slash completion, reconnect with backoff and a fresh snapshot. page.ts is gone.
+	spec: `src/web is a SolidJS 2 app with every feature the plain-DOM page had: password login, one session's transcript folded by common transcript.fold, streamed output, pending prompts and the inbox, drafts kept in localStorage (common/drafts.ts), questions answered through forms.step, the model picker modal, editing the last prompt (common/amend.ts), slash completion, reconnect with backoff and a fresh snapshot. page.ts is gone.
 
 Why a dependency: the page is about to grow (tabs, collapsible cards, animations, prompt editing, image paste) and hand-written DOM patching already ran page.ts past 400 lines. Solid updates exactly the DOM a signal feeds, with no virtual DOM and a small runtime; the previous Hal chose it over React as smaller and less error-prone. Only the browser uses it.
 

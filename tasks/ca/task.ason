@@ -1,6 +1,6 @@
 {
 	title: 'Transcript projection',
-	description: 'One pure function folds a session snapshot and later events into a display model, shared by every client; the display is never provider context. Tests show that a client that followed the events and one that connected afterwards see the same transcript after completion, cancellation and error.',
+	spec: 'One pure function folds a session snapshot and later events into a display model, shared by every client; the display is never provider context. Tests show that a client that followed the events and one that connected afterwards see the same transcript after completion, cancellation and error.',
 	status: 'done',
 	notes: [
 		"The artifacts (history-projection.ts, live-event-blocks.ts) come from the old Hal's event model (stream-delta, tool-result, info, prompt labels, question rows). Almost none of it maps onto the task-6 protocol. Treat them as background reading. Building on `blocks.apply` from task 6 was simpler and guarantees that live folding matches what the host records.",

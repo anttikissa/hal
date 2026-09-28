@@ -1,6 +1,6 @@
 {
 	title: 'Restart lifecycle',
-	description: 'A host restart (Ctrl-R in the host process) keeps the session going: clients reconnect or take over, a running turn is recorded as interrupted, and the restarted process rejoins as a client or host. The terminal stays usable throughout.',
+	spec: 'A host restart (Ctrl-R in the host process) keeps the session going: clients reconnect or take over, a running turn is recorded as interrupted, and the restarted process rejoins as a client or host. The terminal stays usable throughout.',
 	status: 'done',
 	notes: [
 		"Record the interrupted turn from a synchronous `process.on('exit')` handler (`host.init()`). The kernel releases the host flock only after that handler has run, so the successor never sees a turn left half-written. Anything async there is lost. A SIGKILL skips it, so the repair in `history.open` is still needed.",

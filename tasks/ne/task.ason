@@ -1,6 +1,6 @@
 {
 	title: 'One cancellable conversation turn',
-	description: 'Host side of a turn: persist the prompt, stream the answer from the session model, persist the assistant blocks and turn end, and send events to every connected client. Cancel and provider errors end the turn cleanly and leave history replayable; the next turn uses durable history as context.',
+	spec: 'Host side of a turn: persist the prompt, stream the answer from the session model, persist the assistant blocks and turn end, and send events to every connected client. Cancel and provider errors end the turn cleanly and leave history replayable; the next turn uses durable history as context.',
 	status: 'done',
 	notes: [
 		'The snapshot must be built in the same synchronous step as the live events that follow it, but history.read is async (a stream). Hence history.readSync. Anything added to snapshots must stay synchronous.',

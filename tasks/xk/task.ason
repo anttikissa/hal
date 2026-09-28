@@ -1,6 +1,6 @@
 {
 	title: 'Terminal key decoding',
-	description: 'Decode raw terminal bytes incrementally into printable text, Enter, Backspace, arrows, Escape, Ctrl-D and paste; sequences may span chunks. Keep decoding separate from the editor and ignore unsupported sequences without inserting escape bytes. Use terminal fixtures, not a real user TTY.',
+	spec: 'Decode raw terminal bytes incrementally into printable text, Enter, Backspace, arrows, Escape, Ctrl-D and paste; sequences may span chunks. Keep decoding separate from the editor and ignore unsupported sequences without inserting escape bytes. Use terminal fixtures, not a real user TTY.',
 	status: 'done',
 	notes: [
 		"The keys.ts artifact is not incremental despite its paste buffering: its splitKeys emits a chunk-final `ESC [` or a split UTF-8 char as a token, and misses a PASTE_START split across chunks. Its parseKey also ignores SS3 (`ESC O A`) arrows. Don't lift the tokenizer as is.",
