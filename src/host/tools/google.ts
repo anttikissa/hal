@@ -42,7 +42,8 @@ export const tool: Tool & { url: () => string; format: typeof format } = {
 			method: 'POST',
 			headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
 			body: JSON.stringify({ q: query, num }),
-			signal: ctx.signal,
+			// A hung Serper must not hold the turn until Escape.
+			signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(30_000)]),
 		})
 		if (!res.ok) throw new Error(`Serper answered ${res.status}: ${(await res.text()).slice(0, 500)}`)
 		return tool.format((await res.json()) as Answer)
