@@ -109,7 +109,15 @@ test('waiting messages stay on screen, each saying why it waits', () => {
 	expect(steer).toBe('(steering) > steer me')
 	expect(later).toBe('(queued) > run me later')
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'paused' } })
-	expect(rows().find((r) => r.includes('run me later'))).toMatch(/paused/)
+	expect(rows().find((r) => r.includes('run me later'))).toBe('(queued, waiting) > run me later')
+	expect(rows().join('\n')).toMatch(/paused/)
+	// A long reason (a login error) stays in the status line: every row
+	// fits the terminal and the message text is not squeezed apart.
+	let why = 'log in: anthropic token refresh failed: HTTP 400 invalid_grant; run /login claude. '.repeat(3)
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'blocked', reason: why } })
+	let lines = frame.build(app.view(), 80).lines.map((l) => l.replace(/\x1b\][^\x07]*\x07|\x1b\[[0-9;]*m/g, ''))
+	for (let l of lines) expect(l.length).toBeLessThanOrEqual(80)
+	expect(rows().find((r) => r.includes('steer me'))).toBe('(steering, waiting) > steer me')
 	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [] })
 	expect(rows().join('\n')).not.toContain('steer me')
 })

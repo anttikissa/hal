@@ -51,12 +51,13 @@ function label(state: SessionState, item: InboxItem): string {
 }
 
 // The label in a word or two, for a message drawn as a prompt: its
-// kind while the turn runs (it goes in with the next request), else
-// why it waits.
+// kind, and "waiting" when the turn does not run. Why it waits (which
+// can be a long error) is the client's status line, never the tag.
 function tag(state: SessionState, item: InboxItem): string {
-	if (state.type !== 'running') return inbox.label(state, item)
 	let by = item.from === undefined ? '' : ` from ${item.label ?? item.from}`
-	return (item.queue ? 'queued' : item.advisory ? 'advisory' : 'steering') + by
+	let kind = item.queue ? 'queued' : item.advisory ? 'advisory' : 'steering'
+	if (state.type === 'idle') return `waiting${by}`
+	return kind + (state.type === 'running' ? '' : ', waiting') + by
 }
 
 export const inbox = { pending, sender, label, tag }

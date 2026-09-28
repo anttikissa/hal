@@ -150,8 +150,9 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	let t = view.transcript
 	// Each drawn as the prompt it will become: (steering) > text.
 	for (let m of t?.inbox ?? []) {
-		let tag = `(${inbox.tag(t!.state, m)}) `
-		let rows = promptView.mark(ansi.wrap(m.text, Math.max(1, width - tag.length - promptView.FIRST.length)))
+		// The tag takes at most half the row, so the text keeps room.
+		let tag = strings.clipVisual(`(${inbox.tag(t!.state, m)})`, Math.max(1, Math.floor(width / 2))) + ' '
+		let rows = promptView.mark(ansi.wrap(m.text, Math.max(1, width - strings.visLen(tag) - promptView.FIRST.length)))
 		let pad = ' '.repeat(strings.visLen(tag))
 		block(rows.map((r, i) => (i ? pad : ansi.DIM + tag + ansi.UNDIM) + r), colors.user())
 	}
