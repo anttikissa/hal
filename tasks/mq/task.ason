@@ -5,9 +5,7 @@
 	notes: [
 		"compact.auto (src/host/compact.ts) runs in turns.runTurn right before each non-held round; compact.retry handles a too-long refusal before the failure/backoff branch and deletes its failure so it is never retried forever. Context used = running turn's latest round (input+cacheRead+cacheWrite), else the last turn_end context, but unknown once a compact/reset follows it; history.forget(id) moves the running turn's round usage into prior on every boundary so a stale context never re-triggers.",
 		"compactAt needed a new settings type kind 'number' (min/max, any finite number), next to 'integer'. The notice is a plain output record (slash.output), e.g. 'context 85% full (850 of 1000 tokens): compacted'.",
-		"A compact at a turn's first round lands after its prompt, so the prompt reaches the model only inside the summary (verbatim, as one of the last three), and its images are dropped. Compacting before the prompt record would need prompts.ts to check first; not done.",
-		'Append-only boundaries can reference original prompt record numbers (compact.keep); provider replay places them after the summary with original image blocks, while summary excludes those records. No duplicate display prompt is written.',
-		'The earlier note about first-round image loss describes the old bug, now fixed: keep records are replayed after an automatic boundary and excluded from its summary.'
+		'Append-only boundaries can reference original prompt record numbers (compact.keep); provider replay places them after the summary with original image blocks, while summary excludes those records. No duplicate display prompt is written. A kept prompt record that also holds tool results replays only its text and images: its results have no call after the boundary and are dropped.'
 	],
 	needs: [
 		'bc'
