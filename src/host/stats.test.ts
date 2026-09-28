@@ -38,6 +38,21 @@ test('turn ends carry this run’s token totals and the last round’s context; 
 	expect((await fresh(id)).stats).toEqual({ sent: 0, received: 0, context: 2007 })
 })
 
+test('stats rise after a provider round while tools run, then change on the next round without double counting', async () => {
+	let c = client(), id = created(c)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'tool_call', id: 't1', name: 'nope', input: {} }, { type: 'usage', usage: { input: 900, output: 5 } }, { type: 'done', reason: 'tool_use' })
+	await until(() => calls.length === 2)
+	expect(c.of('turn-end')).toHaveLength(0)
+	expect(c.views.get(id)!.stats).toMatchObject({ sent: 900, received: 5, context: 900 })
+	calls[1]!.push({ type: 'usage', usage: { input: 50, cacheRead: 1000, output: 20 } }, { type: 'done', reason: 'end' })
+	await until(() => c.of('turn-end').length)
+	expect(c.of('turn-stats').map((event) => event.stats.context)).toEqual([900, 1050])
+	expect(c.views.get(id)!.stats).toMatchObject({ sent: 950, received: 25, context: 1050 })
+	expect((await fresh(id)).stats).toEqual(c.views.get(id)!.stats)
+})
+
 test('a model change sends the new model’s context window', async () => {
 	let orig = models.contextWindow
 	models.contextWindow = (m) => (m === 'hal/intro' ? 1_000_000 : undefined)
@@ -66,6 +81,10 @@ test('the plan is the subscription account the next request takes, with its wind
 		usage.observe('anthropic', 'two', h('0.18', '0.574'))
 		// The least used goes first: account 2 of 2 (the API key is no subscription).
 		expect(stats.plan(id, 'anthropic/claude-opus-5-5')).toEqual({ account: 2, accounts: 2, windows: { '5h': 18, '7d': 57 } })
+		usage.observe('anthropic', 'two', h('0.3', '0.4'))
+		expect(stats.plan(id, 'anthropic/claude-opus-5-5')!.windows).toEqual({ '5h': 18, '7d': 57 })
+		stats.state.windows.get('anthropic:two')!.at -= 60_000
+		expect(stats.plan(id, 'anthropic/claude-opus-5-5')!.windows).toEqual({ '5h': 30, '7d': 40 })
 		expect(stats.plan(id, 'fake/m1')).toBeUndefined()
 	} finally {
 		if (saved !== undefined) process.env.ANTHROPIC_API_KEY = saved

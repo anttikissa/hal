@@ -198,6 +198,7 @@ export type Event =
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
 	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[]; n?: number }
+	| { type: 'turn-stats'; sessionId: string; stats: Stats }
 	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string; n?: number; stats?: Stats }
 	// The turn asked a question, now in history; it waits for an answer
 	// with no turn running (the state says blocked).
@@ -309,6 +310,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	stream: { sessionId: 's', event: 'o', 'event.type': 's', ts: 's?' },
 	'tool-output': { sessionId: 's', id: 's', at: 'i', chunk: 's' },
 	'tool-results': { sessionId: 's', results: 'a' },
+	'turn-stats': { sessionId: 's', stats: 'o' },
 	'turn-end': { sessionId: 's', status: 's', usage: 'o?', error: 's?', stats: 'o?' },
 	question: { sessionId: 's', id: 's', form: 'o' },
 	answer: { sessionId: 's', question: 's', answers: 'o', secrets: 'S?' },

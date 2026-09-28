@@ -202,6 +202,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					let ts = history.started(id)
 					host.broadcast(id, { type: 'stream', sessionId: id, event, ...(n !== undefined && { n }), ...(ts !== undefined && { ts }) })
 				}
+				if (Object.keys(round.usage).length) host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.round(id, round.usage) })
 				if (last?.type === 'error' && !signal.aborted && compact.retry(id, last, shrunk)) {
 					shrunk = true
 					continue

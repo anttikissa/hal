@@ -278,6 +278,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'inbox') return { ...t, inbox: event.inbox }
 	if (event.type === 'answer') return { ...t, items: transcript.answered(t.items, event) }
 	if (event.type === 'meta') return { ...t, meta: { ...event.meta }, ...(event.stats && { stats: event.stats }) }
+	if (event.type === 'turn-stats') return { ...t, stats: event.stats }
 	if (event.type === 'turn-end' && event.stats) t = { ...t, stats: event.stats }
 	if (event.type === 'tool-output') {
 		let changed = false

@@ -10,6 +10,7 @@ import type { Plan, Stats } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { auth, type Kind } from './auth.ts'
 import { models } from './models.ts'
+import { clock } from './clock.ts'
 import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 import { usage } from './usage.ts'
@@ -34,8 +35,15 @@ function plan(id: string, model: string): Plan | undefined {
 		let subs = list.filter((a) => typeof a.entry.accessToken === 'string' && a.entry.accessToken)
 		let next = auth.order(kind as Kind, list, { session: id })[0]
 		if (!next || !subs.includes(next)) return undefined
-		let windows: Record<string, number> = {}
-		for (let [name, w] of Object.entries(usage.windows(kind, next.name))) windows[name] = Math.round(w.used)
+		let key = `${kind}:${next.name}`
+		let previous = stats.state.windows.get(key)
+		let windows: Record<string, number>
+		if (previous && clock.now() - previous.at < 60_000) windows = previous.windows
+		else {
+			windows = {}
+			for (let [name, w] of Object.entries(usage.windows(kind, next.name))) windows[name] = Math.round(w.used)
+			stats.state.windows.set(key, { at: clock.now(), windows })
+		}
 		return { account: subs.indexOf(next) + 1, accounts: subs.length, windows }
 	} catch {
 		// No login yet, or a broken credentials file: a turn says why.
@@ -47,7 +55,9 @@ function plan(id: string, model: string): Plan | undefined {
 // context in when this host has not seen a turn end yet.
 function of(id: string, records?: HistoryRecord[]): Stats {
 	let model = sessions.open(id).model
-	let tokens = stats.state.tokens.get(id) ?? { sent: 0, received: 0 }
+	let committed = stats.state.tokens.get(id) ?? { sent: 0, received: 0 }
+	let live = stats.state.live.get(id)
+	let tokens = { sent: committed.sent + (live?.sent ?? 0), received: committed.received + (live?.received ?? 0) }
 	let out: Stats = { ...tokens }
 	let context = stats.state.context.get(id) ?? stats.lastContext(records ?? pages.essentials(id))
 	if (context) out.context = context
@@ -58,10 +68,21 @@ function of(id: string, records?: HistoryRecord[]): Stats {
 	return out
 }
 
+// A finished provider round, before the turn ends. The running totals are
+// provisional until turn_end records the whole turn; no double counting.
+function round(id: string, usage: { input?: number; cacheRead?: number; cacheWrite?: number; output?: number }): Stats {
+	let t = stats.state.live.get(id) ?? { sent: 0, received: 0 }
+	stats.state.live.set(id, { sent: t.sent + (usage.input ?? 0), received: t.received + (usage.output ?? 0) })
+	let context = (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
+	if (context) stats.state.context.set(id, context)
+	return stats.of(id)
+}
+
 // Counts a recorded turn end in; returns the stats to send with it.
 function ended(id: string, end: HistoryRecord & { type: 'turn_end' }): Stats {
 	let t = stats.state.tokens.get(id) ?? { sent: 0, received: 0 }
 	stats.state.tokens.set(id, { sent: t.sent + (end.usage.input ?? 0), received: t.received + (end.usage.output ?? 0) })
+	stats.state.live.delete(id)
 	if (end.context) stats.state.context.set(id, end.context)
 	return stats.of(id, [end])
 }
@@ -69,9 +90,10 @@ function ended(id: string, end: HistoryRecord & { type: 'turn_end' }): Stats {
 export const stats = {
 	// Per session, since this host started: tokens of its turns, and the
 	// context of its last turn end.
-	state: { tokens: new Map<string, { sent: number; received: number }>(), context: new Map<string, number>() },
+	state: { tokens: new Map<string, { sent: number; received: number }>(), context: new Map<string, number>(), live: new Map<string, { sent: number; received: number }>(), windows: new Map<string, { at: number; windows: Record<string, number> }>() },
 	lastContext,
 	plan,
 	of,
+	round,
 	ended,
 }

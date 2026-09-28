@@ -354,6 +354,8 @@ function reset(): void {
 	status.state.states.clear()
 	stats.state.tokens.clear()
 	stats.state.context.clear()
+	stats.state.live.clear()
+	stats.state.windows.clear()
 	pages.reset()
 	host.state.done.clear()
 	tabs.reset()
