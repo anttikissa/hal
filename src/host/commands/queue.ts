@@ -5,6 +5,7 @@ import { history } from '../history.ts'
 import { host } from '../host.ts'
 import { prompts } from '../prompts.ts'
 import { status } from '../status.ts'
+import { turns } from '../turns.ts'
 
 export const command: SlashCommand = {
 	help: () => '/queue <prompt>: queue a prompt like Alt-Enter. /queue lists queued prompts; /queue next runs the oldest now; /queue clear drops them all.',
@@ -26,11 +27,12 @@ export const command: SlashCommand = {
 				host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 				return { say: 'next queued prompt will steer this turn' }
 			}
-			// With no turn running, remove its old copy before starting a turn.
-			history.append(id, { type: 'inbox', id: item.id, text: item.text, withdrawn: true })
-			host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
-			let refused = prompts.submit(id, item.text, undefined, false, item.from ? { from: item.from, label: item.label } : undefined)
-			return refused ? { error: refused } : { say: 'running next queued prompt' }
+			// Deliver the existing inbox id as a fresh turn, even if paused.
+			let refused = status.transition(id, { type: 'submit' })
+			if (refused) return { error: refused }
+			let record = prompts.deliver(id, [item], undefined, undefined, true)
+			turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), { ...record, sender: prompts.senders(record.blocks)[0] })
+			return { say: 'running next queued prompt' }
 		}
 		let refused = prompts.submit(id, args, undefined, true)
 		return refused ? { error: refused } : { say: 'queued prompt' }

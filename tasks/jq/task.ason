@@ -2,8 +2,12 @@
 	title: '/queue and /send as commands',
 	spec: '/queue <prompt> queues a prompt for the current session like Alt-Enter; /queue lists the queued prompts, numbered; /queue next moves the oldest queued prompt to run now (as steering if a turn runs, else as a new turn); /queue clear drops them all and says how many. /send <target> <message> sends a prompt to another session like the send tool, where target is a tab number or a session id; an unknown target is refused with the reason, and a message starting with / runs as a command there (so "/send 3 /rename Review" renames tab 3). Tests: queue, list, next and clear; /send to a tab number and to an id; /send of a command; an unknown target.',
 	status: 'done',
-	needs: ['x0', '2r'],
+	needs: [
+		'x0',
+		'2r'
+	],
 	notes: [
-		'Queue entries live in durable inbox history. /queue next edits the oldest queued inbox id into steering in place while busy; when idle/paused it withdraws that id before submitting a new turn. /send resolves tab numbers via the shared tabs file and ids via the same session-id and metadata-file checks as the send tool, then uses prompts.submit with sender provenance.'
+		'Queue entries live in durable inbox history. /queue next edits the oldest queued inbox id into steering in place while busy; when idle/paused it withdraws that id before submitting a new turn. /send resolves tab numbers via the shared tabs file and ids via the same session-id and metadata-file checks as the send tool, then uses prompts.submit with sender provenance.',
+		'Refinement: /queue next on idle or paused delivers the existing queued inbox id directly into a new turn (without withdrawing/recreating it), preserving foreign sender provenance; while busy it edits that id into steering in place.'
 	]
 }
