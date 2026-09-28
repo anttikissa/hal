@@ -100,13 +100,12 @@ test('no row is wider than the terminal, whatever the text', () => {
 	}
 })
 
-test('a described command shows its description first and the command quieter beside it', () => {
+test('a described command separates the description and the quiet command; background uses &', () => {
 	let input = { command: "sed -n '1,40p' config.ason |\n  cat -n", description: 'Show the first 40 lines of the config' }
-	let [line] = frame.build(view([{ type: 'tool', id: 't', name: 'bash', input }]), 100).lines
-	let [before, after] = line!.split(quietOn(colors.toolBash()))
-	expect(strip(before!)).toContain('Show the first 40 lines of the config')
-	expect(strip(before!)).not.toContain('sed')
-	expect(strip(after!)).toContain("sed -n '1,40p' config.ason | cat -n")
+	let lines = frame.build(view([{ type: 'tool', id: 't', name: 'bash', input }]), 100).lines
+	expect(plain(lines).slice(0, 2)).toEqual(['▸ Show the first 40 lines of the config', "$ sed -n '1,40p' config.ason | cat -n"])
+	expect(lines[1]).toContain(quietOn(colors.toolBash()))
+	expect(plain(frame.build(view([{ type: 'tool', id: 't', name: 'bash', input: { ...input, background: true } }]), 100).lines)[1]).toStartWith('& sed')
 })
 
 test('a long tool result shows only its first rows', () => {
@@ -363,7 +362,7 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		let links = targets(lines).map((u) => new URL(u))
 		// Each resolves on the web to the card of that block (task 0z).
 		let blocks = links.map((u) => target.parse(u.href, u.pathname.slice(1)))
-		expect(blocks).toEqual(['4', '5', '6', '7', '8'].map((key) => ({ session: 's', key })))
+		expect(blocks).toEqual(['4', '5', '6', '6', '7', '8'].map((key) => ({ session: 's', key })))
 		// The id is the link's text, at the right edge of the row.
 		for (let key of ['4', '5', '6', '7', '8']) expect(plain(lines).some((l) => l.endsWith(` #${key}`) && l.length === 58)).toBe(true)
 		expect(plain(lines)).not.toContain('#6.1')
@@ -442,4 +441,26 @@ test('finished thinking with no readable text draws nothing, not a bare header',
 	let lines = plain(frame.build(view([{ type: 'thinking', text: '', model: 'anthropic/claude-opus-5-5' }, { type: 'text', text: 'hi' }]), 60).lines)
 	expect(lines.join('\n')).not.toContain('thinking')
 	expect(lines.join('\n')).toContain('hi')
+})
+
+
+test('Bash results link to the call, hide a successful exit, and colour only a failed status', () => {
+	let v = view([
+		{ type: 'tool', id: 'run', name: 'bash', input: { description: 'Check files', command: 'git status --short' } },
+		{ type: 'tool-result', id: 'run', output: '[exit 0]\n M questions.md\n' },
+		{ type: 'tool-result', id: 'run', output: '[exit 123]\nerror: cannot access file\n' },
+		{ type: 'prompt', text: '[exit 123]\nmissing file\n', from: 's', label: 'bash #1813' },
+	])
+	v.transcript!.items = v.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1814', '1815', '1816'][i]! }))
+	let lines = frame.build(v, 70).lines
+	let printed = plain(lines).join('\n')
+	expect(printed).not.toContain('[exit 0]')
+	expect(printed).toContain('◂ #1813>  M questions.md')
+	expect(printed).toContain('◂ #1813> [exit 123]')
+	expect(targets(lines)).toContain('http://localhost:9002/s#1813')
+	let failure = lines.find((line) => line.includes('[exit 123]'))!
+	let errorColor = ansi.sgr({ fg: colors.error().fg! })
+	expect(failure).toContain(errorColor + '[exit 123]')
+	expect(failure.slice(failure.indexOf('[exit 123]') + 10)).not.toContain(errorColor)
+	expect(printed).toContain('Message from bash #1813')
 })

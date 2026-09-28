@@ -685,6 +685,30 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 	}
 }, 20000)
 
+test.skipIf(!chrome)('a background Bash reply links to its recorded call, without showing a successful exit', async () => {
+	let id = tabs.create('/tmp')
+	let call = history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'call-1', name: 'bash', input: { command: 'echo ok', description: 'Run echo', background: true } } })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '[exit 0]\nok\n', from: id, label: `bash #${call.n}`, advisory: true }] })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '[exit 123]\nerror: cannot access file\n', from: id, label: `bash #${call.n}`, advisory: true }] })
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.waitFor(`!!document.querySelector('.Card .who a.call')`)
+		expect(await b.evaluate(`document.querySelector('.Card .who a.call').getAttribute('href')`)).toBe(`/${id}#${call.n}`)
+		expect(await b.evaluate(`document.querySelector('.Card.user.prompt').textContent`)).not.toContain('[exit 0]')
+		expect(await b.evaluate(`(() => {
+			let card = [...document.querySelectorAll('.Card.user.prompt')].at(-1), status = card.querySelector('.exit')
+			return [status.textContent, getComputedStyle(status).color !== getComputedStyle(card).color,
+				card.textContent.includes('error: cannot access file'), card.querySelectorAll('.exit').length]
+		})()`)).toEqual(['[exit 123]', true, true, 1])
+	} finally {
+		await b.close()
+	}
+}, 20000)
+
 test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay, open ones stay open', async () => {
 	// Turns taller than the window, one per page.
 	let id = tabs.create('/tmp')

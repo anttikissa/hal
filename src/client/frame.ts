@@ -88,9 +88,9 @@ function promptWidth(cols: number): number {
 // each is laid out once per width and look, not on every frame: a long
 // history stays cheap to redraw. A kept row keeps the link code it was
 // painted with (task e3 notes).
-function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor): string[] {
+function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>): string[] {
 	let style = itemView.itemStyle(item)
-	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key}`
+	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? calls?.get(item.id) ?? '' : ''}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
@@ -98,7 +98,7 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor): 
 	// On a very narrow terminal the text needs every column.
 	if (ref && width < 4 * strings.visLen(ref.text)) ref = undefined
 	let inner = ref ? Math.max(1, width - strings.visLen(ref.text) - 1) : width
-	let lines = itemView.itemLines(item, inner, !!hal)
+	let lines = itemView.itemLines(item, inner, !!hal, session, calls)
 	if (hal) lines = frame.withCursor(lines, hal, inner)
 	// The id goes on the header row, below a prompt's leading blank row.
 	let at = item.type === 'prompt' ? 1 : 0
@@ -159,16 +159,18 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 		for (let r of rows) lines.push(ansi.paint(r, style, cols))
 	}
 	let items = view.transcript?.items ?? []
+	let calls = new Map<string, string>()
 	let formCursor: Frame['cursor'] | undefined
 	for (let i = 0; i < items.length; i++) {
 		let item = items[i]!
+		if (item.type === 'tool' && item.name === 'bash' && /^\d+(?:\.\d+)?$/.test(item.key)) calls.set(item.id, item.key)
 		if (item.type === 'question' && view.form?.id === item.id) {
 			let f = formView.formLines(view.form, width)
 			block(f.rows, itemView.itemStyle(item))
 			formCursor = { row: lines.length - f.rows.length + f.cursor.row, col: ansi.PAD.length + f.cursor.col }
 		} else {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
-			let rows = frame.itemRows(item, cols, view.transcript?.meta.id, streams ? view.hal : undefined)
+			let rows = frame.itemRows(item, cols, view.transcript?.meta.id, streams ? view.hal : undefined, calls)
 			rows = frame.highWater(rows, item, cols, view.transcript?.meta.id, streams)
 			if (rows.length && (lines.length || above)) lines.push('')
 			for (let r of rows) lines.push(r)

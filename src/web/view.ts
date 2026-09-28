@@ -5,6 +5,7 @@
 
 import { amend, type Editing } from '../common/amend.ts'
 import { attachments } from '../common/attachments.ts'
+import { bashResult } from '../common/bash-result.ts'
 import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
@@ -270,11 +271,11 @@ function oneLine(s: string): string {
 }
 
 // `full`: a tool result's whole output, not its glimpse.
-function show(item: ItemShown, full = false): Shown {
+function show(item: ItemShown, full = false, bash = false): Shown {
 	switch (item.type) {
 		case 'prompt':
 			// Who sent it is in the card's head (task hp).
-			return { kind: 'user prompt', text: item.text }
+			return { kind: 'user prompt', text: (/^bash (?:#\d+|b[0-9a-f]{6})$/.test(item.label ?? '')) ? bashResult.display(item.text) : item.text }
 		case 'image':
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }
@@ -286,12 +287,12 @@ function show(item: ItemShown, full = false): Shown {
 			let kind = `tool tool-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 			let { command, description } = item.input
 			if (typeof command === 'string' && typeof description === 'string')
-				return { kind, text: `▸ ${oneLine(description)}\n  $ ${command}` }
+				return { kind, text: `▸ ${oneLine(description)}\n  ${item.input.background === true ? '&' : '$'} ${command}` }
 			return { kind, text: `▸ ${item.name} ${JSON.stringify(item.input)}` }
 		}
 		case 'tool-result': {
 			// A glimpse, like the terminal: the model sees all of it.
-			let rows = item.output.replace(/\n$/, '').split('\n')
+			let rows = (bash ? bashResult.display(item.output) : item.output).replace(/\n$/, '').split('\n')
 			let shown = full ? rows : rows.slice(0, view.resultRows())
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
 			return { kind: item.isError ? 'result error' : 'result log', text: (item.isError ? '✗ ' : '◂ ') + shown.join('\n  ') }

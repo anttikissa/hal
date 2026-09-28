@@ -30,6 +30,8 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card.image::before { content: none; }
 .Card.prompt::before { content: none; }
 .Card .who { color: var(--quiet); margin-bottom: 0.4rem; }
+.Card .who .call { color: inherit; text-decoration: underline; }
+.Card .exit { background: none; }
 /* A context boundary (tasks bc, vh): its text centred in a rule. */
 .Card.divider { display: flex; align-items: center; gap: 1ch; border-left: none; }
 .Card.divider::before, .Card.divider::after { content: ""; flex: 1; border-top: 1px solid currentColor; }

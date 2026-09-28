@@ -14,6 +14,7 @@
 import { spawn } from 'child_process'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
+import { history } from './history.ts'
 import { prompts } from './prompts.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
@@ -73,11 +74,13 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 // Runs `command` for session `sessionId` in the background. One that
 // ends within jobs.graceMs() (not found, a syntax error) returns its
 // result as a foreground one would; otherwise its id.
-async function start(sessionId: string, command: string, cwd: string, ms?: number): Promise<string> {
+async function start(sessionId: string, command: string, cwd: string, ms?: number, callId?: string): Promise<string> {
+	let call = callId ? history.readSync(sessionId).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === callId) : undefined
+	if (call?.n === undefined) throw new Error('background Bash call has no recorded block id')
+	let id = `${sessionId}:${call.n}`
 	let run = jobs.exec(command, cwd, ms)
 	let early = await Promise.race([run.done, Bun.sleep(jobs.graceMs()).then(() => undefined)])
 	if (early !== undefined) return early
-	let id = jobs.newId()
 	jobs.state.running.set(id, { sessionId, stop: run.stop })
 	let meta = sessions.open(sessionId)
 	meta.background = [...(meta.background ?? []), id]
@@ -85,12 +88,12 @@ async function start(sessionId: string, command: string, cwd: string, ms?: numbe
 		(out) => jobs.finish(id, out),
 		(e) => jobs.finish(id, `[failed: ${e?.message ?? e}]\n`),
 	)
-	return `started in background as ${id}`
+	return `started in background as ${jobs.label(sessionId, id)}`
 }
 
-// A short id unique among this home's running commands.
-function newId(): string {
-	return `b${Buffer.from(crypto.getRandomValues(new Uint8Array(3))).toString('hex')}`
+// The displayed id is the recorded tool-call block, not the internal job key.
+function label(sessionId: string, id: string): string {
+	return id.startsWith(`${sessionId}:`) ? `#${id.slice(sessionId.length + 1)}` : id
 }
 
 // Takes `id` off the session's list of running commands.
@@ -114,7 +117,7 @@ function finish(id: string, out: string): void {
 // Sends `text` to the session as an advisory message from 'bash <id>'.
 function tell(sessionId: string, id: string, text: string): void {
 	let deliver = () => {
-		let refused = prompts.submit(sessionId, text, undefined, false, { from: sessionId, label: `bash ${id}`, advisory: true })
+		let refused = prompts.submit(sessionId, text, undefined, false, { from: sessionId, label: `bash ${jobs.label(sessionId, id)}`, advisory: true })
 		if (refused) diag.log(`bash ${id} to ${sessionId}: ${refused}`)
 	}
 	let ready = host.ready(sessionId)
@@ -154,7 +157,7 @@ async function lost(): Promise<void> {
 			await (host.ready(id) ?? Promise.resolve())
 			for (let b of listed) {
 				jobs.forget(id, b)
-				jobs.tell(id, b, `bash ${b} was lost when Hal restarted`)
+				jobs.tell(id, b, `bash ${jobs.label(id, b)} was lost when Hal restarted`)
 			}
 		} catch (e: any) {
 			diag.log(`lost jobs ${id}: ${e?.message ?? e}`)
@@ -171,7 +174,7 @@ export const jobs = {
 	keepChars: () => 32_000_000,
 	exec,
 	start,
-	newId,
+	label,
 	forget,
 	finish,
 	tell,

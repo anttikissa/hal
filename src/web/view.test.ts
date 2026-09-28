@@ -306,3 +306,14 @@ test('a prompt’s [image/<name>] markers become links; the rest stays text', ()
 	expect(view.links('[paste/0005ab.txt] [paste/0005ab.png]')).toEqual([{ href: '/paste/0005ab.txt', text: '[paste/0005ab.txt]' }, ' [paste/0005ab.png]'])
 	expect(view.links('[image/ABC123.png] [image 0123456789ab]')).toEqual(['[image/ABC123.png] [image 0123456789ab]'])
 })
+
+
+test('Bash display hides successful status but keeps errors and the original source data', () => {
+	let good = { type: 'tool-result' as const, id: 'call', output: '[exit 0]\n M questions.md\n' }
+	let bad = { ...good, output: '[exit 123]\nerror: cannot access file\n' }
+	expect(view.show(good, false, true)?.text).toBe('◂  M questions.md')
+	expect(view.show(bad, false, true)?.text).toContain('[exit 123]\n  error: cannot access file')
+	expect(view.show(good, false, false)?.text).toContain('[exit 0]')
+	expect(view.show({ type: 'prompt', text: good.output, from: 's', label: 'bash #1813' })?.text).toBe(' M questions.md\n')
+	expect(good.output).toStartWith('[exit 0]')
+})

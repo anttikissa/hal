@@ -17,6 +17,8 @@
 
 import { createEffect, createMemo, createSignal, flush, onSettled, Show } from 'solid-js'
 import { titles } from '../../common/titles.ts'
+import { bashResult } from '../../common/bash-result.ts'
+import { transcript } from '../../common/transcript.ts'
 import { Markdown } from './Markdown.tsx'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
@@ -67,9 +69,9 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		},
 	)
 	let shown = () => view.show(props.row.item)
-	let result = () => props.row.result && view.show(props.row.result, full())
+	let result = () => props.row.result && view.show(props.row.result, full(), props.row.item.type === 'tool' && props.row.item.name === 'bash')
 	// Whether the result is longer than its glimpse.
-	let long = () => (props.row.result?.output.replace(/\n$/, '').split('\n').length ?? 0) > view.resultRows()
+	let long = () => (props.row.result ? (props.row.item.type === 'tool' && props.row.item.name === 'bash' ? bashResult.display(props.row.result.output) : props.row.result.output).replace(/\n$/, '').split('\n').length : 0) > view.resultRows()
 	// The link shows the block's id, #35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
@@ -88,6 +90,15 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// (task hp).
 	// A pending row has none: it may yet turn out a command.
 	let title = () => titles.title(props.row.item)
+	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #(\d+)$/)?.[1]
+	let who = () => {
+		let ref = source(), t = title()
+		return ref && t?.endsWith(`#${ref}`) ? <>{t.slice(0, -ref.length - 1)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">#{ref}</a></> : t
+	}
+	let marked = (s: string) => {
+		let match = /\[exit [1-9]\d*\]/.exec(s)
+		return match ? <>{s.slice(0, match.index)}<span class="error exit">{match[0]}</span>{s.slice(match.index + match[0].length)}</> : s
+	}
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
 	let head = () => (props.row.item.type === 'thinking' ? `${title()}: ${lines()[0]}` : lines()[0])
 	let body = () => {
@@ -135,8 +146,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let plain = (s: () => { kind: string; text: string }) => (
 		<div ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.target ? 'target' : '']}>
 			{link()}
-			<Show when={!props.row.pending && title()}>{(t) => <div class="who">{t()}</div>}</Show>
-			<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : parts()}>
+			<Show when={!props.row.pending && title()}>{(_t) => <div class="who">{who()}</div>}</Show>
+			<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : props.row.item.type === 'prompt' && source() ? marked(s().text) : parts()}>
 				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
 			</Show>
 			<Show when={props.cursor && !md()}>{cursor()}</Show>
@@ -160,7 +171,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						</button>
 						<div class="body" inert={!expanded()}>
 							<div class="contents">
-								{md() ? markdown() : body()}
+								{md() ? markdown() : props.row.item.type === 'tool' && props.row.item.name === 'bash' ? marked(body()) : body()}
 								<Show when={props.cursor && !md()}>{cursor()}</Show>
 								<Show when={long()}>
 									<button type="button" class="more" onClick={more}>

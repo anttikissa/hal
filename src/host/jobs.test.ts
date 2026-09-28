@@ -1,5 +1,5 @@
 // Background bash (task v0): the call returns at once, the result comes
-// later as a message from 'bash <id>'.
+// later as a message from the recorded call.
 
 import { expect, test } from 'bun:test'
 import { existsSync } from 'fs'
@@ -34,7 +34,7 @@ async function started(c: C, command: string): Promise<{ id: string; job: string
 	calls[0]!.push(bg(command), { type: 'done', reason: 'tool_use' })
 	await slow(() => calls.length === 2)
 	let job = /^started in background as (\S+)$/.exec(resultOf(1).output)?.[1]
-	expect(job).toBeDefined()
+	expect(job).toMatch(/^#\d+$/)
 	return { id, job: job! }
 }
 

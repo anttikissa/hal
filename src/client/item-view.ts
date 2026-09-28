@@ -2,7 +2,9 @@
 // the style it wears. Pure.
 
 import { attachments } from '../common/attachments.ts'
+import { bashResult } from '../common/bash-result.ts'
 import { colors, type Style } from '../common/colors.ts'
+import { oklch } from '../common/oklch.ts'
 import { forms, type Quote } from '../common/forms.ts'
 import { strings } from '../common/strings.ts'
 import { titles } from '../common/titles.ts'
@@ -48,19 +50,31 @@ function itemStyle(item: Item): Style | undefined {
 
 // A prompt, model text or thinking as the old Hal drew it (task hp):
 // its header ('10:52 Hal (Opus 5.5)'), clipped, a blank row, the body.
-function headed(item: Item, body: string[], width: number): string[] {
-	return [strings.clipVisual(ansi.clean(titles.title(item) ?? ''), width), '', ...body]
+function headed(item: Item, body: string[], width: number, session?: string): string[] {
+	let title = strings.clipVisual(ansi.clean(titles.title(item) ?? ''), width)
+	let call = item.type === 'prompt' && item.label?.match(/^bash #(\d+)$/)?.[1]
+	if (call && session && title.endsWith(`#${call}`)) {
+		let href = transcript.href(session, call)
+		if (href) title = `${title.slice(0, -call.length - 1)}${ansi.quiet(`\x1b]8;;${ansi.webUrl(href)}\x07#${call}${ansi.LINK_OFF}`, itemView.itemStyle(item))}`
+	}
+	return [title, '', ...body]
 }
 
 // Rows for one item at `width` columns, without the side padding;
 // `streaming`: the item is still growing.
-function itemLines(item: Item, width: number, streaming = false): string[] {
+function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>): string[] {
 	let promptWidth = width - promptView.FIRST.length
 	switch (item.type) {
 		// A prompt card has a row of its background above the header and
 		// below the body, as in the old Hal.
 		case 'prompt':
-			return ['', ...itemView.headed(item, ansi.wrap(item.text, width).map(ansi.links), width), '']
+			let bash = (/^bash (?:#\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
+			let body = ansi.wrap(bash ? bashResult.display(item.text) : item.text, width).map(ansi.links)
+			if (bash && /^\[exit [1-9]\d*\]/.test(body[0] ?? '')) {
+				let status = /^\[exit [1-9]\d*\]/.exec(body[0]!)![0]
+				body[0] = ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: colors.user().fg! }) + body[0]!.slice(status.length)
+			}
+			return ['', ...itemView.headed(item, body, width, session), '']
 		case 'image':
 			return [attachments.label(item)]
 		// Trailing blank lines the model streamed are not drawn: the one
@@ -78,8 +92,9 @@ function itemLines(item: Item, width: number, streaming = false): string[] {
 			let row: string
 			if (typeof command === 'string' && typeof description === 'string') {
 				let head = strings.clipVisual(`▸ ${ansi.clean(description).replace(/\s+/g, ' ')}`, width)
-				let rest = strings.clipVisual(`  $ ${ansi.clean(command).replace(/\s+/g, ' ')}`, width - strings.visLen(head))
-				row = head + ansi.quiet(rest, itemView.itemStyle(item))
+				let mark = item.input.background === true ? '&' : '$'
+				let commandLine = strings.clipVisual(`${mark} ${ansi.clean(command).replace(/\s+/g, ' ')}`, width)
+				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-5).flatMap((line) => ansi.wrap(ansi.clean(line), Math.max(1, width - 2))).slice(-5).map((line) => `  ${line}`) : [])]
 			} else {
 				let input = ansi.clean(JSON.stringify(item.input)).replace(/\s+/g, ' ')
 				row = strings.clipVisual(`▸ ${ansi.clean(item.name)} ${input}`, width)
@@ -90,10 +105,23 @@ function itemLines(item: Item, width: number, streaming = false): string[] {
 		}
 		case 'tool-result': {
 			// A glimpse: tool output can be long, the model sees all of it.
-			let rows = ansi.wrap(item.output.replace(/\n$/, ''), Math.max(1, width - 2))
+			let call = calls?.get(item.id)
+			let out = call ? bashResult.display(item.output) : item.output
+			let rows = ansi.wrap(out.replace(/\n$/, ''), Math.max(1, width - 2))
 			let shown = rows.slice(0, itemView.resultRows())
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
-			return shown.map((l, i) => ansi.quiet(strings.clipVisual((i ? '  ' : item.isError ? '✗ ' : '◂ ') + l, width), itemView.itemStyle(item)))
+			return shown.map((l, i) => {
+				let prefix = i ? '  ' : item.isError ? '✗ ' : '◂ '
+				let ref = !i && call && session && transcript.href(session, call)
+				if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07#${call}${ansi.LINK_OFF}> `
+				let line = ansi.quiet(strings.clipVisual(prefix + l, width), itemView.itemStyle(item))
+				if (call && /^\[exit [1-9]\d*\]/.test(l)) {
+					let status = /^\[exit [1-9]\d*\]/.exec(l)![0]
+					let at = line.indexOf(status)
+					if (at >= 0) line = line.slice(0, at) + ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: oklch.quiet(itemView.itemStyle(item)!.fg!, colors.screen) }) + line.slice(at + status.length)
+				}
+				return line
+			})
 		}
 		case 'turn-end':
 			if (item.status === 'error') return ansi.wrap(`error: ${item.error ?? 'turn failed'}`, width)
