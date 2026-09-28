@@ -18,24 +18,41 @@ import type { KeyEvent } from './keys.ts'
 
 const imageTypes: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' }
 
-// The image file a pasted single line names (as a terminal pastes a
-// dropped file: maybe quoted, spaces escaped, or ~/), or undefined.
+// A dropped file as a terminal pastes it (maybe quoted, spaces escaped,
+// or ~/) as a plain path.
+function path(token: string): string {
+	let p = token.trim()
+	let quoted = /^(['"])(.*)\1$/.exec(p)
+	p = quoted ? quoted[2]! : p.replace(/\\(.)/g, '$1')
+	return p.startsWith('~/') ? homedir() + p.slice(1) : p
+}
+
+// The paths of several files dropped at once, as the terminal pasted
+// them (one line, separated by spaces), or undefined unless every one is
+// an existing file: ordinary text with spaces is never split.
+function files(text: string): string[] | undefined {
+	if (text.includes('\n')) return undefined
+	let token = /'[^']*'|"[^"]*"|(?:\\.|[^\s\\'"])+/g
+	let tokens = text.match(token)
+	if (!tokens || tokens.length < 2 || text.replace(token, '').trim()) return undefined
+	let exists = (t: string) => { let p = paste.path(t); return p.startsWith('/') && !!statSync(p, { throwIfNoEntry: false })?.isFile() }
+	return tokens.every(exists) ? tokens : undefined
+}
+
+// The image file a pasted single path names, or undefined.
 // Its bytes, or the error text to paste instead.
 function file(text: string): { mediaType: string; bytes: Uint8Array } | { error: string } | undefined {
-	let path = text.trim()
-	if (!path || path.includes('\n')) return undefined
-	let quoted = /^(['"])(.*)\1$/.exec(path)
-	path = quoted ? quoted[2]! : path.replace(/\\(.)/g, '$1')
-	if (path.startsWith('~/')) path = homedir() + path.slice(1)
-	let mediaType = imageTypes[/\.([a-z]+)$/i.exec(path)?.[1]?.toLowerCase() ?? '']
-	if (!mediaType || !path.startsWith('/')) return undefined
-	let stat = statSync(path, { throwIfNoEntry: false })
+	if (!text.trim() || text.includes('\n')) return undefined
+	let p = paste.path(text)
+	let mediaType = imageTypes[/\.([a-z]+)$/i.exec(p)?.[1]?.toLowerCase() ?? '']
+	if (!mediaType || !p.startsWith('/')) return undefined
+	let stat = statSync(p, { throwIfNoEntry: false })
 	if (!stat?.isFile()) return undefined
 	// Not read at all if it is too large to send.
 	let big = uploads.tooBig(stat.size)
 	if (big) return { error: big }
 	try {
-		return { mediaType, bytes: new Uint8Array(readFileSync(path)) }
+		return { mediaType, bytes: new Uint8Array(readFileSync(p)) }
 	} catch (e: any) {
 		return { error: `[upload failed: ${e?.message ?? e}]` }
 	}
@@ -53,13 +70,21 @@ function upload(sessionId: string, mediaType: string, bytes: Uint8Array, send: (
 }
 
 // A paste key as the editor should get it: an image path or a long text
-// replaced by the placeholder of its upload, anything else unchanged.
+// replaced by the placeholder of its upload; of several dropped files,
+// each image replaced and the other paths kept; anything else unchanged.
 function key(sessionId: string, k: KeyEvent, send: (command: unknown) => void): KeyEvent {
 	if (k.key !== 'paste' || !k.text) return k
 	let text = prompt.clean(k.text)
-	let image = paste.file(text)
-	if (image && 'error' in image) return { ...k, text: image.error }
-	if (image) return { ...k, text: paste.upload(sessionId, image.mediaType, image.bytes, send) }
+	let attach = (t: string): string | undefined => {
+		let image = paste.file(t)
+		if (image && 'error' in image) return image.error
+		if (image) return paste.upload(sessionId, image.mediaType, image.bytes, send)
+		return undefined
+	}
+	let many = paste.files(text)
+	if (many) return { ...k, text: many.map((t) => attach(t) ?? t).join(' ') }
+	let one = attach(text)
+	if (one !== undefined) return { ...k, text: one }
 	if (uploads.long(text)) return { ...k, text: paste.upload(sessionId, 'text/plain', new TextEncoder().encode(text), send) }
 	return k
 }
@@ -80,4 +105,4 @@ function settled(st: Prompts, event: Event): Settled | undefined {
 	return done
 }
 
-export const paste = { file, upload, key, settled }
+export const paste = { path, files, file, upload, key, settled }

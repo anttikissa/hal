@@ -128,6 +128,20 @@ test('a pasted path of an existing image file attaches the file; other paths sta
 	expect(text()).toEndWith(`${dir}/missing.png`)
 })
 
+test('several dropped files: images attach, other paths stay as typed; text with spaces is never split', async () => {
+	writeFileSync(`${dir}/shot one.png`, png)
+	writeFileSync(`${dir}/notes.md`, '# hi')
+	app.onEvent(snapshot())
+	app.onKeys([key('paste', `${dir}/notes.md ${dir}/shot\\ one.png`)])
+	await tick()
+	expect(attaches()).toHaveLength(1)
+	expect(text()).toBe(`${dir}/notes.md [image/${attaches()[0].name}]`)
+	app.onKeys([key('paste', ` ${dir}/shot\\ one.png is not ${dir}/notes.md`)])
+	await tick()
+	expect(attaches()).toHaveLength(1)
+	expect(text()).toEndWith(`${dir}/shot\\ one.png is not ${dir}/notes.md`)
+})
+
 test('a paste longer than the setting becomes a text attachment; a short one stays inline', async () => {
 	app.onEvent(snapshot())
 	let long = Array.from({ length: 8 }, (_, i) => `line ${i}`).join('\r\n')
