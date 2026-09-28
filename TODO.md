@@ -17,6 +17,3 @@ a task and remove it here.
 - A context graph: cmd-click the status row's context number to open a
   web page plotting context size per block; each drop is a compaction
   or pruning, later also cache misses (item 135).
-- Tools for what agents used eval for (item 119): a research subagent
-  is listing the ten most common purposes; the first candidate is an
-  `inspect` tool (tabs, states, models, cwds, pid, version, uptime).

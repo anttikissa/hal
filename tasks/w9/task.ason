@@ -1,0 +1,7 @@
+{
+	title: 'command tool: the model runs slash commands',
+	spec: "A command tool lets the model run a slash command in its own session, as if the user typed it: /cd, /rename, /go, /model, /compact and the rest the command list marks as model-usable (not /quit, /restart, /login or anything that asks the user for secrets). The result is the command's output or error text. This replaces what the old Hal's agents used eval for most (research 29 Sep: 45 of 62 eval calls were /cd into or out of a worktree, 6 were /rename).",
+	status: 'planned',
+	needs: [],
+	foldInto: ['2t']
+}
