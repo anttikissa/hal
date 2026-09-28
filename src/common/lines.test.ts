@@ -1,5 +1,4 @@
 import { expect, test } from 'bun:test'
-import { ason } from './ason.ts'
 import { lines } from './lines.ts'
 
 function collect(maxLine?: number) {
@@ -20,7 +19,7 @@ const messages = [
 ]
 
 test('messages split at every byte boundary decode unchanged', () => {
-	let bytes = new TextEncoder().encode(messages.map((m) => ason.stringifyLine(m)).join(''))
+	let bytes = new TextEncoder().encode(messages.map((m) => lines.encode(m)).join(''))
 	for (let cut = 1; cut < bytes.length; cut++) {
 		let c = collect()
 		c.feed(bytes.slice(0, cut))
@@ -32,7 +31,7 @@ test('messages split at every byte boundary decode unchanged', () => {
 
 test('a message arrives only once its line is complete', () => {
 	let c = collect()
-	let line = ason.stringifyLine(messages[0])
+	let line = lines.encode(messages[0])
 	c.feed(line.slice(0, -1))
 	expect(c.values).toEqual([])
 	c.feed('\n')
@@ -41,7 +40,7 @@ test('a message arrives only once its line is complete', () => {
 
 test('a bad line is reported and the next one still decodes', () => {
 	let c = collect()
-	c.feed(`{ oops\n\n${ason.stringifyLine({ ok: 1 })}`)
+	c.feed(`{ oops\n\n${lines.encode({ ok: 1 })}`)
 	expect(c.errors.length).toBe(1)
 	expect(c.values).toEqual([{ ok: 1 }])
 })
@@ -52,7 +51,7 @@ test('an overlong line is dropped without buffering it all', () => {
 	c.feed(`${'x'.repeat(60)}`)
 	expect(c.errors.length).toBe(1)
 	c.feed(`${'x'.repeat(500)}'\n`)
-	c.feed(ason.stringifyLine({ ok: 2 }))
+	c.feed(lines.encode({ ok: 2 }))
 	expect(c.errors.length).toBe(1)
 	expect(c.values).toEqual([{ ok: 2 }])
 })

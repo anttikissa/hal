@@ -5,7 +5,6 @@
 // the host socket (Unix socket, line-delimited ASON).
 
 import { createConnection } from 'net'
-import { ason } from '../common/ason.ts'
 import { connection, type Conn, type LinkState, type Transport } from '../common/connection.ts'
 import { lines } from '../common/lines.ts'
 import type { Event } from '../common/protocol.ts'
@@ -52,7 +51,7 @@ function dial(path: string, on: { event(event: Event): void; dropped(): void }):
 		)
 		socket.once('connect', () => {
 			connected = true
-			resolve({ send: (command) => void socket.write(ason.stringifyLine(command)), close: () => void socket.destroy() })
+			resolve({ send: (command) => void socket.write(lines.encode(command)), close: () => void socket.destroy() })
 		})
 		socket.on('error', () => {})
 		socket.on('close', () => (connected ? on.dropped() : resolve(null)))

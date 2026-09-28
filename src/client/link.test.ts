@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'fs'
 import { createServer, type Server, type Socket } from 'net'
 import { tmpdir } from 'os'
-import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
 import type { Event } from '../common/protocol.ts'
 import { connection, type Conn, type LinkState, type Role } from '../common/connection.ts'
@@ -36,8 +35,8 @@ async function fakeHost(): Promise<FakeHost> {
 				(c: any) => {
 					let { id, ...command } = c
 					h.commands.push(command)
-					if (c.type === 'open') socket.write(ason.stringifyLine(snapshotOf(c.sessionId)))
-					socket.write(ason.stringifyLine({ type: 'ack', id }))
+					if (c.type === 'open') socket.write(lines.encode(snapshotOf(c.sessionId)))
+					socket.write(lines.encode({ type: 'ack', id }))
 				},
 				() => {},
 			),

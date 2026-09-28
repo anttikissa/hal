@@ -1,6 +1,6 @@
 // config.ason: the live file behind settings.<name>().
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { settings } from '../common/settings.ts'
 import { config } from './config.ts'
@@ -95,4 +95,28 @@ test('a malformed file never crashes: defaults, a warning, and fixing it applies
 	await until(() => settings.model() === 'test/fixed')
 	expect(settings.model()).toBe('test/fixed')
 	expect(config.warnings()).toEqual([])
+})
+
+test('hand-written comments on keys and array items survive a save', () => {
+	writeFileSync(
+		paths.configFile(),
+		`{
+	// the model I like
+	model: 'test/a',
+	extra: [
+		// first
+		1,
+		/* second */
+		2,
+	],
+}
+`,
+	)
+	start()
+	config.state.data!.model = 'test/b'
+	liveFiles.save(config.state.data!)
+	let text = readFileSync(paths.configFile(), 'utf8')
+	expect(text).toContain("// the model I like\n\tmodel: 'test/b'")
+	expect(text).toContain('// first\n\t\t1,')
+	expect(text).toContain('/* second */\n\t\t2')
 })

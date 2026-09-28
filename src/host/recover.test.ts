@@ -5,6 +5,7 @@
 import { expect, test } from 'bun:test'
 import { mkdirSync, writeFileSync } from 'fs'
 import { ason } from '../common/ason.ts'
+import { lines } from '../common/lines.ts'
 import { busy } from './busy.ts'
 import { history } from './history.ts'
 import { calls, client, restartHost, stamped, testHome, until, useHost } from './host-fixture.test.ts'
@@ -18,7 +19,7 @@ import { turns } from './turns.ts'
 useHost()
 
 const texts = (message: any) => message.blocks.map((b: any) => b.text)
-const line = (r: object) => ason.stringifyLine({ ...r, ts: '2026-01-01T00:00:00Z' })
+const line = (r: object) => lines.encode({ ...r, ts: '2026-01-01T00:00:00Z' })
 
 // A finished session written straight to disk, as an old host left it.
 function onDisk(id: string): void {

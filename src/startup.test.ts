@@ -14,6 +14,7 @@ import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from './common/ason.ts'
+import { lines } from './common/lines.ts'
 
 const uiMs = 150
 const typingMs = 200
@@ -47,9 +48,9 @@ function session(n: number, bytes: number, last: string): string {
 	mkdirSync(dir, { recursive: true })
 	writeFileSync(`${dir}/session.ason`, ason.stringify({ id, cwd: n === tabCount ? cwd : `${cwd}/other-${n}`, model: 'anthropic/claude-opus-4-5', createdAt: ts }) + '\n')
 	let turn = (i: number, answer: string) =>
-		ason.stringifyLine({ type: 'user', blocks: [{ type: 'text', text: `question ${i}: ${'why '.repeat(40)}` }], ts }) +
-		ason.stringifyLine({ type: 'assistant', block: { type: 'text', text: answer }, ts }) +
-		ason.stringifyLine({ type: 'turn_end', status: 'completed', usage: { input: 10, output: 10 }, ts })
+		lines.encode({ type: 'user', blocks: [{ type: 'text', text: `question ${i}: ${'why '.repeat(40)}` }], ts }) +
+		lines.encode({ type: 'assistant', block: { type: 'text', text: answer }, ts }) +
+		lines.encode({ type: 'turn_end', status: 'completed', usage: { input: 10, output: 10 }, ts })
 	let one = turn(0, `answer: ${'lorem ipsum '.repeat(150)}`)
 	let chunks = Array.from({ length: Math.max(1, Math.floor(bytes / one.length)) }, () => one)
 	chunks.push(turn(1, `the end. ${last}`))

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { appendFileSync, existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
-import { ason } from '../common/ason.ts'
+import { lines } from '../common/lines.ts'
 import { forms } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
 import type { HistoryRecord } from '../common/replay.ts'
@@ -131,7 +131,7 @@ test('what the state needs from earlier stays right as history grows and without
 	history.append(id, { type: 'turn_end', status: 'error', error: 'boom', usage: {} })
 	check()
 	// Written by someone else, then by an older host with no marks.
-	appendFileSync(history.file(id), ason.stringifyLine({ type: 'continue', ts: new Date().toISOString() }))
+	appendFileSync(history.file(id), lines.encode({ type: 'continue', ts: new Date().toISOString() }))
 	check()
 	pages.reset()
 	expect(existsSync(`${paths.sessionDir(id)}/marks.ason`)).toBe(true)
@@ -146,7 +146,7 @@ test('a history cut short (a partial last record repaired away) rebuilds the mar
 	history.submit(id, 'second')
 	pages.essentials(id)
 	let records: HistoryRecord[] = history.readSync(id).slice(0, 3)
-	writeFileSync(history.file(id), records.map((r) => ason.stringifyLine(r)).join(''))
+	writeFileSync(history.file(id), records.map((r) => lines.encode(r)).join(''))
 	expect(statSync(history.file(id)).size).toBe(size)
 	expect(states.fromHistory(pages.essentials(id))).toEqual({ type: 'idle' })
 })

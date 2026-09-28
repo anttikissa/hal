@@ -4,14 +4,23 @@
 // and stream. That means JS-like numbers (`.5`, `1e10`, `Infinity`, `123n`,
 // `undefined`), JS-like strings (single, double, backtick), and JS-like
 // commas: separators are required, trailing commas are allowed.
-// Format: tasks/8/ason.md. Comments are accepted but not preserved.
+// See docs/ason.md — keep it in sync when changing this file.
 //
 // License: MIT
 
+/** Symbol key for attaching comments to AsonObject/AsonArray. */
+export const COMMENTS = Symbol('comments')
+
 /** Any value representable in ASON. */
 export type AsonValue = string | number | bigint | boolean | null | undefined | AsonArray | AsonObject
-export type AsonArray = AsonValue[]
-export type AsonObject = { [key: string]: AsonValue }
+
+/** Array with optional comment metadata per element. */
+export type AsonArray = AsonValue[] & { [COMMENTS]?: (string | undefined)[] }
+/** Object with optional comment metadata per key. */
+export type AsonObject = {
+	[key: string]: AsonValue
+	[COMMENTS]?: Record<string, string>
+}
 
 // --- Stringify ---
 
@@ -33,10 +42,19 @@ function quoteKey(key: string): string {
 	return IDENT_RE.test(key) ? key : quoteString(key)
 }
 
+function indentComment(comment: string, pad: string): string {
+	const lines = comment.replace(/\n$/, '').split('\n')
+	return lines.map((l) => (l ? pad + l : '')).join('\n')
+}
+
+function commentPrefix(comment: string | undefined, pad: string): string {
+	return comment ? `${indentComment(comment, pad)}\n` : ''
+}
+
 // Tabs encode one ASON indentation level; keep wrapping compatible with the former two-column indentation.
 // In long mode, skip the unused inline candidate: computing both forms at every level is exponential.
-function renderCollection(open: string, close: string, inline: string, col: number, depth: number, maxWidth: number, buildLines: (pad: string, childDepth: number) => string[]): string {
-	if (maxWidth > 0 && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
+function renderCollection(open: string, close: string, inline: string, col: number, depth: number, maxWidth: number, hasComments: boolean, buildLines: (pad: string, childDepth: number) => string[]): string {
+	if (maxWidth > 0 && !hasComments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 	const childDepth = depth + 1
 	return `${open}\n${buildLines('\t'.repeat(childDepth), childDepth).join('\n')}\n${'\t'.repeat(depth)}${close}`
 }
@@ -56,9 +74,10 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 
 	if (Array.isArray(obj)) {
 		if (obj.length === 0) return '[]'
+		const comments = maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
 		const inline = maxWidth === 0 ? '' : `[${obj.map((v) => stringifyValue(v, 0, depth, maxWidth)).join(', ')}]`
-		return renderCollection('[', ']', inline, col, depth, maxWidth, (pad, childDepth) =>
-			obj.map((v, i) => `${pad}${stringifyValue(v, childDepth * 2, childDepth, maxWidth)}${i < obj.length - 1 ? ',' : ''}`),
+		return renderCollection('[', ']', inline, col, depth, maxWidth, !!comments, (pad, childDepth) =>
+			obj.map((v, i) => `${commentPrefix(comments?.[i], pad)}${pad}${stringifyValue(v, childDepth * 2, childDepth, maxWidth)}${i < obj.length - 1 ? ',' : ''}`),
 		)
 	}
 
@@ -66,26 +85,27 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		const rec = obj as AsonObject
 		const keys = Object.keys(rec)
 		if (keys.length === 0) return '{}'
+		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
 		const inline = maxWidth === 0 ? '' : `{ ${keys.map((k) => `${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth)}`).join(', ')} }`
-		return renderCollection('{', '}', inline, col, depth, maxWidth, (pad, childDepth) =>
-			keys.map((k, i) => `${pad}${quoteKey(k)}: ${stringifyValue(rec[k], childDepth * 2 + `${quoteKey(k)}: `.length, childDepth, maxWidth)}${i < keys.length - 1 ? ',' : ''}`),
+		return renderCollection('{', '}', inline, col, depth, maxWidth, !!comments, (pad, childDepth) =>
+			keys.map((k, i) => `${commentPrefix(comments?.[k], pad)}${pad}${quoteKey(k)}: ${stringifyValue(rec[k], childDepth * 2 + `${quoteKey(k)}: `.length, childDepth, maxWidth)}${i < keys.length - 1 ? ',' : ''}`),
 		)
 	}
 
-	throw new Error(`ASON cannot represent ${typeof obj}`)
+	throw new Error(`TODO: unsupported type ${typeof obj}`)
 }
 
 export type StringifyMode = 'short' | 'smart' | 'long'
 
 /** Convert a value to an ASON string. Mode: 'smart' (default, 80-col wrap), 'short' (single line), 'long' (always expanded). */
-function stringify(obj: unknown, mode: StringifyMode = 'smart'): string {
+export function stringify(obj: unknown, mode: StringifyMode = 'smart'): string {
 	const maxWidth = mode === 'short' ? Infinity : mode === 'long' ? 0 : 80
 	return stringifyValue(obj, 0, 0, maxWidth)
 }
 
 // --- Parse ---
 
-type Ctx = { buf: string; pos: number }
+type Ctx = { buf: string; pos: number; comments?: boolean }
 export type ParseError = Error & { pos: number }
 
 function fail(ctx: Ctx, msg: string): never {
@@ -106,26 +126,52 @@ function isIdent(c: string): boolean {
 	return /[a-zA-Z0-9_$]/.test(c)
 }
 
-function skipWhite(ctx: Ctx): void {
+function skipWhite(ctx: Ctx): string {
+	let collected = ''
+	let newlines = 0
 	while (ctx.pos < ctx.buf.length) {
 		const c = peek(ctx)
-		if (c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f' || c === '\v' || c === '\u00A0' || c === '\uFEFF' || c === '\u2028' || c === '\u2029') {
+		if (c === '\n') {
+			ctx.pos++
+			newlines++
+			continue
+		}
+		if (c === ' ' || c === '\t' || c === '\r' || c === '\f' || c === '\v' || c === '\u00A0' || c === '\uFEFF' || c === '\u2028' || c === '\u2029') {
 			ctx.pos++
 			continue
 		}
 		if (c === '/' && peek2(ctx) === '/') {
+			const start = ctx.pos
 			ctx.pos += 2
 			while (ctx.pos < ctx.buf.length && peek(ctx) !== '\n' && peek(ctx) !== '\r' && peek(ctx) !== '\u2028' && peek(ctx) !== '\u2029') ctx.pos++
+			if (ctx.pos < ctx.buf.length) ctx.pos++ // include \n
+			if (ctx.comments) {
+				if (newlines >= 2) collected += '\n'
+				collected += ctx.buf.slice(start, ctx.pos)
+			}
+			newlines = 0
 			continue
 		}
 		if (c === '/' && peek2(ctx) === '*') {
-			const end = ctx.buf.indexOf('*/', ctx.pos + 2)
-			if (end < 0) fail(ctx, 'Unterminated comment')
-			ctx.pos = end + 2
+			const start = ctx.pos
+			ctx.pos += 2
+			while (ctx.pos < ctx.buf.length) {
+				if (peek(ctx) === '*' && peek2(ctx) === '/') {
+					ctx.pos += 2
+					break
+				}
+				ctx.pos++
+			}
+			if (ctx.comments) {
+				if (newlines >= 2) collected += '\n'
+				collected += ctx.buf.slice(start, ctx.pos)
+			}
+			newlines = 0
 			continue
 		}
 		break
 	}
+	return collected
 }
 
 function peek(ctx: Ctx): string {
@@ -277,10 +323,15 @@ function parseKey(ctx: Ctx): string {
 function parseObject(ctx: Ctx): AsonObject {
 	ctx.pos++ // skip {
 	const obj: AsonObject = {}
+	let commentMap: Record<string, string> | undefined
 	while (true) {
-		skipWhite(ctx)
+		const comment = skipWhite(ctx)
 		if (eat(ctx, '}')) break
 		const key = parseKey(ctx)
+		if (comment) {
+			commentMap ??= {}
+			commentMap[key] = comment
+		}
 		skipWhite(ctx)
 		eat(ctx, ':', true)
 		obj[key] = parseAny(ctx)
@@ -288,20 +339,27 @@ function parseObject(ctx: Ctx): AsonObject {
 		if (eat(ctx, '}')) break
 		if (!eat(ctx, ',')) fail(ctx, "Expected ',' or '}'")
 	}
+	if (commentMap) obj[COMMENTS] = commentMap
 	return obj
 }
 
 function parseArray(ctx: Ctx): AsonArray {
 	ctx.pos++ // skip [
-	const arr: AsonArray = []
+	const arr: AsonArray = [] as AsonArray
+	let commentArr: (string | undefined)[] | undefined
 	while (true) {
-		skipWhite(ctx)
+		const comment = skipWhite(ctx)
 		if (eat(ctx, ']')) break
+		if (comment) {
+			commentArr ??= []
+			commentArr[arr.length] = comment
+		}
 		arr.push(parseAny(ctx))
 		skipWhite(ctx)
 		if (eat(ctx, ']')) break
 		if (!eat(ctx, ',')) fail(ctx, "Expected ',' or ']'")
 	}
+	if (commentArr) arr[COMMENTS] = commentArr
 	return arr
 }
 
@@ -348,17 +406,17 @@ function parseAny(ctx: Ctx): AsonValue {
 	fail(ctx, 'Unexpected token')
 }
 
-/** Parse a single ASON value. Invalid input throws a ParseError with `pos`. */
-function parse(str: string): AsonValue {
-	const ctx: Ctx = { buf: str, pos: 0 }
+/** Parse a single ASON value. Pass `{ comments: true }` to preserve comments as `[COMMENTS]` metadata. */
+export function parse(str: string, opts?: { comments?: boolean }): AsonValue {
+	const ctx: Ctx = { buf: str, pos: 0, comments: opts?.comments }
 	const value = parseAny(ctx)
 	skipWhite(ctx)
 	if (ctx.pos < ctx.buf.length) fail(ctx, 'Unexpected content after value')
 	return value
 }
 
-/** Parse every value in an ASONL string (records may also span lines). */
-function parseAll(str: string): AsonValue[] {
+/** Parse multiple ASON values from a single string (like JSONL — one value per line or concatenated). */
+export function parseAll(str: string): AsonValue[] {
 	const ctx: Ctx = { buf: str, pos: 0 }
 	const results: AsonValue[] = []
 	skipWhite(ctx)
@@ -369,56 +427,38 @@ function parseAll(str: string): AsonValue[] {
 	return results
 }
 
-/** One ASONL record: the value on a single line, newline-terminated. */
-function stringifyLine(value: unknown): string {
-	return `${ason.stringify(value, 'short')}\n`
-}
-
-/** Yields newline-delimited lines from a byte stream, and whether each
- *  was newline-terminated (only the last one may not be). */
-async function* streamLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<[string, boolean]> {
+/** Yields newline-delimited lines from a byte stream.
+ *  split('\n') always produces a trailing element after the last \n;
+ *  pop() keeps that incomplete fragment in buf for the next chunk.
+ *  e.g. "a\nb\nc" → ["a","b","c"] → yield "a", buf="c" */
+async function* streamLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
 	const decoder = new TextDecoder()
 	let buf = ''
 	for await (const chunk of stream) {
 		buf += decoder.decode(chunk, { stream: true })
 		const lines = buf.split('\n')
 		buf = lines.pop()!
-		for (const line of lines) yield [line, true]
+		for (const line of lines) yield line
 	}
-	buf += decoder.decode()
-	if (buf) yield [buf, false]
+	if (buf) yield buf
 }
 
-export type ParseStreamOptions = {
-	/** The stream may start mid-record (e.g. read from an offset): skip a bad first line. */
-	midRecord?: boolean
-	/** An unterminated last line that fails to parse is a partial write:
-	 *  hand it here instead of throwing. */
-	onPartial?: (fragment: string) => void
-}
-
-/** Yields parsed ASON values from a byte stream, one per newline-delimited
- *  record, as soon as each line is complete. A bad record throws. */
-async function* parseStream(stream: ReadableStream<Uint8Array>, opts: ParseStreamOptions = {}): AsyncGenerator<AsonValue> {
+/** Yields parsed ASON values from a byte stream, one per newline-delimited record.
+ *  The first line silently ignores parse errors (the stream may start mid-record). */
+export async function* parseStream(stream: ReadableStream<Uint8Array>): AsyncGenerator<AsonValue> {
 	let first = true
-	for await (const [line, terminated] of streamLines(stream)) {
+	for await (const line of streamLines(stream)) {
 		if (!line.trim()) continue
-		let value: AsonValue
-		try {
-			value = ason.parse(line)
-		} catch (e) {
-			const skipFirst = first && opts.midRecord
+		if (first) {
 			first = false
-			if (skipFirst) continue
-			if (!terminated && opts.onPartial) {
-				opts.onPartial(line)
-				continue
-			}
-			throw e
+			try {
+				yield parse(line)
+			} catch {}
+		} else {
+			yield parse(line)
 		}
-		first = false
-		yield value
 	}
 }
 
-export const ason = { stringify, stringifyLine, parse, parseAll, parseStream }
+export const ason = { stringify, parse, parseAll, parseStream, COMMENTS }
+export default ason

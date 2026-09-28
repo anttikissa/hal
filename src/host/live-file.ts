@@ -14,7 +14,9 @@
 // Options for user-edited files (config.ason): keepBroken starts a
 // malformed file from the defaults (reported, still never overwritten)
 // instead of throwing; onChange hears every external edit, with the
-// error if it left the file malformed.
+// error if it left the file malformed. Comments in the file ride along
+// on the parsed objects (ason COMMENTS) and are written back on save,
+// so a hand-written comment survives every change hal2 makes.
 
 import { chmodSync, renameSync, unlinkSync, watch, writeFileSync, readFileSync, type FSWatcher } from 'fs'
 import { basename, dirname } from 'path'
@@ -64,7 +66,7 @@ function read(path: string): Data | null {
 	}
 	let value: unknown
 	try {
-		value = ason.parse(text)
+		value = ason.parse(text, { comments: true })
 	} catch (e: any) {
 		// First line only: the rest quotes file content, which may be secret.
 		throw fail(path, `malformed ASON: ${String(e?.message).split('\n')[0]}`)
@@ -135,8 +137,8 @@ function reloadExternal(state: LiveState): void {
 	}
 	state.synced = text
 	// In place, so existing references see the new data. External wins
-	// over any change not yet written.
-	for (let key of Object.keys(state.data)) if (!(key in next)) delete state.data[key]
+	// over any change not yet written, its comments included.
+	for (let key of Reflect.ownKeys(state.data)) if (!(key in next)) delete state.data[key as string]
 	Object.assign(state.data, next)
 	state.dirty = false
 	state.onChange?.(null)

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
-import { ason } from '../common/ason.ts'
+import { lines } from '../common/lines.ts'
 import type { DoneEvent, ErrorEvent, Message, StreamEvent } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { diag } from './diag.ts'
@@ -224,7 +224,7 @@ test('open recovers a partially written last record and appends cleanly after it
 
 test('a complete last record missing its newline is kept', async () => {
 	let id = newSession()
-	let line = ason.stringifyLine({ type: 'user', blocks: [{ type: 'text', text: 'a' }], ts: new Date().toISOString() })
+	let line = lines.encode({ type: 'user', blocks: [{ type: 'text', text: 'a' }], ts: new Date().toISOString() })
 	writeFileSync(history.file(id), line + line.trimEnd())
 	sessions.closeAll()
 	await history.open(id)
@@ -235,7 +235,7 @@ test('a complete last record missing its newline is kept', async () => {
 test('a corrupt record mid-file is reported when read and the file left untouched', async () => {
 	let id = newSession()
 	history.submit(id, 'a')
-	appendFileSync(history.file(id), '{ type: @@ }\n' + ason.stringifyLine({ type: 'user', blocks: [{ type: 'text', text: 'b' }], ts: new Date().toISOString() }))
+	appendFileSync(history.file(id), '{ type: @@ }\n' + lines.encode({ type: 'user', blocks: [{ type: 'text', text: 'b' }], ts: new Date().toISOString() }))
 	sessions.closeAll()
 	let before = readFileSync(history.file(id), 'utf8')
 	// Opening reads only the end of the history.
@@ -420,7 +420,7 @@ test('every record is numbered once; a streamed block keeps the number it starte
 
 test('records of an old history without numbers are numbered by place, and new ones past them', async () => {
 	let id = newSession()
-	let line = (text: string) => ason.stringifyLine({ type: 'user', blocks: [{ type: 'text', text }], ts: new Date().toISOString() })
+	let line = (text: string) => lines.encode({ type: 'user', blocks: [{ type: 'text', text }], ts: new Date().toISOString() })
 	writeFileSync(history.file(id), line('a') + line('b'))
 	forget()
 	let old = history.readSync(id).map((r) => r.n)
@@ -436,7 +436,7 @@ test('records of an old history without numbers are numbered by place, and new o
 
 test('a number that is not an integer is corrupt history', async () => {
 	let id = newSession()
-	writeFileSync(history.file(id), ason.stringifyLine({ type: 'continue', n: 'x', ts: new Date().toISOString() }))
+	writeFileSync(history.file(id), lines.encode({ type: 'continue', n: 'x', ts: new Date().toISOString() }))
 	forget()
 	expect(() => history.readSync(id)).toThrow(new RegExp(id))
 })

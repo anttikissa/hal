@@ -1,6 +1,6 @@
 // Line-delimited ASON over a byte stream, such as a socket: one message
 // per line. Short ASON escapes newlines inside strings, so a newline
-// always ends a message. Encode with ason.stringifyLine.
+// always ends a message. Encode with lines.encode.
 
 import { ason } from './ason.ts'
 
@@ -47,8 +47,14 @@ function decoder(
 	}
 }
 
+// One message: the value as short ASON on a single line, newline-ended.
+function encode(value: unknown): string {
+	return `${ason.stringify(value, 'short')}\n`
+}
+
 export const lines = {
 	// Snapshots carry whole conversations, so this is generous.
 	maxLine: () => 256 * 1024 * 1024,
 	decoder,
+	encode,
 }

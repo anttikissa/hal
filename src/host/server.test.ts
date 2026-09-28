@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, rmSync } from 'fs'
 import { createConnection, type Socket } from 'net'
 import { tmpdir } from 'os'
-import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
@@ -57,7 +56,7 @@ async function until(check: () => unknown): Promise<void> {
 test('commands and events cross the socket as ASON lines', async () => {
 	expect(await server.serve()).toBe(true)
 	let a = await dial()
-	let create = ason.stringifyLine({ type: 'create', cwd: '/tmp/x', model: 'fake/m' })
+	let create = lines.encode({ type: 'create', cwd: '/tmp/x', model: 'fake/m' })
 	// A bad line, then a good one split mid-message.
 	a.socket.write('{ not ason\n')
 	a.socket.write(create.slice(0, 7))
@@ -70,7 +69,7 @@ test('commands and events cross the socket as ASON lines', async () => {
 
 	// A second connection sees the same session.
 	let b = await dial()
-	b.socket.write(ason.stringifyLine({ type: 'open', sessionId: a.events[2].sessionId }))
+	b.socket.write(lines.encode({ type: 'open', sessionId: a.events[2].sessionId }))
 	await until(() => b.events.length === 2)
 	expect(b.events[1].snapshot.meta).toEqual(a.events[2].snapshot.meta)
 })
@@ -100,7 +99,7 @@ test('a stale socket file left by a dead host is replaced', async () => {
 	await Bun.write(server.socketPath(), 'stale')
 	expect(await server.serve()).toBe(true)
 	let a = await dial()
-	a.socket.write(ason.stringifyLine({ type: 'create', cwd: '/tmp' }))
+	a.socket.write(lines.encode({ type: 'create', cwd: '/tmp' }))
 	await until(() => a.events.length === 2)
 	expect(a.events[1].type).toBe('snapshot')
 })

@@ -9,6 +9,7 @@
 
 import { appendFileSync, existsSync, openSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
 import { ason } from '../common/ason.ts'
+import { lines } from '../common/lines.ts'
 import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock, type Turn, type Usage, type UserBlock } from '../common/blocks.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { blobs } from './blobs.ts'
@@ -78,7 +79,7 @@ function number(id: string): number {
 function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord {
 	let { n, ts, ...rest } = record
 	let full = { ...rest, n: n ?? history.number(id), ts: ts ?? new Date().toISOString() } as HistoryRecord
-	let line = ason.stringifyLine(full)
+	let line = lines.encode(full)
 	if (busy.starts(full)) busy.add(id)
 	appendFileSync(history.file(id), line)
 	pages.note(id, line, full)
@@ -98,8 +99,19 @@ async function load(id: string): Promise<{ records: HistoryRecord[]; partial?: s
 	let records: HistoryRecord[] = []
 	let partial: string | undefined
 	try {
-		for await (let value of ason.parseStream(Bun.file(path).stream(), { onPartial: (s) => (partial = s) })) {
-			records.push(history.check(value))
+		let text = await Bun.file(path).text()
+		let end = text.lastIndexOf('\n') + 1
+		for (let line of text.slice(0, end).split('\n')) if (line.trim()) records.push(history.check(ason.parse(line)))
+		// An unterminated last line that fails to parse is a torn write.
+		let tail = text.slice(end)
+		if (tail.trim()) {
+			let value: unknown
+			try {
+				value = ason.parse(tail)
+			} catch {
+				partial = tail
+			}
+			if (partial === undefined) records.push(history.check(value))
 		}
 	} catch (e: any) {
 		throw new Error(`${path}: malformed history: ${e?.message ?? e}`)

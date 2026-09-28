@@ -8,7 +8,7 @@
 // parent spends limit + 1 for a child given `limit`.
 
 import { cpSync, existsSync, writeFileSync } from 'fs'
-import { ason } from '../common/ason.ts'
+import { lines } from '../common/lines.ts'
 import type { ToolResultBlock } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import type { SessionMeta, SpawnKind } from '../common/session.ts'
@@ -66,7 +66,7 @@ function prompt(parent: string, task: string, kind: SpawnKind, slots: number): s
 // running this round's calls, so the copy answers them and ends it.
 function fork(parent: string, child: string): void {
 	let records = history.readSync(parent).filter((r) => r.type !== 'inbox')
-	writeFileSync(history.file(child), records.map((r) => ason.stringifyLine(r)).join(''))
+	writeFileSync(history.file(child), records.map((r) => lines.encode(r)).join(''))
 	if (existsSync(blobs.dir(parent))) cpSync(blobs.dir(parent), blobs.dir(child), { recursive: true })
 	let pending: string[] = []
 	for (let r of records) {
