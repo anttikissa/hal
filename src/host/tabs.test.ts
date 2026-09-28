@@ -31,6 +31,14 @@ test('tabs start empty; the first tab-start creates one in cwd', () => {
 	expect(sessions.list().map((s) => s.id)).toEqual([tab])
 })
 
+
+test('a fresh home opens the offline intro; later tabs use the configured provider model', () => {
+	let c = client()
+	let first = newTab(c)
+	expect(sessions.open(first).model).toBe('hal/intro')
+	expect(sessions.open(newTab(c)).model).not.toBe('hal/intro')
+})
+
 test('a tab whose cwd is the Hal repo is marked hal, for its own prompt examples', () => {
 	let a = client()
 	let hal = newTab(a, paths.repoRoot())
@@ -125,17 +133,19 @@ test('an unreadable session stays a tab, failed with the error, and opening it i
 test('a tab wants attention when its turn ends until a client has seen it', async () => {
 	let a = client()
 	let b = client()
+	newTab(a) // the first tab is the offline introduction, not a provider turn
 	let x = newTab(a)
 	a.conn.send({ type: 'open', sessionId: x })
 	send(a, { type: 'submit', sessionId: x, text: 'go' })
 	await until(() => calls.length === 1)
-	await until(() => tabsOf(b)![0].state.type === 'running')
-	expect(tabsOf(b)![0].attention).toBeUndefined()
+	let tab = () => tabsOf(b)!.find((t) => t.id === x)!
+	await until(() => tab().state.type === 'running')
+	expect(tab().attention).toBeUndefined()
 	calls[0]!.push({ type: 'done', reason: 'end' })
-	await until(() => tabsOf(b)![0].attention)
-	expect(tabsOf(b)![0].state.type).toBe('idle')
+	await until(() => tab().attention)
+	expect(tab().state.type).toBe('idle')
 	send(b, { type: 'tab-seen', sessionId: x })
-	expect(tabsOf(a)![0].attention).toBeUndefined()
+	expect(tabsOf(a)!.find((t) => t.id === x)!.attention).toBeUndefined()
 })
 
 test('tabs, their closed positions and attention survive a host restart', () => {

@@ -82,7 +82,9 @@ function insert(id: string, index: number): void {
 }
 
 function create(cwd: string, after?: string): string {
-	let id = sessions.create({ cwd }).id
+	// The very first tab of a fresh home is the offline welcome guide.
+	let first = tabs.file().open.length === 0 && !sessions.newest()
+	let id = sessions.create({ cwd, ...(first ? { model: 'hal/intro' } : {}) }).id
 	let open = tabs.file().open
 	let at = after === undefined ? -1 : open.indexOf(after)
 	tabs.insert(id, at < 0 ? open.length : at + 1)

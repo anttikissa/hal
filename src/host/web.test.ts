@@ -500,7 +500,15 @@ async function browser() {
 	return { call, evaluate, waitFor, close }
 }
 
+// A browser test of provider streaming starts from an already-used home.
+function providerHome(): void {
+	let id = '1-ready'
+	mkdirSync(paths.sessionDir(id))
+	writeFileSync(`${paths.sessionDir(id)}/session.ason`, ason.stringify({ id, cwd: '/tmp', model: 'anthropic/claude-opus-5-5', createdAt: new Date().toISOString() }) + '\n')
+}
+
 test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a reply', async () => {
+	providerHome()
 	turns.stream = () =>
 		(async function* (): AsyncGenerator<StreamEvent> {
 			yield { type: 'text', text: 'hello from fake' }
@@ -796,6 +804,7 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 }, 20000)
 
 test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to where it ran: same card, no fade again', async () => {
+	providerHome()
 	let id = tabs.create('/tmp')
 	let release = () => {}
 	let gate = new Promise<void>((r) => (release = r))

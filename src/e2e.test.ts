@@ -3,7 +3,7 @@
 // in for the tty (stdin in, frames out) and points anthropic at the fake,
 // so neither the real auth.ason nor the real API is touched.
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from './common/ason.ts'
 
@@ -107,6 +107,11 @@ beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-e2e-`)
 	server = Bun.serve({ port: 0, idleTimeout: 0, fetch: async (req) => reply(req, await req.json()) })
 	writeFileSync(`${home}/auth.ason`, ason.stringify({ anthropic: { apiKey: 'fake-key' } }) + '\n', { mode: 0o600 })
+	// Provider tests exercise an already-set-up home; a fresh first tab is hal/intro.
+	mkdirSync(`${home}/sessions/1-ready`, { recursive: true })
+	mkdirSync(`${home}/state`)
+	writeFileSync(`${home}/sessions/1-ready/session.ason`, ason.stringify({ id: '1-ready', cwd: `${import.meta.dir}/..`, model: 'anthropic/claude-opus-5-5', createdAt: new Date().toISOString() }) + '\n')
+	writeFileSync(`${home}/state/tabs.ason`, ason.stringify({ open: ['1-ready'], closed: [], attention: [] }) + '\n')
 	writeFileSync(
 		`${home}/local.ts`,
 		`import { terminal } from ${JSON.stringify(`${import.meta.dir}/client/terminal.ts`)}
@@ -183,6 +188,7 @@ async function until(what: string, check: () => boolean): Promise<void> {
 const seen = (p: Proc, text: string, from = 0) => p.out.indexOf(text, from) >= 0
 const sessionCount = () =>
 	existsSync(`${home}/sessions`) ? readdirSync(`${home}/sessions`).filter((id) => existsSync(`${home}/sessions/${id}/session.ason`)).length : 0
+const hostReady = () => existsSync(`${home}/state/host.sock`)
 
 // Every turn end in the one session's history: its status.
 function ends(): string[] {
@@ -296,8 +302,9 @@ test('a restarted host kills its running command; the next host continues the tu
 
 test('a host restarted mid-turn continues it, and everyone rejoins', async () => {
 	let a = run()
-	await until('a session', () => sessionCount() === 1)
+	await until('the first host', hostReady)
 	let b = run()
+	await until('the joining peer', () => seen(b, 'peer'))
 	type(a, 'hold it\r')
 	await until('both to see the stream', () => seen(a, 'PART1') && seen(b, 'PART1'))
 

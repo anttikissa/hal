@@ -207,7 +207,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model, now: clock.now(), sessionId: id })
 			return yield* turns.stream(model, { system, messages: await history.messages(id), tools: tools.defs(), image: (blob) => blobs.base64(id, blob), sessionId: id }, signal)
 		}
-		let reply = scripted(await history.read(id), answers)
+		let reply = scripted(await history.read(id), answers, id)
 		answers = undefined
 		asking = reply.ask
 		if (reply.say) yield { type: 'text', text: reply.say }

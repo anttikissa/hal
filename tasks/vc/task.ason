@@ -1,6 +1,9 @@
 {
 	title: 'hal/intro: a friendly first-run guide',
 	spec: 'hal/intro (src/host/synthetic.ts) is the first-run guide, a synthetic model that asks with forms and acts on the answers (no provider needed). It walks, one question at a time, each skippable: 1) name, written to USER.md as "# User\\n\\nName: <name>\\n" (task n2; if USER.md already has a Name line it greets by it and skips the question); 2) optionally a sentence about what they mostly work on and how they like answers, appended to USER.md under "## About"; 3) provider login: when no account is logged in it explains and offers to start /login (the command, as if typed), else says which accounts exist; 4) the default model, offered as a choice among the listed models, applied like /model; 5) web search: it says that Claude models search with their own web_search tool, while other models use the google tool through Serper (serper.dev; the free tier goes a long way), and asks yes or no whether to set up Serper; on yes it asks for the API key in a secret field and stores it as serper.apiKey in the credentials file through the same liveFile path provider accounts use (task g6); skipped when a Serper key already exists; 6) it closes with three or four short tips (Escape pauses, Alt-Enter queues, /help, /keys, the web client address) and how to switch this tab to a real model. It is resumable: after a restart or a steered message it continues from the first step not yet answered, reading history (answer records) and USER.md, never asking twice. Writes to USER.md go through one small host function that creates the file with the header when missing and appends otherwise. A fresh home with no sessions opens its first tab on hal/intro. Tests: the steps in order with skips; USER.md content after name and about; an existing Name skips step 1; resuming mid-way; no login offers /login.',
-	status: 'planned',
-	needs: ['n2']
+	status: 'done',
+	needs: ['n2'],
+	notes: [
+		'hal/intro advances by named answer records and USER.md rather than a volatile step counter. The first tab alone starts on hal/intro; provider tests with preexisting homes must seed a provider session. Login launches the real slash command after the intro turn; Serper uses apiKeys.save/liveFile with 0600 and its secret answer never enters history.'
+	]
 }
