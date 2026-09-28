@@ -30,24 +30,11 @@ function blob(b: Blob, mediaType: string, insert: Insert): void {
 	)
 }
 
-// Text files by extension: browsers type many of them oddly or not at
-// all (macOS Chrome calls .ts video/mp2t, most give .md and .toml '').
-const textExts = new Set(
-	'txt md markdown json jsonc json5 ason asonl ndjson csv tsv log xml svg html htm css scss less js mjs cjs jsx ts mts cts tsx py rb go rs c h cc cpp hpp java kt swift sh bash zsh fish yaml yml toml ini cfg conf env sql graphql lua pl php r diff patch tex rst org'.split(' '),
-)
-const textTypes = /^(?:text\/|application\/(?:json|xml|javascript|x-sh|x-yaml|yaml|toml|sql|x-httpd-php)\b)/
 // What the file picker offers.
-const accept = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/*', ...[...textExts].map((e) => `.${e}`)].join(',')
+const accept = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/*', ...[...attachments.textExts].map((e) => `.${e}`)].join(',')
 
-// How `file` is attached: the image's media type, 'text/plain', or
-// undefined when it is neither (a PDF, a zip) and is refused.
-function kind(file: { name: string; type: string }): string | undefined {
-	if (attachments.types[file.type] && file.type.startsWith('image/')) return file.type
-	let ext = /\.([^./]+)$/.exec(file.name)?.[1]?.toLowerCase()
-	if ((ext && textExts.has(ext)) || textTypes.test(file.type)) return 'text/plain'
-	// No extension and no type: README, Makefile, LICENSE.
-	return !ext && !file.type ? 'text/plain' : undefined
-}
+// How `file` is attached (common attachments.fileKind).
+const kind = (file: { name: string; type: string }): string | undefined => attachments.fileKind(file.name, file.type)
 
 // Files dropped or picked: each image or text file becomes a marker at
 // the caret, in order; the rest are named in a notice and not sent.

@@ -128,18 +128,34 @@ test('a pasted path of an existing image file attaches the file; other paths sta
 	expect(text()).toEndWith(`${dir}/missing.png`)
 })
 
-test('several dropped files: images attach, other paths stay as typed; text with spaces is never split', async () => {
+test('several dropped files: images and text files attach, other paths stay as typed; text with spaces is never split', async () => {
 	writeFileSync(`${dir}/shot one.png`, png)
 	writeFileSync(`${dir}/notes.md`, '# hi')
+	writeFileSync(`${dir}/song.s3m`, new Uint8Array([0, 1, 2]))
 	app.onEvent(snapshot())
-	app.onKeys([key('paste', `${dir}/notes.md ${dir}/shot\\ one.png`)])
+	app.onKeys([key('paste', `${dir}/notes.md ${dir}/song.s3m ${dir}/shot\\ one.png`)])
 	await tick()
-	expect(attaches()).toHaveLength(1)
-	expect(text()).toBe(`${dir}/notes.md [image/${attaches()[0].name}]`)
+	expect(attaches().map((c) => c.mediaType)).toEqual(['text/plain', 'image/png'])
+	expect(Buffer.from(attaches()[0].data, 'base64').toString()).toBe('# hi')
+	expect(text()).toBe(`[paste/${attaches()[0].name}] ${dir}/song.s3m [image/${attaches()[1].name}]`)
 	app.onKeys([key('paste', ` ${dir}/shot\\ one.png is not ${dir}/notes.md`)])
 	await tick()
-	expect(attaches()).toHaveLength(1)
+	expect(attaches()).toHaveLength(2)
 	expect(text()).toEndWith(`${dir}/shot\\ one.png is not ${dir}/notes.md`)
+})
+
+test('a dropped text file attaches like the web drop; one that is not UTF-8 stays a path', async () => {
+	writeFileSync(`${dir}/README`, 'read me\n')
+	writeFileSync(`${dir}/bad.txt`, new Uint8Array([0xff, 0xfe, 0x00]))
+	app.onEvent(snapshot())
+	app.onKeys([key('paste', `${dir}/README`)])
+	await tick()
+	expect(attaches()).toMatchObject([{ mediaType: 'text/plain' }])
+	expect(text()).toBe(`[paste/${attaches()[0].name}]`)
+	app.onKeys([key('paste', ` ${dir}/bad.txt`)])
+	await tick()
+	expect(attaches()).toHaveLength(1)
+	expect(text()).toEndWith(`${dir}/bad.txt`)
 })
 
 test('a paste longer than the setting becomes a text attachment; a short one stays inline', async () => {

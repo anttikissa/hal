@@ -14,6 +14,28 @@ const types: Record<string, string> = {
 	'text/plain': 'txt',
 }
 
+// Text files by extension: browsers type many of them oddly or not at
+// all (macOS Chrome calls .ts video/mp2t, most give .md and .toml ''),
+// and a terminal drop gives only the path.
+const textExts = new Set(
+	'txt md markdown json jsonc json5 ason asonl ndjson csv tsv log xml svg html htm css scss less js mjs cjs jsx ts mts cts tsx py rb go rs c h cc cpp hpp java kt swift sh bash zsh fish yaml yml toml ini cfg conf env sql graphql lua pl php r diff patch tex rst org'.split(' '),
+)
+const textTypes = /^(?:text\/|application\/(?:json|xml|javascript|x-sh|x-yaml|yaml|toml|sql|x-httpd-php)\b)/
+
+// How a file (its name, and media type if known) is attached: the
+// image's media type, 'text/plain', or undefined when it is neither (a
+// PDF, a zip) and is not attached. The web's drop and picker and the
+// terminal's dropped paths use this one rule.
+function fileKind(name: string, type = ''): string | undefined {
+	let ext = /\.([^./]+)$/.exec(name)?.[1]?.toLowerCase()
+	if (types[type] && type.startsWith('image/')) return type
+	let image = Object.keys(types).find((t) => t.startsWith('image/') && (types[t] === ext || (ext === 'jpeg' && t === 'image/jpeg')))
+	if (!type && image) return image
+	if ((ext && textExts.has(ext)) || textTypes.test(type)) return 'text/plain'
+	// No extension and no type: README, Makefile, LICENSE.
+	return !ext && !type ? 'text/plain' : undefined
+}
+
 // Blob ids: 12 random lowercase hex digits made by the host, or the
 // 6 base36 characters of a pasted image's name (task qy).
 const blobId = /^(?:[0-9a-f]{12}|[0-9a-z]{6})$/
@@ -76,6 +98,8 @@ function label(b: Pick<ImageBlock, 'mediaType' | 'bytes'>): string {
 
 export const attachments = {
 	types,
+	textExts,
+	fileKind,
 	blobId,
 	fileName,
 	fileMarker,
