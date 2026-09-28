@@ -296,8 +296,18 @@ function close(): void {
 	if (s) liveFiles.close(s)
 }
 
+// The Serper API key (the google tool): the credentials file's
+// serper.apiKey, else SERPER_API_KEY; undefined when neither is set.
+function serperKey(): string | undefined {
+	let entry = existsSync(paths.authFile()) ? (auth.store().serper as Entry | undefined) : undefined
+	let key = entry && typeof entry === 'object' ? entry.apiKey : undefined
+	return auth.usable(key) ? key : process.env.SERPER_API_KEY || undefined
+}
+
 export const auth = {
 	tokenUrl,
+	serperKey,
+	usable,
 	refreshMarginMs,
 	refreshTimeoutMs,
 	// How often a session blocked on login looks at the credentials file.
