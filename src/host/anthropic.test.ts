@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import { blocks, type Message, type StreamEvent } from '../common/blocks.ts'
+import { settings } from '../common/settings.ts'
 import { anthropic } from './anthropic.ts'
 import { auth } from './auth.ts'
 import { provider } from './provider.ts'
@@ -59,6 +60,7 @@ afterEach(() => {
 	anthropic.apiUrl = originalUrl
 	auth.tokenUrl = originalTokenUrl
 	provider.state.providers = {}
+	settings.state.raw = {}
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome
 	rmSync(home, { recursive: true, force: true })
@@ -141,7 +143,7 @@ test('conversation maps to Messages; own thinking replays with its signature, fo
 	await run(messages, { tools, maxTokens: 20_000 })
 	let body = seen[0]!.body
 	expect(body.max_tokens).toBe(20_000)
-	expect(body.tools).toEqual([{ name: 'ls', description: 'List', input_schema: { type: 'object' } }])
+	expect(body.tools).toContainEqual({ name: 'ls', description: 'List', input_schema: { type: 'object' } })
 	let strip = (m: any) => ({ role: m.role, content: m.content.map((b: any) => { let c = { ...b }; delete c.cache_control; return c }) })
 	expect(body.messages.map(strip)).toEqual([
 		{ role: 'user', content: [{ type: 'text', text: 'list files' }] },

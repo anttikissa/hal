@@ -13,6 +13,7 @@ export type SettingType =
 	| { kind: 'integer'; min: number; max: number }
 	| { kind: 'number'; min: number; max: number }
 	| { kind: 'choice'; options: string[] }
+	| { kind: 'boolean' }
 
 // `browser`: the web page needs it too, so the host writes it into the
 // page it serves (host/web.ts); the page reads it with settings.load.
@@ -59,6 +60,7 @@ const table: Setting[] = [
 		default: '',
 		description: 'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
 	},
+	{ name: 'webSearch', type: { kind: 'boolean' }, default: true, description: "Offer Claude Anthropic's server-side web search." },
 ]
 
 // Why `value` doesn't fit `type`, or undefined if it does.
@@ -77,6 +79,8 @@ function problem(type: SettingType, value: unknown): string | undefined {
 			return typeof value === 'number' && value >= type.min && value <= type.max ? undefined : `expected a number ${type.min}–${type.max}`
 		case 'choice':
 			return type.options.includes(value as string) ? undefined : `expected one of ${type.options.map((o) => `'${o}'`).join(', ')}`
+		case 'boolean':
+			return typeof value === 'boolean' ? undefined : 'expected true or false'
 	}
 }
 
@@ -140,4 +144,5 @@ export const settings = {
 	pasteLines: (): number => settings.value('pasteLines') as number,
 	maxRounds: (): number => settings.value('maxRounds') as number,
 	compactAt: (): number => settings.value('compactAt') as number,
+	webSearch: (): boolean => settings.value('webSearch') as boolean,
 }

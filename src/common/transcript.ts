@@ -74,7 +74,13 @@ function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number
 	for (let [i, b] of list.entries()) {
 		let key = transcript.key(ns?.[i], 0, at + out.length)
 		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, key })
-		else if (b.text) {
+		else if (b.type === 'web_search_use') out.push({ type: 'tool', id: b.id, name: 'web_search', input: b.input, key })
+		else if (b.type === 'web_search_result') {
+			let hits = Array.isArray(b.content) ? b.content : [b.content]
+			let output = hits.map((h: any) => [h?.title, h?.url].filter((v) => typeof v === 'string').join('\n')).filter(Boolean).join('\n\n')
+			out.push({ type: 'tool-result', id: b.toolUseId, output: output || 'No results found.', key })
+		} else if (b.type === 'text' || b.type === 'thinking') {
+			if (!b.text) continue
 			let item: Item & { type: 'text' | 'thinking' } = { type: b.type, text: b.text, key }
 			if (by.ts?.[i] !== undefined) item.ts = by.ts[i]
 			if (by.model !== undefined) item.model = by.model
