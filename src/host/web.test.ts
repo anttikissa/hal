@@ -559,7 +559,9 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 		await server.serve()
 		web.start()
 		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('textarea')`)
+		// The textarea mounts before tab-start's snapshot. Background opens
+		// must not make this test type before the focused tab is ready.
+		await b.waitFor(`!!document.querySelector('textarea')?.placeholder`)
 		for (let width of [390, 1280]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/c'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
