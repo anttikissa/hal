@@ -39,18 +39,21 @@ function answered(records: HistoryRecord[], field: string): string | undefined {
 
 // Show identities only, never credential values. The file is loaded via the
 // same live store as /login; malformed credentials fail rather than disappear.
-function accounts(): string[] {
+function accounts(): { names: string[]; providers: string[] } {
 	let data: Entry = existsSync(paths.authFile()) ? auth.store() : {}
-	let out: string[] = []
+	let names: string[] = [], providers: string[] = []
 	for (let [kind, label, env] of [
 		['anthropic', 'Claude', 'ANTHROPIC_API_KEY'], ['openai', 'ChatGPT', 'OPENAI_API_KEY'],
 		['opencode-go', 'OpenCode Go', 'OPENCODE_API_KEY'],
 	] as const) {
 		let entries = data[kind] === undefined ? [] : Array.isArray(data[kind]) ? data[kind] : [data[kind]]
-		for (let entry of entries) if (typeof entry?.accessToken === 'string' || typeof entry?.apiKey === 'string') out.push(`${label}${entry.email ? ` (${entry.email})` : ''}`)
-		if (process.env[env]) out.push(`${label} (${env})`)
+		for (let entry of entries) if ((typeof entry?.accessToken === 'string' && entry.accessToken.length > 0) || (typeof entry?.apiKey === 'string' && entry.apiKey.length > 0)) {
+			names.push(`${label}${entry.email ? ` (${entry.email})` : ''}`)
+			providers.push(kind)
+		}
+		if (process.env[env]) { names.push(`${label} (${env})`); providers.push(kind) }
 	}
-	return out
+	return { names, providers }
 }
 
 function intro(records: HistoryRecord[], answers?: Answers, sessionId?: string): Reply {
@@ -75,20 +78,21 @@ function intro(records: HistoryRecord[], answers?: Answers, sessionId?: string):
 
 	let loggedIn = synthetic.accounts()
 	let login = synthetic.answered(records, 'login')
-	if (!loggedIn.length && login === undefined) return {
+	if (!loggedIn.names.length && login === undefined) return {
 		say: 'There is no provider login yet. A subscription works through /login; API keys in environment variables work too.',
 		ask: { text: 'Would you like to start a provider login now?', fields: [{ type: 'choice', name: 'login', options: ['Skip', '/login claude', '/login chatgpt', '/login opencode'], initial: 0 }] },
 	}
-	if (!loggedIn.length && login?.startsWith('/login ') && !records.some((r) => r.type === 'command' && r.text === login)) {
+	if (!loggedIn.names.length && login?.startsWith('/login ') && !records.some((r) => r.type === 'command' && r.text === login)) {
 		// Let the intro turn end before the command opens its own form.
 		if (sessionId) setTimeout(() => slash.command(sessionId, login, { name: 'login', args: login.slice('/login '.length) }), 0)
 		return { say: `Starting ${login}. After login, send a message to continue this guide.` }
 	}
 
 	let chosen = synthetic.answered(records, 'model')
-	let choices = [...new Set([models.defaultModel(), ...models.known().filter((id) => !id.startsWith('hal/'))])]
-	if (chosen === undefined) return {
-		say: loggedIn.length ? `Available logins: ${loggedIn.join(', ')}.` : 'You can use /login later, or supply a provider API key.',
+	let available = new Set(loggedIn.providers)
+	let choices = [...new Set([models.defaultModel(), ...models.known()])].filter((id) => available.has(id.split('/')[0]!))
+	if (choices.length && chosen === undefined) return {
+		say: `Available logins: ${loggedIn.names.join(', ')}.`,
 		ask: { text: 'Which model should be the default for new sessions? (Skip keeps the current default.)', fields: [{ type: 'choice', name: 'model', options: [...choices, 'Skip'], initial: 0 }] },
 	}
 	if (chosen && choices.includes(chosen)) {

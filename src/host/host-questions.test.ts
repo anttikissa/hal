@@ -14,10 +14,12 @@ import { apiKeys } from './api-keys.ts'
 import { auth } from './auth.ts'
 import { config } from './config.ts'
 import { paths } from './paths.ts'
+import { models } from './models.ts'
 
 const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
 const origModels = synthetic.models
+const originalKnown = models.known
 const keyNames = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'OPENCODE_API_KEY', 'SERPER_API_KEY'] as const
 const savedKeys = keyNames.map((key) => process.env[key])
 let home = ''
@@ -28,6 +30,7 @@ beforeEach(() => {
 	for (let key of keyNames) delete process.env[key]
 	liveFiles.onError = () => {}
 	synthetic.models = { ...origModels }
+	models.known = () => ['anthropic/test-claude', 'openai/test-gpt', 'opencode-go/test-go']
 })
 
 afterEach(() => {
@@ -37,6 +40,7 @@ afterEach(() => {
 	config.reset()
 	auth.close()
 	synthetic.models = origModels
+	models.known = originalKnown
 	liveFiles.onError = origOnError
 	keyNames.forEach((key, i) => {
 		if (savedKeys[i] === undefined) delete process.env[key]
@@ -180,6 +184,7 @@ test('intro resumes through name, about, login, model and secret search setup', 
 	let answer = async (field: string, value: string, next?: string) => {
 		await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === field)
 		let q = transcript.question(c.views.get(id))!
+		if (field === 'login') process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
 		c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { [field]: value } })
 		if (next) await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === next)
 	}
@@ -224,6 +229,25 @@ test('an existing user and accounts skip their questions, while a stored Serper 
 	await until(() => c.of('turn-end').length)
 	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Alex\n\n## About\n\nPrefers plain English.\n')
 	expect(texts(c.views.get(id)!).at(-1)).toContain('You are ready.')
+})
+
+test('intro skips default-model choice without credentials and lists only usable providers', async () => {
+	writeFileSync(`${home}/USER.md`, '# User\n\nName: Alex\n\n## About\n\nNotes.\n')
+	let c = client(), id = created(c)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
+	await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === 'login')
+	let q = transcript.question(c.views.get(id))!
+	c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { login: 'Skip' } })
+	await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === 'search')
+	process.env.OPENAI_API_KEY = 'valid-key'
+	process.env.ANTHROPIC_API_KEY = ''
+	let second = client(), secondId = created(second)
+	second.conn.send({ type: 'submit', sessionId: secondId, text: 'start' })
+	await until(() => transcript.question(second.views.get(secondId))?.form.fields[0]?.name === 'model')
+	let model = transcript.question(second.views.get(secondId))!.form.fields[0]!
+	if (model.type !== 'choice') throw new Error('expected a model choice')
+	expect(model.options.some((option) => option.startsWith('openai/'))).toBe(true)
+	expect(model.options.filter((option) => option !== 'Skip').every((option) => option.startsWith('openai/'))).toBe(true)
 })
 
 
