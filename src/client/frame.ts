@@ -161,17 +161,13 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	// > text; then prompts still on their way to the host, which join
 	// the inbox or history at the same place, so nothing jumps.
 	let t = view.transcript
-	for (let m of t?.inbox ?? []) {
+	let tail = [...(t?.inbox ?? []).map((m) => ({ text: m.text, label: inbox.tag(t!.state, m) })), ...(view.pending ?? []).map((text) => ({ text, label: 'sending' }))]
+	for (let m of tail) {
 		// The tag takes at most half the row, so the text keeps room.
-		let tag = strings.clipVisual(`(${inbox.tag(t!.state, m)})`, Math.max(1, Math.floor(width / 2))) + ' '
+		let tag = strings.clipVisual(`(${m.label})`, Math.max(1, Math.floor(width / 2))) + ' '
 		let rows = promptView.mark(ansi.wrap(m.text, Math.max(1, width - strings.visLen(tag) - promptView.FIRST.length)))
 		let pad = ' '.repeat(strings.visLen(tag))
 		block(rows.map((r, i) => (i ? pad : ansi.DIM + tag + ansi.UNDIM) + r), colors.user())
-	}
-	for (let text of view.pending ?? []) {
-		let rows = itemView.itemLines({ type: 'prompt', text }, width)
-		rows.push(`${promptView.REST}${ansi.DIM}sending…${ansi.UNDIM}`)
-		block(rows, colors.user())
 	}
 	// The idle Hal cursor: a blank row, its row, and the blank row that
 	// comes before the chrome. A question being answered has the cursor.

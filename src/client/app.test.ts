@@ -307,19 +307,31 @@ test('Ctrl-D on an empty prompt quits', () => {
 	expect(quits).toBe(1)
 })
 
-test('a sent prompt shows at once, marked pending until acknowledged', () => {
-	app.onEvent(snapshot())
+test('a sent prompt shows at once, in the place and shape it keeps, never twice', () => {
+	let rows = () => frame.build(app.view(), 80).lines.map((l) => l.replace(new RegExp(`${'\x1b'}\\[[0-9;]*m`, 'g'), '').trim())
 	let ids: string[] = []
 	drafts.send = (c: any) => (c.type === 'submit' && ids.push(c.id), record(c))
+	// Taken into history: the pending row becomes the prompt.
+	app.onEvent(snapshot())
 	type('hello')
 	enter()
-	let rows = () => frame.build(app.view(), 80).lines.map((l) => l.replace(new RegExp(`${'\x1b'}\\[[0-9;]*m`, 'g'), '').trim())
-	expect(rows()).toContain('> hello')
-	expect(rows().join('\n')).toContain('sending')
-	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'hello', provider: 'anthropic' })
+	expect(rows()).toContain('(sending) > hello')
+	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'hello', provider: 'anthropic', command: ids[0]! })
+	// Before the ack: one copy, the host's.
+	expect(rows().filter((r) => r.includes('hello'))).toEqual(['> hello'])
 	app.onEvent({ type: 'ack', id: ids[0]! })
-	expect(rows().filter((r) => r === '> hello')).toHaveLength(1)
-	expect(rows().join('\n')).not.toContain('sending')
+	expect(rows().filter((r) => r.includes('hello'))).toEqual(['> hello'])
+	// Taken into the inbox of a busy session: same row, the label changes.
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'streaming' } })
+	type('FAAAA')
+	enter()
+	let before = rows()
+	let at = before.indexOf('(sending) > FAAAA')
+	expect(at).toBeGreaterThan(0)
+	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: ids[1]!, text: 'FAAAA' }] })
+	let after = rows()
+	expect(after.filter((r) => r.includes('FAAAA'))).toEqual(['(steering) > FAAAA'])
+	expect(after.indexOf('(steering) > FAAAA')).toBe(at)
 })
 
 test('typing updates the shared draft; a draft from elsewhere fills the prompt', () => {

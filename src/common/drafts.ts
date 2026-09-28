@@ -131,6 +131,19 @@ function command(sessionId: string, s: Sending): object {
 // Folds a host event in. True if the session's editor text changed.
 function onEvent(event: Event): boolean {
 	let st = drafts.state
+	// The host's copy of a sent prompt (history or the inbox, under the
+	// id it was sent with) replaces the local one at once, not at the
+	// ack after it: a frame between them would draw the prompt twice.
+	let taken = event.type === 'inbox' ? event.inbox.map((m) => m.id) : (event.type === 'prompt' || event.type === 'turn-start' || event.type === 'command') && event.command ? [event.command] : []
+	if (taken.length && 'sessionId' in event && event.sessionId) {
+		let id = event.sessionId
+		let l = st.sessions.get(id)
+		if (l?.sending.some((s) => taken.includes(s.id))) {
+			l.sending = l.sending.filter((s) => !taken.includes(s.id))
+			drafts.save(id)
+		}
+		return false
+	}
 	if (event.type === 'snapshot') {
 		let id = event.sessionId
 		let l = drafts.local(id)
