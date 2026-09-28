@@ -1,0 +1,70 @@
+// Context boundaries against the real host (tasks bc, vh): /compact and
+// /clear, what the next request holds and what clients show.
+import { expect, test } from 'bun:test'
+import { calls, client, created, fresh, restartHost, shown, until, useHost } from './host-fixture.test.ts'
+import { history } from './history.ts'
+
+useHost()
+
+type C = ReturnType<typeof client>
+
+// A prompt answered with `answer`; waits for its turn end.
+async function ask(c: C, id: string, text: string, answer = `re ${text}`): Promise<void> {
+	let ends = c.of('turn-end').length
+	c.conn.send({ type: 'submit', sessionId: id, text })
+	await until(() => calls.length && c.of('turn-start').length > ends)
+	calls.at(-1)!.push({ type: 'text', text: answer }, { type: 'done', reason: 'end' })
+	await until(() => c.of('turn-end').length > ends)
+}
+
+async function command(c: C, id: string, text: string): Promise<void> {
+	let outputs = c.events.length
+	c.conn.send({ type: 'submit', sessionId: id, text })
+	await until(() => c.events.slice(outputs).some((e) => e.type === 'divider' || e.type === 'output'))
+}
+
+const text = (m: any) => JSON.stringify(m)
+
+test('/compact: the next request holds the summary and only later records; the transcript stays whole', async () => {
+	let c = client()
+	let id = created(c)
+	for (let i = 1; i <= 5; i++) await ask(c, id, `p${i}`)
+	await command(c, id, '/compact')
+	await ask(c, id, 'after')
+	let input = calls.at(-1)!.input.messages
+	expect(input[0].blocks[0].text).toStartWith('Context was compacted')
+	expect(input[0].blocks[0].text).toContain(history.file(id))
+	expect(input.slice(1).map(text).join()).not.toContain('re p5')
+	expect(input.slice(1).map(text).join()).toContain('after')
+	let view = shown(c.views.get(id)!.items)!
+	expect(view).toContainEqual({ type: 'divider', text: 'context compacted (5 prompts summarised)' })
+	expect(view.filter((i) => i.type === 'prompt').length).toBe(6)
+	expect(shown((await fresh(id)).items)).toEqual(view)
+	// A new host rebuilds the very same input.
+	let before = await history.messages(id)
+	restartHost()
+	history.open(id)
+	expect(await history.messages(id)).toEqual(before)
+})
+
+test('/compact with nothing to compact says so, and twice in a row too', async () => {
+	let c = client()
+	let id = created(c)
+	await command(c, id, '/compact')
+	expect(c.of('output').at(-1).text).toBe('nothing to compact')
+	await ask(c, id, 'p1')
+	await command(c, id, '/compact')
+	await command(c, id, '/compact')
+	expect(c.of('divider').length).toBe(1)
+	expect(c.of('output').at(-1).text).toBe('nothing to compact')
+})
+
+test('/compact while a turn runs answers that it is busy', async () => {
+	let c = client()
+	let id = created(c)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'p1' })
+	await until(() => calls.length)
+	await command(c, id, '/compact')
+	expect(c.of('output').at(-1)).toMatchObject({ error: true, text: expect.stringContaining('busy') })
+	calls[0]!.push({ type: 'done', reason: 'end' })
+})

@@ -15,6 +15,7 @@ const list: CommandInfo[] = [
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
 	{ name: 'cd', description: 'change the working directory', category: 'session' },
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w', clientOnly: true },
+	{ name: 'compact', description: 'summarise the context so far', category: 'session' },
 	{ name: 'help', description: 'list commands, or show one in detail', category: 'help' },
 	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1' },
 	{ name: 'login', description: 'log in to a provider', category: 'session' },

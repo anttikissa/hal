@@ -34,6 +34,8 @@ export type Shown =
 	| { type: 'command'; text: string; from?: string }
 	// What a command said.
 	| { type: 'output'; text: string; error?: true }
+	// A context boundary (tasks bc, vh), drawn as a one-row rule.
+	| { type: 'divider'; text: string }
 
 // `key`: the item's id (task w5), the same live, after a reconnect or
 // reload and in a page of earlier history: its record's number `n`, with
@@ -137,6 +139,7 @@ function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
 	if (r.type === 'question') return [{ type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
+	if (r.type === 'compact' || r.type === 'reset') return [{ type: 'divider', text: transcript.boundary(r) }]
 	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b, r.ts) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
@@ -160,8 +163,14 @@ function answered(items: Item[], answer: { question: string; answers: Answers; s
 	})
 }
 
-// A command or its output as shown, from a record or an event.
-function aside(r: { type: 'command'; text: string; from?: string } | { type: 'output'; text: string; error?: true }): Shown {
+// What a context boundary's divider says.
+function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): string {
+	return r.type === 'reset' ? 'context cleared' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarised)`
+}
+
+// A command, its output or a divider as shown, from a record or an event.
+function aside(r: { type: 'command'; text: string; from?: string } | { type: 'output'; text: string; error?: true } | { type: 'divider'; text: string }): Shown {
+	if (r.type === 'divider') return { type: 'divider', text: r.text }
 	if (r.type === 'command') return r.from === undefined ? { type: 'command', text: r.text } : { type: 'command', text: r.text, from: r.from }
 	return r.error ? { type: 'output', text: r.text, error: true } : { type: 'output', text: r.text }
 }
@@ -264,7 +273,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'meta') return { ...t, meta: { ...event.meta }, ...(event.stats && { stats: event.stats }) }
 	if (event.type === 'turn-end' && event.stats) t = { ...t, stats: event.stats }
 	if (event.type === 'completions' || event.type === 'history') return t
-	if (event.type === 'command' || event.type === 'output') {
+	if (event.type === 'command' || event.type === 'output' || event.type === 'divider') {
 		// Where history has it: after the running round's blocks already
 		// written, before the one still streaming (`streaming`), which
 		// stays live; as a snapshot taken now or later shows it.
@@ -330,4 +339,4 @@ function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' 
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 
-export const transcript = { blockItems, turnItems, fresh, promptItem, key, href, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }
+export const transcript = { blockItems, turnItems, fresh, promptItem, key, href, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, boundary, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }

@@ -207,6 +207,8 @@ export type Event =
 	// What a command said, now in history; `error` if it failed.
 	// `streaming`: as in command.
 	| { type: 'output'; sessionId: string; text: string; error?: true; n?: number; streaming?: true }
+	// A context boundary was recorded (tasks bc, vh): `text`, its divider.
+	| { type: 'divider'; sessionId: string; text: string; n?: number; streaming?: true }
 	// The session's metadata changed (a /cd, a /model: then `stats` too).
 	| { type: 'meta'; sessionId: string; meta: SessionMeta; stats?: Stats }
 	// Sent only to the client that asked: every full text `text` may
@@ -293,6 +295,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	answer: { sessionId: 's', question: 's', answers: 'o', secrets: 'S?' },
 	command: { sessionId: 's', text: 's', from: 's?', command: 's?' },
 	output: { sessionId: 's', text: 's' },
+	divider: { sessionId: 's', text: 's' },
 	meta: { sessionId: 's', meta: 'o', stats: 'o?' },
 	completions: { sessionId: 's', text: 's', items: 'S' },
 	models: { sessionId: 's', current: 's', items: 'S' },

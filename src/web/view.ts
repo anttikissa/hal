@@ -276,6 +276,8 @@ function show(item: ItemShown, full = false): Shown {
 			return { kind: 'user', text: item.from === undefined ? item.text : `${item.text}\n(sent from ${item.from})` }
 		case 'output':
 			return { kind: item.error ? 'output error' : 'output log', text: item.text }
+		case 'divider':
+			return { kind: 'divider log', text: item.text }
 	}
 }
 

@@ -41,6 +41,8 @@ function itemStyle(item: Item): Style | undefined {
 			return colors.user()
 		case 'output':
 			return { fg: (item.error ? colors.error() : colors.log()).fg! }
+		case 'divider':
+			return { fg: colors.log().fg! }
 	}
 }
 
@@ -104,6 +106,13 @@ function itemLines(item: Item, width: number, streaming = false): string[] {
 		}
 		case 'output':
 			return ansi.wrap(item.text, width)
+		// One row: the text centred in a rule across the width.
+		case 'divider': {
+			let text = strings.clipVisual(` ${item.text} `, width)
+			let rest = Math.max(0, width - strings.visLen(text))
+			let left = Math.floor(rest / 2)
+			return ['─'.repeat(left) + text + '─'.repeat(rest - left)]
+		}
 	}
 }
 

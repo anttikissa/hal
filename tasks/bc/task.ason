@@ -1,6 +1,11 @@
 {
 	title: 'Compaction: /compact keeps a session going past its window',
 	spec: 'A history record {type: compact} is a context boundary: provider input is rebuilt only from the records after the latest one, preceded by one user message the host builds from the records before it (no model call, as in the old Hal): the line "Context was compacted to avoid exceeding the token limit. Verify before assuming.", then the first user prompt and the assistant text after it, the last three user prompts and all assistant text after the first of them, each numbered by position, long assistant text trimmed to its head and tail with a size marker, and every omitted run replaced by one line counting its tool calls, results, thinking blocks, assistant blocks and prompts; last, the path of the session history so the model can read the rest with bash. The summary is built when the compact record is written and stored in it, so provider input stays byte-stable afterwards. /compact (src/host/commands/compact.ts) writes the record; on an idle session only (a running turn answers that it is busy); with nothing to compact it says so. Clients still show the whole transcript: the boundary draws as a one-row divider "context compacted (N prompts summarised)" in terminal and web. Context used (status row, task 1g) drops at the next turn end. Artifact old-compaction.ts (the old replay.ts compaction functions; lift and adapt). Tests: provider input after a compact holds the summary and only later records; summary contents (first and last prompts kept, omission lines, trimming); a second compact summarises from the start, including the first summary\'s prompts; a restart rebuilds identical input.',
-	status: 'planned',
-	needs: ['sj', 'x0']
+	status: 'done',
+	needs: ['sj', 'x0'],
+	notes: [
+		"Summary numbering uses each record's number n (the #n block id clients show), not a position in a flattened list, so the model can find entries in history.asonl; omission lines name the first-last omitted record numbers.",
+		'Record types: {type: compact, summary, prompts} and {type: reset} (vh) in common/replay.ts; toMessages slices after the latest of either. replay.withoutCommands drops both, else states.fromHistory reads an idle session ending in a compact as running.',
+		"Pure summary builder in src/common/compaction.ts; host side (write record + broadcast a 'divider' event) in src/host/compact.ts, shared by /compact, /clear (vh) and auto-compaction (mq). Transcript item {type: divider, text}; text from transcript.boundary(). slash.test.ts's /c completion check allows other /c commands (compact, clear)."
+	]
 }

@@ -66,6 +66,13 @@ export type HistoryRecord = Numbered &
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
 	// told in front of its next prompt.
 	| { type: 'change'; cwd?: string; model?: string; ts: string }
+	// A context boundary (task bc): provider input is rebuilt from the
+	// records after the latest one alone, after `summary`, which stands
+	// in for everything before it; `prompts`: how many it summarises.
+	| { type: 'compact'; summary: string; prompts: number; ts: string }
+	// A fresh context (/clear, task vh): provider input is rebuilt from
+	// the records after it alone, with no summary.
+	| { type: 'reset'; ts: string }
 	)
 
 type Numbered = { n?: number }
@@ -80,9 +87,15 @@ type Numbered = { n?: number }
 // notes for a cwd or model that changed since the last prompt):
 // providers join adjacent text blocks with no separator, so merged
 // prompts read as one ("pong" + "k" became "pongk").
+//
+// Only the records after the latest compact or reset count; a compact's
+// summary is the first user message.
 function toMessages(records: HistoryRecord[]): Message[] {
 	records = replay.current(records)
-	let out: Message[] = []
+	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
+	let boundary = records[at]
+	if (at >= 0) records = records.slice(at + 1)
+	let out: Message[] = boundary?.type === 'compact' ? [{ role: 'user', blocks: [{ type: 'text', text: boundary.summary }] }] : []
 	let pending: string[] = []
 	let status: TurnStatus | undefined
 	let note: string | undefined
@@ -106,7 +119,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			if (r.model !== undefined) changed.model = r.model
 			continue
 		}
-		if (r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output') continue
+		if (r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) {
 			note = undefined
@@ -194,12 +207,12 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 }
 
 // The records of turns alone: without slash commands, what they said,
-// the questions they asked and the changes they made. Commands run
-// beside turns and never change how one stands.
+// the questions they asked and the changes and context boundaries they
+// made. Commands run beside turns and never change how one stands.
 function withoutCommands(records: HistoryRecord[]): HistoryRecord[] {
 	let asked = new Set(records.flatMap((r) => (r.type === 'question' && r.from ? [r.id] : [])))
 	return records.filter((r) => {
-		if (r.type === 'command' || r.type === 'output' || r.type === 'change') return false
+		if (r.type === 'command' || r.type === 'output' || r.type === 'change' || r.type === 'compact' || r.type === 'reset') return false
 		if (r.type === 'question') return !r.from
 		return r.type !== 'answer' || !asked.has(r.question)
 	})

@@ -250,12 +250,14 @@ test('completion runs on the host against its files, answering only the asker', 
 		a.conn.send({ type: 'complete', sessionId: id, text })
 		return a.of('completions').at(-1)
 	}
-	expect(ask('/c').items).toEqual(['/cd ', '/close '])
+	// Other /c commands come and go; these two stay.
+	expect(ask('/c').items).toEqual(expect.arrayContaining(['/cd ', '/close ']))
+	expect(ask('/c').items.every((t: string) => t.startsWith('/c'))).toBe(true)
 	expect(ask('/cd ~/projec').items.sort()).toEqual(['/cd ~/projection/', '/cd ~/projects/'])
 	expect(ask('/cd projects/').items).toEqual(['/cd projects/a/'])
 	expect(ask('/cd ~/.h').items).toEqual(['/cd ~/.hidden/'])
 	expect(ask('/cd ~/').items.sort()).toEqual(['/cd ~/projection/', '/cd ~/projects/'])
-	expect(ask('/help c').items).toEqual(['/help cd', '/help close'])
+	expect(ask('/help c').items).toEqual(expect.arrayContaining(['/help cd', '/help close']))
 	expect(ask('/nope x').items).toEqual([])
 	expect(ask('/cd ~/projec')).toMatchObject({ sessionId: id, text: '/cd ~/projec' })
 	expect(b.of('completions')).toEqual([])
