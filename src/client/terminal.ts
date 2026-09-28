@@ -71,6 +71,8 @@ function realIO(): TerminalIO {
 			// A deliberate quit, like Ctrl-C (tasks/j1/states.md).
 			process.on('SIGTERM', () => terminal.quit(143))
 			process.on('SIGHUP', () => terminal.quit(129))
+			// A restart from outside (`kill -USR1 <pid>`), as Ctrl-R would.
+			process.on('SIGUSR1', () => terminal.restart())
 		},
 		size: () => ({ rows: process.stdout.rows || 24, cols: process.stdout.columns || 80 }),
 		onResize: (fn) => process.stdout.on('resize', fn),
