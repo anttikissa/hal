@@ -203,7 +203,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
 		if (!scripted) {
-			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model, now: clock.now() })
+			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model, now: clock.now(), sessionId: id })
 			return yield* turns.stream(model, { system, messages: await history.messages(id), tools: tools.defs(), image: (blob) => blobs.base64(id, blob), sessionId: id }, signal)
 		}
 		let reply = scripted(await history.read(id), answers)

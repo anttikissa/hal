@@ -104,3 +104,49 @@ test('SYSTEM.md is read per build: an edit shows on the next one, no edit keeps 
 		systemPrompt.file = orig
 	}
 })
+
+
+test('SYSTEM preprocessing removes comments and selects every matching condition; project files stay literal', () => {
+	let old = systemPrompt.file
+	try {
+		systemPrompt.file = () => `${root}/SYSTEM.md`
+		writeFileSync(`${root}/SYSTEM.md`, 'You are Hal.<!-- secret\non another line -->\n::: if model="anthropic/*" harness="hal"\nCLAUDE ONLY\n:::\n::: if model="openai/*"\nOPENAI ONLY\n:::\n${model} ${unknown}')
+		writeFileSync(`${root}/AGENTS.md`, '<!-- untouched -->\n::: if model="openai/*"')
+		let text = systemPrompt.build({ cwd: root, model: 'anthropic/claude-x', now: at })
+		expect(text).toContain('CLAUDE ONLY')
+		expect(text).not.toContain('OPENAI ONLY')
+		expect(text).not.toContain('secret')
+		expect(text).toContain('anthropic/claude-x ${unknown}')
+		expect(text).toContain('<!-- untouched -->')
+		expect(text).toContain('::: if model="openai/*"')
+		expect(systemPrompt.build({ cwd: root, model: 'openai/gpt', now: at })).toContain('OPENAI ONLY')
+	} finally { systemPrompt.file = old }
+})
+
+test('bad SYSTEM directives fail with the line number, even for unknown conditions in a dropped block', () => {
+	let old = systemPrompt.file
+	try {
+		systemPrompt.file = () => `${root}/SYSTEM.md`
+		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n::: if model="wrong/*" unknown="*"\ntext\n:::')
+		expect(() => systemPrompt.build({ cwd: root, model: 'other/x', now: at })).toThrow(/SYSTEM.md:2: unknown key unknown/)
+		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n::: if model="*"\ntext')
+		expect(() => systemPrompt.build({ cwd: root, model: 'other/x', now: at })).toThrow(/SYSTEM.md:2: unclosed/)
+	} finally { systemPrompt.file = old }
+})
+
+test('SYSTEM includes expand relative to their file, optional absences vanish and loops or required absences fail', () => {
+	let old = systemPrompt.file
+	try {
+		systemPrompt.file = () => `${root}/SYSTEM.md`
+		mkdirSync(`${root}/more`)
+		writeFileSync(`${root}/more/part.md`, 'Included ${harness} in ${home}\n@?missing.md')
+		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n@more/part.md\n@?absent.md')
+		let text = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
+		expect(text).toContain('Included hal in ')
+		expect(text).not.toContain('@?')
+		writeFileSync(`${root}/more/part.md`, 'Inside\n@missing.md')
+		expect(() => systemPrompt.build({ cwd: root, model: 'm/x', now: at })).toThrow(/missing.md/)
+		writeFileSync(`${root}/more/part.md`, '@../SYSTEM.md')
+		expect(() => systemPrompt.build({ cwd: root, model: 'm/x', now: at })).toThrow(/include loop/)
+	} finally { systemPrompt.file = old }
+})
