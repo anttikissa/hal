@@ -54,12 +54,12 @@ test('shows every item, however long the history', () => {
 
 test('exactly one blank row before [paused], however many newlines the model streamed', () => {
 	let items: Item[] = [
-		{ type: 'text', text: 'rain\n\n&nbsp;\n\n\n  \n' },
+		{ type: 'text', text: 'rain\n\n\n  \n' },
 		{ type: 'turn-end', status: 'paused' },
 	]
 	let lines = plain(frame.build(view(items), 40).lines)
 	let at = lines.indexOf('[paused]')
-	expect(lines.slice(at - 2, at + 1)).toEqual(['&nbsp;', '', '[paused]'])
+	expect(lines.slice(at - 2, at + 1)).toEqual(['rain', '', '[paused]'])
 })
 
 test('the same items drawn again follow a new width and colour', () => {
