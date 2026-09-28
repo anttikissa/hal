@@ -11,7 +11,7 @@ import { ansi } from './ansi.ts'
 import { markdownView } from './markdown-view.ts'
 import { promptView } from './prompt-view.ts'
 
-const { DIM, UNDIM, INVERSE, UNINVERSE } = ansi
+const { INVERSE, UNINVERSE } = ansi
 
 // The style of a tool's name: toolBash for bash, tool for one without its own.
 function toolStyle(name: string): Style {
@@ -64,16 +64,20 @@ function itemLines(item: Item, width: number, streaming = false): string[] {
 		// Trailing blank lines the model streamed are not drawn: the one
 		// blank row between items (frame.build) is the only gap. Model
 		// text is markdown (task fn).
-		case 'text':
+		// Finished thinking with no readable text (redacted or empty)
+		// draws nothing, not a bare header (task hp).
 		case 'thinking':
-			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming), width)
+			if (!item.text.trim() && !streaming) return []
+		// falls through
+		case 'text':
+			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		case 'tool': {
 			let { command, description } = item.input
-			// A described command: the sentence first, the command dimmed beside it.
+			// A described command: the sentence first, the command quieter beside it.
 			if (typeof command === 'string' && typeof description === 'string') {
 				let head = strings.clipVisual(`▸ ${ansi.clean(description).replace(/\s+/g, ' ')}`, width)
 				let rest = strings.clipVisual(`  $ ${ansi.clean(command).replace(/\s+/g, ' ')}`, width - strings.visLen(head))
-				return [head + (rest ? DIM + rest + UNDIM : '')]
+				return [head + ansi.quiet(rest, itemView.itemStyle(item))]
 			}
 			let input = ansi.clean(JSON.stringify(item.input)).replace(/\s+/g, ' ')
 			return [strings.clipVisual(`▸ ${ansi.clean(item.name)} ${input}`, width)]
@@ -83,7 +87,7 @@ function itemLines(item: Item, width: number, streaming = false): string[] {
 			let rows = ansi.wrap(item.output.replace(/\n$/, ''), Math.max(1, width - 2))
 			let shown = rows.slice(0, itemView.resultRows())
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
-			return shown.map((l, i) => DIM + strings.clipVisual((i ? '  ' : item.isError ? '✗ ' : '◂ ') + l, width) + UNDIM)
+			return shown.map((l, i) => ansi.quiet(strings.clipVisual((i ? '  ' : item.isError ? '✗ ' : '◂ ') + l, width), itemView.itemStyle(item)))
 		}
 		case 'turn-end':
 			if (item.status === 'error') return ansi.wrap(`error: ${item.error ?? 'turn failed'}`, width)

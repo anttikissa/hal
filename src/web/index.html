@@ -26,9 +26,9 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card.user::before { content: "> "; }
 .Card.image::before { content: none; }
 .Card.prompt::before { content: none; }
-.Card .who { opacity: 0.7; margin-bottom: 0.4rem; }
+.Card .who { color: var(--quiet); margin-bottom: 0.4rem; }
 .Card.image img { display: block; max-width: 100%; max-height: 24rem; }
-.Card.pending { opacity: 0.6; }
+.Card.pending { color: var(--quiet); }
 .Card.pending::after { content: "\A sending…"; font-size: 0.85em; }
 .Card.folds { padding: 0; cursor: pointer; }
 .Card .head { display: flex; gap: 0.6ch; width: 100%; padding: 0.4rem 0.7rem; background: none; color: inherit; text-align: left; border-radius: 0; }
@@ -39,9 +39,9 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
    shown on hover or focus; the linked card is outlined. */
 .Card { position: relative; padding-right: 7ch; }
 .Card .head { padding-right: 7ch; }
-.Card > .link { position: absolute; top: 0; right: 0; padding: 0.4rem 0.7rem 0.4rem 0.5ch; color: inherit; text-decoration: none; user-select: none; opacity: 0.5; }
+.Card > .link { position: absolute; top: 0; right: 0; padding: 0.4rem 0.7rem 0.4rem 0.5ch; color: inherit; text-decoration: none; user-select: none; color: var(--quiet); }
 .Card > .link::before { content: attr(data-ref); }
-.Card > .link:hover, .Card > .link:focus-visible { opacity: 1; text-decoration: underline; }
+.Card > .link:hover, .Card > .link:focus-visible { color: inherit; text-decoration: underline; }
 .Card.target { outline: 1px solid currentColor; outline-offset: 2px; scroll-margin-top: 0.5rem; }
 .Card .more { display: block; margin-top: 0.3rem; background: none; color: inherit; text-decoration: underline; padding: 0; }
 @media (pointer: coarse) { .Card > .link { min-width: 44px; min-height: 44px; text-align: right; } .Card .more { min-height: 44px; } }
@@ -57,7 +57,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .cursor-line { min-height: 2.5rem; padding: 0.2rem 0 0.6rem; color: var(--cursor); }
 .cursor-line span, .Card .cursor { display: block; width: 1ch; height: 1lh; background: currentColor; animation: blink 1s steps(1, end) infinite; }
 .Card .cursor { display: inline-block; vertical-align: text-bottom; margin-left: 0.2ch; background: var(--cursor); }
-.Card.thinking .cursor { background: currentColor; opacity: 0.6; }
+.Card.thinking .cursor { background: var(--quiet); }
 .Card .head .cursor { flex: none; align-self: center; }
 /* Model text as markdown (task fn). Each source line is a row, a blank
    one as tall as text; the last is inline so Hal's cursor follows it. A
@@ -74,7 +74,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Markdown .code, .Markdown pre { font-family: ui-monospace, monospace; }
 .Markdown a { color: inherit; }
 .Markdown pre { margin: 0.3rem 0; white-space: pre-wrap; }
-.Markdown pre[data-lang]::before { content: attr(data-lang); display: block; opacity: 0.6; }
+.Markdown pre[data-lang]::before { content: attr(data-lang); display: block; color: var(--quiet); }
 .Markdown .table { overflow-x: auto; margin: 0.3rem 0; white-space: normal; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
 .Markdown table { border-collapse: collapse; }
 .Markdown th, .Markdown td { border: 1px solid color-mix(in oklab, currentColor 30%, transparent); padding: 0.15rem 0.5rem; text-align: left; vertical-align: top; overflow-wrap: normal; min-width: 6ch; }
@@ -95,7 +95,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .entry textarea { flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; border-radius: 0; padding: 0.5rem 0.7rem; }
 .entry button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; border-radius: 0; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor 35%, transparent); transition: background-color 120ms var(--ease-out); }
 .entry button:hover:not(:disabled) { background: color-mix(in oklab, currentColor 14%, transparent); }
-.entry button:disabled { opacity: 0.45; cursor: default; }
+.entry button:disabled { color: var(--quiet); cursor: default; }
 .help { display: flex; flex-wrap: wrap; gap: 0 1.5ch; padding-top: 0.3rem; color: var(--description); }
 .help b { color: var(--key); font-weight: 600; }
 textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem; resize: none; outline: none; }

@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
-import { colors } from './colors.ts'
+import { colors, type Style } from './colors.ts'
+import { oklch, type Oklch } from './oklch.ts'
 
 test('every style is a set of OKLCH colours', () => {
 	for (let [key, value] of Object.entries(colors)) {
@@ -37,4 +38,32 @@ test('overriding one style is seen by styles built on it', () => {
 	} finally {
 		colors.toolRead = saved
 	}
+})
+
+// tasks/README.md, readable text: WCAG AA against the background each
+// colour sits on, its style's own bg or else the screen we design for.
+test('every colour is readable where it is drawn, and so is its quieter form', () => {
+	let backgrounds = /^(bg|canvas|field|border|button)$|Bg$/
+	let marks = /^(cursor|cursorIdle)$/
+	let low: string[] = []
+	let check = (name: string, fg: Oklch, bg: Oklch, min: number) => {
+		let r = oklch.contrast(fg, bg)
+		if (r < min) low.push(`${name} ${r.toFixed(2)}`)
+	}
+	for (let [key, value] of Object.entries(colors)) {
+		if (typeof value !== 'function') continue
+		let style = value() as Style
+		let bg = style.bg ?? colors.screen
+		for (let [part, c] of Object.entries(style)) {
+			if (backgrounds.test(part)) continue
+			check(`${key}.${part}`, c, bg, marks.test(part) ? 3 : 4.5)
+			if (marks.test(part)) continue
+			check(`${key}.${part} quieter`, oklch.quiet(c, bg), bg, 4.5)
+			if (style.linkBg) check(`${key}.${part} on linkBg`, c, style.linkBg, 4.5)
+		}
+	}
+	let page = colors.page()
+	for (let on of ['field', 'button'] as const) check(`page.text on ${on}`, page.text!, page[on]!, 4.5)
+	check('page.border', page.border!, page.canvas!, 3)
+	expect(low).toEqual([])
 })

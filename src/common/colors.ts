@@ -16,6 +16,10 @@ import type { Oklch } from './oklch.ts'
 export type Style = { [part: string]: Oklch }
 
 export const colors = {
+	// The lightest dark background we design for: where a style has no
+	// bg of its own, its text is checked against this (4.5:1, 3:1 for
+	// marks; tasks/README.md, readable text).
+	screen: [0.25, 0.01, 260] as Oklch,
 	// Shared lightness and chroma of the vivid foregrounds and the card
 	// backgrounds.
 	fgL: 0.8,
@@ -27,7 +31,7 @@ export const colors = {
 	assistant: (): Style => ({
 		fg: [colors.fgL, colors.fgC, 55],
 		cursor: [colors.fgL, colors.fgC, 55],
-		cursorIdle: [0.56, 0, 55],
+		cursorIdle: [0.6, 0, 55],
 		bold: [0.9, 0.06, 55],
 		code: [0.86, 0.04, 55],
 		linkFg: [0.88, 0.15, 55],
@@ -44,28 +48,28 @@ export const colors = {
 	user: (): Style => ({ fg: [0.82, 0.11, 220], bg: [0.29, 0.05, 220] }),
 	input: (): Style => ({ ...colors.user(), cursor: colors.user().fg! }),
 	// Log: neutral, moderately dim.
-	log: (): Style => ({ fg: [0.66, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
+	log: (): Style => ({ fg: [0.7, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
 	// Warnings: amber, noticeable but not fatal.
 	warning: (): Style => ({ fg: [0.78, 0.14, 85], bg: [0.28, 0.05, 85], code: [0.88, 0.1, 85], linkBg: [0.35, 0.05, 85] }),
 	// Errors: hot red.
-	error: (): Style => ({ fg: [0.7, 0.2, 25], bg: [0.27, 0.08, 25], code: [0.82, 0.14, 25], linkBg: [0.34, 0.08, 25] }),
+	error: (): Style => ({ fg: [0.7, 0.2, 25], bg: [0.27, 0.08, 25], code: [0.82, 0.14, 25], linkBg: [0.3, 0.07, 25] }),
 	info: (): Style => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
 	// Fork lineage: vivid purple.
 	fork: (): Style => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),
 	// Status line: neutral, with a highlight for what matters.
-	status: (): Style => ({ fg: [0.64, 0, 0], highlight: [0.9, 0.01, 250] }),
+	status: (): Style => ({ fg: [0.68, 0, 0], highlight: [0.9, 0.01, 250] }),
 	// Tab labels.
 	tab: (): Style => ({
 		activeFg: [0.9, 0.01, 250],
-		inactiveFg: [0.58, 0, 0],
+		inactiveFg: [0.68, 0, 0],
 		doneFg: [0.78, 0.14, 145],
 		warningFg: [0.86, 0.16, 95],
 		errorFg: colors.error().fg!,
 		pausedFg: [0.86, 0.16, 95],
 	}),
 	// Help bar: keys stand out from descriptions.
-	help: (): Style => ({ key: [0.76, 0.008, 250], description: [0.6, 0, 0] }),
-	popup: (): Style => ({ neutralFg: [0.64, 0, 0], dangerFg: [0.86, 0.16, 85] }),
+	help: (): Style => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0] }),
+	popup: (): Style => ({ neutralFg: [0.68, 0, 0], dangerFg: [0.86, 0.16, 85] }),
 	popupCurrent: (): Style => ({ fg: [0.98, 0.04, 55], bg: [0.42, 0.12, 55] }),
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
 	// Edit diffs: green additions, removals in the error hue.
@@ -78,7 +82,7 @@ export const colors = {
 		text: [0.89, 0.006, 260],
 		accent: [0.77, 0.1, 260],
 		field: [0.235, 0.009, 260],
-		border: [0.33, 0.012, 260],
+		border: [0.52, 0.012, 260],
 		button: [0.35, 0.05, 262],
 	}),
 	// Tools: each kind its own hue. Red is kept for real failures. A

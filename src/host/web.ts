@@ -123,7 +123,10 @@ const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
 
 // The theme as CSS, computed now so overrides show on the next load:
 // one class per style (toolBash is .tool-bash) with fg as color, bg as
-// background and any other colour as a custom property (--link-bg).
+// background and any other colour as a custom property (--link-bg),
+// plus --quiet: the fg's quieter, still readable form (oklch.quiet), for
+// secondary text, which never fades by opacity (tasks/README.md). The
+// page's is measured on its lightest surface, the button.
 function css(): string {
 	let rules: string[] = []
 	for (let [key, value] of Object.entries(colors)) {
@@ -132,6 +135,9 @@ function css(): string {
 			let prop = part === 'fg' ? 'color' : part === 'bg' ? 'background-color' : `--${kebab(part)}`
 			return `${prop}: ${oklch.toHex(c)}`
 		})
+		let style = value() as Style
+		let fg = style.fg ?? style.text
+		if (fg) decls.push(`--quiet: ${oklch.toHex(oklch.quiet(fg, style.bg ?? style.button ?? colors.screen))}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
 	return rules.join('\n')

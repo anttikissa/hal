@@ -207,6 +207,9 @@ function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 	let calls = new Map<string, Row>()
 	for (let [at, item] of items.entries()) {
 		if (item.type === 'turn-end' && item.status === 'completed') continue
+		// Thinking with no readable text (redacted or empty) is no card,
+		// unless it is the last item, which may be streaming (task hp).
+		if (item.type === 'thinking' && !item.text.trim() && at < items.length - 1) continue
 		let call = item.type === 'tool-result' ? calls.get(item.id) : undefined
 		if (call && item.type === 'tool-result') {
 			call.result = item

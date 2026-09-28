@@ -2,7 +2,7 @@
 // SGR, padded and painted rows, links, and text made safe to show.
 
 import { attachments } from '../common/attachments.ts'
-import type { Style } from '../common/colors.ts'
+import { colors, type Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import { settings } from '../common/settings.ts'
 import { strings } from '../common/strings.ts'
@@ -33,11 +33,11 @@ function wrap(text: string, width: number): string[] {
 
 // A row with each whole [image/<name>] or [paste/<name>] marker made an
 // OSC 8 link to its page on the host's web endpoint (tasks qy, 31); a
-// marker still uploading is dim and not yet a link. Each link closes in
+// marker still uploading is quieter (ansi.quiet) and not yet a link. Each link closes in
 // the row it opens in; the visible text is unchanged.
 function links(row: string): string {
 	return row.replace(attachments.fileMarker, (m, path: string) =>
-		uploads.inFlight(m) ? `${ansi.DIM}${m}${ansi.UNDIM}` : `\x1b]8;;${ansi.webUrl(`/${path}`)}\x07${m}${ansi.LINK_OFF}`,
+		uploads.inFlight(m) ? ansi.quiet(m, colors.user()) : `\x1b]8;;${ansi.webUrl(`/${path}`)}\x07${m}${ansi.LINK_OFF}`,
 	)
 }
 
@@ -51,14 +51,21 @@ function webUrl(path: string): string {
 	return `${url || `http://localhost:${settings.webPort()}`}${page}${code ? `?auth=${code}` : ''}${hash ?? ''}`
 }
 
+// `text` in the quieter colour of `style` (oklch.quiet), then back to
+// the style's own fg; plain in a monochrome terminal. Never SGR 2.
+function quiet(text: string, style: Style | undefined): string {
+	if (ansi.mono() || !text) return text
+	let fg = style?.fg ?? colors.log().fg!
+	let back = style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m'
+	return ansi.sgr({ fg: oklch.quiet(fg, style?.bg ?? colors.screen) }) + text + back
+}
+
 export const ansi = {
 	// The host's web address and this client's link code, from its
 	// latest `auth` event (task e3); empty until one came.
 	state: { web: { url: '', code: '' } },
 	// One blank column on each side of every row.
 	PAD: ' ',
-	DIM: '\x1b[2m',
-	UNDIM: '\x1b[22m',
 	INVERSE: '\x1b[7m',
 	UNINVERSE: '\x1b[27m',
 	UNCOLOR: '\x1b[39;49m',
@@ -66,9 +73,10 @@ export const ansi = {
 	LINK_OFF: '\x1b]8;;\x07',
 	// GNU screen (STY set, or a TERM of screen*) mangles truecolor, so
 	// there the terminal is monochrome: no colour escapes at all, only
-	// bold, dim and reverse video. Read on every call.
+	// bold and reverse video. Read on every call.
 	mono: (): boolean => !!process.env.STY || (process.env.TERM ?? '').startsWith('screen'),
 	sgr,
+	quiet,
 	paint,
 	clean: (s: string): string => strings.clean(s),
 	wrap,

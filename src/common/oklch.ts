@@ -57,4 +57,45 @@ function toHex(c: Oklch): string {
 	return '#' + oklch.toRgb(c).map((x) => x.toString(16).padStart(2, '0')).join('')
 }
 
-export const oklch = { state: { rgb: new Map<string, [number, number, number]>() }, toRgb, convert, toHex }
+// WCAG 2.2 contrast ratio of two colours as shown (after gamut
+// mapping): 1 to 21, symmetric.
+function contrast(a: Oklch, b: Oklch): number {
+	let lum = (c: Oklch) => {
+		let [r, g, bl] = oklch.toRgb(c).map((x) => {
+			x /= 255
+			return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4
+		})
+		return 0.2126 * r! + 0.7152 * g! + 0.0722 * bl!
+	}
+	let [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+	return (hi! + 0.05) / (lo! + 0.05)
+}
+
+// A quieter `fg` for secondary text on `bg` (hints, ids, glimpses):
+// darker by a lightness step, but never below 4.6:1 on `bg`, so it stays
+// readable (tasks/README.md, readable text). We compute it; the
+// terminal's faint style is never used.
+function quiet(fg: Oklch, bg: Oklch): Oklch {
+	let key = `${fg.join()}/${bg.join()}`
+	let hit = oklch.state.quiet.get(key)
+	if (hit) return hit
+	if (oklch.state.quiet.size >= 256) oklch.state.quiet.clear()
+	let out = search(fg, bg)
+	oklch.state.quiet.set(key, out)
+	return out
+}
+
+function search(fg: Oklch, bg: Oklch): Oklch {
+	let [L, C, h] = fg
+	let lo = Math.max(bg[0], L - 0.12)
+	if (oklch.contrast([lo, C, h], bg) >= 4.6) return [lo, C, h]
+	let hi = L
+	for (let i = 0; i < 20; i++) {
+		let mid = (lo + hi) / 2
+		if (oklch.contrast([mid, C, h], bg) >= 4.6) hi = mid
+		else lo = mid
+	}
+	return [hi, C, h]
+}
+
+export const oklch = { state: { rgb: new Map<string, [number, number, number]>(), quiet: new Map<string, Oklch>() }, toRgb, convert, toHex, contrast, quiet }

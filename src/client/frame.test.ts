@@ -12,7 +12,8 @@ import { promptView } from './prompt-view.ts'
 import { ansi } from './ansi.ts'
 import { target } from '../web/target.ts'
 
-const DIM = '\x1b[2m'
+// Where text in `style`'s quieter colour starts (ansi.quiet).
+const quietOn = (style: { fg?: Oklch; bg?: Oklch }) => ansi.sgr({ fg: oklch.quiet(style.fg!, style.bg ?? colors.screen) })
 
 // Visible text only: escape sequences removed.
 function strip(s: string): string {
@@ -99,10 +100,10 @@ test('no row is wider than the terminal, whatever the text', () => {
 	}
 })
 
-test('a described command shows its description first and the command dimmed beside it', () => {
+test('a described command shows its description first and the command quieter beside it', () => {
 	let input = { command: "sed -n '1,40p' config.ason |\n  cat -n", description: 'Show the first 40 lines of the config' }
 	let [line] = frame.build(view([{ type: 'tool', id: 't', name: 'bash', input }]), 100).lines
-	let [before, after] = line!.split(DIM)
+	let [before, after] = line!.split(quietOn(colors.toolBash()))
 	expect(strip(before!)).toContain('Show the first 40 lines of the config')
 	expect(strip(before!)).not.toContain('sed')
 	expect(strip(after!)).toContain("sed -n '1,40p' config.ason | cat -n")
@@ -283,10 +284,10 @@ describe('prompt box', () => {
 		expect(rows(prompt.step(st, { key: '-', ctrl: true }, frame.promptWidth(80)).state)).toBe(2)
 	})
 
-	test('an empty prompt shows its placeholder dimmed, cursor at its start', () => {
+	test('an empty prompt shows its placeholder quieter, cursor at its start', () => {
 		let f = frame.build({ prompt: { text: '', cursor: 0 }, placeholder: 'Try this' }, 40)
 		expect(boxOf(f).rows).toEqual(['> Try this'])
-		expect(f.lines[1]).toContain(DIM)
+		expect(f.lines[1]).toContain(quietOn(colors.input()) + 'Try this')
 		expect(f.cursor).toEqual({ row: 1, col: 3 })
 		let typed = frame.build({ prompt: { text: 'x', cursor: 1 }, placeholder: 'Try this' }, 40)
 		expect(boxOf(typed).rows).toEqual(['> x'])
@@ -387,14 +388,14 @@ test('every block shows its id at the right of its first row, linked to the bloc
 	}
 })
 
-test('a [paste/<name>] marker links to its page; while its upload is in flight it is dim and no link, with the same text', () => {
+test('a [paste/<name>] marker links to its page; while its upload is in flight it is quieter and no link, with the same text', () => {
 	let marker = uploads.begin('s', 'c.1', 'text/plain')
 	let path = marker.slice(1, -1)
 	let build = () => frame.build(view([], `see ${marker}`), 60).lines.filter((l) => l.includes(marker))
 	try {
 		let flying = build()
 		expect(flying.join('')).not.toContain('\x1b]8;')
-		expect(flying.join('')).toContain(`\x1b[2m${marker}`)
+		expect(flying.join('')).toContain(quietOn(colors.user()) + marker)
 		uploads.settle({ type: 'attached', sessionId: 's', command: 'c.1', blob: 'b', marker })
 		let landed = build()
 		expect(landed.join('')).toContain(`\x1b]8;;http://localhost:${settings.webPort()}/${path}\x07${marker}\x1b]8;;\x07`)
@@ -435,4 +436,10 @@ test('a narrow terminal clips the header and keeps the block id', () => {
 	expect(lines[0]).toMatch(/^10:51 Hal \(Opus 5.* #35$/)
 	expect(lines[0]).not.toContain('high')
 	expect(strings.visLen(frame.build(v, 24).lines[0]!)).toBeLessThanOrEqual(24)
+})
+
+test('finished thinking with no readable text draws nothing, not a bare header', () => {
+	let lines = plain(frame.build(view([{ type: 'thinking', text: '', model: 'anthropic/claude-opus-5-5' }, { type: 'text', text: 'hi' }]), 60).lines)
+	expect(lines.join('\n')).not.toContain('thinking')
+	expect(lines.join('\n')).toContain('hi')
 })

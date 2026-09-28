@@ -5,9 +5,9 @@
 
 import { markdown, type Block, type Run } from '../common/markdown.ts'
 import { strings } from '../common/strings.ts'
+import type { Style } from '../common/colors.ts'
 import { ansi } from './ansi.ts'
 
-const { DIM, UNDIM } = ansi
 
 function styled(r: Run, text: string): string {
 	if (r.bold) text = `\x1b[1m${text}\x1b[22m`
@@ -51,14 +51,14 @@ function fit(natural: number[], words: number[], room: number): number[] {
 	return w
 }
 
-function table(rows: Run[][][], width: number): string[] {
+function table(rows: Run[][][], width: number, style?: Style): string[] {
 	let n = Math.max(...rows.map((r) => r.length))
 	let plain = (c: Run[] | undefined) => (c ?? []).map((r) => r.text).join('')
 	let col = (f: (s: string) => number) => Array.from({ length: n }, (_, i) => Math.max(1, ...rows.map((r) => f(plain(r[i])))))
 	let words = col((s) => Math.max(0, ...s.split(/\s+/).map((w) => strings.visLen(w))))
 	let w = markdownView.fit(col((s) => strings.visLen(s)), words, width - 3 * n - 1)
-	let rule = (l: string, m: string, r: string) => DIM + l + w.map((x) => '─'.repeat(x + 2)).join(m) + r + UNDIM
-	let bar = DIM + '│' + UNDIM
+	let rule = (l: string, m: string, r: string) => ansi.quiet(l + w.map((x) => '─'.repeat(x + 2)).join(m) + r, style)
+	let bar = ansi.quiet('│', style)
 	let out = [rule('┌', '┬', '┐')]
 	rows.forEach((row, ri) => {
 		let cells = w.map((x, i) => wrapRuns((row[i] ?? []).map((r) => (ri ? r : { ...r, bold: true })), x))
@@ -72,22 +72,23 @@ function table(rows: Run[][][], width: number): string[] {
 	return out.map((r) => strings.clipVisual(r, width))
 }
 
-function block(b: Block, width: number): string[] {
-	if (b.type === 'table') return markdownView.table(b.rows, width)
+// `style`: the item's, whose fg the quieter rules and fences come back to.
+function block(b: Block, width: number, style?: Style): string[] {
+	if (b.type === 'table') return markdownView.table(b.rows, width, style)
 	if (b.type === 'code') {
-		let fence = (s: string) => ansi.wrap(s, width).map((r) => DIM + r + UNDIM)
+		let fence = (s: string) => ansi.wrap(s, width).map((r) => ansi.quiet(r, style))
 		return [...fence(b.open), ...b.lines.flatMap((l) => ansi.wrap(l, width)), ...(b.close === undefined ? [] : fence(b.close))]
 	}
-	let marker = b.kind === 'quote' ? DIM + '│ ' + UNDIM : b.marker
+	let marker = b.kind === 'quote' ? ansi.quiet('│ ', style) : b.marker
 	let indent = strings.visLen(marker)
 	let rows = wrapRuns(b.runs, Math.max(1, width - indent))
 	return rows.map((r, i) => (i && b.kind !== 'quote' ? ' '.repeat(indent) : marker) + r)
 }
 
 // Rows of model text at `width` columns; `streaming`: it may still grow.
-function lines(text: string, width: number, streaming = false): string[] {
+function lines(text: string, width: number, streaming = false, style?: Style): string[] {
 	let source = strings.expandTabs(ansi.clean(text.replace(/\r\n?/g, '\n')))
-	return markdown.parse(source, streaming).flatMap((b) => markdownView.block(b, width))
+	return markdown.parse(source, streaming).flatMap((b) => markdownView.block(b, width, style))
 }
 
 export const markdownView = { lines, block, table, fit, styled }

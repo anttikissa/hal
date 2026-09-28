@@ -40,7 +40,7 @@ function border(l: string, r: string, text: string, right: string, width: number
  */
 function modalLines(m: ModalState, width: number, height: number): { rows: string[]; cursor: Cursor; scroll: number } {
 	let inner = Math.max(0, width - 4)
-	let fields = m.form ? formView.fieldLines(m.form, inner) : { rows: [], cursor: undefined }
+	let fields = m.form ? formView.fieldLines(m.form, inner, { fg: colors.popup().neutralFg! }) : { rows: [], cursor: undefined }
 	let content = fields.rows.slice(0, height - 2)
 	let visible = Math.max(0, height - 2 - content.length)
 	let scroll = modalView.modalScroll(m, visible)

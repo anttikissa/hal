@@ -2,12 +2,13 @@
 // and the cursor among them. Pure.
 
 import type { FormState } from '../common/forms.ts'
+import { colors, type Style } from '../common/colors.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 import { itemView } from './item-view.ts'
 import { promptView } from './prompt-view.ts'
 
-const { DIM, UNDIM, INVERSE, UNINVERSE } = ansi
+const { INVERSE, UNINVERSE } = ansi
 
 /**
  * Rows of an open question being filled in, at `width` columns, and
@@ -19,11 +20,11 @@ function formLines(st: FormState, width: number): { rows: string[]; cursor: { ro
 	let f = formView.fieldLines(st, width)
 	let hint = st.form.fields.length > 1 ? 'Enter: next · Tab: move · Escape: pause' : 'Enter: answer · Escape: pause'
 	let cursor = { row: rows.length + f.cursor.row, col: f.cursor.col }
-	return { rows: [...rows, ...f.rows, DIM + strings.clipVisual(`  ${hint}`, width) + UNDIM], cursor }
+	return { rows: [...rows, ...f.rows, ansi.quiet(strings.clipVisual(`  ${hint}`, width), colors.warning())], cursor }
 }
 
 // Rows of a form's fields alone, and the cursor in them.
-function fieldLines(st: FormState, width: number): { rows: string[]; cursor: { row: number; col: number } } {
+function fieldLines(st: FormState, width: number, style: Style = colors.warning()): { rows: string[]; cursor: { row: number; col: number } } {
 	let rows: string[] = []
 	let cursor = { row: 0, col: 0 }
 	st.form.fields.forEach((field, i) => {
@@ -47,7 +48,7 @@ function fieldLines(st: FormState, width: number): { rows: string[]; cursor: { r
 		let at = field.type === 'secret' ? dots(value.slice(0, st.cursor)).length : st.cursor
 		let indent = Math.min(strings.visLen(head), Math.max(0, width - 1))
 		let p = promptView.layoutPrompt(shown, at, Math.max(1, width - indent))
-		if (!value && field.type === 'text' && field.placeholder) p.rows[0] = DIM + strings.clipVisual(ansi.clean(field.placeholder), width - indent) + UNDIM
+		if (!value && field.type === 'text' && field.placeholder) p.rows[0] = ansi.quiet(strings.clipVisual(ansi.clean(field.placeholder), width - indent), style)
 		if (focused) cursor = { row: rows.length + p.row, col: indent + p.col }
 		p.rows.forEach((r, j) => rows.push((j ? ' '.repeat(indent) : strings.clipVisual(head, indent)) + r))
 	})

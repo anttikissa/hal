@@ -65,7 +65,7 @@ function serve(pathname: string, css: string): Response {
 <title>${escape(name!)}</title><style>${css}
 body { margin: 0; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 header { padding: 12px 16px; overflow-wrap: anywhere; }
-header .label { opacity: 0.7; }
+header .label { color: var(--quiet); }
 header a { color: var(--code); text-decoration: underline; text-underline-offset: 2px; }
 header .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
 header .actions a { display: inline-flex; align-items: center; min-height: 44px; }
