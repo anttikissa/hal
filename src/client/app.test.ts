@@ -615,7 +615,7 @@ test('web links carry the latest link code only in their hidden target', () => {
 		type('see [image/frdbn1.png]')
 		let lines = frame.build(app.view(), 60).lines
 		let targets = lines.flatMap((l) => [...l.matchAll(/\x1b\]8;;([^\x07]+)\x07/g)].map((m) => m[1]))
-		expect(targets).toEqual(expect.arrayContaining(['https://h.example/a?auth=k3x9qa', 'https://h.example/b?auth=k3x9qa', 'https://h.example/image/frdbn1.png?auth=k3x9qa']))
+		expect(targets).toEqual(expect.arrayContaining(['https://h.example/a?auth=k3x9qa', 'https://h.example/b?auth=k3x9qa', 'https://h.example/image/frdbn1?auth=k3x9qa']))
 		expect(lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, '')).join('\n')).not.toContain('k3x9qa')
 		// A replaced code is what the next paint links with.
 		app.onEvent({ type: 'auth', code: 'm2p7rt', link: 'https://h.example' })

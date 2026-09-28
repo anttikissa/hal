@@ -304,7 +304,7 @@ test('inside GNU screen the frame has no colour, only reverse video for the sele
 })
 
 test('an [image/<name>] marker is a link to the image, in the transcript and the prompt; the text stays the same', () => {
-	let url = `http://localhost:${settings.webPort()}/image/abc123.png`
+	let url = `http://localhost:${settings.webPort()}/image/abc123`
 	let link = `\x1b]8;;${url}\x07[image/abc123.png]\x1b]8;;\x07`
 	let f = frame.build(view([{ type: 'prompt', text: 'see [image/abc123.png] ok' }], 'and [image/abc123.png]'), 60)
 	let rows = f.lines.filter((l) => l.includes('[image/abc123.png]'))
@@ -362,7 +362,7 @@ test('a [paste/<name>] marker links to its page; while its upload is in flight i
 		expect(flying.join('')).toContain(`\x1b[2m${marker}`)
 		uploads.settle({ type: 'attached', sessionId: 's', command: 'c.1', blob: 'b', marker })
 		let landed = build()
-		expect(landed.join('')).toContain(`\x1b]8;;http://localhost:${settings.webPort()}/${path}\x07${marker}\x1b]8;;\x07`)
+		expect(landed.join('')).toContain(`\x1b]8;;http://localhost:${settings.webPort()}/${path.slice(0, path.lastIndexOf('.'))}\x07${marker}\x1b]8;;\x07`)
 		expect(plain(landed)).toEqual(plain(flying))
 	} finally {
 		uploads.reset()

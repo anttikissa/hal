@@ -285,7 +285,7 @@ test('a sent prompt shows pending, then as the host’s item under the same key,
 })
 
 test('a prompt’s [image/<name>] markers become links; the rest stays text', () => {
-	expect(view.links('see [image/abc123.png] and [image/zz99yy.webp]!')).toEqual(['see ', { href: '/image/abc123.png', text: '[image/abc123.png]' }, ' and ', { href: '/image/zz99yy.webp', text: '[image/zz99yy.webp]' }, '!'])
-	expect(view.links('[paste/0005ab.txt] [paste/0005ab.png]')).toEqual([{ href: '/paste/0005ab.txt', text: '[paste/0005ab.txt]' }, ' [paste/0005ab.png]'])
+	expect(view.links('see [image/abc123.png] and [image/zz99yy.webp]!')).toEqual(['see ', { href: '/image/abc123', text: '[image/abc123.png]' }, ' and ', { href: '/image/zz99yy', text: '[image/zz99yy.webp]' }, '!'])
+	expect(view.links('[paste/0005ab.txt] [paste/0005ab.png]')).toEqual([{ href: '/paste/0005ab', text: '[paste/0005ab.txt]' }, ' [paste/0005ab.png]'])
 	expect(view.links('[image/ABC123.png] [image 0123456789ab]')).toEqual(['[image/ABC123.png] [image 0123456789ab]'])
 })

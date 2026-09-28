@@ -229,17 +229,29 @@ test('GET /image/<name> is a page naming where the image lives; /raw/<name> its 
 	await server.serve()
 	web.start()
 	let id = sessions.create({ cwd: home }).id
-	let png = Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.from('pixels')])
+	let png = Buffer.concat([Buffer.from('89504e470d0a1a0a0000000d4948445200000138000000d8', 'hex'), Buffer.from('pixels')])
 	blobs.stage('abc123.png', 'image/png', png.toString('base64'))
 	let jar = await cookie()
 	let get = (path: string, auth = true) => fetch(`${base()}${path}`, { headers: auth ? { cookie: jar } : {} })
 	let tmp = `${paths.imageDir()}/abc123.png`
 
+	expect((await get('/image/abc123', false)).status).toBe(401)
 	expect((await get('/image/abc123.png', false)).status).toBe(401)
 	expect((await get('/raw/abc123.png', false)).status).toBe(401)
 	let page = await (await get('/image/abc123.png')).text()
 	expect(page).toContain(tmp)
 	expect(page).toContain('src="/raw/abc123.png"')
+	expect(page).toContain('PNG · 312 × 216 · 30 B')
+	expect(page).toContain('href="/raw/abc123.png" download="abc123.png"')
+	expect(page).toContain('>Open original</a>')
+	expect((await get('/image/abc123')).status).toBe(200)
+	let larger = Buffer.concat([png, Buffer.alloc(1_234_567 - png.length)])
+	blobs.stage('def456.png', 'image/png', larger.toString('base64'))
+	expect(await (await get('/image/def456')).text()).toContain('1.2 MB')
+	blobs.stage('abc123.jpg', 'image/jpeg', Buffer.from('ffd8ff', 'hex').toString('base64'))
+	expect((await get('/image/abc123')).status).toBe(404)
+	expect((await get('/image/abc123.png')).status).toBe(200)
+	rmSync(`${paths.imageDir()}/abc123.jpg`)
 	let res = await get('/raw/abc123.png')
 	expect(res.headers.get('content-type')).toBe('image/png')
 	expect(Buffer.from(await res.arrayBuffer())).toEqual(png)
@@ -253,7 +265,7 @@ test('GET /image/<name> is a page naming where the image lives; /raw/<name> its 
 	expect(page).not.toContain(tmp)
 	expect(Buffer.from(await (await get('/raw/abc123.png')).arrayBuffer())).toEqual(png)
 	expect((await get(`/blob/${id}/abc123`)).status).toBe(200)
-	for (let path of ['/image/abc123.jpg', '/image/zzz999.png', '/image/abc123', '/image/..%2fabc123.png', '/image/abc123.png/x', '/paste/abc123.png', '/raw/abc123']) {
+	for (let path of ['/image/abc123.jpg', '/image/zzz999.png', '/image/..%2fabc123.png', '/image/abc123.png/x', '/paste/abc123.png', '/raw/abc123']) {
 		expect((await get(path)).status).toBe(404)
 	}
 })

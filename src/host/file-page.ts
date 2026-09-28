@@ -9,7 +9,7 @@
 import { attachments } from '../common/attachments.ts'
 import { blobs } from './blobs.ts'
 
-const pagePath = /^\/(image|paste)\/([0-9a-z]{6}\.[a-z]{3,4})$/
+const pagePath = /^\/(image|paste)\/([0-9a-z]{6})(?:\.([a-z]{3,4}))?$/
 const rawPath = /^\/raw\/([0-9a-z]{6}\.[a-z]{3,4})$/
 
 function escape(s: string): string {
@@ -17,6 +17,17 @@ function escape(s: string): string {
 }
 
 const notFound = (): Response => new Response('not found\n', { status: 404 })
+
+// The separate header reader runs only for an image page, never during
+// host startup. A malformed image simply has no resolution line.
+function dimensions(bytes: Buffer, type: string): string | undefined {
+	let out = Bun.spawnSync([process.execPath, `${import.meta.dir}/../../scripts/image-dimensions.ts`, type], { stdin: bytes })
+	return out.exitCode === 0 ? out.stdout.toString().trim() || undefined : undefined
+}
+
+function size(bytes: number): string {
+	return bytes < 1000 ? `${bytes} B` : bytes < 1e6 ? `${Math.floor(bytes / 100) / 10} kB` : `${Math.floor(bytes / 1e5) / 10} MB`
+}
 
 // Whether `pathname` is one of this module's addresses.
 function owns(pathname: string): boolean {
@@ -29,7 +40,11 @@ function owns(pathname: string): boolean {
 function serve(pathname: string, css: string): Response {
 	let raw = rawPath.exec(pathname)?.[1]
 	let m = pagePath.exec(pathname)
-	let name = raw ?? m?.[2]
+	let stem = m?.[2]
+	// An extensionless page has exactly one matching file; never guess if
+	// different formats happen to share the same six-character stem.
+	let names = stem && !m?.[3] ? Object.entries(attachments.types).filter(([type]) => (m![1] === 'paste') === (type === 'text/plain')).map(([, ext]) => `${stem}.${ext}`).filter((n) => !!blobs.file(n)) : []
+	let name = raw ?? (m?.[3] ? `${stem}.${m[3]}` : names.length === 1 ? names[0] : undefined)
 	let found = name === undefined ? undefined : blobs.file(name)
 	if (!found || (m && (m[1] === 'paste') !== (found.mediaType === 'text/plain'))) return notFound()
 	if (raw) {
@@ -38,6 +53,8 @@ function serve(pathname: string, css: string): Response {
 	}
 	let where = [...(found.tmp ? [['file', found.tmp]] : []), ...found.blobs.map((p) => ['session copy', p])]
 	let header = where.map(([label, path]) => `<div><span class="label">${label}</span> <code>${escape(path!)}</code></div>`).join('')
+	let detail = found.mediaType !== 'text/plain' ? [name!.split('.').at(-1)!.toUpperCase(), dimensions(found.bytes, found.mediaType), size(found.bytes.length)].filter(Boolean).join(' · ') : size(found.bytes.length)
+	header = `<div>${escape(detail)}</div>` + header
 	let body =
 		found.mediaType === 'text/plain'
 			? `<pre>${escape(found.bytes.toString('utf8'))}</pre>`
@@ -47,10 +64,14 @@ function serve(pathname: string, css: string): Response {
 body { margin: 0; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 header { padding: 12px 16px; overflow-wrap: anywhere; }
 header .label { opacity: 0.7; }
+header a { color: var(--code); text-decoration: underline; text-underline-offset: 2px; }
+header .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
+header .actions a { display: inline-flex; align-items: center; min-height: 44px; }
+header .actions a[download] { background: var(--button); color: var(--text); padding: 0 14px; border-radius: 6px; }
 main { padding: 12px 16px; }
 pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 img { max-width: 100%; }
-</style></head><body class="page"><header class="info">${header}<div><a href="/raw/${name}">raw</a></div></header><main>${body}</main></body></html>`
+</style></head><body class="page"><header class="info">${header}<div class="actions"><a href="/raw/${name}">Open original</a><a href="/raw/${name}" download="${name}">Download</a></div></header><main>${body}</main></body></html>`
 	return new Response(html, {
 		headers: {
 			'content-type': 'text/html; charset=utf-8',

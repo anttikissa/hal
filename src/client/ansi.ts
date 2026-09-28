@@ -37,7 +37,7 @@ function wrap(text: string, width: number): string[] {
 // the row it opens in; the visible text is unchanged.
 function links(row: string): string {
 	return row.replace(attachments.fileMarker, (m, path: string) =>
-		uploads.inFlight(m) ? `${ansi.DIM}${m}${ansi.UNDIM}` : `\x1b]8;;${ansi.webUrl(`/${path}`)}\x07${m}${ansi.LINK_OFF}`,
+		uploads.inFlight(m) ? `${ansi.DIM}${m}${ansi.UNDIM}` : `\x1b]8;;${ansi.webUrl(`/${path.slice(0, path.lastIndexOf('.'))}`)}\x07${m}${ansi.LINK_OFF}`,
 	)
 }
 
