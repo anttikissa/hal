@@ -41,3 +41,24 @@ test('a surrogate pair is never split by splice', () => {
 	let t = editor.splice('\u{1F600}', '\u{1F601}')
 	expect(t).toEqual({ start: 0, end: 2, text: '\u{1F601}' })
 })
+
+test('writing back an unchanged text leaves the box alone', () => {
+	// A browser's execCommand('delete') on a caret deletes backwards.
+	let box = { value: 'see [image/abc123.png]', selectionStart: 22, selectionEnd: 22, focus() {}, setSelectionRange(a: number, b: number) { box.selectionStart = a; box.selectionEnd = b } }
+	let doc = globalThis as any
+	let had = doc.document
+	doc.document = {
+		execCommand(cmd: string, _: boolean, text: string) {
+			let { selectionStart: a, selectionEnd: b, value } = box
+			if (cmd === 'delete' && a === b) a = Math.max(0, a - 1)
+			box.value = value.slice(0, a) + (cmd === 'insertText' ? text : '') + value.slice(b)
+			return true
+		},
+	}
+	try {
+		editor.write(box as any, editor.splice(box.value, box.value), 22)
+		expect(box.value).toBe('see [image/abc123.png]')
+	} finally {
+		doc.document = had
+	}
+})

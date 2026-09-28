@@ -51,11 +51,16 @@ function splice(before: string, after: string): Splice {
 // `anchor` to the caret at `cursor` (none when they are equal).
 function write(box: HTMLTextAreaElement, edit: Splice, cursor: number, anchor = cursor): void {
 	box.focus()
-	box.setSelectionRange(edit.start, edit.end)
-	let done = document.execCommand(edit.text ? 'insertText' : 'delete', false, edit.text)
-	if (!done) {
-		box.setRangeText(edit.text, edit.start, edit.end)
-		box.dispatchEvent(new Event('input', { bubbles: true }))
+	// An empty edit changes nothing: execCommand('delete') on a caret
+	// would delete the character before it (an upload whose marker was
+	// already final lost its closing bracket that way).
+	if (edit.text || edit.start !== edit.end) {
+		box.setSelectionRange(edit.start, edit.end)
+		let done = document.execCommand(edit.text ? 'insertText' : 'delete', false, edit.text)
+		if (!done) {
+			box.setRangeText(edit.text, edit.start, edit.end)
+			box.dispatchEvent(new Event('input', { bubbles: true }))
+		}
 	}
 	box.setSelectionRange(Math.min(anchor, cursor), Math.max(anchor, cursor), anchor > cursor ? 'backward' : 'forward')
 }
