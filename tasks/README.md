@@ -182,6 +182,19 @@ and the notes of 1b and 4s before writing a component.
 - Suspend restores the terminal and SIGSTOPs the process group; on
   SIGCONT it re-enters raw mode and calls `terminal.redraw()`.
 
+## Readable text (invariant, terminal and web)
+
+Never use faint/dim (SGR 2), and never fade text at rest on the web
+(opacity, filter or color-mix); animations may pass through it. Every
+glyph meets WCAG 2.2 AA contrast against the background it actually
+sits on (the block's own, else the lightest dark background we
+support): text at least 4.5:1, including placeholders and disabled
+items (terminal text is never "large text"); meaningful non-text marks
+(Hal cursor, tab glyphs, rules, control borders) at least 3:1.
+Hierarchy comes from hue, lightness steps above the minimum, bold or
+position, never from dropping below it. Don't overdo testing this;
+just be careful when introducing new colours.
+
 ## Artifacts
 
 Files in a task directory are its artifacts, copied from the old Hal.
