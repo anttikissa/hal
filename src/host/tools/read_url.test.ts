@@ -51,9 +51,11 @@ test('bad schemes and HTTP errors cannot masquerade as successful content', asyn
 
 test('large text says how many characters were cut', async () => {
 	response = () => new Response('x'.repeat(55_000), { headers: { 'content-type': 'text/plain' } })
-	let result = await tool.run({ url: url() }, ctx())
-	expect(typeof result).toBe('string')
-	expect(result).toContain('5000 more characters')
+	let result = await tools.run({ type: 'tool_call', id: '1', name: 'read_url', input: { url: url() } }, ctx())
+	expect(result.output.length).toBeLessThanOrEqual(tools.maxChars())
+	let cut = Number(result.output.match(/\[output truncated: (\d+) more characters\]/)?.[1])
+	expect(result.output.startsWith('x'.repeat(1000))).toBe(true)
+	expect(result.output.slice(0, 55_000 - cut)).toBe('x'.repeat(55_000 - cut))
 })
 
 test('image is a stored image result replayable to Anthropic, not base64 history', async () => {

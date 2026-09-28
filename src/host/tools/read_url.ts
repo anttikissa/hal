@@ -45,7 +45,9 @@ export const tool: Tool<ToolOutput> = {
 		let bytes = new Uint8Array(await res.arrayBuffer())
 		if (type === 'text/html' || type === 'application/xhtml+xml' || type.startsWith('text/') || type === 'application/json' || type.endsWith('+json')) {
 			let text = new TextDecoder().decode(bytes)
-			return tools.cap(type === 'text/html' || type === 'application/xhtml+xml' ? htmlText(text) : text)
+			let readable = type === 'text/html' || type === 'application/xhtml+xml' ? htmlText(text) : text
+			let max = tools.maxChars() - 100
+			return readable.length > max ? `${readable.slice(0, max)}\n[output truncated: ${readable.length - max} more characters]` : readable
 		}
 		let dir = paths.fileDir()
 		mkdirSync(dir, { recursive: true, mode: 0o700 })
