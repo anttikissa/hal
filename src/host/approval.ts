@@ -36,13 +36,58 @@ function tmpVars(command: string): Map<string, string> {
 	return vars
 }
 
-// A removal inside /tmp (not /tmp itself): scratch space models clean up.
-function safeTmp(token: string, vars: Map<string, string>): boolean {
+// A removal inside /tmp (not /tmp itself): scratch space models clean
+// up. `dir`: where the command runs, if cd made it known (a relative
+// target resolves against it).
+function safeTmp(token: string, vars: Map<string, string>, dir?: string): boolean {
 	let t = token.replace(/^['"]|['"]$/g, '')
 	let v = t.match(/^\$\{?([A-Za-z_]\w*)\}?$/)
 	if (v && vars.has(v[1]!)) t = vars.get(v[1]!)!
-	if (!t.startsWith('/tmp/') || t.includes('..') || t === '/tmp/' || t === '/tmp/*') return false
+	if (t.includes('..') || /[$`~\\]/.test(t)) return false
+	if (!t.startsWith('/')) {
+		if (!dir) return false
+		t = resolve(dir, t)
+	}
+	if (!t.startsWith('/tmp/') || t === '/tmp/' || t === '/tmp/*') return false
 	return resolve('/', t).startsWith('/tmp/')
+}
+
+// Where `cd <arg>` goes from `dir`, or undefined if that can't be told:
+// no argument (home), ~, variables other than a known /tmp one, .., options.
+function cdTarget(arg: string | undefined, dir: string | undefined, vars: Map<string, string>): string | undefined {
+	if (!arg) return undefined
+	let t = arg.replace(/^['"]|['"]$/g, '')
+	if (t === '$(mktemp -d)') return '/tmp/mktemp'
+	let v = t.match(/^\$\{?([A-Za-z_]\w*)\}?$/)
+	if (v) return vars.get(v[1]!)
+	if (t.includes('..') || t.startsWith('-') || /[$`~*?\\]/.test(t)) return undefined
+	return t.startsWith('/') ? resolve(t) : dir && resolve(dir, t)
+}
+
+// The directory each segment runs in, as far as cd shows it (undefined
+// when unknown, as at the start). A cd carries over && only, since after
+// ; or || the next command also runs when cd failed; a `cd /tmp` that
+// surely ran (not itself after &&) cannot fail, so it carries over ;
+// and newlines too. Pipes, background jobs and any other directory
+// change (a cd inside braces or if, pushd, eval, source) make it unknown.
+function dirs(command: string, segs: Mark[], vars: Map<string, string>): (string | undefined)[] {
+	let out: (string | undefined)[] = []
+	let dir: string | undefined
+	let sure = false
+	for (let i = 0; i < segs.length; i++) {
+		let [from, to] = segs[i]!
+		let sep = i ? command.slice(segs[i - 1]![1], from).replace(/\n/g, '') : ''
+		if (sep !== '&&' && !((sep === ';' || sep === '') && sure)) dir = undefined
+		out.push(dir)
+		let seg = command.slice(from, to)
+		let cd = seg.match(/^\s*cd(?:\s+("?\$\(mktemp -d\)"?|\S+))?\s*$/)
+		if (cd) {
+			dir = cdTarget(cd[1], dir, vars)
+			sure = dir === '/tmp' && cd[1]!.replace(/^['"]|['"]$/g, '').startsWith('/') && sep !== '&&'
+		} else if (/(^|[\s({`$])(cd|pushd|popd|source|eval)(\s|$)|(^|[\s({])\.\s/.test(seg)) dir = undefined
+		if (!dir) sure = false
+	}
+	return out
 }
 
 const git: RegExp[] = [
@@ -57,7 +102,9 @@ const git: RegExp[] = [
 function marks(command: string): Mark[] {
 	let out: Mark[] = []
 	let vars = approval.tmpVars(command)
-	for (let [from, to] of approval.segments(command)) {
+	let segs = approval.segments(command)
+	let where = approval.dirs(command, segs, vars)
+	for (let [i, [from, to]] of segs.entries()) {
 		let seg = command.slice(from, to)
 		let found: RegExpMatchArray | null = null
 		let rm = seg.match(/\brm\s+(.*)/)
@@ -67,7 +114,7 @@ function marks(command: string): Mark[] {
 			let recursive = flags.some((f) => f === '--recursive' || /^-[a-zA-Z]*[rR]/.test(f))
 			let force = flags.some((f) => f === '--force' || /^-[a-zA-Z]*f/.test(f))
 			let targets = tokens.filter((t) => !t.startsWith('-'))
-			if (recursive && force && (!targets.length || targets.some((t) => !approval.safeTmp(t, vars)))) found = rm
+			if (recursive && force && (!targets.length || targets.some((t) => !approval.safeTmp(t, vars, where[i])))) found = rm
 		}
 		for (let re of git) found ??= seg.match(re)
 		if (!found) continue
@@ -123,4 +170,4 @@ function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<
 	return asked ? { calls, decided } : undefined
 }
 
-export const approval = { segments, tmpVars, safeTmp, marks, form, declined, held }
+export const approval = { segments, tmpVars, safeTmp, cdTarget, dirs, marks, form, declined, held }

@@ -76,3 +76,38 @@ test('calls held for approval are found with the decisions so far, until they ra
 	expect(held([prompt, call('c1')])).toBeUndefined()
 	expect(held([prompt, call('c1'), q('q1', 'c1'), a('q1', 'yes'), at({ type: 'user', blocks: [{ type: 'tool_result', id: 'c1', output: 'ok' }] })])).toBeUndefined()
 })
+
+test('rm -rf after cd into /tmp or a mktemp dir runs without asking, as far as the cd can be followed', () => {
+	let free = [
+		'cd /tmp; rm -rf build',
+		'cd /tmp\nrm -rf build',
+		'cd /tmp/x && rm -rf y',
+		'cd "$(mktemp -d)" && make && rm -rf out',
+		'D=$(mktemp -d) && cd $D && rm -rf out',
+		'cd /tmp && cd x && rm -rf y',
+		'cd /tmp; echo hi; rm -rf ./build',
+	]
+	for (let command of free) expect([command, marked(command)]).toEqual([command, []])
+	let asks = [
+		'cd /tmp; cd ~; rm -rf x',
+		'cd /tmp/../home && rm -rf x',
+		'rm -rf /tmp/../x',
+		// cd may fail, and then rm runs where the command started.
+		'cd /tmp/x; rm -rf y',
+		'cd /tmp/x || rm -rf y',
+		'cd /tmp/x && make; rm -rf y',
+		'cd /tmp/x && cd /tmp; rm -rf y',
+		// Unfollowable: other variables, subshells, braces, eval, home.
+		'cd $HOME && rm -rf x',
+		'cd /tmp && { cd ~; } && rm -rf x',
+		'cd /tmp && eval "cd ~" && rm -rf x',
+		'cd /tmp & rm -rf x',
+		'cd /tmp; cd; rm -rf x',
+		'cd /tmp && rm -rf ~/x',
+		'cd /tmp && rm -rf .',
+		'cd /tmp && rm -rf *',
+		'cd /tmp && rm -rf ../etc',
+		'cd /tmp && rm -rf $X',
+	]
+	for (let command of asks) expect([command, marked(command).length > 0]).toEqual([command, true])
+})
