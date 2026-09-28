@@ -595,7 +595,7 @@ test('/go changes this terminal only while it shows the source session', () => {
 	expect(shown()).toBe('a')
 	app.onEvent({ type: 'go', sessionId: 'a', tab: 'b' })
 	expect(shown()).toBe('b')
-	expect(sent).toEqual([{ type: 'close', sessionId: 'a' }, { type: 'open', sessionId: 'b' }])
+	expect(sent).toEqual([{ type: 'open', sessionId: 'b' }])
 	app.onEvent({ type: 'go', sessionId: 'a', tab: 'c' })
 	expect(shown()).toBe('b')
 })

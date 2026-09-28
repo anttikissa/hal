@@ -52,6 +52,10 @@ function open(state: SessionState, text: string, cursor: number, anchor?: number
 	app.onEvent({ type: 'ack', id: 'x', tab: 'k' })
 	let snap: Snapshot = { meta: { id: 'k', cwd: '/', model: 'anthropic/x', createdAt: '' }, history: [], state }
 	app.onEvent({ type: 'snapshot', sessionId: 'k', snapshot: snap })
+	// This suite probes keys, not the asynchronous background tab loader.
+	app.state.painted = false
+	if (app.state.timer) clearTimeout(app.state.timer)
+	delete app.state.timer
 	app.state.prompt = { text, cursor, kill: 'K', rows: 5, undo: [{ text: 'u', cursor: 1 }], redo: [{ text: 'r', cursor: 1 }], ...(anchor === undefined ? {} : { anchor }) }
 	effects = []
 }

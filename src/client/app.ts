@@ -63,12 +63,8 @@ export type AppState = {
 	modal?: ModalState
 	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
 	onModalKey?: (modal: ModalState) => ModalState
-	older: Map<string, Backfill>
-	background: Set<string>
-	painted: boolean
-	loading?: string
-	timer?: ReturnType<typeof setTimeout>
-	choices?: string[]
+	older: Map<string, Backfill>; background: Set<string>; painted: boolean; loading?: string
+	timer?: ReturnType<typeof setTimeout>; choices?: string[]
 }
 
 function createState(): AppState {
