@@ -20,6 +20,7 @@ const list: CommandInfo[] = [
 	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1' },
 	{ name: 'login', description: 'log in to a provider', category: 'session' },
 	{ name: 'model', description: 'pick the model', category: 'session', key: 'ctrl-m' },
+	{ name: 'move', description: 'move this tab to a numbered position', category: 'tabs' },
 	{ name: 'new', description: 'new tab', category: 'tabs', key: 'ctrl-t', clientOnly: true },
 	{ name: 'pause', description: 'pause the turn', category: 'session' },
 	{ name: 'perf', description: 'show startup timing marks', category: 'debug' },
