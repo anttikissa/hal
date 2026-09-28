@@ -60,3 +60,25 @@ context (about $2–4 each); split bigger ones. A coordinator needs one
 spawn slot per task it will start: slots don't come back. Measure
 with scripts/sloc (non-blank, non-comment, non-test lines) and
 scripts/cost <session-id>... (Opus 5.5 list prices).
+
+"Progress report" means this, on one screen, with every number
+measured now (git log, `scripts/sloc . HEAD`, `tsk ls`, a test-case
+count, `scripts/cost`; `scripts/sloc ~/.hal <rev>` for the old Hal),
+never recalled:
+
+1. A map by feature area in a code block: what exists, a 12-cell bar
+   (█ done, ░ missing, marked as estimates) and what's missing:
+   ```
+   FOUNDATIONS  host, takeover, restart, history   ████████████  sturdier than the old Hal
+   TOOLS        read · bash · send · spawn · wait  █████░░░░░░░  no write/edit/grep/glob
+   ```
+2. A timeline in a code block, one line per run, ending "← now":
+   ```
+   27 Sep 11:38 ──── 18 tasks ──── split files, Solid, editing, tabs   9.5k lines
+   27 Sep 21:02 ──── answers to questions 1–82 → 26 tasks             11.3k  ← now
+   ```
+3. A table against the previous report (source lines, tests, tasks
+   done/planned, questions answered), when the old Hal reached the
+   same size, and cost since the last report and in total.
+4. A short numbered list of what needs the user: decisions, what
+   isn't deployed, security items.
