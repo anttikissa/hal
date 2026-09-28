@@ -31,6 +31,7 @@ const list: CommandInfo[] = [
 	{ name: 'restart', description: 'restart', category: 'app', key: 'ctrl-r', clientOnly: true },
 	{ name: 'resume', description: 'reopen the last closed tab', category: 'tabs', key: 'shift-ctrl-t', clientOnly: true },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
+	{ name: 'version', description: 'show which code the host runs', category: 'debug' },
 ]
 
 // Keys a browser keeps for itself except on macOS, where they are Cmd.

@@ -8,6 +8,7 @@
 		"/pause is a host command (turns.stop), so another session's /pause works too. The host refuses a clientOnly name in slash.command before recording anything: 'only a client can run /<name>' comes back as a rejected submit.",
 		"key-help.ts imports commandList and vice versa (parse); both only call each other at run time. KeyRow gained `command`; render pads keys and command columns across all sections. keys.ts decodes F1 (ESC O P, CSI P, CSI 1;mP, CSI 11~); the web maps e.key 'F1'.",
 		'Web: view.commandKey binds host command keys (ctrl-m, f1) if commandList.onWeb (browser keeps ctrl-t, shift-ctrl-t, ctrl-w, ctrl-n except on macOS); client-only tab keys stay in web/shortcuts.ts. Open: /keys is rendered on the host, so the web still lists terminal-only keys; typed /new, /close etc. on the web reach the host and are refused.',
+		'A new host command needs its file and an entry in common/commands/list.ts (description, category, key); the one-side test fails otherwise (n1 landed /version in parallel and had to be added).',
 		"startup.test.ts's 100 ms budget fails at ~125 ms under load, also on the commit before this task."
 	],
 	needs: ['et'],
