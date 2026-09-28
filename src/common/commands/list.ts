@@ -13,6 +13,7 @@ export type CommandInfo = { name: string; description: string; category: string;
 // Sorted by name.
 const list: CommandInfo[] = [
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
+	{ name: 'budget', description: 'show or set spawn slots', category: 'session' },
 	{ name: 'cd', description: 'change the working directory', category: 'session' },
 	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session' },
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w', clientOnly: true },
