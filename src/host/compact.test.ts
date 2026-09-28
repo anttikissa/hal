@@ -1,8 +1,11 @@
 // Context boundaries against the real host (tasks bc, vh): /compact and
 // /clear, what the next request holds and what clients show.
-import { expect, test } from 'bun:test'
-import { calls, client, created, fresh, restartHost, shown, until, useHost } from './host-fixture.test.ts'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { settings } from '../common/settings.ts'
+import { compact } from './compact.ts'
+import { calls, client, created, fresh, readCall, records, restartHost, shown, toolSession, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
+import { models } from './models.ts'
 
 useHost()
 
@@ -67,4 +70,82 @@ test('/compact while a turn runs answers that it is busy', async () => {
 	await command(c, id, '/compact')
 	expect(c.of('output').at(-1)).toMatchObject({ error: true, text: expect.stringContaining('busy') })
 	calls[0]!.push({ type: 'done', reason: 'end' })
+})
+
+describe('automatic compaction (task mq)', () => {
+	let window = models.contextWindow
+	beforeEach(() => {
+		models.contextWindow = () => 1000
+		settings.state.raw = {}
+	})
+	afterEach(() => {
+		models.contextWindow = window
+		settings.state.raw = {}
+	})
+
+	// A turn whose first round asks for a tool, having taken in `input`.
+	async function fullRound(c: C, input: number): Promise<string> {
+		let id = toolSession(c)
+		await ask(c, id, 'p1')
+		c.conn.send({ type: 'submit', sessionId: id, text: 'p2' })
+		await until(() => calls.length === 2)
+		calls[1]!.push(readCall(), { type: 'usage', usage: { input: input - 100, cacheRead: 100 } }, { type: 'done', reason: 'tool_use' })
+		await until(() => calls.length === 3)
+		return id
+	}
+
+	test('at the threshold it compacts between rounds, after the results, and says so', async () => {
+		let c = client()
+		let id = await fullRound(c, 850)
+		expect(calls[2]!.input.messages[0].blocks[0].text).toStartWith('Context was compacted')
+		expect(calls[2]!.input.messages.length).toBe(1)
+		let types = (await records(id)).map((r) => r.type)
+		let at = types.lastIndexOf('compact')
+		expect(types[at - 1]).toBe('user')
+		expect((await records(id))[at - 1]).toMatchObject({ blocks: [{ type: 'tool_result' }] })
+		expect(c.of('output').at(-1).text).toContain('85%')
+		calls[2]!.push({ type: 'text', text: 'done' }, { type: 'usage', usage: { input: 100 } }, { type: 'done', reason: 'end' })
+		await until(() => c.of('turn-end').length === 2)
+		// The next turn starts from the small context: no second compact.
+		await ask(c, id, 'p3')
+		expect(c.of('divider').length).toBe(1)
+	})
+
+	test('with compactAt 0 it never compacts', async () => {
+		settings.state.raw = { compactAt: 0 }
+		let c = client()
+		let id = await fullRound(c, 990)
+		expect(calls[2]!.input.messages[0].blocks[0].text).not.toStartWith('Context was compacted')
+		expect((await records(id)).some((r) => r.type === 'compact')).toBe(false)
+		calls[2]!.push({ type: 'done', reason: 'end' })
+	})
+
+	test('below the threshold it does not compact', async () => {
+		let id = await fullRound(client(), 840)
+		expect((await records(id)).some((r) => r.type === 'compact')).toBe(false)
+		calls[2]!.push({ type: 'done', reason: 'end' })
+	})
+
+	test('a prompt too long compacts and retries once, then the turn fails with the provider message', async () => {
+		let c = client()
+		let id = created(c)
+		await ask(c, id, 'p1')
+		c.conn.send({ type: 'submit', sessionId: id, text: 'p2' })
+		await until(() => calls.length === 2)
+		let refusal = { type: 'error' as const, message: 'prompt is too long: 250000 tokens > 200000 maximum', status: 400 }
+		calls[1]!.push({ ...refusal })
+		await until(() => calls.length === 3)
+		expect(calls[2]!.input.messages[0].blocks[0].text).toStartWith('Context was compacted')
+		calls[2]!.push({ ...refusal })
+		await until(() => c.of('turn-end').length === 2)
+		expect(c.of('turn-end').at(-1)).toMatchObject({ status: 'error', error: expect.stringContaining('prompt is too long') })
+		expect(calls.length).toBe(3)
+	})
+
+	test('too long is recognised by provider wording and status', () => {
+		expect(compact.tooLong({ type: 'error', message: 'x', body: '{"error":{"code":"context_length_exceeded"}}', status: 400 })).toBe(true)
+		expect(compact.tooLong({ type: 'error', message: 'request too large', status: 413 })).toBe(true)
+		expect(compact.tooLong({ type: 'error', message: 'request too large', status: 500 })).toBe(false)
+		expect(compact.tooLong({ type: 'error', message: 'invalid tool schema', status: 400 })).toBe(false)
+	})
 })

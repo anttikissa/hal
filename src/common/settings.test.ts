@@ -21,9 +21,9 @@ test('every declared default passes its own validation', () => {
 })
 
 test('valid values are taken', () => {
-	let { values, warnings } = settings.check({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50 })
+	let { values, warnings } = settings.check({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50, compactAt: 0.5 })
 	expect(warnings).toEqual([])
-	expect(values).toEqual({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50 })
+	expect(values).toEqual({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50, compactAt: 0.5 })
 })
 
 test('an unknown key is a warning and changes nothing else', () => {
@@ -34,7 +34,7 @@ test('an unknown key is a warning and changes nothing else', () => {
 })
 
 test('a bad value warns and only that setting falls back to its default', () => {
-	for (let bad of [{ security: 'paranoid' }, { webPort: 'x' }, { webPort: 70000 }, { webPort: 80.5 }, { model: 3 }, { model: '' }]) {
+	for (let bad of [{ security: 'paranoid' }, { webPort: 'x' }, { webPort: 70000 }, { webPort: 80.5 }, { model: 3 }, { model: '' }, { compactAt: 1.5 }, { compactAt: '0.8' }]) {
 		let key = Object.keys(bad)[0]!
 		let { values, warnings } = settings.check({ ...bad, promptRows: 4 })
 		expect(warnings.length).toBe(1)

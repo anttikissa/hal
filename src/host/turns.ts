@@ -15,6 +15,7 @@ import { auth } from './auth.ts'
 import { blobs } from './blobs.ts'
 import { busy } from './busy.ts'
 import { clock } from './clock.ts'
+import { compact } from './compact.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { models } from './models.ts'
@@ -216,6 +217,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let failure: string | undefined
 	// Failed rounds in a row, for the backoff.
 	let failures = 0
+	// Compacted once already for a prompt too long (compact.retry).
+	let shrunk = false
 	// Finished rounds, and why Hal paused the turn if it did.
 	let rounds = 0
 	let capped: string | undefined
@@ -234,6 +237,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					last = undefined
 					break
 				}
+				compact.auto(id, model)
 				let round = blocks.newTurn(running.provider)
 				last = undefined
 				prompts.steer(id)
@@ -249,6 +253,10 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					let n = history.streaming(id)
 					let ts = history.started(id)
 					host.broadcast(id, { type: 'stream', sessionId: id, event, ...(n !== undefined && { n }), ...(ts !== undefined && { ts }) })
+				}
+				if (last?.type === 'error' && !signal.aborted && compact.retry(id, last, shrunk)) {
+					shrunk = true
+					continue
 				}
 				if (last?.type === 'error' && last.failure && !last.cancelled && !signal.aborted) {
 					await turns.waitOut(id, last, failures++, signal)
