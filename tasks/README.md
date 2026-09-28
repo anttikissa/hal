@@ -61,6 +61,12 @@ point to it.
   around it. The one exception is a torn last history line, which a
   crash mid-write leaves and opening a session cuts off. The user
   prefers this to defensive code.
+- A history record type, once written by any commit, stays readable
+  for good: retiring it means reading it as nothing, never removing it
+  from history.ts's record types (removing 'blocked' made a session
+  with one unreadable, and the terminal whose last tab it was showed
+  no tab at all). Likewise the host never names a tab (tab-start) that
+  its tabs event does not list.
 - Slash commands are files in `src/host/commands/` (one per command,
   found by listing the directory; `src/host/commands.ts`). They run and
   complete on the host; a command that asks re-runs with the answer.

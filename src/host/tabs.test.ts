@@ -109,6 +109,16 @@ test('tab-start prefers last if open in cwd, then the first tab in cwd, then a n
 	expect(other.events.length).toBe(before)
 })
 
+test('tab-start never names a tab it does not list, such as an unreadable session', () => {
+	let a = client()
+	let good = newTab(a, '/tmp/p')
+	let broken = newTab(a, '/tmp/p')
+	writeFileSync(`${paths.sessionDir(broken)}/history.asonl`, '{ type: @@ }\n')
+	send(a, { type: 'tab-new', cwd: '/tmp/p' })
+	expect(ids(a)).not.toContain(broken)
+	expect(ack(a, send(a, { type: 'tab-start', cwd: '/tmp/p', last: broken })).tab).toBe(good)
+})
+
 test('a tab wants attention when its turn ends until a client has seen it', async () => {
 	let a = client()
 	let b = client()

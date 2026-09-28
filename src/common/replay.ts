@@ -43,6 +43,10 @@ export type HistoryRecord = Numbered &
 	| { type: 'turn_end'; status: TurnStatus; reason?: StopReason; error?: string; pauseReason?: string; usage: Usage; context?: number; ts: string }
 	// The turn goes on after a pause, a failure or a host that went away.
 	| { type: 'continue'; ts: string }
+	// Written only by 6f9f63d..2c71640 (28 Sep 2026); read as nothing, so
+	// a history holding one still opens (a record type once written stays
+	// readable).
+	| { type: 'blocked'; reason: string; ts: string }
 	// A durable question (tasks/w4/forms.md): the turn waits, blocked,
 	// with nothing in memory, until an answer re-runs whoever asked.
 	// `call`: the tool call it asks approval for (host/approval.ts).
@@ -104,7 +108,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			if (r.model !== undefined) changed.model = r.model
 			continue
 		}
-		if (r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output') continue
+		if (r.type === 'inbox' || r.type === 'blocked' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) {
 			note = undefined

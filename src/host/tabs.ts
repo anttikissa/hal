@@ -107,7 +107,9 @@ function resume(id?: string): Outcome {
 }
 
 function start(cwd?: string, last?: string): Outcome {
-	let open = tabs.file().open
+	// Only tabs clients are told of: a session that cannot be read is
+	// not listed, and naming it would leave the client showing nothing.
+	let open = tabs.list().map((t) => t.id)
 	let inCwd = (id: string) => {
 		if (cwd === undefined) return true
 		try {
