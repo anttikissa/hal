@@ -137,12 +137,50 @@ test('a bad code or a refused exchange is an error that never echoes the code, a
 	expect(existsSync(file())).toBe(false)
 })
 
-test('/login without a known provider says which ones exist', async () => {
-	for (let args of ['', 'nope']) {
-		let reply = await command.run(args, undefined, ctx)
-		expect(reply.error).toContain('claude')
-		expect(reply.ask).toBeUndefined()
+test('/login asks for a method; choosing one continues to a secret form without losing other accounts', async () => {
+	let first = await command.run('', undefined, ctx)
+	expect(first.ask?.fields[0]).toMatchObject({ type: 'choice', name: 'method', options: expect.arrayContaining(['Claude subscription', 'ChatGPT subscription', 'Claude API key', 'ChatGPT API key', 'OpenCode API key', 'OpenRouter API key']) })
+	writeFileSync(file(), ason.stringify({ anthropic: { accessToken: 'subscription', refreshToken: 'refresh', email: 'a@example.com' } }), { mode: 0o600 })
+	let picked = await command.run('', { method: 'Claude API key' }, ctx)
+	expect(picked.ask?.fields[0]).toMatchObject({ type: 'secret', name: 'key' })
+	expect(picked.askArgs).toBe('anthropic-key')
+	await command.run(picked.askArgs!, { key: 'my-key' }, ctx)
+	expect(disk().anthropic).toEqual([expect.objectContaining({ accessToken: 'subscription', refreshToken: 'refresh' }), { apiKey: 'my-key' }])
+	await command.run(picked.askArgs!, { key: 'new-key' }, ctx)
+	expect(disk().anthropic).toHaveLength(2)
+	expect(auth.all('anthropic').list.map((a) => a.entry)).toEqual([expect.objectContaining({ accessToken: 'subscription' }), expect.objectContaining({ apiKey: 'new-key' })])
+	let subscription = await command.run('', { method: 'Claude subscription' }, ctx)
+	expect(subscription.askArgs).toBe('claude')
+	expect(subscription.ask?.fields[0]?.type).toBe('secret')
+})
+
+test('/login with an unknown method says which ones exist', async () => {
+	let reply = await command.run('nope', undefined, ctx)
+	expect(reply.error).toContain('claude')
+	expect(reply.ask).toBeUndefined()
+})
+
+test('a chosen login method survives question answers; API key never enters history', async () => {
+	let events: Event[] = []
+	let conn = host.connect((event) => events.push(event))
+	let until = async (check: () => unknown) => {
+		for (let i = 0; i < 500 && !check(); i++) await Bun.sleep(2)
+		if (!check()) throw Error('timed out')
 	}
+	conn.send({ type: 'create', cwd: '/tmp', model: 'fake/m' })
+	let id = (events.find((e) => e.type === 'snapshot') as any).sessionId
+	conn.send({ type: 'submit', sessionId: id, text: '/login' })
+	await until(() => events.some((e) => e.type === 'question'))
+	let first = events.findLast((e) => e.type === 'question') as any
+	expect(first.form.fields[0].type).toBe('choice')
+	conn.send({ type: 'answer', sessionId: id, question: first.id, answers: { method: 'OpenRouter API key' } })
+	await until(() => events.filter((e) => e.type === 'question').length === 2)
+	let second = events.findLast((e) => e.type === 'question') as any
+	expect(second.form.fields[0].type).toBe('secret')
+	conn.send({ type: 'answer', sessionId: id, question: second.id, answers: { key: 'very-private-key' } })
+	await until(() => events.some((e) => e.type === 'output' && e.text.includes('openrouter')))
+	expect(disk().openrouter.apiKey).toBe('very-private-key')
+	expect(readFileSync(history.file(id), 'utf8')).not.toContain('very-private-key')
 })
 
 test('ANTHROPIC_API_KEY alone needs no file; a login in the file comes first and the key next', async () => {

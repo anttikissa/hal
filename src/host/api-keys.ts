@@ -28,7 +28,15 @@ function save(name: string, key: string): void {
 		let path = paths.authFile()
 		let created = !existsSync(path)
 		let data = created ? liveFiles.liveFile(path, {} as Record<string, any>, { mode: 0o600, watch: false }) : auth.store()
-		data[name] = { apiKey: key }
+		if (name === 'anthropic' || name === 'openai') {
+			// A provider may have subscription accounts: adding its API key must
+			// not discard their refresh tokens. Re-entering the key replaces it.
+			let entries = data[name] === undefined ? [] : Array.isArray(data[name]) ? data[name] : [data[name]]
+			let existing = entries.findIndex((entry: any) => entry?.apiKey && !entry?.accessToken)
+			if (existing < 0) entries.push({ apiKey: key })
+			else entries[existing] = { ...entries[existing], apiKey: key }
+			data[name] = entries
+		} else data[name] = { apiKey: key }
 		liveFiles.save(data)
 		if (created) liveFiles.close(data)
 	} finally {

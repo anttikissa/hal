@@ -1,7 +1,10 @@
 {
 	title: '/login with no argument asks which login',
 	spec: "`/login` with no argument is not an error: it asks a question with choices, one per way to log in (Claude subscription, ChatGPT subscription, API key for each provider), picked with arrow keys and Enter, and continues with the chosen login (questions.md 120; the user's reference is pi's 'Select authentication method').",
-	status: 'planned',
+	status: 'done',
 	needs: [],
-	foldInto: ['nd']
+	foldInto: ['nd'],
+	notes: [
+		'The /login method choice is a durable host question. For a second secret question, Reply.askArgs carries the chosen provider into the new question provenance (src/host/slash.ts), so a restart does not forget it. Stored Anthropic/OpenAI API keys append to, rather than replace, subscription accounts; re-entering a key replaces only its key account. OpenCode and OpenRouter keys use the same secret form.'
+	]
 }

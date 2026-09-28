@@ -97,7 +97,7 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 		return slash.output(id, `/${name} can't ask while the session is busy; try again when it is done`, true)
 	let question = crypto.randomUUID().slice(0, 8)
 	let before = status.stateOf(id)
-	let { n } = history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args } })
+	let { n } = history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args: reply.askArgs ?? args } })
 	host.broadcast(id, { type: 'question', sessionId: id, id: question, form: reply.ask, n })
 	status.settle(id, before)
 }
