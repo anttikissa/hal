@@ -1,0 +1,7 @@
+{
+	title: 'Commands declare their key; client-only commands',
+	description: 'Commands declare their key, and some commands run only in the client, as specified in tasks/w4/forms.md (Keys and client-only commands), which this task keeps true. Keys: /model ctrl-m, /redraw ctrl-l, /quit ctrl-c, /suspend ctrl-z, /restart ctrl-r, /new ctrl-t, /resume shift-ctrl-t, /close ctrl-w, /pause esc, /keys f1. The ad-hoc key checks in client/app.ts and client/tabs.ts for these keys go away; the dispatcher finds the command by key. Behaviour does not change beyond: typed /quit, /restart, /suspend, /redraw, /new, /resume, /close, /pause work, and f1 opens /keys. Tests: every command key appears in /keys; each key runs its command; typed /restart exits with the restart code like Ctrl-R; the host refuses a client-only command sent by another session; no two commands share a key; a key the browser takes is not bound on the web.',
+	status: 'planned',
+	needs: ['et'],
+	foldInto: ['et']
+}

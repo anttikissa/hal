@@ -57,6 +57,49 @@ listing the directory. Each exports:
   Example: `/cd ~/sync/project` returns "directory not found. Create
   one? (Y/n)"; Enter re-runs with `{ create: true }`.
 
+### Keys and client-only commands (task x0)
+
+Every command, whether the host or the client runs it, is one file and
+one entry in one list, so `/keys`, `/help`, completion and the key
+dispatcher can never disagree.
+
+- **The list** lives in `src/common/commands/`: per command its name,
+  `description`, `category`, optional `key` and optional `clientOnly`.
+  Host and clients import it. The host's command files keep their
+  `run`/`complete`/`help` in `src/host/commands/<name>.ts`; client-only
+  commands keep their action in `src/client/commands/<name>.ts`. A
+  name is in exactly one of the two.
+- **`key`**: a key label as `common/key-help.ts` writes them
+  (`'ctrl-m'`, `'shift-ctrl-t'`, `'f1'`). Pressing it runs the command
+  with no arguments, exactly as if `/<name>` were typed and sent. A
+  command that needs an argument opens its picker (a modal or a
+  question) when run bare, so it can still have a key. One key, one
+  command; a test fails on duplicates.
+- **`clientOnly: true`** (default false, and never written out when
+  false): the client runs it itself and never sends it to the host:
+  /quit, /restart, /suspend, /redraw, and the tab commands whose effect
+  is the client's own view. Typing `/restart` does exactly what Ctrl-R
+  does. The host still lists these names for completion and `/help`.
+  If one reaches the host anyway (another session sends `/restart`,
+  see Provenance), the host answers "only a client can run /restart"
+  and does nothing: a session may not quit or restart the user's
+  terminal.
+- **Emergency keys** (tasks/README.md) keep their route. `/quit`,
+  `/suspend` and `/restart` declare `key: 'ctrl-c'` (etc.) like any
+  other command, with a comment above `key:` telling a programmer that
+  the key is really caught by the emergency path: raw stdin is scanned
+  in `src/client/emergency.ts` and the action handled synchronously in
+  `src/client/terminal.ts` before any key decoding, so changing `key:`
+  in the command file changes only what `/keys` shows, not what the
+  key does. There is no `emergency` flag; the key dispatcher simply
+  never sees those keys.
+- **Not commands**: prompt-editing keys (ctrl-a, ctrl-k, alt-left,
+  undo…) stay rows in `key-help.ts`; they act on the text, not the
+  session. `/keys` shows those rows plus one row per command key.
+- **Web**: binds a command key only if the browser gives it to the
+  page (not ctrl-t, ctrl-w, ctrl-n); `/keys` on the web lists only the
+  keys the web really has.
+
 ## Provenance
 
 A command or prompt an agent sends must work exactly as if the user had

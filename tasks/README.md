@@ -64,6 +64,10 @@ point to it.
 - Slash commands are files in `src/host/commands/` (one per command,
   found by listing the directory; `src/host/commands.ts`). They run and
   complete on the host; a command that asks re-runs with the answer.
+  A command may declare a `key`; `clientOnly` commands (quit, restart,
+  suspend, redraw) run in the client from `src/client/commands/`. One
+  shared list in `src/common/commands/` feeds /keys, /help, completion
+  and key dispatch (tasks/w4/forms.md, Keys and client-only commands).
 - Model tools are files in `src/host/tools/` the same way (one per
   tool, exporting `tool`; `src/host/tools.ts` is the registry). Calls
   run one after another in call order, never in parallel.
