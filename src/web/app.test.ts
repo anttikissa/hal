@@ -113,6 +113,25 @@ test('Tab at the end of a slash command asks the host, and its answer fills the 
 	expect(app.state.text).toBe('/cd ~/projects/')
 })
 
+test('typing opens host completions; keyboard choice is not sent, stale answers and Escape stay hidden', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	app.input('/c')
+	expect(sent).toContainEqual(expect.objectContaining({ type: 'complete', text: '/c' }))
+	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
+	expect(app.state.menu?.choices).toHaveLength(2)
+	expect(press('ArrowDown', message('/c'))).toBe(true)
+	expect(press('Enter', message('/c'))).toBe(true)
+	expect(app.state.text).toBe('/clear ')
+	expect(app.state.menu).toBeUndefined()
+	app.input('/c')
+	app.onEvent({ type: 'completions', sessionId, text: '/clear ', items: ['/clear '] })
+	expect(app.state.menu).toBeUndefined()
+	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
+	expect(press('Escape', message('/c'))).toBe(true)
+	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
+	expect(app.state.menu).toBeUndefined()
+})
+
 test('an open question takes the keys: fields type natively, Enter answers', () => {
 	let form = { text: 'Name?', fields: [{ type: 'text' as const, name: 'name' }] }
 	app.onEvent(snapshot({ type: 'blocked', reason: 'question' }))

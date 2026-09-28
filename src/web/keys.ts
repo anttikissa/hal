@@ -78,6 +78,11 @@ function key(e: KeyInput, target: Target): boolean {
 		return true
 	}
 	let plain = !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey
+	if (plain && target.kind === 'message' && app.state.menu) {
+		let menuKey = { ArrowUp: 'up', ArrowDown: 'down', Escape: 'escape', Enter: 'enter' } as const
+		let choice = menuKey[e.key as keyof typeof menuKey]
+		if (choice) return app.menuKey(choice)
+	}
 	let edit = plain && target.kind === 'message' && arrows[e.key] ? view.editKey(st.view, arrows[e.key]!, st.text) : undefined
 	if (edit) {
 		st.view = edit.view
@@ -100,8 +105,13 @@ function key(e: KeyInput, target: Target): boolean {
 	let sel = target.anchor === undefined ? '' : st.text.slice(Math.min(target.anchor, target.cursor), Math.max(target.anchor, target.cursor))
 	if (plain && !sel && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && keys.recall(e.key === 'ArrowUp' ? -1 : 1, target)) return true
 	if (k && editor.routed(k)) return keys.edit(k, target)
+	if (e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && st.menu) {
+		app.choose(st.menu.selected)
+		return true
+	}
 	let complete = e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && view.complete(st.view, st.text)
 	if (complete) {
+		st.completedByTab = st.text
 		connection.send(complete)
 		return true
 	}

@@ -101,6 +101,10 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Composer > * { max-width: 60rem; margin: 0 auto; }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.2rem 0; }
+.Composer .completions { max-height: min(35dvh, 20rem); overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--field); }
+.Composer .completions button { display: flex; flex-direction: column; width: 100%; min-height: 44px; padding: 0.4rem 0.7rem; text-align: left; border-radius: 0; background: transparent; color: var(--text); }
+.Composer .completions button:hover, .Composer .completions button[aria-selected="true"] { background: var(--button); }
+.Composer .completions span { color: var(--quiet); font-size: 0.85em; }
 .status .busy { color: var(--highlight); }
 .status .warning, .status .error { background: none; }
 .status .dot.busy { animation: pulse 1s steps(2) infinite; }

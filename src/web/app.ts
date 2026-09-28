@@ -20,6 +20,7 @@ import { placeholders } from '../common/placeholders.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import { recall } from '../common/recall.ts'
 import { uploads, type Settled } from '../common/uploads.ts'
+import { completions, type Menu } from './completions.ts'
 import { link } from './link.ts'
 import { router } from './router.ts'
 import { push } from './push.ts'
@@ -35,8 +36,7 @@ import { view, type ViewState } from './view.ts'
 // the page can keep what the reader was reading in place.
 // `target`: the block the address links to (target.ts), `found` once
 // its card is in the transcript, `shown` once scrolled to.
-export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true } }
-
+export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; completedByTab?: string; suppressed?: string }
 
 function createState(): AppState {
 	return { view: {}, text: '', tabs: [], asked: new Set(), older: new Map(), pages: 0 }
@@ -92,15 +92,26 @@ function onEvent(event: Event): void {
 	let landed = uploads.settle(event)
 	if (landed) app.settled(landed)
 	st.view = view.onEvent(st.view, event)
+	if (event.type === 'snapshot') { st.menu = undefined; st.completedByTab = undefined; st.suppressed = undefined }
 	if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
 	if (event.type === 'history' && backfill.onPage(st.older, event) && st.view.transcript?.meta.id === event.sessionId) {
 		st.view = { ...st.view, transcript: backfill.apply(st.older, st.view.transcript) }
 		st.pages++
 	}
-	let done = event.type === 'completions' && view.completed(st.view, event, st.text)
-	if (done) {
-		st.view = { ...st.view, notice: done.notice }
-		return app.input(done.text)
+	if (event.type === 'completions' && st.view.transcript?.meta.id === event.sessionId && st.text === event.text) {
+		if (st.completedByTab === event.text) {
+			st.completedByTab = undefined
+			if (event.items.length > 1) st.menu = completions.receive(event.text, event.items)
+			else {
+				let done = view.completed(st.view, event, st.text)
+				if (done) {
+					st.view = { ...st.view, notice: done.notice }
+					app.input(done.text)
+				}
+			}
+		} else if (st.suppressed !== event.text) st.menu = completions.receive(event.text, event.items)
+		app.changed()
+		return
 	}
 	let id = app.sessionId()
 	// A recalled entry stays in the box; the draft changes underneath.
@@ -156,12 +167,45 @@ function onState(state: LinkState): void {
 	app.setNotice(state.type === 'connected' ? undefined : state.type === 'joining' ? 'connecting…' : 'disconnected; reconnecting…')
 }
 
-// The message box now says `text`.
+// The message box now says `text`; stale replies may never reopen the menu.
 function input(text: string): void {
-	app.state.text = text
+	let st = app.state
+	let previous = st.text
+	st.text = text
+	if (text !== previous) {
+		st.menu = undefined
+		st.suppressed = undefined
+		st.completedByTab = undefined
+		let request = view.complete(st.view, text)
+		if (request && !text.includes('\n') && connection.connected()) connection.send(request)
+	}
 	let id = app.sessionId()
 	if (id && recall.typed(id, text)) drafts.edit(id, text)
 	app.changed()
+}
+
+function choose(index: number): void {
+	let item = app.state.menu?.choices[index]
+	if (!item) return
+	app.state.menu = undefined
+	app.rewrite(() => ({ text: item.value, cursor: item.value.length }))
+	app.state.suppressed = item.value
+	app.changed()
+}
+
+function menuKey(key: 'up' | 'down' | 'escape' | 'enter'): boolean {
+	let menu = app.state.menu
+	if (!menu) return false
+	if (key === 'enter') app.choose(menu.selected)
+	else if (key === 'escape') {
+		app.state.suppressed = app.state.text
+		app.state.menu = undefined
+		app.changed()
+	} else {
+		app.state.menu = completions.step(menu, key === 'up' ? -1 : 1)
+		app.changed()
+	}
+	return true
 }
 
 // Open question: a text field typed into, a field focused, an option
@@ -308,6 +352,8 @@ export const app = {
 	pending,
 	notice,
 	placeholder,
+	choose,
+	menuKey,
 	setView,
 	setNotice,
 	sendNow,

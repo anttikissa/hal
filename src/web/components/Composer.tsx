@@ -14,11 +14,12 @@
 import { createEffect, For } from 'solid-js'
 import { app } from '../app.ts'
 import { attach } from '../attach.ts'
+import type { Menu } from '../completions.ts'
 import { editor } from '../editor.ts'
 import { keys } from '../keys.ts'
 import { view, type ViewState } from '../view.ts'
 
-export function Composer(props: { view: ViewState; text: string; notice: string | undefined; placeholder: string | undefined; connected: boolean; dropping: boolean }) {
+export function Composer(props: { view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; connected: boolean; dropping: boolean }) {
 	let input!: HTMLTextAreaElement
 	let picker!: HTMLInputElement
 	// Text at the caret, replacing the selection, as if typed.
@@ -69,6 +70,15 @@ export function Composer(props: { view: ViewState; text: string; notice: string 
 				</span>{' '}
 				<span class={tone()}>{line().text}</span>
 			</div>
+			{props.menu && (
+				<div class="completions" role="listbox" aria-label="Completions">
+					<For each={props.menu.choices}>{(choice, index) => (
+						<button type="button" role="option" aria-selected={props.menu?.selected === index() ? 'true' : 'false'} onClick={() => { app.choose(index()); input.focus() }}>
+							<strong>{choice.label}</strong><span>{choice.description}</span>
+						</button>
+					)}</For>
+				</div>
+			)}
 			<div class={['entry input', { dropping: props.dropping }]}>
 				<textarea
 					ref={box}

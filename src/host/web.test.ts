@@ -552,6 +552,31 @@ function providerHome(): void {
 	writeFileSync(`${paths.sessionDir(id)}/session.ason`, ason.stringify({ id, cwd: '/tmp', model: 'anthropic/claude-opus-5-5', createdAt: new Date().toISOString() }) + '\n')
 }
 
+test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tapped', async () => {
+	providerHome()
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+		await b.waitFor(`!!document.querySelector('textarea')`)
+		for (let width of [390, 1280]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/c'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+			await b.waitFor(`document.querySelectorAll('.completions [role=option]').length > 1`)
+			let layout = await b.evaluate(`(() => { let r = document.querySelector('.completions').getBoundingClientRect(), box = document.querySelector('textarea').getBoundingClientRect(); return { left: r.left, right: r.right, bottom: r.bottom, boxTop: box.top, target: document.querySelector('.completions button').getBoundingClientRect().height, viewport: innerWidth } })()`)
+			expect(layout.left).toBeGreaterThanOrEqual(0)
+			expect(layout.right).toBeLessThanOrEqual(layout.viewport)
+			expect(layout.bottom).toBeLessThanOrEqual(layout.boxTop)
+			expect(layout.target).toBeGreaterThanOrEqual(44)
+			await b.evaluate(`document.querySelector('.completions button').click()`)
+			await b.waitFor(`!document.querySelector('.completions')`)
+			expect(await b.evaluate(`document.querySelector('textarea').value`)).toStartWith('/c')
+			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+		}
+	} finally { await b.close() }
+}, 15000)
+
 test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a reply', async () => {
 	providerHome()
 	turns.stream = () =>

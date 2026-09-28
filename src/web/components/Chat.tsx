@@ -21,7 +21,7 @@ import { Tabs } from './Tabs.tsx'
 import { StatusRow } from './StatusRow.tsx'
 import { Transcript } from './Transcript.tsx'
 
-const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration })
+const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, menu: app.state.menu, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration })
 type Snap = ReturnType<typeof snap>
 
 // A change to the transcript follows the bottom: a new prompt pending
@@ -97,7 +97,7 @@ export function Chat() {
 	// One memo per field, gated on its value, so a redraw reaches only
 	// what changed: typing touches the composer, never the transcript.
 	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
-	let [tabs, shown, view, text, notice, placeholder, connected, linked, pushReady] = [field('tabs'), field('shown'), field('view'), field('text'), field('notice'), field('placeholder'), field('connected'), field('target'), field('pushReady')]
+	let [tabs, shown, view, text, menu, notice, placeholder, connected, linked, pushReady] = [field('tabs'), field('shown'), field('view'), field('text'), field('menu'), field('notice'), field('placeholder'), field('connected'), field('target'), field('pushReady')]
 	let pending = createMemo(() => state().pending, { equals: same })
 	// Files are dragged over the page: the box shows it takes them.
 	let [dropping, setDropping] = createSignal(false)
@@ -149,7 +149,7 @@ export function Chat() {
 			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} />
 			<StatusRow view={view()} />
-			<Composer view={view()} text={text()} notice={notice()} placeholder={placeholder()} connected={connected()} dropping={dropping()} />
+			<Composer view={view()} text={text()} menu={menu()} notice={notice()} placeholder={placeholder()} connected={connected()} dropping={dropping()} />
 			<Picker modal={view().modal} />
 		</div>
 	)
