@@ -120,12 +120,12 @@ describe('automatic compaction (task mq)', () => {
 		let c = client()
 		let id = await fullRound(c, 850)
 		expect(calls[2]!.input.messages[0].blocks[0].text).toStartWith('Context was compacted')
-		expect(calls[2]!.input.messages.length).toBe(1)
+		expect(calls[2]!.input.messages.at(-1).blocks[0].text).toContain('p2')
 		let types = (await records(id)).map((r) => r.type)
 		let at = types.lastIndexOf('compact')
 		expect(types[at - 1]).toBe('user')
 		expect((await records(id))[at - 1]).toMatchObject({ blocks: [{ type: 'tool_result' }] })
-		expect(c.of('output').at(-1).text).toContain('85%')
+		expect(calls[2]!.input.messages[0].blocks[0].text).not.toContain('user: p2')
 		calls[2]!.push({ type: 'text', text: 'done' }, { type: 'usage', usage: { input: 100 } }, { type: 'done', reason: 'end' })
 		await until(() => c.of('turn-end').length === 2)
 		// The next turn starts from the small context: no second compact.
@@ -148,6 +148,27 @@ describe('automatic compaction (task mq)', () => {
 		calls[2]!.push({ type: 'done', reason: 'end' })
 	})
 
+	test('first-round compaction keeps the new prompt and image outside the summary, also after restart', async () => {
+		let c = client()
+		let id = created(c)
+		c.conn.send({ type: 'submit', sessionId: id, text: 'old context' })
+		await until(() => calls.length === 1)
+		calls[0]!.push({ type: 'usage', usage: { input: 900 } }, { type: 'done', reason: 'end' })
+		await until(() => c.of('turn-end').length === 1)
+		let png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from('IHDR-image')]).toString('base64')
+		c.conn.send({ type: 'attach', sessionId: id, mediaType: 'image/png', data: png, id: 'picture' })
+		let marker = c.of('attached').at(-1).marker
+		c.conn.send({ type: 'submit', sessionId: id, text: `new question ${marker}` })
+		await until(() => calls.length === 2)
+		let messages = calls[1]!.input.messages
+		expect(messages[0].blocks[0].text).toContain('old context')
+		expect(messages[0].blocks[0].text).not.toContain('new question')
+		expect(messages.at(-1).blocks).toMatchObject([{ type: 'text', text: expect.stringContaining('new question') }, { type: 'image', mediaType: 'image/png' }])
+		expect(messages.at(-1).blocks[1].blob).toBe(c.of('attached').at(-1).blob)
+		restartHost()
+		history.open(id)
+		expect(await history.messages(id)).toEqual(messages)
+	})
 	test('a prompt too long compacts and retries once, then the turn fails with the provider message', async () => {
 		let c = client()
 		let id = created(c)

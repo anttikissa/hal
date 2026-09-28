@@ -66,10 +66,9 @@ export type HistoryRecord = Numbered &
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
 	// told in front of its next prompt.
 	| { type: 'change'; cwd?: string; model?: string; ts: string }
-	// A context boundary (task bc): provider input is rebuilt from the
-	// records after the latest one alone, after `summary`, which stands
-	// in for everything before it; `prompts`: how many it summarises.
-	| { type: 'compact'; summary: string; prompts: number; ts: string }
+	// A context boundary: `keep` names this turn's prompts, replayed
+	// verbatim (including images) after the summary, not summarised into it.
+	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; ts: string }
 	// A fresh context (/clear, task vh): provider input is rebuilt from
 	// the records after it alone, with no summary.
 	| { type: 'reset'; ts: string }
@@ -94,7 +93,9 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	records = replay.current(records)
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	let boundary = records[at]
-	if (at >= 0) records = records.slice(at + 1)
+	let kept = boundary?.type === 'compact' ? new Set(boundary.keep ?? []) : new Set<number>()
+	let prompts = records.slice(0, at).filter((r) => r.type === 'user' && r.n !== undefined && kept.has(r.n))
+	if (at >= 0) records = [...prompts, ...records.slice(at + 1)]
 	let out: Message[] = boundary?.type === 'compact' ? [{ role: 'user', blocks: [{ type: 'text', text: boundary.summary }] }] : []
 	let pending: string[] = []
 	let status: TurnStatus | undefined

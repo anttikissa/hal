@@ -19,21 +19,23 @@ function anything(records: HistoryRecord[]): boolean {
 	return records.slice(at + 1).some((r) => r.type === 'user' || r.type === 'assistant')
 }
 
-function boundary(id: string, record: { type: 'compact'; summary: string; prompts: number } | { type: 'reset' }): HistoryRecord {
+function boundary(id: string, record: { type: 'compact'; summary: string; prompts: number; keep?: number[] } | { type: 'reset' }): HistoryRecord {
 	let r = history.append(id, record)
 	history.forget(id)
 	host.broadcast(id, { type: 'divider', sessionId: id, text: transcript.boundary(record), ...(r.n !== undefined && { n: r.n }) })
 	return r
 }
 
-// Compacts the session's context; how many prompts the summary covers,
-// or undefined when there is nothing to compact.
-function run(id: string): number | undefined {
+// Compacts earlier context. During a turn, its prompt records remain
+// outside the summary and are replayed after the boundary by number.
+function run(id: string, protect = false): number | undefined {
 	let records = history.readSync(id)
 	if (!compact.anything(records)) return undefined
-	let made = compaction.summary(records, history.file(id))
+	let start = records.findLastIndex((r) => r.type === 'turn_end') + 1
+	let keep = protect ? records.slice(start).filter((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text')).map((r) => r.n!) : []
+	let made = compaction.summary(records.filter((r) => !keep.includes(r.n!)), history.file(id))
 	if (!made) return undefined
-	compact.boundary(id, { type: 'compact', ...made })
+	compact.boundary(id, { type: 'compact', ...made, ...(keep.length && { keep }) })
 	return made.prompts
 }
 
@@ -70,7 +72,7 @@ function auto(id: string, model: string): void {
 	let window = models.contextWindow(model)
 	let context = compact.used(id)
 	if (!at || !window || !context || context < at * window) return
-	if (compact.run(id) === undefined) return
+	if (compact.run(id, true) === undefined) return
 	slash.output(id, `context ${Math.round((context / window) * 100)}% full (${context} of ${window} tokens): compacted`)
 }
 
@@ -89,7 +91,7 @@ function tooLong(e: ErrorEvent): boolean {
 function retry(id: string, e: ErrorEvent, tried: boolean): boolean {
 	if (e.cancelled || !compact.tooLong(e)) return false
 	delete e.failure
-	if (tried || compact.run(id) === undefined) return false
+	if (tried || compact.run(id, true) === undefined) return false
 	slash.output(id, 'the provider said the prompt is too long: compacted, trying again')
 	return true
 }
