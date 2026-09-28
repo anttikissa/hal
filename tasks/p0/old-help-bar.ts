@@ -1,0 +1,77 @@
+// Static context-sensitive help for the bottom help line.
+
+type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'idle-retry' | 'working' | 'working-text'
+
+type ContinueAction = 'continue' | 'retry'
+
+interface Hint {
+	keyLabel: string
+	description: string
+}
+
+interface HelpStyle {
+	key: string
+	description: string
+	separator: string
+}
+
+const config = {
+	rightKeyLabel: '/keys',
+	rightDescription: 'shortcuts',
+}
+
+const HINTS: Partial<Record<HelpState, Hint[]>> = {
+	'idle-text': [
+		{ keyLabel: 'enter', description: 'send' },
+		{ keyLabel: 'shift-enter', description: 'newline' },
+		{ keyLabel: 'alt-enter', description: 'queue' },
+	],
+	'idle-continue': [{ keyLabel: 'enter', description: 'continue' }],
+	'idle-retry': [{ keyLabel: 'enter', description: 'retry' }],
+	working: [{ keyLabel: 'esc', description: 'pause' }],
+	'working-text': [
+		{ keyLabel: 'enter', description: 'steer' },
+		{ keyLabel: 'alt-enter', description: 'queue' },
+		{ keyLabel: 'shift-enter', description: 'newline' },
+		{ keyLabel: 'esc', description: 'pause' },
+	],
+}
+
+function deriveState(working: boolean, hasText: boolean, continueAction: ContinueAction | false = false): HelpState {
+	if (hasText) {
+		if (working) return 'working-text'
+		return 'idle-text'
+	}
+	if (working) return 'working'
+	if (continueAction === 'retry') return 'idle-retry'
+	if (continueAction === 'continue') return 'idle-continue'
+	return 'idle-empty'
+}
+
+function formatHint(hint: Hint, style?: HelpStyle): string {
+	if (!style) return `${hint.keyLabel}: ${hint.description}`
+	return `${style.key}${hint.keyLabel}${style.description}: ${hint.description}`
+}
+
+function shortcutListHint(style?: HelpStyle): string {
+	return formatHint({ keyLabel: config.rightKeyLabel, description: config.rightDescription }, style)
+}
+
+function restoreTabHint(style?: HelpStyle): string {
+	return formatHint({ keyLabel: 'ctrl-shift-t', description: 'restore tab' }, style)
+}
+
+function build(working: boolean, hasText: boolean, continueAction: ContinueAction | false = false, style?: HelpStyle): string {
+	const state = deriveState(working, hasText, continueAction)
+	const separator = style ? `${style.separator}, ${style.description}` : ', '
+	return (HINTS[state] ?? []).map((hint) => formatHint(hint, style)).filter(Boolean).join(separator)
+}
+
+export const helpBar = {
+	config,
+	build,
+	shortcutListHint,
+	restoreTabHint,
+	deriveState,
+	HINTS,
+}
