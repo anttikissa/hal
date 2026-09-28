@@ -41,6 +41,7 @@ function context(id: string): Context {
 		model: meta.model,
 		setCwd: (cwd) => slash.change(id, { cwd }),
 		setModel: (model) => slash.change(id, { model }),
+		setName: (name) => slash.name(id, name),
 		say: (text) => slash.output(id, text),
 	}
 }
@@ -60,6 +61,15 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 	host.broadcast(id, changed.model === undefined ? { type: 'meta', sessionId: id, meta: { ...meta } } : { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
 }
 
+// Session names change tab labels but not the model's working context.
+function name(id: string, value?: string): void {
+	let meta = sessions.open(id)
+	if (meta.name === value) return
+	if (value === undefined) delete meta.name
+	else meta.name = value
+	liveFiles.save(meta)
+	host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta } })
+}
 // Runs command `name` (again, with `answers`, once its question is
 // answered) and records what it said. A command asks only when no turn
 // is busy and no other question is open.
@@ -114,6 +124,7 @@ export const slash = {
 	command,
 	context,
 	change,
+	name,
 	runCommand,
 	models,
 	output,

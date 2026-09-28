@@ -24,7 +24,7 @@ export type Reply = { say?: string; show?: string; error?: string; ask?: Form; o
 // The session the command runs in.
 // setCwd and setModel also tell the model, on its next prompt; say
 // records output while the command still runs (a login that waits).
-export type Context = { sessionId: string; cwd: string; model: string; setCwd(cwd: string): void; setModel(model: string): void; say(text: string): void }
+export type Context = { sessionId: string; cwd: string; model: string; setCwd(cwd: string): void; setModel(model: string): void; setName?(name?: string): void; say(text: string): void }
 
 export type SlashCommand = {
 	// The detail /help <name> shows; `args` follow the name.

@@ -28,6 +28,7 @@ const list: CommandInfo[] = [
 	// these three `key`s changes only what /keys shows, not the keys.
 	{ name: 'quit', description: 'quit', category: 'app', key: 'ctrl-c', clientOnly: true },
 	{ name: 'redraw', description: 'redraw', category: 'app', key: 'ctrl-l', clientOnly: true },
+	{ name: 'rename', description: 'name or clear the session name', category: 'session' },
 	{ name: 'restart', description: 'restart', category: 'app', key: 'ctrl-r', clientOnly: true },
 	{ name: 'resume', description: 'reopen the last closed tab', category: 'tabs', key: 'shift-ctrl-t', clientOnly: true },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
