@@ -1,0 +1,6 @@
+{
+	title: 'ask tool: real models ask the user with a form',
+	spec: 'Real models get an `ask` tool that asks the user a durable question with the same forms synthetic models and commands use (tasks/w4/forms.md): input text (the question) and optional fields (text, choice with options, confirm; no secret fields for models). The turn parks on the question like approval does (a restart keeps it; the tab shows the question and gets attention); the answer returns as the tool result in plain text ("name: Dave"); Escape on it cancels the question and the tool result says the user declined, without pausing the turn. The tool description tells the model to use it only when a choice truly needs the user, and never for things it can find out itself. Tests: a fake provider calls ask, the answer arrives as the result; a restart while parked keeps the question; cancelling gives a declined result; secret fields are refused.',
+	status: 'planned',
+	needs: ['w4']
+}
