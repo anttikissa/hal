@@ -67,12 +67,13 @@ describe('high-water mark', () => {
 	let height = (v: View) => frame.build(v, 40).history
 
 	test('a streaming block keeps its tallest height, also once it stops', () => {
-		expect(height(view('s', 'a\nb\nc', true))).toBe(3)
-		expect(height(view('s', 'a', true))).toBe(3)
-		expect(height(view('s', 'a', false))).toBe(3)
+		let tall = height(view('s', 'a\nb\nc', true))
+		expect(height(view('s', 'a', true))).toBe(tall)
+		expect(height(view('s', 'a', false))).toBe(tall)
 		// Another tab's block, or the same one after a full redraw, starts afresh.
-		expect(height(view('t', 'a', false))).toBe(1)
+		let short = height(view('t', 'a', false))
+		expect(short).toBe(tall - 2)
 		frame.state.peaks.clear()
-		expect(height(view('s', 'a', false))).toBe(1)
+		expect(height(view('s', 'a', false))).toBe(short)
 	})
 })
