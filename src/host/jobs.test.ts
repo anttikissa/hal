@@ -106,6 +106,34 @@ test('after a restart the session hears the command was lost, and it no longer r
 	expect(sessions.open(id).background).toBeUndefined()
 })
 
+test('a background command times out by default; a longer per-command timeout overrides it', async () => {
+	let original = jobs.backgroundMs
+	jobs.backgroundMs = () => 170
+	try {
+		let c = client()
+		let { id, job } = await started(c, 'sleep 5; echo never')
+		calls[1]!.push({ type: 'done', reason: 'end' })
+		await slow(() => c.views.get(id)?.inbox.some((m) => m.label === `bash ${job}`) || calls.length === 3)
+		let delivered = c.views.get(id)!.inbox.find((m) => m.label === `bash ${job}`)?.text ?? texts(2)
+		expect(delivered).toContain('timed out after 0.17s')
+		expect(delivered).not.toContain('never\n')
+		expect(jobs.running(id)).toEqual([])
+
+		let other = client()
+		let target = toolSession(other)
+		other.conn.send({ type: 'submit', sessionId: target, text: 'go' })
+		await slow(() => calls.length >= 4)
+		calls[3]!.push({ type: 'tool_call', id: 'long', name: 'bash', input: { command: 'sleep 0.3; echo finished', description: 'Run longer', background: true, timeout: 1000 } }, { type: 'done', reason: 'tool_use' })
+		await slow(() => calls.length >= 5)
+		let startedResult = resultOf(4).output
+		expect(startedResult).toContain('started in background')
+		await slow(() => other.views.get(target)?.inbox.some((m) => m.text.includes('finished')) || calls.length >= 6)
+		expect(other.views.get(target)!.inbox.some((m) => m.text.includes('timed out'))).toBe(false)
+	} finally {
+		jobs.backgroundMs = original
+	}
+})
+
 test('an endless command keeps only both ends of its output in memory, counting the rest', async () => {
 	let keep = jobs.keepChars
 	jobs.keepChars = () => 1000

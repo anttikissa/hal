@@ -19,7 +19,7 @@ export const tool: Tool = {
 				type: 'string',
 				description: 'One short plain-language sentence for the user: what the command does and why, e.g. "Show the first 40 lines of the config"',
 			},
-			timeout: { type: 'integer', description: 'Timeout in ms (default: 120000; none in the background)' },
+			timeout: { type: 'integer', description: 'Timeout in ms (default: 120000 foreground, 600000 background)' },
 			background: { type: 'boolean', description: 'Run in the background, e.g. a long build or a server' },
 		},
 		required: ['command', 'description'],
@@ -30,8 +30,8 @@ export const tool: Tool = {
 		if (input.background !== undefined && typeof input.background !== 'boolean') throw new Error('background must be a boolean; the command did not run')
 		if (ctx.signal.aborted) throw new Error('cancelled; the command did not run')
 		let given = Number(input.timeout) > 0 ? Number(input.timeout) : undefined
-		// In the background only a given timeout applies, and Escape does not stop it.
-		if (input.background) return jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId)
+		// Escape does not stop a background job, but its timer always does.
+		if (input.background) return jobs.start(ctx.sessionId, input.command, ctx.cwd, given ?? jobs.backgroundMs(), ctx.callId)
 		let run = jobs.exec(input.command, ctx.cwd, given ?? 120_000, ctx.onOutput)
 		ctx.signal.addEventListener('abort', run.stop, { once: true })
 		try {

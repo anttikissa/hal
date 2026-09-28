@@ -16,6 +16,7 @@
 		"Background calls get no default timeout (only an explicit one) and ignore the turn's abort signal, including during the 100 ms grace wait.",
 		"Running ids are kept in session.ason `background` (validated as a list of strings). host.init's exit handler (and host.reset) calls jobs.killAll without clearing it, so main.becomeHost's jobs.lost() finds the ids of open tabs and busy sessions and sends 'bash #<call block id> was lost when Hal restarted'. Tab close (tabs.close) kills silently and clears it; closing a tab never stopped foreground turns, so this is the only kill on close.",
 		"subagents.finished does not close a subagent's tab while it has background commands, since closing would kill them.",
-		'The note saying closing a tab kills only background commands was superseded by task 8v: tab close pauses the foreground turn and owned subagent turns too.'
+		'The note saying closing a tab kills only background commands was superseded by task 8v: tab close pauses the foreground turn and owned subagent turns too.',
+		'Task rn replaces the no-default-timeout behavior: background Bash now defaults to ten minutes, while a model may give a longer timeout.'
 	]
 }

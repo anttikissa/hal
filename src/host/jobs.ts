@@ -170,6 +170,8 @@ export const jobs = {
 	state: { running: new Map<string, Job>() },
 	// How long a background call waits for a command that fails at once.
 	graceMs: () => 100,
+	// Background jobs must not run unseen indefinitely; callers may override it.
+	backgroundMs: () => 600_000,
 	// The most output one command keeps in memory (both ends past it).
 	keepChars: () => 32_000_000,
 	exec,
