@@ -147,7 +147,9 @@ function transcript(items: Item[]): Transcript {
 // n question/answer pairs.
 function items(n: number, from = 0): Item[] {
 	let out: Item[] = []
-	for (let i = from; i < from + n; i++) out.push({ type: 'prompt', text: `q${i}` }, { type: 'text', text: `a${i}` })
+	// Items of two rows each, without headers (task hp): a command and
+	// its output.
+	for (let i = from; i < from + n; i++) out.push({ type: 'command', text: `q${i}` }, { type: 'output', text: `a${i}` })
 	return out
 }
 
@@ -190,7 +192,7 @@ describe('grow mode', () => {
 	})
 
 	test('updates in place while the frame fits: streaming, a longer and a shorter prompt', () => {
-		setup(16, 30, ['$ hal'])
+		setup(20, 30, ['$ hal'])
 		show(items(1))
 		for (let text of ['He', 'Hello', 'Hello, world, how are you doing today']) {
 			show([...items(1), { type: 'prompt', text: 'q1' }, { type: 'text', text }])
@@ -242,7 +244,7 @@ describe('full mode', () => {
 		setup(8, 30, ['$ hal'])
 		show(items(10))
 		let list = items(10)
-		list[0] = { type: 'prompt', text: 'q0 edited' }
+		list[0] = { type: 'command', text: 'q0 edited' }
 		show(list)
 		expect(term.content()).toEqual(frameText())
 		expect(frameText()).toContain(' > q0 edited')

@@ -132,7 +132,12 @@ export const stamped = (text: string) => expect.stringMatching(new RegExp(`^\\[[
 
 // Items as shown, without their keys (task w5), for comparing with
 // literals; a live transcript and a fresh one compare keys too.
-export const shown = (items: Item[] | undefined) => items?.map(({ key: _key, ...s }) => s)
+// Items without key and header facts (time, model, effort: task hp),
+// which tests of what happened need not repeat.
+export const shown = (items: Item[] | undefined) => items?.map(({ key: _key, ...s }) => {
+	let { ts: _ts, model: _model, effort: _effort, ...rest } = s as typeof s & { ts?: string; model?: string; effort?: string }
+	return rest
+})
 
 export const records = async (id: string) => (await history.read(id)).map(({ ts: _ts, n: _n, ...r }) => r)
 

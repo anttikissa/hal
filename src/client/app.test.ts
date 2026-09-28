@@ -262,7 +262,7 @@ test('replayed history carries no mark: it reads like one followed live', () => 
 	app.reset()
 	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, history: [], state: { type: 'idle' } } })
 	for (let e of [
-		{ type: 'turn-start', sessionId: 's1', prompt: 'old question', provider: 'anthropic' },
+		{ type: 'turn-start', sessionId: 's1', prompt: 'old question', provider: 'anthropic', ts: '2026-09-26T00:50:00Z' },
 		{ type: 'turn-end', sessionId: 's1', status: 'error', error: 'overloaded' },
 		{ type: 'turn-start', sessionId: 's1', prompt: 'new question', provider: 'anthropic' },
 	] as Event[])

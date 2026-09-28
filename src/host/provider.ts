@@ -50,6 +50,9 @@ export type Provider = {
 	// Input tokens `model` takes here, when the account caps it below
 	// what models.dev says (a ChatGPT subscription).
 	contextWindow?(model: string): number | undefined
+	// The reasoning effort a request for `model` sets, if it sets one:
+	// block headers show it (task hp).
+	effort?(model: string): string | undefined
 }
 
 class Cancelled extends Error {}

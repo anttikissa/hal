@@ -30,7 +30,9 @@ export type { TurnStatus } from './replay.ts'
 // followed by the turn end match what a later snapshot shows. `ns`: each
 // block's record number (HistoryRecord `n`), given when it started
 // streaming and kept by its record.
-export type LiveTurn = { provider: string; blocks: AssistantBlock[]; usage: Usage; ns?: number[] }
+// `model`, `effort`: what writes the turn; `ts`: when each block
+// started (task hp).
+export type LiveTurn = { provider: string; model?: string; effort?: string; blocks: AssistantBlock[]; usage: Usage; ns?: number[]; ts?: string[] }
 
 // Text typed into a session but not sent yet, one per session, shared
 // by every client (tasks/j1/states.md, Drafts and sending). `rev` counts
@@ -169,7 +171,7 @@ export type Event =
 	// prompt, if not the human. `command`: the client's id for the submit
 	// that sent the prompt, so it can put the prompt in place of the one
 	// it shows pending.
-	| { type: 'turn-start'; sessionId: string; prompt?: string; images?: ImageBlock[]; sender?: Sender; provider: string; n?: number; command?: string }
+	| { type: 'turn-start'; sessionId: string; prompt?: string; images?: ImageBlock[]; sender?: Sender; provider: string; model?: string; effort?: string; n?: number; command?: string; ts?: string }
 	// A page of earlier history, answering the `history` command for
 	// `before`: whole records ending there, oldest first. `older`: where
 	// they start, when there are more before them.
@@ -183,8 +185,9 @@ export type Event =
 	// that takes the place of the last prompt and everything after it.
 	// `senders`: who sent each text ({} the human), when not all the human.
 	// `command`: as in turn-start, for the last text.
-	| { type: 'prompt'; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; replaces?: true; n?: number; command?: string }
-	| { type: 'stream'; sessionId: string; event: LiveStreamEvent; n?: number }
+	| { type: 'prompt'; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; replaces?: true; n?: number; command?: string; ts?: string }
+	// `ts`: when the block it streams into started (task hp).
+	| { type: 'stream'; sessionId: string; event: LiveStreamEvent; n?: number; ts?: string }
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
 	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[]; n?: number }
@@ -278,12 +281,12 @@ function invalid(value: unknown): string | undefined {
 // ? for optional. Nested fields are named with a dot.
 const eventFields: Record<EventType, Record<string, string>> = {
 	snapshot: { sessionId: 's', snapshot: 'o', 'snapshot.meta': 'o', 'snapshot.history': 'a', 'snapshot.state': 'o', 'snapshot.stats': 'o?' },
-	'turn-start': { sessionId: 's', provider: 's', prompt: 's?', images: 'a?', command: 's?' },
+	'turn-start': { sessionId: 's', provider: 's', model: 's?', effort: 's?', prompt: 's?', images: 'a?', command: 's?', ts: 's?' },
 	history: { sessionId: 's', before: 'i', records: 'a', older: 'i?' },
 	state: { sessionId: 's', state: 'o', 'state.type': 's' },
 	inbox: { sessionId: 's', inbox: 'a' },
-	prompt: { sessionId: 's', texts: 'S', senders: 'a?', images: 'a?', command: 's?' },
-	stream: { sessionId: 's', event: 'o', 'event.type': 's' },
+	prompt: { sessionId: 's', texts: 'S', senders: 'a?', images: 'a?', command: 's?', ts: 's?' },
+	stream: { sessionId: 's', event: 'o', 'event.type': 's', ts: 's?' },
 	'tool-results': { sessionId: 's', results: 'a' },
 	'turn-end': { sessionId: 's', status: 's', usage: 'o?', error: 's?', stats: 'o?' },
 	question: { sessionId: 's', id: 's', form: 'o' },

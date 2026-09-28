@@ -5,6 +5,7 @@ import { attachments } from '../common/attachments.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { forms, type Quote } from '../common/forms.ts'
 import { strings } from '../common/strings.ts'
+import { titles } from '../common/titles.ts'
 import { transcript, type Item as Keyed, type Shown as Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { promptView } from './prompt-view.ts'
@@ -42,21 +43,27 @@ function itemStyle(item: Item): Style | undefined {
 	}
 }
 
+// A prompt, model text or thinking as the old Hal drew it (task hp):
+// its header ('10:52 Hal (Opus 5.5)'), clipped, a blank row, the body.
+function headed(item: Item, body: string[], width: number): string[] {
+	return [strings.clipVisual(ansi.clean(titles.title(item) ?? ''), width), '', ...body]
+}
+
 // Rows for one item at `width` columns, without the side padding.
 function itemLines(item: Item, width: number): string[] {
 	let promptWidth = width - promptView.FIRST.length
 	switch (item.type) {
-		case 'prompt': {
-			let text = item.from === undefined ? item.text : `${item.text}\n(sent from ${item.label ?? item.from})`
-			return promptView.mark(ansi.wrap(text, promptWidth).map(ansi.links))
-		}
+		// A prompt card ends with a row of its background, as it starts
+		// with its header.
+		case 'prompt':
+			return [...itemView.headed(item, ansi.wrap(item.text, width).map(ansi.links), width), '']
 		case 'image':
-			return [promptView.REST + attachments.label(item)]
+			return [attachments.label(item)]
 		// Trailing blank lines the model streamed are not drawn: the one
 		// blank row between items (frame.build) is the only gap.
 		case 'text':
 		case 'thinking':
-			return ansi.wrap(item.text.trimEnd(), width)
+			return itemView.headed(item, ansi.wrap(item.text.trimEnd(), width), width)
 		case 'tool': {
 			let { command, description } = item.input
 			// A described command: the sentence first, the command dimmed beside it.
@@ -131,6 +138,7 @@ export const itemView = {
 	toolStyle,
 	itemStyle,
 	itemLines,
+	headed,
 	ref,
 	quoteLines,
 }

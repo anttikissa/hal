@@ -16,6 +16,7 @@
 // (host tools cap what they keep), so nothing is fetched.
 
 import { createEffect, createMemo, createSignal, flush, onSettled, Show } from 'solid-js'
+import { titles } from '../../common/titles.ts'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
@@ -80,9 +81,13 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	)
 	let folds = () => props.row.item.type === 'thinking' || props.row.item.type === 'tool'
 	// A tool's first line (its description or call) heads the card;
-	// thinking is headed by its first line.
+	// thinking is headed by the terminal's header words and its first
+	// line. Prompts and model text show those words above their text
+	// (task hp).
+	// A pending row has none: it may yet turn out a command.
+	let title = () => titles.title(props.row.item)
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
-	let head = () => (props.row.item.type === 'thinking' ? `thinking: ${lines()[0]}` : lines()[0])
+	let head = () => (props.row.item.type === 'thinking' ? `${title()}: ${lines()[0]}` : lines()[0])
 	let body = () => {
 		let rest = props.row.item.type === 'thinking' ? lines() : lines().slice(1).map((l) => l.replace(/^ {2}/, ''))
 		return [...rest, ...(result() ? [result()!.text] : [])].join('\n')
@@ -119,6 +124,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let plain = (s: () => { kind: string; text: string }) => (
 		<div ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.target ? 'target' : '']}>
 			{link()}
+			<Show when={!props.row.pending && title()}>{(t) => <div class="who">{t()}</div>}</Show>
 			<Show when={props.row.item.type === 'image' && props.row.item} fallback={parts()}>
 				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
 			</Show>

@@ -6,6 +6,7 @@ import type { StreamEvent } from '../common/blocks.ts'
 import { replay } from '../common/replay.ts'
 import { states } from '../common/states.ts'
 import type { Shown as Item } from '../common/transcript.ts'
+import { titles } from '../common/titles.ts'
 import { history } from './history.ts'
 import { calls, client, created, fakeStream, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
 import { host } from './host.ts'
@@ -13,6 +14,28 @@ import { tools } from './tools.ts'
 import { turns } from './turns.ts'
 
 useHost()
+
+// Task hp: a block's header is right from its first streamed byte:
+// what a client shows mid-stream is what the saved record replays.
+test('a streaming block has its final header from the first event on', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'thinking', text: 'h' })
+	await until(() => a.views.get(id)!.items.some((i) => i.type === 'thinking'))
+	let heads = () => a.views.get(id)!.items.filter((i) => i.type !== 'turn-end').map((i) => titles.title(i))
+	let early = heads()
+	await new Promise((r) => setTimeout(r, 5))
+	calls[0]!.push({ type: 'thinking', text: 'mm' }, { type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length)
+	let saved = (await fresh(id)).items.filter((i) => i.type !== 'turn-end').map((i) => titles.title(i))
+	expect(early[1]).toMatch(/^\d\d:\d\d Hal \(m1, thinking\)$/)
+	expect(saved.slice(0, 2)).toEqual(early)
+	expect(heads()).toEqual(saved)
+	expect(saved[2]).toMatch(/Hal \(m1\)$/)
+	expect((await history.read(id)).filter((r) => r.type === 'assistant').map((r) => (r as { model?: string }).model)).toEqual(['fake/m1', 'fake/m1'])
+})
 
 test('a completed turn reaches every follower and is durable before turn-end', async () => {
 	let a = client()

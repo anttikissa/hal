@@ -181,6 +181,7 @@ function promptEvent(id: string, record: HistoryRecord & { type: 'user' }): Even
 	if (record.replaces) event.replaces = true
 	if (record.n !== undefined) event.n = record.n
 	if (record.command !== undefined) event.command = record.command
+	event.ts = record.ts
 	return event
 }
 

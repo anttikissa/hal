@@ -25,6 +25,8 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card { padding: 0.4rem 0.7rem; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); white-space: pre-wrap; overflow-wrap: anywhere; }
 .Card.user::before { content: "> "; }
 .Card.image::before { content: none; }
+.Card.prompt::before { content: none; }
+.Card .who { opacity: 0.7; margin-bottom: 0.4rem; }
 .Card.image img { display: block; max-width: 100%; max-height: 24rem; }
 .Card.pending { opacity: 0.6; }
 .Card.pending::after { content: "\A sending…"; font-size: 0.85em; }

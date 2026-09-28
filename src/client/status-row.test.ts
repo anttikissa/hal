@@ -55,10 +55,6 @@ test('one subscription account shows no index; no usage, no tokens part', () => 
 	expect(row.endsWith('host · Sub: 5h 3%')).toBe(true)
 })
 
-test('model names: Claude ids read as family and version, others as their id', () => {
-	expect(['anthropic/claude-opus-5-5', 'anthropic/claude-sonnet-4-5-20250929', 'anthropic/claude-opus-4-20250514', 'openai/gpt-5.5'].map(statusRow.modelName)).toEqual(['Opus 5.5', 'Sonnet 4.5', 'Opus 4', 'gpt-5.5'])
-})
-
 test('the painted row fits the terminal and ends its colour', () => {
 	let row = statusRow.row(info, 60)
 	expect(strings.visLen(row)).toBeLessThanOrEqual(60)

@@ -529,7 +529,7 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 			`(() => { let t = document.querySelector('textarea'); t.value = 'hi'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`,
 		)
 		await b.waitFor(`document.querySelector('main').innerText.includes('hello from fake')`)
-		expect(await b.evaluate(`document.querySelector('.user').textContent`)).toBe('hi')
+		expect(await b.evaluate(`document.querySelector('.user').textContent`)).toMatch(/^\d\d:\d\d Youhi$/)
 		// The reply wears the theme's assistant colour.
 		expect(await b.evaluate(`getComputedStyle(document.querySelector('.assistant')).color`)).toBe(
 			`rgb(${oklch.toRgb(colors.assistant().fg!).join(', ')})`,
@@ -679,7 +679,8 @@ test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay
 			let t = document.querySelector('textarea'); t.value = 'fresh'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
 			let card = document.querySelector('.Card.pending')
 			for (let i = 0; i < 250 && (card?.classList.contains('pending') || !document.querySelector('main').innerText.includes('ok')); i++) await new Promise((r) => setTimeout(r, 20))
-			return { same: !!card && card.isConnected && !card.classList.contains('pending'), text: card?.textContent, count: [...document.querySelectorAll('.Card.user')].filter((c) => c.textContent === 'fresh').length }
+			let body = (c) => c?.textContent.replace(c.querySelector('.who')?.textContent ?? '', '')
+			return { same: !!card && card.isConnected && !card.classList.contains('pending'), text: body(card), count: [...document.querySelectorAll('.Card.user')].filter((c) => body(c) === 'fresh').length }
 		})()`)
 		expect(swapped).toEqual({ same: true, text: 'fresh', count: 1 })
 	} finally {

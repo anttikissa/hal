@@ -46,7 +46,7 @@ test('shows every item, however long the history', () => {
 	let items: Item[] = []
 	for (let i = 0; i < 300; i++) items.push({ type: 'prompt', text: `question ${i}` }, { type: 'text', text: `answer ${i}` })
 	let lines = plain(frame.build(view(items), 40).lines)
-	expect(lines).toContain('> question 0')
+	expect(lines).toContain('question 0')
 	expect(lines).toContain('answer 0')
 	expect(lines).toContain('answer 299')
 	expect(lines.filter((l) => l.startsWith('answer')).length).toBe(300)
@@ -66,7 +66,7 @@ test('the same items drawn again follow a new width and colour', () => {
 	let v = view([{ type: 'text', text: 'one two three four five six' }])
 	let wide = frame.build(v, 40).lines
 	expect(frame.build(v, 40).lines).toEqual(wide)
-	expect(plain(frame.build(v, 12).lines).slice(0, 3)).toEqual(['one two', 'three four', 'five six'])
+	expect(plain(frame.build(v, 12).lines).slice(0, 5)).toEqual(['Hal', '', 'one two', 'three four', 'five six'])
 	let saved = colors.assistant
 	try {
 		colors.assistant = () => ({ fg: [0.5, 0.1, 30] })
@@ -335,7 +335,7 @@ test('an [image/<name>] marker is a link to the image, in the transcript and the
 	let rows = f.lines.filter((l) => l.includes('[image/abc123.png]'))
 	expect(rows).toHaveLength(2)
 	for (let row of rows) expect(row).toContain(link)
-	expect(plain(rows)).toEqual(['> see [image/abc123.png] ok', '> and [image/abc123.png]'])
+	expect(plain(rows)).toEqual(['see [image/abc123.png] ok', '> and [image/abc123.png]'])
 	// A forged name is not linked.
 	expect(frame.build(view([{ type: 'prompt', text: '[image/../x.png]' }]), 60).lines.join('')).not.toMatch(/\x1b\]8;;[^\x07]*x\.png/)
 })
@@ -375,7 +375,9 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		let stream = view([{ type: 'text', text: 'Hel' }])
 		stream.transcript!.items[0]!.key = '9'
 		stream.hal = { at: 'stream', lit: true, color: colors.assistant().fg! }
-		expect(plain(frame.build(stream, 60).lines)[0]).toMatch(/^Hel█ +#9$/)
+		let streamed = plain(frame.build(stream, 60).lines)
+		expect(streamed[0]).toMatch(/^Hal +#9$/)
+		expect(streamed[2]).toBe('Hel█')
 		// A block still streaming before it has a number is not linked.
 		let streaming = view([{ type: 'tool', id: 't2', name: 'bash', input: {} }])
 		streaming.transcript!.items[0]!.key = '~0'
@@ -402,3 +404,35 @@ test('a [paste/<name>] marker links to its page; while its upload is in flight i
 	}
 })
 
+
+test('prompts, text and thinking have a header row, a blank row and the body; a prompt card ends with a row of its colour', () => {
+	let ts = new Date(2026, 8, 28, 10, 49).toISOString()
+	let items: Item[] = [
+		{ type: 'prompt', text: 'Can you?', ts },
+		{ type: 'thinking', text: 'Hmm.', model: 'anthropic/claude-opus-5-5', effort: 'high', ts },
+		{ type: 'text', text: 'Yes.', model: 'anthropic/claude-opus-5-5', ts },
+		{ type: 'prompt', text: 'Done.', from: '4-abc', label: 'tab 4: Review', ts },
+		{ type: 'command', text: '/help' },
+	]
+	let f = frame.build(view(items), 60)
+	let lines = plain(f.lines)
+	let at = (s: string) => lines.indexOf(s)
+	expect(lines.slice(at('10:49 You'), at('10:49 You') + 4)).toEqual(['10:49 You', '', 'Can you?', ''])
+	expect(lines.slice(at('10:49 Hal (Opus 5.5, thinking high)'), at('10:49 Hal (Opus 5.5, thinking high)') + 3)).toEqual(['10:49 Hal (Opus 5.5, thinking high)', '', 'Hmm.'])
+	expect(lines.slice(at('10:49 Hal (Opus 5.5)'), at('10:49 Hal (Opus 5.5)') + 3)).toEqual(['10:49 Hal (Opus 5.5)', '', 'Yes.'])
+	expect(lines).toContain('10:49 Message from tab 4: Review')
+	expect(lines).toContain('> /help')
+	// The prompt's background paints its blank rows too: the whole card.
+	let bg = `48;2;${oklch.toRgb(colors.user().bg!).join(';')}`
+	for (let i = at('10:49 You'); i < at('10:49 You') + 4; i++) expect(f.lines[i]).toContain(bg)
+})
+
+test('a narrow terminal clips the header and keeps the block id', () => {
+	let item: Item = { type: 'thinking', text: 'x', model: 'anthropic/claude-opus-5-5', effort: 'high', ts: new Date(2026, 8, 28, 10, 51).toISOString() }
+	let v = view([item])
+	v.transcript!.items[0]!.key = '35'
+	let lines = plain(frame.build(v, 24).lines)
+	expect(lines[0]).toMatch(/^10:51 Hal \(Opus 5.* #35$/)
+	expect(lines[0]).not.toContain('high')
+	expect(strings.visLen(frame.build(v, 24).lines[0]!)).toBeLessThanOrEqual(24)
+})

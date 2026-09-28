@@ -237,7 +237,8 @@ function oneLine(s: string): string {
 function show(item: ItemShown, full = false): Shown {
 	switch (item.type) {
 		case 'prompt':
-			return { kind: 'user', text: item.from === undefined ? item.text : `${item.text}\n(sent from ${item.label ?? item.from})` }
+			// Who sent it is in the card's head (task hp).
+			return { kind: 'user prompt', text: item.text }
 		case 'image':
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }

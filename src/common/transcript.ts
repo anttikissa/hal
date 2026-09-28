@@ -16,12 +16,14 @@ import type { SessionState } from './states.ts'
 // An item as shown; Item adds its key.
 export type Shown =
 	// `from`: the session that sent it, `label` naming it; without it,
-	// the human.
-	| { type: 'prompt'; text: string; from?: string; label?: string }
+	// the human. `ts`: when it was sent (task hp).
+	| { type: 'prompt'; text: string; from?: string; label?: string; ts?: string }
 	// An image attached to the prompt before it (task 2a).
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number }
-	| { type: 'text'; text: string }
-	| { type: 'thinking'; text: string }
+	// `ts`: when the block started; `model`, `effort`: what wrote it
+	// (task hp). Records from before hp have none of them.
+	| { type: 'text'; text: string; ts?: string; model?: string; effort?: string }
+	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
 	| { type: 'tool'; id: string; name: string; input: Record<string, unknown> }
 	| { type: 'tool-result'; id: string; output: string; isError?: boolean }
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string }
@@ -63,22 +65,37 @@ export type Transcript = {
 
 // Display items for assistant blocks. Empty thinking (a bare signature,
 // redacted reasoning) shows nothing.
-// `ns`: the blocks' record numbers; `at`: where the items will go.
-function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number): Item[] {
+// `ns`: the blocks' record numbers; `at`: where the items will go;
+// `by`: the model and effort that wrote them and when each started.
+function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number, by: By = {}): Item[] {
 	let out: Item[] = []
 	for (let [i, b] of list.entries()) {
 		let key = transcript.key(ns?.[i], 0, at + out.length)
 		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, key })
-		else if (b.text) out.push({ type: b.type, text: b.text, key })
+		else if (b.text) {
+			let item: Item & { type: 'text' | 'thinking' } = { type: b.type, text: b.text, key }
+			if (by.ts?.[i] !== undefined) item.ts = by.ts[i]
+			if (by.model !== undefined) item.model = by.model
+			if (by.effort !== undefined) item.effort = by.effort
+			out.push(item)
+		}
 	}
 	return out
 }
 
+type By = { model?: string; effort?: string; ts?: string[] }
+
+// A live turn's blocks as items going at `at`.
+function turnItems(turn: LiveTurn, at: number): Item[] {
+	return transcript.blockItems(turn.blocks, turn.ns, at, turn)
+}
+
 // A prompt text as shown, saying who sent it if not the human.
-function promptItem(text: string, s?: Sender): Shown {
+function promptItem(text: string, s?: Sender, ts?: string): Shown {
 	let item: Shown = { type: 'prompt', text }
 	if (s?.from !== undefined) item.from = s.from
 	if (s?.label !== undefined) item.label = s.label
+	if (ts !== undefined) item.ts = ts
 	return item
 }
 
@@ -112,7 +129,7 @@ function resultItem(b: ToolResultBlock): Shown {
 
 // Display items for one history record, going at `at`.
 function recordItems(r: HistoryRecord, at: number): Item[] {
-	if (r.type === 'assistant') return transcript.blockItems([r.block], r.n === undefined ? undefined : [r.n], at)
+	if (r.type === 'assistant') return transcript.blockItems([r.block], r.n === undefined ? undefined : [r.n], at, { model: r.model, effort: r.effort, ts: [r.ts] })
 	return transcript.keyed(transcript.recordShown(r), r.n, at)
 }
 
@@ -120,7 +137,7 @@ function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'continue' || r.type === 'blocked' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
 	if (r.type === 'question') return [{ type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
-	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
+	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b, r.ts) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
 
@@ -182,7 +199,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	if (snapshot.turn) {
 		let turn = transcript.copyTurn(snapshot.turn)
 		t.live = { start: items.length, turn }
-		t.items = [...items, ...transcript.blockItems(turn.blocks, turn.ns, items.length)]
+		t.items = [...items, ...transcript.turnItems(turn, items.length)]
 	}
 	return t
 }
@@ -222,9 +239,18 @@ function copyTurn(turn: LiveTurn): LiveTurn {
 	let list = turn.blocks.slice()
 	let last = list.at(-1)
 	if (last) list[list.length - 1] = { ...last }
-	let copy: LiveTurn = { provider: turn.provider, blocks: list, usage: { ...turn.usage } }
+	let copy: LiveTurn = { ...transcript.fresh(turn), blocks: list, usage: { ...turn.usage } }
 	if (turn.ns) copy.ns = turn.ns.slice()
+	if (turn.ts) copy.ts = turn.ts.slice()
 	return copy
+}
+
+// An empty live turn by the provider, model and effort of `like`.
+function fresh(like: { provider: string; model?: string; effort?: string }): LiveTurn {
+	let turn: LiveTurn = { provider: like.provider, blocks: [], usage: {} }
+	if (like.model !== undefined) turn.model = like.model
+	if (like.effort !== undefined) turn.effort = like.effort
+	return turn
 }
 
 // The transcript after `event`; the same object if the event does not
@@ -243,17 +269,17 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		// written, before the one still streaming (`streaming`), which
 		// stays live; as a snapshot taken now or later shows it.
 		if (!t.live) return { ...t, items: [...t.items, ...transcript.keyed([transcript.aside(event)], event.n, t.items.length)] }
-		let { blocks: list, ns } = t.live.turn
+		let { blocks: list, ns, ts } = t.live.turn
 		let keep = event.streaming ? Math.max(0, list.length - 1) : list.length
 		let done = transcript.settle(t.items, { start: t.live.start, turn: { ...t.live.turn, blocks: list.slice(0, keep) } })
 		let items = [...done, ...transcript.keyed([transcript.aside(event)], event.n, done.length)]
-		let turn = transcript.copyTurn({ ...t.live.turn, blocks: list.slice(keep), ...(ns ? { ns: ns.slice(keep) } : {}) })
-		return { ...t, items: [...items, ...transcript.blockItems(turn.blocks, turn.ns, items.length)], live: { start: items.length, turn } }
+		let turn = transcript.copyTurn({ ...t.live.turn, blocks: list.slice(keep), ...(ns ? { ns: ns.slice(keep) } : {}), ...(ts ? { ts: ts.slice(keep) } : {}) })
+		return { ...t, items: [...items, ...transcript.turnItems(turn, items.length)], live: { start: items.length, turn } }
 	}
 	if (event.type === 'turn-start') {
-		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
-		let items: Item[] = [...t.items, ...transcript.keyed([transcript.promptItem(event.prompt, event.sender), ...(event.images ?? []).map((b) => transcript.imageItem(b))], event.n, t.items.length)]
-		return { ...t, items, prompt: t.items.length, live: { start: items.length, turn: { provider: event.provider, blocks: [], usage: {} } } }
+		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: transcript.fresh(event) } }
+		let items: Item[] = [...t.items, ...transcript.keyed([transcript.promptItem(event.prompt, event.sender, event.ts), ...(event.images ?? []).map((b) => transcript.imageItem(b))], event.n, t.items.length)]
+		return { ...t, items, prompt: t.items.length, live: { start: items.length, turn: transcript.fresh(event) } }
 	}
 	let question: Shown | undefined = event.type === 'question' ? { type: 'question', id: event.id, form: event.form } : undefined
 	let ended = (items: Item[], end: Shown): Item[] => [...items, ...transcript.keyed([end], (event as { n?: number }).n, items.length)]
@@ -267,20 +293,22 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'prompt') {
 		// The round's blocks are in history before the prompt.
 		let next = transcript.prompted(t, transcript.settle(t.items, t.live), event)
-		return { ...next, live: { start: next.items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
+		return { ...next, live: { start: next.items.length, turn: transcript.fresh(t.live.turn) } }
 	}
 	if (event.type === 'stream') {
 		let turn = transcript.copyTurn(t.live.turn)
 		blocks.apply(turn, event.event)
 		while (turn.ns && event.n !== undefined && turn.ns.length < turn.blocks.length) turn.ns.push(event.n)
 		if (!turn.ns && event.n !== undefined && turn.blocks.length) turn.ns = turn.blocks.map(() => event.n!)
-		return { ...t, items: [...settled, ...transcript.blockItems(turn.blocks, turn.ns, settled.length)], live: { start: t.live.start, turn } }
+		// A block's start time comes with its first event.
+		while (event.ts !== undefined && (turn.ts ??= []).length < turn.blocks.length) turn.ts.push(event.ts)
+		return { ...t, items: [...settled, ...transcript.turnItems(turn, settled.length)], live: { start: t.live.start, turn } }
 	}
 	if (event.type === 'tool-results') {
 		// The round's blocks are in history now; the next round starts empty.
 		let done = transcript.settle(t.items, t.live)
 		let items = [...done, ...transcript.keyed(event.results.map((b) => transcript.resultItem(b)), event.n, done.length)]
-		return { ...t, items, live: { start: items.length, turn: { provider: t.live.turn.provider, blocks: [], usage: {} } } }
+		return { ...t, items, live: { start: items.length, turn: transcript.fresh(t.live.turn) } }
 	}
 	// Asking stops the running turn: its output is in history.
 	let end = question ?? transcript.endItem(event as Event & { type: 'turn-end' })
@@ -290,7 +318,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 
 // The items with the live turn's blocks settled as history has them.
 function settle(items: Item[], live: NonNullable<Transcript['live']>): Item[] {
-	return [...items.slice(0, live.start), ...transcript.blockItems(live.turn.blocks, live.turn.ns, live.start)]
+	return [...items.slice(0, live.start), ...transcript.turnItems(live.turn, live.start)]
 }
 
 // After `items`, a prompt event's texts; an edit (`replaces`) takes
@@ -298,8 +326,8 @@ function settle(items: Item[], live: NonNullable<Transcript['live']>): Item[] {
 function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' }): Transcript {
 	let keep = event.replaces && t.prompt !== undefined ? items.slice(0, t.prompt) : items
 	let { live: _live, ...rest } = t
-	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i])), ...(event.images ?? []).map((b) => transcript.imageItem(b))]
+	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts)), ...(event.images ?? []).map((b) => transcript.imageItem(b))]
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 
-export const transcript = { blockItems, promptItem, key, href, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }
+export const transcript = { blockItems, turnItems, fresh, promptItem, key, href, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }

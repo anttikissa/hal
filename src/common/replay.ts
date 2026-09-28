@@ -34,7 +34,9 @@ export type HistoryRecord = Numbered &
 	// (edited into a slash command). `command`: the edit's command id.
 	| { type: 'inbox'; id: string; text: string; queue?: true; from?: string; label?: string; advisory?: true; withdrawn?: true; command?: string; ts: string }
 	// One assistant block, appended as soon as it is complete.
-	| { type: 'assistant'; block: AssistantBlock; ts: string }
+	// `ts`: when the block started streaming; `model`, `effort`: what
+	// wrote it (task hp; older records have neither).
+	| { type: 'assistant'; block: AssistantBlock; model?: string; effort?: string; ts: string }
 	// Ends one model turn, or pauses it (then `pauseReason` if Hal, not
 	// the user, paused it). `usage`: all its rounds'; `context`: the
 	// tokens its last round with usage took in (status row, task 1g).

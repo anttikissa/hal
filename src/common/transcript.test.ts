@@ -36,9 +36,9 @@ test('a snapshot shows history as display items without provider details', () =>
 	])!
 	expect(t.meta).toEqual(meta)
 	expect(t.items).toEqual([
-		{ type: 'prompt', text: 'hi', key: '1' },
-		{ type: 'thinking', text: 'hmm', key: '2' },
-		{ type: 'text', text: 'hello', key: '4' },
+		{ type: 'prompt', text: 'hi', ts, key: '1' },
+		{ type: 'thinking', text: 'hmm', ts, key: '2' },
+		{ type: 'text', text: 'hello', ts, key: '4' },
 		{ type: 'tool', id: 't1', name: 'bash', input: { cmd: 'ls' }, key: '5' },
 		{ type: 'turn-end', status: 'completed', usage: { input: 3 }, key: '6' },
 		// One record, two items; a record built without a number is keyed
@@ -53,29 +53,29 @@ test('a snapshot shows history as display items without provider details', () =>
 test('streamed deltas merge into the running turn and turn-end settles it', () => {
 	let t = fold([
 		snap({ history: [] }),
-		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1 },
-		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'a' }, n: 2 },
-		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'b' }, n: 2 },
-		{ type: 'stream', sessionId, event: { type: 'signature', value: 's' }, n: 2 },
-		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'c' }, n: 3 },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'x' }, n: 4 },
-		{ type: 'stream', sessionId, event: { type: 'usage', usage: { output: 4 } }, n: 4 },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'y' }, n: 4 },
+		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1, ts },
+		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'a' }, n: 2, ts },
+		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'b' }, n: 2, ts },
+		{ type: 'stream', sessionId, event: { type: 'signature', value: 's' }, n: 2, ts },
+		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'c' }, n: 3, ts },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'x' }, n: 4, ts },
+		{ type: 'stream', sessionId, event: { type: 'usage', usage: { output: 4 } }, n: 4, ts },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'y' }, n: 4, ts },
 	])!
 	// Each item has its record's number from its first streamed byte.
 	expect(t.items).toEqual([
-		{ type: 'prompt', text: 'go', key: '1' },
-		{ type: 'thinking', text: 'ab', key: '2' },
-		{ type: 'thinking', text: 'c', key: '3' },
-		{ type: 'text', text: 'xy', key: '4' },
+		{ type: 'prompt', text: 'go', ts, key: '1' },
+		{ type: 'thinking', text: 'ab', ts, key: '2' },
+		{ type: 'thinking', text: 'c', ts, key: '3' },
+		{ type: 'text', text: 'xy', ts, key: '4' },
 	])
 	expect(t.live).toMatchObject({ start: 1, turn: { usage: { output: 4 } } })
 
 	let done = fold([{ type: 'turn-end', sessionId, status: 'completed', usage: { output: 4 }, n: 5 }], t)!
 	expect(done.items.slice(1)).toEqual([
-		{ type: 'thinking', text: 'ab', key: '2' },
-		{ type: 'thinking', text: 'c', key: '3' },
-		{ type: 'text', text: 'xy', key: '4' },
+		{ type: 'thinking', text: 'ab', ts, key: '2' },
+		{ type: 'thinking', text: 'c', ts, key: '3' },
+		{ type: 'text', text: 'xy', ts, key: '4' },
 		{ type: 'turn-end', status: 'completed', usage: { output: 4 }, key: '5' },
 	])
 	expect(done.live).toBeUndefined()
@@ -83,14 +83,14 @@ test('streamed deltas merge into the running turn and turn-end settles it', () =
 
 test('folding never mutates the previous transcript', () => {
 	let before = fold([
-		snap({ history: [prompt('go', 1)], turn: { provider: 'fake', blocks: [{ type: 'text', text: 'a' }], usage: {}, ns: [2] } }),
+		snap({ history: [prompt('go', 1)], turn: { provider: 'fake', blocks: [{ type: 'text', text: 'a' }], usage: {}, ns: [2], ts: [ts] } }),
 	])!
 	let copy = structuredClone(before)
 	fold(
 		[
-			{ type: 'stream', sessionId, event: { type: 'text', text: 'b' }, n: 2 },
-			{ type: 'stream', sessionId, event: { type: 'text', text: 'c' }, n: 3 },
-			{ type: 'stream', sessionId, event: { type: 'usage', usage: { input: 1 } } },
+			{ type: 'stream', sessionId, event: { type: 'text', text: 'b' }, n: 2, ts },
+			{ type: 'stream', sessionId, event: { type: 'text', text: 'c' }, n: 3, ts },
+			{ type: 'stream', sessionId, event: { type: 'usage', usage: { input: 1 } }, ts },
 			{ type: 'turn-end', sessionId, status: 'completed' },
 		],
 		before,
@@ -99,12 +99,12 @@ test('folding never mutates the previous transcript', () => {
 })
 
 test('events for other sessions, rejections and events before a snapshot change nothing', () => {
-	expect(fold([{ type: 'turn-start', sessionId, prompt: 'x', provider: 'p' }])).toBeUndefined()
+	expect(fold([{ type: 'turn-start', sessionId, prompt: 'x', provider: 'p', ts }])).toBeUndefined()
 	let t = fold([snap({ history: [prompt('a', 1)] })])!
 	for (let e of [
 		{ type: 'turn-start', sessionId: 'other', prompt: 'x', provider: 'p' },
 		{ type: 'rejected', sessionId, command: 'submit', reason: 'busy' },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'stray' } },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'stray' }, ts },
 	] as Event[])
 		expect(transcript.fold(t, e)).toBe(t)
 })
@@ -112,11 +112,11 @@ test('events for other sessions, rejections and events before a snapshot change 
 test('a later snapshot replaces whatever was folded before', () => {
 	let t = fold([
 		snap({ history: [] }),
-		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake' },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'x' } },
+		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', ts },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'x' }, ts },
 		snap({ history: [prompt('fresh', 1)] }),
 	])!
-	expect(t.items).toEqual([{ type: 'prompt', text: 'fresh', key: '1' }])
+	expect(t.items).toEqual([{ type: 'prompt', text: 'fresh', ts, key: '1' }])
 	expect(t.live).toBeUndefined()
 })
 
@@ -124,19 +124,19 @@ test('tool results settle the round so far; the next round streams after them', 
 	let call = { type: 'tool_call' as const, id: 't1', name: 'read', input: { path: 'a' } }
 	let events: Event[] = [
 		snap({ history: [] }),
-		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1 },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'look' }, n: 2 },
+		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1, ts },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'look' }, n: 2, ts },
 		{ type: 'stream', sessionId, event: call, n: 3 },
 		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 't1', output: 'no such file', isError: true }], n: 4 },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'gone' }, n: 5 },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'gone' }, n: 5, ts },
 	]
 	let t = fold(events)!
 	expect(t.items).toEqual([
-		{ type: 'prompt', text: 'go', key: '1' },
-		{ type: 'text', text: 'look', key: '2' },
+		{ type: 'prompt', text: 'go', ts, key: '1' },
+		{ type: 'text', text: 'look', ts, key: '2' },
 		{ type: 'tool', id: 't1', name: 'read', input: { path: 'a' }, key: '3' },
 		{ type: 'tool-result', id: 't1', output: 'no such file', isError: true, key: '4' },
-		{ type: 'text', text: 'gone', key: '5' },
+		{ type: 'text', text: 'gone', ts, key: '5' },
 	])
 	// A client that connects now sees the same.
 	let late = fold([
@@ -147,7 +147,7 @@ test('tool results settle the round so far; the next round streams after them', 
 				said(call, 3),
 				{ type: 'user', blocks: [{ type: 'tool_result', id: 't1', output: 'no such file', isError: true }], ts, n: 4 },
 			],
-			turn: { provider: 'fake', blocks: [{ type: 'text', text: 'gone' }], usage: {}, ns: [5] },
+			turn: { provider: 'fake', blocks: [{ type: 'text', text: 'gone' }], usage: {}, ns: [5], ts: [ts] },
 		}),
 	])!
 	expect(late).toEqual(t)
@@ -161,13 +161,13 @@ test('state events and a continued turn fold like the snapshot that follows them
 		snap({ history: [prompt('go', 1), said({ type: 'text', text: 'a' }, 2), { type: 'turn_end', status: 'paused', usage: {}, ts, n: 3 }] }),
 		{ type: 'state', sessionId, state: running },
 		{ type: 'turn-start', sessionId, provider: 'fake' },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'b' }, n: 5 },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'b' }, n: 5, ts },
 	])!
 	expect(t.state).toEqual(running)
 	let later = fold([
 		snap({
 			history: [prompt('go', 1), said({ type: 'text', text: 'a' }, 2), { type: 'turn_end', status: 'paused', usage: {}, ts, n: 3 }, { type: 'continue', ts, n: 4 }],
-			turn: { provider: 'fake', blocks: [{ type: 'text', text: 'b' }], usage: {}, ns: [5] },
+			turn: { provider: 'fake', blocks: [{ type: 'text', text: 'b' }], usage: {}, ns: [5], ts: [ts] },
 		}),
 		{ type: 'state', sessionId, state: running },
 	])!
@@ -180,7 +180,7 @@ test('a question and its answer fold like the snapshot that follows them, and on
 	let asking = { type: 'blocked' as const, reason: 'question' }
 	let live = fold([
 		snap({ history: [prompt('hi', 1)], turn: { provider: 'hal', blocks: [], usage: {}, ns: [] } }),
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'Hello.' }, n: 2 },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'Hello.' }, n: 2, ts },
 		{ type: 'question', sessionId, id: 'q1', form, n: 3 },
 		{ type: 'state', sessionId, state: asking },
 	])!
@@ -207,23 +207,23 @@ test('an edited prompt takes the place of the prompt it replaces and its turn, l
 	let history = [...before, two, said({ type: 'text', text: 'Looking' }, 5), paused(6)]
 	let t = fold([
 		snap({ history }),
-		{ type: 'prompt', sessionId, texts: ['one', 'fix it'], replaces: true, n: 7 },
+		{ type: 'prompt', sessionId, texts: ['one', 'fix it'], replaces: true, n: 7, ts },
 		{ type: 'turn-start', sessionId, provider: 'fake' },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'Fixed' }, n: 8 },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'Fixed' }, n: 8, ts },
 	])!
 	expect(t.items.slice(before.length)).toEqual([
-		{ type: 'prompt', text: 'one', key: '7' },
-		{ type: 'prompt', text: 'fix it', key: '7.1' },
-		{ type: 'text', text: 'Fixed', key: '8' },
+		{ type: 'prompt', text: 'one', ts, key: '7' },
+		{ type: 'prompt', text: 'fix it', ts, key: '7.1' },
+		{ type: 'text', text: 'Fixed', ts, key: '8' },
 	])
 	let edited = { type: 'user' as const, blocks: [{ type: 'text' as const, text: 'one' }, { type: 'text' as const, text: 'fix it' }], replaces: true as const, ts, n: 7 }
-	let late = fold([snap({ history: [...history, edited], turn: { provider: 'fake', blocks: [{ type: 'text', text: 'Fixed' }], usage: {}, ns: [8] } })])!
+	let late = fold([snap({ history: [...history, edited], turn: { provider: 'fake', blocks: [{ type: 'text', text: 'Fixed' }], usage: {}, ns: [8], ts: [ts] } })])!
 	expect(late).toEqual(t)
 	// Edited again: the edit is now the prompt it replaces.
-	let again: Event = { type: 'prompt', sessionId, texts: ['fix it!'], replaces: true, n: 10 }
+	let again: Event = { type: 'prompt', sessionId, texts: ['fix it!'], replaces: true, n: 10, ts }
 	let end: Event = { type: 'turn-end', sessionId, status: 'paused', n: 9 }
 	let t2 = fold([end, again], t)!
-	expect(t2.items.slice(before.length)).toEqual([{ type: 'prompt', text: 'fix it!', key: '10' }])
+	expect(t2.items.slice(before.length)).toEqual([{ type: 'prompt', text: 'fix it!', ts, key: '10' }])
 	let late2 = fold([snap({ history: [...history, edited, said({ type: 'text', text: 'Fixed' }, 8), paused(9), { ...edited, blocks: [{ type: 'text', text: 'fix it!' }], n: 10 }] })])!
 	expect(late2).toEqual(t2)
 })
@@ -231,13 +231,13 @@ test('an edited prompt takes the place of the prompt it replaces and its turn, l
 test('a command during a running turn goes where history has it: after finished blocks, before the one streaming', () => {
 	let t = fold([
 		snap({ history: [] }),
-		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1 },
-		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' }, n: 2 },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'wor' }, n: 3 },
+		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1, ts },
+		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' }, n: 2, ts },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'wor' }, n: 3, ts },
 		{ type: 'command', sessionId, text: '/cd x', from: '2-xyz', n: 4, streaming: true },
 		{ type: 'output', sessionId, text: 'no such directory', error: true, n: 5, streaming: true },
-		{ type: 'stream', sessionId, event: { type: 'text', text: 'king' }, n: 3 },
-		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'c', name: 'ls', input: {} }, n: 6 },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'king' }, n: 3, ts },
+		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'c', name: 'ls', input: {} }, n: 6, ts },
 		// The round is done: every block is in history before this one.
 		{ type: 'command', sessionId, text: '/help', n: 7 },
 		{ type: 'meta', sessionId, meta: { ...meta, cwd: '/x' } },
@@ -247,11 +247,11 @@ test('a command during a running turn goes where history has it: after finished 
 	// The streaming block keeps the number it started with, written
 	// after the command numbered past it.
 	expect(t.items).toEqual([
-		{ type: 'prompt', text: 'go', key: '1' },
-		{ type: 'thinking', text: 'hm', key: '2' },
+		{ type: 'prompt', text: 'go', ts, key: '1' },
+		{ type: 'thinking', text: 'hm', ts, key: '2' },
 		{ type: 'command', text: '/cd x', from: '2-xyz', key: '4' },
 		{ type: 'output', text: 'no such directory', error: true, key: '5' },
-		{ type: 'text', text: 'working', key: '3' },
+		{ type: 'text', text: 'working', ts, key: '3' },
 		{ type: 'tool', id: 'c', name: 'ls', input: {}, key: '6' },
 		{ type: 'command', text: '/help', key: '7' },
 		{ type: 'tool-result', id: 'c', output: 'ok', key: '8' },

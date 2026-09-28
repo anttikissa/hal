@@ -214,6 +214,7 @@ function init(): void {
 		rejected: (account) => auth.rejected(account, 'openai'),
 		known: () => openai.knownModels(),
 		contextWindow: (model) => openai.contextWindow(model),
+		effort: (model) => openai.effort(model),
 	})
 }
 

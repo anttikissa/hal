@@ -17,6 +17,7 @@ import { busy } from './busy.ts'
 import { clock } from './clock.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
+import { models } from './models.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
@@ -31,7 +32,8 @@ import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 
 // `done`: settles when runTurn has returned.
-type Running = { provider: string; controller: AbortController; done?: Promise<void> }
+// `model`, `effort`: what writes the turn (task hp).
+type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void> }
 
 // Asks the open turn's human a durable question: in history first,
 // then shown; the turn stops running here and waits, blocked, for the
@@ -57,11 +59,15 @@ function ask(id: string, form: Form, call?: string): void {
 // `images`: the prompt's image blocks, for followers to show; `record`:
 // the prompt's, whose number, command id and sender (of its first text)
 // they are told.
-function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender }): void {
+function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender; ts?: string }): void {
 	let model = sessions.open(id).model
-	let running: Running = { provider: blocks.parseModelId(model)?.provider ?? model, controller: new AbortController() }
+	let running: Running = { provider: blocks.parseModelId(model)?.provider ?? model, model, controller: new AbortController() }
+	let effort = models.effort(model)
+	if (effort !== undefined) running.effort = effort
 	turns.state.running.set(id, running)
-	let event: Event = { type: 'turn-start', sessionId: id, provider: running.provider }
+	let event: Event & { type: 'turn-start' } = { type: 'turn-start', sessionId: id, provider: running.provider, model }
+	if (effort !== undefined) event.effort = effort
+	if (prompt !== undefined && record?.ts !== undefined) event.ts = record.ts
 	if (prompt !== undefined) event.prompt = prompt
 	if (images?.length) event.images = images
 	if (prompt !== undefined && record?.sender?.from !== undefined) event.sender = record.sender
@@ -232,7 +238,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				last = undefined
 				prompts.steer(id)
 				status.transition(id, { type: 'request' })
-				for await (let event of history.record(id, running.provider, stream())) {
+				for await (let event of history.record(id, running.provider, stream(), running)) {
 					blocks.apply(round, event)
 					if (event.type === 'done' || event.type === 'error') {
 						last = event
@@ -241,7 +247,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					if (signal.aborted) break
 					status.transition(id, { type: 'stream' })
 					let n = history.streaming(id)
-					host.broadcast(id, n === undefined ? { type: 'stream', sessionId: id, event } : { type: 'stream', sessionId: id, event, n })
+					let ts = history.started(id)
+					host.broadcast(id, { type: 'stream', sessionId: id, event, ...(n !== undefined && { n }), ...(ts !== undefined && { ts }) })
 				}
 				if (last?.type === 'error' && last.failure && !last.cancelled && !signal.aborted) {
 					await turns.waitOut(id, last, failures++, signal)

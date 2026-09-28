@@ -283,7 +283,9 @@ function snapshot(id: string): Snapshot {
 	let running = turns.state.running.get(id)
 	if (running) {
 		let live = history.live(id)
-		snap.turn = { provider: running.provider, blocks: live?.blocks ?? [], usage: live?.usage ?? {}, ns: live?.ns ?? [] }
+		snap.turn = { provider: running.provider, blocks: live?.blocks ?? [], usage: live?.usage ?? {}, ns: live?.ns ?? [], ts: live?.ts ?? [] }
+		if (running.model !== undefined) snap.turn.model = running.model
+		if (running.effort !== undefined) snap.turn.effort = running.effort
 	}
 	return snap
 }

@@ -5,6 +5,7 @@
 // the subscription account's usage windows. When the row is too narrow
 // the right parts go from the end, then the left is clipped. Pure.
 
+import { titles } from '../common/titles.ts'
 import { colors } from '../common/colors.ts'
 import type { Oklch } from '../common/oklch.ts'
 import type { Stats } from '../common/protocol.ts'
@@ -35,15 +36,6 @@ function heat(pct: number): Oklch {
 	return [0.78, 0.14, 145 - 1.2 * Math.max(0, Math.min(100, pct))]
 }
 
-// "anthropic/claude-opus-5-5" -> "Opus 5.5"; other ids without the
-// provider.
-function modelName(id: string): string {
-	let model = id.slice(id.indexOf('/') + 1)
-	let m = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/.exec(model)
-	if (!m) return model
-	return `${m[1]![0]!.toUpperCase()}${m[1]!.slice(1)} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
-}
-
 // The context used as a percentage of the window; none without one.
 function percent(s: Stats | undefined): number | undefined {
 	return s?.window ? Math.round(((s.context ?? 0) / s.window) * 100) : undefined
@@ -56,7 +48,7 @@ function left(info: StatusInfo): Part[][] {
 	let home = info.home
 	let cwd = home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
 	out.push([{ text: ansi.clean(cwd), fg: info.hal ? colors.assistant().fg! : hi }])
-	out.push([{ text: ansi.clean(statusRow.modelName(info.model)), fg: hi }])
+	out.push([{ text: ansi.clean(titles.modelName(info.model)), fg: hi }])
 	let s = info.stats
 	let pct = statusRow.percent(s)
 	if (pct !== undefined) {
@@ -116,4 +108,4 @@ function row(info: StatusInfo, cols: number): string {
 	return ansi.PAD + base + parts.map((p) => (p.fg ? ansi.sgr({ fg: p.fg }) + p.text + base : p.text)).join('') + ansi.UNCOLOR
 }
 
-export const statusRow = { count, heat, modelName, percent, left, right, fit, row }
+export const statusRow = { count, heat, percent, left, right, fit, row }

@@ -111,6 +111,11 @@ export const models = {
 		let own = parsed && provider.state.providers[parsed.provider]?.contextWindow?.(parsed.model)
 		return own ?? modelsDev.contextWindow(id)
 	},
+	// The reasoning effort requests for `id` set, if any (task hp).
+	effort(id: string): string | undefined {
+		let parsed = blocks.parseModelId(id)
+		return parsed && provider.state.providers[parsed.provider]?.effort?.(parsed.model)
+	},
 	fallback,
 	known,
 	valid,
