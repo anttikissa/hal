@@ -27,7 +27,7 @@ type Job = { sessionId: string; stop: () => void }
 // `done` is the status line (`[exit N]`, `[timed out after Ns]`, …)
 // then the output, cut past tools.maxChars(); it waits for stdout to
 // close. `ms`: kill the group after that long.
-function exec(command: string, cwd: string, ms?: number): Run {
+function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: string) => void): Run {
 	let child = spawn('bash', ['-c', `exec 2>&1\n${command}`], { cwd, detached: true, stdio: ['ignore', 'pipe', 'ignore'] })
 	let kill = () => child.pid !== undefined && tools.killGroup(child.pid)
 	let stopped = false
@@ -37,6 +37,7 @@ function exec(command: string, cwd: string, ms?: number): Run {
 	let out = ''
 	child.stdout!.setEncoding('utf8').on('data', (d: string) => {
 		out += d
+		onOutput?.(d)
 	})
 	let done = new Promise<string>((resolve, reject) => {
 		child.on('error', (e) => (clearTimeout(timer), reject(e)))

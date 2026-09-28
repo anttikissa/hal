@@ -18,7 +18,7 @@ import type { ToolDef } from './provider.ts'
 // `sessionId`: the session whose turn runs the call. `endTurn`: the
 // turn ends once this round's results are in, unless messages wait to
 // be read (the wait tool).
-export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string; callId?: string; endTurn?: () => void }
+export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string; callId?: string; endTurn?: () => void; onOutput?: (chunk: string) => void }
 export type ToolOutput = string | { text: string; image: { mediaType: string; data: string } }
 
 // One file per tool in src/host/tools/, named like it (read.ts is

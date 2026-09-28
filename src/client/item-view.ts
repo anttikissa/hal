@@ -75,14 +75,18 @@ function itemLines(item: Item, width: number, streaming = false): string[] {
 			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		case 'tool': {
 			let { command, description } = item.input
-			// A described command: the sentence first, the command quieter beside it.
+			let row: string
 			if (typeof command === 'string' && typeof description === 'string') {
 				let head = strings.clipVisual(`▸ ${ansi.clean(description).replace(/\s+/g, ' ')}`, width)
 				let rest = strings.clipVisual(`  $ ${ansi.clean(command).replace(/\s+/g, ' ')}`, width - strings.visLen(head))
-				return [head + ansi.quiet(rest, itemView.itemStyle(item))]
+				row = head + ansi.quiet(rest, itemView.itemStyle(item))
+			} else {
+				let input = ansi.clean(JSON.stringify(item.input)).replace(/\s+/g, ' ')
+				row = strings.clipVisual(`▸ ${ansi.clean(item.name)} ${input}`, width)
 			}
-			let input = ansi.clean(JSON.stringify(item.input)).replace(/\s+/g, ' ')
-			return [strings.clipVisual(`▸ ${ansi.clean(item.name)} ${input}`, width)]
+			if (!item.partial) return [row]
+			let lines = item.partial.replace(/\n$/, '').split('\n').slice(-5)
+			return [row, ...lines.flatMap((line) => ansi.wrap(ansi.clean(line), Math.max(1, width - 2))).slice(-5).map((line) => `  ${line}`)]
 		}
 		case 'tool-result': {
 			// A glimpse: tool output can be long, the model sees all of it.

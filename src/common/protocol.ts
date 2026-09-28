@@ -56,6 +56,8 @@ export type Snapshot = {
 	state: SessionState
 	inbox?: InboxItem[]
 	turn?: LiveTurn
+	// Foreground bash output still in flight: not history or provider input.
+	toolOutput?: { id: string; output: string }
 	draft?: Draft
 	older?: number
 	earlier?: HistoryRecord[]
@@ -188,6 +190,8 @@ export type Event =
 	| { type: 'prompt'; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; replaces?: true; n?: number; command?: string; ts?: string }
 	// `ts`: when the block it streams into started (task hp).
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent; n?: number; ts?: string }
+	// New bytes only; a late joiner gets the same partial output in its snapshot.
+	| { type: 'tool-output'; sessionId: string; id: string; at: number; chunk: string }
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
 	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[]; n?: number }
@@ -289,6 +293,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	inbox: { sessionId: 's', inbox: 'a' },
 	prompt: { sessionId: 's', texts: 'S', senders: 'a?', images: 'a?', command: 's?', ts: 's?' },
 	stream: { sessionId: 's', event: 'o', 'event.type': 's', ts: 's?' },
+	'tool-output': { sessionId: 's', id: 's', at: 'i', chunk: 's' },
 	'tool-results': { sessionId: 's', results: 'a' },
 	'turn-end': { sessionId: 's', status: 's', usage: 'o?', error: 's?', stats: 'o?' },
 	question: { sessionId: 's', id: 's', form: 'o' },

@@ -24,7 +24,7 @@ export type Shown =
 	// (task hp). Records from before hp have none of them.
 	| { type: 'text'; text: string; ts?: string; model?: string; effort?: string }
 	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
-	| { type: 'tool'; id: string; name: string; input: Record<string, unknown> }
+	| { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string }
 	| { type: 'tool-result'; id: string; output: string; isError?: boolean }
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string }
 	// A durable question; with `answers` once answered (secrets only named).
@@ -216,6 +216,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 		t.live = { start: items.length, turn }
 		t.items = [...items, ...transcript.turnItems(turn, items.length)]
 	}
+	if (snapshot.toolOutput) t.items = t.items.map((item) => item.type === 'tool' && item.id === snapshot.toolOutput!.id ? { ...item, partial: snapshot.toolOutput!.output } : item)
 	return t
 }
 
@@ -278,6 +279,18 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'answer') return { ...t, items: transcript.answered(t.items, event) }
 	if (event.type === 'meta') return { ...t, meta: { ...event.meta }, ...(event.stats && { stats: event.stats }) }
 	if (event.type === 'turn-end' && event.stats) t = { ...t, stats: event.stats }
+	if (event.type === 'tool-output') {
+		let changed = false
+		let items = t.items.map((item): Item => {
+			if (item.type !== 'tool' || item.id !== event.id) return item
+			let before = item.partial ?? ''
+			let added = event.chunk.slice(Math.max(0, before.length - event.at))
+			if (!added || event.at > before.length) return item
+			changed = true
+			return { ...item, partial: before + added }
+		})
+		return changed ? { ...t, items } : t
+	}
 	if (event.type === 'completions' || event.type === 'history') return t
 	if (event.type === 'command' || event.type === 'output' || event.type === 'divider') {
 		// Where history has it: after the running round's blocks already
@@ -321,7 +334,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	}
 	if (event.type === 'tool-results') {
 		// The round's blocks are in history now; the next round starts empty.
-		let done = transcript.settle(t.items, t.live)
+		let done = transcript.settle(t.items, t.live).map((item): Item => item.type === 'tool' && event.results.some((r) => r.id === item.id) ? { ...item, partial: undefined } : item)
 		let items = [...done, ...transcript.keyed(event.results.map((b) => transcript.resultItem(b)), event.n, done.length)]
 		return { ...t, items, live: { start: items.length, turn: transcript.fresh(t.live.turn) } }
 	}

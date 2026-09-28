@@ -32,7 +32,7 @@ export const tool: Tool = {
 		let given = Number(input.timeout) > 0 ? Number(input.timeout) : undefined
 		// In the background only a given timeout applies, and Escape does not stop it.
 		if (input.background) return jobs.start(ctx.sessionId, input.command, ctx.cwd, given)
-		let run = jobs.exec(input.command, ctx.cwd, given ?? 120_000)
+		let run = jobs.exec(input.command, ctx.cwd, given ?? 120_000, ctx.onOutput)
 		ctx.signal.addEventListener('abort', run.stop, { once: true })
 		try {
 			return await run.done

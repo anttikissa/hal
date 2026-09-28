@@ -34,6 +34,7 @@ import { version } from './version.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
+import { toolOutput } from './tool-output.ts'
 import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
 
@@ -272,6 +273,8 @@ function snapshot(id: string): Snapshot {
 	let tail = pages.snapshot(id)
 	let records = [...tail.earlier, ...tail.history]
 	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records), stats: stats.of(id, records) }
+	let output = toolOutput.state.get(id)
+	if (output?.output) snap.toolOutput = { ...output }
 	if (tail.older !== undefined) Object.assign(snap, { older: tail.older, earlier: tail.earlier })
 	try {
 		let draft = drafts.get(id)

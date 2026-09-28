@@ -55,6 +55,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	onSettled(() => root && enter(root))
 	let open = () => opened().has(id())
 	let setOpen = (on: boolean) => setOpened(toggled(opened(), id(), on))
+	let expanded = () => open() || (props.row.item.type === 'tool' && !!props.row.item.partial && !props.row.result)
 	let full = () => whole().has(id())
 	let setFull = (on: boolean) => setWhole(toggled(whole(), id(), on))
 	createEffect(
@@ -91,13 +92,14 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let head = () => (props.row.item.type === 'thinking' ? `${title()}: ${lines()[0]}` : lines()[0])
 	let body = () => {
 		let rest = props.row.item.type === 'thinking' ? lines() : lines().slice(1).map((l) => l.replace(/^ {2}/, ''))
-		return [...rest, ...(result() ? [result()!.text] : [])].join('\n')
+		let partial = props.row.item.type === 'tool' ? props.row.item.partial : undefined
+		return [...rest, ...(result() ? [result()!.text] : partial ? [partial] : [])].join('\n')
 	}
 	let failed = () => !!props.row.result?.isError
 	let toggle = (e: MouseEvent) => {
 		if (!folds() || (e.target as Element).closest('a, .more') || !getSelection()?.isCollapsed) return
 		scroll.follow(() => {
-			setOpen(!open())
+			setOpen(!expanded())
 			flush()
 		}, 'track')
 	}
@@ -144,11 +146,11 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		<Show when={shown()}>
 			{(s) => (
 				<Show when={folds()} fallback={plain(s)}>
-					<article ref={(e) => (root = e)} class={['Card', 'folds', ...s().kind.split(' '), open() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
+					<article ref={(e) => (root = e)} class={['Card', 'folds', ...s().kind.split(' '), expanded() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
 						{link()}
-						<button type="button" class="head" aria-expanded={open() ? 'true' : 'false'}>
+						<button type="button" class="head" aria-expanded={expanded() ? 'true' : 'false'}>
 							<span class="mark" aria-hidden="true">
-								{open() ? '▾' : '▸'}
+								{expanded() ? '▾' : '▸'}
 							</span>
 							<span class="title">{head()}</span>
 							<Show when={props.cursor && !open()}>{cursor()}</Show>
@@ -156,7 +158,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 								<span class="error">✗</span>
 							</Show>
 						</button>
-						<div class="body" inert={!open()}>
+						<div class="body" inert={!expanded()}>
 							<div class="contents">
 								{md() ? markdown() : body()}
 								<Show when={props.cursor && !md()}>{cursor()}</Show>

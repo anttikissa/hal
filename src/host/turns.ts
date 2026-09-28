@@ -29,11 +29,9 @@ import { prompts } from './prompts.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
 import { subagents } from './subagents.ts'
-
-// `done`: settles when runTurn has returned.
-// `model`, `effort`: what writes the turn (task hp).
+import { toolOutput } from './tool-output.ts'
+// A running turn settles when runTurn returns (task hp).
 type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void> }
-
 // Asks the open turn's human a durable question: in history first,
 // then shown; the turn stops running here and waits, blocked, for the
 // first answer (reply), which runs it again. Nothing waits in memory:
@@ -244,7 +242,12 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let results: ToolResultBlock[] = []
 			let ending = false
 			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
-			for (let call of calls) results.push(call.name !== 'ask' && decided.get(call.id) === false ? approval.declined(call) : await tools.run(call, ctx))
+			for (let call of calls) {
+				if (call.name !== 'ask' && decided.get(call.id) === false) { results.push(approval.declined(call)); continue }
+				let stream = call.name === 'bash' && call.input.background !== true ? toolOutput.start(id, call.id) : undefined
+				try { results.push(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx)) }
+				finally { stream?.stop() }
+			}
 			if (turns.state.running.get(id) !== running) return
 			let n = history.results(id, results)?.n
 			host.broadcast(id, n === undefined ? { type: 'tool-results', sessionId: id, results } : { type: 'tool-results', sessionId: id, results, n })
