@@ -3,8 +3,11 @@
 	spec: "The status row shows every model by its models.dev display name (GPT-6 Sol, Kimi K2, Opus 5.5), as the old Hal did, falling back to the id only when models.dev has none. The host-vs-peer notice names each version by its git hash plus, when there are local changes, a short hash of them (git stash create), never the word 'dirty' (questions.md 136).",
 	status: 'done',
 	needs: [],
-	foldInto: ['1g'],
+	foldInto: [
+		'1g'
+	],
 	notes: [
-		'models.dev names are sent as a model-names event on connection, model switch, and background catalog refresh; shared titles falls back to the complete id. git stash create yields different hashes on repeated calls (timestamps), so verify stable formatting and different content, not exact repeated hash.'
+		'models.dev names are sent as a model-names event on connection, model switch, and background catalog refresh; shared titles falls back to the complete id. git stash create yields different hashes on repeated calls (timestamps), so verify stable formatting and different content, not exact repeated hash.',
+		'Keep host.ts within the project 400-line module limit when broadcasting names; startup and recovery timing tests fluctuate heavily under concurrent agents.'
 	]
 }

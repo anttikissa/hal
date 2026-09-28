@@ -1,10 +1,6 @@
-// The host end of the protocol (src/common/protocol.ts). It alone owns
-// sessions, provider calls and state writes; clients only send commands
-// and receive events. connect() is the in-memory connection; a socket
-// transport wraps it by serializing both directions. Commands are
-// carried out by the session modules: prompts.ts (what the user sends),
-// turns.ts (running a turn), slash.ts (slash commands), status.ts (the
-// session's state).
+// The host end of the protocol: owns sessions, provider calls and state
+// writes. In-memory connect() and socket transports send the same events.
+// Session modules carry out commands: prompts, turns, slash and status.
 //
 // Snapshot and live events are sent from the same synchronous step, so a
 // client that opens a session never misses or double-counts an event.
