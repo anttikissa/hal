@@ -155,6 +155,19 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 			for (let r of rows) lines.push(r)
 		}
 	}
+	// The transcript's tail: what is not in history yet, right after
+	// it (never across the full-mode padding), where it will land. The
+	// inbox first, each drawn as the prompt it will become: (steering)
+	// > text; then prompts still on their way to the host, which join
+	// the inbox or history at the same place, so nothing jumps.
+	let t = view.transcript
+	for (let m of t?.inbox ?? []) {
+		// The tag takes at most half the row, so the text keeps room.
+		let tag = strings.clipVisual(`(${inbox.tag(t!.state, m)})`, Math.max(1, Math.floor(width / 2))) + ' '
+		let rows = promptView.mark(ansi.wrap(m.text, Math.max(1, width - strings.visLen(tag) - promptView.FIRST.length)))
+		let pad = ' '.repeat(strings.visLen(tag))
+		block(rows.map((r, i) => (i ? pad : ansi.DIM + tag + ansi.UNDIM) + r), colors.user())
+	}
 	for (let text of view.pending ?? []) {
 		let rows = itemView.itemLines({ type: 'prompt', text }, width)
 		rows.push(`${promptView.REST}${ansi.DIM}sending…${ansi.UNDIM}`)
@@ -170,16 +183,6 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	let history = lines
 	lines = []
 	above = history.length > 0 || full
-	// The inbox, always in view above the prompt.
-	let t = view.transcript
-	// Each drawn as the prompt it will become: (steering) > text.
-	for (let m of t?.inbox ?? []) {
-		// The tag takes at most half the row, so the text keeps room.
-		let tag = strings.clipVisual(`(${inbox.tag(t!.state, m)})`, Math.max(1, Math.floor(width / 2))) + ' '
-		let rows = promptView.mark(ansi.wrap(m.text, Math.max(1, width - strings.visLen(tag) - promptView.FIRST.length)))
-		let pad = ' '.repeat(strings.visLen(tag))
-		block(rows.map((r, i) => (i ? pad : ansi.DIM + tag + ansi.UNDIM) + r), colors.user())
-	}
 	if (view.notice) block(ansi.wrap(view.notice, width), { fg: colors.log().fg! })
 	// Below them, the chrome proper: tab bar, the prompt box between
 	// two rules, then the help row. Its height depends only on the
