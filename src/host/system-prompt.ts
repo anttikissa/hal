@@ -49,9 +49,8 @@ function read(path: string): string | undefined {
 
 // SYSTEM.md alone is a template; project instructions remain verbatim.
 export type PromptSource = { path: string; bytes: number }
-function preprocess(file: string, vars: Record<string, string>, stack: string[] = [], sources?: PromptSource[]): string {
+function preprocess(file: string, vars: Record<string, string>, sources?: PromptSource[]): string {
 	let path = resolve(file)
-	if (stack.includes(path)) throw new Error(`${path}: include loop (${[...stack, path].join(' -> ')})`)
 	let raw = readFileSync(path, 'utf8')
 	sources?.push({ path, bytes: Buffer.byteLength(raw) })
 	let text = raw.replace(/<!--[\s\S]*?-->/g, '')
@@ -85,11 +84,13 @@ function preprocess(file: string, vars: Record<string, string>, stack: string[] 
 			if (name.startsWith('~/')) name = resolve(homedir(), name.slice(2))
 			let target = resolve(dirname(path), name)
 			if (include[1] && !existsSync(target)) continue
-			output.push(systemPrompt.preprocess(target, vars, [...stack, path], sources))
-		} else output.push(line)
+			let raw = readFileSync(target, 'utf8')
+			sources?.push({ path: target, bytes: Buffer.byteLength(raw) })
+			output.push(raw)
+		} else output.push(substitute(line))
 	}
 	if (active !== undefined) throw new Error(`${path}:${opened}: unclosed if block`)
-	return substitute(output.join('\n'))
+	return output.join('\n')
 }
 
 function assemble(input: { cwd: string; model: string; now: number; sessionId?: string }, sources?: PromptSource[]): string {
@@ -101,7 +102,7 @@ function assemble(input: { cwd: string; model: string; now: number; sessionId?: 
 		hal_source: fromSource !== '..' && !fromSource.startsWith(`..${sep}`) && !isAbsolute(fromSource) ? 'true' : 'false',
 	}
 	// Missing SYSTEM.md is a broken checkout: throw with the path.
-	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars, [], sources).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
+	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars, sources).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
 	for (let dir of systemPrompt.candidates(input.cwd)) {
 		// One file per directory: AGENTS.md, else CLAUDE.md.
 		for (let name of ['AGENTS.md', 'CLAUDE.md']) {

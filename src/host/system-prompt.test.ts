@@ -134,20 +134,19 @@ test('bad SYSTEM directives fail with the line number, even for unknown conditio
 	} finally { systemPrompt.file = old }
 })
 
-test('SYSTEM includes expand relative to their file, optional absences vanish and loops or required absences fail', () => {
+test('SYSTEM includes are literal text, even directives, nested includes, comments and variables', () => {
 	let old = systemPrompt.file
 	try {
 		systemPrompt.file = () => `${root}/SYSTEM.md`
 		mkdirSync(`${root}/more`)
-		writeFileSync(`${root}/more/part.md`, 'Included ${harness} in ${home}\n@?missing.md')
+		let raw = '<!-- keep -->\n::: if model="wrong/*"\n@../SYSTEM.md\n${model}\n:::\n@?missing.md\n'
+		writeFileSync(`${root}/more/part.md`, raw)
 		writeFileSync(`${root}/SYSTEM.md`, 'Hello\n@more/part.md\n@?absent.md')
 		let text = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
-		expect(text).toContain('Included hal in ')
-		expect(text).not.toContain('@?')
-		writeFileSync(`${root}/more/part.md`, 'Inside\n@missing.md')
+		expect(text).toContain(raw)
+		expect(text).not.toContain('@?absent.md')
+		writeFileSync(`${root}/SYSTEM.md`, '@missing.md')
 		expect(() => systemPrompt.build({ cwd: root, model: 'm/x', now: at })).toThrow(/missing.md/)
-		writeFileSync(`${root}/more/part.md`, '@../SYSTEM.md')
-		expect(() => systemPrompt.build({ cwd: root, model: 'm/x', now: at })).toThrow(/include loop/)
 	} finally { systemPrompt.file = old }
 })
 
