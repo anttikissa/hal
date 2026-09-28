@@ -9,7 +9,10 @@
 		'Synthetic models: src/host/synthetic.ts, model ids hal/<name>, (records, answers?) => { say?, ask? }, run by runTurn in place of a provider round. hal/intro is the proof. Only synthetic models (and later commands) ask; real models get no ask tool.',
 		"For et (commands): add an asker to the question record (say `from: { command, args }`) and make host.reply re-run that command's run(args, answers) instead of host.start when the question came from a command; a command question is outside any turn, so decide how its blocked state ends (probably: state from forms.open alone, with no turn). For 6f (approval): ask from inside runTurn before tools.run, one y/N form per matching call; on reply re-run the turn and have it find the answered question for the pending calls (history already holds the calls without results; replay treats them as missing, so 6f must run them itself before the next provider round). The highlighted part of the call needs a field or form text markup both clients can render; forms have none yet.",
 		'For kv (modals): forms.step and FormState are client-neutral, so a modal can reuse them unchanged; frame.formLines(form, width) renders one as rows with a cursor, which a modal can place in its box. Web: page.formNode/syncForm render a form as DOM with native inputs (text typing is native; view.key maps browser keys, and enter/escape/tab/up/down go through forms.step).',
-		'Clients: while a question is open, terminal keys go to the form (app.state.form), the prompt keeps its text; the web disables the textarea. Escape in a form sends pause (forms.command).'
+		'Clients: while a question is open, terminal keys go to the form (app.state.form), the prompt keeps its text; the web disables the textarea. Escape in a form sends pause (forms.command).',
+		'Task bx supersedes the old forms.md statement that real models have no ask tool; durable form blocks and client handling are shared unchanged, except Escape declines an ask tool question without pausing the turn.'
 	],
-	needs: ['j1']
+	needs: [
+		'j1'
+	]
 }

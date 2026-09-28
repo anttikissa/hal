@@ -18,7 +18,7 @@ import type { ToolDef } from './provider.ts'
 // `sessionId`: the session whose turn runs the call. `endTurn`: the
 // turn ends once this round's results are in, unless messages wait to
 // be read (the wait tool).
-export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string; endTurn?: () => void }
+export type ToolContext = { cwd: string; signal: AbortSignal; sessionId: string; callId?: string; endTurn?: () => void }
 export type ToolOutput = string | { text: string; image: { mediaType: string; data: string } }
 
 // One file per tool in src/host/tools/, named like it (read.ts is
@@ -76,7 +76,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	try {
 		let tool = tools.all().get(call.name)
 		if (!tool) throw new Error(`unknown tool '${call.name}'`)
-		let out = await tool.run(call.input, ctx)
+		let out = await tool.run(call.input, { ...ctx, callId: call.id })
 		if (typeof out === 'string') result = { type: 'tool_result', id: call.id, output: out }
 		else {
 			let image = blobs.store(ctx.sessionId, out.image.mediaType, out.image.data)

@@ -8,14 +8,14 @@ import { forms, type Answers, type Form } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { settings } from '../common/settings.ts'
-import { states, type StateEvent } from '../common/states.ts'
-import { existsSync } from 'fs'
+import type { StateEvent } from '../common/states.ts'
 import { approval } from './approval.ts'
 import { auth } from './auth.ts'
 import { blobs } from './blobs.ts'
-import { busy } from './busy.ts'
 import { clock } from './clock.ts'
 import { compact } from './compact.ts'
+import { turnRecovery } from './turn-recovery.ts'
+import { tool as askTool } from './tools/ask.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { models } from './models.ts'
@@ -25,8 +25,6 @@ import { synthetic } from './synthetic.ts'
 import { systemPrompt } from './system-prompt.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
-import { pages } from './pages.ts'
-import { tabs } from './tabs.ts'
 import { prompts } from './prompts.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
@@ -82,7 +80,16 @@ function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlo
 // it paused; one not running here (unfinished on disk) is paused on disk.
 // A command's open question is dismissed instead: nothing ran.
 function stop(id: string, reason?: string): string | undefined {
-	let open = forms.open(history.readSync(id))
+	let records = history.readSync(id)
+	let open = forms.open(records)
+	if (open?.call && records.some((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === open.call && r.block.name === 'ask')) {
+		let refused = status.transition(id, { type: 'answer' })
+		if (refused) return refused
+		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
+		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, cancelled: true })
+		turns.start(id)
+		return
+	}
 	if (open?.from) {
 		let before = status.stateOf(id)
 		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
@@ -104,66 +111,6 @@ function stop(id: string, reason?: string): string | undefined {
 	if (Object.keys(end.usage).length) ended.usage = end.usage
 	host.broadcast(id, ended)
 	subagents.report(id)
-}
-
-// Continues every unfinished turn on disk (a new host after a restart or
-// a host that went away). A turn that keeps bringing hosts down would
-// loop forever, so after states.maxRecoveries() continuations without
-// progress it is paused with a reason instead. An idle session whose
-// inbox still holds queued messages (the host died between a turn end
-// and the next queued prompt) runs the oldest, as prompts.next would have.
-//
-// It costs what the open tabs and busy sessions (busy.ts) cost, never
-// what is on disk: only their marks (pages.ts) are read, and a whole
-// history only for a session with work left.
-async function recover(): Promise<void> {
-	for (let id of new Set([...tabs.file().open, ...busy.list()])) {
-		if (turns.state.running.has(id)) continue
-		if (!existsSync(history.file(id))) {
-			busy.drop(id)
-			continue
-		}
-		if (!turns.leftWork(id)) {
-			busy.drop(id)
-			continue
-		}
-		try {
-			await (host.ready(id) ?? Promise.resolve())
-		} catch (e: any) {
-			diag.log(`recover ${id}: ${e?.message ?? e}`)
-			continue
-		}
-		let records = history.readSync(id)
-		if (turns.state.running.has(id)) continue
-		let state = status.stateOf(id, records)
-		if (state.type === 'idle') {
-			prompts.next(id)
-			continue
-		}
-		if (state.type !== 'running') continue
-		let n = states.recoveries(records)
-		if (n >= states.maxRecoveries()) {
-			turns.stop(id, `continued ${n} times without progress; it may be what stops the host`)
-			continue
-		}
-		history.append(id, { type: 'continue' })
-		turns.start(id)
-	}
-}
-
-// Whether a session may have a turn to continue or a queued message to
-// run, from its marks alone: its last turn record is no end, or a queued
-// message waits after a completed turn (or before any turn).
-function leftWork(id: string): boolean {
-	let m = pages.marks(id)
-	let path = history.file(id)
-	let last = m.turn === undefined ? undefined : pages.lineAt(path, m.turn).record
-	if (last && last.type !== 'turn_end') return true
-	if (last && last.status !== 'completed') return false
-	return Object.values(m.inbox).flat().some((at) => {
-		let r = pages.lineAt(path, at).record
-		return r.type === 'inbox' && r.queue === true
-	})
 }
 
 // Runs one turn and always ends it. A turn is every provider round from
@@ -283,6 +230,12 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			}
 			if (cancelled()) break
 			for (let call of calls) {
+				if (call.name === 'ask' && !askTool.answered(history.readSync(id), call)) {
+					// Bad model input is a tool error, not a broken turn.
+					let form: Form
+					try { form = askTool.form(call.input) } catch { continue }
+					return turns.ask(id, form, call.id)
+				}
 				let form = decided.has(call.id) ? undefined : approval.form(call)
 				if (form) return turns.ask(id, form, call.id)
 			}
@@ -291,7 +244,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let results: ToolResultBlock[] = []
 			let ending = false
 			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
-			for (let call of calls) results.push(decided.get(call.id) === false ? approval.declined(call) : await tools.run(call, ctx))
+			for (let call of calls) results.push(call.name !== 'ask' && decided.get(call.id) === false ? approval.declined(call) : await tools.run(call, ctx))
 			if (turns.state.running.get(id) !== running) return
 			let n = history.results(id, results)?.n
 			host.broadcast(id, n === undefined ? { type: 'tool-results', sessionId: id, results } : { type: 'tool-results', sessionId: id, results, n })
@@ -387,8 +340,8 @@ export const turns = {
 	ask,
 	start,
 	stop,
-	recover,
-	leftWork,
+	recover: () => turnRecovery.recover(),
+	leftWork: (id: string) => turnRecovery.leftWork(id),
 	runTurn,
 	parkedUsage,
 	stopped,

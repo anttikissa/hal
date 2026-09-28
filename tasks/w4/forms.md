@@ -32,8 +32,8 @@ survive restart. While one is open the session is `blocked (question)`
 Nothing waits in memory for an answer: whoever asked is re-run with the
 answer (a command gets `run(args, answers)`; a tool batch continues).
 
-Real models get no ask tool: conversation is enough. Synthetic models
-and commands may ask.
+Real models use the same durable block through the ask tool (task bx);
+synthetic models and commands may ask directly. Model questions never request secrets.
 
 Secrets are not encrypted: HTTPS covers the web, and locally the same
 data is in files anyway. History records only that a secret was given.

@@ -1,6 +1,12 @@
 {
 	title: 'ask tool: real models ask the user with a form',
-	spec: 'Real models get an `ask` tool that asks the user a durable question with the same forms synthetic models and commands use (tasks/w4/forms.md): input text (the question) and optional fields (text, choice with options, confirm; no secret fields for models). The turn parks on the question like approval does (a restart keeps it; the tab shows the question and gets attention); the answer returns as the tool result in plain text ("name: Dave"); Escape on it cancels the question and the tool result says the user declined, without pausing the turn. The tool description tells the model to use it only when a choice truly needs the user, and never for things it can find out itself. Tests: a fake provider calls ask, the answer arrives as the result; a restart while parked keeps the question; cancelling gives a declined result; secret fields are refused.',
-	status: 'planned',
-	needs: ['w4']
+	spec: 'Real models receive an ask tool for durable user questions, with question text and optional text, choice (options), and confirm fields; a missing fields list means one text answer. Models cannot request secret fields, and invalid model input becomes a tool error without parking. The tool description says to ask only for choices requiring the user and never for things the model can find out itself. A question uses the same session form block as synthetic models and commands: a turn parks without waiting in memory, survives a restart, shows attention and blocked (question), and the first answer resumes its call with plain text lines (name: Dave), preserving the order of other calls in the batch. Escape declines the question, returning a declined tool result without pausing the turn. Test the answer, restart, cancellation, secret rejection, and multiple calls.',
+	status: 'done',
+	needs: [
+		'w4'
+	],
+	notes: [
+		'src/host/tools/ask.ts provides form conversion and validates model input before parking; turns.ts checks pending calls before running them, reuses existing question and answer records on restart, and tools.run supplies the call id so a result reads only its own answer. Existing approval.held preserves a whole tool batch across questions. turn-recovery.ts was split from turns.ts to keep it under 400 lines.',
+		'Tool call ids can repeat in later provider rounds. Scope answer lookup to the latest matching assistant tool call (ask.pending), not every question with the same id in the session.'
+	]
 }
