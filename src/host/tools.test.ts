@@ -190,7 +190,7 @@ import { blobs } from './blobs.ts'
 import { history } from './history.ts'
 
 const originalHome = paths.home
-const blobRun = (id: string) => tools.run({ type: 'tool_call', id: 'rb', name: 'read_blob', input: { id } }, { cwd: dir, signal, sessionId: 's' })
+const blobRun = (id: string, options: { offset?: number; limit?: number } = {}) => tools.run({ type: 'tool_call', id: 'rb', name: 'read_blob', input: { id, ...options } }, { cwd: dir, signal, sessionId: 's' })
 
 test('large bash output preserves both ends and the whole result in a session blob', async () => {
 	paths.home = () => dir
@@ -202,10 +202,12 @@ test('large bash output preserves both ends and the whole result in a session bl
 		expect(result.output).toContain('exit 7')
 		let id = result.output.match(/whole output in blob ([0-9a-f]{12})/)?.[1]
 		expect(id).toBeDefined()
-		let full = (await blobRun(id!)).output
-		expect(full).toContain('START')
-		expect(full).toContain('END')
-		expect(full.length).toBeGreaterThan(80_000)
+		let first = (await blobRun(id!)).output
+		expect(first).toContain('START')
+		let total = Number(first.match(/of (\d+); continue/)?.[1])
+		let end = (await blobRun(id!, { offset: total - 2 })).output
+		expect(end).toContain('END')
+		expect(total).toBeGreaterThan(1000)
 	} finally { paths.home = originalHome }
 })
 
@@ -223,6 +225,30 @@ test('read_blob resolves text and images and rejects unknown or escaping referen
 			expect((await blobRun(id)).isError).toBe(true)
 		}
 	} finally { paths.home = originalHome }
+})
+
+test('read_blob pages large text and history blocks within the result cap', async () => {
+	paths.home = () => dir
+	let max = tools.maxChars
+	try {
+		tools.maxChars = () => 900
+		let lines = Array.from({ length: 50 }, (_, i) => `line ${i + 1}: ${'x'.repeat(60)}\n`)
+		let id = blobs.storeOutput('s', lines.join('')).blob
+		let first = (await blobRun(id)).output
+		expect(first.length).toBeLessThanOrEqual(tools.maxChars())
+		let next = Number(first.match(/continue with offset (\d+)/)?.[1])
+		expect(next).toBeGreaterThan(1)
+		expect((await blobRun(id, { offset: next })).output).toContain(`line ${next}:`)
+		let selected = (await blobRun(id, { offset: 18, limit: 2 })).output
+		expect(selected).toContain('line 18:')
+		expect(selected).not.toContain('line 20:')
+		expect((await blobRun(id, { offset: 51 })).isError).toBe(true)
+		let record = history.append('s', { type: 'user', blocks: lines.map((text) => ({ type: 'text' as const, text })) })
+		let block = (await blobRun(`#${record.n}`)).output
+		expect(block.length).toBeLessThanOrEqual(tools.maxChars())
+		expect(block).toContain('continue with offset')
+		expect((await blobRun(id, { offset: 0 })).isError).toBe(true)
+	} finally { paths.home = originalHome; tools.maxChars = max }
 })
 
 test('read_blob fetches a numbered tool call and its result from history', async () => {

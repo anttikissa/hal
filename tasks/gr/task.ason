@@ -1,13 +1,19 @@
 {
 	title: 'Tools as files',
-	spec: 'Every model tool is one file in src/host/tools/, named like the tool (read.ts, bash.ts), found by listing the directory the way src/host/commands.ts finds slash commands, so adding a tool touches nothing else. Each file exports `tool`: its definition (name, description, parameters), readOnly when running it changes nothing (task wb), and run(input, ctx). src/host/tools.ts keeps only the registry: listing, provider definitions, dispatch, readOnly lookup. Tools run one after another in call order, as now: later tools (spawn then wait) rely on it.',
+	spec: 'Every model tool is one file in src/host/tools/, named like the tool (read.ts, bash.ts), found by listing the directory the way src/host/commands.ts finds slash commands, so adding a tool touches nothing else. Each file exports `tool`: its definition (name, description, parameters), readOnly when running it changes nothing (task wb), and run(input, ctx). src/host/tools.ts keeps only the registry: listing, provider definitions, dispatch, readOnly lookup. Tools run one after another in call order, as now: later tools (spawn then wait) rely on it. The shared page helper keeps its output within tools.maxChars() even when the first source line exceeds the cap, marking the line cut and naming the offset to continue when later lines remain.',
 	status: 'done',
-	needs: ['1r'],
 	notes: [
 		'Tool is flat: { name, description, parameters, readOnly?, run }. tools.defs() maps parameters to the provider ToolDef inputSchema; providers are unchanged.',
 		'tools.all() re-lists src/host/tools/ on every call (require caches the modules), skips *.test.ts and throws when a file names a different tool. Tests point tools.dir at a temp directory holding a self-contained tool file to test discovery.',
 		'Shared helpers (page, maxChars, maxLines, maxFileBytes) stay on the tools object in tools.ts; tool files import { tools } from ../tools.ts and call them through it, so overrides still apply.',
-		"Lookup happens inside tools.run's try, so a broken tool file becomes an error result rather than an exception in the turn."
+		"Lookup happens inside tools.run's try, so a broken tool file becomes an error result rather than an exception in the turn.",
+		'read_blob reuses tools.page for both text blobs and JSON-serialized history blocks; page must cap its first line as well as later lines when maxChars is overridden.'
 	],
-	foldInto: ['sj', '1r']
+	needs: [
+		'1r'
+	],
+	foldInto: [
+		'sj',
+		'1r'
+	]
 }

@@ -58,7 +58,7 @@ function page(text: string, offset = 1, limit = tools.maxLines()): string {
 	if (offset > Math.max(lines.length, 1)) throw new Error(`offset ${offset} is past the end (${lines.length} lines)`)
 	let out = ''
 	let n = offset - 1
-	let lineMax = tools.maxLineChars()
+	let lineMax = Math.min(tools.maxLineChars(), Math.max(1, tools.maxChars() - 200))
 	for (; n < lines.length && n < offset - 1 + limit; n++) {
 		let line = lines[n]!
 		if (line.length > lineMax) line = `${line.slice(0, lineMax)}… [line cut: ${line.length - lineMax} more characters]\n`
