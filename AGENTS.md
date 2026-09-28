@@ -2,6 +2,10 @@ Commit automatically. 72-column commit messages.
 
 Push and pull (with rabase and autostash - config git to use those by default) all the time; this is being developed on two hosts, connected by github only, and we want latest codes on both.
 
+This repository is managed with `tsk`, a simple task manager. Every feature, performance requirement, or other item that defines a behavioral or qualitative aspecf ot the software, must be tracked down to the task that first implemented it. When you modify a task that is 'done', you must change the code or other files associated with it. And when modifying code, for example fixing bugs, you must change the associated task or make a new one.
+
+The idea: we plan to rebuild the software from the tasks from time to time - thus, any change not backed up with an equivalent change under tasks/ will be lost.
+
 The user works with planning agent (writes tasks) and one or more agents (possibly spawned by the planner) that implement them.
 
 Tasks are living specs for a rebuild from scratch, not one-time
