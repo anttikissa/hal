@@ -1,6 +1,9 @@
 {
 	title: '/status: usage windows of every account',
 	spec: '/status shows every provider account and its usage windows as a table like the old Hal\'s: slot i/n with * on the one the current session uses, the account (email or key name, masked as a***@g****.com), and for each window (5h, 7d, and model-specific ones such as 7d_sonnet) a small bar, "N% used" and when it resets (local time, "on 3 Oct" when not today). API-key accounts show "API key" instead of windows. Data comes from task 61\'s usage tracking; if it is older than a minute the command refreshes it first (with a short timeout, keeping the old data on failure and saying so). Terminal and web render the same table from one data shape. Tests: masking; the reset wording today and another day; the * mark; stale data refreshed.',
-	status: 'planned',
-	needs: ['61', 'x0']
+	status: 'done',
+	needs: ['61', 'x0'],
+	notes: [
+		'Usage headers carry per-window observed ISO timestamps from now on; /status uses the old cached values when a stale subscription usage endpoint fails, reports refresh failure, and only refreshes stale subscription accounts (60s). Shared Markdown table from status-usage.ts renders on both terminal and web. Anthropic /api/oauth/usage and ChatGPT /backend-api/wham/usage are short-timeout refresh endpoints; token refresh reuses auth.credential.'
+	]
 }

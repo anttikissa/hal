@@ -13,7 +13,7 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
 // `used`: percent 0..100; `resets`: ISO time, when known.
-export type Window = { used: number; resets?: string }
+export type Window = { used: number; resets?: string; observed?: string }
 // Window name ("5h", "7d", "7d_sonnet") -> window.
 export type Windows = Record<string, Window>
 
@@ -77,7 +77,8 @@ function observe(provider: string, account: string | undefined, headers: Headers
 	if (!account || !Object.keys(windows).length) return
 	let data = usage.store()
 	data[provider] ??= {}
-	data[provider]![account] = { ...data[provider]![account], ...windows }
+	let observed = new Date(clock.now()).toISOString()
+	data[provider]![account] = { ...data[provider]![account], ...Object.fromEntries(Object.entries(windows).map(([name, w]) => [name, { ...w, observed }])) }
 }
 
 // The account's windows still running (a window past its reset counts

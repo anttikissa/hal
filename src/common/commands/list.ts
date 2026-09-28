@@ -37,6 +37,7 @@ const list: CommandInfo[] = [
 	{ name: 'resume', description: 'reopen the last closed tab', category: 'tabs', key: 'shift-ctrl-t', clientOnly: true },
 	{ name: 'send', description: 'send a prompt or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
+	{ name: 'status', description: 'show account usage windows', category: 'session' },
 	{ name: 'version', description: 'show which code the host runs', category: 'debug' },
 ]
 
