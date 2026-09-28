@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hal installer (task: tsk show for "install"). Makes sure Bun is there,
+# Hal installer (task hd). Makes sure Bun is there,
 # installs dependencies, links ~/.local/bin/hal to ./run and puts
 # ~/.local/bin on the PATH. Safe to run again: it only does what is
 # missing. -y answers yes to the one question.
