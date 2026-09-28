@@ -95,7 +95,9 @@ dispatcher can never disagree.
   never sees those keys.
 - **Not commands**: prompt-editing keys (ctrl-a, ctrl-k, alt-left,
   undo…) stay rows in `key-help.ts`; they act on the text, not the
-  session. `/keys` shows those rows plus one row per command key.
+  session. So do keys whose meaning depends on the state: esc (pause,
+  but also leave editing and close a picker) and enter. `/keys` keeps
+  its sections; a command key's row reads `ctrl-m  /model  <description>`.
 - **Web**: binds a command key only if the browser gives it to the
   page (not ctrl-t, ctrl-w, ctrl-n); `/keys` on the web lists only the
   keys the web really has.
