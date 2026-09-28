@@ -1,0 +1,6 @@
+{
+	title: 'Bare http(s) URLs in model text are links',
+	spec: "A bare http:// or https:// URL in model text (answers and thinking, outside code) is a clickable link on the web (a real <a href>, rel=noopener, opening a new tab) and in the terminal (an OSC 8 hyperlink over the URL as shown), so an address a model gives as plain text can be followed. The URL runs to the first whitespace or <, and trailing punctuation that usually ends a sentence (. , ; : ! ? and a ) with no matching ( inside the URL) is left out, so 'see https://x.dev/a.' links https://x.dev/a and '(https://x.dev/b)' links without the parenthesis. Only http and https: never javascript: or data:. A long URL that wraps is one link across its rows. The rule lives in src/common and is used by both clients (on top of task fn's parser when that exists, as its autolink step; standalone before). Tests: the trailing-punctuation cases, a URL inside code stays text, a javascript: address is never a link.",
+	status: 'planned',
+	needs: []
+}
