@@ -74,6 +74,7 @@ test('a refresh is cached and serves context windows and lists offline, after a 
 	expect(modelsDev.contextWindow('anthropic/unknown-9')).toBeUndefined()
 	expect(modelsDev.ids('anthropic').sort()).toEqual(['claude-big-2', 'claude-old-1'])
 	expect(models.names(['anthropic/claude-big-2', 'openrouter/acme/solo-1'])).toEqual({ 'anthropic/claude-big-2': 'Claude Big 2' })
+	expect(models.names(['work/claude-big-2', 'work/not-listed'])).toEqual({ 'work/claude-big-2': 'Claude Big 2' })
 })
 
 test('a failed fetch keeps the old cache and is noted only in diagnostics', async () => {

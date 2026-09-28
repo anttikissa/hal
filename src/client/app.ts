@@ -36,6 +36,7 @@ import { tabBar } from './tab-bar.ts'
 import type { StatusInfo } from './status-row.ts'
 import { tabSwitch, type TabView } from './tab-switch.ts'
 import { versions } from './versions.ts'
+import { titles } from '../common/titles.ts'
 
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
@@ -158,6 +159,7 @@ function onEvent(event: Event): void {
 	let resume = paste.settled(st, event)?.resume
 	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: resume.queue, ctrl: false, cmd: false }])
 	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
+	if (event.type === 'model-names') Object.assign(titles.names, event.names)
 	if (event.type === 'tabs') return app.onTabs(event.tabs)
 	if (event.type === 'go') {
 		if (st.focus.tab === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) app.focusOn({ tab: event.tab })

@@ -91,6 +91,16 @@ function info(id: string): ModelInfo | undefined {
 	return modelsDev.catalog()[id.slice(0, slash)]?.[id.slice(slash + 1)]
 }
 
+// The same model can be served under a provider absent from models.dev;
+// prefer that provider's name, then another catalog entry for its id.
+function displayName(id: string): string | undefined {
+	let own = modelsDev.info(id)?.name
+	if (own) return own
+	let model = id.slice(id.indexOf('/') + 1)
+	for (let entries of Object.values(modelsDev.catalog())) if (entries[model]?.name) return entries[model].name
+	return undefined
+}
+
 // The provider's model ids (without "provider/"), newest cache; empty
 // if models.dev does not know the provider.
 function ids(name: string): string[] {
@@ -119,6 +129,7 @@ export const modelsDev = {
 	parse,
 	refresh,
 	info,
+	displayName,
 	ids,
 	contextWindow,
 }

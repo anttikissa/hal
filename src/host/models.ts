@@ -78,7 +78,7 @@ function known(): string[] {
 function names(ids: string[]): Record<string, string> {
 	let out: Record<string, string> = {}
 	for (let id of ids) {
-		let name = modelsDev.info(id)?.name
+		let name = modelsDev.displayName(id)
 		if (name) out[id] = name
 	}
 	return out

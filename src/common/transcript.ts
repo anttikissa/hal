@@ -273,7 +273,7 @@ function fresh(like: { provider: string; model?: string; effort?: string }): Liv
 // concern it. Events before the first snapshot are ignored.
 function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'snapshot') return t && t.meta.id !== event.sessionId ? t : transcript.fromSnapshot(event.snapshot)
-	if (!t || event.type === 'rejected' || event.type === 'warning' || event.type === 'tabs' || event.type === 'ack' || event.type === 'draft' || event.type === 'auth' || event.type === 'version' || event.sessionId !== t.meta.id) return t
+	if (!t || !('sessionId' in event) || event.type === 'rejected' || event.type === 'draft' || event.sessionId !== t.meta.id) return t
 	if (event.type === 'state') return { ...t, state: event.state }
 	if (event.type === 'inbox') return { ...t, inbox: event.inbox }
 	if (event.type === 'answer') return { ...t, items: transcript.answered(t.items, event) }

@@ -18,6 +18,7 @@ import { config } from './host/config.ts'
 import { diag } from './host/diag.ts'
 import { host } from './host/host.ts'
 import { jobs } from './host/jobs.ts'
+import { models } from './host/models.ts'
 import { modelsDev } from './host/models-dev.ts'
 import { sessions } from './host/sessions.ts'
 import { turns } from './host/turns.ts'
@@ -147,6 +148,8 @@ async function becomeHost(): Promise<boolean> {
 async function refreshModels(): Promise<void> {
 	let picked = [settings.model(), ...sessions.openIds().map((id) => sessions.open(id).model)]
 	let gone = await modelsDev.refresh([...new Set(picked)])
+	let names = models.names([...new Set(picked)])
+	if (Object.keys(names).length) for (let client of host.state.clients) client.deliver({ type: 'model-names', names })
 	if (!gone.length) return
 	let text = `models.dev no longer lists ${gone.join(', ')}`
 	for (let client of host.state.clients) client.deliver({ type: 'warning', text })

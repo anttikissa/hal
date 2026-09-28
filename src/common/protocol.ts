@@ -251,6 +251,9 @@ export type Event =
 	// The host process's version (task n1), sent on connect once known
 	// and to every client when the host learns it.
 	| { type: 'version'; version: string }
+	// Cached models.dev display names for the open tabs, sent on connect,
+	// model switch and background catalog refresh.
+	| { type: 'model-names'; names: Record<string, string> }
 
 export type EventType = Event['type']
 
@@ -318,6 +321,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	attached: { sessionId: 's', command: 's', blob: 's', marker: 's' },
 	warning: { text: 's' },
 	version: { version: 's' },
+	'model-names': { names: 'o' },
 	tabs: { tabs: 'a' },
 	go: { sessionId: 's', tab: 's' },
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },

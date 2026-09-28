@@ -60,6 +60,10 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 	liveFiles.save(meta)
 	history.append(id, { type: 'change', ...changed })
 	host.broadcast(id, changed.model === undefined ? { type: 'meta', sessionId: id, meta: { ...meta } } : { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
+	if (changed.model) {
+		let names = modelList.names([changed.model])
+		if (Object.keys(names).length) host.broadcast(id, { type: 'model-names', names })
+	}
 }
 
 // Session names change tab labels but not the model's working context.

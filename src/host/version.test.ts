@@ -57,11 +57,16 @@ test('a commit after start offers new code once; an uncommitted edit does not', 
 	expect(version.state.loaded).toBe(hash)
 })
 
-test('a tree with uncommitted changes at start is +dirty', async () => {
+test('local changes identify their content, not just an ambiguous dirty marker', async () => {
 	checkout([])
 	writeFileSync(`${repo}/a.ts`, 'edited')
 	await version.init()
-	expect(version.state.loaded).toBe(`${git('rev-parse', '--short', 'HEAD')}+dirty`)
+	let first = version.state.loaded!
+	expect(first).toMatch(new RegExp(`^${git('rev-parse', '--short', 'HEAD')}\\+[0-9a-f]{7}$`))
+	version.stop()
+	writeFileSync(`${repo}/a.ts`, 'edited again')
+	await version.init()
+	expect(version.state.loaded).not.toBe(first)
 })
 
 test('outside a checkout the version is unknown and nothing is watched', async () => {

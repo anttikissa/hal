@@ -26,6 +26,7 @@ import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { jobs } from './jobs.ts'
 import { pages } from './pages.ts'
+import { models } from './models.ts'
 import { push } from './push.ts'
 import { sessions } from './sessions.ts'
 import { prompts } from './prompts.ts'
@@ -64,7 +65,13 @@ function connect(deliver: (event: Event) => void): Connection {
 	if (version.state.loaded) client.deliver({ type: 'version', version: version.state.loaded })
 	// The tabs come with the first events, so no client has to ask.
 	try {
-		client.deliver({ type: 'tabs', tabs: tabs.list() })
+		let openTabs = tabs.list()
+		client.deliver({ type: 'tabs', tabs: openTabs })
+		queueMicrotask(() => {
+			if (!host.state.clients.has(client)) return
+			try { let names = models.names(openTabs.map((tab) => tab.model)); if (Object.keys(names).length) client.deliver({ type: 'model-names', names }) }
+			catch (e: any) { client.deliver({ type: 'warning', text: String(e?.message ?? e) }) }
+		})
 	} catch (e: any) {
 		client.deliver({ type: 'warning', text: String(e?.message ?? e) })
 	}

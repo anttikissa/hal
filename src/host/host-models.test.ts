@@ -8,8 +8,10 @@ import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
 import { provider, type Provider } from './provider.ts'
+import { modelsDev } from './models-dev.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
+import { tabs } from './tabs.ts'
 
 // /model and the model list: the host lists every configured
 // provider's models, and switching is an ordinary command.
@@ -39,6 +41,7 @@ beforeEach(() => {
 	calls = 0
 	synthetic.models = { ...origModels, ok: () => ({ say: 'ok' }) }
 	provider.state.providers = { acme: fake(['big-1', 'small-1']), down: fake(new Error('offline')) }
+	modelsDev.state.catalog = null
 	models.state.lists.clear()
 	models.state.lists.set('acme', { at: Date.now(), ids: ['acme/big-1', 'acme/small-1'] })
 })
@@ -50,6 +53,7 @@ afterEach(() => {
 	synthetic.models = origModels
 	provider.state.providers = origProviders
 	models.state.lists.clear()
+	modelsDev.state.catalog = null
 	liveFiles.onError = origOnError
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome
@@ -101,6 +105,17 @@ test('the first picker opens from cached models, while provider requests warm th
 	expect(ids).toEqual(expect.arrayContaining(['acme/big-1', 'acme/small-1']))
 	expect(new Set(ids).size).toBe(ids.length)
 	await until(() => calls >= 3)
+})
+
+test('a connecting client receives model display names from the cached catalog', async () => {
+	modelsDev.state.catalog = { acme: { 'big-1': { name: 'Acme Big' } } }
+	modelsDev.state.path = modelsDev.file()
+	let a = client()
+	let id = created(a, 'acme/big-1')
+	tabs.file().open.push(id)
+	let b = client()
+	await until(() => b.of('model-names').length)
+	expect(b.of('model-names')[0].names['acme/big-1']).toBe('Acme Big')
 })
 
 test('family aliases choose a subscription before an API key, and explain missing access', () => {

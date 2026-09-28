@@ -3,13 +3,10 @@
 
 import type { Shown } from './transcript.ts'
 
-// "anthropic/claude-opus-5-5" -> "Opus 5.5"; other ids without the
-// provider.
+// Names sent by the host's cached models.dev catalog; fall back to the
+// complete id, never a guessed marketing name.
 function modelName(id: string): string {
-	let model = id.slice(id.indexOf('/') + 1)
-	let m = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/.exec(model)
-	if (!m) return model
-	return `${m[1]![0]!.toUpperCase()}${m[1]!.slice(1)} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
+	return titles.names[id] ?? id
 }
 
 // Local HH:MM of an ISO time; '' without one. Parsed once per minute
@@ -48,4 +45,4 @@ function title(item: Shown): string | undefined {
 	return t ? `${t} ${w}` : w
 }
 
-export const titles = { modelName, time, who, title }
+export const titles = { names: {} as Record<string, string>, modelName, time, who, title }

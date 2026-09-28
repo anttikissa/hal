@@ -4,7 +4,7 @@ import type { SlashCommand } from '../commands.ts'
 import { version } from '../version.ts'
 
 export const command: SlashCommand = {
-	help: () => "/version shows the host's version: the commit its checkout was at when it started (+dirty if it had uncommitted changes), and whether a newer commit is checked out since.",
+	help: () => "/version shows the host's startup commit, plus a short git stash-create hash when local changes were present, and whether a newer commit is checked out.",
 	run: () => {
 		let st = version.state
 		if (!st.loaded) return { say: 'version: still looking it up' }
