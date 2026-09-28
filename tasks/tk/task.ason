@@ -1,9 +1,9 @@
 {
 	title: '/budget: spawn slots of a session',
-	spec: "/budget shows how many spawn slots the current session has left (task 0a's slots); /budget <n> sets them, /budget +n and -n adjust; a negative result or a non-number is refused with the usage. Only a human runs it (a command, never a tool), so the model cannot raise its own limit. Tests: show, set, adjust, refusals.",
+	spec: "/budget shows how many spawn slots the current session has left (task 0a's slots); /budget <n> sets them, /budget +n and -n adjust; a negative result, unsafe integer, or a non-number is refused with the usage. Only a human may run it: it is a command, never a tool, and session-sent slash commands cannot adjust it. The model cannot raise its own limit. Tests: show, set, adjust, refusals including session-sent commands.",
 	status: 'done',
-	needs: ['x0'],
 	notes: [
 		'The durable SessionMeta.slots defaults through subagents.initialSlots(), just as spawn does; /budget writes slots directly on the live session metadata. Only submitted slash commands, not provider tools, expose adjustment. Reject unsafe integers and negative adjustments before mutation.'
-	]
+	],
+	needs: ['x0']
 }

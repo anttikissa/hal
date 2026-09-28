@@ -22,6 +22,7 @@ import { status } from './status.ts'
 // not quit or restart the user's terminal).
 function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string): string | undefined {
 	if (commandList.byName(call.name)?.clientOnly) return `only a client can run /${call.name}`
+	if (call.name === 'budget' && from !== undefined) return 'only a human can run /budget'
 	if (!commands.all().has(call.name)) return `unknown command /${call.name} (/help lists them)`
 	let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text }
 	if (from !== undefined) record.from = from

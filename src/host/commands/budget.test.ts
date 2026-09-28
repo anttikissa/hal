@@ -19,4 +19,8 @@ test('/budget shows default, sets and adjusts slots, rejecting invalid or negati
 	expect((await submit('/budget -7')).text).toContain('1 spawn slot')
 	for (let text of ['/budget -2', '/budget nope', '/budget 2.5', '/budget 999999999999999999999']) expect((await submit(text)).error).toBe(true)
 	expect(sessions.open(id).slots).toBe(1)
+	let other = created(c)
+	c.conn.send({ type: 'submit', sessionId: other, text: `/send ${id} /budget 99` })
+	await until(() => c.of('output').some((o) => o.error && o.text?.includes('only a human can run /budget')))
+	expect(sessions.open(id).slots).toBe(1)
 })
