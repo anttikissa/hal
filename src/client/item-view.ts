@@ -55,10 +55,10 @@ function headed(item: Item, body: string[], width: number): string[] {
 function itemLines(item: Item, width: number, streaming = false): string[] {
 	let promptWidth = width - promptView.FIRST.length
 	switch (item.type) {
-		// A prompt card ends with a row of its background, as it starts
-		// with its header.
+		// A prompt card has a row of its background above the header and
+		// below the body, as in the old Hal.
 		case 'prompt':
-			return [...itemView.headed(item, ansi.wrap(item.text, width).map(ansi.links), width), '']
+			return ['', ...itemView.headed(item, ansi.wrap(item.text, width).map(ansi.links), width), '']
 		case 'image':
 			return [attachments.label(item)]
 		// Trailing blank lines the model streamed are not drawn: the one

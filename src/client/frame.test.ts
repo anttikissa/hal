@@ -405,7 +405,7 @@ test('a [paste/<name>] marker links to its page; while its upload is in flight i
 })
 
 
-test('prompts, text and thinking have a header row, a blank row and the body; a prompt card ends with a row of its colour', () => {
+test('prompts, text and thinking have a header row, a blank row and the body; a prompt card has a row of its colour above and below', () => {
 	let ts = new Date(2026, 8, 28, 10, 49).toISOString()
 	let items: Item[] = [
 		{ type: 'prompt', text: 'Can you?', ts },
@@ -417,14 +417,14 @@ test('prompts, text and thinking have a header row, a blank row and the body; a 
 	let f = frame.build(view(items), 60)
 	let lines = plain(f.lines)
 	let at = (s: string) => lines.indexOf(s)
-	expect(lines.slice(at('10:49 You'), at('10:49 You') + 4)).toEqual(['10:49 You', '', 'Can you?', ''])
+	expect(lines.slice(at('10:49 You') - 1, at('10:49 You') + 4)).toEqual(['', '10:49 You', '', 'Can you?', ''])
 	expect(lines.slice(at('10:49 Hal (Opus 5.5, thinking high)'), at('10:49 Hal (Opus 5.5, thinking high)') + 3)).toEqual(['10:49 Hal (Opus 5.5, thinking high)', '', 'Hmm.'])
 	expect(lines.slice(at('10:49 Hal (Opus 5.5)'), at('10:49 Hal (Opus 5.5)') + 3)).toEqual(['10:49 Hal (Opus 5.5)', '', 'Yes.'])
 	expect(lines).toContain('10:49 Message from tab 4: Review')
 	expect(lines).toContain('> /help')
 	// The prompt's background paints its blank rows too: the whole card.
 	let bg = `48;2;${oklch.toRgb(colors.user().bg!).join(';')}`
-	for (let i = at('10:49 You'); i < at('10:49 You') + 4; i++) expect(f.lines[i]).toContain(bg)
+	for (let i = at('10:49 You') - 1; i < at('10:49 You') + 4; i++) expect(f.lines[i]).toContain(bg)
 })
 
 test('a narrow terminal clips the header and keeps the block id', () => {

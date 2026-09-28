@@ -100,11 +100,13 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor): 
 	let inner = ref ? Math.max(1, width - strings.visLen(ref.text) - 1) : width
 	let lines = itemView.itemLines(item, inner, !!hal)
 	if (hal) lines = frame.withCursor(lines, hal, inner)
-	if (ref && lines.length) {
-		let gap = ' '.repeat(Math.max(1, width - strings.visLen(lines[0]!) - strings.visLen(ref.text)))
+	// The id goes on the header row, below a prompt's leading blank row.
+	let at = item.type === 'prompt' ? 1 : 0
+	if (ref && lines.length > at) {
+		let gap = ' '.repeat(Math.max(1, width - strings.visLen(lines[at]!) - strings.visLen(ref.text)))
 		// The glyph may have ended the item's colour: take it up again.
 		let fg = style?.fg ? ansi.sgr({ fg: style.fg }) : ''
-		lines[0] += `${gap}${fg}${ansi.DIM}\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}${ansi.UNDIM}`
+		lines[at] += `${gap}${fg}${ansi.DIM}\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}${ansi.UNDIM}`
 	}
 	let rows = lines.map((r) => ansi.paint(r, style, cols))
 	if (!hal) frame.state.rows.set(item, { key, rows })
