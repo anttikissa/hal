@@ -117,7 +117,7 @@ function recordItems(r: HistoryRecord, at: number): Item[] {
 }
 
 function recordShown(r: HistoryRecord): Shown[] {
-	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
+	if (r.type === 'continue' || r.type === 'blocked' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
 	if (r.type === 'question') return [{ type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))

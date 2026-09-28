@@ -82,6 +82,11 @@ progress, pause it with a reason.
   time in the body), which can be hours away. Must survive restart.
 - Auth broken (401, refresh token rejected, e.g. a copied credentials
   file): blocked on login; continue by itself once credentials work.
+  The block is durable (a `blocked` history record): a restart shows
+  the same blocked state and goes on waiting for the credentials
+  without trying the request again, and messages sent meanwhile stay in
+  the inbox until the round that follows the login takes them in. A
+  restart never changes what the user sees (Ctrl-R keeps the screen).
 - Laptop sleep: after wake it must just work, as if the lid had never
   closed. This is hard to test, so defensive code is allowed here (and
   only here): detect the wake (timer gap, clock jump) and treat every

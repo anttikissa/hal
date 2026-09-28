@@ -173,6 +173,36 @@ test('broken login blocks until the credentials file changes, then continues by 
 	expect(a.ends()[0]).toMatchObject({ status: 'completed' })
 })
 
+test('a restart while blocked on a login goes on waiting, with steering still waiting', async () => {
+	let a = client()
+	let changed = () => {}
+	auth.changed = (signal) => new Promise<void>((r) => ((changed = r), signal?.addEventListener('abort', () => r())))
+	script = [[{ type: 'error', message: 'invalid_grant', failure: 'auth' }]]
+	let id = start(a)
+	await until(() => status.stateOf(id).type === 'blocked')
+	a.conn.send({ type: 'submit', sessionId: id, text: 'steer' })
+	await until(() => status.inboxOf(id).length)
+	let before = { state: status.stateOf(id), inbox: status.inboxOf(id), records: history.readSync(id).length }
+	// A new host (Ctrl-R): memory gone, the same files.
+	history.stop(false)
+	host.reset()
+	sessions.closeAll()
+	history.state.running.clear()
+	script = [done]
+	await turns.recover()
+	await until(() => status.stateOf(id).type === 'blocked')
+	expect(status.stateOf(id)).toEqual(before.state)
+	expect(status.inboxOf(id)).toEqual(before.inbox)
+	expect(history.readSync(id)).toHaveLength(before.records)
+	expect(calls).toHaveLength(1)
+	// Logging in delivers the steering with the next round.
+	changed()
+	await until(() => status.stateOf(id).type === 'idle')
+	expect(calls).toHaveLength(2)
+	expect(JSON.stringify(calls[1]!.input.messages)).toContain('steer')
+	expect(status.inboxOf(id)).toEqual([])
+})
+
 test('a rejected token (auth with a retry time) retries instead of blocking', async () => {
 	let a = client()
 	script = [[{ type: 'error', message: 'HTTP 401', status: 401, failure: 'auth', retryAt: now }], done]
