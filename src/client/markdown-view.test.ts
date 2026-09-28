@@ -55,6 +55,12 @@ describe('terminal markdown', () => {
 		expect(rows.some((r) => r.includes('identifier_name'))).toBe(true)
 		expect(rows.filter((r) => r.startsWith('│')).length).toBeGreaterThan(2)
 	})
+	test('a two-line cell puts the bar over the reset text in one row', () => {
+		let rows = markdownView.lines('| Account | 5h |\n|---|---|\n| alice | █████<br>95% used (resets 23:39) |', 64).map(visible)
+		expect(rows.some((r) => r.includes('█████') && r.includes('alice'))).toBe(true)
+		expect(rows.some((r) => r.includes('95% used (resets 23:39)') && !r.includes('alice'))).toBe(true)
+		expect(rows.join('')).not.toContain('<br>')
+	})
 })
 
 describe('high-water mark', () => {

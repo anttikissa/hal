@@ -86,6 +86,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Markdown .table { overflow-x: auto; margin: 0.3rem 0; white-space: normal; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
 .Markdown table { border-collapse: collapse; }
 .Markdown th, .Markdown td { border: 1px solid color-mix(in oklab, currentColor 30%, transparent); padding: 0.15rem 0.5rem; text-align: left; vertical-align: top; overflow-wrap: normal; min-width: 6ch; }
+.Markdown td { white-space: pre-line; }
 @property --fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @keyframes md-fade { from { --fade: 2.5rem; } 99% { --fade: 2.5rem; } to { --fade: 0px; } }
 @keyframes blink { 50% { opacity: 0; } }

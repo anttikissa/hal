@@ -139,7 +139,7 @@ function cells(row: string, open: boolean): Run[][] {
 		.trim()
 		.replace(/^\||\|$/g, '')
 		.split('|')
-		.map((c) => inline(c.trim(), open))
+		.map((c) => c.trim().split(/<br\s*\/?>/i).flatMap((line, i) => [...(i ? [{ text: '\n' }] : []), ...inline(line, open)]))
 }
 
 function parse(text: string, streaming = false): Block[] {

@@ -63,6 +63,11 @@ describe('parse', () => {
 		expect(table.type === 'table' && table.rows.map((r) => r.map(show))).toEqual([['a', 'b'], ['1', '2']])
 		expect(blocks[5]).toEqual({ type: 'line', kind: 'p', marker: '', runs: [] })
 	})
+	test('table cell line breaks become newlines, without interpreting arbitrary HTML', () => {
+		let block = markdown.parse('| window | value |\n|---|---|\n| 5h | ▉<br>95% used |')[0]!
+		expect(block.type === 'table' && block.rows[1]![1]!.map((r) => r.text).join('')).toBe('▉\n95% used')
+		expect(markdown.inline('<script>alert(1)</script>').map((r) => r.text).join('')).toBe('<script>alert(1)</script>')
+	})
 
 	test('an open fence is code to the end', () => {
 		expect(markdown.parse('```\nx\n**y')).toEqual([{ type: 'code', lang: '', open: '```', lines: ['x', '**y'], close: undefined }])

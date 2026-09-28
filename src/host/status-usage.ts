@@ -1,12 +1,14 @@
 // /status: one table shape for the terminal and web (both render Markdown).
 // Usage normally comes from response headers; stale subscriptions can be
 // refreshed from the provider's usage endpoint without sending a model turn.
-import { auth, type Kind } from './auth.ts'
+import { auth, jwtClaims, type Kind } from './auth.ts'
 import { clock } from './clock.ts'
 import { usage, type Windows } from './usage.ts'
+import { liveFiles } from './live-file.ts'
+import { version } from './version.ts'
 
 type Account = ReturnType<typeof auth.all>['list'][number]
-export type UsageRow = { provider: Kind; slot: string; account: string; windows: Windows; apiKey: boolean }
+export type UsageRow = { provider: Kind; slot: string; account: string; plan?: string; error?: string; windows: Windows; apiKey: boolean }
 
 function mask(value: string): string {
 	return value.replace(/^([^@])[^@]*@([^.]*)?(\..*)$/, (_all, first: string, domain: string, suffix: string) => `${first}***@${domain?.slice(0, 1) ?? ''}****${suffix}`)
@@ -15,28 +17,38 @@ function mask(value: string): string {
 function reset(at: string, now = clock.now()): string {
 	let date = new Date(at)
 	let today = new Date(now)
-	let time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-	return date.toDateString() === today.toDateString() ? `today at ${time}` : `on ${date.getDate()} ${date.toLocaleString(undefined, { month: 'short' })} at ${time}`
+	let time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+	return date.toDateString() === today.toDateString() ? time : `${time} on ${date.getDate()} ${date.toLocaleString(undefined, { month: 'short' })}`
 }
 
 function bar(percent: number): string {
-	let filled = Math.round(Math.max(0, Math.min(100, percent)) / 10)
-	return '█'.repeat(filled) + '░'.repeat(10 - filled)
+	let eighths = Math.round(Math.max(0, Math.min(100, percent)) * 14 * 8 / 100)
+	let whole = Math.floor(eighths / 8)
+	let part = eighths % 8
+	return '█'.repeat(whole) + (part ? '▏▎▍▌▋▊▉'[part - 1] : '') + '░'.repeat(14 - whole - (part ? 1 : 0))
 }
 
 function table(rows: UsageRow[]): string {
-	let names = [...new Set(rows.flatMap((row) => Object.keys(row.windows)))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-	let cols = names.length ? names : ['Usage']
-	let lines = [`| Provider | Slot | Account | ${cols.join(' | ')} |`, `|${Array(cols.length + 3).fill(' --- ').join('|')}|`]
-	for (let row of rows) {
-		let cells = cols.map((name) => {
-			if (row.apiKey) return 'API key'
-			let w = row.windows[name]
-			return w ? `${bar(w.used)} ${Math.round(w.used)}% used${w.resets ? ` (resets ${reset(w.resets)})` : ''}` : '—'
-		})
-		lines.push(`| ${row.provider} | ${row.slot} | ${row.account} | ${cells.join(' | ')} |`)
+	let groups: string[] = []
+	for (let kind of ['anthropic', 'openai'] as const) {
+		let accounts = rows.filter((row) => row.provider === kind)
+		if (!accounts.length) continue
+		let names = [...new Set(accounts.flatMap((row) => Object.keys(row.windows)))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+		let cols = names.length ? names : ['5h', '7d']
+		let lines = [`${kind === 'anthropic' ? 'Anthropic' : 'OpenAI'} subscriptions:`, '', `| Slot | Account | ${cols.join(' | ')} |`, `|${Array(cols.length + 2).fill('---').join('|')}|`]
+		for (let row of accounts) {
+			let safe = (value: string) => value.replace(/[|<>]/g, ' ').replace(/\*/g, '\\*')
+			let account = `${safe(statusUsage.mask(row.account))}${row.plan ? ` (${safe(row.plan)})` : ''}${row.error ? `<br>${safe(row.error)}` : ''}`
+			let cells = cols.map((name) => {
+				if (row.apiKey) return 'API key'
+				let w = row.windows[name]
+				return w ? `${statusUsage.bar(w.used)}<br>${Math.round(w.used)}% used${w.resets ? ` (resets ${statusUsage.reset(w.resets)})` : ''}` : '?'
+			})
+			lines.push(`| ${row.slot} | ${account} | ${cells.join(' | ')} |`)
+		}
+		groups.push(lines.join('\n'))
 	}
-	return lines.join('\n')
+	return groups.join('\n\n')
 }
 
 // A provider response is only a cache update when it contains valid windows.
@@ -74,20 +86,56 @@ async function refresh(kind: Kind, account: Account): Promise<void> {
 	if (credential.type !== 'token') return
 	let url = kind === 'anthropic' ? 'https://api.anthropic.com/api/oauth/usage' : 'https://chatgpt.com/backend-api/wham/usage'
 	let headers: Record<string, string> = { Authorization: `Bearer ${credential.value}` }
+	if (kind === 'anthropic') Object.assign(headers, { 'anthropic-version': '2023-06-01', 'anthropic-beta': 'oauth-2025-04-20', Accept: 'application/json' })
 	if (kind === 'openai' && credential.accountId) headers['ChatGPT-Account-ID'] = credential.accountId
 	let response = await fetch(url, { headers, signal: AbortSignal.timeout(5000) })
-	if (!response.ok) throw new Error(`${kind} usage: HTTP ${response.status}`)
-	let windows = statusUsage.payload(kind, await response.json())
-	if (!Object.keys(windows).length) throw new Error(`${kind} usage: no windows returned`)
+	if (!response.ok) throw new Error(`HTTP ${response.status}`)
+	let raw = await response.json()
+	let windows = statusUsage.payload(kind, raw)
+	if (!Object.keys(windows).length) throw new Error('no windows returned')
 	let store = usage.store()
 	store[kind] ??= {}
 	let observed = new Date(clock.now()).toISOString()
 	store[kind]![account.name] = { ...store[kind]![account.name], ...Object.fromEntries(Object.entries(windows).map(([name, w]) => [name, { ...w, observed }])) }
+	let email = typeof raw?.email === 'string' && raw.email.includes('@') ? raw.email : jwtClaims(credential.value)?.['https://api.openai.com/profile']?.email
+	if (kind === 'anthropic' && !email && !account.entry.email && !account.name.includes('@')) {
+		try {
+			let profile = await fetch('https://api.anthropic.com/api/oauth/profile', { headers, signal: AbortSignal.timeout(5000) })
+			if (profile.ok) email = (await profile.json())?.account?.email
+		} catch { /* usage still succeeded */ }
+	}
+	let current = auth.all(kind).list.find((a) => a.name === account.name)?.entry ?? account.entry
+	if (typeof email === 'string' && email.includes('@') && !current.email) {
+		current.email = email
+		if (account.name !== email) {
+			store[kind]![email] = { ...store[kind]![email], ...store[kind]![account.name] }
+			delete store[kind]![account.name]
+			for (let [key, name] of auth.state.chosen) if (key.startsWith(`${kind} `) && name === account.name) auth.state.chosen.set(key, email)
+		}
+	}
+	if (kind === 'openai' && typeof raw?.plan_type === 'string' && /^[\w -]{1,32}$/.test(raw.plan_type)) current.plan = raw.plan_type
+	if (current.email || current.plan) liveFiles.save(data)
+}
+
+function problem(error: unknown): { text: string; login: boolean } {
+	let message = error instanceof Error ? error.message : String(error)
+	let http = /HTTP (\d{3})/.exec(message)
+	if (http) return { text: `HTTP ${http[1]}`, login: http[1] === '401' || http[1] === '403' }
+	if (/invalid_grant|expired|rejected|no refreshToken|login/i.test(message)) return { text: 'login expired', login: true }
+	if (/timeout|timed out|abort/i.test(message)) return { text: 'timed out', login: false }
+	return { text: 'refresh failed', login: false }
+}
+
+function runtime(): string {
+	let started = new Date(clock.now() - process.uptime() * 1000)
+	let uptime = Math.floor(process.uptime())
+	let date = `${started.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })} on ${started.getDate()} ${started.toLocaleString(undefined, { month: 'short' })} ${started.getFullYear()}`
+	return `Runtime:\nPID: ${process.pid} · version: ${version.state.loaded ?? 'unknown'}\nStarted: ${date} (${Math.floor(uptime / 3600)}h ${Math.floor(uptime % 3600 / 60)}m ago)`
 }
 
 async function show(sessionId: string, model: string): Promise<string> {
 	let rows: UsageRow[] = []
-	let failures: string[] = []
+	let broken = false
 	for (let kind of ['anthropic', 'openai'] as const) {
 		let list: Account[]
 		try { list = auth.all(kind).list } catch (e: any) {
@@ -99,13 +147,23 @@ async function show(sessionId: string, model: string): Promise<string> {
 			let apiKey = !auth.usable(account.entry.accessToken)
 			let data = usage.store()[kind]?.[account.name] ?? {}
 			let recent = Math.max(0, ...Object.values(data).map((w) => Date.parse(w.observed ?? '') || 0))
+			let error: string | undefined
 			if (!apiKey && clock.now() - recent > 60_000) {
-				try { await statusUsage.refresh(kind, account) } catch (e: any) { failures.push(`${kind} ${statusUsage.mask(account.name)}: refresh failed (${e?.message ?? e}); showing cached usage`) }
+				try { await statusUsage.refresh(kind, account) } catch (e) {
+					let failure = statusUsage.problem(e)
+					error = `${failure.text} — showing cached usage`
+					broken ||= failure.login
+				}
 			}
-			rows.push({ provider: kind, slot: `${i + 1}/${list.length}${account.name === selected ? ' *' : ''}`, account: statusUsage.mask(account.name), windows: apiKey ? {} : usage.windows(kind, account.name), apiKey })
+			let current = auth.all(kind).list[i]?.entry ?? account.entry
+			let email = current.email ?? jwtClaims(current.accessToken ?? '')?.['https://api.openai.com/profile']?.email
+			let name = typeof email === 'string' && email.includes('@') ? email : account.name
+			let key = usage.store()[kind]?.[name] ? name : account.name
+			let plan = kind === 'openai' && typeof current.plan === 'string' && /^[\w -]{1,32}$/.test(current.plan) ? current.plan : undefined
+			rows.push({ provider: kind, slot: `${i + 1}/${list.length}${(account.name === selected || name === selected) ? ' *' : ''}`, account: name, plan, error, windows: apiKey ? {} : usage.windows(kind, key), apiKey })
 		}
 	}
-	return `${rows.length ? statusUsage.table(rows) : 'No accounts configured.'}${failures.length ? `\n\n${failures.join('\n')}` : ''}`
+	return `${statusUsage.runtime()}\n\n${rows.length ? statusUsage.table(rows) : 'No accounts configured.'}${broken ? '\n\nTo log in again, run /login claude or /login chatgpt.' : ''}`
 }
 
-export const statusUsage = { mask, reset, bar, table, payload, refresh, show }
+export const statusUsage = { mask, reset, bar, table, payload, refresh, problem, runtime, show }

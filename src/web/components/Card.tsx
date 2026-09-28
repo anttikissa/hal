@@ -127,7 +127,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let cursor = () => <span class="cursor" aria-hidden="true" />
 	// Model text is markdown (task fn), Hal's cursor after its last line.
 	// A memo, so a new row object while streaming rebuilds nothing.
-	let md = createMemo(() => props.row.item.type === 'text' || props.row.item.type === 'thinking')
+	let md = createMemo(() => props.row.item.type === 'text' || props.row.item.type === 'thinking' || props.row.item.type === 'output')
 	let markdown = () => (
 		<Markdown text={shown()?.text ?? ''} streaming={props.cursor}>
 			<Show when={props.cursor}>{cursor()}</Show>

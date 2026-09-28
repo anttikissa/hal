@@ -54,14 +54,24 @@ function fit(natural: number[], words: number[], room: number): number[] {
 function table(rows: Run[][][], width: number, style?: Style): string[] {
 	let n = Math.max(...rows.map((r) => r.length))
 	let plain = (c: Run[] | undefined) => (c ?? []).map((r) => r.text).join('')
-	let col = (f: (s: string) => number) => Array.from({ length: n }, (_, i) => Math.max(1, ...rows.map((r) => f(plain(r[i])))))
+	let col = (f: (s: string) => number) => Array.from({ length: n }, (_, i) => Math.max(1, ...rows.flatMap((r) => plain(r[i]).split('\n').map(f))))
 	let words = col((s) => Math.max(0, ...s.split(/\s+/).map((w) => strings.visLen(w))))
 	let w = markdownView.fit(col((s) => strings.visLen(s)), words, width - 3 * n - 1)
 	let rule = (l: string, m: string, r: string) => ansi.quiet(l + w.map((x) => '─'.repeat(x + 2)).join(m) + r, style)
 	let bar = ansi.quiet('│', style)
 	let out = [rule('┌', '┬', '┐')]
 	rows.forEach((row, ri) => {
-		let cells = w.map((x, i) => wrapRuns((row[i] ?? []).map((r) => (ri ? r : { ...r, bold: true })), x))
+		let cells = w.map((x, i) => {
+			let lines: Run[][] = [[]]
+			for (let r of row[i] ?? []) {
+				let parts = r.text.split('\n')
+				parts.forEach((text, k) => {
+					if (k) lines.push([])
+					if (text) lines.at(-1)!.push(ri ? { ...r, text } : { ...r, text, bold: true })
+				})
+			}
+			return lines.flatMap((runs) => wrapRuns(runs, x))
+		})
 		let height = Math.max(...cells.map((c) => c.length))
 		for (let k = 0; k < height; k++) {
 			let parts = cells.map((c, i) => (c[k] ?? '') + ' '.repeat(w[i]! - strings.visLen(c[k] ?? '')))

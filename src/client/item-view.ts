@@ -137,7 +137,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			return promptView.mark(ansi.wrap(text, promptWidth))
 		}
 		case 'output':
-			return ansi.wrap(item.text, width)
+			return markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item))
 		// One row: the text centred in a rule across the width.
 		case 'divider': {
 			let text = strings.clipVisual(` ${item.text} `, width)
