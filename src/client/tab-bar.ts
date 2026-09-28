@@ -11,28 +11,24 @@ import { colors } from '../common/colors.ts'
 import type { Oklch } from '../common/oklch.ts'
 import type { Tab } from '../common/protocol.ts'
 import { strings } from '../common/strings.ts'
+import { tabMark } from '../common/tab-mark.ts'
 import { ansi } from './ansi.ts'
 
 type Part = { text: string; fg?: Oklch; link?: string; dim?: Oklch }
 type Hint = { text: string; priority: number }
 
-// The one character after a tab's number, if any, its colour and, if
-// it blinks, `dim`: its colour in the dark phase. From the session
-// state (tasks/j1/states.md) and whether the tab wants attention (its
-// turn ended, failed or asked since a client showed it).
+// The mark after a tab's number (common/tab-mark.ts, shared with the
+// web), its colour and, if it blinks, `dim`: its colour in the dark
+// phase.
 function indicator(tab: Tab): Part | undefined {
+	let m = tabMark.mark(tab)
+	if (!m) return undefined
 	let c = colors.tab()
-	let s = tab.state
 	let hal = colors.assistant()
 	let darker = ([L, C, h]: Oklch): Oklch => [L * 0.65, C, h]
-	if (s.type === 'blocked') return { text: '!', fg: c.warningFg! }
-	if (s.type === 'running' && tab.attention) return { text: '◆', fg: c.warningFg!, dim: darker(c.warningFg!) }
-	if (s.type === 'running') return { text: '▪', fg: hal.cursor!, dim: hal.cursorIdle! }
-	if (s.type === 'retrying' || s.type === 'error') return { text: '✗', fg: c.errorFg!, dim: darker(c.errorFg!) }
-	if (s.type === 'paused') return { text: '!', fg: c.pausedFg! }
-	// Idle: its last turn finished and nobody has looked yet.
-	if (tab.attention) return { text: '✓', fg: c.doneFg! }
-	return undefined
+	let fg: Oklch = { asking: c.warningFg!, noticed: c.warningFg!, working: hal.cursor!, failed: c.errorFg!, paused: c.pausedFg!, done: c.doneFg! }[m.kind]
+	if (!m.blinks) return { text: m.glyph, fg }
+	return { text: m.glyph, fg, dim: m.kind === 'working' ? hal.cursorIdle! : darker(fg) }
 }
 
 // Whether any tab in `list` has a blinking indicator.

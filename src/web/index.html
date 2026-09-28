@@ -113,8 +113,12 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .tab[aria-current] { color: var(--active-fg); }
 .Tabs [aria-current] .n { font-weight: 600; }
 .Tabs .marker { font-size: 0.85em; }
-.Tabs .marker.working { color: var(--active-fg); animation: pulse 1s steps(2) infinite; }
-.Tabs .marker.asking { color: var(--warning-fg); font-weight: 600; }
+.Tabs .marker.blink { animation: pulse 1s steps(2) infinite; }
+.Tabs .marker.working { color: var(--active-fg); }
+.Tabs .marker.asking, .Tabs .marker.noticed { color: var(--warning-fg); font-weight: 600; }
+.Tabs .marker.paused { color: var(--paused-fg); font-weight: 600; }
+.Tabs .marker.failed { color: var(--error-fg); }
+.Tabs .marker.done { color: var(--done-fg); }
 .Tabs button { background: transparent; color: inherit; padding: 0.2rem 0.5rem; }
 .Tabs button:hover, .Tabs .tab:hover { background: color-mix(in oklab, currentColor 14%, transparent); }
 .Tabs .close { color: var(--inactive-fg); }

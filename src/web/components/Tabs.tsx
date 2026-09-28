@@ -1,25 +1,23 @@
 /// <reference lib="dom" />
 // The host's tabs above the conversation. Each tab is a link to its
 // address (Cmd- or middle-click opens it in a browser tab; a plain
-// click shows it here) with its number, name and a marker: a dot while
-// it works, ? when it waits for an answer, a bell when it wants
-// attention. A close button per tab and a new tab button (in the shown
+// click shows it here) with its number, name and the same marker as the
+// terminal's tab bar. A close button per tab and a new tab button (in the shown
 // tab's cwd). The strip wraps and never scrolls sideways, which would
 // fight the back-swipe gesture; on narrow screens it is one button
 // opening a sheet with the same list and actions.
 
 import { createEffect, createSignal, For } from 'solid-js'
 import type { Tab } from '../../common/protocol.ts'
-import { states } from '../../common/states.ts'
+import { tabMark } from '../../common/tab-mark.ts'
 import { router } from '../router.ts'
 import { tabs } from '../tabs.ts'
 
-// The marker: what it shows and says.
-function marker(tab: Tab): { glyph: string; label: string; class: string } | undefined {
-	if (tab.state.type === 'blocked') return { glyph: '?', label: 'waiting for an answer', class: 'asking' }
-	if (states.busy(tab.state)) return { glyph: '●', label: 'working', class: 'working' }
-	if (tab.attention) return { glyph: '🔔', label: 'wants attention', class: 'attention' }
-	return undefined
+// The marker: the same glyph as the terminal's (common/tab-mark.ts),
+// styled by its kind; a blinking one pulses.
+function marker(tab: Tab): { glyph: string; label: string; class: string[] } | undefined {
+	let m = tabMark.mark(tab)
+	return m && { glyph: m.glyph, label: m.label, class: [m.kind, ...(m.blinks ? ['blink'] : [])] }
 }
 
 // A plain left click shows the tab here; anything else is the browser's.
@@ -42,7 +40,7 @@ function Link(props: { tab: Tab; n: number; shown: boolean; onPick?: () => void 
 		>
 			<span class="n">{props.n}</span>
 			<span class="name">{props.tab.name}</span>
-			<span class={['marker', m()?.class]} role="img" aria-label={m()?.label} hidden={!m()}>
+			<span class={['marker', ...(m()?.class ?? [])]} role="img" aria-label={m()?.label} hidden={!m()}>
 				{m()?.glyph ?? ''}
 			</span>
 		</a>
