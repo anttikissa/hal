@@ -1,0 +1,268 @@
+import { test, expect, describe } from 'bun:test'
+import { md, type MdColors } from './md.ts'
+import {
+	visLen,
+	hardWrap,
+	resolveMarkers,
+	M_BOLD,
+	M_BOLD_OFF,
+	M_ITALIC,
+	M_ITALIC_OFF,
+} from '../../utils/strings.ts'
+
+// mdInline outputs PUA marker chars, not raw ANSI.
+// resolveMarkers() converts them to ANSI later.
+const B = M_BOLD,
+	B_OFF = M_BOLD_OFF
+const I = M_ITALIC,
+	I_OFF = M_ITALIC_OFF
+const LINK_COLORS: MdColors = {
+	bold: [M_BOLD, M_BOLD_OFF],
+	italic: [M_ITALIC, M_ITALIC_OFF],
+	code: ['', ''],
+	link: ['<link>', '</link>'],
+}
+
+/** Strip ANSI escapes AND marker chars for plain-text assertions. */
+function strip(s: string): string {
+	return s.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\uE000-\uE003]/g, '')
+}
+
+// ── mdInline ─────────────────────────────────────────────────────────────────
+
+test('mdInline: inline code defaults to plain text', () => {
+	expect(md.mdInline('run `npm install`')).toBe('run npm install')
+})
+
+test('mdInline: star inside backtick code is not italic', () => {
+	const r = md.mdInline('matching `state/sessions/*/session.ason` and `*` only')
+	expect(r).not.toContain(I)
+	expect(r).toContain('state/sessions/*/session.ason')
+	expect(r).toContain('*')
+})
+
+test('mdInline: backslash stays literal inside inline code', () => {
+	const source = 'Git receives `\\` then `n`.'
+	const colors = {
+		bold: ['', ''] as [string, string],
+		italic: ['', ''] as [string, string],
+		code: ['<', '>'] as [string, string],
+	}
+	expect(md.mdInline(source, colors)).toBe('Git receives <\\> then <n>.')
+})
+
+test('mdInline: escaped backtick stays literal outside code', () => {
+	expect(md.mdInline('escape \\` marker')).toBe('escape ` marker')
+})
+
+test('mdInline: escaped stars stay literal', () => {
+	const r = md.mdInline('a\\*\\*\\*@g\\*\\*\\*\\*.com')
+	expect(strip(r)).toBe('a***@g****.com')
+	expect(r).not.toContain(I)
+})
+
+test('mdInline: links render their label as an OSC 8 hyperlink', () => {
+	const url = 'https://example.com/docs'
+	expect(md.mdInline(`Read [the docs](${url}).`, LINK_COLORS)).toBe(
+		`Read \x1b]8;;${url}\x07<link>the docs</link>\x1b]8;;\x07.`,
+	)
+})
+
+test('mdInline: formatting works inside link labels', () => {
+	const url = 'https://example.com'
+	expect(md.mdInline(`[**important**](${url})`, LINK_COLORS)).toBe(
+		`\x1b]8;;${url}\x07<link>${B}important${B_OFF}</link>\x1b]8;;\x07`,
+	)
+})
+
+test('mdInline: non-web and malformed links stay unchanged', () => {
+	expect(md.mdInline('[run](javascript:alert(1)) and [broken](https://example.com')).toBe(
+		'[run](javascript:alert(1)) and [broken](https://example.com',
+	)
+})
+
+// ── mdSpans ──────────────────────────────────────────────────────────────────
+
+test('mdSpans: code fence', () => {
+	const spans = md.mdSpans('before\n```ts\nconst x = 1\n```\nafter')
+	expect(spans).toEqual([
+		{ type: 'text', lines: ['before'] },
+		{ type: 'code', lang: 'ts', lines: ['const x = 1'] },
+		{ type: 'text', lines: ['after'] },
+	])
+})
+
+test('mdSpans: unclosed code fence', () => {
+	const spans = md.mdSpans('```\ncode here')
+	expect(spans).toEqual([{ type: 'code', lang: '', lines: ['code here'] }])
+})
+
+test('mdSpans: table', () => {
+	const spans = md.mdSpans('text\n| a | b |\n| c | d |\nmore')
+	expect(spans.length).toBe(3)
+	expect(spans[0]).toEqual({ type: 'text', lines: ['text'] })
+	expect(spans[1]).toEqual({ type: 'table', lines: ['| a | b |', '| c | d |'] })
+	expect(spans[2]).toEqual({ type: 'text', lines: ['more'] })
+})
+
+// ── mdTable ──────────────────────────────────────────────────────────────────
+
+test('mdTable: box-drawing with aligned columns', () => {
+	const lines = ['| name | age |', '|------|-----|', '| Alice | 30 |', '| Bob | 7 |']
+	const result = md.mdTable(lines, 80)
+	expect(result).toEqual([
+		'┌───────┬─────┐',
+		'│ name  │ age │',
+		'├───────┼─────┤',
+		'│ Alice │ 30  │',
+		'├───────┼─────┤',
+		'│ Bob   │ 7   │',
+		'└───────┴─────┘',
+	])
+})
+
+test('mdTable: bold cells do not inflate column width', () => {
+	const lines = ['| **Commit** | **Fix** |', '|---|---|', '| abc | def |']
+	const result = md.mdTable(lines, 80)
+	// **Commit** has 6 visible chars, not 10. Column should be 6 wide.
+	expect(result.map(strip)).toEqual([
+		'┌────────┬─────┐',
+		'│ Commit │ Fix │',
+		'├────────┼─────┤',
+		'│ abc    │ def │',
+		'└────────┴─────┘',
+	])
+	// Verify ANSI bold is present in header (markers already resolved inside mdTable)
+	expect(result[1]).toContain('\x1b[1m')
+})
+
+test('mdTable: inline code cells measured correctly', () => {
+	const lines = ['| Command | Description |', '|---|---|', '| `ls -la` | list files |']
+	const result = md.mdTable(lines, 80)
+	// "Command" (7) vs "ls -la" (6) → header wins at 7
+	expect(result.map(strip)).toEqual([
+		'┌─────────┬─────────────┐',
+		'│ Command │ Description │',
+		'├─────────┼─────────────┤',
+		'│ ls -la  │ list files  │',
+		'└─────────┴─────────────┘',
+	])
+})
+
+test('mdTable: emoji cells measured with visLen', () => {
+	const lines = ['| Status | Item |', '|---|---|', '| ✅ | done |', '| ❌ | todo |']
+	const result = md.mdTable(lines, 80)
+	// ✅ is 2 columns wide. "Status" (6) wins over ✅ (2).
+	expect(result.map(strip)).toEqual([
+		'┌────────┬──────┐',
+		'│ Status │ Item │',
+		'├────────┼──────┤',
+		'│ ✅     │ done │',
+		'├────────┼──────┤',
+		'│ ❌     │ todo │',
+		'└────────┴──────┘',
+	])
+})
+
+test('mdTable: all lines fit within given width', () => {
+	const lines = [
+		'| Area | Previous | Us now | Status |',
+		'|---|---|---|---|',
+		'| CLI/UI (render, prompt, keys, tabs, diff, blocks, colors) | 3,520 | 1,132 | ~32% done |',
+		'| Runtime/Agent (agent loop, commands, context) | 2,089 | 79 | ~4% done |',
+	]
+	const width = 60
+	const result = md.mdTable(lines, width)
+	for (const line of result) {
+		expect(visLen(line)).toBeLessThanOrEqual(width)
+	}
+})
+
+test('mdTable: wide cells wrap within column', () => {
+	const lines = ['| Name | Description |', '|---|---|', '| foo | This is a very long description that should wrap |']
+	const result = md.mdTable(lines, 40)
+	const plain = result.map(strip)
+	// Every line has proper borders
+	for (const line of plain) {
+		if (line.includes('│')) {
+			// Data/header rows: exactly 3 │ characters (left, middle, right)
+			expect(line.split('│').length - 1).toBe(3)
+		}
+	}
+	// No line exceeds width
+	for (const line of result) {
+		expect(visLen(line)).toBeLessThanOrEqual(40)
+	}
+	// Content is preserved across wrapped lines
+	const allText = plain.join(' ')
+	expect(allText).toContain('very long')
+	expect(allText).toContain('should wrap')
+})
+
+test('mdTable: keeps narrow identifier columns wide before shrinking prose', () => {
+	const lines = [
+		'| Model | What is known |',
+		'|---|---|',
+		'| gpt-5.6-luna | A separate provider/routing variant with no publicly documented specialization available here. |',
+	]
+	const result = md.mdTable(lines, 50)
+	const plain = result.map(strip)
+
+	expect(plain.some((line) => line.includes('│ gpt-5.6-luna │'))).toBe(true)
+	for (const line of result) {
+		expect(visLen(line)).toBeLessThanOrEqual(50)
+	}
+})
+
+test('mdTable: wrapped inline code cells reset color at visual line boundaries', () => {
+	const fg = '\x1b[38;2;1;2;3m'
+	const code = '\x1b[31m'
+	const colors = {
+		bold: [M_BOLD, M_BOLD_OFF] as [string, string],
+		italic: [M_ITALIC, M_ITALIC_OFF] as [string, string],
+		code: [code, fg] as [string, string],
+	}
+	const result = md.mdTable(['| Model | What |', '|---|---|', '| `gpt-5.6-luna` | x |'], 20, colors)
+	const dataLines = result.filter((line) => line.includes(code) || line.includes('na'))
+
+	expect(dataLines[0]).toContain(`${code}gpt-5.6-lu${fg} │`)
+	expect(dataLines[1]).toContain(`│ ${code}na${fg}`)
+	for (const line of result) {
+		expect(visLen(line)).toBeLessThanOrEqual(20)
+	}
+})
+
+test('mdTable: explicit <br> creates multiple lines inside a cell', () => {
+	const lines = ['| name | usage |', '|---|---|', '| alpha | [████▌░░]<br>68% used |']
+	const result = md.mdTable(lines, 80)
+	const plain = result.map(strip)
+
+	expect(plain).toContain('│ alpha │ [████▌░░] │')
+	expect(plain).toContain('│       │ 68% used  │')
+})
+
+// ── resolveMarkers ───────────────────────────────────────────────────────────
+
+test('resolveMarkers: style split across lines — re-opens and closes', () => {
+	// Simulates what happens when wordWrap splits mid-bold.
+	const lines = [`${M_BOLD}some bold text`, `continues here${M_BOLD_OFF}`]
+	const result = resolveMarkers(lines)
+	expect(result[0]).toBe('\x1b[1msome bold text\x1b[22m')
+	expect(result[1]).toBe('\x1b[1mcontinues here\x1b[22m')
+})
+
+describe('hardWrap', () => {
+	test('breaks at exact column boundary', () => {
+		expect(hardWrap('abcdefghij', 5)).toEqual(['abcde', 'fghij'])
+	})
+
+	test('preserves ANSI escapes', () => {
+		const s = '\x1b[31mred text here\x1b[0m'
+		const lines = hardWrap(s, 8)
+		// "red text" = 8 cols, " here" = 5 cols
+		expect(lines.length).toBe(2)
+		// ANSI escapes don't count toward column width
+		expect(visLen(lines[0]!)).toBe(8)
+		expect(visLen(lines[1]!)).toBe(5)
+	})
+})
