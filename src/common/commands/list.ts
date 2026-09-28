@@ -14,6 +14,7 @@ export type CommandInfo = { name: string; description: string; category: string;
 const list: CommandInfo[] = [
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
 	{ name: 'cd', description: 'change the working directory', category: 'session' },
+	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session' },
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w', clientOnly: true },
 	{ name: 'compact', description: 'summarise the context so far', category: 'session' },
 	{ name: 'help', description: 'list commands, or show one in detail', category: 'help' },

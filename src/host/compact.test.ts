@@ -72,6 +72,28 @@ test('/compact while a turn runs answers that it is busy', async () => {
 	calls[0]!.push({ type: 'done', reason: 'end' })
 })
 
+test('/clear: the next request holds only later records; a compact after it summarises only what followed', async () => {
+	let c = client()
+	let id = created(c)
+	await ask(c, id, 'before')
+	await command(c, id, '/clear')
+	await ask(c, id, 'after')
+	let input = calls.at(-1)!.input.messages
+	expect(input.length).toBe(1)
+	expect(text(input)).toContain('after')
+	expect(text(input)).not.toContain('before')
+	expect(shown(c.views.get(id)!.items)).toContainEqual({ type: 'divider', text: 'context cleared' })
+	await command(c, id, '/clear')
+	await command(c, id, '/clear')
+	expect(c.of('output').at(-1).text).toBe('the context is already empty')
+	await ask(c, id, 'later')
+	await command(c, id, '/compact')
+	await ask(c, id, 'last')
+	let summary = calls.at(-1)!.input.messages[0].blocks[0].text
+	expect(summary).toContain('user: later')
+	expect(summary).not.toContain('after')
+})
+
 describe('automatic compaction (task mq)', () => {
 	let window = models.contextWindow
 	beforeEach(() => {
