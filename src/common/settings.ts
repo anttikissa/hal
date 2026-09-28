@@ -11,7 +11,6 @@
 export type SettingType =
 	| { kind: 'text'; url?: true }
 	| { kind: 'integer'; min: number; max: number }
-	| { kind: 'number'; min: number; max: number }
 	| { kind: 'choice'; options: string[] }
 	| { kind: 'boolean' }
 
@@ -47,12 +46,6 @@ const table: Setting[] = [
 		default: 200,
 		description: 'Provider rounds one turn may run before it pauses; Enter continues for as many again.',
 	},
-	{
-		name: 'compactAt',
-		type: { kind: 'number', min: 0, max: 1 },
-		default: 0.85,
-		description: 'Compact the context when the last request filled this fraction of the model window; 0 never does.',
-	},
 	{ name: 'webPort', type: { kind: 'integer', min: 1, max: 65535 }, default: 9002, description: 'Port for the browser client (127.0.0.1).' },
 	{
 		name: 'webUrl',
@@ -76,8 +69,6 @@ function problem(type: SettingType, value: unknown): string | undefined {
 			return Number.isInteger(value) && (value as number) >= type.min && (value as number) <= type.max
 				? undefined
 				: `expected an integer ${type.min}–${type.max}`
-		case 'number':
-			return typeof value === 'number' && value >= type.min && value <= type.max ? undefined : `expected a number ${type.min}–${type.max}`
 		case 'choice':
 			return type.options.includes(value as string) ? undefined : `expected one of ${type.options.map((o) => `'${o}'`).join(', ')}`
 		case 'boolean':
@@ -144,7 +135,6 @@ export const settings = {
 	promptRows: (): number => settings.value('promptRows') as number,
 	pasteLines: (): number => settings.value('pasteLines') as number,
 	maxRounds: (): number => settings.value('maxRounds') as number,
-	compactAt: (): number => settings.value('compactAt') as number,
 	webSearch: (): boolean => settings.value('webSearch') as boolean,
 	push: (): boolean => settings.value('push') as boolean,
 }

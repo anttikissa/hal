@@ -239,17 +239,6 @@ function blockRecord(running: Running, i: number): NewRecord & { ts?: string } {
 	return r
 }
 
-// The running turn's context is unknown again (a boundary was just
-// written, task mq): its rounds so far count as prior usage, and none
-// is taken as what the next round will take in.
-function forget(id: string): void {
-	let running = history.state.running.get(id)
-	if (!running) return
-	running.prior = addUsage(running.prior, running.turn.usage)
-	running.turn.usage = {}
-	delete running.context
-}
-
 // Records the results of a round's tool calls, unless the turn has
 // already ended (stop()).
 function results(id: string, list: ToolResultBlock[]): HistoryRecord | undefined {
@@ -368,7 +357,6 @@ export const history = {
 	messages,
 	record,
 	results,
-	forget,
 	end,
 	park,
 	carry,

@@ -182,7 +182,6 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					last = undefined
 					break
 				}
-				compact.auto(id, model)
 				let round = blocks.newTurn(running.provider)
 				last = undefined
 				prompts.steer(id)
