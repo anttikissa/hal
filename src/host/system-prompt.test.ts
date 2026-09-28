@@ -150,3 +150,24 @@ test('SYSTEM includes expand relative to their file, optional absences vanish an
 		expect(() => systemPrompt.build({ cwd: root, model: 'm/x', now: at })).toThrow(/include loop/)
 	} finally { systemPrompt.file = old }
 })
+
+
+test('the home USER.md appears in the real SYSTEM prompt when present, with no residue when absent', () => {
+	let old = process.env.HAL_HOME
+	try {
+		process.env.HAL_HOME = root
+		let input = { cwd: `${root}/work`, model: 'm/x', now: at }
+		let without = systemPrompt.build(input)
+		writeFileSync(`${root}/USER.md`, '# User\n\nName: Rowan\n\nPrefers concise answers.\n')
+		let withUser = systemPrompt.build(input)
+		expect(withUser).toContain('Name: Rowan')
+		expect(withUser).toContain('Prefers concise answers.')
+		// The only addition is the optional file, not a printed include path.
+		expect(withUser).not.toContain('@?')
+		rmSync(`${root}/USER.md`)
+		expect(systemPrompt.build(input)).toBe(without)
+	} finally {
+		if (old === undefined) delete process.env.HAL_HOME
+		else process.env.HAL_HOME = old
+	}
+})

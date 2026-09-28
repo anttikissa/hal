@@ -1,5 +1,6 @@
 node_modules/
 auth.ason
+USER.md
 local.ts
 config.ason
 .idea/

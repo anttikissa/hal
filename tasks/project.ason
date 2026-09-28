@@ -1,5 +1,5 @@
 {
 	format: 'tsk',
 	version: 1,
-	keep: ['auth.ason', 'local.ts', 'sessions/', 'state/']
+	keep: ['auth.ason', 'USER.md', 'local.ts', 'sessions/', 'state/']
 }
