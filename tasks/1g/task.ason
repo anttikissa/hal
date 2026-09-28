@@ -1,7 +1,15 @@
 {
 	title: 'Terminal status row: session, cwd, model, context',
 	description: "Between the prompt box's bottom rule and the help row (task p0) the terminal draws one status row like the old Hal's renderStatusLine (artifact tasks/5p/old-render-status.ts). Left, joined with ' · ': the session id, then ': <name>' in the highlight colour when the session has a name (e.g. '156-way: Orchestrate v3'); the cwd with the home shortened to ~ (the Hal dir in the assistant colour, others highlighted); the model's display name (Opus 5.5); the context used, e.g. '87k/1000k (9%)', where used is the last round's input tokens (input + cache read + cache write) and max is the model's context window, both numbers heat-coloured by the percentage. Right-aligned, joined with ' · ': this process's role (host or peer); the session's total tokens this run, '↑252 ↓41k' (sent and received, compact counts: 252, 4.1k, 41k, 1.2M); for a subscription account, 'Sub i/n: 5h 18%, 7d 57%' from task 61's usage windows (i/n only with more than one account), percentages heat-coloured. When the row is too narrow, drop the right parts from the end (Sub, then tokens, then role), then clip the left. The host sends clients what they cannot know (context window, usage, usage windows) as part of session or host state it already pushes; nothing polls. The web shows the same facts in its own layout later; not required here. Tests: fitting at several widths drops parts in that order; the context percentage; the compact token counts; numbers update after a turn ends.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Data: common/protocol.ts Stats { context?, window?, sent, received, plan? { account, accounts, windows: name -> percent } } rides on snapshot.stats, turn-end.stats and meta.stats (only when /model changed the model); host/stats.ts builds it. transcript.fold keeps the latest as Transcript.stats, so the web gets it too.',
+		'Context used is recorded durably: turn_end records carry `context` (history.ts contextOf: the last round with usage, input + cacheRead + cacheWrite). turn_end usage is the sum of all rounds, so it cannot be used for the context meter. After a restart stats.of finds it in the snapshot records (lastContext); memory (stats.state.context) covers the rest.',
+		"Tokens this run are host memory (stats.state.tokens), counted from each recorded turn_end's usage (input and output only, as the old Hal's default showTokenInOut); a parked turn's usage is counted once, at its end. A new host starts at 0.",
+		'Plan: the account auth.order would try first for the session (its sticky one, task wg, else least used); only accounts with an accessToken count as subscriptions, indexed in file order. usage.windows already drops expired windows. Any auth error hides the plan.',
+		"Display: status-row.ts modelName turns claude-<family>-<maj>[-<min>][-date] into 'Opus 5.5', other ids show without the provider; clipVisual ends a clipped left side with '…'. The row is always drawn (blank before the first snapshot) so the chrome height stays steady (p0). Role is connection.state.link.role: 'client' shows as 'peer'.",
+		"Not done: live context/usage updates mid-turn (only at turn end, snapshot or /model), the old ≠host version badge, and the web's layout."
+	],
 	needs: ['p0'],
 	foldInto: ['7w']
 }

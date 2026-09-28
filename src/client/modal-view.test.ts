@@ -47,7 +47,7 @@ test('a modal draws over the transcript: transcript, a blank column, the outline
 		let row = strip(f.lines[i]!)
 		expect(strings.visLen(f.lines[i]!)).toBeLessThanOrEqual(60)
 		expect(row.slice(0, b.left - 1).trimEnd()).toBe(under[i]!.slice(0, b.left - 1).trimEnd())
-		expect(row.slice(1, b.left - 1)).toMatch(/^(x+|─+| *)$/)
+		expect(row.slice(1, b.left - 1)).toMatch(/^(x+|─+|> *| *)$/)
 		expect(row[b.left - 1]).toBe(' ')
 		expect('╭│╰').toContain(row[b.left]!)
 		expect('╮│╯').toContain(row[b.right]!)

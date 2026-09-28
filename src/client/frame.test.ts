@@ -103,7 +103,7 @@ test('a long tool result shows only its first rows', () => {
 	let lines = plain(frame.build(view([{ type: 'tool-result', id: 't', output }]), 40).lines)
 	expect(lines.join('\n')).toContain('row 0')
 	expect(lines.join('\n')).not.toContain('row 50')
-	expect(lines.length).toBeLessThan(10)
+	expect(lines.length).toBeLessThan(11)
 })
 
 test('text cannot send escape sequences to the terminal', () => {
@@ -145,12 +145,12 @@ test('a cursor after a full prompt row stays inside the terminal', () => {
 	expect(f.cursor).toEqual({ row: boxOf(f).top + 1, col: 19 })
 })
 
-test('an empty session is just the chrome: the prompt between its rules, then the help row', () => {
+test('an empty session is just the chrome: the prompt between its rules, then the status and help rows', () => {
 	let f = frame.build({ prompt: { text: '', cursor: 0 } }, 80)
 	let b = boxOf(f)
 	expect(b.top).toBe(0)
 	expect(b.rows).toEqual(['>'])
-	expect(f.lines.length).toBe(b.bottom + 2)
+	expect(f.lines.length).toBe(b.bottom + 3)
 	expect(f.cursor).toEqual({ row: 1, col: 3 })
 })
 

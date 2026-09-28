@@ -27,6 +27,7 @@ import { promptView } from './prompt-view.ts'
 import type { HalCursor } from './hal-cursor.ts'
 import { tabBar } from './tab-bar.ts'
 import { helpRow } from './help-row.ts'
+import { statusRow, type StatusInfo } from './status-row.ts'
 import { strings } from '../common/strings.ts'
 
 export interface View {
@@ -54,6 +55,8 @@ export interface View {
 	editing?: string
 	/** The Hal cursor: after the streaming last item, or on its own row. */
 	hal?: HalCursor
+	/** The status row below the prompt box (task 1g); blank without. */
+	status?: StatusInfo
 }
 
 export interface Frame {
@@ -174,7 +177,7 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	let top = lines.length
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))
 	lines.push(rule(p.below ? `↓${p.below}` : ''))
-	// Task 1g's status row goes here, between the rule and the help row.
+	lines.push(view.status ? statusRow.row(view.status, cols) : '')
 	lines.push(helpRow.row(view, cols))
 	let pad = Math.max(0, Math.min(peak, rows - lines.length) - history.length)
 	let chrome = lines

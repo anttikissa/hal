@@ -32,6 +32,7 @@ import { halCursor } from './hal-cursor.ts'
 import { promptKeys, type Clip } from './prompt-keys.ts'
 import type { Focus } from './tabs.ts'
 import { tabBar } from './tab-bar.ts'
+import type { StatusInfo } from './status-row.ts'
 import { tabSwitch, type TabView } from './tab-switch.ts'
 
 // `form`: the session's open question as filled in here; while there is
@@ -87,7 +88,22 @@ function view(): View {
 	if (activity) v.activity = activity
 	let hal = halCursor.of(st.transcript, pulse.beat())
 	if (hal) v.hal = hal
+	if (t) v.status = app.status(t)
 	return v
+}
+
+// The status row's facts (client/status-row.ts): the session's, and
+// this process's role once connected.
+function status(t: Transcript): StatusInfo {
+	let { id, name, cwd, model } = t.meta
+	let s: StatusInfo = { id, cwd, model }
+	if (name) s.name = name
+	if (app.focusedTab()?.hal) s.hal = true
+	if (process.env.HOME) s.home = process.env.HOME
+	if (t.stats) s.stats = t.stats
+	let link = connection.state.link
+	if (link.type === 'connected') s.role = link.role === 'host' ? 'host' : 'peer'
+	return s
 }
 
 // What the session is doing in a word or two, for the prompt's top
@@ -346,6 +362,7 @@ export const app = {
 	cols: (): number => render.state.out?.size().cols ?? 80,
 	view,
 	activity,
+	status,
 	blinks,
 	show,
 	beat,
