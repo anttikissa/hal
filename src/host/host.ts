@@ -30,6 +30,7 @@ import { sessions } from './sessions.ts'
 import { prompts } from './prompts.ts'
 import { slash } from './slash.ts'
 import { stats } from './stats.ts'
+import { version } from './version.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
@@ -58,6 +59,7 @@ function connect(deliver: (event: Event) => void): Connection {
 	let client: Client = { deliver: (e) => deliver(wire(e)), open: new Set() }
 	host.state.clients.add(client)
 	host.warn(client)
+	if (version.state.loaded) client.deliver({ type: 'version', version: version.state.loaded })
 	// The tabs come with the first events, so no client has to ask.
 	try {
 		client.deliver({ type: 'tabs', tabs: tabs.list() })
@@ -102,6 +104,11 @@ function adapt(write: (message: string) => void): { receive(message: string): vo
 function warn(client: Client): void {
 	let text = config.warnings().join('; ')
 	if (text) client.deliver({ type: 'warning', text })
+}
+
+// This process's version is known: every client hears it (task n1).
+function announce(loaded: string): void {
+	for (let client of host.state.clients) client.deliver({ type: 'version', version: loaded })
 }
 
 // After config.ason changed: tells every client what is wrong now.
@@ -348,6 +355,7 @@ export const host = {
 	adapt,
 	warn,
 	warnAll,
+	announce,
 	reject,
 	remember,
 	handle,

@@ -34,6 +34,7 @@ import type { Focus } from './tabs.ts'
 import { tabBar } from './tab-bar.ts'
 import type { StatusInfo } from './status-row.ts'
 import { tabSwitch, type TabView } from './tab-switch.ts'
+import { versions } from './versions.ts'
 
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
@@ -82,9 +83,10 @@ function view(): View {
 	if (t && !st.prompt.text) v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	if (v.tabs && tabBar.blinks(st.tabs)) v.tabs.lit = pulse.slow(pulse.beat())
-	let notice = st.notice ?? (t && why(t))
+	let notice = st.notice ?? (t && why(t)) ?? versions.notice()
 	if (notice) v.notice = notice
 	if (st.editing) v.editing = amend.hint(st.editing)
+	if (versions.state.newCode) v.newCode = true
 	let activity = t && app.activity(t)
 	if (activity) v.activity = activity
 	let hal = halCursor.of(st.transcript, pulse.beat())
@@ -200,9 +202,8 @@ function onState(state: LinkState): void {
 	app.show()
 }
 
-// Enter: a prompt (steering a busy turn; `queue`: after it), an edit
-// of the last prompt, or a continue on an empty prompt. Refuses (keeping the typed text) what the
-// host would refuse anyway.
+// Enter: a prompt (steering a busy turn; `queue`: after it), an edit of the last prompt,
+// or a continue on an empty prompt. Refuses (keeping the typed text) what the host would refuse anyway.
 function submit(text: string, queue = false): boolean {
 	let st = app.state
 	if (!st.transcript) {
@@ -383,8 +384,7 @@ export const app = {
 	onTabs: tabSwitch.onTabs,
 	focusOn: tabSwitch.focusOn,
 	tabKey: tabSwitch.tabKey,
-	// Told the tab shown after every change (main.ts keeps it for a
-	// restart).
+	// Told the tab shown after every change (main.ts keeps it for a restart).
 	focused: (_tab: Tab): void => {},
 	submit,
 	completed,

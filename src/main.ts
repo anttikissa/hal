@@ -7,6 +7,7 @@ import { draftFile } from './client/draft-file.ts'
 import { link } from './client/link.ts'
 import { render } from './client/render.ts'
 import { terminal } from './client/terminal.ts'
+import { versions } from './client/versions.ts'
 import type { LinkState } from './common/connection.ts'
 import { drafts } from './common/drafts.ts'
 import { perf } from './common/perf.ts'
@@ -20,6 +21,7 @@ import { jobs } from './host/jobs.ts'
 import { modelsDev } from './host/models-dev.ts'
 import { sessions } from './host/sessions.ts'
 import { turns } from './host/turns.ts'
+import { version } from './host/version.ts'
 import { openai } from './host/openai.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
@@ -87,7 +89,24 @@ function init(): void {
 		app.state.start = { cwd: process.cwd(), ...main.lastTab() }
 		app.focused = (tab) => main.keepTab(tab)
 		app.init()
+		// Which code this process runs (task n1), found after the first
+		// frame; the host tells its clients, a new commit offers ctrl-r.
+		version.found = (loaded) => {
+			versions.state.own = loaded
+			host.announce(loaded)
+			app.show()
+		}
+		version.changed = () => ((versions.state.newCode = true), app.show())
+		main.later(() => void version.init())
 	}
+}
+
+// Events from the host for the terminal: the host's version is kept
+// for the notice (client/versions.ts), the rest go to the app.
+function onEvent(event: Event): void {
+	if (event.type !== 'version') return app.onEvent(event)
+	versions.state.host = event.version
+	app.show()
 }
 
 // Joins this home's host, or becomes it; resolves once connected. Either
@@ -203,7 +222,7 @@ async function start(): Promise<void> {
 		process.exit(1)
 	}
 	await main.joinHost(
-		(event) => app.onEvent(event),
+		(event) => main.onEvent(event),
 		(state) => app.onState(state),
 	)
 	perf.mark('joined')
@@ -218,6 +237,7 @@ export const main = {
 	localPath,
 	loadLocal,
 	init,
+	onEvent,
 	becomeHost,
 	refreshModels,
 	later,

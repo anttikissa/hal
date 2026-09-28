@@ -57,6 +57,8 @@ export interface View {
 	hal?: HalCursor
 	/** The status row below the prompt box (task 1g); blank without. */
 	status?: StatusInfo
+	/** A new commit is checked out: the help row offers ctrl-r. */
+	newCode?: boolean
 }
 
 export interface Frame {

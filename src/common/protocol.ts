@@ -234,6 +234,9 @@ export type Event =
 	// The one-time web login code an `auth` command asked for; `link`,
 	// the host's web address, if it is meant for links (task e3).
 	| { type: 'auth'; code: string; link?: string }
+	// The host process's version (task n1), sent on connect once known
+	// and to every client when the host learns it.
+	| { type: 'version'; version: string }
 
 export type EventType = Event['type']
 
@@ -292,6 +295,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	models: { sessionId: 's', current: 's', items: 'S' },
 	attached: { sessionId: 's', command: 's', blob: 's', marker: 's' },
 	warning: { text: 's' },
+	version: { version: 's' },
 	tabs: { tabs: 'a' },
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },
 	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },

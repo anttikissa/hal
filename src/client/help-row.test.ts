@@ -83,3 +83,11 @@ test('the top rule carries the activity centred and the fold count at its left',
 	let folded = rows({ ...view(running, long), activity: 'thinking' })
 	expect(folded.find((l) => l.includes('thinking'))).toMatch(/^↑\d+ ─+ thinking ─+$/)
 })
+
+test('new code adds ctrl-r to the state hints, not over a question or choices', () => {
+	let idle: SessionState = { type: 'idle' }
+	expect(help({ ...view(idle), newCode: true })).toMatch(/^ctrl-r: load new code +\/keys: shortcuts$/)
+	expect(help({ ...view(running, 'hi'), newCode: true }, 140)).toMatch(/esc: pause, ctrl-r: load new code +\/keys/)
+	expect(help({ ...view(idle, '/m'), choices: ['/model', '/move'], newCode: true })).not.toContain('ctrl-r')
+	expect(chrome({ ...view(idle), newCode: true })).toBe(chrome(view(idle)))
+})
