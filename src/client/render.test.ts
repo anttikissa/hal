@@ -467,17 +467,22 @@ describe('tabs', () => {
 		expect(term.content()).toEqual(frameText())
 	})
 
-	test('the prompt stays on its row between two short tabs once peak is set', () => {
-		setup(20, 30)
-		showTab('a', items(3), 'typed')
-		showTab('b', items(1), 'typed')
+	test('in full mode the prompt is on the bottom rows, whatever the tab height', () => {
+		// A restart on a short tab 3: the first paint already has it low.
+		setup(20, 30, ['$ hal'])
+		let bottom = () => term.screen().findLastIndex((r) => r.trim() !== '')
+		showTab('c', items(1), 'typed')
 		let row = promptRow()
-		showTab('c', [], 'typed')
-		expect(promptRow()).toBe(row)
-		showTab('a', items(3), 'typed')
-		expect(promptRow()).toBe(row)
-		showTab('b', items(1), 'typed')
-		expect(promptRow()).toBe(row)
+		expect(row).toBeGreaterThan(10)
+		expect(bottom()).toBe(19)
+		for (let [id, n] of [['a', 3], ['b', 0], ['c', 30], ['a', 3]] as const) {
+			showTab(id, items(n), 'typed')
+			expect(promptRow()).toBe(row)
+			expect(bottom()).toBe(19)
+		}
+		term.resize(14, 25)
+		render.draw(true)
+		expect(bottom()).toBe(13)
 	})
 
 	test('a single tab that fits keeps grow mode and never clears scrollback', () => {
@@ -515,15 +520,5 @@ describe('tabs', () => {
 			expect(term.written).toContain('\x1b[3J')
 			expect(term.content()).toEqual(frameText())
 		}
-	})
-
-	test('a narrower terminal starts peak again', () => {
-		setup(20, 30)
-		showTab('a', items(5), 'typed')
-		showTab('b', [], 'typed')
-		let padded = promptRow()
-		term.resize(20, 25)
-		render.draw(true)
-		expect(promptRow()).toBeLessThan(padded)
 	})
 })

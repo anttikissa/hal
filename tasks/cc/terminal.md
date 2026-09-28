@@ -162,12 +162,21 @@ nearest valid source boundary.
 
 ### Height management
 
-`peak` is a high-water mark: the tallest any tab's history has ever been.
-It grows but never shrinks (even if the tall tab is closed).
+Grow mode (one tab): the frame is as tall as its content; a short
+history leaves the prompt high, like a shell program.
 
-Padding = `min(peak, rows - chrome) - activeTab.historyPhysicalHeight`. Physical
-height is derived from the current frame and terminal width; it is never stored
-on history blocks or URL lines. This keeps the prompt stable across tabs.
+Full mode (two or more tabs, see Tab switching): the prompt, status and
+tab bar always sit on the terminal's last rows. Blank rows between the
+history and the chrome pad the frame to exactly `rows`:
+`pad = max(0, rows - chrome - history)`. A tab switch, a restart on
+any tab and a resize therefore never move the prompt off the bottom.
+
+The padding depends only on the current tab, `rows` and the chrome.
+Never derive it from what this process painted before (the old Hal's
+`peak` high-water mark): a restarted process has painted nothing, so a
+restart with several short tabs put the prompt mid-screen under the
+history. Tests must start from a fresh renderer on a short tab, not
+only switch between tabs within one run.
 
 ### Modals
 
@@ -284,7 +293,7 @@ remain hard-wrapped until complete, ensuring a soft logical line is immutable.
 assumes URL labels contain only single-column printable characters; do not extend
 the exception to arbitrary prose, code, tabs, or wide characters.
 
-Diffing remains logical, while cursor positioning, peak/padding, fullscreen
+Diffing remains logical, while cursor positioning, padding, fullscreen
 thresholds, and shrink/growth decisions always use derived physical heights.
 
 ### 4a. Terminal colors come from `colors.ason`

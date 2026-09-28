@@ -34,9 +34,6 @@ interface RenderState {
 	prev: string[]
 	cursorRow: number
 	fullscreen: boolean
-	/** The tallest history painted at `peakCols` wide; only grows. */
-	peak: number
-	peakCols: number
 	/** The tab painted last. */
 	tab: string | undefined
 	/** Parked for the shell (suspend, quit); only a forced draw paints. */
@@ -59,8 +56,6 @@ function createState(): RenderState {
 		prev: [],
 		cursorRow: 0,
 		fullscreen: false,
-		peak: 0,
-		peakCols: 0,
 		tab: undefined,
 		parked: false,
 		timer: null,
@@ -176,12 +171,7 @@ function draw(force = false): void {
 		if (st.tab !== undefined && st.tab !== tab) st.fullscreen = force = true
 		st.tab = tab
 	}
-	if (cols !== st.peakCols) {
-		st.peak = 0
-		st.peakCols = cols
-	}
-	let next = frame.build(st.view, cols, rows, st.peak)
-	st.peak = Math.max(st.peak, next.history)
+	let next = frame.build(st.view, cols, rows, st.fullscreen)
 	// The modal's list moves only as far as it must from where it was.
 	if (st.view.modal && next.modalScroll !== undefined) st.view.modal.scroll = next.modalScroll
 	// So does the prompt box.

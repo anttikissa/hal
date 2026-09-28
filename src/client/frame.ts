@@ -126,11 +126,11 @@ function withCursor(rows: string[], hal: HalCursor, width: number): string[] {
 	return [...rows, g]
 }
 
-// The frame for `view` on a terminal of `rows` × `cols`. Blank rows after
-// the history lift it to `peak` rows (as far as the screen allows), so
-// the prompt stays on one row between tabs (tasks/cc/terminal.md, Height
-// management).
-function build(view: View, cols: number, rows = 24, peak = 0): Frame {
+// The frame for `view` on a terminal of `rows` × `cols`. `full`: full
+// mode, where blank rows after a short history put the chrome on the
+// screen's last rows, so the prompt is always at the bottom
+// (tasks/cc/terminal.md, Height management).
+function build(view: View, cols: number, rows = 24, full = false): Frame {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let lines: string[] = []
 	// Whether something is above `lines` (the history, above the chrome).
@@ -169,7 +169,7 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	// The chrome, built apart to know its height for the padding.
 	let history = lines
 	lines = []
-	above = history.length > 0 || peak > 0
+	above = history.length > 0 || full
 	// The inbox, always in view above the prompt.
 	let t = view.transcript
 	// Each drawn as the prompt it will become: (steering) > text.
@@ -195,7 +195,7 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 	lines.push(rule(p.below ? `↓${p.below}` : ''))
 	lines.push(view.status ? statusRow.row(view.status, cols) : '')
 	lines.push(helpRow.row(view, cols))
-	let pad = Math.max(0, Math.min(peak, rows - lines.length) - history.length)
+	let pad = full ? Math.max(0, rows - lines.length - history.length) : 0
 	let chrome = lines
 	lines = [...history, ...Array<string>(pad).fill(''), ...chrome]
 	top += history.length + pad
