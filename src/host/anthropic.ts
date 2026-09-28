@@ -143,7 +143,7 @@ async function models(signal: AbortSignal): Promise<string[]> {
 const reasons: Record<string, StopReason> = {
 	end_turn: 'end',
 	stop_sequence: 'end',
-	pause_turn: 'end',
+	pause_turn: 'pause',
 	tool_use: 'tool_use',
 	max_tokens: 'max_tokens',
 	model_context_window_exceeded: 'max_tokens',

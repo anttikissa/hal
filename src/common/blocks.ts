@@ -38,7 +38,9 @@ export type Message = { role: 'user'; blocks: UserBlock[] } | { role: 'assistant
 // Token counts. Cumulative: each usage event overwrites what it carries.
 export type Usage = { input?: number; output?: number; cacheRead?: number; cacheWrite?: number }
 
-export type StopReason = 'end' | 'tool_use' | 'max_tokens' | 'refusal'
+// `pause`: the provider stopped a long server-side turn (Anthropic's
+// pause_turn, web search) and wants the same answer sent back to go on.
+export type StopReason = 'end' | 'tool_use' | 'max_tokens' | 'refusal' | 'pause'
 
 // `explanation`: why the provider refused, if it said.
 export type DoneEvent = { type: 'done'; reason: StopReason; explanation?: string }

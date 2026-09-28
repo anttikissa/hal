@@ -221,7 +221,9 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				calls = round.blocks.filter((b) => b.type === 'tool_call')
 				if (last?.type !== 'done') break
 				// A finished answer with steering waiting: the model hears it.
+				// A paused server-side answer (web search) goes on from itself.
 				if (!calls.length) {
+					if (last.reason === 'pause' && !signal.aborted) continue
 					if (signal.aborted || !status.inboxOf(id).some((m) => !m.queue)) break
 					continue
 				}
