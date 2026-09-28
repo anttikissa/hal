@@ -1,0 +1,6 @@
+{
+	title: '/broadcast and /send all',
+	spec: '/broadcast <message> (and /send all <message>) sends the message to every other open session like /send, each as a prompt from this session; with no other session it says so. Tests: all other tabs get it, the sender does not; no other session.',
+	status: 'planned',
+	needs: ['jq']
+}

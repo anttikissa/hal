@@ -1,0 +1,6 @@
+{
+	title: 'Web status row',
+	spec: 'The web client shows the facts of the terminal status row (task 1g): session id and name, cwd, model, context used with its percentage heat-coloured, tokens this run, and subscription usage windows. It sits just above the composer as one line that wraps into two on phones instead of dropping parts; the same Stats shape feeds it (transcript.stats), so nothing new is sent. Colours come from the generated CSS; readable-text invariant applies. Tests: a view-module unit test that the parts and percentage come out of a Stats value; looks checked by hand at phone and desktop widths.',
+	status: 'planned',
+	needs: ['1g']
+}

@@ -1,0 +1,6 @@
+{
+	title: '/system: show the assembled system prompt',
+	spec: "/system shows the system prompt this session would send right now: first one line per source file (SYSTEM.md, each included file, each AGENTS.md or CLAUDE.md) with its size and path, then the total size, then the full text after preprocessing (task q5). It is read-only and works in any state. A preprocessing error (unclosed block, missing @ include) is shown as the command's error with the line it names. Tests: the header lists included files; the text equals what a provider request gets.",
+	status: 'planned',
+	needs: ['q5', 'x0']
+}
