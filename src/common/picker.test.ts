@@ -45,13 +45,20 @@ function type(st: ReturnType<typeof picker.open>, s: string) {
 
 test('the picker opens on the current model and filters as you type', () => {
 	let st = picker.open('anthropic/claude-sonnet-4-5', ids)
-	expect(st.items).toEqual(ids)
-	expect(st.items[st.selected]).toBe('anthropic/claude-sonnet-4-5')
+	expect(st.items).toEqual(expect.arrayContaining(['anthropic/  (4 models)', '  anthropic/opus  (default: claude-opus-5-5)']))
+	expect(st.choices?.[st.items[st.selected]!]).toBe('anthropic/claude-sonnet-4-5')
 	expect(st.title).toContain('anthropic/claude-sonnet-4-5')
 	st = type(st, 'opus-5.5')
 	expect(st.items[st.selected]).toBe('anthropic/claude-opus-5-5')
 	let { action } = modals.step(st, key('enter'))
 	expect(action?.type === 'submit' && picker.command('s1', st, action)).toEqual({ type: 'submit', sessionId: 's1', text: '/model anthropic/claude-opus-5-5' })
+})
+
+test('Enter on a family uses its newest model; grouped models retain their display names', () => {
+	let st = picker.open('hal/intro', ids, { 'anthropic/claude-opus-5-5': 'Opus 5.5' })
+	let row = st.items.findIndex((item) => item.startsWith('  anthropic/opus  '))
+	expect(st.items.some((item) => item.includes('Opus 5.5'))).toBe(true)
+	expect(picker.command('s1', st, { type: 'submit', answers: {}, item: row })).toEqual({ type: 'submit', sessionId: 's1', text: '/model anthropic/claude-opus-5-5' })
 })
 
 test('Enter with nothing matching switches to nothing', () => {

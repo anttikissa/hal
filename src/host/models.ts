@@ -9,8 +9,12 @@
 
 import { blocks } from '../common/blocks.ts'
 import { settings } from '../common/settings.ts'
+import { existsSync } from 'fs'
+import { apiKeys } from './api-keys.ts'
+import { auth, type Kind } from './auth.ts'
 import { diag } from './diag.ts'
 import { modelsDev } from './models-dev.ts'
+import { paths } from './paths.ts'
 import { provider } from './provider.ts'
 import { synthetic } from './synthetic.ts'
 
@@ -52,12 +56,11 @@ async function ask(name: string, list: (signal: AbortSignal) => Promise<string[]
 	}
 }
 
-// Every model id to offer, `current` first, then the default, the
-// synthetic ones and each provider's in registration order.
-async function list(current: string): Promise<string[]> {
-	let lists = await Promise.all(Object.keys(provider.state.providers).map((name) => models.fetchList(name)))
-	let hal = Object.keys(synthetic.models).map((m) => `hal/${m}`)
-	return [...new Set([current, models.defaultModel(), ...hal, ...lists.flatMap((l) => l ?? [])])]
+// Build the first picker from disk and in-memory caches, never from HTTP.
+// Warm provider lists for later openings without holding this one up.
+function list(current: string): string[] {
+	for (let name of Object.keys(provider.state.providers)) void models.fetchList(name).catch((e) => diag.log(`models of ${name}: ${e}`))
+	return [...new Set([current, models.defaultModel(), ...models.known()])]
 }
 
 // The ids known without asking anyone: synthetic ones, and each
@@ -91,6 +94,28 @@ function valid(id: string): boolean {
 	return slash > 0 && slash < id.length - 1 && !!provider.state.providers[id.slice(0, slash)]
 }
 
+// Short names choose the family's preferred model, then a provider we can
+// actually use. Subscriptions take precedence over metered API keys.
+function resolve(input: string): { id?: string; login?: string } {
+	let family = input.toLowerCase()
+	if (!['gpt', 'claude', 'opus', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'].includes(family)) return { id: input }
+	let own = family === 'gpt' ? 'openai' : family === 'claude' || family === 'opus' ? 'anthropic' : undefined
+	let needle = family === 'claude' || family === 'opus' ? 'opus' : family
+	let candidates = models.known().filter((id) => id.split('/').slice(1).join('/').toLowerCase().includes(needle))
+	let preferred = family === 'gpt' ? 'openai/gpt-6-sol' : own ? 'anthropic/claude-opus-5-5' : undefined
+	if (preferred) candidates = [preferred, ...candidates.filter((id) => id !== preferred)]
+	let providers = own ? [own] : ['opencode-go', 'openrouter']
+	for (let name of providers) {
+		let available = name === 'openai' || name === 'anthropic'
+			? !!(auth.envKey(name as Kind) || (existsSync(paths.authFile()) && auth.accounts(auth.store(), name as Kind).length))
+			: !!(apiKeys.get(name === 'opencode-go' ? 'opencode' : name) || process.env[name === 'opencode-go' ? 'OPENCODE_API_KEY' : 'OPENROUTER_API_KEY'])
+		if (!available) continue
+		let found = candidates.find((id) => id.startsWith(`${name}/`))
+		if (found) return { id: found }
+	}
+	return { login: own === 'openai' ? '/login chatgpt' : own === 'anthropic' ? '/login claude' : '/login opencode or /login openrouter' }
+}
+
 export const models = {
 	state: { lists: new Map<string, Listing>() },
 	// provider/model id used when a session has not chosen one:
@@ -105,6 +130,7 @@ export const models = {
 	ask,
 	list,
 	names,
+	resolve,
 	// Tokens `id` can take in, if known: for the context meter.
 	contextWindow(id: string): number | undefined {
 		let parsed = blocks.parseModelId(id)

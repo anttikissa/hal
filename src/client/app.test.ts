@@ -413,7 +413,8 @@ test('Ctrl-M asks the host for the models; the picker filters as you type and En
 	expect(app.view().modal).toBeUndefined()
 	let items = ['anthropic/x', 'openrouter/stepfun/step-3.5-flash', 'anthropic/claude-opus-5-5']
 	app.onEvent({ type: 'models', sessionId: 's1', current: 'anthropic/x', items })
-	expect(app.view().modal?.items).toEqual(items)
+	expect(app.view().modal?.choices?.[app.view().modal!.items[app.view().modal!.selected]!]).toBe('anthropic/x')
+	expect(app.view().modal?.items).toContain('  anthropic/opus  (default: claude-opus-5-5)')
 	type('opus-5.5')
 	expect(app.view().modal?.items).toEqual(['anthropic/claude-opus-5-5'])
 	enter()

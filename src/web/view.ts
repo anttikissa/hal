@@ -36,7 +36,7 @@ export type Shown = { kind: string; text: string } | null
 function onEvent(st: ViewState, event: Event): ViewState {
 	if (event.type === 'rejected') return { ...st, notice: `${event.command} refused: ${event.reason}` }
 	if (event.type === 'warning') return { ...st, notice: event.text }
-	if (event.type === 'models') return event.sessionId === st.transcript?.meta.id ? { ...st, modal: picker.open(event.current, event.items), models: event.items, names: event.names ?? {} } : st
+	if (event.type === 'models') return event.sessionId === st.transcript?.meta.id ? { ...st, modal: picker.open(event.current, event.items, event.names), models: event.items, names: event.names ?? {} } : st
 	let t = transcript.fold(st.transcript, event)
 	if (t === st.transcript) return st
 	let next: ViewState = { ...st, transcript: t }

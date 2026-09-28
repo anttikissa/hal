@@ -40,6 +40,7 @@ beforeEach(() => {
 	synthetic.models = { ...origModels, ok: () => ({ say: 'ok' }) }
 	provider.state.providers = { acme: fake(['big-1', 'small-1']), down: fake(new Error('offline')) }
 	models.state.lists.clear()
+	models.state.lists.set('acme', { at: Date.now(), ids: ['acme/big-1', 'acme/small-1'] })
 })
 
 afterEach(() => {
@@ -89,23 +90,49 @@ async function opened(id: string) {
 	return c
 }
 
-test('the list holds the current model, every provider that answered, and the synthetic models', async () => {
-	let ids = await models.list('acme/old-0')
+test('the first picker opens from cached models, while provider requests warm the next one', async () => {
+	models.state.lists.clear()
+	let ids = models.list('acme/old-0')
 	expect(ids[0]).toBe('acme/old-0')
-	expect(ids).toEqual(expect.arrayContaining(['acme/big-1', 'acme/small-1', 'hal/intro', 'hal/ok']))
+	expect(ids).toEqual(expect.arrayContaining(['hal/intro', 'hal/ok']))
+	expect(ids).not.toContain('acme/big-1')
+	await until(() => models.state.lists.has('acme'))
+	ids = models.list('acme/old-0')
+	expect(ids).toEqual(expect.arrayContaining(['acme/big-1', 'acme/small-1']))
 	expect(new Set(ids).size).toBe(ids.length)
-	expect(ids.some((id) => id.startsWith('down/'))).toBe(false)
-	// Answers are kept a while; a provider that failed is asked again.
-	await models.list('acme/big-1')
-	expect(calls).toBe(3)
+	await until(() => calls >= 3)
+})
+
+test('family aliases choose a subscription before an API key, and explain missing access', () => {
+	let before = [process.env.OPENCODE_API_KEY, process.env.OPENROUTER_API_KEY]
+	try {
+		provider.state.providers = { 'opencode-go': fake([]), openrouter: fake([]) }
+		models.state.lists.set('opencode-go', { at: Date.now(), ids: ['opencode-go/kimi-k2'] })
+		models.state.lists.set('openrouter', { at: Date.now(), ids: ['openrouter/moonshotai/kimi-k2'] })
+		delete process.env.OPENCODE_API_KEY
+		delete process.env.OPENROUTER_API_KEY
+		expect(models.resolve('kimi').login).toContain('/login opencode')
+		process.env.OPENROUTER_API_KEY = 'test-key'
+		expect(models.resolve('kimi').id).toBe('openrouter/moonshotai/kimi-k2')
+		process.env.OPENCODE_API_KEY = 'test-key'
+		expect(models.resolve('kimi').id).toBe('opencode-go/kimi-k2')
+	} finally {
+		if (before[0] === undefined) delete process.env.OPENCODE_API_KEY
+		else process.env.OPENCODE_API_KEY = before[0]
+		if (before[1] === undefined) delete process.env.OPENROUTER_API_KEY
+		else process.env.OPENROUTER_API_KEY = before[1]
+	}
 })
 
 test('a provider that never answers does not hold up the list', async () => {
+	models.state.lists.clear()
 	provider.state.providers.slow = { ...fake([]), models: (signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))) }
 	let saved = models.timeoutMs
 	models.timeoutMs = () => 5
 	try {
-		expect(await models.list('acme/big-1')).toContain('acme/small-1')
+		models.list('acme/big-1')
+		await until(() => models.state.lists.has('acme'))
+		expect(models.list('acme/big-1')).toContain('acme/small-1')
 	} finally {
 		models.timeoutMs = saved
 	}

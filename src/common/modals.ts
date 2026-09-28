@@ -18,6 +18,8 @@ export type ModalState = {
 	hint?: string
 	form?: FormState
 	items: string[]
+	/** Model picker group row -> default model; other modals omit this. */
+	choices?: Record<string, string>
 	selected: number
 	/** The first list row in view; clients keep it with modals.scroll. */
 	scroll: number

@@ -190,7 +190,8 @@ test('Ctrl-M opens the model picker from the host list; typing filters, Enter sw
 	expect(view.commandKey(st, view.key({ key: 'm', ctrlKey: false, shiftKey: false, altKey: false, metaKey: false })!, false)).toBeUndefined()
 	let items = ['fake/m', 'x/step-3.5-flash', 'anthropic/claude-opus-5-5']
 	st = view.onEvent(st, { type: 'models', sessionId, current: 'fake/m', items })
-	expect(st.modal?.items).toEqual(items)
+	expect(st.modal?.choices?.[st.modal.items[st.modal.selected]!]).toBe('fake/m')
+	expect(st.modal?.items).toContain('  anthropic/opus  (default: claude-opus-5-5)')
 	st = view.search(st, 'opus-5.5')
 	expect(st.modal?.items).toEqual(['anthropic/claude-opus-5-5'])
 	let r = view.modalKey(st, { key: 'enter' })
