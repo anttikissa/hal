@@ -42,17 +42,24 @@ function file(): TabsFile {
 // is left out rather than failing the rest.
 function list(): Tab[] {
 	let f = tabs.file()
-	return f.open.flatMap((id) => {
-		try {
-			let meta = sessions.open(id)
-			let tab: Tab = { id, name: meta.name ?? id, cwd: meta.cwd, model: meta.model, state: status.stateOf(id) }
-			if (f.attention.includes(id)) tab.attention = true
-			if (meta.cwd.replace(/\/+$/, '') === paths.repoRoot()) tab.hal = true
-			return [tab]
-		} catch {
-			return []
-		}
+	return f.open.map((id) => {
+		let meta = sessions.open(id)
+		let tab: Tab = { id, name: meta.name ?? id, cwd: meta.cwd, model: meta.model, state: stateOf(id) }
+		if (f.attention.includes(id)) tab.attention = true
+		if (meta.cwd.replace(/\/+$/, '') === paths.repoRoot()) tab.hal = true
+		return tab
 	})
+}
+
+// A session whose history cannot be read stays in the tab bar, failed
+// with the reader's error (path and record), so it is seen, never
+// skipped; opening it is refused with the same error.
+function stateOf(id: string): Tab['state'] {
+	try {
+		return status.stateOf(id)
+	} catch (e: any) {
+		return { type: 'error', message: String(e?.message ?? e) }
+	}
 }
 
 // A session as people and models tell it apart: tab, id and name.
@@ -107,17 +114,8 @@ function resume(id?: string): Outcome {
 }
 
 function start(cwd?: string, last?: string): Outcome {
-	// Only tabs clients are told of: a session that cannot be read is
-	// not listed, and naming it would leave the client showing nothing.
-	let open = tabs.list().map((t) => t.id)
-	let inCwd = (id: string) => {
-		if (cwd === undefined) return true
-		try {
-			return resolve(sessions.open(id).cwd) === resolve(cwd)
-		} catch {
-			return false
-		}
-	}
+	let open = tabs.file().open
+	let inCwd = (id: string) => cwd === undefined || resolve(sessions.open(id).cwd) === resolve(cwd)
 	let found = last !== undefined && open.includes(last) && inCwd(last) ? last : open.find(inCwd)
 	return found ? { tab: found } : { tab: tabs.create(cwd ?? host.cwd()) }
 }

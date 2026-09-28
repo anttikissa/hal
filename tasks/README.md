@@ -65,8 +65,10 @@ point to it.
   for good: retiring it means reading it as nothing, never removing it
   from history.ts's record types (removing 'blocked' made a session
   with one unreadable, and the terminal whose last tab it was showed
-  no tab at all). Likewise the host never names a tab (tab-start) that
-  its tabs event does not list.
+  no tab at all).
+- Fail fast and loud, never speculative defensive code: an unreadable
+  session is never skipped or hidden. Its tab stays, failed with the
+  reader's error (path, record); opening it is refused with that error.
 - Slash commands are files in `src/host/commands/` (one per command,
   found by listing the directory; `src/host/commands.ts`). They run and
   complete on the host; a command that asks re-runs with the answer.
