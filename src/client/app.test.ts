@@ -128,12 +128,21 @@ test('Escape pauses a turn another host is carrying on, too', () => {
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 })
 
+test('the activity says what the session does, and waiting for answer on a question', () => {
+	app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
+	expect(app.view().activity).toBe('processing')
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'blocked', reason: 'question' } })
+	expect(app.view().activity).toBe('waiting for answer')
+	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'idle' } })
+	expect(app.view().activity).toBeUndefined()
+})
+
 test('bare Enter continues a paused or failed turn, and says so', () => {
 	app.onEvent(snapshot('s1', { type: 'paused' }))
-	expect(app.view().notice).toMatch(/paused.*Enter/)
+	expect(app.view().activity).toBe('paused')
 	enter()
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'error', message: '400 nope' } })
-	expect(app.view().notice).toMatch(/400 nope/)
+	expect(app.view().activity).toMatch(/400 nope/)
 	enter()
 	expect(sent).toEqual([
 		{ type: 'continue', sessionId: 's1' },
@@ -155,7 +164,7 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 	up()
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 	expect(app.view().prompt).toEqual({ text: 'fix ti', cursor: 6 })
-	expect(app.view().notice).toMatch(/editing/)
+	expect(app.view().editing).toMatch(/editing/)
 	paused()
 	app.onKeys([key('backspace'), key('backspace'), key('i', 'i'), key('t', 't')])
 	enter()
@@ -205,7 +214,7 @@ test('Down with the text unchanged, or Escape, continues the paused turn', () =>
 	escape()
 	expect(sent.at(-1)).toEqual({ type: 'continue', sessionId: 's1' })
 	expect(app.view().prompt.text).toBe('fix ti!')
-	expect(app.view().notice ?? '').not.toMatch(/editing/)
+	expect(app.view().editing).toBeUndefined()
 })
 
 test('Up does nothing with text typed or when nothing works', () => {
@@ -217,7 +226,7 @@ test('Up does nothing with text typed or when nothing works', () => {
 	up()
 	expect(sent).toEqual([])
 	// Not an edit: input history recalls the prompt instead.
-	expect(app.view().notice ?? '').not.toMatch(/editing/)
+	expect(app.view().editing).toBeUndefined()
 })
 
 test('Escape with no turn running sends nothing', () => {
@@ -383,27 +392,28 @@ test('Tab on a command asks the host to complete it; the answer fills the prompt
 	expect(app.state.prompt.text).toBe('/cd ~/project')
 })
 
-test('several completions are listed below the prompt until the next key, and Up still recalls history', () => {
+test('several completions are listed in the help row until the next key, and Up still recalls history', () => {
 	app.onEvent(snapshot())
 	type('earlier')
 	enter()
 	app.onEvent({ type: 'prompt', sessionId: 's1', texts: ['earlier'] })
 	type('/cd ~/pro')
+	let before = frame.build(app.view(), 40)
 	app.onKeys([key('tab')])
 	let names = Array.from({ length: 12 }, (_, i) => `project-${i}/`)
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: names.map((n) => `/cd ~/${n}`) })
 	let f = frame.build(app.view(), 40)
-	let below = f.lines.slice(f.cursor.row + 1).map((l) => l.replace(/\x1b\[[0-9;]*m/g, ''))
-	// Every name, in order, wrapped over rows that fit.
-	expect(below.join(' ').split(/\s+/).filter(Boolean)).toEqual(names)
-	expect(below.length).toBeGreaterThan(1)
-	for (let row of f.lines.slice(f.cursor.row + 1)) expect(strings.visLen(row)).toBeLessThanOrEqual(40)
+	// The first names, in order, on the last row; the frame keeps its height.
+	let help = f.lines.at(-1)!.replace(/\x1b\[[0-9;]*m/g, '')
+	expect(help).toMatch(/project-0\/ +project-1\/ /)
+	expect(strings.visLen(f.lines.at(-1)!)).toBeLessThanOrEqual(40)
+	expect(f.lines.length).toBe(before.lines.length)
 	expect(app.view().notice).toBeUndefined()
 	app.onKeys([key('up')])
 	expect(app.view().choices).toBeUndefined()
 	expect(app.state.prompt.text).toBe('earlier')
 	let after = frame.build(app.view(), 40)
-	expect(after.lines.slice(after.cursor.row + 1).join('')).not.toContain('project-')
+	expect(after.lines.join('')).not.toContain('project-')
 })
 
 test('Ctrl-M asks the host for the models; the picker filters as you type and Enter switches', () => {
@@ -437,7 +447,8 @@ test('Up moves by the rows the terminal draws, at its width', () => {
 		app.cols = () => 20
 		app.onKeys([key('up')])
 		let f = frame.build(app.view(), 20)
-		expect(f.cursor.row).toBe(f.lines.length - 2)
+		expect(f.lines[f.cursor.row + 1]).toContain('xx')
+		expect(f.lines[f.cursor.row + 2]).toContain('─')
 		expect(app.view().prompt.cursor).toBe(30 - frame.promptWidth(20))
 	} finally {
 		app.cols = cols
@@ -631,7 +642,7 @@ test('web links carry the latest link code only in their hidden target', () => {
 test('the tab bar shows the tabs with the focused one', () => {
 	startOn(['a', 'b'])
 	let lines = frame.build(app.view(), 60).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, ''))
-	expect(lines.at(-2)).toContain('Tabs: [1] 2 ')
+	expect(lines.find((l) => l.includes('Tabs:'))).toContain('Tabs: [1] 2 ')
 })
 
 // A session that was sent `prompts`, idle again.

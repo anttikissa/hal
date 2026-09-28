@@ -190,7 +190,7 @@ describe('grow mode', () => {
 	})
 
 	test('updates in place while the frame fits: streaming, a longer and a shorter prompt', () => {
-		setup(12, 30, ['$ hal'])
+		setup(16, 30, ['$ hal'])
 		show(items(1))
 		for (let text of ['He', 'Hello', 'Hello, world, how are you doing today']) {
 			show([...items(1), { type: 'prompt', text: 'q1' }, { type: 'text', text }])
@@ -214,7 +214,7 @@ describe('grow mode', () => {
 	})
 
 	test('a forced repaint keeps the shell output above', () => {
-		setup(10, 30, ['$ hal'])
+		setup(14, 30, ['$ hal'])
 		show(items(2), 'hi')
 		show(items(2), 'hi', 2, true)
 		expect(term.content()).toEqual(['$ hal', ...frameText()])

@@ -9,8 +9,8 @@
 //
 // Its parts are drawn by ansi.ts (escapes, painted rows), item-view.ts
 // (transcript items), form-view.ts (open questions), prompt-view.ts
-// (the prompt), tab-bar.ts (the tabs) and modal-view.ts (modals over
-// it all).
+// (the prompt), tab-bar.ts (the tabs), help-row.ts (the last row) and
+// modal-view.ts (modals over it all).
 
 import { colors, type Style } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
@@ -26,6 +26,7 @@ import type { Tab } from '../common/protocol.ts'
 import { promptView } from './prompt-view.ts'
 import type { HalCursor } from './hal-cursor.ts'
 import { tabBar } from './tab-bar.ts'
+import { helpRow } from './help-row.ts'
 import { strings } from '../common/strings.ts'
 
 export interface View {
@@ -45,8 +46,12 @@ export interface View {
 	/** The host's tabs and the one shown: a tab bar row above the prompt;
 	 * `lit` is the blink phase while an indicator blinks. */
 	tabs?: { list: Tab[]; focused?: string; lit?: boolean }
-	/** Tab completion's choices: a list below the prompt. */
+	/** Tab completion's choices: listed in the help row. */
 	choices?: string[]
+	/** What the session is doing, centred in the prompt's top rule. */
+	activity?: string
+	/** The hint while the last prompt is edited: the help row shows it. */
+	editing?: string
 	/** The Hal cursor: after the streaming last item, or on its own row. */
 	hal?: HalCursor
 }
@@ -157,17 +162,20 @@ function build(view: View, cols: number, rows = 24, peak = 0): Frame {
 		block(rows.map((r, i) => (i ? pad : ansi.DIM + tag + ansi.UNDIM) + r), colors.user())
 	}
 	if (view.notice) block(ansi.wrap(view.notice, width), { fg: colors.log().fg! })
+	// Below them, the chrome proper: tab bar, the prompt box between
+	// two rules, then the help row. Its height depends only on the
+	// prompt's rows, so nothing below the transcript jumps.
 	let p = promptView.box(view.prompt, width, view.placeholder)
-	let log = { fg: colors.log().fg! }
-	let bar = !!view.tabs?.list.length
-	if ((lines.length || above) && (bar || !p.above)) lines.push('')
-	if (bar) lines.push(tabBar.row(view.tabs!.list, view.tabs!.focused, cols, view.tabs!.lit ?? true))
-	if (p.above) lines.push(ansi.paint(p.above, log, cols))
-	let top = lines.length
 	let input = colors.input()
+	let rule = (left: string, center = '') => ansi.sgr(input) + promptView.rule(cols, left, ansi.clean(center)) + ansi.UNCOLOR
+	if (lines.length || above) lines.push('')
+	if (view.tabs?.list.length) lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true))
+	lines.push(rule(p.above ? `↑${p.above}` : '', view.activity))
+	let top = lines.length
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))
-	if (p.below) lines.push(ansi.paint(p.below, log, cols))
-	for (let r of view.choices ? ansi.wrap(view.choices.join('  '), width) : []) lines.push(ansi.paint(r, log, cols))
+	lines.push(rule(p.below ? `↓${p.below}` : ''))
+	// Task 1g's status row goes here, between the rule and the help row.
+	lines.push(helpRow.row(view, cols))
 	let pad = Math.max(0, Math.min(peak, rows - lines.length) - history.length)
 	let chrome = lines
 	lines = [...history, ...Array<string>(pad).fill(''), ...chrome]

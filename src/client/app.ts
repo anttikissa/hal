@@ -81,12 +81,24 @@ function view(): View {
 	if (t && !st.prompt.text) v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	if (v.tabs && tabBar.blinks(st.tabs)) v.tabs.lit = pulse.slow(pulse.beat())
-	// A passing notice, else what the session is doing.
-	let notice = st.notice ?? (st.editing ? amend.hint(st.editing) : st.transcript && states.describe(st.transcript.state))
-	if (notice) v.notice = notice
+	if (st.notice) v.notice = st.notice
+	if (st.editing) v.editing = amend.hint(st.editing)
+	let activity = t && app.activity(t)
+	if (activity) v.activity = activity
 	let hal = halCursor.of(st.transcript, pulse.beat())
 	if (hal) v.hal = hal
 	return v
+}
+
+// What the session is doing in a word or two, for the prompt's top
+// rule: states.describe's words, except that the help row already says
+// which key continues, and the question on screen needs its answer.
+function activity(t: Transcript): string | undefined {
+	let s = t.state
+	if (s.type === 'blocked' && s.reason === 'question') return 'waiting for answer'
+	if (s.type === 'paused') return s.reason ? `paused: ${s.reason}` : 'paused'
+	if (s.type === 'error') return `error: ${s.message}`
+	return states.describe(s, Date.now(), t.items)
 }
 
 // What blinks in `view`, as a key that changes with every blink phase.
@@ -333,6 +345,7 @@ export const app = {
 	/** The terminal's width, which Up/Down move by. */
 	cols: (): number => render.state.out?.size().cols ?? 80,
 	view,
+	activity,
 	blinks,
 	show,
 	beat,

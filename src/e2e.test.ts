@@ -212,7 +212,7 @@ test('Escape pauses a turn; it stays paused over a restart and Enter continues i
 
 	let mark = p.out.length
 	type(p, '\x12') // Ctrl-R
-	await until('the conversation after restart', () => seen(p, 'ECHO(first)', mark) && seen(p, 'PART1', mark) && seen(p, 'Enter continues', mark))
+	await until('the conversation after restart', () => seen(p, 'ECHO(first)', mark) && seen(p, 'PART1', mark) && seen(p, ': continue', mark))
 	expect(p.exit).toBeUndefined()
 	await Bun.sleep(200)
 	expect(requests).toHaveLength(2)
@@ -262,7 +262,7 @@ test('Ctrl-C of the last Hal process pauses the turn, and the next start leaves 
 	expect(ends()).toEqual(['paused'])
 
 	let b = run()
-	await until('the paused turn', () => seen(b, 'PART1') && seen(b, 'Enter continues'))
+	await until('the paused turn', () => seen(b, 'PART1') && seen(b, ': continue'))
 	await Bun.sleep(200)
 	expect(requests).toHaveLength(1)
 }, 30_000)

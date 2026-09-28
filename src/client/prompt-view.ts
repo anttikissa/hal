@@ -32,20 +32,27 @@ function layoutPrompt(text: string, cursor: number, width: number, sel?: { start
 	return { rows, row: at.row, col: Math.min(at.col, width) }
 }
 
-// A dim rule across the box's edge, saying how many rows it hides.
-function rule(label: string, width: number): string {
-	let head = strings.clipVisual(`── ${label} `, width)
-	return ansi.DIM + head + '─'.repeat(Math.max(0, width - strings.visLen(head))) + ansi.UNDIM
+// A full-width rule `cols` wide: `left` at its left end and `center`
+// in the middle (pushed right of `left` when they would meet), clipped
+// to fit. Unpainted.
+function rule(cols: number, left = '', center = ''): string {
+	let l = left ? ` ${left} ` : ''
+	let c = center ? strings.clipVisual(` ${center} `, cols) : ''
+	let cw = strings.visLen(c)
+	l = strings.clipVisual(l, Math.max(0, cols - cw))
+	let lw = strings.visLen(l)
+	let at = Math.max(lw, Math.floor((cols - cw) / 2))
+	return l + '─'.repeat(at - lw) + c + '─'.repeat(Math.max(0, cols - at - cw))
 }
 
 // The prompt box: its rows scrolled to show the cursor (`scroll` is
-// where it was), rules above and below saying what it hides, and a
-// dim example on an empty prompt. Rows are marked, not yet painted.
+// where it was), how many rows it hides above and below, and a dim
+// example on an empty prompt. Rows are marked, not yet painted.
 function box(
 	st: PromptState,
 	width: number,
 	placeholder?: string,
-): { above?: string; rows: string[]; below?: string; row: number; col: number; scroll: number } {
+): { above: number; rows: string[]; below: number; row: number; col: number; scroll: number } {
 	let textWidth = Math.max(1, width - promptView.FIRST.length)
 	let p = promptView.layoutPrompt(st.text, st.cursor, textWidth, prompt.selection(st))
 	let height = st.rows ?? promptLayout.autoHeight(p.rows.length, settings.promptRows())
@@ -53,10 +60,7 @@ function box(
 	let shown = promptView.mark(p.rows).slice(vp.top, vp.top + height)
 	while (shown.length < height) shown.push(promptView.REST)
 	if (!st.text && placeholder) shown[0] = promptView.FIRST + ansi.DIM + strings.clipVisual(ansi.clean(placeholder), textWidth) + ansi.UNDIM
-	let out: ReturnType<typeof box> = { rows: shown, row: p.row - vp.top, col: promptView.FIRST.length + p.col, scroll: vp.top }
-	if (vp.above) out.above = promptView.rule(`up ${vp.above}`, width)
-	if (vp.below) out.below = promptView.rule(`down ${vp.below}`, width)
-	return out
+	return { above: vp.above, rows: shown, below: vp.below, row: p.row - vp.top, col: promptView.FIRST.length + p.col, scroll: vp.top }
 }
 
 // Text rows marked as a prompt: the first with `FIRST`, the rest indented.

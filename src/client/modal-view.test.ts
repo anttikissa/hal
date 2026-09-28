@@ -36,7 +36,9 @@ function box(lines: string[]): { top: number; bottom: number; left: number; righ
 }
 
 test('a modal draws over the transcript: transcript, a blank column, the outline, the contents', () => {
-	let f = frame.build(modalView({ title: 'Models', form: search, items: names(3) }), 60, 30)
+	let v = modalView({ title: 'Models', form: search, items: names(3) })
+	let f = frame.build(v, 60, 30)
+	let under = frame.build({ ...v, modal: undefined }, 60, 30).lines.map(strip)
 	let b = box(f.lines)
 	expect(b.bottom - b.top + 1).toBe(24)
 	// Drawn over the frame, not added to it.
@@ -44,12 +46,13 @@ test('a modal draws over the transcript: transcript, a blank column, the outline
 	for (let i = b.top; i <= b.bottom; i++) {
 		let row = strip(f.lines[i]!)
 		expect(strings.visLen(f.lines[i]!)).toBeLessThanOrEqual(60)
-		expect(row.slice(1, b.left - 1)).toMatch(/^x+$/)
+		expect(row.slice(0, b.left - 1).trimEnd()).toBe(under[i]!.slice(0, b.left - 1).trimEnd())
+		expect(row.slice(1, b.left - 1)).toMatch(/^(x+|─+| *)$/)
 		expect(row[b.left - 1]).toBe(' ')
 		expect('╭│╰').toContain(row[b.left]!)
 		expect('╮│╯').toContain(row[b.right]!)
 		expect(row[b.right + 1]).toBe(' ')
-		expect(row.slice(b.right + 2).trimEnd()).toMatch(/^x+$/)
+		expect(row.slice(b.right + 2).trimEnd()).toBe(under[i]!.slice(b.right + 2).trimEnd())
 	}
 	let rows = f.lines.map(strip)
 	expect(rows[b.top]).toContain('Models')
