@@ -61,6 +61,7 @@ const table: Setting[] = [
 		description: 'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
 	},
 	{ name: 'webSearch', type: { kind: 'boolean' }, default: true, description: "Offer Claude Anthropic's server-side web search." },
+	{ name: 'push', type: { kind: 'boolean' }, default: true, description: 'Send web push notifications to subscribed devices.' },
 ]
 
 // Why `value` doesn't fit `type`, or undefined if it does.
@@ -145,4 +146,5 @@ export const settings = {
 	maxRounds: (): number => settings.value('maxRounds') as number,
 	compactAt: (): number => settings.value('compactAt') as number,
 	webSearch: (): boolean => settings.value('webSearch') as boolean,
+	push: (): boolean => settings.value('push') as boolean,
 }

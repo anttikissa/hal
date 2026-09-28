@@ -43,6 +43,7 @@ import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
 import { filePage } from './file-page.ts'
 import { host } from './host.ts'
+import { push } from './push.ts'
 import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
 
@@ -154,6 +155,9 @@ async function page(): Promise<Response> {
 		return new Response('the web client failed to build; see diag.log\n', { status: 500 })
 	}
 	html = html.replace('/*COLORS*/', () => web.css()).replace('/*SETTINGS*/', () => settings.forPage())
+	// Public signing key only, encoded into JSON safely (never the private key).
+	try { let key = (await push.keys()).publicKey; html = html.replace('/*PUSH_KEY*/', () => JSON.stringify(key)) }
+	catch (e: any) { diag.log(`push: ${e?.message ?? e}`); html = html.replace('/*PUSH_KEY*/', 'null') }
 	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 }
 
@@ -195,6 +199,9 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	let blob = get && (pathname.startsWith('/blob/') || filePage.owns(pathname))
 	if (get && url.searchParams.has('auth') && (blob || pathname === '/' || session.isId(pathname.slice(1)))) return web.linkLogin(url, req)
 	if (get && (pathname === '/' || session.isId(pathname.slice(1)))) return web.page()
+	if (get && pathname === '/manifest.webmanifest') return new Response(JSON.stringify({ name: 'Hal', short_name: 'Hal', start_url: '/', scope: '/', display: 'standalone', background_color: '#141a26', theme_color: '#141a26', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }), { headers: { 'content-type': 'application/manifest+json', 'cache-control': 'no-store' } })
+	if (get && (pathname === '/icon-192.png' || pathname === '/icon-512.png')) return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' } })
+	if (get && pathname === '/sw.js') return new Response(Bun.file(`${import.meta.dir}/../web/sw.js`), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store', 'service-worker-allowed': '/' } })
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
 	let check = pathname === '/login' && get
 	if (!check && !blob && pathname !== '/ws') return new Response('not found\n', { status: 404 })

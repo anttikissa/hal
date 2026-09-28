@@ -12,6 +12,7 @@ import type { Event, Tab } from '../common/protocol.ts'
 import { app } from './app.ts'
 import type { KeyInput } from './keys.ts'
 import { router } from './router.ts'
+import { push } from './push.ts'
 import { scroll } from './scroll.ts'
 import { shortcuts, type TabAction } from './shortcuts.ts'
 
@@ -68,6 +69,7 @@ function show(id: string, replace: boolean): void {
 	st.text = recall.shown(id) ?? drafts.text(id)
 	router.store.save(id)
 	connection.send({ type: 'open', sessionId: id })
+	push.visibility(id)
 	tabs.seen()
 	app.changed()
 }
@@ -80,6 +82,7 @@ function onPopState(): void {
 
 // The shown tab no longer wants attention.
 function seen(): void {
+	if (typeof document !== 'undefined' && (document.visibilityState !== 'visible' || !document.hasFocus())) return
 	let { tabs, shown } = app.state
 	if (tabs.find((t) => t.id === shown)?.attention) connection.send({ type: 'tab-seen', sessionId: shown })
 }

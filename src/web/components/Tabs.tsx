@@ -12,6 +12,7 @@ import type { Tab } from '../../common/protocol.ts'
 import { tabMark } from '../../common/tab-mark.ts'
 import { router } from '../router.ts'
 import { tabs } from '../tabs.ts'
+import { push } from '../push.ts'
 
 // The marker: the same glyph as the terminal's (common/tab-mark.ts),
 // styled by its kind; a blinking one pulses.
@@ -55,7 +56,9 @@ function Close(props: { tab: Tab }) {
 	)
 }
 
-export function Tabs(props: { tabs: Tab[]; shown: string | undefined }) {
+export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady: boolean }) {
+	let [requested, setRequested] = createSignal(false)
+	let enable = () => void push.enable().then(() => setRequested(true)).catch((e) => alert(`Notifications: ${e.message}`))
 	let [open, setOpen] = createSignal(false)
 	let sheet!: HTMLDialogElement
 	createEffect(open, (o) => {
@@ -81,6 +84,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined }) {
 				<button type="button" class="new" aria-label="New tab" onClick={newTab}>
 					+
 				</button>
+				{props.pushReady && !requested() && push.available() && <button type="button" class="notify" onClick={enable}>Notify me</button>}
 			</nav>
 			<button type="button" class="menu" aria-haspopup="dialog" aria-expanded={open() ? 'true' : 'false'} onClick={() => void setOpen(true)}>
 				<span class="n">{current() + 1 || ''}</span>
@@ -88,6 +92,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined }) {
 				<span aria-hidden="true">▾</span>
 				<span class="count">{`${props.tabs.length} tabs`}</span>
 			</button>
+			{props.pushReady && !requested() && push.available() && <button type="button" class="notify-mobile" onClick={enable}>Notify me</button>}
 			<dialog
 				ref={(e) => (sheet = e)}
 				class="sheet"

@@ -22,6 +22,7 @@ import { recall } from '../common/recall.ts'
 import { uploads, type Settled } from '../common/uploads.ts'
 import { link } from './link.ts'
 import { router } from './router.ts'
+import { push } from './push.ts'
 import { tabs } from './tabs.ts'
 import { target, type Target } from './target.ts'
 import { view, type ViewState } from './view.ts'
@@ -85,6 +86,7 @@ function sendNow(command: unknown): boolean {
 
 function onEvent(event: Event): void {
 	let st = app.state
+	if (event.type === 'tabs') push.badge(event.tabs)
 	if (tabs.onEvent(event)) return
 	let changed = drafts.onEvent(event)
 	let landed = uploads.settle(event)
@@ -150,7 +152,7 @@ function older(): void {
 }
 
 function onState(state: LinkState): void {
-	if (state.type === 'connected') tabs.connected()
+	if (state.type === 'connected') { tabs.connected(); push.visibility(app.state.shown) }
 	app.setNotice(state.type === 'connected' ? undefined : state.type === 'joining' ? 'connecting…' : 'disconnected; reconnecting…')
 }
 
@@ -270,6 +272,11 @@ function start(): void {
 	addEventListener('popstate', () => tabs.onPopState())
 	addEventListener('hashchange', () => app.aim())
 	app.aim()
+	void push.start(() => app.changed()).catch(() => {})
+	let visible = () => { push.visibility(app.state.shown); if (document.visibilityState === 'visible' && document.hasFocus()) tabs.seen() }
+	addEventListener('focus', visible)
+	addEventListener('blur', visible)
+	document.addEventListener('visibilitychange', visible)
 }
 
 // Whether the cookie is good; logging in sets it. login answers the

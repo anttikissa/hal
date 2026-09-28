@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Hal</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <style>
 /* The one stylesheet: layout only. Colours come from the theme below
    (src/common/colors.ts; .page carries the page's own as variables). */
@@ -161,6 +164,9 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .sheet .new { padding: 0.6rem; background: var(--button); }
 .Tabs .sheet::backdrop { background: color-mix(in oklab, var(--canvas) 60%, transparent); }
 @media (max-width: 40rem) { .Tabs .strip { display: none; } .Tabs .menu { display: flex; } }
+.Tabs .notify-mobile { display: none; }
+@media (max-width: 40rem) { .Tabs .notify-mobile { display: block; width: 100%; text-align: center; } }
+@media (pointer: coarse) { .Tabs .notify, .Tabs .notify-mobile { min-height: 44px; } }
 /* The theme (src/common/colors.ts), put here by the host. */
 /*COLORS*/
 </style>
@@ -168,6 +174,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 <body>
 <!-- The browser's settings from config.ason, put here per request. -->
 <script type="application/json" id="settings">/*SETTINGS*/</script>
+<script type="application/json" id="push-key">/*PUSH_KEY*/</script>
 <script>/*APP*/</script>
 </body>
 </html>

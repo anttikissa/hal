@@ -99,6 +99,27 @@ test('the host serves the web endpoint and stops it with the host', async () => 
 	await expect(fetch(`${url}/`)).rejects.toThrow()
 })
 
+test('the installable app serves its manifest, PNG icons and service worker', async () => {
+	await server.serve()
+	web.start()
+	let manifest = await (await fetch(`${base()}/manifest.webmanifest`)).json()
+	expect(manifest.display).toBe('standalone')
+	expect(manifest.name).toBe('Hal')
+	for (let icon of manifest.icons) {
+		let response = await fetch(new URL(icon.src, base()))
+		expect(response.headers.get('content-type')).toBe('image/png')
+		let bytes = new Uint8Array(await response.arrayBuffer())
+		expect(bytes.length).toBeGreaterThan(100)
+		expect(bytes.slice(0, 4)).toEqual(new Uint8Array([137, 80, 78, 71]))
+	}
+	let sw = await fetch(`${base()}/sw.js`)
+	expect(sw.ok).toBe(true)
+	expect(sw.headers.get('cache-control')).toBe('no-store')
+	let html = await (await fetch(`${base()}/`)).text()
+	expect(html).toContain('rel="manifest"')
+	expect(html).toContain('rel="apple-touch-icon"')
+})
+
 test('the page carries the theme as CSS, following overrides, without its code', async () => {
 	await server.serve()
 	web.start()

@@ -26,6 +26,7 @@ import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { jobs } from './jobs.ts'
 import { pages } from './pages.ts'
+import { push } from './push.ts'
 import { sessions } from './sessions.ts'
 import { prompts } from './prompts.ts'
 import { slash } from './slash.ts'
@@ -44,7 +45,7 @@ export type Connection = {
 	close(): void
 }
 
-type Client = { deliver: (event: Event) => void; open: Set<string> }
+type Client = { deliver: (event: Event) => void; open: Set<string>; visible?: string }
 // What a command did: refused (why), or done, naming a created session
 // (followed) or the tab a tab command created, reopened or picked, or
 // with the event that answered it (attached), sent again on a repeat.
@@ -205,6 +206,14 @@ function act(client: Client, c: Command): Outcome | undefined {
 	}
 	if (tabs.is(c)) return tabs.act(c)
 	if (c.type === 'auth' && c.link) webLinks.follow(client, client.deliver)
+	if (c.type === 'push-subscribe') {
+		push.subscribe({ endpoint: c.subscription.endpoint, ...c.subscription.keys })
+		return {}
+	}
+	if (c.type === 'visibility') {
+		client.visible = c.visible && client.open.has(c.sessionId) ? c.sessionId : undefined
+		return {}
+	}
 	if (c.type === 'auth') return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } }
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	// An edit waits for the turn it paused to finish stopping, so nothing
@@ -217,7 +226,7 @@ function act(client: Client, c: Command): Outcome | undefined {
 		return undefined
 	}
 	let refused: string | undefined
-	if (c.type === 'close') client.open.delete(c.sessionId)
+	if (c.type === 'close') { client.open.delete(c.sessionId); if (client.visible === c.sessionId) client.visible = undefined }
 	else if (c.type === 'attach') {
 		// A named paste waits in /tmp for its prompt (tasks qy, 31).
 		let stored = c.name !== undefined ? blobs.stage(c.name, c.mediaType, c.data) : blobs.store(c.sessionId, c.mediaType, c.data)
@@ -296,6 +305,12 @@ function snapshot(id: string): Snapshot {
 function broadcast(id: string, event: Event): void {
 	for (let client of host.state.clients) if (client.open.has(id)) client.deliver(event)
 	tabs.observe(id, event)
+	if ((event.type === 'turn-end' && ['completed', 'error'].includes(event.status)) || event.type === 'question') {
+		if (![...host.state.clients].some((c) => c.visible === id)) {
+			let line = event.type === 'question' ? 'needs an answer' : event.status === 'error' ? 'failed' : 'done'
+			void push.notify(id, sessions.open(id).name ?? id, line).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
+		}
+	}
 }
 
 // Whenever this process exits while it is host (quit, restart, SIGTERM,
@@ -335,6 +350,7 @@ function reset(): void {
 	pages.reset()
 	host.state.done.clear()
 	tabs.reset()
+	push.reset()
 	busy.reset()
 	drafts.reset()
 	webLinks.reset()

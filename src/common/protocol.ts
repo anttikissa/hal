@@ -151,6 +151,9 @@ export type Command = (
 	// terminal, task e3): a code for its web links, replaced by a new
 	// `auth` event whenever it is used and before it grows old.
 	| { type: 'auth'; link?: boolean }
+	// A browser registers a push endpoint and reports its shown tab.
+	| { type: 'push-subscribe'; subscription: { endpoint: string; keys: { p256dh: string; auth: string } } }
+	| { type: 'visibility'; sessionId: string; visible: boolean }
 ) & { id?: string }
 
 export type CommandType = Command['type']
@@ -249,7 +252,7 @@ export type Event =
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'visibility']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -265,6 +268,12 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
 	if (c.type === 'tab-new') return str('cwd') ?? str('after', true)
+	if (c.type === 'push-subscribe') {
+		let s = c.subscription as Record<string, unknown> | undefined
+		let keys = s?.keys as Record<string, unknown> | undefined
+		return s && keys && typeof s.endpoint === 'string' && typeof keys.p256dh === 'string' && typeof keys.auth === 'string' ? undefined : 'push-subscribe: invalid subscription'
+	}
+	if (c.type === 'visibility') return str('sessionId') ?? (typeof c.visible === 'boolean' ? undefined : 'visibility: visible must be a boolean')
 	if (c.type === 'tab-start') return str('cwd', true) ?? str('last', true)
 	if (c.type === 'tab-resume') return str('sessionId', true)
 	if (c.type === 'history' && !(Number.isInteger(c.before) && (c.before as number) >= 0)) return 'history: before must be an offset'

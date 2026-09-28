@@ -13,13 +13,14 @@ import { app } from '../app.ts'
 import { editor } from '../editor.ts'
 import { keys, type Target } from '../keys.ts'
 import { scroll } from '../scroll.ts'
+import { push } from '../push.ts'
 import { viewport } from '../viewport.ts'
 import { Composer } from './Composer.tsx'
 import { Picker } from './Picker.tsx'
 import { Tabs } from './Tabs.tsx'
 import { Transcript } from './Transcript.tsx'
 
-const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected() })
+const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration })
 type Snap = ReturnType<typeof snap>
 
 // A change to the transcript follows the bottom: a new prompt pending
@@ -95,7 +96,7 @@ export function Chat() {
 	// One memo per field, gated on its value, so a redraw reaches only
 	// what changed: typing touches the composer, never the transcript.
 	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
-	let [tabs, shown, view, text, notice, placeholder, connected, linked] = [field('tabs'), field('shown'), field('view'), field('text'), field('notice'), field('placeholder'), field('connected'), field('target')]
+	let [tabs, shown, view, text, notice, placeholder, connected, linked, pushReady] = [field('tabs'), field('shown'), field('view'), field('text'), field('notice'), field('placeholder'), field('connected'), field('target'), field('pushReady')]
 	let pending = createMemo(() => state().pending, { equals: same })
 	// Files are dragged over the page: the box shows it takes them.
 	let [dropping, setDropping] = createSignal(false)
@@ -144,7 +145,7 @@ export function Chat() {
 	})
 	return (
 		<div class="Chat">
-			<Tabs tabs={tabs()} shown={shown()} />
+			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} />
 			<Composer view={view()} text={text()} notice={notice()} placeholder={placeholder()} connected={connected()} dropping={dropping()} />
 			<Picker modal={view().modal} />

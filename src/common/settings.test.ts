@@ -23,7 +23,7 @@ test('every declared default passes its own validation', () => {
 test('valid values are taken', () => {
 	let { values, warnings } = settings.check({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50, compactAt: 0.5 })
 	expect(warnings).toEqual([])
-	expect(values).toEqual({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50, compactAt: 0.5, webSearch: true })
+	expect(values).toEqual({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50, compactAt: 0.5, webSearch: true, push: true })
 })
 
 test('an unknown key is a warning and changes nothing else', () => {
