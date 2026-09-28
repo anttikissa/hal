@@ -1,0 +1,29 @@
+import { expect, test } from 'bun:test'
+import { calls, client, created, until, useHost } from '../host-fixture.test.ts'
+import { tabs } from '../tabs.ts'
+
+useHost()
+
+test('/send resolves tab number and id, preserves provenance, runs remote commands and rejects unknown targets', async () => {
+	let a = client()
+	let target = created(a)
+	let sender = created(a)
+	tabs.insert(target, 0)
+	tabs.insert(sender, 1)
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: target })
+	await until(() => b.views.has(target))
+	let send = (text: string) => a.conn.send({ type: 'submit', sessionId: sender, text })
+	send('/send 1 hello by tab')
+	await until(() => calls.length === 1)
+	expect(b.views.get(target)?.items.find((i) => i.type === 'prompt')).toMatchObject({ text: 'hello by tab', from: sender })
+	send(`/send ${target} /rename Remote name`)
+	await until(() => b.views.get(target)?.meta.name === 'Remote name')
+	expect(b.views.get(target)?.items.find((i) => i.type === 'command')).toMatchObject({ from: sender, text: '/rename Remote name' })
+	send(`/send ${target} hello by id`)
+	await until(() => b.views.get(target)?.inbox.some((m) => m.text === 'hello by id'))
+	expect(b.views.get(target)?.inbox[0]).toMatchObject({ from: sender, text: 'hello by id' })
+	send('/send 99 no such tab')
+	await until(() => a.of('output').at(-1)?.error)
+	expect(a.of('output').at(-1)?.text).toContain('no session 99')
+})
