@@ -31,7 +31,8 @@ import { status } from './status.ts'
 import { subagents } from './subagents.ts'
 import { toolOutput } from './tool-output.ts'
 // A running turn settles when runTurn returns (task hp).
-type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void> }
+// `rewait`: ends the current wait out of a failed round (a model switch).
+type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController }
 // Asks the open turn's human a durable question: in history first,
 // then shown; the turn stops running here and waits, blocked, for the
 // first answer (reply), which runs it again. Nothing waits in memory:
@@ -58,9 +59,8 @@ function ask(id: string, form: Form, call?: string): void {
 // they are told.
 function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender; ts?: string }): void {
 	let model = sessions.open(id).model
-	let running: Running = { provider: blocks.parseModelId(model)?.provider ?? model, model, controller: new AbortController() }
-	let effort = models.effort(model)
-	if (effort !== undefined) running.effort = effort
+	let running: Running = { provider: '', controller: new AbortController() }
+	let effort = target(running, model)
 	turns.state.running.set(id, running)
 	let event: Event & { type: 'turn-start' } = { type: 'turn-start', sessionId: id, provider: running.provider, model }
 	if (effort !== undefined) event.effort = effort
@@ -144,6 +144,16 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 // pauses with a reason, and continuing gives it as many again. A round
 // cut off at max_tokens or refused runs none of its calls and ends the
 // turn in error (stopped).
+// Points `running` at `model`; returns its effort.
+function target(running: Running, model: string): string | undefined {
+	running.provider = blocks.parseModelId(model)?.provider ?? model
+	running.model = model
+	let effort = models.effort(model)
+	if (effort !== undefined) running.effort = effort
+	else delete running.effort
+	return effort
+}
+
 async function runTurn(id: string, model: string, running: Running, answers?: Answers): Promise<void> {
 	let { signal } = running.controller
 	let records = history.readSync(id)
@@ -186,6 +196,10 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					last = undefined
 					break
 				}
+				// Each round asks the session's model: a /model switch counts
+				// from the next request, even inside a turn.
+				let now = sessions.open(id).model
+				if (now !== model) target(running, (model = now))
 				let round = blocks.newTurn(running.provider)
 				last = undefined
 				prompts.steer(id)
@@ -320,8 +334,18 @@ function parkedUsage(records: HistoryRecord[]): Usage {
 // why: retrying at a time (temporary: at once, then backing off; rate
 // limited: when the provider said, or at once when another account can
 // take over), or blocked until the credentials file changes (a broken
-// login). Ends early on Escape (`signal`); a wake retries at once.
-async function waitOut(id: string, error: ErrorEvent, failures: number, signal: AbortSignal): Promise<void> {
+// login). Ends early on Escape (`signal`); a wake or a model switch
+// (the new model may not share the failure) retries at once.
+async function waitOut(id: string, error: ErrorEvent, failures: number, outer: AbortSignal): Promise<void> {
+	let running = turns.state.running.get(id)
+	let rewait = new AbortController()
+	if (running) running.rewait = rewait
+	let signal = AbortSignal.any([outer, rewait.signal])
+	try { await waitFor(id, error, failures, signal) }
+	finally { if (running?.rewait === rewait) delete running.rewait }
+}
+
+async function waitFor(id: string, error: ErrorEvent, failures: number, signal: AbortSignal): Promise<void> {
 	// Output cut off mid-answer: the model hears it was interrupted.
 	if (history.readSync(id).at(-1)?.type === 'assistant') history.append(id, { type: 'continue' })
 	if (error.failure === 'auth' && error.retryAt === undefined) {

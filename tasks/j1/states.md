@@ -82,6 +82,11 @@ progress, pause it with a reason.
   time in the body), which can be hours away. Must survive restart.
 - Auth broken (401, refresh token rejected, e.g. a copied credentials
   file): blocked on login; continue by itself once credentials work.
+- Every round uses the session's model as it is when the round starts,
+  so /model counts from the next request even inside a turn. A switch
+  while retrying or blocked ends the wait at once and tries the new
+  model: a login broken for one provider must not hold a session that
+  moved to another.
 - Laptop sleep: after wake it must just work, as if the lid had never
   closed. This is hard to test, so defensive code is allowed here (and
   only here): detect the wake (timer gap, clock jump) and treat every

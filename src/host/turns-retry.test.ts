@@ -15,6 +15,7 @@ import { status } from './status.ts'
 import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
+import { slash } from './slash.ts'
 
 const savedHome = process.env.HAL_HOME
 const orig = { stream: turns.stream, now: clock.now, sleep: clock.sleep, changed: auth.changed, onError: liveFiles.onError }
@@ -27,10 +28,10 @@ let hold = false
 
 // Each call answers with the next scripted list of events.
 let script: StreamEvent[][] = []
-let calls: { input: any }[] = []
+let calls: { model: string; input: any }[] = []
 
-function fakeStream(_model: string, input: any): AsyncIterable<StreamEvent> {
-	calls.push({ input })
+function fakeStream(model: string, input: any): AsyncIterable<StreamEvent> {
+	calls.push({ model, input })
 	let events = script.shift() ?? [{ type: 'done', reason: 'end' }]
 	return (async function* () {
 		yield* events
@@ -170,6 +171,18 @@ test('broken login blocks until the credentials file changes, then continues by 
 	expect(calls).toHaveLength(1)
 	changed()
 	await until(() => a.ends().length)
+	expect(a.ends()[0]).toMatchObject({ status: 'completed' })
+})
+
+test('switching model while blocked on a login tries the new model at once', async () => {
+	let a = client()
+	auth.changed = (signal) => new Promise<void>((r) => signal?.addEventListener('abort', () => r()))
+	script = [[{ type: 'error', message: 'anthropic token refresh failed', failure: 'auth' }], done]
+	let id = start(a)
+	await until(() => status.stateOf(id).type === 'blocked')
+	slash.change(id, { model: 'other/m2' })
+	await until(() => a.ends().length)
+	expect(calls.map((c) => c.model)).toEqual(['fake/m1', 'other/m2'])
 	expect(a.ends()[0]).toMatchObject({ status: 'completed' })
 })
 

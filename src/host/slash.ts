@@ -15,6 +15,7 @@ import { sessions } from './sessions.ts'
 import { host } from './host.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
+import { turns } from './turns.ts'
 
 // Records a slash command as typed (by whom: `from`, else the human) and
 // runs it. `command`: the client's id for the submit. Returns why it is
@@ -61,6 +62,8 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 	history.append(id, { type: 'change', ...changed })
 	host.broadcast(id, changed.model === undefined ? { type: 'meta', sessionId: id, meta: { ...meta } } : { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
 	if (changed.model) {
+		// A turn waiting out a failure tries the new model now.
+		turns.state.running.get(id)?.rewait?.abort()
 		let names = modelList.names([changed.model])
 		if (Object.keys(names).length) host.broadcast(id, { type: 'model-names', names })
 	}
