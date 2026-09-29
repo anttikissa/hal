@@ -26,18 +26,31 @@ test('hues land where expected: 25 red, 145 green, 250 blue', () => {
 	expect(b3).toBeGreaterThan(g3)
 })
 
-test('colours outside sRGB lose chroma, not hue or lightness', () => {
+test('colours outside sRGB darken to keep their chroma and hue', () => {
+	// A bright orange no sRGB colour holds at its lightness: it stays
+	// vivid orange by darkening, never fading to peach.
+	let [L, C, h] = oklch.fit([0.84, 0.19, 55])
+	expect(h).toBe(55)
+	expect(L).toBeLessThan(0.84)
+	expect(C).toBeGreaterThan(0.17)
+	let [r, g, b] = oklch.toRgb([0.84, 0.19, 55])
+	expect(r).toBe(255)
+	expect(b).toBeLessThan(40)
+	expect(g).toBeGreaterThan(b)
+	// One that fits once darker keeps its chroma exactly.
+	expect(oklch.fit([0.8, 0.15, 55])[1]).toBe(0.15)
+	// In gamut: untouched.
+	expect(oklch.fit([0.7, 0.05, 55])).toEqual([0.7, 0.05, 55])
+	// A dark one (a card background) keeps its lightness and loses chroma.
+	let bg = oklch.fit([0.21, 0.06, 215])
+	expect(bg[0]).toBe(0.21)
+	expect(bg[1]).toBeLessThan(0.06)
+	// Impossible chroma: still red, integers in range.
 	let wild = oklch.toRgb([0.7, 0.5, 25])
 	for (let c of wild) {
 		expect(Number.isInteger(c)).toBe(true)
 		expect(c).toBeGreaterThanOrEqual(0)
 		expect(c).toBeLessThanOrEqual(255)
 	}
-	// Still red, and not clipped to pure primaries.
 	expect(wild[0]).toBeGreaterThan(wild[1])
-	expect(wild[1]).toBeGreaterThan(0)
-	// Same lightness: about as bright as a grey of the same L.
-	let grey = oklch.toRgb([0.7, 0, 0])[0]
-	let luma = 0.2126 * wild[0] + 0.7152 * wild[1] + 0.0722 * wild[2]
-	expect(Math.abs(luma - grey)).toBeLessThan(40)
 })

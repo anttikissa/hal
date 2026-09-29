@@ -14,7 +14,7 @@ export const look: Look = {
 	user: () => ({ fg: [0.9, 0.15, 200], bg: [0.14, 0.03, 200] }),
 	thinking: () => ({ fg: [0.74, 0.07, 210], bold: [0.86, 0.07, 210], code: [0.8, 0.07, 210], linkBg: [0.2, 0.03, 210] }),
 	warning: () => ({ fg: [0.9, 0.17, 95], bg: [0.14, 0.03, 95], code: [0.94, 0.1, 95], linkBg: [0.24, 0.05, 95] }),
-	error: () => ({ fg: [0.7, 0.24, 25], bg: [0.15, 0.05, 25], code: [0.84, 0.15, 25], linkBg: [0.26, 0.07, 25] }),
+	error: () => ({ fg: [0.7, 0.24, 25], bg: [0.15, 0.05, 25], code: [0.84, 0.15, 25], linkBg: [0.22, 0.06, 25] }),
 	// Tools stay in the grid's blues and cyans.
 	tool: () => ({ fg: [colors.fgL(), colors.fgC(), 235], bg: [colors.bgL(), colors.bgC(), 235] }),
 	toolBash: () => ({ fg: [colors.fgL(), colors.fgC(), 195], bg: [colors.bgL(), colors.bgC(), 195] }),

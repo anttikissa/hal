@@ -1,7 +1,8 @@
 // OKLCH to sRGB. A colour is [lightness 0..1, chroma, hue in degrees];
 // equal L and C across hues look equally bright and vivid. Colours
-// outside sRGB keep their lightness and hue and lose chroma until they
-// fit.
+// outside sRGB keep their chroma and hue and darken until they fit, so
+// a bright orange stays orange (not peach); only one no lightness can
+// hold loses chroma instead. Terminal and web both get the fitted one.
 
 export type Oklch = [number, number, number]
 
@@ -37,25 +38,43 @@ function toRgb(c: Oklch): [number, number, number] {
 	return [...rgb]
 }
 
-function convert([L, C, h]: Oklch): [number, number, number] {
+// `c` inside sRGB, keeping its hue: as dark as needed to keep its
+// chroma, or, if no lightness holds that much, at the lightness that
+// holds the most (the hue's most vivid colour). Never darker than that
+// point: below it darkening only loses chroma, so a colour already
+// darker than it (a card background) loses chroma instead.
+function fit([L, C, h]: Oklch): Oklch {
 	L = Math.min(1, Math.max(0, L))
-	let rgb = linear([L, C, h])
-	if (!fits(rgb)) {
+	if (fits(linear([L, C, h]))) return [L, C, h]
+	let most = (l: number) => {
 		let lo = 0
 		let hi = C
 		for (let i = 0; i < 20; i++) {
 			let mid = (lo + hi) / 2
-			if (fits(linear([L, mid, h]))) lo = mid
+			if (fits(linear([l, mid, h]))) lo = mid
 			else hi = mid
 		}
-		rgb = linear([L, lo, h])
+		return lo
 	}
-	return rgb.map(gamma) as [number, number, number]
+	// Darker holds more chroma only down to the hue's most vivid point.
+	let best: Oklch = [L, most(L), h]
+	for (let l = L - 0.005; l > 0; l -= 0.005) {
+		if (fits(linear([l, C, h]))) return [+l.toFixed(3), C, h]
+		let c = most(l)
+		if (c < best[1]) break
+		best = [+l.toFixed(3), c, h]
+	}
+	return best
 }
 
-// `c` as a CSS oklch() colour, unfitted: the browser maps it to the
-// screen's gamut.
-function toCss([L, C, h]: Oklch): string {
+function convert(c: Oklch): [number, number, number] {
+	return linear(oklch.fit(c)).map(gamma) as [number, number, number]
+}
+
+// `c` as a CSS oklch() colour, fitted as the terminal draws it, so the
+// page and the terminal show the same colour.
+function toCss(c: Oklch): string {
+	let [L, C, h] = oklch.fit(c)
 	return `oklch(${+L.toFixed(3)} ${+C.toFixed(3)} ${+h.toFixed(1)})`
 }
 
@@ -112,4 +131,4 @@ function faint(fg: Oklch, bg: Oklch): Oklch {
 	return [Math.min(1, Math.round((bg[0] + 0.3) * 10) / 10), Math.min(fg[1], chroma), fg[2]]
 }
 
-export const oklch = { state: { rgb: new Map<string, [number, number, number]>(), quiet: new Map<string, Oklch>() }, toRgb, convert, toHex, toCss, contrast, quiet, faint }
+export const oklch = { state: { rgb: new Map<string, [number, number, number]>(), quiet: new Map<string, Oklch>() }, toRgb, fit, convert, toHex, toCss, contrast, quiet, faint }
