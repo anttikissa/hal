@@ -18,6 +18,7 @@ import { settings } from './common/settings.ts'
 import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
 import { diag } from './host/diag.ts'
+import { find } from './host/find.ts'
 import { host } from './host/host.ts'
 import { jobs } from './host/jobs.ts'
 import { liveFiles } from './host/live-file.ts'
@@ -155,6 +156,7 @@ async function becomeHost(): Promise<boolean> {
 	if (!(await server.serve())) return false
 	perf.mark('host')
 	main.later(() => {
+		find.init()
 		web.start()
 		if (web.state.server && web.state.server.port !== settings.webPort() && terminal.available()) {
 			app.state.notice = `Web is on port ${web.state.server.port} (preferred ${settings.webPort()} is busy)`

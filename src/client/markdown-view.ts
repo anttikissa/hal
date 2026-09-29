@@ -12,7 +12,8 @@ import { ansi } from './ansi.ts'
 function styled(r: Run, text: string): string {
 	if (r.bold) text = `\x1b[1m${text}\x1b[22m`
 	if (r.italic) text = `\x1b[3m${text}\x1b[23m`
-	return r.href ? `\x1b]8;;${r.href}\x07${text}${ansi.LINK_OFF}` : text
+	let href = r.href?.startsWith('/') ? ansi.webUrl(r.href) : r.href
+	return href ? `\x1b]8;;${href}\x07${text}${ansi.LINK_OFF}` : text
 }
 
 // Runs wrapped to `width`: the plain text is wrapped, then each row

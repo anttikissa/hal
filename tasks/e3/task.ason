@@ -9,7 +9,8 @@
 		'The gate at a file address (/image/<name>, /blob/<session>/<blob>) is the page itself with status 401 and cache-control no-store (web.gate); App.tsx reloads instead of opening the chat when router.isApp says the address is not / or /<id>, so a login lands on the file. ?auth= on a file address redirects like on a page. /login and /ws still answer a bare 401.',
 		'Paste markers are linked since task 31: [paste/<name>.txt] to /paste/<name>, through ansi.webUrl like images; /paste/ and /raw/ are file addresses in web.fetch (gate and ?auth=).',
 		'src/startup.test.ts fails its 100 ms budget on a loaded machine (several agents testing at once), on the base commit too.',
-		'The moved() renewal must snapshot the holders before re-inserting into the Map; use Array.from rather than an unnecessary array spread to satisfy the lint rule. The bind-port test narrows Bun.serve().port (typed number | undefined) before supplying it as web.port(), so full TypeScript and oxlint remain green.'
+		'The moved() renewal must snapshot the holders before re-inserting into the Map; use Array.from rather than an unnecessary array spread to satisfy the lint rule. The bind-port test narrows Bun.serve().port (typed number | undefined) before supplying it as web.port(), so full TypeScript and oxlint remain green.',
+		'Task v8: terminal Markdown host-relative session links (as printed by /find) also pass through ansi.webUrl, so their hidden OSC8 target includes the host web address and the current one-time login code; the recorded command output contains only the relative stable block link, never a login code.'
 	],
 	needs: [],
 	foldInto: ['8a', 'qy', '7w']

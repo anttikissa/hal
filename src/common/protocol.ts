@@ -17,6 +17,7 @@ import type { InboxItem } from './inbox.ts'
 import type { NoticeEvent } from './notices.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 import type { SessionMeta } from './session.ts'
+import type { FindBatch, FindFilter } from './find.ts'
 import type { SessionState } from './states.ts'
 
 export type { TurnStatus } from './replay.ts'
@@ -84,6 +85,8 @@ export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'e
 
 export type Command = (
 	| { type: 'create'; cwd: string; model?: string; name?: string }
+	| { type: 'find'; request: string; query: string; kinds?: FindFilter[] }
+	| { type: 'find-cancel' }
 	// Open the newest session, or create one in cwd (the host's own
 	// working directory if none is given) when there is none.
 	| { type: 'open-newest'; cwd?: string }
@@ -172,6 +175,7 @@ export type Tab = { id: string; name: string; cwd: string; model: string; state:
 // (HistoryRecord `n`); on `stream`, the number of the block the event
 // went into. Clients key transcript items by it (task w5).
 export type Event =
+	| FindBatch
 	| { type: 'snapshot'; sessionId: string; snapshot: Snapshot }
 	// The prompt is now in history and a turn is running. No prompt: an
 	// earlier turn continues (a `continue` record). `images`: the
@@ -267,7 +271,7 @@ export type Event =
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'visibility', 'hello']
+const commandTypes: CommandType[] = ['find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'visibility', 'hello']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -280,6 +284,12 @@ function invalid(value: unknown): string | undefined {
 	let problem = str('id', true)
 	if (problem) return problem
 	if (c.type === 'hello') return Number.isInteger(c.pid) ? undefined : 'hello: pid must be an integer'
+	if (c.type === 'find-cancel') return undefined
+	if (c.type === 'find') {
+		let kinds = c.kinds
+		let valid = kinds === undefined || (Array.isArray(kinds) && kinds.every((k) => ['text', 'thinking', 'tools', 'other'].includes(k)))
+		return str('request') ?? str('query') ?? ((c.query as string).length > 4096 ? 'find: query exceeds 4096 characters' : valid ? undefined : 'find: invalid kinds')
+	}
 	if (c.type === 'auth') return c.link === undefined || typeof c.link === 'boolean' ? undefined : 'auth: link must be a boolean'
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)
@@ -311,6 +321,7 @@ function invalid(value: unknown): string | undefined {
 // s: string, i: integer, o: object, a: list, S: list of strings, with
 // ? for optional. Nested fields are named with a dot.
 const eventFields: Record<EventType, Record<string, string>> = {
+	'find-results': { request: 's', tier: 's', results: 'a', done: 'b', scanning: 'i?', error: 's?' },
 	snapshot: { sessionId: 's', snapshot: 'o', 'snapshot.meta': 'o', 'snapshot.history': 'a', 'snapshot.state': 'o', 'snapshot.stats': 'o?' },
 	'turn-start': { sessionId: 's', provider: 's', model: 's?', effort: 's?', prompt: 's?', images: 'a?', command: 's?', ts: 's?' },
 	history: { sessionId: 's', before: 'i', records: 'a', older: 'i?' },
@@ -346,12 +357,13 @@ const eventFields: Record<EventType, Record<string, string>> = {
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const kinds: Record<string, (v: unknown) => boolean> = {
 	s: (v) => typeof v === 'string',
+	b: (v) => typeof v === 'boolean',
 	i: (v) => Number.isInteger(v),
 	o: isObject,
 	a: Array.isArray,
 	S: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
 }
-const kindNames: Record<string, string> = { s: 'a string', i: 'an integer', o: 'an object', a: 'a list', S: 'a list of strings' }
+const kindNames: Record<string, string> = { s: 'a string', b: 'a boolean', i: 'an integer', o: 'an object', a: 'a list', S: 'a list of strings' }
 
 // Why `value` is not an event this client understands, or undefined.
 function invalidEvent(value: unknown): string | undefined {
@@ -363,6 +375,12 @@ function invalidEvent(value: unknown): string | undefined {
 		if (!kinds[kind[0]!]!(v)) return `${value.type}: ${path} must be ${kindNames[kind[0]!]}`
 	}
 	if (value.type === 'tabs' && !(value.tabs as unknown[]).every((t) => isObject(t) && ['id', 'name', 'cwd'].every((k) => typeof t[k] === 'string'))) return 'tabs: every tab needs an id, name and cwd'
+	if (value.type === 'find-results') {
+		let tiers = ['metadata', 'user', 'assistant', 'thinking', 'tool-call', 'tool-output', 'other']
+		if (!tiers.includes(value.tier as string)) return 'find-results: invalid tier'
+		let valid = (value.results as unknown[]).every((r) => isObject(r) && ['sessionId', 'name', 'blockId', 'snippet', 'href'].every((k) => typeof r[k] === 'string') && tiers.includes(r.kind as string) && typeof r.age === 'number' && Number.isFinite(r.age) && typeof r.score === 'number' && Number.isFinite(r.score))
+		if (!valid) return 'find-results: invalid result'
+	}
 	return undefined
 }
 

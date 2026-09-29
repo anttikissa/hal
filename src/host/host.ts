@@ -20,6 +20,7 @@ import { clients, type ClientInfo, type ClientRecord } from './clients.ts'
 import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
 import { config } from './config.ts'
+import { find } from './find.ts'
 import { busy } from './busy.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'
@@ -76,6 +77,7 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 			host.state.clients.delete(client)
 			clients.leave(client.record)
 			webLinks.drop(client)
+			find.cancel(client)
 		},
 	}
 }
@@ -204,6 +206,8 @@ function answer(client: Client, c: Command, outcome: Outcome, repeat = true): vo
 // Carries out a valid command: what it did (a promise if that takes
 // slices), or undefined if it will answer later.
 function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined {
+	if (c.type === 'find') { find.search(client, c.request, c.query, c.kinds, client.deliver); return {} }
+	if (c.type === 'find-cancel') { find.cancel(client); return {} }
 	if (c.type === 'create' || c.type === 'open-newest') {
 		let id = c.type === 'open-newest' ? sessions.newest() : undefined
 		if (id) return host.act(client, { type: 'open', sessionId: id, ...(c.id === undefined ? {} : { id: c.id }) })
@@ -345,6 +349,7 @@ function quitting(last: boolean): void {
 
 // Forgets every client and turn (tests).
 function reset(): void {
+	find.reset()
 	for (let r of turns.state.running.values()) r.controller.abort()
 	turns.state.running.clear()
 	jobs.killAll()
