@@ -45,6 +45,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 					field.type === 'choice' ? (
 						<div role="group" aria-label={field.label ?? form().text} ref={(el) => (fields[i()] = el)}>
 							{field.label ? `${field.label}: ` : ''}
+							{field.help ? <div>{field.help}</div> : null}
 							<For each={field.options}>
 								{(option) => (
 									<>
@@ -58,10 +59,12 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 					) : (
 						<label>
 							{field.label ? `${field.label}: ` : ''}
+							{field.help ? <span>{field.help}</span> : null}
 							<input
 								ref={(el) => (fields[i()] = el)}
 								class="input"
 								type={field.type === 'secret' ? 'password' : 'text'}
+								inputmode={field.type === 'integer' ? 'numeric' : undefined}
 								aria-label={field.label ?? form().text}
 								autocomplete="off"
 								placeholder={field.type === 'text' ? field.placeholder : undefined}

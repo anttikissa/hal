@@ -27,6 +27,10 @@ export type Reply = { say?: string; show?: string; error?: string; ask?: Form; a
 export type Context = { sessionId: string; cwd: string; model: string; setCwd(cwd: string): void; setModel(model: string): void; setName?(name?: string): void; say(text: string): void }
 
 export type SlashCommand = {
+	// Refuse a bad answer before recording it or closing the question.
+	checkAnswers?(args: string, answers: Answers): string | undefined
+	// Safe command text for history and other clients (secret arguments).
+	record?(args: string): string
 	// The detail /help <name> shows; `args` follow the name.
 	help?(args: string): string
 	// Full argument texts `args` may complete to.

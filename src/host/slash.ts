@@ -24,6 +24,7 @@ function command(id: string, text: string, call: { name: string; args: string },
 	if (commandList.byName(call.name)?.clientOnly) return `only a client can run /${call.name}`
 	if (call.name === 'budget' && from !== undefined) return 'only a human can run /budget'
 	if (!commands.all().has(call.name)) return `unknown command /${call.name} (/help lists them)`
+	text = commands.all().get(call.name)!.record?.(call.args) ?? text
 	let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text }
 	if (from !== undefined) record.from = from
 	if (command !== undefined) record.command = command

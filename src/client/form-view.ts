@@ -28,6 +28,7 @@ function fieldLines(st: FormState, width: number, style: Style = colors.warning(
 	let rows: string[] = []
 	let cursor = { row: 0, col: 0 }
 	st.form.fields.forEach((field, i) => {
+		if (field.help) rows.push(...ansi.wrap(`  ${ansi.clean(field.help)}`, width))
 		let head = `  ${field.label ? `${ansi.clean(field.label)}: ` : ''}`
 		let value = st.values[i]!
 		let focused = i === st.focus

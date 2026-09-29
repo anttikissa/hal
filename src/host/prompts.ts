@@ -230,6 +230,10 @@ function reply(id: string, question: string, answers: Answers): string | undefin
 	if (!open || open.id !== question || (!open.from && turns.state.running.has(id))) return 'that question is not open (answered already?)'
 	let problem = forms.check(open.form, answers)
 	if (problem) return problem
+	if (open.from) {
+		problem = commands.all().get(open.from.command)?.checkAnswers?.(open.from.args, answers)
+		if (problem) return problem
+	}
 	let kept = forms.redact(open.form, answers)
 	if (open.from) {
 		// Beside the turn: its state stays as it is.

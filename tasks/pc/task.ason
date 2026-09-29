@@ -2,14 +2,13 @@
 	title: 'Settings: config.ason over local.ts',
 	spec: "Two layers. config.ason in the home root (next to the credentials file; user-edited, like a dotfile) holds the common settings, and only those declared in one table in src/common/settings.ts: name, type, default, one-line description. That table validates the file, documents it, and is what /config renders (each type maps to a form field, tasks/w4/forms.md). The file is a live file: edits apply at once, code reads settings.<name>() at call time. A missing file means all defaults; an unknown key or bad value is a visible warning and that setting falls back to its default, never silently ignored and never a crash. local.ts stays the unlimited escape hatch: it runs after config and may replace any exported function, settings.* included. First settings: model (default model), security (best-effort | none, tasks/6f), web password and port. Replace the README rule 'No config file' with this.",
 	status: 'done',
-	needs: [],
-	foldInto: ['9'],
 	notes: [
 		'Settings keys are flat: model, security, webPassword, webPort (defaults anthropic/claude-opus-4-5, best-effort, a test password, 9002 — the values the code had before). models.defaultModel() and web.port()/password() delegate to settings, so old local.ts overrides still work.',
 		'config.ason sits in the home root, which is the repo root: it is gitignored like the credentials file and local.ts.',
 		'liveFile gained keepBroken (a malformed file starts from defaults instead of throwing, still never overwritten) and onChange (external edits and breakage, not own writes). Deleting the file while running keeps the last values, as for every live file.',
 		"Warnings reach clients as a session-less protocol event { type: 'warning', text }: sent on connect and after every edit (main.start wires config.init to host.warnAll). Clients show it as their notice. Secrets are never echoed in warnings.",
-		'main.start runs config.init before local.ts, so local.ts sees the file and may replace settings.* (tested in src/local.test.ts).',
-		'/config (rendering the table as a form) is not built yet; SettingType kinds text/secret/integer/choice are meant to map to form fields (tasks/w4/forms.md).'
-	]
+		'main.start runs config.init before local.ts, so local.ts sees the file and may replace settings.* (tested in src/local.test.ts).'
+	],
+	needs: [],
+	foldInto: ['9']
 }

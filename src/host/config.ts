@@ -26,6 +26,29 @@ function warnings(): string[] {
 	return settings.warnings().map((w) => `config.ason: ${w}`)
 }
 
+// Apply only changed keys, preserving unknown keys and comments. Defaults
+// are represented by absence. Refuse a broken file before mutating it.
+function update(values: Record<string, unknown>): string[] {
+	config.init()
+	let data = config.state.data!
+	let broken = liveFiles.brokenError(data)
+	if (broken) throw broken
+	let changed: string[] = []
+	let current = settings.check(data).values
+	for (let s of settings.table) {
+		if (!(s.name in values) || Object.is(values[s.name], current[s.name])) continue
+		let why = settings.problem(s.type, values[s.name])
+		if (why) throw new Error(`${s.name}: ${why}`)
+	}
+	for (let s of settings.table) {
+		if (!(s.name in values) || Object.is(values[s.name], current[s.name])) continue
+		if (Object.is(values[s.name], s.default)) delete data[s.name]
+		else data[s.name] = values[s.name]
+		changed.push(s.name)
+	}
+	liveFiles.save(data)
+	return changed
+}
 // Stops watching and forgets the file (tests).
 function reset(): void {
 	let data = config.state.data
@@ -38,5 +61,6 @@ export const config = {
 	state: { data: null as Record<string, unknown> | null },
 	init,
 	warnings,
+	update,
 	reset,
 }

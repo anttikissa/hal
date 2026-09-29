@@ -8,14 +8,14 @@
 
 import type { HistoryRecord } from './replay.ts'
 
-export type Field =
-	// One line of text; may be left empty.
-	| { type: 'text'; name: string; label?: string; placeholder?: string }
-	// Like text, but never shown and never written to history.
+export type Field = { help?: string } & (
+	// One line of text; may be left empty, or prefilled by the host.
+	| { type: 'text'; name: string; label?: string; placeholder?: string; initial?: string }
+	| { type: 'integer'; name: string; label?: string; initial?: string }
+	// Never put a secret's current value in the form (it goes to history).
 	| { type: 'secret'; name: string; label?: string }
-	// One of `options`, `initial` (an index) selected at first: y/N is
-	// ['yes', 'no'] with initial 1; a single option is "press Enter".
 	| { type: 'choice'; name: string; label?: string; options: string[]; initial?: number }
+)
 
 // `quote`: text shown as it is below the question (a command to
 // approve), with `marks`, [start, end) offsets, highlighted.
@@ -54,7 +54,9 @@ function invalid(value: unknown): string | undefined {
 		names.add(field.name)
 		if (field.type === 'choice') {
 			if (!Array.isArray(field.options) || !field.options.length || field.options.some((o) => typeof o !== 'string')) return `${field.name}: choices need options`
-		} else if (field.type !== 'text' && field.type !== 'secret') return `${(field as Field).name}: unknown field type`
+		} else if (field.type !== 'text' && field.type !== 'secret' && field.type !== 'integer') return `${(field as Field).name}: unknown field type`
+		if ((field.type === 'text' || field.type === 'integer') && field.initial !== undefined && typeof field.initial !== 'string') return `${field.name}: initial must be a string`
+		if (field.help !== undefined && typeof field.help !== 'string') return `${field.name}: help must be a string`
 	}
 	return undefined
 }
@@ -125,8 +127,8 @@ function summary(form: Form, answers: Answers, secrets: string[] = []): string[]
 }
 
 function start(id: string, form: Form): FormState {
-	let values = form.fields.map((f) => (f.type === 'choice' ? f.options[Math.min(f.initial ?? 0, f.options.length - 1)]! : ''))
-	return { id, form, values, focus: 0, cursor: 0 }
+	let values = form.fields.map((f) => (f.type === 'choice' ? f.options[Math.min(f.initial ?? 0, f.options.length - 1)]! : f.type === 'secret' ? '' : f.initial ?? ''))
+	return { id, form, values, focus: 0, cursor: values[0]!.length }
 }
 
 // The form state for question `open` (the transcript's open one): the

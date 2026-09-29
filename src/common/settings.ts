@@ -10,6 +10,7 @@
 
 export type SettingType =
 	| { kind: 'text'; url?: true }
+	| { kind: 'secret' }
 	| { kind: 'integer'; min: number; max: number }
 	| { kind: 'choice'; options: string[] }
 	| { kind: 'boolean' }
@@ -59,6 +60,8 @@ const table: Setting[] = [
 // Why `value` doesn't fit `type`, or undefined if it does.
 function problem(type: SettingType, value: unknown): string | undefined {
 	switch (type.kind) {
+		case 'secret':
+			return typeof value === 'string' && value !== '' ? undefined : 'expected a non-empty string'
 		case 'text':
 			// An empty address means the default (localhost).
 			if (typeof value !== 'string' || (value === '' && !type.url)) return 'expected a non-empty string'
@@ -83,9 +86,9 @@ function check(raw: Record<string, unknown>): { values: Record<string, unknown>;
 	for (let s of settings.table) {
 		values[s.name] = s.default
 		if (!(s.name in raw)) continue
-		let why = problem(s.type, raw[s.name])
+		let why = settings.problem(s.type, raw[s.name])
 		if (!why) values[s.name] = raw[s.name]
-		else warnings.push(`${s.name}: ${why}, got ${JSON.stringify(raw[s.name]) ?? String(raw[s.name])}; using the default`)
+		else warnings.push(`${s.name}: ${why}${s.type.kind === 'secret' ? '' : `, got ${JSON.stringify(raw[s.name]) ?? String(raw[s.name])}`}; using the default`)
 	}
 	for (let key of Object.keys(raw)) {
 		if (!settings.table.some((s) => s.name === key)) warnings.push(`unknown setting '${key}', ignored`)
@@ -122,6 +125,7 @@ export const settings = {
 	state: { raw: {} as Record<string, unknown>, listeningPort: undefined as number | undefined },
 	table,
 	check,
+	problem,
 	value,
 	forPage,
 	load,
