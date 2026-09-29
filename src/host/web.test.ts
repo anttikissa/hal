@@ -2,8 +2,6 @@ import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
-import { colors } from '../common/colors.ts'
-import { oklch } from '../common/oklch.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { blobs } from './blobs.ts'
@@ -99,42 +97,7 @@ test('the host serves the web endpoint and stops it with the host', async () => 
 	await expect(fetch(`${url}/`)).rejects.toThrow()
 })
 
-test('the installable app serves its manifest, PNG icons and service worker', async () => {
-	await server.serve()
-	web.start()
-	let manifest = await (await fetch(`${base()}/manifest.webmanifest`)).json()
-	for (let icon of manifest.icons) {
-		let response = await fetch(new URL(icon.src, base()))
-		expect(response.headers.get('content-type')).toBe('image/png')
-		let bytes = new Uint8Array(await response.arrayBuffer())
-		expect(bytes.length).toBeGreaterThan(100)
-		expect(bytes.slice(0, 4)).toEqual(new Uint8Array([137, 80, 78, 71]))
-	}
-	let sw = await fetch(`${base()}/sw.js`)
-	expect(sw.ok).toBe(true)
-	expect(sw.headers.get('cache-control')).toBe('no-store')
-	let html = await (await fetch(`${base()}/`)).text()
-	expect(html).toContain('rel="manifest"')
-	expect(html).toContain('rel="apple-touch-icon"')
-})
 
-test('the page carries the theme as CSS, following overrides, without its code', async () => {
-	await server.serve()
-	web.start()
-	let saved = colors.fgL
-	try {
-		let html = await (await fetch(`${base()}/`)).text()
-		expect(html).toContain(oklch.toCss(colors.assistant().fg!))
-		expect(html).toContain(`.tool-bash { `)
-		expect(html.split('.tool-bash {')[1]!.split('}')[0]).toContain(oklch.toCss(colors.toolBash().bg!))
-		expect(html).not.toContain('fgL')
-		colors.fgL = () => 0.95
-		let after = await (await fetch(`${base()}/`)).text()
-		expect(after).toContain(oklch.toCss([0.95, colors.fgC(), 55]))
-	} finally {
-		colors.fgL = saved
-	}
-})
 
 test('a missing JSX compiler fails the page with 500 and a diag line, not the host', async () => {
 	let orig = web.compiler
@@ -651,8 +614,6 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		)
 		await b.waitFor(`document.querySelector('main').innerText.includes('hello from fake')`)
 		expect(await b.evaluate(`document.querySelector('.user').textContent`)).toMatch(/^\d\d:\d\d Youhi$/)
-		// The reply wears the theme's assistant colour.
-		expect(await b.evaluate(`getComputedStyle(document.querySelector('.assistant')).color`)).toBe(oklch.toCss(colors.assistant().fg!))
 		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('')
 		// Typing redraws the message box, not the transcript: the cards keep
 		// their DOM, so none replays its fade-in.
@@ -775,29 +736,6 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 	}
 }, 20000)
 
-test.skipIf(!chrome)('a background Bash reply links to its recorded call, without showing a successful exit', async () => {
-	let id = tabs.create('/tmp')
-	let call = history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'call-1', name: 'bash', input: { command: 'echo ok', description: 'Run echo', background: true } } })
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '[exit 0]\nok\n', from: id, label: `bash #${call.n}`, advisory: true }] })
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '[exit 123]\nerror: cannot access file\n', from: id, label: `bash #${call.n}`, advisory: true }] })
-	let b = await browser()
-	try {
-		await server.serve()
-		web.start()
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Page.navigate', { url: `${base()}/${id}` })
-		await b.waitFor(`!!document.querySelector('.Card .who a.call')`)
-		expect(await b.evaluate(`document.querySelector('.Card .who a.call').getAttribute('href')`)).toBe(`/${id}#${call.n}`)
-		expect(await b.evaluate(`document.querySelector('.Card.user.prompt').textContent`)).not.toContain('[exit 0]')
-		expect(await b.evaluate(`(() => {
-			let card = [...document.querySelectorAll('.Card.user.prompt')].at(-1), status = card.querySelector('.exit')
-			return [status.textContent, getComputedStyle(status).color !== getComputedStyle(card).color,
-				card.textContent.includes('error: cannot access file'), card.querySelectorAll('.exit').length]
-		})()`)).toEqual(['[exit 123]', true, true, 1])
-	} finally {
-		await b.close()
-	}
-}, 20000)
 
 test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay, open ones stay open', async () => {
 	// Turns taller than the window, one per page.

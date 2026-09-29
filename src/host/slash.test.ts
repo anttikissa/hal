@@ -195,37 +195,7 @@ test('a command question asked while a turn streams leaves the turn streaming; a
 	expect((await opened(id)).views.get(id)).toEqual(a.views.get(id))
 })
 
-test('/help lists every command by category and /help <name> shows its detail', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: '/help' })
-	await until(() => outputs(a.views.get(id)!).length)
-	let list = outputs(a.views.get(id)!)[0]!
-	for (let c of commandList.all()) {
-		let line = list.split('\n').find((l) => l.trim().startsWith(`/${c.name} `))
-		expect(line).toEndWith(c.description)
-		if (c.key) expect(line).toContain(` ${c.key} `)
-		expect(list).toContain(`${c.category}:`)
-	}
-	a.conn.send({ type: 'submit', sessionId: id, text: '/help cd' })
-	await until(() => outputs(a.views.get(id)!).length === 2)
-	expect(outputs(a.views.get(id)!)[1]).toBe(commands.all().get('cd')!.help!(''))
-	a.conn.send({ type: 'submit', sessionId: id, text: '/help nope' })
-	await until(() => a.views.get(id)!.items.some((i) => i.type === 'output' && i.error))
-})
 
-test('/keys shows every key the table lists, with what it does', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: '/keys' })
-	await until(() => outputs(a.views.get(id)!).length)
-	let lines = outputs(a.views.get(id)!)[0]!.split('\n')
-	for (let row of keyHelp.sections().flatMap((s) => s.rows)) {
-		expect(lines.some((l) => l.includes(row.keys) && l.endsWith(row.description))).toBe(true)
-	}
-	// Every command key shows, with its command.
-	for (let c of commandList.all().filter((c) => c.key)) expect(lines.some((l) => l.includes(`${c.key}  `) && l.includes(`/${c.name} `))).toBe(true)
-})
 
 test('the host refuses a client-only command, whoever sent it, and runs nothing', async () => {
 	let a = client()

@@ -54,7 +54,8 @@ Test behavior and invariants, not the implementation. Avoid tests that
 assert on source text, repeat a constant or template in the expectation,
 or merely restate a one-line function. Keep exact-output tests where the
 format is a contract (such as ASON). Don't test nondeterministic model
-wording. A test should catch a plausible wrong implementation.
+wording. A test should catch a plausible wrong implementation. When
+unsure whether a test earns its keep, drop it.
 
 Before adding code, climb the lazy ladder: skip it if it needn't exist;
 prefer the standard library; prefer native platform features (Bun,

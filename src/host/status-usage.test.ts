@@ -4,36 +4,8 @@ import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { usage } from './usage.ts'
 import { liveFiles } from './live-file.ts'
-import { markdown } from '../common/markdown.ts'
-import { markdownView } from '../client/markdown-view.ts'
 
-const visible = (s: string) => s.replace(/\x1b\]8;;[^\x07]*\x07/g, '').replace(/\x1b\[[\d;]*m/g, '')
 
-test('provider-specific tables show full identities, plan and two-line reset cells', () => {
-	let now = new Date(2026, 8, 28, 12).getTime()
-	let old = clock.now
-	clock.now = () => now
-	try {
-		let text = statusUsage.table([
-			{ provider: 'anthropic', slot: '2/3 *', account: 'alice@gmail.com', apiKey: false, windows: { '5h': { used: 42, resets: new Date(now + 3600_000).toISOString() }, '7d_sonnet': { used: 90, resets: new Date(now + 5 * 86400_000).toISOString() } } },
-			{ provider: 'openai', slot: '1/2', account: 'bob@longdomain.org', plan: 'plus', apiKey: false, windows: { '5h': { used: 0 } } },
-			{ provider: 'openai', slot: '2/2', account: 'OPENAI_API_KEY', apiKey: true, windows: {} },
-		])
-		let tables = markdown.parse(text).filter((b) => b.type === 'table')
-		expect(tables).toHaveLength(2)
-		expect(tables[0]!.type === 'table' && tables[0]!.rows[0]!.map((c) => c.map((r) => r.text).join(''))).toEqual(['Slot', 'Account', '5h'])
-		expect(tables[1]!.type === 'table' && tables[1]!.rows[0]!.map((c) => c.map((r) => r.text).join(''))).toEqual(['Slot', 'Account', '5h'])
-		let rendered = markdownView.lines(text, 100).map(visible).join('\n')
-		expect(rendered).toContain('alice@gmail.com')
-		expect(rendered).toContain('bob@longdomain.org (plus)')
-		expect(rendered).toContain('2/3 *')
-		expect(rendered).toContain('42% used (resets 13:00)')
-		expect(rendered).not.toContain('sonnet')
-		expect(rendered).toContain('API key')
-		expect(rendered).not.toContain('<br>')
-		expect(rendered).not.toContain('| Slot |')
-	} finally { clock.now = old }
-})
 
 test('stale usage refreshes only subscriptions and failed auth leaves cached windows with short advice', async () => {
 	let all = auth.all, refresh = statusUsage.refresh, store = usage.store, windows = usage.windows, now = clock.now

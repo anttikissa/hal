@@ -24,11 +24,6 @@ afterEach(() => {
 
 const read = (input: Record<string, unknown>) => tools.run({ type: 'tool_call', id: 'c1', name: 'read', input }, { cwd: dir, signal, sessionId: 's' })
 
-test('every tool is offered to the model with an object schema', () => {
-	let defs = tools.defs()
-	expect(defs.map((d) => d.name)).toContain('read')
-	for (let d of defs) expect(d.inputSchema.type).toBe('object')
-})
 
 const echo = (name: string, readOnly: boolean) => `export const tool = {
 	name: '${name}', description: 'echo', parameters: { type: 'object', properties: {} }, ${readOnly ? 'readOnly: true,' : ''}

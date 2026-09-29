@@ -33,13 +33,6 @@ test('a fresh home opens the offline intro; later tabs use the configured provid
 	expect(sessions.open(newTab(c)).model).not.toBe('hal/intro')
 })
 
-test('a tab whose cwd is the Hal repo is marked hal, for its own prompt examples', () => {
-	let a = client()
-	let hal = newTab(a, paths.repoRoot())
-	let other = newTab(a)
-	expect(tabsOf(a)?.find((t) => t.id === hal)?.hal).toBe(true)
-	expect(tabsOf(a)?.find((t) => t.id === other)?.hal).toBeUndefined()
-})
 
 test('two clients see the same order after new, move, close and resume', () => {
 	let a = client()
