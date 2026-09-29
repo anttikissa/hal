@@ -11,9 +11,21 @@ import { host } from './host.ts'
 import { pages } from './pages.ts'
 
 // The session's state: what this host last made it, else what its
-// history says (the few records that decide it: pages.essentials).
+// history says (the few records that decide it: pages.essentials), kept
+// while the history does not grow (the tab bar asks for every tab's).
 function stateOf(id: string, records?: HistoryRecord[]): SessionState {
-	return status.state.states.get(id) ?? states.fromHistory(records ?? pages.essentials(id))
+	let moved = status.state.states.get(id)
+	if (moved || records) return moved ?? states.fromHistory(records!)
+	let derived = status.state.derived.get(id)
+	if (derived?.size !== pages.marks(id).size) return status.derive(id, pages.essentials(id))
+	return { ...derived.state }
+}
+
+// Keeps the state `essentials` (pages.essentials, just read) say.
+function derive(id: string, essentials: HistoryRecord[]): SessionState {
+	let state = states.fromHistory(essentials)
+	status.state.derived.set(id, { size: pages.marks(id).size, state })
+	return { ...state }
 }
 
 // Moves the session's state on `event`, telling followers if it changed.
@@ -36,8 +48,11 @@ export const status = {
 	state: {
 		// Each session's state, once this host has moved it.
 		states: new Map<string, SessionState>(),
+		// Each session's state as its history says, and its size then.
+		derived: new Map<string, { size: number; state: SessionState }>(),
 	},
 	stateOf,
+	derive,
 	transition,
 	inboxOf,
 }

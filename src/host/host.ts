@@ -3,29 +3,31 @@
 // Session modules carry out commands: prompts, turns, slash and status.
 //
 // Snapshot and live events are sent from the same synchronous step, so a
-// client that opens a session never misses or double-counts an event.
+// client that opens a session never misses or double-counts an event. A
+// big snapshot's history is read in slices first (pages.slices) and
+// caught up in that step; the client's commands for the session wait
+// until it is sent, so they act in the order sent (task 7j).
 // The conversation lives only in durable history (history.ts): prompts,
 // finished blocks, tool results and turn ends are on disk before clients
 // hear of them, and snapshots and provider input are read back from
 // there.
 
 import { ason } from '../common/ason.ts'
-import { protocol, type Command, type Event, type Snapshot } from '../common/protocol.ts'
+import { protocol, type Command, type Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { commands } from './commands.ts'
 import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
 import { config } from './config.ts'
-import { diag } from './diag.ts'
 import { busy } from './busy.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { jobs } from './jobs.ts'
-import { pages } from './pages.ts'
-import { models } from './models.ts'
+import { pages, type Page, type Tail } from './pages.ts'
 import { notify } from './notify.ts'
 import { push } from './push.ts'
 import { sessions } from './sessions.ts'
+import { snapshots } from './snapshots.ts'
 import { prompts } from './prompts.ts'
 import { slash } from './slash.ts'
 import { stats } from './stats.ts'
@@ -33,9 +35,9 @@ import { version } from './version.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
-import { toolOutput } from './tool-output.ts'
 import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
+import { wire } from './wire.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -43,44 +45,45 @@ export type Connection = {
 	close(): void
 }
 
-type Client = { deliver: (event: Event) => void; open: Set<string>; visible?: string }
+// `held`: commands waiting, by session, for its snapshot to be sent;
+// under '*', every command, until the tabs are sent.
+type Client = { deliver: (event: Event) => void; open: Set<string>; visible?: string; held: Map<string, unknown[]> }
 // What a command did: refused (why), or done, naming a created session
 // (followed) or the tab a tab command created, reopened or picked, or
 // with the event that answered it (attached), sent again on a repeat.
 type Outcome = { refused?: string; sessionId?: string; tab?: string; reply?: Event }
 
-// The in-memory stand-in for the wire: both directions go through ASON,
-// so nothing non-serializable or shared by reference crosses it.
-function wire<T>(value: T): T {
-	return ason.parse(ason.stringify(value, 'short')) as T
-}
-
 function connect(deliver: (event: Event) => void): Connection {
-	let client: Client = { deliver: (e) => deliver(wire(e)), open: new Set() }
+	let client: Client = { deliver: (e) => deliver(wire.event(e)), open: new Set(), held: new Map() }
 	host.state.clients.add(client)
 	host.warn(client)
 	if (version.state.loaded) client.deliver({ type: 'version', version: version.state.loaded })
-	// The tabs come with the first events, so no client has to ask.
-	try {
-		let openTabs = tabs.list()
-		client.deliver({ type: 'tabs', tabs: openTabs })
-		queueMicrotask(() => {
-			if (!host.state.clients.has(client)) return
-			try { let names = models.names(openTabs.map((tab) => tab.model)); if (Object.keys(names).length) client.deliver({ type: 'model-names', names }) }
-			catch (e: any) { client.deliver({ type: 'warning', text: String(e?.message ?? e) }) }
-		})
-	} catch (e: any) {
-		client.deliver({ type: 'warning', text: String(e?.message ?? e) })
+	// The tabs come with the first events, so no client has to ask; their
+	// states need the open tabs' marks, caught up in slices first.
+	let indexed = tabs.indexed()
+	if (!indexed) tabs.greet(client, () => host.state.clients.has(client))
+	else {
+		client.held.set('*', [])
+		void indexed.then(() => host.state.clients.has(client) && host.release(client, '*'))
 	}
 	return {
 		send: (command) => {
-			if (host.state.clients.has(client)) host.handle(client, wire(command))
+			if (host.state.clients.has(client)) host.handle(client, wire.copy(command))
 		},
 		close: () => {
 			host.state.clients.delete(client)
 			webLinks.drop(client)
 		},
 	}
+}
+
+// Carries out the commands held under `key` (a session, or '*' for the
+// tabs), in order; handle() holds them again if need be.
+function release(client: Client, key: string): void {
+	let held = client.held.get(key) ?? []
+	client.held.delete(key)
+	if (key === '*') tabs.greet(client, () => host.state.clients.has(client))
+	for (let c of held) host.handle(client, c)
 }
 
 // One transport connection (a socket, a WebSocket) as a host
@@ -148,21 +151,33 @@ function remember(id: string, outcome: Outcome): void {
 }
 
 function handle(client: Client, command: unknown): void {
+	let held = client.held.get('*') ?? client.held.get((command as { sessionId?: string } | null)?.sessionId as string)
+	if (held) return void held.push(command)
 	let problem = protocol.invalid(command)
 	if (problem) return host.reject(client, command, problem, (command as any)?.sessionId)
 	let c = command as Command
 	let repeat = c.id === undefined ? undefined : (host.state.done.get(c.id) ?? host.submitted(c))
 	if (repeat) return host.answer(client, c, repeat)
-	let outcome: Outcome | undefined
+	let outcome: Outcome | Promise<Outcome> | undefined
 	try {
 		outcome = host.act(client, c)
 	} catch (e: any) {
 		outcome = { refused: String(e?.message ?? e) }
 	}
-	// Undefined: still opening; act() answers when it is done.
+	// Undefined: act() answers when it is done.
 	if (!outcome) return
-	if (c.id !== undefined && once.has(c.type)) host.remember(c.id, outcome)
-	host.answer(client, c, outcome, false)
+	let done = (outcome: Outcome) => {
+		if (c.id !== undefined && once.has(c.type)) host.remember(c.id, outcome)
+		host.answer(client, c, outcome, false)
+	}
+	if (!(outcome instanceof Promise)) return done(outcome)
+	void outcome
+		.catch((e) => ({ refused: String(e?.message ?? e) }))
+		.then((o) => {
+			if (!host.state.clients.has(client)) return
+			done(o)
+			if (c.type === 'open') host.release(client, c.sessionId)
+		})
 }
 
 // A repeat of a submit the previous host recorded, found in history.
@@ -182,9 +197,9 @@ function answer(client: Client, c: Command, outcome: Outcome, repeat = true): vo
 	if (c.id !== undefined) client.deliver({ type: 'ack', id: c.id, ...(outcome.tab ? { tab: outcome.tab } : {}) })
 }
 
-// Carries out a valid command: what it did, or undefined if it will
-// answer later.
-function act(client: Client, c: Command): Outcome | undefined {
+// Carries out a valid command: what it did (a promise if that takes
+// slices), or undefined if it will answer later.
+function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined {
 	if (c.type === 'create' || c.type === 'open-newest') {
 		let id = c.type === 'open-newest' ? sessions.newest() : undefined
 		if (id) return host.act(client, { type: 'open', sessionId: id, ...(c.id === undefined ? {} : { id: c.id }) })
@@ -196,17 +211,21 @@ function act(client: Client, c: Command): Outcome | undefined {
 		return { sessionId: id }
 	}
 	if (c.type === 'open') {
-		let ready = host.ready(c.sessionId)
-		if (!ready) {
-			host.follow(client, c.sessionId)
+		let id = c.sessionId
+		let ready = host.ready(id)
+		let tail = ready ? undefined : pages.slices(pages.snapshotSteps(id))
+		if (tail && !(tail instanceof Promise)) {
+			host.follow(client, id, tail)
 			return {}
 		}
-		// Once open, the same command takes the synchronous path.
-		ready.then(
-			() => host.state.clients.has(client) && host.handle(client, c),
-			(e) => host.reject(client, c, String(e?.message ?? e), c.sessionId),
-		)
-		return undefined
+		// Opening from disk or reading a big tail: the client's commands
+		// for the session wait for its snapshot.
+		client.held.set(id, [])
+		return (async () => {
+			await ready
+			host.follow(client, id, await (tail ?? pages.slices(pages.snapshotSteps(id))))
+			return {}
+		})()
 	}
 	if (tabs.is(c)) return tabs.act(c)
 	if (c.type === 'auth' && c.link) webLinks.follow(client, client.deliver)
@@ -256,10 +275,13 @@ function act(client: Client, c: Command): Outcome | undefined {
 	else if (c.type === 'answer') refused = prompts.reply(c.sessionId, c.question, c.answers)
 	else if (c.type === 'models') void slash.models(c.sessionId).then((e) => host.state.clients.has(client) && client.deliver(e))
 	else if (c.type === 'history') {
-		let page = pages.page(c.sessionId, c.before)
-		let reply: Event = { type: 'history', sessionId: c.sessionId, before: c.before, records: page.records }
-		if (page.start > 0) reply.older = page.start
-		return { reply }
+		let answer = (page: Page): Outcome => {
+			let reply: Event = { type: 'history', sessionId: c.sessionId, before: c.before, records: page.records }
+			if (page.start > 0) reply.older = page.start
+			return { reply }
+		}
+		let page = pages.slices(pages.pageSteps(c.sessionId, c.before))
+		return page instanceof Promise ? page.then(answer) : answer(page)
 	} else if (c.type === 'complete') client.deliver({ type: 'completions', sessionId: c.sessionId, text: c.text, items: commands.complete(c.text, slash.context(c.sessionId)) })
 	return refused === undefined ? {} : { refused }
 }
@@ -278,33 +300,12 @@ function ready(id: string): Promise<void> | undefined {
 	return pending
 }
 
-function follow(client: Client, id: string): void {
+// Sends the session's snapshot and from then on its events. A tail read
+// in slices is caught up with what was appended meanwhile.
+function follow(client: Client, id: string, tail?: Tail): void {
+	if (!host.state.clients.has(client)) return
 	client.open.add(id)
-	client.deliver({ type: 'snapshot', sessionId: id, snapshot: host.snapshot(id) })
-}
-
-function snapshot(id: string): Snapshot {
-	let tail = pages.snapshot(id)
-	let records = [...tail.earlier, ...tail.history]
-	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records), stats: stats.of(id, records) }
-	let output = toolOutput.state.get(id)
-	if (output?.output) snap.toolOutput = { ...output }
-	if (tail.older !== undefined) Object.assign(snap, { older: tail.older, earlier: tail.earlier })
-	try {
-		let draft = drafts.get(id)
-		if (draft.rev) snap.draft = draft
-	} catch (e: any) {
-		// A malformed draft.ason stays on disk untouched; the session opens.
-		diag.log(`draft ${id}: ${e?.message ?? e}`)
-	}
-	let running = turns.state.running.get(id)
-	if (running) {
-		let live = history.live(id)
-		snap.turn = { provider: running.provider, blocks: live?.blocks ?? [], usage: live?.usage ?? {}, ns: live?.ns ?? [], ts: live?.ts ?? [] }
-		if (running.model !== undefined) snap.turn.model = running.model
-		if (running.effort !== undefined) snap.turn.effort = running.effort
-	}
-	return snap
+	client.deliver({ type: 'snapshot', sessionId: id, snapshot: snapshots.build(id, tail && pages.since(id, tail)) })
 }
 
 function broadcast(id: string, event: Event): void {
@@ -345,6 +346,7 @@ function reset(): void {
 	host.state.opening.clear()
 	host.state.clients.clear()
 	status.state.states.clear()
+	status.state.derived.clear()
 	for (let map of Object.values(stats.state)) map.clear()
 	pages.reset()
 	host.state.done.clear()
@@ -370,7 +372,6 @@ export const host = {
 	cwd: (): string => process.cwd(),
 	// How many command ids the host remembers for spotting repeats.
 	remembered: () => 1000,
-	wire,
 	connect,
 	adapt,
 	warn,
@@ -384,7 +385,7 @@ export const host = {
 	act,
 	ready,
 	follow,
-	snapshot,
+	release,
 	broadcast,
 	init,
 	quitting,

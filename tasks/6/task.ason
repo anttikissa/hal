@@ -8,7 +8,8 @@
 		"The snapshot's `turn` holds only blocks not yet in history, and assistant blocks are recorded at turn end. If output were persisted mid-turn, snapshots would show it twice unless `turn` changed to match.",
 		'`create` has no sessionId. The client learns the id from the snapshot that answers it. This is the one exception to "every message names its session".',
 		'On cancel, break out of the stream loop on `signal.aborted` too. Do not rely on the provider stopping, or a late delta can be broadcast after the cancel.',
-		'Pass the in-memory connection through ASON both ways. That catches non-serializable events and clients mutating host state through shared references. A test depends on it.'
+		'Pass the in-memory connection through ASON both ways. That catches non-serializable events and clients mutating host state through shared references. A test depends on it.',
+		'The in-memory connection copies every event through ASON except the history records of a snapshot or history page (host/wire.ts, task 7j): they are freshly read from disk and held by nobody on the host, and copying a multi-megabyte page twice blocked the event loop 20-50 ms. Commands still go through ASON.'
 	],
 	needs: ['b', 'gj']
 }

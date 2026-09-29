@@ -14,6 +14,8 @@ import { host } from './host.ts'
 import { history } from './history.ts'
 import { jobs } from './jobs.ts'
 import { liveFiles } from './live-file.ts'
+import { models } from './models.ts'
+import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { states } from '../common/states.ts'
@@ -52,6 +54,46 @@ function list(): Tab[] {
 		if (meta.cwd.replace(/\/+$/, '') === paths.repoRoot()) tab.hal = true
 		return tab
 	})
+}
+
+// Sends the tabs, then the model names they show, to a new client
+// (host.connect) while `live`.
+function greet(client: { deliver: (event: Event) => void }, live: () => boolean): void {
+	try {
+		let openTabs = tabs.list()
+		client.deliver({ type: 'tabs', tabs: openTabs })
+		queueMicrotask(() => {
+			if (!live()) return
+			try {
+				let names = models.names(openTabs.map((tab) => tab.model))
+				if (Object.keys(names).length) client.deliver({ type: 'model-names', names })
+			} catch (e: any) {
+				client.deliver({ type: 'warning', text: String(e?.message ?? e) })
+			}
+		})
+	} catch (e: any) {
+		client.deliver({ type: 'warning', text: String(e?.message ?? e) })
+	}
+}
+
+// Works out the open tabs' states from their marks, caught up first, in
+// slices (pages.slices): undefined when done at once, else a promise,
+// never rejected (an unreadable history fails its tab in list()).
+function indexed(): Promise<void> | undefined {
+	let open: string[] = []
+	try {
+		open = tabs.file().open
+	} catch {}
+	let done = pages.slices(
+		(function* () {
+			for (let id of open) {
+				try {
+					status.derive(id, (yield* pages.markedSteps(id)).map((l) => l.record))
+				} catch {}
+			}
+		})(),
+	)
+	return done instanceof Promise ? done : undefined
 }
 
 // A session whose history cannot be read stays in the tab bar, failed
@@ -194,6 +236,8 @@ export const tabs = {
 	file,
 	is,
 	list,
+	greet,
+	indexed,
 	label,
 	publish,
 	insert,
