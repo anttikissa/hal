@@ -84,13 +84,16 @@ function redact(form: Form, answers: Answers): { answers: Answers; secrets?: str
 	return secrets.length ? { answers: kept, secrets } : { answers: kept }
 }
 
-// The question waiting for an answer: the last one in the unfinished
-// turn, if nothing answered it since. A turn end closes it (a pause).
+// The question waiting for an answer: the last one, if nothing answered
+// it since. At most one is open at a time. A turn end (a pause) closes
+// a turn's question; a command's lives beside turns and outlasts it.
 function open(records: HistoryRecord[]): QuestionRecord | undefined {
+	let ended = false
 	for (let i = records.length - 1; i >= 0; i--) {
 		let r = records[i]!
-		if (r.type === 'question') return r
-		if (r.type === 'answer' || r.type === 'turn_end') return undefined
+		if (r.type === 'question') return r.from || !ended ? r : undefined
+		if (r.type === 'answer') return undefined
+		if (r.type === 'turn_end') ended = true
 	}
 	return undefined
 }

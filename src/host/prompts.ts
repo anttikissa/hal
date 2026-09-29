@@ -137,18 +137,6 @@ function harmless(records: HistoryRecord[]): boolean {
 	return records.every((r) => r.type !== 'assistant' || r.block.type !== 'tool_call' || tools.readOnly(r.block.name))
 }
 
-// After a command's question closed on an idle session: runs what was
-// sent meanwhile, steering first, as submit and next would have. A
-// turn of their own: advisory messages get full attention.
-function drain(id: string): void {
-	if (status.stateOf(id).type !== 'idle') return
-	let steering = status.inboxOf(id).filter((m) => !m.queue)
-	if (!steering.length) return prompts.next(id)
-	if (status.transition(id, { type: 'submit' })) return
-	prompts.deliver(id, steering.map((m) => ({ ...m, advisory: undefined })))
-	turns.start(id)
-}
-
 // Records inbox messages (and a new prompt `extra`) as one prompt, its
 // attachment markers resolved (blobs.resolve), and tells followers: a
 // `prompt` event, or with `quiet` nothing, as the caller's turn-start
@@ -239,12 +227,10 @@ function reply(id: string, question: string, answers: Answers): string | undefin
 	if (problem) return problem
 	let kept = forms.redact(open.form, answers)
 	if (open.from) {
-		let { command: name, args } = open.from
-		let before = status.stateOf(id)
+		// Beside the turn: its state stays as it is.
 		history.append(id, { type: 'answer', question, ...kept })
 		host.broadcast(id, { type: 'answer', sessionId: id, question, ...kept })
-		status.settle(id, before)
-		void slash.runCommand(id, name, args, answers).then(() => prompts.drain(id))
+		void slash.runCommand(id, open.from.command, open.from.args, answers)
 		return
 	}
 	let refused = status.transition(id, { type: 'answer' })
@@ -259,7 +245,6 @@ export const prompts = {
 	amend,
 	edit,
 	harmless,
-	drain,
 	deliver,
 	blocks: blocksOf,
 	senders,

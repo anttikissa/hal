@@ -26,8 +26,12 @@ The same fields render in two places.
 Questions that are part of the session: tool approval, questions from
 synthetic models (the intro), command confirmations. Written to history,
 shown as a block, answerable from any client (first answer wins),
-survive restart. While one is open the session is `blocked (question)`
-(tasks/j1/states.md).
+survive restart. While a turn's question is open the session is
+`blocked (question)` (tasks/j1/states.md). A command's question is not
+a state: it sits beside whatever the session does (a turn blocked on a
+login, a turn streaming), like the inbox, and never changes the state
+or ends the turn. One question is open at a time; a newer one replaces
+a command's.
 
 Nothing waits in memory for an answer: whoever asked is re-run with the
 answer (a command gets `run(args, answers)`; a tool batch continues).

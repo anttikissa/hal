@@ -26,6 +26,7 @@ import { systemPrompt } from './system-prompt.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
+import { slash } from './slash.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
 import { subagents } from './subagents.ts'
@@ -41,6 +42,9 @@ type Running = { provider: string; model?: string; effort?: string; controller: 
 function ask(id: string, form: Form, call?: string): void {
 	let problem = forms.invalid(form)
 	if (problem) throw new Error(`bad question: ${problem}`)
+	// A command's open question gives way: one question at a time.
+	let open = forms.open(history.readSync(id))
+	if (open?.from) slash.dismiss(id, open.id)
 	let question = crypto.randomUUID().slice(0, 8)
 	let usage = history.park(id)
 	turns.state.running.delete(id)
@@ -92,13 +96,7 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
 		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, cancelled: true })
 	}
-	if (open?.from) {
-		let before = status.stateOf(id)
-		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
-		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, cancelled: true })
-		status.settle(id, before)
-		return void prompts.drain(id)
-	}
+	if (open?.from) return void slash.dismiss(id, open.id)
 	let event: StateEvent = { type: 'pause' }
 	if (reason !== undefined) event.reason = reason
 	let refused = status.transition(id, event)

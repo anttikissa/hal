@@ -6,7 +6,6 @@ import { commandList } from '../common/commands/list.ts'
 import { forms, type Answers } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
-import { states } from '../common/states.ts'
 import { auth } from './auth.ts'
 import { commands, type Context, type Reply } from './commands.ts'
 import { history } from './history.ts'
@@ -15,7 +14,6 @@ import { models as modelList } from './models.ts'
 import { sessions } from './sessions.ts'
 import { host } from './host.ts'
 import { stats } from './stats.ts'
-import { status } from './status.ts'
 import { turns } from './turns.ts'
 
 // Records a slash command as typed (by whom: `from`, else the human) and
@@ -80,8 +78,7 @@ function name(id: string, value?: string): void {
 	host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta } })
 }
 // Runs command `name` (again, with `answers`, once its question is
-// answered) and records what it said. A command asks only when no turn
-// is busy and no other question is open.
+// answered) and records what it said.
 async function runCommand(id: string, name: string, args: string, answers?: Answers): Promise<Reply> {
 	let reply: Reply
 	try {
@@ -102,19 +99,20 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 		slash.output(id, error, true)
 		return { error }
 	}
-	// A session blocked on something other than a question (a login)
-	// waits for a human anyway, so /login claude may ask there.
-	let now = status.stateOf(id)
-	if (states.busy(now) && !(now.type === 'blocked' && now.reason !== 'question')) {
-		let error = `/${name} can't ask while the session is busy; try again when it is done`
+	// A command's question is not the turn's: it opens beside whatever
+	// the session does (a turn blocked on a login is the point of /login)
+	// and leaves the state alone. Only a turn's open question, which the
+	// turn waits on, keeps it out; a command's earlier one it replaces.
+	let open = forms.open(history.readSync(id))
+	if (open && !open.from) {
+		let error = `/${name} can't ask while a question is open; answer it first`
 		slash.output(id, error, true)
 		return { error }
 	}
+	if (open) slash.dismiss(id, open.id)
 	let question = crypto.randomUUID().slice(0, 8)
-	let before = status.stateOf(id)
 	let { n } = history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args: reply.askArgs ?? args } })
-	host.broadcast(id, { type: 'question', sessionId: id, id: question, form: reply.ask, n })
-	status.settle(id, before)
+	host.broadcast(id, { type: 'question', sessionId: id, id: question, form: reply.ask, n, command: true, ...slash.placed(id) })
 	return reply
 }
 
@@ -123,6 +121,13 @@ async function models(id: string): Promise<Event & { type: 'models' }> {
 	let current = sessions.open(id).model
 	let items = await modelList.list(current)
 	return { type: 'models', sessionId: id, current, items, names: modelList.names(items) }
+}
+
+// Closes question `question` unanswered: Escape, or a newer one
+// replaces it. Whoever asked is not run again.
+function dismiss(id: string, question: string): void {
+	history.append(id, { type: 'answer', question, answers: {}, cancelled: true })
+	host.broadcast(id, { type: 'answer', sessionId: id, question, answers: {}, cancelled: true })
 }
 
 function output(id: string, text: string, error = false): void {
@@ -144,6 +149,7 @@ export const slash = {
 	name,
 	runCommand,
 	models,
+	dismiss,
 	output,
 	placed,
 }

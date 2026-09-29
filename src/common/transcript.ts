@@ -28,8 +28,9 @@ export type Shown =
 	| { type: 'tool-result'; id: string; output: string; isError?: boolean }
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string }
 	// A durable question; with `answers` once answered (secrets only named).
-	// `cancelled`: dismissed with Escape (a command's question).
-	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; cancelled?: true }
+	// `cancelled`: dismissed (Escape, or a newer question replaced it).
+	// `command`: a slash command asked; open in any session state.
+	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; cancelled?: true; command?: true }
 	// A slash command as typed; `from`: the session that sent it.
 	| { type: 'command'; text: string; from?: string; ts?: string }
 	// What a command said.
@@ -143,7 +144,7 @@ function recordItems(r: HistoryRecord, at: number): Item[] {
 
 function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
-	if (r.type === 'question') return [{ type: 'question', id: r.id, form: r.form }]
+	if (r.type === 'question') return [r.from ? { type: 'question', id: r.id, form: r.form, command: true } : { type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'compact' || r.type === 'reset') return [{ type: 'divider', text: transcript.boundary(r) }]
 	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b, r.ts) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
@@ -175,17 +176,19 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 }
 
 // A command, its output or a divider as shown, from a record or an event.
-function aside(r: { type: 'command'; text: string; from?: string; ts?: string } | { type: 'output'; text: string; error?: true } | { type: 'divider'; text: string }): Shown {
+function aside(r: { type: 'command'; text: string; from?: string; ts?: string } | { type: 'output'; text: string; error?: true } | { type: 'divider'; text: string } | { type: 'question'; id: string; form: Form }): Shown {
+	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true }
 	if (r.type === 'divider') return { type: 'divider', text: r.text }
 	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.from !== undefined && { from: r.from }), ...(r.ts !== undefined && { ts: r.ts }) }
 	return r.error ? { type: 'output', text: r.text, error: true } : { type: 'output', text: r.text }
 }
 
-// The question waiting for an answer from this transcript, if any.
+// The question waiting for an answer from this transcript, if any: a
+// command's while unanswered, a turn's while the turn waits on it.
 function question(t: Transcript | undefined): (Item & { type: 'question' }) | undefined {
-	if (t?.state.type !== 'blocked' || t.state.reason !== 'question') return undefined
-	let last = t.items.findLast((item) => item.type === 'question')
-	return last?.type === 'question' && !last.answers ? last : undefined
+	let last = t?.items.findLast((item) => item.type === 'question')
+	if (last?.type !== 'question' || last.answers || last.cancelled) return undefined
+	return last.command || (t?.state.type === 'blocked' && t.state.reason === 'question') ? last : undefined
 }
 
 // Earlier records (a snapshot's `earlier`) to show before the tail
@@ -293,7 +296,8 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		return changed ? { ...t, items } : t
 	}
 	if (event.type === 'completions' || event.type === 'history') return t
-	if (event.type === 'command' || event.type === 'output' || event.type === 'divider') {
+	// A command's question is an aside too: it never ends the turn.
+	if (event.type === 'command' || event.type === 'output' || event.type === 'divider' || (event.type === 'question' && event.command)) {
 		// Where history has it: after the running round's blocks already
 		// written, before the one still streaming (`streaming`), which
 		// stays live; as a snapshot taken now or later shows it.

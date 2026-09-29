@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
+import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
 import { commandList } from '../common/commands/list.ts'
@@ -18,6 +19,7 @@ const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
 const saved = { dir: commands.dir, home: commands.home }
 const origModels = synthetic.models
+const origStream = turns.stream
 let home = ''
 let work = ''
 
@@ -40,6 +42,7 @@ afterEach(() => {
 	history.state.running.clear()
 	Object.assign(commands, saved)
 	synthetic.models = origModels
+	turns.stream = origStream
 	liveFiles.onError = origOnError
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome
@@ -107,7 +110,8 @@ test('/cd to a missing directory asks; any client answers, yes creates it and ch
 	await until(() => transcript.question(b.views.get(id)))
 	let q = transcript.question(b.views.get(id))!
 	expect(q.form.text).toContain(`${work}/new/place`)
-	expect(b.views.get(id)!.state).toEqual({ type: 'blocked', reason: 'question' })
+	// A command's question is not the turn's: the state stays idle.
+	expect(b.views.get(id)!.state).toEqual({ type: 'idle' })
 	expect(existsSync(`${work}/new`)).toBe(false)
 	b.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { create: 'yes' } })
 	a.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { create: 'no' } })
@@ -130,30 +134,62 @@ test('a command question survives a restart; no answers it and nothing changes',
 	history.state.running.clear()
 	await turns.recover()
 	let b = await opened(id)
-	expect(b.views.get(id)!.state).toEqual({ type: 'blocked', reason: 'question' })
+	expect(transcript.question(b.views.get(id))?.id).toBe(q.id)
+	expect(b.views.get(id)!.state).toEqual({ type: 'idle' })
 	expect(b.of('turn-start')).toEqual([])
 	b.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { create: 'no' } })
-	await until(() => b.views.get(id)!.state.type === 'idle')
+	await until(() => b.views.get(id)!.items.some((i) => i.type === 'question' && i.answers))
 	expect(existsSync(`${work}/nowhere`)).toBe(false)
 	expect(b.views.get(id)!.meta.cwd).toBe(work)
 })
 
-test('Escape on a command question dismisses it and the session returns to its state; a prompt sent meanwhile then runs', async () => {
+test('a command question lives beside turns: a prompt runs at once, the turn end leaves it open, Escape dismisses it', async () => {
 	synthetic.models.ok = () => ({ say: 'ok' })
 	let a = client()
 	let id = created(a, 'hal/ok')
 	a.conn.send({ type: 'submit', sessionId: id, text: '/cd nowhere' })
 	await until(() => transcript.question(a.views.get(id)))
 	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
-	expect(a.views.get(id)!.inbox.map((m) => m.text)).toEqual(['hi'])
-	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.of('turn-end').length)
+	expect(a.views.get(id)!.inbox).toEqual([])
+	expect(a.views.get(id)!.state).toEqual({ type: 'idle' })
+	expect(transcript.question(a.views.get(id))).toBeTruthy()
+	expect(transcript.question((await opened(id)).views.get(id))).toBeTruthy()
+	a.conn.send({ type: 'pause', sessionId: id })
+	await until(() => !transcript.question(a.views.get(id)))
 	let view = a.views.get(id)!
 	expect(view.items.find((i) => i.type === 'question')).toMatchObject({ cancelled: true })
-	expect(view.items.filter((i) => i.type === 'turn-end')).toHaveLength(1)
-	expect(view.inbox).toEqual([])
 	expect(existsSync(`${work}/nowhere`)).toBe(false)
 	expect((await opened(id)).views.get(id)).toEqual(view)
+})
+
+test('a command question asked while a turn streams leaves the turn streaming; a newer one replaces it', async () => {
+	let release = () => {}
+	let held = new Promise<void>((r) => (release = r))
+	turns.stream = () =>
+		(async function* (): AsyncGenerator<StreamEvent> {
+			yield { type: 'text', text: 'working' }
+			await held
+			yield { type: 'text', text: ' done' }
+			yield { type: 'done', reason: 'end' }
+		})()
+	let a = client()
+	let id = created(a, 'fake/m')
+	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
+	await until(() => a.of('stream').length)
+	a.conn.send({ type: 'submit', sessionId: id, text: '/cd nowhere' })
+	await until(() => transcript.question(a.views.get(id)))
+	let first = transcript.question(a.views.get(id))!.id
+	expect(a.views.get(id)!.live).toBeTruthy()
+	expect(a.views.get(id)!.state).toEqual({ type: 'running', phase: 'streaming' })
+	a.conn.send({ type: 'submit', sessionId: id, text: '/cd elsewhere' })
+	await until(() => transcript.question(a.views.get(id))?.id !== first)
+	expect(a.views.get(id)!.items.find((i) => i.type === 'question' && i.id === first)).toMatchObject({ cancelled: true })
+	release()
+	await until(() => a.of('turn-end').length)
+	expect(a.views.get(id)!.items.filter((i) => i.type === 'text').map((i: any) => i.text)).toEqual(['working done'])
+	expect(transcript.question(a.views.get(id))).toBeTruthy()
+	expect((await opened(id)).views.get(id)).toEqual(a.views.get(id))
 })
 
 test('/help lists every command by category and /help <name> shows its detail', async () => {

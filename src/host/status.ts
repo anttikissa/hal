@@ -32,16 +32,6 @@ function inboxOf(id: string, records?: HistoryRecord[]): InboxItem[] {
 	return inbox.pending(records ?? pages.essentials(id))
 }
 
-// Sets the session's state to what history says, telling followers if
-// it changed: after a command's question opens or closes, the session
-// is as it was before (a command is not a turn). `before`: the state
-// followers know, taken before the change was recorded.
-function settle(id: string, before: SessionState): void {
-	let next = states.fromHistory(pages.essentials(id))
-	status.state.states.set(id, next)
-	if (ason.stringify(next) !== ason.stringify(before)) host.broadcast(id, { type: 'state', sessionId: id, state: next })
-}
-
 export const status = {
 	state: {
 		// Each session's state, once this host has moved it.
@@ -50,5 +40,4 @@ export const status = {
 	stateOf,
 	transition,
 	inboxOf,
-	settle,
 }

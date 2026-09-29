@@ -5,8 +5,7 @@
 // back through the rest by byte offsets from the end.
 //
 // What the state needs from earlier is found through sessions/<id>/
-// marks.ason: the offsets of the last question, the last answer or turn
-// end, the last record of a turn, the last prompt and every inbox
+// marks.ason: the offsets of the last question, the last answer, the last record of a turn, the last prompt and every inbox
 // message not yet delivered. It is a cache of history, which stays the
 // truth: `size` says how much of the file it covers, and whatever was
 // appended since is read and folded in; a file shorter than that, or no
@@ -20,7 +19,7 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
-type Marks = { size: number; next?: number; question?: number; turnQuestion?: string; close?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]> }
+type Marks = { size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]> }
 type Line = { offset: number; bytes: number; record: HistoryRecord }
 export type Page = { records: HistoryRecord[]; start: number }
 // `older`: where `history` starts, when earlier records exist.
@@ -88,7 +87,9 @@ function apply(m: Marks, r: HistoryRecord, offset: number): void {
 			m.turn = offset
 		}
 	} else if (r.type === 'answer' || r.type === 'turn_end') {
-		m.close = offset
+		// A turn end is the turn's last record; it closes only a turn's
+		// question (forms.open), so the last answer is kept apart.
+		if (r.type === 'answer') m.answer = offset
 		if (r.type === 'turn_end' || r.question === m.turnQuestion) m.turn = offset
 	} else if (r.type === 'inbox' && r.withdrawn) delete m.inbox[r.id]
 	// Every record of a message: an edit keeps the place of the first.
@@ -124,7 +125,9 @@ function marks(id: string): Marks {
 	let path = history.file(id)
 	let size = existsSync(path) ? statSync(path).size : 0
 	let m = pages.load(id)
-	if (m.size < 0 || m.size > size || (m.size > 0 && m.next === undefined)) {
+	// Marks from before `next`, or with `close` (an answer or a turn end,
+	// before answers were kept apart), are rebuilt.
+	if (m.size < 0 || m.size > size || (m.size > 0 && m.next === undefined) || 'close' in m) {
 		for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
 		Object.assign(m, { size: 0, inbox: {} })
 	}
@@ -151,7 +154,7 @@ function note(id: string, line: string, record: HistoryRecord): void {
 
 function marked(id: string): Line[] {
 	let m = pages.marks(id)
-	let offsets = new Set([m.question, m.close, m.turn, m.prompt, ...Object.values(m.inbox).flat()].filter((o) => o !== undefined))
+	let offsets = new Set([m.question, m.answer, m.turn, m.prompt, ...Object.values(m.inbox).flat()].filter((o) => o !== undefined))
 	let path = history.file(id)
 	return [...offsets].sort((a, b) => a - b).map((o) => pages.lineAt(path, o))
 }

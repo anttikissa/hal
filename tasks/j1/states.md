@@ -35,7 +35,10 @@ error names what ends it: a live stream or tool, a time T, or a
 human-facing reason. A session that waits on nothing is a bug.
 
 Queued and steering messages (the inbox) are not a state: they are
-visible data attached to a session in any state.
+visible data attached to a session in any state. Neither is a slash
+command's question (/login, /cd): the state belongs to the turn, and
+nothing outside the turn may overwrite what the host knows about it,
+say by re-deriving the state from history.
 
 ## Who may stop work
 

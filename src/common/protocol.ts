@@ -200,9 +200,11 @@ export type Event =
 	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[]; n?: number }
 	| { type: 'turn-stats'; sessionId: string; stats: Stats }
 	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string; n?: number; stats?: Stats }
-	// The turn asked a question, now in history; it waits for an answer
-	// with no turn running (the state says blocked).
-	| { type: 'question'; sessionId: string; id: string; form: Form; n?: number }
+	// A question, now in history. A turn's waits for an answer with no
+	// turn running (the state says blocked). `command`: a slash command
+	// asked, beside whatever the session does, placed like `command`
+	// (`streaming`).
+	| { type: 'question'; sessionId: string; id: string; form: Form; n?: number; command?: true; streaming?: true }
 	// The first answer to it, as history keeps it (secrets only named).
 	// `cancelled`: Escape dismissed a command's question.
 	| { type: 'answer'; sessionId: string; question: string; answers: Answers; secrets?: string[]; cancelled?: true }
