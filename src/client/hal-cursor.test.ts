@@ -4,6 +4,7 @@ import type { Event, Snapshot } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
 import { ansi } from './ansi.ts'
 import { app } from './app.ts'
+import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
 import { halCursor } from './hal-cursor.ts'
 import { pulse } from './pulse.ts'
@@ -46,7 +47,7 @@ function rows(cols = 40): string[] {
 	let hal = ansi.sgr({ fg: colors.assistant().cursor! })
 	let think = ansi.sgr({ fg: colors.thinking().fg! })
 	return frame
-		.build(app.view(), cols)
+		.build(appView.view(), cols)
 		.lines.map((l) => l.replaceAll(hal + '█', '{hal}').replaceAll(think + '█', '{think}').replace(new RegExp('\x1b\\[[0-9;]*m', 'g'), '').trimEnd())
 }
 // The rows after the last transcript row, `after`.
@@ -100,7 +101,7 @@ test('the cursor goes when the block ends; blank, cursor, blank rows follow the 
 
 test('a finished session never seen working here shows the grey cursor at once', () => {
 	app.onEvent(snapshot())
-	let lines = frame.build(app.view(), 40).lines
+	let lines = frame.build(appView.view(), 40).lines
 	let grey = ansi.sgr({ fg: colors.assistant().cursorIdle! }) + '█'
 	expect(lines.some((l) => l.includes(grey))).toBe(true)
 })
@@ -158,7 +159,7 @@ test('a blinking tab indicator keeps the pulse and blinks with it', () => {
 	expect(pulse.running()).toBe(false)
 	app.onEvent({ type: 'tabs', tabs: [tab({ type: 'running', phase: 'tools' })] })
 	expect(pulse.running()).toBe(true)
-	let bar = () => frame.build(app.view(), 40).lines.find((l) => l.includes('Tabs:'))
+	let bar = () => frame.build(appView.view(), 40).lines.find((l) => l.includes('Tabs:'))
 	let lit = bar()
 	now = 2 * pulse.ms()
 	let count = shown.length

@@ -8,6 +8,7 @@ import type { SessionState } from '../common/states.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 import { app } from './app.ts'
+import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
 import type { KeyEvent } from './keys.ts'
 import { render } from './render.ts'
@@ -66,7 +67,7 @@ test('typing and Enter submits to the open session and clears the prompt', () =>
 	type('hello')
 	enter()
 	expect(sent).toEqual([{ type: 'submit', sessionId: 's1', text: 'hello' }])
-	expect(app.view().prompt.text).toBe('')
+	expect(appView.view().prompt.text).toBe('')
 })
 
 test('an empty prompt is not submitted', () => {
@@ -80,8 +81,8 @@ test('a submit before any session arrives keeps the text', () => {
 	type('early')
 	enter()
 	expect(sent).toEqual([])
-	expect(app.view().prompt.text).toBe('early')
-	expect(app.view().notice).toBeTruthy()
+	expect(appView.view().prompt.text).toBe('early')
+	expect(appView.view().notice).toBeTruthy()
 })
 
 test('while a turn runs, Enter steers it, Alt-Enter queues, and Escape pauses it', () => {
@@ -90,7 +91,7 @@ test('while a turn runs, Enter steers it, Alt-Enter queues, and Escape pauses it
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'requesting' } })
 	type('now')
 	enter()
-	expect(app.view().prompt.text).toBe('')
+	expect(appView.view().prompt.text).toBe('')
 	type('later')
 	app.onKeys([{ ...key('enter'), alt: true }])
 	escape()
@@ -104,7 +105,7 @@ test('while a turn runs, Enter steers it, Alt-Enter queues, and Escape pauses it
 test('waiting messages stay on screen, each saying why it waits', () => {
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
 	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'a', text: 'steer me' }, { id: 'b', text: 'run me later', queue: true }] })
-	let rows = () => frame.build(app.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim())
+	let rows = () => frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim())
 	let steer = rows().find((r) => r.includes('steer me'))!
 	let later = rows().find((r) => r.includes('run me later'))!
 	expect(steer).not.toBe(later)
@@ -126,31 +127,31 @@ test('Escape pauses a turn another host is carrying on, too', () => {
 
 test('the activity says what the session does, and waiting for answer on a question', () => {
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'requesting' }))
-	expect(app.view().activity).toBe('processing')
+	expect(appView.view().activity).toBe('processing')
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'blocked', reason: 'question' } })
-	expect(app.view().activity).toBe('waiting for answer')
+	expect(appView.view().activity).toBe('waiting for answer')
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'idle' } })
-	expect(app.view().activity).toBeUndefined()
+	expect(appView.view().activity).toBeUndefined()
 })
 
 test('a login block says so in a word above the prompt; the whole message is the notice', () => {
 	app.onEvent(snapshot('s1', { type: 'blocked', reason: 'log in: token refresh failed: HTTP 400 invalid_grant' }))
-	expect(app.view().activity).toBe('blocked: log in')
-	expect(app.view().why).toContain('invalid_grant')
+	expect(appView.view().activity).toBe('blocked: log in')
+	expect(appView.view().why).toContain('invalid_grant')
 })
 
 test('bare Enter continues a paused or failed turn, and says so', () => {
 	app.onEvent(snapshot('s1', { type: 'paused' }))
-	expect(app.view().activity).toBe('paused')
+	expect(appView.view().activity).toBe('paused')
 	// [paused] in the transcript and the help row's enter: continue say it all.
-	expect(app.view().why).toBeUndefined()
+	expect(appView.view().why).toBeUndefined()
 	app.onEvent(snapshot('s1', { type: 'paused', reason: 'reached 200 rounds' }))
-	expect(app.view().why).toBe('reached 200 rounds')
+	expect(appView.view().why).toBe('reached 200 rounds')
 	enter()
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'error', message: '400 nope' } })
 	// The rule says it in a word; the notice has the whole message.
-	expect(app.view().activity).toBe('error')
-	expect(app.view().why).toMatch(/400 nope.*Enter/)
+	expect(appView.view().activity).toBe('error')
+	expect(appView.view().why).toMatch(/400 nope.*Enter/)
 	enter()
 	expect(sent).toEqual([
 		{ type: 'continue', sessionId: 's1' },
@@ -171,13 +172,13 @@ test('Up on an empty prompt while the model works pauses it and edits the last p
 	working()
 	up()
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
-	expect(app.view().prompt).toEqual({ text: 'fix ti', cursor: 6 })
-	expect(app.view().editing).toMatch(/editing/)
+	expect(appView.view().prompt).toEqual({ text: 'fix ti', cursor: 6 })
+	expect(appView.view().editing).toMatch(/editing/)
 	paused()
 	app.onKeys([key('backspace'), key('backspace'), key('i', 'i'), key('t', 't')])
 	enter()
 	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'fix it', amend: true })
-	expect(app.view().prompt.text).toBe('')
+	expect(appView.view().prompt.text).toBe('')
 	// The edit is over: the next prompt is a new one.
 	type('more')
 	enter()
@@ -210,7 +211,7 @@ test('Down with the text unchanged, or Escape, continues the paused turn', () =>
 	paused()
 	down()
 	expect(sent.at(-1)).toEqual({ type: 'continue', sessionId: 's1' })
-	expect(app.view().prompt.text).toBe('')
+	expect(appView.view().prompt.text).toBe('')
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'streaming' } })
 	sent = []
 	up()
@@ -221,8 +222,8 @@ test('Down with the text unchanged, or Escape, continues the paused turn', () =>
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 	escape()
 	expect(sent.at(-1)).toEqual({ type: 'continue', sessionId: 's1' })
-	expect(app.view().prompt.text).toBe('fix ti!')
-	expect(app.view().editing).toBeUndefined()
+	expect(appView.view().prompt.text).toBe('fix ti!')
+	expect(appView.view().editing).toBeUndefined()
 })
 
 test('Up does nothing with text typed or when nothing works', () => {
@@ -234,7 +235,7 @@ test('Up does nothing with text typed or when nothing works', () => {
 	up()
 	expect(sent).toEqual([])
 	// Not an edit: input history recalls the prompt instead.
-	expect(app.view().editing).toBeUndefined()
+	expect(appView.view().editing).toBeUndefined()
 })
 
 test('Escape with no turn running sends nothing', () => {
@@ -247,7 +248,7 @@ test('streamed output reaches the view', () => {
 	app.onEvent(snapshot())
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'q', provider: 'anthropic' })
 	app.onEvent({ type: 'stream', sessionId: 's1', event: { type: 'text', text: 'answer' } })
-	expect(app.view().transcript?.items).toContainEqual(expect.objectContaining({ type: 'text', text: 'answer' }))
+	expect(appView.view().transcript?.items).toContainEqual(expect.objectContaining({ type: 'text', text: 'answer' }))
 })
 
 test('replayed history carries no mark: it reads like one followed live', () => {
@@ -257,12 +258,12 @@ test('replayed history carries no mark: it reads like one followed live', () => 
 	]
 	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, history, state: { type: 'idle' } } })
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'new question', provider: 'anthropic' })
-	let rows = frame.build(app.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim()).filter(Boolean)
+	let rows = frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim()).filter(Boolean)
 	let at = (s: string) => rows.findIndex((r) => r.includes(s))
 	expect(at('error: overloaded')).toBeLessThan(at('new question'))
 	expect(rows.join('\n')).not.toMatch(/resumed|last turn/)
 	// A client that followed the same session live draws the same lines.
-	let live = frame.build(app.view(), 80).lines
+	let live = frame.build(appView.view(), 80).lines
 	app.reset()
 	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, history: [], state: { type: 'idle' } } })
 	for (let e of [
@@ -271,31 +272,31 @@ test('replayed history carries no mark: it reads like one followed live', () => 
 		{ type: 'turn-start', sessionId: 's1', prompt: 'new question', provider: 'anthropic' },
 	] as Event[])
 		app.onEvent(e)
-	expect(frame.build(app.view(), 80).lines).toEqual(live)
+	expect(frame.build(appView.view(), 80).lines).toEqual(live)
 })
 
 test('a refused command is shown until the next submit', () => {
 	app.onEvent(snapshot())
 	app.onEvent({ type: 'rejected', sessionId: 's1', command: 'submit', reason: 'disk full' })
-	expect(app.view().notice).toContain('disk full')
+	expect(appView.view().notice).toContain('disk full')
 	type('again')
 	enter()
-	expect(app.view().notice).toBeUndefined()
+	expect(appView.view().notice).toBeUndefined()
 })
 
 test('a config warning is shown and keeps the transcript', () => {
 	app.onEvent(snapshot())
-	let before = app.view().transcript
+	let before = appView.view().transcript
 	app.onEvent({ type: 'warning', text: 'config.ason: webPort: bad' })
-	expect(app.view().notice).toContain('webPort')
-	expect(app.view().transcript).toBe(before)
+	expect(appView.view().notice).toContain('webPort')
+	expect(appView.view().transcript).toBe(before)
 })
 
 test('losing the host is shown, and cleared on reconnect', () => {
 	app.onState({ type: 'disconnected', retryAt: Date.now() + 100 })
-	expect(app.view().notice).toBeTruthy()
+	expect(appView.view().notice).toBeTruthy()
 	app.onState({ type: 'connected', role: 'client' })
-	expect(app.view().notice).toBeUndefined()
+	expect(appView.view().notice).toBeUndefined()
 })
 
 test('Ctrl-D on an empty prompt quits', () => {
@@ -305,13 +306,13 @@ test('Ctrl-D on an empty prompt quits', () => {
 
 test('typing updates the shared draft; a draft from elsewhere fills the prompt', () => {
 	app.onEvent(snapshot('s1', { type: 'idle' }, { text: 'from the phone', rev: 3 }))
-	expect(app.view().prompt.text).toBe('from the phone')
+	expect(appView.view().prompt.text).toBe('from the phone')
 	type('!')
 	expect(drafted).toEqual([{ type: 'draft', sessionId: 's1', text: 'from the phone!', base: 3 }])
 	app.reset()
 	app.onEvent(snapshot())
 	app.onEvent({ type: 'draft', sessionId: 's1', draft: { text: 'typed elsewhere', rev: 1 } })
-	expect(app.view().prompt.text).toBe('typed elsewhere')
+	expect(appView.view().prompt.text).toBe('typed elsewhere')
 })
 
 test('an open question takes the keys until it is answered; the prompt keeps its text', () => {
@@ -321,16 +322,16 @@ test('an open question takes the keys until it is answered; the prompt keeps its
 	app.onEvent({ type: 'question', sessionId: 's1', id: 'q1', form })
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'blocked', reason: 'question' } })
 	// The question is all it shows: no status naming the state.
-	expect(app.view().why).toBeUndefined()
-	expect(app.view().notice).toBeUndefined()
+	expect(appView.view().why).toBeUndefined()
+	expect(appView.view().notice).toBeUndefined()
 	type('Dave')
 	enter()
 	expect(sent).toEqual([{ type: 'answer', sessionId: 's1', question: 'q1', answers: { name: 'Dave' } }])
-	expect(app.view().form?.values).toEqual(['Dave'])
+	expect(appView.view().form?.values).toEqual(['Dave'])
 	app.onEvent({ type: 'answer', sessionId: 's1', question: 'q1', answers: { name: 'Dave' } })
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'running', phase: 'requesting' } })
-	expect(app.view().form).toBeUndefined()
-	expect(app.view().prompt.text).toBe('draft')
+	expect(appView.view().form).toBeUndefined()
+	expect(appView.view().prompt.text).toBe('draft')
 })
 
 test('Escape on an open question pauses the session', () => {
@@ -345,13 +346,13 @@ test('a modal takes the keys over everything and ends in an ordinary command', (
 	type('draft')
 	let search = { text: 'Models', fields: [{ type: 'text' as const, name: 'q', label: 'Search' }] }
 	app.open(modals.open({ title: 'Models', form: search, items: ['a', 'b'] }), (action) => ({ type: 'model', sessionId: 's1', item: action.item, q: action.answers.q }))
-	expect(app.view().modal?.title).toBe('Models')
+	expect(appView.view().modal?.title).toBe('Models')
 	type('op')
 	app.onKeys([key('down')])
 	enter()
 	expect(sent).toEqual([{ type: 'model', sessionId: 's1', item: 1, q: 'op' }])
 	expect(app.state.prompt.text).toBe('draft')
-	expect(app.view().modal).toBeUndefined()
+	expect(appView.view().modal).toBeUndefined()
 	// Keys are the prompt's again.
 	type('!')
 	expect(app.state.prompt.text).toBe('draft!')
@@ -362,7 +363,7 @@ test('Escape closes a modal and nothing else: the running turn goes on', () => {
 	app.open(modals.open({ title: 'Models', items: ['a'] }), () => ({ type: 'never' }))
 	escape()
 	expect(sent).toEqual([])
-	expect(app.view().modal).toBeUndefined()
+	expect(appView.view().modal).toBeUndefined()
 	escape()
 	expect(sent).toEqual([{ type: 'pause', sessionId: 's1' }])
 })
@@ -389,19 +390,19 @@ test('Tab on a command asks the host to complete it; the answer fills the prompt
 test("completion leaves other notices alone and never uncovers the tab's state by clearing one", () => {
 	app.onEvent(snapshot('s1', { type: 'error', message: 'no credits' }))
 	app.onEvent({ type: 'warning', text: 'Web is on port 9002' })
-	let before = [app.view().why, app.view().notice]
+	let before = [appView.view().why, appView.view().notice]
 	expect(before).toEqual([expect.stringContaining('no credits'), 'Web is on port 9002'])
 	type('/sta')
 	app.onKeys([key('tab')])
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/sta', items: ['/status '] })
-	expect([app.view().why, app.view().notice]).toEqual(before)
+	expect([appView.view().why, appView.view().notice]).toEqual(before)
 	type('x')
 	app.onKeys([key('tab')])
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/status x', items: [] })
-	expect(app.view().notice).toBe('no completions')
+	expect(appView.view().notice).toBe('no completions')
 	app.onKeys([key('backspace'), key('tab')])
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/status ', items: ['/status '] })
-	expect(app.view().notice).toBeUndefined()
+	expect(appView.view().notice).toBeUndefined()
 })
 
 test('several completions are listed in the help row until the next key, and Up still recalls history', () => {
@@ -410,21 +411,21 @@ test('several completions are listed in the help row until the next key, and Up 
 	enter()
 	app.onEvent({ type: 'prompt', sessionId: 's1', texts: ['earlier'] })
 	type('/cd ~/pro')
-	let before = frame.build(app.view(), 40)
+	let before = frame.build(appView.view(), 40)
 	app.onKeys([key('tab')])
 	let names = Array.from({ length: 12 }, (_, i) => `project-${i}/`)
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: names.map((n) => `/cd ~/${n}`) })
-	let f = frame.build(app.view(), 40)
+	let f = frame.build(appView.view(), 40)
 	// The first names, in order, on the last row; the frame keeps its height.
 	let help = f.lines.at(-1)!.replace(/\x1b\[[0-9;]*m/g, '')
 	expect(help).toMatch(/project-0\/ +project-1\/ /)
 	expect(strings.visLen(f.lines.at(-1)!)).toBeLessThanOrEqual(40)
 	expect(f.lines.length).toBe(before.lines.length)
-	expect(app.view().notice).toBeUndefined()
+	expect(appView.view().notice).toBeUndefined()
 	app.onKeys([key('up')])
-	expect(app.view().choices).toBeUndefined()
+	expect(appView.view().choices).toBeUndefined()
 	expect(app.state.prompt.text).toBe('earlier')
-	let after = frame.build(app.view(), 40)
+	let after = frame.build(appView.view(), 40)
 	expect(after.lines.join('')).not.toContain('project-')
 })
 
@@ -433,26 +434,26 @@ test('Ctrl-M asks the host for the models; the picker filters as you type and En
 	type('draft')
 	app.onKeys([{ ...key('m'), ctrl: true }])
 	expect(sent).toEqual([{ type: 'models', sessionId: 's1' }])
-	expect(app.view().modal).toBeUndefined()
+	expect(appView.view().modal).toBeUndefined()
 	let items = ['anthropic/x', 'openrouter/stepfun/step-3.5-flash', 'anthropic/claude-opus-5-5']
 	app.onEvent({ type: 'models', sessionId: 's1', current: 'anthropic/x', items })
-	let modal = app.view().modal!
+	let modal = appView.view().modal!
 	expect(modal.tree?.rows[modal.selected]?.id).toBe('anthropic/x')
 	// Left closes the current model's category: the tree keys reach the picker.
 	app.onKeys([key('left')])
-	expect(app.view().modal!.items[app.view().modal!.selected]).toMatch(/▶ other$/)
+	expect(appView.view().modal!.items[appView.view().modal!.selected]).toMatch(/▶ other$/)
 	type('opus-5.5')
-	expect(app.view().modal!.items[app.view().modal!.selected]).toMatch(/anthropic\/claude-opus-5-5$/)
+	expect(appView.view().modal!.items[appView.view().modal!.selected]).toMatch(/anthropic\/claude-opus-5-5$/)
 	enter()
 	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: '/model anthropic/claude-opus-5-5' })
-	expect(app.view().modal).toBeUndefined()
+	expect(appView.view().modal).toBeUndefined()
 	expect(app.state.prompt.text).toBe('draft')
 })
 
 test('a model list for another session opens nothing', () => {
 	app.onEvent(snapshot())
 	app.onEvent({ type: 'models', sessionId: 's2', current: 'a/b', items: ['a/b'] })
-	expect(app.view().modal).toBeUndefined()
+	expect(appView.view().modal).toBeUndefined()
 })
 
 test('Up moves by the rows the terminal draws, at its width', () => {
@@ -462,10 +463,10 @@ test('Up moves by the rows the terminal draws, at its width', () => {
 		type('x'.repeat(30))
 		app.cols = () => 20
 		app.onKeys([key('up')])
-		let f = frame.build(app.view(), 20)
+		let f = frame.build(appView.view(), 20)
 		expect(f.lines[f.cursor.row + 1]).toContain('xx')
 		expect(f.lines[f.cursor.row + 2]).toContain('─')
-		expect(app.view().prompt.cursor).toBe(30 - frame.promptWidth(20))
+		expect(appView.view().prompt.cursor).toBe(30 - frame.promptWidth(20))
 	} finally {
 		app.cols = cols
 	}
@@ -473,14 +474,14 @@ test('Up moves by the rows the terminal draws, at its width', () => {
 
 test('an empty prompt shows an example that changes each turn, with its own list for the Hal repo', () => {
 	app.onEvent(snapshot())
-	let first = app.view().placeholder
+	let first = appView.view().placeholder
 	expect(first).toBeTruthy()
 	type('hi')
-	expect(app.view().placeholder).toBeUndefined()
+	expect(appView.view().placeholder).toBeUndefined()
 	enter()
 	app.onEvent({ type: 'prompt', sessionId: 's1', texts: ['hi'] })
-	expect(app.view().placeholder).not.toBe(first)
-	expect(app.view().placeholder).toBe(placeholders.general[1])
+	expect(appView.view().placeholder).not.toBe(first)
+	expect(appView.view().placeholder).toBe(placeholders.general[1])
 })
 
 // ── Tabs ──
@@ -497,7 +498,7 @@ const startOn = (ids: string[], at = 'a') => {
 	app.onEvent(snapshot(at))
 	sent = []
 }
-const shown = () => app.view().tabs?.focused
+const shown = () => appView.view().tabs?.focused
 
 test('after the focused paint, nearby tabs load in slices and switching uses their cached tails', async () => {
 	startOn(['a', 'b', 'c', 'd'], 'c')
@@ -514,15 +515,15 @@ test('after the focused paint, nearby tabs load in slices and switching uses the
 	app.onEvent(snapshot('a'))
 	app.onKeys([alt('2')])
 	expect(shown()).toBe('b')
-	expect(app.view().transcript?.meta.id).toBe('b')
+	expect(appView.view().transcript?.meta.id).toBe('b')
 	expect(sent.filter((c) => c.type === 'open').map((c) => c.sessionId)).toEqual(['b', 'd', 'a'])
 })
 
 test('the example on an empty prompt comes from the Hal list when the host marks the tab hal', () => {
 	startOn(['a', 'b'])
-	expect(app.view().placeholder).toBe(placeholders.general[0])
+	expect(appView.view().placeholder).toBe(placeholders.general[0])
 	app.onEvent(tabsEvent(tabOf('a', { hal: true }), 'b'))
-	expect(app.view().placeholder).toBe(placeholders.hal[0])
+	expect(appView.view().placeholder).toBe(placeholders.hal[0])
 })
 
 test('a saved draft shown on starting is not doubled; text typed before it follows it', () => {
@@ -533,14 +534,14 @@ test('a saved draft shown on starting is not doubled; text typed before it follo
 		app.onEvent(tabsEvent('a', 'b'))
 		acked('a')
 		app.onEvent(snapshot('a'))
-		expect(app.view().prompt.text).toBe('saved')
+		expect(appView.view().prompt.text).toBe('saved')
 		app.reset()
 		type('early')
 		app.onEvent(tabsEvent('a', 'b'))
 		acked('a')
-		expect(app.view().prompt.text).toBe('saved\nearly')
+		expect(appView.view().prompt.text).toBe('saved\nearly')
 		app.onEvent(snapshot('a'))
-		expect(app.view().prompt.text).toBe('saved\nearly')
+		expect(appView.view().prompt.text).toBe('saved\nearly')
 		expect(stored.get('a')?.text).toBe('saved\nearly')
 	} finally {
 		drafts.store = store
@@ -560,6 +561,23 @@ test('connecting asks the host for the tab to show; its ack focuses and follows 
 	// A reconnect asks for the tab shown, in its own cwd.
 	app.onState({ type: 'connected', role: 'client' })
 	expect(sent.at(-2)).toEqual({ type: 'tab-start', cwd: '/b', last: 'b' })
+})
+
+test('a remote client starts without a cwd (it names nothing there) and its status names the host', () => {
+	app.state.start = { last: 'b' }
+	app.onState({ type: 'connected', role: 'client' })
+	expect(sent[0]).toEqual({ type: 'tab-start', last: 'b' })
+	startOn(['a'])
+	let link = connection.state.link
+	connection.state.link = { type: 'connected', role: 'client' }
+	try {
+		expect(appView.view().status?.role).toBe('peer')
+		appView.state.remote = 'example.com'
+		expect(appView.view().status?.role).toBe('example.com')
+	} finally {
+		connection.state.link = link
+		appView.state.remote = undefined
+	}
 })
 
 test('Ctrl-T opens a tab after the focused one and shows it once the host names it', () => {
@@ -627,29 +645,29 @@ test('each tab keeps its editor state while another is shown; a modal closes on 
 	type('hello')
 	app.onKeys([key('left'), key('left')])
 	app.onKeys([ctrl('n')])
-	expect(app.view().prompt.text).toBe('')
+	expect(appView.view().prompt.text).toBe('')
 	app.onEvent(snapshot('b'))
 	type('x')
 	app.open(modals.open({ title: 'Models', items: ['m'] }), () => undefined)
 	app.onKeys([ctrl('p')])
-	expect(app.view().modal).toBeUndefined()
-	expect(app.view().prompt).toMatchObject({ text: 'hello', cursor: 3 })
+	expect(appView.view().modal).toBeUndefined()
+	expect(appView.view().prompt).toMatchObject({ text: 'hello', cursor: 3 })
 	// Its transcript shows until the fresh snapshot replaces it.
-	expect(app.view().transcript?.meta.id).toBe('a')
+	expect(appView.view().transcript?.meta.id).toBe('a')
 	app.onEvent(snapshot('a'))
-	expect(app.view().prompt).toMatchObject({ text: 'hello', cursor: 3 })
+	expect(appView.view().prompt).toMatchObject({ text: 'hello', cursor: 3 })
 	app.onKeys([ctrl('n')])
-	expect(app.view().prompt.text).toBe('x')
+	expect(appView.view().prompt.text).toBe('x')
 })
 
 test('late events of a tab just left do not reach the view', () => {
 	startOn(['a', 'b'])
 	app.onKeys([ctrl('n')])
 	app.onEvent(snapshot('a', { type: 'running', phase: 'streaming' }))
-	expect(app.view().transcript).toBeUndefined()
+	expect(appView.view().transcript).toBeUndefined()
 	app.onEvent(snapshot('b'))
 	app.onEvent({ type: 'state', sessionId: 'a', state: { type: 'error', message: 'x' } })
-	expect(app.view().transcript?.state).toEqual({ type: 'idle' })
+	expect(appView.view().transcript?.state).toEqual({ type: 'idle' })
 })
 
 test('a shown tab that wants attention is told seen', () => {
@@ -667,16 +685,16 @@ test('web links carry the latest link code only in their hidden target', () => {
 	try {
 		app.onEvent({ type: 'auth', code: 'k3x9qa', link: 'https://h.example' })
 		type('see [image/frdbn1.png]')
-		let lines = frame.build(app.view(), 60).lines
+		let lines = frame.build(appView.view(), 60).lines
 		let targets = lines.flatMap((l) => [...l.matchAll(/\x1b\]8;;([^\x07]+)\x07/g)].map((m) => m[1]))
 		expect(targets).toEqual(expect.arrayContaining(['https://h.example/a?auth=k3x9qa', 'https://h.example/b?auth=k3x9qa', 'https://h.example/image/frdbn1.png?auth=k3x9qa']))
 		expect(lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, '')).join('\n')).not.toContain('k3x9qa')
 		// A replaced code is what the next paint links with.
 		app.onEvent({ type: 'auth', code: 'm2p7rt', link: 'https://h.example' })
-		expect(frame.build(app.view(), 60).lines.join('\n')).toContain('https://h.example/a?auth=m2p7rt')
+		expect(frame.build(appView.view(), 60).lines.join('\n')).toContain('https://h.example/a?auth=m2p7rt')
 		// A plain `auth` reply (./run auth) is not a link code.
 		app.onEvent({ type: 'auth', code: 'zzzzzz' })
-		expect(frame.build(app.view(), 60).lines.join('\n')).not.toContain('zzzzzz')
+		expect(frame.build(appView.view(), 60).lines.join('\n')).not.toContain('zzzzzz')
 	} finally {
 		ansi.state.web = { url: '', code: '' }
 	}
@@ -684,7 +702,7 @@ test('web links carry the latest link code only in their hidden target', () => {
 
 test('the tab bar shows the tabs with the focused one', () => {
 	startOn(['a', 'b'])
-	let lines = frame.build(app.view(), 60).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, ''))
+	let lines = frame.build(appView.view(), 60).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, ''))
 	expect(lines.find((l) => l.includes('Tabs:'))).toContain('Tabs: [1] 2 ')
 })
 
@@ -700,17 +718,17 @@ test('Up and Down browse the prompts sent; the draft stays the text being writte
 	type('mine')
 	drafted = []
 	up()
-	expect(app.view().prompt).toMatchObject({ text: 'second', cursor: 6 })
+	expect(appView.view().prompt).toMatchObject({ text: 'second', cursor: 6 })
 	up()
-	expect(app.view().prompt.text).toBe('first')
+	expect(appView.view().prompt.text).toBe('first')
 	// The oldest: Up goes to the start.
 	up()
-	expect(app.view().prompt).toMatchObject({ text: 'first', cursor: 0 })
+	expect(appView.view().prompt).toMatchObject({ text: 'first', cursor: 0 })
 	down()
-	expect(app.view().prompt.text).toBe('second')
+	expect(appView.view().prompt.text).toBe('second')
 	expect(drafts.text('s1')).toBe('mine')
 	down()
-	expect(app.view().prompt).toMatchObject({ text: 'mine', cursor: 4 })
+	expect(appView.view().prompt).toMatchObject({ text: 'mine', cursor: 4 })
 	expect(drafted).toEqual([])
 })
 
@@ -722,13 +740,13 @@ test('an edited entry becomes the draft; sending an entry brings the own text ba
 	expect(drafts.text('s1')).toBe('first!')
 	// Browsing is over: Down stays in the text.
 	down()
-	expect(app.view().prompt.text).toBe('first!')
+	expect(appView.view().prompt.text).toBe('first!')
 	app.onKeys([key('backspace'), key('backspace'), key('backspace'), key('backspace'), key('backspace'), key('backspace')])
 	type('mine')
 	up()
 	enter()
 	expect(sent.at(-1)).toEqual({ type: 'submit', sessionId: 's1', text: 'first' })
-	expect(app.view().prompt.text).toBe('mine')
+	expect(appView.view().prompt.text).toBe('mine')
 	expect(drafts.text('s1')).toBe('mine')
 })
 
@@ -736,18 +754,18 @@ test('a draft from elsewhere does not replace a recalled entry but is what Down 
 	sentBefore('first')
 	up()
 	app.onEvent({ type: 'draft', sessionId: 's1', draft: { text: 'web text', rev: 3 } })
-	expect(app.view().prompt.text).toBe('first')
+	expect(appView.view().prompt.text).toBe('first')
 	down()
-	expect(app.view().prompt.text).toBe('web text')
+	expect(appView.view().prompt.text).toBe('web text')
 })
 
 test('the last prompt being edited is skipped by the first Up', () => {
 	working('one')
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'two', provider: 'anthropic' })
 	up()
-	expect(app.view().prompt.text).toBe('two')
+	expect(appView.view().prompt.text).toBe('two')
 	up()
-	expect(app.view().prompt.text).toBe('one')
+	expect(appView.view().prompt.text).toBe('one')
 })
 
 test('Up inside a multi-row prompt moves a row before recalling', () => {
@@ -756,9 +774,9 @@ test('Up inside a multi-row prompt moves a row before recalling', () => {
 	app.onKeys([{ ...key('enter'), shift: true }])
 	type('b')
 	up()
-	expect(app.view().prompt).toMatchObject({ text: 'a\nb', cursor: 1 })
+	expect(appView.view().prompt).toMatchObject({ text: 'a\nb', cursor: 1 })
 	up()
-	expect(app.view().prompt.text).toBe('first')
+	expect(appView.view().prompt.text).toBe('first')
 })
 
 test('browsing belongs to the tab: switching away and back keeps the recalled entry', () => {
@@ -773,9 +791,9 @@ test('browsing belongs to the tab: switching away and back keeps the recalled en
 	let again = snapshot('a') as Event & { type: 'snapshot' }
 	again.snapshot.history = [{ type: 'user', blocks: [{ type: 'text', text: 'first' }], ts: '' }]
 	app.onEvent(again)
-	expect(app.view().prompt.text).toBe('first')
+	expect(appView.view().prompt.text).toBe('first')
 	down()
-	expect(app.view().prompt.text).toBe('mine')
+	expect(appView.view().prompt.text).toBe('mine')
 })
 
 test('Ctrl-L repaints everything', () => {
@@ -807,7 +825,7 @@ test('output in a tab not shown paints nothing', () => {
 
 test('the status row sits below the prompt box and its numbers follow each turn end', () => {
 	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/w', model: 'anthropic/claude-opus-5-5', createdAt: '', name: 'Fix it' }, history: [], state: { type: 'idle' }, stats: { window: 200_000, sent: 0, received: 0 } } })
-	let rows = () => frame.build(app.view(), 100).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim())
+	let rows = () => frame.build(appView.view(), 100).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim())
 	let status = () => rows().at(-2)!
 	expect(rows().at(-3)).toMatch(/^─+$/)
 	expect(status()).toStartWith('s1: Fix it · /w · Opus 5.5 · 0/200k (0%)')

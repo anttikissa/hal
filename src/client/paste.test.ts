@@ -5,6 +5,7 @@ import { drafts } from '../common/drafts.ts'
 import type { Event, Snapshot } from '../common/protocol.ts'
 import { settings } from '../common/settings.ts'
 import { app } from './app.ts'
+import { appView } from './app-view.ts'
 import { clipboard } from './clipboard.ts'
 import type { KeyEvent } from './keys.ts'
 import { render } from './render.ts'
@@ -45,7 +46,7 @@ const snapshot = (id = 's1'): Event => {
 }
 const key = (key: string, text?: string, mods: Partial<KeyEvent> = {}): KeyEvent => ({ key, text, shift: false, alt: false, ctrl: false, cmd: false, ...mods })
 const type = (s: string) => app.onKeys([...s].map((c) => key(c, c)))
-const text = () => app.view().prompt.text
+const text = () => appView.view().prompt.text
 const attaches = () => sent.filter((c) => c.type === 'attach')
 const submits = () => sent.filter((c) => c.type === 'submit').map((c) => c.text)
 const tick = () => new Promise((r) => setTimeout(r, 0))

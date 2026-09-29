@@ -35,7 +35,7 @@ import type { Focus } from './tabs.ts'
 import { tabBar } from './tab-bar.ts'
 import type { StatusInfo } from './status-row.ts'
 import { tabSwitch, type TabView } from './tab-switch.ts'
-import { versions } from './versions.ts'
+import { appView } from './app-view.ts'
 import { titles } from '../common/titles.ts'
 
 // `form`: the session's open question as filled in here; while there is
@@ -69,84 +69,17 @@ function createState(): AppState {
 	return { tabs: [], focus: {}, hidden: new Map(), start: { cwd: '/' }, prompt: prompt.empty(), older: new Map(), background: new Set(), painted: false }
 }
 
-function view(): View {
-	let st = app.state
-	let v: View = { prompt: st.prompt }
-	if (st.transcript) v.transcript = st.transcript
-	let pending = st.transcript ? drafts.pending(st.transcript.meta.id).map((s) => s.text) : []
-	if (pending.length) v.pending = pending
-	if (st.form) v.form = st.form
-	if (st.modal) v.modal = st.modal
-	if (st.choices) v.choices = st.choices
-	// An example request for an empty prompt, another each turn.
-	let t = st.transcript
-	if (t && !st.prompt.text) v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
-	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
-	if (v.tabs && tabBar.blinks(st.tabs)) v.tabs.lit = pulse.slow(pulse.beat())
-	let stopped = t && why(t), notice = st.notice ?? versions.notice()
-	if (stopped) v.why = stopped
-	if (notice) v.notice = notice
-	if (st.editing) v.editing = amend.hint(st.editing)
-	if (versions.state.newCode) v.newCode = true
-	let activity = t && app.activity(t)
-	if (activity) v.activity = activity
-	let hal = halCursor.of(st.transcript, pulse.beat())
-	if (hal) v.hal = hal
-	if (t) v.status = app.status(t)
-	return v
-}
-
-// The status row's facts (client/status-row.ts): the session's, and
-// this process's role once connected.
-function status(t: Transcript): StatusInfo {
-	let { id, name, cwd, model } = t.meta
-	let s: StatusInfo = { id, cwd, model }
-	if (name) s.name = name
-	if (app.focusedTab()?.hal) s.hal = true
-	if (process.env.HOME) s.home = process.env.HOME
-	if (t.stats) s.stats = t.stats
-	let link = connection.state.link
-	if (link.type === 'connected') s.role = link.role === 'host' ? 'host' : 'peer'
-	return s
-}
-
-// The activity in the prompt's top rule: a word or two, never a message
-// clipped to the row; the whole sentence is the notice (why).
-function activity(t: Transcript): string | undefined {
-	let s = t.state
-	if (s.type === 'blocked') return s.reason === 'question' ? 'waiting for answer' : `blocked: ${s.reason.split(':')[0]}`
-	if (s.type === 'paused') return 'paused'
-	if (s.type === 'error') return 'error'
-	if (s.type === 'retrying') return (states.describe(s, Date.now()) ?? '').replace(/ \(.*$/s, '')
-	return states.describe(s, Date.now(), t.items)
-}
-
-// Why a stopped session waits and what the user can do, in full.
-function why(t: Transcript): string | undefined {
-	let s = t.state
-	if (s.type === 'running' || s.type === 'idle' || (s.type === 'blocked' && s.reason === 'question')) return undefined
-	// [paused] and the help row's enter: continue say the rest.
-	if (s.type === 'paused') return s.reason || undefined
-	return states.describe(s, Date.now(), t.items)
-}
-
-// What blinks in `view`, as a key that changes with every blink phase.
-function blinks(view: View): string {
-	let lit = view.tabs?.lit
-	return view.hal || lit !== undefined ? JSON.stringify([view.hal, lit]) : ''
-}
-
 // Paints the view; the pulse beats while something in it blinks.
 function show(): void {
-	let v = app.view()
-	pulse.keep(app.blinks(v) ? app.beat : null)
+	let v = appView.view()
+	pulse.keep(appView.blinks(v) ? app.beat : null)
 	render.show(v)
 }
 
 // A beat of the pulse: a repaint, if a blink changed.
 function beat(): void {
-	let v = app.view()
-	if (app.blinks(v) !== app.blinks(render.state.view)) render.show(v)
+	let v = appView.view()
+	if (appView.blinks(v) !== appView.blinks(render.state.view)) render.show(v)
 }
 
 function onEvent(event: Event): void {
@@ -371,10 +304,6 @@ export const app = {
 	send: (command: unknown): void => connection.send(command),
 	/** The terminal's width, which Up/Down move by. */
 	cols: (): number => render.state.out?.size().cols ?? 80,
-	view,
-	activity,
-	status,
-	blinks,
 	show,
 	beat,
 	onEvent,

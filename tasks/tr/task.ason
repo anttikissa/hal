@@ -6,7 +6,7 @@ Login: the terminal logs in like a browser (task 8a): it asks for a one-time cod
 
 Connection: one WebSocket at /ws carrying the token as the hal cookie and an Origin naming the remote, through the common connection core (src/common/connection.ts) with the same transport as the browser (ASON per message, reconnect with backoff, pending commands resent), so everything the local terminal does works remotely: tabs, prompts, drafts, uploads, questions, web links. Losing the host shows the usual reconnecting notice and retries forever. A socket closed with 4001 (/auth revoke), or a refused socket whose token GET /login then rejects, forgets the token and quits with a message saying to run \`./run -r\` again.
 
-The client starts on the tab it left (a Ctrl-R restart keeps the -r arguments through ./run) or else the remote's first tab: this machine's cwd means nothing there. Local drafts of remote sessions are kept apart from this home's, under state/remote/<host>/drafts. Ctrl-C quits the client without pausing anything on the remote; Ctrl-Z and Ctrl-R work as always. Old Hal's version for reference: artifacts main.ts (remoteHost branch), remote-auth.ts, web-connection.ts. Tests: a code logs in and the token is remembered, a wrong code is refused, a revoked token is detected, and a client over the WebSocket gets the remote's tabs and its command is carried out.`,
+The client starts on the tab it left (a Ctrl-R restart keeps the -r arguments through ./run) or else the remote's first tab: this machine's cwd means nothing there. Local drafts of remote sessions are kept apart from this home's, under state/remote/<host>/drafts. The status row names the remote host (example.com) where a local client shows host or peer. Ctrl-C quits the client without pausing anything on the remote; Ctrl-Z and Ctrl-R work as always. Old Hal's version for reference: artifacts main.ts (remoteHost branch), remote-auth.ts, web-connection.ts. Tests: a code logs in and the token is remembered, a wrong code is refused, a revoked token is detected, and a client over the WebSocket gets the remote's tabs and its command is carried out.`,
 	status: 'done',
 	needs: [
 		'8a',
@@ -15,6 +15,6 @@ The client starts on the tab it left (a Ctrl-R restart keeps the -r arguments th
 	notes: [
 		"The browser's WebSocket transport moved from src/web/link.ts to src/common/ws-link.ts (object wsLink) so the terminal shares it; its reload() callback is the terminal's logout. Bun's WebSocket takes { headers } (Cookie and Origin), which host/web.ts checks exactly as for a page, so the host needed no change.",
 		"Login flow and transport live in src/client/remote.ts; main.ts keeps state/remote.ason through liveFiles (client code may not import host) and runs main.initTerminal(origin), skipping host init, version checks and the Ctrl-C pause (terminal.onQuit stays a no-op). The code is read with Bun's prompt() before raw mode.",
-		"The status row still says 'peer' for a remote client; naming the remote host there would be a small follow-up (client/app.ts is at its 400-line limit)."
+		"The view derivation (view, status, activity, why, blinks) moved out of client/app.ts into client/app-view.ts (appView), which also holds state.remote, the host name the status row shows; app.ts keeps state, events, keys and painting (show, beat)."
 	]
 }

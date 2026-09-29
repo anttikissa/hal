@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { app } from './client/app.ts'
+import { appView } from './client/app-view.ts'
 import { draftFile } from './client/draft-file.ts'
 import { link } from './client/link.ts'
 import { remote as remoteClient, type Saved } from './client/remote.ts'
@@ -107,6 +108,7 @@ function initTerminal(remote?: string): void {
 	draftFile.dir = () => join(dir, 'drafts')
 	drafts.store = draftFile
 	app.state.start = { ...(remote ? {} : { cwd: process.cwd() }), ...main.lastTab() }
+	if (remote) appView.state.remote = new URL(remote).host
 	app.focused = (tab) => main.keepTab(tab)
 	app.init()
 }

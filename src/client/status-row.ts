@@ -1,7 +1,7 @@
 // The status row between the prompt box and the help row (task 1g),
 // after the old Hal's renderStatusLine. Left, joined with ' · ': the
 // session id (and its name), the cwd, the model and the context used;
-// right-aligned: this process's role, the session's tokens this run and
+// right-aligned: this process's role (or the remote host), the session's tokens this run and
 // the subscription account's usage windows. When the row is too narrow
 // the right parts go from the end, then the left is clipped. Pure.
 
@@ -13,7 +13,7 @@ import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 
 // `hal`: the cwd is the Hal repo; `home` is shortened to ~ in the cwd.
-export type StatusInfo = { id: string; name?: string; cwd: string; hal?: boolean; model: string; role?: 'host' | 'peer'; stats?: Stats; home?: string }
+export type StatusInfo = { id: string; name?: string; cwd: string; hal?: boolean; model: string; role?: string; stats?: Stats; home?: string }
 
 type Part = { text: string; fg?: Oklch }
 

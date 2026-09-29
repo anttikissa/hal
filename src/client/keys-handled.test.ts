@@ -4,6 +4,7 @@ import { keyHelp, type Binding } from '../common/key-help.ts'
 import type { Event, Snapshot, Tab } from '../common/protocol.ts'
 import type { SessionState } from '../common/states.ts'
 import { app } from './app.ts'
+import { appView } from './app-view.ts'
 import { clipboard } from './clipboard.ts'
 import { emergency } from './emergency.ts'
 import type { KeyEvent } from './keys.ts'
@@ -131,7 +132,7 @@ test('a clipboard that fails shows a notice and keys go on working', async () =>
 	app.onKeys([ctrl('v'), { key: 'y', text: 'y', shift: false, alt: false, ctrl: false, cmd: false }])
 	await Bun.sleep(0)
 	expect(app.state.prompt.text).toBe('xy')
-	expect(app.view().notice).toBe('no clipboard tool')
+	expect(appView.view().notice).toBe('no clipboard tool')
 })
 
 test('a paste that arrives after the tab changed is dropped', async () => {

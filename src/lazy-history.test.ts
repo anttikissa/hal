@@ -8,6 +8,7 @@ import { drafts } from './common/drafts.ts'
 import type { Event } from './common/protocol.ts'
 import { transcript } from './common/transcript.ts'
 import { app } from './client/app.ts'
+import { appView } from './client/app-view.ts'
 import { frame } from './client/frame.ts'
 import { render } from './client/render.ts'
 import { history } from './host/history.ts'
@@ -78,7 +79,7 @@ async function terminalShowing(id: string): Promise<{ lines: string[]; events: E
 	// Pages are asked for a macrotask apart; wait until they stop.
 	for (let seen = -1; seen !== events.length; await Bun.sleep(1)) seen = events.length
 	conn.close()
-	return { lines: frame.build(app.view(), 80, 24).lines, events }
+	return { lines: frame.build(appView.view(), 80, 24).lines, events }
 }
 
 test("the terminal's frame after the background load equals the frame from a full load", async () => {
