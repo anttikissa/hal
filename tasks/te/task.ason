@@ -1,0 +1,16 @@
+{
+	title: 'Scale test: real-sized homes in every client',
+	spec: "hal2 stays responsive with a home the size of the user's: the profile in task y9 (about 60 open tabs, histories up to 100 MB, about 2,000 closed sessions). Four setups are measured, each cold (no marks.ason, first open since import) and warm: ./run as host; ./run joining it as a peer; ./run -r over the WebSocket to a host on this machine; the web client at the host's local URL in a headless browser (the Chrome web.test.ts uses). Budgets, on the machine assumed in startup.test.ts (task kn): the first frame within 150 ms; a key typed at any moment, including while tabs load in the background, shows within 50 ms (the longest event-loop stall on the host and on the client stays under 50 ms); every open tab's snapshot has arrived within 10 s cold and 3 s warm; the host's resident memory stays under 1 GB. Three ways to run it: ./test runs a small generated home (about 10 tabs, one 20 MB history, cold) and checks only counts that load cannot disturb: bytes read before the first frame, bytes read per background open, and that no step reads a whole history while a client waits on it. './test perf' runs every setup and budget on the full generated home (perf-home from y9's profile). './test perf --real <old-state>' imports the given old Hal state (task 3q) into a temporary home, runs the same, then deletes that home; it runs only when asked, never in ./test, and skips itself (saying why) when the path is missing. Every run prints its measurements (times, bytes, memory) and no session content; nothing it reads from real data is written into the repo. A budget the product misses fails the run; a fix belongs in its own task.",
+	status: 'planned',
+	needs: [
+		'y9',
+		'kn',
+		'zk',
+		'tr',
+		'4s'
+	],
+	notes: [
+		"Expected first finding: a session with no marks.ason builds it by reading the whole history on the host's thread (host/pages.ts), and every client opens every tab in the background after the first frame, so a cold host would stall on each big tab. Measure before fixing.",
+		'The existing startup.test.ts timing budget fails under machine load around 6 or more; take the best of several runs, as kn and zk do.'
+	]
+}

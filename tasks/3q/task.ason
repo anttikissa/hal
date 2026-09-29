@@ -1,0 +1,14 @@
+{
+	title: 'Import old Hal sessions',
+	spec: "scripts/import-old <old-state> <new-home> converts the old Hal's sessions (<old-state>/sessions/<id>/) into a hal2 home's sessions/, run by hand; nothing on the host path imports or calls it. Each old session becomes one hal2 session with the same id, whose history holds exactly what the old Hal would show and send for it: the records of its current log (session.ason currentLog, default history.asonl; earlier logs were superseded by /rebase and a reset and are not imported), preceded, when that log starts with forked_from { parent, ts }, by the parent's full imported history filtered to records older than ts, recursively (the old loadAllHistory). Record contents in blobs/<blobId>.ason (thinking, tool calls and results, errors; for fork-prefix records, the parent's blobs) are written inline. Old records map to hal2 records (common/replay.ts): user parts to user blocks (images to hal2 image blobs, the bytes copied), assistant text, thinking and tool_call to one assistant record per block, tool_result to user tool_result blocks, turn_end to turn_end, question and answer to their hal2 forms, reset and compact to theirs, cwd and model to change, info, log, warning and error to output (error: true for errors); usage, input_history, pending_tools, forked_to, rebased_from and rebased_to carry nothing the transcript or the model needs and are dropped. Every imported history replays (common/replay.ts) to provider messages where every tool call has its result, and records are numbered n as history.append would. session.ason gets id, cwd (workingDir), model, name and createdAt. The sessions listed in <old-state>/ipc/state.ason become the new home's open tabs (state/tabs.ason), in that order; all others are closed. The script refuses a <new-home> that already has sessions, never writes under <old-state>, and prints a count of sessions, records and bytes, never session content. Tests build small old-format fixtures by hand (no real session data in the repo): a fork of a fork, a rebased session, a blob-backed tool result, an image, an open question.",
+	status: 'planned',
+	needs: [
+		'gj',
+		'bq',
+		'0a'
+	],
+	notes: [
+		"Old format facts, from ~/.hal/src: loadAllHistoryWithOrigin (server/sessions.ts) follows forked_from to the parent's current log and keeps parent records with ts < the fork ts; rewriteHistoryForRebase writes a new historyN.asonl starting with rebased_from, appends rebased_to to the old one and moves currentLog; blobs resolve through the fork parent for inherited records (server/session/blob.ts); record types are in common/history.ts. Read these there; do not copy them into this task.",
+		"The user's old state is ~/.hal/state (about 2,000 sessions, 2.2 GB, the largest 96 MB with blobs). Never commit or paste its contents; use it only through the opt-in run in task te."
+	]
+}
