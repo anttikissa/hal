@@ -213,8 +213,8 @@ support): text at least 4.5:1, including placeholders and disabled
 items (terminal text is never "large text"); meaningful non-text marks
 (Hal cursor, tab glyphs, rules, control borders) at least 3:1. The one
 exception, the user's choice: the example request in an empty prompt
-(oklch.faint, about 2.2:1), which says nothing needed and must never
-look like typed text.
+(oklch.faint; about 3.1:1 on the HAL palette), which says nothing
+needed and stays visibly distinct from typed text.
 Hierarchy comes from hue, lightness steps above the minimum, bold or
 position, never from dropping below it. Don't overdo testing this;
 just be careful when introducing new colours.

@@ -104,12 +104,12 @@ function search(fg: Oklch, bg: Oklch, target = 4.6, step = 0.12): Oklch {
 	return [hi, C, h]
 }
 
-// The example request in an empty prompt: greyer and far darker than
-// `fg`, about 2.2:1 on `bg`, so it never reads as typed text. The one
-// exception to the readable-text rule (tasks/README.md): it says
-// nothing the user needs and is gone at the first key.
+// Example text in an empty prompt. Follow the box's lightness and
+// the prompt's hue; keep the stronger phosphor/green themes colourful
+// without letting the hint read like typed text.
 function faint(fg: Oklch, bg: Oklch): Oklch {
-	return search([fg[0], fg[1] / 2, fg[2]], bg, 2.2, 1)
+	let chroma = fg[1] >= 0.2 ? 0.12 : fg[1] >= 0.16 ? 0.09 : 0.08
+	return [Math.min(1, Math.round((bg[0] + 0.3) * 10) / 10), Math.min(fg[1], chroma), fg[2]]
 }
 
 export const oklch = { state: { rgb: new Map<string, [number, number, number]>(), quiet: new Map<string, Oklch>() }, toRgb, convert, toHex, toCss, contrast, quiet, faint }
