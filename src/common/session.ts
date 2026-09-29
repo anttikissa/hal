@@ -5,6 +5,8 @@ export interface SessionMeta {
 	// Working directory and provider/model id for the next turn.
 	cwd: string
 	model: string
+	// Explicit request override; omitted uses provider policy.
+	effort?: string
 	// ISO timestamp.
 	createdAt: string
 	name?: string

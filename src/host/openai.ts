@@ -13,6 +13,7 @@ import type { AssistantBlock, StopReason, StreamEvent, Usage } from '../common/b
 import { auth, jwtClaims } from './auth.ts'
 import { modelsDev } from './models-dev.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
+import { effort } from './effort.ts'
 
 const SCOPE = 'api.responses.write'
 // A ChatGPT subscription's input limit: 400k window = 272k input + 128k
@@ -72,7 +73,7 @@ function assistantItem(b: AssistantBlock): unknown {
 }
 
 function reasons(model: string): boolean {
-	return /^(gpt-5|o\d|codex)/.test(model)
+	return /^(gpt-[56]|o\d|codex)/.test(model)
 }
 
 function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
@@ -84,10 +85,11 @@ function body(req: ProviderRequest, codex: boolean): Record<string, unknown> {
 		b.parallel_tool_calls = true
 	}
 	if (reasons(req.model)) {
-		let effort = openai.effort(req.model)
+		let effort = req.effort ?? openai.effort(req.model)
 		b.reasoning = { summary: 'auto', ...(effort && { effort }) }
 		b.include = ['reasoning.encrypted_content']
 	}
+	Object.assign(b, effort.wire('openai', req.model, req.effort))
 	if (req.sessionId) b.prompt_cache_key = req.sessionId
 	if (codex) b.text = { verbosity: 'high' }
 	// The Codex backend rejects max_output_tokens.

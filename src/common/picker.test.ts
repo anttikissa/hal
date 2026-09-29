@@ -1,3 +1,4 @@
+import type { EffortCapability } from './effort.ts'
 import { expect, test } from 'bun:test'
 import { modals } from './modals.ts'
 import { picker } from './picker.ts'
@@ -82,9 +83,13 @@ test('typing a model selects the best match, shown in its open categories', () =
 	expect(selected(st)).toMatch(/hal\/intro$/)
 })
 
-test('right opens a category, left closes it or the one the selection is in', () => {
+test('right opens a category, left closes it or moves from a closed category to its parent', () => {
 	let st = picker.open('anthropic/claude-opus-5', tree)
 	expect(selected(st)).toMatch(/anthropic\/claude-opus-5$/)
+	st = press(st, key('left'))
+	expect(selected(st)).toMatch(/anthropic\/claude-opus-5$/)
+	st = press(st, key('up'))
+	st = press(st, key('up'))
 	st = press(st, key('left'))
 	expect(selected(st)).toMatch(/^▶ opus/)
 	st = press(st, key('left'))
@@ -171,4 +176,36 @@ test('searching opens a family but keeps its older closed, unless only older mat
 	let opened = picker.step(at, key('right'), all).state
 	expect(opened.items.join('\n')).toMatch(/gpt-5\.5$/m)
 	expect(picker.step(opened, key('left'), all).state.items.join('\n')).not.toMatch(/gpt-5\.5$/m)
+})
+
+
+test('effort drafts clamp on leaves, preserve tags and filtering, keep row identity, and commit only on Enter', () => {
+	let ids = ['ollama/gpt-oss:20b', 'openai/gpt-6-sol', 'hal/intro']
+	let capabilities: Record<string, EffortCapability> = {
+		[ids[0]!]: { levels: ['low', 'medium', 'high'], default: 'medium' },
+		[ids[1]!]: { levels: ['none', 'low', 'high', 'max'] },
+	}
+	let st = picker.open(ids[0]!, ids, {}, capabilities, 'high')
+	let row = st.tree!.rows[st.selected]
+	st = picker.step(st, key('right'), ids).state
+	expect(picker.label(st, ids[0]!)).toBe('high')
+	st = picker.step(st, key('left'), ids).state
+	expect(picker.label(st, ids[0]!)).toBe('medium')
+	expect(st.tree!.rows[st.selected]).toBe(row)
+	st = picker.step(st, key('x', 'gpt-oss'), ids).state
+	st = picker.refilter(st, ids, {}, ids[0])
+	st = picker.step(st, key('left'), ids).state
+	st = picker.step(st, key('left'), ids).state
+	expect(picker.label(st, ids[0]!)).toBe('low')
+	let cancel = picker.step(st, key('escape'), ids)
+	expect(cancel.action).toEqual({ type: 'cancel' })
+	let submit = picker.step(st, key('enter'), ids)
+	expect(picker.command('s', submit.state, submit.action as any)?.text).toBe('/model ollama/gpt-oss:20b:low')
+	let unknown = picker.open(ids[1]!, ids, {}, capabilities)
+	expect(picker.label(unknown, ids[1]!)).toBe('default/unknown')
+	expect(picker.label(picker.step(unknown, key('right'), ids).state, ids[1]!)).toBe('none')
+	expect(picker.label(picker.step(unknown, key('left'), ids).state, ids[1]!)).toBe('max')
+	let unsupported = picker.open('hal/intro', ids, {}, capabilities)
+	expect(picker.step(unsupported, key('left'), ids).state).toBe(unsupported)
+	expect(picker.label(unsupported, 'hal/intro')).toBe('no effort control')
 })

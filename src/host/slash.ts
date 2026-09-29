@@ -16,6 +16,7 @@ import { sessions } from './sessions.ts'
 import { host } from './host.ts'
 import { stats } from './stats.ts'
 import { turns } from './turns.ts'
+import { effort } from './effort.ts'
 
 // Records a slash command as typed (by whom: `from`, else the human) and
 // runs it. `command`: the client's id for the submit. Returns why it is
@@ -42,6 +43,7 @@ function context(id: string): Context {
 		sessionId: id,
 		cwd: meta.cwd,
 		model: meta.model,
+		effort: meta.effort,
 		setCwd: (cwd) => slash.change(id, { cwd }),
 		setModel: (model) => slash.change(id, { model }),
 		setName: (name) => slash.name(id, name),
@@ -56,9 +58,15 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 	let meta = sessions.open(id)
 	let changed: typeof patch = {}
 	if (patch.cwd !== undefined && patch.cwd !== meta.cwd) changed.cwd = patch.cwd
-	if (patch.model !== undefined && patch.model !== meta.model) changed.model = patch.model
+	let selection = patch.model === undefined ? undefined : modelList.selection(patch.model)
+	if (selection && (selection.id !== meta.model || selection.effort !== meta.effort)) changed.model = modelList.qualified(selection.id, selection.effort)
 	if (!Object.keys(changed).length) return
-	Object.assign(meta, changed)
+	if (changed.cwd !== undefined) meta.cwd = changed.cwd
+	if (changed.model !== undefined && selection) {
+		meta.model = selection.id
+		if (selection.effort === undefined) delete meta.effort
+		else meta.effort = selection.effort
+	}
 	liveFiles.save(meta)
 	history.append(id, { type: 'change', ...changed })
 	host.broadcast(id, changed.model === undefined ? { type: 'meta', sessionId: id, meta: { ...meta } } : { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
@@ -117,7 +125,8 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 async function models(id: string): Promise<Event & { type: 'models' }> {
 	let current = sessions.open(id).model
 	let items = await modelList.list(current)
-	return { type: 'models', sessionId: id, current, items, names: modelList.names(items) }
+	let capabilities = Object.fromEntries(items.flatMap((model) => { let cap = effort.describe(model); return cap ? [[model, cap]] : [] }))
+	return { type: 'models', sessionId: id, current, effort: sessions.open(id).effort, capabilities, items, names: modelList.names(items) }
 }
 
 // Closes question `question` unanswered: Escape, or a newer one

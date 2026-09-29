@@ -15,6 +15,8 @@ import { contextPage } from './context-page.ts'
 import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 import { usage } from './usage.ts'
+import { effort as labels } from '../common/effort.ts'
+import { effort } from './effort.ts'
 
 // The context of the last turn end among `records` that has one.
 function lastContext(records: HistoryRecord[]): number | undefined {
@@ -62,6 +64,7 @@ function of(id: string, records?: HistoryRecord[]): Stats {
 	let out: Stats = { ...tokens }
 	let files = Object.keys(pages.marks(id).changedPaths ?? {}).length
 	if (files) out.files = files
+	if (effort.describe(model) || sessions.open(id).effort || models.effort(model)) out.effort = labels.label(effort.describe(model), sessions.open(id).effort ?? models.effort(model))
 	let context = stats.state.context.get(id) ?? stats.lastContext(records ?? pages.essentials(id))
 	if (context) out.context = context
 	let window = models.contextWindow(model)

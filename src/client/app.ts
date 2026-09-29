@@ -287,7 +287,7 @@ function pick(event: Event & { type: 'models' }): void {
 	if (app.state.transcript?.meta.id !== event.sessionId) return
 	let id = event.sessionId
 	app.open(
-		picker.open(event.current, event.items, event.names),
+		picker.open(event.current, event.items, event.names, event.capabilities, event.effort),
 		(action, modal) => picker.command(id, modal, action),
 		(modal, key) => picker.step(modal, key, event.items, event.names),
 	)

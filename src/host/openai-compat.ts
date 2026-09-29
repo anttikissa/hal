@@ -4,6 +4,9 @@
 import type { StopReason, StreamEvent, Usage } from '../common/blocks.ts'
 import { apiKeys } from './api-keys.ts'
 import { provider, type Provider, type ProviderRequest, type SseMessage } from './provider.ts'
+import { effort, type Capability } from './effort.ts'
+import { effort as vocabulary, type EffortLevel } from '../common/effort.ts'
+import { effortCatalog } from './effort-catalog.ts'
 
 // keyEnv names the environment variable holding the API key, used when
 // the credentials file stores none for the endpoint (api-keys.ts);
@@ -20,6 +23,7 @@ export type Endpoint = {
 	images?: false
 	models?: false
 	headers?: (req: ProviderRequest) => Record<string, string>
+	capability?: (model: string) => Capability | undefined
 }
 
 // `images`: whether the endpoint takes image input.
@@ -160,20 +164,43 @@ function endpoint(name: string): { base: string; headers: Record<string, string>
 	return { base: ep.baseUrl.replace(/\/+$/, ''), headers }
 }
 
+// Load verified descriptors lazily; never fetch to interpret a saved selection.
+function cachedCapability(name: string, model: string): Capability | undefined {
+	if (name === 'openrouter' && openaiCompat.state.catalog !== effortCatalog.file()) {
+		openaiCompat.state.capabilities.clear()
+		for (let [id, cap] of Object.entries(effortCatalog.read())) openaiCompat.state.capabilities.set(id, { ...cap, wire: (level) => ({ reasoning: { effort: level } }) })
+		openaiCompat.state.catalog = effortCatalog.file()
+	}
+	return openaiCompat.state.capabilities.get(`${name}/${model}`)
+}
 function create(name: string): Provider {
 	let p: Provider = {
 		request(req) {
 			let { base, headers } = openaiCompat.endpoint(name)
 			let ep = openaiCompat.endpoints()[name]
-			return { url: `${base}/chat/completions`, headers: { ...headers, ...ep?.headers?.(req) }, body: openaiCompat.body(req, ep?.images !== false) }
+			return { url: `${base}/chat/completions`, headers: { ...headers, ...ep?.headers?.(req) }, body: { ...openaiCompat.body(req, ep?.images !== false), ...effort.wire(name, req.model, req.effort, req.maxTokens) } }
 		},
 		parse: openaiCompat.parse,
+		capability: (model) => openaiCompat.endpoints()[name]?.capability?.(model) ?? openaiCompat.cachedCapability(name, model),
 		// GET /models, which OpenRouter, Ollama and most servers offer.
 		async models(signal) {
 			let { base, headers } = openaiCompat.endpoint(name)
 			let res = await provider.fetch(`${base}/models`, { headers, signal })
 			if (!res.ok) throw new Error(`HTTP ${res.status} listing models`)
-			let body = (await res.json()) as { data?: { id?: unknown }[] }
+			let body = (await res.json()) as { data?: { id?: unknown; reasoning?: { supported_efforts?: unknown; default_effort?: string; mandatory?: boolean } }[] }
+			if (name === 'openrouter') {
+				openaiCompat.cachedCapability(name, '')
+				openaiCompat.state.capabilities.clear()
+			}
+			for (let m of body.data ?? []) {
+				if (name !== 'openrouter' || typeof m.id !== 'string') continue
+				let r = m.reasoning
+				let supported = r?.supported_efforts
+				if (supported === undefined) { openaiCompat.state.capabilities.delete(`${name}/${m.id}`); continue }
+				let levels = vocabulary.levels.filter((l) => (supported === null || (Array.isArray(supported) && supported.includes(l))) && !(r?.mandatory && l === 'none'))
+				openaiCompat.state.capabilities.set(`${name}/${m.id}`, { levels, ...(levels.includes(r?.default_effort as EffortLevel) && { default: r!.default_effort as EffortLevel }), wire: (level) => ({ reasoning: { effort: level } }) })
+			}
+			if (name === 'openrouter') effortCatalog.save(Object.fromEntries([...openaiCompat.state.capabilities].map(([id, cap]) => [id, { levels: cap.levels, ...(cap.default && { default: cap.default }) }])))
 			return (body.data ?? []).flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))
 		},
 	}
@@ -187,6 +214,8 @@ function init(): void {
 }
 
 export const openaiCompat = {
+	state: { capabilities: new Map<string, Capability>(), catalog: '' },
+	cachedCapability,
 	// Provider name -> endpoint. Replace from local.ts to add servers or
 	// point one elsewhere.
 	endpoints(): Record<string, Endpoint> {

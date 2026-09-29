@@ -328,13 +328,18 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		return { ...next, live: { start: next.items.length, turn: transcript.fresh(t.live.turn) } }
 	}
 	if (event.type === 'stream') {
-		let turn = transcript.copyTurn(t.live.turn)
+		let live = t.live
+		if (event.model !== undefined && (event.model !== live.turn.model || event.effort !== live.turn.effort)) {
+			settled = transcript.settle(t.items, live)
+			live = { start: settled.length, turn: transcript.fresh({ provider: event.model.split('/')[0]!, model: event.model, effort: event.effort }) }
+		}
+		let turn = transcript.copyTurn(live.turn)
 		blocks.apply(turn, event.event)
 		while (turn.ns && event.n !== undefined && turn.ns.length < turn.blocks.length) turn.ns.push(event.n)
 		if (!turn.ns && event.n !== undefined && turn.blocks.length) turn.ns = turn.blocks.map(() => event.n!)
 		// A block's start time comes with its first event.
 		while (event.ts !== undefined && (turn.ts ??= []).length < turn.blocks.length) turn.ts.push(event.ts)
-		return { ...t, items: [...settled, ...transcript.turnItems(turn, settled.length)], live: { start: t.live.start, turn } }
+		return { ...t, items: [...settled, ...transcript.turnItems(turn, settled.length)], live: { start: live.start, turn } }
 	}
 	if (event.type === 'tool-results') {
 		// The round's blocks are in history now; the next round starts empty.

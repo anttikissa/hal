@@ -13,18 +13,18 @@ const info: StatusInfo = {
 }
 
 const text = (i: StatusInfo, cols: number) => statusRow.fit(i, cols).map((p) => p.text).join('')
-const LEFT = '156-way: Orchestrate v3 · ~/hal2 · Opus 5.5 · 87k/1000k (9%)'
+const LEFT = '156-way: Orchestrate v3 · ~/hal2 · Opus 5.5 (default/unknown) · 87k/1000k (9%)'
 
 test('a wide row shows every part, the right side flush right', () => {
-	let row = text(info, 120)
+	let row = text(info, 140)
 	expect(row.startsWith(LEFT)).toBe(true)
 	expect(row.endsWith('host · ↑252 ↓41k · Sub 1/2: 5h 18%, 7d 57%')).toBe(true)
-	expect(strings.visLen(row)).toBe(120)
+	expect(strings.visLen(row)).toBe(140)
 })
 
 test('narrowing drops the plan, then the tokens, then the role, then clips the left', () => {
 	let seen: string[] = []
-	for (let cols = 120; cols > 10; cols--) {
+	for (let cols = 140; cols > 10; cols--) {
 		let row = text(info, cols)
 		expect(strings.visLen(row)).toBeLessThanOrEqual(cols)
 		let kind = row.includes('Sub') ? 'all' : row.includes('↑') ? 'tokens' : row.endsWith('host') ? 'role' : LEFT.startsWith(row.replace(/…$/, '')) ? 'left' : row

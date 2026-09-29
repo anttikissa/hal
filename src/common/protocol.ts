@@ -19,6 +19,7 @@ import type { HistoryRecord, TurnStatus } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { FindBatch, FindFilter } from './find.ts'
 import type { SessionState } from './states.ts'
+import type { EffortCapability } from './effort.ts'
 
 export type { TurnStatus } from './replay.ts'
 
@@ -75,7 +76,7 @@ export type Snapshot = {
 // started. `plan`: the subscription account the session's next request
 // goes to: its place among the provider's subscription accounts
 // (1-based) and each usage window's percent used ("5h": 18).
-export type Stats = { context?: number; window?: number; sent: number; received: number; files?: number; plan?: Plan }
+export type Stats = { context?: number; window?: number; sent: number; received: number; files?: number; plan?: Plan; effort?: string }
 export type Plan = { account: number; accounts: number; windows: Record<string, number> }
 
 // Stream events forwarded live; terminal done/error become `turn-end`.
@@ -199,7 +200,7 @@ export type Event =
 	// `command`: as in turn-start, for the last text.
 	| { type: 'prompt'; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; queued?: true; replaces?: true; n?: number; command?: string; ts?: string }
 	// `ts`: when the block it streams into started (task hp).
-	| { type: 'stream'; sessionId: string; event: LiveStreamEvent; n?: number; ts?: string }
+	| { type: 'stream'; sessionId: string; event: LiveStreamEvent; n?: number; ts?: string; model?: string; effort?: string }
 	// New bytes only; a late joiner gets the same partial output in its snapshot.
 	| { type: 'tool-output'; sessionId: string; id: string; at: number; chunk: string }
 	// The host ran the round's tool calls and recorded these results; the
@@ -235,7 +236,7 @@ export type Event =
 	// offer. Sent to the client that asked (`models`), or to every
 	// follower when /model runs alone. `names`: display names models.dev
 	// gives some of them, which the search matches too.
-	| { type: 'models'; sessionId: string; current: string; items: string[]; names?: Record<string, string> }
+	| { type: 'models'; sessionId: string; current: string; effort?: string; capabilities?: Record<string, EffortCapability>; items: string[]; names?: Record<string, string> }
 	// Sent only to the client that attached: the command `command` (its
 	// id) stored blob `blob`, which a prompt names with `marker`.
 	| { type: 'attached'; sessionId: string; command: string; blob: string; marker: string }
@@ -328,7 +329,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	state: { sessionId: 's', state: 'o', 'state.type': 's' },
 	inbox: { sessionId: 's', inbox: 'a' },
 	prompt: { sessionId: 's', texts: 'S', senders: 'a?', images: 'a?', command: 's?', ts: 's?' },
-	stream: { sessionId: 's', event: 'o', 'event.type': 's', ts: 's?' },
+	stream: { sessionId: 's', event: 'o', 'event.type': 's', ts: 's?', model: 's?', effort: 's?' },
 	'tool-output': { sessionId: 's', id: 's', at: 'i', chunk: 's' },
 	'tool-results': { sessionId: 's', results: 'a' },
 	'turn-stats': { sessionId: 's', stats: 'o' },
@@ -340,7 +341,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	divider: { sessionId: 's', text: 's' },
 	meta: { sessionId: 's', meta: 'o', stats: 'o?' },
 	completions: { sessionId: 's', text: 's', items: 'S' },
-	models: { sessionId: 's', current: 's', items: 'S' },
+	models: { sessionId: 's', current: 's', items: 'S', effort: 's?', capabilities: 'o?' },
 	attached: { sessionId: 's', command: 's', blob: 's', marker: 's' },
 	warning: { text: 's' },
 	version: { version: 's' },

@@ -48,7 +48,7 @@ export const tool: Tool = {
 		let task = text(input, 'task') ?? ''
 		if (!task && kind !== 'interactive') throw new Error('task is required unless kind is interactive')
 		let model = text(input, 'model')
-		if (model !== undefined && !models.valid(model)) throw new Error(`unknown model ${model}`)
+		if (model !== undefined) { let selected = models.selection(model); if (!models.valid(selected.id)) throw new Error(`unknown model ${model}`); model = models.qualified(selected.id, selected.effort) }
 		let cwd = resolve(ctx.cwd, text(input, 'cwd') ?? '.')
 		if (!statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${cwd} is not a directory`)
 		let id = subagents.spawn(ctx.sessionId, { kind, task, fork: mode === 'fork', cwd, model, name: text(input, 'name'), limit })

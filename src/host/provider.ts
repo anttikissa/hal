@@ -7,12 +7,14 @@ import { blocks, type ErrorEvent, type Message, type StreamEvent } from '../comm
 import { clock } from './clock.ts'
 import { limits } from './limits.ts'
 import { usage } from './usage.ts'
+import type { Capability } from './effort.ts'
 
 export type ToolDef = { name: string; description: string; inputSchema: Record<string, unknown> }
 
 export type ProviderRequest = {
 	// Model name without the "provider/" prefix.
 	model: string
+	effort?: string
 	system?: string
 	messages: Message[]
 	tools?: ToolDef[]
@@ -55,6 +57,7 @@ export type Provider = {
 	// The reasoning effort a request for `model` sets, if it sets one:
 	// block headers show it (task hp).
 	effort?(model: string): string | undefined
+	capability?(model: string): Capability | undefined
 }
 
 class Cancelled extends Error {}

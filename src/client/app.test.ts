@@ -429,9 +429,9 @@ test('Ctrl-M asks the host for the models; the picker filters as you type and En
 	app.onEvent({ type: 'models', sessionId: 's1', current: 'anthropic/x', items })
 	let modal = appView.view().modal!
 	expect(modal.tree?.rows[modal.selected]?.id).toBe('anthropic/x')
-	// Left closes the current model's category: the tree keys reach the picker.
+	// An unsupported leaf's arrows do nothing, not navigate to a provider.
 	app.onKeys([key('left')])
-	expect(appView.view().modal!.items[appView.view().modal!.selected]).toMatch(/▶ other$/)
+	expect(appView.view().modal!.tree?.rows[appView.view().modal!.selected]?.id).toBe('anthropic/x')
 	type('opus-5.5')
 	expect(appView.view().modal!.items[appView.view().modal!.selected]).toMatch(/anthropic\/claude-opus-5-5$/)
 	enter()
@@ -819,7 +819,7 @@ test('the status row sits below the prompt box and its numbers follow each turn 
 	let rows = () => frame.build(appView.view(), 100).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
 	let status = () => rows().at(-2)!
 	expect(rows().at(-3)).toMatch(/^─+$/)
-	expect(status()).toStartWith('s1: Fix it · /w · Opus 5.5 · 0/200k (0%)')
+	expect(status()).toStartWith('s1: Fix it · /w · Opus 5.5 (default/unknown) · 0/200k (0%)')
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'go', provider: 'anthropic' })
 	app.onEvent({ type: 'turn-end', sessionId: 's1', status: 'completed', stats: { context: 50_000, window: 200_000, sent: 1234, received: 5678 } })
 	expect(status()).toContain('50k/200k (25%)')

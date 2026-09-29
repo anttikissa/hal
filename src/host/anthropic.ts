@@ -5,6 +5,7 @@
 import type { AssistantBlock, StopReason, StreamEvent, Usage, UserBlock } from '../common/blocks.ts'
 import { auth } from './auth.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
+import { effort } from './effort.ts'
 
 // OAuth tokens are rejected unless the first system block is exactly this.
 const IDENTITY = "You are Claude Code, Anthropic's official CLI for Claude."
@@ -84,6 +85,7 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 	else if (/^claude-(opus|sonnet)/.test(req.model) && maxTokens > MIN_THINKING) {
 		b.thinking = { type: 'enabled', budget_tokens: Math.max(MIN_THINKING, Math.min(anthropic.thinkingBudget(), maxTokens - 1024)) }
 	}
+	Object.assign(b, effort.wire('anthropic', req.model, req.effort, maxTokens))
 	return b
 }
 
@@ -244,7 +246,7 @@ export const anthropic = {
 	maxTokens: () => 64_000,
 	thinkingBudget: () => 10_000,
 	// Offered when neither the account's list nor models.dev has any.
-	knownModels: () => ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5', 'claude-sonnet-5'],
+	knownModels: () => ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-opus-5', 'claude-fable-5', 'claude-sonnet-5'],
 	toMessages,
 	body,
 	headers,

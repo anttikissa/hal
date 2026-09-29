@@ -15,11 +15,11 @@ test('status shows all session facts and percentages from pushed Stats, includin
 		meta: { ...meta, name: 'Work', cwd: '/w/project', model: 'anthropic/claude-opus-5-5' }, history: [], state: { type: 'idle' },
 		stats: { context: 87000, window: 1000000, sent: 252, received: 41000, plan: { account: 2, accounts: 3, windows: { '5h': 18, '7d': 92 } } },
 	} }])
-	expect(view.status(st)[2]?.parts[0]?.text).toBe('anthropic/claude-opus-5-5')
+	expect(view.status(st)[2]?.parts[0]?.text).toBe('anthropic/claude-opus-5-5 (default/unknown)')
 	st = view.onEvent(st, { type: 'model-names', names: { 'anthropic/claude-opus-5-5': 'Opus 5.5' } })
 	let groups = view.status(st)
 	expect(groups.map((g) => g.parts.map((p) => p.text).join(''))).toEqual([
-		'1-abc: Work', '/w/project', 'Opus 5.5', '87k/1000k (9%)', '↑252 ↓41k', 'Sub 2/3: 5h 18%, 7d 92%',
+		'1-abc: Work', '/w/project', 'Opus 5.5 (default/unknown)', '87k/1000k (9%)', '↑252 ↓41k', 'Sub 2/3: 5h 18%, 7d 92%',
 	])
 	expect(groups.flatMap((g) => g.parts).filter((p) => p.heat)).toEqual([
 		{ text: '9%', heat: 'cool' }, { text: '18%', heat: 'cool' }, { text: '92%', heat: 'hot' },

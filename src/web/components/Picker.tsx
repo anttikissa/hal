@@ -8,6 +8,7 @@ import { createEffect, For } from 'solid-js'
 import { fuzzy } from '../../common/fuzzy.ts'
 import type { ModalState } from '../../common/modals.ts'
 import { app } from '../app.ts'
+import { picker } from '../../common/picker.ts'
 
 // `text` in pieces, the search matches in <b> (index.html makes them bright).
 function marked(text: string, query: string | undefined) {
@@ -36,8 +37,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				if (box.open) box.close()
 				return
 			}
-			if (!box.open) box.showModal()
-			if (document.activeElement !== search) search.focus()
+			if (!box.open) { box.showModal(); search.focus() }
 			list.children[selected]?.scrollIntoView({ block: 'nearest' })
 		},
 	)
@@ -71,14 +71,18 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				onInput={(e) => app.search(e.currentTarget.value)}
 			/>
 			<ul ref={(e) => (list = e)} role="listbox">
-				<For each={props.modal?.items ?? []}>
-					{(item, i) => (
+				<For each={props.modal?.tree?.rows ?? []}>
+					{(row, i) => (
 						<li role="option" id={`modal-item-${i()}`} aria-selected={i() === props.modal?.selected ? 'true' : 'false'} onClick={() => app.modalPick(i())}>
-							{marked(item, props.modal?.query)}
+							{marked(props.modal?.items[i()] ?? '', props.modal?.query)}
 						</li>
 					)}
 				</For>
 			</ul>
+			<div class="effort-controls" role="group" aria-label="Selected model effort">
+				<button type="button" aria-label={`Lower effort (${props.modal ? picker.label(props.modal, props.modal.tree?.rows[props.modal.selected]?.id ?? '') : ''})`} disabled={!props.modal || !picker.canAdjust(props.modal, 'left')} onClick={() => app.modalKey({ key: 'left' })}>Lower</button>
+				<button type="button" aria-label={`Higher effort (${props.modal ? picker.label(props.modal, props.modal.tree?.rows[props.modal.selected]?.id ?? '') : ''})`} disabled={!props.modal || !picker.canAdjust(props.modal, 'right')} onClick={() => app.modalKey({ key: 'right' })}>Higher</button>
+			</div>
 			<div class="log">{props.modal?.hint ?? ''}</div>
 		</dialog>
 	)

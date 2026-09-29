@@ -56,11 +56,10 @@ function key(e: KeyInput, target: Target): boolean {
 	// The message box may hold text no input event told us about.
 	if (target.kind === 'message' && target.text !== st.text) app.input(target.text)
 	let k = view.key(e)
-	// The modal takes the keys first; its search box edits natively, but
-	// while it is empty left and right open and close the tree.
+	// Contextual model arrows remain tree/effort keys while filtering.
 	if (st.view.modal) {
-		let tree = !st.view.modal.form?.values[0] ? ['left', 'right'] : []
-		if (!k || ![...tree, 'enter', 'escape', 'up', 'down'].includes(k.key)) return false
+		if (target.kind === 'button' && (e.key === 'Enter' || e.key === ' ')) return false
+		if (!k || e.ctrlKey || e.metaKey || e.altKey || !['left', 'right', 'enter', 'escape', 'up', 'down'].includes(k.key)) return false
 		app.modalKey(k)
 		return true
 	}

@@ -42,7 +42,7 @@ function onEvent(st: ViewState, event: Event): ViewState {
 		Object.assign(titles.names, event.names)
 		return { ...st }
 	}
-	if (event.type === 'models') return event.sessionId === st.transcript?.meta.id ? { ...st, modal: picker.open(event.current, event.items, event.names), models: event.items, names: event.names ?? {} } : st
+	if (event.type === 'models') return event.sessionId === st.transcript?.meta.id ? { ...st, modal: picker.open(event.current, event.items, event.names, event.capabilities, event.effort), models: event.items, names: event.names ?? {} } : st
 	let t = transcript.fold(st.transcript, event)
 	if (t === st.transcript) return st
 	let next: ViewState = { ...st, transcript: t }
@@ -212,7 +212,7 @@ function status(st: ViewState): StatusGroup[] {
 	let groups: StatusGroup[] = [
 		{ parts: [{ text: meta.id }, ...(meta.name ? [{ text: `: ${meta.name}` }] : [])] },
 		{ parts: [{ text: meta.cwd }], path: true },
-		{ parts: [{ text: titles.modelName(meta.model) }] },
+		{ parts: [{ text: `${titles.modelName(meta.model)} (${stats?.effort ?? 'default/unknown'})` }] },
 	]
 	if (stats?.files) groups.push({ parts: [{ text: `${stats.files} files` }], href: `/changes/${meta.id}` })
 	if (stats?.window) {

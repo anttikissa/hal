@@ -190,6 +190,8 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker li { padding: 0 0.4rem; cursor: pointer; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Picker li[aria-selected="true"] { background: var(--button); }
 .Picker li .match { color: var(--match); font-weight: bold; }
+.Picker .effort-controls { display: flex; gap: 0.5rem; }
+.Picker .effort-controls button { min-height: 44px; min-width: 44px; }
 /* Apple HIG: touch targets at least 44x44pt. */
 @media (pointer: coarse) {
   .Picker { width: calc(var(--app-width, 100vw) - 1rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; max-width: none; height: calc(var(--app-height, 100dvh) - 1rem); max-height: none; top: calc(var(--app-top, 0px) + 0.5rem); bottom: auto; margin: 0; }

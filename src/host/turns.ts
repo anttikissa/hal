@@ -65,7 +65,7 @@ function ask(id: string, form: Form, call?: string): void {
 function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender; queued?: true; ts?: string }): void {
 	let model = sessions.open(id).model
 	let running: Running = { provider: '', controller: new AbortController() }
-	let effort = target(running, model)
+	let effort = target(running, model, sessions.open(id).effort)
 	turns.state.running.set(id, running)
 	let event: Event & { type: 'turn-start' } = { type: 'turn-start', sessionId: id, provider: running.provider, model }
 	if (effort !== undefined) event.effort = effort
@@ -145,10 +145,10 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 // cut off at max_tokens or refused runs none of its calls and ends the
 // turn in error (stopped).
 // Points `running` at `model`; returns its effort.
-function target(running: Running, model: string): string | undefined {
+function target(running: Running, model: string, selected?: string): string | undefined {
 	running.provider = blocks.parseModelId(model)?.provider ?? model
 	running.model = model
-	let effort = models.effort(model)
+	let effort = models.effort(model, selected)
 	if (effort !== undefined) running.effort = effort
 	else delete running.effort
 	return effort
@@ -165,7 +165,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		if (!scripted) {
 			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model, now: clock.now(), sessionId: id })
 			let defs = tools.defs()
-			return yield* turns.stream(model, { system, messages: await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model) }), tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id }, signal)
+			return yield* turns.stream(model, { system, effort: running.effort, messages: await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model) }), tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id }, signal)
 		}
 		let reply = scripted(await history.read(id), answers, id)
 		answers = undefined
@@ -203,8 +203,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				}
 				// Each round asks the session's model: a /model switch counts
 				// from the next request, even inside a turn.
-				let now = sessions.open(id).model
-				if (now !== model) target(running, (model = now))
+				let now = sessions.open(id)
+				target(running, (model = now.model), now.effort)
 				let round = blocks.newTurn(running.provider)
 				last = undefined
 				prompts.steer(id)
@@ -219,7 +219,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					status.transition(id, { type: 'stream' })
 					let n = history.streaming(id)
 					let ts = history.started(id)
-					host.broadcast(id, { type: 'stream', sessionId: id, event, ...(n !== undefined && { n }), ...(ts !== undefined && { ts }) })
+					host.broadcast(id, { type: 'stream', sessionId: id, event, model: running.model, effort: running.effort, ...(n !== undefined && { n }), ...(ts !== undefined && { ts }) })
 				}
 				if (Object.keys(round.usage).length) host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.round(id, round.usage) })
 				if (last?.type === 'error' && !signal.aborted && compact.retry(id, last, shrunk)) {

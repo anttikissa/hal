@@ -11,6 +11,7 @@
 // change.
 
 import { forms, type Answers, type Form, type FormState, type Key } from './forms.ts'
+import type { EffortCapability } from './effort.ts'
 
 // What each list row of a tree modal is: a model `id`, or a category
 // `path` ("anthropic/opus") with the model Enter picks for it. `parent` is
@@ -20,7 +21,7 @@ import { forms, type Answers, type Form, type FormState, type Key } from './form
 // `opened`. A category row's `open` says how it is shown now. `current`
 // is the session's model.
 export type TreeRow = { id?: string; path?: string; parent?: string; default?: string; open?: boolean }
-export type Tree = { rows: TreeRow[]; open: string[]; closed?: string[]; opened?: string[]; current: string }
+export type Tree = { rows: TreeRow[]; open: string[]; closed?: string[]; opened?: string[]; current: string; capabilities?: Record<string, EffortCapability>; efforts?: Record<string, string | undefined>; currentEffort?: string }
 
 export type ModalState = {
 	title: string

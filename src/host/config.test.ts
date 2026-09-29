@@ -6,6 +6,8 @@ import { settings } from '../common/settings.ts'
 import { config } from './config.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
+import { models } from './models.ts'
+import { sessions } from './sessions.ts'
 
 const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
@@ -21,6 +23,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	config.reset()
+	sessions.closeAll()
 	liveFiles.onError = origOnError
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome
@@ -114,4 +117,15 @@ test('hand-written comments on keys and array items survive a save', () => {
 	expect(text).toContain("// the model I like\n\tmodel: 'test/b'")
 	expect(text).toContain('// first\n\t\t1,')
 	expect(text).toContain('/* second */\n\t\t2')
+})
+
+
+test('qualified config defaults create the same validated pair and reject bad effort before saving', () => {
+	start()
+	config.update({ model: 'openai/gpt-6-sol:high' })
+	let chosen = models.selection(settings.model())
+	expect(chosen).toEqual({ id: 'openai/gpt-6-sol', effort: 'high' })
+	expect(sessions.create({ cwd: '/tmp' })).toMatchObject({ model: chosen.id, effort: chosen.effort })
+	expect(() => config.update({ model: 'openai/gpt-6.1-sol:none' })).toThrow('unsupported effort')
+	expect(settings.model()).toBe('openai/gpt-6-sol:high')
 })

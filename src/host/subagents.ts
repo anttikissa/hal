@@ -22,6 +22,7 @@ import { prompts } from './prompts.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
+import { models } from './models.ts'
 
 export type Spawn = { kind: SpawnKind; task: string; fork: boolean; cwd: string; model?: string; name?: string; limit: number }
 
@@ -29,10 +30,11 @@ export type Spawn = { kind: SpawnKind; task: string; fork: boolean; cwd: string;
 // spending nothing, when the parent has too few slots left.
 function spawn(parent: string, s: Spawn): string {
 	let meta = sessions.open(parent)
+	let selected = models.selection(s.model ?? models.qualified(meta.model, meta.effort))
 	let left = meta.slots ?? subagents.initialSlots()
 	if (s.limit + 1 > left) throw new Error(`limit ${s.limit} needs ${s.limit + 1} spawn slots, but this session has ${left} left`)
 	meta.slots = left - s.limit - 1
-	let child = sessions.create({ cwd: s.cwd, model: s.model ?? meta.model, name: s.name })
+	let child = sessions.create({ cwd: s.cwd, model: models.qualified(selected.id, selected.effort), name: s.name })
 	Object.assign(child, { parent, spawn: s.kind, slots: s.limit } satisfies Partial<SessionMeta>)
 	if (s.fork) subagents.fork(parent, child.id)
 	let at = tabs.file().open.indexOf(parent)

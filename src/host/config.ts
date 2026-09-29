@@ -7,6 +7,7 @@
 import { settings } from '../common/settings.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
+import { models } from './models.ts'
 
 // Loads and watches config.ason; `onChange` hears every external edit.
 // Idempotent.
@@ -39,6 +40,7 @@ function update(values: Record<string, unknown>): string[] {
 		if (!(s.name in values) || Object.is(values[s.name], current[s.name])) continue
 		let why = settings.problem(s.type, values[s.name])
 		if (why) throw new Error(`${s.name}: ${why}`)
+		if (s.name === 'model') models.selection(values[s.name] as string)
 	}
 	for (let s of settings.table) {
 		if (!(s.name in values) || Object.is(values[s.name], current[s.name])) continue

@@ -18,6 +18,7 @@ import { modelsDev } from './models-dev.ts'
 import { paths } from './paths.ts'
 import { provider } from './provider.ts'
 import { synthetic } from './synthetic.ts'
+import { effort } from './effort.ts'
 
 // One provider's model ids ("provider/model") and when they were got.
 type Listing = { at: number; ids: string[] }
@@ -61,7 +62,7 @@ async function ask(name: string, list: (signal: AbortSignal) => Promise<string[]
 // Warm provider lists for later openings without holding this one up.
 function list(current: string): string[] {
 	for (let name of Object.keys(provider.state.providers)) void models.fetchList(name).catch((e) => diag.log(`models of ${name}: ${e}`))
-	return [...new Set([current, models.defaultModel(), ...models.known()])]
+	return [...new Set([current, models.selection(models.defaultModel()).id, ...models.known()])]
 }
 
 // The ids known without asking anyone: synthetic ones, and each
@@ -139,10 +140,28 @@ export const models = {
 		return own ?? modelsDev.contextWindow(id)
 	},
 	// The reasoning effort requests for `id` set, if any (task hp).
-	effort(id: string): string | undefined {
+	effort(id: string, selected?: string): string | undefined {
 		let parsed = blocks.parseModelId(id)
-		return parsed && provider.state.providers[parsed.provider]?.effort?.(parsed.model)
+		return selected ?? effort.describe(id)?.policy ?? (parsed && provider.state.providers[parsed.provider]?.effort?.(parsed.model))
 	},
+	selection(input: string): { id: string; effort?: string } {
+		let base = input
+		let level: string | undefined
+		if (!models.known().includes(input)) {
+			let colon = input.lastIndexOf(':')
+			if (colon >= 0) {
+				let suffix = input.slice(colon + 1)
+				let candidate = input.slice(0, colon)
+				let alias = models.resolve(candidate)
+				if (suffix === 'default' || effort.vocabulary.includes(suffix as any)) { base = candidate; level = suffix }
+				else if (models.known().includes(candidate) || alias.id !== candidate || alias.login) throw new Error(`${candidate}: unknown effort '${suffix}'; use default or ${alias.id ? effort.describe(alias.id)?.levels.join(', ') || 'no verified effort control' : 'a supported level'}`)
+			}
+		}
+		let choice = models.resolve(base)
+		if (!choice.id) throw new Error(`${base}: no access; ${choice.login} to use it`)
+		return { id: choice.id, ...(level && level !== 'default' ? { effort: effort.validate(choice.id, level) } : {}) }
+	},
+	qualified(model: string, selected?: string): string { return selected === undefined ? model : `${model}:${selected}` },
 	fallback,
 	known,
 	valid,

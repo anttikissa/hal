@@ -4,10 +4,11 @@ import { sessions } from './sessions.ts'
 import { slash } from './slash.ts'
 import { subagents } from './subagents.ts'
 import { tabs } from './tabs.ts'
+import { models } from './models.ts'
 
 function create(parent: string): string {
 	let meta = sessions.open(parent)
-	let child = sessions.create({ cwd: meta.cwd, model: meta.model, name: `${meta.name ?? parent} (fork)` })
+	let child = sessions.create({ cwd: meta.cwd, model: models.qualified(meta.model, meta.effort), name: `${meta.name ?? parent} (fork)` })
 	subagents.fork(parent, child.id)
 	let at = tabs.file().open.indexOf(parent)
 	tabs.insert(child.id, at < 0 ? tabs.file().open.length : at + 1)
