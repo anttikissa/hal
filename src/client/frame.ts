@@ -36,6 +36,8 @@ export interface View {
 	prompt: PromptState
 	/** Prompts sent but not yet acknowledged by the host. */
 	pending?: string[]
+	/** Why the tab stopped (an error, a block, a pause reason): its state. */
+	why?: string
 	/** A passing message for the user, such as a refused command. */
 	notice?: string
 	/** The open question being answered here: keys and cursor go to it. */
@@ -203,7 +205,9 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	let history = lines
 	lines = []
 	above = history.length > 0 || full
-	if (view.notice) block(ansi.wrap(view.notice, width), { fg: colors.log().fg! })
+	// Why the tab stopped, then a one-off notice, a rule between them.
+	let told = [view.why, view.notice].filter((t) => t).map((t) => ansi.wrap(t!, width))
+	block(told.flatMap((rows, i) => (i ? ['─'.repeat(width), ...rows] : rows)), { fg: colors.log().fg! })
 	// Below them, the chrome proper: tab bar, the prompt box between
 	// two rules, then the help row. Its height depends only on the
 	// prompt's rows, so nothing below the transcript jumps.

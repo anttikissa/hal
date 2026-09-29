@@ -83,7 +83,8 @@ function view(): View {
 	if (t && !st.prompt.text) v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	if (v.tabs && tabBar.blinks(st.tabs)) v.tabs.lit = pulse.slow(pulse.beat())
-	let notice = st.notice ?? (t && why(t)) ?? versions.notice()
+	let stopped = t && why(t), notice = st.notice ?? versions.notice()
+	if (stopped) v.why = stopped
 	if (notice) v.notice = notice
 	if (st.editing) v.editing = amend.hint(st.editing)
 	if (versions.state.newCode) v.newCode = true
@@ -249,7 +250,7 @@ function completed(event: Event & { type: 'completions' }): void {
 	let { text, choices } = completion.apply(event.text, event.items)
 	app.setPrompt(text)
 	if (text !== event.text) drafts.edit(event.sessionId, text)
-	st.notice = event.items.length ? undefined : 'no completions'
+	if (!event.items.length || st.notice === 'no completions') st.notice = event.items.length ? undefined : 'no completions'
 	st.choices = choices
 }
 

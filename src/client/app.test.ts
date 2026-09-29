@@ -136,21 +136,21 @@ test('the activity says what the session does, and waiting for answer on a quest
 test('a login block says so in a word above the prompt; the whole message is the notice', () => {
 	app.onEvent(snapshot('s1', { type: 'blocked', reason: 'log in: token refresh failed: HTTP 400 invalid_grant' }))
 	expect(app.view().activity).toBe('blocked: log in')
-	expect(app.view().notice).toContain('invalid_grant')
+	expect(app.view().why).toContain('invalid_grant')
 })
 
 test('bare Enter continues a paused or failed turn, and says so', () => {
 	app.onEvent(snapshot('s1', { type: 'paused' }))
 	expect(app.view().activity).toBe('paused')
 	// [paused] in the transcript and the help row's enter: continue say it all.
-	expect(app.view().notice).toBeUndefined()
+	expect(app.view().why).toBeUndefined()
 	app.onEvent(snapshot('s1', { type: 'paused', reason: 'reached 200 rounds' }))
-	expect(app.view().notice).toBe('reached 200 rounds')
+	expect(app.view().why).toBe('reached 200 rounds')
 	enter()
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'error', message: '400 nope' } })
 	// The rule says it in a word; the notice has the whole message.
 	expect(app.view().activity).toBe('error')
-	expect(app.view().notice).toMatch(/400 nope.*Enter/)
+	expect(app.view().why).toMatch(/400 nope.*Enter/)
 	enter()
 	expect(sent).toEqual([
 		{ type: 'continue', sessionId: 's1' },
@@ -321,6 +321,7 @@ test('an open question takes the keys until it is answered; the prompt keeps its
 	app.onEvent({ type: 'question', sessionId: 's1', id: 'q1', form })
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'blocked', reason: 'question' } })
 	// The question is all it shows: no status naming the state.
+	expect(app.view().why).toBeUndefined()
 	expect(app.view().notice).toBeUndefined()
 	type('Dave')
 	enter()
@@ -383,6 +384,24 @@ test('Tab on a command asks the host to complete it; the answer fills the prompt
 	// Typed on meanwhile: a late answer is dropped.
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: ['/cd ~/prof/'] })
 	expect(app.state.prompt.text).toBe('/cd ~/project')
+})
+
+test("completion leaves other notices alone and never uncovers the tab's state by clearing one", () => {
+	app.onEvent(snapshot('s1', { type: 'error', message: 'no credits' }))
+	app.onEvent({ type: 'warning', text: 'Web is on port 9002' })
+	let before = [app.view().why, app.view().notice]
+	expect(before).toEqual([expect.stringContaining('no credits'), 'Web is on port 9002'])
+	type('/sta')
+	app.onKeys([key('tab')])
+	app.onEvent({ type: 'completions', sessionId: 's1', text: '/sta', items: ['/status '] })
+	expect([app.view().why, app.view().notice]).toEqual(before)
+	type('x')
+	app.onKeys([key('tab')])
+	app.onEvent({ type: 'completions', sessionId: 's1', text: '/status x', items: [] })
+	expect(app.view().notice).toBe('no completions')
+	app.onKeys([key('backspace'), key('tab')])
+	app.onEvent({ type: 'completions', sessionId: 's1', text: '/status ', items: ['/status '] })
+	expect(app.view().notice).toBeUndefined()
 })
 
 test('several completions are listed in the help row until the next key, and Up still recalls history', () => {
