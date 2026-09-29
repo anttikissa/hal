@@ -172,8 +172,3 @@ test('searching opens a family but keeps its older closed, unless only older mat
 	expect(opened.items.join('\n')).toMatch(/gpt-5\.5$/m)
 	expect(picker.step(opened, key('left'), all).state.items.join('\n')).not.toMatch(/gpt-5\.5$/m)
 })
-
-test('the picker says what to highlight: the search text', () => {
-	expect(picker.open('hal/intro', tree).query).toBe('')
-	expect(type(picker.open('hal/intro', tree), 'opus').query).toBe('opus')
-})

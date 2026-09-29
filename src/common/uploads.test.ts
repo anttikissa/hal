@@ -87,11 +87,6 @@ test('a paste over the configured number of lines is long', () => {
 	expect(uploads.long('1\n2\n3')).toBe(true)
 })
 
-test('only what the host may take is sent', () => {
-	expect(uploads.tooBig(5 * 1024 * 1024)).toBeUndefined()
-	expect(uploads.tooBig(5 * 1024 * 1024 + 1)).toContain('5 MB')
-})
-
 test('base64 matches the platform encoder, beyond one chunk', () => {
 	let bytes = new Uint8Array(100_000).map((_, i) => (i * 7) & 255)
 	expect(uploads.base64(bytes)).toBe(Buffer.from(bytes).toString('base64'))

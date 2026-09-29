@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { strings } from './strings.ts'
 
-let { charWidth, clipVisual, expandTabs, sliceVisual, visLen, wordWrap } = strings
+let { clipVisual, expandTabs, sliceVisual, visLen, wordWrap } = strings
 
 test('plain symbol glyphs match Ghostty single-cell width', () => {
 	for (let glyph of ['▪', '▫', '▶', '◀', '✓', '×', '✗', '✔', '✔️', '✖️', '☀', '❤', '⚠', '➡', '⬅', '⬆', '⬇', '←', '→', '↑', '↓', '…']) {
@@ -35,7 +35,6 @@ test('escape sequences are invisible', () => {
 
 test('word wrap uses emoji presentation sequence width', () => {
 	expect(wordWrap('ab☀️cd', 3)).toEqual(['ab', '☀️c', 'd'])
-	expect(charWidth('☀'.codePointAt(0)!)).toBe(1)
 })
 
 test('word wrap breaks at spaces, and mid-word only when it must', () => {

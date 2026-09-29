@@ -9,21 +9,19 @@ function defaults(): Record<string, unknown> {
 	return settings.check({}).values
 }
 
-test('an empty file means every declared default and no warnings', () => {
+test('an empty file means every declared default, and every default passes its own validation', () => {
 	let { values, warnings } = settings.check({})
 	expect(warnings).toEqual([])
 	for (let s of settings.table) expect(values[s.name]).toEqual(s.default)
-})
-
-test('every declared default passes its own validation', () => {
 	let all = Object.fromEntries(settings.table.map((s) => [s.name, s.default]))
 	expect(settings.check(all).warnings).toEqual([])
 })
 
 test('valid values are taken', () => {
-	let { values, warnings } = settings.check({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50 })
+	let given = { model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50 }
+	let { values, warnings } = settings.check(given)
 	expect(warnings).toEqual([])
-	expect(values).toEqual({ model: 'openai/gpt-5', security: 'none', webPort: 8080, webUrl: 'https://h.example', promptRows: 4, pasteLines: 20, maxRounds: 50, webSearch: true, push: true })
+	expect(values).toEqual({ ...defaults(), ...given })
 })
 
 test('an unknown key is a warning and changes nothing else', () => {
