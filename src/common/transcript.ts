@@ -22,7 +22,7 @@ export type Shown =
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number }
 	// `ts`: when the block started; `model`, `effort`: what wrote it
 	// (task hp). Records from before hp have none of them.
-	| { type: 'text'; text: string; ts?: string; model?: string; effort?: string }
+	| { type: 'text'; text: string; naming?: true; ts?: string; model?: string; effort?: string }
 	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
 	| { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string }
 	| { type: 'tool-result'; id: string; output: string; isError?: boolean }
@@ -77,6 +77,7 @@ function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number
 		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, key })
 		else if (b.text) {
 			let item: Item & { type: 'text' | 'thinking' } = { type: b.type, text: b.text, key }
+			if (b.type === 'text' && b.naming) (item as Item & { type: 'text' }).naming = true
 			if (by.ts?.[i] !== undefined) item.ts = by.ts[i]
 			if (by.model !== undefined) item.model = by.model
 			if (by.effort !== undefined) item.effort = by.effort

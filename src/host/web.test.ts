@@ -428,6 +428,7 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	let conn = host.connect((e) => local.push(e))
 	conn.send({ type: 'create', cwd: '/tmp', model: 'fake/m' })
 	let id = (local.find((e) => e.type === 'snapshot') as any).sessionId
+	sessions.open(id).nameOwner = 'manual'
 
 	let w = await dial(await cookie())
 	expect(w.opened).toBe(true)

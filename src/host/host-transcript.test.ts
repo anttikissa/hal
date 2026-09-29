@@ -11,6 +11,7 @@ import { host } from './host.ts'
 import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
+import { naming } from './naming.ts'
 
 const savedHome = process.env.HAL_HOME
 const origStream = turns.stream
@@ -85,6 +86,7 @@ async function turn(finish: (push: (...e: StreamEvent[]) => void, send: (c: unkn
 	let early = viewer()
 	early.send({ type: 'create', cwd: '/tmp/w', model: 'fake/m' })
 	let id = early.t!.meta.id
+	naming.manual(id, sessions.open(id).name)
 	early.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => pushes.length === 1)
 	pushes[0]!({ type: 'thinking', text: 'hm' }, { type: 'signature', value: 's' }, { type: 'text', text: 'par' })

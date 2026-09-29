@@ -17,6 +17,7 @@ import { turns } from './turns.ts'
 const savedHome = process.env.HAL_HOME
 const origStream = turns.stream
 const origOnError = liveFiles.onError
+const origCreate = sessions.create
 let home = ''
 
 // The home directory of the running test.
@@ -66,6 +67,11 @@ export function useHost(): void {
 		process.env.HAL_HOME = home
 		liveFiles.onError = () => {}
 		turns.stream = fakeStream
+		sessions.create = (init) => {
+			let meta = origCreate(init)
+			meta.nameOwner = 'manual'
+			return meta
+		}
 		calls.length = 0
 	})
 
@@ -73,6 +79,7 @@ export function useHost(): void {
 		host.reset()
 		sessions.closeAll()
 		turns.stream = origStream
+		sessions.create = origCreate
 		liveFiles.onError = origOnError
 		if (savedHome === undefined) delete process.env.HAL_HOME
 		else process.env.HAL_HOME = savedHome

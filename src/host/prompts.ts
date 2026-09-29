@@ -23,6 +23,7 @@ import { commands } from './commands.ts'
 import { diag } from './diag.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'
+import { naming } from './naming.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
 import { slash } from './slash.ts'
@@ -107,6 +108,7 @@ function amend(id: string, text: string, command?: string): string | undefined {
 	let blocks = prompts.blocks(id, parts)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, replaces: true }
 	if (command !== undefined) record.command = command
+	naming.prepare(id, record as Extract<HistoryRecord, { type: 'user' }>)
 	host.broadcast(id, prompts.promptEvent(id, history.append(id, record) as HistoryRecord & { type: 'user' }))
 	turns.start(id)
 }
@@ -149,6 +151,7 @@ function deliver(id: string, items: InboxItem[], extra?: Sender & { text: string
 		record.queued = true
 		record.command ??= items[0]!.id
 	}
+	naming.prepare(id, record as Extract<HistoryRecord, { type: 'user' }>)
 	let written = history.append(id, record) as HistoryRecord & { type: 'user' }
 	host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 	if (!quiet) host.broadcast(id, prompts.promptEvent(id, written))

@@ -2,7 +2,7 @@
 // onto Anthropic Messages, OpenAI Responses and Chat Completions is
 // recorded in tasks/7f/mapping.md.
 
-export type TextBlock = { type: 'text'; text: string }
+export type TextBlock = { type: 'text'; text: string; naming?: true }
 
 // `signature` is opaque and only meaningful to `provider`, the provider
 // that produced it; others must not send it back.
@@ -55,7 +55,7 @@ export type ErrorEvent = {
 
 // A stream ends with exactly one terminal event: done or error.
 export type StreamEvent =
-	| { type: 'text'; text: string }
+	| { type: 'text'; text: string; naming?: true }
 	| { type: 'thinking'; text: string }
 	// Closes the current thinking block (or makes an empty one).
 	| { type: 'signature'; value: string }
@@ -83,7 +83,7 @@ function apply(turn: Turn, event: StreamEvent): void {
 	switch (event.type) {
 		case 'text':
 			if (last?.type === 'text') last.text += event.text
-			else turn.blocks.push({ type: 'text', text: event.text })
+			else turn.blocks.push({ type: 'text', text: event.text, ...(event.naming && { naming: true }) })
 			break
 		case 'thinking':
 			if (last?.type === 'thinking' && last.signature === undefined) last.text += event.text

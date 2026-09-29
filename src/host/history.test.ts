@@ -61,7 +61,7 @@ async function* ended(id: string, stream: AsyncIterable<StreamEvent>): AsyncGene
 }
 
 const strip = (records: HistoryRecord[]) => records.map(({ ts: _ts, n: _n, ...rest }) => rest)
-const newSession = () => sessions.create({ cwd: '/', model: 'fake/m' }).id
+const newSession = () => sessions.create({ cwd: '/', model: 'fake/m', name: 'History fixture' }).id
 
 // Lets a test see what a turn sent and script what comes back.
 function fakeStream(script: (input: { messages: Message[] }) => StreamEvent[]) {

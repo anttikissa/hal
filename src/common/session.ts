@@ -8,6 +8,9 @@ export interface SessionMeta {
 	// ISO timestamp.
 	createdAt: string
 	name?: string
+	nameOwner?: 'auto' | 'manual'
+	nameVersion?: number
+	nameTurns?: number
 	// Spawned by session `parent` (task t0) as `spawn`: a `subagent`
 	// closes its tab after a clean finish, `subagent-leave-open` stays,
 	// `interactive` is the user's.

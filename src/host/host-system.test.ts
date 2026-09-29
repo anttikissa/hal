@@ -53,6 +53,7 @@ function start() {
 	let conn = host.connect((e) => events.push(e))
 	conn.send({ type: 'create', cwd: work, model: 'anthropic/claude-test' })
 	let id = (events.find((e) => e.type === 'snapshot') as any).sessionId as string
+	sessions.open(id).nameOwner = 'manual'
 	let ended = () => events.filter((e) => e.type === 'turn-end').length
 	let prompt = async (text: string) => {
 		let n = ended()

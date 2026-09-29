@@ -17,6 +17,7 @@ import { states } from '../common/states.ts'
 import { transcript, type Item, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
 import { titles } from '../common/titles.ts'
 import { summary } from '../common/summary.ts'
+import { names } from '../common/names.ts'
 
 // `form`: the open question as filled in on this page.
 // `editing`: the last prompt is in the input (src/common/amend.ts).
@@ -288,7 +289,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }
 		case 'text':
-			return { kind: 'assistant', text: summary.strip(item.text) }
+			return { kind: 'assistant', text: item.naming ? names.strip(summary.strip(item.text)) : summary.strip(item.text) }
 		case 'thinking':
 			return { kind: 'thinking', text: item.text }
 		case 'tool': {

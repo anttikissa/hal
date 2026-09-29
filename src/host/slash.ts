@@ -9,6 +9,7 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { auth } from './auth.ts'
 import { commands, type Context, type Reply } from './commands.ts'
 import { history } from './history.ts'
+import { naming } from './naming.ts'
 import { liveFiles } from './live-file.ts'
 import { models as modelList } from './models.ts'
 import { sessions } from './sessions.ts'
@@ -71,12 +72,7 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 
 // Session names change tab labels but not the model's working context.
 function name(id: string, value?: string): void {
-	let meta = sessions.open(id)
-	if (meta.name === value) return
-	if (value === undefined) delete meta.name
-	else meta.name = value
-	liveFiles.save(meta)
-	host.broadcast(id, { type: 'meta', sessionId: id, meta: { ...meta } })
+	naming.manual(id, value)
 }
 // Runs command `name` (again, with `answers`, once its question is
 // answered) and records what it said.

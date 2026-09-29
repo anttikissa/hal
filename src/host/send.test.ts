@@ -43,7 +43,7 @@ test('an advisory message reaches a working session with its next request, frame
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'working' })
 	let next = await send(c, b, { to: '1', text: 'check the tests' })
-	expect(resultOf(next)).toMatchObject({ output: `Sent to tab 1 · ${a}` })
+	expect(resultOf(next)).toMatchObject({ output: `Sent to ${tabs.label(a)}` })
 	expect(resultOf(next).isError).toBeUndefined()
 	// Waiting, visibly from the other session.
 	let waiting = c.views.get(a)!.inbox

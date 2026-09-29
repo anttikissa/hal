@@ -57,6 +57,6 @@ test('unsafe, unknown and malformed commands are rejected without recording or e
 	let ac = new AbortController()
 	ac.abort()
 	expect((await run(id, '/rename Hidden', ac.signal)).isError).toBe(true)
-	expect(sessions.open(id).name).toBeUndefined()
+	expect(sessions.open(id).name).toContain(id)
 	expect((await records(id)).filter((r) => r.type === 'command')).toEqual([])
 })

@@ -49,7 +49,7 @@ test('two clients see the same order after new, move, close and resume', () => {
 	expect(ack(b, r).tab).toBe(x)
 	expect(ids(a)).toEqual([y, x, z])
 	expect(ids(b)).toEqual(ids(a))
-	expect(tabsOf(a)![0]).toMatchObject({ id: y, name: y, cwd: '/tmp/w' })
+	expect(tabsOf(a)![0]).toMatchObject({ id: y, name: `Session ${y}`, cwd: '/tmp/w' })
 })
 
 test('resume puts each closed tab back where it was, most recent first', () => {

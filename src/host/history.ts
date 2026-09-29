@@ -21,6 +21,7 @@ import { provider, type ProviderRequest } from './provider.ts'
 import { pruning } from './pruning.ts'
 import { models } from './models.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
+import { naming } from './naming.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
 
@@ -56,6 +57,10 @@ function addUsage(a: Usage, b: Usage): Usage {
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
 	if (!r || typeof r !== 'object' || !recordTypes.has(r.type) || (r.n !== undefined && !Number.isSafeInteger(r.n))) throw new Error(`unknown record ${ason.stringify(value, 'short').slice(0, 80)}`)
+	if (r.type === 'user' && r.naming !== undefined) {
+		let n = r.naming
+		if (!n || !Number.isSafeInteger(n.turn) || n.turn < 1 || !Number.isSafeInteger(n.version) || n.version < 0 || typeof n.name !== 'string' || typeof n.eligible !== 'boolean') throw new Error('invalid naming context')
+	}
 	return r
 }
 
@@ -85,6 +90,7 @@ function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord 
 	if (busy.starts(full)) busy.add(id)
 	appendFileSync(history.file(id), line)
 	pages.note(id, line, full)
+	naming.committed(id, full)
 	if (full.type === 'turn_end' && !Object.keys(pages.marks(id).inbox).length) busy.drop(id)
 	return full
 }
@@ -92,7 +98,9 @@ function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord 
 // `command`: the client's id for the submit, so a resend is recognised.
 function submit(id: string, prompt: string | UserBlock[], command?: string): HistoryRecord {
 	let content = typeof prompt === 'string' ? [{ type: 'text' as const, text: prompt }] : prompt
-	return history.append(id, command === undefined ? { type: 'user', blocks: content } : { type: 'user', blocks: content, command })
+	let record = { type: 'user' as const, blocks: content, ...(command !== undefined && { command }) }
+	naming.prepare(id, record as Extract<HistoryRecord, { type: 'user' }>)
+	return history.append(id, record)
 }
 
 async function load(id: string): Promise<{ records: HistoryRecord[]; partial?: string }> {

@@ -6,6 +6,7 @@
 
 import { existsSync, mkdirSync, readdirSync } from 'fs'
 import type { SessionMeta } from '../common/session.ts'
+import { names } from '../common/names.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
 import { paths } from './paths.ts'
@@ -26,6 +27,8 @@ function validate(id: string, data: Record<string, any>): void {
 		if (typeof data[key] !== 'string') throw new Error(`${path}: missing or invalid ${key}`)
 	}
 	if (data.name !== undefined && typeof data.name !== 'string') throw new Error(`${path}: invalid name`)
+	if (data.nameOwner !== undefined && data.nameOwner !== 'auto' && data.nameOwner !== 'manual') throw new Error(`${path}: invalid nameOwner`)
+	for (let key of ['nameVersion', 'nameTurns']) if (data[key] !== undefined && (!Number.isSafeInteger(data[key]) || data[key] < 0)) throw new Error(`${path}: invalid ${key}`)
 	let bg = data.background
 	if (bg !== undefined && !(Array.isArray(bg) && bg.every((b) => typeof b === 'string'))) throw new Error(`${path}: background must be a list of ids`)
 }
@@ -71,7 +74,10 @@ function create(init: { cwd: string; model?: string; name?: string }): SessionMe
 		model: init.model ?? models.defaultModel(),
 		createdAt: new Date().toISOString(),
 	}
-	if (init.name !== undefined) meta.name = init.name
+	meta.name = init.name ? names.validate(init.name) : names.fallback(id)
+	meta.nameOwner = init.name ? 'manual' : 'auto'
+	meta.nameVersion = 0
+	meta.nameTurns = 0
 	// Assigned, not passed as defaults: defaults alone are never written.
 	let data = liveFiles.liveFile<Record<string, any>>(metaPath(id), {}, { watch: false })
 	Object.assign(data, meta)
@@ -86,6 +92,9 @@ function open(id: string): SessionMeta {
 	if (existing) return existing
 	let meta = sessions.load(id, false)
 	sessions.state.open.set(id, meta)
+	if (meta.nameOwner === undefined) meta.nameOwner = meta.name?.trim() && meta.name !== id && meta.name !== names.fallback(id) ? 'manual' : 'auto'
+	if (!meta.name?.trim() || meta.name === id) meta.name = names.fallback(id)
+	liveFiles.save(meta)
 	return meta
 }
 

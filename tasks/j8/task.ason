@@ -1,9 +1,10 @@
 {
 	title: '/rename: name the session',
-	spec: '/rename <name> sets the session name (the one the status row and tab titles show, task 1g); /rename with no argument clears it. The name is stored in the session metadata through liveFile and pushed to every client at once. A name is one line, trimmed, at most 60 chars; longer is refused with the reason. Tests: rename reaches another client; clearing; the length refusal; the name survives a restart.',
+	spec: '/rename <name> sets a nonempty persisted session name and manual ownership, pushed to all clients and tab titles. The entire title is validated before changing metadata: reject controls, terminal escapes, markup, empty or more than 60 Unicode characters; trim and collapse whitespace. /rename auto, or no argument, returns to automatic naming with an id fallback rather than leaving a nameless tab (task tx). /rename backfill performs the cancellable legacy naming walk specified in tx. Tests cover broadcast, automatic reset, invalid length, and persistence across restart.',
 	status: 'done',
-	needs: ['x0'],
 	notes: [
-		'Use the existing meta broadcast path so tabs.observe publishes renamed labels; clear by deleting name rather than storing an empty string. Context.setName is optional for existing command test contexts.'
-	]
+		'Use the existing meta broadcast path so tabs.observe publishes renamed labels; clear by deleting name rather than storing an empty string. Context.setName is optional for existing command test contexts.',
+		'Task tx supersedes clearing: an empty /rename now selects automatic ownership with an id fallback; metadata is never cleared to an unnamed tab. The historical clearing note above describes the pre-tx implementation.'
+	],
+	needs: ['x0']
 }

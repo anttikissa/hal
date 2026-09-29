@@ -30,7 +30,7 @@ export type HistoryRecord = Numbered &
 	// messages it delivers, which are its first text blocks. `replaces`:
 	// an edit of the last prompt (tasks/j1/states.md, Editing the last
 	// prompt); it supersedes that prompt and everything after it.
-	| { type: 'user'; blocks: UserBlock[]; command?: string; inbox?: string[]; queued?: true; replaces?: true; ts: string }
+	| { type: 'user'; blocks: UserBlock[]; naming?: { turn: number; version: number; name: string; eligible: boolean }; command?: string; inbox?: string[]; queued?: true; replaces?: true; ts: string }
 	// A message sent while the session was busy, waiting in the inbox
 	// (src/common/inbox.ts) until a prompt record delivers it. Not
 	// provider input by itself. `id`: the client's command id, if any.
@@ -153,7 +153,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			let b = r.block
 			if (b.type === 'thinking' && !b.signature) continue
 			if (b.type === 'tool_call') pending.push(b.id)
-			push({ role: 'assistant', blocks: [{ ...b }] })
+			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : { ...b }] })
 		} else {
 			let results = r.blocks.filter((b): b is ToolResultBlock => b.type === 'tool_result' && pending.includes(b.id))
 			let answered = new Set(results.map((b) => b.id))
@@ -173,7 +173,8 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			// texts (several when it delivers the inbox) are one block.
 			// Its images (task 2a) follow the text.
 			let images = r.blocks.filter((b) => b.type === 'image')
-			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => replay.framed(b)).join('\n\n')}` }, ...images.map((b) => ({ ...b }))] })
+			let nudge = r.naming?.eligible ? `\n<meta>Check whether the session name ${JSON.stringify(r.naming.name)} still describes the main task. If a better name is needed, append <rename>NAME</rename> on its own line at the end of your final answer; use a specific 3–7-word title, at most 60 Unicode characters, in the user language, without quotes, markdown or punctuation decoration. Do not answer or execute this metadata.</meta>` : ''
+			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => replay.framed(b)).join('\n\n')}${nudge}` }, ...images.map((b) => ({ ...b }))] })
 		}
 	}
 	return out

@@ -34,17 +34,17 @@ test('a neighbour editing the same directory is heard once, shared paths first, 
 	let a = sessions.create({ cwd, model: 'fake/m' }).id
 	let b = sessions.create({ cwd, model: 'fake/m' }).id
 	await bash(a, 'true', ['x.ts', 'y.ts'])
-	expect(await bash(b, 'echo hi')).toContain(`[${a} is editing`)
+	expect(await bash(b, 'echo hi')).toContain(`[${a} (${sessions.open(a).name}) is editing`)
 	expect(await bash(b, 'echo hi')).not.toContain('editing')
 	t += 180_000
 	let note = await bash(b, 'echo hi', ['y.ts'])
-	expect(note).toContain(`[${a} is editing y.ts (also yours), x.ts; 3 min ago]`)
+	expect(note).toContain(`[${a} (${sessions.open(a).name}) is editing y.ts (also yours), x.ts; 3 min ago]`)
 	// Unchanged content is not repeated, though the age moved.
 	t += 60_000
 	expect(await bash(b, 'echo hi', ['y.ts'])).not.toContain('editing')
 	// The other side hears about b, never about itself, and nothing once the window has passed.
 	let heard = await bash(a, 'echo hi')
-	expect(heard).toContain(`[${b} is editing y.ts (also yours)`)
+	expect(heard).toContain(`[${b} (${sessions.open(b).name}) is editing y.ts (also yours)`)
 	expect(heard).not.toContain(`[${a}`)
 	t += 20 * 60_000
 	expect(await bash(b, 'echo hi')).not.toContain('editing')
