@@ -1,12 +1,10 @@
 {
 	title: 'USER.md: what Hal knows about its user',
-	spec: 'The home root (where the credentials file and config.ason live) may hold USER.md, the user\'s own notes for Hal: it starts "# User" then "Name: <name>", and later holds anything durable Hal learned about the user as a person (role, preferences, how they like answers). It is private: gitignored and in tasks/project.ason keep. SYSTEM.md ends with @?USER.md (resolved against the home root, e.g. via ${home}), so it is in every prompt when it exists and costs nothing when it does not. SYSTEM.md tells the model, in two or three lines, that it may append short durable facts about the user to USER.md with bash when the user states them or asks it to remember, never secrets, and never rewrite what the user wrote. Tests: the prompt includes USER.md when present and is unchanged when absent. USER.md is included verbatim: its comments, ::: directives, @-prefixed lines and ${...} placeholders are text, never template syntax.',
+	spec: 'The home root (where the credentials file and config.ason live) may hold USER.md, the user\'s own notes for Hal: it starts "# User" then "Name: <name>", and later holds anything durable Hal learned about the user as a person (role, preferences, how they like answers). It is private: gitignored and in tasks/project.ason keep. SYSTEM.md ends with @?USER.md (resolved against the home root, e.g. via ${home}), so it is in every prompt when it exists and costs nothing when it does not. SYSTEM.md tells the model, in two or three lines, that it may append short durable facts about the user to USER.md when the user states them or asks it to remember, never secrets, and never rewrite what the user wrote. Tests: the prompt includes USER.md when present and is unchanged when absent. USER.md is included verbatim: its comments, ::: directives, @-prefixed lines and ${...} placeholders are text, never template syntax.',
 	status: 'done',
 	notes: [
 		'The optional @?${home}/USER.md include in SYSTEM.md uses the home root, not cwd or checkout; never commit actual USER.md. .gitignore and project.ason keep protect it during resets.',
 		'Included files are inserted raw and only SYSTEM.md itself is preprocessed; substituting after joining would still expand USER.md variables. Includes do not recurse, so a USER.md @ line cannot cause a failed request.'
 	],
-	needs: [
-		'q5'
-	]
+	needs: ['q5']
 }
