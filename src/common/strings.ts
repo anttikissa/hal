@@ -120,8 +120,8 @@ function skipEscape(s: string, i: number): number {
 		while (j < s.length && (s.charCodeAt(j) < 0x40 || s.charCodeAt(j) > 0x7e)) j++
 		return Math.min(s.length, j + 1)
 	}
-	if (next === ']') {
-		// Ends with BEL or ST.
+	if (next === ']' || next === '_') {
+		// OSC or APC: ends with BEL or ST.
 		for (let j = i + 2; j < s.length; j++) {
 			if (s[j] === '\x07') return j + 1
 			if (s[j] === '\x1b' && s[j + 1] === '\\') return j + 2
@@ -197,9 +197,11 @@ function containLinks(lines: string[]): string[] {
 /**
  * Wrap each line of text to at most `width` columns, breaking after
  * spaces where possible and mid-word otherwise. A space at a break is
- * dropped. Escape sequences are kept and never counted.
+ * dropped. Escape sequences are kept and never counted. `keepLong`: a
+ * word wider than `width` (a URL, say) is never broken but gets a row
+ * of its own, wider than `width`, for the terminal to soft-wrap.
  */
-function wordWrap(text: string, width: number): string[] {
+function wordWrap(text: string, width: number, keepLong = false): string[] {
 	if (width <= 0) return text.split('\n')
 	let out: string[] = []
 	for (let raw of text.split('\n')) {
@@ -231,7 +233,7 @@ function wordWrap(text: string, width: number): string[] {
 			}
 			// Break after the last space, or else right here; the part
 			// carried over may itself need another break.
-			while (col + g.width > width && i > lineStart) {
+			while (col + g.width > width && i > lineStart && !(keepLong && breakAt <= lineStart)) {
 				if (breakAt > lineStart) {
 					out.push(raw.slice(lineStart, breakAt - 1))
 					lineStart = breakAt

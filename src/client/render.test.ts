@@ -14,6 +14,9 @@ class FakeTerminal {
 	row = 0
 	col = 0
 	written = ''
+	// Buffer rows the terminal auto-wrapped out of: each continues on the
+	// next, so selecting across them copies one line.
+	soft = new Set<number>()
 	constructor(
 		public rows: number,
 		public cols: number,
@@ -64,6 +67,7 @@ class FakeTerminal {
 						this.row = this.col = 0
 						break
 					case 'K':
+						if (n === 2) this.soft.delete(this.top + this.row)
 						if (n === 2) line.length = 0
 						else line.length = Math.min(line.length, this.col)
 						break
@@ -94,6 +98,7 @@ class FakeTerminal {
 			}
 			let g = strings.glyphAt(s, i, this.col)
 			if (this.col + g.width > this.cols) {
+				this.soft.add(this.top + this.row)
 				this.col = 0
 				this.lineFeed()
 			}
@@ -110,6 +115,18 @@ class FakeTerminal {
 		let out = this.buffer.map((r) => r.join('').trimEnd())
 		while (out.length && out.at(-1) === '') out.pop()
 		return out
+	}
+	/** Lines as copied: rows the terminal soft-wrapped joined. */
+	logical(): string[] {
+		let out: string[] = []
+		let joining = false
+		this.buffer.forEach((r, i) => {
+			let text = r.join('')
+			if (joining) out[out.length - 1] += text
+			else out.push(text)
+			joining = this.soft.has(i)
+		})
+		return out.map((l) => l.trimEnd())
 	}
 	/** Rows on the screen. */
 	screen(): string[] {
@@ -521,5 +538,29 @@ describe('tabs', () => {
 			expect(term.written).toContain('\x1b[3J')
 			expect(term.content()).toEqual(frameText())
 		}
+	})
+})
+
+describe('long words', () => {
+	let url = 'https://claude.ai/oauth/authorize?code=true&client_id=9d1c250a&scope=org%3Acreate_api_key'
+
+	test('a URL wider than the terminal is one soft-wrapped line: no pad or fill inside it', () => {
+		setup(20, 30)
+		show([{ type: 'output', text: `Open this: ${url} then paste` }])
+		expect(term.content()).toEqual(frameText())
+		expect(term.logical()).toContain(` ${url}`)
+	})
+
+	test('rows after it and changes inside it keep it whole and in place', () => {
+		setup(20, 30)
+		let list: Item[] = [{ type: 'output', text: 'before' }, { type: 'output', text: url }]
+		show(list)
+		show([...list, { type: 'output', text: 'after' }], 'typed')
+		expect(term.logical()).toContain(` ${url}`)
+		// The URL grows (it streams): its rows are rewritten in place.
+		show([list[0]!, { type: 'output', text: `${url}&more=1` }, { type: 'output', text: 'after' }], 'typed')
+		expect(term.content()).toEqual(frameText())
+		expect(term.logical()).toContain(` ${url}&more=1`)
+		expect(term.logical()).not.toContain(` ${url}`)
 	})
 })

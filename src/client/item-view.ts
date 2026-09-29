@@ -92,14 +92,14 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let head = strings.clipVisual(`▸ ${ansi.clean(description).replace(/\s+/g, ' ')}`, width)
 				let mark = item.input.background === true ? '&' : '$'
 				let commandLine = strings.clipVisual(`${mark} ${ansi.clean(command).replace(/\s+/g, ' ')}`, width)
-				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-5).flatMap((line) => ansi.wrap(ansi.clean(line), Math.max(1, width - 2))).slice(-5).map((line) => `  ${line}`) : [])]
+				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-5).flatMap((line) => ansi.wrap(ansi.clean(line), Math.max(1, width - 2), false)).slice(-5).map((line) => `  ${line}`) : [])]
 			} else {
 				let input = ansi.clean(JSON.stringify(item.input)).replace(/\s+/g, ' ')
 				row = strings.clipVisual(`▸ ${ansi.clean(item.name)} ${input}`, width)
 			}
 			if (!item.partial) return [row]
 			let lines = item.partial.replace(/\n$/, '').split('\n').slice(-5)
-			return [row, ...lines.flatMap((line) => ansi.wrap(ansi.clean(line), Math.max(1, width - 2))).slice(-5).map((line) => `  ${line}`)]
+			return [row, ...lines.flatMap((line) => ansi.wrap(ansi.clean(line), Math.max(1, width - 2), false)).slice(-5).map((line) => `  ${line}`)]
 		}
 		case 'tool-result': {
 			// A glimpse: tool output can be long, the model sees all of it.
@@ -111,7 +111,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let lines = out.replace(/\n$/, '').split('\n')
 			let rows: string[] = []
 			let used = 0
-			while (used < lines.length && rows.length <= max) rows.push(...ansi.wrap(lines[used++]!.slice(0, (max + 1) * wide * 4), wide))
+			while (used < lines.length && rows.length <= max) rows.push(...ansi.wrap(lines[used++]!.slice(0, (max + 1) * wide * 4), wide, false))
 			let shown = rows.slice(0, max)
 			let more = rows.length - shown.length + lines.length - used
 			if (more) shown.push(`… ${more} more lines`)

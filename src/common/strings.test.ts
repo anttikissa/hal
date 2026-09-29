@@ -45,6 +45,10 @@ test('word wrap breaks at spaces, and mid-word only when it must', () => {
 	expect(wordWrap('漢字漢字漢', 4)).toEqual(['漢字', '漢字', '漢'])
 })
 
+test('word wrap can keep a too-long word whole on a row of its own', () => {
+	expect(wordWrap('go to https://a.b/cdefgh now or else', 8, true)).toEqual(['go to', 'https://a.b/cdefgh', 'now or', 'else'])
+})
+
 test('wrapped rows never exceed the width, and keep all visible text', () => {
 	let text = 'Lorem ipsum 漢字 dolor sit amet, e\u0301te 😀😀 consectetur\tadipiscing elit sed do eiusmod'
 	for (let width = 1; width < 40; width++) {

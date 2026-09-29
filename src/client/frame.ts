@@ -3,7 +3,8 @@
 // renderer (render.ts) decides how to get it onto the terminal.
 //
 // All history is always in the frame, never a viewport-sized slice
-// (tasks/cc/terminal.md rule 3). Every row fits the terminal width, has
+// (tasks/cc/terminal.md rule 3). Every row fits the terminal width (a
+// wider one flows on over rows ending in ansi.FLOW), has
 // its tabs expanded, and carries no control characters from the text
 // it shows.
 //
@@ -108,7 +109,7 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 		let gap = ' '.repeat(Math.max(1, width - strings.visLen(lines[at]!) - strings.visLen(ref.text)))
 		lines[at] += gap + ansi.quiet(`\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}`, style)
 	}
-	let rows = lines.map((r) => ansi.paint(r, style, cols))
+	let rows = lines.flatMap((r) => ansi.paintRows(r, style, cols))
 	if (!hal) frame.state.rows.set(item, { key, rows })
 	return rows
 }
@@ -158,7 +159,7 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	let block = (rows: string[], style: Style | undefined) => {
 		if (!rows.length) return
 		if (lines.length || above) lines.push('')
-		for (let r of rows) lines.push(ansi.paint(r, style, cols))
+		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
 	}
 	let items = view.transcript?.items ?? []
 	let session = view.transcript?.meta.id
@@ -184,7 +185,8 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 		if (item.type === 'question' && view.form?.id === item.id) {
 			let f = formView.formLines(view.form, width)
 			block(f.rows, itemView.itemStyle(item))
-			formCursor = { row: lines.length - f.rows.length + f.cursor.row, col: ansi.PAD.length + f.cursor.col }
+			// Counted from the end: the question above may flow on.
+			formCursor = { row: lines.length - (f.rows.length - f.cursor.row), col: ansi.PAD.length + f.cursor.col }
 		} else {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
 			let rows = frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls)

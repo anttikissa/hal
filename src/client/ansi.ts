@@ -27,8 +27,38 @@ function paint(row: string, style: Style | undefined, cols: number): string {
 	return on + ansi.PAD + row + fill + ansi.UNCOLOR
 }
 
-function wrap(text: string, width: number): string[] {
-	return strings.wordWrap(strings.expandTabs(ansi.clean(text.replace(/\r\n?/g, '\n'))), width)
+// Text wrapped to `width`; a word wider than that keeps a row of its
+// own, which paintRows lets the terminal soft-wrap. Glimpses that count
+// rows (tool output) pass `keepLong` false: they break it.
+function wrap(text: string, width: number, keepLong = true): string[] {
+	return strings.wordWrap(strings.expandTabs(ansi.clean(text.replace(/\r\n?/g, '\n'))), width, keepLong)
+}
+
+// A row painted as terminal rows. One wider than the terminal (a long
+// word, such as a URL) flows on: its first terminal row starts at the
+// pad, the rest at column 0, and every row but the last ends with FLOW
+// (nothing else pads them), so the renderer writes them in one go and
+// the terminal soft-wraps them into one line: a URL there opens and
+// copies whole. Colour ends only after the last one.
+function paintRows(row: string, style: Style | undefined, cols: number): string[] {
+	let full = ansi.PAD + row
+	if (strings.visLen(full) <= cols) return [ansi.paint(row, style, cols)]
+	let on = style ? ansi.sgr(style) : ''
+	let out: string[] = []
+	let start = 0
+	let used = 0
+	strings.walk(full, 0, (i, w) => {
+		if (used + w > cols) {
+			out.push(full.slice(start, i))
+			start = i
+			used = 0
+		}
+		used += w
+	})
+	let fill = on && style!.bg ? ' '.repeat(cols - used) : ''
+	let rows = out.map((r) => on + r + ansi.FLOW)
+	rows.push(on + full.slice(start) + fill + (on && ansi.UNCOLOR))
+	return rows
 }
 
 // A row with each whole [image/<name>] or [paste/<name>] marker made an
@@ -73,6 +103,9 @@ export const ansi = {
 	UNCOLOR: '\x1b[39;49m',
 	RESET: '\x1b[0m',
 	LINK_OFF: '\x1b]8;;\x07',
+	// Ends a terminal row that the next one continues (paintRows): an
+	// APC the renderer strips, zero columns wide.
+	FLOW: '\x1b_flow\x1b\\',
 	// GNU screen (STY set, or a TERM of screen*) mangles truecolor, so
 	// there the terminal is monochrome: no colour escapes at all, only
 	// bold and reverse video. Read on every call.
@@ -80,6 +113,7 @@ export const ansi = {
 	sgr,
 	quiet,
 	paint,
+	paintRows,
 	clean: (s: string): string => strings.clean(s),
 	wrap,
 	links,

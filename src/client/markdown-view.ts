@@ -16,11 +16,13 @@ function styled(r: Run, text: string): string {
 }
 
 // Runs wrapped to `width`: the plain text is wrapped, then each row
-// takes the styles of the runs its columns came from.
-function wrapRuns(runs: Run[], width: number): string[] {
+// takes the styles of the runs its columns came from. `keepLong`: a
+// word wider than `width` keeps a row of its own (ansi.paintRows lets
+// the terminal soft-wrap it); table cells break it instead.
+function wrapRuns(runs: Run[], width: number, keepLong = false): string[] {
 	let plain = runs.map((r) => r.text).join('')
 	let at = 0
-	return strings.wordWrap(plain, width).map((row) => {
+	return strings.wordWrap(plain, width, keepLong).map((row) => {
 		let from = plain.indexOf(row, at)
 		at = from + row.length
 		let out = ''
@@ -91,7 +93,7 @@ function block(b: Block, width: number, style?: Style): string[] {
 	}
 	let marker = b.kind === 'quote' ? ansi.quiet('│ ', style) : b.marker
 	let indent = strings.visLen(marker)
-	let rows = wrapRuns(b.runs, Math.max(1, width - indent))
+	let rows = wrapRuns(b.runs, Math.max(1, width - indent), true)
 	return rows.map((r, i) => (i && b.kind !== 'quote' ? ' '.repeat(indent) : marker) + r)
 }
 

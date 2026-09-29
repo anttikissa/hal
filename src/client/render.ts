@@ -17,8 +17,12 @@
 //   clears screen and scrollback and writes the whole frame again.
 // - state.cursorRow always says which frame row the cursor is on.
 // - Every frame line is at most one terminal row (frame.ts wraps), so
-//   frame rows and terminal rows are the same thing.
+//   frame rows and terminal rows are the same thing. Rows ending in
+//   ansi.FLOW continue on the next (a long URL): they are written with
+//   no CRLF between, so the terminal soft-wraps them into one line, and
+//   such a chain is always rewritten whole, from its first row.
 
+import { ansi } from './ansi.ts'
 import { frame, type Frame, type View } from './frame.ts'
 import { terminal } from './terminal.ts'
 
@@ -69,10 +73,20 @@ function move(from: number, to: number): string {
 	return ''
 }
 
+// Whether frame row `line` continues on the next.
+function flows(line: string | undefined): boolean {
+	return !!line?.endsWith(ansi.FLOW)
+}
+
+// Rows as written: CRLF between them, none after a row that flows on.
+function join(lines: string[]): string {
+	return lines.map((l, i) => (flows(l) ? l.slice(0, -ansi.FLOW.length) : i < lines.length - 1 ? l + '\r\n' : l)).join('')
+}
+
 // Clear screen and scrollback, write the whole frame. The cursor ends
 // on its last row.
 function canonical(lines: string[]): string {
-	return CLEAR_ALL + lines.join('\r\n')
+	return CLEAR_ALL + join(lines)
 }
 
 /**
@@ -98,12 +112,15 @@ function paint(next: Frame, rows: number, force = false): string {
 	} else if (force || !prev.length) {
 		// Grow mode, or the first paint: from the top of our frame (the
 		// cursor, on a first paint) clear down and write everything.
-		body = '\r' + move(st.cursorRow, 0) + `${CSI}J` + lines.join('\r\n')
+		body = '\r' + move(st.cursorRow, 0) + `${CSI}J` + join(lines)
 		row = lines.length - 1
 	} else {
 		let first = 0
 		while (first < lines.length && first < prev.length && lines[first] === prev[first]) first++
-		if (first === lines.length && first === prev.length) {
+		let same = first === lines.length && first === prev.length
+		// A change inside a flowing chain rewrites it from its start.
+		while (first > 0 && first < lines.length && flows(lines[first - 1])) first--
+		if (same) {
 			// Nothing changed but the cursor.
 			let out = move(st.cursorRow, next.cursor.row) + render.column(next.cursor.col)
 			st.cursorRow = next.cursor.row
@@ -125,11 +142,26 @@ function paint(next: Frame, rows: number, force = false): string {
 			let parts: string[] = []
 			let at = st.cursorRow
 			for (let i = first; i < lines.length; i++) {
-				if (i < prev.length && lines[i] === prev[i]) continue
+				// A flowing chain, i..end, goes as one unit.
+				let end = i
+				while (end < lines.length - 1 && flows(lines[end])) end++
+				let changed = false
+				for (let k = i; k <= end; k++) if (k >= prev.length || lines[k] !== prev[k]) changed = true
+				if (!changed) {
+					i = end
+					continue
+				}
 				// Appending: from the row above, which exists.
-				if (i >= prev.length) parts.push(move(at, i - 1), `\r\n${CSI}2K${lines[i]}`)
-				else parts.push(move(at, i), `\r${CSI}2K${lines[i]}`)
-				at = i
+				if (i >= prev.length) parts.push(move(at, i - 1), `\r\n${CSI}2K`)
+				else {
+					parts.push(move(at, i), `\r${CSI}2K`)
+					// Clear the chain's other old rows first: writing it
+					// must not stop between them.
+					let old = Math.min(end, prev.length - 1) - i
+					if (old > 0) parts.push(`${CSI}B${CSI}2K`.repeat(old), move(i + old, i), '\r')
+				}
+				parts.push(join(lines.slice(i, end + 1)))
+				at = i = end
 			}
 			row = at
 			if (lines.length < prev.length) {
