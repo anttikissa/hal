@@ -75,6 +75,10 @@ export type HistoryRecord = Numbered &
 	| { type: 'change'; cwd?: string; model?: string; ts: string }
 	// Observed changes during bash, not proof of authorship; not provider input.
 	| { type: 'file_changes'; toolId: string; cwd: string; files: FileChange[]; ts: string }
+	// One provider round's own usage (task c4), after its blocks: the
+	// context graph's points. `block`: the number of the round's first
+	// assistant record. Not provider input, not shown in the transcript.
+	| { type: 'round'; usage: Usage; model?: string; block?: number; ts: string }
 	// A context boundary: `keep` names this turn's prompts, replayed
 	// verbatim (including images) after the summary, not summarised into it.
 	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; ts: string }
@@ -129,7 +133,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			if (r.model !== undefined) changed.model = r.model
 			continue
 		}
-		if (r.type === 'file_changes' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
+		if (r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) {
 			note = undefined

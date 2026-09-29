@@ -11,6 +11,7 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { auth, type Kind } from './auth.ts'
 import { models } from './models.ts'
 import { clock } from './clock.ts'
+import { contextPage } from './context-page.ts'
 import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 import { usage } from './usage.ts'
@@ -77,6 +78,7 @@ function round(id: string, usage: { input?: number; cacheRead?: number; cacheWri
 	stats.state.live.set(id, { sent: t.sent + (usage.input ?? 0), received: t.received + (usage.output ?? 0) })
 	let context = (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
 	if (context) stats.state.context.set(id, context)
+	contextPage.notify(id)
 	return stats.of(id)
 }
 
@@ -86,6 +88,7 @@ function ended(id: string, end: HistoryRecord & { type: 'turn_end' }): Stats {
 	stats.state.tokens.set(id, { sent: t.sent + (end.usage.input ?? 0), received: t.received + (end.usage.output ?? 0) })
 	stats.state.live.delete(id)
 	if (end.context) stats.state.context.set(id, end.context)
+	contextPage.notify(id)
 	return stats.of(id, [end])
 }
 

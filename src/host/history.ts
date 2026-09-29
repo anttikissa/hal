@@ -25,7 +25,7 @@ import { naming } from './naming.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
 
-const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'change', 'compact', 'reset', 'file_changes'])
+const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'change', 'compact', 'reset', 'file_changes', 'round'])
 
 // One running turn: its current provider round (`turn`), how many of
 // that round's blocks are on disk, and the usage of earlier rounds.
@@ -247,6 +247,7 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 		turn.end = { type: 'error', message: String(e?.message ?? e) }
 	} finally {
 		flush(turn.blocks.length)
+		if (!running.ended && Object.keys(turn.usage).length) history.append(id, { type: 'round', usage: { ...turn.usage }, ...(by.model !== undefined && { model: by.model }), ...(running.ns[0] !== undefined && { block: running.ns[0] }) })
 		if (turn.end?.type === 'done') pruning.consumed(id, inputRecords)
 	}
 	if (turn.end && !running.ended) yield turn.end

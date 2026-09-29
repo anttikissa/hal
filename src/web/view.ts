@@ -217,8 +217,8 @@ function status(st: ViewState): StatusGroup[] {
 	if (stats?.files) groups.push({ parts: [{ text: `${stats.files} files` }], href: `/changes/${meta.id}` })
 	if (stats?.window) {
 		let percent = Math.round((stats.context ?? 0) / stats.window * 100)
-		groups.push({ parts: [{ text: `${kilo(stats.context ?? 0)}/${kilo(stats.window)} (` }, { text: `${percent}%`, heat: heat(percent) }, { text: ')' }] })
-	} else if (stats?.context) groups.push({ parts: [{ text: kilo(stats.context) }] })
+		groups.push({ parts: [{ text: `${kilo(stats.context ?? 0)}/${kilo(stats.window)} (` }, { text: `${percent}%`, heat: heat(percent) }, { text: ')' }], href: `/context/${meta.id}` })
+	} else if (stats?.context) groups.push({ parts: [{ text: kilo(stats.context) }], href: `/context/${meta.id}` })
 	if (stats) groups.push({ parts: [{ text: `↑${count(stats.sent)} ↓${count(stats.received)}` }] })
 	if (stats?.plan) {
 		let plan = stats.plan

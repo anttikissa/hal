@@ -53,7 +53,7 @@ test('a completed turn reaches every follower and is durable before turn-end', a
 	})
 	watcher.send({ type: 'open', sessionId: id })
 	await until(() => b.of('turn-end').length)
-	expect(onDisk).toEqual(['user', 'assistant', 'assistant', 'turn_end'])
+	expect(onDisk).toEqual(['user', 'assistant', 'assistant', 'round', 'turn_end'])
 
 	let expected: Item[] = [
 		{ type: 'prompt', text: 'hi' },

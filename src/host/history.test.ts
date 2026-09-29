@@ -96,6 +96,7 @@ test('a completed turn is stored as prompt, blocks and a turn end with usage', a
 		{ type: 'user', blocks: [{ type: 'text', text: 'hello' }] },
 		{ type: 'assistant', block: { type: 'thinking', text: 'hm', signature: 'sig', provider: 'fake' } },
 		{ type: 'assistant', block: { type: 'text', text: 'hi there' } },
+		{ type: 'round', usage: { input: 10, output: 3 }, block: 2 },
 		{ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 10, output: 3 }, context: 10 },
 	])
 	for (let r of records) expect(Date.parse(r.ts)).not.toBeNaN()
@@ -325,7 +326,9 @@ test('a turn spans tool rounds: one turn end with the usage of all rounds', asyn
 	history.end(id, { type: 'done', reason: 'end' })
 	expect(strip(await history.read(id)).slice(1)).toEqual([
 		{ type: 'assistant', block: call },
+		{ type: 'round', usage: { input: 10, output: 1 }, block: 2 },
 		{ type: 'user', blocks: [{ type: 'tool_result', id: 't1', output: 'x' }] },
+		{ type: 'round', usage: { input: 12, output: 2 } },
 		// The context is the last round's input alone, not the sum.
 		{ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 22, output: 3 }, context: 12 },
 	])
@@ -338,7 +341,7 @@ test('a host quitting between tool rounds pauses the turn once; late results are
 	history.stop(true)
 	history.results(id, [{ type: 'tool_result', id: 't1', output: 'late' }])
 	history.end(id, undefined)
-	expect(strip(await history.read(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'turn_end'])
+	expect(strip(await history.read(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'round', 'turn_end'])
 	expect((await history.read(id)).at(-1)).toMatchObject({ status: 'paused', usage: { output: 4 } })
 })
 

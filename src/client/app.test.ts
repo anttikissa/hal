@@ -110,7 +110,7 @@ test('while a turn runs, Enter steers it, Alt-Enter queues, and Escape pauses it
 test('waiting messages stay on screen, each saying why it waits', () => {
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
 	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'a', text: 'steer me' }, { id: 'b', text: 'run me later', queue: true }] })
-	let rows = () => frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim())
+	let rows = () => frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
 	let steer = rows().find((r) => r.includes('steer me'))!
 	let later = rows().find((r) => r.includes('run me later'))!
 	expect(steer).not.toBe(later)
@@ -248,7 +248,7 @@ test('replayed history carries no mark: it reads like one followed live', () => 
 	]
 	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/', model: 'anthropic/x', createdAt: '' }, history, state: { type: 'idle' } } })
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'new question', provider: 'anthropic' })
-	let rows = frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim()).filter(Boolean)
+	let rows = frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim()).filter(Boolean)
 	let at = (s: string) => rows.findIndex((r) => r.includes(s))
 	expect(at('error: overloaded')).toBeLessThan(at('new question'))
 	expect(rows.join('\n')).not.toMatch(/resumed|last turn/)
@@ -407,7 +407,7 @@ test('several completions are listed in the help row until the next key, and Up 
 	app.onEvent({ type: 'completions', sessionId: 's1', text: '/cd ~/pro', items: names.map((n) => `/cd ~/${n}`) })
 	let f = frame.build(appView.view(), 40)
 	// The first names, in order, on the last row; the frame keeps its height.
-	let help = f.lines.at(-1)!.replace(/\x1b\[[0-9;]*m/g, '')
+	let help = f.lines.at(-1)!.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '')
 	expect(help).toMatch(/project-0\/ +project-1\/ /)
 	expect(strings.visLen(f.lines.at(-1)!)).toBeLessThanOrEqual(40)
 	expect(f.lines.length).toBe(before.lines.length)
@@ -816,7 +816,7 @@ test('output in a tab not shown paints nothing', () => {
 
 test('the status row sits below the prompt box and its numbers follow each turn end', () => {
 	app.onEvent({ type: 'snapshot', sessionId: 's1', snapshot: { meta: { id: 's1', cwd: '/w', model: 'anthropic/claude-opus-5-5', createdAt: '', name: 'Fix it' }, history: [], state: { type: 'idle' }, stats: { window: 200_000, sent: 0, received: 0 } } })
-	let rows = () => frame.build(appView.view(), 100).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim())
+	let rows = () => frame.build(appView.view(), 100).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
 	let status = () => rows().at(-2)!
 	expect(rows().at(-3)).toMatch(/^─+$/)
 	expect(status()).toStartWith('s1: Fix it · /w · Opus 5.5 · 0/200k (0%)')

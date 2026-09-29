@@ -54,8 +54,8 @@ function left(info: StatusInfo): Part[][] {
 	let pct = statusRow.percent(s)
 	if (pct !== undefined) {
 		let fg = statusRow.heat(pct)
-		out.push([{ text: kilo(s!.context ?? 0), fg }, { text: `/${kilo(s!.window!)} (` }, { text: `${pct}%`, fg }, { text: ')' }])
-	} else if (s?.context) out.push([{ text: kilo(s.context) }])
+		out.push([{ text: kilo(s!.context ?? 0), fg }, { text: `/${kilo(s!.window!)} (` }, { text: `${pct}%`, fg }, { text: ')' }].map((p) => ({ ...p, href: `/context/${info.id}` })))
+	} else if (s?.context) out.push([{ text: kilo(s.context), href: `/context/${info.id}` }])
 	return out
 }
 
@@ -106,10 +106,15 @@ function fit(info: StatusInfo, cols: number): Part[] {
 function row(info: StatusInfo, cols: number): string {
 	let base = ansi.sgr({ fg: colors.status().fg! })
 	let parts = statusRow.fit(info, Math.max(1, cols - 2 * ansi.PAD.length))
-	return ansi.PAD + base + parts.map((p) => {
-		let text = p.href ? `\x1b]8;;${ansi.webUrl(p.href)}\x07${p.text}${ansi.LINK_OFF}` : p.text
-		return p.fg ? ansi.sgr({ fg: p.fg }) + text + base : text
-	}).join('') + ansi.UNCOLOR
+	// Neighbouring parts with one href share a single link.
+	let link: string | undefined
+	let out = parts.map((p) => {
+		let text = p.fg ? ansi.sgr({ fg: p.fg }) + p.text + base : p.text
+		let pre = p.href === link ? '' : (link ? ansi.LINK_OFF : '') + (p.href ? `\x1b]8;;${ansi.webUrl(p.href)}\x07` : '')
+		link = p.href
+		return pre + text
+	}).join('')
+	return ansi.PAD + base + out + (link ? ansi.LINK_OFF : '') + ansi.UNCOLOR
 }
 
 export const statusRow = { count, heat, percent, left, right, fit, row }
