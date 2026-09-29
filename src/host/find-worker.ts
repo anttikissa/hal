@@ -46,7 +46,9 @@ async function search(c: Search): Promise<void> {
 		if (!current()) return
 		for (let m of c.meta ?? []) findIndex.state.meta.set(m.id, m)
 		let q = findQuery.parse(c.query, c.kinds), now = Date.now()
-		if (!q.words.length && q.since === undefined && !q.cwd && !q.model) { send([], true); return }
+		if (!c.query.trim()) { send([], true); return }
+		let pending: { meta: SessionMeta; offset: number }[] | undefined
+		let rebuilding = new Set<string>()
 		for (tier of q.kinds) {
 			let hits = new Map<string, FindResult>()
 			let take = (row: FindRow) => {
@@ -61,10 +63,21 @@ async function search(c: Search): Promise<void> {
 				continue
 			}
 			let started = performance.now()
-			// Capture fallback offsets before yielding while querying SQLite.
-			let pending = [...findIndex.state.meta.values()].filter((m) => findWorker.eligible(m, q)).map((m) => ({ meta: m, offset: findIndex.start(m.id) })).filter((p) => (statSync(history.file(p.meta.id), { throwIfNoEntry: false })?.size ?? 0) > p.offset).sort((a, b) => Date.parse(b.meta.createdAt) - Date.parse(a.meta.createdAt))
+			// Capture fallback offsets once before yielding while querying SQLite.
+			if (!pending) {
+				pending = []
+				for (let m of findIndex.state.meta.values()) {
+					if (!findWorker.eligible(m, q)) continue
+					let stat = statSync(history.file(m.id), { throwIfNoEntry: false }), mark = findIndex.mark(m.id)
+					let offset = mark?.offset ?? 0
+					if (mark && stat && (stat.size < offset || (stat.size === mark.size && stat.mtimeMs !== mark.mtime))) { offset = 0; rebuilding.add(m.id) }
+					if ((stat?.size ?? 0) > offset) pending.push({ meta: m, offset })
+					if (performance.now() - started > 4) { await Bun.sleep(0); started = performance.now(); if (!current()) return }
+				}
+				pending.sort((a, b) => Date.parse(b.meta.createdAt) - Date.parse(a.meta.createdAt))
+			}
 			for (let row of findWorker.candidates(tier, q)) {
-				take(row)
+				if (!rebuilding.has(row.sessionId)) take(row)
 				if (performance.now() - started > 4) {
 					await Bun.sleep(0); started = performance.now(); if (!current()) return
 				}

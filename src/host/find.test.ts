@@ -4,6 +4,8 @@ import { tmpdir } from 'os'
 import { Database } from 'bun:sqlite'
 import { findQuery, type FindBatch } from '../common/find.ts'
 import { lines } from '../common/lines.ts'
+import { ansi } from '../client/ansi.ts'
+import { markdownView } from '../client/markdown-view.ts'
 import { host } from './host.ts'
 import { find } from './find.ts'
 import { history } from './history.ts'
@@ -65,6 +67,11 @@ test('worker projection streams tiers, catches durable appends, indexes blobs an
 	history.append(a.id, { type: 'assistant', block: { type: 'text', text: 'incremental uniquenew' } })
 	await ready
 	let hit = (await find.top('uniquenew'))[0]!
+	let web = ansi.state.web
+	try {
+		ansi.state.web = { url: 'https://hal.example', code: 'example-code' }
+		expect(markdownView.lines(`[found](${hit.href})`, 80).join('')).toContain(`https://hal.example/${a.id}?auth=example-code#5`)
+	} finally { ansi.state.web = web }
 	expect(hit.href).toBe(`/${a.id}#5`)
 	find.reset()
 	let db = new Database(`${home}/state/find.sqlite`, { readonly: true })

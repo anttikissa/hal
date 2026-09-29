@@ -1,16 +1,12 @@
-// The host end of the protocol: owns sessions, provider calls and state
-// writes. In-memory connect() and socket transports send the same events.
-// Session modules carry out commands: prompts, turns, slash and status.
-//
+// Host protocol: one owner of sessions, providers and state writes;
+// session modules act on commands, all transports deliver the same events.
 // Snapshot and live events are sent from the same synchronous step, so a
 // client that opens a session never misses or double-counts an event. A
 // big snapshot's history is read in slices first (pages.slices) and
 // caught up in that step; the client's commands for the session wait
 // until it is sent, so they act in the order sent (task 7j).
-// The conversation lives only in durable history (history.ts): prompts,
-// finished blocks, tool results and turn ends are on disk before clients
-// hear of them, and snapshots and provider input are read back from
-// there.
+// History is durable before clients hear it; snapshots and provider input
+// are read back from it, never reconstructed from display state.
 
 import { ason } from '../common/ason.ts'
 import { protocol, type Command, type Event } from '../common/protocol.ts'
