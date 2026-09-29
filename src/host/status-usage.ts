@@ -11,10 +11,6 @@ import { web } from './web.ts'
 type Account = ReturnType<typeof auth.all>['list'][number]
 export type UsageRow = { provider: Kind; slot: string; account: string; plan?: string; error?: string; windows: Windows; apiKey: boolean }
 
-function mask(value: string): string {
-	return value.replace(/^([^@])[^@]*@([^.]*)?(\..*)$/, (_all, first: string, domain: string, suffix: string) => `${first}***@${domain?.slice(0, 1) ?? ''}****${suffix}`)
-}
-
 function reset(at: string, now = clock.now()): string {
 	let date = new Date(at)
 	let today = new Date(now)
@@ -39,7 +35,7 @@ function table(rows: UsageRow[]): string {
 		let lines = [`${kind === 'anthropic' ? 'Anthropic' : 'OpenAI'} subscriptions:`, '', `| Slot | Account | ${cols.join(' | ')} |`, `|${Array(cols.length + 2).fill('---').join('|')}|`]
 		for (let row of accounts) {
 			let safe = (value: string) => value.replace(/[|<>]/g, ' ').replace(/\*/g, '\\*')
-			let account = `${safe(statusUsage.mask(row.account))}${row.plan ? ` (${safe(row.plan)})` : ''}${row.error ? `<br>${safe(row.error)}` : ''}`
+			let account = `${safe(row.account)}${row.plan ? ` (${safe(row.plan)})` : ''}${row.error ? `<br>${safe(row.error)}` : ''}`
 			let cells = cols.map((name) => {
 				if (row.apiKey) return 'API key'
 				let w = row.windows[name]
@@ -167,4 +163,4 @@ async function show(sessionId: string, model: string): Promise<string> {
 	return `${statusUsage.runtime()}\n\n${rows.length ? statusUsage.table(rows) : 'No accounts configured.'}${broken ? '\n\nTo log in again, run /login claude or /login chatgpt.' : ''}`
 }
 
-export const statusUsage = { mask, reset, bar, table, payload, refresh, problem, runtime, show }
+export const statusUsage = { reset, bar, table, payload, refresh, problem, runtime, show }

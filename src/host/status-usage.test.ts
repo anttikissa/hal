@@ -9,7 +9,7 @@ import { markdownView } from '../client/markdown-view.ts'
 
 const visible = (s: string) => s.replace(/\x1b\]8;;[^\x07]*\x07/g, '').replace(/\x1b\[[\d;]*m/g, '')
 
-test('provider-specific tables show masked identities, plan, eighth bars and two-line reset cells', () => {
+test('provider-specific tables show full identities, plan, eighth bars and two-line reset cells', () => {
 	let now = new Date(2026, 8, 28, 12).getTime()
 	let old = clock.now
 	clock.now = () => now
@@ -23,11 +23,9 @@ test('provider-specific tables show masked identities, plan, eighth bars and two
 		expect(tables).toHaveLength(2)
 		expect(tables[0]!.type === 'table' && tables[0]!.rows[0]!.map((c) => c.map((r) => r.text).join(''))).toEqual(['Slot', 'Account', '5h'])
 		expect(tables[1]!.type === 'table' && tables[1]!.rows[0]!.map((c) => c.map((r) => r.text).join(''))).toEqual(['Slot', 'Account', '5h'])
-		expect(text).not.toContain('alice@gmail.com')
-		expect(text).not.toContain('bob@longdomain.org')
 		let rendered = markdownView.lines(text, 100).map(visible).join('\n')
-		expect(rendered).toContain('a***@g****.com')
-		expect(rendered).toContain('b***@l****.org (plus)')
+		expect(rendered).toContain('alice@gmail.com')
+		expect(rendered).toContain('bob@longdomain.org (plus)')
 		expect(rendered).toContain('2/3 *')
 		expect(rendered).toContain('42% used (resets 13:00)')
 		expect(rendered).not.toContain('sonnet')
