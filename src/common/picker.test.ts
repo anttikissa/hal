@@ -102,22 +102,53 @@ test('Enter with nothing matching switches to nothing', () => {
 	expect(enter(st)).toBeUndefined()
 })
 
-test('families go most capable first, and equal matches select the higher row', () => {
+test('families go most capable first, and equal matches select an alias model, else the higher row', () => {
 	let all = [...tree, 'anthropic/claude-haiku-4-5', 'anthropic/claude-sonnet-5', 'anthropic/claude-fable-5', 'anthropic/claude-fable-5-1', 'openai/gpt-6-luna']
 	let st = picker.open('hal/intro', all)
 	st = picker.refilter({ ...st, tree: { ...st.tree!, open: ['anthropic', 'openai', 'openai/gpt'] } }, all)
 	expect(st.items.map((r) => r.trim().split('  ')[0]!).filter((r) => /^▶ (fable|opus|sonnet)$/.test(r))).toEqual(['▶ fable', '▶ opus', '▶ sonnet'])
 	let gpt = st.items.filter((r) => r.includes('openai/gpt-')).map((r) => r.split('openai/')[1])
 	expect(gpt).toEqual(['gpt-6-sol', 'gpt-6-terra', 'gpt-6-luna', 'gpt-5.5'])
-	expect(enter(picker.step(st, key('c', 'clau'), all).state)).toBe('/model anthropic/claude-fable-5-1')
+	expect(enter(picker.step(st, key('c', 'clau'), all).state)).toBe('/model anthropic/claude-opus-5-5')
+	expect(enter(picker.step(st, key('s', 'sonnet 5'), all).state)).toBe('/model anthropic/claude-sonnet-5')
 })
 
-test('dated snapshots and models over a version behind their family newest are hidden', () => {
+test('dated snapshots hide; versions past a family two newest wait under older', () => {
 	let all = ['anthropic/claude-opus-5-5', 'anthropic/claude-opus-4-5', 'anthropic/claude-opus-4-5-20251101', 'anthropic/claude-opus-4-1', 'anthropic/claude-haiku-3-20240307']
-	let shown = (current: string) => picker.refilter({ ...picker.open(current, all), tree: { rows: [], open: ['anthropic', 'anthropic/opus'], current } }, all).items.join('\n')
-	expect(shown('hal/intro')).toMatch(/claude-opus-4-5$/m)
-	expect(shown('hal/intro')).not.toMatch(/20251101|opus-4-1/)
-	// A snapshot alone stays; the current model stays whatever its age.
-	expect(shown('hal/intro')).toContain('claude-haiku-3-20240307')
-	expect(shown('anthropic/claude-opus-4-1')).toContain('opus-4-1')
+	let shown = (current: string, open: string[]) => picker.refilter({ ...picker.open(current, all), tree: { rows: [], open, current } }, all).items.join('\n')
+	let closed = shown('hal/intro', ['anthropic', 'anthropic/opus'])
+	expect(closed).toMatch(/claude-opus-4-5$/m)
+	expect(closed).not.toMatch(/20251101|opus-4-1/)
+	expect(closed).toMatch(/▶ older$/m)
+	expect(shown('hal/intro', ['anthropic', 'anthropic/opus', 'anthropic/opus/older'])).toMatch(/claude-opus-4-1$/m)
+	// A snapshot alone stays; the current model's categories open.
+	expect(closed).toContain('claude-haiku-3-20240307')
+	expect(picker.open('anthropic/claude-opus-4-1', all).items.join('\n')).toMatch(/\* 4\.1 .*claude-opus-4-1$/m)
+})
+
+test('a family lists its flagships; variants and non-chat models wait in closed buckets, last', () => {
+	let all = ['openai/gpt-6-sol', 'openai/gpt-6-luna', 'openai/gpt-5.6-sol', 'openai/gpt-5.5', 'openai/gpt-6-mini', 'openai/gpt-daybreak-blue-latest', 'openai/gpt-image-2', 'openai/gpt-realtime-2.1', 'openai/o3', 'openai/text-embedding-3-large']
+	let st = picker.open('openai/gpt-6-sol', all)
+	let text = st.items.join('\n')
+	expect(text).toMatch(/gpt-6-luna$/m)
+	expect(text).toMatch(/gpt-5\.6-sol$/m)
+	expect(text).not.toMatch(/gpt-5\.5$|mini|daybreak|image|realtime|o3|embedding/m)
+	expect(st.items.findIndex((r) => r.trim() === '▶ older')).toBeGreaterThan(st.items.findIndex((r) => r.endsWith('gpt-5.6-sol')))
+	expect(st.items.at(-1)!.trim()).toBe('▶ other')
+	// A bucket has no default: Enter opens it.
+	let other = picker.refilter({ ...st, selected: st.items.length - 1 }, all)
+	other = picker.step({ ...other, selected: other.items.length - 1 }, key('enter'), all).state
+	expect(other.items.join('\n')).toMatch(/gpt-image-2$/m)
+	expect(other.items.join('\n')).toMatch(/openai\/o3$/m)
+	// Searching reaches them.
+	expect(enter(picker.step(st, key('d', 'daybreak'), all).state)).toBe('/model openai/gpt-daybreak-blue-latest')
+})
+
+test('left and right open and close categories while searching too', () => {
+	let st = type(picker.open('hal/intro', tree), 'opus')
+	expect(selected(st)).toMatch(/opus/)
+	let closed = press(st, key('left'))
+	expect(closed.form?.values[0]).toBe('opus')
+	expect(selected(closed)).toMatch(/▶ opus/)
+	expect(selected(press(closed, key('right')))).toMatch(/▼ opus/)
 })

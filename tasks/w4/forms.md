@@ -176,20 +176,23 @@ A tree like the old Hal's: provider (old Hal's order: hal, openai,
 anthropic, google, opencode-go, openrouter, then the rest), then the
 family when two or more of a direct provider's models share one (opus,
 gpt, kimi…; the leaf is the rest of the name, `5-5` shown as `5.5`), or
-the vendor for a reseller (openrouter/moonshotai/kimi-k2). ▶/▼ mark
-closed/open categories; it opens with the current model's categories
-open and selected (`*` marks it). With the search box empty, right opens
-the selected category and left closes it or the one the selection is in;
+the vendor for a reseller (openrouter/moonshotai/kimi-k2). A family
+lists its two newest versions' flagships; the rest wait in a closed
+`older` inside it, and a provider's non-chat and family-less models in
+a closed `other`, both last. ▶/▼ mark closed/open categories; it opens
+with the current model's categories open and selected (`*` marks it).
+Right opens the selected category and left closes it or the one the
+selection is in, also while searching;
 Enter on a category picks its default (the alias's model: gpt →
 gpt-6-sol, opus → claude-opus-5-5; else a family's or vendor's newest; a
 provider has one only through an alias), and on one without a default
 opens or closes it. Typing ranks the models (`opus-5.5` finds
 claude-opus-5-5 first), shows only the matches with their categories
 open, and selects a matching category first (`gp` selects openai/gpt,
-`opus` anthropic/opus), else the best-ranked model. Emptying the search
-(Ctrl-U) brings back the tree and the current model. On the web, left
-and right reach the tree while the search box is empty, and a tap is
-Enter.
+`opus` anthropic/opus), else the best-ranked model, an alias's model on
+a tie (`claude` selects Opus 5.5). Emptying the search
+(Ctrl-U) brings back the tree and the current model. On the web a tap
+is Enter.
 
 ## Find / filter (later task)
 

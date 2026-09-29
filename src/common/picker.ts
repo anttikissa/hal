@@ -75,11 +75,19 @@ const defaults: Record<string, string> = { gpt: 'openai/gpt-6-sol', opus: 'anthr
 // Providers in the old Hal's order; others follow in the host's order.
 const providers = ['hal', 'openai', 'anthropic', 'google', 'opencode-go', 'openrouter']
 const FAMILY = /(?:^|[-_])(fable|opus|sonnet|haiku|gpt|gemini|grok|kimi|qwen|deepseek|glm|minimax)(?=[-_.\d]|$)/i
+// Not chat models: a direct provider lists them under its `other`.
+const SPECIAL = /(?:^|[-_.])(?:image|realtime|audio|tts|transcribe|embedding|moderation|search|whisper|dall-e|sora|computer-use)(?=[-_.\d]|$)/i
 const newest = new Intl.Collator('en', { numeric: true })
 // Families of a provider, most capable first; others follow by name.
 const families = ['fable', 'opus', 'sonnet', 'haiku', 'gpt']
-// Same-version variants: the plain model, then these tiers, then by name.
-const tiers = ['sol', 'terra', 'luna']
+// Flagship variants of a version: the plain model, then these tiers.
+// Other variants (mini, pro, codex, daybreak...) go under `older`.
+const tiers = ['sol', 'terra', 'luna', 'astra']
+// The closed-by-default buckets: a family's older versions and variants,
+// a provider's non-chat and family-less models. Listed last, no default.
+const OLDER = 'older'
+const OTHER = 'other'
+const bucket = (n: Node) => n.path.includes('/') && (n.name === OLDER || n.name === OTHER)
 const DATED = /[-_](?:\d{8}|\d{4}-\d{2}-\d{2})$/
 const version = (leaf: string) => Number(/^\d+(?:\.\d+)?/.exec(leaf)?.[0] ?? NaN)
 const tier = (leaf: string) => {
@@ -91,50 +99,67 @@ type Node = { name: string; path: string; nodes: Node[]; ids: { id: string; leaf
 
 // Where `id` goes: its category path and its label there. A direct
 // provider's models group by family when two or more share one; a
-// reseller's (openrouter/vendor/model) by vendor. A dated snapshot hides
-// behind its undated alias, and a family shows only models at most one
-// version older than its newest (opus 5.5: 4.5 to 5.5); `keep` stays.
+// reseller's (openrouter/vendor/model) by vendor. A family lists its two
+// newest versions' flagship variants (gpt: 6 and 5.6; sol, terra, luna,
+// astra), the rest under family/older. A provider with families lists
+// non-chat and family-less models (image, realtime, o3) under
+// provider/other. A dated snapshot hides behind its undated alias unless
+// it is `keep`, the session's model.
 function tree(ids: string[], keep = ''): Node {
 	let all = new Set(ids)
 	let placed = ids.flatMap((id) => {
 		let parts = id.split('/')
 		if (parts.length < 2 || (id !== keep && DATED.test(id) && all.has(id.replace(DATED, '')))) return []
 		let model = parts.pop()!
-		let family = parts.length === 1 ? FAMILY.exec(model)?.[1]?.toLowerCase() : undefined
-		return [{ id, path: parts, model, family }]
+		let special = parts.length === 1 && SPECIAL.test(model)
+		let family = parts.length === 1 && !special ? FAMILY.exec(model)?.[1]?.toLowerCase() : undefined
+		return [{ id, path: parts, model, family, special }]
 	})
 	let count = new Map<string, number>()
 	for (let p of placed) if (p.family) count.set(`${p.path[0]}/${p.family}`, (count.get(`${p.path[0]}/${p.family}`) ?? 0) + 1)
+	let withFamilies = new Set(placed.filter((p) => p.family).map((p) => p.path[0]))
 	let root: Node = { name: '', path: '', nodes: [], ids: [], all: [] }
+	let node = (path: string[]) => {
+		let at = root
+		for (let name of path) {
+			let full = at.path ? `${at.path}/${name}` : name
+			let next = at.nodes.find((n) => n.path === full)
+			if (!next) at.nodes.push((next = { name, path: full, nodes: [], ids: [], all: [] }))
+			at = next
+		}
+		return at
+	}
 	for (let p of placed) {
 		let leaf = p.model
 		let path = p.path
-		if (p.family && count.get(`${path[0]}/${p.family}`)! > 1) {
-			let at = p.model.toLowerCase().indexOf(p.family) + p.family.length
+		let grouped = !!p.family && count.get(`${path[0]}/${p.family}`)! > 1
+		if (grouped) {
+			let at = p.model.toLowerCase().indexOf(p.family!) + p.family!.length
 			leaf = (p.model.slice(at).replace(/^[-_.]/, '') || p.model).replace(/(\d)-(?=\d)/g, '$1.')
-			path = [...path, p.family]
-		}
-		let node = root
-		for (let name of path) {
-			let at = node.path ? `${node.path}/${name}` : name
-			let next = node.nodes.find((n) => n.path === at)
-			if (!next) node.nodes.push((next = { name, path: at, nodes: [], ids: [], all: [] }))
-			node = next
-		}
-		node.ids.push({ id: p.id, leaf, family: !!p.family && path.length > 1 })
+			path = [...path, p.family!]
+		} else if (p.special || (!p.family && path.length === 1 && withFamilies.has(path[0]!))) path = [...path, OTHER]
+		node(path).ids.push({ id: p.id, leaf, family: grouped })
 	}
-	let order = (list: string[], n: Node) => (list.includes(n.name) ? list.indexOf(n.name) : list.length)
+	let order = (list: string[], n: Node) => (bucket(n) ? Infinity : list.includes(n.name) ? list.indexOf(n.name) : list.length)
 	root.nodes.sort((a, b) => order(providers, a) - order(providers, b))
 	let finish = (n: Node): string[] => {
+		if (n.ids.some((i) => i.family) && n.name !== OLDER) {
+			let top = [...new Set(n.ids.map((i) => version(i.leaf)).filter((v) => !isNaN(v)))].sort((a, b) => b - a).slice(0, 2)
+			let flagship = (i: Node['ids'][number]) => top.includes(version(i.leaf)) && tier(i.leaf) <= tiers.length
+			let rest = n.ids.filter((i) => !flagship(i))
+			n.ids = n.ids.filter(flagship)
+			if (rest.length) n.nodes.push({ name: OLDER, path: `${n.path}/${OLDER}`, nodes: [], ids: rest, all: [] })
+		}
 		n.nodes.sort((a, b) => order(families, a) - order(families, b) || a.name.localeCompare(b.name))
-		let top = Math.max(...n.ids.filter((i) => i.family).map((i) => version(i.leaf)).filter((v) => !isNaN(v)))
-		n.ids = n.ids.filter((i) => !i.family || i.id === keep || !(version(i.leaf) < top - 1))
 		n.ids.sort((a, b) =>
 			a.family && b.family ? version(b.leaf) - version(a.leaf) || tier(a.leaf) - tier(b.leaf) || a.leaf.localeCompare(b.leaf) : newest.compare(b.id, a.id))
-		n.all = [...n.nodes.flatMap(finish), ...n.ids.map((i) => i.id)]
+		let inner = n.nodes.filter((c) => !bucket(c)).flatMap(finish)
+		let later = n.nodes.filter(bucket).flatMap(finish)
+		n.all = [...inner, ...n.ids.map((i) => i.id), ...later]
 		let preferred = Object.values(defaults).find((id) => n.all.includes(id))
-		// A provider has a default only through an alias (anthropic: opus).
-		n.default = preferred ?? (n.path.includes('/') ? n.all[0] : undefined)
+		// A provider has a default only through an alias (anthropic: opus);
+		// a bucket has none, so Enter opens it.
+		n.default = bucket(n) ? undefined : preferred ?? (n.path.includes('/') ? n.all[0] : undefined)
 		n.ids.sort((a, b) => Number(b.id === n.default) - Number(a.id === n.default))
 		return n.all
 	}
@@ -143,22 +168,24 @@ function tree(ids: string[], keep = ''): Node {
 }
 
 // The rows of `node`'s children that hold a `kept` id, `open` categories
-// showing theirs.
+// showing theirs: categories, then models, then the buckets.
 function rows(node: Node, kept: Set<string>, open: (path: string) => boolean, current: string, names: Record<string, string>, depth = 0, out = { items: [] as string[], rows: [] as TreeRow[] }) {
 	let indent = '  '.repeat(depth)
-	for (let n of node.nodes) {
-		if (!n.all.some((id) => kept.has(id))) continue
+	let category = (n: Node) => {
+		if (!n.all.some((id) => kept.has(id))) return
 		let shown = open(n.path)
 		let base = n.default?.slice(n.default.indexOf('/') + 1)
 		out.items.push(`${indent}${shown ? '▼' : '▶'} ${n.name}${base ? `  (default: ${base})` : ''}`)
 		out.rows.push({ path: n.path, ...(node.path ? { parent: node.path } : {}), ...(n.default ? { default: n.default } : {}) })
 		if (shown) rows(n, kept, open, current, names, depth + 1, out)
 	}
+	node.nodes.filter((n) => !bucket(n)).forEach(category)
 	for (let { id, leaf } of node.ids) {
 		if (!kept.has(id)) continue
 		out.items.push(`${indent}${id === current ? '* ' : '  '}${leaf.padEnd(12)} ${names[id] ? `${names[id]} · ` : ''}${id}`)
 		out.rows.push({ id, parent: node.path })
 	}
+	node.nodes.filter(bucket).forEach(category)
 	return out
 }
 
@@ -178,18 +205,22 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 	let t = st.tree ?? { rows: [], open: [], current: '' }
 	let query = (st.form?.values[0] ?? '').trim()
 	let ranked = query ? picker.rank(ids, query, names) : ids
-	let built = rows(tree(ids, t.current), new Set(ranked), query ? () => true : (p) => t.open.includes(p), t.current, names)
+	let closed = t.closed ?? []
+	let built = rows(tree(ids, t.current), new Set(ranked), query ? (p) => !closed.includes(p) : (p) => t.open.includes(p), t.current, names)
 	let at = (want?: string) => (want === undefined ? -1 : built.rows.findIndex((r) => r.path === want || r.id === want))
 	let selected = at(select)
 	if (selected < 0 && query) {
-		// A matching category first, else the best model; ties go to the
-		// higher row, so the most capable of equal matches.
+		// A matching category first, else the best model; ties go to an
+		// alias's model ("claude": opus 5.5), else the higher row, so the
+		// most capable of equal matches.
 		let q = words(query)
+		let preferred = new Set(Object.values(defaults))
 		let best = (text: (r: TreeRow) => string | undefined) => {
-			let found = { i: -1, score: -1 }
+			let found = { i: -1, score: -1, preferred: false }
 			built.rows.forEach((r, i) => {
 				let s = text(r) === undefined ? undefined : score(text(r)!, q)
-				if (s !== undefined && s > found.score) found = { i, score: s }
+				let p = !!r.id && preferred.has(r.id)
+				if (s !== undefined && (s > found.score || (s === found.score && p && !found.preferred))) found = { i, score: s, preferred: p }
 			})
 			return found.i
 		}
@@ -209,25 +240,34 @@ function open(current: string, ids: string[], names: Record<string, string> = {}
 	return picker.refilter({ ...st, tree: { rows: [], open, current } }, ids, names)
 }
 
-// A key on the picker. With the search box empty, right opens the
-// selected category, left closes it or the one the selection is in, and
-// Enter on a category without a default toggles it. The rest is the
-// modal's (typing refilters; Enter picks).
+// A key on the picker. Left and right are the tree's, whatever the
+// search box holds (Ctrl-A/E move in it): right opens the selected
+// category, left closes it or the one the selection is in. Enter on a
+// category without a default toggles it. The rest is the modal's
+// (typing refilters, reopening every category; Enter picks).
 function step(st: ModalState, key: Key, ids: string[], names: Record<string, string> = {}): { state: ModalState; action?: ModalAction } {
 	let t = st.tree
 	let row = t?.rows[st.selected]
 	let plain = !key.ctrl && !key.alt && !key.cmd && !key.shift
-	let empty = !(st.form?.values[0] ?? '').trim()
-	if (t && row && plain && empty) {
-		let isOpen = !!row.path && t.open.includes(row.path)
-		let set = (open: string[], select: string) => ({ state: picker.refilter({ ...st, tree: { ...t, open } }, ids, names, select) })
-		if (row.path && (key.key === 'right' || (key.key === 'enter' && !row.default)) && !isOpen) return set([...t.open, row.path], row.path)
-		if (row.path && (key.key === 'left' || (key.key === 'enter' && !row.default)) && isOpen) return set(t.open.filter((p) => p !== row.path), row.path)
-		if (key.key === 'left' && row.parent) return set(t.open.filter((p) => p !== row.parent), row.parent)
+	if (t && row && plain && (key.key === 'left' || key.key === 'right' || (key.key === 'enter' && row.path && !row.default))) {
+		let searching = !!(st.form?.values[0] ?? '').trim()
+		let closed = t.closed ?? []
+		let isOpen = (p: string) => (searching ? !closed.includes(p) : t.open.includes(p))
+		let set = (path: string, open: boolean) => {
+			let tree = searching
+				? { ...t, closed: open ? closed.filter((p) => p !== path) : [...closed, path] }
+				: { ...t, open: open ? [...t.open, path] : t.open.filter((p) => p !== path) }
+			return { state: picker.refilter({ ...st, tree }, ids, names, path) }
+		}
+		let toggle = key.key === 'enter'
+		if (row.path && (key.key === 'right' || toggle) && !isOpen(row.path)) return set(row.path, true)
+		if (row.path && (key.key === 'left' || toggle) && isOpen(row.path)) return set(row.path, false)
+		if (key.key === 'left' && row.parent) return set(row.parent, false)
+		return { state: st }
 	}
 	let r = modals.step(st, key)
 	if (r.action || r.state.form?.values[0] === st.form?.values[0]) return r
-	return { state: picker.refilter(r.state, ids, names) }
+	return { state: picker.refilter({ ...r.state, ...(t ? { tree: { ...t, closed: [] } } : {}) }, ids, names) }
 }
 
 // The command Enter sends: switch the session to the selected model, or

@@ -15,9 +15,10 @@ import { forms, type Answers, type Form, type FormState, type Key } from './form
 // What each list row of a tree modal is: a model `id`, or a category
 // `path` ("anthropic/opus") with the model Enter picks for it. `parent` is
 // the category the row is in. `open` holds the categories shown open
-// while the search box is empty; `current` is the session's model.
+// while the search box is empty; while searching every category is open
+// but those in `closed`. `current` is the session's model.
 export type TreeRow = { id?: string; path?: string; parent?: string; default?: string }
-export type Tree = { rows: TreeRow[]; open: string[]; current: string }
+export type Tree = { rows: TreeRow[]; open: string[]; closed?: string[]; current: string }
 
 export type ModalState = {
 	title: string

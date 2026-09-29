@@ -440,7 +440,7 @@ test('Ctrl-M asks the host for the models; the picker filters as you type and En
 	expect(modal.tree?.rows[modal.selected]?.id).toBe('anthropic/x')
 	// Left closes the current model's category: the tree keys reach the picker.
 	app.onKeys([key('left')])
-	expect(app.view().modal!.items[app.view().modal!.selected]).toMatch(/^▶ anthropic/)
+	expect(app.view().modal!.items[app.view().modal!.selected]).toMatch(/▶ other$/)
 	type('opus-5.5')
 	expect(app.view().modal!.items[app.view().modal!.selected]).toMatch(/anthropic\/claude-opus-5-5$/)
 	enter()
