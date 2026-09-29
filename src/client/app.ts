@@ -41,7 +41,8 @@ import { titles } from '../common/titles.ts'
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
 // `editing`: the last prompt is in the editor (src/common/amend.ts).
-// `modal`: client-only UI; onModal submits, onModalKey refilters.
+// `modal`: client-only UI; onModal submits, onModalKey (if set) takes
+// its keys instead of modals.step (the picker's tree keys).
 // `choices`: tab completion's, listed below the prompt until a key.
 // `tabs`: the host's, in order; `focus`: the one shown; `asked`: the tab
 // this client's own tab command named, focused once it is in the list;
@@ -60,7 +61,7 @@ export type AppState = {
 	editing?: Editing
 	modal?: ModalState
 	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
-	onModalKey?: (modal: ModalState) => ModalState
+	onModalKey?: (modal: ModalState, key: KeyEvent) => ReturnType<typeof modals.step>
 	older: Map<string, Backfill>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout>; choices?: string[]
 }
 
@@ -268,9 +269,8 @@ function onKeys(events: KeyEvent[]): void {
 		// Tab and command keys, whatever has the keys.
 		if (app.tabKey(k) || clientCommands.key(k)) continue
 		if (st.modal) {
-			let { state, action } = modals.step(st.modal, k)
+			let { state, action } = st.onModalKey ? st.onModalKey(st.modal, k) : modals.step(st.modal, k)
 			st.modal = state
-			if (!action && st.onModalKey) st.modal = st.onModalKey(state)
 			if (!action) continue
 			let submit = st.onModal
 			app.close()
@@ -345,7 +345,7 @@ function pick(event: Event & { type: 'models' }): void {
 	app.open(
 		picker.open(event.current, event.items, event.names),
 		(action, modal) => picker.command(id, modal, action),
-		(modal) => picker.refilter(modal, event.items, event.names),
+		(modal, key) => picker.step(modal, key, event.items, event.names),
 	)
 }
 

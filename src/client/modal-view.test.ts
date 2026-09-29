@@ -71,9 +71,9 @@ test('a modal keeps its height whatever it holds or is typed into it', () => {
 	let first = at({ title: 'Models', form: search, items: names(300) })
 	for (let spec of [{ title: 'Models', form: search }, { title: 'Models', items: names(2) }]) expect(at(spec)).toEqual(first)
 	expect(at({ title: 'Models', form: search, items: names(300) }, 'a long search '.repeat(9))).toEqual(first)
-	// 80% of the rows, at most 50.
+	// 80% of the rows, at most 36.
 	let tall = at({ title: 'Models', items: names(2) }, '', 100)
-	expect(tall.bottom - tall.top + 1).toBe(50)
+	expect(tall.bottom - tall.top + 1).toBe(36)
 })
 
 test('a modal list scrolls to its selection; the cursor is in the search box', () => {

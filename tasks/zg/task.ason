@@ -1,0 +1,12 @@
+{
+	title: 'Model picker tree like the old Hal',
+	spec: "The model picker is the old Hal's tree (tasks/w4/forms.md, Model picker): provider, family or vendor, models; ▶/▼ show closed and open categories, right/left open and close them, Enter on a category picks its default (gpt → gpt-6-sol, opus → opus 5.5). Typing matches categories too and selects the matching one first (gp → openai/gpt, opus → anthropic/opus), else the best-ranked model. Modal text fields have Ctrl-A/E, Ctrl-U/K and Alt-Backspace (Ctrl-W stays close-tab). Modals are 80% of the rows, at most 36.",
+	status: 'done',
+	needs: [],
+	foldInto: [
+		'0x'
+	],
+	notes: [
+		"ModalState.tree (rows parallel to items: id or category path, parent, default; open paths; current) replaced the earlier choices map keyed by row text. picker.step wraps modals.step for tree keys; client app.open's onKey hook now takes (modal, key) and replaces modals.step. picker.defaults is also what models.resolve uses for gpt/opus. The terminal modal list used to squash whitespace, which erased tree indentation: it now only turns newlines/tabs into spaces; web li is white-space: pre. Families need 2+ models of one direct provider, so haiku alone is a leaf."
+	]
+}

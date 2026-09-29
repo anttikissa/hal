@@ -10,7 +10,7 @@ import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
-import { modals, type ModalState } from '../common/modals.ts'
+import type { ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
@@ -94,8 +94,8 @@ function closed(st: ViewState): ViewState {
 // A key on the open modal: the view after and the command Enter sends.
 function modalKey(st: ViewState, k: Key): { state: ViewState; command?: unknown } {
 	if (!st.modal || !st.transcript) return { state: st }
-	let { state, action } = modals.step(st.modal, k)
-	if (!action) return { state: { ...st, modal: picker.refilter(state, st.models ?? [], st.names) } }
+	let { state, action } = picker.step(st.modal, k, st.models ?? [], st.names)
+	if (!action) return { state: { ...st, modal: state } }
 	let command = action.type === 'submit' ? picker.command(st.transcript.meta.id, state, action) : undefined
 	return command ? { state: closed(st), command } : { state: closed(st) }
 }

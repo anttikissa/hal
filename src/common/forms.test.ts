@@ -37,6 +37,14 @@ test('a pasted newline stays one line', () => {
 	expect(press(forms.start('q1', name), [k('paste', 'a\nb'), k('enter')]).action).toEqual({ type: 'submit', answers: { name: 'a b' } })
 })
 
+test('a text field has the prompt basic line keys', () => {
+	let ctrl = (c: string) => k(c, undefined, { ctrl: true })
+	let run = (keys: Key[]) => press(forms.start('q1', name), [...typed('one two three'), ...keys]).st
+	expect(run([k('left'), k('left'), ctrl('u')])).toMatchObject({ values: ['ee'], cursor: 0 })
+	expect(run([ctrl('a'), k('right'), ctrl('k')])).toMatchObject({ values: ['o'], cursor: 1 })
+	expect(run([ctrl('a'), ctrl('e'), k('backspace', undefined, { alt: true })])).toMatchObject({ values: ['one two '], cursor: 8 })
+})
+
 test('y/N: Enter takes the default, y answers at once, arrows change it', () => {
 	let start = forms.start('q1', yesNo)
 	expect(press(start, [k('enter')]).action).toEqual({ type: 'submit', answers: { ok: 'no' } })

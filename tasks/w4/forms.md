@@ -149,27 +149,43 @@ the transcript to its left and right, then one blank column, an outline
 and the contents. The diff renderer treats it like any frame change; no
 extra terminal state is needed. (The old Hal blanked whole rows.)
 
-Height is fixed while open: 80% of the rows, at most 50. Contents
+Height is fixed while open: 80% of the rows, at most 36. Contents
 scroll. Typing into a search box never changes the height.
 
-## Model picker (later task for the tree)
+## Model picker
 
 ```
-Current model: anthropic/claude-opus-5-5:high
-Search: opu_
-Models:
-  > hal/
-  > openai/
-  v anthropic/
-      > fable
-      v opus (default: opus-5-5)
-*         5.5   Opus 5.5 (anthropic/claude-opus-5-5)  <- default
-          5.0   Opus 5 (anthropic/claude-opus-5)
-Thinking: [xxxx ] high  (left/right: change)
+╭─ Model: anthropic/claude-opus-5-5 ─────────────────────────╮
+│ Search: _                                                   │
+│   ▶ hal                                                     │
+│   ▶ openai  (default: gpt-6-sol)                            │
+│   ▼ anthropic  (default: claude-opus-5-5)                   │
+│     ▼ opus  (default: claude-opus-5-5)                      │
+│ >     * 5.5          Claude Opus 5.5 · anthropic/claude-... │
+│         5            anthropic/claude-opus-5                │
+│     ▶ sonnet  (default: claude-sonnet-5)                    │
+│   ▶ openrouter                                              │
+╰─ ←/→: close/open, enter: pick, esc: cancel ─────────────────╯
 ```
 
-The first picker is a plain filtered list with ranking that works
-(`opus-5.5` finds claude-opus-5-5 first).
+A tree like the old Hal's: provider (old Hal's order: hal, openai,
+anthropic, google, opencode-go, openrouter, then the rest), then the
+family when two or more of a direct provider's models share one (opus,
+gpt, kimi…; the leaf is the rest of the name, `5-5` shown as `5.5`), or
+the vendor for a reseller (openrouter/moonshotai/kimi-k2). ▶/▼ mark
+closed/open categories; it opens with the current model's categories
+open and selected (`*` marks it). With the search box empty, right opens
+the selected category and left closes it or the one the selection is in;
+Enter on a category picks its default (the alias's model: gpt →
+gpt-6-sol, opus → claude-opus-5-5; else a family's or vendor's newest; a
+provider has one only through an alias), and on one without a default
+opens or closes it. Typing ranks the models (`opus-5.5` finds
+claude-opus-5-5 first), shows only the matches with their categories
+open, and selects a matching category first (`gp` selects openai/gpt,
+`opus` anthropic/opus), else the best-ranked model. Emptying the search
+(Ctrl-U) brings back the tree and the current model. On the web, left
+and right reach the tree while the search box is empty, and a tap is
+Enter.
 
 ## Find / filter (later task)
 

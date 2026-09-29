@@ -56,9 +56,11 @@ function key(e: KeyInput, target: Target): boolean {
 	// The message box may hold text no input event told us about.
 	if (target.kind === 'message' && target.text !== st.text) app.input(target.text)
 	let k = view.key(e)
-	// The modal takes the keys first; its search box edits natively.
+	// The modal takes the keys first; its search box edits natively, but
+	// while it is empty left and right open and close the tree.
 	if (st.view.modal) {
-		if (!k || !['enter', 'escape', 'up', 'down'].includes(k.key)) return false
+		let tree = !st.view.modal.form?.values[0] ? ['left', 'right'] : []
+		if (!k || ![...tree, 'enter', 'escape', 'up', 'down'].includes(k.key)) return false
 		app.modalKey(k)
 		return true
 	}

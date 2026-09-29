@@ -12,14 +12,21 @@
 
 import { forms, type Answers, type Form, type FormState, type Key } from './forms.ts'
 
+// What each list row of a tree modal is: a model `id`, or a category
+// `path` ("anthropic/opus") with the model Enter picks for it. `parent` is
+// the category the row is in. `open` holds the categories shown open
+// while the search box is empty; `current` is the session's model.
+export type TreeRow = { id?: string; path?: string; parent?: string; default?: string }
+export type Tree = { rows: TreeRow[]; open: string[]; current: string }
+
 export type ModalState = {
 	title: string
 	/** Key hints for the outline, such as "enter: switch". */
 	hint?: string
 	form?: FormState
 	items: string[]
-	/** Model picker group row -> default model; other modals omit this. */
-	choices?: Record<string, string>
+	/** The model picker's tree (common/picker.ts); other modals omit it. */
+	tree?: Tree
 	selected: number
 	/** The first list row in view; clients keep it with modals.scroll. */
 	scroll: number

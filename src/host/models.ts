@@ -8,6 +8,7 @@
 // its list from the models.dev cache (task qq) plus its built-in one.
 
 import { blocks } from '../common/blocks.ts'
+import { picker } from '../common/picker.ts'
 import { settings } from '../common/settings.ts'
 import { existsSync } from 'fs'
 import { apiKeys } from './api-keys.ts'
@@ -102,7 +103,7 @@ function resolve(input: string): { id?: string; login?: string } {
 	let own = family === 'gpt' ? 'openai' : family === 'claude' || family === 'opus' ? 'anthropic' : undefined
 	let needle = family === 'claude' || family === 'opus' ? 'opus' : family
 	let candidates = models.known().filter((id) => id.split('/').slice(1).join('/').toLowerCase().includes(needle))
-	let preferred = family === 'gpt' ? 'openai/gpt-6-sol' : own ? 'anthropic/claude-opus-5-5' : undefined
+	let preferred = family === 'gpt' ? picker.defaults.gpt : own ? picker.defaults.opus : undefined
 	if (preferred) candidates = [preferred, ...candidates.filter((id) => id !== preferred)]
 	let providers = own ? [own] : ['opencode-go', 'openrouter']
 	for (let name of providers) {

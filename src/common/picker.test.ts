@@ -38,32 +38,66 @@ test('an empty query keeps the host order', () => {
 })
 
 const key = (k: string, text?: string): Key => (text === undefined ? { key: k } : { key: k, text })
+const tree = [...ids, 'openai/gpt-6-terra', 'openai/gpt-6-sol', 'openai/gpt-5.5', 'openrouter/moonshotai/kimi-k2']
 function type(st: ReturnType<typeof picker.open>, s: string) {
-	for (let c of s) st = picker.refilter(modals.step(st, key(c, c)).state, ids)
+	for (let c of s) st = picker.step(st, key(c, c), tree).state
 	return st
 }
-
-test('the picker opens on the current model and filters as you type', () => {
-	let st = picker.open('anthropic/claude-sonnet-4-5', ids)
-	expect(st.items).toEqual(expect.arrayContaining(['anthropic/  (4 models)', '  anthropic/opus  (default: claude-opus-5-5)']))
-	expect(st.choices?.[st.items[st.selected]!]).toBe('anthropic/claude-sonnet-4-5')
-	expect(st.title).toContain('anthropic/claude-sonnet-4-5')
-	st = type(st, 'opus-5.5')
-	expect(st.items[st.selected]).toBe('anthropic/claude-opus-5-5')
+const press = (st: ReturnType<typeof picker.open>, k: Key) => picker.step(st, k, tree).state
+const enter = (st: ReturnType<typeof picker.open>) => {
 	let { action } = modals.step(st, key('enter'))
-	expect(action?.type === 'submit' && picker.command('s1', st, action)).toEqual({ type: 'submit', sessionId: 's1', text: '/model anthropic/claude-opus-5-5' })
+	return action?.type === 'submit' ? picker.command('s1', st, action)?.text : undefined
+}
+const selected = (st: ReturnType<typeof picker.open>) => st.items[st.selected]!.trim()
+
+test('the picker opens as a tree on the current model, its categories open', () => {
+	let st = picker.open('anthropic/claude-sonnet-4-5', tree, { 'anthropic/claude-opus-5-5': 'Opus 5.5' })
+	expect(st.title).toContain('anthropic/claude-sonnet-4-5')
+	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▶ openai', '▼ anthropic', '▶ opus', '* claude-sonnet-4-5 anthropic/claude-sonnet-4-5', '▶ openrouter'])
+	expect(selected(st)).toContain('anthropic/claude-sonnet-4-5')
+	expect(enter(st)).toBe('/model anthropic/claude-sonnet-4-5')
 })
 
-test('Enter on a family uses its newest model; grouped models retain their display names', () => {
-	let st = picker.open('hal/intro', ids, { 'anthropic/claude-opus-5-5': 'Opus 5.5' })
-	let row = st.items.findIndex((item) => item.startsWith('  anthropic/opus  '))
-	expect(st.items.some((item) => item.includes('Opus 5.5'))).toBe(true)
-	expect(picker.command('s1', st, { type: 'submit', answers: {}, item: row })).toEqual({ type: 'submit', sessionId: 's1', text: '/model anthropic/claude-opus-5-5' })
+test('typing a family selects its category, and Enter there picks its default', () => {
+	let st = picker.open('hal/intro', tree)
+	let gpt = type(st, 'gp')
+	expect(selected(gpt)).toMatch(/^▼ gpt/)
+	expect(enter(gpt)).toBe('/model openai/gpt-6-sol')
+	let opus = type(st, 'opus')
+	expect(selected(opus)).toMatch(/^▼ opus/)
+	expect(enter(opus)).toBe('/model anthropic/claude-opus-5-5')
+	// A provider defaults through its alias; a reseller's vendor to its newest.
+	expect(enter(type(st, 'anthropic'))).toBe('/model anthropic/claude-opus-5-5')
+	expect(enter(type(st, 'moonshot'))).toBe('/model openrouter/moonshotai/kimi-k2')
+})
+
+test('typing a model selects the best match, shown in its open categories', () => {
+	let st = type(picker.open('hal/intro', tree), 'opus-5.5')
+	expect(selected(st)).toMatch(/anthropic\/claude-opus-5-5$/)
+	expect(st.items.filter((r) => r.includes('▼')).length).toBeGreaterThan(0)
+	expect(enter(st)).toBe('/model anthropic/claude-opus-5-5')
+	// Ctrl-U empties the search: the tree and the current model are back.
+	st = press(st, { key: 'u', ctrl: true })
+	expect(st.form?.values[0]).toBe('')
+	expect(selected(st)).toMatch(/hal\/intro$/)
+})
+
+test('right opens a category, left closes it or the one the selection is in', () => {
+	let st = picker.open('anthropic/claude-opus-5', tree)
+	expect(selected(st)).toMatch(/anthropic\/claude-opus-5$/)
+	st = press(st, key('left'))
+	expect(selected(st)).toMatch(/^▶ opus/)
+	st = press(st, key('left'))
+	expect(selected(st)).toMatch(/^▶ anthropic/)
+	st = press(press(st, key('up')), key('right'))
+	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▼ openai', '▶ gpt', '▶ anthropic', '▶ openrouter'])
+	// Enter on a category without a default opens it instead.
+	st = press(press(st, key('up')), key('enter'))
+	expect(st.items.some((r) => r.includes('hal/intro'))).toBe(true)
 })
 
 test('Enter with nothing matching switches to nothing', () => {
-	let st = type(picker.open('hal/intro', ids), 'zzz')
+	let st = type(picker.open('hal/intro', tree), 'zzz')
 	expect(st.items).toEqual([])
-	let { action } = modals.step(st, key('enter'))
-	expect(action?.type === 'submit' && picker.command('s1', st, action)).toBeUndefined()
+	expect(enter(st)).toBeUndefined()
 })

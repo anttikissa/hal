@@ -178,6 +178,9 @@ test('Ctrl-M asks for models; the picker takes the keys and a click picks', () =
 	expect(app.state.view.modal).toBeDefined()
 	// Plain keys go to the search box.
 	expect(press('x', { kind: 'other' })).toBe(false)
+	// A tap on a category without a default opens it; then on its model.
+	app.modalPick(app.state.view.modal!.items.indexOf('▶ x'))
+	expect(sent.at(-1)).toMatchObject({ type: 'models' })
 	app.modalPick(app.state.view.modal!.items.findIndex((item) => item.includes('x/y')))
 	expect(sent.at(-1)).toMatchObject({ type: 'submit', text: '/model x/y' })
 	expect(app.state.view.modal).toBeUndefined()

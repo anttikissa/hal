@@ -13,11 +13,11 @@ type Cursor = { row: number; col: number }
 
 /**
  * Where a modal goes on a terminal of `rows` × `cols`: a fixed height
- * (80% of the rows, at most 50) and width, centred across. Outside it
+ * (80% of the rows, at most 36) and width, centred across. Outside it
  * on each side: at least one blank column and one of transcript.
  */
 function modalBox(rows: number, cols: number): { height: number; width: number; left: number } {
-	let height = Math.min(rows, Math.max(3, Math.min(50, Math.floor(rows * 0.8))))
+	let height = Math.min(rows, Math.max(3, Math.min(36, Math.floor(rows * 0.8))))
 	let width = cols < 10 ? cols : Math.min(100, cols - 2 * Math.max(2, Math.round(cols * 0.1)))
 	return { height, width, left: Math.floor((cols - width) / 2) }
 }
@@ -47,7 +47,8 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	let current = colors.popupCurrent()
 	let cursor = fields.cursor ?? { row: content.length, col: 0 }
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
-		let row = strings.clipVisual((i === m.selected ? '> ' : '  ') + ansi.clean(m.items[i]!).replace(/\s+/g, ' '), inner)
+		// Leading spaces are the picker's tree indentation: keep them.
+		let row = strings.clipVisual((i === m.selected ? '> ' : '  ') + ansi.clean(m.items[i]!).replace(/[\r\n\t]+/g, ' '), inner)
 		if (i === m.selected) {
 			if (!fields.cursor) cursor = { row: content.length, col: 0 }
 			// Monochrome: reverse video instead of the highlight colour.

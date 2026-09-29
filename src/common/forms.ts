@@ -196,15 +196,29 @@ function step(st: FormState, key: Key): { state: FormState; action?: FormAction 
 	let bounds = edges(value)
 	let before = bounds.filter((b) => b < st.cursor).at(-1) ?? 0
 	let after = bounds.find((b) => b > st.cursor) ?? value.length
-	switch (key.key) {
+	// The prompt's basic line keys: Ctrl-A/E ends, Ctrl-U/K clear before
+	// or after the cursor, Alt-Backspace the word before it (Ctrl-W stays
+	// the close-tab key).
+	let chord = (key.ctrl ? 'C-' : key.alt ? 'M-' : '') + key.key
+	switch (chord) {
 		case 'left':
 			return { state: { ...st, cursor: before } }
 		case 'right':
 			return { state: { ...st, cursor: after } }
 		case 'home':
+		case 'C-a':
 			return { state: { ...st, cursor: 0 } }
 		case 'end':
+		case 'C-e':
 			return { state: { ...st, cursor: value.length } }
+		case 'C-u':
+			return put(value.slice(st.cursor), 0)
+		case 'C-k':
+			return put(value.slice(0, st.cursor), st.cursor)
+		case 'M-backspace': {
+			let start = value.slice(0, st.cursor).search(/\S*\s*$/)
+			return put(value.slice(0, start) + value.slice(st.cursor), start)
+		}
 		case 'backspace':
 			return st.cursor ? put(value.slice(0, before) + value.slice(st.cursor), before) : { state: st }
 		case 'delete':
