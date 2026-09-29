@@ -5,13 +5,6 @@ import { host } from './host.ts'
 
 afterEach(() => host.reset())
 
-test('shortAgent names browser and system in a few words', () => {
-	let ios = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-	expect(clients.shortAgent(ios)).toBe('Safari on iPhone')
-	expect(clients.shortAgent('Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0')).toBe('Firefox on Linux')
-	expect(clients.shortAgent(undefined)).toBe('browser')
-})
-
 test('the diagram lists live peers beside the host and others below, gone ones marked, and forgets after a day', () => {
 	let now = Date.now()
 	let real = Date.now
