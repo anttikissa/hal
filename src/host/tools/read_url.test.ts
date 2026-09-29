@@ -40,6 +40,15 @@ test('HTML title, blocks, entities and redirects; plain text and JSON pass throu
 	expect(await tool.run({ url: url() }, ctx())).toBe('a\n  b\n')
 })
 
+test('an empty HTML app shell or empty text tells the model nothing was read', async () => {
+	response = () => new Response('<html><head><script src="/app.js"></script></head><body><div id="app"></div></body></html>', { headers: { 'content-type': 'text/html' } })
+	let shell = await tool.run({ url: url('/article') }, ctx())
+	expect(shell).toContain('No readable content found')
+	expect(shell).toContain(url('/article'))
+	response = () => new Response('', { headers: { 'content-type': 'text/plain' } })
+	expect(await tool.run({ url: url('/empty') }, ctx())).toContain('No readable content found')
+})
+
 test('bad schemes and HTTP errors cannot masquerade as successful content', async () => {
 	for (let bad of ['file:///etc/passwd', 'data:text/plain,hi', 'javascript:alert(1)']) await expect(tool.run({ url: bad }, ctx())).rejects.toThrow(/http or https/)
 	expect(requested).toEqual([])

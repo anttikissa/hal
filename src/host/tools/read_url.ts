@@ -67,6 +67,7 @@ export const tool: Tool<ToolOutput> & { maxTextBytes: () => number } = {
 			let { bytes, cut } = await body(res, tool.maxTextBytes())
 			let text = new TextDecoder().decode(bytes)
 			let readable = type === 'text/html' || type === 'application/xhtml+xml' ? htmlText(text) : text
+			if (!readable.trim()) return `No readable content found at ${res.url} (empty page or JavaScript-rendered page).`
 			let max = tools.maxChars() - 100
 			let more = cut ? `more than ${tool.maxTextBytes()} bytes; ` : ''
 			if (readable.length > max) return `${readable.slice(0, max)}\n[output truncated: ${more}${readable.length - max} more characters]`
