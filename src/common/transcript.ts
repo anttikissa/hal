@@ -138,7 +138,7 @@ function recordItems(r: HistoryRecord, at: number): Item[] {
 }
 
 function recordShown(r: HistoryRecord): Shown[] {
-	if (r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
+	if (r.type === 'file_changes' || r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
 	if (r.type === 'question') return [r.from ? { type: 'question', id: r.id, form: r.form, command: true } : { type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'compact' || r.type === 'reset') return [{ type: 'divider', text: transcript.boundary(r) }]

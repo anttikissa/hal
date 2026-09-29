@@ -170,4 +170,9 @@ function held(records: HistoryRecord[]): { calls: ToolCallBlock[]; decided: Map<
 	return asked ? { calls, decided } : undefined
 }
 
-export const approval = { segments, tmpVars, safeTmp, cdTarget, dirs, marks, form, declined, held }
+// Shared best-effort sensitive-path policy: snapshots never retain bytes.
+function sensitive(path: string): boolean {
+	return /(?:^|\/)(?:\.env(?:\.[^/]*)?|\.ssh|\.aws|\.gnupg|credentials(?:\.[^/]*)?|auth\.ason|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?)(?:\/|$)/i.test(path) || /\.(?:pem|key|p12|pfx)$/i.test(path)
+}
+
+export const approval = { segments, tmpVars, safeTmp, cdTarget, dirs, marks, form, declined, held, sensitive }

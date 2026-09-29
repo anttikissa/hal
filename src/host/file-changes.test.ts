@@ -1,0 +1,124 @@
+import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { replay } from '../common/replay.ts'
+import { transcript } from '../common/transcript.ts'
+import { fileChanges } from './file-changes.ts'
+import { history } from './history.ts'
+import { sessions } from './sessions.ts'
+import { tools } from './tools.ts'
+import type { ToolContext } from './tools.ts'
+
+let home = '', cwd = '', id = ''
+const savedHome = process.env.HAL_HOME
+beforeEach(async () => {
+	home = mkdtempSync(`${tmpdir()}/hal-file-changes-`)
+	process.env.HAL_HOME = home
+	cwd = `${home}/repo`
+	mkdirSync(cwd)
+	id = sessions.create({ cwd, model: 'fake/m' }).id
+	await fileChanges.git(cwd, ['init', '-q'])
+})
+afterEach(() => {
+	sessions.closeAll()
+	if (savedHome === undefined) delete process.env.HAL_HOME
+	else process.env.HAL_HOME = savedHome
+	rmSync(home, { recursive: true, force: true })
+})
+const context = (sessionId = id): ToolContext => ({ sessionId, cwd, signal: new AbortController().signal, callId: 'c1' })
+const bash = (command: string, modifies?: unknown, ctx = context()) => tools.run({ type: 'tool_call', id: ctx.callId!, name: 'bash', input: { command, description: 'Change test files', ...(modifies === undefined ? {} : { modifies }) } }, ctx)
+const changes = () => history.readSync(id).filter((r) => r.type === 'file_changes')
+const bytes = (hash: unknown) => readFileSync(fileChanges.blobPath(id, hash as string))
+
+// One integration test covers all snapshot transitions and the Git observation
+// boundary, including a dirty file whose status stays unchanged.
+test('snapshots creations, edits, deletes and new glob matches; observes undeclared status only', async () => {
+	writeFileSync(`${cwd}/edit`, 'old')
+	writeFileSync(`${cwd}/gone`, 'delete me')
+	writeFileSync(`${cwd}/same`, 'untouched')
+	await fileChanges.git(cwd, ['add', '.'])
+	let result = await bash('printf new > edit; rm gone; touch same; printf created > new.txt; printf other > other', ['edit', 'gone', 'same', '*.txt'])
+	expect(result.isError).toBeUndefined()
+	let r = changes()[0]!
+	expect(r).toMatchObject({ toolId: 'c1', cwd })
+	expect(r.files.map((f) => f.path).sort()).toEqual(['edit', 'gone', 'new.txt', 'other'])
+	let edit = r.files.find((f) => f.path === 'edit')!
+	expect(bytes(edit.before).toString()).toBe('old')
+	expect(bytes(edit.after).toString()).toBe('new')
+	let gone = r.files.find((f) => f.path === 'gone')!
+	expect(bytes(gone.before).toString()).toBe('delete me')
+	expect(gone.after).toBeNull()
+	let fresh = r.files.find((f) => f.path === 'new.txt')!
+	expect(fresh.before).toBeNull()
+	expect(bytes(fresh.after).toString()).toBe('created')
+	expect(r.files.find((f) => f.path === 'other')).toEqual({ path: 'other', undeclared: true, statusBefore: null, statusAfter: '??' })
+	expect(replay.toMessages([r])).toEqual([])
+	expect(transcript.recordItems(r, 0)).toEqual([])
+	await bash('printf different > edit; printf new > surprise')
+	expect(changes()[1]!.files.map((f) => f.path)).toEqual(['surprise'])
+})
+
+test('sensitive paths and symlink aliases, and large files retain metadata not bytes', async () => {
+	writeFileSync(`${cwd}/.env`, 'private')
+	symlinkSync('.env', `${cwd}/alias`)
+	writeFileSync(`${cwd}/large`, Buffer.alloc(fileChanges.maxBytes() + 1))
+	await bash('printf changed-secret > .env; printf x >> large', ['.env', 'alias', 'large'])
+	let files = changes()[0]!.files
+	expect(files).toHaveLength(3)
+	for (let f of files) {
+		expect(typeof f.before).toBe('object')
+		expect(typeof f.after).toBe('object')
+		expect(f.after).toHaveProperty('size')
+	}
+	expect(readFileSync(history.file(id), 'utf8')).not.toContain('private')
+	expect(() => bytes('..')).toThrow('invalid snapshot hash')
+})
+
+test('overlapping aliases wait across sessions; disjoint and undeclared calls do not; waiting cancels', async () => {
+	writeFileSync(`${cwd}/file`, 'old')
+	symlinkSync('file', `${cwd}/alias`)
+	let owner = await fileChanges.begin(context(), ['file'])
+	let second = sessions.create({ cwd, model: 'fake/m' }).id
+	let chunks: string[] = []
+	let waiting = false
+	let next = fileChanges.begin({ ...context(second), onOutput: (c) => { chunks.push(c); waiting = true } }, ['alias'])
+	for (let i = 0; i < 100 && !waiting; i++) await Bun.sleep(5)
+	expect(chunks.join('')).toContain(`waiting for ${id} (editing file)`)
+	let disjoint = await fileChanges.begin(context(second), ['other'])
+	disjoint.release()
+	let undeclared = await fileChanges.begin(context(second), [])
+	undeclared.release()
+	let controller = new AbortController()
+	let cancelled = fileChanges.begin({ ...context(second), signal: controller.signal }, ['file'])
+	controller.abort()
+	await expect(cancelled).rejects.toThrow('cancelled')
+	writeFileSync(`${cwd}/file`, 'first')
+	await fileChanges.finish(owner)
+	let acquired = await next
+	expect(bytes(acquired.before.get('alias')).toString()).toBe('first')
+	acquired.release()
+	expect(fileChanges.state.locks).toHaveLength(0)
+})
+
+test('background calls hold overlapping locks until exit and record final bytes', async () => {
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', name: 'bash', id: 'bg', input: {} } })
+	let result = await tools.run({ type: 'tool_call', id: 'bg', name: 'bash', input: { command: 'sleep 0.3; printf background > file', description: 'Create later', background: true, modifies: ['file'] } }, context())
+	expect(result.output).toContain('started in background')
+	let seen = false
+	let other = sessions.create({ cwd, model: 'fake/m' }).id
+	let next = bash('printf foreground >> file', ['file'], { ...context(other), onOutput: () => { seen = true } })
+	await next
+	expect(seen).toBe(true)
+	expect(readFileSync(`${cwd}/file`, 'utf8')).toBe('backgroundforeground')
+	expect(bytes(changes()[0]!.files[0]!.after).toString()).toBe('background')
+})
+
+test('invalid declarations never execute; failed commands still retain changes', async () => {
+	for (let modifies of ['file', [null], ['/tmp/file'], ['../file']]) {
+		expect((await bash('touch ran', modifies)).isError).toBe(true)
+	}
+	expect(changes()).toHaveLength(0)
+	let result = await bash('printf changed > file; exit 4', ['file'])
+	expect(result.output).toContain('[exit 4]')
+	expect(bytes(changes()[0]!.files[0]!.after).toString()).toBe('changed')
+})

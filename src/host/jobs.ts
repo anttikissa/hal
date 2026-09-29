@@ -74,11 +74,11 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 // Runs `command` for session `sessionId` in the background. One that
 // ends within jobs.graceMs() (not found, a syntax error) returns its
 // result as a foreground one would; otherwise its id.
-async function start(sessionId: string, command: string, cwd: string, ms?: number, callId?: string): Promise<string> {
+async function start(sessionId: string, command: string, cwd: string, ms?: number, callId?: string, prepared?: () => Run): Promise<string> {
 	let call = callId ? history.readSync(sessionId).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === callId) : undefined
 	if (call?.n === undefined) throw new Error('background Bash call has no recorded block id')
 	let id = `${sessionId}:${call.n}`
-	let run = jobs.exec(command, cwd, ms)
+	let run = prepared ? prepared() : jobs.exec(command, cwd, ms)
 	let early = await Promise.race([run.done, Bun.sleep(jobs.graceMs()).then(() => undefined)])
 	if (early !== undefined) return early
 	jobs.state.running.set(id, { sessionId, stop: run.stop })

@@ -3,6 +3,7 @@
 // (tools.ts).
 
 import { jobs } from '../jobs.ts'
+import { fileChanges } from '../file-changes.ts'
 import type { Tool } from '../tools.ts'
 
 export const tool: Tool = {
@@ -21,6 +22,7 @@ export const tool: Tool = {
 			},
 			timeout: { type: 'integer', description: 'Timeout in ms (default: 120000 foreground, 600000 background)' },
 			background: { type: 'boolean', description: 'Run in the background, e.g. a long build or a server' },
+			modifies: { type: 'array', items: { type: 'string' }, description: 'Paths or globs relative to cwd that this command creates, changes or deletes. Declare for every writing command.' },
 		},
 		required: ['command', 'description'],
 	},
@@ -28,16 +30,26 @@ export const tool: Tool = {
 		if (typeof input.command !== 'string' || !input.command.trim()) throw new Error('command must be a non-empty string')
 		if (typeof input.description !== 'string' || !input.description.trim()) throw new Error('description must be a non-empty sentence; the command did not run')
 		if (input.background !== undefined && typeof input.background !== 'boolean') throw new Error('background must be a boolean; the command did not run')
+		let patterns = fileChanges.validate(input.modifies)
 		if (ctx.signal.aborted) throw new Error('cancelled; the command did not run')
 		let given = Number(input.timeout) > 0 ? Number(input.timeout) : undefined
-		// Escape does not stop a background job, but its timer always does.
-		if (input.background) return jobs.start(ctx.sessionId, input.command, ctx.cwd, given ?? jobs.backgroundMs(), ctx.callId)
-		let run = jobs.exec(input.command, ctx.cwd, given ?? 120_000, ctx.onOutput)
-		ctx.signal.addEventListener('abort', run.stop, { once: true })
+		let observation = await fileChanges.begin(ctx, patterns)
+		let launched = false
+		let launch = () => {
+			if (ctx.signal.aborted) throw new Error('cancelled; the command did not run')
+			let run = jobs.exec(input.command as string, ctx.cwd, given ?? (input.background ? jobs.backgroundMs() : 120_000), input.background ? undefined : ctx.onOutput)
+			launched = true
+			return { ...run, done: run.done.finally(() => fileChanges.finish(observation)) }
+		}
 		try {
-			return await run.done
+			// Escape does not stop a background job. Its snapshot and lock
+			// last until actual exit, not until the early tool result.
+			if (input.background) return await jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId, launch)
+			let run = launch()
+			ctx.signal.addEventListener('abort', run.stop, { once: true })
+			try { return await run.done } finally { ctx.signal.removeEventListener('abort', run.stop) }
 		} finally {
-			ctx.signal.removeEventListener('abort', run.stop)
+			if (!launched) observation.release()
 		}
 	},
 }

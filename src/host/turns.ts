@@ -262,7 +262,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
 			for (let call of calls) {
 				if (call.name !== 'ask' && decided.get(call.id) === false) { results.push(approval.declined(call)); continue }
-				let stream = call.name === 'bash' && call.input.background !== true ? toolOutput.start(id, call.id) : undefined
+				let stream = call.name === 'bash' ? toolOutput.start(id, call.id) : undefined
 				try { results.push(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx)) }
 				finally { stream?.stop() }
 			}

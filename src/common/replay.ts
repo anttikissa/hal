@@ -10,6 +10,13 @@ import type { Answers, Form } from './forms.ts'
 // (the old Escape and restart) and read as paused.
 export type TurnStatus = 'completed' | 'paused' | 'error' | 'cancelled' | 'interrupted'
 
+// A hash names raw bytes in the session's file-blobs/. Metadata-only
+// snapshots cover large/sensitive files; null means absent (8w).
+export type FileSnapshot = string | { size: number; mtime: number } | null
+export type FileChange =
+	| { path: string; before: FileSnapshot; after: FileSnapshot; undeclared?: never }
+	| { path: string; undeclared: true; statusBefore: string | null; statusAfter: string | null; before?: never; after?: never }
+
 // Every record has `n`, its number in the session (task w5): 1, 2, 3...,
 // given by the host, the one writer of a home's histories, so numbers
 // never collide; elsewhere a record is named '<session id>#<n>'. A
@@ -66,6 +73,8 @@ export type HistoryRecord = Numbered &
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
 	// told in front of its next prompt.
 	| { type: 'change'; cwd?: string; model?: string; ts: string }
+	// Observed changes during bash, not proof of authorship; not provider input.
+	| { type: 'file_changes'; toolId: string; cwd: string; files: FileChange[]; ts: string }
 	// A context boundary: `keep` names this turn's prompts, replayed
 	// verbatim (including images) after the summary, not summarised into it.
 	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; ts: string }
@@ -120,7 +129,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			if (r.model !== undefined) changed.model = r.model
 			continue
 		}
-		if (r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
+		if (r.type === 'file_changes' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) {
 			note = undefined
