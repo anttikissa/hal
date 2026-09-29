@@ -14,6 +14,9 @@ import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
+import { chatgptLogin } from './login-chatgpt.ts'
+import { status } from './status.ts'
+import { tabs } from './tabs.ts'
 
 const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
@@ -319,4 +322,42 @@ test('no two commands share a key', () => {
 	let keys = commandList.all().flatMap((c) => (c.key ? [JSON.stringify(keyHelp.parse(c.key))] : []))
 	expect(keys.length).toBeGreaterThan(5)
 	expect(new Set(keys).size).toBe(keys.length)
+})
+
+test('a bare /login chatgpt never turns an idle tab into a working turn, including after reopen', async () => {
+	let original = chatgptLogin.run
+	let pending: ((email: string) => void)[] = []
+	chatgptLogin.run = (say) => {
+		say('Open the device page and enter its code')
+		return new Promise<string>((resolve) => pending.push(resolve))
+	}
+	try {
+		let c = client()
+		let id = created(c)
+		tabs.insert(id, tabs.list().length)
+		tabs.publish()
+		c.conn.send({ type: 'submit', sessionId: id, text: '/login' })
+		await until(() => transcript.question(c.views.get(id)))
+		let q = transcript.question(c.views.get(id))!
+		c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { method: 'ChatGPT subscription' } })
+		await until(() => pending.length === 1)
+		// The first device flow is still polling when a second /login succeeds.
+		c.conn.send({ type: 'submit', sessionId: id, text: '/login' })
+		await until(() => transcript.question(c.views.get(id))?.id !== q.id)
+		q = transcript.question(c.views.get(id))!
+		c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { method: 'ChatGPT subscription' } })
+		await until(() => pending.length === 2)
+		pending[1]!('test@example.com')
+		await until(() => outputs(c.views.get(id)!).some((o) => o.includes('logged in')))
+		pending[0]!('first@example.com')
+		await until(() => outputs(c.views.get(id)!).some((o) => o.includes('first@example.com')))
+		expect(status.stateOf(id)).toEqual({ type: 'idle' })
+		expect(c.views.get(id)!.state).toEqual({ type: 'idle' })
+		expect(tabs.list().find((t) => t.id === id)?.state).toEqual({ type: 'idle' })
+		expect(c.of('tabs').at(-1)?.tabs.find((t: { id: string }) => t.id === id)?.state).toEqual({ type: 'idle' })
+		let reopened = await opened(id)
+		expect(reopened.views.get(id)!.state).toEqual({ type: 'idle' })
+	} finally {
+		chatgptLogin.run = original
+	}
 })

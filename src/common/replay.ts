@@ -210,12 +210,15 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 // The records of turns alone: without slash commands, what they said,
 // the questions they asked and the changes and context boundaries they
 // made. Commands run beside turns and never change how one stands.
+// Sparse state marks may keep an older command answer but only the newest
+// question. An answer without its question is not evidence of a turn:
+// leaving it in would make an idle tab look permanently working.
 function withoutCommands(records: HistoryRecord[]): HistoryRecord[] {
-	let asked = new Set(records.flatMap((r) => (r.type === 'question' && r.from ? [r.id] : [])))
+	let questions = new Map(records.flatMap((r) => (r.type === 'question' ? [[r.id, r] as const] : [])))
 	return records.filter((r) => {
 		if (r.type === 'command' || r.type === 'output' || r.type === 'change' || r.type === 'compact' || r.type === 'reset') return false
 		if (r.type === 'question') return !r.from
-		return r.type !== 'answer' || !asked.has(r.question)
+		return r.type !== 'answer' || (questions.has(r.question) && !questions.get(r.question)!.from)
 	})
 }
 
