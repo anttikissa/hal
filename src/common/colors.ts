@@ -1,4 +1,5 @@
-// The theme, as code. Every top-level field is a function, read at call
+// The built-in look, hal, as code; other themes are plugins that
+// replace fields (themes/, task d3). Every top-level field is a function, read at call
 // time: shared values (fgL: () => 0.8, screen) and styles computed from
 // them, so overriding a value from local.ts (colors.fgL = () => 0.9, or
 // around(colors, 'fgL', ...) from a plugin, which can undo it) moves
@@ -16,17 +17,22 @@ import type { Oklch } from './oklch.ts'
 
 export type Style = { [part: string]: Oklch }
 
+type Colors = typeof colors
+// A theme (task d3): replacements for some fields, each given the field
+// it replaces, so it can change one part of a style and keep the rest.
+export type Look = { [K in keyof Colors]?: (base: Colors[K]) => ReturnType<Colors[K]> }
+
 export const colors = {
 	// The lightest dark background we design for: where a style has no
 	// bg of its own, its text is checked against this (4.5:1, 3:1 for
 	// marks; tasks/README.md, readable text).
-	screen: (): Oklch => [0.25, 0.01, 260],
+	screen: (): Oklch => [0.16, 0.01, 260],
 	// Shared lightness and chroma of the vivid foregrounds and the card
 	// backgrounds.
-	fgL: (): number => 0.8,
-	fgC: (): number => 0.15,
-	bgL: (): number => 0.25,
-	bgC: (): number => 0.04,
+	fgL: (): number => 0.84,
+	fgC: (): number => 0.19,
+	bgL: (): number => 0.2,
+	bgC: (): number => 0.05,
 
 	// Hal's responses: warm orange.
 	assistant: (): Style => ({
@@ -46,14 +52,14 @@ export const colors = {
 		linkBg: [0.2, 0.02, 250],
 	}),
 	// User messages and the prompt input: the same bright blue card.
-	user: (): Style => ({ fg: [0.82, 0.11, 220], bg: [0.29, 0.05, 220] }),
+	user: (): Style => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215] }),
 	input: (): Style => ({ ...colors.user(), cursor: colors.user().fg! }),
 	// Log: neutral, moderately dim.
 	log: (): Style => ({ fg: [0.7, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
 	// Warnings: amber, noticeable but not fatal.
-	warning: (): Style => ({ fg: [0.78, 0.14, 85], bg: [0.28, 0.05, 85], code: [0.88, 0.1, 85], linkBg: [0.35, 0.05, 85] }),
+	warning: (): Style => ({ fg: [0.87, 0.18, 82], bg: [0.2, 0.05, 82], code: [0.92, 0.12, 82], linkBg: [0.28, 0.06, 82] }),
 	// Errors: hot red.
-	error: (): Style => ({ fg: [0.7, 0.2, 25], bg: [0.27, 0.08, 25], code: [0.82, 0.14, 25], linkBg: [0.3, 0.07, 25] }),
+	error: (): Style => ({ fg: [0.72, 0.24, 25], bg: [0.2, 0.08, 25], code: [0.84, 0.16, 25], linkBg: [0.28, 0.08, 25] }),
 	info: (): Style => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
 	// Fork lineage: vivid purple.
 	fork: (): Style => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),
@@ -65,7 +71,7 @@ export const colors = {
 	statusHot: (): Style => ({ fg: [0.76, 0.16, 25] }),
 	// Tab labels.
 	tab: (): Style => ({
-		activeFg: [0.9, 0.01, 250],
+		activeFg: [0.86, 0.16, 200],
 		inactiveFg: [0.68, 0, 0],
 		doneFg: [0.78, 0.14, 145],
 		warningFg: [0.86, 0.16, 95],
@@ -85,12 +91,13 @@ export const colors = {
 	// and text, the focus accent, form fields, borders, and buttons (the
 	// picker's selected item too), and search matches. The terminal has its own.
 	page: (): Style => ({
-		canvas: [0.2, 0.008, 260],
-		text: [0.89, 0.006, 260],
-		accent: [0.77, 0.1, 260],
-		field: [0.235, 0.009, 260],
-		border: [0.52, 0.012, 260],
-		button: [0.35, 0.05, 262],
+		canvas: [0.14, 0.01, 260],
+		text: [0.93, 0.01, 260],
+		accent: [0.86, 0.16, 200],
+		field: [0.18, 0.015, 260],
+		// No slate (tasks/README.md, look): lines and buttons are cyan.
+		border: [0.5, 0.08, 210],
+		button: [0.3, 0.08, 215],
 		// Search matches in the picker's list.
 		match: [0.92, 0.14, 95],
 	}),

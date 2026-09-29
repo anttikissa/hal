@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { readdirSync } from 'fs'
 import { colors, type Style } from './colors.ts'
 import { oklch, type Oklch } from './oklch.ts'
 
@@ -48,7 +49,7 @@ test('overriding one style is seen by styles built on it', () => {
 
 // tasks/README.md, readable text: WCAG AA against the background each
 // colour sits on, its style's own bg or else the screen we design for.
-test('every colour is readable where it is drawn, and so is its quieter form', () => {
+function readable(): string[] {
 	let backgrounds = /^(bg|canvas|field|border|button)$|Bg$/
 	let marks = /^(cursor|cursorIdle)$/
 	let low: string[] = []
@@ -69,5 +70,29 @@ test('every colour is readable where it is drawn, and so is its quieter form', (
 	let page = colors.page()
 	for (let on of ['field', 'button'] as const) check(`page.text on ${on}`, page.text!, page[on]!, 4.5)
 	check('page.border', page.border!, page.canvas!, 3)
-	expect(low).toEqual([])
+	return low
+}
+
+test('every colour is readable where it is drawn, and so is its quieter form', () => {
+	expect(readable()).toEqual([])
+})
+
+// Each theme (task d3) keeps the same rule, applied as its plugin would.
+test('every shipped theme is readable too', async () => {
+	let dir = `${import.meta.dir}/../../themes`
+	let names = readdirSync(dir).filter((f) => f.endsWith('.ts'))
+	expect(names.length).toBeGreaterThan(0)
+	for (let name of names) {
+		let { look } = await import(`${dir}/${name}`)
+		let saved = { ...colors }
+		try {
+			for (let [key, fn] of Object.entries(look as Record<string, (base: unknown) => unknown>)) {
+				let base = saved[key as keyof typeof colors]
+				;(colors as Record<string, unknown>)[key] = () => fn(base)
+			}
+			expect(readable(), name).toEqual([])
+		} finally {
+			Object.assign(colors, saved)
+		}
+	}
 })

@@ -42,6 +42,7 @@ const list: CommandInfo[] = [
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
 	{ name: 'status', description: 'show account usage windows', category: 'session', modelUsable: true },
 	{ name: 'system', description: 'show the assembled system prompt', category: 'session', modelUsable: true },
+	{ name: 'theme', description: 'list or switch the colour theme', category: 'app', modelUsable: true },
 	{ name: 'version', description: 'show which code the host runs', category: 'debug', modelUsable: true },
 ]
 
