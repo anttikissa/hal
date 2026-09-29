@@ -216,6 +216,10 @@ Each client only maps that to its medium (terminal rows, DOM elements).
 On the web an open question is a card like the others (square, lit bar
 on the left, its style's tint behind) with a ✕ at its top right that
 dismisses it exactly as Escape does; tapping outside does not. Choice
-options wrap with the same gap across and down.
+options wrap with the same gap across and down; each is outlined in
+the card's colour and the chosen one is solid in it, dark text on top
+(no slate buttons, no pale accent). The web's current tab is lit the
+same way: a bar in its colour on the left, its tint behind. No glow
+anywhere: a card's bar is a plain solid edge.
 A feature is done when both clients have it, unless its task says
 otherwise.

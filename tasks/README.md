@@ -173,8 +173,8 @@ page with Bun, not on the host startup path.
 
 Bold, colourful, contrasty: think 2001: A Space Odyssey, Alien, Blade
 Runner, CRT VT100 terminals glowing in the dark. Saturated phosphor
-hues on near-black, lit edges that glow (a card's left bar is an LED,
-not a hairline), square corners everywhere (cards, buttons, tabs,
+hues on near-black, lit solid edges (a card's left bar is an LED,
+not a hairline; no glow or blur: the user doesn't want it), square corners everywhere (cards, buttons, tabs,
 fields, dialogs; no border-radius). Never meek, pastel, washed-out or
 corporate-neutral (the user's words: "be-afraid-say-nothing"). Colour
 changes are proposed to the user with options before they land; he

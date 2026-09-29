@@ -80,16 +80,19 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				</div>
 			)}
 			<div class={['entry input', { dropping: props.dropping }]}>
+				{/* Our own placeholder, so it can fade as typing starts. */}
+				<div class="field">
+				<span class={['hint', { gone: !!props.text }]} aria-hidden="true">{props.placeholder}</span>
 				<textarea
 					ref={box}
 					rows={1}
 					aria-label="Message"
-					placeholder={props.placeholder}
 					value={props.text}
 					disabled={!!props.view.form}
 					onInput={(e) => app.input(e.currentTarget.value)}
 					onPaste={(e) => e.clipboardData && attach.paste(e.clipboardData, insert) && e.preventDefault()}
 				/>
+				</div>
 				<input
 					ref={(e) => (picker = e)}
 					type="file"

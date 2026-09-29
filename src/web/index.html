@@ -26,8 +26,8 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left)); }
 .Transcript > * { max-width: 60rem; margin: 0 auto 0.6rem; }
 /* Cards and the open question share one shape: square, a lit bar on
-   the left glowing like a CRT phosphor, the style's tint behind. */
-.Card, .Question { border-left: 3px solid currentColor; box-shadow: -3px 0 10px -4px currentColor; }
+   the left, the style's tint behind. */
+.Card, .Question { border-left: 3px solid currentColor; }
 .Card { padding: 0.4rem 0.7rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Card.user::before { content: "> "; }
 .Card.image::before { content: none; }
@@ -115,8 +115,13 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .entry { display: flex; align-items: stretch; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); }
 .entry:focus-within { border-left-color: var(--cursor); }
 .entry.dropping { outline: 2px dashed var(--cursor); outline-offset: 2px; }
+.entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
+/* The example request: the input's quiet blue, as in the terminal. It
+   leaves fast as typing starts and returns a little slower. */
+.entry .hint { position: absolute; inset: 0.5rem 0.7rem auto; color: var(--quiet); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
+.entry .hint.gone { opacity: 0; transition-duration: 80ms; }
 .entry textarea { flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: 0.5rem 0.7rem; }
-.entry button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor 35%, transparent); transition: background-color 120ms var(--ease-out); }
+.entry button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor 35%, transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
 .entry button:hover:not(:disabled) { background: color-mix(in oklab, currentColor 14%, transparent); }
 .entry button:disabled { color: var(--quiet); cursor: default; }
 .help { display: flex; flex-wrap: wrap; gap: 0 1.5ch; padding-top: 0.3rem; color: var(--description); }
@@ -129,12 +134,16 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 /* Phones: 16px fields, or iOS zooms in on focus. */
 /* Touch keyboards: Enter is a newline and Send sends, so the key hints
    do not apply. */
-@media (pointer: coarse) { .help { display: none; } textarea, input { font-size: 16px; } }
-@media (max-width: 40rem) { textarea, input { font-size: 16px; } .Transcript, .Composer { padding-left: max(0.6rem, env(safe-area-inset-left)); padding-right: max(0.6rem, env(safe-area-inset-right)); } .Transcript { padding-block: 0.6rem; } }
-@media (prefers-reduced-motion: reduce) { .Card .body { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
+@media (pointer: coarse) { .help { display: none; } textarea, input, .entry .hint { font-size: 16px; } }
+@media (max-width: 40rem) { textarea, input, .entry .hint { font-size: 16px; } .Transcript, .Composer { padding-left: max(0.6rem, env(safe-area-inset-left)); padding-right: max(0.6rem, env(safe-area-inset-right)); } .Transcript { padding-block: 0.6rem; } }
+@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
 .Question { position: relative; max-width: 60rem; margin: 0 auto 0.6rem; padding: 0.4rem 0.7rem; display: flex; flex-direction: column; gap: 0.4rem; }
-.Question button { padding: 0.2rem 0.8rem; }
+/* Options: outlined in the card's colour; the chosen one solid in it,
+   its text the canvas colour (text-fill keeps currentColor the card's). */
+.Question button:not(.dismiss) { padding: 0.2rem 0.8rem; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px currentColor; }
+.Question button[aria-pressed="true"] { background: currentColor; -webkit-text-fill-color: var(--canvas); font-weight: 600; }
+.Question button:hover:not([aria-pressed="true"]) { background: color-mix(in oklab, currentColor 18%, transparent); }
 /* Options wrap with the same gap across and down. */
 .Question [role="group"] { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
 .Question .dismiss { position: absolute; top: 0; right: 0; background: none; color: inherit; padding: 0.4rem 0.7rem; }
@@ -158,7 +167,8 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs { flex: none; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .Tabs .strip { display: flex; flex-wrap: wrap; gap: 0.2rem; padding: 0.3rem 0.6rem; }
 .Tabs .item, .Tabs li { display: flex; align-items: stretch; min-width: 0; }
-.Tabs .item:has([aria-current]), .Tabs li:has([aria-current]) { background: var(--button); }
+/* The current tab is lit like a card: bright bar on the left, tint behind. */
+.Tabs .item:has([aria-current]), .Tabs li:has([aria-current]) { background: color-mix(in oklab, var(--active-fg) 16%, transparent); box-shadow: inset 3px 0 0 var(--active-fg); }
 .Tabs .tab { display: flex; background: none; gap: 0.6ch; align-items: baseline; min-width: 0; padding: 0.2rem 0.3rem 0.2rem 0.6rem; text-decoration: none; }
 .Tabs .item .name { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .Tabs .tab { color: var(--inactive-fg); }

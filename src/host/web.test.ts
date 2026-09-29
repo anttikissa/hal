@@ -579,7 +579,13 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
 		// The textarea mounts before tab-start's snapshot. Background opens
 		// must not make this test type before the focused tab is ready.
-		await b.waitFor(`!!document.querySelector('textarea')?.placeholder`)
+		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+		// The example request fades while there is text, and returns.
+		let type = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+		await type('x')
+		await b.waitFor(`document.querySelector('.entry .hint').classList.contains('gone')`)
+		await type('')
+		await b.waitFor(`!document.querySelector('.entry .hint').classList.contains('gone')`)
 		for (let width of [390, 1280]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/c'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
