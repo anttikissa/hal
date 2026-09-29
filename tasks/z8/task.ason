@@ -1,11 +1,14 @@
 {
 	title: '/clients: a map of who is connected',
-	spec: `/clients prints an ASCII diagram of the host and everything connected to it: the host (pid, hostname, uptime) at the top, peers on this machine (pid, tty) beside it joined with <->, and below them remote terminals (./run -r) and browsers, each with its address, user agent in a few words (Safari on iPhone), the sessions it follows, and when it last spoke ("now", "3 min ago", "2 h ago"). Clients that went away in the last 24 hours stay listed as gone, with their last-seen time; the host keeps this list in memory only (a restart forgets it). Box-drawing characters in the terminal; the web shows the same text in a monospace card. Example shape:
-  host 1234 (up 3 h)  <->  peer 5678 ttys003  <->  peer 9012 ttys005
-      |
-      +-- remote terminal 203.0.113.7   follows 3 tabs   now
-      +-- web 198.51.100.4 Safari/iPhone  follows 158-ash  2 h ago (gone)
-The host records for each connection: kind (own terminal, peer, remote terminal, web), remote address, user agent, connect time, last message time. Nothing about clients is written to disk.`,
-	status: 'planned',
+	spec: `/clients prints a diagram of the host and everything connected to it, in a code fence (monospace on the web, the same text in the terminal): the host (pid, hostname, uptime) at the top with the live peers on this machine (pid and tty) beside it joined with <->, and below them a tree of remote terminals (./run -r), browsers, and anything gone: each with its address (remote terminal, web), the browser and system in a few words (Safari on iPhone), the sessions it follows (the id when one, else "N tabs"), and when it last spoke ("now", "3 min ago", "2 h ago"). A client that went away stays listed for 24 hours with "(gone)" and what it followed when it left, unless the same client joins again (a peer by pid; a browser or remote terminal by address and user agent), which replaces its gone entry. Shape:
+    host 1234 example-host (up 3 h)  <->  peer 5678 ttys003  <->  peer 9012 ttys005
+        │
+        ├── remote terminal 203.0.113.7               follows 3 tabs      now
+        └── web 198.51.100.4 Safari on iPhone         follows 158-ash     2 h ago (gone)
+The host (src/host/clients.ts) records for each connection its kind (own terminal, peer, remote terminal, web), address, user agent, connect time and last command time; nothing is written to disk and a restart forgets it. The own terminal is recorded (host.connect without info) but not drawn. Kinds: a Unix socket connection is a peer, and names its process with the \`hello\` protocol command (pid) that src/client/link.ts sends on connecting (hello from anything but a socket peer is ignored: a browser cannot name a pid); a WebSocket is web, or remote terminal when its user agent starts with hal-terminal (src/client/remote.ts sets it); the address is the first X-Forwarded-For entry, else the socket address. The tty comes from ps at draw time.`,
+	status: 'done',
+	notes: [
+		"Own terminal is recorded but not drawn: the host line already stands for it. Remote terminals are told apart from browsers by an explicit user-agent header (hal-terminal) that ./run -r sets, not by guessing Bun's default. The peer pid needed a protocol command (hello), since Bun exposes no peer credentials for Unix sockets; link.test.ts's fake host must skip hello. host.ts is at 398 of 400 lines: further client bookkeeping belongs in clients.ts."
+	],
 	needs: ['r6', 'tr']
 }

@@ -16,6 +16,7 @@ import { ason } from '../common/ason.ts'
 import { protocol, type Command, type Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { commands } from './commands.ts'
+import { clients, type ClientInfo, type ClientRecord } from './clients.ts'
 import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
 import { config } from './config.ts'
@@ -47,14 +48,15 @@ export type Connection = {
 
 // `held`: commands waiting, by session, for its snapshot to be sent;
 // under '*', every command, until the tabs are sent.
-type Client = { deliver: (event: Event) => void; open: Set<string>; visible?: string; held: Map<string, unknown[]> }
+type Client = { deliver: (event: Event) => void; open: Set<string>; visible?: string; held: Map<string, unknown[]>; record: ClientRecord }
 // What a command did: refused (why), or done, naming a created session
 // (followed) or the tab a tab command created, reopened or picked, or
 // with the event that answered it (attached), sent again on a repeat.
 type Outcome = { refused?: string; sessionId?: string; tab?: string; reply?: Event }
 
-function connect(deliver: (event: Event) => void): Connection {
-	let client: Client = { deliver: (e) => deliver(wire.event(e)), open: new Set(), held: new Map() }
+function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection {
+	let open = new Set<string>()
+	let client: Client = { deliver: (e) => deliver(wire.event(e)), open, held: new Map(), record: clients.join(open, info) }
 	host.state.clients.add(client)
 	host.warn(client)
 	if (version.state.loaded) client.deliver({ type: 'version', version: version.state.loaded })
@@ -72,6 +74,7 @@ function connect(deliver: (event: Event) => void): Connection {
 		},
 		close: () => {
 			host.state.clients.delete(client)
+			clients.leave(client.record)
 			webLinks.drop(client)
 		},
 	}
@@ -90,9 +93,9 @@ function release(client: Client, key: string): void {
 // connection: each message received is one ASON command, and each event
 // goes to `write` as one short ASON message. Unreadable messages are
 // answered with `rejected`, never thrown.
-function adapt(write: (message: string) => void): { receive(message: string): void; unreadable(reason: string): void; close(): void } {
+function adapt(write: (message: string) => void, info?: ClientInfo): { receive(message: string): void; unreadable(reason: string): void; close(): void } {
 	let send = (event: Event) => write(ason.stringify(event, 'short'))
-	let conn = host.connect(send)
+	let conn = host.connect(send, info)
 	let unreadable = (reason: string) => send({ type: 'rejected', command: '', reason: `unreadable message: ${reason}` })
 	return {
 		receive: (message) => {
@@ -151,6 +154,7 @@ function remember(id: string, outcome: Outcome): void {
 }
 
 function handle(client: Client, command: unknown): void {
+	clients.touch(client.record)
 	let held = client.held.get('*') ?? client.held.get((command as { sessionId?: string } | null)?.sessionId as string)
 	if (held) return void held.push(command)
 	let problem = protocol.invalid(command)
@@ -233,6 +237,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		push.subscribe({ endpoint: c.subscription.endpoint, ...c.subscription.keys })
 		return {}
 	}
+	if (c.type === 'hello') return clients.hello(client.record, c.pid)
 	if (c.type === 'visibility') {
 		// Not checked against open: a tab's open may still be pending.
 		client.visible = c.visible ? c.sessionId : undefined
@@ -355,6 +360,7 @@ function reset(): void {
 	busy.reset()
 	drafts.reset()
 	webLinks.reset()
+	clients.reset()
 	host.state.pauseOnExit = false
 }
 

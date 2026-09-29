@@ -85,7 +85,7 @@ async function signIn(typed: string | undefined, saved: Saved, ask: (question: s
 // as a page of it would send (host/web.ts checks both).
 function dial(at: string, token: string): Socket {
 	let url = `${at.replace(/^http/, 'ws')}/ws`
-	return new WebSocket(url, { headers: { cookie: cookie(token), origin: at } } as any) as unknown as Socket
+	return new WebSocket(url, { headers: { cookie: cookie(token), origin: at, 'user-agent': 'hal-terminal' } } as any) as unknown as Socket
 }
 
 // Follows the host until the process ends; `loggedOut` runs when the

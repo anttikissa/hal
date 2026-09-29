@@ -40,6 +40,7 @@ import { oklch, type Oklch } from '../common/oklch.ts'
 import { session } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
 import { blobs } from './blobs.ts'
+import { clients, type ClientInfo } from './clients.ts'
 import { diag } from './diag.ts'
 import { filePage } from './file-page.ts'
 import { host } from './host.ts'
@@ -49,7 +50,7 @@ import { webLinks } from './web-links.ts'
 
 const cookieName = 'hal'
 
-type Data = { conn?: ReturnType<typeof host.adapt>; stale?: boolean }
+type Data = { conn?: ReturnType<typeof host.adapt>; stale?: boolean; info?: ClientInfo }
 type Socket = ServerWebSocket<Data>
 
 function authorized(req: Request): boolean {
@@ -228,7 +229,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 async function upgrade(req: Request, srv: Server<Data>): Promise<Response | undefined> {
 	let v = new URL(req.url).searchParams.get('v')
 	let stale = v !== null && v !== (await web.version())
-	if (srv.upgrade(req, { data: { stale } })) return undefined
+	if (srv.upgrade(req, { data: { stale, info: clients.fromRequest(req, srv.requestIP(req)?.address) } })) return undefined
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
 }
 
@@ -247,7 +248,7 @@ const websocket = {
 	open(ws: Socket) {
 		if (ws.data.stale) return ws.close(4000, 'reload')
 		web.state.sockets.add(ws)
-		ws.data.conn = host.adapt((message) => ws.send(message))
+		ws.data.conn = host.adapt((message) => ws.send(message), ws.data.info)
 	},
 	message(ws: Socket, message: string | Buffer) {
 		ws.data.conn?.receive(String(message))

@@ -96,7 +96,7 @@ function accept(socket: Socket): void {
 	server.state.sockets.add(socket)
 	let conn = host.adapt((message) => {
 		if (!socket.destroyed) socket.write(`${message}\n`)
-	})
+	}, { kind: 'peer' })
 	socket.on(
 		'data',
 		lines.decoder(

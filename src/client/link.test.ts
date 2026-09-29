@@ -9,7 +9,7 @@ import { link } from './link.ts'
 
 // A stand-in host on the socket: records commands and answers every
 // open with a snapshot of that session.
-type FakeHost = { server: Server; sockets: Socket[]; commands: any[] }
+type FakeHost = { server: Server; sockets: Socket[]; commands: any[]; hellos: any[] }
 
 let dir = ''
 let hosts: FakeHost[] = []
@@ -25,7 +25,7 @@ function snapshotOf(id: string): Event {
 }
 
 async function fakeHost(): Promise<FakeHost> {
-	let h: FakeHost = { server: createServer(), sockets: [], commands: [] }
+	let h: FakeHost = { server: createServer(), sockets: [], commands: [], hellos: [] }
 	h.server.on('connection', (socket) => {
 		h.sockets.push(socket)
 		socket.on('error', () => {})
@@ -33,6 +33,7 @@ async function fakeHost(): Promise<FakeHost> {
 			'data',
 			lines.decoder(
 				(c: any) => {
+					if (c.type === 'hello') return void h.hellos.push(c.pid)
 					let { id, ...command } = c
 					h.commands.push(command)
 					if (c.type === 'open') socket.write(lines.encode(snapshotOf(c.sessionId)))
@@ -129,6 +130,13 @@ test('commands sent while disconnected reach the next host once', async () => {
 	await until(() => second.commands.length === 1)
 	await Bun.sleep(50)
 	expect(second.commands).toEqual([{ type: 'submit', sessionId: '1-a', text: 'hello' }])
+})
+
+test('a socket client names its process to the host first (task z8)', async () => {
+	let first = await fakeHost()
+	await start()
+	await until(() => first.hellos.length === 1)
+	expect(first.hellos).toEqual([process.pid])
 })
 
 test('when the lock is free the link becomes host and talks in-process', async () => {

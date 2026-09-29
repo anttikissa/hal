@@ -155,6 +155,8 @@ export type Command = (
 	// A browser registers a push endpoint and reports its shown tab.
 	| { type: 'push-subscribe'; subscription: { endpoint: string; keys: { p256dh: string; auth: string } } }
 	| { type: 'visibility'; sessionId: string; visible: boolean }
+	// A peer on the host socket names its process, for /clients (task z8).
+	| { type: 'hello'; pid: number }
 ) & { id?: string }
 
 export type CommandType = Command['type']
@@ -265,7 +267,7 @@ export type Event =
 
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'visibility']
+const commandTypes: CommandType[] = ['create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'visibility', 'hello']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -277,6 +279,7 @@ function invalid(value: unknown): string | undefined {
 		(optional && c[key] === undefined) || typeof c[key] === 'string' ? undefined : `${c.type}: ${key} must be a string`
 	let problem = str('id', true)
 	if (problem) return problem
+	if (c.type === 'hello') return Number.isInteger(c.pid) ? undefined : 'hello: pid must be an integer'
 	if (c.type === 'auth') return c.link === undefined || typeof c.link === 'boolean' ? undefined : 'auth: link must be a boolean'
 	if (c.type === 'create') return str('cwd') ?? str('model', true) ?? str('name', true)
 	if (c.type === 'open-newest') return str('cwd', true)

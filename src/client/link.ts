@@ -51,6 +51,7 @@ function dial(path: string, on: { event(event: Event): void; dropped(): void }):
 		)
 		socket.once('connect', () => {
 			connected = true
+			socket.write(lines.encode({ type: 'hello', pid: process.pid }))
 			resolve({ send: (command) => void socket.write(lines.encode(command)), close: () => void socket.destroy() })
 		})
 		socket.on('error', () => {})
