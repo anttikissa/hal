@@ -1,5 +1,6 @@
 // Authenticated read-only pages; request paths never name host files.
 import { changes } from './changes.ts'
+import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 
 function escape(s: string): string { return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`) }
@@ -9,6 +10,9 @@ async function serve(url: URL, css: string): Promise<Response> {
 	let id = url.pathname.slice('/changes/'.length)
 	let all = sessions.list()
 	if (!all.some((s) => s.id === id)) return new Response('not found\n', { status: 404 })
+	// Catch every session's marks up in slices first: after an upgrade that
+	// rebuilds marks, a synchronous catch-up of the whole home would stall.
+	for (let s of all) if (!s.error) await pages.slices(pages.catchUp(s.id))
 	let files = changes.list(id)
 	let selected = url.searchParams.get('path')
 	if (selected !== null && !files.some((f) => f.path === selected)) return new Response('not found\n', { status: 404 })
