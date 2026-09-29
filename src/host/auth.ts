@@ -11,8 +11,12 @@
 // (log in, fix the file), 'temporary' when trying again may work,
 // 'limited' (with retryAt) when every account is rate limited.
 //
-// Several entries of a provider are accounts, ranked by provider-wide
-// usage (including API keys); a turn stays on one account until limited
+// Several entries of a provider are accounts: subscriptions (OAuth
+// tokens) ranked by provider-wide usage, then API keys in file order,
+// the environment's last. A key is paid per token, so it is used only
+// while no subscription is usable (auth.fallback tells the session so);
+// a key that runs out of credits is set aside like a broken login
+// (auth.spent). A turn stays on one account until limited
 // for the model (limits.ts) or its login breaks, so a 429 rotates. A
 // login is broken when its refresh token is rejected (invalid_grant: typically
 // a copied file where another home already rotated the token) or its
@@ -145,15 +149,19 @@ function fingerprint(entry: Entry): string {
 // Kept in memory only: a restart may pick again.
 export type For = { session?: string }
 
-// One replaceable account chooser for local.ts. Its default ranks every
-// account (including API keys) by provider-wide usage, while retaining the
-// session's chosen account first for its prompt cache.
+// A subscription login, as opposed to a pay-per-token API key.
+const subscription = (a: Account): boolean => usable(a.entry.accessToken)
+
+// One replaceable account chooser for local.ts. Its default ranks the
+// subscriptions by provider-wide usage, retaining the session's chosen
+// one first for its prompt cache, then the API keys in order: a key has
+// no usage windows, so ranked with them it would always look least used.
 function pickAccount(kind: Kind, list: Account[], who: For = {}): Account[] {
-	let out = usage.order(kind, list, (a) => a.name)
+	let out = usage.order(kind, list.filter(subscription), (a) => a.name)
 	let mine = who.session ? auth.state.chosen.get(`${kind} ${who.session}`) : undefined
 	let i = out.findIndex((a) => a.name === mine)
 	if (i > 0) out.unshift(...out.splice(i, 1))
-	return out
+	return [...out, ...list.filter((a) => !subscription(a))]
 }
 
 // A valid credential of `kind`, refreshing an expired token first, from
@@ -164,20 +172,32 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 	list = auth.pickAccount(kind, list, who)
 	let limitedUntil = Infinity
 	let problems: string[] = []
+	// Why each subscription passed over was, for the fallback notice.
+	let skipped: string[] = []
 	for (let account of list) {
 		let why = auth.state.broken.get(fingerprint(account.entry))
 		if (why) {
 			problems.push(why)
+			if (subscription(account)) skipped.push(`${account.name}: ${why}`)
 			continue
 		}
 		let until = model ? limits.until(limits.key(`${kind}/${model}`, account.name)) : 0
 		if (until) {
 			limitedUntil = Math.min(limitedUntil, until)
+			if (subscription(account)) skipped.push(`${account.name}: rate limited until ${new Date(until).toTimeString().slice(0, 5)}`)
 			continue
 		}
 		try {
 			let cred = await auth.credential(data, account, kind)
-			if (who.session) auth.state.chosen.set(`${kind} ${who.session}`, account.name)
+			if (who.session) {
+				let key = `${kind} ${who.session}`
+				let before = auth.state.chosen.get(key)
+				auth.state.chosen.set(key, account.name)
+				if (cred.type === 'api-key' && before !== account.name && skipped.length) {
+					// A notice that cannot be written must not cost the request.
+					try { auth.fallback(who.session, `using ${account.name}, a paid API key: no ${kind} subscription is usable (${skipped.join('; ')})`) } catch {}
+				}
+			}
 			return cred
 		} catch (e: any) {
 			if (e?.failure !== 'auth') throw e
@@ -222,6 +242,13 @@ function rejected(name: string, kind: Kind = 'anthropic'): void {
 		auth.state.retried.set(key, clock.now())
 		auth.state.stale.add(fp)
 	} else auth.state.broken.set(fp, fail(`${kind} credentials for ${name} were rejected (401); ${LOG_INS[kind]}`).message)
+}
+
+// The provider says the account has no credits left (a paid key, out of
+// money): set it aside like a broken login, until its entry changes.
+function spent(name: string, kind: Kind = 'anthropic'): void {
+	let account = auth.all(kind).list.find((a) => a.name === name)
+	if (account) auth.state.broken.set(fingerprint(account.entry), `${name} has no credits left`)
 }
 
 // Resolves when the credentials file changes (appears, is replaced or
@@ -324,6 +351,10 @@ export const auth = {
 	openai: (model?: string, who?: For) => auth.pick('openai', model, who),
 	credential,
 	rejected,
+	spent,
+	// Tells session `id` it now runs on a paid key; slash.ts writes it
+	// into the transcript.
+	fallback: (_id: string, _text: string): void => {},
 	changed,
 	refresh,
 	close,

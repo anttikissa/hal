@@ -7,6 +7,7 @@ import { forms, type Answers } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { states } from '../common/states.ts'
+import { auth } from './auth.ts'
 import { commands, type Context, type Reply } from './commands.ts'
 import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
@@ -146,3 +147,6 @@ export const slash = {
 	output,
 	placed,
 }
+
+// A session falling back to a paid API key says so where the user reads.
+auth.fallback = (id, text) => slash.output(id, text)

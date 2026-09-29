@@ -7,7 +7,7 @@ import { auth } from './auth.ts'
 // Fake credentials only. HAL_HOME and HOME point at temp dirs, so neither
 // ./auth.ason nor ~/.hal/auth.ason can be read or written here.
 
-const savedEnv = { HAL_HOME: process.env.HAL_HOME, HOME: process.env.HOME }
+const savedEnv = { HAL_HOME: process.env.HAL_HOME, HOME: process.env.HOME, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
 const origTokenUrl = auth.tokenUrl
 let home = ''
 let server: ReturnType<typeof Bun.serve> | null = null
@@ -18,6 +18,9 @@ beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-auth-`)
 	process.env.HAL_HOME = home
 	process.env.HOME = `${home}/user`
+	// Real keys never reach a test, even run outside ./test.
+	delete process.env.ANTHROPIC_API_KEY
+	delete process.env.OPENAI_API_KEY
 	requests = []
 	server = Bun.serve({
 		port: 0,
@@ -258,21 +261,62 @@ test('every login broken is an auth failure naming the problem', async () => {
 	expect(e.message).not.toContain('secret-')
 })
 
-test('pickAccount is the per-request override point and ranks keys with tokens', async () => {
+test('pickAccount is the per-request override point; a key waits behind any usable subscription', async () => {
 	write({ anthropic: [
-		{ accessToken: 'token', email: 'sub@x', expires: later() },
 		{ apiKey: 'key', email: 'key@x' },
+		{ accessToken: 'token', email: 'sub@x', expires: later() },
 	] })
 	let { usage } = await import('./usage.ts')
 	let { paths } = await import('./paths.ts')
 	paths.init()
 	let reset = String(Math.floor(later() / 1000))
-	usage.observe('anthropic', 'sub@x', new Headers({ 'anthropic-ratelimit-unified-5h-utilization': '0.8', 'anthropic-ratelimit-unified-5h-reset': reset }))
-	expect((await auth.anthropic()).account).toBe('key@x')
+	// A key has no usage windows; a busy subscription still comes first.
+	usage.observe('anthropic', 'sub@x', new Headers({ 'anthropic-ratelimit-unified-5h-utilization': '0.95', 'anthropic-ratelimit-unified-5h-reset': reset }))
+	expect((await auth.anthropic()).account).toBe('sub@x')
 	let original = auth.pickAccount
-	auth.pickAccount = (_kind, list) => [list.find((a) => a.name === 'sub@x')!, ...list.filter((a) => a.name !== 'sub@x')]
-	try { expect((await auth.anthropic()).account).toBe('sub@x') }
+	auth.pickAccount = (_kind, list) => [list.find((a) => a.name === 'key@x')!, ...list.filter((a) => a.name !== 'key@x')]
+	try { expect((await auth.anthropic()).account).toBe('key@x') }
 	finally { auth.pickAccount = original; usage.close() }
+})
+
+test('a session falls back to a key only while every subscription is out, says so once, and comes back', async () => {
+	let { limits } = await import('./limits.ts')
+	let { paths } = await import('./paths.ts')
+	paths.init()
+	let told: string[] = []
+	let original = auth.fallback
+	auth.fallback = (id, text) => told.push(`${id} ${text}`)
+	try {
+		write({ openai: [{ accessToken: 'sub', expires: later(), email: 'sub@x' }, { apiKey: 'sk-secret' }] })
+		let s = { session: 's' }
+		expect((await auth.openai('m', s)).value).toBe('sub')
+		limits.set(limits.key('openai/m', 'sub@x'), now() + 60_000)
+		expect((await auth.openai('m', s)).value).toBe('sk-secret')
+		expect((await auth.openai('m', s)).value).toBe('sk-secret')
+		expect(told).toHaveLength(1)
+		expect(told[0]).toMatch(/^s using account 2, a paid API key: .*sub@x: rate limited until/)
+		expect(told[0]).not.toContain('sk-secret')
+		// The subscription is free again: the session leaves the key at once.
+		delete limits.store()[limits.key('openai/m', 'sub@x')]
+		expect((await auth.openai('m', s)).value).toBe('sub')
+	} finally {
+		auth.fallback = original
+		limits.close()
+	}
+})
+
+test('a key out of credits is set aside until its entry changes', async () => {
+	write({ openai: [{ apiKey: 'k1' }, { apiKey: 'k2' }] })
+	expect((await auth.openai()).value).toBe('k1')
+	auth.spent('account 1', 'openai')
+	expect((await auth.openai()).value).toBe('k2')
+	auth.spent('account 2', 'openai')
+	let e: any = await auth.openai().catch((x) => x)
+	expect(e.failure).toBe('auth')
+	expect(e.message).toContain('no credits')
+	write({ openai: [{ apiKey: 'k3' }] })
+	auth.close()
+	expect((await auth.openai()).value).toBe('k3')
 })
 
 test('a rejected token is refreshed once; rejected again soon, the login is broken', async () => {
@@ -332,8 +376,8 @@ test('rotation takes the least used subscription, skips a limited one, and keeps
 		})
 		used('a@x', 0.9)
 		used('b@x', 0.3)
-		// A metered key with heavier usage comes after subscriptions.
-		used('account 1', 0.95)
+		// A key comes after subscriptions whatever its usage.
+		used('account 1', 0)
 		// c has no data yet: unused.
 		expect((await auth.anthropic('m', { session: 's' })).account).toBe('c@x')
 		used('c@x', 0.5)

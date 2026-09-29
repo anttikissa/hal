@@ -79,10 +79,7 @@ test('the plan is the subscription account the next request takes, with its wind
 		let h = (u5: string, u7: string) => new Headers({ 'anthropic-ratelimit-unified-5h-utilization': u5, 'anthropic-ratelimit-unified-7d-utilization': u7 })
 		usage.observe('anthropic', 'one', h('0.9', '0.5'))
 		usage.observe('anthropic', 'two', h('0.18', '0.574'))
-		// An unused key ranks before the subscriptions; no subscription badge.
-		expect(stats.plan(id, 'anthropic/claude-opus-5-5')).toBeUndefined()
-		usage.observe('anthropic', 'account 3', h('0.95', '0.95'))
-		// When the key is busier, the least-used subscription appears.
+		// A key, however unused, waits behind the least-used subscription.
 		expect(stats.plan(id, 'anthropic/claude-opus-5-5')).toEqual({ account: 2, accounts: 2, windows: { '5h': 18, '7d': 57 } })
 		usage.observe('anthropic', 'two', h('0.3', '0.4'))
 		expect(stats.plan(id, 'anthropic/claude-opus-5-5')!.windows).toEqual({ '5h': 18, '7d': 57 })

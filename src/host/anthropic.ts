@@ -264,7 +264,7 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 
 // Registers the provider. Idempotent.
 function init(): void {
-	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse, rejected: (account) => auth.rejected(account), models: (signal) => anthropic.models(signal), known: () => anthropic.knownModels() })
+	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse, rejected: (account) => auth.rejected(account), spent: (account) => auth.spent(account), models: (signal) => anthropic.models(signal), known: () => anthropic.knownModels() })
 }
 
 export const anthropic = {

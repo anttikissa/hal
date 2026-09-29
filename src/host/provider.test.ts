@@ -313,6 +313,22 @@ test('a 401 tells the provider which account was rejected', async () => {
 	expect(rejected).toEqual(['a@x'])
 })
 
+test('an account out of credits is set aside and the host rotates at once, not after a rate limit', async () => {
+	let spent: string[] = []
+	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'k' }), spent: (a) => void spent.push(a) })
+	// OpenAI says it with a 429; Anthropic with a 400.
+	fakeFetch(() => Response.json({ error: { message: 'You exceeded your current quota', code: 'insufficient_quota' } }, { status: 429 }))
+	let [e] = (await all(provider.stream('fake/m1', req))) as any[]
+	expect(e).toMatchObject({ failure: 'auth', retryAt: now })
+	expect(limits.until(limits.key('fake/m1', 'k'))).toBe(0)
+	fakeFetch(() => Response.json({ error: { message: 'Your credit balance is too low to access the Anthropic API.' } }, { status: 400 }))
+	await all(provider.stream('fake/m1', req))
+	// A plain 429 is only a rate limit.
+	fakeFetch(() => new Response('{}', { status: 429 }))
+	await all(provider.stream('fake/m1', req))
+	expect(spent).toEqual(['k', 'k'])
+})
+
 test('errors thrown while building the request keep their failure and reset time', async () => {
 	provider.register('fake', {
 		...echo,

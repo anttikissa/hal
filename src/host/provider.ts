@@ -40,6 +40,8 @@ export type Provider = {
 	request(req: ProviderRequest): HttpRequest | Promise<HttpRequest>
 	// The account's credentials were rejected (401).
 	rejected?(account: string): void
+	// The account (a paid key) has no credits left.
+	spent?(account: string): void
 	// Should end with done or error; shared code adds an error if not.
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
 	// The model names it offers (without "provider/"), for the picker.
@@ -145,6 +147,13 @@ function failure(status: number | undefined): Failure | undefined {
 	return undefined
 }
 
+// Out of credits, as OpenAI (insufficient_quota and billing codes, often
+// with 429) and Anthropic (400 "credit balance is too low") say it.
+function noCredits(e: ErrorEvent): boolean {
+	if (e.status === 402) return true
+	return /insufficient_quota|billing_hard_limit_reached|billing_not_active|credit balance is too low/i.test(`${e.body ?? ''} ${e.message}`)
+}
+
 // The provider's own words from an error body, for the user.
 function detail(body: string): string {
 	try {
@@ -181,6 +190,14 @@ function resetAt(headers: Headers, body: string): number | undefined {
 function failed(p: Provider, modelId: string, account: string | undefined, e: ErrorEvent, reset?: number): ErrorEvent {
 	e.failure ??= provider.failure(e.status)
 	let now = clock.now()
+	if (account && p.spent && provider.noCredits(e)) {
+		// Not a rate limit: waiting will not refill it. Set the account
+		// aside and retry at once on the next, or block on login.
+		p.spent(account)
+		e.failure = 'auth'
+		e.retryAt = now
+		return e
+	}
 	if (e.status === 429) {
 		if (account) {
 			limits.set(limits.key(modelId, account), reset ?? now + provider.accountLimitMs())
@@ -298,6 +315,7 @@ export const provider = {
 	fetch: (url: string, init: RequestInit): Promise<Response> => fetch(url, init),
 	register,
 	failure,
+	noCredits,
 	detail,
 	resetAt,
 	sse,

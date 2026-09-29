@@ -219,6 +219,7 @@ function init(): void {
 		request: openai.request,
 		parse: openai.parse,
 		rejected: (account) => auth.rejected(account, 'openai'),
+		spent: (account) => auth.spent(account, 'openai'),
 		known: () => openai.knownModels(),
 		contextWindow: (model) => openai.contextWindow(model),
 		effort: (model) => openai.effort(model),
