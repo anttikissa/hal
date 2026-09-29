@@ -12,7 +12,7 @@
    (src/common/colors.ts; .page carries the page's own as variables). */
 :root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --fade-ms: 300ms; --toggle-ms: 250ms; }
 * { box-sizing: border-box; }
-html { background: var(--canvas); color: var(--text); }
+html { background: var(--canvas); color: var(--text); overscroll-behavior: none; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
 /* Keep the document geometry still while Safari pans its visual viewport
    for the focused field. Move the app, not a fixed body whose layout top
@@ -121,6 +121,9 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Composer { position: relative; z-index: 1; flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, calc(env(safe-area-inset-bottom) - (100dvh - var(--app-height, 100dvh)))) max(1rem, env(safe-area-inset-left)); }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.2rem 0; }
+/* Static footer chrome is not a scroll surface. Only the draft itself
+   scrolls, without handing its edge gestures to Safari's viewport. */
+.StatusRow, .Composer .status, .entry > button, .entry .actions { touch-action: none; }
 /* Completions: a panel in the box's own colour (the input style), like a
    card: lit left bar, outline, names bright; the selected row solid in
    that colour with canvas text, as a chosen option is. */
@@ -143,7 +146,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
    leaves fast as typing starts and returns a little slower. */
 .entry .hint { position: absolute; inset: 0.5rem 0.7rem auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
 .entry .hint.gone { opacity: 0; transition-duration: 80ms; }
-.entry textarea { max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: 0.5rem 0.7rem; }
+.entry textarea { overscroll-behavior: none; touch-action: pan-y pinch-zoom; max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: 0.5rem 0.7rem; }
 .entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
 .entry > button:hover:not(:disabled), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
 .entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; }
