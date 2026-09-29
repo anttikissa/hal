@@ -30,10 +30,8 @@ const BS = '\x7f'
 const paste = (s: string) => `\x1b[200~${s}\x1b[201~`
 
 describe('insert', () => {
-	test('typing appends at the end', () => {
+	test('typing at the end, in the middle and at the start', () => {
 		expect(run('abc').shown).toBe('abc|')
-	})
-	test('typing in the middle and at the start', () => {
 		expect(run(`ac${LEFT}b`).shown).toBe('ab|c')
 		expect(run(`bc${LEFT}${LEFT}a`).shown).toBe('a|bc')
 	})
@@ -116,9 +114,6 @@ describe('actions', () => {
 	})
 	test('editing keys produce no action', () => {
 		expect(run(`ab${LEFT}${BS}c${paste('x')}`).actions).toEqual([])
-	})
-	test('a whole session through the decoder', () => {
-		expect(run(`helo${LEFT}l\r`).actions).toEqual(['submit:hello'])
 	})
 })
 

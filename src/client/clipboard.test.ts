@@ -53,12 +53,9 @@ test('with no tool, copy and paste give a notice instead of throwing', async () 
 	expect(await clipboard.read()).toEqual({ notice: expect.stringMatching(/clipboard/) })
 })
 
-test('a command that cannot be found is a failure, not an exception', async () => {
+test('a command that runs gives its output and gets its input; a missing one is null, not an exception', async () => {
 	expect(await clipboard.run(['/nonexistent/hal-no-such-tool'], 'x')).toBeNull()
 	expect(await clipboard.run(['/nonexistent/hal-no-such-tool'])).toBeNull()
-})
-
-test('a command that runs gives its output, and gets its input', async () => {
 	expect(await clipboard.run(['cat'], 'round trip')).toBe('round trip')
 	expect(await clipboard.run(['false'])).toBeNull()
 })

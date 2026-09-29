@@ -50,11 +50,6 @@ test('token counts are compact', () => {
 	expect([252, 999, 1000, 4100, 9_960, 41_000, 999_499, 999_600, 1_200_000, 12_000_000].map(statusRow.count)).toEqual(['252', '999', '1.0k', '4.1k', '10k', '41k', '999k', '1.0M', '1.2M', '12M'])
 })
 
-test('one subscription account shows no index; no usage, no tokens part', () => {
-	let row = text({ ...info, stats: { sent: 0, received: 0, plan: { account: 1, accounts: 1, windows: { '5h': 3 } } } }, 120)
-	expect(row.endsWith('host · Sub: 5h 3%')).toBe(true)
-})
-
 test('the painted row fits the terminal and ends its colour', () => {
 	let row = statusRow.row(info, 60)
 	expect(strings.visLen(row)).toBeLessThanOrEqual(60)

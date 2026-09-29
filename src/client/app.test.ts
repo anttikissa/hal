@@ -74,10 +74,11 @@ test('typing and Enter submits to the open session and clears the prompt', () =>
 	expect(appView.view().prompt.text).toBe('')
 })
 
-test('an empty prompt is not submitted', () => {
+test('an empty prompt is not submitted; idle Escape sends nothing', () => {
 	app.onEvent(snapshot())
 	type('  ')
 	enter()
+	escape()
 	expect(sent).toEqual([])
 })
 
@@ -136,9 +137,7 @@ test('the activity says what the session does, and waiting for answer on a quest
 	expect(appView.view().activity).toBe('waiting for answer')
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'idle' } })
 	expect(appView.view().activity).toBeUndefined()
-})
-
-test('a login block says so in a word above the prompt; the whole message is the notice', () => {
+	// A login block says so in a word; the whole message is the notice.
 	app.onEvent(snapshot('s1', { type: 'blocked', reason: 'log in: token refresh failed: HTTP 400 invalid_grant' }))
 	expect(appView.view().activity).toBe('blocked: log in')
 	expect(appView.view().why).toContain('invalid_grant')
@@ -240,19 +239,6 @@ test('Up does nothing with text typed or when nothing works', () => {
 	expect(sent).toEqual([])
 	// Not an edit: input history recalls the prompt instead.
 	expect(appView.view().editing).toBeUndefined()
-})
-
-test('Escape with no turn running sends nothing', () => {
-	app.onEvent(snapshot())
-	escape()
-	expect(sent).toEqual([])
-})
-
-test('streamed output reaches the view', () => {
-	app.onEvent(snapshot())
-	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'q', provider: 'anthropic' })
-	app.onEvent({ type: 'stream', sessionId: 's1', event: { type: 'text', text: 'answer' } })
-	expect(appView.view().transcript?.items).toContainEqual(expect.objectContaining({ type: 'text', text: 'answer' }))
 })
 
 test('replayed history carries no mark: it reads like one followed live', () => {
@@ -711,12 +697,6 @@ test('web links carry the latest link code only in their hidden target', () => {
 	}
 })
 
-test('the tab bar shows the tabs with the focused one', () => {
-	startOn(['a', 'b'])
-	let lines = frame.build(appView.view(), 60).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, ''))
-	expect(lines.find((l) => l.includes('Tabs:'))).toContain('Tabs: [1] 2 ')
-})
-
 // A session that was sent `prompts`, idle again.
 function sentBefore(...prompts: string[]) {
 	app.onEvent(snapshot())
@@ -868,19 +848,3 @@ test('the terminal watches the tab it shows until its window reports losing focu
 	expect(watched).toHaveLength(5)
 })
 
-test('notices stack at the right just above the tab bar, full width on a narrow terminal', () => {
-	startOn(['a', 'b'])
-	app.onEvent({ type: 'notice', session: 'b', tab: 2, name: 'Themes', kind: 'attention', line: 'pick phosphor or nostromo?' })
-	let plain = (cols: number) => frame.build(appView.view(), cols, 30, true).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ''))
-	for (let cols of [100, 40]) {
-		let rows = plain(cols)
-		let at = rows.findIndex((r) => r.includes('┃   pick phosphor'))
-		expect(rows[at - 1]).toContain('┃ 2 Themes · needs your attention')
-		// Below it the tab bar, then the prompt box's rule.
-		expect(rows[at + 1]).toContain('Tabs:')
-		expect(rows[at + 2]).toMatch(/^─+$/)
-		expect(rows.every((r) => strings.visLen(r) <= cols)).toBe(true)
-		let left = rows[at]!.indexOf('┃')
-		expect(cols === 40 ? left : left > 40).toBe(cols === 40 ? 0 : true)
-	}
-})

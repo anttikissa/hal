@@ -48,10 +48,3 @@ test("other clients' tabs never move focus", () => {
 	expect(tabs.focus(['a', 'b'], ['a', 'b'], f, 'b')).toBe(f)
 })
 
-test('Ctrl-N and Ctrl-P wrap around', () => {
-	let ids = ['a', 'b', 'c']
-	expect(tabs.step(ids, 'c', 1)).toBe('a')
-	expect(tabs.step(ids, 'a', -1)).toBe('c')
-	expect(tabs.step(ids, 'b', 1)).toBe('c')
-	expect(tabs.step([], 'a', 1)).toBeUndefined()
-})

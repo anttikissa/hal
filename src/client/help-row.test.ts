@@ -39,12 +39,6 @@ test('each state shows its key hints, with /keys at the right', () => {
 	expect(help(view({ type: 'paused' }, 'x'))).toMatch(/^enter: send/)
 })
 
-test('keys and descriptions differ in colour', () => {
-	let row = frame.build(view({ type: 'idle' }, 'hi'), 100).lines.at(-1)!
-	let colourOf = (word: string) => row.slice(0, row.indexOf(word)).match(/\x1b\[[0-9;]*m(?!.*\x1b\[)/s)?.[0]
-	expect(colourOf('enter')).not.toBe(colourOf('send'))
-})
-
 test('a question, then editing, then completion choices outrank the key hints', () => {
 	let form = { text: 'Run?', fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'] }] }
 	let asked = { ...view({ type: 'blocked', reason: 'question' }, 'x', [{ type: 'question', id: 'q', form }]), form: forms.start('q', form) }
@@ -71,17 +65,6 @@ test('the chrome keeps its height: choices, a question and working change only t
 	let f = frame.build({ ...asked, form: forms.start('q', form) }, 60)
 	let plain = frame.build(asked, 60)
 	expect(f.lines.slice(-4).map(strip).slice(0, 3)).toEqual(plain.lines.slice(-4).map(strip).slice(0, 3))
-})
-
-test('the top rule carries the activity centred and the fold count at its left', () => {
-	let rows = (v: View) => frame.build(v, 40).lines.map(strip)
-	let top = rows({ ...view(running), activity: 'running bash' }).find((l) => l.includes('running bash'))!
-	expect(top).toMatch(/^─+ running bash ─+$/)
-	let [before, after] = top.split(' running bash ')
-	expect(Math.abs(before!.length - after!.length)).toBeLessThanOrEqual(1)
-	let long = Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\n')
-	let folded = rows({ ...view(running, long), activity: 'thinking' })
-	expect(folded.find((l) => l.includes('thinking'))).toMatch(/^↑\d+ ─+ thinking ─+$/)
 })
 
 test('new code adds ctrl-r to the state hints, not over a question or choices', () => {

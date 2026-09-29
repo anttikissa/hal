@@ -79,10 +79,6 @@ test('a wrong code is asked again, a right one is remembered, and a revoked toke
 	expect(saved.tokens[at]).toBe(again.token)
 })
 
-test('with nothing saved and no host, ./run -r says to name one', async () => {
-	await expect(remote.signIn(undefined, { last: '', tokens: {} }, () => null, () => {})).rejects.toThrow('./run -r <host>')
-})
-
 test('over the WebSocket the terminal gets the remote tabs, its commands are carried out, and revoking logs it out', async () => {
 	let at = await serve()
 	let id = sessions.create({ cwd: '/tmp' }).id

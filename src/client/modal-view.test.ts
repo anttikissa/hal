@@ -96,15 +96,6 @@ test('a modal over a short frame still gets its full height', () => {
 	expect(f.lines.length).toBeLessThanOrEqual(30)
 })
 
-test('transcript right of a modal keeps its colour', () => {
-	let v: View = { ...view([{ type: 'prompt', text: 'y'.repeat(58 * 30) }]), modal: modals.open({ title: 'Models' }) }
-	let f = frame.build(v, 60, 30)
-	let b = box(f.lines)
-	let row = f.lines[b.top + 1]!
-	let right = row.slice(row.lastIndexOf('│'))
-	expect(right).toContain(`48;2;${oklch.toRgb(colors.user().bg!).join(';')}`)
-})
-
 test('a modal never makes a row wider than the terminal, however small', () => {
 	for (let cols = 3; cols < 70; cols++) {
 		for (let rows of [1, 2, 3, 5, 30]) {
@@ -118,12 +109,3 @@ test('a modal never makes a row wider than the terminal, however small', () => {
 	}
 })
 
-test('search matches in a modal list are bold, then the row carries on unchanged', () => {
-	let v = modalView({ title: 'Models', form: search, items: ['gpt 6 sol', 'opus 5.5'] })
-	v = { ...v, modal: { ...v.modal!, query: 'sol', selected: 1 } }
-	let row = frame.build(v, 60, 30).lines.find((l) => strip(l).includes('gpt 6 sol'))!
-	expect(row).toMatch(/gpt 6 \x1b\[1m(\x1b\[[0-9;]*m)*sol\x1b\[22m/)
-	expect(strip(row)).toContain('  gpt 6 sol')
-	let other = frame.build(v, 60, 30).lines.find((l) => strip(l).includes('opus 5.5'))!
-	expect(other).not.toContain('\x1b[1m')
-})

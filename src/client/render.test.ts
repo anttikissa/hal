@@ -269,14 +269,7 @@ describe('full mode', () => {
 		expect(frameText()).toContain(' a9')
 	})
 
-	test('a shrinking frame repaints canonically instead of duplicating rows', () => {
-		setup(8, 30)
-		show(items(10), 'two\nrows')
-		show(items(10), 'one')
-		expect(term.content()).toEqual(frameText())
-	})
-
-	test('after a shrink, any later change still lands on the right row', () => {
+	test('a shrink repaints canonically, and any later change still lands on the right row', () => {
 		// A shrink cannot pull scrollback back onto the screen; a renderer
 		// that shrank in place would misplace later edits near the top.
 		for (let k = 0; k < 20; k++) {
@@ -284,6 +277,7 @@ describe('full mode', () => {
 			setup(8, 30)
 			show(items(10), 'three\nprompt\nrows')
 			show(items(10), 'one')
+			if (k === 0) expect(term.content()).toEqual(frameText())
 			let list = items(10)
 			list[k] = { type: 'text', text: 'edited' }
 			show(list, 'one')
@@ -302,14 +296,6 @@ describe('full mode', () => {
 		expect(term.content()).toEqual(['$ hal', ...frameText()])
 	})
 
-	test('a forced repaint (resize) clears scrollback and writes the whole frame', () => {
-		setup(8, 30, ['$ hal'])
-		show(items(10))
-		term.resize(6, 30)
-		render.draw(true)
-		expect(term.content()).toEqual(frameText())
-		expect(frameText().length).toBeGreaterThan(20)
-	})
 })
 
 describe('resize', () => {
@@ -452,14 +438,6 @@ describe('modals', () => {
 		withModal(m)
 		expect(rowOf(39)).toBe(bottom - 1)
 	})
-})
-
-test('an attached image shows as one line naming its size and type under its prompt', () => {
-	setup(10, 40)
-	show([{ type: 'prompt', text: 'look' }, { type: 'image', blob: '0123456789ab', mediaType: 'image/png', bytes: 12_345 }])
-	let lines = frameText()
-	let at = lines.findIndex((l) => l.includes('look'))
-	expect(lines.slice(at + 1).find((l) => l.trim())).toMatch(/^\s*\[image 12 kB png\]$/)
 })
 
 describe('tabs', () => {

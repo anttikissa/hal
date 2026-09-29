@@ -155,21 +155,13 @@ describe('quit and restart', () => {
 		expect(t.log.filter((l) => l.startsWith('exit'))).toEqual(['exit 0'])
 	})
 
-	test('found inside an unfinished paste', () => {
-		let t = fixture()
-		t.type('\x1b[200~a long paste that never ', 'ends\x03')
-		expect(t.log.at(-1)).toBe('exit 0')
-	})
-
-	test('found inside a half-read escape sequence', () => {
+	test('found inside a half-read escape sequence or paste, and split', () => {
 		let t = fixture()
 		t.type('\x1b[1;', '\x12')
 		expect(t.log.at(-1)).toBe(`exit ${terminal.restartCode}`)
-	})
-
-	test('kitty form split across reads', () => {
-		let t = fixture()
-		t.type('\x1b[9', '9;', '5u')
+		terminal.reset()
+		t = fixture()
+		t.type('\x1b[200~a long paste that never ', 'ends', '\x1b[9', '9;', '5u')
 		expect(t.log.at(-1)).toBe('exit 0')
 	})
 

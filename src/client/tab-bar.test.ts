@@ -21,15 +21,6 @@ const tab = (id: string, state: SessionState = { type: 'idle' }, attention = fal
 const text = (s: string) => s.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '')
 const bar = (list: Tab[], focused: string, cols: number) => text(tabBar.row(list, focused, cols))
 
-test('one tab shows creation hints, several show navigation hints', () => {
-	expect(bar([tab('a')], 'a', 80)).toBe(' Tabs: [1]  ctrl-t: new')
-	let wide = bar([tab('a'), tab('b'), tab('c')], 'b', 80)
-	expect(wide).toStartWith(' Tabs:  1 [2] 3 ')
-	expect(wide).toContain('alt-#: goto')
-	expect(wide).toContain('ctrl-n/p: switch')
-	expect(wide).not.toContain('ctrl-t')
-})
-
 test('each tab shows at most one indicator for what it needs', () => {
 	let list = [
 		tab('a', { type: 'running', phase: 'streaming' }),

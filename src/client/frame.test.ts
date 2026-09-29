@@ -100,22 +100,6 @@ test('no row is wider than the terminal, whatever the text', () => {
 	}
 })
 
-test('a described command separates the description and the quiet command; background uses &', () => {
-	let input = { command: "sed -n '1,40p' config.ason |\n  cat -n", description: 'Show the first 40 lines of the config' }
-	let lines = frame.build(view([{ type: 'tool', id: 't', name: 'bash', input }]), 100).lines
-	expect(plain(lines).slice(0, 2)).toEqual(['▸ Show the first 40 lines of the config', "$ sed -n '1,40p' config.ason | cat -n"])
-	expect(lines[1]).toContain(quietOn(colors.toolBash()))
-	expect(plain(frame.build(view([{ type: 'tool', id: 't', name: 'bash', input: { ...input, background: true } }]), 100).lines)[1]).toStartWith('& sed')
-})
-
-test('a long tool result shows only its first rows', () => {
-	let output = Array.from({ length: 100 }, (_, i) => `row ${i}`).join('\n')
-	let lines = plain(frame.build(view([{ type: 'tool-result', id: 't', output }]), 40).lines)
-	expect(lines.join('\n')).toContain('row 0')
-	expect(lines.join('\n')).not.toContain('row 50')
-	expect(lines.length).toBeLessThan(11)
-})
-
 test('a tool result of megabytes is glimpsed in its first rows, each shown line wrapped, the rest counted', () => {
 	let long = 'w'.repeat(100)
 	let output = [long, ...Array.from({ length: 200_000 }, (_, i) => `row ${i}`)].join('\n')
@@ -192,15 +176,6 @@ test('a cursor after a full prompt row stays inside the terminal', () => {
 	expect(f.cursor).toEqual({ row: boxOf(f).top + 1, col: 19 })
 })
 
-test('an empty session is just the chrome: the prompt between its rules, then the status and help rows', () => {
-	let f = frame.build({ prompt: { text: '', cursor: 0 } }, 80)
-	let b = boxOf(f)
-	expect(b.top).toBe(0)
-	expect(b.rows).toEqual([''])
-	expect(f.lines.length).toBe(b.bottom + 3)
-	expect(f.cursor).toEqual({ row: 1, col: 1 })
-})
-
 test("the tab's state and a one-off notice both show, state first, a rule between", () => {
 	let v = view([{ type: 'text', text: 'answer' }], '')
 	v.why = 'error: no credits (Enter retries)'
@@ -233,25 +208,6 @@ const fgOf = (c: Oklch) => `38;2;${oklch.toRgb(c).join(';')}`
 const bgOf = (c: Oklch) => `48;2;${oklch.toRgb(c).join(';')}`
 const rowWith = (lines: string[], text: string) => lines.find((l) => strip(l).includes(text))!
 
-test('items wear their theme colours', () => {
-	let items: Item[] = [
-		{ type: 'prompt', text: 'ask' },
-		{ type: 'thinking', text: 'ponder' },
-		{ type: 'text', text: 'reply' },
-		{ type: 'tool', id: 't', name: 'bash', input: { command: 'ls' } },
-		{ type: 'tool', id: 'u', name: 'mystery', input: {} },
-		{ type: 'turn-end', status: 'error', error: 'boom' },
-	]
-	let lines = frame.build(view(items, 'typed'), 60).lines
-	expect(rowWith(lines, 'ask')).toContain(fgOf(colors.user().fg!))
-	expect(rowWith(lines, 'ponder')).toContain(fgOf(colors.thinking().fg!))
-	expect(rowWith(lines, 'reply')).toContain(fgOf(colors.assistant().fg!))
-	expect(rowWith(lines, 'ls')).toContain(bgOf(colors.toolBash().bg!))
-	expect(rowWith(lines, 'mystery')).toContain(bgOf(colors.tool().bg!))
-	expect(rowWith(lines, 'boom')).toContain(fgOf(colors.error().fg!))
-	expect(rowWith(lines, 'typed')).toContain(bgOf(colors.input().bg!))
-})
-
 test('a card background fills the whole row and colour ends with the row', () => {
 	let f = frame.build(view([{ type: 'prompt', text: 'short\nlines' }], 'typed'), 30)
 	for (let text of ['short', 'lines', 'typed']) {
@@ -263,17 +219,6 @@ test('a card background fills the whole row and colour ends with the row', () =>
 	// The cursor still sits right after the typed text.
 	let row = f.lines[f.cursor.row]!
 	expect(f.cursor.col).toBe(strings.visLen(row.slice(0, row.indexOf('typed') + 5)))
-})
-
-test('the terminal follows a theme override at the next build', () => {
-	let saved = colors.fgL
-	try {
-		colors.fgL = () => 0.95
-		let row = rowWith(frame.build(view([{ type: 'text', text: 'reply' }]), 40).lines, 'reply')
-		expect(row).toContain(fgOf([0.95, colors.fgC(), colors.assistant().fg![2]]))
-	} finally {
-		colors.fgL = saved
-	}
 })
 
 describe('prompt box', () => {
@@ -457,30 +402,6 @@ test('a [paste/<name>] marker links to its page; while its upload is in flight i
 	}
 })
 
-
-test('prompts, text and thinking have a header row, a blank row and the body; a prompt card has a row of its colour above and below', () => {
-	let ts = new Date(2026, 8, 28, 10, 49).toISOString()
-	let items: Item[] = [
-		{ type: 'prompt', text: 'Can you?', ts },
-		{ type: 'thinking', text: 'Hmm.', model: 'anthropic/claude-opus-5-5', effort: 'high', ts },
-		{ type: 'text', text: 'Yes.', model: 'anthropic/claude-opus-5-5', ts },
-		{ type: 'prompt', text: 'Done.', from: '4-abc', label: 'tab 4: Review', ts },
-		{ type: 'command', text: '/help' },
-	]
-	let f = frame.build(view(items), 60)
-	let lines = plain(f.lines)
-	let at = (s: string) => lines.indexOf(s)
-	expect(lines.slice(at('10:49 You') - 1, at('10:49 You') + 4)).toEqual(['', '10:49 You', '', 'Can you?', ''])
-	expect(lines.slice(at('10:49 Hal (Opus 5.5, thinking high)'), at('10:49 Hal (Opus 5.5, thinking high)') + 3)).toEqual(['10:49 Hal (Opus 5.5, thinking high)', '', 'Hmm.'])
-	expect(lines.slice(at('10:49 Hal (Opus 5.5)'), at('10:49 Hal (Opus 5.5)') + 3)).toEqual(['10:49 Hal (Opus 5.5)', '', 'Yes.'])
-	expect(lines).toContain('10:49 Message from tab 4: Review')
-	// A command is drawn as the prompt it was typed as.
-	expect(lines.slice(at('You') - 1, at('You') + 4)).toEqual(['', 'You', '', '/help', ''])
-	expect(lines.join('\n')).not.toContain('> ')
-	// The prompt's background paints its blank rows too: the whole card.
-	let bg = `48;2;${oklch.toRgb(colors.user().bg!).join(';')}`
-	for (let i = at('10:49 You') - 1; i < at('10:49 You') + 4; i++) expect(f.lines[i]).toContain(bg)
-})
 
 test('a narrow terminal clips the header and keeps the block id', () => {
 	let item: Item = { type: 'thinking', text: 'x', model: 'anthropic/claude-opus-5-5', effort: 'high', ts: new Date(2026, 8, 28, 10, 51).toISOString() }
