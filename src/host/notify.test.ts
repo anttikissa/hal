@@ -44,3 +44,11 @@ test('a turn end reaches the user once: nothing if watched, a notice if another 
 	expect(await turn(a, one, 'third')).toBe(1)
 	expect(a.of('notice')).toHaveLength(1)
 })
+
+test("a reply's <summary> is its notice line", async () => {
+	let a = client()
+	let one = created(a), two = created(a)
+	a.conn.send({ type: 'visibility', sessionId: two, visible: true })
+	await turn(a, one, 'Deployed.\n\n<summary>Deploy to example.com finished in 15 s.</summary>\nthanks')
+	expect(a.of('notice').at(-1)).toMatchObject({ line: 'Deploy to example.com finished in 15 s.' })
+})

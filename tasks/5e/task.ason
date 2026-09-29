@@ -1,0 +1,6 @@
+{
+	title: 'A notify tool posts a notice mid-turn',
+	spec: "A notify tool with one text argument (under 80 characters) posts a notice from the running turn, for example when the user asked to be told if an approach fails. It routes like any notice (task qm: nothing if the session is watched, a notice to clients watching another tab, else a push) and answers 'sent'. A tool, not a tag: mid-turn the turn goes on anyway, so it costs no extra request and is structured.",
+	status: 'planned',
+	needs: ['x8']
+}

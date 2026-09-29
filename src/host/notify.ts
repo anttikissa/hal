@@ -12,6 +12,7 @@ import { pages } from './pages.ts'
 import { push } from './push.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
+import { summary } from '../common/summary.ts'
 
 type Watcher = { deliver: (event: Event) => void; visible?: string }
 
@@ -21,14 +22,17 @@ function kind(event: Event): NoticeKind | undefined {
 	return event.status === 'completed' ? 'done' : event.status === 'error' ? 'failed' : undefined
 }
 
-// The last non-blank line of the text the latest turn replied with.
+// What the latest turn replied: its <summary> (common/summary.ts), else
+// the last non-blank line of its text.
 function replyLine(id: string): string {
 	let records = pages.page(id).records
 	for (let i = records.length - 1; i >= 0; i--) {
 		let r = records[i]!
 		if (r.type === 'user') break
 		if (r.type !== 'assistant' || r.block.type !== 'text') continue
-		let last = r.block.text.split('\n').map((l) => l.trim()).filter(Boolean).at(-1)
+		let told = summary.extract(r.block.text)
+		if (told) return told
+		let last = summary.strip(r.block.text).split('\n').map((l) => l.trim()).filter(Boolean).at(-1)
 		if (last) return last
 	}
 	return ''
@@ -49,7 +53,8 @@ function route(clients: Iterable<Watcher>, id: string, event: Event): void {
 	let watching = all.filter((c) => c.visible !== undefined)
 	if (!watching.length) {
 		let word = k === 'attention' ? 'needs an answer' : k === 'failed' ? 'failed' : 'done'
-		return void push.notify(id, name, word).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
+		let told = k === 'done' ? notify.replyLine(id) : ''
+		return void push.notify(id, name, told ? `${word}: ${told}` : word).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
 	}
 	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: k, line: notify.line(id, event) }
 	let tab = tabs.file().open.indexOf(id)
