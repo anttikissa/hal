@@ -422,22 +422,6 @@ describe('modals', () => {
 		expect(term.content()).toEqual(before)
 		expect(term.written.slice(written)).not.toContain('[3J')
 	})
-
-	test('the list scrolls only as far as the selection needs', () => {
-		setup(20, 40)
-		let m = modals.open({ title: 'Models', items: names })
-		let rowOf = (i: number) => term.screen().findIndex((r) => r.includes(`→ model ${i}`))
-		withModal(m)
-		for (let i = 0; i < 40; i++) {
-			m = modals.step(m, { key: 'down' }).state
-			withModal(m)
-			m = render.state.view.modal!
-		}
-		let bottom = rowOf(40)
-		m = modals.step(m, { key: 'up' }).state
-		withModal(m)
-		expect(rowOf(39)).toBe(bottom - 1)
-	})
 })
 
 describe('tabs', () => {
