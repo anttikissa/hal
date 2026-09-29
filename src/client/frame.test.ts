@@ -13,7 +13,7 @@ import { ansi } from './ansi.ts'
 import { target } from '../web/target.ts'
 
 // Where text in `style`'s quieter colour starts (ansi.quiet).
-const quietOn = (style: { fg?: Oklch; bg?: Oklch }) => ansi.sgr({ fg: oklch.quiet(style.fg!, style.bg ?? colors.screen) })
+const quietOn = (style: { fg?: Oklch; bg?: Oklch }) => ansi.sgr({ fg: oklch.quiet(style.fg!, style.bg ?? colors.screen()) })
 
 // Visible text only: escape sequences removed.
 function strip(s: string): string {
@@ -231,9 +231,9 @@ test('a card background fills the whole row and colour ends with the row', () =>
 test('the terminal follows a theme override at the next build', () => {
 	let saved = colors.fgL
 	try {
-		colors.fgL = 0.95
+		colors.fgL = () => 0.95
 		let row = rowWith(frame.build(view([{ type: 'text', text: 'reply' }]), 40).lines, 'reply')
-		expect(row).toContain(fgOf([0.95, colors.fgC, 55]))
+		expect(row).toContain(fgOf([0.95, colors.fgC(), 55]))
 	} finally {
 		colors.fgL = saved
 	}

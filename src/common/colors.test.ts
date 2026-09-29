@@ -2,10 +2,16 @@ import { expect, test } from 'bun:test'
 import { colors, type Style } from './colors.ts'
 import { oklch, type Oklch } from './oklch.ts'
 
+// Shared values (fgL, screen) are a number or one colour; the rest are styles.
+const styles = () => Object.entries(colors).map(([key, value]) => [key, value()] as const)
+	.filter((e): e is [string, Style] => typeof e[1] === 'object' && !Array.isArray(e[1]))
+
+test('every field is a function, so a plugin can wrap it and undo that', () => {
+	for (let [key, value] of Object.entries(colors)) expect(typeof value, key).toBe('function')
+})
+
 test('every style is a set of OKLCH colours', () => {
-	for (let [key, value] of Object.entries(colors)) {
-		if (typeof value !== 'function') continue
-		let style = value()
+	for (let [key, style] of styles()) {
 		expect(Object.keys(style).length, key).toBeGreaterThan(0)
 		for (let c of Object.values(style)) {
 			expect(c).toHaveLength(3)
@@ -19,7 +25,7 @@ test('overriding a shared value moves every style derived from it, at call time'
 	let saved = colors.fgL
 	try {
 		let before = { assistant: colors.assistant().fg, bash: colors.toolBash().fg, grep: colors.toolGrep().fg }
-		colors.fgL = 0.9
+		colors.fgL = () => 0.9
 		expect(colors.assistant().fg![0]).toBe(0.9)
 		expect(colors.toolBash().fg![0]).toBe(0.9)
 		expect(colors.toolGrep().fg).toEqual(colors.toolRead().fg!)
@@ -50,10 +56,8 @@ test('every colour is readable where it is drawn, and so is its quieter form', (
 		let r = oklch.contrast(fg, bg)
 		if (r < min) low.push(`${name} ${r.toFixed(2)}`)
 	}
-	for (let [key, value] of Object.entries(colors)) {
-		if (typeof value !== 'function') continue
-		let style = value() as Style
-		let bg = style.bg ?? colors.screen
+	for (let [key, style] of styles()) {
+		let bg = style.bg ?? colors.screen()
 		for (let [part, c] of Object.entries(style)) {
 			if (backgrounds.test(part)) continue
 			check(`${key}.${part}`, c, bg, marks.test(part) ? 3 : 4.5)

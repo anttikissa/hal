@@ -129,6 +129,10 @@ point to it.
   goes in a `state` field on that object.
 - Config values are plain functions on these objects, such as
   `models.defaultModel()`, read at call time — never captured at import.
+- Every overridable setting on a module object is a function, never a
+  plain value (`colors.fgL: () => 0.8`, not `fgL: 0.8`), so a plugin
+  can override it with `around(obj, key, ...)` and undo that. Only
+  `state` and constants nobody overrides may be plain values.
 
 ## Web client (Solid)
 

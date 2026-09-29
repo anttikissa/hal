@@ -1,7 +1,8 @@
-// The theme, as code. Top-level fields are either plain values (fgL,
-// fgC, ...) or functions that compute a style from them when called, so
-// overriding a value from local.ts (colors.fgL = 0.9) moves everything
-// derived from it. A style names its colours: fg and bg, plus extras
+// The theme, as code. Every top-level field is a function, read at call
+// time: shared values (fgL: () => 0.8, screen) and styles computed from
+// them, so overriding a value from local.ts (colors.fgL = () => 0.9, or
+// around(colors, 'fgL', ...) from a plugin, which can undo it) moves
+// everything derived from it. A style names its colours: fg and bg, plus extras
 // such as bold, code or cursor for later renderers. Every colour is
 // OKLCH [lightness, chroma, hue]: equal L and C across hues look equally
 // bright and vivid.
@@ -19,18 +20,18 @@ export const colors = {
 	// The lightest dark background we design for: where a style has no
 	// bg of its own, its text is checked against this (4.5:1, 3:1 for
 	// marks; tasks/README.md, readable text).
-	screen: [0.25, 0.01, 260] as Oklch,
+	screen: (): Oklch => [0.25, 0.01, 260],
 	// Shared lightness and chroma of the vivid foregrounds and the card
 	// backgrounds.
-	fgL: 0.8,
-	fgC: 0.15,
-	bgL: 0.25,
-	bgC: 0.04,
+	fgL: (): number => 0.8,
+	fgC: (): number => 0.15,
+	bgL: (): number => 0.25,
+	bgC: (): number => 0.04,
 
 	// Hal's responses: warm orange.
 	assistant: (): Style => ({
-		fg: [colors.fgL, colors.fgC, 55],
-		cursor: [colors.fgL, colors.fgC, 55],
+		fg: [colors.fgL(), colors.fgC(), 55],
+		cursor: [colors.fgL(), colors.fgC(), 55],
 		cursorIdle: [0.6, 0, 55],
 		bold: [0.9, 0.06, 55],
 		code: [0.86, 0.04, 55],
@@ -95,14 +96,14 @@ export const colors = {
 	}),
 	// Tools: each kind its own hue. Red is kept for real failures. A
 	// tool without its own entry (tool + capitalised name) uses `tool`.
-	tool: (): Style => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),
-	toolBash: (): Style => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
-	toolEval: (): Style => ({ fg: [colors.fgL, colors.fgC, 295], bg: [colors.bgL, 0.06, 295] }),
-	toolRead: (): Style => ({ fg: [colors.fgL, colors.fgC, 155], bg: [colors.bgL, colors.bgC, 155] }),
+	tool: (): Style => ({ fg: [colors.fgL(), colors.fgC(), 250], bg: [colors.bgL(), colors.bgC(), 250] }),
+	toolBash: (): Style => ({ fg: [colors.fgL(), colors.fgC(), 320], bg: [colors.bgL(), colors.bgC(), 320] }),
+	toolEval: (): Style => ({ fg: [colors.fgL(), colors.fgC(), 295], bg: [colors.bgL(), 0.06, 295] }),
+	toolRead: (): Style => ({ fg: [colors.fgL(), colors.fgC(), 155], bg: [colors.bgL(), colors.bgC(), 155] }),
 	toolGrep: (): Style => colors.toolRead(),
 	toolGlob: (): Style => colors.toolRead(),
 	toolLs: (): Style => colors.toolRead(),
-	toolWrite: (): Style => ({ fg: [0.78, 0.12, 75], bg: [colors.bgL, 0.04, 75] }),
-	toolEdit: (): Style => ({ fg: [0.76, 0.11, 190], bg: [colors.bgL, 0.04, 190] }),
+	toolWrite: (): Style => ({ fg: [0.78, 0.12, 75], bg: [colors.bgL(), 0.04, 75] }),
+	toolEdit: (): Style => ({ fg: [0.76, 0.11, 190], bg: [colors.bgL(), 0.04, 190] }),
 }
 

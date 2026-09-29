@@ -154,9 +154,9 @@ test('the page carries the theme as CSS, following overrides, without its code',
 		expect(html).toContain(`.tool-bash { `)
 		expect(html.split('.tool-bash {')[1]!.split('}')[0]).toContain(oklch.toCss(colors.toolBash().bg!))
 		expect(html).not.toContain('fgL')
-		colors.fgL = 0.95
+		colors.fgL = () => 0.95
 		let after = await (await fetch(`${base()}/`)).text()
-		expect(after).toContain(oklch.toCss([0.95, colors.fgC, 55]))
+		expect(after).toContain(oklch.toCss([0.95, colors.fgC(), 55]))
 	} finally {
 		colors.fgL = saved
 	}

@@ -36,7 +36,7 @@
 
 import type { BunPlugin, Server, ServerWebSocket } from 'bun'
 import { colors, type Style } from '../common/colors.ts'
-import { oklch } from '../common/oklch.ts'
+import { oklch, type Oklch } from '../common/oklch.ts'
 import { session } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
 import { blobs } from './blobs.ts'
@@ -133,14 +133,15 @@ const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
 function css(): string {
 	let rules: string[] = []
 	for (let [key, value] of Object.entries(colors)) {
-		if (typeof value !== 'function') continue
-		let decls = Object.entries(value() as Style).map(([part, c]) => {
+		// Shared values (fgL, screen) are numbers or one colour, not styles.
+		let style = value() as Style | number | Oklch
+		if (typeof style !== 'object' || Array.isArray(style)) continue
+		let decls = Object.entries(style).map(([part, c]) => {
 			let prop = part === 'fg' ? 'color' : part === 'bg' ? 'background-color' : `--${kebab(part)}`
 			return `${prop}: ${oklch.toCss(c)}`
 		})
-		let style = value() as Style
 		let fg = style.fg ?? style.text
-		if (fg) decls.push(`--quiet: ${oklch.toCss(oklch.quiet(fg, style.bg ?? style.button ?? colors.screen))}`)
+		if (fg) decls.push(`--quiet: ${oklch.toCss(oklch.quiet(fg, style.bg ?? style.button ?? colors.screen()))}`)
 		if (key === 'input' && fg && style.bg) decls.push(`--faint: ${oklch.toCss(oklch.faint(fg, style.bg))}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
