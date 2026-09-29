@@ -16,4 +16,9 @@ bun test src || status=1
 if [ -f local.ts ]; then
 	bun -e "await import('./local.ts')" || status=1
 fi
+# Plugins (task an) are typechecked by tsc too; importing one must do
+# nothing but define it, so each is also imported on its own.
+for f in plugins/*.ts; do
+	bun -e "await import('./$f')" || status=1
+done
 exit $status

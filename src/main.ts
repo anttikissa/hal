@@ -29,7 +29,9 @@ import { version } from './host/version.ts'
 import { openai } from './host/openai.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
+import { plugins } from './host/plugins.ts'
 import { server } from './host/server.ts'
+import { slash } from './host/slash.ts'
 import { web } from './host/web.ts'
 import { webAuth } from './host/web-auth.ts'
 
@@ -44,6 +46,17 @@ function localPath(): string {
 async function loadLocal(): Promise<void> {
 	let path = main.localPath()
 	if (existsSync(path)) await import(path)
+}
+
+// Loads and follows plugins/*.ts (task an), after local.ts. A failure
+// goes to stderr and, on the host, to every open session and client.
+async function loadPlugins(): Promise<void> {
+	plugins.report = (text) => {
+		process.stderr.write(`${text}\n`)
+		for (let id of sessions.openIds()) slash.output(id, text, true)
+		for (let client of host.state.clients) client.deliver({ type: 'warning', text })
+	}
+	await plugins.init()
 }
 
 // A restart comes back to the tab it left: ./run gives every start of
@@ -267,6 +280,8 @@ async function start(): Promise<void> {
 	config.init(() => host.warnAll())
 	await main.loadLocal()
 	perf.mark('local.ts')
+	await main.loadPlugins()
+	perf.mark('plugins')
 	if (process.argv[2] === '-r') {
 		if (!terminal.available()) {
 			process.stderr.write('hal2 needs a terminal\n')
@@ -295,6 +310,7 @@ export const main = {
 	keepTab,
 	localPath,
 	loadLocal,
+	loadPlugins,
 	init,
 	initTerminal,
 	onEvent,

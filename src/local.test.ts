@@ -1,7 +1,7 @@
 // local.ts overrides: loaded from the home at startup, optional, and able
 // to replace config functions on module objects.
 import { expect, test } from 'bun:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 
@@ -108,5 +108,33 @@ await main.start()
 		let out = run(home, script)
 		expect(out.exitCode).toBe(0)
 		expect(JSON.parse(out.stderr)).toEqual({ seen: 'test/from-config', model: 'test/from-local', port: 4321 })
+	})
+})
+
+test('start loads plugins after local.ts and before init; /plugins names module targets', () => {
+	withHome((home) => {
+		writeFileSync(join(home, 'local.ts'), `globalThis.localLoaded = true\n`)
+		mkdirSync(join(home, 'plugins'))
+		writeFileSync(
+			join(home, 'plugins', 'p.ts'),
+			`import { models } from ${JSON.stringify(`${srcDir}/host/models.ts`)}\n` +
+				`export default (plugin: any) => { globalThis.sawLocal = globalThis.localLoaded; plugin.around(models, 'defaultModel', () => 'test/plugin') }\n`,
+		)
+		let script = `
+let { main } = await import(${JSON.stringify(`${srcDir}/main.ts`)})
+let { models } = await import(${JSON.stringify(`${srcDir}/host/models.ts`)})
+let { plugins } = await import(${JSON.stringify(`${srcDir}/host/plugins.ts`)})
+main.init = () => {
+	process.stderr.write(JSON.stringify({ sawLocal: globalThis.sawLocal, model: models.defaultModel(), list: plugins.describe() }))
+	process.exit(0)
+}
+await main.start()
+`
+		let out = run(home, script)
+		expect(out.exitCode).toBe(0)
+		let got = JSON.parse(out.stderr)
+		expect(got.sawLocal).toBe(true)
+		expect(got.model).toBe('test/plugin')
+		expect(got.list).toContain('host/models.defaultModel around')
 	})
 })

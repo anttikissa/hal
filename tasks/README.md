@@ -80,6 +80,8 @@ point to it.
 - Settings: common ones in config.ason (home root, declared in one
   table in src/common/settings.ts, task pc); anything else by
   overriding exported functions or fields from gitignored `local.ts`.
+  Owned, hot-reloaded hooks on those functions go in plugins/*.ts
+  (src/host/plugins.ts, task an).
   Settings marked `browser` reach the web page as JSON the host writes
   into each page it serves (task rr), not over the WebSocket.
 

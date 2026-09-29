@@ -27,6 +27,7 @@ const list: CommandInfo[] = [
 	{ name: 'new', description: 'new tab', category: 'tabs', key: 'ctrl-t', clientOnly: true },
 	{ name: 'pause', description: 'pause the turn', category: 'session' },
 	{ name: 'perf', description: 'show startup timing marks', category: 'debug', modelUsable: true },
+	{ name: 'plugins', description: 'list loaded plugins and their hooks', category: 'debug', modelUsable: true },
 	{ name: 'queue', description: 'list, run or clear queued prompts', category: 'session' },
 	// Ctrl-C, Ctrl-Z and Ctrl-R are really caught by the emergency path:
 	// src/client/emergency.ts scans raw stdin and src/client/terminal.ts

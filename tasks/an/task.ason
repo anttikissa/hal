@@ -22,10 +22,13 @@ Repo: plugins/.gitignore ignores everything but itself and example-plugin.ts, so
 Temporary plugins (agents' convention, stated in the example comments): name the file after the session, e.g. 158-lil-trace-render.ts, and set expires.
 
 Not in this task: plugin slash commands (command metadata lives in common/commands/list.ts, which clients read; needs its own task), a lifecycle event catalogue, web plugins, comparing plugin sets between host and peers (diagnostic only when added).`,
-	status: 'planned',
+	status: 'done',
 	notes: [
 		"Motivating first plugin (local, not committed): drain the discontinued OpenAI sub first via plugin.around(auth, 'pickAccount', ...) moving that account to the front for kind 'openai'; pick() still skips it when limited or broken.",
-		'Design discussed in session 158-lil with GPT-6 Sol/Astra reviews: before/after observe only; export default registration enables staging and expiry-without-running; eval decision deferred until plugins are tried (old-Hal eval study: /tmp/eval-usage-report.md, ~5% of calls were durable hot patches).'
+		'Design discussed in session 158-lil with GPT-6 Sol/Astra reviews: before/after observe only; export default registration enables staging and expiry-without-running; eval decision deferred until plugins are tried (old-Hal eval study: /tmp/eval-usage-report.md, ~5% of calls were durable hot patches).',
+		"Bun cannot import a file created after it first resolved in a symlinked directory (/tmp on macOS, so every test home): 'Cannot find module', even cache-busted or via require. plugins.load imports realpathSync(path) + '?v=<gen>', which works; the query string does re-run the file (tested with a top-level counter). Each reload leaves the old module version in memory.",
+		'Superseding is one generation counter: every load, removal and expiry bumps state.latest[path]; a load checks it after import and after registration and drops itself if overtaken. The watcher skips events whose content hash equals the last one tried, so a failed file is not retried until it changes.',
+		'Target names (host/auth.pickAccount) come from scanning require.cache for the module whose exports include the object. The wrapper is rebuilt if someone else (eval, local.ts) replaced it; their function becomes the new original. main.loadPlugins wires report to stderr, slash.output in open sessions and a warning to clients; startup failures happen before sessions open, so they show on stderr and in /plugins.'
 	],
 	needs: ['9', 'wf']
 }

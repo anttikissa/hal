@@ -1,0 +1,4 @@
+# User plugins stay local; delete this file to track your own.
+*
+!.gitignore
+!example-plugin.ts
