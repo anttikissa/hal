@@ -1,0 +1,3 @@
+#!/bin/bash
+# usage: scripts/perf [scale]  (task te; generated data, never real)
+exec bun "$(dirname "$0")/../src/perf/run.ts" "$@"
