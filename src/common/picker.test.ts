@@ -101,3 +101,23 @@ test('Enter with nothing matching switches to nothing', () => {
 	expect(st.items).toEqual([])
 	expect(enter(st)).toBeUndefined()
 })
+
+test('families go most capable first, and equal matches select the higher row', () => {
+	let all = [...tree, 'anthropic/claude-haiku-4-5', 'anthropic/claude-sonnet-5', 'anthropic/claude-fable-5', 'anthropic/claude-fable-5-1', 'openai/gpt-6-luna']
+	let st = picker.open('hal/intro', all)
+	st = picker.refilter({ ...st, tree: { ...st.tree!, open: ['anthropic', 'openai', 'openai/gpt'] } }, all)
+	expect(st.items.map((r) => r.trim().split('  ')[0]!).filter((r) => /^▶ (fable|opus|sonnet)$/.test(r))).toEqual(['▶ fable', '▶ opus', '▶ sonnet'])
+	let gpt = st.items.filter((r) => r.includes('openai/gpt-')).map((r) => r.split('openai/')[1])
+	expect(gpt).toEqual(['gpt-6-sol', 'gpt-6-terra', 'gpt-6-luna', 'gpt-5.5'])
+	expect(enter(picker.step(st, key('c', 'clau'), all).state)).toBe('/model anthropic/claude-fable-5-1')
+})
+
+test('dated snapshots and models over a version behind their family newest are hidden', () => {
+	let all = ['anthropic/claude-opus-5-5', 'anthropic/claude-opus-4-5', 'anthropic/claude-opus-4-5-20251101', 'anthropic/claude-opus-4-1', 'anthropic/claude-haiku-3-20240307']
+	let shown = (current: string) => picker.refilter({ ...picker.open(current, all), tree: { rows: [], open: ['anthropic', 'anthropic/opus'], current } }, all).items.join('\n')
+	expect(shown('hal/intro')).toMatch(/claude-opus-4-5$/m)
+	expect(shown('hal/intro')).not.toMatch(/20251101|opus-4-1/)
+	// A snapshot alone stays; the current model stays whatever its age.
+	expect(shown('hal/intro')).toContain('claude-haiku-3-20240307')
+	expect(shown('anthropic/claude-opus-4-1')).toContain('opus-4-1')
+})

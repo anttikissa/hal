@@ -76,16 +76,29 @@ const defaults: Record<string, string> = { gpt: 'openai/gpt-6-sol', opus: 'anthr
 const providers = ['hal', 'openai', 'anthropic', 'google', 'opencode-go', 'openrouter']
 const FAMILY = /(?:^|[-_])(fable|opus|sonnet|haiku|gpt|gemini|grok|kimi|qwen|deepseek|glm|minimax)(?=[-_.\d]|$)/i
 const newest = new Intl.Collator('en', { numeric: true })
+// Families of a provider, most capable first; others follow by name.
+const families = ['fable', 'opus', 'sonnet', 'haiku', 'gpt']
+// Same-version variants: the plain model, then these tiers, then by name.
+const tiers = ['sol', 'terra', 'luna']
+const DATED = /[-_](?:\d{8}|\d{4}-\d{2}-\d{2})$/
+const version = (leaf: string) => Number(/^\d+(?:\.\d+)?/.exec(leaf)?.[0] ?? NaN)
+const tier = (leaf: string) => {
+	let rest = leaf.replace(/^[\d.]+[-_]?/, '')
+	return rest ? (tiers.includes(rest) ? tiers.indexOf(rest) + 1 : tiers.length + 1) : 0
+}
 
-type Node = { name: string; path: string; nodes: Node[]; ids: { id: string; leaf: string }[]; all: string[]; default?: string }
+type Node = { name: string; path: string; nodes: Node[]; ids: { id: string; leaf: string; family: boolean }[]; all: string[]; default?: string }
 
 // Where `id` goes: its category path and its label there. A direct
 // provider's models group by family when two or more share one; a
-// reseller's (openrouter/vendor/model) by vendor.
-function tree(ids: string[]): Node {
+// reseller's (openrouter/vendor/model) by vendor. A dated snapshot hides
+// behind its undated alias, and a family shows only models at most one
+// version older than its newest (opus 5.5: 4.5 to 5.5); `keep` stays.
+function tree(ids: string[], keep = ''): Node {
+	let all = new Set(ids)
 	let placed = ids.flatMap((id) => {
 		let parts = id.split('/')
-		if (parts.length < 2) return []
+		if (parts.length < 2 || (id !== keep && DATED.test(id) && all.has(id.replace(DATED, '')))) return []
 		let model = parts.pop()!
 		let family = parts.length === 1 ? FAMILY.exec(model)?.[1]?.toLowerCase() : undefined
 		return [{ id, path: parts, model, family }]
@@ -108,12 +121,16 @@ function tree(ids: string[]): Node {
 			if (!next) node.nodes.push((next = { name, path: at, nodes: [], ids: [], all: [] }))
 			node = next
 		}
-		node.ids.push({ id: p.id, leaf })
+		node.ids.push({ id: p.id, leaf, family: !!p.family && path.length > 1 })
 	}
-	let rank = (n: Node) => (providers.includes(n.name) ? providers.indexOf(n.name) : providers.length)
-	root.nodes.sort((a, b) => rank(a) - rank(b))
+	let order = (list: string[], n: Node) => (list.includes(n.name) ? list.indexOf(n.name) : list.length)
+	root.nodes.sort((a, b) => order(providers, a) - order(providers, b))
 	let finish = (n: Node): string[] => {
-		n.ids.sort((a, b) => newest.compare(b.id, a.id))
+		n.nodes.sort((a, b) => order(families, a) - order(families, b) || a.name.localeCompare(b.name))
+		let top = Math.max(...n.ids.filter((i) => i.family).map((i) => version(i.leaf)).filter((v) => !isNaN(v)))
+		n.ids = n.ids.filter((i) => !i.family || i.id === keep || !(version(i.leaf) < top - 1))
+		n.ids.sort((a, b) =>
+			a.family && b.family ? version(b.leaf) - version(a.leaf) || tier(a.leaf) - tier(b.leaf) || a.leaf.localeCompare(b.leaf) : newest.compare(b.id, a.id))
 		n.all = [...n.nodes.flatMap(finish), ...n.ids.map((i) => i.id)]
 		let preferred = Object.values(defaults).find((id) => n.all.includes(id))
 		// A provider has a default only through an alias (anthropic: opus).
@@ -161,17 +178,23 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 	let t = st.tree ?? { rows: [], open: [], current: '' }
 	let query = (st.form?.values[0] ?? '').trim()
 	let ranked = query ? picker.rank(ids, query, names) : ids
-	let built = rows(tree(ids), new Set(ranked), query ? () => true : (p) => t.open.includes(p), t.current, names)
+	let built = rows(tree(ids, t.current), new Set(ranked), query ? () => true : (p) => t.open.includes(p), t.current, names)
 	let at = (want?: string) => (want === undefined ? -1 : built.rows.findIndex((r) => r.path === want || r.id === want))
 	let selected = at(select)
 	if (selected < 0 && query) {
+		// A matching category first, else the best model; ties go to the
+		// higher row, so the most capable of equal matches.
 		let q = words(query)
-		let best = { i: -1, score: -1 }
-		built.rows.forEach((r, i) => {
-			let s = r.path ? score(r.path, q) : undefined
-			if (s !== undefined && s > best.score) best = { i, score: s }
-		})
-		selected = best.i >= 0 ? best.i : at(ranked[0])
+		let best = (text: (r: TreeRow) => string | undefined) => {
+			let found = { i: -1, score: -1 }
+			built.rows.forEach((r, i) => {
+				let s = text(r) === undefined ? undefined : score(text(r)!, q)
+				if (s !== undefined && s > found.score) found = { i, score: s }
+			})
+			return found.i
+		}
+		selected = best((r) => r.path)
+		if (selected < 0) selected = best((r) => (r.id ? (names[r.id] ? `${r.id} ${names[r.id]}` : r.id) : undefined))
 	}
 	if (selected < 0) selected = Math.max(0, at(t.current))
 	let row = built.rows[selected]
@@ -182,7 +205,7 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 // The picker over `ids`, on the current model, its categories open.
 function open(current: string, ids: string[], names: Record<string, string> = {}): ModalState {
 	let st = modals.open({ title: `Model: ${current}`, form: { text: 'Switch model', fields: [{ type: 'text', name: 'search', label: 'Search' }] } })
-	let open = ancestors(tree(ids), current)
+	let open = ancestors(tree(ids, current), current)
 	return picker.refilter({ ...st, tree: { rows: [], open, current } }, ids, names)
 }
 
