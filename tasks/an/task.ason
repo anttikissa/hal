@@ -1,0 +1,34 @@
+{
+	title: 'Plugins: owned, hot-reloaded function hooks',
+	spec: `Plugins: hot-reloaded files that hook functions on module objects, owned per file.
+
+Files: every \`plugins/*.ts\` in the Hal home (HAL_HOME or the repo root, beside local.ts) is a plugin. Each Hal process (host, and a terminal peer) loads them at startup, after modules are imported and after local.ts, and watches the directory with fs.watch. Web is out of scope. A plugin exports \`default (plugin) => { ... }\`; importing the file must do nothing else operational. Optional \`export const expires = '2026-09-29T16:00:00Z'\`: an absolute UTC ISO timestamp; anything else is a load error.
+
+API on \`plugin\` (the registration function's argument), target = module object + key, typechecked:
+- plugin.before(obj, 'key', (...args) => void): observes the arguments; its return value is ignored.
+- plugin.after(obj, 'key', (result, args) => void): observes the return value exactly as returned (a Promise for async functions, not its resolved value); ignored return.
+- plugin.around(obj, 'key', (fn, ...args) => result): replaces the call; may call fn (bound to obj) zero or more times and return anything.
+- plugin.unload(fn): cleanup run when the file's hooks are removed (reload, delete, expiry, failed replacement is NOT a removal).
+before/after callbacks may not be async (a returned Promise is a registration-time error when detectable, else a loud error at call). A target whose key is missing or not a function is a load error naming the file and target. Changing arguments or results is around's job only.
+
+Composition: one wrapper per patched function, holding a chain; when the chain empties the original function is put back exactly. The wrapper keeps \`this\`, lets thrown errors through, and keeps a sync function sync. Files load sorted by filename, hooks keep registration order within a file; editing a file never moves its hooks relative to other files. The first registered around is outermost; befores run in order before the around chain, afters in order after it. A call already underway finishes with the chain it started with.
+
+Reload is atomic for hooks: on change, the file is re-imported cache-busted and its registration function runs against a staging recorder; only if import and registration both succeed are the old hooks (and unload callbacks) removed and the staged ones activated. A failed load reports loudly with the file path (an info/error line in open sessions and stderr on the host) and keeps the last working hooks. Top-level side effects cannot be rolled back; the example says so. A deleted file's hooks are removed and its unload runs. Expiry: at load, an already expired file's registration function is not run; a loaded file's hooks are removed and unload runs when its expiry passes. Expiry never deletes the file.
+
+/plugins (host command, model-usable) lists loaded plugin files with hook targets (e.g. host/auth.pickAccount around), expiry, content hash and last load error.
+
+Repo: plugins/.gitignore ignores everything but itself and example-plugin.ts, so user plugins stay local by default and a fork can delete it to track its own. plugins/example-plugin.ts is tracked, fully commented out (does nothing), and documents the API with: a setting override via around on a config function, an observing before, and adding a harmless tool via after(tools, 'all', m => m.set(...)). No security-looking examples: a hook is not a security boundary. ./test typechecks plugins/*.ts like local.ts.
+
+Temporary plugins (agents' convention, stated in the example comments): name the file after the session, e.g. 158-lil-trace-render.ts, and set expires.
+
+Not in this task: plugin slash commands (command metadata lives in common/commands/list.ts, which clients read; needs its own task), a lifecycle event catalogue, web plugins, comparing plugin sets between host and peers (diagnostic only when added).`,
+	status: 'planned',
+	needs: [
+		'9',
+		'wf'
+	],
+	notes: [
+		"Motivating first plugin (local, not committed): drain the discontinued OpenAI sub first via plugin.around(auth, 'pickAccount', ...) moving that account to the front for kind 'openai'; pick() still skips it when limited or broken.",
+		'Design discussed in session 158-lil with GPT-6 Sol/Astra reviews: before/after observe only; export default registration enables staging and expiry-without-running; eval decision deferred until plugins are tried (old-Hal eval study: /tmp/eval-usage-report.md, ~5% of calls were durable hot patches).'
+	]
+}
