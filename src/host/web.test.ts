@@ -583,6 +583,13 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
 		for (let width of [390, 1280]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			await b.waitFor(`document.querySelector('.entry')?.getBoundingClientRect().bottom > 700`)
+			// Prime the textarea's auto-height before comparing menu geometry:
+			// the first typed character can change its native scrollHeight.
+			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'x'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+			await b.evaluate(`new Promise(resolve => requestAnimationFrame(resolve))`)
+			let frame = `(() => { let rect = (s) => document.querySelector(s).getBoundingClientRect(); return { transcript: rect('.Transcript').bottom, status: rect('.StatusRow').top, activity: rect('.Composer .status').top, entry: rect('.entry').top, composer: rect('.Composer').top } })()`
+			let before = await b.evaluate(frame)
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/c'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
 			await b.waitFor(`document.querySelectorAll('.completions [role=option]').length > 1`)
 			let layout = await b.evaluate(`(() => { let r = document.querySelector('.completions').getBoundingClientRect(), box = document.querySelector('textarea').getBoundingClientRect(); return { left: r.left, right: r.right, bottom: r.bottom, boxTop: box.top, target: document.querySelector('.completions button').getBoundingClientRect().height, viewport: innerWidth } })()`)
@@ -590,6 +597,15 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 			expect(layout.right).toBeLessThanOrEqual(layout.viewport)
 			expect(layout.bottom).toBeLessThanOrEqual(layout.boxTop)
 			expect(layout.target).toBeGreaterThanOrEqual(44)
+			expect(await b.evaluate(frame)).toEqual(before)
+			let covered = await b.evaluate(`(() => {
+				let menu = document.querySelector('.completions'), m = menu.getBoundingClientRect();
+				return ['.Composer .status', '.StatusRow'].map((selector) => {
+					let s = document.querySelector(selector).getBoundingClientRect(), y = (Math.max(m.top, s.top) + Math.min(m.bottom, s.bottom)) / 2;
+					return { overlaps: m.top < s.bottom && m.bottom > s.top, onTop: menu.contains(document.elementFromPoint(m.left + m.width / 2, y)) };
+				});
+			})()`)
+			expect(covered).toEqual([{ overlaps: true, onTop: true }, { overlaps: true, onTop: true }])
 			// A request for the next character must not make an unchanged menu
 			// disappear for a frame or rebuild its rows when the answer arrives.
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/lo'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
@@ -607,6 +623,7 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 			expect(stable).toEqual({ sameMenu: true, sameRow: true, connected: true, changes: 0, y: 0 })
 			await b.evaluate(`document.querySelector('.completions button').click()`)
 			await b.waitFor(`!document.querySelector('.completions')`)
+			expect(await b.evaluate(frame)).toEqual(before)
 			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/login ')
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
 		}

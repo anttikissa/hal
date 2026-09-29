@@ -70,16 +70,16 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				</span>{' '}
 				<span class={tone()}>{line().text}</span>
 			</div>
-			{props.menu && (
-				<div class="completions" role="listbox" aria-label="Completions">
-					<For each={props.menu.choices}>{(choice, index) => (
-						<button type="button" role="option" aria-selected={props.menu?.selected === index() ? 'true' : 'false'} onClick={() => { app.choose(index()); input.focus() }}>
-							<strong>{choice.label}</strong><span>{choice.description}</span>
-						</button>
-					)}</For>
-				</div>
-			)}
 			<div class={['entry input', { dropping: props.dropping }]}>
+				{props.menu && (
+					<div class="completions" role="listbox" aria-label="Completions">
+						<For each={props.menu.choices}>{(choice, index) => (
+							<button type="button" role="option" aria-selected={props.menu?.selected === index() ? 'true' : 'false'} onClick={() => { app.choose(index()); input.focus() }}>
+								<strong>{choice.label}</strong><span>{choice.description}</span>
+							</button>
+						)}</For>
+					</div>
+				)}
 				{/* Our own placeholder, so it can fade as typing starts. */}
 				<div class="field">
 				<span class={['hint', { gone: !!props.text }]} aria-hidden="true">{props.placeholder}</span>

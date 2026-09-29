@@ -103,11 +103,11 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .StatusRow .group:first-child { white-space: nowrap; }
 .StatusRow .separator { white-space: pre; }
 @media (max-width: 40rem) { .StatusRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding-inline: max(0.6rem, env(safe-area-inset-left)) max(0.6rem, env(safe-area-inset-right)); } .StatusRow .separator { display: none; } .StatusRow .group:first-child { white-space: normal; } }
-.Composer { flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
+.Composer { position: relative; z-index: 1; flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
 .Composer > * { max-width: 60rem; margin: 0 auto; }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.2rem 0; }
-.Composer .completions { max-height: min(35dvh, 20rem); overflow-y: auto; border: 1px solid var(--border); background: var(--field); }
+.Composer .completions { position: absolute; bottom: 100%; left: 0; right: 0; max-height: min(35dvh, 20rem); overflow-y: auto; border: 1px solid var(--border); background: var(--field); }
 .Composer .completions button { display: flex; flex-direction: column; width: 100%; min-height: 44px; padding: 0.4rem 0.7rem; text-align: left; background: transparent; color: var(--text); }
 .Composer .completions button:hover, .Composer .completions button[aria-selected="true"] { background: var(--button); }
 .Composer .completions span { color: var(--quiet); font-size: 0.85em; }
@@ -115,7 +115,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .status .warning, .status .error { background: none; }
 .status .dot.busy { animation: pulse 1s steps(2) infinite; }
 @keyframes pulse { 50% { opacity: 0.3; } }
-.entry { display: flex; align-items: stretch; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); }
+.entry { position: relative; display: flex; align-items: stretch; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); }
 .entry:focus-within { border-left-color: var(--cursor); }
 .entry.dropping { outline: 2px dashed var(--cursor); outline-offset: 2px; }
 .entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
@@ -124,9 +124,9 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .entry .hint { position: absolute; inset: 0.5rem 0.7rem auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
 .entry .hint.gone { opacity: 0; transition-duration: 80ms; }
 .entry textarea { flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: 0.5rem 0.7rem; }
-.entry button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor 35%, transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
-.entry button:hover:not(:disabled) { background: color-mix(in oklab, currentColor 14%, transparent); }
-.entry button:disabled { color: var(--quiet); cursor: default; }
+.entry > button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor 35%, transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
+.entry > button:hover:not(:disabled) { background: color-mix(in oklab, currentColor 14%, transparent); }
+.entry > button:disabled { color: var(--quiet); cursor: default; }
 .help { display: flex; flex-wrap: wrap; gap: 0 1.5ch; padding-top: 0.3rem; color: var(--description); }
 .help b { color: var(--key); font-weight: 600; }
 textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 0.5rem 0.6rem; resize: none; outline: none; }
