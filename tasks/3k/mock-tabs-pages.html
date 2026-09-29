@@ -1,0 +1,114 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabs pages mock</title>
+<style>
+:root { --bg: #0b0e12; --fg: #c9d1d9; --dim: #6b7480; --active: #5fd0f0; --warn: #f5c542; --err: #ff5f56; --ok: #4ad07a; --border: #1d3a44; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 ui-monospace, "JetBrains Mono", Menlo, monospace; }
+header { border-bottom: 1px solid var(--border); padding: 0.3rem 0.6rem; display: flex; align-items: baseline; white-space: nowrap; overflow: hidden; }
+header button { font: inherit; background: none; border: 0; color: inherit; cursor: pointer; padding: 0.15rem 0; }
+.cells { display: flex; flex: 1; min-width: 0; overflow: hidden; }
+.cell { text-align: left; color: var(--dim); }
+.cell .n { display: inline-block; text-align: right; }
+.cell .m { display: inline-block; width: 1ch; text-align: left; }
+.cell .name { color: var(--dim); }
+.cell.cur .n { color: var(--active); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.cell.cur .name { color: var(--active); }
+.cell:hover .n { color: var(--fg); }
+.edge { color: var(--dim); text-align: center; }
+.edge[disabled] { visibility: hidden; }
+.m.warn { color: var(--warn); } .m.err { color: var(--err); } .m.work { color: var(--ok); animation: blink 1.2s steps(2) infinite; } .m.done { color: var(--ok); }
+@keyframes blink { 50% { opacity: 0.3; } }
+.menu, .new { width: 3ch; color: var(--dim); }
+main { padding: 1rem 1.2rem; color: var(--dim); max-width: 70ch; }
+kbd { border: 1px solid #333; border-radius: 3px; padding: 0 0.4ch; color: var(--fg); }
+.status { position: fixed; bottom: 0; left: 0; right: 0; padding: 0.3rem 0.8rem; border-top: 1px solid var(--border); color: var(--dim); font-size: 0.85em; }
+.status b { color: var(--fg); font-weight: normal; }
+#measure { position: absolute; visibility: hidden; white-space: pre; }
+</style>
+
+<header>
+	<button class="menu" title="All tabs (/)">≡</button>
+	<button class="edge" id="prev"></button>
+	<div class="cells" id="cells"></div>
+	<button class="edge" id="next"></button>
+	<button class="new" title="New tab">+</button>
+</header>
+<main>
+	<p>Paged tab strip: one row, every cell the same width, the current tab underlined.
+	Move with <kbd>[</kbd>/<kbd>]</kbd> or <kbd>Alt-←</kbd>/<kbd>Alt-→</kbd> (Ctrl-N/P in the real thing).
+	Inside a page only the underline moves; crossing a page border flips the row. The edge buttons show how many tabs
+	are on the other pages and the most urgent marker among them; click to flip.</p>
+	<p>Names appear only if every tab fits with its name. Resize the window, or change the tab count:
+	<input id="count" type="range" min="2" max="120" value="57"> <span id="countv"></span></p>
+	<p>Markers: <span class="m warn">◆</span> needs a look, <span class="m err">✗</span> error,
+	<span class="m work">●</span> working, <span class="m done">✓</span> done.</p>
+</main>
+<div class="status" id="status"></div>
+<span id="measure"></span>
+
+<script>
+const MARKS = { 3: 'warn', 12: 'err', 39: 'done', 41: 'work', 42: 'warn', 43: 'warn', 52: 'err' }
+const GLYPH = { warn: '◆', err: '✗', work: '●', done: '✓' }
+const RANK = { err: 3, warn: 2, work: 1, done: 0 }
+let n = 57, cur = 52
+const name = (i) => `${(i * 7 + 11) % 60}-${'etfcscvmmlsdifnelxzdrqigmcgsptlwwxzj'.slice((i * 3) % 30, (i * 3) % 30 + 3)}`
+const measure = document.getElementById('measure')
+const chW = () => { measure.textContent = '0'.repeat(100); return measure.getBoundingClientRect().width / 100 }
+
+function urgent(a, b) {
+	let best
+	for (let i = a; i <= b; i++) if (MARKS[i] && MARKS[i] !== 'done' && (!best || RANK[MARKS[i]] > RANK[best])) best = MARKS[i]
+	return best
+}
+
+function layout() {
+	let digits = String(n).length, ch = chW()
+	let numCell = digits + 1 + 1                     // number, marker, gap
+	let nameLen = 10, nameCell = numCell + nameLen + 1
+	let edgeCell = digits + 3                         // "‹57◆"
+	let header = document.querySelector('header')
+	let avail = header.clientWidth / ch - 6 - 1.2     // menu + new + padding
+	let withNames = n * nameCell <= avail
+	let cell = withNames ? nameCell : numCell
+	let paged = !withNames && n * numCell > avail
+	let per = paged ? Math.max(1, Math.floor((avail - 2 * edgeCell) / numCell)) : n
+	let lo = Math.floor(cur / per) * per, hi = Math.min(n - 1, lo + per - 1)
+	let html = ''
+	for (let i = lo; i <= hi; i++) {
+		let m = MARKS[i]
+		html += `<button class="cell ${i === cur ? 'cur' : ''}" data-i="${i}" style="width:${cell}ch" title="${i + 1} ${name(i)}">`
+			+ `<span class="n" style="width:${digits}ch">${i + 1}</span><span class="m ${m || ''}">${m ? GLYPH[m] : ''}</span>`
+			+ (withNames ? `<span class="name">${name(i).slice(0, nameLen)}</span>` : '') + `</button>`
+	}
+	document.getElementById('cells').innerHTML = html
+	let edge = (el, a, b, arrow, left) => {
+		el.style.width = paged ? `${edgeCell}ch` : '0'
+		el.disabled = !paged || a > b
+		if (!paged || a > b) { el.innerHTML = ''; return }
+		let u = urgent(a, b)
+		let mark = `<span class="m ${u || ''}">${u ? GLYPH[u] : ''}</span>`
+		el.innerHTML = left ? `${arrow}${b - a + 1}${mark}` : `${b - a + 1}${mark}${arrow}`
+		el.title = `Tabs ${a + 1}–${b + 1}`
+	}
+	edge(document.getElementById('prev'), 0, lo - 1, '‹', true)
+	edge(document.getElementById('next'), hi + 1, n - 1, '›', false)
+	document.getElementById('prev').onclick = () => go(lo - 1)
+	document.getElementById('next').onclick = () => go(hi + 1)
+	document.getElementById('status').innerHTML = `<b>${cur + 1} ${name(cur)}</b> &nbsp; /Users/antti/hal2 &nbsp; Claude Opus 5.5 &nbsp; ${header.getBoundingClientRect().height.toFixed(0)}px strip, ${paged ? `${per} per page` : withNames ? 'names' : 'numbers'}`
+}
+
+function go(i) { cur = (i + n) % n; layout() }
+document.getElementById('cells').addEventListener('click', (e) => { let b = e.target.closest('[data-i]'); if (b) go(+b.dataset.i) })
+addEventListener('keydown', (e) => {
+	let next = (e.ctrlKey && e.key === 'n') || (e.altKey && e.key === 'ArrowRight') || e.key === ']'
+	let prev = (e.ctrlKey && e.key === 'p') || (e.altKey && e.key === 'ArrowLeft') || e.key === '['
+	if (next || prev) { e.preventDefault(); go(cur + (next ? 1 : -1)) }
+})
+let count = document.getElementById('count')
+count.addEventListener('input', () => { n = +count.value; cur = Math.min(cur, n - 1); document.getElementById('countv').textContent = n; layout() })
+addEventListener('resize', layout)
+document.getElementById('countv').textContent = n
+layout()
+</script>

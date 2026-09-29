@@ -1,0 +1,23 @@
+{
+	title: 'Tab strips: equal cells, underline, pages; full-width web',
+	spec: `Tab strips in the terminal and on the web are one row of equal cells in real tab order, so Ctrl-N/P always move one cell right/left and no number ever shifts.
+
+Cells: every cell has the same width: the widest tab number, right-aligned, plus one marker slot (task fr's glyph, or a blank of the same width) and a gap. The current tab is shown by an underline on its number (colour of the active tab), never by brackets or padding that would move other cells. The terminal loses its [n] brackets.
+
+Names: only when every tab fits with a name at one fixed width (number, marker, name clipped to that width) do cells show names; otherwise all cells are numbers. No per-tab close button in the strip (the web closes with Ctrl-W, /close or the full list).
+
+Pages: when not even every number fits, tabs come in fixed pages of as many cells as fit beside two edge buttons: tabs 1..k, k+1..2k, and so on. The shown page is the one holding the current tab, a pure function of (tab count, current index, cells that fit), so going somewhere and back looks identical; moving inside a page moves only the underline, crossing a border replaces the row. The edge buttons have a fixed width (widest count plus arrow plus marker slot): the left one reads ‹N, the right one N›, N being how many tabs lie on that side, followed by the most urgent marker among them (failed over asking or attention over working; finished marks do not count), hidden when that side is empty. Clicking an edge goes to the neighbouring page (the web; in the terminal they are display only). Ctrl-N on the last tab wraps to the first.
+
+The paging arithmetic (which page, which edge counts, which most-urgent mark) lives in one common module used by both clients, tested as a pure function.
+
+Web: the strip is one row, a menu button (the existing sheet: the full list with close buttons, now on every width) then the cells, edge buttons and new tab button; it never wraps and never scrolls sideways (the back-swipe rule of task ng). The whole header stays under 50px at any width. The current tab's name is in the status row already, so there is no title line.
+
+Terminal: the tab bar keeps its hints and 'Tabs:' label while they fit (task 7w), then drops them, then pages, and never clips a cell.
+
+Web transcript and composer use the full window width (minus padding), text included: no reading-width cap (the user: text often loves a wide screen).`,
+	status: 'planned',
+	notes: [
+		'Mocks from the design discussion: /tmp/tabs-pages.html (the chosen paged strip) and /tmp/tabs-lens.html (rejected: variable-width cells and a sliding window made numbers move). Rejected also: centring on the current tab (every step shifts all numbers) and a lazily sliding window (the view depends on history).'
+	],
+	needs: ['ng', '7w', 'fr']
+}
