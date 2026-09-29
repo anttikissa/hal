@@ -1,9 +1,7 @@
 {
 	title: 'Link to any block; tool results in full on the web',
-	spec: 'Every card on the web page has a stable address, <webUrl>/<session id>#<block id>: the id comes from history, so it is the same in every client, after a reload and in the terminal (questions.md items 53 and 75). A card shows its link at its top right as its id, e.g. #35 (the same text the terminal shows, task wc), always visible, dimmer than the text, brighter and underlined on hover; it is an <a href> (Cmd-click and copy work), and its text is drawn by CSS so copying the card text leaves it out. Opening such an address scrolls to that card, marks it and unfolds it, loading earlier history pages if needed. A tool card shows a short glimpse of its result when unfolded and can expand to the full output, fetched from the host when the snapshot holds only the glimpse; a linked tool card opens expanded. Tests: ids are stable across snapshot, reconnect and paging; an address for a block in an older page loads that page and shows the card; the full output of a long tool result is reachable.',
+	spec: 'Every card on the web page has a stable address, <webUrl>/<session id>#<block id>: the id comes from history, so it is the same in every client, after a reload and in the terminal. A card shows its link at its top right as its id, e.g. #35 (the same text the terminal shows, task wc), always visible, dimmer than the text, brighter and underlined on hover; it is an <a href> (Cmd-click and copy work), and its text is drawn by CSS so copying the card text leaves it out. Opening such an address scrolls to that card, marks it and unfolds it, loading earlier history pages if needed. A tool card shows a short glimpse of its result when unfolded and can expand to the full output, fetched from the host when the snapshot holds only the glimpse; a linked tool card opens expanded. Tests: ids are stable across snapshot, reconnect and paging; an address for a block in an older page loads that page and shows the card; the full output of a long tool result is reachable.',
 	status: 'done',
-	needs: [],
-	foldInto: ['4s'],
 	notes: [
 		"Built as: src/web/target.ts (parse the address's #<block id>, href, the row holding a block: a tool result's id maps to its call's card, seek decides show / fetch an earlier page / give up). app.aim() runs at start and on hashchange; app.seek() after every event sets target.found or calls app.older() until backfill.complete, then gives up with a notice. Chat.reveal() scrolls to the .Card.target once (after the redraw, since a tab's first redraw calls scroll.restore and would undo an earlier scroll). tabs.show drops the target when switching away.",
 		'Block id = the item key of task w5 (`<n>` or `<n>.<i>`); `~<pos>` keys and pending rows get no link. The address is /<session>#<id>, relative to the page until e3 brings webUrl to the browser; router.go keeps no hash, so a tab switch drops it.',
@@ -12,5 +10,7 @@
 		'`items.map(view.show)` passes the index as the second argument: with show(item, full) that silently showed every result in full; call it through a lambda.',
 		'--cursor is defined only on the .input element (host CSS puts non-fg colours on their style class), so a card outline uses currentColor.',
 		'Checked in headless Chrome at 1200x800 and 390x800 (coarse pointer): linked card scrolled to the top with its outline, all 40 lines and show less; show less keeps the button in view. Not checked on a real phone.'
-	]
+	],
+	needs: [],
+	foldInto: ['4s']
 }

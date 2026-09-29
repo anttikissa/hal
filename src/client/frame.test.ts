@@ -413,7 +413,7 @@ test('finished thinking with no readable text draws nothing, not a bare header',
 test('Bash results link to the call, hide a successful exit, and colour only a failed status', () => {
 	let v = view([
 		{ type: 'tool', id: 'run', name: 'bash', input: { description: 'Check files', command: 'git status --short' } },
-		{ type: 'tool-result', id: 'run', output: '[exit 0]\n M questions.md\n' },
+		{ type: 'tool-result', id: 'run', output: '[exit 0]\n M notes.md\n' },
 		{ type: 'tool-result', id: 'run', output: '[exit 123]\nerror: cannot access file\n' },
 		{ type: 'prompt', text: '[exit 123]\nmissing file\n', from: 's', label: 'bash #1813' },
 	])
@@ -421,7 +421,7 @@ test('Bash results link to the call, hide a successful exit, and colour only a f
 	let lines = frame.build(v, 70).lines
 	let printed = plain(lines).join('\n')
 	expect(printed).not.toContain('[exit 0]')
-	expect(printed).toContain('◂ #1813>  M questions.md')
+	expect(printed).toContain('◂ #1813>  M notes.md')
 	expect(printed).toContain('◂ #1813> [exit 123]')
 	expect(targets(lines)).toContain(`${settings.webUrl()}/s#1813`)
 	let failure = lines.find((line) => line.includes('[exit 123]'))!

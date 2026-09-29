@@ -1,10 +1,10 @@
 {
 	title: 'Closing a tab stops its turn',
-	spec: "Closing a tab does what Escape does first: aborts its running turn, kills its bash process groups and background commands, and stops its subagents' turns if the closed tab owns them, before the tab closes (as the old Hal did). A turn never runs on unseen in a closed tab (questions.md 121).",
+	spec: "Closing a tab does what Escape does first: aborts its running turn, kills its bash process groups and background commands, and stops its subagents' turns if the closed tab owns them, before the tab closes (as the old Hal did). A turn never runs on unseen in a closed tab.",
 	status: 'done',
-	needs: [],
-	foldInto: ['7w'],
 	notes: [
 		'tabs.close stops the tab and owned non-interactive subagents before removing it. Child reports to a closed parent must not wake an idle unseen turn; an interactive child and a human-promoted child remain independent. Closing an open ask question cancels its form without restarting its round.'
-	]
+	],
+	needs: [],
+	foldInto: ['7w']
 }

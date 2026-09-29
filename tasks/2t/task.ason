@@ -1,10 +1,10 @@
 {
 	title: '/go switches windows to a session',
-	spec: "`/go <target>` shows a session in every window that is showing the session running it (host terminal, peers, web pages), and in no others. Target: a tab number, a session id or name, or a directory (the first open session there). Tab completes targets, with directories from the open tabs' cwds (`/go ~/h<Tab>` lists them) (questions.md 119).",
+	spec: "`/go <target>` shows a session in every window that is showing the session running it (host terminal, peers, web pages), and in no others. Target: a tab number, a session id or name, or a directory (the first open session there). Tab completes targets, with directories from the open tabs' cwds (`/go ~/h<Tab>` lists them).",
 	status: 'done',
-	needs: [],
-	foldInto: ['7w'],
 	notes: [
 		'/go is a host slash command; target resolution reads only open tabs, in order (number, id, name, first tab with matching cwd). Completion includes tab numbers, ids, names, distinct tab cwds and ~/ paths. Host broadcasts a go event to followers of the source session only; terminal and web check their current shown id before switching, so /send from another session has the same effect without switching unrelated windows. Web uses normal router navigation so Back works.'
-	]
+	],
+	needs: [],
+	foldInto: ['7w']
 }

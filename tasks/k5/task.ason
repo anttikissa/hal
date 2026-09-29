@@ -1,6 +1,6 @@
 {
 	title: 'Status row numbers update during a turn',
-	spec: "The status row's context and token numbers update after every provider round of a running turn, not just at its end, so the context visibly rises and drops as compaction or pruning works. The usage windows (Sub) displayed on the status row refresh from the latest response-header cache at most once a minute (questions.md 135); the host still records every response's headers for immediate account rotation and rate-limit decisions.",
+	spec: "The status row's context and token numbers update after every provider round of a running turn, not just at its end, so the context visibly rises and drops as compaction or pruning works. The usage windows (Sub) displayed on the status row refresh from the latest response-header cache at most once a minute; the host still records every response's headers for immediate account rotation and rate-limit decisions.",
 	status: 'done',
 	notes: [
 		'A new turn-stats protocol event follows each provider round with reported usage; clients fold it into status numbers without adding transcript items. Provisional per-turn token totals are committed only by turn_end, preventing double counting; context uses each round’s own input + cache-read + cache-write. Usage headers update each account at most once/minute, except 429 immediately updates to protect account rotation.',

@@ -1,10 +1,10 @@
 {
 	title: 'Model aliases like the old Hal',
-	spec: "/model and the model picker accept the old Hal's aliases: `gpt` picks the default GPT (gpt-6-sol now), `claude` or `opus` the best general Claude (opus 5.5 now), `kimi` and the other open-model families pick the provider that the user has credentials for, a subscription (opencode-go) before an API key (openrouter); with no credentials anywhere it says which login would give access. The picker groups by provider and family, marks each family's default, and Enter on a family picks its default (see the old Hal's picker and model code in ~/.hal/src/server/models*, model-refresh.ts). The picker opens at once the first time (Ctrl-M, /model): model lists come from a cache on disk, refreshed in the background (questions.md 109).",
+	spec: "/model and the model picker accept the old Hal's aliases: `gpt` picks the default GPT (gpt-6-sol now), `claude` or `opus` the best general Claude (opus 5.5 now), `kimi` and the other open-model families pick the provider that the user has credentials for, a subscription (opencode-go) before an API key (openrouter); with no credentials anywhere it says which login would give access. The picker groups by provider and family, marks each family's default, and Enter on a family picks its default (see the old Hal's picker and model code in ~/.hal/src/server/models*, model-refresh.ts). The picker opens at once the first time (Ctrl-M, /model): model lists come from a cache on disk, refreshed in the background.",
 	status: 'done',
-	needs: [],
-	foldInto: ['0x'],
 	notes: [
 		'Picker now renders cached models immediately; provider model lists warm asynchronously for the next opening. Aliases prefer credentialed subscriptions and fall back to API keys; grouping is shared by terminal and web.'
-	]
+	],
+	needs: [],
+	foldInto: ['0x']
 }

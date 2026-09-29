@@ -1,12 +1,12 @@
 {
 	title: 'No resumed mark on replayed history',
-	spec: "Replayed history carries no 'resumed · last turn' mark, in the terminal or on the web (questions.md item 46: the user did not want it). A transcript after a reconnect, restart or tab switch looks like one followed live. Nothing keeps where the last snapshot ended: no transcript.resumed or resumedLabel, no app.state.resumed or ViewState.resumed.",
+	spec: "Replayed history carries no 'resumed · last turn' mark, in the terminal or on the web. A transcript after a reconnect, restart or tab switch looks like one followed live. Nothing keeps where the last snapshot ended: no transcript.resumed or resumedLabel, no app.state.resumed or ViewState.resumed.",
 	status: 'done',
-	needs: [],
 	notes: [
 		'Removed: transcript.resumed/resumedLabel, app.state.resumed and ViewState.resumed (also in tab-switch.ts tabFields and backfill.fetchAll), frame.ts drawing the label, view.markRow, and two mark sites in Transcript.tsx (before a row and after the last). Missing the second one broke the web page silently: bun test passed except the CDP tests in host/web.test.ts (login never reached the textarea); tsc in ./test names the undefined markAt.',
 		'client/terminal.ts terminal.resumed() is SIGCONT handling, unrelated to the mark.',
 		'The terminal test now checks the invariant: a client that got history in a snapshot draws the same lines as one that followed the same turns live.'
 	],
+	needs: [],
 	foldInto: ['nn', '7w']
 }

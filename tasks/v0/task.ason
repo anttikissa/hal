@@ -1,14 +1,7 @@
 {
 	title: 'Background bash: result arrives as a message',
-	spec: "The bash tool takes an optional background: true (questions.md item 29). The command starts at once in its own process group; the call waits at most 100 ms, so a command that fails at once (not found, syntax error, exit within 100 ms) returns its output and exit code as a normal result; otherwise it returns 'started in background as #<call block id>' and the turn goes on. When the command exits, its output (capped and saved like a normal bash result) and exit code reach the session as an advisory message from 'bash #<call block id>', delivered like messages from other sessions (task rj): into the running turn at the next tool result, or starting a turn when the session is idle, except while the user has it paused. The background job uses the already recorded call block number as its visible id, not a random hex id; its advisory message links back to that call in terminal and web. Bash call descriptions and the command occupy separate lines, a foreground command prefixed with $ and a background command with &. Both clients omit a redundant [exit 0] in display (not in history/provider input) and colour only the [exit N] token for a nonzero exit; the rest of the error remains in the ordinary text colour. Escape does not kill background commands; closing the session or quitting the last Hal process does, as for foreground ones. Background commands survive neither a host restart nor a takeover: after one, the session gets 'bash #<call block id> was lost when Hal restarted'.",
+	spec: "The bash tool takes an optional background: true. The command starts at once in its own process group; the call waits at most 100 ms, so a command that fails at once (not found, syntax error, exit within 100 ms) returns its output and exit code as a normal result; otherwise it returns 'started in background as #<call block id>' and the turn goes on. When the command exits, its output (capped and saved like a normal bash result) and exit code reach the session as an advisory message from 'bash #<call block id>', delivered like messages from other sessions (task rj): into the running turn at the next tool result, or starting a turn when the session is idle, except while the user has it paused. The background job uses the already recorded call block number as its visible id, not a random hex id; its advisory message links back to that call in terminal and web. Bash call descriptions and the command occupy separate lines, a foreground command prefixed with $ and a background command with &. Both clients omit a redundant [exit 0] in display (not in history/provider input) and colour only the [exit N] token for a nonzero exit; the rest of the error remains in the ordinary text colour. Escape does not kill background commands; closing the session or quitting the last Hal process does, as for foreground ones. Background commands survive neither a host restart nor a takeover: after one, the session gets 'bash #<call block id> was lost when Hal restarted'.",
 	status: 'done',
-	needs: [
-		'1r',
-		'rj'
-	],
-	foldInto: [
-		'1r'
-	],
 	notes: [
 		'Background call references use the last matching recorded assistant tool-call n (history.readSync, already cached in an open session) and an internal key <session>:<n>; legacy b-hex ids in saved metadata still display unchanged on recovery. src/common/bash-result.ts changes presentation only, not the recorded tool result or advisory content.',
 		'Process running for both modes lives in src/host/jobs.ts (exec, plus the background registry); tools/bash.ts only validates and picks a mode. tools.cap is the shared output cut, so the delivered message is capped like a result.',
@@ -18,5 +11,7 @@
 		"subagents.finished does not close a subagent's tab while it has background commands, since closing would kill them.",
 		'The note saying closing a tab kills only background commands was superseded by task 8v: tab close pauses the foreground turn and owned subagent turns too.',
 		'Task rn replaces the no-default-timeout behavior: background Bash now defaults to ten minutes, while a model may give a longer timeout.'
-	]
+	],
+	needs: ['1r', 'rj'],
+	foldInto: ['1r']
 }

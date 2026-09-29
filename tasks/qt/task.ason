@@ -1,14 +1,14 @@
 {
 	title: 'Connection edges: tabs on connect, checked events, socket path',
-	spec: "A client learns the tab list as soon as it connects: the host sends it with the connection's first events, so no client has to ask first (questions.md item 16); tab-start is only for choosing or creating the tab to show, if that still needs a command at all. Clients check every event from the socket before using it, since a terminal or browser page can outlive a host restart onto newer code: a small hand-written check per event type (no dependency, no schema library), the same style as the host's command validation in common/protocol.ts. An event that fails the check is not applied; the client shows one plain error naming the event type and asking to reload or restart, and a web page reloads itself when the host's code changed under it (item 18). A home whose socket path is too long for a Unix socket (over 103 bytes) gives the user one clear error naming the path and the limit and saying to use a shorter HAL_HOME, instead of a thrown stack (item 20).",
+	spec: "A client learns the tab list as soon as it connects: the host sends it with the connection's first events, so no client has to ask first; tab-start is only for choosing or creating the tab to show, if that still needs a command at all. Clients check every event from the socket before using it, since a terminal or browser page can outlive a host restart onto newer code: a small hand-written check per event type (no dependency, no schema library), the same style as the host's command validation in common/protocol.ts. An event that fails the check is not applied; the client shows one plain error naming the event type and asking to reload or restart, and a web page reloads itself when the host's code changed under it. A home whose socket path is too long for a Unix socket (over 103 bytes) gives the user one clear error naming the path and the limit and saying to use a shorter HAL_HOME, instead of a thrown stack.",
 	status: 'done',
-	needs: ['0a', 'r6', 'ja'],
-	foldInto: ['0a', 'r6', 'ja'],
 	notes: [
 		'tab-start stays: the tabs arrive from host.connect() (a tabs event right after any config warning), but choosing or creating the tab in cwd still needs the host; it no longer answers with the tab list.',
 		'The event check is a field table in protocol.ts (eventFields, dotted paths for nested fields) and runs in connection.receive for every transport, in-process too; it is shallow (records, blocks, forms are not checked deeply). A failing event becomes a warning event, so both clients show it as their usual notice.',
 		'host-fixture client() asserts every event the host sends passes protocol.invalidEvent, so a new event type or field that the table misses fails the host tests at once. Tests that index events[0] on a fresh connection now see tabs first.',
 		'Web reload: the page carries data-version (Bun.hash of the built html) and dials /ws?v=...; the host builds the page if needed, compares, and closes a mismatched socket with code 4000, on which web/link.ts calls reload(). Bun allows srv.upgrade() after an await in fetch.',
 		'The socket path check runs first in main.start (before the terminal is taken), since a too-long path can neither host nor connect as a client; server.listen throws the same message for other callers.'
-	]
+	],
+	needs: ['0a', 'r6', 'ja'],
+	foldInto: ['0a', 'r6', 'ja']
 }

@@ -1,10 +1,10 @@
 {
 	title: 'Background bash times out after 10 minutes',
-	spec: 'A background bash command without its own timeout is killed after 10 minutes, and its result message says it timed out; the model can give a longer timeout per command (questions.md 122).',
+	spec: 'A background bash command without its own timeout is killed after 10 minutes, and its result message says it timed out; the model can give a longer timeout per command.',
 	status: 'done',
-	needs: [],
-	foldInto: ['v0'],
 	notes: [
 		'Bash background defaults to jobs.backgroundMs() = 600000 ms, overridable per call with timeout; the existing jobs.exec timer kills the entire process group and its status text is delivered in the advisory result. Tests shorten the default through the mutable jobs function and check the explicit longer timeout.'
-	]
+	],
+	needs: [],
+	foldInto: ['v0']
 }
