@@ -34,6 +34,14 @@ function used(code: string): void {
 	for (let [key, held] of webLinks.state.holders) if (held.code === code) webLinks.follow(key, held.deliver)
 }
 
+// The web address changed (the server bound after clients asked, maybe
+// on another port than the preferred one): everyone gets it again.
+// A copy: follow re-inserts each holder, which a live Map iteration
+// would visit again forever.
+function moved(): void {
+	for (let [key, held] of [...webLinks.state.holders]) webLinks.follow(key, held.deliver)
+}
+
 function reset(): void {
 	for (let key of webLinks.state.holders.keys()) webLinks.drop(key)
 }
@@ -44,5 +52,6 @@ export const webLinks = {
 	follow,
 	drop,
 	used,
+	moved,
 	reset,
 }

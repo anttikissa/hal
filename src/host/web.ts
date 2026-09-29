@@ -258,6 +258,7 @@ function start(): void {
 		try {
 			web.state.server = Bun.serve({ hostname: '127.0.0.1', port, fetch: web.fetch, websocket })
 			settings.state.listeningPort = web.state.server.port
+			webLinks.moved()
 			return
 		} catch (e: any) {
 			if (e?.code === 'EADDRINUSE' && port < 9100) continue

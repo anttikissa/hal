@@ -48,7 +48,7 @@ function links(row: string): string {
 function webUrl(path: string): string {
 	let { url, code } = ansi.state.web
 	let [page, hash] = path.split(/(?=#)/)
-	return `${url || `http://localhost:${settings.webPort()}`}${page}${code ? `?auth=${code}` : ''}${hash ?? ''}`
+	return `${url || settings.webUrl()}${page}${code ? `?auth=${code}` : ''}${hash ?? ''}`
 }
 
 // `text` in the quieter colour of `style` (oklch.quiet), then back to

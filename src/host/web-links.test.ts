@@ -101,3 +101,27 @@ test('no link code reaches any file of the home', async () => {
 	expect(files.some((d) => d.name.endsWith('.asonl'))).toBe(true)
 	for (let { code } of a.codes()) expect(all).not.toContain(code)
 })
+
+test('a terminal that asked before the web server bound gets the port it really bound', async () => {
+	let a = client()
+	a.conn.send({ type: 'auth', link: true })
+	expect(a.codes()[0]!.link).toBe(`http://localhost:${settings.webPort()}`)
+	// The preferred port is taken (say by another Hal), so the server moves on.
+	// web.start tries ports up to 9100, so take one below it.
+	let busy!: ReturnType<typeof Bun.serve>
+	for (let port = 9050; !busy && port < 9099; port++) {
+		try { busy = Bun.serve({ hostname: '127.0.0.1', port, fetch: () => new Response() }) } catch {}
+	}
+	let origPort = web.port
+	web.port = () => busy.port
+	try {
+		web.start()
+		let bound = web.state.server!.port
+		expect(bound).not.toBe(busy.port)
+		expect(a.codes().at(-1)!.link).toBe(`http://localhost:${bound}`)
+	} finally {
+		web.port = origPort
+		await web.stop()
+		busy.stop(true)
+	}
+})
