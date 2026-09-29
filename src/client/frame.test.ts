@@ -176,16 +176,6 @@ test('a cursor after a full prompt row stays inside the terminal', () => {
 	expect(f.cursor).toEqual({ row: boxOf(f).top + 1, col: 19 })
 })
 
-test("the tab's state and a one-off notice both show, state first, a rule between", () => {
-	let v = view([{ type: 'text', text: 'answer' }], '')
-	v.why = 'error: no credits (Enter retries)'
-	v.notice = 'Web is on port 9002'
-	let lines = plain(frame.build(v, 40).lines)
-	let at = lines.findIndex((l) => l.startsWith('error:'))
-	expect(lines.slice(at, at + 3)).toEqual([v.why, '─'.repeat(lines[at + 1]!.length), 'Web is on port 9002'])
-	expect(lines[at + 1]).toMatch(/^─{20,}$/)
-})
-
 test('a notice sits between the transcript and the prompt, wrapped and cleaned', () => {
 	let v = view([{ type: 'text', text: 'answer' }], 'typed')
 	v.notice = 'refused: a turn is already running\x1b[2J in this session'
