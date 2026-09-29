@@ -1,7 +1,10 @@
 {
 	title: 'command tool: the model runs slash commands',
 	spec: "A command tool lets the model run a slash command in its own session, as if the user typed it: /cd, /rename, /go, /model, /compact and the rest the command list marks as model-usable (not /quit, /restart, /login or anything that asks the user for secrets). The result is the command's output or error text. This replaces what the old Hal's agents used eval for most (research 29 Sep: 45 of 62 eval calls were /cd into or out of a worktree, 6 were /rename).",
-	status: 'planned',
+	status: 'done',
 	needs: [],
-	foldInto: ['2t']
+	foldInto: ['2t'],
+	notes: [
+		'The model tool reuses slash.command, so it records the same command history and runs the same guards as typing a slash command. Eligibility is an explicit modelUsable registry flag, not inferred from server-side availability; slash.runCommand reports reply output/errors. Session-busy guards still prevent /clear and /compact while the model turn is active.'
+	]
 }

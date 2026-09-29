@@ -4,6 +4,7 @@
 	status: 'done',
 	needs: [],
 	notes: [
-		'The shared tabs list is the authoritative order; sessions.openIds() includes non-tab sessions. models.known() exposes cached/fallback and synthetic ids without HTTP or secrets; provider registration occurs at startup. Host uptime derives from process.uptime().'
+		'The shared tabs list is the authoritative order; sessions.openIds() includes non-tab sessions. models.known() exposes cached/fallback and synthetic ids without HTTP or secrets; provider registration occurs at startup. Host uptime derives from process.uptime().',
+		'Host start timestamp uses performance.timeOrigin (stable origin even if system clock changes), and elapsed uptime uses process.uptime().'
 	]
 }

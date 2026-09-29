@@ -8,26 +8,26 @@
 
 import { keyHelp, type Binding } from '../key-help.ts'
 
-export type CommandInfo = { name: string; description: string; category: string; key?: string; clientOnly?: true }
+export type CommandInfo = { name: string; description: string; category: string; key?: string; clientOnly?: true; modelUsable?: true }
 
 // Sorted by name.
 const list: CommandInfo[] = [
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
 	{ name: 'budget', description: 'show or set spawn slots', category: 'session' },
 	{ name: 'broadcast', description: 'message every other open session', category: 'session' },
-	{ name: 'cd', description: 'change the working directory', category: 'session' },
-	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session' },
+	{ name: 'cd', description: 'change the working directory', category: 'session', modelUsable: true },
+	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session', modelUsable: true },
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w', clientOnly: true },
-	{ name: 'compact', description: 'summarise the context so far', category: 'session' },
-	{ name: 'go', description: 'show a tab in windows watching this session', category: 'tabs' },
-	{ name: 'help', description: 'list commands, or show one in detail', category: 'help' },
-	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1' },
+	{ name: 'compact', description: 'summarise the context so far', category: 'session', modelUsable: true },
+	{ name: 'go', description: 'show a tab in windows watching this session', category: 'tabs', modelUsable: true },
+	{ name: 'help', description: 'list commands, or show one in detail', category: 'help', modelUsable: true },
+	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1', modelUsable: true },
 	{ name: 'login', description: 'log in to a provider', category: 'session' },
-	{ name: 'model', description: 'pick the model', category: 'session', key: 'ctrl-m' },
-	{ name: 'move', description: 'move this tab to a numbered position', category: 'tabs' },
+	{ name: 'model', description: 'pick the model', category: 'session', key: 'ctrl-m', modelUsable: true },
+	{ name: 'move', description: 'move this tab to a numbered position', category: 'tabs', modelUsable: true },
 	{ name: 'new', description: 'new tab', category: 'tabs', key: 'ctrl-t', clientOnly: true },
 	{ name: 'pause', description: 'pause the turn', category: 'session' },
-	{ name: 'perf', description: 'show startup timing marks', category: 'debug' },
+	{ name: 'perf', description: 'show startup timing marks', category: 'debug', modelUsable: true },
 	{ name: 'queue', description: 'list, run or clear queued prompts', category: 'session' },
 	// Ctrl-C, Ctrl-Z and Ctrl-R are really caught by the emergency path:
 	// src/client/emergency.ts scans raw stdin and src/client/terminal.ts
@@ -35,14 +35,14 @@ const list: CommandInfo[] = [
 	// these three `key`s changes only what /keys shows, not the keys.
 	{ name: 'quit', description: 'quit', category: 'app', key: 'ctrl-c', clientOnly: true },
 	{ name: 'redraw', description: 'redraw', category: 'app', key: 'ctrl-l', clientOnly: true },
-	{ name: 'rename', description: 'name or clear the session name', category: 'session' },
+	{ name: 'rename', description: 'name or clear the session name', category: 'session', modelUsable: true },
 	{ name: 'restart', description: 'restart', category: 'app', key: 'ctrl-r', clientOnly: true },
 	{ name: 'resume', description: 'reopen the last closed tab', category: 'tabs', key: 'shift-ctrl-t', clientOnly: true },
 	{ name: 'send', description: 'send a prompt or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
-	{ name: 'status', description: 'show account usage windows', category: 'session' },
-	{ name: 'system', description: 'show the assembled system prompt', category: 'session' },
-	{ name: 'version', description: 'show which code the host runs', category: 'debug' },
+	{ name: 'status', description: 'show account usage windows', category: 'session', modelUsable: true },
+	{ name: 'system', description: 'show the assembled system prompt', category: 'session', modelUsable: true },
+	{ name: 'version', description: 'show which code the host runs', category: 'debug', modelUsable: true },
 ]
 
 // Keys a browser keeps for itself except on macOS, where they are Cmd.

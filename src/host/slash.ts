@@ -20,7 +20,7 @@ import { status } from './status.ts'
 // runs it. `command`: the client's id for the submit. Returns why it is
 // refused: no such command, or one only a client may run (a session may
 // not quit or restart the user's terminal).
-function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string): string | undefined {
+function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string, completed?: (reply: Reply) => void): string | undefined {
 	if (commandList.byName(call.name)?.clientOnly) return `only a client can run /${call.name}`
 	if (call.name === 'budget' && from !== undefined) return 'only a human can run /budget'
 	if (!commands.all().has(call.name)) return `unknown command /${call.name} (/help lists them)`
@@ -29,7 +29,7 @@ function command(id: string, text: string, call: { name: string; args: string },
 	if (command !== undefined) record.command = command
 	let { n } = history.append(id, record)
 	host.broadcast(id, { type: 'command', sessionId: id, text, ...(from !== undefined && { from }), n, ...(command !== undefined && { command }), ...slash.placed(id) })
-	void slash.runCommand(id, call.name, call.args)
+	void slash.runCommand(id, call.name, call.args).then((reply) => completed?.(reply))
 }
 
 // What a command runs with: its session, whose cwd and model it may
@@ -78,7 +78,7 @@ function name(id: string, value?: string): void {
 // Runs command `name` (again, with `answers`, once its question is
 // answered) and records what it said. A command asks only when no turn
 // is busy and no other question is open.
-async function runCommand(id: string, name: string, args: string, answers?: Answers): Promise<void> {
+async function runCommand(id: string, name: string, args: string, answers?: Answers): Promise<Reply> {
 	let reply: Reply
 	try {
 		let cmd = commands.all().get(name)
@@ -91,19 +91,27 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 	if (reply.show !== undefined) host.broadcast(id, { type: 'output', sessionId: id, text: reply.show, ...slash.placed(id) })
 	if (reply.error !== undefined) slash.output(id, reply.error, true)
 	if (reply.open === 'models') void slash.models(id).then((e) => host.broadcast(id, e))
-	if (!reply.ask) return
+	if (!reply.ask) return reply
 	let problem = forms.invalid(reply.ask)
-	if (problem) return slash.output(id, `/${name} asked a bad question: ${problem}`, true)
+	if (problem) {
+		let error = `/${name} asked a bad question: ${problem}`
+		slash.output(id, error, true)
+		return { error }
+	}
 	// A session blocked on something other than a question (a login)
 	// waits for a human anyway, so /login claude may ask there.
 	let now = status.stateOf(id)
-	if (states.busy(now) && !(now.type === 'blocked' && now.reason !== 'question'))
-		return slash.output(id, `/${name} can't ask while the session is busy; try again when it is done`, true)
+	if (states.busy(now) && !(now.type === 'blocked' && now.reason !== 'question')) {
+		let error = `/${name} can't ask while the session is busy; try again when it is done`
+		slash.output(id, error, true)
+		return { error }
+	}
 	let question = crypto.randomUUID().slice(0, 8)
 	let before = status.stateOf(id)
 	let { n } = history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args: reply.askArgs ?? args } })
 	host.broadcast(id, { type: 'question', sessionId: id, id: question, form: reply.ask, n })
 	status.settle(id, before)
+	return reply
 }
 
 // The model picker's content for session `id`.

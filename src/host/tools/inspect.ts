@@ -23,7 +23,7 @@ export const tool: Tool = {
 			return lines.join('\n')
 		}
 		let uptime = Math.floor(process.uptime())
-		let lines = [`Host PID ${process.pid}; version ${version.state.loaded ?? 'unknown'}; started ${new Date(Date.now() - process.uptime() * 1000).toISOString()}; uptime ${uptime}s`, `Clients: ${host.state.clients.size}`]
+		let lines = [`Host PID ${process.pid}; version ${version.state.loaded ?? 'unknown'}; started ${new Date(performance.timeOrigin).toISOString()}; uptime ${uptime}s`, `Clients: ${host.state.clients.size}`]
 		for (let [index, tab] of tabs.list().entries()) {
 			let state = tab.state.type === 'running' ? `running (${tab.state.phase})` : tab.state.type === 'blocked' ? `asking (${tab.state.reason})` : tab.state.type
 			lines.push(`${index + 1}. ${tab.id}${tab.id === ctx.sessionId ? ' (you)' : ''} · ${tab.name} · ${state} · ${tab.model} · ${tab.cwd}`)
