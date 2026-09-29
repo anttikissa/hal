@@ -144,7 +144,7 @@ test('a frame reusing the last one equals a frame built from nothing, as items s
 	steps.push({ ...v, transcript: { ...t2, items: [...t2.items, { type: 'tool-result', id: 'c', output: 'done', key: '~9' }] } })
 	// A changed item (a new object) in the middle.
 	let t3 = steps[2]!.transcript!
-	steps.push({ ...v, transcript: { ...t3, items: [t3.items[0]!, { ...t3.items[1]!, text: 'one, edited' } as Item, ...t3.items.slice(2)] } })
+	steps.push({ ...v, transcript: { ...t3, items: [t3.items[0]!, { ...t3.items[1]!, text: 'one, edited' } as (typeof t3.items)[number], ...t3.items.slice(2)] } })
 	steps.push({ ...steps[3]!, prompt: { text: 'typing', cursor: 6 } })
 	for (let w of steps) expect(frame.build(w, 50, 20, true).lines).toEqual(fresh(w))
 	// Another width lays everything out again.
