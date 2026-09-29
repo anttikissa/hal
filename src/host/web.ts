@@ -122,7 +122,9 @@ async function version(): Promise<string | undefined> {
 
 const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
 
-// The theme as CSS, computed now so overrides show on the next load:
+// The theme as CSS, computed now so overrides show on the next load,
+// as oklch() (wide-gamut screens show the full colour; the terminal
+// gets it fitted to sRGB):
 // one class per style (toolBash is .tool-bash) with fg as color, bg as
 // background and any other colour as a custom property (--link-bg),
 // plus --quiet: the fg's quieter, still readable form (oklch.quiet), for
@@ -134,12 +136,12 @@ function css(): string {
 		if (typeof value !== 'function') continue
 		let decls = Object.entries(value() as Style).map(([part, c]) => {
 			let prop = part === 'fg' ? 'color' : part === 'bg' ? 'background-color' : `--${kebab(part)}`
-			return `${prop}: ${oklch.toHex(c)}`
+			return `${prop}: ${oklch.toCss(c)}`
 		})
 		let style = value() as Style
 		let fg = style.fg ?? style.text
-		if (fg) decls.push(`--quiet: ${oklch.toHex(oklch.quiet(fg, style.bg ?? style.button ?? colors.screen))}`)
-		if (key === 'input' && fg && style.bg) decls.push(`--faint: ${oklch.toHex(oklch.faint(fg, style.bg))}`)
+		if (fg) decls.push(`--quiet: ${oklch.toCss(oklch.quiet(fg, style.bg ?? style.button ?? colors.screen))}`)
+		if (key === 'input' && fg && style.bg) decls.push(`--faint: ${oklch.toCss(oklch.faint(fg, style.bg))}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
 	return rules.join('\n')

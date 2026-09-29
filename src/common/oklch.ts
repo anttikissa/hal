@@ -53,6 +53,12 @@ function convert([L, C, h]: Oklch): [number, number, number] {
 	return rgb.map(gamma) as [number, number, number]
 }
 
+// `c` as a CSS oklch() colour, unfitted: the browser maps it to the
+// screen's gamut.
+function toCss([L, C, h]: Oklch): string {
+	return `oklch(${+L.toFixed(3)} ${+C.toFixed(3)} ${+h.toFixed(1)})`
+}
+
 function toHex(c: Oklch): string {
 	return '#' + oklch.toRgb(c).map((x) => x.toString(16).padStart(2, '0')).join('')
 }
@@ -106,4 +112,4 @@ function faint(fg: Oklch, bg: Oklch): Oklch {
 	return search([fg[0], fg[1] / 2, fg[2]], bg, 2.2, 1)
 }
 
-export const oklch = { state: { rgb: new Map<string, [number, number, number]>(), quiet: new Map<string, Oklch>() }, toRgb, convert, toHex, contrast, quiet, faint }
+export const oklch = { state: { rgb: new Map<string, [number, number, number]>(), quiet: new Map<string, Oklch>() }, toRgb, convert, toHex, toCss, contrast, quiet, faint }

@@ -150,12 +150,13 @@ test('the page carries the theme as CSS, following overrides, without its code',
 	let saved = colors.fgL
 	try {
 		let html = await (await fetch(`${base()}/`)).text()
-		expect(html).toContain(oklch.toHex(colors.assistant().fg!))
-		expect(html).toMatch(new RegExp(`\\.tool-bash\\s*\\{[^}]*${oklch.toHex(colors.toolBash().bg!)}`))
+		expect(html).toContain(oklch.toCss(colors.assistant().fg!))
+		expect(html).toContain(`.tool-bash { `)
+		expect(html.split('.tool-bash {')[1]!.split('}')[0]).toContain(oklch.toCss(colors.toolBash().bg!))
 		expect(html).not.toContain('fgL')
 		colors.fgL = 0.95
 		let after = await (await fetch(`${base()}/`)).text()
-		expect(after).toContain(oklch.toHex([0.95, colors.fgC, 55]))
+		expect(after).toContain(oklch.toCss([0.95, colors.fgC, 55]))
 	} finally {
 		colors.fgL = saved
 	}
@@ -629,9 +630,7 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await b.waitFor(`document.querySelector('main').innerText.includes('hello from fake')`)
 		expect(await b.evaluate(`document.querySelector('.user').textContent`)).toMatch(/^\d\d:\d\d Youhi$/)
 		// The reply wears the theme's assistant colour.
-		expect(await b.evaluate(`getComputedStyle(document.querySelector('.assistant')).color`)).toBe(
-			`rgb(${oklch.toRgb(colors.assistant().fg!).join(', ')})`,
-		)
+		expect(await b.evaluate(`getComputedStyle(document.querySelector('.assistant')).color`)).toBe(oklch.toCss(colors.assistant().fg!))
 		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('')
 		// Typing redraws the message box, not the transcript: the cards keep
 		// their DOM, so none replays its fade-in.
