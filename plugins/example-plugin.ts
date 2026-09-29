@@ -17,7 +17,15 @@
 //   call fn(...args) for the original (or the next around). Only around
 //   changes arguments or results. It keeps the target's return type: a
 //   sync function needs a sync replacement.
-// - plugin.unload(() => {}) runs when the file's hooks are removed.
+// - plugin.unload(() => {}) runs when the file's hooks are removed, or
+//   at once if this load fails or a newer edit overtakes it.
+// - plugin.onChange(({ reason, phase }) => {}) runs once a hook swap is
+//   complete: reason 'load', 'reload', 'delete' or 'expire'; phase
+//   'activate' for this version coming in, 'deactivate' going out. Hooks
+//   only affect future calls, so reconcile what depends on them here (a
+//   theme repaints); nothing is redrawn for you. On reload the old
+//   version's callbacks run, then the new one's, both with the new hooks
+//   active. Make them repeat-safe; a failed load runs none.
 //
 // Hooks run in filename order, then registration order; the first
 // around is outermost. A hook is not a security boundary.
@@ -31,6 +39,8 @@ import type { Plugin } from '../src/host/plugins.ts'
 // import { models } from '../src/host/models.ts'
 // import { tools } from '../src/host/tools.ts'
 // import { diag } from '../src/host/diag.ts'
+// import { colors } from '../src/common/colors.ts'
+// import { terminal } from '../src/client/terminal.ts'
 //
 // export const expires = '2026-12-31T23:59:00Z'
 //
@@ -52,6 +62,13 @@ export default async (plugin: Plugin) => {
 // 			run: async () => new Date().toDateString(),
 // 		})
 // 	})
+//
+// 	// A theme: colours are OKLCH [lightness, chroma, hue], one typed
+// 	// around per colour; repaint whenever this file comes or goes.
+// 	plugin.around(colors, 'fgL', () => 0.85)
+// 	plugin.around(colors, 'user', (fn) => ({ ...fn(), bg: [0.3, 0.06, 150] }))
+// 	plugin.around(colors, 'screen', () => [0.2, 0.01, 150])
+// 	plugin.onChange(() => terminal.redraw())
 //
 // 	// A sync target cannot wait for async work: fetch ahead (here while
 // 	// registering, which may be async, then on a timer) and let the

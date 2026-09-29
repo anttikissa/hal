@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import { colors } from '../common/colors.ts'
 import { modals, type ModalState } from '../common/modals.ts'
 import { strings } from '../common/strings.ts'
 import type { Shown as Item, Transcript } from '../common/transcript.ts'
+import { ansi } from './ansi.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 
@@ -562,5 +564,38 @@ describe('long words', () => {
 		expect(term.content()).toEqual(frameText())
 		expect(term.logical()).toContain(` ${url}&more=1`)
 		expect(term.logical()).not.toContain(` ${url}`)
+	})
+})
+
+describe('terminal.redraw', () => {
+	test('is a no-op before the UI is ready and while suspended', () => {
+		expect(() => terminal.redraw()).not.toThrow()
+		setup()
+		show(items(1))
+		term.written = ''
+		terminal.state.suspended = true
+		terminal.redraw()
+		terminal.state.suspended = false
+		expect(term.written).toBe('')
+	})
+
+	test('repaints every row in the current colours, cached rows too', () => {
+		setup(10, 40)
+		// The exit status colour is painted inside the row, not part of
+		// the item's own style.
+		show([{ type: 'prompt', label: 'bash #1', text: '[exit 1] failed' }])
+		let error = colors.error
+		let red = ansi.sgr({ fg: colors.error().fg! })
+		let green = ansi.sgr({ fg: [0.8, 0.15, 145] })
+		expect(term.written).toContain(red)
+		try {
+			colors.error = () => ({ ...error(), fg: [0.8, 0.15, 145] })
+			term.written = ''
+			terminal.redraw()
+			expect(term.written).toContain(green)
+			expect(term.written).not.toContain(red)
+		} finally {
+			colors.error = error
+		}
 	})
 })

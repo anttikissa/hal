@@ -3,7 +3,9 @@
 // `expires` (a UTC ISO time). Hooks are owned by their file: reloading,
 // deleting or expiring it removes exactly its hooks, and an emptied
 // chain puts the original function back. A reload is staged: the old
-// hooks stay until the new file imported and registered cleanly.
+// hooks stay until the new file imported and registered cleanly. Once
+// a swap is complete, the files' onChange callbacks reconcile whatever
+// depends on the hooks (a theme repaints).
 
 import { createHash } from 'crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, watch, type FSWatcher } from 'fs'
@@ -19,9 +21,14 @@ type F<T, K extends keyof T> = Extract<T[K], Fn>
 export type Plugin = {
 	before<T extends object, K extends Keys<T>>(obj: T, key: K, fn: (...args: Parameters<F<T, K>>) => void): void
 	after<T extends object, K extends Keys<T>>(obj: T, key: K, fn: (result: ReturnType<F<T, K>>, args: Parameters<F<T, K>>) => void): void
-	around<T extends object, K extends Keys<T>>(obj: T, key: K, fn: (next: F<T, K>, ...args: Parameters<F<T, K>>) => ReturnType<F<T, K>>): void
+	around<T extends object, K extends Keys<T>>(obj: T, key: K, fn: NoInfer<(next: F<T, K>, ...args: Parameters<F<T, K>>) => ReturnType<F<T, K>>>): void
 	unload(fn: () => void): void
+	onChange(fn: (change: Change) => unknown): void
 }
+
+// 'load' is a file's first load; phase says whether this callback's
+// version is coming in ('activate') or going out ('deactivate').
+export type Change = { reason: 'load' | 'reload' | 'delete' | 'expire'; phase: 'activate' | 'deactivate' }
 
 type Kind = 'before' | 'after' | 'around'
 type Hook = { file: string; seq: number; kind: Kind; obj: any; key: string; fn: Fn; target: string }
@@ -29,7 +36,7 @@ type Hook = { file: string; seq: number; kind: Kind; obj: any; key: string; fn: 
 // underway finishes with the chain it started with.
 type Run = { befores: Fn[]; arounds: Fn[]; afters: Fn[] }
 type Patch = { original: Fn; wrapper: Fn; hooks: Hook[]; run: Run }
-export type Loaded = { path: string; hash: string; expires?: string; expired?: true; error?: string; hooks: Hook[]; unloads: (() => void)[]; timer?: Timer }
+export type Loaded = { path: string; hash: string; expires?: string; expired?: true; error?: string; hooks: Hook[]; unloads: (() => void)[]; changes: Fn[]; active?: true; timer?: Timer }
 
 const srcDir = join(import.meta.dir, '..')
 
@@ -99,8 +106,23 @@ function settle(obj: any, key: string, patch: Patch): void {
 	}
 }
 
-// Takes `entry`'s hooks out and runs its unload callbacks.
-function deactivate(entry: Loaded): void {
+// Runs every callback in `fns`; one that throws or rejects is
+// reported and the rest still run. Results are not awaited.
+function runAll(path: string, what: string, fns: Fn[], ...args: unknown[]): void {
+	let fail = (e: any) => plugins.report(`plugin ${path}: ${what} failed: ${e?.stack ?? e}`)
+	for (let fn of fns) {
+		try {
+			let out = fn(...args)
+			if (out && typeof out.then === 'function') out.then(undefined, fail)
+		} catch (e) {
+			fail(e)
+		}
+	}
+}
+
+// Takes `entry`'s hooks out and runs its unload callbacks. Returns its
+// onChange callbacks, for the caller to run once its swap is complete.
+function deactivate(entry: Loaded): Fn[] {
 	clearTimeout(entry.timer)
 	for (let h of entry.hooks) {
 		let patch = plugins.state.patches.get(h.obj)?.get(h.key)
@@ -108,18 +130,24 @@ function deactivate(entry: Loaded): void {
 		patch.hooks = patch.hooks.filter((x) => x !== h)
 		plugins.settle(h.obj, h.key, patch)
 	}
-	for (let fn of entry.unloads) {
-		try {
-			fn()
-		} catch (e: any) {
-			plugins.report(`plugin ${entry.path}: unload failed: ${e?.stack ?? e}`)
-		}
-	}
+	let { unloads, changes } = entry
 	entry.hooks = []
 	entry.unloads = []
+	entry.changes = []
+	runAll(entry.path, 'unload', unloads)
+	return changes
+}
+
+// A load that never activates: its staged cleanups run at once, so a
+// timer or connection it started does not leak.
+function discard(staged: Loaded): void {
+	let unloads = staged.unloads
+	staged.unloads = []
+	runAll(staged.path, 'unload', unloads)
 }
 
 function activate(entry: Loaded): void {
+	entry.active = true
 	for (let h of entry.hooks) {
 		let patch = plugins.patchOf(h.obj, h.key)
 		patch.hooks.push(h)
@@ -140,8 +168,9 @@ function expire(path: string): void {
 	let entry = plugins.state.files.get(path)
 	if (!entry) return
 	plugins.state.latest.set(path, ++plugins.state.gen)
-	plugins.deactivate(entry)
+	let changes = plugins.deactivate(entry)
 	entry.expired = true
+	runAll(path, 'onChange', changes, { reason: 'expire', phase: 'deactivate' })
 }
 
 // A registration recorder: hooks and unloads are only collected here,
@@ -151,7 +180,7 @@ function recorder(path: string, entry: Loaded): Plugin {
 		if (!obj || typeof obj[key] !== 'function') throw new Error(`${path}: ${kind} target ${obj ? targetName(obj, key) : key} is not a function`)
 		entry.hooks.push({ file: basename(path), seq: entry.hooks.length, kind, obj, key, fn, target: `${targetName(obj, key)} ${kind}` })
 	}
-	return { before: add('before'), after: add('after'), around: add('around'), unload: (fn) => void entry.unloads.push(fn) } as Plugin
+	return { before: add('before'), after: add('after'), around: add('around'), unload: (fn) => void entry.unloads.push(fn), onChange: (fn) => void entry.changes.push(fn) } as Plugin
 }
 
 // (Re)loads plugin file `path`. The file's old hooks stay unless the new
@@ -163,7 +192,7 @@ async function load(path: string): Promise<void> {
 	st.latest.set(path, gen)
 	let current = () => st.latest.get(path) === gen
 	let text = readFileSync(path)
-	let staged: Loaded = { path, hash: createHash('sha256').update(text).digest('hex').slice(0, 8), hooks: [], unloads: [] }
+	let staged: Loaded = { path, hash: createHash('sha256').update(text).digest('hex').slice(0, 8), hooks: [], unloads: [], changes: [] }
 	let old = st.files.get(path)
 	try {
 		// A query string makes Bun import (and run) the file afresh. The
@@ -180,17 +209,23 @@ async function load(path: string): Promise<void> {
 			if (typeof mod.default !== 'function') throw new Error(`${path}: export default (plugin) => { ... } is missing`)
 			await mod.default(plugins.recorder(path, staged))
 		}
-		if (!current()) return
-		if (old) plugins.deactivate(old)
+		if (!current()) return plugins.discard(staged)
+		let reload = !!old?.active
+		let outgoing = old ? plugins.deactivate(old) : []
 		st.files.set(path, staged)
 		if (expired()) staged.expired = true
 		else plugins.activate(staged)
+		// Both versions' callbacks see the new hooks already active.
+		let reason = reload ? 'reload' : 'load'
+		runAll(path, 'onChange', outgoing, { reason, phase: 'deactivate' })
+		runAll(path, 'onChange', staged.changes, { reason, phase: 'activate' })
 	} catch (e: any) {
+		plugins.discard(staged)
 		if (!current()) return
 		let error = String(e?.message ?? e)
 		if (!error.includes(path)) error = `${path}: ${error}`
 		if (old) Object.assign(old, { error, hash: staged.hash })
-		else st.files.set(path, { ...staged, hooks: [], unloads: [], error })
+		else st.files.set(path, { ...staged, hooks: [], unloads: [], changes: [], error })
 		plugins.report(`plugin failed to load, keeping its last working hooks: ${error}`)
 	}
 }
@@ -199,8 +234,8 @@ function remove(path: string): void {
 	let st = plugins.state
 	st.latest.set(path, ++st.gen)
 	let entry = st.files.get(path)
-	if (entry) plugins.deactivate(entry)
 	st.files.delete(path)
+	if (entry) runAll(path, 'onChange', plugins.deactivate(entry), { reason: 'delete', phase: 'deactivate' })
 }
 
 // Brings file `name` in dir `d` up to date: loads it if its content
@@ -261,6 +296,7 @@ export const plugins = {
 	patchOf,
 	settle,
 	deactivate,
+	discard,
 	activate,
 	arm,
 	expire,

@@ -183,3 +183,69 @@ test('the directory is watched: a new file hooks, an edit reloads, /plugins name
 	for (let i = 0; i < 100 && t.f(1) !== 'two'; i++) await Bun.sleep(20)
 	expect(t.f(1)).toBe('two')
 })
+
+// A plugin body that logs its onChange calls as `tag reason phase`, and
+// what t.f returns at that moment (which hooks are active).
+let changes = (tag: string) => `plugin.onChange(({ reason, phase }: any) => t.log.push(\`${tag} \${reason} \${phase} \${t.f(1)}\`))`
+
+test('onChange: load, then reload runs outgoing then incoming, both seeing the new hooks', async () => {
+	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 'v1')\n${changes('v1')}`)
+	expect(t.log).toEqual(['v1 load activate v1'])
+	t.log.length = 0
+	await plugin('a.ts', `plugin.around(t, 'f', () => 'v2')\n${changes('v2')}`)
+	expect(t.log).toEqual(['v1 reload deactivate v2', 'v2 reload activate v2'])
+	t.log.length = 0
+	// A failed or superseded load runs none and keeps the hooks.
+	writeFileSync(path, `export default (plugin: any) => { plugin.onChange(() => (globalThis as any).pluginRuns++); throw new Error('bad') }\n`)
+	await plugins.load(path)
+	expect(g.pluginRuns).toBe(0)
+	expect(t.log).toEqual([])
+	expect(t.f(1)).toBe('v2')
+})
+
+test('onChange: delete and expiry run deactivate with the hooks already gone', async () => {
+	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 0)\n${changes('a')}`)
+	unlinkSync(path)
+	await plugins.sync(dir, 'a.ts')
+	let soon = new Date(Date.now() + 100).toISOString()
+	await plugin('b.ts', `plugin.around(t, 'f', () => 0)\n${changes('b')}`, `export const expires = '${soon}'`)
+	await Bun.sleep(250)
+	expect(t.log.filter((l: string) => l !== 'f')).toEqual(['a load activate 0', 'a delete deactivate 2', 'b load activate 0', 'b expire deactivate 2'])
+})
+
+test('a throwing or rejecting callback is reported and the others still run', async () => {
+	await plugin(
+		'a.ts',
+		`plugin.onChange(() => { throw new Error('sync boom') })
+plugin.onChange(async () => { throw new Error('async boom') })
+plugin.onChange(() => t.log.push('third'))
+plugin.unload(() => { throw new Error('unload boom') })
+plugin.unload(() => t.log.push('unloaded'))`,
+	)
+	await plugin('a.ts', ``)
+	await Bun.sleep(1)
+	expect(t.log).toEqual(['third', 'unloaded', 'third'])
+	expect(reports.join('\n')).toContain('sync boom')
+	expect(reports.join('\n')).toContain('async boom')
+	expect(reports.join('\n')).toContain('unload boom')
+})
+
+test('a failed or superseded load runs its staged cleanups at once and keeps the active version', async () => {
+	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 'v1')\nplugin.unload(() => t.log.push('v1 unload'))`)
+	writeFileSync(path, `export default (plugin: any) => { plugin.unload(() => (globalThis as any).pluginRuns++); throw new Error('bad') }\n`)
+	await plugins.load(path)
+	expect(g.pluginRuns).toBe(1)
+	expect(t.f(1)).toBe('v1')
+	expect(t.log).toEqual([])
+
+	let slow = `plugin.unload(() => t.log.push('slow unload'))\nawait new Promise((r) => (globalThis.release = r))`
+	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default async (plugin: any) => {\n${slow}\n}\n`)
+	let pending = plugins.load(path)
+	await Bun.sleep(20)
+	await plugin('a.ts', `plugin.around(t, 'f', () => 'v3')`)
+	expect(t.log).toEqual(['v1 unload'])
+	g.release()
+	await pending
+	expect(t.log).toEqual(['v1 unload', 'slow unload'])
+	expect(t.f(1)).toBe('v3')
+})

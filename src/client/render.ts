@@ -203,8 +203,11 @@ function draw(force = false): void {
 		if (st.tab !== undefined && st.tab !== tab) st.fullscreen = force = true
 		st.tab = tab
 	}
-	// A full redraw drops what kept blocks from shrinking (task fn).
+	// A full redraw drops what kept blocks from shrinking (task fn), and
+	// every laid-out row, so all repaint in the current colours (a
+	// plugin's theme, task an).
 	if (force) {
+		frame.state.rows = new WeakMap()
 		frame.state.peaks.clear()
 		frame.state.history = undefined
 	}
@@ -260,7 +263,9 @@ function park(): void {
 function init(out: Output | null = terminal.state.io): void {
 	if (render.state.out || !out) return
 	render.state.out = out
-	terminal.redraw = () => render.draw(true)
+	// Never while suspended: the shell has the terminal (a plugin's
+	// onChange may call it any time).
+	terminal.redraw = () => void (terminal.state.suspended || render.draw(true))
 	terminal.onResize = () => render.draw(true)
 	terminal.park = () => render.park()
 }
