@@ -24,7 +24,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
    is 0 without it, yet iOS still draws the page under the rounded
    corners and home indicator), so the edge rows pad themselves. */
 .Transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left)); }
-.Transcript > * { max-width: 60rem; margin: 0 auto 0.6rem; }
+.Transcript > * { margin: 0 0 0.6rem; }
 /* Cards and the open question share one shape: square, a lit bar on
    the left, the style's tint behind. */
 .Card, .Question { border-left: 3px solid currentColor; }
@@ -117,7 +117,6 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .StatusRow .group > span { unicode-bidi: isolate; }
 @media (max-width: 40rem) { .StatusRow { padding-inline: max(0.6rem, env(safe-area-inset-left)) max(0.6rem, env(safe-area-inset-right)); } }
 .Composer { position: relative; z-index: 1; flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
-.Composer > * { max-width: 60rem; margin: 0 auto; }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.2rem 0; }
 /* Completions: a panel in the box's own colour (the input style), like a
@@ -158,7 +157,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 @media (max-width: 40rem) { textarea, input, .entry .hint { font-size: 16px; } .Transcript, .Composer { padding-left: max(0.6rem, env(safe-area-inset-left)); padding-right: max(0.6rem, env(safe-area-inset-right)); } .Transcript { padding-block: 0.6rem; } }
 @media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
-.Question { position: relative; max-width: 60rem; margin: 0 auto 0.6rem; padding: 0.4rem 0.7rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.Question { position: relative; margin: 0 0 0.6rem; padding: 0.4rem 0.7rem; display: flex; flex-direction: column; gap: 0.4rem; }
 /* Options: outlined in the card's colour; the chosen one solid in it,
    its text the canvas colour (text-fill keeps currentColor the card's). */
 .Question button:not(.dismiss) { padding: 0.2rem 0.8rem; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px currentColor; }
@@ -183,44 +182,43 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker li .match { color: var(--match); font-weight: bold; }
 /* Apple HIG: touch targets at least 44x44pt. */
 @media (pointer: coarse) { .Picker li { min-height: 44px; display: flex; align-items: center; } .Picker .close { min-width: 44px; min-height: 44px; } }
-/* Tabs: a strip that wraps (never scrolls sideways: that fights the
-   back-swipe), or on phones one button opening a sheet. */
+/* Tabs (task 3k): one row that never wraps or scrolls sideways (that
+   fights the back-swipe): menu, equal cells (widths set by Tabs.tsx
+   from common/tab-pages.ts), page edges, new tab. The shown tab's
+   number is underlined; nothing else moves. Under 50px tall. */
 .Tabs { flex: none; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
-.Tabs .strip { display: flex; flex-wrap: wrap; gap: 0.2rem; padding: 0.3rem 0.6rem; }
-.Tabs .item, .Tabs li { display: flex; align-items: stretch; min-width: 0; }
-/* The current tab is lit like a card: bright bar on the left, tint behind. */
-.Tabs .item:has([aria-current]), .Tabs li:has([aria-current]) { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 3px 0 0 var(--active-fg); }
-.Tabs .tab { display: flex; background: none; gap: 0.6ch; align-items: baseline; min-width: 0; padding: 0.2rem 0.3rem 0.2rem 0.6rem; text-decoration: none; }
-.Tabs .item .name { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.Tabs .tab { color: var(--inactive-fg); }
+.Tabs .strip { display: flex; align-items: stretch; white-space: nowrap; overflow: hidden; }
+.Tabs .pages { position: relative; flex: 1; min-width: 0; display: flex; overflow: hidden; }
+.Tabs .probe { position: absolute; visibility: hidden; pointer-events: none; }
+.Tabs .tab { display: flex; flex: none; align-items: center; width: var(--cell); padding: 0.3rem 0; background: none; text-decoration: none; color: var(--inactive-fg); }
+.Tabs .tab .n { display: inline-block; width: calc(var(--digits) * 1ch); text-align: right; }
 .Tabs .tab[aria-current] { color: var(--active-fg); }
-.Tabs [aria-current] .n { font-weight: 600; }
-.Tabs .marker { font-size: 0.85em; }
+.Tabs .tab[aria-current] .n { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; font-weight: 600; }
+.Tabs .marker { display: inline-block; width: 1ch; text-align: left; }
+.Tabs .strip .name { width: 12ch; margin-left: 1ch; overflow: hidden; text-overflow: ellipsis; }
+.Tabs .edge { display: flex; flex: none; align-items: center; justify-content: center; width: var(--edge); padding: 0.3rem 0; text-decoration: none; color: var(--inactive-fg); }
+.Tabs .edge[hidden] { display: none; }
 .Tabs .marker.blink { animation: pulse 1s steps(2) infinite; }
 .Tabs .marker.working { color: var(--active-fg); }
 .Tabs .marker.asking, .Tabs .marker.noticed { color: var(--warning-fg); font-weight: 600; }
 .Tabs .marker.paused { color: var(--paused-fg); font-weight: 600; }
 .Tabs .marker.failed { color: var(--error-fg); }
 .Tabs .marker.done { color: var(--done-fg); }
-.Tabs button { background: transparent; color: inherit; padding: 0.2rem 0.5rem; }
-.Tabs button:hover, .Tabs .tab:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
-.Tabs .close { color: var(--inactive-fg); }
-.Tabs .menu { display: none; width: 100%; gap: 0.6ch; align-items: baseline; text-align: left; padding: 0.5rem 0.8rem; }
-.Tabs .menu .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.Tabs .menu .count { color: var(--inactive-fg); }
+.Tabs button { flex: none; background: transparent; color: inherit; padding: 0.3rem 0.8rem; }
+.Tabs button:hover, .Tabs .tab:hover, .Tabs .edge:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
+.Tabs .menu, .Tabs .close { color: var(--inactive-fg); }
+@media (pointer: coarse) { .Tabs .strip { min-height: 44px; } .Tabs button { min-width: 44px; } }
 .Tabs .sheet { width: 100%; max-width: 100%; max-height: 80dvh; margin: auto 0 0; padding: 0.6rem 0.6rem max(0.6rem, env(safe-area-inset-bottom)); background: var(--canvas); color: var(--text); border: 0; border-top: 1px solid var(--border); }
 .Tabs .sheet[open] { display: flex; flex-direction: column; gap: 0.4rem; }
 .Tabs .sheet ul { margin: 0; padding: 0; list-style: none; overflow-y: auto; }
-.Tabs .sheet li { justify-content: space-between; }
-.Tabs .sheet .tab { flex: 1; padding: 0.6rem; }
+.Tabs .sheet li { display: flex; align-items: stretch; justify-content: space-between; }
+/* The shown tab in the list is lit like a card: bar on the left, tint. */
+.Tabs .sheet li:has([aria-current]) { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 3px 0 0 var(--active-fg); }
+.Tabs .sheet .tab { flex: 1; width: auto; justify-content: flex-start; gap: 1ch; padding: 0.6rem; }
 .Tabs .sheet .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .Tabs .sheet .close { padding: 0.6rem 1rem; }
 .Tabs .sheet .new { padding: 0.6rem; background: var(--button); }
 .Tabs .sheet::backdrop { background: color-mix(in oklab, var(--canvas) var(--mix-backdrop), transparent); }
-@media (max-width: 40rem) { .Tabs .strip { display: none; } .Tabs .menu { display: flex; } }
-.Tabs .notify-mobile { display: none; }
-@media (max-width: 40rem) { .Tabs .notify-mobile { display: block; width: 100%; text-align: center; } }
-@media (pointer: coarse) { .Tabs .notify, .Tabs .notify-mobile { min-height: 44px; } }
 /* The theme (src/common/colors.ts), put here by the host. */
 /*COLORS*/
 </style>

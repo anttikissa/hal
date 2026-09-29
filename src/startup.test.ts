@@ -106,8 +106,9 @@ function start(): Run {
 			let plain = text.replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
 			rest = text.slice(-10_000)
 			let ms = Date.now() - t0
-			// Tab numbers, each maybe with its state glyph (task fr).
-			seen.bar ||= /\b1\S? +2\S? +3\S? +4\S? +5\b/.test(plain)
+			// Tab numbers, each maybe with its state glyph (task fr); 50
+			// tabs page (task 3k), so the page holding the focused last.
+			seen.bar ||= /\b46\S? +47\S? +48\S? +49\S? +50\b/.test(plain)
 			seen.tail ||= plain.includes(tail)
 			seen.draft ||= plain.includes(draft)
 			if (run.ui === undefined && seen.bar && seen.tail && seen.draft) run.ui = ms

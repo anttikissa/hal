@@ -828,7 +828,7 @@ test.skipIf(!chrome)('in a browser a block address loads its page, marks its car
 	}
 }, 20000)
 
-test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the address; phones get a sheet', async () => {
+test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the address; the strip stays one short row', async () => {
 	let origCwd = host.cwd
 	host.cwd = () => '/tmp'
 	let b = await browser()
@@ -839,11 +839,11 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
 		await b.call('Page.navigate', { url: `${base()}/` })
 		// Landing on the first (new) tab rewrites the address.
-		await b.waitFor(`document.querySelectorAll('.Tabs .strip a').length === 1 && /\\/\\d+-[a-z]{3}$/.test(location.pathname)`)
+		await b.waitFor(`document.querySelectorAll('.Tabs .strip a.tab').length === 1 && /\\/\\d+-[a-z]{3}$/.test(location.pathname)`)
 		let first = await b.evaluate(`location.pathname`)
-		expect(await b.evaluate(`document.querySelector('.Tabs .strip a').getAttribute('href')`)).toBe(first)
+		expect(await b.evaluate(`document.querySelector('.Tabs .strip a.tab').getAttribute('href')`)).toBe(first)
 		await b.evaluate(`document.querySelector('.Tabs .strip .new').click()`)
-		await b.waitFor(`document.querySelectorAll('.Tabs .strip a').length === 2 && location.pathname !== '${first}'`)
+		await b.waitFor(`document.querySelectorAll('.Tabs .strip a.tab').length === 2 && location.pathname !== '${first}'`)
 		let second = await b.evaluate(`location.pathname`)
 		expect(await b.evaluate(`document.querySelector('.Tabs .strip [aria-current]').getAttribute('href')`)).toBe(second)
 		// The strip never scrolls sideways.
@@ -855,13 +855,14 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 		await b.waitFor(`location.pathname === '${second}'`)
 		// Closing the shown tab lands on its neighbour, replacing the entry.
 		let entries = await b.evaluate(`history.length`)
-		await b.evaluate(`document.querySelector('.Tabs .strip .item:has([aria-current]) .close').click()`)
-		await b.waitFor(`document.querySelectorAll('.Tabs .strip a').length === 1 && location.pathname === '${first}'`)
-		expect(await b.evaluate(`history.length`)).toBe(entries)
-		// A phone: one button opening a sheet with the same tabs.
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true })
-		await b.waitFor(`getComputedStyle(document.querySelector('.Tabs .strip')).display === 'none'`)
 		await b.evaluate(`document.querySelector('.Tabs .menu').click()`)
+		await b.evaluate(`document.querySelector('.Tabs .sheet li:has([aria-current]) .close').click()`)
+		await b.waitFor(`document.querySelectorAll('.Tabs .strip a.tab').length === 1 && location.pathname === '${first}'`)
+		expect(await b.evaluate(`history.length`)).toBe(entries)
+		// A phone: the same one row, its menu opening the sheet.
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true })
+		expect(await b.evaluate(`document.querySelector('.Tabs').getBoundingClientRect().height < 50`)).toBe(true)
+		await b.evaluate(`document.querySelector('.Tabs .sheet').open || document.querySelector('.Tabs .menu').click()`)
 		await b.waitFor(`document.querySelector('.Tabs .sheet').open && document.querySelectorAll('.Tabs .sheet a').length === 1`)
 		await b.evaluate(`document.querySelector('.Tabs .sheet .new').click()`)
 		await b.waitFor(`!document.querySelector('.Tabs .sheet').open && location.pathname !== '${first}'`)

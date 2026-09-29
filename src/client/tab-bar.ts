@@ -1,28 +1,33 @@
 // The tab bar row above the prompt (tasks/cc/terminal.md, Tabs):
-// "Tabs:", a numeric label per tab with the focused one in brackets and
-// one indicator character when the tab needs a look, then key hints.
+// "Tabs:", one equal cell per tab (its number right-aligned, a marker
+// slot, a gap; the focused number underlined), then key hints.
 // Indicators follow the old Hal's tabIndicator; the blinking ones go
 // with the shared pulse (pulse.ts): `lit` says which phase to draw.
 // It stays one row: hints go from the lowest priority up, then the
-// label, then the padding between tabs, and only then is it clipped.
+// label, then the tabs come in pages (common/tab-pages.ts, task 3k)
+// between two display-only edges; a cell is never clipped.
 // Each number is an OSC 8 link to that tab's web page.
 
 import { colors } from '../common/colors.ts'
 import type { Oklch } from '../common/oklch.ts'
 import type { Tab } from '../common/protocol.ts'
 import { strings } from '../common/strings.ts'
-import { tabMark } from '../common/tab-mark.ts'
+import { tabMark, type Mark } from '../common/tab-mark.ts'
+import { tabPages, type Edge } from '../common/tab-pages.ts'
 import { ansi } from './ansi.ts'
 
-type Part = { text: string; fg?: Oklch; link?: string; dim?: Oklch }
+type Part = { text: string; fg?: Oklch; link?: string; dim?: Oklch; under?: boolean }
 type Hint = { text: string; priority: number }
 
 // The mark after a tab's number (common/tab-mark.ts, shared with the
 // web), its colour and, if it blinks, `dim`: its colour in the dark
 // phase.
-function indicator(tab: Tab): Part | undefined {
+const indicator = (tab: Tab): Part | undefined => {
 	let m = tabMark.mark(tab)
-	if (!m) return undefined
+	return m && tabBar.markPart(m)
+}
+
+function markPart(m: Mark): Part {
 	let c = colors.tab()
 	let hal = colors.assistant()
 	let fg: Oklch = { asking: c.warningFg!, noticed: c.warningFg!, working: hal.cursor!, failed: c.errorFg!, paused: c.pausedFg!, done: c.doneFg! }[m.kind]
@@ -51,18 +56,33 @@ function hints(count: number): Hint[] {
 	]
 }
 
-function labels(list: Tab[], focused: string | undefined, compact: boolean, lit: boolean): Part[] {
+// A mark drawn lit or dark, or a blank marker slot.
+const slot = (mark: Part | undefined, lit: boolean): Part => (!mark ? { text: ' ' } : mark.dim && !lit ? dark(mark) : mark)
+
+// Tabs start..end-1 as cells of one width: number, marker slot, gap.
+function cells(list: Tab[], focused: string | undefined, start: number, end: number, lit: boolean): Part[] {
 	let c = colors.tab()
+	let d = tabPages.digits(list.length)
 	let parts: Part[] = []
-	list.forEach((tab, i) => {
+	for (let i = start; i < end; i++) {
+		let tab = list[i]!
 		let on = tab.id === focused
-		let fg = on ? c.activeFg! : c.inactiveFg!
-		let mark = tabBar.indicator(tab)
-		if (compact && i > 0) parts.push({ text: ' ' })
-		parts.push({ text: on ? '[' : compact ? '' : ' ', fg }, { text: String(i + 1), fg, link: `/${tab.id}` })
-		if (mark) parts.push(mark.dim && !lit ? dark(mark) : mark)
-		parts.push({ text: on ? ']' : compact ? '' : ' ', fg })
-	})
+		let n = String(i + 1)
+		parts.push({ text: ' '.repeat(d - n.length) }, { text: n, fg: on ? c.activeFg! : c.inactiveFg!, link: `/${tab.id}`, under: on })
+		parts.push(slot(tabBar.indicator(tab), lit), { text: ' ' })
+	}
+	return parts
+}
+
+// An edge `width` wide: ‹N or N› and the side's most urgent mark, or
+// blanks when that side is empty.
+function edge(e: Edge, left: boolean, width: number, lit: boolean): Part[] {
+	if (!e.count) return [{ text: ' '.repeat(width) }]
+	let text = left ? `‹${e.count}` : `${e.count}›`
+	let m = e.mark && tabBar.markPart(e.mark)
+	let pad = ' '.repeat(Math.max(0, width - text.length - 2))
+	let parts: Part[] = [{ text: left ? text : pad + text, fg: colors.status().fg! }, slot(m, lit), { text: ' ' }]
+	if (left) parts.push({ text: pad })
 	return parts
 }
 
@@ -72,12 +92,12 @@ const plain = (parts: Part[]) => parts.map((p) => p.text).join('')
 // blinking indicators drawn lit or dark.
 function fit(list: Tab[], focused: string | undefined, width: number, lit = true): Part[] {
 	let dim = colors.status().fg!
-	let tabs = labels(list, focused, false, lit)
+	let all = cells(list, focused, 0, list.length, lit)
 	let left = [...hints(list.length)]
-	let bar = (label: boolean, hs: Hint[], ts = tabs): Part[] => [
+	let bar = (label: boolean, hs: Hint[]): Part[] => [
 		...(label ? [{ text: 'Tabs: ', fg: dim }] : []),
-		...ts,
-		...(hs.length ? [{ text: `  ${hs.map((h) => h.text).join(', ')}`, fg: dim }] : []),
+		...all,
+		...(hs.length ? [{ text: ` ${hs.map((h) => h.text).join(', ')}`, fg: dim }] : []),
 	]
 	for (;;) {
 		let parts = bar(true, left)
@@ -86,11 +106,16 @@ function fit(list: Tab[], focused: string | undefined, width: number, lit = true
 		let low = left.reduce((a, b) => (b.priority < a.priority ? b : a))
 		left = left.filter((h) => h !== low)
 	}
-	for (let parts of [bar(false, []), bar(false, [], labels(list, focused, true, lit))]) if (strings.visLen(plain(parts)) <= width) return parts
-	// Still too wide: clip the compact bar.
-	let text = strings.clipVisual(plain(bar(false, [], labels(list, focused, true, lit))), width)
-	return [{ text, fg: dim }]
+	if (strings.visLen(plain(all)) <= width) return all
+	let d = tabPages.digits(list.length)
+	let sizes = { cell: d + 2, edge: d + 3 }
+	let at = list.findIndex((t) => t.id === focused)
+	let p = tabPages.page(list, at, width, sizes)
+	return [...edge(p.left!, true, sizes.edge, lit), ...cells(list, focused, p.start, p.end, lit), ...edge(p.right!, false, sizes.edge, lit)]
 }
+
+const UNDER = '\x1b[4m'
+const UNUNDER = '\x1b[24m'
 
 // The painted row for a terminal `cols` wide.
 function row(list: Tab[], focused: string | undefined, cols: number, lit = true): string {
@@ -98,9 +123,12 @@ function row(list: Tab[], focused: string | undefined, cols: number, lit = true)
 	// A tab's number links to its web page (task e3).
 	let out = fit(list, focused, width, lit).map((p) => {
 		let text = p.link ? `\x1b]8;;${ansi.webUrl(p.link)}\x07${p.text}${ansi.LINK_OFF}` : p.text
+		// Underline is no colour: it marks the focused tab in a monochrome
+		// terminal too.
+		if (p.under) text = UNDER + text + UNUNDER
 		return (p.fg ? ansi.sgr({ fg: p.fg }) : '') + text
 	})
 	return ansi.PAD + out.join('') + ansi.UNCOLOR
 }
 
-export const tabBar = { indicator, blinks, hints, fit, row }
+export const tabBar = { indicator, markPart, blinks, hints, fit, row }

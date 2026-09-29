@@ -14,7 +14,7 @@ Bottom-anchored sections:
 ```
 [history lines...]   — per-tab, append-only, ALL of them
 [padding]            — blank lines to stabilize prompt position across tabs
-[tab bar]            — " Tabs: [1]  2" plus tab-specific hints when they fit
+[tab bar]            — " Tabs: 1  2 " (1 underlined) plus tab-specific hints when they fit
 [prompt top rule]    — one full-width rule on the prompt blue background; shows ↑N when prompt rows are hidden above
 [prompt]             — user input, blue bg, padded one column on each side
 [prompt bottom rule] — one full-width rule on the prompt blue background; shows ↓N when prompt rows are hidden below
@@ -133,12 +133,14 @@ hottest repaint path. Do keep their widths in agreement.
 ## Tabs
 
 Each tab has its own history. Ctrl-T opens, Ctrl-W closes, Ctrl-N/P switches.
-The tab bar uses compact numeric labels, brackets for the active tab, and a
-one-character status indicator after the tab number when needed. With one tab,
+The tab bar uses numeric labels in equal cells, the active tab's number
+underlined (no brackets, task 3k), and a one-character status indicator
+after the tab number when needed. With one tab,
 it shows creation hints such as `ctrl-t: new`; with multiple tabs, it switches
 to navigation hints such as `alt-#: goto` and `ctrl-n/p: switch`. It stays one
 row: tab-specific hints are dropped from lowest to highest priority, then the
-"Tabs:" label is dropped, rather than wrapping.
+"Tabs:" label is dropped, then the tabs come in pages (task 3k),
+rather than wrapping or clipping.
 Tab labels are OSC 8 links to the same session in the browser; only the
 `(sessionId/blockId)` reference in a block header links to that block in the
 web transcript. Image and saved-paste markers link to their host-backed content.

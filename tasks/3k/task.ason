@@ -15,9 +15,12 @@ Web: the strip is one row, a menu button (the existing sheet: the full list with
 Terminal: the tab bar keeps its hints and 'Tabs:' label while they fit (task 7w), then drops them, then pages, and never clips a cell.
 
 Web transcript and composer use the full window width (minus padding), text included: no reading-width cap (the user: text often loves a wide screen).`,
-	status: 'planned',
+	status: 'done',
 	notes: [
-		'Mocks from the design discussion: /tmp/tabs-pages.html (the chosen paged strip) and /tmp/tabs-lens.html (rejected: variable-width cells and a sliding window made numbers move). Rejected also: centring on the current tab (every step shifts all numbers) and a lazily sliding window (the view depends on history).'
+		'Mocks from the design discussion: /tmp/tabs-pages.html (the chosen paged strip) and /tmp/tabs-lens.html (rejected: variable-width cells and a sliding window made numbers move). Rejected also: centring on the current tab (every step shifts all numbers) and a lazily sliding window (the view depends on history).',
+		"Implemented: src/common/tab-pages.ts (tabPages.page: names, numbers or a page, and the edges' counts and most urgent mark; widths in any unit, so the terminal passes columns and the web CSS px), used by src/client/tab-bar.ts and src/web/components/Tabs.tsx. The web measures its cell room with a ResizeObserver on .pages and a hidden 10-zero probe for 1ch; on pointer: coarse cells and edges are at least 44px, which the arithmetic simply gets as a bigger cell.",
+		"Terminal cells show numbers only (7w's numeric labels); names are a web thing. The focused number is underlined with raw SGR 4/24, outside ansi.sgr, so it shows in a monochrome terminal too. Below about 16 columns a page (one cell plus two edges) no longer fits and the row overflows; no real terminal is that narrow.",
+		"Edges are hidden with visibility on an empty side (the page size stays fixed) and display: none when not paged; a CSS display rule on .edge beats the hidden attribute, so .edge[hidden] needs its own display: none. Paging broke src/startup.test.ts's tab-bar regex (50 tabs at 120 columns now show the focused page 28..50), and the ng browser test now closes through the sheet. The sheet scrolls the shown tab into view when it opens."
 	],
 	needs: ['ng', '7w', 'fr']
 }
