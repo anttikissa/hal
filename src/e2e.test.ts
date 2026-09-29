@@ -121,7 +121,7 @@ web.port = () => 0
 terminal.available = () => true
 terminal.realIO = () => ({
 	setRawMode() {},
-	onData(fn) { process.stdin.on('data', fn) },
+	onData(fn) { process.stdin.on('data', fn); process.stdin.on('end', () => process.exit(0)); process.stdin.resume() },
 	write: (s) => process.stdout.write(s),
 	exit: (code) => process.exit(code),
 	stop() {},
@@ -202,6 +202,16 @@ function ends(): string[] {
 }
 
 const continued = 'ECHO(<meta>The previous response'
+
+// If the test runner dies before afterEach, its stdin pipe closes. The
+// subprocess must exit rather than keep a host alive on a deleted temp home.
+test('the test host exits when its controller closes stdin', async () => {
+	let p = run()
+	await until('the host socket', hostReady)
+	p.sub.stdin.end()
+	await until('the host to exit after stdin EOF', () => p.exit !== undefined)
+	expect(p.exit).toBe(0)
+}, 30_000)
 
 test('Escape pauses a turn; it stays paused over a restart and Enter continues it', async () => {
 	let p = run()

@@ -1,6 +1,6 @@
 {
 	title: 'Restart lifecycle',
-	spec: 'A host restart (Ctrl-R in the host process) keeps the session going: clients reconnect or take over, a running turn is recorded as interrupted, and the restarted process rejoins as a client or host. The terminal stays usable throughout.',
+	spec: 'A host restart (Ctrl-R in the host process) keeps the session going: clients reconnect or take over, a running turn is recorded as interrupted, and the restarted process rejoins as a client or host. The terminal stays usable throughout. End-to-end test hosts run in their own process groups and stop when the test controller closes stdin, including when its test runner dies before cleanup; they must never persist as orphaned hosts on deleted temporary homes.',
 	status: 'done',
 	notes: [
 		"Record the interrupted turn from a synchronous `process.on('exit')` handler (`host.init()`). The kernel releases the host flock only after that handler has run, so the successor never sees a turn left half-written. Anything async there is lost. A SIGKILL skips it, so the repair in `history.open` is still needed.",
@@ -8,7 +8,8 @@
 		"The `process-control.ts` artifact (`requestExit`/`exitIfRequested`) wasn't needed: `terminal.restart()` exits directly, and the exit handler provides the durability boundary.",
 		"`./run` is a bash loop with a `bun` child. Killing the spawned `./run` orphans that child, which stays alive until killed by hand (b3's e2e tests leaked about 15 of them). Spawn with `detached: true` and kill the group (`process.kill(-pid)`). After multi-process tests, check `pgrep -fl src/main.ts`.",
 		'oxlint rejects `return` inside `finally` (no-unsafe-finally). Guard the writes with a flag instead.',
-		"When a shared test file also holds another agent's edits, stage only your hunks (for example with `git hash-object -w` + `git update-index --cacheinfo`). `git add <file>` committed another agent's work here by mistake."
+		"When a shared test file also holds another agent's edits, stage only your hunks (for example with `git hash-object -w` + `git update-index --cacheinfo`). `git add <file>` committed another agent's work here by mistake.",
+		'The e2e fixture overrides terminal IO: its stdin is the runner-owned pipe. A killed runner skips afterEach and leaves ./run plus bun alive if the fixture does not handle stdin EOF. Keep the fixture listening for end and exiting the process, and test closure of the pipe while the host is running.'
 	],
 	needs: ['b3']
 }
