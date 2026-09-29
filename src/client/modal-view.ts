@@ -67,9 +67,9 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	}
 	let below = m.items.length - scroll - visible
 	let place = scroll > 0 || below > 0 ? `${m.selected + 1}/${m.items.length}` : ''
-	let rows = [line + modalView.border('╭', '╮', m.title, '', width) + UNCOLOR]
+	let rows = [line + modalView.border('┌', '┐', m.title, '', width) + UNCOLOR]
 	for (let r = 0; r < height - 2; r++) rows.push(side('│') + pad(content[r] ?? '') + side('│'))
-	rows.push(line + modalView.border('╰', '╯', m.hint ?? '', place, width) + UNCOLOR)
+	rows.push(line + modalView.border('└', '┘', m.hint ?? '', place, width) + UNCOLOR)
 	// A box too small for its fields still keeps the cursor inside it.
 	let at = { row: Math.min(height - 1, 1 + cursor.row), col: Math.max(0, Math.min(width - 1, 2 + cursor.col)) }
 	return { rows: rows.slice(0, height), cursor: at, scroll }

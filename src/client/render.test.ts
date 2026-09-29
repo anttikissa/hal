@@ -405,7 +405,7 @@ describe('modals', () => {
 		let written = term.written.length
 		let m = modals.open({ title: 'Models', form: search, items: names })
 		withModal(m)
-		expect(term.screen().some((r) => r.includes('╭─ Models'))).toBe(true)
+		expect(term.screen().some((r) => r.includes('┌─ Models'))).toBe(true)
 		for (let c of 'opus') {
 			m = modals.step(m, { key: c, text: c }).state
 			withModal(m)

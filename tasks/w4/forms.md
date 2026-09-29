@@ -159,7 +159,7 @@ scroll. Typing into a search box never changes the height.
 ## Model picker
 
 ```
-╭─ Model: anthropic/claude-opus-5-5 ─────────────────────────╮
+┌─ Model: anthropic/claude-opus-5-5 ─────────────────────────┐
 │ Search: _                                                   │
 │   ▶ hal                                                     │
 │   ▶ openai  (default: gpt-6-sol)                            │
@@ -169,7 +169,7 @@ scroll. Typing into a search box never changes the height.
 │         5            anthropic/claude-opus-5                │
 │     ▶ sonnet  (default: claude-sonnet-5)                    │
 │   ▶ openrouter                                              │
-╰─ ←/→: close/open, enter: pick, esc: cancel ─────────────────╯
+└─ ←/→: close/open, enter: pick, esc: cancel ─────────────────┘
 ```
 
 A tree like the old Hal's: provider (old Hal's order: hal, openai,

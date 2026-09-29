@@ -30,9 +30,9 @@ const names = (n: number) => Array.from({ length: n }, (_, i) => `model ${i}`)
 // Where the box is: first and last frame row, and its left column.
 function box(lines: string[]): { top: number; bottom: number; left: number; right: number } {
 	let rows = lines.map(strip)
-	let top = rows.findIndex((r) => r.includes('╭'))
-	let bottom = rows.findIndex((r) => r.includes('╰'))
-	return { top, bottom, left: rows[top]!.indexOf('╭'), right: rows[top]!.indexOf('╮') }
+	let top = rows.findIndex((r) => r.includes('┌'))
+	let bottom = rows.findIndex((r) => r.includes('└'))
+	return { top, bottom, left: rows[top]!.indexOf('┌'), right: rows[top]!.indexOf('┐') }
 }
 
 test('a modal draws over the transcript: transcript, a blank column, the outline, the contents', () => {
@@ -49,8 +49,8 @@ test('a modal draws over the transcript: transcript, a blank column, the outline
 		expect(row.slice(0, b.left - 1).trimEnd()).toBe(under[i]!.slice(0, b.left - 1).trimEnd())
 		expect(row.slice(1, b.left - 1)).toMatch(/^(x+|─+|> *| *)$/)
 		expect(row[b.left - 1]).toBe(' ')
-		expect('╭│╰').toContain(row[b.left]!)
-		expect('╮│╯').toContain(row[b.right]!)
+		expect('┌│└').toContain(row[b.left]!)
+		expect('┐│┘').toContain(row[b.right]!)
 		expect(row[b.right + 1]).toBe(' ')
 		expect(row.slice(b.right + 2).trimEnd()).toBe(under[i]!.slice(b.right + 2).trimEnd())
 	}
