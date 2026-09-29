@@ -39,7 +39,7 @@ function used(code: string): void {
 // A copy: follow re-inserts each holder, which a live Map iteration
 // would visit again forever.
 function moved(): void {
-	for (let [key, held] of [...webLinks.state.holders]) webLinks.follow(key, held.deliver)
+	for (let [key, held] of Array.from(webLinks.state.holders)) webLinks.follow(key, held.deliver)
 }
 
 function reset(): void {

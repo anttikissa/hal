@@ -112,8 +112,10 @@ test('a terminal that asked before the web server bound gets the port it really 
 	for (let port = 9050; !busy && port < 9099; port++) {
 		try { busy = Bun.serve({ hostname: '127.0.0.1', port, fetch: () => new Response() }) } catch {}
 	}
+	let port = busy.port
+	if (port === undefined) throw new Error('server did not report its bound port')
 	let origPort = web.port
-	web.port = () => busy.port
+	web.port = () => port
 	try {
 		web.start()
 		let bound = web.state.server!.port
