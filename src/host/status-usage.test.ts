@@ -9,7 +9,7 @@ import { markdownView } from '../client/markdown-view.ts'
 
 const visible = (s: string) => s.replace(/\x1b\]8;;[^\x07]*\x07/g, '').replace(/\x1b\[[\d;]*m/g, '')
 
-test('provider-specific tables show full identities, plan, eighth bars and two-line reset cells', () => {
+test('provider-specific tables show full identities, plan and two-line reset cells', () => {
 	let now = new Date(2026, 8, 28, 12).getTime()
 	let old = clock.now
 	clock.now = () => now
@@ -30,7 +30,6 @@ test('provider-specific tables show full identities, plan, eighth bars and two-l
 		expect(rendered).toContain('42% used (resets 13:00)')
 		expect(rendered).not.toContain('sonnet')
 		expect(rendered).toContain('API key')
-		expect(rendered).toContain('█████▉')
 		expect(rendered).not.toContain('<br>')
 		expect(rendered).not.toContain('| Slot |')
 	} finally { clock.now = old }

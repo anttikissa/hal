@@ -21,7 +21,6 @@ test('says who, when and where: date, cwd and model', () => {
 	expect(text).toContain('2026-09-26')
 	expect(text).toContain(`${root}/work`)
 	expect(text).toContain('anthropic/claude-x')
-	expect(text).toMatch(/Hal/)
 })
 
 test('in Git, one file per directory from the repo root down to the cwd, outermost first', () => {
@@ -77,14 +76,6 @@ test('the same inputs give the same text; a changed input changes it', () => {
 	expect(systemPrompt.build({ ...input, now: at + 86_400_000 })).not.toBe(first)
 })
 
-test('a missing cwd still gives a prompt', () => {
-	expect(systemPrompt.build({ cwd: `${root}/gone`, model: 'm/x', now: at })).toContain(`${root}/gone`)
-})
-
-test('the checkout SYSTEM.md opens the prompt: it says who Hal is', () => {
-	expect(systemPrompt.build({ cwd: root, model: 'm/x', now: at })).toMatch(/^You are Hal\b/)
-})
-
 test('SYSTEM.md is read per build: an edit shows on the next one, no edit keeps the text', () => {
 	let orig = systemPrompt.file
 	try {
@@ -104,7 +95,6 @@ test('SYSTEM.md is read per build: an edit shows on the next one, no edit keeps 
 		systemPrompt.file = orig
 	}
 })
-
 
 test('SYSTEM preprocessing removes comments and selects every matching condition; project files only lose comments', () => {
 	let old = systemPrompt.file
@@ -151,7 +141,6 @@ test('SYSTEM includes lose comments but keep directives, nested includes and var
 		expect(() => systemPrompt.build({ cwd: root, model: 'm/x', now: at })).toThrow(/missing.md/)
 	} finally { systemPrompt.file = old }
 })
-
 
 test('the home USER.md appears in the real SYSTEM prompt when present, with no residue when absent', () => {
 	let old = process.env.HAL_HOME

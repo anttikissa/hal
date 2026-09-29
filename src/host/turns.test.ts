@@ -179,7 +179,7 @@ test('pause stops the turn, keeping partial output, and continue carries it on',
 	expect(await fresh(id)).toEqual(a.views.get(id)!)
 })
 
-test('continue is refused with nothing to continue; after an error it retries the request', async () => {
+test('continue is refused with nothing to continue; a provider error ends the turn and continue retries it', async () => {
 	let a = client()
 	let id = created(a)
 	a.conn.send({ type: 'continue', sessionId: id })
@@ -190,21 +190,12 @@ test('continue is refused with nothing to continue; after an error it retries th
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'error', message: '400 bad request', status: 400 })
 	await until(() => a.of('turn-end').length)
+	expect(a.of('turn-end')[0]).toMatchObject({ status: 'error', error: '400 bad request' })
+	expect(await fresh(id)).toEqual(a.views.get(id)!)
 	expect(a.views.get(id)!.state).toEqual({ type: 'error', message: '400 bad request' })
 	a.conn.send({ type: 'continue', sessionId: id })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: stamped('go') }] }])
-})
-
-test('a provider error ends the turn with the error', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
-	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'error', message: 'HTTP 500 from fake', status: 500 })
-	await until(() => a.of('turn-end').length)
-	expect(a.of('turn-end')[0]).toMatchObject({ status: 'error', error: 'HTTP 500 from fake' })
-	expect(await fresh(id)).toEqual(a.views.get(id)!)
 })
 
 test('a stream that throws still ends the turn and frees the session', async () => {

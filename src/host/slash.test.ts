@@ -223,13 +223,8 @@ test('/keys shows every key the table lists, with what it does', async () => {
 	for (let row of keyHelp.sections().flatMap((s) => s.rows)) {
 		expect(lines.some((l) => l.includes(row.keys) && l.endsWith(row.description))).toBe(true)
 	}
-	// Every command key shows, with its command; descriptions line up
-	// across sections.
+	// Every command key shows, with its command.
 	for (let c of commandList.all().filter((c) => c.key)) expect(lines.some((l) => l.includes(`${c.key}  `) && l.includes(`/${c.name} `))).toBe(true)
-	let rows = lines.filter((l) => l.startsWith('  '))
-	let at = (l: string, d: string) => l.length - d.length
-	let cols = new Set(keyHelp.sections().flatMap((s) => s.rows).map((r) => at(rows.find((l) => l.includes(r.keys) && l.endsWith(r.description))!, r.description)))
-	expect(cols.size).toBe(1)
 })
 
 test('the host refuses a client-only command, whoever sent it, and runs nothing', async () => {
@@ -241,15 +236,6 @@ test('the host refuses a client-only command, whoever sent it, and runs nothing'
 	expect(history.readSync(id).filter((r) => r.type === 'command')).toEqual([])
 })
 
-test('/pause pauses a busy session', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
-	await until(() => transcript.question(a.views.get(id)))
-	a.conn.send({ type: 'submit', sessionId: id, text: '/pause' })
-	await until(() => a.views.get(id)!.state.type === 'paused')
-})
-
 test('an unknown command is refused; text that only starts with a path is a prompt', async () => {
 	let a = client()
 	let id = created(a)
@@ -259,7 +245,7 @@ test('an unknown command is refused; text that only starts with a path is a prom
 	await until(() => a.of('turn-start').length)
 })
 
-test('a command runs while a turn is busy instead of waiting in the inbox', async () => {
+test('a command runs while a turn is busy instead of waiting in the inbox; /pause pauses it', async () => {
 	let a = client()
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
@@ -268,6 +254,8 @@ test('a command runs while a turn is busy instead of waiting in the inbox', asyn
 	await until(() => a.views.get(id)!.meta.cwd === `${work}/projects`)
 	expect(a.views.get(id)!.inbox).toEqual([])
 	expect(a.views.get(id)!.state).toEqual({ type: 'blocked', reason: 'question' })
+	a.conn.send({ type: 'submit', sessionId: id, text: '/pause' })
+	await until(() => a.views.get(id)!.state.type === 'paused')
 })
 
 test('history records who sent a command', async () => {

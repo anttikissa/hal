@@ -132,13 +132,6 @@ test('bash without a description is an error and does not run the command', asyn
 	expect((await bash({ description: 'Nothing' })).isError).toBe(true)
 })
 
-test('bash output is bounded, keeping the exit status', async () => {
-	tools.maxChars = () => 1000
-	let r = await bash({ command: 'yes | head -c 100000; exit 5', description: 'Print a lot' })
-	expect(r.output.length).toBeLessThanOrEqual(1200)
-	expect(r.output).toMatch(/\b5\b/)
-})
-
 test('cancel stops a running command, pipelines included, and a cancelled turn runs nothing more', async () => {
 	let ac = new AbortController()
 	let started = Date.now()
@@ -192,11 +185,12 @@ import { history } from './history.ts'
 const originalHome = paths.home
 const blobRun = (id: string, options: { offset?: number; limit?: number } = {}) => tools.run({ type: 'tool_call', id: 'rb', name: 'read_blob', input: { id, ...options } }, { cwd: dir, signal, sessionId: 's' })
 
-test('large bash output preserves both ends and the whole result in a session blob', async () => {
+test('large bash output is bounded, keeps both ends and the whole result in a session blob', async () => {
 	paths.home = () => dir
 	try {
 		tools.maxChars = () => 1000
 		let result = await bash({ command: "printf 'START\\n'; yes middle | head -c 80000; printf '\\nEND\\n'; exit 7", description: 'Produce long output and fail' })
+		expect(result.output.length).toBeLessThanOrEqual(1200)
 		expect(result.output).toContain('START')
 		expect(result.output).toContain('END')
 		expect(result.output).toContain('exit 7')

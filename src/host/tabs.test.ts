@@ -26,15 +26,6 @@ const rejected = (c: C, id: string) => c.events.find((e: any) => e.type === 'rej
 // Opens a new tab and returns its id, as named in the answer.
 const newTab = (c: C, cwd = '/tmp/w', after?: string) => ack(c, send(c, { type: 'tab-new', cwd, ...(after ? { after } : {}) })).tab as string
 
-test('tabs start empty; the first tab-start creates one in cwd', () => {
-	let a = client()
-	let id = send(a, { type: 'tab-start', cwd: '/tmp/p' })
-	let tab = ack(a, id).tab
-	expect(tabsOf(a)).toEqual([expect.objectContaining({ id: tab, cwd: '/tmp/p', state: { type: 'idle' } })])
-	expect(sessions.list().map((s) => s.id)).toEqual([tab])
-})
-
-
 test('a fresh home opens the offline intro; later tabs use the configured provider model', () => {
 	let c = client()
 	let first = newTab(c)

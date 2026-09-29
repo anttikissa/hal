@@ -205,16 +205,3 @@ test('Escape while blocked pauses', async () => {
 	await until(() => a.ends().length)
 	expect(status.stateOf(id)).toEqual({ type: 'paused' })
 })
-
-test('a bad request ends the turn in error with the provider message; continue retries it', async () => {
-	let a = client()
-	script = [[{ type: 'error', message: 'HTTP 400 from fake: image input not supported', status: 400 }], done]
-	let id = start(a)
-	await until(() => a.ends().length)
-	expect(status.stateOf(id)).toEqual({ type: 'error', message: 'HTTP 400 from fake: image input not supported' })
-	expect(calls).toHaveLength(1)
-	a.conn.send({ type: 'continue', sessionId: id })
-	await until(() => a.ends().length === 2)
-	expect(status.stateOf(id).type).toBe('idle')
-	expect(calls[1]!.input.messages).toEqual(calls[0]!.input.messages)
-})

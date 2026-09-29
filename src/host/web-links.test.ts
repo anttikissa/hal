@@ -9,6 +9,7 @@ import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
+import { statusUsage } from './status-usage.ts'
 import { web } from './web.ts'
 
 const savedHome = process.env.HAL_HOME
@@ -102,7 +103,7 @@ test('no link code reaches any file of the home', async () => {
 	for (let { code } of a.codes()) expect(all).not.toContain(code)
 })
 
-test('a terminal that asked before the web server bound gets the port it really bound', async () => {
+test('a busy preferred web port falls back; the advertised URL and link codes follow the bound port', async () => {
 	let a = client()
 	a.conn.send({ type: 'auth', link: true })
 	expect(a.codes()[0]!.link).toBe(`http://localhost:${settings.webPort()}`)
@@ -118,8 +119,11 @@ test('a terminal that asked before the web server bound gets the port it really 
 	web.port = () => port
 	try {
 		web.start()
-		let bound = web.state.server!.port
-		expect(bound).not.toBe(busy.port)
+		let bound = web.state.server!.port!
+		expect(bound).toBeGreaterThan(port)
+		expect((await fetch(`http://127.0.0.1:${bound}/`)).status).toBe(200)
+		expect(settings.webUrl()).toBe(`http://localhost:${bound}`)
+		expect(statusUsage.runtime()).toContain(`Web: port ${bound}`)
 		expect(a.codes().at(-1)!.link).toBe(`http://localhost:${bound}`)
 	} finally {
 		web.port = origPort
