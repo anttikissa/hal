@@ -180,11 +180,13 @@ it only when building the page with Bun, not on the host startup path.
 ## Look: retro sci-fi terminal (user's standing preference)
 
 Bold, colourful, contrasty: think 2001: A Space Odyssey, Alien, Blade
-Runner, CRT VT100 terminals glowing in the dark. Saturated phosphor
+Runner, Tron (the early-1980s film), CRT VT100 terminals glowing in the dark. Saturated phosphor
 hues on near-black, lit solid edges (a card's left bar is an LED,
 not a hairline; no glow or blur: the user doesn't want it), square corners everywhere (cards, buttons, tabs,
 fields, dialogs; no border-radius). Never meek, pastel, washed-out or
-corporate-neutral (the user's words: "be-afraid-say-nothing"). Colour
+corporate-neutral (the user's words: "be-afraid-say-nothing"). No
+slate: no blue-grey surfaces or buttons in any theme, the default
+included. Colour
 changes are proposed to the user with options before they land; he
 decides. Readable text below still holds.
 
