@@ -8,11 +8,12 @@
 
 import { keyHelp, type Binding } from '../key-help.ts'
 
-export type CommandInfo = { name: string; description: string; category: string; key?: string; clientOnly?: true; modelUsable?: true }
+export type CommandInfo = { name: string; description: string; category: string; key?: string; clientOnly?: true; modelUsable?: true; hidden?: true }
 
 // Sorted by name.
 const list: CommandInfo[] = [
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
+	{ name: 'branch', description: 'alias for /fork', category: 'tabs', hidden: true },
 	{ name: 'budget', description: 'show or set spawn slots', category: 'session' },
 	{ name: 'cd', description: 'change the working directory', category: 'session', modelUsable: true },
 	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session', modelUsable: true },
@@ -20,6 +21,7 @@ const list: CommandInfo[] = [
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w', clientOnly: true },
 	{ name: 'compact', description: 'summarise the context so far', category: 'session', modelUsable: true },
 	{ name: 'config', description: 'show or change settings', category: 'app' },
+	{ name: 'fork', description: 'fork this session into a new tab', category: 'tabs', key: 'ctrl-b' },
 	{ name: 'go', description: 'show a tab in windows watching this session', category: 'tabs', modelUsable: true },
 	{ name: 'help', description: 'list commands, or show one in detail', category: 'help', modelUsable: true },
 	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1', modelUsable: true },

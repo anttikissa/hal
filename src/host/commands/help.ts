@@ -8,7 +8,7 @@ export const command: SlashCommand = {
 	help: () => '/help lists every command by category; /help <name> shows one in detail.',
 	complete: (args) => commandList.all().map((c) => c.name).filter((n) => n.startsWith(args)),
 	run(args) {
-		let all = commandList.all()
+		let all = commandList.all().filter((c) => !c.hidden)
 		if (args) {
 			let [name = '', ...rest] = args.replace(/^\//, '').split(/\s+/)
 			let info = commandList.byName(name)

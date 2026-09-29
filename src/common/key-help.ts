@@ -80,6 +80,7 @@ function sections(): KeySection[] {
 			title: 'Tabs and app',
 			rows: [
 				command('new'),
+				command('fork'),
 				command('resume'),
 				command('close'),
 				row('ctrl-n / ctrl-p', 'next or previous tab'),

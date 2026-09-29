@@ -70,13 +70,17 @@ function fork(parent: string, child: string): void {
 	if (existsSync(blobs.dir(parent))) cpSync(blobs.dir(parent), blobs.dir(child), { recursive: true })
 	let pending: string[] = []
 	for (let r of records) {
-		if (r.type === 'turn_end' || r.type === 'user') pending = []
+		if (r.type === 'turn_end' || r.type === 'user') {
+			if (r.type === 'turn_end') pending = []
+			else for (let b of r.blocks) if (b.type === 'tool_result') pending = pending.filter((id) => id !== b.id)
+		}
 		if (r.type === 'assistant' && r.block.type === 'tool_call') pending.push(r.block.id)
 	}
-	let output = `This session is a fork of ${parent}, made by this round's calls, which ran there, not here.`
+	let output = `This session is a fork of ${parent}; copied calls ran there, not here.`
 	if (pending.length) history.append(child, { type: 'user', blocks: pending.map((id): ToolResultBlock => ({ type: 'tool_result', id, output })) })
 	let last = records.findLast((r) => r.type === 'user' || r.type === 'assistant' || r.type === 'continue' || r.type === 'turn_end')
 	if (last && last.type !== 'turn_end') history.append(child, { type: 'turn_end', status: 'completed', usage: {} })
+	history.append(child, { type: 'output', text: output })
 }
 
 // The parent's subagents still at work: what wait waits for.

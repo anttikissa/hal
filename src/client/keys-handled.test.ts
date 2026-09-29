@@ -97,7 +97,7 @@ test('every binding /keys lists does something', async () => {
 	for (let b of bindings) if (!(await handled(b))) idle.push(JSON.stringify(b))
 	expect(idle).toEqual([])
 	// The check itself can tell: keys Hal leaves alone do nothing.
-	for (let label of ['ctrl-q', 'ctrl-b', 'cmd-k', 'alt-x']) expect(await handled(keyHelp.parse(label))).toBe(false)
+	for (let label of ['ctrl-q', 'cmd-k', 'alt-x']) expect(await handled(keyHelp.parse(label))).toBe(false)
 })
 
 const cmd = (key: string): KeyEvent => ({ key, shift: false, alt: false, ctrl: false, cmd: true })
