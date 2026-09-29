@@ -49,7 +49,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	let cursor = fields.cursor ?? { row: content.length, col: 0 }
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
 		// Leading spaces are the picker's tree indentation: keep them.
-		let row = strings.clipVisual((i === m.selected ? '> ' : '  ') + ansi.clean(m.items[i]!).replace(/[\r\n\t]+/g, ' '), inner)
+		let row = strings.clipVisual((i === m.selected ? `${formView.ARROW} ` : '  ') + ansi.clean(m.items[i]!).replace(/[\r\n\t]+/g, ' '), inner)
 		if (m.query) row = modalView.highlight(row, m.query, i === m.selected ? current : undefined)
 		if (i === m.selected) {
 			if (!fields.cursor) cursor = { row: content.length, col: 0 }

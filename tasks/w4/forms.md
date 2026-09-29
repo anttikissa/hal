@@ -180,7 +180,8 @@ the vendor for a reseller (openrouter/moonshotai/kimi-k2). A family
 lists its two newest versions' flagships; the rest wait in a closed
 `older` inside it, and a provider's non-chat and family-less models in
 a closed `other`, both last. ▶/▼ mark closed/open categories; it opens
-with the current model's categories open and selected (`*` marks it).
+with the current model's categories open and selected (a `✓` marks it;
+the selected row is lit in the picker colour behind a `→`).
 Right opens the selected category and left closes it or the one the
 selection is in, also while searching;
 Enter on a category picks its default (the alias's model: gpt →
@@ -226,7 +227,8 @@ lines and escape codes are not DOM. Shared, in `src/common`:
 Each client only maps that to its medium (terminal rows, DOM elements).
 In the terminal a choice's options stand one per row, never side by
 side (a long list must not run off a wide screen), under the field's
-label if it has one; the chosen one is inverse. Up and down move
+label if it has one; the chosen one reads `→ name`, lit like a
+picker's selected row (colors.popupCurrent, inverse on monochrome). Up and down move
 through them, left and right alike, without wrapping round; past the
 first or last option they move to the field above or below.
 On the web an open question is a card like the others (square, lit bar

@@ -57,7 +57,7 @@ test('a modal draws over the transcript: transcript, a blank column, the outline
 	let rows = f.lines.map(strip)
 	expect(rows[b.top]).toContain('Models')
 	expect(rows.find((r) => r.includes('Search:'))).toBeDefined()
-	expect(rows.find((r) => r.includes('> model 0'))).toBeDefined()
+	expect(rows.find((r) => r.includes('→ model 0'))).toBeDefined()
 	// The box sits on the screen: the frame's last 30 rows.
 	expect(b.top).toBeGreaterThanOrEqual(f.lines.length - 30)
 })
@@ -82,7 +82,7 @@ test('a modal list scrolls to its selection; the cursor is in the search box', (
 	v.modal = { ...v.modal!, selected: 150 }
 	let f = frame.build(v, 60, 30)
 	let rows = f.lines.map(strip)
-	expect(rows.some((r) => r.includes('> model 150'))).toBe(true)
+	expect(rows.some((r) => r.includes('→ model 150'))).toBe(true)
 	expect(rows.some((r) => r.includes(' model 0 '))).toBe(false)
 	let at = rows.findIndex((r) => r.includes('Search: op'))
 	expect(f.cursor).toEqual({ row: at, col: rows[at]!.indexOf('Search: op') + 'Search: op'.length })

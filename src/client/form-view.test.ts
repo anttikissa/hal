@@ -50,7 +50,8 @@ test('a secret is never on screen; the chosen option is marked', () => {
 	let f = frame.build({ ...view([item]), form: st }, 40)
 	expect(f.lines.join('\n')).not.toContain('sk-')
 	expect(plain(f.lines)[1]).toBe('Key: •••••')
-	expect(f.lines[2]).toContain('\x1b[7m yes \x1b[27m')
+	expect(plain(f.lines)[2]).toBe('→ yes')
+	expect(plain(f.lines)[3]).toBe('no')
 })
 
 test('choice options stand one per row, the cursor on the chosen one', () => {
@@ -60,7 +61,7 @@ test('choice options stand one per row, the cursor on the chosen one', () => {
 	let f = frame.build({ ...view([item]), form: st }, 40)
 	let rows = plain(f.lines)
 	let at = rows.indexOf('? Pick the theme.')
-	expect(rows.slice(at + 1, at + 4).map((r) => r.trim())).toEqual(['hal', 'nostromo', 'tron'])
+	expect(rows.slice(at + 1, at + 4).map((r) => r.trim())).toEqual(['hal', '→ nostromo', 'tron'])
 	expect(f.cursor.row).toBe(at + 2)
 })
 

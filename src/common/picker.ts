@@ -144,7 +144,7 @@ function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean)
 	node.nodes.filter((n) => !bucket(n)).forEach(category)
 	for (let { id, leaf } of node.ids) {
 		if (!kept.has(id)) continue
-		out.items.push(`${indent}${id === current ? '* ' : '  '}${leaf.padEnd(12)} ${names[id] ? `${names[id]} · ` : ''}${id}`)
+		out.items.push(`${indent}${id === current ? '✓ ' : '  '}${leaf.padEnd(12)} ${names[id] ? `${names[id]} · ` : ''}${id}`)
 		out.rows.push({ id, parent: node.path })
 	}
 	node.nodes.filter(bucket).forEach(category)

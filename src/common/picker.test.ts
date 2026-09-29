@@ -53,7 +53,7 @@ const selected = (st: ReturnType<typeof picker.open>) => st.items[st.selected]!.
 test('the picker opens as a tree on the current model, its categories open', () => {
 	let st = picker.open('anthropic/claude-sonnet-4-5', tree, { 'anthropic/claude-opus-5-5': 'Opus 5.5' })
 	expect(st.title).toContain('anthropic/claude-sonnet-4-5')
-	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▶ openai', '▼ anthropic', '▶ opus', '* claude-sonnet-4-5 anthropic/claude-sonnet-4-5', '▶ openrouter'])
+	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▶ openai', '▼ anthropic', '▶ opus', '✓ claude-sonnet-4-5 anthropic/claude-sonnet-4-5', '▶ openrouter'])
 	expect(selected(st)).toContain('anthropic/claude-sonnet-4-5')
 	expect(enter(st)).toBe('/model anthropic/claude-sonnet-4-5')
 })
@@ -123,7 +123,7 @@ test('dated snapshots hide; versions past a family two newest wait under older',
 	expect(shown('hal/intro', ['anthropic', 'anthropic/opus', 'anthropic/opus/older'])).toMatch(/claude-opus-4-1$/m)
 	// A snapshot alone stays; the current model's categories open.
 	expect(closed).toContain('claude-haiku-3-20240307')
-	expect(picker.open('anthropic/claude-opus-4-1', all).items.join('\n')).toMatch(/\* 4\.1 .*claude-opus-4-1$/m)
+	expect(picker.open('anthropic/claude-opus-4-1', all).items.join('\n')).toMatch(/✓ 4\.1 .*claude-opus-4-1$/m)
 })
 
 test('a family lists its flagships; variants and non-chat models wait in closed buckets, last', () => {

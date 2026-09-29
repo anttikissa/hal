@@ -34,11 +34,13 @@ function fieldLines(st: FormState, width: number, style: Style = colors.warning(
 		// A choice's options stand in a column under its label.
 		if (field.type === 'choice') {
 			if (field.label) rows.push(strings.clipVisual(head.trimEnd(), width))
-			let indent = field.label ? '    ' : '  '
+			// The chosen one is marked and lit like a picker's selection.
+			let indent = field.label ? '  ' : ''
+			let lit = colors.popupCurrent()
 			for (let o of field.options) {
-				let label = ` ${ansi.clean(o)} `
-				if (o === value && focused) cursor = { row: rows.length, col: indent.length + 1 }
-				rows.push(strings.clipVisual(indent + (o === value ? INVERSE + label + UNINVERSE : label), width))
+				let label = `${o === value ? formView.ARROW : ' '} ${ansi.clean(o)} `
+				if (o === value && focused) cursor = { row: rows.length, col: indent.length + 2 }
+				rows.push(strings.clipVisual(indent + (o === value ? (ansi.sgr(lit) || INVERSE) + label + ansi.UNCOLOR + UNINVERSE + ansi.sgr(style) : label), width))
 			}
 			return
 		}
@@ -55,4 +57,4 @@ function fieldLines(st: FormState, width: number, style: Style = colors.warning(
 	return { rows, cursor }
 }
 
-export const formView = { formLines, fieldLines }
+export const formView = { ARROW: '→', formLines, fieldLines }
