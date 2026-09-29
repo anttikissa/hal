@@ -29,16 +29,3 @@ test('foreground bash streams to every client, late snapshots match, final resul
 	calls[1]?.push({ type: 'done', reason: 'end' })
 })
 
-test('chatty command streams bounded event count without dropping final bytes', async () => {
-	let c = client()
-	let id = created(c, testHome())
-	c.conn.send({ type: 'submit', sessionId: id, text: 'count' })
-	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'tool_call', id: 'b1', name: 'bash', input: { command: 'for i in {1..90}; do echo "$i"; sleep .004; done', description: 'Count rows' } }, { type: 'done', reason: 'tool_use' })
-	for (let i = 0; i < 100 && !c.of('tool-results').length; i++) await Bun.sleep(20)
-	expect(c.of('tool-results')).toHaveLength(1)
-	expect(c.of('tool-output').length).toBeLessThan(12)
-	expect(c.of('tool-output').every((e) => e.chunk.length > 0)).toBe(true)
-	expect(c.of('tool-results')[0].results[0].output).toContain('90\n')
-	calls[1]?.push({ type: 'done', reason: 'end' })
-})

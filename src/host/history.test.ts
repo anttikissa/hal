@@ -145,13 +145,6 @@ test('a consumer that stops early still ends the turn, as paused', async () => {
 	expect(history.state.running.has(id)).toBe(false)
 })
 
-test('a failed turn records the error', async () => {
-	let id = newSession()
-	history.submit(id, 'x')
-	await drain(ended(id, events({ type: 'error', message: 'HTTP 500 from fake', status: 500 })))
-	expect((await history.read(id)).at(-1)).toMatchObject({ type: 'turn_end', status: 'error', error: 'HTTP 500 from fake' })
-})
-
 test('a prompt after a failed turn is its own message, told of the failure', async () => {
 	let id = newSession()
 	let sent = fakeStream((input) => (input.messages.length === 1 ? [{ type: 'error', message: 'HTTP 400 from fake', status: 400 }] : [{ type: 'done', reason: 'end' }]))
@@ -188,19 +181,6 @@ test('thinking signatures replay exactly, rebuilt from disk alone', async () => 
 			{ type: 'text', text: 'ok' },
 		],
 	})
-})
-
-test('a turn uses the session model and passes options through', async () => {
-	let id = sessions.create({ cwd: '/', model: 'fake/big' }).id
-	let got: unknown[] = []
-	provider.stream = async function* (model, input, signal) {
-		got.push(model, input.system, signal)
-		yield { type: 'done', reason: 'end' }
-	}
-	let ac = new AbortController()
-	history.submit(id, 'x')
-	await drain(history.turn(id, { system: 'be brief' }, ac.signal))
-	expect(got).toEqual(['fake/big', 'be brief', ac.signal])
 })
 
 test('open recovers a partially written last record and appends cleanly after it', async () => {

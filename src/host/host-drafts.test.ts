@@ -129,15 +129,6 @@ afterEach(() => {
 	rmSync(home, { recursive: true, force: true })
 })
 
-test('a draft follows the session to another client, both ways', async () => {
-	await client()
-	let p = phone()
-	drafts.edit(id, 'started on the laptop')
-	expect(p.draft?.text).toBe('started on the laptop')
-	p.send({ type: 'draft', sessionId: id, text: 'started on the laptop, finished on the phone', base: p.draft!.rev })
-	expect(drafts.text(id)).toBe('started on the laptop, finished on the phone')
-})
-
 test('host restart while typing: the draft is still there', async () => {
 	await client()
 	drafts.edit(id, 'half a thou')

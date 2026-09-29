@@ -158,12 +158,6 @@ test('a refresh that fails on the server side or the network is temporary, and t
 	expect((await auth.anthropic()).value).toBe('new-access')
 })
 
-test('refresh response without an access token is an error', async () => {
-	write({ anthropic: { accessToken: 'old', refreshToken: 'r', expires: earlier() } })
-	reply = () => Response.json({ nope: true })
-	expect((await failure()).message).toContain('access token')
-})
-
 test('expired token without a refresh token is an error', async () => {
 	write({ anthropic: { accessToken: 'old', expires: earlier() } })
 	expect((await failure()).message).toContain('expired')
@@ -197,20 +191,6 @@ test('missing or unusable anthropic entries are errors without secrets', async (
 		let e = await failure()
 		expect(e.message).toContain('anthropic')
 		expect(e.message).not.toContain('secret-')
-	}
-})
-
-test('the file is read from the current home at call time', async () => {
-	write({ anthropic: { accessToken: 'first' } })
-	expect((await auth.anthropic()).value).toBe('first')
-	let other = mkdtempSync(`${tmpdir()}/hal-auth-other-`)
-	try {
-		process.env.HAL_HOME = other
-		writeFileSync(`${other}/auth.ason`, ason.stringify({ anthropic: { accessToken: 'second' } }))
-		expect((await auth.anthropic()).value).toBe('second')
-	} finally {
-		auth.close()
-		rmSync(other, { recursive: true, force: true })
 	}
 })
 

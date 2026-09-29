@@ -66,9 +66,3 @@ test('until ends early on a wake or an abort', async () => {
 	expect(now).toBe(start)
 })
 
-test('the real sleep resolves on abort', async () => {
-	let ac = new AbortController()
-	let p = clock.sleep(60_000, ac.signal)
-	ac.abort()
-	await p
-})

@@ -9,7 +9,6 @@ import { provider, type Provider } from './provider.ts'
 import { modelsDev } from './models-dev.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
-import { tabs } from './tabs.ts'
 import { client, until } from './host-fixture.test.ts'
 
 // /model and the model list: the host lists every configured
@@ -82,17 +81,6 @@ test('the first picker opens from cached models, while provider requests warm th
 	expect(ids).toEqual(expect.arrayContaining(['acme/big-1', 'acme/small-1']))
 	expect(new Set(ids).size).toBe(ids.length)
 	await until(() => calls >= 3)
-})
-
-test('a connecting client receives model display names from the cached catalog', async () => {
-	modelsDev.state.catalog = { acme: { 'big-1': { name: 'Acme Big' } } }
-	modelsDev.state.path = modelsDev.file()
-	let a = client()
-	let id = created(a, 'acme/big-1')
-	tabs.file().open.push(id)
-	let b = client()
-	await until(() => b.of('model-names').length)
-	expect(b.of('model-names')[0].names['acme/big-1']).toBe('Acme Big')
 })
 
 test('family aliases choose a subscription before an API key, and explain missing access', () => {

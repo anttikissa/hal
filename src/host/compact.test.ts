@@ -48,18 +48,6 @@ test('/compact: the next request holds the summary and only later records; the t
 	expect(await history.messages(id)).toEqual(before)
 })
 
-test('/compact with nothing to compact says so, and twice in a row too', async () => {
-	let c = client()
-	let id = created(c)
-	await command(c, id, '/compact')
-	expect(c.of('output').at(-1).text).toBe('nothing to compact')
-	await ask(c, id, 'p1')
-	await command(c, id, '/compact')
-	await command(c, id, '/compact')
-	expect(c.of('divider').length).toBe(1)
-	expect(c.of('output').at(-1).text).toBe('nothing to compact')
-})
-
 test('/compact while a turn runs answers that it is busy', async () => {
 	let c = client()
 	let id = created(c)

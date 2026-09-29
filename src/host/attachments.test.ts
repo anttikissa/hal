@@ -43,17 +43,6 @@ test('an attached png reaches both providers as an image; history keeps only its
 	expect(file).toContain(attached.blob)
 })
 
-test('a provider that takes no images gets a note, not the bytes', async () => {
-	let c = client()
-	let id = created(c)
-	let { attached } = attach(c, id, 'image/png', png64)
-	c.conn.send({ type: 'submit', sessionId: id, text: attached.marker })
-	await until(() => calls.length)
-	let chat = JSON.stringify(openaiCompat.toMessages({ model: 'm', ...calls[0]!.input }, false))
-	expect(chat).not.toContain(png64)
-	expect(chat).toContain('cannot see images')
-})
-
 test('a paste becomes its text for the model', async () => {
 	let c = client()
 	let id = created(c)

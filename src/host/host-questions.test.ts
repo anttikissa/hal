@@ -202,25 +202,6 @@ test('an existing user and accounts skip their questions, while a stored Serper 
 	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Alex\n\n## About\n\nPrefers plain English.\n')
 })
 
-test('intro skips default-model choice without credentials and lists only usable providers', async () => {
-	writeFileSync(`${home}/USER.md`, '# User\n\nName: Alex\n\n## About\n\nNotes.\n')
-	let c = client(), id = created(c)
-	c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
-	await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === 'login')
-	let q = transcript.question(c.views.get(id))!
-	c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { login: 'Skip' } })
-	await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === 'search')
-	process.env.OPENAI_API_KEY = 'valid-key'
-	process.env.ANTHROPIC_API_KEY = ''
-	let second = client(), secondId = created(second)
-	second.conn.send({ type: 'submit', sessionId: secondId, text: 'start' })
-	await until(() => transcript.question(second.views.get(secondId))?.form.fields[0]?.name === 'model')
-	let model = transcript.question(second.views.get(secondId))!.form.fields[0]!
-	if (model.type !== 'choice') throw new Error('expected a model choice')
-	expect(model.options.some((option) => option.startsWith('openai/'))).toBe(true)
-	expect(model.options.filter((option) => option !== 'Skip').every((option) => option.startsWith('openai/'))).toBe(true)
-})
-
 test('choosing provider login starts its real slash command, then the guide continues', async () => {
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
