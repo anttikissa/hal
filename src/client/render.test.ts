@@ -426,7 +426,7 @@ describe('modals', () => {
 	test('the list scrolls only as far as the selection needs', () => {
 		setup(20, 40)
 		let m = modals.open({ title: 'Models', items: names })
-		let rowOf = (i: number) => term.screen().findIndex((r) => r.includes(`> model ${i}`))
+		let rowOf = (i: number) => term.screen().findIndex((r) => r.includes(`→ model ${i}`))
 		withModal(m)
 		for (let i = 0; i < 40; i++) {
 			m = modals.step(m, { key: 'down' }).state
