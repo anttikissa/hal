@@ -60,6 +60,8 @@ test('branch works and completes but help and keys expose only fork', async () =
 	expect(keyHelp.render()).toContain('/fork')
 	expect(keyHelp.render()).not.toContain('/branch')
 	expect(commandList.byKey(keyHelp.parse('ctrl-b'))?.name).toBe('fork')
+	sessions.open(parent).name = 'x'.repeat(60)
 	await slash.runCommand(parent, 'branch', '')
 	expect(tabs.file().open).toHaveLength(2)
+	expect(sessions.open(tabs.file().open[1]!).name).toBe(`${'x'.repeat(53)} (fork)`)
 })
