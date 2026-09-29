@@ -64,6 +64,9 @@ test('local changes identify their content, not just an ambiguous dirty marker',
 	let first = version.state.loaded!
 	expect(first).toMatch(new RegExp(`^${git('rev-parse', '--short', 'HEAD')}\\+[0-9a-f]{7}$`))
 	version.stop()
+	await version.init()
+	expect(version.state.loaded).toBe(first)
+	version.stop()
 	writeFileSync(`${repo}/a.ts`, 'edited again')
 	await version.init()
 	expect(version.state.loaded).not.toBe(first)

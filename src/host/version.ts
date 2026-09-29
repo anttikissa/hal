@@ -1,5 +1,5 @@
-// This process's version (task n1): HEAD plus the short hash of local
-// changes when present, instead of an ambiguous 'dirty' marker.
+// This process's version (task n1): HEAD plus a short hash of the
+// uncommitted diff when present, instead of an ambiguous 'dirty' marker.
 // Looked up off the startup path (main.ts runs init after the first
 // frame). Then every checkMs it asks git for HEAD again: a new commit
 // means new code is ready, and `changed` fires once. Uncommitted edits
@@ -28,9 +28,12 @@ async function init(): Promise<void> {
 	let st = version.state
 	if (st.started) return
 	st.started = true
-	let [hash, changes] = await Promise.all([version.head(), version.git('stash', 'create')])
+	// Read-only on purpose: `git stash create` writes .git/index.lock, and
+	// hosts killed mid-call (tests start dozens) left it behind for others.
+	let [hash, diff] = await Promise.all([version.head(), version.git('--no-optional-locks', 'diff', 'HEAD')])
 	st.head = hash
-	st.loaded = hash === undefined ? 'unknown' : changes ? `${hash}+${changes.slice(0, 7)}` : hash
+	let changes = diff ? Bun.hash(diff).toString(16).padStart(7, '0').slice(0, 7) : ''
+	st.loaded = hash === undefined ? 'unknown' : changes ? `${hash}+${changes}` : hash
 	diag.log(`version ${st.loaded} (${version.dir()})`)
 	version.found(st.loaded)
 	if (hash === undefined) return
