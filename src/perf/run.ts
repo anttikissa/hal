@@ -26,7 +26,8 @@ function launch(home: string, args: string[] = []): Term {
 			if (buf.length > 60000) buf = buf.slice(-60000)
 		},
 	})
-	let proc = Bun.spawn([run, ...args], { cwd: realpathSync(`${home}/..`), env: { ...process.env, HAL_HOME: home, TMPDIR: home }, terminal: term, detached: true })
+	let root = realpathSync(`${home}/..`)
+	let proc = Bun.spawn([run, ...args], { cwd: root, env: { ...process.env, HAL_HOME: home, TMPDIR: home, HAL_STALLS: `${root}/stalls.log` }, terminal: term, detached: true })
 	return {
 		exited: () => proc.exitCode !== null,
 		write: (s) => term.write(s),
@@ -57,12 +58,24 @@ async function until(test: () => boolean, ms: number): Promise<number | undefine
 	return undefined
 }
 
-type Probe = { first?: number; interactive?: number; p50?: number; p99?: number; max?: number; lost: number; allMarks?: number; rssMB: number }
+type Stalls = { n: number; max: number; total: number; worst: string }
+type Probe = { first?: number; interactive?: number; p50?: number; p99?: number; max?: number; lost: number; allMarks?: number; rssMB: number; stalls: Stalls }
+
+// Event-loop blocks over 10 ms that any hal2 process under `root`
+// reported (HAL_STALLS, task 7j) between wall-clock `from` and `to`;
+// `worst` lists the longest as length@seconds-since-from.
+function stalls(root: string, from: number, to: number): Stalls {
+	let file = `${root}/stalls.log`
+	let all = existsSync(file) ? readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => l.split(' ').map(Number) as [number, number, number]) : []
+	let got = all.filter(([, at]) => at >= from && at <= to).map(([, at, ms]) => ({ at: (at - from) / 1000, ms }))
+	let worst = got.toSorted((a, b) => b.ms - a.ms).slice(0, 4).map((s) => `${s.ms}@${s.at.toFixed(1)}s`).join(' ')
+	return { n: got.length, max: Math.max(0, ...got.map((s) => s.ms)), total: got.reduce((a, s) => a + s.ms, 0), worst }
+}
 
 // Launches ./run, types a key at once (time to interactive), then one key
 // at a time for `secs`, each erased once it shows.
 async function probe(home: string, args: string[], ready: RegExp, secs: number, open: string[]): Promise<Probe> {
-	let t0 = performance.now()
+	let t0 = performance.now(), wall = Date.now()
 	let term = launch(home, args)
 	term.write('Ω')
 	let first: number | undefined, interactive: number | undefined, allMarks: number | undefined
@@ -92,9 +105,10 @@ async function probe(home: string, args: string[], ready: RegExp, secs: number, 
 		if (i % 10 === 0) rss = Math.max(rss, term.rss())
 		await Bun.sleep(Math.max(0, 100 - (performance.now() - at)))
 	}
+	let stalled = stalls(realpathSync(`${home}/..`), wall, Date.now())
 	await term.stop()
 	lat.sort((a, b) => a - b)
-	return { first, interactive, p50: lat[lat.length >> 1], p99: lat[Math.floor(lat.length * 0.99)], max: lat.at(-1), lost, allMarks, rssMB: Math.round(rss / 2 ** 20) }
+	return { first, interactive, p50: lat[lat.length >> 1], p99: lat[Math.floor(lat.length * 0.99)], max: lat.at(-1), lost, allMarks, rssMB: Math.round(rss / 2 ** 20), stalls: stalled }
 }
 
 // Ctrl-N through every tab on a running client; each switch's time until
@@ -202,7 +216,9 @@ async function main(): Promise<number> {
 		let peer = launch(home)
 		await until(() => /\bpeer\b/.test(peer.screen()), 10000)
 		await Bun.sleep(3000)
+		let swFrom = Date.now()
 		let sw = await switches(peer, Math.min(open.length, 30))
+		let swStalls = stalls(realpathSync(root), swFrom, Date.now())
 		await peer.stop()
 
 		let remote = `${root}/r`
@@ -215,7 +231,9 @@ async function main(): Promise<number> {
 		await login.stop()
 		rows.push(['-r to this host', await probe(remote, ['-r'], new RegExp(`localhost:${port}`), 10, [])])
 
+		let webFrom = Date.now()
 		let web = await webLoad(`http://localhost:${port}/?auth=${code(home)}`)
+		let webStalls = stalls(realpathSync(root), webFrom, Date.now())
 		await host.stop()
 
 		console.log('\nsetup             first screen  interactive  key p50  key p99  key max  lost  all indexed  memory')
@@ -223,6 +241,9 @@ async function main(): Promise<number> {
 		let sorted = sw.toSorted((a, b) => a - b)
 		console.log(`\ntab switch (${sw.length}, peer): p50 ${ms(sorted[sorted.length >> 1])}, max ${ms(sorted.at(-1))}`)
 		console.log(`web page ready (focused tab shown): ${chrome ? ms(web) : 'no Chrome'}`)
+		let stallRows: [string, Stalls][] = [...rows.map(([n, p]): [string, Stalls] => [n, p.stalls]), ['tab switching', swStalls], ['web page load (host)', webStalls]]
+		console.log('\nevent-loop blocks over 10 ms (task 7j)\nsetup                 count  longest    total  worst (ms@s)')
+		for (let [name, st] of stallRows) console.log(`${name.padEnd(20)}${String(st.n).padStart(7)}${ms(st.max).padStart(9)}${ms(st.total).padStart(9)}  ${st.worst}`)
 
 		for (let [name, p] of rows) {
 			if (name !== 'host, cold') {
@@ -233,6 +254,7 @@ async function main(): Promise<number> {
 			if (p.lost) failed.push(`${name}: ${p.lost} keys never showed`)
 			if (p.rssMB > 1024) failed.push(`${name}: memory ${p.rssMB} MB > 1024 MB`)
 		}
+		for (let [name, st] of stallRows) if (st.max > 10) failed.push(`${name}: event loop blocked ${st.max} ms > 10 ms`)
 		check('host, cold every tab indexed', rows[0]![1].allMarks, 10000)
 		check('tab switch max', sorted.at(-1), 200)
 		if (chrome) check('web page ready', web, 1000)

@@ -1,0 +1,11 @@
+{
+	title: 'The event loop never blocks over 10 ms',
+	spec: `Hal never freezes. No piece of work on the host or on a client (terminal or web) holds the event loop for more than 10 ms: work that can grow with history size or tab count (laying out and painting history, writing a big frame to the terminal, decoding history pages, building marks indexes, replaying a session, loading tabs, reading or writing files on a hot path) runs asynchronously or in slices that yield to the scheduler between them, and nothing spins a core. Keys, frames and host events keep flowing while such work runs; it may finish later, never block.
+
+The rule is measured, not assumed: perf.watch (common/perf.ts) runs a timer every 5 ms and reports each time it fires more than 10 ms late. main starts it when HAL_STALLS names a file and appends one line per block, pid, wall-clock ms and length ms. scripts/perf (task te) sets HAL_STALLS for every process it launches, prints per setup (host cold and warm, peer, -r, tab switching, web page load) the count, longest and total of blocks over 10 ms with the worst ones and when they happened, and fails if any block exceeds 10 ms. Garbage-collection pauses cannot be told apart and count too: holding less memory is how they are kept short. Histories are streamed line by line (asonl); single ASON files stay small (about 1 MB at most), so parsing one is not sliced.`,
+	status: 'planned',
+	notes: [
+		"Baseline before any fix (generated home scale 1, load ~2): blocks over 10 ms per setup, count/longest/total: host cold 11/674/1457 ms, host warm 17/518/981, peer 8/755/1037, -r 16/629/1153, tab switching 23/111/497, web page load (host) 3/16/40. The long ones come about 2-3 s after start: the focused 50 MB tab's backfill drawn into scrollback in one go."
+	],
+	needs: ['te']
+}

@@ -37,4 +37,20 @@ function trace(): string {
 		.join('\n')
 }
 
-export const perf = { state: { epoch: performance.timeOrigin, marks: [] as Mark[] }, maxMarks: 500, now, mark, trace }
+// Stall watchdog (task 7j): a timer due every `tick` ms that fires late
+// means the event loop was blocked; each block over `limit` ms goes to
+// `report` with its length and when it ended (ms since the epoch). A
+// stop function is returned. Costs one timer; used by scripts/perf.
+function watch(report: (ms: number, at: number) => void, limit = 10, tick = 5): () => void {
+	let due = performance.now() + tick
+	let timer = setInterval(() => {
+		let now = performance.now()
+		let late = now - due
+		due = now + tick
+		if (late > limit) report(late, perf.now() - perf.state.epoch)
+	}, tick)
+	;(timer as { unref?: () => void }).unref?.()
+	return () => clearInterval(timer)
+}
+
+export const perf = { state: { epoch: performance.timeOrigin, marks: [] as Mark[] }, maxMarks: 500, now, mark, trace, watch }

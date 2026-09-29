@@ -1,6 +1,6 @@
 // Composition root: the one explicit startup path. Other modules do no
 // work on import; start() calls their init() functions in order.
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { app } from './client/app.ts'
 import { appView } from './client/app-view.ts'
@@ -271,6 +271,10 @@ async function remote(typed: string | undefined): Promise<void> {
 async function start(): Promise<void> {
 	perf.state.epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || perf.state.epoch
 	perf.mark('imported')
+	// scripts/perf sets HAL_STALLS: every event-loop block over 10 ms is
+	// appended there as "pid wall-clock-ms length-ms" (task 7j).
+	let stalls = process.env.HAL_STALLS
+	if (stalls) perf.watch((ms) => appendFileSync(stalls, `${process.pid} ${Date.now()} ${ms.toFixed(0)}\n`))
 	// A home too deep for a Unix socket can neither host nor join.
 	let problem = server.pathProblem()
 	if (problem) {
