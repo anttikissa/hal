@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { viewport } from './viewport.ts'
 
-test('the page follows the visual viewport as the keyboard opens, until stopped', () => {
+test('the page follows the visual viewport as the keyboard opens, until stopped; without one nothing is written', () => {
 	let listeners = new Map<string, () => void>()
 	let source = {
 		height: 800,
@@ -20,9 +20,6 @@ test('the page follows the visual viewport as the keyboard opens, until stopped'
 	expect(css).toEqual({ '--app-height': '450px', '--app-top': '120px' })
 	stop()
 	expect(listeners.size).toBe(0)
-})
-
-test('without visualViewport nothing is written and the CSS keeps 100dvh', () => {
 	let written = 0
 	viewport.sync(undefined, { setProperty: () => void written++ })()
 	expect(written).toBe(0)

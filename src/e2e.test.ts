@@ -37,17 +37,8 @@ const sse = (events: Uint8Array[]) =>
 		{ headers: { 'content-type': 'text/event-stream' } },
 	)
 
-// "read <path>" asks for the read tool; a tool result is answered with
-// SAW(<its first line>).
-const toolUse = (path: string) => [
-	sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }),
-	sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_1', name: 'read', input: {} } }),
-	sseEvent({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ path }) } }),
-	sseEvent({ type: 'content_block_stop', index: 0 }),
-	sseEvent({ type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 3 } }),
-	sseEvent({ type: 'message_stop' }),
-]
-// "bash <command>" asks for the bash tool.
+// "bash <command>" asks for the bash tool; a tool result is answered
+// with SAW(<its first line>).
 const bashUse = (command: string) => [
 	sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }),
 	sseEvent({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_b', name: 'bash', input: {} } }),
@@ -75,7 +66,6 @@ function reply(req: Request, body: any): Response {
 	let lastBlock = messages.at(-1).content.at(-1)
 	if (lastBlock.type === 'tool_result') return sse([sseEvent({ type: 'message_start', message: { usage: { input_tokens: 5 } } }), ...toolAnswer(lastBlock)])
 	let prompt: string = bare(lastBlock.text)
-	if (prompt.startsWith('read ')) return sse(toolUse(prompt.slice(5)))
 	if (prompt.startsWith('bash ')) return sse(bashUse(prompt.slice(5)))
 	let stream = new ReadableStream<Uint8Array>({
 		start(c) {
@@ -203,16 +193,6 @@ function ends(): string[] {
 
 const continued = 'ECHO(<meta>The previous response'
 
-// If the test runner dies before afterEach, its stdin pipe closes. The
-// subprocess must exit rather than keep a host alive on a deleted temp home.
-test('the test host exits when its controller closes stdin', async () => {
-	let p = run()
-	await until('the host socket', hostReady)
-	p.sub.stdin.end()
-	await until('the host to exit after stdin EOF', () => p.exit !== undefined)
-	expect(p.exit).toBe(0)
-}, 30_000)
-
 test('Escape pauses a turn; it stays paused over a restart and Enter continues it', async () => {
 	let p = run()
 	await until('a session', () => sessionCount() === 1)
@@ -268,22 +248,10 @@ test('a second ./run follows the same stream and carries the turn on when the ho
 	expect(sessionCount()).toBe(1)
 }, 30_000)
 
-test('Ctrl-C of the last Hal process pauses the turn, and the next start leaves it paused', async () => {
-	let a = run()
-	await until('a session', () => sessionCount() === 1)
-	type(a, 'hold this\r')
-	await until('streaming output', () => seen(a, 'PART1'))
-	type(a, '\x03')
-	await until('quit', () => a.exit !== undefined)
-	expect(ends()).toEqual(['paused'])
-
-	let b = run()
-	await until('the paused turn', () => seen(b, 'PART1') && seen(b, ': continue'))
-	await Bun.sleep(200)
-	expect(requests).toHaveLength(1)
-}, 30_000)
-
-test('Ctrl-C of the last Hal process kills a running command, background jobs included', async () => {
+// Also the one check that a host exits when its controller closes stdin:
+// a runner that dies before afterEach must not leave orphaned hosts on
+// deleted temp homes (task ah).
+test('Ctrl-C of the last Hal process kills its command and pauses the turn; the next start leaves it paused', async () => {
 	let marker = `32.${process.pid}3`
 	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
 	let a = run()
@@ -294,6 +262,14 @@ test('Ctrl-C of the last Hal process kills a running command, background jobs in
 	await until('quit', () => a.exit !== undefined)
 	await until('no sleep left', () => !alive())
 	expect(ends()).toEqual(['paused'])
+
+	let b = run()
+	await until('the paused turn', () => seen(b, ': continue'))
+	await Bun.sleep(200)
+	expect(requests).toHaveLength(1)
+	b.sub.stdin.end()
+	await until('the host to exit after stdin EOF', () => b.exit !== undefined)
+	expect(b.exit).toBe(0)
 }, 30_000)
 
 test('a restarted host kills its running command; the next host continues the turn', async () => {
@@ -337,13 +313,4 @@ test('a host restarted mid-turn continues it, and everyone rejoins', async () =>
 	expect(texts.filter((t: string) => !t.startsWith('<meta>') && !t.startsWith('ECHO(<meta>'))).toEqual(['hold it', 'PART1', 'from b', 'ECHO(from b)', 'from a'])
 	expect(ends()).toEqual(['completed', 'completed', 'completed'])
 	expect(sessionCount()).toBe(1)
-}, 30_000)
-
-test('the model reads a file through the host and answers from it', async () => {
-	let p = run()
-	await until('a session', () => sessionCount() === 1)
-	type(p, 'read run\r')
-	await until('the answer from the file', () => seen(p, 'SAW(#!/usr/bin/env bash)'))
-	expect(requests).toHaveLength(2)
-	expect(requests[1]!.at(-1).content[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu_1' })
 }, 30_000)

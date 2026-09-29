@@ -58,25 +58,22 @@ test('events fold into what the page shows, like the terminal transcript', () =>
 	])
 })
 
-test('long and failed tool results show a marked glimpse', () => {
+test('long and failed tool results show a marked glimpse, and all of it in full', () => {
 	let output = Array.from({ length: view.resultRows() + 3 }, (_, i) => `l${i}`).join('\n')
 	let s = view.show({ type: 'tool-result', id: 't', output, isError: true })!
 	expect(s.kind).toContain('error')
 	expect(s.text.startsWith('✗ l0\n')).toBe(true)
 	expect(s.text.split('\n')).toHaveLength(view.resultRows() + 1)
 	expect(s.text.endsWith('… 3 more lines')).toBe(true)
+	expect(view.show({ type: 'tool-result', id: 't', output }, true)!.text).toContain(`l${view.resultRows() + 2}`)
 })
 
-test('a rejected command becomes a notice and keeps the transcript', () => {
+test('a rejected command or a config warning becomes a notice and keeps the transcript', () => {
 	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
 	let after = view.onEvent(st, { type: 'rejected', sessionId, command: 'submit', reason: 'busy' })
 	expect(after.notice).toBe('submit refused: busy')
 	expect(after.transcript).toBe(st.transcript)
-})
-
-test('a config warning becomes a notice and keeps the transcript', () => {
-	let st = fold([{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } }])
-	let after = view.onEvent(st, { type: 'warning', text: 'config.ason: webPort: bad' })
+	after = view.onEvent(st, { type: 'warning', text: 'config.ason: webPort: bad' })
 	expect(after.notice).toContain('webPort')
 	expect(after.transcript).toBe(st.transcript)
 })
@@ -110,8 +107,8 @@ test('waiting messages are shown with their kind', () => {
 	expect(view.inbox({})).toEqual([])
 })
 
-test('the open question is filled in with browser keys and answered; afterwards it shows the answer', () => {
-	let form = { text: 'Create it?', fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'], initial: 1 }] }
+test('the open question is filled in with browser keys and answered; afterwards it shows its quote and the answer', () => {
+	let form = { text: 'Create it?', quote: { text: 'rm -rf x', marks: [[0, 8]] as [number, number][] }, fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'], initial: 1 }] }
 	let st = fold([
 		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'blocked', reason: 'question' } } },
 		{ type: 'question', sessionId, id: 'q1', form },
@@ -126,7 +123,7 @@ test('the open question is filled in with browser keys and answered; afterwards 
 	expect(view.formKey(st, browser('Escape')!).command).toEqual({ type: 'pause', sessionId })
 	st = fold([{ type: 'answer', sessionId, question: 'q1', answers: { ok: 'yes' } }], enter.state)
 	expect(st.form).toBeUndefined()
-	expect(shown(st)).toEqual([{ kind: 'question warning', text: '? Create it?\n  yes' }])
+	expect(shown(st)).toEqual([{ kind: 'question warning', text: '? Create it?\n    rm -rf x\n  yes' }])
 })
 
 test('Up on an empty input while the model works edits the last prompt; Enter sends it, Down or Escape continues', () => {
@@ -145,16 +142,6 @@ test('Up on an empty input while the model works edits the last prompt; Enter se
 	expect(down).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: '' })
 	// Escape keeps changed text.
 	expect(view.editKey(editing, 'escape', 'fix it')).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: 'fix it' })
-})
-
-test('a question shows its quote under the text', () => {
-	let form = { text: 'Run this?', quote: { text: 'rm -rf x', marks: [[0, 8]] as [number, number][] }, fields: [{ type: 'choice' as const, name: 'run', options: ['yes', 'no'] }] }
-	let st = fold([
-		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'blocked', reason: 'question' } } },
-		{ type: 'question', sessionId, id: 'q1', form },
-		{ type: 'answer', sessionId, question: 'q1', answers: { run: 'no' } },
-	])
-	expect(shown(st)).toEqual([{ kind: 'question warning', text: '? Run this?\n    rm -rf x\n  no' }])
 })
 
 test('commands show who sent them, and their output; a cancelled question says so', () => {
@@ -311,7 +298,6 @@ test('a prompt’s [image/<name>] markers become links; the rest stays text', ()
 	expect(view.links('[paste/0005ab.txt] [paste/0005ab.png]')).toEqual([{ href: '/paste/0005ab.txt', text: '[paste/0005ab.txt]' }, ' [paste/0005ab.png]'])
 	expect(view.links('[image/ABC123.png] [image 0123456789ab]')).toEqual(['[image/ABC123.png] [image 0123456789ab]'])
 })
-
 
 test('Bash display hides successful status but keeps errors and the original source data', () => {
 	let good = { type: 'tool-result' as const, id: 'call', output: '[exit 0]\n M questions.md\n' }

@@ -15,7 +15,7 @@ test('only the keys whose meaning differs from a textarea leave native editing',
 	for (let [k, mods] of [['a', {}], ['left', { alt: true }], ['right', { cmd: true }], ['backspace', {}], ['home', {}], ['z', { cmd: true }], ['a', { ctrl: true }]] as const) expect(routed(k, mods)).toBe(false)
 })
 
-test('splice finds the smallest replacement between two texts', () => {
+test('splice finds the smallest replacement between two texts, never splitting a surrogate pair', () => {
 	let apply = (before: string, after: string) => {
 		let s = editor.splice(before, after)
 		return before.slice(0, s.start) + s.text + before.slice(s.end)
@@ -33,13 +33,8 @@ test('splice finds the smallest replacement between two texts', () => {
 	for (let [before, after] of pairs) expect(apply(before!, after!)).toBe(after!)
 	expect(editor.splice('hello world', 'hello ')).toEqual({ start: 6, end: 11, text: '' })
 	expect(editor.splice('ab', 'aXb')).toEqual({ start: 1, end: 1, text: 'X' })
-})
-
-test('a surrogate pair is never split by splice', () => {
-	let s = editor.splice('👍🏽', '👍🏿')
-	expect(s).toEqual({ start: 2, end: 4, text: '🏿' })
-	let t = editor.splice('\u{1F600}', '\u{1F601}')
-	expect(t).toEqual({ start: 0, end: 2, text: '\u{1F601}' })
+	expect(editor.splice('👍🏽', '👍🏿')).toEqual({ start: 2, end: 4, text: '🏿' })
+	expect(editor.splice('\u{1F600}', '\u{1F601}')).toEqual({ start: 0, end: 2, text: '\u{1F601}' })
 })
 
 test('writing back an unchanged text leaves the box alone', () => {

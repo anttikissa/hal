@@ -55,16 +55,13 @@ test('formats answer box, knowledge graph and hits; key from the credentials fil
 	expect(seen).toEqual([{ key: 'filekey', body: { q: 'bun', num: 10 } }])
 })
 
-test('falls back to SERPER_API_KEY; empty results say so', async () => {
+test('no key names both places and sends nothing; then SERPER_API_KEY serves, and empty results say so', async () => {
+	await expect(tool.run({ query: 'x' }, ctx())).rejects.toThrow(/credentials file.*SERPER_API_KEY/)
+	expect(seen).toEqual([])
 	process.env.SERPER_API_KEY = 'envkey'
 	answer = () => Response.json({ organic: [] })
 	expect(await tool.run({ query: 'x' }, ctx())).toBe('No results found.')
 	expect(seen[0]).toEqual({ key: 'envkey', body: { q: 'x', num: 5 } })
-})
-
-test('no key names both places and sends nothing', async () => {
-	await expect(tool.run({ query: 'x' }, ctx())).rejects.toThrow(/credentials file.*SERPER_API_KEY/)
-	expect(seen).toEqual([])
 })
 
 test('a non-2xx answer is an error with the status and a clipped body', async () => {

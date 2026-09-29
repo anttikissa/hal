@@ -187,15 +187,7 @@ test('an open choice question leaves Cmd and Ctrl keys to the browser; a letter 
 	expect(sent.at(-1)).toMatchObject({ type: 'answer', answers: { m: 'Router' } })
 })
 
-test('a click on an option of a one-field question answers it', () => {
-	let form = { text: 'Ok?', fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'] }] }
-	app.onEvent(snapshot({ type: 'blocked', reason: 'question' }))
-	app.onEvent({ type: 'question', sessionId, id: 'q1', form })
-	app.pick(0, 'no')
-	expect(sent.at(-1)).toMatchObject({ type: 'answer', question: 'q1', answers: { ok: 'no' } })
-})
-
-test('answering while disconnected sends nothing and says so', () => {
+test('a click on an option of a one-field question answers it, unless disconnected', () => {
 	let form = { text: 'Ok?', fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'] }] }
 	app.onEvent(snapshot({ type: 'blocked', reason: 'question' }))
 	app.onEvent({ type: 'question', sessionId, id: 'q1', form })
@@ -203,6 +195,9 @@ test('answering while disconnected sends nothing and says so', () => {
 	app.pick(0, 'yes')
 	expect(sent.filter((c) => c.type === 'answer')).toEqual([])
 	expect(app.notice()).toMatch(/not connected/)
+	connection.connected = () => true
+	app.pick(0, 'no')
+	expect(sent.at(-1)).toMatchObject({ type: 'answer', question: 'q1', answers: { ok: 'no' } })
 })
 
 test('Ctrl-M asks for models; the picker takes the keys and a click picks', () => {
@@ -226,14 +221,6 @@ test('the link state shows as a notice until connected', () => {
 	expect(app.notice()).toMatch(/reconnect/)
 	app.onState({ type: 'connected', role: 'client' })
 	expect(app.notice()).toBeUndefined()
-})
-
-test('the Send button sends what the box holds, like Enter', () => {
-	app.onEvent(snapshot({ type: 'idle' }))
-	app.input('from the button')
-	app.send()
-	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ sessionId, text: 'from the button' })
-	expect(app.state.text).toBe('')
 })
 
 test('Ctrl-K, Ctrl-U, Alt-D, Alt-Backspace and Ctrl-Y edit the box through the shared editor, as native edits', () => {

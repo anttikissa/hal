@@ -9,7 +9,8 @@
 		"`./run` is a bash loop with a `bun` child. Killing the spawned `./run` orphans that child, which stays alive until killed by hand (b3's e2e tests leaked about 15 of them). Spawn with `detached: true` and kill the group (`process.kill(-pid)`). After multi-process tests, check `pgrep -fl src/main.ts`.",
 		'oxlint rejects `return` inside `finally` (no-unsafe-finally). Guard the writes with a flag instead.',
 		"When a shared test file also holds another agent's edits, stage only your hunks (for example with `git hash-object -w` + `git update-index --cacheinfo`). `git add <file>` committed another agent's work here by mistake.",
-		'The e2e fixture overrides terminal IO: its stdin is the runner-owned pipe. A killed runner skips afterEach and leaves ./run plus bun alive if the fixture does not handle stdin EOF. Keep the fixture listening for end and exiting the process, and test closure of the pipe while the host is running.'
+		'The e2e fixture overrides terminal IO: its stdin is the runner-owned pipe. A killed runner skips afterEach and leaves ./run plus bun alive if the fixture does not handle stdin EOF. Keep the fixture listening for end and exiting the process, and test closure of the pipe while the host is running.',
+		'The stdin-EOF check is part of the e2e Ctrl-C test (the second ./run ends by closing its stdin and must exit 0), not a test of its own: one fewer ./run spawn.'
 	],
 	needs: ['b3']
 }

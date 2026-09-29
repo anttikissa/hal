@@ -44,21 +44,6 @@ test('a missing local.ts is normal and changes nothing', () => {
 	})
 })
 
-test('local.ts replaces a config function read at call time', () => {
-	withHome((home) => {
-		writeFileSync(
-			join(home, 'local.ts'),
-			`import { models } from ${JSON.stringify(`${srcDir}/host/models.ts`)}\n` +
-				`models.defaultModel = () => 'test/overridden'\n`,
-		)
-		let out = run(home, probe)
-		expect(out.exitCode).toBe(0)
-		let { before, after } = JSON.parse(out.stdout)
-		expect(before).not.toBe('test/overridden')
-		expect(after).toBe('test/overridden')
-	})
-})
-
 test('a broken local.ts fails loudly instead of being ignored', () => {
 	withHome((home) => {
 		writeFileSync(join(home, 'local.ts'), `throw new Error('local-boom')\n`)
@@ -68,25 +53,7 @@ test('a broken local.ts fails loudly instead of being ignored', () => {
 	})
 })
 
-test('start loads local.ts before initializing modules', () => {
-	withHome((home) => {
-		writeFileSync(join(home, 'local.ts'), `globalThis.localLoaded = true\n`)
-		let script = `
-let { main } = await import(${JSON.stringify(`${srcDir}/main.ts`)})
-// Report and stop at init: without a tty, start would exit next.
-main.init = () => {
-	process.stderr.write('local-before-init=' + (globalThis.localLoaded === true))
-	process.exit(0)
-}
-await main.start()
-`
-		let out = run(home, script)
-		expect(out.exitCode).toBe(0)
-		expect(out.stderr).toBe('local-before-init=true')
-	})
-})
-
-test('start reads config.ason before local.ts, which may override any setting', () => {
+test('start reads config.ason, then local.ts, whose overrides hold at call time from init on', () => {
 	withHome((home) => {
 		writeFileSync(join(home, 'config.ason'), "{ model: 'test/from-config', webPort: 4321 }\n")
 		writeFileSync(

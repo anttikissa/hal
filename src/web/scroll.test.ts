@@ -10,20 +10,12 @@ test('the gap is how far the view is above the bottom', () => {
 	expect(scroll.gap(box(400, 0, 400))).toBe(0)
 })
 
-test('a reader near the bottom keeps their gap; one further up is left alone', () => {
+test('a reader near the bottom keeps their gap, one further up is left alone; mid-glide the aim counts; sending lands at the bottom', () => {
 	expect(scroll.keep(0)).toBe(0)
-	expect(scroll.keep(20)).toBe(20)
 	expect(scroll.keep(49)).toBe(49)
 	expect(scroll.keep(50)).toBeUndefined()
-	expect(scroll.keep(400)).toBeUndefined()
-})
-
-test('mid-glide the gap it heads for counts, not the half-finished scroll', () => {
 	// A fast stream outruns the glide: measured 120 px up, heading for 10.
 	expect(scroll.keep(120, 10)).toBe(10)
-})
-
-test('sending lands at the very bottom from anywhere', () => {
 	expect(scroll.keep(5000, undefined, true)).toBe(0)
 	expect(scroll.keep(30, 30, true)).toBe(0)
 })

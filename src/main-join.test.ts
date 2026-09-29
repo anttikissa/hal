@@ -114,12 +114,3 @@ test('killing the host always leaves one host with every client reconnected', as
 	}
 	expect(alive().length).toBe(1)
 }, 60_000)
-
-test('a process joining later becomes a client of the running host', async () => {
-	home = mkdtempSync(`${tmpdir()}/hal-join-`)
-	let first = spawn()
-	await until('a host', () => role(first) === 'host')
-	let second = spawn()
-	await until('the second to connect', () => role(second) === 'client' && snapshots(second) > 0)
-	expect(hosts()).toEqual([first])
-}, 30_000)

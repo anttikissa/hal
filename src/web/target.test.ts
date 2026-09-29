@@ -89,12 +89,3 @@ test('an address without a block id aims at nothing', () => {
 	for (let url of [`http://h/${sessionId}`, `http://h/${sessionId}#paste`, `http://h/${sessionId}#~3`]) expect(target.parse(url, sessionId)).toBeUndefined()
 	expect(target.parse(`http://h/#3`, undefined)).toBeUndefined()
 })
-
-test('a tool result shows a glimpse, and all of its output in full', () => {
-	app.onEvent(snapshot(late))
-	let result = rows().find((r) => r.result)!.result!
-	let glimpse = view.show(result)!.text
-	let full = view.show(result, true)!.text
-	expect(glimpse).not.toContain('line 40')
-	expect(full).toContain('line 40')
-})
