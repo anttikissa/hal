@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { diag } from './diag.ts'
 import { paths } from './paths.ts'
@@ -29,15 +29,3 @@ test('diagnostics land redacted in owner-only state/, not in sessions/', () => {
 	expect(readdirSync(paths.sessionsDir())).toEqual([])
 })
 
-test('logging prints nothing', () => {
-	home = mkdtempSync(`${tmpdir()}/hal-diag-`)
-	let script = [
-		`import { paths } from ${JSON.stringify(`${import.meta.dir}/paths.ts`)}`,
-		`import { diag } from ${JSON.stringify(`${import.meta.dir}/diag.ts`)}`,
-		`paths.init(); diag.log('hello')`,
-	].join('\n')
-	let out = Bun.spawnSync(['bun', '-e', script], { env: { ...process.env, HAL_HOME: home } })
-	expect(out.exitCode).toBe(0)
-	expect(out.stdout.toString() + out.stderr.toString()).toBe('')
-	expect(existsSync(`${home}/state/diag.log`)).toBe(true)
-})

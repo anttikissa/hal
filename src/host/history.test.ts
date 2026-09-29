@@ -283,13 +283,6 @@ test('the last Hal process quitting mid-turn records it paused, once', async () 
 	])
 })
 
-test('a session without history has no records and no messages', async () => {
-	let id = newSession()
-	expect(await history.read(id)).toEqual([])
-	expect(await history.messages(id)).toEqual([])
-	expect((await history.open(id)).id).toBe(id)
-})
-
 test('a stream that throws ends the turn as an error, yielded and recorded', async () => {
 	let id = newSession()
 	history.submit(id, 'x')
@@ -327,6 +320,9 @@ test('live output and the file together always hold the whole turn once', async 
 test('readSync agrees with read, skipping a partial last record', async () => {
 	let id = newSession()
 	expect(history.readSync(id)).toEqual([])
+	expect(await history.read(id)).toEqual([])
+	expect(await history.messages(id)).toEqual([])
+	expect((await history.open(id)).id).toBe(id)
 	history.submit(id, 'a')
 	await drain(ended(id, events({ type: 'text', text: 'b' }, { type: 'done', reason: 'end' })))
 	appendFileSync(history.file(id), "{ type: 'user', blo")

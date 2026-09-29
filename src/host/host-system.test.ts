@@ -10,6 +10,7 @@ import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
 import type { ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
+import { until } from './host-fixture.test.ts'
 
 const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
@@ -46,14 +47,6 @@ afterEach(() => {
 	else process.env.HAL_HOME = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
-
-async function until(check: () => unknown): Promise<void> {
-	for (let i = 0; i < 200; i++) {
-		if (check()) return
-		await new Promise((r) => setTimeout(r, 1))
-	}
-	throw new Error('timed out')
-}
 
 function start() {
 	let events: Event[] = []

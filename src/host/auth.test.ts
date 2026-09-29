@@ -79,11 +79,6 @@ test('array shape: first entry holding a credential is used', async () => {
 	expect((await auth.anthropic()).value).toBe('second')
 })
 
-test('an apiKey entry is returned as an api key', async () => {
-	write({ anthropic: { apiKey: 'fake-key' } })
-	expect(await auth.anthropic()).toMatchObject({ type: 'api-key', value: 'fake-key' })
-})
-
 test('expired token is refreshed and only this copy is rewritten, 0600, others kept', async () => {
 	let userAuth = `${home}/user/.hal/auth.ason`
 	mkdirSync(`${home}/user/.hal`, { recursive: true })

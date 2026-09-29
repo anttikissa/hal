@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
-import type { Event } from '../common/protocol.ts'
-import { transcript, type Transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
@@ -12,6 +10,7 @@ import { modelsDev } from './models-dev.ts'
 import { sessions } from './sessions.ts'
 import { synthetic } from './synthetic.ts'
 import { tabs } from './tabs.ts'
+import { client, until } from './host-fixture.test.ts'
 
 // /model and the model list: the host lists every configured
 // provider's models, and switching is an ordinary command.
@@ -59,28 +58,6 @@ afterEach(() => {
 	else process.env.HAL_HOME = savedHome
 	rmSync(home, { recursive: true, force: true })
 })
-
-function client() {
-	let events: Event[] = []
-	let views = new Map<string, Transcript>()
-	let conn = host.connect((e) => {
-		events.push(e)
-		let id = 'sessionId' in e ? e.sessionId : undefined
-		if (id) {
-			let t = transcript.fold(views.get(id), e)
-			if (t) views.set(id, t)
-		}
-	})
-	return { conn, events, views, of: (type: string) => events.filter((e) => e.type === type) as any[] }
-}
-
-async function until(check: () => unknown): Promise<void> {
-	for (let i = 0; i < 200; i++) {
-		if (check()) return
-		await new Promise((r) => setTimeout(r, 1))
-	}
-	throw new Error('timed out')
-}
 
 function created(c: ReturnType<typeof client>, model = 'hal/intro'): string {
 	c.conn.send({ type: 'create', cwd: home, model })

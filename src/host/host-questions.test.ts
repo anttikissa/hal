@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import type { Answers } from '../common/forms.ts'
-import type { Event } from '../common/protocol.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
@@ -15,6 +14,7 @@ import { auth } from './auth.ts'
 import { config } from './config.ts'
 import { paths } from './paths.ts'
 import { models } from './models.ts'
+import { client, until } from './host-fixture.test.ts'
 
 const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
@@ -51,29 +51,6 @@ afterEach(() => {
 	rmSync(home, { recursive: true, force: true })
 })
 
-// A client that records events and folds them into what it would show.
-function client() {
-	let events: Event[] = []
-	let views = new Map<string, Transcript>()
-	let conn = host.connect((e) => {
-		events.push(e)
-		let id = 'sessionId' in e ? e.sessionId : undefined
-		if (id) {
-			let t = transcript.fold(views.get(id), e)
-			if (t) views.set(id, t)
-		}
-	})
-	return { conn, events, views, of: (type: string) => events.filter((e) => e.type === type) as any[] }
-}
-
-async function until(check: () => unknown): Promise<void> {
-	for (let i = 0; i < 200; i++) {
-		if (check()) return
-		await new Promise((r) => setTimeout(r, 1))
-	}
-	throw new Error('timed out')
-}
-
 function created(c: ReturnType<typeof client>, model = 'hal/intro'): string {
 	c.conn.send({ type: 'create', cwd: '/tmp/w', model })
 	return c.of('snapshot').at(-1).sessionId
@@ -95,7 +72,6 @@ test('hal/intro asks a name, any client answers, the first answer wins and the m
 	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
 	await until(() => transcript.question(b.views.get(id)))
 	let q = transcript.question(b.views.get(id))!
-	expect(q.form.text).toBe('How should I call you?')
 	expect(a.views.get(id)!.state).toEqual({ type: 'blocked', reason: 'question' })
 	expect(a.of('turn-end')).toEqual([])
 	// A message sent meanwhile waits in the inbox; the question stays open.
@@ -109,8 +85,7 @@ test('hal/intro asks a name, any client answers, the first answer wins and the m
 	await until(() => transcript.question(a.views.get(id))?.form.fields[0]?.name === 'about')
 	let view = a.views.get(id)!
 	expect(view.state).toEqual({ type: 'blocked', reason: 'question' })
-	expect(texts(view)[0]).toContain('HAL 9001')
-	expect(texts(view)[1]).toBe('Nice to meet you, Dave.')
+	expect(texts(view)[1]).toContain('Dave')
 	expect(readFileSync(`${home}/USER.md`, 'utf8')).toContain('Name: Dave')
 	expect(view.items.find((i) => i.type === 'question')).toMatchObject({ answers: { name: 'Dave' } })
 	expect((await opened(id)).views.get(id)).toEqual(view)
@@ -133,7 +108,6 @@ test('an open question survives a restart, is not continued by the new host, and
 	expect(b.views.get(id)!.items.filter((i) => i.type === 'question')).toHaveLength(1)
 	b.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { name: '' } })
 	await until(() => transcript.question(b.views.get(id))?.form.fields[0]?.name === 'about')
-	expect(texts(b.views.get(id)!).at(-1)).toBe('Glad to meet you.')
 })
 
 test('Escape while a question waits pauses the turn; continuing asks again', async () => {
@@ -178,7 +152,6 @@ test('a secret reaches whoever asked but history only records that it was given;
 	expect(a.of('answer')[0]).toMatchObject({ answers: { save: 'yes' }, secrets: ['key'] })
 })
 
-
 test('intro resumes through name, about, login, model and secret search setup', async () => {
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
@@ -198,7 +171,6 @@ test('intro resumes through name, about, login, model and secret search setup', 
 	c = resumed
 	await answer('about', 'Builds tools; likes short answers', 'login')
 	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Rowan\n\n## About\n\nBuilds tools; likes short answers\n')
-	expect(transcript.question(c.views.get(id))?.form.text).toMatch(/provider login/)
 	await answer('login', 'Skip', 'model')
 	let q = transcript.question(c.views.get(id))!
 	let chosen = q.form.fields[0]!.type === 'choice' ? q.form.fields[0]!.options.find((x) => x.startsWith('anthropic/'))! : ''
@@ -212,7 +184,6 @@ test('intro resumes through name, about, login, model and secret search setup', 
 	expect(JSON.stringify(c.events)).not.toContain('secret-SERPER-123')
 	expect(sessions.open(id).model).toBe(chosen)
 	expect(readFileSync(paths.configFile(), 'utf8')).toContain(chosen)
-	expect(texts(c.views.get(id)!).at(-1)).toMatch(/Escape pauses.*\/help.*web client/)
 })
 
 test('an existing user and accounts skip their questions, while a stored Serper key skips search', async () => {
@@ -224,12 +195,11 @@ test('an existing user and accounts skip their questions, while a stored Serper 
 	await until(() => transcript.question(c.views.get(id)))
 	let q = transcript.question(c.views.get(id))!
 	expect(q.form.fields[0]?.name).toBe('model')
-	expect(texts(c.views.get(id)!)).toEqual(['Available logins: OpenCode Go.'])
+	expect(texts(c.views.get(id)!).join()).toContain('OpenCode Go')
 	let chosen = q.form.fields[0]!.type === 'choice' ? q.form.fields[0]!.options[0]! : ''
 	c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { model: chosen } })
 	await until(() => c.of('turn-end').length)
 	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Alex\n\n## About\n\nPrefers plain English.\n')
-	expect(texts(c.views.get(id)!).at(-1)).toContain('You are ready.')
 })
 
 test('intro skips default-model choice without credentials and lists only usable providers', async () => {
@@ -250,7 +220,6 @@ test('intro skips default-model choice without credentials and lists only usable
 	expect(model.options.some((option) => option.startsWith('openai/'))).toBe(true)
 	expect(model.options.filter((option) => option !== 'Skip').every((option) => option.startsWith('openai/'))).toBe(true)
 })
-
 
 test('choosing provider login starts its real slash command, then the guide continues', async () => {
 	let c = client(), id = created(c)

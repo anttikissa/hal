@@ -233,19 +233,11 @@ test('redacted thinking survives a round trip', async () => {
 	])
 })
 
-test('stop reasons map to neutral ones', async () => {
-	for (let [wire, reason] of [
-		['end_turn', 'end'],
-		['stop_sequence', 'end'],
-		['max_tokens', 'max_tokens'],
-		['refusal', 'refusal'],
-	]) {
+test('stop reasons map to neutral ones; a call cut off by max_tokens is none; a refusal keeps its explanation', async () => {
+	for (let [wire, reason] of [['end_turn', 'end'], ['stop_sequence', 'end']]) {
 		reply = () => sse(start(), ...stop(wire!))
 		expect(await run()).toEqual([{ type: 'done', reason: reason as any }])
 	}
-})
-
-test('a tool call cut off by max_tokens is no call; a refusal keeps its explanation', async () => {
 	let tool = (json: string) => [
 		{ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 't', name: 'ls', input: {} } },
 		{ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: json } },

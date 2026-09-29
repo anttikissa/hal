@@ -52,17 +52,12 @@ test('a missing file means all defaults, no warnings, and is not created', async
 	expect(await Bun.file(paths.configFile()).exists()).toBe(false)
 })
 
-test('values in config.ason are what settings return', () => {
-	writeFileSync(paths.configFile(), "{ model: 'test/from-file', webPort: 4321 }\n")
+test('values in config.ason are what settings return; edits apply at once and are announced', async () => {
+	writeFileSync(paths.configFile(), "{ model: 'test/one', webPort: 4321 }\n")
 	start()
-	expect(settings.model()).toBe('test/from-file')
+	expect(settings.model()).toBe('test/one')
 	expect(settings.webPort()).toBe(4321)
 	expect(settings.security()).toBe(defaults().security as 'best-effort')
-})
-
-test('edits apply at once and are announced', async () => {
-	writeFileSync(paths.configFile(), "{ model: 'test/one' }\n")
-	start()
 	await Bun.sleep(50)
 	edit("{ model: 'test/two' }\n")
 	await until(() => settings.model() === 'test/two')
