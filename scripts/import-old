@@ -1,0 +1,3 @@
+#!/bin/bash
+# usage: scripts/import-old <old-state> <new-home>  (task 3q)
+exec bun "$(dirname "$0")/../src/import-old.ts" "$@"
