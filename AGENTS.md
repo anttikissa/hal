@@ -29,6 +29,11 @@ Exception: gitignored files (the user's plugins/, local.ts, auth and
 state) are private. They have no task, and nothing about them (their
 content, purpose, account IDs, emails, dates, plans) ever goes into
 tasks, notes, commits or any other tracked file. If unsure, ask.
+Personal hostnames, IPs, SSH aliases and deployment topology (users,
+paths, ports, process names) are private too, even when publicly
+resolvable. Deployment scripts and instructions stay gitignored and
+local; tracked examples use reserved example domains. Permission to
+operate a host is not permission to publish its configuration.
 
 Lessons that would help the next implementer (surprises, wrong
 artifacts, decisions later tasks depend on) go in the task's `notes`
