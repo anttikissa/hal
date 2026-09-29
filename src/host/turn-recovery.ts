@@ -19,6 +19,9 @@ async function recover(): Promise<void> {
 			busy.drop(id)
 			continue
 		}
+		// Startup's first-frame timeout can fire before tab indexing finishes.
+		// Recovery must not finish that work synchronously through marks().
+		await pages.slices(pages.catchUp(id))
 		if (!turnRecovery.leftWork(id)) {
 			busy.drop(id)
 			continue
