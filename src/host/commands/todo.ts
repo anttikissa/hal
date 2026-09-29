@@ -9,7 +9,7 @@ import { status } from '../status.ts'
 
 export const command: SlashCommand = {
 	help: () => '/todo <item>: append and commit an item in this directory’s TODO.md, or ask the model to file it. A busy session forks instead of being interrupted. Bare /todo lists open items.',
-	run(args, _answers, ctx) {
+	async run(args, _answers, ctx) {
 		let item = args.trim()
 		let path = resolve(ctx.cwd, 'TODO.md')
 		if (existsSync(path)) {
@@ -20,9 +20,11 @@ export const command: SlashCommand = {
 			}
 			appendFileSync(path, `${text && !text.endsWith('\n') ? '\n' : ''}- ${item}\n`)
 			let message = `TODO: ${item}\n\nImplemented by: ${ctx.model}\nSession: ${ctx.sessionId}`
+			// Async: commit hooks may take seconds; the host loop must not wait.
 			for (let args of [['add', '--', 'TODO.md'], ['commit', '-m', message, '--', 'TODO.md']]) {
-				let result = Bun.spawnSync(['git', ...args], { cwd: ctx.cwd, stdout: 'pipe', stderr: 'pipe' })
-				if (result.exitCode !== 0) return { error: `Added to ${path}, but git ${args[0]} failed: ${result.stderr.toString().trim() || result.stdout.toString().trim()}` }
+				let p = Bun.spawn(['git', ...args], { cwd: ctx.cwd, stdout: 'pipe', stderr: 'pipe' })
+				let [code, out, err] = await Promise.all([p.exited, new Response(p.stdout).text(), new Response(p.stderr).text()])
+				if (code !== 0) return { error: `Added to ${path}, but git ${args[0]} failed: ${err.trim() || out.trim()}` }
 			}
 			return { say: `Added to ${path} and committed.` }
 		}
