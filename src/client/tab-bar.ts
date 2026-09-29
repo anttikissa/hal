@@ -25,10 +25,9 @@ function indicator(tab: Tab): Part | undefined {
 	if (!m) return undefined
 	let c = colors.tab()
 	let hal = colors.assistant()
-	let darker = ([L, C, h]: Oklch): Oklch => [L * 0.65, C, h]
 	let fg: Oklch = { asking: c.warningFg!, noticed: c.warningFg!, working: hal.cursor!, failed: c.errorFg!, paused: c.pausedFg!, done: c.doneFg! }[m.kind]
 	if (!m.blinks) return { text: m.glyph, fg }
-	return { text: m.glyph, fg, dim: m.kind === 'working' ? hal.cursorIdle! : darker(fg) }
+	return { text: m.glyph, fg, dim: m.kind === 'working' ? hal.cursorIdle! : colors.blinkDim(fg) }
 }
 
 // Whether any tab in `list` has a blinking indicator.

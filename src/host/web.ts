@@ -35,7 +35,7 @@
 //   ?auth=<code> a file address redeems the code like a page (task e3).
 
 import type { BunPlugin, Server, ServerWebSocket } from 'bun'
-import { colors, type Style } from '../common/colors.ts'
+import { colors, DERIVED, type Style } from '../common/colors.ts'
 import { oklch, type Oklch } from '../common/oklch.ts'
 import { session } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
@@ -127,22 +127,27 @@ const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
 // gets it fitted to sRGB):
 // one class per style (toolBash is .tool-bash) with fg as color, bg as
 // background and any other colour as a custom property (--link-bg),
-// plus --quiet: the fg's quieter, still readable form (oklch.quiet), for
+// plus --quiet: the fg's quieter, still readable form (colors.quiet), for
 // secondary text, which never fades by opacity (tasks/README.md). The
 // page's is measured on its lightest surface, the button.
 function css(): string {
 	let rules: string[] = []
 	for (let [key, value] of Object.entries(colors)) {
+		if ((DERIVED as readonly string[]).includes(key)) continue
+		if (key === 'mix') {
+			rules.push(`:root { ${Object.entries(colors.mix()).map(([k, v]) => `--mix-${kebab(k)}: ${v}%`).join('; ')} }`)
+			continue
+		}
 		// Shared values (fgL, screen) are numbers or one colour, not styles.
-		let style = value() as Style | number | Oklch
+		let style = (value as () => unknown)() as Style | number | Oklch
 		if (typeof style !== 'object' || Array.isArray(style)) continue
 		let decls = Object.entries(style).map(([part, c]) => {
 			let prop = part === 'fg' ? 'color' : part === 'bg' ? 'background-color' : `--${kebab(part)}`
 			return `${prop}: ${oklch.toCss(c)}`
 		})
 		let fg = style.fg ?? style.text
-		if (fg) decls.push(`--quiet: ${oklch.toCss(oklch.quiet(fg, style.bg ?? style.button ?? colors.screen()))}`)
-		if (key === 'input' && fg && style.bg) decls.push(`--faint: ${oklch.toCss(oklch.faint(fg, style.bg))}`)
+		if (fg) decls.push(`--quiet: ${oklch.toCss(colors.quiet(fg, style.bg ?? style.button ?? colors.screen()))}`)
+		if (key === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
 	return rules.join('\n')

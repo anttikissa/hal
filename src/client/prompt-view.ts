@@ -3,7 +3,6 @@
 // them. Pure.
 
 import { ansi } from './ansi.ts'
-import { oklch } from '../common/oklch.ts'
 import { colors } from '../common/colors.ts'
 import { promptLayout } from '../common/prompt-layout.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
@@ -60,7 +59,7 @@ function box(
 	let vp = promptLayout.viewport(st.scroll ?? 0, height, p.rows.length, p.row)
 	let shown = p.rows.slice(vp.top, vp.top + height)
 	while (shown.length < height) shown.push('')
-	if (!st.text && placeholder) shown[0] = ansi.sgr({ fg: oklch.faint(colors.input().fg!, colors.input().bg!) }) + strings.clipVisual(ansi.clean(placeholder), width) + ansi.sgr({ fg: colors.input().fg! })
+	if (!st.text && placeholder) shown[0] = ansi.sgr({ fg: colors.input().placeholder! }) + strings.clipVisual(ansi.clean(placeholder), width) + ansi.sgr({ fg: colors.input().fg! })
 	return { above: vp.above, rows: shown, below: vp.below, row: p.row - vp.top, col: !st.text && placeholder ? 0 : p.col, scroll: vp.top }
 }
 

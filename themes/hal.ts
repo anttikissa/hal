@@ -2,10 +2,13 @@
 // themes/<name>.ts, change what you like, then /theme <name>. Every
 // colour is OKLCH [lightness, chroma, hue]; a style can read another
 // through colors (colors.fgL()), which sees this theme's values.
+// Derived colours (quiet, blinkDim) are functions given the field they
+// replace first; every colour Hal draws comes from a field here.
 // It starts equal to src/common/colors.ts; nothing keeps them in step.
 
 import { terminal } from '../src/client/terminal.ts'
 import { colors, type Look } from '../src/common/colors.ts'
+import { oklch } from '../src/common/oklch.ts'
 import type { Plugin } from '../src/host/plugins.ts'
 
 export const look: Look = {
@@ -15,14 +18,28 @@ export const look: Look = {
 	screen: () => [0.16, 0.01, 260],
 	// Shared lightness and chroma of the vivid foregrounds and the card
 	// backgrounds.
-	fgL: () => 0.84,
-	fgC: () => 0.19,
+	fgL: () => 0.85,
+	fgC: () => 0.16,
 	bgL: () => 0.2,
 	bgC: () => 0.05,
 
+	// Derived colours: code calls these, so a theme may override them
+	// like any field. quiet: a style's secondary text (hints, ids,
+	// command lines, table rules), darker than fg but never below 4.6:1
+	// on bg. blinkDim: a blinking tab mark in its dark phase.
+	quiet: (_base, fg, bg) => oklch.quiet(fg, bg),
+	blinkDim: (_base, fg) => [fg[0] * 0.65, fg[1], fg[2]],
+	// Web only, percentages: how much of the current colour tints a
+	// hovered control (hover; a choice, choiceHover) or the current tab
+	// (tab), draws the prompt box bar (entry), quote bar (quote) and
+	// table lines (table) and the line before the prompt box's buttons
+	// (divider); how much canvas the phone tab sheet's backdrop
+	// is (backdrop), and how far the busy dot pulses (pulse).
+	mix: () => ({ hover: 14, choiceHover: 18, tab: 16, entry: 55, divider: 35, quote: 40, table: 30, backdrop: 60, pulse: 30 }),
+
 	// Hal's responses: warm orange.
 	assistant: () => ({
-		fg: [colors.fgL(), colors.fgC(), 55],
+		fg: [colors.fgL(), colors.fgC(), 57],
 		cursor: [colors.fgL(), colors.fgC(), 55],
 		cursorIdle: [0.6, 0, 55],
 		bold: [0.9, 0.06, 55],
@@ -39,7 +56,9 @@ export const look: Look = {
 	}),
 	// User messages and the prompt input: the same bright blue card.
 	user: () => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215] }),
-	input: () => ({ ...colors.user(), cursor: colors.user().fg! }),
+	// placeholder: the example request in an empty prompt, readable but
+	// quieter than typed text.
+	input: () => ({ ...colors.user(), cursor: colors.user().fg!, placeholder: [0.5, 0.09, 215] }),
 	// Log: neutral, moderately dim.
 	log: () => ({ fg: [0.7, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
 	// Warnings: amber, noticeable but not fatal.
@@ -63,6 +82,15 @@ export const look: Look = {
 		warningFg: [0.86, 0.16, 95],
 		errorFg: colors.error().fg!,
 		pausedFg: [0.86, 0.16, 95],
+	}),
+	// The notice stack (task qm): a bar in the event's colour on near
+	// black, never slate.
+	notice: () => ({
+		fg: [0.9, 0, 0],
+		bg: [0.13, 0, 0],
+		doneFg: colors.tab().doneFg!,
+		failedFg: colors.error().fg!,
+		attentionFg: colors.tab().warningFg!,
 	}),
 	// Help bar: keys stand out from descriptions.
 	help: () => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0] }),

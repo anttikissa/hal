@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test'
 import { readdirSync } from 'fs'
-import { colors, type Style } from './colors.ts'
+import { colors, DERIVED, type Style } from './colors.ts'
 import { oklch, type Oklch } from './oklch.ts'
 
 // Shared values (fgL, screen) are a number or one colour; the rest are styles.
-const styles = () => Object.entries(colors).map(([key, value]) => [key, value()] as const)
+const styles = () => Object.entries(colors).filter(([key]) => key !== 'mix' && !(DERIVED as readonly string[]).includes(key)).map(([key, value]) => [key, (value as () => unknown)()] as const)
 	.filter((e): e is [string, Style] => typeof e[1] === 'object' && !Array.isArray(e[1]))
 
 test('every field is a function, so a plugin can wrap it and undo that', () => {
@@ -50,7 +50,9 @@ test('overriding one style is seen by styles built on it', () => {
 // tasks/README.md, readable text: WCAG AA against the background each
 // colour sits on, its style's own bg or else the screen we design for.
 function readable(): string[] {
-	let backgrounds = /^(bg|canvas|field|border|button)$|Bg$/
+	// placeholder: the example request, faint on purpose (frame.test.ts
+	// checks it stands apart from both the box and typed text).
+	let backgrounds = /^(bg|canvas|field|border|button|placeholder)$|Bg$/
 	let marks = /^(cursor|cursorIdle)$/
 	let low: string[] = []
 	let check = (name: string, fg: Oklch, bg: Oklch, min: number) => {

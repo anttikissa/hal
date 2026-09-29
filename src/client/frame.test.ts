@@ -270,7 +270,7 @@ test('the terminal follows a theme override at the next build', () => {
 	try {
 		colors.fgL = () => 0.95
 		let row = rowWith(frame.build(view([{ type: 'text', text: 'reply' }]), 40).lines, 'reply')
-		expect(row).toContain(fgOf([0.95, colors.fgC(), 55]))
+		expect(row).toContain(fgOf([0.95, colors.fgC(), colors.assistant().fg![2]]))
 	} finally {
 		colors.fgL = saved
 	}

@@ -13,14 +13,18 @@
 // sees these functions. A style key becomes a CSS class in kebab case:
 // toolBash is .tool-bash.
 
-import type { Oklch } from './oklch.ts'
+import { oklch, type Oklch } from './oklch.ts'
 
 export type Style = { [part: string]: Oklch }
 
 type Colors = typeof colors
 // A theme (task d3): replacements for some fields, each given the field
 // it replaces, so it can change one part of a style and keep the rest.
-export type Look = { [K in keyof Colors]?: (base: Colors[K]) => ReturnType<Colors[K]> }
+export type Look = { [K in keyof Colors]?: (base: Colors[K], ...args: Parameters<Colors[K]>) => ReturnType<Colors[K]> }
+
+// Fields that derive a colour from others, so take arguments; every
+// other field is a value or a style, read with no arguments.
+export const DERIVED = ['quiet', 'blinkDim'] as const
 
 export const colors = {
 	// The lightest dark background we design for: where a style has no
@@ -29,14 +33,28 @@ export const colors = {
 	screen: (): Oklch => [0.16, 0.01, 260],
 	// Shared lightness and chroma of the vivid foregrounds and the card
 	// backgrounds.
-	fgL: (): number => 0.84,
-	fgC: (): number => 0.19,
+	fgL: (): number => 0.85,
+	fgC: (): number => 0.16,
 	bgL: (): number => 0.2,
 	bgC: (): number => 0.05,
 
+	// Derived colours: code calls these, so a theme may override them
+	// like any field. quiet: a style's secondary text (hints, ids,
+	// command lines, table rules), darker than fg but never below 4.6:1
+	// on bg. blinkDim: a blinking tab mark in its dark phase.
+	quiet: (fg: Oklch, bg: Oklch): Oklch => oklch.quiet(fg, bg),
+	blinkDim: (fg: Oklch): Oklch => [fg[0] * 0.65, fg[1], fg[2]],
+	// Web only, percentages: how much of the current colour tints a
+	// hovered control (hover; a choice, choiceHover) or the current tab
+	// (tab), draws the prompt box bar (entry), quote bar (quote) and
+	// table lines (table) and the line before the prompt box's buttons
+	// (divider); how much canvas the phone tab sheet's backdrop
+	// is (backdrop), and how far the busy dot pulses (pulse).
+	mix: () => ({ hover: 14, choiceHover: 18, tab: 16, entry: 55, divider: 35, quote: 40, table: 30, backdrop: 60, pulse: 30 }),
+
 	// Hal's responses: warm orange.
 	assistant: (): Style => ({
-		fg: [colors.fgL(), colors.fgC(), 55],
+		fg: [colors.fgL(), colors.fgC(), 57],
 		cursor: [colors.fgL(), colors.fgC(), 55],
 		cursorIdle: [0.6, 0, 55],
 		bold: [0.9, 0.06, 55],
@@ -53,7 +71,9 @@ export const colors = {
 	}),
 	// User messages and the prompt input: the same bright blue card.
 	user: (): Style => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215] }),
-	input: (): Style => ({ ...colors.user(), cursor: colors.user().fg! }),
+	// placeholder: the example request in an empty prompt, readable but
+	// quieter than typed text.
+	input: (): Style => ({ ...colors.user(), cursor: colors.user().fg!, placeholder: oklch.faint(colors.user().fg!, colors.user().bg!) }),
 	// Log: neutral, moderately dim.
 	log: (): Style => ({ fg: [0.7, 0, 0], code: [0.78, 0, 0], linkBg: [0.3, 0, 0] }),
 	// Warnings: amber, noticeable but not fatal.

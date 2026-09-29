@@ -4,7 +4,6 @@
 import { attachments } from '../common/attachments.ts'
 import { bashResult } from '../common/bash-result.ts'
 import { colors, type Style } from '../common/colors.ts'
-import { oklch } from '../common/oklch.ts'
 import { forms, type Quote } from '../common/forms.ts'
 import { strings } from '../common/strings.ts'
 import { titles } from '../common/titles.ts'
@@ -124,7 +123,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (call && /^\[exit [1-9]\d*\]/.test(l)) {
 					let status = /^\[exit [1-9]\d*\]/.exec(l)![0]
 					let at = line.indexOf(status)
-					if (at >= 0) line = line.slice(0, at) + ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: oklch.quiet(itemView.itemStyle(item)!.fg!, colors.screen()) }) + line.slice(at + status.length)
+					if (at >= 0) line = line.slice(0, at) + ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: colors.quiet(itemView.itemStyle(item)!.fg!, colors.screen()) }) + line.slice(at + status.length)
 				}
 				return line
 			})
