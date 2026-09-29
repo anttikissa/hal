@@ -17,8 +17,3 @@ a task and remove it here.
 - A context graph: cmd-click the status row's context number to open a
   web page plotting context size per block; each drop is a compaction
   or pruning, later also cache misses (item 135).
-- `hal -r <host>`: the terminal client connects to a remote hal2 host
-  (e.g. example.com) over the web socket, logging in with a one-time
-  code and remembering host and token; `hal -r` alone reuses the last
-  one. Old Hal: src/main.ts (remoteHost), src/client/remote-auth.ts,
-  src/client/web-connection.ts. Progress reports list it under REACH.

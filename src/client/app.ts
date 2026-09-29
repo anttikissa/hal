@@ -46,14 +46,14 @@ import { titles } from '../common/titles.ts'
 // `choices`: tab completion's, listed below the prompt until a key.
 // `tabs`: the host's, in order; `focus`: the one shown; `asked`: the tab
 // this client's own tab command named, focused once it is in the list;
-// `hidden`: the client state of tabs not shown. `start`: where a
-// starting client looks for its tab (a restart: the one it left).
+// `hidden`: the client state of tabs not shown. `start`: where a starting
+// client looks for its tab (a restart: the one it left; remote: no cwd).
 export type AppState = {
 	tabs: Tab[]
 	focus: Focus
 	asked?: string
 	hidden: Map<string, TabView>
-	start: { cwd: string; last?: string }
+	start: { cwd?: string; last?: string }
 	transcript?: Transcript
 	prompt: PromptState
 	notice?: string
@@ -202,8 +202,8 @@ function onState(state: LinkState): void {
 	st.notice = state.type === 'connected' ? undefined : 'host lost; reconnecting…'
 	if (state.type === 'connected') {
 		let tab = app.focusedTab()
-		let last = tab?.id ?? st.start.last
-		app.send({ type: 'tab-start', cwd: tab?.cwd ?? st.start.cwd, ...(last === undefined ? {} : { last }) })
+		let last = tab?.id ?? st.start.last, cwd = tab?.cwd ?? st.start.cwd
+		app.send({ type: 'tab-start', ...(cwd === undefined ? {} : { cwd }), ...(last === undefined ? {} : { last }) })
 		// A code for the web links this terminal prints (task e3).
 		app.send({ type: 'auth', link: true })
 	}

@@ -1,6 +1,6 @@
 // A client's connection to the host, the same for the terminal, a peer
 // and the browser; only the transport differs (client/link.ts: in
-// process or Unix socket, web/link.ts: WebSocket). States
+// process or Unix socket, common/ws-link.ts: WebSocket). States
 // (tasks/j1/states.md): joining, connected as host or client, or
 // disconnected until a retry time.
 //

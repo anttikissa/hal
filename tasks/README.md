@@ -38,7 +38,8 @@ point to it.
   host goes away, a client takes over. Reconnect = connect + snapshot.
 - Every client (terminal, peer, browser) uses one connection core,
   `src/common/connection.ts`, over a small transport: in-process or
-  Unix socket (`src/client/link.ts`), WebSocket (`src/web/link.ts`).
+  Unix socket (`src/client/link.ts`), WebSocket (`src/common/ws-link.ts`,
+  the browser and `./run -r <host>`, task tr).
   It re-opens followed sessions and resends unanswered commands; each
   command's client-made id lets the host ignore repeats. The host side
   of every transport is `host.adapt()`.

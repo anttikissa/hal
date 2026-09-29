@@ -1,16 +1,17 @@
-// The browser's transport to the host for the common connection
-// (src/common/connection.ts): one WebSocket at /ws, each message one
-// ASON command or event. The host closes it with code 4000 when the
-// page was built from other code than the host runs, and with 4001 when
-// /auth revoke logged every browser out: either way the page reloads.
-// A socket refused before it opens may mean the login expired or was
-// revoked while the page was closed or asleep: if the host then says the
-// cookie is no good, the page reloads onto the gate instead of retrying
-// forever.
+// The WebSocket transport to a host's web endpoint for the common
+// connection (src/common/connection.ts), used by the browser and by a
+// terminal on a remote host (client/remote.ts, task tr): one WebSocket
+// at /ws, each message one ASON command or event. The host closes it
+// with code 4000 when a page was built from other code than the host
+// runs, and with 4001 when /auth revoke logged every client out: either
+// way reload() runs (the page reloads, the terminal quits). A socket
+// refused before it opens may mean the login expired or was revoked
+// while the client was away: if the host then says the token is no
+// good, reload() runs too instead of retrying forever.
 
-import { ason } from '../common/ason.ts'
-import { connection, type Conn, type LinkState, type Transport } from '../common/connection.ts'
-import type { Event } from '../common/protocol.ts'
+import { ason } from './ason.ts'
+import { connection, type Conn, type LinkState, type Transport } from './connection.ts'
+import type { Event } from './protocol.ts'
 
 // The part of a WebSocket this uses, so tests can pass a fake.
 export type Socket = {
@@ -24,7 +25,7 @@ export type Socket = {
 export type LinkOptions = {
 	dial: () => Socket
 	// The host runs other code than this page, or logged it out: load
-	// it again.
+	// it again (the terminal quits).
 	reload: () => void
 	// Whether the cookie is still good (GET /login); asked after a
 	// socket that never opened.
@@ -70,13 +71,13 @@ function transport(dial: () => Socket, reload: () => void = () => {}, authorized
 // Connects, and reconnects with backoff whenever the socket drops.
 function start(opts: LinkOptions): void {
 	let startOpts: Parameters<typeof connection.start>[0] = {
-		transport: link.transport(opts.dial, opts.reload, opts.authorized),
+		transport: wsLink.transport(opts.dial, opts.reload, opts.authorized),
 		onEvent: opts.onEvent,
-		baseMs: link.baseMs(),
-		maxMs: link.maxDelayMs(),
+		baseMs: wsLink.baseMs(),
+		maxMs: wsLink.maxDelayMs(),
 	}
 	if (opts.onState) startOpts.onState = opts.onState
 	void connection.start(startOpts)
 }
 
-export const link = { baseMs: () => 250, maxDelayMs: () => 10_000, transport, start }
+export const wsLink = { baseMs: () => 250, maxDelayMs: () => 10_000, transport, start }

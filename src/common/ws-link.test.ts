@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'bun:test'
 import { ason } from '../common/ason.ts'
 import { connection, type LinkState } from '../common/connection.ts'
 import type { Event } from '../common/protocol.ts'
-import { link, type Socket } from './link.ts'
+import { wsLink as link, type Socket } from './ws-link.ts'
 
 class FakeSocket implements Socket {
 	sent: any[] = []

@@ -5,6 +5,7 @@ import { join } from 'path'
 import { app } from './client/app.ts'
 import { draftFile } from './client/draft-file.ts'
 import { link } from './client/link.ts'
+import { remote as remoteClient, type Saved } from './client/remote.ts'
 import { render } from './client/render.ts'
 import { terminal } from './client/terminal.ts'
 import { versions } from './client/versions.ts'
@@ -18,6 +19,7 @@ import { config } from './host/config.ts'
 import { diag } from './host/diag.ts'
 import { host } from './host/host.ts'
 import { jobs } from './host/jobs.ts'
+import { liveFiles } from './host/live-file.ts'
 import { models } from './host/models.ts'
 import { modelsDev } from './host/models-dev.ts'
 import { sessions } from './host/sessions.ts'
@@ -73,33 +75,40 @@ function init(): void {
 	openai.init()
 	openaiCompat.init()
 	// Piped stdin (tests, scripts) has no raw mode and no emergency keys.
-	if (terminal.available()) {
-		terminal.init()
-		// Ctrl-C pauses running turns only if no other Hal process (a peer
-		// on the host socket) can carry them on (tasks/j1/states.md).
-		terminal.onQuit = () => host.quitting(server.state.sockets.size === 0)
-		render.init()
-		render.painted = (view) => {
-			if (main.state.shown) return
-			perf.mark('frame', view.transcript ? view.transcript.meta.id : 'no tab yet')
-			if (view.transcript) main.shown()
-		}
-		// Drafts are kept on this machine too, for when the host is gone.
-		draftFile.dir = () => join(paths.stateDir(), 'drafts')
-		drafts.store = draftFile
-		app.state.start = { cwd: process.cwd(), ...main.lastTab() }
-		app.focused = (tab) => main.keepTab(tab)
-		app.init()
-		// Which code this process runs (task n1), found after the first
-		// frame; the host tells its clients, a new commit offers ctrl-r.
-		version.found = (loaded) => {
-			versions.state.own = loaded
-			host.announce(loaded)
-			app.show()
-		}
-		version.changed = () => ((versions.state.newCode = true), app.show())
-		main.later(() => void version.init())
+	if (!terminal.available()) return
+	main.initTerminal()
+	// Ctrl-C pauses running turns only if no other Hal process (a peer
+	// on the host socket) can carry them on (tasks/j1/states.md).
+	terminal.onQuit = () => host.quitting(server.state.sockets.size === 0)
+	// Which code this process runs (task n1), found after the first
+	// frame; the host tells its clients, a new commit offers ctrl-r.
+	version.found = (loaded) => {
+		versions.state.own = loaded
+		host.announce(loaded)
+		app.show()
 	}
+	version.changed = () => ((versions.state.newCode = true), app.show())
+	main.later(() => void version.init())
+}
+
+// The terminal client, for this home's host or (`remote`, an origin;
+// task tr) another machine's, whose drafts are kept apart and where
+// this machine's cwd means nothing.
+function initTerminal(remote?: string): void {
+	terminal.init()
+	render.init()
+	render.painted = (view) => {
+		if (main.state.shown) return
+		perf.mark('frame', view.transcript ? view.transcript.meta.id : 'no tab yet')
+		if (view.transcript) main.shown()
+	}
+	// Drafts are kept on this machine too, for when the host is gone.
+	let dir = remote ? join(paths.stateDir(), 'remote', new URL(remote).host) : paths.stateDir()
+	draftFile.dir = () => join(dir, 'drafts')
+	drafts.store = draftFile
+	app.state.start = { ...(remote ? {} : { cwd: process.cwd() }), ...main.lastTab() }
+	app.focused = (tab) => main.keepTab(tab)
+	app.init()
 }
 
 // Events from the host for the terminal: the host's version is kept
@@ -207,6 +216,40 @@ async function auth(): Promise<number> {
 	return 0
 }
 
+// `./run -r [host]` (task tr): the terminal follows a remote host over
+// its web endpoint, logging in with a one-time code the first time; the
+// host and its token are kept in state/remote.ason (0600).
+async function remote(typed: string | undefined): Promise<void> {
+	paths.init()
+	let saved = liveFiles.liveFile<Saved>(join(paths.stateDir(), 'remote.ason'), { last: '', tokens: {} }, { watch: false, mode: 0o600 })
+	let origin: string
+	let token: string
+	try {
+		;({ origin, token } = await remoteClient.signIn(typed, saved, (q) => prompt(q), (text) => process.stderr.write(text)))
+	} catch (e: any) {
+		process.stderr.write(`hal2: ${e?.message ?? e}\n`)
+		process.exit(1)
+	}
+	liveFiles.save(saved)
+	process.stderr.write(`Connecting to ${origin}…\n`)
+	main.initTerminal(origin)
+	remoteClient.start({
+		origin,
+		token,
+		onEvent: (event) => main.onEvent(event),
+		onState: (state) => app.onState(state),
+		// Revoked: forget the token and say how to log in again.
+		loggedOut: () => {
+			let { [origin]: _, ...rest } = saved.tokens
+			saved.tokens = rest
+			liveFiles.save(saved)
+			terminal.leave()
+			process.stderr.write(`hal2: ${origin} logged this terminal out; run ./run -r again to log in\n`)
+			terminal.state.io!.exit(1)
+		},
+	})
+}
+
 async function start(): Promise<void> {
 	perf.state.epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || perf.state.epoch
 	perf.mark('imported')
@@ -222,6 +265,13 @@ async function start(): Promise<void> {
 	config.init(() => host.warnAll())
 	await main.loadLocal()
 	perf.mark('local.ts')
+	if (process.argv[2] === '-r') {
+		if (!terminal.available()) {
+			process.stderr.write('hal2 needs a terminal\n')
+			process.exit(1)
+		}
+		return main.remote(process.argv[3])
+	}
 	main.init()
 	perf.mark('init')
 	if (!terminal.available()) {
@@ -244,6 +294,7 @@ export const main = {
 	localPath,
 	loadLocal,
 	init,
+	initTerminal,
 	onEvent,
 	becomeHost,
 	refreshModels,
@@ -251,6 +302,7 @@ export const main = {
 	shown,
 	joinHost,
 	auth,
+	remote,
 	start,
 }
 
