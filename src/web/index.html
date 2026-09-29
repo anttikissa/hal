@@ -107,9 +107,13 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Composer > * { max-width: 60rem; margin: 0 auto; }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.2rem 0; }
-.Composer .completions { position: absolute; bottom: 100%; left: 0; right: 0; max-height: min(35dvh, 20rem); overflow-y: auto; border: 1px solid var(--border); background: var(--field); }
-.Composer .completions button { display: flex; flex-direction: column; width: 100%; min-height: 44px; padding: 0.4rem 0.7rem; text-align: left; background: transparent; color: var(--text); }
-.Composer .completions button:hover, .Composer .completions button[aria-selected="true"] { background: var(--button); }
+/* Completions: a panel in the box's own colour (the input style), like a
+   card: lit left bar, outline, names bright; the selected row solid in
+   that colour with canvas text, as a chosen option is. */
+.Composer .completions { position: absolute; bottom: 100%; left: 0; right: 0; max-height: min(35dvh, 20rem); overflow-y: auto; background: var(--canvas); box-shadow: inset 0 0 0 1px currentColor; border-left: 3px solid currentColor; }
+.Composer .completions button { display: flex; flex-direction: column; width: 100%; min-height: 44px; padding: 0.4rem 0.7rem; text-align: left; background: transparent; color: inherit; }
+.Composer .completions button:hover { background: color-mix(in oklab, currentColor 18%, transparent); }
+.Composer .completions button[aria-selected="true"] { background: currentColor; -webkit-text-fill-color: var(--canvas); }
 .Composer .completions span { color: var(--quiet); font-size: 0.85em; }
 .status .busy { color: var(--highlight); }
 .status .warning, .status .error { background: none; }
