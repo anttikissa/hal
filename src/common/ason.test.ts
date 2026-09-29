@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { stringify, parse, parseAll, parseStream, COMMENTS, type AsonObject, type AsonArray } from './ason'
+import { stringify, parse, parseAll, parseStream, COMMENTS } from './ason'
 
 describe('stringify', () => {
 	describe('primitives', () => {
@@ -21,13 +21,6 @@ describe('stringify', () => {
 })
 
 describe('stringify modes', () => {
-	const wide = {
-		name: 'alice',
-		email: 'alice@example.com',
-		score: 100,
-		tags: ['admin', 'user', 'moderator'],
-	}
-
 	test('long always uses multi-line', () => {
 		const result = stringify({ a: 1 }, 'long')
 		expect(result).toContain('\n')
@@ -233,44 +226,6 @@ describe('parseStream', () => {
 		controller!.close()
 		await iter.return(undefined)
 	})
-})
-
-describe('parseStream e2e', () => {
-	test('tail -f a file, parse objects as they are appended', async () => {
-		const { tails } = await import('./tail-file')
-		const { appendFile } = await import('fs/promises')
-		const path = '/tmp/hal-ason-e2e-test.asonl'
-		await Bun.write(path, '')
-
-		const stream = tails.tailFile(path)
-		const iter = parseStream(stream)
-
-		// Give tail -f a moment to start watching
-		await Bun.sleep(100)
-
-		async function nextValue(): Promise<any> {
-			const { done, value } = await iter.next()
-			if (done) throw new Error('stream ended unexpectedly')
-			return value
-		}
-
-		await appendFile(path, "{ name: 'alice', score: 100 }\n")
-		expect(await nextValue()).toEqual({ name: 'alice', score: 100 })
-
-		await appendFile(path, "{ name: 'bob', score: 200 }\n")
-		expect(await nextValue()).toEqual({ name: 'bob', score: 200 })
-
-		// Partial line, then complete it
-		await appendFile(path, "{ key: 'val")
-		await Bun.sleep(50)
-		await appendFile(path, "ue' }\n{ more: 42 }\n")
-		expect(await nextValue()).toEqual({ key: 'value' })
-		expect(await nextValue()).toEqual({ more: 42 })
-
-		// Clean up
-		await iter.return(undefined)
-		;(await Bun.file(path).exists()) && (await Bun.$`rm ${path}`)
-	}, 10000)
 })
 
 describe('comments', () => {

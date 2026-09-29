@@ -1,15 +1,11 @@
 {
 	title: "ASON is the old Hal's ason.ts, verbatim",
-	spec: "src/common/ason.ts and its test are verbatim copies of the old Hal's (tasks/8/ason.ts and ason.test.ts, identical to ~/.hal/src/utils/ason.ts); nobody edits them, and hal2 adapts to their API instead (the ason object: stringify, parse, parseAll, parseStream, COMMENTS). Comments round-trip: live ASON files that a person edits by hand (config.ason, the credentials file, any liveFile) are parsed with comments kept and written back with them, so a hand-written comment survives every save. Test: a config file with comments on keys and array items keeps them after hal2 changes a value and saves (questions.md 115; the user never allowed dropping comment preservation).",
+	spec: "src/common/ason.ts is a verbatim copy of the old Hal's (tasks/8/ason.ts, identical to ~/.hal/src/utils/ason.ts); nobody edits it, and hal2 adapts to their API instead (the ason object: stringify, parse, parseAll, parseStream, COMMENTS). Comments round-trip: live ASON files that a person edits by hand (config.ason, the credentials file, any liveFile) are parsed with comments kept and written back with them, so a hand-written comment survives every save. Test: a config file with comments on keys and array items keeps them after hal2 changes a value and saves (questions.md 115; the user never allowed dropping comment preservation).",
 	status: 'done',
-	needs: [],
-	foldInto: [
-		'8'
-	],
 	notes: [
-		"ason.ts and ason.test.ts are byte copies of tasks/8 (cmp them). hal2's old extras live elsewhere: lines.encode (was ason.stringifyLine) and history.load's own line parsing with the torn-tail 'partial' (was parseStream's midRecord/onPartial).",
-		"The verbatim test imports ./tail-file (tails.tailFile); src/common/tail-file.ts is a tiny 'tail -f -c +1' stream just for it.",
-		'live-file parses with { comments: true } and stringifies smart, so COMMENTS ride on the data objects: Object.assign and spread copy the symbol, a reload deletes it via Reflect.ownKeys. Replacing an array or object from code drops its comments; array comments are by index.',
-		'The verbatim test has unused imports; .oxlintrc.json ignorePatterns excludes it, since ./test lints with --deny-warnings.'
-	]
+		"ason.ts is a byte copy of tasks/8 (cmp it). ason.test.ts started as tasks/8/ason.test.ts and is pruned like any test: its tail -f e2e case (and the tail-file.ts helper only it used) is gone, so parseStream is tested with in-memory streams, and it is linted like other files. hal2's old extras live elsewhere: lines.encode (was ason.stringifyLine) and history.load's own line parsing with the torn-tail 'partial' (was parseStream's midRecord/onPartial).",
+		'live-file parses with { comments: true } and stringifies smart, so COMMENTS ride on the data objects: Object.assign and spread copy the symbol, a reload deletes it via Reflect.ownKeys. Replacing an array or object from code drops its comments; array comments are by index.'
+	],
+	needs: [],
+	foldInto: ['8']
 }

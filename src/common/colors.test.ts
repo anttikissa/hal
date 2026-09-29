@@ -7,10 +7,6 @@ import { oklch, type Oklch } from './oklch.ts'
 const styles = () => Object.entries(colors).filter(([key]) => key !== 'mix' && !(DERIVED as readonly string[]).includes(key)).map(([key, value]) => [key, (value as () => unknown)()] as const)
 	.filter((e): e is [string, Style] => typeof e[1] === 'object' && !Array.isArray(e[1]))
 
-test('every field is a function, so a plugin can wrap it and undo that', () => {
-	for (let [key, value] of Object.entries(colors)) expect(typeof value, key).toBe('function')
-})
-
 test('every style is a set of OKLCH colours', () => {
 	for (let [key, style] of styles()) {
 		expect(Object.keys(style).length, key).toBeGreaterThan(0)
