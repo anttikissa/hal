@@ -278,6 +278,11 @@ test('a sent prompt shows pending, then as the host’s item under the same key,
 	let sending = [{ id: 'c7', text: 'go' }]
 	let before = view.withPending(view.rows(st.transcript!.items, st.sent), sending)
 	expect(before.map((r) => [r.key, r.item.type, r.pending])).toEqual([['c7', 'prompt', true]])
+	// The durable inbox replaces the optimistic row before acknowledgement,
+	// using the same key; it lives in the transcript, not the fixed footer.
+	let waiting = [{ id: 'c7', text: 'go', queue: true as const }]
+	let queued = view.withPending(view.rows(st.transcript!.items, st.sent), sending, waiting)
+	expect(queued.map((r) => [r.key, r.pending, r.waiting])).toEqual([['c7', undefined, 'queued']])
 	// The host's item arrives before the ack that ends the pending one.
 	st = fold([{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 4, command: 'c7' }] as Event[], st)
 	let after = view.withPending(view.rows(st.transcript!.items, st.sent), sending)

@@ -52,9 +52,9 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 		if (scroll.atTop()) app.older()
 		return
 	}
-	if (items(next) === items(before) && next.pending.length === before.pending.length) return set(next)
+	if (items(next) === items(before) && next.view.transcript?.inbox === before.view.transcript?.inbox && next.pending.length === before.pending.length) return set(next)
 	let sent = next.pending.length > before.pending.length
-	let grew = (items(next)?.length ?? 0) > (items(before)?.length ?? 0)
+	let grew = (items(next)?.length ?? 0) + (next.view.transcript?.inbox.length ?? 0) > (items(before)?.length ?? 0) + (before.view.transcript?.inbox.length ?? 0)
 	scroll.follow(
 		() => {
 			set(next)

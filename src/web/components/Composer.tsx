@@ -60,9 +60,6 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	}
 	return (
 		<footer class="Composer">
-			<div class="inbox">
-				<For each={view.inbox(props.view)}>{(m) => <div class="log">{`${m.label}: ${m.text}`}</div>}</For>
-			</div>
 			<div id="notice" class="log">
 				{props.notice ?? ''}
 			</div>

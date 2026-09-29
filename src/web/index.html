@@ -18,7 +18,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; }
    the phone keyboard never hides the composer or pans the page. */
 body { position: fixed; left: 0; right: 0; top: var(--app-top, 0); height: var(--app-height, 100dvh); }
 body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-.App, .Chat { height: 100%; display: flex; flex-direction: column; }
+.App, .Chat { height: 100%; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 /* The one scroller: nothing inside it scrolls; long lines wrap. */
 /* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
@@ -116,7 +116,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .StatusRow .group { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .StatusRow .group > span { unicode-bidi: isolate; }
 @media (max-width: 40rem) { .StatusRow { padding-inline: max(0.6rem, env(safe-area-inset-left)) max(0.6rem, env(safe-area-inset-right)); } }
-.Composer { position: relative; z-index: 1; flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
+.Composer { position: relative; z-index: 1; flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, calc(env(safe-area-inset-bottom) - (100dvh - var(--app-height, 100dvh)))) max(1rem, env(safe-area-inset-left)); }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.2rem 0; }
 /* Completions: a panel in the box's own colour (the input style), like a
@@ -134,14 +134,14 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .entry { position: relative; display: flex; align-items: stretch; border-left: 3px solid color-mix(in oklab, currentColor var(--mix-entry), transparent); }
 .entry:focus-within { border-left-color: var(--cursor); }
 .entry.dropping { outline: 2px dashed var(--cursor); outline-offset: 2px; }
-.entry .actions { display: flex; flex-direction: column; }
+.entry .actions { display: flex; }
 .entry .actions button { flex: 1; min-height: 44px; }
 .entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
 /* The example request: the input's faint blue, as in the terminal. It
    leaves fast as typing starts and returns a little slower. */
 .entry .hint { position: absolute; inset: 0.5rem 0.7rem auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
 .entry .hint.gone { opacity: 0; transition-duration: 80ms; }
-.entry textarea { flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: 0.5rem 0.7rem; }
+.entry textarea { max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: 0.5rem 0.7rem; }
 .entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
 .entry > button:hover:not(:disabled), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
 .entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; }

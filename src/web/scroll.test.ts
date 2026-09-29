@@ -63,3 +63,31 @@ test('earlier history put above keeps what the reader was reading in place', () 
 		scroll.state.el = saved
 	}
 })
+
+test('a finger takes over a send glide and streamed updates do not fight its drag', () => {
+	let original = { ...scroll.state }
+	let cancel = globalThis.cancelAnimationFrame
+	let cancelled = 0
+	globalThis.cancelAnimationFrame = (id) => { cancelled = id }
+	let el = box(1000, 600, 400)
+	Object.assign(scroll.state, { el, frame: 7, gap: 0, forced: true })
+	try {
+		scroll.touchStart()
+		expect(cancelled).toBe(7)
+		expect(scroll.state.frame).toBe(0)
+		// The reader has only moved 10px: still inside near-bottom range.
+		el.scrollTop = 590
+		scroll.follow(() => { el.scrollHeight += 100 }, 'jump')
+		expect(el.scrollTop).toBe(590)
+		scroll.touchEnd()
+		// The reader now has a real gap; later output leaves them alone.
+		scroll.follow(() => { el.scrollHeight += 100 }, 'jump')
+		expect(el.scrollTop).toBe(590)
+		// A deliberate send still takes them to the bottom.
+		scroll.follow(() => {}, 'jump', true)
+		expect(el.scrollTop).toBe(800)
+	} finally {
+		globalThis.cancelAnimationFrame = cancel
+		Object.assign(scroll.state, original)
+	}
+})

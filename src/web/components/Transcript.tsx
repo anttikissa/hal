@@ -29,7 +29,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// status) keep every row object, so no card binding runs again.
 	let items = createMemo(() => props.view.transcript?.items ?? none)
 	let rows = createMemo(() => view.rows(items(), props.view.sent))
-	let all = createMemo(() => view.withPending(rows(), props.pending))
+	let all = createMemo(() => view.withPending(rows(), props.pending, props.view.transcript?.inbox))
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorAt = () => (streaming() ? rows().length - 1 : -1)

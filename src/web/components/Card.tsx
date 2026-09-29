@@ -75,7 +75,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// The link shows the block's id, #35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
-	let href = () => (props.row.pending ? undefined : target.href(props.session, props.row.item.key))
+	let href = () => (props.row.pending || props.row.waiting ? undefined : target.href(props.session, props.row.item.key))
 	let link = () => (
 		<Show when={href()}>
 			{(h) => (
@@ -88,7 +88,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// thinking is headed by the terminal's header words and its first
 	// line. Prompts and model text show those words above their text
 	// (task hp).
-	let title = () => titles.title(props.row.item)
+	let title = () => props.row.waiting ? `(${props.row.waiting})` : titles.title(props.row.item)
 	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #(\d+)$/)?.[1]
 	let who = () => {
 		let ref = source(), t = title()

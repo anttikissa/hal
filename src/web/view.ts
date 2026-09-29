@@ -9,7 +9,7 @@ import { bashResult } from '../common/bash-result.ts'
 import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
-import { inbox } from '../common/inbox.ts'
+import { inbox, type InboxItem } from '../common/inbox.ts'
 import type { ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
 import type { Event } from '../common/protocol.ts'
@@ -240,7 +240,7 @@ function hints(st: ViewState): [key: string, does: string][] {
 // `key`: what keeps the row's card (task w5): the item's key, or for a
 // prompt or command this client sent, the command id it had while pending.
 // `pending`: sent, not yet acknowledged.
-export type Row = { item: Item; at: number; key: string; result?: Item & { type: 'tool-result' }; pending?: true }
+export type Row = { item: Item; at: number; key: string; result?: Item & { type: 'tool-result' }; pending?: true; waiting?: string }
 
 function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 	let out: Row[] = []
@@ -265,11 +265,13 @@ function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 // `rows` and after them the prompts still pending (`id`: the submit's
 // command id), but for one the host already put in the transcript: it
 // is a row already, under the same key, so its card stays.
-function withPending(rows: Row[], pending: { id: string; text: string }[]): Row[] {
+function withPending(rows: Row[], pending: { id: string; text: string }[], waiting: InboxItem[] = []): Row[] {
 	let keys = new Set(rows.map((r) => r.key))
 	let at = (rows.at(-1)?.at ?? -1) + 1
+	let queued = waiting.filter((m) => !keys.has(m.id)).map((m): Row => ({ item: { type: 'prompt', text: m.text, ...inbox.sender(m), key: m.id }, at, key: m.id, waiting: inbox.tag(m) }))
+	for (let row of queued) keys.add(row.key)
 	let more = pending.filter((s) => !keys.has(s.id)).map((s): Row => ({ item: { type: 'prompt', text: s.text, key: s.id }, at, key: s.id, pending: true }))
-	return more.length ? [...rows, ...more] : rows
+	return queued.length || more.length ? [...rows, ...queued, ...more] : rows
 }
 
 function oneLine(s: string): string {
