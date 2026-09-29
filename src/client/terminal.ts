@@ -9,12 +9,15 @@
 import { emergency, type EmergencyAction, type EmergencyState } from './emergency.ts'
 import { keys, type DecoderState, type KeyEvent } from './keys.ts'
 import { ansi } from './ansi.ts'
+import fs from 'fs'
 
 /** The process and tty operations the terminal needs; faked in tests. */
 export interface TerminalIO {
 	setRawMode(on: boolean): void
 	onData(fn: (chunk: string | Uint8Array) => void): void
 	write(s: string): void
+	/** Write what `make` returns once what is queued before it is out. */
+	defer?(make: () => string): void
 	exit(code: number): void
 	/** Stop this process like a shell job (SIGSTOP). */
 	stop(): void
@@ -50,16 +53,77 @@ function createState(): TerminalState {
 	return { io: null, decoder: keys.createState(), emergency: emergency.createState(), entered: false, suspended: false, escapeTimer: null }
 }
 
-function realIO(): TerminalIO {
+// Output to `fd` that never holds the event loop (task 7j): a write to
+// a terminal blocks for as long as the terminal takes to read it, and a
+// full repaint is megabytes. Writes queue and go out in order, one
+// chunk at a time, by fs.write on the thread pool; a frame painted
+// while a big one is still going out waits behind it. flush() writes
+// what is queued synchronously on the way out (exit, suspend, leaving
+// raw mode); a chunk already on its way then may land after it.
+function writer(fd: number, chunk = 64 * 1024): { write(s: string): void; defer(make: () => string): void; flush(): void } {
+	let queue: (Buffer | (() => string))[] = []
+	let busy = false
+	let pump = (): void => {
+		let next = queue.shift()
+		busy = next !== undefined
+		if (next === undefined) return
+		let b = typeof next === 'function' ? Buffer.from(next()) : next
+		if (b.length > chunk) {
+			queue.unshift(b.subarray(chunk))
+			b = b.subarray(0, chunk)
+		}
+		fs.write(fd, b, (err, n) => {
+			// The terminal is gone: nothing more can reach it.
+			if (err) {
+				queue = []
+				busy = false
+				return
+			}
+			if (n < b.length) queue.unshift(b.subarray(n))
+			pump()
+		})
+	}
 	return {
-		setRawMode: (on) => process.stdin.setRawMode(on),
+		write(s) {
+			queue.push(Buffer.from(s))
+			if (!busy) pump()
+		},
+		defer(make) {
+			queue.push(make)
+			if (!busy) pump()
+		},
+		flush() {
+			let rest = queue
+			queue = []
+			try {
+				for (let next of rest) {
+					let b = typeof next === 'function' ? Buffer.from(next()) : next
+					for (let at = 0; at < b.length; ) at += fs.writeSync(fd, b, at)
+				}
+			} catch {}
+		},
+	}
+}
+
+function realIO(): TerminalIO {
+	let out = terminal.writer(1)
+	return {
+		setRawMode(on) {
+			out.flush()
+			process.stdin.setRawMode(on)
+		},
 		onData(fn) {
 			process.stdin.on('data', fn)
 			process.stdin.resume()
 		},
-		write: (s) => process.stdout.write(s),
-		exit: (code) => process.exit(code),
+		write: (s) => out.write(s),
+		defer: (make) => out.defer(make),
+		exit(code) {
+			out.flush()
+			process.exit(code)
+		},
 		stop() {
+			out.flush()
 			// The whole process group, as a shell job would be stopped.
 			try {
 				process.kill(0, 'SIGSTOP')
@@ -70,7 +134,10 @@ function realIO(): TerminalIO {
 		onContinue: (fn) => process.on('SIGCONT', fn),
 		onExit(fn) {
 			// Uncaught errors still emit 'exit'; these signals do not.
-			process.on('exit', fn)
+			process.on('exit', () => {
+				fn()
+				out.flush()
+			})
 			// A deliberate quit, like Ctrl-C (tasks/j1/states.md).
 			process.on('SIGTERM', () => terminal.quit(143))
 			process.on('SIGHUP', () => terminal.quit(129))
@@ -212,6 +279,7 @@ export const terminal = {
 	/** Moves the cursor below the frame before the terminal is given
 	 * back; replaced by the renderer. Must not throw or clear. */
 	park: (): void => {},
+	writer,
 	realIO,
 	init,
 	reset,

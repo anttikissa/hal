@@ -283,3 +283,19 @@ describe('escape', () => {
 		expect(t.keys).toEqual([])
 	})
 })
+
+test('the writer sends everything in order across chunks and deferred parts', async () => {
+	let fs = await import('fs')
+	let dir = fs.mkdtempSync('/tmp/hal-writer-')
+	let path = `${dir}/out`
+	let fd = fs.openSync(path, 'w')
+	let w = terminal.writer(fd, 5)
+	w.write('héllo wörld, ')
+	w.defer(() => 'made when its turn came')
+	w.write('!')
+	let want = Buffer.byteLength('héllo wörld, made when its turn came!')
+	while (fs.statSync(path).size < want) await Bun.sleep(1)
+	fs.closeSync(fd)
+	expect(fs.readFileSync(path, 'utf8')).toBe('héllo wörld, made when its turn came!')
+	fs.rmSync(dir, { recursive: true })
+})

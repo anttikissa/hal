@@ -153,36 +153,40 @@ function withCursor(rows: string[], hal: HalCursor, width: number): string[] {
 	return [...rows, g]
 }
 
-// The frame for `view` on a terminal of `rows` × `cols`. `full`: full
-// mode, where blank rows after a short history put the chrome on the
-// screen's last rows, so the prompt is always at the bottom
-// (tasks/cc/terminal.md, Height management).
-function build(view: View, cols: number, rows = 24, full = false): Frame {
+// The rows of the transcript's items, and where a question being
+// answered among them puts the cursor.
+export type Past = { lines: string[]; formCursor?: Frame['cursor'] }
+
+// Lays out the transcript's items. The rows of items drawn last time
+// and unchanged since are reused as they are: a frame costs what
+// changed, not the whole history. With a `deadline`, stops at the first
+// stable item once it is past (after laying out at least one) and
+// returns nothing; what was laid out is kept (unless `save` is false),
+// so the next call goes on from there: a long history is laid out in
+// slices (task 7j).
+function layout(view: View, cols: number, deadline = Infinity, save = true): Past | undefined {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
-	let lines: string[] = []
-	// Whether something is above `lines` (the history, above the chrome).
-	let above = false
-	let block = (rows: string[], style: Style | undefined) => {
-		if (!rows.length) return
-		if (lines.length || above) lines.push('')
-		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
-	}
 	let items = view.transcript?.items ?? []
 	let session = view.transcript?.meta.id
 	let calls = new Map<string, string>()
 	let formCursor: Frame['cursor'] | undefined
-	// The rows of items drawn last frame and unchanged since are reused
-	// as they are: a frame costs what changed, not the whole history.
 	let look = `${cols} ${session} ${itemView.resultRows()} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
 	let kept = frame.state.history
 	let start = 0
 	if (kept?.look === look) while (start < kept.items.length && items[start] === kept.items[start]) start++
-	if (start) lines = kept!.lines.slice(0, kept!.ends[start - 1])
+	let lines = start ? kept!.lines.slice(0, kept!.ends[start - 1]) : []
 	let ends = kept && start ? kept.ends.slice(0, start) : []
 	let bash = kept && start ? kept.bash.filter((b) => b.at < start) : []
 	for (let b of bash) calls.set(b.id, b.key)
 	let stable = start
+	let keep = () => {
+		if (save) frame.state.history = { look, items: items.slice(0, stable), ends: ends.slice(0, stable), bash, lines }
+	}
 	for (let i = start; i < items.length; i++) {
+		if (stable === i && i > start && performance.now() > deadline) {
+			keep()
+			return undefined
+		}
 		let item = items[i]!
 		if (item.type === 'tool' && item.name === 'bash' && /^\d+(?:\.\d+)?$/.test(item.key)) {
 			calls.set(item.id, item.key)
@@ -190,14 +194,15 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 		}
 		if (item.type === 'question' && view.form?.id === item.id) {
 			let f = formView.formLines(view.form, width)
-			block(f.rows, itemView.itemStyle(item))
+			if (f.rows.length && lines.length) lines.push('')
+			for (let r of f.rows) lines.push(...ansi.paintRows(r, itemView.itemStyle(item), cols))
 			// Counted from the end: the question above may flow on.
 			formCursor = { row: lines.length - (f.rows.length - f.cursor.row), col: ansi.PAD.length + f.cursor.col }
 		} else {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
 			let rows = frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls)
 			rows = frame.highWater(rows, item, cols, session, streams)
-			if (rows.length && (lines.length || above)) lines.push('')
+			if (rows.length && lines.length) lines.push('')
 			for (let r of rows) lines.push(r)
 			// A streaming block or a question being answered is redrawn
 			// every frame; so is everything after it.
@@ -205,7 +210,26 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 		}
 		ends.push(lines.length)
 	}
-	frame.state.history = { look, items: items.slice(0, stable), ends: ends.slice(0, stable), bash, lines }
+	keep()
+	return formCursor ? { lines, formCursor } : { lines }
+}
+
+// The frame for `view` on a terminal of `rows` × `cols`. `full`: full
+// mode, where blank rows after a short history put the chrome on the
+// screen's last rows, so the prompt is always at the bottom
+// (tasks/cc/terminal.md, Height management). `past`: the items' rows
+// (layout), laid out already.
+function build(view: View, cols: number, rows = 24, full = false, past: Past = frame.layout(view, cols)!): Frame {
+	let width = Math.max(1, cols - 2 * ansi.PAD.length)
+	let lines: string[] = past.lines.slice()
+	// Whether something is above `lines` (the history, above the chrome).
+	let above = false
+	let block = (rows: string[], style: Style | undefined) => {
+		if (!rows.length) return
+		if (lines.length || above) lines.push('')
+		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
+	}
+	let formCursor = view.form ? past.formCursor : undefined
 	// The transcript's tail, right after it (never across the full-mode
 	// padding): the inbox, each message drawn as the prompt it will
 	// become, (steering) > text, then prompts on their way to the host,
@@ -267,4 +291,4 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined }, build, itemRows, highWater, glyph, withCursor, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined }, layout, build, itemRows, highWater, glyph, withCursor, promptWidth }

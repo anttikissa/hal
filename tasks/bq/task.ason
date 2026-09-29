@@ -2,12 +2,8 @@
 	title: 'Lazy history: the tail first, the rest on demand',
 	spec: `Opening a session costs what is shown, not the size of its history. A snapshot carries the transcript of the history's tail only (the last records up to a byte budget, about 256 KB, never cutting a turn in two) plus everything the state needs from earlier (an open question, the last prompt for editing, inbox, draft, usage), and says whether earlier records exist. A client gets earlier records with a \`history\` command { sessionId, before } answered in pages. The terminal paints the tail at once and then fetches the rest in the background, repainting once when it has all of it (full-mode rules of tasks/cc/terminal.md hold: the frame still ends up with every history line). The web prepends earlier pages when the reader scrolls near the top, keeping what they were reading in place. After first paint, both clients load the other open tabs' tails in background, nearest focused tab first, one snapshot per event-loop slice; the tab bar entries still come from the tabs event. A switch to a loaded tab uses its cached transcript immediately. Background loading is not intentionally throttled after startup.
 On the host nothing reads every session or every history eagerly: listing tabs reads only tabs.ason and the open sessions' metadata; the newest session is found from directory names; recovering unfinished turns reads tails (history.tail already does); provider input is rebuilt from the full history only when a turn runs, then kept in memory while the session is open.
-Tests: a snapshot of a 20 MB history reads at most the budget from disk (count bytes read), holds the tail items and an open question from far back; paging back yields every record exactly once and in order; the terminal's frame after the background load equals the frame from a full load.`,
+Tests: a snapshot of a 20 MB history reads at most the budget from disk (count bytes read), holds the tail items and an open question from far back; paging back yields every record exactly once and in order; the terminal's frame after the background load equals the frame from a full load. Applying fetched pages compares them with the snapshot's stand-ins only while earlier pages remain (the web's per-page apply); the terminal's one apply of all pages never stringifies them (that cost 100+ ms on a 50 MB history, task 7j).`,
 	status: 'done',
-	needs: [
-		'7w',
-		'4s'
-	],
 	notes: [
 		'history.tail() reads the last 64 KiB and falls back to a full readSync when the last line is longer; with images in history (task 2a stores blob refs, not bytes) lines stay small, but a single huge tool result can still trigger the fallback. Page by byte offsets from the end, not by record counts from the start.',
 		'replay.current(records) applies prompt replacement (task wb): an edited prompt supersedes records before the tail boundary too. The snapshot must fold through current() over enough history to be right, or send the replacement as part of the tail.',
@@ -17,5 +13,6 @@ Tests: a snapshot of a 20 MB history reads at most the budget from disk (count b
 		"history.open no longer reads the whole file: it repairs only the end, so a corrupt record further back is reported when read (readSync, a snapshot), not at open. readSync keeps each open session's records in memory and reads only what was appended since; tests that simulate a host restart must call history.stop(false) as the real exit handler does, or the in-memory turn never reaches disk.",
 		"Web: transcript.prepend puts page items in front, so every item's index shifts. The web transcript keyed rows by position (task 4s), which is only safe while items append: after a page lands each card is rebound to another item and open cards move with their slot. Rows need a key that survives prepending, and the 4s render test loads a page and asserts the cards already shown stay connected with their open state.",
 		'Task a7 supersedes the old note saying background tabs wait until shown: both clients now prefetch all open tabs tails after focused paint, keep live subscriptions, and switch to cached transcripts. Full earlier-page backfill still starts only when a terminal tab is focused or the web requests it.'
-	]
+	],
+	needs: ['7w', '4s']
 }

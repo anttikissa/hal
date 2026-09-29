@@ -23,13 +23,19 @@
 //   such a chain is always rewritten whole, from its first row.
 
 import { ansi } from './ansi.ts'
-import { frame, type Frame, type View } from './frame.ts'
+import { frame, type Frame, type Past, type View } from './frame.ts'
 import { terminal } from './terminal.ts'
 
 export interface Output {
 	write(s: string): void
+	/** Write what `make` returns when the bytes before it are out, so a
+	 * big repaint is joined and encoded a piece at a time (task 7j). */
+	defer?(make: () => string): void
 	size(): { rows: number; cols: number }
 }
+
+// Bytes to write: a string, or a piece of a big one made when written.
+type Part = string | (() => string)
 
 interface RenderState {
 	out: Output | null
@@ -44,6 +50,11 @@ interface RenderState {
 	parked: boolean
 	timer: ReturnType<typeof setTimeout> | null
 	dirty: boolean
+	/** The items' rows painted last and whose tab they are: shown again
+	 * while a long history is laid out in slices. */
+	past: { session: string | undefined; past: Past } | undefined
+	/** The next slice of that layout. */
+	slicing: ReturnType<typeof setTimeout> | null
 }
 
 const CSI = '\x1b['
@@ -64,6 +75,8 @@ function createState(): RenderState {
 		parked: false,
 		timer: null,
 		dirty: false,
+		past: undefined,
+		slicing: null,
 	}
 }
 
@@ -78,15 +91,38 @@ function flows(line: string | undefined): boolean {
 	return !!line?.endsWith(ansi.FLOW)
 }
 
-// Rows as written: CRLF between them, none after a row that flows on.
-function join(lines: string[]): string {
-	return lines.map((l, i) => (flows(l) ? l.slice(0, -ansi.FLOW.length) : i < lines.length - 1 ? l + '\r\n' : l)).join('')
+// Rows from..to-1 as written: CRLF between them, none after a row that
+// flows on.
+function join(lines: string[], from = 0, to = lines.length): string {
+	let out = ''
+	for (let i = from; i < to; i++) {
+		let l = lines[i]!
+		out += flows(l) ? l.slice(0, -ansi.FLOW.length) : i < to - 1 ? l + '\r\n' : l
+	}
+	return out
+}
+
+// All the rows, joined a piece at a time as they are written.
+function rowParts(lines: string[]): Part[] {
+	let n = render.chunkRows()
+	if (lines.length <= n) return [join(lines)]
+	let parts: Part[] = []
+	for (let a = 0; a < lines.length; a += n) {
+		let b = Math.min(lines.length, a + n)
+		parts.push(() => join(lines, a, b) + (b < lines.length && !flows(lines[b - 1]) ? '\r\n' : ''))
+	}
+	return parts
 }
 
 // Clear screen and scrollback, write the whole frame. The cursor ends
 // on its last row.
-function canonical(lines: string[]): string {
-	return CLEAR_ALL + join(lines)
+function canonical(lines: string[]): Part[] {
+	return [CLEAR_ALL, ...rowParts(lines)]
+}
+
+// Parts made into one string (tests, small frames).
+function text(parts: Part[]): string {
+	return parts.map((p) => (typeof p === 'string' ? p : p())).join('')
 }
 
 /**
@@ -94,13 +130,17 @@ function canonical(lines: string[]): string {
  * `next`, with `rows` terminal rows. Updates the state as if written.
  */
 function paint(next: Frame, rows: number, force = false): string {
+	return text(render.paintParts(next, rows, force))
+}
+
+function paintParts(next: Frame, rows: number, force = false): Part[] {
 	let st = render.state
 	let prev = st.prev
 	let lines = next.lines
 	let wasFull = st.fullscreen
 	// The last written row, where the cursor is after the body below.
 	let row: number
-	let body: string
+	let body: Part[]
 	if (force && !wasFull && st.cursorRow >= rows) {
 		// Our top is out of reach (the terminal shrank): no clean
 		// repaint in place is possible any more.
@@ -112,7 +152,7 @@ function paint(next: Frame, rows: number, force = false): string {
 	} else if (force || !prev.length) {
 		// Grow mode, or the first paint: from the top of our frame (the
 		// cursor, on a first paint) clear down and write everything.
-		body = '\r' + move(st.cursorRow, 0) + `${CSI}J` + join(lines)
+		body = ['\r' + move(st.cursorRow, 0) + `${CSI}J`, ...rowParts(lines)]
 		row = lines.length - 1
 	} else {
 		let first = 0
@@ -125,7 +165,7 @@ function paint(next: Frame, rows: number, force = false): string {
 			let out = move(st.cursorRow, next.cursor.row) + render.column(next.cursor.col)
 			st.cursorRow = next.cursor.row
 			if (lines.length > rows) st.fullscreen = true
-			return out
+			return [out]
 		}
 		let writableTop = Math.max(0, prev.length - rows)
 		if (wasFull && (first < writableTop || lines.length < prev.length)) {
@@ -133,7 +173,7 @@ function paint(next: Frame, rows: number, force = false): string {
 			row = lines.length - 1
 		} else if (first >= lines.length) {
 			// Only rows at the end went away.
-			body = move(st.cursorRow, first) + `\r${CSI}J`
+			body = [move(st.cursorRow, first) + `\r${CSI}J`]
 			row = first
 		} else {
 			// Rewrite the rows that changed from the first change on (a
@@ -160,7 +200,7 @@ function paint(next: Frame, rows: number, force = false): string {
 					let old = Math.min(end, prev.length - 1) - i
 					if (old > 0) parts.push(`${CSI}B${CSI}2K`.repeat(old), move(i + old, i), '\r')
 				}
-				parts.push(join(lines.slice(i, end + 1)))
+				parts.push(join(lines, i, end + 1))
 				at = i = end
 			}
 			row = at
@@ -170,13 +210,13 @@ function paint(next: Frame, rows: number, force = false): string {
 				parts.push(move(at, lines.length - 1), `\r${CSI}1B${CSI}J`)
 				row = lines.length
 			}
-			body = parts.join('')
+			body = [parts.join('')]
 		}
 	}
 	if (lines.length > rows) st.fullscreen = true
 	st.prev = lines
 	st.cursorRow = next.cursor.row
-	return SYNC_ON + HIDE_CURSOR + body + move(row, next.cursor.row) + render.column(next.cursor.col) + SHOW_CURSOR + SYNC_OFF
+	return [SYNC_ON + HIDE_CURSOR, ...body, move(row, next.cursor.row) + render.column(next.cursor.col) + SHOW_CURSOR + SYNC_OFF]
 }
 
 function column(col: number): string {
@@ -210,14 +250,58 @@ function draw(force = false): void {
 		frame.state.rows = new WeakMap()
 		frame.state.peaks.clear()
 		frame.state.history = undefined
+		st.past = undefined
 	}
-	let next = frame.build(st.view, cols, rows, st.fullscreen)
+	// A long history is laid out a slice at a time (task 7j). Until it
+	// is, the tab's rows painted last stay; a tab not painted since the
+	// last full redraw shows its last screenful of items meanwhile.
+	let session = st.view.transcript?.meta.id
+	let past = frame.layout(st.view, cols, performance.now() + render.sliceMs())
+	if (!past) {
+		render.later()
+		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false)!
+	}
+	st.past = { session, past }
+	let next = frame.build(st.view, cols, rows, st.fullscreen, past)
 	// The modal's list moves only as far as it must from where it was.
 	if (st.view.modal && next.modalScroll !== undefined) st.view.modal.scroll = next.modalScroll
 	// So does the prompt box.
 	st.view.prompt.scroll = next.promptScroll
-	st.out.write(render.paint(next, rows, force))
+	let out = st.out
+	let pending = ''
+	for (let p of render.paintParts(next, rows, force)) {
+		if (typeof p === 'string') pending += p
+		else if (out.defer) {
+			if (pending) out.write(pending)
+			pending = ''
+			out.defer(p)
+		} else pending += p()
+	}
+	if (pending) out.write(pending)
 	render.painted(st.view)
+}
+
+// `view` with only the last items of its transcript, about a screen of
+// rows `cols` wide.
+function tail(view: View, cols: number, rows: number): View {
+	let t = view.transcript
+	if (!t) return view
+	let at = t.items.length
+	for (let n = 0; at > 0 && n < rows; ) n += frame.itemRows(t.items[--at]!, cols, t.meta.id).length + 1
+	return { ...view, transcript: { ...t, items: t.items.slice(at) } }
+}
+
+// Lays out the next slice of the history in a task of its own, and
+// paints once it is all laid out.
+function later(): void {
+	let st = render.state
+	if (st.slicing) return
+	st.slicing = setTimeout(() => {
+		st.slicing = null
+		if (!st.out) return
+		if (frame.layout(st.view, st.out.size().cols, performance.now() + render.sliceMs())) render.request()
+		else render.later()
+	}, 0)
 }
 
 /**
@@ -273,6 +357,7 @@ function init(out: Output | null = terminal.state.io): void {
 /** Forget everything (tests). */
 function reset(): void {
 	if (render.state.timer) clearTimeout(render.state.timer)
+	if (render.state.slicing) clearTimeout(render.state.slicing)
 	render.state = createState()
 	frame.state.peaks.clear()
 	frame.state.history = undefined
@@ -282,11 +367,18 @@ export const render = {
 	state: createState(),
 	/** Minimum time between two paints. */
 	frameMs: () => 16,
+	/** How long a slice of history layout may run before yielding. */
+	sliceMs: () => 4,
+	/** Rows joined per piece of a big repaint. */
+	chunkRows: () => 1000,
 	/** Told every view painted (main.ts waits for the first tab's). */
 	painted: (_view: View): void => {},
 	paint,
+	paintParts,
 	column,
 	draw,
+	tail,
+	later,
 	request,
 	show,
 	park,

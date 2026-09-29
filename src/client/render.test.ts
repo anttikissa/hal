@@ -561,3 +561,31 @@ describe('terminal.redraw', () => {
 		}
 	})
 })
+
+describe('a long history (task 7j)', () => {
+	test('is laid out in slices: the prompt paints meanwhile, and the end is the frame built at once', async () => {
+		let slice = render.sliceMs
+		render.sliceMs = () => -1
+		try {
+			setup(8, 30)
+			let list = items(40)
+			render.state.view = { transcript: transcript(list), prompt: { text: '', cursor: 0 } }
+			render.draw()
+			expect(frameText()).toContain(' a39')
+			expect(frameText()).not.toContain(' q0')
+			render.state.view.prompt = { text: 'typed', cursor: 5 }
+			render.draw()
+			expect(term.screen().join('\n')).toContain('typed')
+			while (render.state.slicing) await Bun.sleep(1)
+			expect(term.content()).toEqual(frameText())
+			let sliced = frameText()
+			render.reset()
+			setup(8, 30)
+			render.sliceMs = slice
+			show(list, 'typed')
+			expect(frameText()).toEqual(sliced)
+		} finally {
+			render.sliceMs = slice
+		}
+	})
+})

@@ -56,8 +56,9 @@ function complete(all: Sessions, sessionId: string): boolean {
 function apply(all: Sessions, t: Transcript): Transcript {
 	let b = all.get(t.meta.id)
 	if (!b?.pages.length) return t
-	let fetched = new Set(b.pages.map((r) => JSON.stringify(r)))
-	let keep = b.older !== undefined && !b.earlier.some((r) => fetched.has(r))
+	// Stand-ins stay on top while pages further back remain; once all are
+	// in (the terminal's one apply), no page need be compared with them.
+	let keep = b.older !== undefined && !!b.earlier.length && !b.pages.some((r) => b.earlier.includes(JSON.stringify(r)))
 	let out = transcript.prepend(t, b.loaded, b.pages, keep)
 	b.loaded = [...b.pages, ...b.loaded]
 	b.pages = []
