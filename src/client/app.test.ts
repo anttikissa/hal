@@ -688,11 +688,18 @@ test('web links carry the latest link code only in their hidden target', () => {
 	startOn(['a', 'b'])
 	try {
 		app.onEvent({ type: 'auth', code: 'k3x9qa', link: 'https://h.example' })
+		app.onEvent({ type: 'output', sessionId: 'a', text: 'AGENTS.md changed', n: 1 })
 		type('see [image/frdbn1.png]')
 		let lines = frame.build(appView.view(), 60).lines
 		let targets = lines.flatMap((l) => [...l.matchAll(/\x1b\]8;;([^\x07]+)\x07/g)].map((m) => m[1]))
 		expect(targets).toEqual(expect.arrayContaining(['https://h.example/a?auth=k3x9qa', 'https://h.example/b?auth=k3x9qa', 'https://h.example/image/frdbn1.png?auth=k3x9qa']))
 		expect(lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, '')).join('\n')).not.toContain('k3x9qa')
+		// A history item laid out before the server bound (on another port
+		// than the preferred one) links to where it really listens.
+		let item = () => frame.build(appView.view(), 60).lines.find((l) => l.includes('#1'))
+		expect(item()).toContain('https://h.example/a?auth=k3x9qa#1')
+		app.onEvent({ type: 'auth', code: 'k3x9qa', link: 'http://localhost:9003' })
+		expect(item()).toContain('http://localhost:9003/a?auth=k3x9qa#1')
 		// A replaced code is what the next paint links with.
 		app.onEvent({ type: 'auth', code: 'm2p7rt', link: 'https://h.example' })
 		expect(frame.build(appView.view(), 60).lines.join('\n')).toContain('https://h.example/a?auth=m2p7rt')

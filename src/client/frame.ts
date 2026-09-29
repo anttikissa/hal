@@ -97,7 +97,9 @@ function promptWidth(cols: number): number {
 // painted with (task e3 notes).
 function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>): string[] {
 	let style = itemView.itemStyle(item)
-	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? calls?.get(item.id) ?? '' : ''}`
+	// The web address is in every item's link: a server that bound after
+	// the first paint (another port) must reach rows laid out before it.
+	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? calls?.get(item.id) ?? '' : ''} ${ansi.state.web.url}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
@@ -171,7 +173,7 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	let formCursor: Frame['cursor'] | undefined
 	// The rows of items drawn last frame and unchanged since are reused
 	// as they are: a frame costs what changed, not the whole history.
-	let look = `${cols} ${session} ${itemView.resultRows()} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''}`
+	let look = `${cols} ${session} ${itemView.resultRows()} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
 	let kept = frame.state.history
 	let start = 0
 	if (kept?.look === look) while (start < kept.items.length && items[start] === kept.items[start]) start++
