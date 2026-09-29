@@ -30,6 +30,7 @@ function looksLike(mediaType: string, bytes: Uint8Array): boolean {
 	if (mediaType === 'image/jpeg') return head('\xff\xd8\xff')
 	if (mediaType === 'image/gif') return head('GIF8')
 	if (mediaType === 'image/webp') return head('RIFF') && head('WEBP', 8)
+	if (mediaType === 'application/octet-stream') return true
 	try {
 		new TextDecoder('utf-8', { fatal: true }).decode(bytes)
 		return true
@@ -40,7 +41,7 @@ function looksLike(mediaType: string, bytes: Uint8Array): boolean {
 
 // The bytes of an attachment's base64 `data`; throws why it is refused.
 function decode(mediaType: string, data: string): Buffer {
-	if (!attachments.types[mediaType]) throw new Error(`unsupported attachment type ${JSON.stringify(mediaType)}; expected png, jpeg, gif, webp or text/plain`)
+	if (!attachments.types[mediaType] && mediaType !== 'application/octet-stream') throw new Error(`unsupported attachment type ${JSON.stringify(mediaType)}`)
 	let max = attachments.maxBytes()
 	// Checked before decoding: base64 is 4 characters per 3 bytes.
 	if (data.length > Math.ceil(max / 3) * 4) throw new Error(`attachment larger than ${max / 1024 / 1024} MB`)
@@ -55,7 +56,7 @@ function decode(mediaType: string, data: string): Buffer {
 // Checks and stores one attachment; throws the reason it is refused.
 function store(sessionId: string, mediaType: string, data: string): Stored {
 	let bytes = blobs.decode(mediaType, data)
-	let ext = attachments.types[mediaType]!
+	let ext = attachments.types[mediaType] ?? 'bin'
 	mkdirSync(blobs.dir(sessionId), { recursive: true })
 	let blob: string
 	do blob = Buffer.from(crypto.getRandomValues(new Uint8Array(6))).toString('hex')
@@ -109,7 +110,7 @@ function file(name: string): { bytes: Buffer; mediaType: string; tmp?: string; b
 // The session's blob with this exact id: its file and media type.
 function find(sessionId: string, blob: string): { path: string; mediaType: string } | undefined {
 	if (!attachments.blobId.test(blob)) return undefined
-	for (let [mediaType, ext] of Object.entries(attachments.types)) {
+	for (let [mediaType, ext] of [...Object.entries(attachments.types), ['application/octet-stream', 'bin'] as const]) {
 		let path = `${blobs.dir(sessionId)}/${blob}.${ext}`
 		if (existsSync(path)) return { path, mediaType }
 	}
@@ -132,7 +133,7 @@ function named(sessionId: string, m: Marker): { path: string; mediaType: string 
 	let found = blobs.find(sessionId, m.blob)
 	if (m.file) {
 		let mediaType = attachments.nameType(m.file)
-		// A text file keeps its own extension (.md): its copy is by name.
+		if (!mediaType || (m.kind === 'paste' ? mediaType !== 'text/plain' : m.kind === 'file' ? mediaType !== 'application/octet-stream' : !mediaType.startsWith('image/'))) return undefined
 		let own = `${blobs.dir(sessionId)}/${m.file}`
 		if (mediaType && existsSync(own)) found = { path: own, mediaType }
 		if (found) return found.mediaType === mediaType ? found : undefined
@@ -143,7 +144,7 @@ function named(sessionId: string, m: Marker): { path: string; mediaType: string 
 		writeFileSync(path, fresh.bytes, { mode: 0o600 })
 		return { path, mediaType: fresh.mediaType }
 	}
-	return found && (found.mediaType === 'text/plain') === (m.kind === 'paste') ? found : undefined
+	return found && (m.kind === 'paste' ? found.mediaType === 'text/plain' : m.kind === 'file' ? found.mediaType === 'application/octet-stream' : found.mediaType.startsWith('image/')) ? found : undefined
 }
 
 // The markers in `text` that name no blob of the session.
@@ -178,10 +179,11 @@ function expand(sessionId: string, text: string): string {
 	let parts: string[] = []
 	let from = 0
 	for (let m of attachments.markers(text)) {
-		if (m.kind !== 'paste') continue
+		if (m.kind !== 'paste' && m.kind !== 'file') continue
 		let found = blobs.named(sessionId, m)
-		if (!found || found.mediaType !== 'text/plain') continue
-		parts.push(text.slice(from, m.at), readFileSync(found.path, 'utf8'))
+		if (!found) continue
+		let path = m.file && existsSync(`${paths.fileDir(m.file)}/${m.file}`) ? `${paths.fileDir(m.file)}/${m.file}` : found.path
+		parts.push(text.slice(from, m.at), m.kind === 'file' ? `${m.text} (read with bash: ${path})` : readFileSync(found.path, 'utf8'))
 		from = m.at + m.text.length
 	}
 	if (!from) return text

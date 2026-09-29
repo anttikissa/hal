@@ -203,7 +203,7 @@ async function open(id: string): Promise<SessionMeta> {
 // expanded to the pasted text (blobs.expand): history keeps markers.
 async function messages(id: string) {
 	return replay.toMessages(history.readSync(id)).map((m) =>
-		m.role === 'user' ? { ...m, blocks: m.blocks.map((b) => (b.type === 'text' && b.text.includes('[paste') ? { ...b, text: blobs.expand(id, b.text) } : b)) } : m,
+		m.role === 'user' ? { ...m, blocks: m.blocks.map((b) => (b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b)) } : m,
 	)
 }
 

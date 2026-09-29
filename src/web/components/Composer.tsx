@@ -102,7 +102,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 						e.currentTarget.value = ''
 					}}
 				/>
-				<button type="button" aria-label="Attach file" title="Attach image or text file" disabled={!!props.view.form} onClick={() => picker.click()}>
+				<button type="button" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onClick={() => picker.click()}>
 					+
 				</button>
 				<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={send}>

@@ -22,18 +22,16 @@ const textExts = new Set(
 )
 const textTypes = /^(?:text\/|application\/(?:json|xml|javascript|x-sh|x-yaml|yaml|toml|sql|x-httpd-php)\b)/
 
-// How a file (its name, and media type if known) is attached: the
-// image's media type, 'text/plain', or undefined when it is neither (a
-// PDF, a zip) and is not attached. The web's drop and picker and the
-// terminal's dropped paths use this one rule.
+// The file's upload kind. Unknown binary formats use octet-stream and
+// keep a safe extension; all their bytes stay opaque.
 function fileKind(name: string, type = ''): string | undefined {
 	let ext = /\.([^./]+)$/.exec(name)?.[1]?.toLowerCase()
 	if (types[type] && type.startsWith('image/')) return type
 	let image = Object.keys(types).find((t) => t.startsWith('image/') && (types[t] === ext || (ext === 'jpeg' && t === 'image/jpeg')))
 	if (!type && image) return image
 	if ((ext && textExts.has(ext)) || textTypes.test(type)) return 'text/plain'
-	// No extension and no type: README, Makefile, LICENSE.
-	return !ext && !type ? 'text/plain' : undefined
+	if (!ext && !type) return 'text/plain'
+	return 'application/octet-stream'
 }
 
 // Blob ids: 12 random lowercase hex digits made by the host, or the
@@ -45,25 +43,20 @@ const blobId = /^(?:[0-9a-f]{12}|[0-9a-z]{6})$/
 // file's own (.md, .csv; .txt for a pasted text or a file without one).
 // The host keeps it at paths.fileDir(name)/<name> until a prompt copies
 // it into a blob.
-const imageExt = '(?:png|jpg|gif|webp)'
-const textExt = `(?:${[...textExts].sort((a, b) => b.length - a.length).join('|')})`
-const fileName = new RegExp(`^[0-9a-z]{6}\\.(?:${imageExt.slice(3, -1)}|${textExt.slice(3, -1)})$`)
+const safeExt = '[a-z0-9]{1,8}'
+const fileName = new RegExp(`^[0-9a-z]{6}\\.${safeExt}$`)
 
-// [image/<name>] or [paste/<name>] alone, as clients link them: group 1
-// is the address of its page on the host (/image/<name>).
-const fileMarker = new RegExp(`\\[(image\\/[0-9a-z]{6}\\.${imageExt}|paste\\/[0-9a-z]{6}\\.${textExt})\\]`, 'g')
-
-// [image/<name>], [paste/<name>], and the older [image <blob>] and
-// [paste <blob>, N lines] that history may still hold.
-const markerPattern = new RegExp(`\\[(?:(image|paste)\\/([0-9a-z]{6}\\.(?:${imageExt.slice(3, -1)}|${textExt.slice(3, -1)}))|image ([0-9a-f]{12})|paste ([0-9a-f]{12}), \\d+ lines?)\\]`, 'g')
+// Marker addresses are links in both clients.
+const fileMarker = new RegExp(`\\[((?:image\\/[0-9a-z]{6}\\.(?:png|jpg|gif|webp)|paste\\/[0-9a-z]{6}\\.(?:${[...textExts].join('|')})|file\\/[0-9a-z]{6}\\.${safeExt}))\\]`, 'g')
+const markerPattern = new RegExp(`\\[(?:(image|paste|file)\\/([0-9a-z]{6}\\.${safeExt})|image ([0-9a-f]{12})|paste ([0-9a-f]{12}), \\d+ lines?)\\]`, 'g')
 
 // `file`: the name of an [image/<name>] or [paste/<name>] marker, whose
 // blob is the name without its extension.
-export type Marker = { text: string; kind: 'image' | 'paste'; blob: string; at: number; file?: string }
+export type Marker = { text: string; kind: 'image' | 'paste' | 'file'; blob: string; at: number; file?: string }
 
 function markers(text: string): Marker[] {
 	return [...text.matchAll(markerPattern)].map((m) => {
-		if (m[1]) return { text: m[0], kind: m[1] as 'image' | 'paste', blob: m[2]!.slice(0, 6), at: m.index, file: m[2] }
+		if (m[1]) return { text: m[0], kind: m[1] as Marker['kind'], blob: m[2]!.slice(0, 6), at: m.index, file: m[2] }
 		return { text: m[0], kind: m[3] ? ('image' as const) : ('paste' as const), blob: (m[3] ?? m[4])!, at: m.index }
 	})
 }
@@ -74,7 +67,7 @@ function markers(text: string): Marker[] {
 function newName(mediaType: string, from = ''): string {
 	let chars = [...crypto.getRandomValues(new Uint8Array(6))].map((b) => (b % 36).toString(36)).join('')
 	let own = /\.([^./]+)$/.exec(from)?.[1]?.toLowerCase()
-	let ext = mediaType === 'text/plain' && own && textExts.has(own) ? own : types[mediaType]
+	let ext = mediaType === 'application/octet-stream' ? own && /^[a-z0-9]{1,8}$/.test(own) && !textExts.has(own) && !Object.values(types).includes(own) ? own : 'bin' : mediaType === 'text/plain' && own && textExts.has(own) ? own : types[mediaType]
 	return `${chars}.${ext}`
 }
 
@@ -82,12 +75,12 @@ function newName(mediaType: string, from = ''): string {
 function nameType(name: string): string | undefined {
 	if (!fileName.test(name)) return undefined
 	let ext = name.slice(7)
-	return textExts.has(ext) ? 'text/plain' : Object.keys(types).find((t) => types[t] === ext)
+	return textExts.has(ext) ? 'text/plain' : Object.keys(types).find((t) => types[t] === ext) ?? 'application/octet-stream'
 }
 
 // The marker of pasted file `name`: [image/<name>] or [paste/<name>].
 function named(name: string): string {
-	return `[${nameType(name) === 'text/plain' ? 'paste' : 'image'}/${name}]`
+	return `[${nameType(name) === 'text/plain' ? 'paste' : nameType(name) === 'application/octet-stream' ? 'file' : 'image'}/${name}]`
 }
 
 // The marker a prompt uses for a stored blob; `lines` for a paste.

@@ -9,7 +9,7 @@
 import { attachments } from '../common/attachments.ts'
 import { blobs } from './blobs.ts'
 
-const pagePath = /^\/(image|paste)\/([0-9a-z]{6})(?:\.([a-z0-9]{1,8}))?$/
+const pagePath = /^\/(image|paste|file)\/([0-9a-z]{6})(?:\.([a-z0-9]{1,8}))?$/
 const rawPath = /^\/raw\/([0-9a-z]{6}\.[a-z0-9]{1,8})$/
 
 function escape(s: string): string {
@@ -43,23 +43,24 @@ function serve(pathname: string, css: string): Response {
 	let stem = m?.[2]
 	// An extensionless page has exactly one matching file; never guess if
 	// different formats happen to share the same six-character stem.
-	let exts = m?.[1] === 'paste' ? [...attachments.textExts] : Object.entries(attachments.types).filter(([type]) => type !== 'text/plain').map(([, ext]) => ext)
+	let exts = m?.[1] === 'paste' ? [...attachments.textExts] : m?.[1] === 'file' ? [] : Object.entries(attachments.types).filter(([type]) => type !== 'text/plain').map(([, ext]) => ext)
 	let names = stem && !m?.[3] ? exts.map((ext) => `${stem}.${ext}`).filter((n) => !!blobs.file(n)) : []
 	let name = raw ?? (m?.[3] ? `${stem}.${m[3]}` : names.length === 1 ? names[0] : undefined)
 	let found = name === undefined ? undefined : blobs.file(name)
-	if (!found || (m && (m[1] === 'paste') !== (found.mediaType === 'text/plain'))) return notFound()
+	if (!found || (m && (m[1] === 'paste' ? found.mediaType !== 'text/plain' : m[1] === 'file' ? found.mediaType !== 'application/octet-stream' : !found.mediaType.startsWith('image/')))) return notFound()
 	if (raw) {
 		let type = found.mediaType === 'text/plain' ? 'text/plain; charset=utf-8' : found.mediaType
-		return new Response(new Uint8Array(found.bytes), { headers: { 'content-type': type, 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=31536000, immutable' } })
+		return new Response(new Uint8Array(found.bytes), { headers: { 'content-type': type, 'content-disposition': found.mediaType === 'application/octet-stream' ? `attachment; filename="${name}"` : 'inline', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=31536000, immutable' } })
 	}
 	// "file /tmp/hal/image/ain96g.png (384 x 298, 50.4 kB)": no format,
 	// the extension already says it.
-	let detail = [found.mediaType !== 'text/plain' && dimensions(found.bytes, found.mediaType), size(found.bytes.length)].filter(Boolean).join(', ')
+	let detail = [found.mediaType.startsWith('image/') && dimensions(found.bytes, found.mediaType), size(found.bytes.length)].filter(Boolean).join(', ')
 	let where = [...(found.tmp ? [['file', found.tmp]] : []), ...found.blobs.map((p) => ['session copy', p])]
 	let header = where.map(([label, path], i) => `<div><span class="label">${label}</span> <code>${escape(path!)}</code>${i ? '' : ` (${escape(detail)})`}</div>`).join('')
 	let body =
 		found.mediaType === 'text/plain'
 			? `<pre>${escape(found.bytes.toString('utf8'))}</pre>`
+			: found.mediaType === 'application/octet-stream' ? `<p>Binary file. Use the host path above or download the original.</p>`
 			: `<img src="/raw/${name}" alt="${escape(attachments.named(name!))}">`
 	let html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(name!)}</title><style>${css}

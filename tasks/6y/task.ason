@@ -1,7 +1,10 @@
 {
 	title: 'Any small file can be dropped or pasted',
 	spec: 'A dropped or pasted file that is neither image nor text (PDF, archives, audio) up to 5 MB is uploaded to /tmp/hal/file/<random>.<ext> and the prompt gets a marker for it, so the model can read it with bash. Works on the web (drop, paste) and in the terminal (a dropped path to such a file). Bigger files are refused with a notice naming the limit (questions.md 127).',
-	status: 'planned',
+	status: 'done',
 	needs: [],
-	foldInto: ['n5']
+	foldInto: ['n5'],
+	notes: [
+		'Unknown binary types use application/octet-stream with at most 5 MB decoded; browser drops/pastes and terminal file paths produce [file/<random>.<safe ext>] (fallback .bin). The host stores /tmp/hal/file/<name> (or home/tmp/file in tests) and on prompt resolution copies to session blobs, then puts a read-with-bash path in provider text, not binary bytes. /file/<name> shows paths without previewing bytes, /raw/<name> downloads attachment with nosniff. Keep image/text markers and legacy blobs intact; tests cover PDF in CDP, opaque invalid UTF-8, cleanup, binary route and size limit.'
+	]
 }

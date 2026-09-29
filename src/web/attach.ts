@@ -21,7 +21,7 @@ function blob(b: Blob, mediaType: string, insert: Insert, from = ''): void {
 	let id = app.sessionId()
 	if (!id) return
 	let big = uploads.tooBig(b.size)
-	if (big) return insert(big)
+	if (big) return app.setNotice(big)
 	let command = connection.nextId()
 	insert(uploads.begin(id, command, mediaType, from))
 	b.arrayBuffer().then(
@@ -31,30 +31,27 @@ function blob(b: Blob, mediaType: string, insert: Insert, from = ''): void {
 }
 
 // What the file picker offers.
-const accept = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/*', ...[...attachments.textExts].map((e) => `.${e}`)].join(',')
+const accept = '' // The picker offers every file type.
 
 // How `file` is attached (common attachments.fileKind).
 const kind = (file: { name: string; type: string }): string | undefined => attachments.fileKind(file.name, file.type)
 
-// Files dropped or picked: each image or text file becomes a marker at
-// the caret, in order; the rest are named in a notice and not sent.
+// Files dropped or picked are uploaded at the caret in order.
 function files(list: ArrayLike<File>, insert: Insert): void {
-	let refused: string[] = []
-	for (let f of Array.from(list)) {
-		let type = attach.kind(f)
-		if (type) attach.blob(f, type, insert, f.name)
-		else refused.push(f.name)
-	}
-	if (refused.length) app.setNotice(`not attached (neither image nor text): ${refused.join(', ')}`)
+	for (let f of Array.from(list)) attach.blob(f, attach.kind(f) ?? 'application/octet-stream', insert, f.name)
 }
 
 // A paste into the box: true if taken here (the first image, or a long
 // text), so the caller stops the browser's own paste.
 function paste(data: Pasted, insert: Insert): boolean {
 	if (!app.sessionId()) return false
-	let item = Array.from(data.items ?? []).find((i) => i.kind === 'file' && i.type.startsWith('image/'))
-	let image = item?.getAsFile()
-	if (item && image) return (attach.blob(image, item.type, insert), true)
+	let item = Array.from(data.items ?? []).find((i) => i.kind === 'file')
+	let file = item?.getAsFile()
+	if (file) {
+		let name = 'name' in file && typeof file.name === 'string' ? file.name : `attachment.${item!.type.split('/')[1] ?? 'bin'}`
+		attach.blob(file, attachments.fileKind(name, item!.type) ?? 'application/octet-stream', insert, name)
+		return true
+	}
 	let text = prompt.clean(data.getData('text/plain'))
 	if (!uploads.long(text)) return false
 	attach.blob(new Blob([text]), 'text/plain', insert)

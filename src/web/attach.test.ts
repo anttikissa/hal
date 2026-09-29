@@ -98,22 +98,29 @@ test('long pasted text becomes a text attachment; short text pastes natively', a
 	expect(attaches()[0].mediaType).toBe('text/plain')
 })
 
-test('dropped files become markers at the caret in drop order; others are named, never sent', async () => {
+test('pasted PDF file uploads rather than pasting clipboard text', async () => {
+	let file = new File([new Uint8Array([0x25, 0x50, 0xff])], 'report.pdf', { type: 'application/pdf' })
+	expect(attach.paste(clip([item(file)], 'ordinary text'), insert)).toBe(true)
+	expect(app.state.text).toMatch(/^\[file\/[0-9a-z]{6}\.pdf\]$/)
+	await tick()
+	expect(attaches()[0]).toMatchObject({ mediaType: 'application/octet-stream', name: app.state.text.slice(6, -1) })
+})
+
+test('dropped binary, image and text files become markers at the caret in order', async () => {
 	type('ab')
 	caret = 1
 	let files = [new File([png], 'shot.png', { type: 'image/png' }), new File(['%PDF-1.4'], 'paper.pdf', { type: 'application/pdf' }), new File(['# hi\n'], 'notes.md', { type: '' })]
 	attach.files(files, insert)
-	let [, image, paste] = /^a\[image\/([0-9a-z]{6}\.png)\]\[paste\/([0-9a-z]{6}\.md)\]b$/.exec(app.state.text)!
+	let [, image, file, paste] = /^a\[image\/([0-9a-z]{6}\.png)\]\[file\/([0-9a-z]{6}\.pdf)\]\[paste\/([0-9a-z]{6}\.md)\]b$/.exec(app.state.text)!
 	await tick()
 	expect(attaches().map((c) => [c.name, c.mediaType, Buffer.from(c.data, 'base64').toString()])).toEqual([
 		[image, 'image/png', Buffer.from(png).toString()],
+		[file, 'application/octet-stream', '%PDF-1.4'],
 		[paste, 'text/plain', '# hi\n'],
 	])
-	expect(app.notice()).toContain('paper.pdf')
-	expect(app.notice()).not.toContain('notes.md')
 })
 
-test('a file is an image the host takes, text by extension or type, or refused', () => {
+test('a file is an image, text by extension or type, or opaque binary', () => {
 	let kind = (name: string, type = '') => attach.kind({ name, type })
 	expect(kind('a.jpg', 'image/jpeg')).toBe('image/jpeg')
 	// macOS Chrome types TypeScript as video.
@@ -122,13 +129,13 @@ test('a file is an image the host takes, text by extension or type, or refused',
 	expect(kind('weird', 'text/x-custom')).toBe('text/plain')
 	expect(kind('Makefile')).toBe('text/plain')
 	expect(kind('logo.svg', 'image/svg+xml')).toBe('text/plain')
-	for (let [name, type] of [['paper.pdf', 'application/pdf'], ['photo.heic', 'image/heic'], ['a.zip', 'application/zip'], ['blob.bin', ''], ['movie.mp4', 'video/mp4']]) expect(kind(name!, type)).toBeUndefined()
+	for (let [name, type] of [['paper.pdf', 'application/pdf'], ['photo.heic', 'image/heic'], ['a.zip', 'application/zip'], ['blob.bin', ''], ['movie.mp4', 'video/mp4']]) expect(kind(name!, type)).toBe('application/octet-stream')
 })
 
 test('an image too large to send is refused before reading it', () => {
 	attach.files([new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' })], insert)
 	expect(attaches()).toEqual([])
-	expect(app.state.text).toContain('5 MB')
+	expect(app.notice()).toContain('5 MB')
 })
 
 // What the page does on load (main.tsx): read the settings the host

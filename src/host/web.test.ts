@@ -337,6 +337,24 @@ test('a pasted long text lands at the stated /tmp path; its page names that path
 	expect(await (await get('/paste/0005ab.txt')).text()).toContain(`${paths.sessionDir(id)}/blobs/0005ab.txt`)
 })
 
+test('binary file page previews no bytes and raw download is safe', async () => {
+	await server.serve()
+	web.start()
+	let file = blobs.stage('a1b2c3.pdf', 'application/octet-stream', Buffer.from([0, 255, 60, 88]).toString('base64'))
+	expect(file.marker).toBe('[file/a1b2c3.pdf]')
+	let jar = await cookie()
+	let get = (path: string) => fetch(`${base()}${path}`, { headers: { cookie: jar } })
+	let page = await (await get('/file/a1b2c3.pdf')).text()
+	expect(page).toContain(`${paths.tmpDir()}/file/a1b2c3.pdf`)
+	expect(page).toContain('Binary file')
+	expect(page).not.toContain('&#60;X')
+	let raw = await get('/raw/a1b2c3.pdf')
+	expect(raw.headers.get('content-disposition')).toContain('attachment')
+	expect(raw.headers.get('x-content-type-options')).toBe('nosniff')
+	expect(new Uint8Array(await raw.arrayBuffer())).toEqual(new Uint8Array([0, 255, 60, 88]))
+	expect((await get('/image/a1b2c3.pdf')).status).toBe(404)
+})
+
 test('a file address takes a link code; a used or expired one gets the gate, which leads back there', async () => {
 	await server.serve()
 	web.start()
@@ -720,8 +738,8 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: '!', text: '!' })
 		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: '!' })
 		await b.waitFor(`document.activeElement === document.querySelector('textarea') && document.querySelector('textarea').value.split('!').length === 2`)
-		// Files dropped on the page attach at the caret in drop order; a PDF
-		// is named and refused, and the page stays where it is (task n5).
+		// Files dropped on the page attach at the caret in drop order, including
+		// a PDF, and the page stays where it is (tasks n5, 6y).
 		mkdirSync(`${home}/drop`, { recursive: true })
 		writeFileSync(`${home}/drop/shot.png`, Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.from('pixels')]))
 		writeFileSync(`${home}/drop/notes.md`, '# dropped\n')
@@ -732,12 +750,12 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		for (let type of ['dragEnter', 'dragOver']) await b.call('Input.dispatchDragEvent', { type, x: 100, y: 100, data })
 		await b.waitFor(`!!document.querySelector('.entry.dropping')`)
 		await b.call('Input.dispatchDragEvent', { type: 'drop', x: 100, y: 100, data })
-		await b.waitFor(`/^\\[image\\/[0-9a-z]{6}\\.png\\]\\[paste\\/[0-9a-z]{6}\\.md\\]half/.test(document.querySelector('textarea').value)`)
-		expect(await b.evaluate(`document.querySelector('#notice').textContent`)).toContain('paper.pdf')
+		await b.waitFor(`/^\\[image\\/[0-9a-z]{6}\\.png\\]\\[paste\\/[0-9a-z]{6}\\.md\\]\\[file\\/[0-9a-z]{6}\\.pdf\\]half/.test(document.querySelector('textarea').value)`)
 		expect(await b.evaluate(`!!document.querySelector('.entry.dropping')`)).toBe(false)
-		let [image, paste] = [...(await b.evaluate(`document.querySelector('textarea').value`)).matchAll(/\/([0-9a-z]{6}\.(?:png|md))\]/g)].map((m) => m[1]!)
-		await until(() => existsSync(`${paths.fileDir(paste!)}/${paste}`) && existsSync(`${paths.fileDir(image!)}/${image}`))
+		let [image, paste, pdf] = [...(await b.evaluate(`document.querySelector('textarea').value`)).matchAll(/\/([0-9a-z]{6}\.(?:png|md|pdf))\]/g)].map((m) => m[1]!)
+		await until(() => [paste, image, pdf].every((name) => existsSync(`${paths.fileDir(name!)}/${name}`)))
 		expect(readFileSync(`${paths.fileDir(paste!)}/${paste}`, 'utf8')).toBe('# dropped\n')
+		expect(readFileSync(`${paths.fileDir(pdf!)}/${pdf}`, 'utf8')).toBe('%PDF-1.4\n')
 		expect(await b.evaluate(`location.href`)).toBe(href)
 	} finally {
 		host.cwd = origCwd

@@ -41,7 +41,8 @@ function imageDir(): string {
 // Where pasted file `name` (attachments.fileName) waits.
 function fileDir(name?: string): string {
 	if (name === undefined) return `${paths.tmpDir()}/file`
-	return attachments.nameType(name) === 'text/plain' ? `${paths.tmpDir()}/paste` : paths.imageDir()
+	let type = attachments.nameType(name)
+	return type === 'text/plain' ? `${paths.tmpDir()}/paste` : type === 'application/octet-stream' ? `${paths.tmpDir()}/file` : paths.imageDir()
 }
 
 // Everything else: socket, host lock, diagnostics, later peer and access
