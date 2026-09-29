@@ -21,6 +21,7 @@ const allowed: Record<string, string[]> = {
 	host: ['host', 'common'],
 	client: ['client', 'common'],
 	web: ['web', 'common'],
+	perf: ['perf', 'common'],
 }
 
 function violation(file: string, target: string): string | undefined {
@@ -99,7 +100,7 @@ test('src/web has no colour literals', () => {
 	expect(found).toEqual([])
 })
 
-test('src has only common, host, client and web directories', () => {
+test('src has only the layer directories', () => {
 	let dirs = new Set<string>()
 	for (let file of sourceFiles()) {
 		let l = layer(file)

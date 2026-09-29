@@ -91,6 +91,8 @@ point to it.
   No disk, sockets or process globals; imports only common.
 - `src/host/` — sessions, providers, disk. Imports host and common.
 - `src/client/` — terminal. Imports client and common.
+- `src/perf/` — the performance harness behind scripts/perf (tasks y9,
+  te); never loaded by Hal. Imports perf and common.
 - `src/web/` — browser client, a SolidJS 2 app (task 1b). Imports web
   and common only; host/web.ts bundles `main.tsx` into `index.html`
   with Bun.build on first request, compiling .tsx with the JSX
