@@ -6,17 +6,23 @@ import { type Tool, type ToolOutput, tools } from '../tools.ts'
 
 export const tool: Tool<ToolOutput> = {
 	name: 'read_blob',
-	description: 'Read a stored blob or history block. Text comes in pages: use offset (first line, 1-based) and limit (number of lines) to continue. Images return as images.',
+	description: 'Read an immutable blob or history record. Text is paged with offset (first line, 1-based) and limit. For lossless recovery of long/cut lines or JSON use charOffset (1-based character position) instead. Images return as images.',
 	parameters: {
 		type: 'object',
-		properties: { id: { type: 'string', description: 'A blob id, sessionId/blobId, #35, or sessionId#35' }, offset: { type: 'integer', minimum: 1 }, limit: { type: 'integer', minimum: 1 } },
+		properties: { id: { type: 'string', description: 'A blob id, sessionId/blobId, #35, or sessionId#35' }, offset: { type: 'integer', minimum: 1 }, limit: { type: 'integer', minimum: 1 }, charOffset: { type: 'integer', minimum: 1 } },
 		required: ['id'],
 	},
 	readOnly: true,
 	async run(input, ctx) {
 		if (typeof input.id !== 'string') throw new Error('id must be a string')
-		for (let key of ['offset', 'limit'] as const) if (input[key] !== undefined && (typeof input[key] !== 'number' || !Number.isSafeInteger(input[key]) || input[key] < 1)) throw new Error(`${key} must be a positive integer`)
-		let page = (text: string) => tools.page(text, input.offset as number | undefined, input.limit as number | undefined)
+		for (let key of ['offset', 'limit', 'charOffset'] as const) if (input[key] !== undefined && (typeof input[key] !== 'number' || !Number.isSafeInteger(input[key]) || input[key] < 1)) throw new Error(`${key} must be a positive integer`)
+		let page = (text: string) => {
+			if (input.charOffset === undefined) return tools.page(text, input.offset as number | undefined, input.limit as number | undefined)
+			let at = (input.charOffset as number) - 1
+			if (at > text.length) throw new Error(`charOffset ${input.charOffset} is past the end (${text.length} characters)`)
+			let end = Math.min(text.length, at + Math.max(1, tools.maxChars() - 200))
+			return text.slice(at, end) + (end < text.length ? `\n[characters ${at + 1}-${end} of ${text.length}; continue with charOffset ${end + 1}]` : '')
+		}
 		let ref = /^(?:([\w-]+)\/)?([0-9a-f]{12}|[0-9a-z]{6})$/.exec(input.id)
 		let block = /^(?:([\w-]+))?#([1-9]\d*)$/.exec(input.id)
 		if (!ref && !block) throw new Error(`invalid blob or block id: ${JSON.stringify(input.id)}`)
@@ -27,6 +33,12 @@ export const tool: Tool<ToolOutput> = {
 			let record = history.readSync(id).find((r) => r.n === n)
 			if (!record) throw new Error(`block ${input.id} not found`)
 			let value = record.type === 'assistant' ? record.block : record.type === 'user' && record.blocks.length === 1 ? record.blocks[0] : record
+			if (value?.type === 'tool_result') {
+				if (!value.image) return page(value.output)
+				let image = blobs.read(id, value.image.blob)
+				if (!image) throw new Error(`image blob ${value.image.blob} not found`)
+				return { text: page(value.output), image: { mediaType: image.mediaType, data: image.bytes.toString('base64') } }
+			}
 			if (value?.type === 'image') {
 				let image = blobs.read(id, value.blob)
 				if (!image) throw new Error(`image blob ${value.blob} not found`)

@@ -14,6 +14,7 @@ import { readdirSync } from 'fs'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
 import { blobs } from './blobs.ts'
 import type { ToolDef } from './provider.ts'
+import { pruning } from './pruning.ts'
 
 // `sessionId`: the session whose turn runs the call. `endTurn`: the
 // turn ends once this round's results are in, unless messages wait to
@@ -74,6 +75,8 @@ function page(text: string, offset = 1, limit = tools.maxLines()): string {
 async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlock> {
 	let result: ToolResultBlock
 	try {
+		let copied = pruning.copied(call.input)
+		if (copied) throw new Error(`Copied omission marker ${copied}: read the named record/blob with read_blob and retry with the actual value.`)
 		let tool = tools.all().get(call.name)
 		if (!tool) throw new Error(`unknown tool '${call.name}'`)
 		let out = await tool.run(call.input, { ...ctx, callId: call.id })

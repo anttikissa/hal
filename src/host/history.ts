@@ -18,6 +18,7 @@ import { diag } from './diag.ts'
 import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { provider, type ProviderRequest } from './provider.ts'
+import { pruning } from './pruning.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
@@ -201,10 +202,9 @@ async function open(id: string): Promise<SessionMeta> {
 
 // The session as provider messages, each prompt's paste markers
 // expanded to the pasted text (blobs.expand): history keeps markers.
-async function messages(id: string) {
-	return replay.toMessages(history.readSync(id)).map((m) =>
-		m.role === 'user' ? { ...m, blocks: m.blocks.map((b) => (b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b)) } : m,
-	)
+async function messages(id: string, budget: { overhead?: number; window?: number } = {}) {
+	let records = history.readSync(id).map((r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b) } : r)
+	return replay.toMessages(pruning.project(id, records, budget))
 }
 
 // One provider round of a turn. Passes stream events through,
@@ -214,6 +214,7 @@ async function messages(id: string) {
 // through tool calls and later rounds, until end().
 async function* record(id: string, providerName: string, events: AsyncIterable<StreamEvent>, by: By = {}): AsyncGenerator<StreamEvent> {
 	let before = history.state.running.get(id)
+	let inputRecords = history.readSync(id)
 	let prior = before ? addUsage(before.prior, before.turn.usage) : {}
 	let running: Running = { turn: blocks.newTurn(providerName), written: 0, prior, ns: [], starts: [], by, ...(before && contextOf(before)) }
 	let { turn } = running
@@ -237,6 +238,7 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 		turn.end = { type: 'error', message: String(e?.message ?? e) }
 	} finally {
 		flush(turn.blocks.length)
+		if (turn.end?.type === 'done') pruning.consumed(id, inputRecords)
 	}
 	if (turn.end && !running.ended) yield turn.end
 }
@@ -334,7 +336,7 @@ function started(id: string): string | undefined {
 // unanswered; the host's turns run them (host.ts).
 async function* turn(id: string, opts: Omit<ProviderRequest, 'model' | 'messages'> = {}, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
 	let modelId = sessions.open(id).model
-	let input = { ...opts, messages: await history.messages(id), image: (blob: string) => blobs.base64(id, blob) }
+	let input = { ...opts, messages: await history.messages(id, { overhead: (opts.system?.length ?? 0) + JSON.stringify(opts.tools ?? []).length, window: undefined }), image: (blob: string) => blobs.base64(id, blob) }
 	let providerName = blocks.parseModelId(modelId)?.provider ?? modelId
 	let last: DoneEvent | ErrorEvent | undefined
 	try {
