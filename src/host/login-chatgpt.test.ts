@@ -75,13 +75,22 @@ function context() {
 	return { said, ctx: { sessionId: 's', cwd: '/tmp', model: 'openai/gpt-5.5', setCwd() {}, setModel() {}, say: (t: string) => said.push(t) } }
 }
 
+test('/login offers the device sign-in setting before selecting ChatGPT; direct login shows it before contacting OpenAI', async () => {
+	let menu = await command.run('', undefined, context().ctx)
+	expect(menu.ask?.text).toContain('Enable device code sign-in at https://chatgpt.com/#settings/Security')
+	let atFirstMessage = -1
+	await chatgptLogin.run(() => { if (atFirstMessage < 0) atFirstMessage = seen.length })
+	expect(atFirstMessage).toBe(0)
+})
+
 test('/login chatgpt shows the URL and code first, waits for the code, then saves a working openai login', async () => {
 	pending = 2
 	let { said, ctx } = context()
 	let reply = await command.run('chatgpt', undefined, ctx)
-	expect(said).toHaveLength(1)
-	expect(said[0]).toContain('https://auth.openai.com/codex/device')
-	expect(said[0]).toContain('ABCD-1234')
+	expect(said).toHaveLength(2)
+	expect(said[0]).toContain('Enable device code sign-in at https://chatgpt.com/#settings/Security')
+	expect(said[1]).toContain('https://auth.openai.com/codex/device')
+	expect(said[1]).toContain('ABCD-1234')
 	expect(reply.say).toContain('me@example.com')
 	expect(seen.filter((r) => r.path === '/device/token')).toHaveLength(3)
 	let exchange = seen.find((r) => r.path === '/token')!
@@ -114,7 +123,9 @@ test('a login that is never finished times out, and failures never echo codes or
 	expect(e.message).not.toContain('auth-code')
 	expect(existsSync(file())).toBe(false)
 	deviceStatus = 404
-	await expect(command.run('chatgpt', undefined, context().ctx) as Promise<unknown>).rejects.toThrow('device-code login')
+	let failed = context()
+	await expect(command.run('chatgpt', undefined, failed.ctx) as Promise<unknown>).rejects.toThrow('https://chatgpt.com/#settings/Security')
+	expect(failed.said[0]).toContain('Enable device code sign-in')
 })
 
 test('an ended /login chatgpt, good or not, wakes sessions blocked on login', async () => {

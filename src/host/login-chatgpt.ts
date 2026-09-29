@@ -34,7 +34,7 @@ async function post(url: string, body: unknown): Promise<Response> {
 // Asks for a user code to show.
 async function start(): Promise<Device> {
 	let res = await post(`${chatgptLogin.deviceUrl()}/usercode`, { client_id: OPENAI_CLIENT_ID })
-	if (res.status === 404) throw new Error('ChatGPT device-code login is unavailable: enable device-code login in your ChatGPT security or workspace settings')
+	if (res.status === 404) throw new Error('ChatGPT device-code login is unavailable: turn on Enable device code sign-in at https://chatgpt.com/#settings/Security (or ask your workspace admin)')
 	if (!res.ok) throw new Error(`ChatGPT device-code request failed: HTTP ${res.status}`)
 	let data: any = await res.json().catch(() => null)
 	if (typeof data?.device_auth_id !== 'string' || typeof data?.user_code !== 'string') throw new Error('ChatGPT device-code response is missing its code')
@@ -90,6 +90,7 @@ async function exchange(grant: { code: string; verifier: string }): Promise<stri
 // The whole flow: `show` gets the URL and code to tell the user.
 async function run(show: (text: string) => void): Promise<string | undefined> {
 	try {
+		show('Before ChatGPT login, turn on Enable device code sign-in at https://chatgpt.com/#settings/Security')
 		let device = await chatgptLogin.start()
 		show(`Open this URL to log in to ChatGPT:\n\n${device.url}\n\nand enter this one-time code (expires in 15 minutes):\n\n${device.userCode}\n\nOnly continue if you started this login in Hal.`)
 		return await chatgptLogin.exchange(await chatgptLogin.wait(device))
