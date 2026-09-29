@@ -392,19 +392,3 @@ test('pause between tool rounds ends the turn and keeps the results', async () =
 	expect(view.items.map((i) => i.type)).toEqual(['prompt', 'tool', 'tool-result', 'turn-end'])
 	expect((await records(id)).map((r) => r.type)).toEqual(['user', 'assistant', 'user', 'turn_end'])
 })
-
-// Anthropic's pause_turn (a long server-side web search): the answer so
-// far goes back and the model goes on from it, in the same turn.
-test('a round paused by the provider continues in the same turn from its own answer', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'search' })
-	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'text', text: 'Searching' }, { type: 'done', reason: 'pause' })
-	await until(() => calls.length === 2)
-	expect(a.of('turn-end')).toEqual([])
-	expect(calls[1]!.input.messages.at(-1)).toMatchObject({ role: 'assistant', blocks: [{ type: 'text', text: 'Searching' }] })
-	calls[1]!.push({ type: 'text', text: ' done' }, { type: 'done', reason: 'end' })
-	await until(() => a.of('turn-end').length)
-	expect(a.of('turn-end')[0]).toMatchObject({ status: 'completed' })
-})

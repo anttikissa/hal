@@ -103,7 +103,7 @@ function intro(records: HistoryRecord[], answers?: Answers, sessionId?: string):
 
 	let search = synthetic.answered(records, 'search')
 	if (!auth.serperKey() && search === undefined) return {
-		say: 'Claude models search with their own web_search tool. Other models use the google tool through Serper (serper.dev); its free tier goes a long way.',
+		say: 'Hal searches the web with the google tool through Serper (serper.dev), for every model; its free searches go a long way.',
 		ask: { text: 'Set up a Serper web search key?', fields: [{ type: 'choice', name: 'search', options: ['No', 'Yes'], initial: 0 }] },
 	}
 	if (search === 'Yes' && !auth.serperKey()) {

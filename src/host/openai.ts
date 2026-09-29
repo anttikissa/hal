@@ -59,7 +59,6 @@ function input(req: ProviderRequest): unknown[] {
 // Only reasoning this provider encrypted can go back; other thinking is
 // dropped, as anthropic.ts drops foreign signatures.
 function assistantItem(b: AssistantBlock): unknown {
-	if (b.type === 'web_search_use' || b.type === 'web_search_result') return undefined
 	if (b.type === 'text') return b.text ? { type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: b.text, annotations: [] }] } : undefined
 	if (b.type === 'tool_call') return { type: 'function_call', call_id: b.id, name: b.name, arguments: JSON.stringify(b.input) }
 	if (b.provider !== 'openai' || !b.signature) return undefined

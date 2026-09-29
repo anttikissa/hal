@@ -9,10 +9,6 @@ export type TextBlock = { type: 'text'; text: string }
 export type ThinkingBlock = { type: 'thinking'; text: string; signature?: string; provider?: string }
 
 export type ToolCallBlock = { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
-// Anthropic's server-side search blocks, in the order the API sent them.
-// `content` stays opaque: Anthropic requires the original search result on replay.
-export type WebSearchUse = { type: 'web_search_use'; id: string; input: Record<string, unknown> }
-export type WebSearchResult = { type: 'web_search_result'; toolUseId: string; content: unknown }
 
 export type ToolResultBlock = { type: 'tool_result'; id: string; output: string; isError?: boolean; image?: ImageBlock }
 
@@ -31,16 +27,14 @@ export type Sender = { from?: string; label?: string; advisory?: true }
 export type UserText = TextBlock & Sender
 
 export type UserBlock = UserText | ToolResultBlock | ImageBlock
-export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock | WebSearchUse | WebSearchResult
+export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock
 
 export type Message = { role: 'user'; blocks: UserBlock[] } | { role: 'assistant'; blocks: AssistantBlock[] }
 
 // Token counts. Cumulative: each usage event overwrites what it carries.
 export type Usage = { input?: number; output?: number; cacheRead?: number; cacheWrite?: number }
 
-// `pause`: the provider stopped a long server-side turn (Anthropic's
-// pause_turn, web search) and wants the same answer sent back to go on.
-export type StopReason = 'end' | 'tool_use' | 'max_tokens' | 'refusal' | 'pause'
+export type StopReason = 'end' | 'tool_use' | 'max_tokens' | 'refusal'
 
 // `explanation`: why the provider refused, if it said.
 export type DoneEvent = { type: 'done'; reason: StopReason; explanation?: string }
@@ -66,8 +60,6 @@ export type StreamEvent =
 	// Closes the current thinking block (or makes an empty one).
 	| { type: 'signature'; value: string }
 	| ({ type: 'tool_call' } & Omit<ToolCallBlock, 'type'>)
-	| WebSearchUse
-	| WebSearchResult
 	| { type: 'usage'; usage: Usage }
 	| DoneEvent
 	| ErrorEvent
@@ -103,10 +95,6 @@ function apply(turn: Turn, event: StreamEvent): void {
 			break
 		case 'tool_call':
 			turn.blocks.push({ type: 'tool_call', id: event.id, name: event.name, input: event.input })
-			break
-		case 'web_search_use':
-		case 'web_search_result':
-			turn.blocks.push(event)
 			break
 		case 'usage':
 			for (let [k, v] of Object.entries(event.usage)) if (v !== undefined) turn.usage[k as keyof Usage] = v

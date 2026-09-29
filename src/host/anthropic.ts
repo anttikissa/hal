@@ -3,7 +3,6 @@
 // tasks/7f/mapping.md; OAuth contract: tasks/ya/anthropic.ts.
 
 import type { AssistantBlock, StopReason, StreamEvent, Usage, UserBlock } from '../common/blocks.ts'
-import { settings } from '../common/settings.ts'
 import { auth } from './auth.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 
@@ -47,29 +46,15 @@ function userBlock(b: UserBlock, req: ProviderRequest): unknown {
 function assistantBlock(b: AssistantBlock): unknown {
 	if (b.type === 'text') return { type: 'text', text: b.text }
 	if (b.type === 'tool_call') return { type: 'tool_use', id: b.id, name: b.name, input: b.input }
-	if (b.type === 'web_search_use') return { type: 'server_tool_use', id: b.id, name: 'web_search', input: b.input }
-	if (b.type === 'web_search_result') return { type: 'web_search_tool_result', tool_use_id: b.toolUseId, content: b.content }
 	if (b.provider !== 'anthropic' || !b.signature) return undefined
 	let data = redactedData(b.signature)
 	return data !== undefined ? { type: 'redacted_thinking', data } : { type: 'thinking', thinking: b.text, signature: b.signature }
 }
 
-// Interrupted turns and compacted histories can leave half a search.
-// The API accepts neither half without its matching block in this message.
-function paired(blocks: AssistantBlock[]): AssistantBlock[] {
-	let open = new Set<string>()
-	let complete = new Set<string>()
-	for (let b of blocks) {
-		if (b.type === 'web_search_use') open.add(b.id)
-		else if (b.type === 'web_search_result' && open.has(b.toolUseId)) complete.add(b.toolUseId)
-	}
-	return blocks.filter((b) => b.type === 'web_search_use' ? complete.has(b.id) : b.type === 'web_search_result' ? complete.has(b.toolUseId) : true)
-}
-
 function toMessages(req: ProviderRequest): any[] {
 	let out: any[] = []
 	for (let m of req.messages) {
-		let content = m.role === 'user' ? m.blocks.map((b) => userBlock(b, req)) : paired(m.blocks).map(assistantBlock).filter(Boolean)
+		let content = m.role === 'user' ? m.blocks.map((b) => userBlock(b, req)) : m.blocks.map(assistantBlock).filter(Boolean)
 		// The API rejects empty text blocks and empty messages.
 		content = content.filter((b: any) => b.type !== 'text' || b.text !== '')
 		if (content.length) out.push({ role: m.role, content })
@@ -94,9 +79,7 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 	if (req.system) system.push({ type: 'text', text: oauth ? `\n\n${req.system}` : req.system, cache_control: ephemeral })
 	let b: Record<string, unknown> = { model: req.model, max_tokens: maxTokens, stream: true, messages: anthropic.toMessages(req) }
 	if (system.length) b.system = system
-	let offered: unknown[] = (req.tools ?? []).map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }))
-	if (req.model.startsWith('claude-') && settings.webSearch()) offered.push({ type: 'web_search_20250305', name: 'web_search', max_uses: 5 })
-	if (offered.length) b.tools = offered
+	if (req.tools?.length) b.tools = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }))
 	if (adaptive(req.model)) b.thinking = { type: 'adaptive' }
 	else if (/^claude-(opus|sonnet)/.test(req.model) && maxTokens > MIN_THINKING) {
 		b.thinking = { type: 'enabled', budget_tokens: Math.max(MIN_THINKING, Math.min(anthropic.thinkingBudget(), maxTokens - 1024)) }
@@ -143,7 +126,7 @@ async function models(signal: AbortSignal): Promise<string[]> {
 const reasons: Record<string, StopReason> = {
 	end_turn: 'end',
 	stop_sequence: 'end',
-	pause_turn: 'pause',
+	pause_turn: 'end',
 	tool_use: 'tool_use',
 	max_tokens: 'max_tokens',
 	model_context_window_exceeded: 'max_tokens',
@@ -174,7 +157,6 @@ function usage(u: any): Usage | undefined {
 async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<StreamEvent> {
 	// Tool input arrives as JSON fragments per content block index.
 	let tools = new Map<number, { id: string; name: string; json: string; input: unknown }>()
-	let searches = new Map<number, { id: string; json: string; input: unknown }>()
 	let reason: StopReason | undefined
 	let explanation: string | undefined
 	// A call whose input is not JSON: cut off by max_tokens (then it is
@@ -191,8 +173,6 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 			case 'content_block_start': {
 				let b = ev.content_block
 				if (b?.type === 'tool_use') tools.set(ev.index, { id: b.id, name: b.name, json: '', input: b.input })
-				else if (b?.type === 'server_tool_use' && b.name === 'web_search') searches.set(ev.index, { id: b.id, json: '', input: b.input })
-				else if (b?.type === 'web_search_tool_result') yield { type: 'web_search_result', toolUseId: b.tool_use_id, content: b.content }
 				else if (b?.type === 'redacted_thinking') yield { type: 'signature', value: JSON.stringify({ redacted: b.data }) }
 				break
 			}
@@ -204,21 +184,10 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 				else if (d?.type === 'input_json_delta') {
 					let t = tools.get(ev.index)
 					if (t) t.json += d.partial_json
-					let search = searches.get(ev.index)
-					if (search) search.json += d.partial_json
 				}
 				break
 			}
-
 			case 'content_block_stop': {
-				let search = searches.get(ev.index)
-				if (search) {
-					searches.delete(ev.index)
-					let input: unknown = search.input ?? {}
-					try { if (search.json) input = JSON.parse(search.json) } catch { input = undefined }
-					if (input && typeof input === 'object' && !Array.isArray(input)) yield { type: 'web_search_use', id: search.id, input: input as Record<string, unknown> }
-					break
-				}
 				let t = tools.get(ev.index)
 				if (!t) break
 				tools.delete(ev.index)

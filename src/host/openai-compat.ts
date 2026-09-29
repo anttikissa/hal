@@ -59,7 +59,6 @@ function toMessages(req: ProviderRequest, images = true): unknown[] {
 			if (b.type === 'text') text += b.text
 			else if (b.type === 'tool_call') calls.push({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input) } })
 		}
-		if (!text && !calls.length && msg.blocks.some((b) => b.type === 'web_search_use' || b.type === 'web_search_result')) continue
 		out.push(calls.length ? { role: 'assistant', content: text || null, tool_calls: calls } : { role: 'assistant', content: text })
 	}
 	return out

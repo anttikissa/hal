@@ -143,7 +143,7 @@ test('conversation maps to Messages; own thinking replays with its signature, fo
 	await run(messages, { tools, maxTokens: 20_000 })
 	let body = seen[0]!.body
 	expect(body.max_tokens).toBe(20_000)
-	expect(body.tools).toContainEqual({ name: 'ls', description: 'List', input_schema: { type: 'object' } })
+	expect(body.tools).toEqual([{ name: 'ls', description: 'List', input_schema: { type: 'object' } }])
 	let strip = (m: any) => ({ role: m.role, content: m.content.map((b: any) => { let c = { ...b }; delete c.cache_control; return c }) })
 	expect(body.messages.map(strip)).toEqual([
 		{ role: 'user', content: [{ type: 'text', text: 'list files' }] },

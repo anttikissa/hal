@@ -53,7 +53,6 @@ const table: Setting[] = [
 		default: '',
 		description: 'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
 	},
-	{ name: 'webSearch', type: { kind: 'boolean' }, default: true, description: "Offer Claude Anthropic's server-side web search." },
 	{ name: 'push', type: { kind: 'boolean' }, default: true, description: 'Send web push notifications to subscribed devices.' },
 ]
 
@@ -135,6 +134,5 @@ export const settings = {
 	promptRows: (): number => settings.value('promptRows') as number,
 	pasteLines: (): number => settings.value('pasteLines') as number,
 	maxRounds: (): number => settings.value('maxRounds') as number,
-	webSearch: (): boolean => settings.value('webSearch') as boolean,
 	push: (): boolean => settings.value('push') as boolean,
 }
