@@ -216,7 +216,8 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .marker.failed { color: var(--error-fg); }
 .Tabs .marker.done { color: var(--done-fg); }
 .Tabs button { flex: none; background: transparent; color: inherit; padding: 0.3rem 0.8rem; }
-.Tabs button:hover, .Tabs .tab:hover, .Tabs .edge:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
+@media (hover: hover) and (pointer: fine) { .Tabs button:hover, .Tabs .tab:hover, .Tabs .edge:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
+.Tabs .tab, .Tabs .edge, .Tabs button { touch-action: manipulation; }
 .Tabs .menu, .Tabs .close { color: var(--inactive-fg); }
 @media (pointer: coarse) { .Tabs .strip { min-height: 44px; } .Tabs button { min-width: 44px; } }
 .Tabs .sheet { width: 100%; max-width: 100%; max-height: 80dvh; margin: auto 0 0; padding: 0.6rem 0.6rem max(0.6rem, env(safe-area-inset-bottom)); background: var(--canvas); color: var(--text); border: 0; border-top: 1px solid var(--border); }
