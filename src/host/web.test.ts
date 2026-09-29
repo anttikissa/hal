@@ -590,9 +590,24 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 			expect(layout.right).toBeLessThanOrEqual(layout.viewport)
 			expect(layout.bottom).toBeLessThanOrEqual(layout.boxTop)
 			expect(layout.target).toBeGreaterThanOrEqual(44)
+			// A request for the next character must not make an unchanged menu
+			// disappear for a frame or rebuild its rows when the answer arrives.
+			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/lo'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+			await b.waitFor(`document.querySelector('.completions button')?.textContent.includes('/login') && document.querySelectorAll('.completions button').length === 1`)
+			await b.evaluate(`(() => {
+				let menu = document.querySelector('.completions'), row = menu.querySelector('button'), box = document.querySelector('textarea');
+				window.__completionWatch = { menu, row, y: box.getBoundingClientRect().top, changes: 0 };
+				let watch = window.__completionWatch;
+				watch.observer = new MutationObserver((list) => { watch.changes += list.filter((m) => m.target === menu.parentNode || menu.contains(m.target)).length });
+				watch.observer.observe(menu.parentNode, { subtree: true, childList: true, attributes: true, characterData: true });
+				box.value = '/log'; box.dispatchEvent(new InputEvent('input', { bubbles: true }));
+			})()`)
+			await Bun.sleep(100)
+			let stable = await b.evaluate(`(() => { let w = window.__completionWatch; w.observer.disconnect(); return { sameMenu: w.menu === document.querySelector('.completions'), sameRow: w.row === document.querySelector('.completions button'), connected: w.row.isConnected, changes: w.changes, y: document.querySelector('textarea').getBoundingClientRect().top - w.y } })()`)
+			expect(stable).toEqual({ sameMenu: true, sameRow: true, connected: true, changes: 0, y: 0 })
 			await b.evaluate(`document.querySelector('.completions button').click()`)
 			await b.waitFor(`!document.querySelector('.completions')`)
-			expect(await b.evaluate(`document.querySelector('textarea').value`)).toStartWith('/c')
+			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/login ')
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
 		}
 	} finally { await b.close() }

@@ -20,7 +20,7 @@ import { placeholders } from '../common/placeholders.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import { recall } from '../common/recall.ts'
 import { uploads, type Settled } from '../common/uploads.ts'
-import { completions, type Menu } from './completions.ts'
+import { completions, type Known, type Menu } from './completions.ts'
 import { link } from './link.ts'
 import { router } from './router.ts'
 import { push } from './push.ts'
@@ -36,7 +36,7 @@ import { view, type ViewState } from './view.ts'
 // the page can keep what the reader was reading in place.
 // `target`: the block the address links to (target.ts), `found` once
 // its card is in the transcript, `shown` once scrolled to.
-export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; completedByTab?: string; suppressed?: string; cached: Map<string, ViewState>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout> }
+export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; known?: Known; completedByTab?: string; suppressed?: string; cached: Map<string, ViewState>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout> }
 
 function createState(): AppState {
 	return { view: {}, text: '', tabs: [], asked: new Set(), older: new Map(), pages: 0, cached: new Map(), background: new Set(), painted: false }
@@ -93,24 +93,29 @@ function onEvent(event: Event): void {
 	if (landed) app.settled(landed)
 	if (st.shown && 'sessionId' in event && event.sessionId && event.sessionId !== st.shown) return tabs.hiddenEvent(event)
 	st.view = view.onEvent(st.view, event)
-	if (event.type === 'snapshot') { st.menu = undefined; st.completedByTab = undefined; st.suppressed = undefined }
+	if (event.type === 'snapshot') { st.menu = undefined; st.known = undefined; st.completedByTab = undefined; st.suppressed = undefined }
 	if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
 	if (event.type === 'history' && backfill.onPage(st.older, event) && st.view.transcript?.meta.id === event.sessionId) {
 		st.view = { ...st.view, transcript: backfill.apply(st.older, st.view.transcript) }
 		st.pages++
 	}
 	if (event.type === 'completions' && st.view.transcript?.meta.id === event.sessionId && st.text === event.text) {
+		if (st.suppressed === event.text) return
+		st.known = { input: event.text, items: event.items }
 		if (st.completedByTab === event.text) {
 			st.completedByTab = undefined
-			if (event.items.length > 1) st.menu = completions.receive(event.text, event.items)
+			if (event.items.length > 1) st.menu = completions.receive(event.text, event.items, st.menu)
 			else {
 				let done = view.completed(st.view, event, st.text)
 				if (done) {
 					st.view = { ...st.view, notice: done.notice }
+					st.menu = undefined
+					st.known = undefined
 					app.input(done.text)
+					st.suppressed = done.text
 				}
 			}
-		} else if (st.suppressed !== event.text) st.menu = completions.receive(event.text, event.items)
+		} else st.menu = completions.receive(event.text, event.items, st.menu)
 		app.changed()
 		return
 	}
@@ -178,16 +183,21 @@ function onState(state: LinkState): void {
 }
 
 // The message box now says `text`; stale replies may never reopen the menu.
+// A pending host answer does not erase visible choices: the last answer can
+// predict a longer prefix, and an unpredicted edit keeps its display.
 function input(text: string): void {
 	let st = app.state
 	let previous = st.text
 	st.text = text
 	if (text !== previous) {
-		st.menu = undefined
 		st.suppressed = undefined
 		st.completedByTab = undefined
 		let request = view.complete(st.view, text)
-		if (request && !text.includes('\n') && connection.connected()) connection.send(request)
+		if (!request || text.includes('\n')) { st.menu = undefined; st.known = undefined }
+		else {
+			st.menu = completions.predict(text, st.known, st.menu)
+			if (connection.connected()) connection.send(request)
+		}
 	}
 	let id = app.sessionId()
 	if (id && recall.typed(id, text)) drafts.edit(id, text)
@@ -198,6 +208,7 @@ function choose(index: number): void {
 	let item = app.state.menu?.choices[index]
 	if (!item) return
 	app.state.menu = undefined
+	app.state.known = undefined
 	app.rewrite(() => ({ text: item.value, cursor: item.value.length }))
 	app.state.suppressed = item.value
 	app.changed()
@@ -210,6 +221,7 @@ function menuKey(key: 'up' | 'down' | 'escape' | 'enter'): boolean {
 	else if (key === 'escape') {
 		app.state.suppressed = app.state.text
 		app.state.menu = undefined
+		app.state.known = undefined
 		app.changed()
 	} else {
 		app.state.menu = completions.step(menu, key === 'up' ? -1 : 1)
@@ -238,11 +250,6 @@ function pick(index: number, option: string): void {
 	if (form.form.fields.length === 1) app.sendForm({ type: 'submit', answers: forms.answers(form) })
 }
 
-function submitForm(): void {
-	let form = app.state.view.form
-	if (form) app.sendForm({ type: 'submit', answers: forms.answers(form) })
-}
-
 function sendForm(action: FormAction): void {
 	let { form, transcript } = app.state.view
 	if (form && transcript) app.sendNow(forms.command(transcript.meta.id, form, action))
@@ -262,11 +269,6 @@ function modalPick(index: number): void {
 	app.state.view = { ...app.state.view, modal: { ...modal, selected: index } }
 	app.modalKey({ key: 'enter' })
 }
-
-function search(text: string): void {
-	app.setView(view.search(app.state.view, text))
-}
-
 // Sends what the box holds (Enter, or the Send button); `queue`
 // (Alt+Enter) waits for the running turn.
 function send(queue = false): void {
@@ -333,12 +335,6 @@ function start(): void {
 	document.addEventListener('visibilitychange', visible)
 }
 
-// Whether the cookie is good; logging in sets it. login answers the
-// notice to show, or undefined once logged in.
-async function authorized(): Promise<boolean> {
-	return (await fetch('/login')).status !== 401
-}
-
 async function login(code: string): Promise<string | undefined> {
 	let body = new FormData()
 	body.set('code', code)
@@ -383,15 +379,16 @@ export const app = {
 	formInput,
 	formFocus,
 	pick,
-	submitForm,
+	submitForm: (): void => { let form = app.state.view.form; if (form) app.sendForm({ type: 'submit', answers: forms.answers(form) }) },
 	sendForm,
 	modalKey,
 	modalPick,
-	search,
+	search: (text: string): void => app.setView(view.search(app.state.view, text)),
 	send,
 	store,
 	start,
-	authorized,
+	// Whether the cookie is good; logging in sets it.
+	authorized: async (): Promise<boolean> => (await fetch('/login')).status !== 401,
 	login,
 	reset,
 }

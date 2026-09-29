@@ -61,8 +61,9 @@ runtime. Do not carry Solid 1 or React lifecycle patterns into this app.
   hold the next host answer, type `/log`: the same visible choice, DOM row,
   and composer position must survive. Then give an identical reply (still
   no DOM change), and a genuinely different reply (only changed rows may
-  update). An older reply must never roll the view back. Check Escape,
-  choosing an item and switching sessions still dismiss deliberately.
+  update). An older reply must never roll the view back. Check Escape and
+  choosing an item still dismiss deliberately; tab-local choices belong to
+  task 7w.
 - Unit-test decisions in plain `.ts` modules; use a real browser with a
   MutationObserver and bounding boxes for retained DOM and layout. Don't
   test source text, copy the JSX into expectations, or test a one-line

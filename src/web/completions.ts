@@ -5,18 +5,31 @@ import { completion } from '../common/completion.ts'
 
 export type Choice = { value: string; label: string; description: string }
 export type Menu = { input: string; choices: Choice[]; selected: number }
+export type Known = { input: string; items: string[] }
 
-function receive(input: string, items: string[]): Menu | undefined {
+// Use the host's full candidate set for a longer prefix while its next
+// answer is in flight. A shorter prefix might have additional matches.
+function predict(text: string, known: Known | undefined, current?: Menu): Menu | undefined {
+	if (!known || !text.startsWith(known.input)) return current
+	return completions.receive(text, known.items.filter((item) => item.startsWith(text)), current)
+}
+
+function receive(input: string, items: string[], previous?: Menu): Menu | undefined {
 	if (!items.length) return undefined
 	let short = completion.apply(input, items).choices
-	return { input, selected: 0, choices: items.map((value, i) => {
+	let choices = items.map((value, i) => {
 		let name = value.trimEnd().split(' ')[0]!
-		return { value, label: short?.[i] ?? (name === value.trimEnd() ? name : value.slice(value.lastIndexOf(' ') + 1)), description: (name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) ?? (value.endsWith('/') ? 'directory' : 'path') }
-	}) }
+		let label = short?.[i] ?? (name === value.trimEnd() ? name : value.slice(value.lastIndexOf(' ') + 1))
+		let description = (name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) ?? (value.endsWith('/') ? 'directory' : 'path')
+		return previous?.choices.find((choice) => choice.value === value && choice.label === label && choice.description === description) ?? { value, label, description }
+	})
+	if (previous && choices.length === previous.choices.length && choices.every((choice, i) => choice === previous.choices[i])) return previous
+	let selected = previous ? choices.findIndex((choice) => choice.value === previous.choices[previous.selected]?.value) : -1
+	return { input, selected: Math.max(0, selected), choices }
 }
 
 function step(menu: Menu, direction: number): Menu {
 	return { ...menu, selected: (menu.selected + direction + menu.choices.length) % menu.choices.length }
 }
 
-export const completions = { receive, step }
+export const completions = { receive, predict, step }

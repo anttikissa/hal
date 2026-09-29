@@ -132,6 +132,41 @@ test('typing opens host completions; keyboard choice is not sent, stale answers 
 	expect(app.state.menu).toBeUndefined()
 })
 
+// The answer arrives later than the input event. Repainting an unchanged
+// menu between the two is an observable layout jump, not loading feedback.
+test('a completion menu remains identical across input and an unchanged host reply', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	app.input('/lo')
+	app.onEvent({ type: 'completions', sessionId, text: '/lo', items: ['/login '] })
+	let shown = app.state.menu
+	app.input('/log')
+	expect(app.state.menu).toBe(shown)
+	expect(sent.at(-1)).toMatchObject({ type: 'complete', text: '/log' })
+	app.onEvent({ type: 'completions', sessionId, text: '/lo', items: [] })
+	expect(app.state.menu).toBe(shown)
+	app.onEvent({ type: 'completions', sessionId, text: '/log', items: ['/login '] })
+	expect(app.state.menu).toBe(shown)
+})
+
+test('a longer prefix filters known choices without waiting, while a shorter one waits for the full host list', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	app.input('/c')
+	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
+	let first = app.state.menu!.choices[0]!
+	let clear = app.state.menu!.choices[1]!
+	app.input('/cl')
+	expect(app.state.menu!.choices).toEqual([clear])
+	let filtered = app.state.menu
+	app.onEvent({ type: 'completions', sessionId, text: '/cl', items: ['/clear '] })
+	expect(app.state.menu).toBe(filtered)
+	app.input('/c')
+	expect(app.state.menu!.choices).toEqual([clear]) // only the host can supply candidates the shorter prefix adds
+	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
+	expect(app.state.menu!.choices).toEqual([first, clear])
+	app.input('/clx')
+	expect(app.state.menu).toBeUndefined()
+})
+
 test('an open question takes the keys: fields type natively, Enter answers', () => {
 	let form = { text: 'Name?', fields: [{ type: 'text' as const, name: 'name' }] }
 	app.onEvent(snapshot({ type: 'blocked', reason: 'question' }))
