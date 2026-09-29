@@ -76,7 +76,7 @@ export interface Frame {
 // The prompt's content width on a terminal `cols` wide: what Up/Down
 // move through.
 function promptWidth(cols: number): number {
-	return Math.max(1, Math.max(1, cols - 2 * ansi.PAD.length) - promptView.FIRST.length)
+	return Math.max(1, cols - 2 * ansi.PAD.length)
 }
 
 // An item's painted rows on a terminal `cols` wide. An item with a

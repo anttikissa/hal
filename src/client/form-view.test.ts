@@ -40,7 +40,7 @@ test('an open question shows its fields and takes the cursor into the focused te
 	// An empty text shows its placeholder; the prompt stays below.
 	let empty = frame.build({ ...v, form: forms.start('q1', item.form) }, 40)
 	expect(plain(empty.lines)[1]).toBe('Name: leave empty')
-	expect(plain(empty.lines)).toContain('> draft')
+	expect(plain(empty.lines)).toContain('draft')
 })
 
 test('a secret is never on screen; the chosen option is marked', () => {
@@ -69,7 +69,7 @@ test('a quote shows under the question with its marked part highlighted on every
 	let answered = frame.build(view([{ ...item, answers: { run: 'no' } }]), 30).lines
 	for (let lines of [open, answered]) {
 		// Quote rows are indented past the answer rows.
-		let rows = lines.filter((l) => strip(l).startsWith(' '.repeat(5)) && !strip(l).includes('/keys'))
+		let rows = lines.filter((l) => strip(l).startsWith(' '.repeat(5)) && strip(l).trim() !== '' && !strip(l).includes('/keys'))
 		expect(rows.length).toBe(3)
 		expect(rows.map((r) => strip(r).trim()).join(' ').replace(/\s+/g, ' ')).toContain('cd build && rm -rf')
 		// Marked text is inverse; every row ends it, so nothing bleeds.

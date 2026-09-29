@@ -46,7 +46,7 @@ function rule(cols: number, left = '', center = ''): string {
 	return l + '─'.repeat(at - lw) + c + '─'.repeat(Math.max(0, cols - at - cw))
 }
 
-// The prompt box: its rows scrolled to show the cursor (`scroll` is
+// The prompt box, unmarked (no '> ', no indent): its rows scrolled to show the cursor (`scroll` is
 // where it was), how many rows it hides above and below, and a dim
 // example on an empty prompt. Rows are marked, not yet painted.
 function box(
@@ -54,14 +54,13 @@ function box(
 	width: number,
 	placeholder?: string,
 ): { above: number; rows: string[]; below: number; row: number; col: number; scroll: number } {
-	let textWidth = Math.max(1, width - promptView.FIRST.length)
-	let p = promptView.layoutPrompt(st.text, st.cursor, textWidth, prompt.selection(st))
+	let p = promptView.layoutPrompt(st.text, st.cursor, Math.max(1, width), prompt.selection(st))
 	let height = st.rows ?? promptLayout.autoHeight(p.rows.length, settings.promptRows())
 	let vp = promptLayout.viewport(st.scroll ?? 0, height, p.rows.length, p.row)
-	let shown = promptView.mark(p.rows).slice(vp.top, vp.top + height)
-	while (shown.length < height) shown.push(promptView.REST)
+	let shown = p.rows.slice(vp.top, vp.top + height)
+	while (shown.length < height) shown.push('')
 	if (!st.text && placeholder) shown[0] = ansi.quiet(strings.clipVisual(ansi.clean(placeholder), width), colors.input())
-	return { above: vp.above, rows: shown, below: vp.below, row: p.row - vp.top, col: !st.text && placeholder ? 0 : promptView.FIRST.length + p.col, scroll: vp.top }
+	return { above: vp.above, rows: shown, below: vp.below, row: p.row - vp.top, col: !st.text && placeholder ? 0 : p.col, scroll: vp.top }
 }
 
 // Text rows marked as a prompt: the first with `FIRST`, the rest indented.

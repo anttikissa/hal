@@ -1,10 +1,11 @@
 {
-	title: 'Prompt placeholder without the prompt indent',
-	spec: "The empty prompt's rotating example placeholder starts at the prompt box's first column: no '> ' marker and no two-space indent before it (questions.md 102).",
+	title: 'Prompt box without the > marker and indent',
+	spec: "The terminal prompt box has no '> ' marker and no two-space indent on any row, typed or empty: text, wrapped rows and the rotating example placeholder all start at the box's first column (after the outer padding) and use its full inside width (questions.md 102: the user wants the marker gone, not only on the placeholder). Transcript items (commands, pending prompts) keep their own markers.",
 	status: 'done',
 	needs: [],
 	foldInto: ['8m'],
 	notes: [
-		'The empty terminal prompt uses the full inside width for the quiet placeholder and leaves its cursor at column one (after the outer padding); typing restores the normal > marker. Browser textarea already has no prompt marker.'
+		'The empty terminal prompt uses the full inside width for the quiet placeholder and leaves its cursor at column one (after the outer padding). Browser textarea already has no prompt marker.',
+		"First done only for the placeholder, with typing bringing '> ' back; the user reported the marker still visible. promptView.box no longer marks rows, and frame.promptWidth is the inside width (Up/Down layout must match the box)." 
 	]
 }

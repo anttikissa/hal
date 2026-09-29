@@ -128,7 +128,7 @@ test('the prompt is below the transcript and the cursor sits where the prompt cu
 	let f = frame.build(view([{ type: 'text', text: 'hello' }], 'ab漢cd', 3), 40)
 	let b = boxOf(f)
 	expect(b.top).toBeGreaterThan(plain(f.lines).indexOf('hello'))
-	expect(b.rows).toEqual(['> ab漢cd'])
+	expect(b.rows).toEqual(['ab漢cd'])
 	expect(f.cursor.row).toBe(b.top + 1)
 	// The cursor is right after "ab漢": its column is the width of the row up to there.
 	let row = f.lines[b.top + 1]!
@@ -139,7 +139,7 @@ test('prompt cursor follows newlines and wrapping', () => {
 	let text = 'first\n' + 'x'.repeat(30)
 	let f = frame.build(view([], text), 20)
 	// Two logical lines; the second wraps; the cursor is at its very end.
-	expect(boxOf(f).rows.join('').replace(/[ >]/g, '')).toBe(text.replace('\n', ''))
+	expect(boxOf(f).rows.join('').replace(/ /g, '')).toBe(text.replace('\n', ''))
 	expect(f.cursor.row).toBe(boxOf(f).bottom - 1)
 	let lastRow = f.lines[f.cursor.row]!
 	expect(f.cursor.col).toBe(strip(lastRow).trimEnd().length)
@@ -149,8 +149,8 @@ test('prompt cursor follows newlines and wrapping', () => {
 })
 
 test('a cursor after a full prompt row stays inside the terminal', () => {
-	// 20 columns: 1 pad + "> " + 16 text + 1 pad.
-	let f = frame.build(view([], 'y'.repeat(16)), 20)
+	// 20 columns: 1 pad + 18 text + 1 pad.
+	let f = frame.build(view([], 'y'.repeat(18)), 20)
 	expect(boxOf(f).rows.length).toBe(1)
 	expect(f.cursor).toEqual({ row: boxOf(f).top + 1, col: 19 })
 })
@@ -159,9 +159,9 @@ test('an empty session is just the chrome: the prompt between its rules, then th
 	let f = frame.build({ prompt: { text: '', cursor: 0 } }, 80)
 	let b = boxOf(f)
 	expect(b.top).toBe(0)
-	expect(b.rows).toEqual(['>'])
+	expect(b.rows).toEqual([''])
 	expect(f.lines.length).toBe(b.bottom + 3)
-	expect(f.cursor).toEqual({ row: 1, col: 3 })
+	expect(f.cursor).toEqual({ row: 1, col: 1 })
 })
 
 test('a notice sits between the transcript and the prompt, wrapped and cleaned', () => {
@@ -172,7 +172,7 @@ test('a notice sits between the transcript and the prompt, wrapped and cleaned',
 	let at = lines.findIndex((l) => l.startsWith('refused'))
 	expect(at).toBeGreaterThan(lines.indexOf('answer'))
 	expect(at).toBeLessThan(boxOf(f).top)
-	expect(boxOf(f).rows).toEqual(['> typed'])
+	expect(boxOf(f).rows).toEqual(['typed'])
 	expect(lines.join(' ')).toContain('in this session')
 	for (let line of f.lines) {
 		expect(strings.visLen(line)).toBeLessThanOrEqual(20)
@@ -289,24 +289,25 @@ describe('prompt box', () => {
 		expect(f.lines[1]).toContain(quietOn(colors.input()) + 'Try this')
 		expect(f.cursor).toEqual({ row: 1, col: 1 })
 		let typed = frame.build({ prompt: { text: 'x', cursor: 1 }, placeholder: 'Try this' }, 40)
-		expect(boxOf(typed).rows).toEqual(['> x'])
+		expect(boxOf(typed).rows).toEqual(['x'])
+		expect(typed.cursor).toEqual({ row: 1, col: 2 })
 	})
 
 	test('tabs are drawn as spaces to the next stop', () => {
 		let f = frame.build({ prompt: { text: 'ab\tc', cursor: 3 } }, 40)
 		expect(f.lines[1]).not.toContain('\t')
-		expect(boxOf(f).rows).toEqual(['> ab  c'])
-		expect(f.cursor.col).toBe(3 + 4)
+		expect(boxOf(f).rows).toEqual(['ab  c'])
+		expect(f.cursor.col).toBe(1 + 4)
 	})
 
 	test('the selection shows in reverse video, a selected tab as spaces to its stop', () => {
 		let row = (st: PromptState, cols = 40) => promptView.box(st, cols).rows
-		expect(row({ text: 'a\tb', cursor: 2, anchor: 1 })).toEqual(['> a\x1b[7m   \x1b[27mb'])
-		expect(row({ text: '\tone\n\ttwo\nthree', cursor: 8, anchor: 0 })).toEqual(['> \x1b[7m    one\x1b[27m', '  \x1b[7m    tw\x1b[27mo', '  three'])
+		expect(row({ text: 'a\tb', cursor: 2, anchor: 1 })).toEqual(['a\x1b[7m   \x1b[27mb'])
+		expect(row({ text: '\tone\n\ttwo\nthree', cursor: 8, anchor: 0 })).toEqual(['\x1b[7m    one\x1b[27m', '\x1b[7m    tw\x1b[27mo', 'three'])
 		// Across a wrapped row, and ending inside the box's width.
-		let wrapped = row({ text: 'abcdef', cursor: 0, anchor: 6 }, 2 + 3)
-		expect(wrapped).toEqual(['> \x1b[7mabc\x1b[27m', '  \x1b[7mdef\x1b[27m'])
-		expect(row({ text: 'abc', cursor: 1, anchor: 1 })).toEqual(['> abc'])
+		let wrapped = row({ text: 'abcdef', cursor: 0, anchor: 6 }, 3)
+		expect(wrapped).toEqual(['\x1b[7mabc\x1b[27m', '\x1b[7mdef\x1b[27m'])
+		expect(row({ text: 'abc', cursor: 1, anchor: 1 })).toEqual(['abc'])
 	})
 })
 
@@ -335,7 +336,7 @@ test('an [image/<name>] marker is a link to the image, in the transcript and the
 	let rows = f.lines.filter((l) => l.includes('[image/abc123.png]'))
 	expect(rows).toHaveLength(2)
 	for (let row of rows) expect(row).toContain(link)
-	expect(plain(rows)).toEqual(['see [image/abc123.png] ok', '> and [image/abc123.png]'])
+	expect(plain(rows)).toEqual(['see [image/abc123.png] ok', 'and [image/abc123.png]'])
 	// A forged name is not linked.
 	expect(frame.build(view([{ type: 'prompt', text: '[image/../x.png]' }]), 60).lines.join('')).not.toMatch(/\x1b\]8;;[^\x07]*x\.png/)
 })
