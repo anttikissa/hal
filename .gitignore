@@ -6,4 +6,5 @@ config.ason
 .idea/
 sessions/
 state/
+.DS_Store
 scripts/deploy
