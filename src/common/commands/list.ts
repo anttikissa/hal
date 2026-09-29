@@ -48,6 +48,7 @@ const list: CommandInfo[] = [
 	{ name: 'status', description: 'show account usage windows', category: 'session', modelUsable: true },
 	{ name: 'system', description: 'show the assembled system prompt', category: 'session', modelUsable: true },
 	{ name: 'theme', description: 'list or switch the colour theme', category: 'app', modelUsable: true },
+	{ name: 'todo', description: 'file or list project TODO items', category: 'session' },
 	{ name: 'version', description: 'show which code the host runs', category: 'debug', modelUsable: true },
 ]
 
