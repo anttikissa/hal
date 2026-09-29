@@ -25,7 +25,10 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
    corners and home indicator), so the edge rows pad themselves. */
 .Transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left)); }
 .Transcript > * { max-width: 60rem; margin: 0 auto 0.6rem; }
-.Card { padding: 0.4rem 0.7rem; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Cards and the open question share one shape: square, a lit bar on
+   the left glowing like a CRT phosphor, the style's tint behind. */
+.Card, .Question { border-left: 3px solid currentColor; box-shadow: -3px 0 10px -4px currentColor; }
+.Card { padding: 0.4rem 0.7rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Card.user::before { content: "> "; }
 .Card.image::before { content: none; }
 .Card.prompt::before { content: none; }
@@ -39,7 +42,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card.pending { color: var(--quiet); }
 .Card.pending::after { content: "\A sending…"; font-size: 0.85em; }
 .Card.folds { padding: 0; cursor: pointer; }
-.Card .head { display: flex; gap: 0.6ch; width: 100%; padding: 0.4rem 0.7rem; background: none; color: inherit; text-align: left; border-radius: 0; }
+.Card .head { display: flex; gap: 0.6ch; width: 100%; padding: 0.4rem 0.7rem; background: none; color: inherit; text-align: left; }
 .Card .head:focus-visible { outline: 1px solid currentColor; outline-offset: -2px; }
 .Card .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .Card .head .error { background: none; margin-left: auto; }
@@ -101,8 +104,8 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Composer > * { max-width: 60rem; margin: 0 auto; }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.2rem 0; }
-.Composer .completions { max-height: min(35dvh, 20rem); overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--field); }
-.Composer .completions button { display: flex; flex-direction: column; width: 100%; min-height: 44px; padding: 0.4rem 0.7rem; text-align: left; border-radius: 0; background: transparent; color: var(--text); }
+.Composer .completions { max-height: min(35dvh, 20rem); overflow-y: auto; border: 1px solid var(--border); background: var(--field); }
+.Composer .completions button { display: flex; flex-direction: column; width: 100%; min-height: 44px; padding: 0.4rem 0.7rem; text-align: left; background: transparent; color: var(--text); }
 .Composer .completions button:hover, .Composer .completions button[aria-selected="true"] { background: var(--button); }
 .Composer .completions span { color: var(--quiet); font-size: 0.85em; }
 .status .busy { color: var(--highlight); }
@@ -112,16 +115,16 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .entry { display: flex; align-items: stretch; border-left: 3px solid color-mix(in oklab, currentColor 55%, transparent); }
 .entry:focus-within { border-left-color: var(--cursor); }
 .entry.dropping { outline: 2px dashed var(--cursor); outline-offset: 2px; }
-.entry textarea { flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; border-radius: 0; padding: 0.5rem 0.7rem; }
-.entry button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; border-radius: 0; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor 35%, transparent); transition: background-color 120ms var(--ease-out); }
+.entry textarea { flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: 0.5rem 0.7rem; }
+.entry button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor 35%, transparent); transition: background-color 120ms var(--ease-out); }
 .entry button:hover:not(:disabled) { background: color-mix(in oklab, currentColor 14%, transparent); }
 .entry button:disabled { color: var(--quiet); cursor: default; }
 .help { display: flex; flex-wrap: wrap; gap: 0 1.5ch; padding-top: 0.3rem; color: var(--description); }
 .help b { color: var(--key); font-weight: 600; }
-textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem; resize: none; outline: none; }
+textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 0.5rem 0.6rem; resize: none; outline: none; }
 textarea:focus, input:focus { border-color: var(--accent); }
 .input textarea { caret-color: var(--cursor); }
-button { background: var(--button); color: var(--text); border: 0; border-radius: 6px; padding: 0.5rem; cursor: pointer; }
+button { background: var(--button); color: var(--text); border: 0; padding: 0.5rem; cursor: pointer; }
 button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 /* Phones: 16px fields, or iOS zooms in on focus. */
 /* Touch keyboards: Enter is a newline and Send sends, so the key hints
@@ -130,11 +133,17 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 @media (max-width: 40rem) { textarea, input { font-size: 16px; } .Transcript, .Composer { padding-left: max(0.6rem, env(safe-area-inset-left)); padding-right: max(0.6rem, env(safe-area-inset-right)); } .Transcript { padding-block: 0.6rem; } }
 @media (prefers-reduced-motion: reduce) { .Card .body { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
-.Question { max-width: 60rem; margin: 0 auto 0.6rem; padding: 0.4rem 0.6rem; border-radius: 4px; display: flex; flex-direction: column; gap: 0.4rem; }
+.Question { position: relative; max-width: 60rem; margin: 0 auto 0.6rem; padding: 0.4rem 0.7rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .Question button { padding: 0.2rem 0.8rem; }
+/* Options wrap with the same gap across and down. */
+.Question [role="group"] { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
+.Question .dismiss { position: absolute; top: 0; right: 0; background: none; color: inherit; padding: 0.4rem 0.7rem; }
+.Question .dismiss:hover { background: color-mix(in oklab, currentColor 14%, transparent); }
+.Question > .text { padding-right: 3ch; }
+@media (pointer: coarse) { .Question .dismiss { min-width: 44px; min-height: 44px; } }
 .Question pre.quote { margin: 0 0 0 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .Question mark { background: currentColor; color: var(--canvas); }
-.Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--canvas); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem; }
+.Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--canvas); color: var(--text); border: 1px solid var(--border); padding: 0.6rem; }
 .Picker[open] { display: flex; flex-direction: column; gap: 0.4rem; }
 .Picker .top { display: flex; align-items: center; gap: 0.6ch; }
 .Picker .title { flex: 1; min-width: 0; }
@@ -148,7 +157,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
    back-swipe), or on phones one button opening a sheet. */
 .Tabs { flex: none; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .Tabs .strip { display: flex; flex-wrap: wrap; gap: 0.2rem; padding: 0.3rem 0.6rem; }
-.Tabs .item, .Tabs li { display: flex; align-items: stretch; min-width: 0; border-radius: 6px; }
+.Tabs .item, .Tabs li { display: flex; align-items: stretch; min-width: 0; }
 .Tabs .item:has([aria-current]), .Tabs li:has([aria-current]) { background: var(--button); }
 .Tabs .tab { display: flex; background: none; gap: 0.6ch; align-items: baseline; min-width: 0; padding: 0.2rem 0.3rem 0.2rem 0.6rem; text-decoration: none; }
 .Tabs .item .name { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -165,10 +174,10 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs button { background: transparent; color: inherit; padding: 0.2rem 0.5rem; }
 .Tabs button:hover, .Tabs .tab:hover { background: color-mix(in oklab, currentColor 14%, transparent); }
 .Tabs .close { color: var(--inactive-fg); }
-.Tabs .menu { display: none; width: 100%; gap: 0.6ch; align-items: baseline; text-align: left; padding: 0.5rem 0.8rem; border-radius: 0; }
+.Tabs .menu { display: none; width: 100%; gap: 0.6ch; align-items: baseline; text-align: left; padding: 0.5rem 0.8rem; }
 .Tabs .menu .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .Tabs .menu .count { color: var(--inactive-fg); }
-.Tabs .sheet { width: 100%; max-width: 100%; max-height: 80dvh; margin: auto 0 0; padding: 0.6rem 0.6rem max(0.6rem, env(safe-area-inset-bottom)); background: var(--canvas); color: var(--text); border: 0; border-top: 1px solid var(--border); border-radius: 10px 10px 0 0; }
+.Tabs .sheet { width: 100%; max-width: 100%; max-height: 80dvh; margin: auto 0 0; padding: 0.6rem 0.6rem max(0.6rem, env(safe-area-inset-bottom)); background: var(--canvas); color: var(--text); border: 0; border-top: 1px solid var(--border); }
 .Tabs .sheet[open] { display: flex; flex-direction: column; gap: 0.4rem; }
 .Tabs .sheet ul { margin: 0; padding: 0; list-style: none; overflow-y: auto; }
 .Tabs .sheet li { justify-content: space-between; }

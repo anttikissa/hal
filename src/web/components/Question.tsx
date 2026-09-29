@@ -2,7 +2,8 @@
 // The open question as a form: its text, the quote (a command to
 // approve) with marked parts highlighted, a text or password input per
 // text field and a button per option. Values and focus follow the
-// shared form state; keys go through keys.key (forms.step).
+// shared form state; keys go through keys.key (forms.step). ✕
+// dismisses it as Escape does.
 
 import { createEffect, For, Show } from 'solid-js'
 import { forms, type FormState } from '../../common/forms.ts'
@@ -28,7 +29,10 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 	}
 	return (
 		<form class="Question warning" onSubmit={submit}>
-			<div>? {form().text}</div>
+			<div class="text">? {form().text}</div>
+			<button type="button" class="dismiss" aria-label="Dismiss" title="Dismiss (Esc)" onClick={() => app.sendForm({ type: 'cancel' })}>
+				✕
+			</button>
 			<Show when={form().quote}>
 				{(quote) => (
 					<pre class="quote">
@@ -46,7 +50,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 									<>
 										<button type="button" value={option} aria-pressed={props.form.values[i()] === option ? 'true' : 'false'} onClick={() => app.pick(i(), option)}>
 											{option}
-										</button>{' '}
+										</button>
 									</>
 								)}
 							</For>

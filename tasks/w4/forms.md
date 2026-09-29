@@ -101,6 +101,10 @@ dispatcher can never disagree.
 - **Web**: binds a command key only if the browser gives it to the
   page (not ctrl-t, ctrl-w, ctrl-n); `/keys` on the web lists only the
   keys the web really has.
+- **Web forms** never claim Cmd or Ctrl keys: with a question open, the
+  shared form keys get only unmodified (or Shift/Alt) keys, so Cmd-R,
+  Cmd-L, Ctrl-R and the like keep their browser meaning (user report:
+  an open /login ate Cmd-R and Cmd-L).
 
 ## Provenance
 
@@ -193,5 +197,9 @@ lines and escape codes are not DOM. Shared, in `src/common`:
   in both.
 
 Each client only maps that to its medium (terminal rows, DOM elements).
+On the web an open question is a card like the others (square, lit bar
+on the left, its style's tint behind) with a ✕ at its top right that
+dismisses it exactly as Escape does; tapping outside does not. Choice
+options wrap with the same gap across and down.
 A feature is done when both clients have it, unless its task says
 otherwise.

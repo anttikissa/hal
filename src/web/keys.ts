@@ -68,10 +68,11 @@ function key(e: KeyInput, target: Target): boolean {
 		return true
 	}
 	if (st.view.form) {
-		// Text fields edit natively, a submit button submits; the shared
-		// form keys decide the rest.
+		// Text fields edit natively, a submit button submits, Cmd and Ctrl
+		// keys stay the browser's (Cmd-R, Cmd-L); the shared form keys
+		// decide the rest.
 		let native = target.kind === 'field' && !['enter', 'escape', 'tab', 'up', 'down'].includes(k?.key ?? '')
-		if (!k || native || (target.kind === 'button' && target.submits && e.key === 'Enter')) return false
+		if (!k || native || e.metaKey || e.ctrlKey || (target.kind === 'button' && target.submits && e.key === 'Enter')) return false
 		let { state, command } = view.formKey(st.view, k)
 		app.setView(state)
 		if (command) app.sendNow(command)

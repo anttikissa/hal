@@ -167,6 +167,17 @@ and the notes of 1b and 4s before writing a component.
   read source or copy CSS; CDP tests assert structure (nodes kept,
   one scroller, delegated events firing).
 
+## Look: retro sci-fi terminal (user's standing preference)
+
+Bold, colourful, contrasty: think 2001: A Space Odyssey, Alien, Blade
+Runner, CRT VT100 terminals glowing in the dark. Saturated phosphor
+hues on near-black, lit edges that glow (a card's left bar is an LED,
+not a hairline), square corners everywhere (cards, buttons, tabs,
+fields, dialogs; no border-radius). Never meek, pastel, washed-out or
+corporate-neutral (the user's words: "be-afraid-say-nothing"). Colour
+changes are proposed to the user with options before they land; he
+decides. Readable text below still holds.
+
 ## Emergency keys (invariants)
 
 - Ctrl-C quits, Ctrl-Z suspends, Ctrl-R restarts — in every state,

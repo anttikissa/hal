@@ -142,6 +142,16 @@ test('an open question takes the keys: fields type natively, Enter answers', () 
 	expect(sent.at(-1)).toMatchObject({ type: 'answer', sessionId, question: 'q1', answers: { name: 'Ann' } })
 })
 
+test('an open choice question leaves Cmd and Ctrl keys to the browser; a letter picks', () => {
+	let form = { text: 'Method?', fields: [{ type: 'choice' as const, name: 'm', options: ['Claude', 'Router'] }] }
+	app.onEvent(snapshot({ type: 'blocked', reason: 'question' }))
+	app.onEvent({ type: 'question', sessionId, id: 'q1', form })
+	for (let [key, mods] of [['r', { metaKey: true }], ['l', { metaKey: true }], ['r', { ctrlKey: true }]] as const) expect(press(key, { kind: 'button', submits: false }, mods)).toBe(false)
+	expect(sent.filter((c) => c.type === 'answer')).toEqual([])
+	expect(press('r', { kind: 'button', submits: false })).toBe(true)
+	expect(sent.at(-1)).toMatchObject({ type: 'answer', answers: { m: 'Router' } })
+})
+
 test('a click on an option of a one-field question answers it', () => {
 	let form = { text: 'Ok?', fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'] }] }
 	app.onEvent(snapshot({ type: 'blocked', reason: 'question' }))
