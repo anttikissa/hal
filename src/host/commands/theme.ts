@@ -12,7 +12,7 @@ const themesDir = () => join(import.meta.dir, '../../../themes')
 const link = () => join(plugins.dir(), 'color-theme.ts')
 
 function names(): string[] {
-	return ['hal', ...readdirSync(themesDir()).filter((f) => f.endsWith('.ts')).map((f) => f.slice(0, -3)).sort()]
+	return [...new Set(['hal', ...readdirSync(themesDir()).filter((f) => f.endsWith('.ts')).map((f) => f.slice(0, -3)).sort()])]
 }
 
 // The active theme's name; undefined when color-theme.ts is a file of
@@ -40,6 +40,8 @@ export const command: SlashCommand = {
 		args ||= answers?.theme ?? ''
 		if (!all.includes(args)) return { error: `unknown theme ${args}: choose ${all.join(', ')}` }
 		if (now === undefined) return { error: `${link()} is your own file; move it away to use /theme` }
+		// hal is the built-in look: no link at all, so a tweaked themes/hal.ts
+		// is a template to copy, never what hal means.
 		if (args === 'hal') rmSync(link(), { force: true })
 		else {
 			// Replace the link in one rename, so the loader never sees none.
