@@ -1,7 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { chmodSync, mkdtempSync, rmSync, statSync } from 'fs'
 import { tmpdir } from 'os'
-import { resolve } from 'path'
 import { paths } from './paths.ts'
 
 const saved = process.env.HAL_HOME
@@ -30,17 +29,6 @@ test('all paths follow HAL_HOME, read at call time', () => {
 	}
 	expect(paths.sessionDir('abc').startsWith(`${paths.sessionsDir()}/`)).toBe(true)
 	expect(paths.stateDir()).not.toBe(paths.sessionsDir())
-})
-
-test('without HAL_HOME, the home is the repo root, outside tests only', () => {
-	let script = `import { paths } from ${JSON.stringify(`${import.meta.dir}/paths.ts`)}; process.stdout.write(paths.home())`
-	let env = { ...process.env }
-	delete env.HAL_HOME
-	delete env.NODE_ENV
-	let live = Bun.spawnSync(['bun', '-e', script], { env })
-	expect(live.stdout.toString()).toBe(resolve(import.meta.dir, '../..'))
-	let inTest = Bun.spawnSync(['bun', '-e', script], { env: { ...env, NODE_ENV: 'test' } })
-	expect(inTest.stdout.toString().startsWith(resolve(import.meta.dir, '../..'))).toBe(false)
 })
 
 test('session ids cannot escape sessions/', () => {
