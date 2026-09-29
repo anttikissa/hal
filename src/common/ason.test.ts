@@ -71,6 +71,16 @@ describe('parse', () => {
 
 		test('backtick escaped ${', () => expect(parse('`cost: \\${x}`')).toBe('cost: ${x}'))
 		test('backtick rejects unescaped ${', () => expect(() => parse('`${x}`')).toThrow(/interpolation/))
+		test('long slices keep escaped delimiters, backslashes and surrogate pairs', () => {
+			const plain = '漢🙂'.repeat(4096)
+			for (const quote of ["'", '"', '`']) {
+				const source = quote + plain + '\\' + quote + '\\\\' + plain + '\\uD83D\\uDE42\\n' + quote
+				expect(parse(source)).toBe(plain + quote + '\\' + plain + '🙂\n')
+				expect(() => parse(source.slice(0, -1))).toThrow(/Unterminated string/)
+			}
+			expect(parse('`' + plain + '\\${ok}\\`' + plain + '`')).toBe(plain + '${ok}`' + plain)
+			expect(() => parse('`' + plain + '\\${ok}\\`' + plain + '${bad}`')).toThrow(/interpolation/)
+		})
 	})
 
 	describe('objects', () => {

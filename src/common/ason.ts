@@ -1,12 +1,16 @@
-// ASON — A Saner Object Notation
-//
-// Goal: be as JavaScript-compatible as practical while staying easy to read
-// and stream. That means JS-like numbers (`.5`, `1e10`, `Infinity`, `123n`,
-// `undefined`), JS-like strings (single, double, backtick), and JS-like
-// commas: separators are required, trailing commas are allowed.
-// See docs/ason.md — keep it in sync when changing this file.
-//
-// License: MIT
+// ASON — A Saner Object Notation (MIT). Import ason (default/named object)
+// or its named functions: stringify(value, mode = 'smart') wraps at 80 columns;
+// 'short' is one line without comments, 'long' always expands collections.
+// parse(text, { comments: true }) keeps leading key/item comments on COMMENTS;
+// smart/long stringify reuse them best-effort, not a full comment round-trip.
+// parseAll(text) reads concatenated values; parseStream(byteStream) yields ASONL
+// records, ignoring a malformed first nonblank line (for mid-record starts).
+// Parse errors carry .pos and a line/column caret. No dependencies or eval.
+// A superset of JSON and JSONC, with JSON5 syntax: comments, trailing commas,
+// unquoted keys, single quotes, hex, signed/leading-dot numbers, NaN/Infinity,
+// escapes and line continuations. Not ALL JSON5: Unicode whitespace outside the
+// explicit whitespace set is unsupported. Also: undefined, BigInt, numeric
+// separators and multiline backticks (no ${interpolation}). Commas required.
 
 /** Symbol key for attaching comments to AsonObject/AsonArray. */
 export const COMMENTS = Symbol('comments')
@@ -54,6 +58,7 @@ function commentPrefix(comment: string | undefined, pad: string): string {
 // Tabs encode one ASON indentation level; keep wrapping compatible with the former two-column indentation.
 // In long mode, skip the unused inline candidate: computing both forms at every level is exponential.
 function renderCollection(open: string, close: string, inline: string, col: number, depth: number, maxWidth: number, hasComments: boolean, buildLines: (pad: string, childDepth: number) => string[]): string {
+	if (maxWidth === Infinity) return inline // short strings already escape newlines
 	if (maxWidth > 0 && !hasComments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 	const childDepth = depth + 1
 	return `${open}\n${buildLines('\t'.repeat(childDepth), childDepth).join('\n')}\n${'\t'.repeat(depth)}${close}`
@@ -204,66 +209,56 @@ const HEX4_RE = /^[0-9a-fA-F]{4}$/
 
 function parseString(ctx: Ctx, quote: string): string {
 	ctx.pos++ // skip opening quote
-	const start = ctx.pos
 	const buf = ctx.buf
-	const qc = quote.charCodeAt(0)
-	const checkTemplateDollar = quote === '`'
-
-	// Fast path: scan for a plain closing quote before falling back to escapes.
-	let pos = ctx.pos
-	while (pos < buf.length) {
-		const cc = buf.charCodeAt(pos)
-		if (cc === 0x5c) break
-		if (cc === qc) {
-			ctx.pos = pos + 1
-			return buf.slice(start, pos)
-		}
-		if (checkTemplateDollar && cc === 0x24 && buf.charCodeAt(pos + 1) === 0x7b) {
-			ctx.pos = pos
-			fail(ctx, 'Template interpolation is not supported')
-		}
-		pos++
-	}
-
+	const template = quote === '`'
 	const segments: string[] = []
-	let segStart = start
-	ctx.pos = pos
+	let end = buf.indexOf(quote, ctx.pos)
 	while (ctx.pos < buf.length) {
-		const cc = buf.charCodeAt(ctx.pos)
-		if (cc === 0x5c) {
-			segments.push(buf.slice(segStart, ctx.pos))
-			ctx.pos++
-			const esc = buf.charCodeAt(ctx.pos)
-			switch (esc) {
-				case 0x0d:
-					if (buf.charCodeAt(ctx.pos + 1) === 0x0a) ctx.pos++
-					break
-				case 0x0a:
-				case 0x2028:
-				case 0x2029:
-					break
-				case 0x78:
-				case 0x75: {
-					const size = esc === 0x78 ? 2 : 4
-					const hex = buf.slice(ctx.pos + 1, ctx.pos + 1 + size)
-					if (!(size === 2 ? HEX2_RE : HEX4_RE).test(hex)) fail(ctx, size === 2 ? 'Invalid hex escape' : 'Invalid unicode escape')
-					segments.push(String.fromCharCode(parseInt(hex, 16)))
-					ctx.pos += size
-					break
-				}
-				default:
-					segments.push(SIMPLE_ESCAPES[esc] ?? buf[ctx.pos]!)
+		// Cache the quote across escapes, and bound searches to this string.
+		// Re-scanning for a quote after every newline escape is quadratic.
+		if (end >= 0 && end < ctx.pos) end = buf.indexOf(quote, ctx.pos)
+		const remaining = buf.slice(ctx.pos, end < 0 ? buf.length : end)
+		const slash = remaining.indexOf('\\')
+		const part = slash < 0 ? remaining : remaining.slice(0, slash)
+		if (template) {
+			const dollar = part.indexOf('${')
+			if (dollar >= 0) {
+				ctx.pos += dollar
+				fail(ctx, 'Template interpolation is not supported')
 			}
-			ctx.pos++
-			segStart = ctx.pos
-			continue
 		}
-		if (cc === qc) {
-			segments.push(buf.slice(segStart, ctx.pos))
+		const next = ctx.pos + part.length
+		ctx.pos = next
+		if (next === buf.length) break
+		if (next === end) {
 			ctx.pos++
+			if (!segments.length) return part
+			segments.push(part)
 			return segments.join('')
 		}
-		if (checkTemplateDollar && cc === 0x24 && buf.charCodeAt(ctx.pos + 1) === 0x7b) fail(ctx, 'Template interpolation is not supported')
+		segments.push(part)
+		ctx.pos++
+		const esc = buf.charCodeAt(ctx.pos)
+		switch (esc) {
+			case 0x0d:
+				if (buf.charCodeAt(ctx.pos + 1) === 0x0a) ctx.pos++
+				break
+			case 0x0a:
+			case 0x2028:
+			case 0x2029:
+				break
+			case 0x78:
+			case 0x75: {
+				const size = esc === 0x78 ? 2 : 4
+				const hex = buf.slice(ctx.pos + 1, ctx.pos + 1 + size)
+				if (!(size === 2 ? HEX2_RE : HEX4_RE).test(hex)) fail(ctx, size === 2 ? 'Invalid hex escape' : 'Invalid unicode escape')
+				segments.push(String.fromCharCode(parseInt(hex, 16)))
+				ctx.pos += size
+				break
+			}
+			default:
+				segments.push(SIMPLE_ESCAPES[esc] ?? buf[ctx.pos]!)
+		}
 		ctx.pos++
 	}
 	fail(ctx, 'Unterminated string')

@@ -1,6 +1,6 @@
 {
 	title: 'ASON compatibility',
-	spec: 'Lift the ason.ts and ason.test.ts artifacts (self-contained, format in ason.md) rather than rewriting them. Keep parse, stringify and ASONL; keep them verbatim, comment preservation and streaming included (see task mw: never edit ason.ts). Invalid input throws an error with its position. The format is a contract, so tests assert exact output and round trips.',
+	spec: 'Lift the ason.ts and ason.test.ts artifacts (self-contained, format in ason.md) as the starting point rather than rewriting them. Keep parse, stringify and ASONL, comment preservation and streaming included. Task mw supersedes the original verbatim-copy restriction: the live implementation may evolve and be optimized without removing features; the original artifact stays unchanged as reference. Invalid input throws an error with its position. The format is a contract, so tests assert exact output and round trips.',
 	status: 'done',
 	notes: [
 		'The ason.md example is wrong: `/* block comments /*` never closes. The verbatim parser silently swallows the rest of the input (an unterminated block comment is not an error). Fix the doc example if you copy it.',
