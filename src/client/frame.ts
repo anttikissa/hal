@@ -161,23 +161,43 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 		for (let r of rows) lines.push(ansi.paint(r, style, cols))
 	}
 	let items = view.transcript?.items ?? []
+	let session = view.transcript?.meta.id
 	let calls = new Map<string, string>()
 	let formCursor: Frame['cursor'] | undefined
-	for (let i = 0; i < items.length; i++) {
+	// The rows of items drawn last frame and unchanged since are reused
+	// as they are: a frame costs what changed, not the whole history.
+	let look = `${cols} ${session} ${itemView.resultRows()} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''}`
+	let kept = frame.state.history
+	let start = 0
+	if (kept?.look === look) while (start < kept.items.length && items[start] === kept.items[start]) start++
+	if (start) lines = kept!.lines.slice(0, kept!.ends[start - 1])
+	let ends = kept && start ? kept.ends.slice(0, start) : []
+	let bash = kept && start ? kept.bash.filter((b) => b.at < start) : []
+	for (let b of bash) calls.set(b.id, b.key)
+	let stable = start
+	for (let i = start; i < items.length; i++) {
 		let item = items[i]!
-		if (item.type === 'tool' && item.name === 'bash' && /^\d+(?:\.\d+)?$/.test(item.key)) calls.set(item.id, item.key)
+		if (item.type === 'tool' && item.name === 'bash' && /^\d+(?:\.\d+)?$/.test(item.key)) {
+			calls.set(item.id, item.key)
+			bash.push({ at: i, id: item.id, key: item.key })
+		}
 		if (item.type === 'question' && view.form?.id === item.id) {
 			let f = formView.formLines(view.form, width)
 			block(f.rows, itemView.itemStyle(item))
 			formCursor = { row: lines.length - f.rows.length + f.cursor.row, col: ansi.PAD.length + f.cursor.col }
 		} else {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
-			let rows = frame.itemRows(item, cols, view.transcript?.meta.id, streams ? view.hal : undefined, calls)
-			rows = frame.highWater(rows, item, cols, view.transcript?.meta.id, streams)
+			let rows = frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls)
+			rows = frame.highWater(rows, item, cols, session, streams)
 			if (rows.length && (lines.length || above)) lines.push('')
 			for (let r of rows) lines.push(r)
+			// A streaming block or a question being answered is redrawn
+			// every frame; so is everything after it.
+			if (stable === i && !streams) stable++
 		}
+		ends.push(lines.length)
 	}
+	frame.state.history = { look, items: items.slice(0, stable), ends: ends.slice(0, stable), bash, lines }
 	// The transcript's tail, right after it (never across the full-mode
 	// padding): the inbox, each message drawn as the prompt it will
 	// become, (steering) > text, then prompts on their way to the host,
@@ -224,7 +244,7 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	lines.push(helpRow.row(view, cols))
 	let pad = full ? Math.max(0, rows - lines.length - history.length) : 0
 	let chrome = lines
-	lines = [...history, ...Array<string>(pad).fill(''), ...chrome]
+	lines = history.concat(Array<string>(pad).fill(''), chrome)
 	top += history.length + pad
 	let cursor = formCursor ?? { row: top + p.row, col: ansi.PAD.length + p.col }
 	let out = { lines, cursor, promptScroll: p.scroll, history: history.length }
@@ -233,4 +253,8 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	return { ...out, cursor: m.cursor, modalScroll: m.scroll }
 }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>() }, build, itemRows, highWater, glyph, withCursor, promptWidth }
+// `history`: the last frame's transcript rows (lines), where each of its
+// first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
+type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
+
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined }, build, itemRows, highWater, glyph, withCursor, promptWidth }

@@ -116,6 +116,43 @@ test('a long tool result shows only its first rows', () => {
 	expect(lines.length).toBeLessThan(11)
 })
 
+test('a tool result of megabytes is glimpsed in its first rows, each shown line wrapped, the rest counted', () => {
+	let long = 'w'.repeat(100)
+	let output = [long, ...Array.from({ length: 200_000 }, (_, i) => `row ${i}`)].join('\n')
+	let started = performance.now()
+	let lines = plain(frame.build(view([{ type: 'tool-result', id: 't', output }]), 40).lines).filter((l) => /w|row|more/.test(l))
+	expect(performance.now() - started).toBeLessThan(50)
+	// 100 w's on 34 columns wrap to three rows: the first three shown.
+	expect(lines.slice(0, 3).every((l) => /^◂? ?w+$/.test(l))).toBe(true)
+	expect(lines.at(-1)).toBe('… 200000 more lines')
+})
+
+test('a frame reusing the last one equals a frame built from nothing, as items stream in and change', () => {
+	let items: Item[] = [{ type: 'prompt', text: 'hi' }, { type: 'text', text: 'one' }]
+	let v = view(items)
+	let fresh = (w: View) => {
+		let kept = frame.state.history
+		frame.state.history = undefined
+		let f = frame.build(w, 50, 20, true)
+		frame.state.history = kept
+		return f.lines
+	}
+	let steps: View[] = [v]
+	let t = v.transcript!
+	steps.push({ ...v, transcript: { ...t, items: [...t.items, { type: 'tool', id: 'c', name: 'bash', input: {}, key: '7' }] } })
+	let t2 = steps[1]!.transcript!
+	steps.push({ ...v, transcript: { ...t2, items: [...t2.items, { type: 'tool-result', id: 'c', output: 'done', key: '~9' }] } })
+	// A changed item (a new object) in the middle.
+	let t3 = steps[2]!.transcript!
+	steps.push({ ...v, transcript: { ...t3, items: [t3.items[0]!, { ...t3.items[1]!, text: 'one, edited' } as Item, ...t3.items.slice(2)] } })
+	steps.push({ ...steps[3]!, prompt: { text: 'typing', cursor: 6 } })
+	for (let w of steps) expect(frame.build(w, 50, 20, true).lines).toEqual(fresh(w))
+	// Another width lays everything out again.
+	let narrow = frame.build(steps[4]!, 30, 20, true).lines
+	frame.state.history = undefined
+	expect(narrow).toEqual(frame.build(steps[4]!, 30, 20, true).lines)
+})
+
 test('text cannot send escape sequences to the terminal', () => {
 	let f = frame.build(view([{ type: 'text', text: 'hi\x1b[2J\x1b]0;title\x07\r\nthere' }], 'a\x1bb'), 40)
 	for (let line of f.lines) for (let c of ['\x07', '\r']) expect(line).not.toContain(c)

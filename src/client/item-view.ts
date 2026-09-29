@@ -105,9 +105,16 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// A glimpse: tool output can be long, the model sees all of it.
 			let call = calls?.get(item.id)
 			let out = call ? bashResult.display(item.output) : item.output
-			let rows = ansi.wrap(out.replace(/\n$/, ''), Math.max(1, width - 2))
-			let shown = rows.slice(0, itemView.resultRows())
-			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
+			// Only the lines shown are laid out (outputs run to megabytes);
+			// the rest are counted as source lines, as on the web.
+			let wide = Math.max(1, width - 2), max = itemView.resultRows()
+			let lines = out.replace(/\n$/, '').split('\n')
+			let rows: string[] = []
+			let used = 0
+			while (used < lines.length && rows.length <= max) rows.push(...ansi.wrap(lines[used++]!.slice(0, (max + 1) * wide * 4), wide))
+			let shown = rows.slice(0, max)
+			let more = rows.length - shown.length + lines.length - used
+			if (more) shown.push(`… ${more} more lines`)
 			return shown.map((l, i) => {
 				let prefix = i ? '  ' : item.isError ? '✗ ' : '◂ '
 				let ref = !i && call && session && transcript.href(session, call)
