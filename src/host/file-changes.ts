@@ -6,6 +6,7 @@ import type { FileChange, FileSnapshot } from '../common/replay.ts'
 import { approval } from './approval.ts'
 import { paths } from './paths.ts'
 import { history } from './history.ts'
+import { neighbours } from './neighbours.ts'
 import type { ToolContext } from './tools.ts'
 
 type Lock = { sessionId: string; paths: Set<string>; done: Promise<void>; release: () => void }
@@ -125,6 +126,7 @@ async function status(cwd: string): Promise<Map<string, string>> {
 async function begin(ctx: ToolContext, patterns: string[]): Promise<Observation> {
 	let release = await fileChanges.acquire(ctx, patterns)
 	try {
+		neighbours.record(ctx.sessionId, ctx.cwd, patterns)
 		let before = new Map<string, FileSnapshot>()
 		for (let path of await fileChanges.expand(ctx.cwd, patterns)) before.set(path, await fileChanges.snapshot(ctx, path))
 		return { ctx, patterns, before, status: await fileChanges.status(ctx.cwd), release }
@@ -144,6 +146,7 @@ async function finish(observation: Observation): Promise<void> {
 		for (let path of new Set([...status.keys(), ...after.keys()])) {
 			if (!declared.has(path) && status.get(path) !== after.get(path)) files.push({ path, undeclared: true, statusBefore: status.get(path) ?? null, statusAfter: after.get(path) ?? null })
 		}
+		neighbours.record(ctx.sessionId, ctx.cwd, files.map((f) => f.path))
 		if (patterns.length || files.length) history.append(ctx.sessionId, { type: 'file_changes', toolId: ctx.callId!, cwd: ctx.cwd, files })
 	} finally { release() }
 }

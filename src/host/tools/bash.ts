@@ -4,6 +4,7 @@
 
 import { jobs } from '../jobs.ts'
 import { fileChanges } from '../file-changes.ts'
+import { neighbours } from '../neighbours.ts'
 import type { Tool } from '../tools.ts'
 
 export const tool: Tool = {
@@ -44,10 +45,11 @@ export const tool: Tool = {
 		try {
 			// Escape does not stop a background job. Its snapshot and lock
 			// last until actual exit, not until the early tool result.
-			if (input.background) return await jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId, launch)
+			let note = (out: string) => neighbours.append(out, ctx.sessionId, ctx.cwd)
+			if (input.background) return note(await jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId, launch))
 			let run = launch()
 			ctx.signal.addEventListener('abort', run.stop, { once: true })
-			try { return await run.done } finally { ctx.signal.removeEventListener('abort', run.stop) }
+			try { return note(await run.done) } finally { ctx.signal.removeEventListener('abort', run.stop) }
 		} finally {
 			if (!launched) observation.release()
 		}
