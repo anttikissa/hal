@@ -10,7 +10,10 @@ const small = { scale: 0.01, seed: 7 }
 function files(home: string): Map<string, string> {
 	let out = new Map<string, string>()
 	let walk = (d: string) => {
-		for (let e of readdirSync(d, { withFileTypes: true })) e.isDirectory() ? walk(`${d}/${e.name}`) : out.set(`${d}/${e.name}`.slice(home.length), readFileSync(`${d}/${e.name}`, 'utf8'))
+		for (let e of readdirSync(d, { withFileTypes: true })) {
+			if (e.isDirectory()) walk(`${d}/${e.name}`)
+			else out.set(`${d}/${e.name}`.slice(home.length), readFileSync(`${d}/${e.name}`, 'utf8'))
+		}
 	}
 	walk(home)
 	return out

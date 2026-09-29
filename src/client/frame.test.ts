@@ -194,8 +194,6 @@ test('a notice sits between the transcript and the prompt, wrapped and cleaned',
 })
 
 // Truecolor SGR parameters for a colour, as the terminal gets them.
-const fgOf = (c: Oklch) => `38;2;${oklch.toRgb(c).join(';')}`
-const bgOf = (c: Oklch) => `48;2;${oklch.toRgb(c).join(';')}`
 const rowWith = (lines: string[], text: string) => lines.find((l) => strip(l).includes(text))!
 
 test('a card background fills the whole row and colour ends with the row', () => {

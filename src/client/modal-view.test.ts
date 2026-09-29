@@ -1,8 +1,6 @@
 // Modals in the frame (modal-view.ts), seen through frame.build.
 import { expect, test } from 'bun:test'
-import { colors } from '../common/colors.ts'
 import { modals } from '../common/modals.ts'
-import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 import type { Shown as Item, Transcript } from '../common/transcript.ts'
 import { frame, type View } from './frame.ts'
