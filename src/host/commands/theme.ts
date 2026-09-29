@@ -27,12 +27,17 @@ function active(): string | undefined {
 }
 
 export const command: SlashCommand = {
-	help: () => '/theme lists the colour themes and marks the active one; /theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
+	help: () => '/theme asks which colour theme to use, the active one chosen; /theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
 	complete: (args) => names().filter((n) => n.startsWith(args)),
-	run(args) {
+	run(args, answers) {
 		let now = active()
 		let all = names()
-		if (!args) return { say: all.map((n) => `${n === now ? '*' : ' '} ${n}`).join('\n') + (now ? '' : `\n${link()} is your own file, not a theme link`) }
+		// With no name, a question to pick from, the active one chosen.
+		if (!args && !answers) {
+			let text = now ? 'Pick the colour theme.' : `${link()} is your own file, not a theme link; /theme will not replace it.`
+			return { ask: { text, fields: [{ type: 'choice', name: 'theme', options: all, initial: Math.max(0, all.indexOf(now ?? '')) }] } }
+		}
+		args ||= answers?.theme ?? ''
 		if (!all.includes(args)) return { error: `unknown theme ${args}: choose ${all.join(', ')}` }
 		if (now === undefined) return { error: `${link()} is your own file; move it away to use /theme` }
 		if (args === 'hal') rmSync(link(), { force: true })

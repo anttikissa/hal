@@ -18,11 +18,24 @@ test('/theme links a theme as the colour plugin, and hal, the built-in, removes 
 	}
 	let link = join(plugins.dir(), 'color-theme.ts')
 	let canvas = colors.page().canvas
-	expect((await say('/theme')).text).toMatch(/^\* hal$/m)
-	expect((await say('/theme nostromo')).error).toBeFalsy()
+	let theme = async () => {
+		let n = a.of('question').length
+		a.conn.send({ type: 'submit', sessionId: id, text: '/theme' })
+		await until(() => a.of('question').length > n)
+		return a.of('question').at(-1)!.form.fields[0] as { options: string[]; initial: number }
+	}
+	let field = await theme()
+	expect(field.options).toContain('wopr')
+	expect(field.options[field.initial]).toBe('hal')
+	// Answering the question switches, like /theme <name>.
+	let n = a.of('output').length
+	a.conn.send({ type: 'answer', sessionId: id, question: a.of('question').at(-1)!.id, answers: { theme: 'nostromo' } })
+	await until(() => a.of('output').length > n)
+	expect(a.of('output').at(-1)!.error).toBeFalsy()
 	expect(realpathSync(link)).toBe(realpathSync(join(import.meta.dir, '../../../themes/nostromo.ts')))
 	expect(readlinkSync(link).startsWith('/')).toBe(false)
-	expect((await say('/theme')).text).toMatch(/^\* nostromo$/m)
+	field = await theme()
+	expect(field.options[field.initial]).toBe('nostromo')
 	// The plugin loader applies it and, once removed, puts colors back.
 	await plugins.init()
 	try {
