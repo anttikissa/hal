@@ -299,15 +299,17 @@ test('the empty box shows an example request, from the Hal list in a tab the hos
 	expect(app.placeholder()).toBe(placeholders.hal[0])
 })
 
-test('a page opened at a tab address asks tab-start for it and shows it without a new history entry', () => {
-	address = 'http://h/2-bbb'
+test('a block address resumes even a closed session, retaining its hash and history entry', () => {
+	address = 'http://h/2-bbb#5'
 	history = [address]
 	app.onState({ type: 'connected', role: 'client' })
-	expect(sent).toContainEqual({ type: 'tab-start', last: '2-bbb' })
+	expect(sent).toContainEqual({ type: 'tab-resume', id: expect.any(String), sessionId: '2-bbb' })
+	app.onEvent(tabsEvent(tab('1-aaa')))
+	expect(app.state.shown).toBeUndefined()
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
 	expect(app.state.shown).toBe('2-bbb')
 	expect(sent).toContainEqual({ type: 'open', sessionId: '2-bbb' })
-	expect(history).toEqual(['http://h/2-bbb'])
+	expect(history).toEqual(['http://h/2-bbb#5'])
 	// A snapshot of another session is not this page's transcript.
 	app.onEvent(snapOf('1-aaa'))
 	expect(app.sessionId()).toBeUndefined()
@@ -321,6 +323,7 @@ test('with no valid id the page lands on the tab shown last, else the first, rep
 	lastTab = '2-bbb'
 	app.onState({ type: 'connected', role: 'client' })
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
+	app.onEvent({ type: 'rejected', id: sent.find((c) => c.type === 'tab-resume').id, command: 'tab-resume', reason: 'no such session' })
 	expect(history).toEqual(['http://h/2-bbb'])
 	app.reset()
 	address = 'http://h/'

@@ -190,8 +190,15 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker li { padding: 0 0.4rem; cursor: pointer; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Picker li[aria-selected="true"] { background: var(--button); }
 .Picker li .match { color: var(--match); font-weight: bold; }
-.Picker .effort-controls { display: flex; gap: 0.5rem; }
+.Picker .effort-controls { display: flex; gap: 0.5rem; flex: none; }
 .Picker .effort-controls button { min-height: 44px; min-width: 44px; }
+.Picker { max-height: calc(var(--app-height, 100dvh) - 1rem); overflow: hidden; }
+.Picker .input, .Picker .top, .Picker .filters, .Picker .log { flex: none; }
+.Picker .filters { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.Picker .filters button { min-height: 44px; }
+.Picker ul { min-height: 0; overscroll-behavior: contain; }
+.Picker li a { display: block; min-height: 44px; padding-block: 0.4rem; color: inherit; text-decoration: none; }
+.Picker :focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* Apple HIG: touch targets at least 44x44pt. */
 @media (pointer: coarse) {
   .Picker { width: calc(var(--app-width, 100vw) - 1rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; max-width: none; height: calc(var(--app-height, 100dvh) - 1rem); max-height: none; top: calc(var(--app-top, 0px) + 0.5rem); bottom: auto; margin: 0; }

@@ -54,6 +54,7 @@ function backgroundStep(): void {
 function onEvent(event: Event): boolean {
 	let st = app.state
 	if (event.type === 'tabs') tabs.onTabs(event.tabs)
+	else if (event.type === 'rejected' && event.id && st.asked.delete(event.id)) { delete st.landing; tabs.onTabs(st.tabs); return false }
 	else if (event.type === 'go') {
 		if (st.shown === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) tabs.show(event.tab, false)
 	}
@@ -66,8 +67,16 @@ function onEvent(event: Event): boolean {
 
 // Each connection brings the tabs; tab-start picks the one to show.
 function connected(): void {
-	let last = app.state.shown ?? router.parse(router.href()) ?? router.store.load()
-	connection.send(last ? { type: 'tab-start', last } : { type: 'tab-start' })
+	let addressed = router.parse(router.href())
+	if (!app.state.shown && addressed) {
+		app.state.landing = addressed
+		let id = connection.nextId()
+		app.state.asked.add(id)
+		connection.send({ type: 'tab-resume', id, sessionId: addressed })
+	} else {
+		let last = app.state.shown ?? router.store.load()
+		connection.send(last ? { type: 'tab-start', last } : { type: 'tab-start' })
+	}
 }
 
 // A tab key: true if it was one (and is done).
@@ -83,6 +92,8 @@ function onTabs(list: Tab[]): void {
 	let st = app.state
 	let before = st.tabs
 	st.tabs = list
+	if (st.landing && !list.some((t) => t.id === st.landing)) return
+	delete st.landing
 	for (let id of st.cached.keys()) if (!list.some((tab) => tab.id === id)) {
 		st.cached.delete(id)
 		st.background.delete(id)

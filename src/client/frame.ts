@@ -35,6 +35,7 @@ import { strings } from '../common/strings.ts'
 
 export interface View {
 	transcript?: Transcript
+	target?: string
 	/** Where replayed history ends: a line there says it is old. */
 	prompt: PromptState
 	/** Prompts sent but not yet acknowledged by the host. */
@@ -155,7 +156,7 @@ function withCursor(rows: string[], hal: HalCursor, width: number): string[] {
 
 // The rows of the transcript's items, and where a question being
 // answered among them puts the cursor.
-export type Past = { lines: string[]; formCursor?: Frame['cursor'] }
+export type Past = { lines: string[]; formCursor?: Frame['cursor']; target?: number }
 
 // Lays out the transcript's items. The rows of items drawn last time
 // and unchanged since are reused as they are: a frame costs what
@@ -211,7 +212,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 		ends.push(lines.length)
 	}
 	keep()
-	return formCursor ? { lines, formCursor } : { lines }
+	let at = view.target ? items.findIndex((i) => i.key === view.target) : -1
+	return { lines, ...(formCursor ? { formCursor } : {}), ...(at >= 0 ? { target: at ? ends[at - 1]! : 0 } : {}) }
 }
 
 // The frame for `view` on a terminal of `rows` × `cols`. `full`: full
@@ -229,7 +231,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 		if (lines.length || above) lines.push('')
 		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
 	}
-	let formCursor = view.form ? past.formCursor : undefined
+	let formCursor = view.form && past.target === undefined ? past.formCursor : undefined
 	// The transcript's tail, right after it (never across the full-mode
 	// padding): the inbox, each message drawn as the prompt it will
 	// become, (steering) > text, then prompts on their way to the host,
@@ -275,6 +277,8 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	lines.push(rule(p.below ? `↓${p.below}` : ''))
 	lines.push(view.status ? statusRow.row(view.status, cols) : '')
 	lines.push(helpRow.row(view, cols))
+	// Keep the matched block's first row in the visible transcript area.
+	if (past.target !== undefined) history = history.slice(0, past.target + Math.max(1, rows - lines.length))
 	let pad = full ? Math.max(0, rows - lines.length - history.length) : 0
 	let chrome = lines
 	lines = history.concat(Array<string>(pad).fill(''), chrome)

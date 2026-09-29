@@ -15,6 +15,7 @@ import { command as redraw } from './commands/redraw.ts'
 import { command as restart } from './commands/restart.ts'
 import { command as resume } from './commands/resume.ts'
 import { command as suspend } from './commands/suspend.ts'
+import { find } from './find.ts'
 
 export type ClientCommand = { run(): void }
 
@@ -23,6 +24,7 @@ const all: Record<string, ClientCommand> = { close, new: newTab, quit, redraw, r
 // Runs command `name` bare. Ctrl-M only asks for the model picker, to
 // this client alone and unrecorded (tasks/w4/forms.md, Provenance).
 function run(name: string): void {
+	if (name === 'find') return find.open()
 	let local = clientCommands.all[name]
 	if (local) return local.run()
 	let id = app.state.transcript?.meta.id

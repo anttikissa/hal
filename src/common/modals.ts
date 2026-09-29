@@ -12,6 +12,7 @@
 
 import { forms, type Answers, type Form, type FormState, type Key } from './forms.ts'
 import type { EffortCapability } from './effort.ts'
+import type { FindDialog } from './find-dialog.ts'
 
 // What each list row of a tree modal is: a model `id`, or a category
 // `path` ("anthropic/opus") with the model Enter picks for it. `parent` is
@@ -27,6 +28,7 @@ export type ModalState = {
 	title: string
 	/** Key hints for the outline, such as "enter: switch". */
 	hint?: string
+	find?: FindDialog
 	form?: FormState
 	items: string[]
 	/** Words to highlight in the items (common/fuzzy.ts marks). */

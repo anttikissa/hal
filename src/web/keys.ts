@@ -23,6 +23,8 @@ import { attach, type Pasted } from './attach.ts'
 import { editor, type Splice } from './editor.ts'
 import { tabs } from './tabs.ts'
 import { view } from './view.ts'
+import { commandList } from '../common/commands/list.ts'
+import { find } from './find.ts'
 
 // Where a key was pressed: the message box (its text, the caret, and
 // `write`, which edits the box natively and leaves the selection from
@@ -56,8 +58,14 @@ function key(e: KeyInput, target: Target): boolean {
 	// The message box may hold text no input event told us about.
 	if (target.kind === 'message' && target.text !== st.text) app.input(target.text)
 	let k = view.key(e)
-	// Contextual model arrows remain tree/effort keys while filtering.
+	if (k && commandList.byKey({ key: k.key.toLowerCase(), ctrl: !!k.ctrl, cmd: !!k.cmd, alt: !!k.alt, shift: !!k.shift })?.name === 'find') { find.open(); return true }
+	// Find has native text editing; model arrows remain tree/effort keys.
 	if (st.view.modal) {
+		if (st.view.modal.find) {
+			if (!k || e.ctrlKey || e.metaKey || e.altKey || !['enter', 'escape', 'up', 'down'].includes(k.key)) return false
+			find.key(k)
+			return true
+		}
 		if (target.kind === 'button' && (e.key === 'Enter' || e.key === ' ')) return false
 		if (!k || e.ctrlKey || e.metaKey || e.altKey || !['left', 'right', 'enter', 'escape', 'up', 'down'].includes(k.key)) return false
 		app.modalKey(k)

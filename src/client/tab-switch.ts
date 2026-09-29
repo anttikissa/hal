@@ -96,10 +96,8 @@ function focusOn(focus: Focus): void {
 		for (let f of tabFields) delete st[f]
 		let back = focus.tab === undefined ? undefined : st.hidden.get(focus.tab)
 		Object.assign(st, { prompt: prompt.empty() }, back)
-		delete st.modal
+		app.close()
 		delete st.choices
-		delete st.onModal
-		delete st.onModalKey
 		if (focus.tab !== undefined) {
 			st.hidden.delete(focus.tab)
 			if (!back) drafts.join(focus.tab, early)

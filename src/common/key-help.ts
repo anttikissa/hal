@@ -86,6 +86,7 @@ function sections(): KeySection[] {
 				row('ctrl-n / ctrl-p', 'next or previous tab'),
 				row('alt-1 … alt-0', 'tab 1 to 10', digits),
 				command('model'),
+				command('find'),
 				command('redraw'),
 				command('quit'),
 				command('suspend'),

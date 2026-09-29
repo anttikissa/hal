@@ -35,6 +35,7 @@ import { tabSwitch, type TabView } from './tab-switch.ts'
 import { appView } from './app-view.ts'
 import { titles } from '../common/titles.ts'
 import { notices } from '../common/notices.ts'
+import { find } from './find.ts'
 
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
@@ -86,6 +87,7 @@ function beat(): void {
 
 function onEvent(event: Event): void {
 	let st = app.state
+	if (event.type === 'find-results') return find.event(event)
 	// A recalled entry stays on screen; the draft changes underneath.
 	let mine = st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id ? event.sessionId : undefined
 	if (drafts.onEvent(event) && mine && !recall.shown(mine)) app.setPrompt(drafts.text(mine))
@@ -118,6 +120,7 @@ function onEvent(event: Event): void {
 		st.form = forms.follow(st.form, transcript.question(t))
 	}
 	app.show()
+	find.seek()
 	if (event.type === 'snapshot' && event.sessionId === shown) st.painted = true
 	if (st.loading === shown && event.type === 'snapshot') delete st.loading
 	app.backgroundStep()
@@ -222,6 +225,7 @@ function onKeys(events: KeyEvent[]): void {
 			if (command) app.send(command)
 			continue
 		}
+		find.target = undefined
 		if (st.form && st.transcript) {
 			let { state, action } = forms.step(st.form, k)
 			st.form = state
@@ -276,6 +280,7 @@ function open(modal: ModalState, submit: NonNullable<AppState['onModal']>, onKey
 }
 
 function close(): void {
+	if (app.state.modal?.find) find.close()
 	delete app.state.modal
 	delete app.state.onModal
 	delete app.state.onModalKey
@@ -301,6 +306,9 @@ function init(): void {
 }
 
 function reset(): void {
+	if (app.state.modal?.find) find.close()
+	find.state = { filters: [...find.state.filters] }
+	find.target = undefined
 	if (app.state.timer) clearTimeout(app.state.timer)
 	app.state = createState()
 	pulse.reset()

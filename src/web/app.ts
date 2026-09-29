@@ -27,6 +27,7 @@ import { push } from './push.ts'
 import { tabs } from './tabs.ts'
 import { target, type Target } from './target.ts'
 import { view, type ViewState } from './view.ts'
+import { find } from './find.ts'
 
 // `kill`: the last text Ctrl-K/U or Alt-D killed, for Ctrl-Y.
 // `tabs`: the host's, in order; `shown`: the tab this page shows;
@@ -36,7 +37,7 @@ import { view, type ViewState } from './view.ts'
 // the page can keep what the reader was reading in place.
 // `target`: the block the address links to (target.ts), `found` once
 // its card is in the transcript, `shown` once scrolled to.
-export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; known?: Known; completedByTab?: string; suppressed?: string; cached: Map<string, ViewState>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout> }
+export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; landing?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; known?: Known; completedByTab?: string; suppressed?: string; cached: Map<string, ViewState>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout> }
 
 function createState(): AppState {
 	return { view: {}, text: '', tabs: [], asked: new Set(), older: new Map(), pages: 0, cached: new Map(), background: new Set(), painted: false }
@@ -65,6 +66,7 @@ function placeholder(): string | undefined {
 }
 
 function setView(v: ViewState): void {
+	if (app.state.view.modal?.find && !v.modal?.find) find.cancel()
 	app.state.view = v
 	app.changed()
 }
@@ -86,6 +88,7 @@ function sendNow(command: unknown): boolean {
 
 function onEvent(event: Event): void {
 	let st = app.state
+	if (event.type === 'find-results') return find.event(event)
 	if (event.type === 'tabs') push.badge(event.tabs)
 	if (tabs.onEvent(event)) return
 	let changed = drafts.onEvent(event)
@@ -258,6 +261,7 @@ function sendForm(action: FormAction): void {
 // The model picker: a key (Enter picks, Escape closes), a click on an
 // item, the search box typed into.
 function modalKey(k: Key): void {
+	if (app.state.view.modal?.find) return find.key(k)
 	let { state, command } = view.modalKey(app.state.view, k)
 	app.setView(state)
 	if (command) app.sendNow(command)
@@ -345,6 +349,8 @@ async function login(code: string): Promise<string | undefined> {
 }
 
 function reset(): void {
+	if (app.state.view.modal?.find) find.close()
+	find.state = { filters: [...find.state.filters] }
 	if (app.state.timer) clearTimeout(app.state.timer)
 	app.state = createState()
 	recall.reset()
@@ -383,7 +389,7 @@ export const app = {
 	sendForm,
 	modalKey,
 	modalPick,
-	search: (text: string): void => app.setView(view.search(app.state.view, text)),
+	search: (text: string): void => { if (app.state.view.modal?.find) find.input(text); else app.setView(view.search(app.state.view, text)) },
 	send,
 	store,
 	start,

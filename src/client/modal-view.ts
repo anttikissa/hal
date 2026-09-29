@@ -7,6 +7,7 @@ import { modals, type ModalState } from '../common/modals.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
+import { findDialog } from '../common/find-dialog.ts'
 
 const { UNCOLOR, RESET, LINK_OFF } = ansi
 
@@ -43,16 +44,20 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	let inner = Math.max(0, width - 4)
 	let fields = m.form ? formView.fieldLines(m.form, inner, { fg: colors.popup().neutralFg! }) : { rows: [], cursor: undefined }
 	let content = fields.rows.slice(0, height - 2)
+	if (m.find) {
+		if (m.find.focus !== 0) fields.cursor = undefined
+		content.push(strings.clipVisual(findDialog.labels.map((label, i) => `${m.find!.focus === i + 1 ? '›' : ''}[${m.find!.filters.includes(findDialog.filters[i]!) ? 'x' : ' '}] ${label}`).join('  '), inner))
+	}
 	let visible = Math.max(0, height - 2 - content.length)
 	let scroll = modalView.modalScroll(m, visible)
 	let current = colors.popupCurrent()
-	let cursor = fields.cursor ?? { row: content.length, col: 0 }
+	let cursor = fields.cursor ?? { row: m.find && m.find.focus > 0 && m.find.focus < 5 ? content.length - 1 : content.length, col: 0 }
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
 		// Leading spaces are the picker's tree indentation: keep them.
 		let row = strings.clipVisual((i === m.selected ? `${formView.ARROW} ` : '  ') + ansi.clean(m.items[i]!).replace(/[\r\n\t]+/g, ' '), inner)
-		if (m.query) row = modalView.highlight(row, m.query, i === m.selected ? current : undefined)
+		if (m.query) row = modalView.highlight(row, m.query, i === m.selected ? current : undefined, !!m.find)
 		if (i === m.selected) {
-			if (!fields.cursor) cursor = { row: content.length, col: 0 }
+			if (!fields.cursor && (!m.find || m.find.focus === 5)) cursor = { row: content.length, col: 0 }
 			// Monochrome: reverse video instead of the highlight colour.
 			row = (ansi.sgr(current) || ansi.INVERSE) + row + ' '.repeat(inner - strings.visLen(row)) + UNCOLOR + ansi.UNINVERSE
 		}
@@ -78,12 +83,12 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 // `row` (plain text) with the query's matches bold and bright, then back
 // to `after`'s colour (the selected row's) or the default. Monochrome:
 // bold only.
-function highlight(row: string, query: string, after?: Style): string {
+function highlight(row: string, query: string, after?: Style, literal = false): string {
 	let on = ansi.BOLD + (ansi.mono() ? '' : ansi.sgr({ fg: colors.popupMatch().fg! }))
 	let off = ansi.UNBOLD + (ansi.mono() ? '' : after?.fg ? ansi.sgr({ fg: after.fg }) : '\x1b[39m')
 	let out = ''
 	let at = 0
-	for (let [from, to] of fuzzy.marks(row, query)) {
+	for (let [from, to] of literal ? findDialog.marks(row, query) : fuzzy.marks(row, query)) {
 		out += row.slice(at, from) + on + row.slice(from, to) + off
 		at = to
 	}
