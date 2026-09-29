@@ -1,6 +1,6 @@
 {
 	title: 'inspect tool: what Hal is doing now',
-	spec: "An inspect tool, read-only, answers what the model otherwise needed eval for: the open tabs in order (number, session id, name, state such as running/idle/paused/asking, model, cwd, which one is the caller), the host's pid, git version, start time and uptime, and connected clients. Optional argument 'models' lists the models each provider offers with the configured default. Output is short plain text; no secrets (research 29 Sep, questions.md 119).",
+	spec: "An inspect tool, read-only, answers what the model otherwise needed eval for: the open tabs in order (number, session id, name, state such as running/idle/paused/asking, model, cwd, which one is the caller), the host's pid, git version, start time and uptime, and connected clients. Its schema offers view 'tabs' (the default, the above) and 'models', both named, so the model sees each exists (a schema naming only 'models' made a model believe tabs were unavailable); 'models' lists the models each provider offers with the configured default. Output is short plain text; no secrets (research 29 Sep, questions.md 119).",
 	status: 'done',
 	needs: [],
 	notes: [

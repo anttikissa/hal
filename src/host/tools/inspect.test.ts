@@ -28,6 +28,9 @@ test('shows tabs in their shared order, identifies caller, live state and client
 	expect(result.output).toContain('idle')
 	expect(result.output).toMatch(/Host PID \d+; version .+; started .*; uptime \d+s/)
 	expect(result.output).not.toContain('token')
+	// The default view is also offered by name, so a model can see it exists.
+	expect((await inspect(first, { view: 'tabs' })).output).toContain(`${first} (you)`)
+	expect(JSON.stringify(tools.defs().find((t) => t.name === 'inspect')?.inputSchema)).toContain('"tabs"')
 })
 
 test('model view groups registered providers and marks configured default', async () => {

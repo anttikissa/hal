@@ -9,11 +9,11 @@ import { version } from '../version.ts'
 
 export const tool: Tool = {
 	name: 'inspect',
-	description: 'Inspect open tabs, this host and connected clients. Set view to models for available models by provider and the default.',
-	parameters: { type: 'object', properties: { view: { type: 'string', enum: ['models'], description: 'Show available models instead of tabs' } } },
+	description: 'Inspect Hal read-only. view "tabs" (the default): open tabs in order with state, model and cwd, plus host pid, version, uptime and client count. view "models": available models by provider and the default.',
+	parameters: { type: 'object', properties: { view: { type: 'string', enum: ['tabs', 'models'], description: 'tabs (default) or models' } } },
 	readOnly: true,
 	async run(input, ctx) {
-		if (input.view !== undefined && input.view !== 'models') throw new Error('view must be models')
+		if (input.view !== undefined && input.view !== 'tabs' && input.view !== 'models') throw new Error('view must be tabs or models')
 		if (input.view === 'models') {
 			let ids = models.known()
 			let lines = [`Default: ${models.defaultModel()}`]
