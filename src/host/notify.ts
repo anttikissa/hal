@@ -49,17 +49,22 @@ function route(clients: Iterable<Watcher>, id: string, event: Event): void {
 	if (!k) return
 	let all = [...clients]
 	if (all.some((c) => c.visible === id)) return
+	let word = k === 'attention' ? 'needs an answer' : k === 'failed' ? 'failed' : 'done'
+	let told = k === 'done' ? notify.replyLine(id) : ''
+	notify.deliver(all, id, k, notify.line(id, event), told ? `${word}: ${told}` : word)
+}
+
+// The same routing for automatic events and a model's mid-turn notice.
+function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: string, pushText: string): void {
+	let all = [...clients]
+	if (all.some((c) => c.visible === id)) return
 	let name = sessions.open(id).name ?? id
 	let watching = all.filter((c) => c.visible !== undefined)
-	if (!watching.length) {
-		let word = k === 'attention' ? 'needs an answer' : k === 'failed' ? 'failed' : 'done'
-		let told = k === 'done' ? notify.replyLine(id) : ''
-		return void push.notify(id, name, told ? `${word}: ${told}` : word).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
-	}
-	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: k, line: notify.line(id, event) }
+	if (!watching.length) return void push.notify(id, name, pushText).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
+	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: k, line }
 	let tab = tabs.file().open.indexOf(id)
 	if (tab >= 0) notice.tab = tab + 1
 	for (let c of watching) c.deliver(notice)
 }
 
-export const notify = { kind, replyLine, line, route }
+export const notify = { kind, replyLine, line, route, deliver }
