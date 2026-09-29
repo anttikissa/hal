@@ -20,7 +20,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; }
 body { height: 100dvh; }
 body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .App, .Chat { height: 100%; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
-.App { position: absolute; top: 0; left: 0; right: 0; height: var(--app-height, 100dvh); transform: translateY(var(--app-top, 0px)); }
+.App { position: absolute; top: 0; left: 0; width: var(--app-width, 100%); height: var(--app-height, 100dvh); transform: translate(var(--app-left, 0px), var(--app-top, 0px)); }
 /* The one scroller: nothing inside it scrolls; long lines wrap. */
 /* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
@@ -40,6 +40,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 /* A context boundary (tasks bc, vh): its text centred in a rule. */
 .Card.divider { display: flex; align-items: center; gap: 1ch; border-left: none; }
 .Card.divider::before, .Card.divider::after { content: ""; flex: 1; border-top: 1px solid currentColor; }
+.Card.image > a:not(.link) { display: block; touch-action: pan-y; }
 .Card.image img { display: block; max-width: 100%; max-height: 24rem; }
 /* A prompt the host hasn't taken yet looks sent; only one that stays
    pending greys, after a delay, so a normal round trip shows nothing. */
@@ -189,7 +190,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker li .match { color: var(--match); font-weight: bold; }
 /* Apple HIG: touch targets at least 44x44pt. */
 @media (pointer: coarse) {
-  .Picker { width: calc(100% - 1rem); max-width: none; height: calc(var(--app-height, 100dvh) - 1rem); max-height: none; top: calc(var(--app-top, 0px) + 0.5rem); bottom: auto; margin: 0 auto; }
+  .Picker { width: calc(var(--app-width, 100vw) - 1rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; max-width: none; height: calc(var(--app-height, 100dvh) - 1rem); max-height: none; top: calc(var(--app-top, 0px) + 0.5rem); bottom: auto; margin: 0; }
   .Picker li { min-height: 44px; padding-block: 0.4rem; }
   .Picker .close { min-width: 44px; min-height: 44px; }
 }

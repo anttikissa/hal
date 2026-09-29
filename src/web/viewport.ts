@@ -8,7 +8,7 @@
 // without visualViewport the CSS keeps 100dvh. Chrome and Firefox
 // honour the meta tag, and the same numbers are right there too.
 
-export type Box = { height: number; offsetTop: number }
+export type Box = { width: number; height: number; offsetLeft: number; offsetTop: number }
 
 type Source = Box & {
 	addEventListener: (type: string, listener: () => void) => void
@@ -18,7 +18,7 @@ type Source = Box & {
 // offsetTop is how far the browser has panned the visual viewport down
 // the layout viewport; translating the app there puts it back on screen.
 function css(box: Box): Record<string, string> {
-	return { '--app-height': `${box.height}px`, '--app-top': `${box.offsetTop}px` }
+	return { '--app-width': `${box.width}px`, '--app-height': `${box.height}px`, '--app-left': `${box.offsetLeft}px`, '--app-top': `${box.offsetTop}px` }
 }
 
 // Mirrors `source` into `style` now and on every change; answers the

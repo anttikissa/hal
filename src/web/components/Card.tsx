@@ -147,7 +147,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			{link()}
 			<Show when={title()}>{(_t) => <div class="who">{who()}</div>}</Show>
 			<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : props.row.item.type === 'prompt' && source() ? marked(s().text) : parts()}>
-				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
+				{(img) => <a href={view.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={view.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
 			</Show>
 			<Show when={props.cursor && !md()}>{cursor()}</Show>
 		</div>
