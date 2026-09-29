@@ -1,4 +1,5 @@
-// Example plugin (task an). Everything is commented out: it does nothing.
+// Example plugin (task an). Its hooks are commented out: it loads and
+// registers nothing.
 // Every plugins/*.ts in the Hal home is a plugin, loaded at startup after
 // local.ts and reloaded whenever it changes (edit, save, done). Copy this
 // file under another name and uncomment what you need.
@@ -25,7 +26,7 @@
 // 158-lil-trace-render.ts, and set `expires` (a UTC ISO time). Once it
 // passes the hooks are removed; the file stays.
 
-// import type { Plugin } from '../src/host/plugins.ts'
+import type { Plugin } from '../src/host/plugins.ts'
 // import { auth } from '../src/host/auth.ts'
 // import { models } from '../src/host/models.ts'
 // import { tools } from '../src/host/tools.ts'
@@ -33,7 +34,8 @@
 //
 // export const expires = '2026-12-31T23:59:00Z'
 //
-// export default async (plugin: Plugin) => {
+// oxlint-disable-next-line no-unused-vars -- used once uncommented
+export default async (plugin: Plugin) => {
 // 	// A setting: around a config function.
 // 	plugin.around(models, 'defaultModel', () => 'anthropic/claude-opus-5-5')
 //
@@ -62,8 +64,8 @@
 // 		let i = out.findIndex((a) => a.name === preferred)
 // 		return kind === 'openai' && i > 0 ? [out[i]!, ...out.filter((_, j) => j !== i)] : out
 // 	})
-// }
-//
+}
+
 // async function fetchPreferred(): Promise<string> {
 // 	return (await Bun.file('/tmp/preferred-account').text()).trim()
 // }

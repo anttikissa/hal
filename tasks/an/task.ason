@@ -17,7 +17,7 @@ Reload is atomic for hooks: on change, the file is re-imported cache-busted and 
 
 /plugins (host command, model-usable) lists loaded plugin files with hook targets (e.g. host/auth.pickAccount around), expiry, content hash and last load error.
 
-Repo: plugins/.gitignore ignores everything but itself and example-plugin.ts, so user plugins stay local by default and a fork can delete it to track its own. plugins/example-plugin.ts is tracked, fully commented out (does nothing), and documents the API with: a setting override via around on a config function, an observing before, and adding a harmless tool via after(tools, 'all', m => m.set(...)). No security-looking examples: a hook is not a security boundary. ./test typechecks plugins/*.ts like local.ts.
+Repo: plugins/.gitignore ignores everything but itself and example-plugin.ts, so user plugins stay local by default and a fork can delete it to track its own. plugins/example-plugin.ts is tracked, loads cleanly with its hooks commented out (an empty registration function, so /plugins shows no hooks and no error), and documents the API with: a setting override via around on a config function, an observing before, and adding a harmless tool via after(tools, 'all', m => m.set(...)). No security-looking examples: a hook is not a security boundary. ./test typechecks plugins/*.ts like local.ts.
 
 Temporary plugins (agents' convention, stated in the example comments): name the file after the session, e.g. 158-lil-trace-render.ts, and set expires.
 
