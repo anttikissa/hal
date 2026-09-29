@@ -117,3 +117,13 @@ test('a modal never makes a row wider than the terminal, however small', () => {
 		}
 	}
 })
+
+test('search matches in a modal list are bold, then the row carries on unchanged', () => {
+	let v = modalView({ title: 'Models', form: search, items: ['gpt 6 sol', 'opus 5.5'] })
+	v = { ...v, modal: { ...v.modal!, query: 'sol', selected: 1 } }
+	let row = frame.build(v, 60, 30).lines.find((l) => strip(l).includes('gpt 6 sol'))!
+	expect(row).toMatch(/gpt 6 \x1b\[1m(\x1b\[[0-9;]*m)*sol\x1b\[22m/)
+	expect(strip(row)).toContain('  gpt 6 sol')
+	let other = frame.build(v, 60, 30).lines.find((l) => strip(l).includes('opus 5.5'))!
+	expect(other).not.toContain('\x1b[1m')
+})

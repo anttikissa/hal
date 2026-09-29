@@ -1,7 +1,8 @@
 // Modals as the frame shows them: a box of fields and a scrolling list,
 // drawn over the transcript in the middle of the screen. Pure.
 
-import { colors } from '../common/colors.ts'
+import { colors, type Style } from '../common/colors.ts'
+import { fuzzy } from '../common/fuzzy.ts'
 import { modals, type ModalState } from '../common/modals.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
@@ -49,6 +50,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
 		// Leading spaces are the picker's tree indentation: keep them.
 		let row = strings.clipVisual((i === m.selected ? '> ' : '  ') + ansi.clean(m.items[i]!).replace(/[\r\n\t]+/g, ' '), inner)
+		if (m.query) row = modalView.highlight(row, m.query, i === m.selected ? current : undefined)
 		if (i === m.selected) {
 			if (!fields.cursor) cursor = { row: content.length, col: 0 }
 			// Monochrome: reverse video instead of the highlight colour.
@@ -71,6 +73,21 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	// A box too small for its fields still keeps the cursor inside it.
 	let at = { row: Math.min(height - 1, 1 + cursor.row), col: Math.max(0, Math.min(width - 1, 2 + cursor.col)) }
 	return { rows: rows.slice(0, height), cursor: at, scroll }
+}
+
+// `row` (plain text) with the query's matches bold and bright, then back
+// to `after`'s colour (the selected row's) or the default. Monochrome:
+// bold only.
+function highlight(row: string, query: string, after?: Style): string {
+	let on = ansi.BOLD + (ansi.mono() ? '' : ansi.sgr({ fg: colors.popupMatch().fg! }))
+	let off = ansi.UNBOLD + (ansi.mono() ? '' : after?.fg ? ansi.sgr({ fg: after.fg }) : '\x1b[39m')
+	let out = ''
+	let at = 0
+	for (let [from, to] of fuzzy.marks(row, query)) {
+		out += row.slice(at, from) + on + row.slice(from, to) + off
+		at = to
+	}
+	return out + row.slice(at)
 }
 
 // The first list row a modal shows with `visible` rows for its list.
@@ -102,4 +119,4 @@ function withModal(lines: string[], m: ModalState, rows: number, cols: number): 
 	return { cursor: { row: top + drawn.cursor.row, col: box.left + drawn.cursor.col }, scroll: drawn.scroll }
 }
 
-export const modalView = { modalBox, border, modalLines, modalScroll, overlay, withModal }
+export const modalView = { modalBox, border, modalLines, highlight, modalScroll, overlay, withModal }

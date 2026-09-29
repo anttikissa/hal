@@ -66,6 +66,8 @@ export const ansi = {
 	state: { web: { url: '', code: '' } },
 	// One blank column on each side of every row.
 	PAD: ' ',
+	BOLD: '\x1b[1m',
+	UNBOLD: '\x1b[22m',
 	INVERSE: '\x1b[7m',
 	UNINVERSE: '\x1b[27m',
 	UNCOLOR: '\x1b[39;49m',

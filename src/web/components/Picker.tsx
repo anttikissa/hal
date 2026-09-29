@@ -5,8 +5,25 @@
 // or its close button closes it, as Escape does.
 
 import { createEffect, For } from 'solid-js'
+import { fuzzy } from '../../common/fuzzy.ts'
 import type { ModalState } from '../../common/modals.ts'
 import { app } from '../app.ts'
+
+// `text` in pieces, the search matches in <b> (index.html makes them bright).
+function marked(text: string, query: string | undefined) {
+	let out: (string | ReturnType<typeof Match>)[] = []
+	let at = 0
+	for (let [from, to] of query ? fuzzy.marks(text, query) : []) {
+		out.push(text.slice(at, from), Match({ text: text.slice(from, to) }))
+		at = to
+	}
+	out.push(text.slice(at))
+	return out
+}
+
+function Match(props: { text: string }) {
+	return <b class="match">{props.text}</b>
+}
 
 export function Picker(props: { modal: ModalState | undefined }) {
 	let box!: HTMLDialogElement
@@ -57,7 +74,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				<For each={props.modal?.items ?? []}>
 					{(item, i) => (
 						<li role="option" id={`modal-item-${i()}`} aria-selected={i() === props.modal?.selected ? 'true' : 'false'} onClick={() => app.modalPick(i())}>
-							{item}
+							{marked(item, props.modal?.query)}
 						</li>
 					)}
 				</For>

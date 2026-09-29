@@ -75,12 +75,14 @@ export const colors = {
 	help: (): Style => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0] }),
 	popup: (): Style => ({ neutralFg: [0.68, 0, 0], dangerFg: [0.86, 0.16, 85] }),
 	popupCurrent: (): Style => ({ fg: [0.98, 0.04, 55], bg: [0.42, 0.12, 55] }),
+	// Search matches in a modal's list: brighter than the items around.
+	popupMatch: (): Style => ({ fg: [0.95, 0.14, 95] }),
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
 	// Edit diffs: green additions, removals in the error hue.
 	diff: (): Style => ({ addFg: colors.tab().doneFg!, removeFg: colors.error().fg! }),
 	// The web page's own surfaces (custom properties on .page): canvas
 	// and text, the focus accent, form fields, borders, and buttons (the
-	// picker's selected item too). The terminal has its own.
+	// picker's selected item too), and search matches. The terminal has its own.
 	page: (): Style => ({
 		canvas: [0.2, 0.008, 260],
 		text: [0.89, 0.006, 260],
@@ -88,6 +90,8 @@ export const colors = {
 		field: [0.235, 0.009, 260],
 		border: [0.52, 0.012, 260],
 		button: [0.35, 0.05, 262],
+		// Search matches in the picker's list.
+		match: [0.92, 0.14, 95],
 	}),
 	// Tools: each kind its own hue. Red is kept for real failures. A
 	// tool without its own entry (tool + capitalised name) uses `tool`.

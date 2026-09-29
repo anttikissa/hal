@@ -152,3 +152,28 @@ test('left and right open and close categories while searching too', () => {
 	expect(selected(closed)).toMatch(/▶ opus/)
 	expect(selected(press(closed, key('right')))).toMatch(/▼ opus/)
 })
+
+test('searching opens a family but keeps its older closed, unless only older matches', () => {
+	let all = ['openai/gpt-6-sol', 'openai/gpt-6-luna', 'openai/gpt-5.6-sol', 'openai/gpt-5.5', 'openai/gpt-image-2', 'anthropic/claude-opus-5-5']
+	let search = (q: string) => picker.step(picker.open('anthropic/claude-opus-5-5', all), key('x', q), all).state
+	let gpt = search('gpt').items.join('\n')
+	expect(gpt).toMatch(/▼ gpt/)
+	expect(gpt).toMatch(/gpt-6-sol$/m)
+	expect(gpt).toMatch(/▶ older$/m)
+	expect(gpt).toMatch(/▶ other$/m)
+	expect(gpt).not.toMatch(/gpt-5\.5$|gpt-image-2$/m)
+	let old = search('gpt 5.5')
+	expect(old.items.join('\n')).toMatch(/▼ older$/m)
+	expect(enter(old)).toBe('/model openai/gpt-5.5')
+	// Right opens a closed bucket while searching; left closes it again.
+	let at = picker.refilter({ ...search('gpt'), selected: 0 }, all)
+	at = { ...at, selected: at.items.findIndex((r) => r.trim() === '▶ older') }
+	let opened = picker.step(at, key('right'), all).state
+	expect(opened.items.join('\n')).toMatch(/gpt-5\.5$/m)
+	expect(picker.step(opened, key('left'), all).state.items.join('\n')).not.toMatch(/gpt-5\.5$/m)
+})
+
+test('the picker says what to highlight: the search text', () => {
+	expect(picker.open('hal/intro', tree).query).toBe('')
+	expect(type(picker.open('hal/intro', tree), 'opus').query).toBe('opus')
+})

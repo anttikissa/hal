@@ -10,59 +10,18 @@
 
 import type { Key } from './forms.ts'
 import type { ModalAction, ModalState, TreeRow } from './modals.ts'
+import { fuzzy } from './fuzzy.ts'
 import { modals } from './modals.ts'
-
-// Lowercase words, split at anything not a letter or digit and between
-// letters and digits: "Opus-5.5" and "opus5 5" are both opus, 5, 5.
-function words(s: string): string[] {
-	return s.toLowerCase().match(/[a-z]+|[0-9]+/g) ?? []
-}
-
-// How well `id` matches the query words, or undefined if it does not:
-// each word must appear, in order, preferably where a word of the id
-// starts. Whole words and words right after the previous match score
-// higher, so "opus-5.5" prefers claude-opus-5-5 to claude-opus-5-15.
-function score(id: string, query: string[]): number | undefined {
-	let parts = words(id)
-	let text = parts.join(' ')
-	let starts = new Set<number>()
-	let at = 0
-	for (let p of parts) {
-		starts.add(at)
-		at += p.length + 1
-	}
-	let total = 0
-	let pos = 0
-	let lastEnd = -1
-	for (let q of query) {
-		let found = -1
-		for (let i = text.indexOf(q, pos); i >= 0; i = text.indexOf(q, i + 1)) {
-			if (found < 0) found = i
-			if (starts.has(i)) {
-				found = i
-				break
-			}
-		}
-		if (found < 0) return undefined
-		let end = found + q.length
-		if (starts.has(found)) total += 2
-		if (starts.has(found) && (end === text.length || text[end] === ' ')) total += 1
-		if (lastEnd >= 0 && found === lastEnd + 1) total += 3
-		lastEnd = end
-		pos = end
-	}
-	return total
-}
 
 // The ids matching `query`, best first; ties keep the given order,
 // shorter ids first. An empty query keeps every id in order. An id's
 // display name in `names` matches too, after the id itself.
 function rank(ids: string[], query: string, names: Record<string, string> = {}): string[] {
-	let q = words(query)
+	let q = fuzzy.words(query)
 	if (!q.length) return ids
 	let scored: { id: string; score: number; i: number }[] = []
 	ids.forEach((id, i) => {
-		let s = score(names[id] ? `${id} ${names[id]}` : id, q)
+		let s = fuzzy.score(names[id] ? `${id} ${names[id]}` : id, q)
 		if (s !== undefined) scored.push({ id, score: s, i })
 	})
 	scored.sort((a, b) => b.score - a.score || a.id.length - b.id.length || a.i - b.i)
@@ -168,15 +127,18 @@ function tree(ids: string[], keep = ''): Node {
 }
 
 // The rows of `node`'s children that hold a `kept` id, `open` categories
-// showing theirs: categories, then models, then the buckets.
-function rows(node: Node, kept: Set<string>, open: (path: string) => boolean, current: string, names: Record<string, string>, depth = 0, out = { items: [] as string[], rows: [] as TreeRow[] }) {
+// showing theirs: categories, then models, then the buckets. `open` gets
+// whether the category shows by itself while searching: all do but a
+// bucket whose parent has matches outside it ("gpt" keeps gpt/older
+// closed, "gpt 5.5" opens it).
+function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean) => boolean, current: string, names: Record<string, string>, depth = 0, out = { items: [] as string[], rows: [] as TreeRow[] }) {
 	let indent = '  '.repeat(depth)
 	let category = (n: Node) => {
 		if (!n.all.some((id) => kept.has(id))) return
-		let shown = open(n.path)
+		let shown = open(n.path, !bucket(n) || !node.all.some((id) => kept.has(id) && !n.all.includes(id)))
 		let base = n.default?.slice(n.default.indexOf('/') + 1)
 		out.items.push(`${indent}${shown ? '▼' : '▶'} ${n.name}${base ? `  (default: ${base})` : ''}`)
-		out.rows.push({ path: n.path, ...(node.path ? { parent: node.path } : {}), ...(n.default ? { default: n.default } : {}) })
+		out.rows.push({ path: n.path, open: shown, ...(node.path ? { parent: node.path } : {}), ...(n.default ? { default: n.default } : {}) })
 		if (shown) rows(n, kept, open, current, names, depth + 1, out)
 	}
 	node.nodes.filter((n) => !bucket(n)).forEach(category)
@@ -206,19 +168,21 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 	let query = (st.form?.values[0] ?? '').trim()
 	let ranked = query ? picker.rank(ids, query, names) : ids
 	let closed = t.closed ?? []
-	let built = rows(tree(ids, t.current), new Set(ranked), query ? (p) => !closed.includes(p) : (p) => t.open.includes(p), t.current, names)
+	let opened = t.opened ?? []
+	let shown = query ? (p: string, auto: boolean) => !closed.includes(p) && (auto || opened.includes(p)) : (p: string) => t.open.includes(p)
+	let built = rows(tree(ids, t.current), new Set(ranked), shown, t.current, names)
 	let at = (want?: string) => (want === undefined ? -1 : built.rows.findIndex((r) => r.path === want || r.id === want))
 	let selected = at(select)
 	if (selected < 0 && query) {
 		// A matching category first, else the best model; ties go to an
 		// alias's model ("claude": opus 5.5), else the higher row, so the
 		// most capable of equal matches.
-		let q = words(query)
+		let q = fuzzy.words(query)
 		let preferred = new Set(Object.values(defaults))
 		let best = (text: (r: TreeRow) => string | undefined) => {
 			let found = { i: -1, score: -1, preferred: false }
 			built.rows.forEach((r, i) => {
-				let s = text(r) === undefined ? undefined : score(text(r)!, q)
+				let s = text(r) === undefined ? undefined : fuzzy.score(text(r)!, q)
 				let p = !!r.id && preferred.has(r.id)
 				if (s !== undefined && (s > found.score || (s === found.score && p && !found.preferred))) found = { i, score: s, preferred: p }
 			})
@@ -230,7 +194,7 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 	if (selected < 0) selected = Math.max(0, at(t.current))
 	let row = built.rows[selected]
 	let hint = row?.id ? 'enter: pick' : row?.default ? 'enter: pick default' : 'enter: open'
-	return { ...st, items: built.items, tree: { ...t, rows: built.rows }, selected, hint: `←/→: close/open, ${hint}, esc: cancel` }
+	return { ...st, items: built.items, query, tree: { ...t, rows: built.rows }, selected, hint: `←/→: close/open, ${hint}, esc: cancel` }
 }
 
 // The picker over `ids`, on the current model, its categories open.
@@ -251,11 +215,11 @@ function step(st: ModalState, key: Key, ids: string[], names: Record<string, str
 	let plain = !key.ctrl && !key.alt && !key.cmd && !key.shift
 	if (t && row && plain && (key.key === 'left' || key.key === 'right' || (key.key === 'enter' && row.path && !row.default))) {
 		let searching = !!(st.form?.values[0] ?? '').trim()
-		let closed = t.closed ?? []
-		let isOpen = (p: string) => (searching ? !closed.includes(p) : t.open.includes(p))
+		let isOpen = (p: string) => !!t.rows.find((r) => r.path === p)?.open
 		let set = (path: string, open: boolean) => {
+			let others = (list: string[]) => list.filter((p) => p !== path)
 			let tree = searching
-				? { ...t, closed: open ? closed.filter((p) => p !== path) : [...closed, path] }
+				? { ...t, closed: open ? others(t.closed ?? []) : [...others(t.closed ?? []), path], opened: open ? [...others(t.opened ?? []), path] : others(t.opened ?? []) }
 				: { ...t, open: open ? [...t.open, path] : t.open.filter((p) => p !== path) }
 			return { state: picker.refilter({ ...st, tree }, ids, names, path) }
 		}
@@ -267,7 +231,7 @@ function step(st: ModalState, key: Key, ids: string[], names: Record<string, str
 	}
 	let r = modals.step(st, key)
 	if (r.action || r.state.form?.values[0] === st.form?.values[0]) return r
-	return { state: picker.refilter({ ...r.state, ...(t ? { tree: { ...t, closed: [] } } : {}) }, ids, names) }
+	return { state: picker.refilter({ ...r.state, ...(t ? { tree: { ...t, closed: [], opened: [] } } : {}) }, ids, names) }
 }
 
 // The command Enter sends: switch the session to the selected model, or

@@ -163,6 +163,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker ul { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
 .Picker li { padding: 0 0.4rem; cursor: pointer; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
 .Picker li[aria-selected="true"] { background: var(--button); }
+.Picker li .match { color: var(--match); font-weight: bold; }
 /* Apple HIG: touch targets at least 44x44pt. */
 @media (pointer: coarse) { .Picker li { min-height: 44px; display: flex; align-items: center; } .Picker .close { min-width: 44px; min-height: 44px; } }
 /* Tabs: a strip that wraps (never scrolls sideways: that fights the
