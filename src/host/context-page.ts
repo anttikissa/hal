@@ -5,7 +5,8 @@
 // the changes pages; its one script only swaps in pushed markup and
 // shows a tapped bar's facts.
 import { context, type Cause, type Point } from './context.ts'
-import { sessions } from './sessions.ts'
+import { existsSync } from 'fs'
+import { paths } from './paths.ts'
 
 const W = 400, H = 340, AXIS = 44, L = 6, R = 12, T = 22, B = 34, SLOT = 14
 const LETTER: Record<Cause, string> = { compaction: 'C', clear: 'X', 'pruning checkpoint': 'P', 'cache miss': 'M' }
@@ -133,7 +134,15 @@ function stream(id: string, signal: AbortSignal): Response {
 			let subs = contextPage.state.subs.get(id) ?? new Set()
 			contextPage.state.subs.set(id, subs)
 			subs.add(send)
-			signal.addEventListener('abort', () => { subs.delete(send!); if (!subs.size) contextPage.state.subs.delete(id) })
+			let end = () => {
+				subs.delete(send!)
+				if (!subs.size) contextPage.state.subs.delete(id)
+				contextPage.state.ends.delete(close)
+			}
+			// /auth revoke ends every stream, as it closes every socket.
+			let close = () => { end(); try { controller.close() } catch {} }
+			contextPage.state.ends.add(close)
+			signal.addEventListener('abort', end)
 			send()
 		},
 	})
@@ -143,7 +152,7 @@ function stream(id: string, signal: AbortSignal): Response {
 function serve(req: Request, css: string, timeout: (req: Request) => void): Response {
 	let path = new URL(req.url).pathname.split('/')
 	let id = path[2]!
-	if (!sessions.list().some((s) => s.id === id)) return new Response('not found\n', { status: 404 })
+	if (!existsSync(paths.sessionDir(id))) return new Response('not found\n', { status: 404 })
 	if (path[3] !== 'events') return page(id, css)
 	timeout(req)
 	return stream(id, req.signal)
@@ -154,4 +163,8 @@ function notify(id: string): void {
 	for (let send of contextPage.state.subs.get(id) ?? []) send()
 }
 
-export const contextPage = { state: { subs: new Map<string, Set<() => void>>() }, owns, serve, notify, graph }
+function closeAll(): void {
+	for (let close of contextPage.state.ends) close()
+}
+
+export const contextPage = { state: { subs: new Map<string, Set<() => void>>(), ends: new Set<() => void>() }, owns, serve, notify, graph, closeAll }

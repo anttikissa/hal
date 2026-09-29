@@ -297,6 +297,7 @@ function revoke(): void {
 	webAuth.revoke()
 	for (let ws of web.state.sockets) ws.close(4001, 'logged out')
 	web.state.sockets.clear()
+	contextPage.closeAll()
 }
 
 export const web = {

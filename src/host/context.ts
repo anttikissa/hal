@@ -8,6 +8,7 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { history } from './history.ts'
 import { models } from './models.ts'
 import { pruning } from './pruning.ts'
+import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 
 export type Cause = 'compaction' | 'clear' | 'pruning checkpoint' | 'cache miss'
@@ -54,7 +55,13 @@ function points(records: HistoryRecord[], window: (model?: string) => number | u
 }
 
 function of(id: string): Point[] {
-	let fallback = sessions.open(id).model
+	// A page for a closed session must not open it (or save its metadata).
+	let fallback = sessions.state.open.get(id)?.model
+	if (fallback === undefined) {
+		let meta = sessions.load(id, false)
+		liveFiles.close(meta)
+		fallback = meta.model
+	}
 	return context.points(history.readSync(id), (model) => models.contextWindow(model ?? fallback))
 }
 
