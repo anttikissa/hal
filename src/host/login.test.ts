@@ -200,7 +200,7 @@ test('ANTHROPIC_API_KEY alone needs no file; a login in the file comes first and
 	expect(await auth.anthropic()).toMatchObject({ type: 'token', value: 'file-token' })
 })
 
-test('a session blocked on login takes /login claude and continues by itself once it succeeds', async () => {
+test('a blocked turn accepts bare /login and /login claude, then resumes after success', async () => {
 	auth.pollMs = () => 5
 	// A provider that needs a working anthropic login, as the real one does.
 	turns.stream = (): AsyncIterable<StreamEvent> =>
@@ -226,10 +226,20 @@ test('a session blocked on login takes /login claude and continues by itself onc
 	await until(() => status.stateOf(id).type === 'blocked')
 	expect((status.stateOf(id) as any).reason).toContain('/login claude')
 
-	// A failed login blocks again; the question stays answerable.
+	let open = () => events.some((e) => e.type === 'question' && !events.some((a) => a.type === 'answer' && (a as any).question === (e as any).id))
+	// A failed login blocks again; the question stays answerable. Bare
+	// /login asks twice (method, then code), and the command's questions
+	// never change the turn's state.
 	for (let code of ['wrong', 'right']) {
-		conn.send({ type: 'submit', sessionId: id, text: '/login claude' })
-		await until(() => events.some((e) => e.type === 'question' && !events.some((a) => a.type === 'answer' && (a as any).question === (e as any).id)))
+		conn.send({ type: 'submit', sessionId: id, text: code === 'wrong' ? '/login' : '/login claude' })
+		if (code === 'wrong') {
+			await until(open)
+			expect((status.stateOf(id) as any).reason).toContain('/login claude')
+			let method = events.findLast((e) => e.type === 'question') as any
+			conn.send({ type: 'answer', sessionId: id, question: method.id, answers: { method: 'Claude subscription' } })
+		}
+		await until(() => open() && (events.findLast((e) => e.type === 'question') as any).form.fields[0].type === 'secret')
+		expect((status.stateOf(id) as any).reason).toContain('/login claude')
 		let q = events.findLast((e) => e.type === 'question') as any
 		let state = new URL(/https:\S+/.exec(q.form.text)![0]).searchParams.get('state')
 		conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { code: code === 'right' ? `c#${state}` : 'wrong' } })
@@ -239,43 +249,4 @@ test('a session blocked on login takes /login claude and continues by itself onc
 	await until(() => events.some((e) => e.type === 'turn-end'))
 	expect(events.find((e) => e.type === 'turn-end')).toMatchObject({ status: 'completed' })
 	expect(readFileSync(history.file(id), 'utf8')).not.toContain(`c#`)
-})
-
-test('bare /login on a session blocked on login asks every step; the turn stays blocked on login throughout', async () => {
-	auth.pollMs = () => 5
-	turns.stream = (): AsyncIterable<StreamEvent> =>
-		(async function* (): AsyncGenerator<StreamEvent> {
-			try {
-				await auth.anthropic()
-			} catch (e: any) {
-				yield { type: 'error', message: e.message, failure: e.failure }
-				return
-			}
-			yield { type: 'text', text: 'ok' }
-			yield { type: 'done', reason: 'end' }
-		})()
-	let events: Event[] = []
-	let conn = host.connect((e) => events.push(e))
-	let until = async (check: () => unknown) => {
-		for (let i = 0; i < 1000 && !check(); i++) await Bun.sleep(2)
-		if (!check()) throw new Error('timed out')
-	}
-	let loginBlocked = () => status.stateOf(id).type === 'blocked' && (status.stateOf(id) as any).reason !== 'question'
-	conn.send({ type: 'create', cwd: '/tmp', model: 'fake/m' })
-	let id = (events.find((e) => e.type === 'snapshot') as any).sessionId
-	conn.send({ type: 'submit', sessionId: id, text: 'go' })
-	await until(loginBlocked)
-	conn.send({ type: 'submit', sessionId: id, text: '/login' })
-	await until(() => events.some((e) => e.type === 'question'))
-	expect(loginBlocked()).toBe(true)
-	let method = events.findLast((e) => e.type === 'question') as any
-	conn.send({ type: 'answer', sessionId: id, question: method.id, answers: { method: 'Claude subscription' } })
-	await until(() => events.filter((e) => e.type === 'question').length === 2)
-	expect(events.some((e) => e.type === 'output' && (e as any).error)).toBe(false)
-	expect(loginBlocked()).toBe(true)
-	let code = events.findLast((e) => e.type === 'question') as any
-	let state = new URL(/https:\S+/.exec(code.form.text)![0]).searchParams.get('state')
-	conn.send({ type: 'answer', sessionId: id, question: code.id, answers: { code: `c#${state}` } })
-	await until(() => events.some((e) => e.type === 'turn-end'))
-	expect(events.find((e) => e.type === 'turn-end')).toMatchObject({ status: 'completed' })
 })

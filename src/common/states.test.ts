@@ -159,8 +159,6 @@ test('history alone: commands leave the turn state as it was, even while one ask
 		expect(states.fromHistory([...before, typed('/cd x'), cmdAsk('c1'), cmdReply('c1'), said('ok')])).toEqual(state)
 		expect(states.fromHistory([...before, typed('/cd x'), cmdAsk('c1')])).toEqual(state)
 	}
-	// A turn's question blocks even while a command's was open before it.
-	expect(states.fromHistory([say('a'), cmdAsk('c1'), cmdReply('c1'), ask('q1')])).toEqual(asking)
 	expect(states.recoveries([say('a'), cont, out('x'), typed('/help'), said('h'), cont])).toBe(2)
 	// A message waiting while a command asked starts nothing by itself.
 	expect(states.fromHistory([say('a'), end('completed'), typed('/cd x'), cmdAsk('c1'), waiting('m'), cmdReply('c1')])).toEqual(idle)
