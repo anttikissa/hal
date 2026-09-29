@@ -249,3 +249,17 @@ test('a failed or superseded load runs its staged cleanups at once and keeps the
 	expect(t.log).toEqual(['v1 unload', 'slow unload'])
 	expect(t.f(1)).toBe('v3')
 })
+
+test('an unload registered after its version was dropped or removed runs at once', async () => {
+	let path = await plugin('a.ts', `globalThis.late = plugin.unload\nplugin.around(t, 'f', () => 'v1')`)
+	let late = g.late
+	await plugin('a.ts', `plugin.around(t, 'f', () => 'v2')`)
+	late(() => t.log.push('late v1'))
+	expect(t.log).toEqual(['late v1'])
+
+	writeFileSync(path, `export default (plugin: any) => { globalThis.late = plugin.unload; throw new Error('bad') }\n`)
+	await plugins.load(path)
+	g.late(() => t.log.push('late failed'))
+	expect(t.log).toEqual(['late v1', 'late failed'])
+	expect(t.f(1)).toBe('v2')
+})

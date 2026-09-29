@@ -36,7 +36,7 @@ type Hook = { file: string; seq: number; kind: Kind; obj: any; key: string; fn: 
 // underway finishes with the chain it started with.
 type Run = { befores: Fn[]; arounds: Fn[]; afters: Fn[] }
 type Patch = { original: Fn; wrapper: Fn; hooks: Hook[]; run: Run }
-export type Loaded = { path: string; hash: string; expires?: string; expired?: true; error?: string; hooks: Hook[]; unloads: (() => void)[]; changes: Fn[]; active?: true; timer?: Timer }
+export type Loaded = { path: string; hash: string; expires?: string; expired?: true; error?: string; hooks: Hook[]; unloads: (() => void)[]; changes: Fn[]; active?: true; closed?: true; timer?: Timer }
 
 const srcDir = join(import.meta.dir, '..')
 
@@ -131,6 +131,7 @@ function deactivate(entry: Loaded): Fn[] {
 		plugins.settle(h.obj, h.key, patch)
 	}
 	let { unloads, changes } = entry
+	entry.closed = true
 	entry.hooks = []
 	entry.unloads = []
 	entry.changes = []
@@ -142,6 +143,7 @@ function deactivate(entry: Loaded): Fn[] {
 // timer or connection it started does not leak.
 function discard(staged: Loaded): void {
 	let unloads = staged.unloads
+	staged.closed = true
 	staged.unloads = []
 	runAll(staged.path, 'unload', unloads)
 }
@@ -174,13 +176,15 @@ function expire(path: string): void {
 }
 
 // A registration recorder: hooks and unloads are only collected here,
-// checked, and activated by load() once registration succeeded.
+// checked, and activated by load() once registration succeeded. An
+// unload registered late (from a timer) after its version was removed
+// or dropped runs at once, so its resource does not leak.
 function recorder(path: string, entry: Loaded): Plugin {
 	let add = (kind: Kind) => (obj: any, key: string, fn: Fn) => {
 		if (!obj || typeof obj[key] !== 'function') throw new Error(`${path}: ${kind} target ${obj ? targetName(obj, key) : key} is not a function`)
 		entry.hooks.push({ file: basename(path), seq: entry.hooks.length, kind, obj, key, fn, target: `${targetName(obj, key)} ${kind}` })
 	}
-	return { before: add('before'), after: add('after'), around: add('around'), unload: (fn) => void entry.unloads.push(fn), onChange: (fn) => void entry.changes.push(fn) } as Plugin
+	return { before: add('before'), after: add('after'), around: add('around'), unload: (fn) => void (entry.closed ? runAll(path, 'unload', [fn]) : entry.unloads.push(fn)), onChange: (fn) => void entry.changes.push(fn) } as Plugin
 }
 
 // (Re)loads plugin file `path`. The file's old hooks stay unless the new
