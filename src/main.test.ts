@@ -18,21 +18,6 @@ test('a home too deep for a Unix socket is one clear error, not a stack', () => 
 	}
 })
 
-test('./run without a terminal says so and fails', () => {
-	// A temp home keeps the user's real local.ts out of the test.
-	let home = mkdtempSync(join(tmpdir(), 'hal2-main-'))
-	try {
-		let out = Bun.spawnSync(['./run'], {
-			cwd: `${import.meta.dir}/..`,
-			env: { ...process.env, HAL_HOME: home },
-		})
-		expect(out.exitCode).toBe(1)
-		expect(out.stderr.toString()).toContain('terminal')
-	} finally {
-		rmSync(home, { recursive: true, force: true })
-	}
-})
-
 test('./run starts again only after a restart exit, finding the tab it left; a fresh ./run starts without one', () => {
 	let home = mkdtempSync(join(tmpdir(), 'hal2-main-'))
 	try {

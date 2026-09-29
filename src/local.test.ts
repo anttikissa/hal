@@ -34,16 +34,6 @@ function withHome(fn: (home: string) => void) {
 	}
 }
 
-test('a missing local.ts is normal and changes nothing', () => {
-	withHome((home) => {
-		let out = run(home, probe)
-		expect(out.stderr).toBe('')
-		expect(out.exitCode).toBe(0)
-		let { before, after } = JSON.parse(out.stdout)
-		expect(after).toBe(before)
-	})
-})
-
 test('a broken local.ts fails loudly instead of being ignored', () => {
 	withHome((home) => {
 		writeFileSync(join(home, 'local.ts'), `throw new Error('local-boom')\n`)

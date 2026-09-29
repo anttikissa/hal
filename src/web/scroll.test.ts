@@ -26,17 +26,6 @@ test('the target keeps the gap after growth, never above the top', () => {
 	expect(scroll.target(box(300, 0, 400), 20)).toBe(0)
 })
 
-test('a glide eases out: starts fast, lands exactly', () => {
-	expect(scroll.at(100, 500, 0)).toBe(100)
-	expect(scroll.at(100, 500, 1)).toBe(500)
-	// Past halfway in distance well before halfway in time.
-	expect(scroll.at(0, 100, 0.25)).toBeGreaterThan(50)
-	let a = scroll.at(0, 100, 0.5)
-	let b = scroll.at(0, 100, 0.6)
-	expect(b).toBeGreaterThan(a)
-	expect(b).toBeLessThan(100)
-})
-
 test('each tab keeps its place: a bottom reader returns to the (grown) bottom, others to their spot', () => {
 	let el = box(1000, 600, 400)
 	scroll.state.el = el

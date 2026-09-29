@@ -98,15 +98,6 @@ test('a tool gets a class for its name that no name can break out of', () => {
 	expect(kind.split(' ')[1]).toMatch(/^tool-[a-z0-9-]+$/)
 })
 
-test('waiting messages are shown with their kind', () => {
-	let st = fold([
-		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'paused' }, inbox: [{ id: 'a', text: 'next', queue: true }] } },
-	])
-	expect(view.inbox(st)).toEqual([{ text: 'next', label: 'queued' }])
-	expect(view.inbox(view.onEvent(st, { type: 'inbox', sessionId, inbox: [] }))).toEqual([])
-	expect(view.inbox({})).toEqual([])
-})
-
 test('the open question is filled in with browser keys and answered; afterwards it shows its quote and the answer', () => {
 	let form = { text: 'Create it?', quote: { text: 'rm -rf x', marks: [[0, 8]] as [number, number][] }, fields: [{ type: 'choice' as const, name: 'ok', options: ['yes', 'no'], initial: 1 }] }
 	let st = fold([

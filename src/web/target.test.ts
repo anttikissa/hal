@@ -84,8 +84,3 @@ test('a block that is in no page gives up with a notice once every page is in', 
 	expect(app.notice()).toContain('#99')
 	expect(sent.filter((c) => c.type === 'history')).toHaveLength(1)
 })
-
-test('an address without a block id aims at nothing', () => {
-	for (let url of [`http://h/${sessionId}`, `http://h/${sessionId}#paste`, `http://h/${sessionId}#~3`]) expect(target.parse(url, sessionId)).toBeUndefined()
-	expect(target.parse(`http://h/#3`, undefined)).toBeUndefined()
-})

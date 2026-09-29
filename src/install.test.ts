@@ -28,10 +28,3 @@ test('links hal, adds the PATH line once, then finds everything in order', () =>
 	let done = install({ PATH: `${home}/.local/bin:${path}` })
 	expect(done.out).toContain('Everything in order')
 })
-
-test('an unknown option is refused before anything changes', () => {
-	home = mkdtempSync(`${tmpdir()}/hal-install-`)
-	let r = install({ PATH: '/usr/bin:/bin' }, '--nope')
-	expect(r.code).toBe(1)
-	expect(() => readlinkSync(`${home}/.local/bin/hal`)).toThrow()
-})

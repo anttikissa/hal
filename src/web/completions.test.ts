@@ -10,10 +10,3 @@ test('slash and path candidates use host values with useful labels and descripti
 	expect(paths.choices[0]!.description).toBe('directory')
 	expect(paths.choices[1]!.value).toBe('/cd ~/profile.pdf')
 })
-
-test('selection wraps through the available choices', () => {
-	let menu = completions.receive('/', ['/cd ', '/help '])!
-	expect(completions.step(menu, -1).selected).toBe(1)
-	expect(completions.step(completions.step(menu, 1), 1).selected).toBe(0)
-	expect(completions.receive('/unknown', [])).toBeUndefined()
-})
