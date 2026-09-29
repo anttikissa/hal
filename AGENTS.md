@@ -25,6 +25,11 @@ any reason, update the task that covers that file, so a rebuild keeps
 the change. Bug fixes especially must not be forgotten: write the rule
 the fix restores into the task's description.
 
+Exception: gitignored files (the user's plugins/, local.ts, auth and
+state) are private. They have no task, and nothing about them (their
+content, purpose, account IDs, emails, dates, plans) ever goes into
+tasks, notes, commits or any other tracked file. If unsure, ask.
+
 Lessons that would help the next implementer (surprises, wrong
 artifacts, decisions later tasks depend on) go in the task's `notes`
 field in task.ason, a list of strings that `tsk show` prints. Never
