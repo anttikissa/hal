@@ -1,4 +1,9 @@
-Commit automatically. 72-column commit messages.
+Commit automatically. 72-column commit messages. Every commit message
+ends with these trailer lines (Task only when a task applies):
+
+    Task: <id>
+    Implemented by: <model id, e.g. anthropic/claude-opus-5-5>
+    Session: <session id, e.g. 157-cms>
 
 Push and pull (with rabase and autostash - config git to use those by default) all the time; this is being developed on two hosts, connected by github only, and we want latest codes on both.
 
@@ -32,6 +37,13 @@ raw backtick breaks the file. After any hand edit, `tsk show <id>`.
 Before changing code, read tasks/README.md: it holds the architecture,
 module conventions and invariants (such as the emergency keys) that
 every change must keep.
+
+# Tests and how to avoid them
+
+Tests are debt. Every single test will add weight for every future task
+to carry. Therefore: be extremely wary when adding tests. Will this test
+surely test something that might break? Is running this test expensive?
+Is this just some cosmetic thing? Will a one-time test suffice?
 
 Test behavior and invariants, not the implementation. Avoid tests that
 assert on source text, repeat a constant or template in the expectation,
