@@ -10,6 +10,3 @@ a task and remove it here.
   reopen a closed tab. Wait for the first user to complain.
 - Linux browsers could get Alt-T/W/N/P for tabs; the user
   only has a Mac.
-- A context graph: cmd-click the status row's context number to open a
-  web page plotting context size per block; each drop is a compaction
-  or pruning, later also cache misses.

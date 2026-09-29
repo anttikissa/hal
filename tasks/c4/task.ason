@@ -1,0 +1,6 @@
+{
+	title: 'Context graph: context size per block on a web page',
+	spec: 'The status row context number (terminal: an OSC 8 link; web: an <a href>) opens a web page under the host webUrl plotting that session context size over its history: x = provider round (with turn boundaries marked and dates on hover), y = input tokens of that round (uncached, cache read and cache write stacked, from the usage records), with the model context window as a line. Drops are labelled with their cause where history knows it: compaction (bc), pruning checkpoint (0d), cache miss (cache read fell to near zero while input stayed). Hovering or tapping a point shows round, tokens and a link to that block. Plain SVG built on the host from history (no chart library, no client JS beyond the page); retro look per tasks/README.md; readable on a phone. Pushed live: while the session runs, new rounds append.',
+	status: 'planned',
+	needs: ['k5', 'e3', '0d']
+}
