@@ -2,11 +2,12 @@
 	title: 'Hal knows its version; ctrl-r hint for new code; host ≠ peer notice',
 	spec: "Each Hal process records the version it loaded at start: its checkout's HEAD (short hash) plus '+dirty' when the tree had uncommitted changes, found off the startup path (after the first frame). It is in the diag log and in /version, for bug reports. New code: every ~10 s each process asks git for its own checkout's HEAD (git rev-parse, a few ms); when it differs from the loaded HEAD, the help row gains 'ctrl-r: load new code'. Only commits count: agents commit after ./test passes and a pull lands finished code, so uncommitted edits (possibly half-written) never offer a restart. Host ≠ peer: the host sends its version to each client (a `version` event on connect once known, and to every client when it learns it, since the lookup comes after the first frame); a peer whose version differs shows it in the notice row, e.g. 'host runs abcd123, this peer bcd4321'; the host has no such notice. No remote restart: /restart and Ctrl-R restart only the process they are pressed in. Tests: a commit after start adds the hint, an uncommitted edit does not; differing host and peer versions produce the notice, equal ones none.",
 	status: 'done',
-	needs: [],
 	notes: [
 		"Shape: host/version.ts (git rev-parse --short HEAD + git status --porcelain in the checkout, version.dir(); init() logs 'version <v> (<dir>)' to diag, then an unref'd setInterval every checkMs runs check(); `found` and `changed` hooks). client/versions.ts holds own, host and newCode for the view; main.ts wires the hooks in init() under main.later(), so every process (host or peer) looks up after its first frame.",
 		'The version travels as its own `version` event, not in snapshots: the host learns it after its first frame, so a peer reconnecting to a freshly restarted host (the case the notice is for) got its snapshot before the host knew. host.connect sends it when known; host.announce broadcasts it once found. transcript.fold ignores it; main.onEvent keeps it out of app.onEvent.',
 		"'unknown' outside a git checkout (no timer then). '+dirty' counts untracked files too. The ctrl-r hint sits after the state hints in the help row, not over a question, edit hint or choices. /version reports the host process's version only.",
-		'client/app.ts is at the 400-line limit: this task merged two comments to stay under it. startup.test.ts measured 124-159 ms both with and without this change under load (4.6); not a regression.'
-	]
+		'client/app.ts is at the 400-line limit: this task merged two comments to stay under it. startup.test.ts measured 124-159 ms both with and without this change under load (4.6); not a regression.',
+		"Every host git call goes through version.git, which always passes --no-optional-locks and only reads. Tests SIGKILL hosts; a killed git that held .git/index.lock (as git stash create did) left it behind and broke agents' commits. ./test fails if a lock appears (task r)."
+	],
+	needs: []
 }

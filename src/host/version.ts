@@ -9,9 +9,12 @@ import { resolve } from 'path'
 import { diag } from './diag.ts'
 
 // Runs git in the checkout; its trimmed output, undefined if it fails.
+// Hosts are killed at any moment (tests SIGKILL dozens), so the host only
+// reads: --no-optional-locks keeps even reads from taking .git/index.lock,
+// which a killed git leaves behind to break the next commit.
 async function git(...args: string[]): Promise<string | undefined> {
 	try {
-		let p = Bun.spawn(['git', ...args], { cwd: version.dir(), stdout: 'pipe', stderr: 'ignore' })
+		let p = Bun.spawn(['git', '--no-optional-locks', ...args], { cwd: version.dir(), stdout: 'pipe', stderr: 'ignore' })
 		let [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited])
 		return code === 0 ? out.trim() : undefined
 	} catch {
@@ -30,7 +33,7 @@ async function init(): Promise<void> {
 	st.started = true
 	// Read-only on purpose: `git stash create` writes .git/index.lock, and
 	// hosts killed mid-call (tests start dozens) left it behind for others.
-	let [hash, diff] = await Promise.all([version.head(), version.git('--no-optional-locks', 'diff', 'HEAD')])
+	let [hash, diff] = await Promise.all([version.head(), version.git('diff', 'HEAD')])
 	st.head = hash
 	let changes = diff ? Bun.hash(diff).toString(16).padStart(7, '0').slice(0, 7) : ''
 	st.loaded = hash === undefined ? 'unknown' : changes ? `${hash}+${changes}` : hash

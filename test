@@ -7,7 +7,15 @@ unset ANTHROPIC_API_KEY OPENROUTER_API_KEY OPENCODE_API_KEY OPENAI_API_KEY
 # Inside GNU screen the terminal client is monochrome; tests expect colour.
 unset STY
 if [[ $TERM == screen* ]]; then export TERM=xterm-256color; fi
+# Hosts under test are killed at any moment; a git call they make must
+# never take a lock, or a stale .git/index.lock breaks the next commit.
+lock="$(git rev-parse --git-path index.lock 2>/dev/null)"
+had_lock=$([ -e "$lock" ] && echo 1)
 bun test src || status=1
+if [ -z "$had_lock" ] && [ -e "$lock" ]; then
+	echo "./test: the tests left $lock behind (a host git call takes a lock)" >&2
+	status=1
+fi
 ./node_modules/.bin/tsc --noEmit || status=1
 ./node_modules/.bin/oxlint --deny-warnings src || status=1
 # The optional, gitignored local.ts is typechecked by tsc above (it sits in
