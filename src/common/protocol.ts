@@ -177,7 +177,7 @@ export type Event =
 	// prompt, if not the human. `command`: the client's id for the submit
 	// that sent the prompt, so it can put the prompt in place of the one
 	// it shows pending.
-	| { type: 'turn-start'; sessionId: string; prompt?: string; images?: ImageBlock[]; sender?: Sender; provider: string; model?: string; effort?: string; n?: number; command?: string; ts?: string }
+	| { type: 'turn-start'; sessionId: string; prompt?: string; images?: ImageBlock[]; sender?: Sender; queued?: true; provider: string; model?: string; effort?: string; n?: number; command?: string; ts?: string }
 	// A page of earlier history, answering the `history` command for
 	// `before`: whole records ending there, oldest first. `older`: where
 	// they start, when there are more before them.
@@ -191,7 +191,7 @@ export type Event =
 	// that takes the place of the last prompt and everything after it.
 	// `senders`: who sent each text ({} the human), when not all the human.
 	// `command`: as in turn-start, for the last text.
-	| { type: 'prompt'; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; replaces?: true; n?: number; command?: string; ts?: string }
+	| { type: 'prompt'; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; queued?: true; replaces?: true; n?: number; command?: string; ts?: string }
 	// `ts`: when the block it streams into started (task hp).
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent; n?: number; ts?: string }
 	// New bytes only; a late joiner gets the same partial output in its snapshot.

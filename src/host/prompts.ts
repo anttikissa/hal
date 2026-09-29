@@ -145,6 +145,10 @@ function deliver(id: string, items: InboxItem[], extra?: Sender & { text: string
 	let blocks = prompts.blocks(id, extra ? [...items, extra] : items)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, inbox: items.map((m) => m.id) }
 	if (command !== undefined) record.command = command
+	if (items.length === 1 && items[0]!.queue) {
+		record.queued = true
+		record.command ??= items[0]!.id
+	}
 	let written = history.append(id, record) as HistoryRecord & { type: 'user' }
 	host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 	if (!quiet) host.broadcast(id, prompts.promptEvent(id, written))
@@ -166,6 +170,7 @@ function promptEvent(id: string, record: HistoryRecord & { type: 'user' }): Even
 	if (who.some((s) => s.from !== undefined)) event.senders = who
 	let shown = prompts.images(record.blocks)
 	if (shown.length) event.images = shown
+	if (record.queued) event.queued = true
 	if (record.replaces) event.replaces = true
 	if (record.n !== undefined) event.n = record.n
 	if (record.command !== undefined) event.command = record.command

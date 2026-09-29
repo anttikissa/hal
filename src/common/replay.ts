@@ -23,7 +23,7 @@ export type HistoryRecord = Numbered &
 	// messages it delivers, which are its first text blocks. `replaces`:
 	// an edit of the last prompt (tasks/j1/states.md, Editing the last
 	// prompt); it supersedes that prompt and everything after it.
-	| { type: 'user'; blocks: UserBlock[]; command?: string; inbox?: string[]; replaces?: true; ts: string }
+	| { type: 'user'; blocks: UserBlock[]; command?: string; inbox?: string[]; queued?: true; replaces?: true; ts: string }
 	// A message sent while the session was busy, waiting in the inbox
 	// (src/common/inbox.ts) until a prompt record delivers it. Not
 	// provider input by itself. `id`: the client's command id, if any.

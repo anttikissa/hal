@@ -4,6 +4,7 @@
 import { expect, test } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
+import { titles } from '../common/titles.ts'
 import { calls, client, created, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
 import { prompts } from './prompts.ts'
 import { tools } from './tools.ts'
@@ -107,11 +108,15 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	expect(a.of('turn-end')).toHaveLength(1)
 	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([stamped('later')])
 	expect(inboxOf(a, id)).toEqual([])
+	let delivered = a.views.get(id)!.items.find((i) => i.type === 'prompt' && i.text === 'later')!
+	expect(delivered).toMatchObject({ queued: true })
+	expect(titles.title(delivered)).toContain('from queue')
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 2)
 	let view = await fresh(id)
 	expect(view.items.map((i) => i.type)).toEqual(['prompt', 'prompt', 'text', 'turn-end', 'prompt', 'turn-end'])
 	expect(a.views.get(id)).toEqual(view)
+	expect(view.items.find((i) => i.type === 'prompt' && i.text === 'later')).toMatchObject({ queued: true })
 })
 
 test('a queued message sent to an idle session just runs', async () => {

@@ -17,7 +17,7 @@ import type { SessionState } from './states.ts'
 export type Shown =
 	// `from`: the session that sent it, `label` naming it; without it,
 	// the human. `ts`: when it was sent (task hp).
-	| { type: 'prompt'; text: string; from?: string; label?: string; ts?: string }
+	| { type: 'prompt'; text: string; from?: string; label?: string; queued?: true; ts?: string }
 	// An image attached to the prompt before it (task 2a).
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number }
 	// `ts`: when the block started; `model`, `effort`: what wrote it
@@ -100,11 +100,12 @@ function turnItems(turn: LiveTurn, at: number): Item[] {
 }
 
 // A prompt text as shown, saying who sent it if not the human.
-function promptItem(text: string, s?: Sender, ts?: string): Shown {
+function promptItem(text: string, s?: Sender, ts?: string, queued = false): Shown {
 	let item: Shown = { type: 'prompt', text }
 	if (s?.from !== undefined) item.from = s.from
 	if (s?.label !== undefined) item.label = s.label
 	if (ts !== undefined) item.ts = ts
+	if (queued) item.queued = true
 	return item
 }
 
@@ -147,7 +148,7 @@ function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'question') return [r.from ? { type: 'question', id: r.id, form: r.form, command: true } : { type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'compact' || r.type === 'reset') return [{ type: 'divider', text: transcript.boundary(r) }]
-	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b, r.ts) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
+	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b, r.ts, r.queued) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
 
@@ -205,7 +206,10 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	let items: Item[] = []
 	let prompt: number | undefined
 	let early = transcript.standIns(snapshot.earlier ?? [], snapshot.history)
+	let queued = new Set([...early, ...snapshot.history].flatMap((r) => r.type === 'inbox' && r.queue ? [r.id] : []))
 	for (let r of [...early, ...replay.current(snapshot.history)]) {
+		// Older delivered records kept only their inbox IDs, not provenance.
+		if (r.type === 'user' && r.inbox?.some((id) => queued.has(id))) r = { ...r, queued: true }
 		if (replay.isPrompt(r)) prompt = items.length
 		if (r.type === 'answer') items = transcript.answered(items, r)
 		else items.push(...transcript.recordItems(r, items.length))
@@ -311,7 +315,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	}
 	if (event.type === 'turn-start') {
 		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: transcript.fresh(event) } }
-		let items: Item[] = [...t.items, ...transcript.keyed([transcript.promptItem(event.prompt, event.sender, event.ts), ...(event.images ?? []).map((b) => transcript.imageItem(b))], event.n, t.items.length)]
+		let items: Item[] = [...t.items, ...transcript.keyed([transcript.promptItem(event.prompt, event.sender, event.ts, event.queued), ...(event.images ?? []).map((b) => transcript.imageItem(b))], event.n, t.items.length)]
 		return { ...t, items, prompt: t.items.length, live: { start: items.length, turn: transcript.fresh(event) } }
 	}
 	let question: Shown | undefined = event.type === 'question' ? { type: 'question', id: event.id, form: event.form } : undefined
@@ -359,7 +363,7 @@ function settle(items: Item[], live: NonNullable<Transcript['live']>): Item[] {
 function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' }): Transcript {
 	let keep = event.replaces && t.prompt !== undefined ? items.slice(0, t.prompt) : items
 	let { live: _live, ...rest } = t
-	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts)), ...(event.images ?? []).map((b) => transcript.imageItem(b))]
+	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts, event.queued)), ...(event.images ?? []).map((b) => transcript.imageItem(b))]
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 

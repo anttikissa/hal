@@ -61,7 +61,7 @@ function ask(id: string, form: Form, call?: string): void {
 // `images`: the prompt's image blocks, for followers to show; `record`:
 // the prompt's, whose number, command id and sender (of its first text)
 // they are told.
-function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender; ts?: string }): void {
+function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender; queued?: true; ts?: string }): void {
 	let model = sessions.open(id).model
 	let running: Running = { provider: '', controller: new AbortController() }
 	let effort = target(running, model)
@@ -70,6 +70,7 @@ function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlo
 	if (effort !== undefined) event.effort = effort
 	if (prompt !== undefined && record?.ts !== undefined) event.ts = record.ts
 	if (prompt !== undefined) event.prompt = prompt
+	if (prompt !== undefined && record?.queued) event.queued = true
 	if (images?.length) event.images = images
 	if (prompt !== undefined && record?.sender?.from !== undefined) event.sender = record.sender
 	if (prompt !== undefined && record?.n !== undefined) event.n = record.n
