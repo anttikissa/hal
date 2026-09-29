@@ -16,6 +16,7 @@ const list: CommandInfo[] = [
 	{ name: 'branch', description: 'alias for /fork', category: 'tabs', hidden: true },
 	{ name: 'budget', description: 'show or set spawn slots', category: 'session' },
 	{ name: 'cd', description: 'change the working directory', category: 'session', modelUsable: true },
+	{ name: 'changes', description: 'list observed file changes and diffs, or clear the list', category: 'session' },
 	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session', modelUsable: true },
 	{ name: 'clients', description: 'show who is connected to the host', category: 'debug' },
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w', clientOnly: true },

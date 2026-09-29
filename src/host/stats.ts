@@ -59,6 +59,8 @@ function of(id: string, records?: HistoryRecord[]): Stats {
 	let live = stats.state.live.get(id)
 	let tokens = { sent: committed.sent + (live?.sent ?? 0), received: committed.received + (live?.received ?? 0) }
 	let out: Stats = { ...tokens }
+	let files = Object.keys(pages.marks(id).changedPaths ?? {}).length
+	if (files) out.files = files
 	let context = stats.state.context.get(id) ?? stats.lastContext(records ?? pages.essentials(id))
 	if (context) out.context = context
 	let window = models.contextWindow(model)

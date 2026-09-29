@@ -20,6 +20,7 @@
 // synchronously either way.
 
 import { closeSync, existsSync, openSync, readSync as readFd, statSync } from 'fs'
+import { resolve } from 'path'
 import { ason } from '../common/ason.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { history } from './history.ts'
@@ -27,7 +28,7 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
-type Marks = { size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]> }
+type Marks = { size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]>; changes?: number[]; changedPaths?: Record<string, true> }
 type Raw = { offset: number; bytes: number; text: string }
 type Line = { offset: number; bytes: number; record: HistoryRecord }
 // `end`: the byte the page (or tail) ends at.
@@ -149,6 +150,13 @@ function lineAt(path: string, offset: number): Line {
 
 function apply(m: Marks, r: HistoryRecord, offset: number): void {
 	m.next = Math.max(m.next ?? 1, (r.n ?? offset + 1) + 1)
+	m.changes ??= []
+	m.changedPaths ??= {}
+	if (r.type === 'command' && r.text.trim() === '/changes clear') { m.changes = []; m.changedPaths = {} }
+	if (r.type === 'file_changes') {
+		(m.changes ??= []).push(offset)
+		for (let file of r.files) (m.changedPaths ??= {})[resolve(r.cwd, file.path)] = true
+	}
 	if (r.type === 'question') {
 		m.question = offset
 		if (!r.from) {
@@ -205,9 +213,9 @@ function* catchUp(id: string): Steps<Marks> {
 		let size = existsSync(path) ? statSync(path).size : 0
 		// Marks from before `next`, or with `close` (an answer or a turn
 		// end, before answers were kept apart), are rebuilt.
-		if (m.size < 0 || m.size > size || (m.size > 0 && m.next === undefined) || 'close' in m) {
+		if (m.size < 0 || m.size > size || (m.size > 0 && (m.next === undefined || m.changes === undefined)) || 'close' in m) {
 			for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
-			Object.assign(m, { size: 0, inbox: {} })
+			Object.assign(m, { size: 0, inbox: {}, changes: [], changedPaths: {} })
 		}
 		if (m.size >= size) return m
 		let base = m.size

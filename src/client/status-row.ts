@@ -15,7 +15,7 @@ import { ansi } from './ansi.ts'
 // `hal`: the cwd is the Hal repo; `home` is shortened to ~ in the cwd.
 export type StatusInfo = { id: string; name?: string; cwd: string; hal?: boolean; model: string; role?: string; stats?: Stats; home?: string }
 
-type Part = { text: string; fg?: Oklch }
+type Part = { text: string; fg?: Oklch; href?: string }
 
 const SEP = ' · '
 
@@ -50,6 +50,7 @@ function left(info: StatusInfo): Part[][] {
 	out.push([{ text: ansi.clean(cwd), fg: info.hal ? colors.assistant().fg! : hi }])
 	out.push([{ text: ansi.clean(titles.modelName(info.model)), fg: hi }])
 	let s = info.stats
+	if (s?.files) out.push([{ text: `${s.files} files`, href: `/changes/${info.id}` }])
 	let pct = statusRow.percent(s)
 	if (pct !== undefined) {
 		let fg = statusRow.heat(pct)
@@ -105,7 +106,10 @@ function fit(info: StatusInfo, cols: number): Part[] {
 function row(info: StatusInfo, cols: number): string {
 	let base = ansi.sgr({ fg: colors.status().fg! })
 	let parts = statusRow.fit(info, Math.max(1, cols - 2 * ansi.PAD.length))
-	return ansi.PAD + base + parts.map((p) => (p.fg ? ansi.sgr({ fg: p.fg }) + p.text + base : p.text)).join('') + ansi.UNCOLOR
+	return ansi.PAD + base + parts.map((p) => {
+		let text = p.href ? `\x1b]8;;${ansi.webUrl(p.href)}\x07${p.text}${ansi.LINK_OFF}` : p.text
+		return p.fg ? ansi.sgr({ fg: p.fg }) + text + base : text
+	}).join('') + ansi.UNCOLOR
 }
 
 export const statusRow = { count, heat, percent, left, right, fit, row }

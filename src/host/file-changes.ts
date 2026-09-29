@@ -8,6 +8,8 @@ import { paths } from './paths.ts'
 import { history } from './history.ts'
 import { neighbours } from './neighbours.ts'
 import type { ToolContext } from './tools.ts'
+import { host } from './host.ts'
+import { stats } from './stats.ts'
 
 type Lock = { sessionId: string; paths: Set<string>; done: Promise<void>; release: () => void }
 type Observation = { ctx: ToolContext; patterns: string[]; before: Map<string, FileSnapshot>; status: Map<string, string>; release: () => void }
@@ -147,7 +149,10 @@ async function finish(observation: Observation): Promise<void> {
 			if (!declared.has(path) && status.get(path) !== after.get(path)) files.push({ path, undeclared: true, statusBefore: status.get(path) ?? null, statusAfter: after.get(path) ?? null })
 		}
 		neighbours.record(ctx.sessionId, ctx.cwd, files.map((f) => f.path))
-		if (patterns.length || files.length) history.append(ctx.sessionId, { type: 'file_changes', toolId: ctx.callId!, cwd: ctx.cwd, files })
+		if (patterns.length || files.length) {
+			history.append(ctx.sessionId, { type: 'file_changes', toolId: ctx.callId!, cwd: ctx.cwd, files })
+			host.broadcast(ctx.sessionId, { type: 'turn-stats', sessionId: ctx.sessionId, stats: stats.of(ctx.sessionId) })
+		}
 	} finally { release() }
 }
 

@@ -75,7 +75,7 @@ export type Snapshot = {
 // started. `plan`: the subscription account the session's next request
 // goes to: its place among the provider's subscription accounts
 // (1-based) and each usage window's percent used ("5h": 18).
-export type Stats = { context?: number; window?: number; sent: number; received: number; plan?: Plan }
+export type Stats = { context?: number; window?: number; sent: number; received: number; files?: number; plan?: Plan }
 export type Plan = { account: number; accounts: number; windows: Record<string, number> }
 
 // Stream events forwarded live; terminal done/error become `turn-end`.

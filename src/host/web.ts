@@ -43,6 +43,7 @@ import { blobs } from './blobs.ts'
 import { clients, type ClientInfo } from './clients.ts'
 import { diag } from './diag.ts'
 import { filePage } from './file-page.ts'
+import { changesPage } from './changes-page.ts'
 import { host } from './host.ts'
 import { push } from './push.ts'
 import { webAuth } from './web-auth.ts'
@@ -206,7 +207,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	let url = new URL(req.url)
 	let { pathname } = url
 	let get = req.method === 'GET'
-	let blob = get && (pathname.startsWith('/blob/') || filePage.owns(pathname))
+	let blob = get && (pathname.startsWith('/blob/') || filePage.owns(pathname) || changesPage.owns(pathname))
 	if (get && url.searchParams.has('auth') && (blob || pathname === '/' || session.isId(pathname.slice(1)))) return web.linkLogin(url, req)
 	if (get && (pathname === '/' || session.isId(pathname.slice(1)))) return web.page()
 	if (get && pathname === '/manifest.webmanifest') return new Response(JSON.stringify({ name: 'Hal', short_name: 'Hal', start_url: '/', scope: '/', display: 'standalone', background_color: '#141a26', theme_color: '#141a26', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }), { headers: { 'content-type': 'application/manifest+json', 'cache-control': 'no-store' } })
@@ -218,7 +219,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	// A page asked for without a login gets the gate, which reloads it
 	// after the login; the API gets a bare 401.
 	if (!web.authorized(req)) return blob ? web.gate() : new Response('log in first\n', { status: 401 })
-	if (blob) return web.blob(pathname)
+	if (blob) return changesPage.owns(pathname) ? changesPage.serve(url, web.css()) : web.blob(pathname)
 	if (check) return new Response(null, { status: 204 })
 	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
 	return web.upgrade(req, srv)
