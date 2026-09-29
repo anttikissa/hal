@@ -169,7 +169,10 @@ async function becomeHost(): Promise<boolean> {
 
 // Refreshes the models.dev cache (task qq). The user hears of it only
 // if a model in use (the default or an open session's) has vanished.
+// Also lists a ChatGPT login's models now, so the first picker shows
+// them rather than models.dev's API-only ones (task q7).
 async function refreshModels(): Promise<void> {
+	void models.fetchList('openai').catch((e) => diag.log(`models of openai: ${e}`))
 	let picked = [settings.model(), ...sessions.openIds().map((id) => sessions.open(id).model)]
 	let gone = await modelsDev.refresh([...new Set(picked)])
 	let names = models.names([...new Set(picked)])

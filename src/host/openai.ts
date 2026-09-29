@@ -207,6 +207,21 @@ function subscription(): boolean {
 	}
 }
 
+// The models a ChatGPT subscription can use are the Codex backend's own
+// visible list: models.dev's OpenAI list has API-only ones ("gpt-5.6",
+// "gpt-6-terra") that fail there with a 400. The backend hides models
+// newer than client_version, so ask as a far-future client. API keys get
+// models.dev's list and the built-in ids.
+async function listModels(signal: AbortSignal): Promise<string[]> {
+	if (!openai.subscription()) return [...new Set([...modelsDev.ids('openai'), ...openai.knownModels()])]
+	let cred = await auth.openai()
+	let accountId = claims(cred.value).accountId ?? cred.accountId
+	let res = await fetch(openai.codexModelsUrl(), { signal, headers: { authorization: `Bearer ${cred.value}`, originator: 'hal', ...(accountId && { 'chatgpt-account-id': accountId }) } })
+	if (!res.ok) throw new Error(`HTTP ${res.status}`)
+	let body = (await res.json()) as { models?: { slug?: unknown; visibility?: unknown }[] }
+	return (body.models ?? []).filter((m) => m.visibility === 'list' && typeof m.slug === 'string').map((m) => m.slug as string)
+}
+
 // A subscription caps input at 272k whatever the API model allows.
 function contextWindow(model: string): number | undefined {
 	let listed = modelsDev.contextWindow(`openai/${model}`)
@@ -220,6 +235,7 @@ function init(): void {
 		parse: openai.parse,
 		rejected: (account) => auth.rejected(account, 'openai'),
 		spent: (account) => auth.spent(account, 'openai'),
+		models: (signal) => openai.listModels(signal),
 		known: () => openai.knownModels(),
 		contextWindow: (model) => openai.contextWindow(model),
 		effort: (model) => openai.effort(model),
@@ -229,6 +245,8 @@ function init(): void {
 export const openai = {
 	apiUrl: () => 'https://api.openai.com/v1/responses',
 	codexUrl: () => 'https://chatgpt.com/backend-api/codex/responses',
+	codexModelsUrl: () => 'https://chatgpt.com/backend-api/codex/models?client_version=99.0.0',
+	listModels,
 	// Reasoning effort for a model; undefined leaves the model's default.
 	effort: (_model: string): string | undefined => undefined,
 	// The old Hal's GPT ids, offered beside models.dev's list.

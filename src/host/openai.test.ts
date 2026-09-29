@@ -14,7 +14,7 @@ import { openai } from './openai.ts'
 import { provider } from './provider.ts'
 
 const saved = { HAL_HOME: process.env.HAL_HOME, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
-const orig = { apiUrl: openai.apiUrl, codexUrl: openai.codexUrl, tokenUrl: auth.tokenUrl }
+const orig = { apiUrl: openai.apiUrl, codexUrl: openai.codexUrl, codexModelsUrl: openai.codexModelsUrl, tokenUrl: auth.tokenUrl }
 let home = ''
 let server: ReturnType<typeof Bun.serve>
 let seen: { path: string; headers: Headers; body: any }[] = []
@@ -38,12 +38,17 @@ beforeEach(() => {
 		async fetch(req) {
 			let path = new URL(req.url).pathname
 			if (path === '/token') return Response.json({ access_token: subscriptionToken, refresh_token: 'r2', expires_in: 3600 })
+			if (path === '/codex/models') {
+				seen.push({ path, headers: req.headers, body: null })
+				return Response.json({ models: [{ slug: 'gpt-6-sol', visibility: 'list' }, { slug: 'gpt-reserve', visibility: 'hide' }] })
+			}
 			seen.push({ path, headers: req.headers, body: await req.json() })
 			return reply()
 		},
 	})
 	openai.apiUrl = () => `http://127.0.0.1:${server.port}/v1/responses`
 	openai.codexUrl = () => `http://127.0.0.1:${server.port}/codex/responses`
+	openai.codexModelsUrl = () => `http://127.0.0.1:${server.port}/codex/models`
 	auth.tokenUrl = () => `http://127.0.0.1:${server.port}/token`
 	openai.init()
 })
@@ -52,7 +57,7 @@ afterEach(() => {
 	auth.close()
 	limits.close()
 	server.stop(true)
-	Object.assign(openai, { apiUrl: orig.apiUrl, codexUrl: orig.codexUrl })
+	Object.assign(openai, { apiUrl: orig.apiUrl, codexUrl: orig.codexUrl, codexModelsUrl: orig.codexModelsUrl })
 	auth.tokenUrl = orig.tokenUrl
 	provider.state.providers = {}
 	for (let [k, v] of Object.entries(saved)) {
@@ -193,6 +198,15 @@ test('a 401 refreshes the token once and retries at once', async () => {
 	reply = () => sse(completed())
 	await run()
 	expect(seen.at(-1)!.headers.get('authorization')).toBe(`Bearer ${subscriptionToken}`)
+})
+
+test('a ChatGPT login lists only the models the Codex backend shows it', async () => {
+	writeAuth({ openai: { accessToken: subscriptionToken } })
+	expect(await openai.listModels(new AbortController().signal)).toEqual(['gpt-6-sol'])
+	expect(seen[0]!.headers.get('chatgpt-account-id')).toBe('acct-1')
+	writeAuth({ openai: { apiKey: 'sk-file' } })
+	auth.close()
+	expect(await openai.listModels(new AbortController().signal)).toEqual(expect.arrayContaining(openai.knownModels()))
 })
 
 test('the picker offers models.dev ids and the known GPT ids; a subscription caps input at 272k', () => {
