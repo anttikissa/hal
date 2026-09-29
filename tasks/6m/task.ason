@@ -1,0 +1,6 @@
+{
+	title: 'Ctrl-F: one find dialog with filters and live results',
+	spec: 'Ctrl-F (terminal and web) opens one dialog holding everything: a query field on top; under it one row of filter toggles [x] user/assistant  [x] thinking  [x] tools  [x] other (all on by default; Space or click toggles, Tab moves between field, toggles and results); under them the results, updated as tiers stream in without the list jumping under the cursor (new lower tiers append; a better hit in an already-shown tier inserts above only while the selection has not moved). Up/Down move the selection, Enter opens the session tab at that block (scrolling it into view), Escape closes. Typing restarts the query after a short debounce (about 80 ms). Each result: kind marker, session id and name, age, snippet with the match highlighted. A footer tells what is still searching ("scanning 1,204 histories…") until done. The toggles are remembered for the next Ctrl-F. On the web it is an overlay that scrolls itself (tasks/README.md web rules), phone-sized touch targets. Not a question form in history: find is transient UI and leaves nothing in the session.',
+	status: 'planned',
+	needs: ['v8', 'w4']
+}

@@ -1,0 +1,6 @@
+{
+	title: '/todo files a project TODO',
+	spec: '/todo <item> records a TODO for the project of the session cwd. If TODO.md exists there it is the source of truth: the item is appended as "- <item>" (adding a missing final newline first) and only that file is committed with the message "TODO: <item>" and the usual trailers, never other staged files (git commit -- TODO.md). Without a TODO.md, the session is prompted "Add a TODO item to this project: <item>" so the model files it where the project keeps them; if the session is working it is not interrupted: a fork (task px) gets that prompt instead. Bare /todo shows the open items of TODO.md.',
+	status: 'planned',
+	needs: ['x0', 'px']
+}

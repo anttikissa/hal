@@ -1,0 +1,7 @@
+{
+	title: 'bash declares the files it changes; the host snapshots them',
+	spec: `The bash tool takes an optional \`modifies\` argument: a list of paths or globs relative to cwd that the command will create, change or delete (for example ["src/cmd.ts", "src/commands/*.ts"]). The system prompt tells the model to declare it for every command that writes files. For each call with modifies, the host, before running: expands the globs (plus the literal paths that do not exist yet), reads each file (size cap 1 MB; bigger ones recorded by size and mtime only) into content-addressed blobs; after the command ends it reads them again and appends one file_changes history record per call: { toolId, cwd, files: [{ path, before, after }] } with blob hashes (null = absent), only files that actually changed. Undeclared changes are observed too, cheaply: in a git work tree the host runs git status --porcelain=v1 -z before and after every bash call (async, never blocking the loop) and records paths that changed status but were not declared, marked undeclared, without content. Hal calls this what it is: observed changes during the call, not proof of authorship.
+Two sessions in one cwd: calls whose modifies sets overlap (after glob expansion, by realpath) run one at a time host-wide; the second waits, and its tool block shows "waiting for 158-abc (editing src/cmd.ts)". Non-overlapping calls and calls without modifies never wait. Secrets: paths matching the approval task sensitive list (6f) are recorded without content.`,
+	status: 'planned',
+	needs: ['1r', 'bz']
+}

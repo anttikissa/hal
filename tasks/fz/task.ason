@@ -1,0 +1,6 @@
+{
+	title: 'What a session changed: /changes and diffs on the web',
+	spec: 'Each session keeps the files it changed, built from its file_changes records: per path the first before and the latest after, so the list survives commits (a commit does not empty it). /changes lists them (path, +added -removed lines, which calls, undeclared ones marked, committed in <short hash> when a later commit in that repo contains the path at exactly the after content). Each path links to a web page showing the unified diff first-before to latest-after, with steps per call; the session has a page with all its diffs. The status row shows the count of changed files ("7 files"), a link to that page. A file changed by two sessions shows in both, and each page names the other session. /changes clear starts a fresh list (the records stay in history).',
+	status: 'planned',
+	needs: ['8w', '0z']
+}

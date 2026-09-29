@@ -1,0 +1,6 @@
+{
+	title: '/mem: host memory',
+	spec: '/mem shows the host process memory: RSS, heap used/total (bun:jsc heapStats), the largest in-memory holders Hal knows about (open sessions with their loaded history block count and bytes, blob caches, web bundle), and the machine free memory. One screen, numbers humanised. Read-only; it never triggers GC unless called as /mem gc, which runs Bun.gc(true) and shows before/after.',
+	status: 'planned',
+	needs: ['x0']
+}

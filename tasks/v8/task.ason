@@ -1,0 +1,10 @@
+{
+	title: 'Find: ranked, streamed search over all sessions',
+	spec: `The host answers a find query with results streamed in tiers, cheapest first, each tier sent as soon as it is ready and a newer query cancelling the old one:
+1. Session metadata: id (prefix "158-" matches every 158-* session), name, model, cwd. Instant, from memory.
+2. User and assistant text, then thinking, then tool calls (input and description), then tool output and other records.
+A tier is a block kind; within a kind, score = match quality (whole word > prefix > substring; case-insensitive; every word of the query must match) times recency (half-life about three days, so a one-day-old tool result can beat a ten-day-old user message). Results carry session id and name, block id, kind, age and a one-line snippet around the match, and link to that block (task 0z addresses). Filters restrict kinds (user/assistant, thinking, tools, other), and a query may say in:<kind>, model:<name>, cwd:<path>, since:<age>.
+Index: a rebuildable projection in state/find.sqlite (bun:sqlite FTS5, porter-free unicode61 tokenizer plus a trigram table for substrings), never a source of truth: deleting it only costs a rebuild. The host updates it as history lines are appended and, at startup, catches up per session from its last indexed byte offset in the background (task 7j: chunks, never blocking the loop over 10 ms). Blob contents are indexed too, capped per block (first 64 kB). Until the index has caught up, the tier falls back to scanning histories newest first, so results arrive anyway. /find <query> prints the top results as a list with links; Ctrl-F opens the dialog (next task).`,
+	status: 'planned',
+	needs: ['gj', 'x0']
+}

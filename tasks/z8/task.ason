@@ -1,0 +1,11 @@
+{
+	title: '/clients: a map of who is connected',
+	spec: `/clients prints an ASCII diagram of the host and everything connected to it: the host (pid, hostname, uptime) at the top, peers on this machine (pid, tty) beside it joined with <->, and below them remote terminals (./run -r) and browsers, each with its address, user agent in a few words (Safari on iPhone), the sessions it follows, and when it last spoke ("now", "3 min ago", "2 h ago"). Clients that went away in the last 24 hours stay listed as gone, with their last-seen time; the host keeps this list in memory only (a restart forgets it). Box-drawing characters in the terminal; the web shows the same text in a monospace card. Example shape:
+  host 1234 (up 3 h)  <->  peer 5678 ttys003  <->  peer 9012 ttys005
+      |
+      +-- remote terminal 203.0.113.7   follows 3 tabs   now
+      +-- web 198.51.100.4 Safari/iPhone  follows 158-ash  2 h ago (gone)
+The host records for each connection: kind (own terminal, peer, remote terminal, web), remote address, user agent, connect time, last message time. Nothing about clients is written to disk.`,
+	status: 'planned',
+	needs: ['r6', 'tr']
+}

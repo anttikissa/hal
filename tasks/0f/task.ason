@@ -1,0 +1,6 @@
+{
+	title: 'Sessions in one directory hear who edits what',
+	spec: 'When a session calls bash in a cwd where another open session has declared or observed changes in the last 15 minutes, the tool result carries a short note after the output, at most one line per other session, like "[158-abc (Fix render) is editing src/host/turns.ts, src/cmd.ts; 3 min ago]". A note is sent again only when its content changed, so an idle neighbour costs nothing. Paths both sessions touched come first and are marked "(also yours)". Nothing is added when no other session works there. Notes are part of the tool result history record (so replay and the cache see the same bytes).',
+	status: 'planned',
+	needs: ['8w', 'rj']
+}

@@ -1,0 +1,6 @@
+{
+	title: '/config: settings as a form',
+	spec: "Bare /config opens the settings table (src/common/settings.ts) as one question form (tasks/w4/forms.md): each setting a field of its type (text, secret masked, integer, choice), prefilled with the current value, its one-line description as help. Submitting writes only changed keys to config.ason through its liveFile, keeping keys it does not know; a setting left at its default is not written. /config <name> <value> sets one directly, /config <name> shows it. Validation is the table's: a bad value is refused with the reason and the form stays open. Secrets are never echoed back in output or history (the form result records that it changed, not its value). Same on terminal and web.",
+	status: 'planned',
+	needs: ['pc', 'w4']
+}

@@ -1,0 +1,6 @@
+{
+	title: '/fork: branch a session (Ctrl-B)',
+	spec: '/fork opens a new tab right after the current one holding a copy of the current session history up to now (the same copy the spawn tool makes with mode fork, src/host/subagents.ts), same cwd and model, named "<parent name> (fork)" until it names itself, and focuses it. It is an ordinary interactive session: no parent report, no spawn slot. The parent history gets a note that it was forked to <id>; the child starts with the fork note the spawn fork already writes. Key: Ctrl-B (b for branch; Ctrl-F is kept for find). /branch is a hidden alias: it works and completes, but /help and /keys list only /fork. Forking a session that is working copies what is in history so far (a streaming block is not copied half-written) and does not stop the parent. Works the same from the terminal and the web.',
+	status: 'planned',
+	needs: ['x0', 't0', '0a']
+}
