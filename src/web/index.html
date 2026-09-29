@@ -134,15 +134,17 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .entry { position: relative; display: flex; align-items: stretch; border-left: 3px solid color-mix(in oklab, currentColor var(--mix-entry), transparent); }
 .entry:focus-within { border-left-color: var(--cursor); }
 .entry.dropping { outline: 2px dashed var(--cursor); outline-offset: 2px; }
+.entry .actions { display: flex; flex-direction: column; }
+.entry .actions button { flex: 1; min-height: 44px; }
 .entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
 /* The example request: the input's faint blue, as in the terminal. It
    leaves fast as typing starts and returns a little slower. */
 .entry .hint { position: absolute; inset: 0.5rem 0.7rem auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
 .entry .hint.gone { opacity: 0; transition-duration: 80ms; }
 .entry textarea { flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: 0.5rem 0.7rem; }
-.entry > button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
-.entry > button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
-.entry > button:disabled { color: var(--quiet); cursor: default; }
+.entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
+.entry > button:hover:not(:disabled), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
+.entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; }
 .help { display: flex; flex-wrap: wrap; gap: 0 1.5ch; padding-top: 0.3rem; color: var(--description); }
 .help b { color: var(--key); font-weight: 600; }
 textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 0.5rem 0.6rem; resize: none; outline: none; }
@@ -174,14 +176,18 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--canvas); color: var(--text); border: 1px solid var(--border); padding: 0.6rem; }
 .Picker[open] { display: flex; flex-direction: column; gap: 0.4rem; }
 .Picker .top { display: flex; align-items: center; gap: 0.6ch; }
-.Picker .title { flex: 1; min-width: 0; }
+.Picker .title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .Picker .close { background: transparent; color: inherit; padding: 0.2rem 0.6rem; }
 .Picker ul { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
-.Picker li { padding: 0 0.4rem; cursor: pointer; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.Picker li { padding: 0 0.4rem; cursor: pointer; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Picker li[aria-selected="true"] { background: var(--button); }
 .Picker li .match { color: var(--match); font-weight: bold; }
 /* Apple HIG: touch targets at least 44x44pt. */
-@media (pointer: coarse) { .Picker li { min-height: 44px; display: flex; align-items: center; } .Picker .close { min-width: 44px; min-height: 44px; } }
+@media (pointer: coarse) {
+  .Picker { width: calc(100% - 1rem); max-width: none; height: calc(var(--app-height, 100dvh) - 1rem); max-height: none; top: calc(var(--app-top, 0px) + 0.5rem); bottom: auto; margin: 0 auto; }
+  .Picker li { min-height: 44px; padding-block: 0.4rem; }
+  .Picker .close { min-width: 44px; min-height: 44px; }
+}
 /* Tabs (task 3k): one row that never wraps or scrolls sideways (that
    fights the back-swipe): menu, equal cells (widths set by Tabs.tsx
    from common/tab-pages.ts), page edges, new tab. The shown tab's

@@ -11,7 +11,8 @@
 // attachments (attach.ts): a placeholder at the caret, then the marker.
 // While files are dragged over the page the box is outlined.
 
-import { createEffect, For } from 'solid-js'
+import { createEffect, For, Show } from 'solid-js'
+import { states } from '../../common/states.ts'
 import { app } from '../app.ts'
 import { attach } from '../attach.ts'
 import type { Menu } from '../completions.ts'
@@ -52,8 +53,9 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	)
 	let line = () => view.line(props.view, props.connected)
 	let tone = () => ({ idle: '', busy: 'busy', warn: 'warning', error: 'error' })[line().tone]
-	let send = () => {
-		app.send()
+	let busy = () => !!props.view.transcript && states.busy(props.view.transcript.state)
+	let send = (queue = false) => {
+		app.send(queue)
 		input.focus()
 	}
 	return (
@@ -108,9 +110,14 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				<button type="button" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onClick={() => picker.click()}>
 					+
 				</button>
-				<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={send}>
-					Send
-				</button>
+				<div class="actions">
+					<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={() => send()}>
+						{busy() ? 'Steer' : 'Send'}
+					</button>
+					<Show when={busy()}>
+						<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={() => send(true)}>Queue</button>
+					</Show>
+				</div>
 			</div>
 			<div class="help">
 				<For each={view.hints(props.view)}>
