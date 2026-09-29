@@ -147,9 +147,8 @@ function transcript(items: Item[]): Transcript {
 // n question/answer pairs.
 function items(n: number, from = 0): Item[] {
 	let out: Item[] = []
-	// Items of two rows each, without headers (task hp): a command and
-	// its output.
-	for (let i = from; i < from + n; i++) out.push({ type: 'command', text: `q${i}` }, { type: 'output', text: `a${i}` })
+	// Items of two rows each, without headers (task hp): two outputs.
+	for (let i = from; i < from + n; i++) out.push({ type: 'output', text: `q${i}` }, { type: 'output', text: `a${i}` })
 	return out
 }
 
@@ -244,10 +243,10 @@ describe('full mode', () => {
 		setup(8, 30, ['$ hal'])
 		show(items(10))
 		let list = items(10)
-		list[0] = { type: 'command', text: 'q0 edited' }
+		list[0] = { type: 'output', text: 'q0 edited' }
 		show(list)
 		expect(term.content()).toEqual(frameText())
-		expect(frameText()).toContain(' > q0 edited')
+		expect(frameText()).toContain(' q0 edited')
 		expect(frameText()).toContain(' a9')
 	})
 

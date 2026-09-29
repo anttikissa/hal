@@ -311,7 +311,8 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			return { kind: 'question warning', text: [`? ${item.form.text}`, ...quote, ...said.map((l) => `  ${l}`)].join('\n') }
 		}
 		case 'command':
-			return { kind: 'user', text: item.from === undefined ? item.text : `${item.text}\n(sent from ${item.from})` }
+			// Drawn as the prompt it was typed as (Card heads it).
+			return { kind: 'user prompt', text: item.text }
 		case 'output':
 			return { kind: item.error ? 'output error' : 'output log', text: item.text }
 		case 'divider':

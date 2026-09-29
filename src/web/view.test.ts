@@ -1,3 +1,4 @@
+import { titles } from '../common/titles.ts'
 import { expect, test } from 'bun:test'
 import type { Event } from '../common/protocol.ts'
 import { view, type ViewState } from './view.ts'
@@ -170,8 +171,10 @@ test('commands show who sent them, and their output; a cancelled question says s
 	let texts = shown(st).map((s) => s!.text)
 	expect(texts[0]).toBe('/help')
 	expect(texts[1]).toBe('Commands')
-	expect(texts[2]).toContain('/cd x')
-	expect(texts[2]).toContain('sent from 7-abc')
+	expect(texts[2]).toBe('/cd x')
+	// A command is drawn as the prompt it was typed as, its sender in the head.
+	expect(shown(st)[2]!.kind).toBe(shown(st)[0]!.kind)
+	expect(titles.who(st.transcript!.items[2]!)).toBe('Message from 7-abc')
 	expect(texts[3]).toContain('(cancelled)')
 	expect(shown(st)[4]!.kind).toContain('error')
 })

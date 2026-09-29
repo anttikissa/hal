@@ -27,8 +27,8 @@ function command(id: string, text: string, call: { name: string; args: string },
 	let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text }
 	if (from !== undefined) record.from = from
 	if (command !== undefined) record.command = command
-	let { n } = history.append(id, record)
-	host.broadcast(id, { type: 'command', sessionId: id, text, ...(from !== undefined && { from }), n, ...(command !== undefined && { command }), ...slash.placed(id) })
+	let { n, ts } = history.append(id, record)
+	host.broadcast(id, { type: 'command', sessionId: id, text, ...(from !== undefined && { from }), ts, n, ...(command !== undefined && { command }), ...slash.placed(id) })
 	void slash.runCommand(id, call.name, call.args).then((reply) => completed?.(reply))
 }
 

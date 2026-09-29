@@ -422,7 +422,9 @@ test('prompts, text and thinking have a header row, a blank row and the body; a 
 	expect(lines.slice(at('10:49 Hal (Opus 5.5, thinking high)'), at('10:49 Hal (Opus 5.5, thinking high)') + 3)).toEqual(['10:49 Hal (Opus 5.5, thinking high)', '', 'Hmm.'])
 	expect(lines.slice(at('10:49 Hal (Opus 5.5)'), at('10:49 Hal (Opus 5.5)') + 3)).toEqual(['10:49 Hal (Opus 5.5)', '', 'Yes.'])
 	expect(lines).toContain('10:49 Message from tab 4: Review')
-	expect(lines).toContain('> /help')
+	// A command is drawn as the prompt it was typed as.
+	expect(lines.slice(at('You') - 1, at('You') + 4)).toEqual(['', 'You', '', '/help', ''])
+	expect(lines.join('\n')).not.toContain('> ')
 	// The prompt's background paints its blank rows too: the whole card.
 	let bg = `48;2;${oklch.toRgb(colors.user().bg!).join(';')}`
 	for (let i = at('10:49 You') - 1; i < at('10:49 You') + 4; i++) expect(f.lines[i]).toContain(bg)

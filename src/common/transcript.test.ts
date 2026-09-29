@@ -234,12 +234,12 @@ test('a command during a running turn goes where history has it: after finished 
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1, ts },
 		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' }, n: 2, ts },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'wor' }, n: 3, ts },
-		{ type: 'command', sessionId, text: '/cd x', from: '2-xyz', n: 4, streaming: true },
+		{ type: 'command', sessionId, text: '/cd x', from: '2-xyz', ts, n: 4, streaming: true },
 		{ type: 'output', sessionId, text: 'no such directory', error: true, n: 5, streaming: true },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'king' }, n: 3, ts },
 		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'c', name: 'ls', input: {} }, n: 6, ts },
 		// The round is done: every block is in history before this one.
-		{ type: 'command', sessionId, text: '/help', n: 7 },
+		{ type: 'command', sessionId, text: '/help', ts, n: 7 },
 		{ type: 'meta', sessionId, meta: { ...meta, cwd: '/x' } },
 		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'c', output: 'ok' }], n: 8 },
 		{ type: 'turn-end', sessionId, status: 'completed', n: 9 },
@@ -249,11 +249,11 @@ test('a command during a running turn goes where history has it: after finished 
 	expect(t.items).toEqual([
 		{ type: 'prompt', text: 'go', ts, key: '1' },
 		{ type: 'thinking', text: 'hm', ts, key: '2' },
-		{ type: 'command', text: '/cd x', from: '2-xyz', key: '4' },
+		{ type: 'command', text: '/cd x', from: '2-xyz', ts, key: '4' },
 		{ type: 'output', text: 'no such directory', error: true, key: '5' },
 		{ type: 'text', text: 'working', ts, key: '3' },
 		{ type: 'tool', id: 'c', name: 'ls', input: {}, key: '6' },
-		{ type: 'command', text: '/help', key: '7' },
+		{ type: 'command', text: '/help', ts, key: '7' },
 		{ type: 'tool-result', id: 'c', output: 'ok', key: '8' },
 		{ type: 'turn-end', status: 'completed', key: '9' },
 	])

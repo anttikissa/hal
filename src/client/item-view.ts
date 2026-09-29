@@ -11,7 +11,6 @@ import { titles } from '../common/titles.ts'
 import { transcript, type Item as Keyed, type Shown as Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { markdownView } from './markdown-view.ts'
-import { promptView } from './prompt-view.ts'
 
 const { INVERSE, UNINVERSE } = ansi
 
@@ -63,7 +62,6 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 // Rows for one item at `width` columns, without the side padding;
 // `streaming`: the item is still growing.
 function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>): string[] {
-	let promptWidth = width - promptView.FIRST.length
 	switch (item.type) {
 		// A prompt card has a row of its background above the header and
 		// below the body, as in the old Hal.
@@ -132,10 +130,9 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
 			return [...rows, ...said.flatMap((l) => ansi.wrap(l, width - 2).map((r) => `  ${r}`))]
 		}
-		case 'command': {
-			let text = item.from === undefined ? item.text : `${item.text}\n(sent from ${item.from})`
-			return promptView.mark(ansi.wrap(text, promptWidth))
-		}
+		// Drawn as the prompt it was typed as: header, then its text.
+		case 'command':
+			return ['', ...itemView.headed(item, ansi.wrap(item.text, width), width, session), '']
 		case 'output':
 			return markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item))
 		// One row: the text centred in a rule across the width.

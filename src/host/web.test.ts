@@ -969,7 +969,7 @@ test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to 
 				fading: [card, reply].some((c) => c.getAnimations().length > 0),
 				// The output is new: it fades in.
 				fresh: !!output && output.getAnimations().length > 0,
-				copies: [...document.querySelectorAll('.Card.user')].filter((c) => c.textContent === '/help').length,
+				copies: [...document.querySelectorAll('.Card.user')].filter((c) => c.textContent.endsWith('/help')).length,
 			}
 		})()`)
 		expect(moved).toEqual({ wasAfter: true, same: true, nowBefore: true, fading: false, fresh: true, copies: 1 })

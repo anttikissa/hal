@@ -31,7 +31,7 @@ export type Shown =
 	// `cancelled`: dismissed with Escape (a command's question).
 	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; cancelled?: true }
 	// A slash command as typed; `from`: the session that sent it.
-	| { type: 'command'; text: string; from?: string }
+	| { type: 'command'; text: string; from?: string; ts?: string }
 	// What a command said.
 	| { type: 'output'; text: string; error?: true }
 	// A context boundary (tasks bc, vh), drawn as a one-row rule.
@@ -175,9 +175,9 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 }
 
 // A command, its output or a divider as shown, from a record or an event.
-function aside(r: { type: 'command'; text: string; from?: string } | { type: 'output'; text: string; error?: true } | { type: 'divider'; text: string }): Shown {
+function aside(r: { type: 'command'; text: string; from?: string; ts?: string } | { type: 'output'; text: string; error?: true } | { type: 'divider'; text: string }): Shown {
 	if (r.type === 'divider') return { type: 'divider', text: r.text }
-	if (r.type === 'command') return r.from === undefined ? { type: 'command', text: r.text } : { type: 'command', text: r.text, from: r.from }
+	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.from !== undefined && { from: r.from }), ...(r.ts !== undefined && { ts: r.ts }) }
 	return r.error ? { type: 'output', text: r.text, error: true } : { type: 'output', text: r.text }
 }
 

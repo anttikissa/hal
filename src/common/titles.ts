@@ -28,6 +28,9 @@ function who(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt':
 			return item.from === undefined ? 'You' : `Message from ${item.label ?? item.from}`
+		// A command is headed as the prompt it was typed as.
+		case 'command':
+			return item.from === undefined ? 'You' : `Message from ${item.from}`
 		case 'text':
 		case 'thinking': {
 			let parts = item.model ? [titles.modelName(item.model)] : []

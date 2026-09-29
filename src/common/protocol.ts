@@ -211,7 +211,7 @@ export type Event =
 	// `streaming`: the running round's last block was still streaming
 	// (not in history yet), so this goes before it; else after all the
 	// round's blocks (task rk).
-	| { type: 'command'; sessionId: string; text: string; from?: string; n?: number; command?: string; streaming?: true }
+	| { type: 'command'; sessionId: string; text: string; from?: string; ts?: string; n?: number; command?: string; streaming?: true }
 	// What a command said, now in history; `error` if it failed.
 	// `streaming`: as in command.
 	| { type: 'output'; sessionId: string; text: string; error?: true; n?: number; streaming?: true }
