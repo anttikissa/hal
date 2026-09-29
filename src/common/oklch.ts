@@ -85,17 +85,25 @@ function quiet(fg: Oklch, bg: Oklch): Oklch {
 	return out
 }
 
-function search(fg: Oklch, bg: Oklch): Oklch {
+function search(fg: Oklch, bg: Oklch, target = 4.6, step = 0.12): Oklch {
 	let [L, C, h] = fg
-	let lo = Math.max(bg[0], L - 0.12)
-	if (oklch.contrast([lo, C, h], bg) >= 4.6) return [lo, C, h]
+	let lo = Math.max(bg[0], L - step)
+	if (oklch.contrast([lo, C, h], bg) >= target) return [lo, C, h]
 	let hi = L
 	for (let i = 0; i < 20; i++) {
 		let mid = (lo + hi) / 2
-		if (oklch.contrast([mid, C, h], bg) >= 4.6) hi = mid
+		if (oklch.contrast([mid, C, h], bg) >= target) hi = mid
 		else lo = mid
 	}
 	return [hi, C, h]
 }
 
-export const oklch = { state: { rgb: new Map<string, [number, number, number]>(), quiet: new Map<string, Oklch>() }, toRgb, convert, toHex, contrast, quiet }
+// The example request in an empty prompt: greyer and far darker than
+// `fg`, about 2.2:1 on `bg`, so it never reads as typed text. The one
+// exception to the readable-text rule (tasks/README.md): it says
+// nothing the user needs and is gone at the first key.
+function faint(fg: Oklch, bg: Oklch): Oklch {
+	return search([fg[0], fg[1] / 2, fg[2]], bg, 2.2, 1)
+}
+
+export const oklch = { state: { rgb: new Map<string, [number, number, number]>(), quiet: new Map<string, Oklch>() }, toRgb, convert, toHex, contrast, quiet, faint }

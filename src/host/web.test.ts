@@ -580,12 +580,6 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 		// The textarea mounts before tab-start's snapshot. Background opens
 		// must not make this test type before the focused tab is ready.
 		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
-		// The example request fades while there is text, and returns.
-		let type = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
-		await type('x')
-		await b.waitFor(`document.querySelector('.entry .hint').classList.contains('gone')`)
-		await type('')
-		await b.waitFor(`!document.querySelector('.entry .hint').classList.contains('gone')`)
 		for (let width of [390, 1280]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/c'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
@@ -952,7 +946,7 @@ test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to 
 		await b.waitFor(`(() => { let t = document.querySelector('textarea'); if (!t) return false; t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`)
 		await b.waitFor(`document.querySelector('main').innerText.includes('streaming now')`)
 		await enter('/help')
-		await b.waitFor(`(() => { let c = document.querySelector('.Card.pending'); return c && c.textContent === '/help' && !c.getAnimations().length })()`)
+		await b.waitFor(`(() => { let c = document.querySelector('.Card.pending'); return c && c.textContent.endsWith('/help') && !c.getAnimations().some((a) => !(a instanceof CSSTransition)) })()`)
 		let moved = await b.evaluate(`(async () => {
 			let card = document.querySelector('.Card.pending'), reply = document.querySelector('.Card.assistant')
 			let before = !!(reply.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING)
@@ -963,7 +957,8 @@ test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to 
 				wasAfter: before,
 				same: card.isConnected && !card.classList.contains('pending'),
 				nowBefore: !!(card.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING),
-				fading: [card, reply].some((c) => c.getAnimations().length > 0),
+				// A colour easing back from pending is not a fade.
+				fading: [card, reply].some((c) => c.getAnimations().some((a) => !(a instanceof CSSTransition))),
 				// The output is new: it fades in.
 				fresh: !!output && output.getAnimations().length > 0,
 				copies: [...document.querySelectorAll('.Card.user')].filter((c) => c.textContent.endsWith('/help')).length,

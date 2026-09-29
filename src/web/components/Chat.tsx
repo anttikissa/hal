@@ -145,7 +145,7 @@ export function Chat() {
 		}
 	})
 	return (
-		<div class="Chat">
+		<div class={['Chat', { offline: !connected() }]}>
 			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} />
 			<StatusRow view={view()} />

@@ -195,6 +195,14 @@ decides. Readable text below still holds.
 - Suspend restores the terminal and SIGSTOPs the process group; on
   SIGCONT it re-enters raw mode and calls `terminal.redraw()`.
 
+## Motion (web)
+
+After Emil Kowalski: animate only opacity, colour and transform; one
+strong ease-out (--ease-out); short (80–300 ms), exits faster than
+entrances; nothing that happens in milliseconds (a round trip) may
+show, so state changes that are usually brief start after a delay;
+no motion under prefers-reduced-motion.
+
 ## Readable text (invariant, terminal and web)
 
 Never use faint/dim (SGR 2), and never fade text at rest on the web
@@ -203,7 +211,10 @@ glyph meets WCAG 2.2 AA contrast against the background it actually
 sits on (the block's own, else the lightest dark background we
 support): text at least 4.5:1, including placeholders and disabled
 items (terminal text is never "large text"); meaningful non-text marks
-(Hal cursor, tab glyphs, rules, control borders) at least 3:1.
+(Hal cursor, tab glyphs, rules, control borders) at least 3:1. The one
+exception, the user's choice: the example request in an empty prompt
+(oklch.faint, about 2.2:1), which says nothing needed and must never
+look like typed text.
 Hierarchy comes from hue, lightness steps above the minimum, bold or
 position, never from dropping below it. Don't overdo testing this;
 just be careful when introducing new colours.

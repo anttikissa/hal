@@ -179,8 +179,13 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	// The transcript's tail, right after it (never across the full-mode
 	// padding): the inbox, each message drawn as the prompt it will
 	// become, (steering) > text, then prompts on their way to the host,
-	// plain > text, where the host's copy will replace them.
-	let tail = [...(view.transcript?.inbox ?? []).map((m) => ({ text: m.text, label: `(${inbox.tag(m)}) ` })), ...(view.pending ?? []).map((text) => ({ text, label: '' }))]
+	// drawn as the prompt card the host's copy will replace.
+	for (let text of view.pending ?? []) {
+		let rows = frame.itemRows({ type: 'prompt', text, key: '' }, cols)
+		if (rows.length && (lines.length || above)) lines.push('')
+		for (let r of rows) lines.push(r)
+	}
+	let tail = (view.transcript?.inbox ?? []).map((m) => ({ text: m.text, label: `(${inbox.tag(m)}) ` }))
 	for (let m of tail) {
 		// The tag takes at most half the row, so the text keeps room.
 		let tag = strings.clipVisual(m.label, Math.max(1, Math.floor(width / 2)))

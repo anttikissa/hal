@@ -139,6 +139,7 @@ function css(): string {
 		let style = value() as Style
 		let fg = style.fg ?? style.text
 		if (fg) decls.push(`--quiet: ${oklch.toHex(oklch.quiet(fg, style.bg ?? style.button ?? colors.screen))}`)
+		if (key === 'input' && fg && style.bg) decls.push(`--faint: ${oklch.toHex(oklch.faint(fg, style.bg))}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
 	return rules.join('\n')

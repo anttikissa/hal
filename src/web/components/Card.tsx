@@ -88,7 +88,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// thinking is headed by the terminal's header words and its first
 	// line. Prompts and model text show those words above their text
 	// (task hp).
-	// A pending row has none: it may yet turn out a command.
 	let title = () => titles.title(props.row.item)
 	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #(\d+)$/)?.[1]
 	let who = () => {
@@ -146,7 +145,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let plain = (s: () => { kind: string; text: string }) => (
 		<div ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.target ? 'target' : '']}>
 			{link()}
-			<Show when={!props.row.pending && title()}>{(_t) => <div class="who">{who()}</div>}</Show>
+			<Show when={title()}>{(_t) => <div class="who">{who()}</div>}</Show>
 			<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : props.row.item.type === 'prompt' && source() ? marked(s().text) : parts()}>
 				{(img) => <img src={view.blobUrl(props.session, img().blob)} alt={s().text} />}
 			</Show>

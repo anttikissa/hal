@@ -283,10 +283,14 @@ describe('prompt box', () => {
 		expect(rows(prompt.step(st, { key: '-', ctrl: true }, frame.promptWidth(80)).state)).toBe(2)
 	})
 
-	test('an empty prompt shows its placeholder quieter, cursor at its start', () => {
+	test('an empty prompt shows its placeholder faint, never like typed text, cursor at its start', () => {
 		let f = frame.build({ prompt: { text: '', cursor: 0 }, placeholder: 'Try this' }, 40)
 		expect(boxOf(f).rows).toEqual(['Try this'])
-		expect(f.lines[1]).toContain(quietOn(colors.input()) + 'Try this')
+		let rgb = /38;2;(\d+);(\d+);(\d+)mTry this/.exec(f.lines[1]!)!.slice(1).map(Number)
+		let fg = oklch.toRgb(colors.input().fg!), bg = oklch.toRgb(colors.input().bg!)
+		// Much nearer the box than typed text is: it can't be mistaken for it.
+		let dist = (a: number[], b: number[]) => Math.hypot(...a.map((v, i) => v - b[i]!))
+		expect(dist(rgb, bg)).toBeLessThan(dist(fg, bg) / 2)
 		expect(f.cursor).toEqual({ row: 1, col: 1 })
 		let typed = frame.build({ prompt: { text: 'x', cursor: 1 }, placeholder: 'Try this' }, 40)
 		expect(boxOf(typed).rows).toEqual(['x'])
