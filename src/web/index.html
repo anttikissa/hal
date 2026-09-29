@@ -110,11 +110,12 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 @media (pointer: coarse) { .Notices .card { min-height: 44px; } }
 @keyframes notice-in { from { transform: translateY(0.5rem); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .Notices .card { animation: none; } }
-.StatusRow { flex: none; display: flex; gap: 0 1.5ch; padding: 0.2rem max(1rem, env(safe-area-inset-right)) 0.2rem max(1rem, env(safe-area-inset-left)); font-size: 0.85em; border-top: 1px solid var(--border); }
-.StatusRow .group { min-width: 0; overflow-wrap: anywhere; }
-.StatusRow .group:first-child { white-space: nowrap; }
-.StatusRow .separator { white-space: pre; }
-@media (max-width: 40rem) { .StatusRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding-inline: max(0.6rem, env(safe-area-inset-left)) max(0.6rem, env(safe-area-inset-right)); } .StatusRow .separator { display: none; } .StatusRow .group:first-child { white-space: normal; } }
+.StatusRow { flex: none; display: flex; flex-wrap: wrap; gap: 0 2.5ch; padding: 0.2rem max(1rem, env(safe-area-inset-right)) 0.2rem max(1rem, env(safe-area-inset-left)); font-size: 0.85em; border-top: 1px solid var(--border); }
+/* Whole groups flow to the next row, never breaking inside; one wider
+   than the row is cut with an ellipsis (a path at its start). */
+.StatusRow .group { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.StatusRow .group > span { unicode-bidi: isolate; }
+@media (max-width: 40rem) { .StatusRow { padding-inline: max(0.6rem, env(safe-area-inset-left)) max(0.6rem, env(safe-area-inset-right)); } }
 .Composer { position: relative; z-index: 1; flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
 .Composer > * { max-width: 60rem; margin: 0 auto; }
 .Composer > #notice:empty { display: none; }

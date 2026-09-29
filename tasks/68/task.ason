@@ -1,6 +1,6 @@
 {
 	title: 'Web status row',
-	spec: 'The web client shows the facts of the terminal status row (task 1g): session id and name, cwd, model, context used with its percentage heat-coloured, tokens this run, and subscription usage windows. It sits just above the composer as one line that wraps into two on phones instead of dropping parts; the same Stats shape feeds it (transcript.stats), so nothing new is sent. Colours come from the generated CSS; readable-text invariant applies. Tests: a view-module unit test that the parts and percentage come out of a Stats value; looks checked by hand at phone and desktop widths.',
+	spec: 'The web client shows the facts of the terminal status row (task 1g): session id and name, cwd, model, context used with its percentage heat-coloured, tokens this run, and subscription usage windows. It sits just above the composer. Its groups are separated by space, not dots, and flow onto more rows when the width runs out, at any width, each group whole: a group never breaks inside, and one wider than the row (a long cwd) is cut with an ellipsis at its start, so the directory name at its end stays; the same Stats shape feeds it (transcript.stats), so nothing new is sent. Colours come from the generated CSS; readable-text invariant applies. Tests: a view-module unit test that the parts and percentage come out of a Stats value; looks checked by hand at phone and desktop widths.',
 	status: 'done',
 	needs: ['1g'],
 	notes: [
