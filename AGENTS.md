@@ -25,6 +25,9 @@ artifacts, decisions later tasks depend on) go in the task's `notes`
 field in task.ason, a list of strings that `tsk show` prints. Never
 put them in separate notes files. Read `tsk help` and the tsk README
 before inventing a convention tsk may already have.
+Change task fields with `tsk edit`/`tsk add-note`, not by string
+surgery on task.ason: long specs are ASON template strings, where a
+raw backtick breaks the file. After any hand edit, `tsk show <id>`.
 
 Before changing code, read tasks/README.md: it holds the architecture,
 module conventions and invariants (such as the emergency keys) that
