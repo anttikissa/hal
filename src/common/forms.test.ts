@@ -55,6 +55,21 @@ test('y/N: Enter takes the default, y answers at once, arrows change it', () => 
 	expect(press(start, [k('q', 'q'), k('y', 'y', { ctrl: true })]).action).toBeUndefined()
 })
 
+test('choice options form a column: arrows move down it and past its ends to other fields', () => {
+	let form: Form = { text: 'Pick', fields: [{ type: 'text', name: 'who' }, { type: 'choice', name: 'c', options: ['a', 'b', 'c'] }, { type: 'text', name: 'why' }] }
+	let st = press(forms.start('q', form), [k('down')]).st
+	expect(st).toMatchObject({ focus: 1, values: ['', 'a', ''] })
+	// Right is down and left is up, and neither wraps round.
+	expect(press(st, [k('down'), k('right')]).st).toMatchObject({ focus: 1, values: ['', 'c', ''] })
+	expect(press(st, [k('down'), k('left')]).st).toMatchObject({ focus: 1, values: ['', 'a', ''] })
+	expect(press(st, [k('down'), k('down'), k('down')]).st.focus).toBe(2)
+	expect(press(st, [k('up')]).st.focus).toBe(0)
+	// A one-field form stays put at its ends.
+	let one = forms.start('q', { text: 'Pick', fields: [{ type: 'choice', name: 'c', options: ['a', 'b'] }] })
+	expect(press(one, [k('up')]).st.values).toEqual(['a'])
+	expect(press(one, [k('down'), k('down'), k('enter')]).action).toEqual({ type: 'submit', answers: { c: 'b' } })
+})
+
 test('a single option is "press Enter"', () => {
 	let form: Form = { text: 'Welcome', fields: [{ type: 'choice', name: 'go', options: ['continue'] }] }
 	expect(press(forms.start('q', form), [k('right'), k('enter')]).action).toEqual({ type: 'submit', answers: { go: 'continue' } })

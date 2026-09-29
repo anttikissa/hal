@@ -161,13 +161,25 @@ function focusOn(st: FormState, focus: number): FormState {
 
 // What `key` does to the form. Enter moves to the next field and on
 // the last one submits; Tab, Shift-Tab, up and down move between
-// fields; Escape cancels (the client pauses the session). A choice
-// changes with left and right, or picks the option with the typed
-// initial, which on a one-field form also submits (y on y/N).
+// fields; Escape cancels (the client pauses the session). A choice's
+// options stand in a column: up and down (left and right alike) move
+// through them and past its ends to the field above or below. A typed
+// initial picks an option, which on a one-field form also submits (y on
+// y/N).
 function step(st: FormState, key: Key): { state: FormState; action?: FormAction } {
 	let field = st.form.fields[st.focus]!
 	let last = st.focus === st.form.fields.length - 1
 	let plain = !key.ctrl && !key.alt && !key.cmd
+	let value = st.values[st.focus]!
+	if (field.type === 'choice' && plain) {
+		let at = field.options.indexOf(value)
+		let move = key.key === 'up' || key.key === 'left' ? -1 : key.key === 'down' || key.key === 'right' ? 1 : 0
+		let to = at + move
+		if (move && to >= 0 && to < field.options.length) return { state: forms.set(st, st.focus, field.options[to]!) }
+		// Past an end: the field above or below, if there is one.
+		if (move && st.form.fields.length === 1) return { state: st }
+		if (move) return { state: forms.focusOn(st, st.focus + move) }
+	}
 	switch (key.key) {
 		case 'escape':
 			return { state: st, action: { type: 'cancel' } }
@@ -181,11 +193,7 @@ function step(st: FormState, key: Key): { state: FormState; action?: FormAction 
 		case 'up':
 			return { state: forms.focusOn(st, st.focus - 1) }
 	}
-	let value = st.values[st.focus]!
 	if (field.type === 'choice') {
-		let at = field.options.indexOf(value)
-		let move = key.key === 'left' ? -1 : key.key === 'right' ? 1 : 0
-		if (move) return { state: forms.set(st, st.focus, field.options[(at + move + field.options.length) % field.options.length]!) }
 		let typed = plain && key.text?.toLowerCase()
 		let pick = typed ? field.options.find((o) => o.toLowerCase().startsWith(typed)) : undefined
 		if (!pick) return { state: st }

@@ -53,6 +53,17 @@ test('a secret is never on screen; the chosen option is marked', () => {
 	expect(f.lines[2]).toContain('\x1b[7m yes \x1b[27m')
 })
 
+test('choice options stand one per row, the cursor on the chosen one', () => {
+	let form = { text: 'Pick the theme.', fields: [{ type: 'choice' as const, name: 't', options: ['hal', 'nostromo', 'tron'] }] }
+	let item: Item = { type: 'question', id: 'q1', form }
+	let st = forms.step(forms.start('q1', form), { key: 'down' }).state
+	let f = frame.build({ ...view([item]), form: st }, 40)
+	let rows = plain(f.lines)
+	let at = rows.indexOf('? Pick the theme.')
+	expect(rows.slice(at + 1, at + 4).map((r) => r.trim())).toEqual(['hal', 'nostromo', 'tron'])
+	expect(f.cursor.row).toBe(at + 2)
+})
+
 test('an answered question shows its answers, secrets only as given; one not answered says so', () => {
 	let done: Item = { type: 'question', id: 'q1', form: secretForm, answers: { ok: 'yes' }, secrets: ['key'] }
 	expect(plain(frame.build(view([done]), 40).lines).slice(0, 3)).toEqual(['? Log in', 'Key: (given)', 'yes'])

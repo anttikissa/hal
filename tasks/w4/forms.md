@@ -224,6 +224,11 @@ lines and escape codes are not DOM. Shared, in `src/common`:
   in both.
 
 Each client only maps that to its medium (terminal rows, DOM elements).
+In the terminal a choice's options stand one per row, never side by
+side (a long list must not run off a wide screen), under the field's
+label if it has one; the chosen one is inverse. Up and down move
+through them, left and right alike, without wrapping round; past the
+first or last option they move to the field above or below.
 On the web an open question is a card like the others (square, lit bar
 on the left, its style's tint behind) with a ✕ at its top right that
 dismisses it exactly as Escape does; tapping outside does not. Choice

@@ -31,15 +31,15 @@ function fieldLines(st: FormState, width: number, style: Style = colors.warning(
 		let head = `  ${field.label ? `${ansi.clean(field.label)}: ` : ''}`
 		let value = st.values[i]!
 		let focused = i === st.focus
+		// A choice's options stand in a column under its label.
 		if (field.type === 'choice') {
-			let col = strings.visLen(head)
-			let parts = field.options.map((o) => {
+			if (field.label) rows.push(strings.clipVisual(head.trimEnd(), width))
+			let indent = field.label ? '    ' : '  '
+			for (let o of field.options) {
 				let label = ` ${ansi.clean(o)} `
-				if (o === value && focused) cursor = { row: rows.length, col: col + 1 }
-				col += strings.visLen(label) + 1
-				return o === value ? INVERSE + label + UNINVERSE : label
-			})
-			rows.push(strings.clipVisual(head + parts.join(' '), width))
+				if (o === value && focused) cursor = { row: rows.length, col: indent.length + 1 }
+				rows.push(strings.clipVisual(indent + (o === value ? INVERSE + label + UNINVERSE : label), width))
+			}
 			return
 		}
 		// A secret shows one dot per character typed, never the text.
