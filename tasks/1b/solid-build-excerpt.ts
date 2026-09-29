@@ -1,5 +1,5 @@
 async function bundleClient(entry = 'main.tsx'): Promise<string> {
-	const { transform } = await import('@dom-expressions/compiler')
+	const { transform } = await import('@solidjs/compiler')
 	const result = await Bun.build({
 		entrypoints: [`${import.meta.dir}/../web-client/${entry}`],
 		target: 'browser',

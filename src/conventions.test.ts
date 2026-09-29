@@ -42,7 +42,7 @@ function sourceFiles(): string[] {
 }
 
 // Packages only the browser may use: the host path stays dependency-free.
-const webOnly = ['solid-js', '@solidjs/web', '@dom-expressions/compiler']
+const webOnly = ['solid-js', '@solidjs/web', '@solidjs/compiler']
 
 // Static imports of webOnly packages from a module outside src/web. A
 // dynamic import() is allowed: host/web.ts loads the JSX compiler that

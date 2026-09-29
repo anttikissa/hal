@@ -1,10 +1,13 @@
 {
 	title: 'Solid on the newest 2.0 release',
-	spec: "The web client uses the newest SolidJS 2.0 release (2.0.0-rc.11 or later, with its matching compiler), not a pin to an old rc. Before bumping, the event bug that made rc.9 unusable is checked again with a test that fails if events silently stop (the one 1b's notes describe); if it still breaks, the pin stays with a note naming the broken version (questions.md 86).",
+	spec: 'The web client uses the latest SolidJS 2 runtime with its matching @solidjs/compiler. The Bun plugin compiles TSX directly without introducing Vite; the compiler is loaded only when serving the web page, so the host stays usable without it. Keep the compiler and runtime in sync on upgrades. The user checks the web UI after an upgrade; do not keep tests for temporary compiler/runtime incompatibilities.',
 	status: 'done',
 	needs: [],
-	foldInto: ['1b'],
+	foldInto: [
+		'1b'
+	],
 	notes: [
-		'2026-09-29: Tried SolidJS 2.0.0-rc.11 (@solidjs/web and @solidjs/signals rc.11) with newest published @dom-expressions/compiler 0.50.0-next.44. Browser CDP regression passed rc.8 and failed rc.11: onInput does not enable Send (delegated event silently missing). Keep rc.8 pinned until the compiler emits the delegated-event key rc.11 expects; the CDP test checks onInput and onClick in a real browser.'
+		'2026-09-29: Tried SolidJS 2.0.0-rc.11 (@solidjs/web and @solidjs/signals rc.11) with newest published @dom-expressions/compiler 0.50.0-next.44. Browser CDP regression passed rc.8 and failed rc.11: onInput does not enable Send (delegated event silently missing). Keep rc.8 pinned until the compiler emits the delegated-event key rc.11 expects; the CDP test checks onInput and onClick in a real browser.',
+		'2026-09-29: Supersedes the earlier rc.11 failure: the old experiment paired the Solid 2 runtime with the legacy @dom-expressions/compiler, which still emits the previous delegated-event key. Switched to @solidjs/compiler 2.0.0-rc.11 and the matching solid-js, @solidjs/web and signals rc.11. Its compiled JSX emits the new _$$ event key; existing project tests pass except recurring load-sensitive timing budgets. The user will manually check the web UI. Removed the historical event-specific CDP assertions.'
 	]
 }

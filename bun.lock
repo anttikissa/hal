@@ -5,9 +5,9 @@
     "": {
       "name": "hal2",
       "dependencies": {
-        "@dom-expressions/compiler": "0.50.0-next.44",
-        "@solidjs/web": "2.0.0-rc.8",
-        "solid-js": "2.0.0-rc.8",
+        "@solidjs/compiler": "2.0.0-rc.11",
+        "@solidjs/web": "2.0.0-rc.11",
+        "solid-js": "2.0.0-rc.11",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -17,28 +17,14 @@
     },
   },
   "overrides": {
-    "@solidjs/signals": "2.0.0-rc.8",
+    "@solidjs/signals": "2.0.0-rc.11",
   },
   "packages": {
-    "@dom-expressions/compiler": ["@dom-expressions/compiler@0.50.0-next.44", "", { "optionalDependencies": { "@dom-expressions/compiler-darwin-arm64": "0.50.0-next.44", "@dom-expressions/compiler-darwin-x64": "0.50.0-next.44", "@dom-expressions/compiler-linux-arm64-gnu": "0.50.0-next.44", "@dom-expressions/compiler-linux-x64-gnu": "0.50.0-next.44", "@dom-expressions/compiler-wasm32-wasi": "0.50.0-next.44", "@dom-expressions/compiler-win32-x64-msvc": "0.50.0-next.44" } }, "sha512-CBj0k+LcpCk8+nJGY7uvqxLC5NLxXTx9l0fuMZBBkBAOgVf5/IlMyMSpaYE5H5AkFiajR05NYvNR07R6e0KZ3w=="],
+    "@emnapi/core": ["@emnapi/core@1.11.3", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.3", "tslib": "^2.4.0" } }, "sha512-zLpS5asjEb7lq8jYLq37N6XKaE41DIexlY1rF/z4/tIl3wo13Sqm28fRyfIsKZD+NZ8mM5RoKkpW/rBcuoSZSg=="],
 
-    "@dom-expressions/compiler-darwin-arm64": ["@dom-expressions/compiler-darwin-arm64@0.50.0-next.44", "", { "os": "darwin", "cpu": "arm64" }, "sha512-7l575p7EQu16lssfbtgspSBWBSK5+car5NP4VYD/iJiK+Qd2VcMQMwaOjgA1xCs/P0S0l9EFY9BHGIJcHQTL+w=="],
+    "@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
 
-    "@dom-expressions/compiler-darwin-x64": ["@dom-expressions/compiler-darwin-x64@0.50.0-next.44", "", { "os": "darwin", "cpu": "x64" }, "sha512-NRbfI3HhBPsSrSQvSUfQXvPXfEKjUQKnbBVCDvcu7ISBPMQd+0yH9M+Qmlf7kVq4Ci9qa1HL5EA2jD22d2v73A=="],
-
-    "@dom-expressions/compiler-linux-arm64-gnu": ["@dom-expressions/compiler-linux-arm64-gnu@0.50.0-next.44", "", { "os": "linux", "cpu": "arm64" }, "sha512-/Gfa8j/YHBKK1i8b2VQw3ewBlA6qlEZSAn+b7g3z1g18WydPUI/TZWISKpgNxAtyl9m9MvwgbWA1HcHVkf4zyg=="],
-
-    "@dom-expressions/compiler-linux-x64-gnu": ["@dom-expressions/compiler-linux-x64-gnu@0.50.0-next.44", "", { "os": "linux", "cpu": "x64" }, "sha512-gV4J4Sr1+6Awnkl5npREqPvxcDfgw4PGguTdFnsHVN9cxAFet3ujcCbWsAJ+QMBUQ8OT/LG6d4oJLlAkQ0D1fA=="],
-
-    "@dom-expressions/compiler-wasm32-wasi": ["@dom-expressions/compiler-wasm32-wasi@0.50.0-next.44", "", { "dependencies": { "@emnapi/core": "1.11.2", "@emnapi/runtime": "1.11.2", "@napi-rs/wasm-runtime": "^1.1.6" } }, "sha512-YrzoB/YZtrmnGXhz3sxs7VeuAXT0JRc6NguNX8iDNt5p5fQ0QX+HR75GYMsxY9FceSVTHObrm3fA/8KGYo5z6Q=="],
-
-    "@dom-expressions/compiler-win32-x64-msvc": ["@dom-expressions/compiler-win32-x64-msvc@0.50.0-next.44", "", { "os": "win32", "cpu": "x64" }, "sha512-BNQEgny4zyjceZqCaRJDCrQ2oy6z7oXruAE/du2uJB7qLz/z24ISJVUKeKHPb5mRzHuSiTlDcK7pDzE7jPPXjg=="],
-
-    "@emnapi/core": ["@emnapi/core@1.11.2", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-TC8MkTuZUtcTSiFeuC0ksCh9QIJ5+F21MvZ4Wn4ORfYaFJ/0dsiudv5tVkejgwZlwQ39jL9WWDe2lz8x0WglOA=="],
-
-    "@emnapi/runtime": ["@emnapi/runtime@1.11.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA=="],
-
-    "@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.2.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA=="],
+    "@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.2.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-ELEBe8PsLvvJ6QMr0zLt8ffvOHW/dc1m3CEzNMg7aJUv3bMaoDtw2TXyDAwkYBuroxxuHEwhRTLJSe5sya547g=="],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.2.4", "", { "dependencies": { "@tybys/wasm-util": "^0.10.3" }, "peerDependencies": { "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.4", "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.4" } }, "sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g=="],
 
@@ -80,9 +66,23 @@
 
     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.85.0", "", { "os": "win32", "cpu": "x64" }, "sha512-pBebIPUpKKhWrhSMWhy8TdAZBewiXnfxmaAGxhzxM1068GagqFaTwgKlU6e+UyJ2sPR+VoHouhXuGJkQjsrDvA=="],
 
-    "@solidjs/signals": ["@solidjs/signals@2.0.0-rc.8", "", {}, "sha512-EGk9WkxnlQtqdERjPgS8gvWVjKLZnBQr95e65FOAs9MqkxVhHIjgipan7svZZ6n0rkp6vSc9GxyeY836boaT6w=="],
+    "@solidjs/compiler": ["@solidjs/compiler@2.0.0-rc.11", "", { "optionalDependencies": { "@solidjs/compiler-darwin-arm64": "2.0.0-rc.11", "@solidjs/compiler-darwin-x64": "2.0.0-rc.11", "@solidjs/compiler-linux-arm64-gnu": "2.0.0-rc.11", "@solidjs/compiler-linux-x64-gnu": "2.0.0-rc.11", "@solidjs/compiler-wasm32-wasi": "2.0.0-rc.11", "@solidjs/compiler-win32-x64-msvc": "2.0.0-rc.11" } }, "sha512-z9a1dMIjlBJzXlHxRXjb7UoXzWDnIx+VhiokITomrjTGTG6wANLNWKcyyvB0KMRv8n2HHB1Mir7oMZQw11Mdfw=="],
 
-    "@solidjs/web": ["@solidjs/web@2.0.0-rc.8", "", { "dependencies": { "seroval": "~1.6.7", "seroval-plugins": "~1.6.7" }, "peerDependencies": { "solid-js": "^2.0.0-rc.8" } }, "sha512-GeJEHtSjsbvRLpREfbQa5ksn6EuJKjxY/kXxuOP5Sn5FlXz6fuL3wHJr88PYlCOPV1KxxxWSc5h5jzKMKQQXDg=="],
+    "@solidjs/compiler-darwin-arm64": ["@solidjs/compiler-darwin-arm64@2.0.0-rc.11", "", { "os": "darwin", "cpu": "arm64" }, "sha512-8CsvcsoISpYCp393opTC1GzmGZgia1rVI774oqQlzbjaRA7qi9EFP64SJT7ZIDENbNUqNEiHzIxbAPbL0hgtpg=="],
+
+    "@solidjs/compiler-darwin-x64": ["@solidjs/compiler-darwin-x64@2.0.0-rc.11", "", { "os": "darwin", "cpu": "x64" }, "sha512-NwY3vbBahhSgqKEXxDnNOTZMOTttvNoU3lB18bSNWY+CVqIMLJaJ2emVpqdWfUtBuB2+oPW2x4yTAhY1XyhPgA=="],
+
+    "@solidjs/compiler-linux-arm64-gnu": ["@solidjs/compiler-linux-arm64-gnu@2.0.0-rc.11", "", { "os": "linux", "cpu": "arm64" }, "sha512-jYQWzcR7nt11ddgbjR3CY5PX6ZZaYr4sHd8evBjEGum8QP/gnMd0ygCA50vipwn4OBWAvdzMGOpHivOXZc0LJw=="],
+
+    "@solidjs/compiler-linux-x64-gnu": ["@solidjs/compiler-linux-x64-gnu@2.0.0-rc.11", "", { "os": "linux", "cpu": "x64" }, "sha512-qzvH1SUthHMmJE97K79+z0qDaMVCjlSaJzkh2cS03cyRcIYmRx6C2BShKGGCd/GRiX7e+F5S0fmNR16Htf7/lQ=="],
+
+    "@solidjs/compiler-wasm32-wasi": ["@solidjs/compiler-wasm32-wasi@2.0.0-rc.11", "", { "dependencies": { "@emnapi/core": "1.11.3", "@emnapi/runtime": "1.11.3", "@napi-rs/wasm-runtime": "^1.1.6" } }, "sha512-UL6iXQD1ScUXI0N63Pr01GM1L5f5H+vXoHklYJOFw8slGGiUA+ZtaNl6BRpqR4AcYfzuIHIF6N9/bowVHsgTcQ=="],
+
+    "@solidjs/compiler-win32-x64-msvc": ["@solidjs/compiler-win32-x64-msvc@2.0.0-rc.11", "", { "os": "win32", "cpu": "x64" }, "sha512-S0xBobAcvkbwE63h5L96avb2YC2oqF74WeQZEExBrKXr9vNPBDX7goikO1Mrj8zTzu2ASZ/fXo7ojInQ4DdDcw=="],
+
+    "@solidjs/signals": ["@solidjs/signals@2.0.0-rc.11", "", {}, "sha512-6nLA2NE3ZY9yh9yTXo0BnaGbIjeuJszdY3SSUFhaOpKa3nLIPxOWvisAcrhxeRCCZNX4dCTjEJTV/DxrUwaymw=="],
+
+    "@solidjs/web": ["@solidjs/web@2.0.0-rc.11", "", { "dependencies": { "seroval": "~1.6.7", "seroval-plugins": "~1.6.7" }, "peerDependencies": { "solid-js": "^2.0.0-rc.11" } }, "sha512-/olwnP/328cFk7DU8LWicmzaTDs+/OlqLUhYewwy3kMEoQ3Oz3QJXwA4XAZPTheU7i4ozJhxBo0pEIpXQKlNng=="],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.4", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A=="],
 
@@ -140,7 +140,7 @@
 
     "seroval-plugins": ["seroval-plugins@1.6.7", "", { "peerDependencies": { "seroval": "^1.0" } }, "sha512-4Nk35ttD3DTDJW4hgw5StsVAPeU6qnDFnULAouw6tQ7oLTV/ICXrWpsXo2EE52eSP2joUMazbVf52mFEcADqRw=="],
 
-    "solid-js": ["solid-js@2.0.0-rc.8", "", { "dependencies": { "@solidjs/signals": "^2.0.0-rc.8", "csstype": "^3.1.0", "seroval": "~1.6.7", "seroval-plugins": "~1.6.7" } }, "sha512-0DwASKxvwXWAxCiea71cN3bmsyBIOUGmmg/pjSfhxPg+2pBVCh/ZKmwLNjKlPjc8SHeu52ZTio6tBBp1TcPB8A=="],
+    "solid-js": ["solid-js@2.0.0-rc.11", "", { "dependencies": { "@solidjs/signals": "^2.0.0-rc.11", "csstype": "^3.1.0", "seroval": "~1.6.7", "seroval-plugins": "~1.6.7" } }, "sha512-qGWn8AOSL/KIwipmr1J5YZnr0LFXcQx01BlPsFuFWEiOhRstP2/E8Jf9L8mlDDNpfPDBqp3QUSVvq3xEWg3GBg=="],
 
     "tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
 

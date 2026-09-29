@@ -4,12 +4,16 @@
 
 Why a dependency: the page is about to grow (tabs, collapsible cards, animations, prompt editing, image paste) and hand-written DOM patching already ran page.ts past 400 lines. Solid updates exactly the DOM a signal feeds, with no virtual DOM and a small runtime; the previous Hal chose it over React as smaller and less error-prone. Only the browser uses it.
 
-The host path stays dependency-free. No module in host, client or common imports solid-js, @solidjs/web or the JSX compiler; the conventions test checks that for every non-web layer. host/web.ts bundles the page with Bun.build and compiles .tsx with @dom-expressions/compiler through a Bun plugin (artifact solid-build-excerpt.ts), imported dynamically on the first GET /, so a host that never serves the page never loads it; a missing or broken compiler answers that request with 500 and a diag.log line and never harms the host.
+The host path stays dependency-free. No module in host, client or common imports solid-js, @solidjs/web or @solidjs/compiler statically; the conventions test checks that for every non-web layer. host/web.ts bundles the page with Bun.build and compiles .tsx with @solidjs/compiler through a Bun plugin (artifact solid-build-excerpt.ts), imported dynamically on the first GET /, so a host that never serves the page never loads it; a missing or broken compiler answers that request with 500 and a diag.log line and never harms the host.
 
 Conventions (update the web section of tasks/README.md): components are .tsx files in src/web/components/, one exported component each, whose root element has a class named after it; decisions (key mapping, view state, reconnect, scroll maths) stay in plain .ts modules unit-tested without a browser; src/web imports only web and common. The browser gets its colours only from the CSS the host generates from src/common/colors.ts (task 1w): no colour literals in src/web or index.html (add fields to colors.ts for what is missing); layout CSS lives in one stylesheet. The conventions test covers .tsx files (layers, side-effect-free import, the 400-line limit); take src/web/page.ts off the size exception list. The CDP end-to-end check in host/web.test.ts still logs in and sees a streamed answer.`,
 	status: 'done',
-	needs: ['0j'],
-	foldInto: ['dz'],
+	needs: [
+		'0j'
+	],
+	foldInto: [
+		'dz'
+	],
 	notes: [
 		'This reverses dz\'s "plain DOM, no framework" choice (and the README line saying so) on purpose; dz\'s other rules stand.',
 		"Read old-web.md (the previous Hal's Solid 2 guide) before writing a component. Solid 2 is not Solid 1: createEffect takes (compute, apply); onSettled replaces onMount; no createResource or batch (writes are microtask-batched, flush() at imperative boundaries); class arrays, not classList; <For keyed={false}> gives an item accessor and index; writing a signal inside a component body or memo throws REACTIVE_WRITE_IN_OWNED_SCOPE.",
@@ -24,7 +28,8 @@ Conventions (update the web section of tasks/README.md): components are .tsx fil
 		"One snapshot signal means every redraw reaches every component. Chat gates it with one createMemo per field (default === equality; pending, a fresh array each time, compares contents), so typing reaches only the composer. Without this gate, typing re-rendered the transcript and (with 4s's fallback bug) remounted every card. Solid ships its own guide at node_modules/solid-js/skills/reactivity-diagnostics/SKILL.md: read UNSTABLE_MEMO_OUTPUT, UNSTABLE_LIST_IDENTITY and HOT_SCOPE_RERUNS before adding state plumbing.",
 		'The page\'s own surfaces (canvas, text, accent, field, border, button) are the colors.page style, custom properties on <html class="page">.',
 		'The CDP test in host/web.test.ts also answers a question (/cd to a missing directory), opens and closes the picker, and checks a typed draft survives a reload: that last check is what catches dead delegated events.',
-		"Render only what changed (tasks/README.md, Web client): the user asked the old Hal \"every live update creates new transcript-item objects? Live update should update that object in place and Solid's signals handle the rest\". Two ways that work: one signal gated by a memo per field (what Chat does), or a store the host's data is merged into with reconcile(data, key) inside a draft setter (old-web.md, Reactivity), which keeps object identity so keyed lists and memos see no change. Don't replace a whole snapshot object and let every consumer recompute.",
-		"A host restart or dropped socket leaves the page's DOM alive: show reconnecting, reconnect, fold the fresh snapshot into the same cards. Never reload on a fixed delay (old Hal commit 601e442: that stranded the installed iOS app on a blank page); if a reload is ever needed, probe HTTP first and only after pending draft writes are durable."
+		'Render only what changed (tasks/README.md, Web client): the user asked the old Hal "every live update creates new transcript-item objects? Live update should update that object in place and Solid\'s signals handle the rest". Two ways that work: one signal gated by a memo per field (what Chat does), or a store the host\'s data is merged into with reconcile(data, key) inside a draft setter (old-web.md, Reactivity), which keeps object identity so keyed lists and memos see no change. Don\'t replace a whole snapshot object and let every consumer recompute.',
+		"A host restart or dropped socket leaves the page's DOM alive: show reconnecting, reconnect, fold the fresh snapshot into the same cards. Never reload on a fixed delay (old Hal commit 601e442: that stranded the installed iOS app on a blank page); if a reload is ever needed, probe HTTP first and only after pending draft writes are durable.",
+		'2026-09-29: Task 67 supersedes the old pin and compiler notes above. The current web build uses @solidjs/compiler dynamically from the Bun plugin, paired with the matching Solid 2 runtime; do not treat the older rc.8 / @dom-expressions/compiler pairing as the rebuild target.'
 	]
 }

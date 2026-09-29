@@ -79,7 +79,7 @@ function redeem(code: unknown, req: Request): { cookie?: string; refused?: 'wron
 
 // The JSX compiler, loaded on first use: nothing else on the host
 // path needs it. Missing or broken, it fails the page, not the host.
-const compiler = (): Promise<{ transform(source: string, opts: object): { code: string } }> => import('@dom-expressions/compiler')
+const compiler = (): Promise<{ transform(source: string, opts: object): { code: string } }> => import('@solidjs/compiler')
 
 // A Bun plugin compiling .tsx into Solid's DOM calls.
 async function plugin(): Promise<BunPlugin> {

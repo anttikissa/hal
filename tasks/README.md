@@ -131,8 +131,10 @@ point to it.
 
 ## Web client (Solid)
 
-Solid 2 is a prerelease and not Solid 1: read tasks/1b/old-web.md
-and the notes of 1b and 4s before writing a component.
+Solid 2 is not Solid 1: read tasks/1b/old-web.md and the notes of
+1b and 4s before writing a component. Match @solidjs/compiler to the
+latest Solid 2 runtime; src/host/web.ts loads it only when building the
+page with Bun, not on the host startup path.
 
 - Render only what changed. A change costs DOM work for what it
   touched: typing reaches the composer alone, a streamed delta one
