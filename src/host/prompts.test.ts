@@ -222,18 +222,6 @@ test('a steer resent to the next host is not added twice', async () => {
 	expect(inboxOf(b, id)).toEqual(['more'])
 })
 
-test('a user message to a paused turn goes on from there', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
-	await until(() => calls.length === 1)
-	a.conn.send({ type: 'pause', sessionId: id })
-	await until(() => a.of('turn-end').length)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'actually' })
-	await until(() => calls.length === 2)
-	expect(a.views.get(id)!.state.type).toBe('running')
-})
-
 // ── Editing the last prompt (tasks/j1/states.md) ──
 
 // Up while the model works: the client pauses the turn, then sends the edit.

@@ -109,7 +109,7 @@ test('conversation maps to Chat Completions messages; key and base URL come from
 	expect(body.messages).toHaveLength(6)
 })
 
-test('the key is read at call time; a missing key is an error naming the variable, with no request', async () => {
+test('the key is read at call time; a missing key is an error naming the variable, with no request; a local endpoint needs none', async () => {
 	delete process.env.FAKE_COMPAT_KEY
 	let events = await run('fake/m')
 	expect(events).toEqual([expect.objectContaining({ type: 'error', message: expect.stringContaining('FAKE_COMPAT_KEY') })])
@@ -119,12 +119,9 @@ test('the key is read at call time; a missing key is an error naming the variabl
 	reply = () => sse(finish('stop'), '[DONE]')
 	await run('fake/m')
 	expect(seen[0]!.auth).toBe('Bearer sk-later')
-})
-
-test('an endpoint without a key variable (local server) sends no authorization', async () => {
-	reply = () => sse(finish('stop'), '[DONE]')
+	// An endpoint without a key variable (local server) sends none.
 	expect(await run('local/llama')).toEqual([{ type: 'done', reason: 'end' }])
-	expect(seen[0]!.auth).toBeNull()
+	expect(seen[1]!.auth).toBeNull()
 })
 
 test('stream: text, reasoning, fragmented parallel tool calls and usage', async () => {
@@ -161,9 +158,7 @@ test('finish reasons map to neutral stop reasons; a server that omits [DONE] sti
 		reply = () => sse(finish(wire!))
 		expect(await run('fake/m')).toEqual([{ type: 'done', reason: reason as any }])
 	}
-})
-
-test('a tool call cut off by the length limit is no call', async () => {
+	// A tool call cut off by the length limit is no call.
 	reply = () => sse({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'a', function: { name: 'ls', arguments: '{"pa' } }] } }] }, finish('length'), '[DONE]')
 	expect(await run('fake/m')).toEqual([{ type: 'done', reason: 'max_tokens' }])
 })

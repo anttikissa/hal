@@ -132,13 +132,7 @@ test('an expired file never registers; a live one is unloaded when its expiry pa
 	expect(plugins.describe()).toContain(`expired ${soon}`)
 })
 
-test('expires that is not a UTC ISO time is a load error', async () => {
-	await plugin('a.ts', `plugin.around(t, 'f', () => 0)`, `export const expires = 'tomorrow'`)
-	expect(t.f(1)).toBe(2)
-	expect(reports[0]).toContain('expires')
-})
-
-test('a missing or non-function target is a load error naming file and target, and registers nothing', async () => {
+test('a missing or non-function target, or a bad expires, is a load error naming file and target, and registers nothing', async () => {
 	let original = t.f
 	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 0)\nplugin.before(t, 'nope', () => {})`)
 	expect(t.f).toBe(original)
@@ -146,6 +140,10 @@ test('a missing or non-function target is a load error naming file and target, a
 	expect(reports[0]).toContain('target.nope')
 	await plugin('b.ts', `plugin.before(t, 'value', () => {})`)
 	expect(reports[1]).toContain('target.value')
+	// So is an expires that is not a UTC ISO time.
+	await plugin('c.ts', `plugin.around(t, 'f', () => 0)`, `export const expires = 'tomorrow'`)
+	expect(t.f).toBe(original)
+	expect(reports[2]).toContain('expires')
 })
 
 test('async registration stays staged; a load overtaken by an edit or deletion is discarded', async () => {

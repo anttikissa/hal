@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test'
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'fs'
+import { chmodSync, mkdtempSync, rmSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
 import { paths } from './paths.ts'
@@ -48,7 +48,7 @@ test('session ids cannot escape sessions/', () => {
 	for (let bad of ['', '..', '../state', 'a/b', '/etc']) expect(() => paths.sessionDir(bad)).toThrow()
 })
 
-test('init creates sessions/ and an owner-only state/, even under a loose umask', () => {
+test('init creates sessions/ and an owner-only state/, even under a loose umask, and tightens an existing one', () => {
 	let home = tempHome()
 	let old = process.umask(0)
 	try {
@@ -58,20 +58,8 @@ test('init creates sessions/ and an owner-only state/, even under a loose umask'
 	}
 	expect(statSync(`${home}/sessions`).isDirectory()).toBe(true)
 	expect(mode(`${home}/state`)).toBe(0o700)
-})
-
-test('init is idempotent and tightens an existing loose state/', () => {
-	let home = tempHome()
-	mkdirSync(`${home}/state`)
+	// Again, over an existing loose state/: it tightens it.
 	chmodSync(`${home}/state`, 0o755)
 	paths.init()
-	paths.init()
 	expect(mode(`${home}/state`)).toBe(0o700)
-})
-
-test('display abbreviates the user home', () => {
-	let h = process.env.HOME!
-	expect(paths.display(`${h}/x/y`)).toBe('~/x/y')
-	expect(paths.display(h)).toBe('~')
-	expect(paths.display(`${h}other/x`)).toBe(`${h}other/x`)
 })

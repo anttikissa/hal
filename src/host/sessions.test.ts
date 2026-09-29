@@ -28,7 +28,7 @@ afterEach(() => {
 const metaFile = (id: string) => `${paths.sessionDir(id)}/session.ason`
 const onDisk = (id: string) => ason.parse(readFileSync(metaFile(id), 'utf8')) as any
 
-test('create writes metadata into its own directory and opens the session', () => {
+test('create writes metadata into its own directory and opens the session; changes persist', async () => {
 	let before = Date.now()
 	let meta = sessions.create({ cwd: '/tmp/work', model: 'openai/gpt-x', name: 'first' })
 	expect(existsSync(paths.sessionDir(meta.id))).toBe(true)
@@ -36,6 +36,10 @@ test('create writes metadata into its own directory and opens the session', () =
 	expect(disk).toMatchObject({ id: meta.id, cwd: '/tmp/work', model: 'openai/gpt-x', name: 'first' })
 	expect(Date.parse(disk.createdAt)).toBeGreaterThanOrEqual(before - 1000)
 	expect(sessions.openIds()).toEqual([meta.id])
+	// Changes to open metadata persist.
+	meta.name = 'renamed'
+	await Bun.sleep(0)
+	expect(onDisk(meta.id).name).toBe('renamed')
 })
 
 test('create defaults the model at call time', () => {
@@ -56,32 +60,20 @@ test('several sessions can be open at once, each with a distinct id', () => {
 	for (let id of ids) expect(() => paths.sessionDir(id)).not.toThrow()
 })
 
-test('changes to open metadata persist', async () => {
-	let meta = sessions.create({ cwd: '/' })
-	meta.name = 'renamed'
-	await Bun.sleep(0)
-	expect(onDisk(meta.id).name).toBe('renamed')
-})
-
 test('close keeps the session on disk; open brings it back', () => {
 	let meta = sessions.create({ cwd: '/a', name: 'keep' })
 	sessions.close(meta.id)
 	expect(sessions.openIds()).toEqual([])
-	expect(existsSync(metaFile(meta.id))).toBe(true)
+	// No history file needed.
+	expect(readdirSync(paths.sessionDir(meta.id))).toEqual(['session.ason'])
 	let again = sessions.open(meta.id)
 	expect(again).toMatchObject({ id: meta.id, cwd: '/a', name: 'keep' })
 	expect(sessions.open(meta.id)).toBe(again)
 	expect(sessions.openIds()).toEqual([meta.id])
 })
 
-test('a session without history is valid', () => {
-	let meta = sessions.create({ cwd: '/' })
-	sessions.closeAll()
-	expect(readdirSync(paths.sessionDir(meta.id))).toEqual(['session.ason'])
-	expect(sessions.open(meta.id).id).toBe(meta.id)
-})
-
-test('open fails for an unknown session without creating it', () => {
+test('on a fresh home, list is empty and open fails for an unknown session without creating it', () => {
+	expect(sessions.list()).toEqual([])
 	expect(() => sessions.open('nope')).toThrow()
 	expect(existsSync(paths.sessionDir('nope'))).toBe(false)
 })
@@ -119,10 +111,6 @@ test('list reads every session on disk, open or not, and reports broken ones', (
 	// Listing is read-only: it neither opens nor repairs anything.
 	expect(sessions.openIds()).toEqual([a.id])
 	expect(readFileSync(metaFile('bad'), 'utf8')).toBe('not ason {')
-})
-
-test('list on a fresh home is empty', () => {
-	expect(sessions.list()).toEqual([])
 })
 
 test('newest is found from directory names, reading only the metadata it needs', () => {

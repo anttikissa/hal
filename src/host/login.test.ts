@@ -152,12 +152,10 @@ test('/login asks for a method; choosing one continues to a secret form without 
 	let subscription = await command.run('', { method: 'Claude subscription' }, ctx)
 	expect(subscription.askArgs).toBe('claude')
 	expect(subscription.ask?.fields[0]?.type).toBe('secret')
-})
-
-test('/login with an unknown method says which ones exist', async () => {
-	let reply = await command.run('nope', undefined, ctx)
-	expect(reply.error).toContain('claude')
-	expect(reply.ask).toBeUndefined()
+	// An unknown method says which ones exist.
+	let unknown = await command.run('nope', undefined, ctx)
+	expect(unknown.error).toContain('claude')
+	expect(unknown.ask).toBeUndefined()
 })
 
 test('a chosen login method survives question answers; API key never enters history', async () => {

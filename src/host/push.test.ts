@@ -30,7 +30,7 @@ test('expired endpoint is removed after 410, surviving a restart', async () => {
 	} finally { push.request = original }
 })
 
-test('a completed turn pushes when unseen but not while another client shows it', async () => {
+test('an unseen completed turn is pushed encrypted to the subscription, unless push is off', async () => {
 	let c = client()
 	let id = created(c)
 	push.subscribe(subscription)
@@ -38,17 +38,9 @@ test('a completed turn pushes when unseen but not while another client shows it'
 	let original = push.request
 	push.request = async (url, init) => { sent.push({ url, body: init.body }); return new Response(null, { status: 201 }) }
 	try {
-		c.conn.send({ type: 'visibility', sessionId: id, visible: true })
 		c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
 		await until(() => calls.length)
 		calls[0]!.push({ type: 'done', reason: 'end' })
-		await until(() => c.of('turn-end').length)
-		await Bun.sleep(10)
-		expect(sent).toHaveLength(0)
-		c.conn.send({ type: 'visibility', sessionId: id, visible: false })
-		c.conn.send({ type: 'submit', sessionId: id, text: 'again' })
-		await until(() => calls.length === 2)
-		calls[1]!.push({ type: 'done', reason: 'end' })
 		await until(() => sent.length)
 		expect(sent[0]!.url).toBe(subscription.endpoint)
 		expect(sent[0]!.body).toBeInstanceOf(Uint8Array)

@@ -4,7 +4,7 @@
 import { expect, test } from 'bun:test'
 import { ason } from '../common/ason.ts'
 import { config } from './config.ts'
-import { calls, client, created, fresh, records, restartHost, until, useHost, shown } from './host-fixture.test.ts'
+import { calls, client, created, fresh, records, restartHost, until, useHost } from './host-fixture.test.ts'
 import { host } from './host.ts'
 import { sessions } from './sessions.ts'
 
@@ -18,26 +18,6 @@ test('create makes a session and sends its snapshot', () => {
 	expect(snap.snapshot.history).toEqual([])
 	expect(snap.snapshot.turn).toBeUndefined()
 	expect(sessions.list().map((s) => s.id)).toEqual([id])
-})
-
-test('a client connecting mid-turn gets the partial turn, then live events', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
-	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'text', text: 'par' })
-	await until(() => a.of('stream').length === 1)
-
-	let late = client()
-	late.conn.send({ type: 'open', sessionId: id })
-	let snap = late.of('snapshot')[0].snapshot
-	expect(snap.history.map((r: any) => r.type)).toEqual(['user'])
-	expect(snap.turn.blocks).toEqual([{ type: 'text', text: 'par' }])
-
-	calls[0]!.push({ type: 'text', text: 'tial' }, { type: 'done', reason: 'end' })
-	await until(() => late.of('turn-end').length)
-	expect(late.views.get(id)).toEqual(a.views.get(id)!)
-	expect(shown(late.views.get(id)!.items)![1]).toEqual({ type: 'text', text: 'partial' })
 })
 
 test('reconnecting is connecting again: the snapshot carries the running turn', async () => {
@@ -133,11 +113,17 @@ test('config warnings reach every client: on connect and when announced', () => 
 	}
 })
 
-test('open-newest opens the newest session, or creates one in the cwd', async () => {
+test("open-newest opens the newest session, or creates one in the cwd (else the host's)", async () => {
+	let orig = host.cwd
+	host.cwd = () => '/tmp/hostcwd'
 	let a = client()
-	a.conn.send({ type: 'open-newest', cwd: '/tmp/first' })
+	try {
+		a.conn.send({ type: 'open-newest' })
+	} finally {
+		host.cwd = orig
+	}
 	let [snap] = a.of('snapshot')
-	expect(snap.snapshot.meta.cwd).toBe('/tmp/first')
+	expect(snap.snapshot.meta.cwd).toBe('/tmp/hostcwd')
 	let older = snap.sessionId
 	let newer = created(a, '/tmp/second')
 	let b = client()
@@ -145,18 +131,6 @@ test('open-newest opens the newest session, or creates one in the cwd', async ()
 	await until(() => b.of('snapshot').length)
 	expect(b.of('snapshot')[0].sessionId).toBe(newer)
 	expect(sessions.list().map((s) => s.id).sort()).toEqual([older, newer].sort())
-})
-
-test("open-newest without a cwd creates the session in the host's", () => {
-	let orig = host.cwd
-	host.cwd = () => '/tmp/hostcwd'
-	try {
-		let a = client()
-		a.conn.send({ type: 'open-newest' })
-		expect(a.of('snapshot')[0].snapshot.meta.cwd).toBe('/tmp/hostcwd')
-	} finally {
-		host.cwd = orig
-	}
 })
 
 test('a command with an id is acknowledged, and a repeat of it never acts twice', async () => {

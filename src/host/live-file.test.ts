@@ -48,7 +48,7 @@ function replace(path: string, text: string): void {
 	renameSync(`${path}.ext`, path)
 }
 
-test('missing file yields defaults and reading never creates it', async () => {
+test('missing file yields defaults and reading never creates it; file values win', async () => {
 	let path = `${dir}/missing.ason`
 	let data = live(path, { foo: 1, deep: { bar: 'x' }, list: [1] }, { watch: false })
 	expect(data.foo).toBe(1)
@@ -56,37 +56,27 @@ test('missing file yields defaults and reading never creates it', async () => {
 	expect(data.list[0]).toBe(1)
 	await tick()
 	expect(existsSync(path)).toBe(false)
+	// File values win; missing keys keep defaults.
+	let existing = `${dir}/existing.ason`
+	writeFileSync(existing, ason.stringify({ foo: 42 }) + '\n')
+	let read = live(existing, { foo: 1, bar: 'default' }, { watch: false })
+	expect(read.foo).toBe(42)
+	expect(read.bar).toBe('default')
 })
 
-test('file values win over defaults; missing keys keep defaults', () => {
-	let path = `${dir}/existing.ason`
-	writeFileSync(path, ason.stringify({ foo: 42 }) + '\n')
-	let data = live(path, { foo: 1, bar: 'default' }, { watch: false })
-	expect(data.foo).toBe(42)
-	expect(data.bar).toBe('default')
-})
-
-test('mutations are deferred, coalesced and do not leak into defaults', async () => {
+test('nested, array and delete mutations are deferred, coalesced and do not leak into defaults', async () => {
 	let path = `${dir}/auto.ason`
-	let defaults = { count: 0, deep: { v: 1 } }
-	let data = live(path, defaults, { watch: false })
+	let defaults = { count: 0, deep: { v: 1 }, list: [1], gone: true }
+	let data = live<Record<string, any>>(path, defaults, { watch: false })
 	data.count = 5
 	data.count = 10
 	data.deep.v = 2
-	expect(existsSync(path)).toBe(false)
-	await tick()
-	expect(disk(path)).toEqual({ count: 10, deep: { v: 2 } })
-	expect(defaults).toEqual({ count: 0, deep: { v: 1 } })
-})
-
-test('nested, array and delete mutations persist', async () => {
-	let path = `${dir}/nested.ason`
-	let data = live<Record<string, any>>(path, { deep: { val: 1 }, list: [1], gone: true }, { watch: false })
-	data.deep.val = 42
 	data.list.push(2)
 	delete data.gone
+	expect(existsSync(path)).toBe(false)
 	await tick()
-	expect(disk(path)).toEqual({ deep: { val: 42 }, list: [1, 2] })
+	expect(disk(path)).toEqual({ count: 10, deep: { v: 2 }, list: [1, 2] })
+	expect(defaults).toEqual({ count: 0, deep: { v: 1 }, list: [1], gone: true })
 })
 
 test('reading and no-op writes leave the file byte-for-byte alone', async () => {

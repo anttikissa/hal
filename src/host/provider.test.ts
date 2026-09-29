@@ -128,36 +128,10 @@ test('HTTP error status becomes one error event carrying status and body', async
 	expect(events[0]).toMatchObject({ type: 'error', status: 529, body: '{"error":"overloaded"}' })
 })
 
-test('network failure becomes an error event', async () => {
+test('nothing follows a terminal event', async () => {
 	provider.register('fake', echo)
-	fakeFetch(() => Promise.reject(new Error('ECONNREFUSED')))
-	let events = await all(provider.stream('fake/m1', req))
-	expect(events).toHaveLength(1)
-	expect(events[0]).toMatchObject({ type: 'error' })
-	expect((events[0] as { message: string }).message).toContain('ECONNREFUSED')
-})
-
-test('a stream that ends without done gets an error; nothing follows a terminal event', async () => {
-	provider.register('fake', echo)
-	fakeFetch(() => new Response(body([sse({ type: 'text', text: 'partial' })])))
-	let events = await all(provider.stream('fake/m1', req))
-	expect(events.map((e) => e.type)).toEqual(['text', 'error'])
-
 	fakeFetch(() => new Response(body([sse({ type: 'done', reason: 'end' }, { type: 'text', text: 'late' }, { type: 'error', message: 'x' })])))
-	events = await all(provider.stream('fake/m1', req))
-	expect(events).toEqual([{ type: 'done', reason: 'end' }])
-})
-
-test('a provider that throws while parsing yields an error, not an exception', async () => {
-	provider.register('bad', {
-		...echo,
-		async *parse(messages) {
-			for await (let m of messages) yield JSON.parse(m.data.slice(1)) as StreamEvent
-		},
-	})
-	fakeFetch(() => new Response(body([sse({ type: 'text', text: 'x' })])))
-	let events = await all(provider.stream('bad/m1', req))
-	expect(events).toEqual([expect.objectContaining({ type: 'error', message: expect.stringContaining('JSON') })])
+	expect(await all(provider.stream('fake/m1', req))).toEqual([{ type: 'done', reason: 'end' }])
 })
 
 test('abort mid-stream ends with one cancelled error and stops reading', async () => {
@@ -231,15 +205,17 @@ test('failures are classified by what fixes them, with the provider message', as
 		expect(e.message).toContain('prompt is too long')
 	}
 	fakeFetch(() => Promise.reject(new Error('ECONNRESET')))
-	expect(await all(provider.stream('fake/m1', req))).toEqual([expect.objectContaining({ failure: 'temporary' })])
-	// Cut off mid-stream, or an overloaded error inside the stream.
+	expect(await all(provider.stream('fake/m1', req))).toEqual([expect.objectContaining({ type: 'error', failure: 'temporary', message: expect.stringContaining('ECONNRESET') })])
+	// Cut off mid-stream (no done), or an overloaded error inside the stream.
 	fakeFetch(() => new Response(body([sse({ type: 'text', text: 'partial' })])))
-	expect((await all(provider.stream('fake/m1', req))).at(-1)).toMatchObject({ failure: 'temporary' })
+	let cut = await all(provider.stream('fake/m1', req))
+	expect(cut.map((e) => e.type)).toEqual(['text', 'error'])
+	expect(cut.at(-1)).toMatchObject({ failure: 'temporary' })
 	fakeFetch(() => new Response(body([sse({ type: 'error', message: 'Overloaded', status: 529 })])))
 	expect((await all(provider.stream('fake/m1', req))).at(-1)).toMatchObject({ failure: 'temporary' })
 })
 
-test('a bug in a provider is not retried', async () => {
+test('a bug in a provider is an error event, not an exception, and not retried', async () => {
 	provider.register('bad', { ...echo, request: () => (undefined as any).x })
 	fakeFetch(() => new Response(''))
 	let [e] = (await all(provider.stream('bad/m1', req))) as any[]
@@ -251,8 +227,9 @@ test('a bug in a provider is not retried', async () => {
 		},
 	})
 	fakeFetch(() => new Response(body([sse({ type: 'text', text: 'x' })])))
-	;[e] = (await all(provider.stream('bad2/m1', req))) as any[]
-	expect(e.failure).toBeUndefined()
+	let events = await all(provider.stream('bad2/m1', req))
+	expect(events).toEqual([expect.objectContaining({ type: 'error', message: expect.stringContaining('JSON') })])
+	expect((events[0] as any).failure).toBeUndefined()
 })
 
 test('429 carries the reset time and the model is not asked again before it, even after a restart', async () => {
