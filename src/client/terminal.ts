@@ -38,6 +38,9 @@ interface TerminalState {
 
 const BRACKETED_PASTE_ON = '\x1b[?2004h'
 const BRACKETED_PASTE_OFF = '\x1b[?2004l'
+// Focus reporting: the window's focus comes as CSI I and CSI O (task qm).
+const FOCUS_ON = '\x1b[?1004h'
+const FOCUS_OFF = '\x1b[?1004l'
 // Kitty keyboard protocol: push "disambiguate escape codes", pop it.
 const KITTY_ON = '\x1b[>1u'
 const KITTY_OFF = '\x1b[<u'
@@ -82,7 +85,7 @@ function realIO(): TerminalIO {
 function enter(): void {
 	let io = terminal.state.io!
 	io.setRawMode(true)
-	io.write((terminal.kitty() ? KITTY_ON : '') + BRACKETED_PASTE_ON)
+	io.write((terminal.kitty() ? KITTY_ON : '') + BRACKETED_PASTE_ON + FOCUS_ON)
 	terminal.state.entered = true
 }
 
@@ -95,7 +98,7 @@ function leave(): void {
 	try {
 		terminal.park()
 	} catch {}
-	io.write((terminal.kitty() ? KITTY_OFF : '') + BRACKETED_PASTE_OFF + SHOW_CURSOR)
+	io.write((terminal.kitty() ? KITTY_OFF : '') + BRACKETED_PASTE_OFF + FOCUS_OFF + SHOW_CURSOR)
 	io.setRawMode(false)
 }
 

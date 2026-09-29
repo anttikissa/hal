@@ -14,6 +14,7 @@
 import type { AssistantBlock, ImageBlock, Sender, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
 import type { InboxItem } from './inbox.ts'
+import type { NoticeEvent } from './notices.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
@@ -257,6 +258,10 @@ export type Event =
 	// Cached models.dev display names for the open tabs, sent on connect,
 	// model switch and background catalog refresh.
 	| { type: 'model-names'; names: Record<string, string> }
+	// Another tab's turn ended or asks, sent only to clients watching
+	// some other tab (task qm); `session`, not sessionId, so no client
+	// takes it as that session's event.
+	| NoticeEvent
 
 export type EventType = Event['type']
 
@@ -326,6 +331,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	warning: { text: 's' },
 	version: { version: 's' },
 	'model-names': { names: 'o' },
+	notice: { session: 's', tab: 'i?', name: 's', kind: 's', line: 's' },
 	tabs: { tabs: 'a' },
 	go: { sessionId: 's', tab: 's' },
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },

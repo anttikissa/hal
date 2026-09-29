@@ -22,6 +22,8 @@ import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
 import { itemView } from './item-view.ts'
 import { modalView } from './modal-view.ts'
+import { noticeView } from './notice-view.ts'
+import type { Folded } from '../common/notices.ts'
 import type { PromptState } from '../common/prompt.ts'
 import type { Tab } from '../common/protocol.ts'
 import { promptView } from './prompt-view.ts'
@@ -62,6 +64,8 @@ export interface View {
 	status?: StatusInfo
 	/** A new commit is checked out: the help row offers ctrl-r. */
 	newCode?: boolean
+	/** The notice stack, over the rows just above the tab bar (task qm). */
+	notices?: Folded
 }
 
 export interface Frame {
@@ -237,6 +241,7 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	let input = colors.input()
 	let rule = (left: string, center = '') => ansi.sgr(input) + promptView.rule(cols, left, ansi.clean(center)) + ansi.UNCOLOR
 	if (lines.length || above) lines.push('')
+	let anchor = lines.length
 	if (view.tabs?.list.length) lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true))
 	lines.push(rule(p.above ? `↑${p.above}` : '', view.activity))
 	let top = lines.length
@@ -247,9 +252,10 @@ function build(view: View, cols: number, rows = 24, full = false): Frame {
 	let pad = full ? Math.max(0, rows - lines.length - history.length) : 0
 	let chrome = lines
 	lines = history.concat(Array<string>(pad).fill(''), chrome)
-	top += history.length + pad
+	let grown = view.notices ? noticeView.overlay(lines, view.notices, history.length + pad + anchor, cols) : 0
+	top += history.length + pad + grown
 	let cursor = formCursor ?? { row: top + p.row, col: ansi.PAD.length + p.col }
-	let out = { lines, cursor, promptScroll: p.scroll, history: history.length }
+	let out = { lines, cursor, promptScroll: p.scroll, history: history.length + grown }
 	if (!view.modal) return out
 	let m = modalView.withModal(lines, view.modal, rows, cols)
 	return { ...out, cursor: m.cursor, modalScroll: m.scroll }

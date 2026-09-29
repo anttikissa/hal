@@ -8,6 +8,7 @@
 import { backfill } from '../common/backfill.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
+import { notices } from '../common/notices.ts'
 import { recall } from '../common/recall.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import { app } from './app.ts'
@@ -57,6 +58,7 @@ function onEvent(event: Event): boolean {
 		if (st.shown === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) tabs.show(event.tab, false)
 	}
 	else if (event.type === 'ack' && st.asked.delete(event.id) && event.tab) tabs.show(event.tab, false)
+	else if (event.type === 'notice') notices.add(notices.fromEvent(event))
 	else if (event.type === 'snapshot' && st.shown && event.sessionId !== st.shown) return false
 	else return false
 	return true

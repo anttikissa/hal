@@ -116,6 +116,20 @@ function focusOn(focus: Focus): void {
 	let tab = app.focusedTab()
 	if (tab) app.focused(tab)
 	if (tab?.attention) app.send({ type: 'tab-seen', sessionId: tab.id })
+	tabSwitch.watch()
+}
+
+// Tells the host which tab this terminal watches (task qm): the one
+// shown, unless the window reported losing focus; a terminal that never
+// reports focus watches whenever it shows a tab. Sent on change only.
+function watch(): void {
+	let st = app.state, tab = st.focus.tab
+	let now = tab === undefined ? undefined : `${tab} ${!st.away}`
+	if (now === undefined || now === st.watching) return
+	st.watching = now
+	app.send({ type: 'visibility', sessionId: tab, visible: !st.away })
+	let shown = app.focusedTab()
+	if (!st.away && shown?.attention) app.send({ type: 'tab-seen', sessionId: shown.id })
 }
 
 // Tab keys: next, previous, go to 1-10. True if handled.
@@ -127,4 +141,4 @@ function tabKey(k: KeyEvent): boolean {
 	return true
 }
 
-export const tabSwitch = { focusedTab, onTabs, focusOn, tabKey, hiddenEvent, backgroundStep }
+export const tabSwitch = { focusedTab, onTabs, focusOn, tabKey, hiddenEvent, backgroundStep, watch }

@@ -10,28 +10,32 @@ import { ansi } from './ansi.ts'
 import { app } from './app.ts'
 import { appView } from './app-view.ts'
 import { frame } from './frame.ts'
-import type { KeyEvent } from './keys.ts'
+import { keys, type KeyEvent } from './keys.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
 
 // The app with a recording link and renderer: what the user types
 // becomes commands, and what the host says becomes the view.
 
-// Commands as sent, ids left out; draft updates are in `drafted`.
+// Commands as sent, ids left out; draft updates are in `drafted`,
+// visibility reports in `watched`.
 let sent: any[] = []
 let drafted: any[] = []
+let watched: any[] = []
 let quits = 0
 const saved = { send: app.send, show: render.show, quit: terminal.quit, draftSend: drafts.send }
 const wasConnected = connection.connected
 const record = (c: any) => {
 	let { id: _id, ...rest } = c
 	if (c.type === 'draft') drafted.push(rest)
+	else if (c.type === 'visibility') watched.push(rest)
 	else sent.push(rest)
 }
 
 beforeEach(() => {
 	sent = []
 	drafted = []
+	watched = []
 	quits = 0
 	app.reset()
 	app.send = record
@@ -833,4 +837,43 @@ test('the status row sits below the prompt box and its numbers follow each turn 
 	app.onEvent({ type: 'turn-end', sessionId: 's1', status: 'completed', stats: { context: 50_000, window: 200_000, sent: 1234, received: 5678 } })
 	expect(status()).toContain('50k/200k (25%)')
 	expect(status()).toEndWith('↑1.2k ↓5.7k')
+})
+
+test('the terminal watches the tab it shows until its window reports losing focus', () => {
+	startOn(['a', 'b'])
+	// Never reported focus: showing a tab is watching it.
+	expect(watched).toEqual([{ type: 'visibility', sessionId: 'a', visible: true }])
+	let decoder = keys.createState()
+	app.onKeys(keys.feed(decoder, '\x1b[O'))
+	app.onKeys(keys.feed(decoder, '\x1b[O'))
+	expect(watched.at(-1)).toEqual({ type: 'visibility', sessionId: 'a', visible: false })
+	app.onKeys([ctrl('n')])
+	expect(watched.at(-1)).toEqual({ type: 'visibility', sessionId: 'b', visible: false })
+	app.onKeys(keys.feed(decoder, '\x1b[I'))
+	expect(watched.at(-1)).toEqual({ type: 'visibility', sessionId: 'b', visible: true })
+	expect(watched).toHaveLength(4)
+	// Focus reports are not keys: the prompt is untouched.
+	expect(app.state.prompt.text).toBe('')
+	// A new connection's host hears it again.
+	app.onState({ type: 'connected', role: 'client' })
+	acked('b')
+	expect(watched.at(-1)).toEqual({ type: 'visibility', sessionId: 'b', visible: true })
+	expect(watched).toHaveLength(5)
+})
+
+test('notices stack at the right just above the tab bar, full width on a narrow terminal', () => {
+	startOn(['a', 'b'])
+	app.onEvent({ type: 'notice', session: 'b', tab: 2, name: 'Themes', kind: 'attention', line: 'pick phosphor or nostromo?' })
+	let plain = (cols: number) => frame.build(appView.view(), cols, 30, true).lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ''))
+	for (let cols of [100, 40]) {
+		let rows = plain(cols)
+		let at = rows.findIndex((r) => r.includes('┃   pick phosphor'))
+		expect(rows[at - 1]).toContain('┃ 2 Themes · needs your attention')
+		// Below it the tab bar, then the prompt box's rule.
+		expect(rows[at + 1]).toContain('Tabs:')
+		expect(rows[at + 2]).toMatch(/^─+$/)
+		expect(rows.every((r) => strings.visLen(r) <= cols)).toBe(true)
+		let left = rows[at]!.indexOf('┃')
+		expect(cols === 40 ? left : left > 40).toBe(cols === 40 ? 0 : true)
+	}
 })

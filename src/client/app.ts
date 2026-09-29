@@ -34,6 +34,7 @@ import type { Focus } from './tabs.ts'
 import { tabSwitch, type TabView } from './tab-switch.ts'
 import { appView } from './app-view.ts'
 import { titles } from '../common/titles.ts'
+import { notices } from '../common/notices.ts'
 
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
@@ -45,7 +46,11 @@ import { titles } from '../common/titles.ts'
 // this client's own tab command named, focused once it is in the list;
 // `hidden`: the client state of tabs not shown. `start`: where a starting
 // client looks for its tab (a restart: the one it left; remote: no cwd).
+// `away`: the window reported losing focus; `watching`: the visibility
+// last told the host (tab-switch.ts watch).
 export type AppState = {
+	away?: boolean
+	watching?: string
 	tabs: Tab[]
 	focus: Focus
 	asked?: string
@@ -90,6 +95,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
 	if (event.type === 'model-names') Object.assign(titles.names, event.names)
 	if (event.type === 'tabs') return app.onTabs(event.tabs)
+	if (event.type === 'notice') return notices.add(notices.fromEvent(event))
 	if (event.type === 'go') {
 		if (st.focus.tab === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) app.focusOn({ tab: event.tab })
 		return
@@ -130,6 +136,8 @@ function backfilled(event: Event & { type: 'snapshot' | 'history' }): void {
 function onState(state: LinkState): void {
 	let st = app.state
 	st.notice = state.type === 'connected' ? undefined : 'host lost; reconnecting…'
+	// A new connection's host knows nothing this client watched.
+	delete st.watching
 	if (state.type === 'connected') {
 		let tab = app.focusedTab()
 		let last = tab?.id ?? st.start.last, cwd = tab?.cwd ?? st.start.cwd
@@ -196,6 +204,11 @@ function setPrompt(text: string): void {
 function onKeys(events: KeyEvent[]): void {
 	let st = app.state
 	for (let k of events) {
+		if (k.key === 'focus-in' || k.key === 'focus-out') {
+			st.away = k.key === 'focus-out'
+			tabSwitch.watch()
+			continue
+		}
 		delete st.choices
 		// Tab and command keys, whatever has the keys.
 		if (app.tabKey(k) || clientCommands.key(k)) continue
@@ -283,6 +296,7 @@ function pick(event: Event & { type: 'models' }): void {
 // Takes keys from the terminal and paints the first frame. Idempotent.
 function init(): void {
 	terminal.onKeys = (events) => app.onKeys(events)
+	notices.onChange = () => app.show()
 	app.show()
 }
 
@@ -294,6 +308,7 @@ function reset(): void {
 	drafts.reset()
 	recall.reset()
 	uploads.reset()
+	notices.reset()
 }
 
 export const app = {

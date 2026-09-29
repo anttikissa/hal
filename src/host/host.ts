@@ -23,6 +23,7 @@ import { history } from './history.ts'
 import { jobs } from './jobs.ts'
 import { pages } from './pages.ts'
 import { models } from './models.ts'
+import { notify } from './notify.ts'
 import { push } from './push.ts'
 import { sessions } from './sessions.ts'
 import { prompts } from './prompts.ts'
@@ -214,7 +215,8 @@ function act(client: Client, c: Command): Outcome | undefined {
 		return {}
 	}
 	if (c.type === 'visibility') {
-		client.visible = c.visible && client.open.has(c.sessionId) ? c.sessionId : undefined
+		// Not checked against open: a tab's open may still be pending.
+		client.visible = c.visible ? c.sessionId : undefined
 		return {}
 	}
 	if (c.type === 'auth') return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } }
@@ -308,12 +310,7 @@ function snapshot(id: string): Snapshot {
 function broadcast(id: string, event: Event): void {
 	for (let client of host.state.clients) if (client.open.has(id)) client.deliver(event)
 	tabs.observe(id, event)
-	if ((event.type === 'turn-end' && ['completed', 'error'].includes(event.status)) || event.type === 'question') {
-		if (![...host.state.clients].some((c) => c.visible === id)) {
-			let line = event.type === 'question' ? 'needs an answer' : event.status === 'error' ? 'failed' : 'done'
-			void push.notify(id, sessions.open(id).name ?? id, line).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
-		}
-	}
+	notify.route(host.state.clients, id, event)
 }
 
 // Whenever this process exits while it is host (quit, restart, SIGTERM,

@@ -5,6 +5,7 @@
 import { amend } from '../common/amend.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
+import { notices } from '../common/notices.ts'
 import { placeholders } from '../common/placeholders.ts'
 import { states } from '../common/states.ts'
 import type { Transcript } from '../common/transcript.ts'
@@ -40,6 +41,7 @@ function view(): View {
 	let hal = halCursor.of(st.transcript, pulse.beat())
 	if (hal) v.hal = hal
 	if (t) v.status = appView.status(t)
+	if (notices.state.entries.length) v.notices = notices.fold(notices.state.entries)
 	return v
 }
 

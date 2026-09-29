@@ -9,6 +9,7 @@
 import { createMemo, createSignal, flush, onSettled } from 'solid-js'
 import { connection } from '../../common/connection.ts'
 import type { Sending } from '../../common/drafts.ts'
+import { notices } from '../../common/notices.ts'
 import { app } from '../app.ts'
 import { editor } from '../editor.ts'
 import { keys, type Target } from '../keys.ts'
@@ -16,12 +17,13 @@ import { scroll } from '../scroll.ts'
 import { push } from '../push.ts'
 import { viewport } from '../viewport.ts'
 import { Composer } from './Composer.tsx'
+import { Notices } from './Notices.tsx'
 import { Picker } from './Picker.tsx'
 import { Tabs } from './Tabs.tsx'
 import { StatusRow } from './StatusRow.tsx'
 import { Transcript } from './Transcript.tsx'
 
-const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, menu: app.state.menu, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration })
+const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, menu: app.state.menu, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration, notices: notices.state.entries })
 type Snap = ReturnType<typeof snap>
 
 // A change to the transcript follows the bottom: a new prompt pending
@@ -98,6 +100,7 @@ export function Chat() {
 	// what changed: typing touches the composer, never the transcript.
 	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
 	let [tabs, shown, view, text, menu, notice, placeholder, connected, linked, pushReady] = [field('tabs'), field('shown'), field('view'), field('text'), field('menu'), field('notice'), field('placeholder'), field('connected'), field('target'), field('pushReady')]
+	let stack = field('notices')
 	let pending = createMemo(() => state().pending, { equals: same })
 	// Files are dragged over the page: the box shows it takes them.
 	let [dropping, setDropping] = createSignal(false)
@@ -106,6 +109,7 @@ export function Chat() {
 			redraw(state(), setState)
 			reveal()
 		}
+		notices.onChange = () => app.changed()
 		let onKey = (e: KeyboardEvent) => {
 			if (keys.key(e, target(e))) e.preventDefault()
 			// Show the outcome now, not a microtask later.
@@ -148,6 +152,7 @@ export function Chat() {
 		<div class={['Chat', { offline: !connected() }]}>
 			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} />
+			<Notices entries={stack()} />
 			<StatusRow view={view()} />
 			<Composer view={view()} text={text()} menu={menu()} notice={notice()} placeholder={placeholder()} connected={connected()} dropping={dropping()} />
 			<Picker modal={view().modal} />

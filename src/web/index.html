@@ -98,6 +98,18 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 @keyframes blink { 50% { opacity: 0; } }
 /* A complete status row above the composer: on phones six groups become
    two rows of three; nothing is omitted to fit a narrow screen. */
+/* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
+.Notices { position: relative; flex: none; height: 0; z-index: 2; }
+.Notices .stack { position: absolute; right: max(0.5rem, env(safe-area-inset-right)); bottom: 0.5rem; width: min(24rem, calc(100vw - 1rem)); display: flex; flex-direction: column; gap: 0.3rem; }
+.Notices .card { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.45rem 0.7rem; border-left: 0.4rem solid; text-decoration: none; animation: notice-in 200ms var(--ease-out); }
+.Notices .card.done { border-color: var(--done-fg); } .Notices .card.done strong { color: var(--done-fg); }
+.Notices .card.failed { border-color: var(--failed-fg); } .Notices .card.failed strong { color: var(--failed-fg); }
+.Notices .card.attention { border-color: var(--attention-fg); } .Notices .card.attention strong { color: var(--attention-fg); }
+.Notices .card .line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.Notices .more { align-self: flex-end; padding: 0.2rem 0.7rem; }
+@media (pointer: coarse) { .Notices .card { min-height: 44px; } }
+@keyframes notice-in { from { transform: translateY(0.5rem); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .Notices .card { animation: none; } }
 .StatusRow { flex: none; display: flex; gap: 0 1.5ch; padding: 0.2rem max(1rem, env(safe-area-inset-right)) 0.2rem max(1rem, env(safe-area-inset-left)); font-size: 0.85em; border-top: 1px solid var(--border); }
 .StatusRow .group { min-width: 0; overflow-wrap: anywhere; }
 .StatusRow .group:first-child { white-space: nowrap; }

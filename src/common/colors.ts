@@ -78,6 +78,15 @@ export const colors = {
 		errorFg: colors.error().fg!,
 		pausedFg: [0.86, 0.16, 95],
 	}),
+	// The notice stack (task qm): a bar in the event's colour on near
+	// black, never slate.
+	notice: (): Style => ({
+		fg: [0.9, 0, 0],
+		bg: [0.13, 0, 0],
+		doneFg: colors.tab().doneFg!,
+		failedFg: colors.error().fg!,
+		attentionFg: colors.tab().warningFg!,
+	}),
 	// Help bar: keys stand out from descriptions.
 	help: (): Style => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0] }),
 	popup: (): Style => ({ neutralFg: [0.68, 0, 0], dangerFg: [0.86, 0.16, 85] }),

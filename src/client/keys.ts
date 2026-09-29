@@ -84,6 +84,8 @@ function modField(field: string | undefined): Pick<KeyEvent, 'shift' | 'alt' | '
 function parseCsi(body: string, final: string): KeyEvent | null {
 	if (final === 'Z' && body === '') return ke('tab', { shift: true })
 	if (final === 'u') return parseCsiU(body)
+	// Focus reporting (CSI ?1004h): the window gained or lost focus.
+	if ((final === 'I' || final === 'O') && body === '') return ke(final === 'I' ? 'focus-in' : 'focus-out')
 	let parts = body.split(';')
 	let name = final === '~' ? TILDE_KEYS[Number(parts[0])] : FINAL_KEYS[final]
 	if (!name || (final !== '~' && body !== '' && parts[0] !== '1')) return null

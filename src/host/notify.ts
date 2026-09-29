@@ -1,0 +1,60 @@
+// Who hears that a session needs the user (task qm): for a turn that
+// completed or failed, or a question waiting. A client watching that
+// session already sees it, so nothing goes; else each client watching
+// another tab gets a notice (common/notices.ts) and no push goes; with
+// nobody watching, a web push (push.ts, task m1). A client watches the
+// session it last reported visible (host.ts, the `visibility` command).
+
+import type { NoticeEvent, NoticeKind } from '../common/notices.ts'
+import type { Event } from '../common/protocol.ts'
+import { diag } from './diag.ts'
+import { pages } from './pages.ts'
+import { push } from './push.ts'
+import { sessions } from './sessions.ts'
+import { tabs } from './tabs.ts'
+
+type Watcher = { deliver: (event: Event) => void; visible?: string }
+
+function kind(event: Event): NoticeKind | undefined {
+	if (event.type === 'question') return 'attention'
+	if (event.type !== 'turn-end') return undefined
+	return event.status === 'completed' ? 'done' : event.status === 'error' ? 'failed' : undefined
+}
+
+// The last non-blank line of the text the latest turn replied with.
+function replyLine(id: string): string {
+	let records = pages.page(id).records
+	for (let i = records.length - 1; i >= 0; i--) {
+		let r = records[i]!
+		if (r.type === 'user') break
+		if (r.type !== 'assistant' || r.block.type !== 'text') continue
+		let last = r.block.text.split('\n').map((l) => l.trim()).filter(Boolean).at(-1)
+		if (last) return last
+	}
+	return ''
+}
+
+// One line saying what happened: the reply's last line, the error, or the question.
+function line(id: string, event: Event): string {
+	let text = event.type === 'question' ? event.form.text : event.type === 'turn-end' && event.error ? event.error : notify.replyLine(id)
+	return (text.split('\n').find((l) => l.trim()) ?? '').trim().slice(0, 200)
+}
+
+function route(clients: Iterable<Watcher>, id: string, event: Event): void {
+	let k = notify.kind(event)
+	if (!k) return
+	let all = [...clients]
+	if (all.some((c) => c.visible === id)) return
+	let name = sessions.open(id).name ?? id
+	let watching = all.filter((c) => c.visible !== undefined)
+	if (!watching.length) {
+		let word = k === 'attention' ? 'needs an answer' : k === 'failed' ? 'failed' : 'done'
+		return void push.notify(id, name, word).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
+	}
+	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: k, line: notify.line(id, event) }
+	let tab = tabs.file().open.indexOf(id)
+	if (tab >= 0) notice.tab = tab + 1
+	for (let c of watching) c.deliver(notice)
+}
+
+export const notify = { kind, replyLine, line, route }
