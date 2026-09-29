@@ -19,6 +19,7 @@ import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { pruning } from './pruning.ts'
+import { models } from './models.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
@@ -336,7 +337,7 @@ function started(id: string): string | undefined {
 // unanswered; the host's turns run them (host.ts).
 async function* turn(id: string, opts: Omit<ProviderRequest, 'model' | 'messages'> = {}, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
 	let modelId = sessions.open(id).model
-	let input = { ...opts, messages: await history.messages(id, { overhead: (opts.system?.length ?? 0) + JSON.stringify(opts.tools ?? []).length, window: undefined }), image: (blob: string) => blobs.base64(id, blob) }
+	let input = { ...opts, messages: await history.messages(id, { overhead: (opts.system?.length ?? 0) + JSON.stringify(opts.tools ?? []).length, window: models.contextWindow(modelId) }), image: (blob: string) => blobs.base64(id, blob) }
 	let providerName = blocks.parseModelId(modelId)?.provider ?? modelId
 	let last: DoneEvent | ErrorEvent | undefined
 	try {
