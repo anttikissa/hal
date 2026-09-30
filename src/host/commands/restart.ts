@@ -5,17 +5,20 @@
 // with the host (it marked itself). `all`: every connected client is
 // told first, and restarts (web: reloads) once the host has gone.
 
-import { terminal } from '../../client/terminal.ts'
 import type { SlashCommand } from '../commands.ts'
 import { host } from '../host.ts'
 
 const scopes = ['local', 'host', 'both', 'all']
 
+// Exit 100, which ./run answers by starting again; main.ts has the
+// terminal leave raw mode first.
+export const restartProcess = { run: (): void => process.exit(100) }
+
 // Long enough for the reply and the clients' restart events to leave.
 const flushMs = 200
 
 function later(): void {
-	setTimeout(() => (terminal.state.io ? terminal.restart() : process.exit(terminal.restartCode)), flushMs)
+	setTimeout(() => restartProcess.run(), flushMs)
 }
 
 export const command: SlashCommand = {

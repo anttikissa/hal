@@ -20,6 +20,7 @@ import { config } from './host/config.ts'
 import { diag } from './host/diag.ts'
 import { find } from './host/find.ts'
 import { host } from './host/host.ts'
+import { restartProcess } from './host/commands/restart.ts'
 import { jobs } from './host/jobs.ts'
 import { liveFiles } from './host/live-file.ts'
 import { models } from './host/models.ts'
@@ -95,6 +96,7 @@ function init(): void {
 	// Ctrl-C pauses running turns only if no other Hal process (a peer
 	// on the host socket) can carry them on (tasks/j1/states.md).
 	terminal.onQuit = () => host.quitting(server.state.sockets.size === 0)
+	restartProcess.run = () => terminal.restart()
 	// Which code this process runs (task n1), found after the first
 	// frame; the host tells its clients, a new commit offers ctrl-r.
 	version.found = (loaded) => {
