@@ -41,7 +41,8 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 		() => props.text,
 		() => {
 			input.style.height = 'auto'
-			input.style.height = `${Math.min(input.scrollHeight + 2, innerHeight * 0.4)}px`
+			// CSS caps content height against the changing visual viewport.
+			input.style.height = `${input.scrollHeight + 2}px`
 		},
 	)
 	createEffect(

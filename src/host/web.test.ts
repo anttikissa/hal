@@ -980,3 +980,56 @@ test.skipIf(!chrome)('compact status keeps two lines and opens full live details
 		await b.close()
 	}
 }, 20_000)
+
+test.skipIf(!chrome)('phone landscape shrinks chrome and bounds long drafts as the visible viewport changes', async () => {
+	providerHome()
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
+		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+		await b.waitFor("document.querySelector('textarea') && document.querySelector('.StatusRow .name')?.textContent.startsWith('Session ')")
+		let draft = Array.from({ length: 30 }, (_, i) => `Draft line ${i}: preserve this text`).join('\n')
+		await b.evaluate(`let t = document.querySelector('textarea'); t.value = ${JSON.stringify(draft)}; t.dispatchEvent(new Event('input', { bubbles: true }))`)
+		let geometry = (height?: number) => b.evaluate(`(() => {
+			${height ? `document.documentElement.style.setProperty('--app-height', '${height}px');` : ''}
+			let q = s => document.querySelector(s), rect = s => q(s).getBoundingClientRect(), font = s => parseFloat(getComputedStyle(q(s)).fontSize);
+			return { transcriptFont: font('.Transcript'), statusFont: font('.overview'), draftFont: font('textarea'), draftHeight: rect('textarea').height, scrollable: q('textarea').scrollHeight > q('textarea').clientHeight, transcriptHeight: rect('.Transcript').height, targets: [...document.querySelectorAll('.overview, .entry button')].every(e => e.getBoundingClientRect().height >= 44), overflow: document.documentElement.scrollWidth > innerWidth, value: q('textarea').value };
+		})()`)
+		let portrait = await geometry()
+		expect(portrait.transcriptFont).toBe(14)
+		expect(portrait.statusFont).toBeGreaterThan(11)
+		expect(portrait.draftHeight).toBeGreaterThan(80)
+		for (let [width, height] of [[844, 390], [667, 375]]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+			let landscape = await geometry()
+			expect(landscape.transcriptFont).toBe(12)
+			expect(landscape.statusFont).toBe(11)
+			expect(landscape.draftFont).toBe(16)
+			expect(landscape.draftHeight).toBeLessThanOrEqual(80)
+			expect(landscape.scrollable).toBe(true)
+			expect(landscape.transcriptHeight).toBeGreaterThan(100)
+			expect(landscape.targets).toBe(true)
+			expect(landscape.overflow).toBe(false)
+			expect(landscape.value).toBe(draft)
+		}
+		// Model the visible space left by a keyboard without changing the draft.
+		let keyboard = await geometry(180)
+		expect(keyboard.draftHeight).toBeLessThanOrEqual(45)
+		expect(keyboard.transcriptHeight).toBeGreaterThan(10)
+		expect(keyboard.value).toBe(draft)
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
+		await b.waitFor("document.querySelector('.App').getBoundingClientRect().height >= 750")
+		expect((await geometry()).draftHeight).toBeGreaterThan(80)
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: false })
+		let desktop = await geometry()
+		expect(desktop.transcriptFont).toBe(14)
+		expect(desktop.statusFont).toBe(portrait.statusFont)
+	} finally {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+}, 20000)

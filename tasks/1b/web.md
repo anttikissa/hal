@@ -78,3 +78,13 @@ runtime. Do not carry Solid 1 or React lifecycle patterns into this app.
   path, name, ID, activity, model/effort, totals, limits and linked stats.
 - No separate activity row duplicates the status above the prompt.
   Native dialog keys never edit or pause the conversation behind it.
+
+## Phone landscape (task cw)
+
+- Short, coarse-pointer landscape viewports use 12px scrollback and 11px
+  status text, reduced padding, and a prompt capped at 25% of visible
+  app height or 80px, whichever is smaller. Prompt text stays at 16px
+  and controls retain 44px targets. Portrait/desktop styling is unchanged.
+- Measure draft content height, but let native CSS max-height enforce
+  the visible-viewport cap so a rotation or keyboard resize takes effect
+  without a keystroke. Long drafts scroll inside the textarea.
