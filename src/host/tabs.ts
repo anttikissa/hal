@@ -12,6 +12,7 @@ import { resolve } from 'path'
 import type { Command, Event, Tab } from '../common/protocol.ts'
 import { host } from './host.ts'
 import { history } from './history.ts'
+import { greetings } from './greetings.ts'
 import { jobs } from './jobs.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
@@ -136,6 +137,7 @@ function create(cwd: string, after?: string): string {
 		cwd: parent?.cwd ?? cwd,
 		...(first ? { model: 'hal/intro' } : parent ? { model: models.qualified(parent.model, parent.effort) } : {}),
 	}).id
+	greetings.open(id)
 	tabs.insert(id, at < 0 ? open.length : at + 1)
 	return id
 }

@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Real bidirectional rotation caught stale --app-width feedback: a width of 844px carried into portrait made the layout/visual viewport remain 844px and zoom out. max-width:100% on App prevents that. It also caught Markdown streaming min-height retaining the portrait peak after wrapping changed; task fn now scopes peaks to width/font layout.',
-		'Delayed image decoding changes scrollHeight without changing the transcript box dimensions, so the viewport ResizeObserver misses it. reflow.watch captures descendant load events and restores its cached reading anchor. The existing deep-link CDP regression reproduced 383px drift before the fix and less than 40px afterward.'
+		'Delayed image decoding changes scrollHeight without changing the transcript box dimensions, so the viewport ResizeObserver misses it. reflow.watch captures descendant load events and restores its cached reading anchor. The existing deep-link CDP regression reproduced 383px drift before the fix and less than 40px afterward.',
+		'The 8y arrival card changes the geometry of the 41px near-edge rotation case: on landscape-to-portrait reflow its text-centre target can lie above scrollTop=0. The browser assertion therefore verifies either the preserved character offset or clamping at the corresponding end of the scroll range, as the spec requires; demanding exact centring in that case is physically impossible.'
 	],
 	needs: ['4s', 'cw', 'fn']
 }

@@ -17,6 +17,7 @@ import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
 import { history } from './history.ts'
+import { greetings } from './greetings.ts'
 import { jobs } from './jobs.ts'
 import { prompts } from './prompts.ts'
 import { sessions } from './sessions.ts'
@@ -37,6 +38,7 @@ function spawn(parent: string, s: Spawn): string {
 	let child = sessions.create({ cwd: s.cwd, model: models.qualified(selected.id, selected.effort), name: s.name })
 	Object.assign(child, { parent, spawn: s.kind, slots: s.limit } satisfies Partial<SessionMeta>)
 	if (s.fork) subagents.fork(parent, child.id)
+	if (s.kind === 'interactive' && !s.task.trim() && !s.fork) greetings.open(child.id)
 	let at = tabs.file().open.indexOf(parent)
 	tabs.insert(child.id, at < 0 ? tabs.file().open.length : at + 1)
 	tabs.publish()

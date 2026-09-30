@@ -20,6 +20,7 @@ import { find } from './find.ts'
 import { busy } from './busy.ts'
 import { drafts } from './drafts.ts'
 import { history } from './history.ts'
+import { greetings } from './greetings.ts'
 import { jobs } from './jobs.ts'
 import { pages, type Page, type Tail } from './pages.ts'
 import { notify } from './notify.ts'
@@ -207,10 +208,8 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	if (c.type === 'create' || c.type === 'open-newest') {
 		let id = c.type === 'open-newest' ? sessions.newest() : undefined
 		if (id) return host.act(client, { type: 'open', sessionId: id, ...(c.id === undefined ? {} : { id: c.id }) })
-		let init: { cwd: string; model?: string; name?: string } = { cwd: c.cwd ?? host.cwd() }
-		if (c.type === 'create' && c.model !== undefined) init.model = c.model
-		if (c.type === 'create' && c.name !== undefined) init.name = c.name
-		id = sessions.create(init).id
+		id = sessions.create(c.type === 'create' ? c : { cwd: c.cwd ?? host.cwd() }).id
+		greetings.open(id)
 		host.follow(client, id)
 		return { sessionId: id }
 	}

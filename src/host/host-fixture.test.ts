@@ -9,6 +9,7 @@ import type { StreamEvent } from '../common/blocks.ts'
 import { protocol, type Event } from '../common/protocol.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
+import { greetings } from './greetings.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
@@ -19,6 +20,7 @@ const savedHome = process.env.HAL_HOME
 const origStream = turns.stream
 const origOnError = liveFiles.onError
 const origPrepare = naming.prepare
+const origGreeting = greetings.open
 let home = ''
 
 // The home directory of the running test.
@@ -62,7 +64,7 @@ export function fakeStream(model: string, input: any, signal?: AbortSignal): Asy
 }
 
 // Registers the hooks that give each test a fresh home and host.
-export function useHost(withNaming = false): void {
+export function useHost(withNaming = false, withGreetings = false): void {
 	beforeEach(() => {
 		home = mkdtempSync(`${tmpdir()}/hal-host-`)
 		process.env.HAL_HOME = home
@@ -70,6 +72,8 @@ export function useHost(withNaming = false): void {
 		turns.stream = fakeStream
 		// Unrelated exact-replay tests isolate title reminders, not user ownership.
 		naming.prepare = withNaming ? origPrepare : () => {}
+		// Unrelated exact-replay tests omit the display-only arrival.
+		greetings.open = withGreetings ? origGreeting : () => {}
 		calls.length = 0
 	})
 
@@ -78,6 +82,7 @@ export function useHost(withNaming = false): void {
 		sessions.closeAll()
 		turns.stream = origStream
 		naming.prepare = origPrepare
+		greetings.open = origGreeting
 		liveFiles.onError = origOnError
 		if (savedHome === undefined) delete process.env.HAL_HOME
 		else process.env.HAL_HOME = savedHome

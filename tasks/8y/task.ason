@@ -11,6 +11,10 @@ The authored pool contains dozens of natural variations, not five greetings rota
 Choose a greeting at the session's initial empty interactive opening and retain that choice across tab switches, redraws, reconnects, and host restarts; clients following the same session agree rather than independently rerolling it. A stored greeting does not cause another greeting on reopening. Preserve ordinary onboarding and session lifecycle behavior and use existing output/history infrastructure where suitable; no new dependency is needed.
 
 Verify meaningful invariants with focused existing or minimal tests: eligible versus excluded sessions, absent and supplied name, local time boundaries and unknown-time neutral fallback, safe rendering of profile text, no immediate repeat, stable selection across reconnect/restart, and exclusion from provider input. Avoid tests that merely repeat the greeting catalogue or assert random wording.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Greeting selection lives in host/greetings.ts and is called only by new interactive creation paths (protocol create/open-newest, tab creation, and blank non-fork interactive spawn). Existing output history records give both clients the same durable text and stay outside provider messages and turn-state replay. Opening an existing session never selects a greeting; scripted hal/* sessions, supplied spawn tasks, subagents and forks are excluded. No client timezone signal exists in the current protocol, so a missing or invalid profile zone uses neutral wording rather than host time.',
+		'The authored catalogue has 50 complete phrases, including optional named phrases and period-specific phrases. Private state/greetings.ason retains the previous rendered choice across host restarts to prevent immediate repeats. Profile names with terminal/bidi controls are omitted, and Markdown punctuation (including URL slashes) is escaped as literal data; the shared Markdown parser accepts escaped slashes. Focused greeting tests use the real arrival path; unrelated host replay fixtures suppress arrivals just as they isolate automatic naming.'
+	],
 	needs: ['ky']
 }

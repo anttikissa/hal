@@ -67,7 +67,7 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 	while (i < s.length) {
 		let c = s[i]!
 		if (until && markdown.closes(s, i, until)) return { runs, end: i + until.length, closed: true }
-		if (c === '\\' && /[\\`*_[\]()#|>&!-]/.test(s[i + 1] ?? '')) {
+		if (c === '\\' && /[\\`*_[\]()#|>&!/-]/.test(s[i + 1] ?? '')) {
 			add(s[i + 1]!, st)
 			i += 2
 			continue

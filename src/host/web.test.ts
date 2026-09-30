@@ -631,7 +631,7 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 			t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true }))
 			return { cards: cards.length, kept: cards.every((c) => c.isConnected), added }
 		})()`)
-		expect(typed).toEqual({ cards: 2, kept: true, added: 0 })
+		expect(typed).toEqual({ cards: 3, kept: true, added: 0 })
 		// Hal's cursor sits inside the card that streams, after its text,
 		// and back on its own line once the turn ends.
 		let release = () => {}
@@ -936,8 +936,8 @@ test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to 
 			let card = document.querySelector('.Card.pending'), reply = document.querySelector('.Card.assistant')
 			let before = !!(reply.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING)
 			window.letGo()
-			for (let i = 0; i < 250 && (card.classList.contains('pending') || !document.querySelector('.Card.output')); i++) await new Promise((r) => setTimeout(r, 10))
-			let output = document.querySelector('.Card.output')
+			for (let i = 0; i < 250 && (card.classList.contains('pending') || !card.nextElementSibling?.matches('.Card.output')); i++) await new Promise((r) => setTimeout(r, 10))
+			let output = card.nextElementSibling
 			return {
 				wasAfter: before,
 				same: card.isConnected && !card.classList.contains('pending'),
@@ -1119,7 +1119,12 @@ test.skipIf(!chrome)('rotation preserves exclusive 40px edge gaps or the text at
 				// At 41px the centre wins, not that nearby edge.
 				await resize(!landscape); await position(edge, 41)
 				let offset = await mark(); await resize(landscape)
-				expect(Math.abs(await markerOffset() - offset)).toBeLessThanOrEqual(1)
+				// A leading arrival can put the centre target above scrollTop=0.
+				// Unreachable targets must land at the corresponding edge (3y).
+				let delta = await markerOffset() - offset
+				let top = await gap('top'), max = top + await gap('bottom')
+				let expectedTop = Math.max(0, Math.min(top + delta, max))
+				expect(Math.abs(top - expectedTop)).toBeLessThanOrEqual(1)
 			}
 			await resize(!landscape); await position('middle')
 			let offset = await mark(); await resize(landscape)
