@@ -1,5 +1,5 @@
 {
-  "exclude": ["node_modules", "tasks", "state"],
+  "exclude": ["node_modules", "tasks", "sessions", "state"],
   "compilerOptions": {
     "lib": ["ESNext"],
     "target": "ESNext",

@@ -55,7 +55,7 @@ const toolAnswer = (result: any) => [
 
 // A prompt's own text, without the [HH:MM] line and <meta> notes that
 // replay puts in front of it.
-const bare = (text: string) => text.replace(/^\[[\d -]+:\d\d\]\n(<meta>[^]*?<\/meta>\n)*/, '').replace(/\n<meta>Check whether the session name [^]*?<\/meta>$/, '')
+const bare = (text: string) => text.replace(/^\[[\d -]+:\d\d\]\n(<meta>[^]*?<\/meta>\n)*/, '').replace(/\n<meta>Current session name: [^]*?<\/meta>$/, '')
 
 // Answers "<prompt>" with "ECHO(<prompt>)". A prompt starting with
 // "hold" streams PART1, then waits for release() to send PART2 and
@@ -195,7 +195,7 @@ const continued = 'ECHO(<meta>The previous response'
 
 test('Escape pauses a turn; it stays paused over a restart and Enter continues it', async () => {
 	let p = run()
-	await until('a session', () => sessionCount() === 1)
+	await until('the seeded tab to be shown', () => seen(p, '1-ready'))
 	type(p, 'first\r')
 	await until('the answer', () => seen(p, 'ECHO(first)'))
 
@@ -229,7 +229,7 @@ test('Escape pauses a turn; it stays paused over a restart and Enter continues i
 
 test('a second ./run follows the same stream and carries the turn on when the host quits', async () => {
 	let a = run()
-	await until('a session', () => sessionCount() === 1)
+	await until('the seeded tab to be shown', () => seen(a, '1-ready'))
 	type(a, 'hold this\r')
 	await until('streaming output', () => seen(a, 'PART1'))
 
@@ -255,7 +255,7 @@ test('Ctrl-C of the last Hal process kills its command and pauses the turn; the 
 	let marker = `32.${process.pid}3`
 	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
 	let a = run()
-	await until('a session', () => sessionCount() === 1)
+	await until('the seeded tab to be shown', () => seen(a, '1-ready'))
 	type(a, `bash sleep ${marker} & sleep ${marker}\r`)
 	await until('the command to run', alive)
 	type(a, '\x03')

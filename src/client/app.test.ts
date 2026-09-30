@@ -13,6 +13,7 @@ import { frame } from './frame.ts'
 import { keys, type KeyEvent } from './keys.ts'
 import { render } from './render.ts'
 import { terminal } from './terminal.ts'
+import { titles } from '../common/titles.ts'
 
 // The app with a recording link and renderer: what the user types
 // becomes commands, and what the host says becomes the view.
@@ -32,7 +33,10 @@ const record = (c: any) => {
 	else sent.push(rest)
 }
 
+let originalNames: Record<string, string>
 beforeEach(() => {
+	originalNames = titles.names
+	titles.names = { 'anthropic/claude-opus-5-5': 'Opus 5.5' }
 	sent = []
 	drafted = []
 	watched = []
@@ -48,6 +52,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+	titles.names = originalNames
 	Object.assign(app, { send: saved.send })
 	connection.connected = wasConnected
 	drafts.send = saved.draftSend

@@ -1,0 +1,9 @@
+{
+	title: 'Checks isolate metadata and runtime state',
+	spec: 'Repository checks remain independent of test order and private runtime files. TypeScript checks cover src plus optional root local.ts and plugins, but exclude gitignored sessions and state. Tests that change the shared model-name catalog restore it afterward. History-page tests reset host-owned state before deleting their temporary home, including tabs opened indirectly while persisting prompt metadata. End-to-end fake-provider parsing removes the current trailing session-name metadata from echoed human prompts, so naming reminders do not alter fake hold or bash commands or exact echo expectations. End-to-end tests with a preseeded session wait for its tab to be shown before sending input; the existence of its fixture directory is not client readiness. Existing startup budgets remain unchanged; concurrent host load is not grounds to loosen them.',
+	status: 'done',
+	notes: [
+		'Catalog restoration exposed terminal tests that implicitly depended on the titles test leaking Opus 5.5. Those tests now supply and restore their own catalog. A preseeded e2e session exists before ./run starts, so sessionCount cannot indicate client readiness; wait for its visible tab instead.'
+	],
+	needs: ['5t']
+}

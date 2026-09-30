@@ -7,6 +7,7 @@ import { inbox } from '../common/inbox.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { states } from '../common/states.ts'
 import { history } from './history.ts'
+import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { pages } from './pages.ts'
@@ -23,8 +24,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+	host.reset()
 	sessions.closeAll()
-	pages.reset()
 	liveFiles.onError = origOnError
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome

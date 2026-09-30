@@ -1,7 +1,11 @@
 import { titles } from '../common/titles.ts'
-import { expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
 import type { Event } from '../common/protocol.ts'
 import { view, type ViewState } from './view.ts'
+
+let originalNames: Record<string, string>
+beforeEach(() => { originalNames = titles.names; titles.names = {} })
+afterEach(() => { titles.names = originalNames })
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id

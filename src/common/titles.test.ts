@@ -1,5 +1,9 @@
-import { expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { titles } from './titles.ts'
+
+let originalNames: Record<string, string>
+beforeEach(() => { originalNames = titles.names; titles.names = {} })
+afterEach(() => { titles.names = originalNames })
 
 // A local wall-clock time as the ISO string records carry.
 let at = (h: number, m: number) => new Date(2026, 8, 28, h, m).toISOString()

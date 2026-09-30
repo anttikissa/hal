@@ -1,6 +1,11 @@
-import { expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { titles } from '../common/titles.ts'
 import { strings } from '../common/strings.ts'
 import { statusRow, type StatusInfo } from './status-row.ts'
+
+let originalNames: Record<string, string>
+beforeEach(() => { originalNames = titles.names; titles.names = { 'anthropic/claude-opus-5-5': 'Opus 5.5' } })
+afterEach(() => { titles.names = originalNames })
 
 const info: StatusInfo = {
 	id: '156-way',

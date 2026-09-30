@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { titles } from '../common/titles.ts'
 import { colors } from '../common/colors.ts'
 import { modals } from '../common/modals.ts'
 import { oklch, type Oklch } from '../common/oklch.ts'
@@ -11,6 +12,10 @@ import { frame, type Frame, type View } from './frame.ts'
 import { promptView } from './prompt-view.ts'
 import { ansi } from './ansi.ts'
 import { target } from '../web/target.ts'
+
+let originalNames: Record<string, string>
+beforeEach(() => { originalNames = titles.names; titles.names = { 'anthropic/claude-opus-5-5': 'Opus 5.5' } })
+afterEach(() => { titles.names = originalNames })
 
 // Where text in `style`'s quieter colour starts (ansi.quiet).
 const quietOn = (style: { fg?: Oklch; bg?: Oklch }) => ansi.sgr({ fg: oklch.quiet(style.fg!, style.bg ?? colors.screen()) })
