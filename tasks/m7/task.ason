@@ -1,0 +1,9 @@
+{
+	title: 'Reliable iOS composer keyboard and viewport recovery',
+	spec: 'In the iOS browser and installed web app, tapping the enabled composer opens the software keyboard, including after sending a prompt, dismissing the keyboard, switching conversation tabs, opening and closing native dialogs, rotation, and resuming the app. When the keyboard is absent the app occupies the available visual viewport; it must not remain at a keyboard-reduced height with unused space underneath. Programmatic focus must not leave the composer in a state where a direct tap cannot open the keyboard. Preserve native caret selection, accessibility, draft durability, and the single transcript scroller. Verify these transitions on an actual iOS device; Chromium emulation alone is not evidence that WebKit keyboard behavior works. Establish the failing transition before choosing a workaround; do not add polling or force blur/refocus on every tap.',
+	status: 'planned',
+	notes: [
+		'Investigation: the reported failure still allowed transcript scrolling, while tapping the empty composer did not show the keyboard. The screenshot showed unused space below a keyboard-height app. No root cause or failing transition is confirmed: native scrolling can continue on the compositor even if JavaScript is blocked. Composer is disabled only by an open question, not by processing state; its placeholder has pointer-events: none. viewport.sync writes visualViewport geometry on resize and scroll, with no resume resynchronization. Targeted Chromium checks of completion taps, login/streaming/input, and status-dialog interaction passed (3 tests, 58 assertions); these exercise the working tree, not the affected iOS page. Host diagnostics contain no browser-side focus or runtime-error telemetry, so they cannot establish what happened in the page. Keep this task planned until reproduced and verified on iOS.'
+	],
+	needs: ['1b']
+}
