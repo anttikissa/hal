@@ -34,6 +34,22 @@ test('a fresh home opens the offline intro; later tabs use the configured provid
 })
 
 
+test('new tabs inherit the source tab model, effort and current cwd', () => {
+	let c = client()
+	let first = newTab(c)
+	let source = newTab(c)
+	let meta = sessions.open(source)
+	meta.model = 'openai/gpt-6-sol'
+	meta.effort = 'high'
+	meta.cwd = '/tmp/changed'
+	let child = newTab(c, '/tmp/stale', source)
+	expect(sessions.open(child)).toMatchObject({ cwd: '/tmp/changed', model: 'openai/gpt-6-sol', effort: 'high' })
+	expect(ids(c)).toEqual([first, source, child])
+	let independent = newTab(c, '/tmp/separate')
+	expect(sessions.open(independent).cwd).toBe('/tmp/separate')
+	expect(sessions.open(independent).model).not.toBe('openai/gpt-6-sol')
+})
+
 test('two clients see the same order after new, move, close and resume', () => {
 	let a = client()
 	let b = client()

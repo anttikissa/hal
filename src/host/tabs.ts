@@ -129,9 +129,13 @@ function insert(id: string, index: number): void {
 function create(cwd: string, after?: string): string {
 	// The very first tab of a fresh home is the offline welcome guide.
 	let first = tabs.file().open.length === 0 && !sessions.newest()
-	let id = sessions.create({ cwd, ...(first ? { model: 'hal/intro' } : {}) }).id
 	let open = tabs.file().open
 	let at = after === undefined ? -1 : open.indexOf(after)
+	let parent = at < 0 ? undefined : sessions.open(after!)
+	let id = sessions.create({
+		cwd: parent?.cwd ?? cwd,
+		...(first ? { model: 'hal/intro' } : parent ? { model: models.qualified(parent.model, parent.effort) } : {}),
+	}).id
 	tabs.insert(id, at < 0 ? open.length : at + 1)
 	return id
 }

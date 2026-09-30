@@ -128,7 +128,8 @@ export type Command = (
 	// Tabs (src/host/tabs.ts): the sessions open as tabs, in order, shared
 	// by every client; unlike open/close, which follow a session. A tab
 	// command that creates, reopens or picks a tab names it in its ack.
-	// A new session in cwd with the default model, after `after` (else last).
+	// After an open tab: inherit its cwd, model and effort; otherwise use
+	// cwd and the default model, appending the new tab.
 	| { type: 'tab-new'; cwd: string; after?: string }
 	// Out of the tabs, remembering its position; the session and any
 	// running turn carry on. Closing the last tab is refused.
