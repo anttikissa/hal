@@ -1,0 +1,9 @@
+{
+	title: 'Read local images directly',
+	spec: 'The read model tool returns local PNG, JPEG, GIF and WebP files as model-visible image results, without a web server or URL workaround. Detect supported image types from their bytes, not their filename, including extensionless files. Use the shared attachment validation and size cap, rejecting oversized images before loading the whole file; results use existing per-session blob storage so images survive source deletion and replay to providers. The description advertises image support. Existing path resolution, text paging, directory listings, argument validation and rejection of other binary files remain unchanged. Valid paging arguments apply only to text; an image is always returned whole. Regression coverage exercises the tool registry, every supported image type, misleading or missing extensions, durable stored bytes after source deletion, the size boundary and unchanged text/binary behavior.',
+	status: 'done',
+	notes: [
+		'Detect image signatures with blobs.looksLike from a 12-byte header; cap the subsequent read at max + 1 bytes so a growing file cannot bypass the memory bound. tools.run already validates and stores image output through blobs.store; no separate persistence path is needed.'
+	],
+	needs: ['sj', '2a']
+}
