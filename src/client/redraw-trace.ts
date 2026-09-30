@@ -1,4 +1,4 @@
-// Opt-in client diagnostics (task 4k). local.ts calls start(path); nothing
+// Opt-in client diagnostics (task 4k). A local plugin calls start(path); nothing
 // imports or enables this on the normal path. Only geometry and fixed
 // cause labels are recorded, never frame strings or host/client identity.
 import { closeSync, constants, fchmodSync, fstatSync, openSync, writeSync } from 'fs'
@@ -72,7 +72,7 @@ function stop(): void {
 	st.pending.clear()
 }
 
-function start(path: string): void {
+function start(path: string | URL): void {
 	redrawTrace.stop()
 	// Do not truncate a previous capture or follow a substituted symlink.
 	let fd = openSync(path, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600)
@@ -96,7 +96,7 @@ function start(path: string): void {
 	})
 	for (let key of ['beat', 'onKeys', 'onState', 'onTabs'] as const) redrawTrace.cause(app, key, `app.${key}`)
 	redrawTrace.cause(terminal, 'resized', 'terminal.resized')
-	// local.ts runs before render.init(), which installs these callbacks.
+	// Plugins activate before render.init(), which installs these callbacks.
 	let terminalHooked = false
 	let hookTerminal = () => {
 		if (terminalHooked || !render.state.out) return
