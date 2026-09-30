@@ -153,8 +153,8 @@ export function Chat() {
 			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} />
 			<Notices entries={stack()} />
-			<StatusRow view={view()} />
-			<Composer view={view()} text={text()} menu={menu()} notice={notice()} placeholder={placeholder()} connected={connected()} dropping={dropping()} />
+			<StatusRow view={view()} connected={connected()} />
+			<Composer view={view()} text={text()} menu={menu()} notice={notice()} placeholder={placeholder()} dropping={dropping()} />
 			<Picker modal={view().modal} />
 		</div>
 	)

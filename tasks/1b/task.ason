@@ -6,14 +6,8 @@ Why a dependency: the page is about to grow (tabs, collapsible cards, animations
 
 The host path stays dependency-free. No module in host, client or common imports solid-js, @solidjs/web or @solidjs/compiler statically; the conventions test checks that for every non-web layer. host/web.ts bundles the page with Bun.build and compiles .tsx with @solidjs/compiler through a Bun plugin (artifact solid-build-excerpt.ts), imported dynamically on the first GET /, so a host that never serves the page never loads it; a missing or broken compiler answers that request with 500 and a diag.log line and never harms the host.
 
-Conventions (update the web section of tasks/README.md): components are .tsx files in src/web/components/, one exported component each, whose root element has a class named after it; decisions (key mapping, view state, reconnect, scroll maths) stay in plain .ts modules unit-tested without a browser; src/web imports only web and common. The browser gets its colours only from the CSS the host generates from src/common/colors.ts (task 1w): no colour literals in src/web or index.html (add fields to colors.ts for what is missing); layout CSS lives in one stylesheet. The conventions test covers .tsx files (layers, side-effect-free import, the 400-line limit); take src/web/page.ts off the size exception list. The CDP end-to-end check in host/web.test.ts still logs in and sees a streamed answer.`,
+Conventions (update the web section of tasks/README.md): components are .tsx files in src/web/components/, one exported component each, whose root element has a class named after it; decisions (key mapping, view state, reconnect, scroll maths) stay in plain .ts modules unit-tested without a browser; src/web imports only web and common. The browser gets its colours only from the CSS the host generates from src/common/colors.ts (task 1w): no colour literals in src/web or index.html (add fields to colors.ts for what is missing); layout CSS lives in one stylesheet. The conventions test covers .tsx files (layers, side-effect-free import, the 400-line limit); take src/web/page.ts off the size exception list. The CDP end-to-end check in host/web.test.ts still logs in and sees a streamed answer. The web.md artifact reflects the current browser status layout: task a0's compact two-line overview with native modal details and no duplicate activity row above the composer.`,
 	status: 'done',
-	needs: [
-		'0j'
-	],
-	foldInto: [
-		'dz'
-	],
 	notes: [
 		'This reverses dz\'s "plain DOM, no framework" choice (and the README line saying so) on purpose; dz\'s other rules stand.',
 		'Current web implementation guide: tasks/1b/web.md. Read it before writing src/web code; old-web.md is a historical artifact rather than the normative guide. The guide distinguishes displayed data, pending replacements and absence, and requires retaining DOM and value identity when an async reply confirms the visible result. Task kx applies it to completion menus.',
@@ -32,5 +26,7 @@ Conventions (update the web section of tasks/README.md): components are .tsx fil
 		'Render only what changed (tasks/README.md, Web client): the user asked the old Hal "every live update creates new transcript-item objects? Live update should update that object in place and Solid\'s signals handle the rest". Two ways that work: one signal gated by a memo per field (what Chat does), or a store the host\'s data is merged into with reconcile(data, key) inside a draft setter (old-web.md, Reactivity), which keeps object identity so keyed lists and memos see no change. Don\'t replace a whole snapshot object and let every consumer recompute.',
 		"A host restart or dropped socket leaves the page's DOM alive: show reconnecting, reconnect, fold the fresh snapshot into the same cards. Never reload on a fixed delay (old Hal commit 601e442: that stranded the installed iOS app on a blank page); if a reload is ever needed, probe HTTP first and only after pending draft writes are durable.",
 		'2026-09-29: Task 67 supersedes the old pin and compiler notes above. The current web build uses @solidjs/compiler dynamically from the Bun plugin, paired with the matching Solid 2 runtime; do not treat the older rc.8 / @dom-expressions/compiler pairing as the rebuild target.'
-	]
+	],
+	needs: ['0j'],
+	foldInto: ['dz']
 }

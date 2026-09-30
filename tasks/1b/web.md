@@ -69,3 +69,12 @@ runtime. Do not carry Solid 1 or React lifecycle patterns into this app.
   test source text, copy the JSX into expectations, or test a one-line
   identity function. Test behavior that a plausible wrong implementation
   would break.
+
+## Compact session status (task a0)
+
+- Two stable lines above the composer show name/activity/context, then
+  cwd basename/model; long values truncate without wrapping or overflow.
+- Tap the whole status button for native modal details with the full
+  path, name, ID, activity, model/effort, totals, limits and linked stats.
+- No separate activity row duplicates the status above the prompt.
+  Native dialog keys never edit or pause the conversation behind it.

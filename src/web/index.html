@@ -99,8 +99,6 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 @property --fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @keyframes md-fade { from { --fade: 2.5rem; } 99% { --fade: 2.5rem; } to { --fade: 0px; } }
 @keyframes blink { 50% { opacity: 0; } }
-/* A complete status row above the composer: on phones six groups become
-   two rows of three; nothing is omitted to fit a narrow screen. */
 /* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
 .Notices { position: relative; flex: none; height: 0; z-index: 2; }
 .Notices .stack { position: absolute; right: max(0.5rem, env(safe-area-inset-right)); bottom: 0.5rem; width: min(24rem, calc(100vw - 1rem)); display: flex; flex-direction: column; gap: 0.3rem; }
@@ -113,13 +111,24 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 @media (pointer: coarse) { .Notices .card { min-height: 44px; } }
 @keyframes notice-in { from { transform: translateY(0.5rem); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .Notices .card { animation: none; } }
-.StatusRow { flex: none; display: flex; flex-wrap: wrap; gap: 0 2.5ch; padding: 0.2rem max(1rem, env(safe-area-inset-right)) 0.2rem max(1rem, env(safe-area-inset-left)); font-size: 0.85em; border-top: 1px solid var(--border); }
-/* Whole groups flow to the next row, never breaking inside; one wider
-   than the row is cut with an ellipsis (a path at its start). */
-.StatusRow .group { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.StatusRow .group > span { unicode-bidi: isolate; }
-.StatusRow a { color: inherit; text-decoration: underline; }
-@media (pointer: coarse) { .StatusRow a { display: inline-flex; align-items: center; min-height: 44px; touch-action: manipulation; } }
+/* Two explicit lines, no accidental wrapping; the whole overview is a target. */
+.StatusRow { flex: none; padding: 0 max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left)); font-size: 0.85em; border-top: 1px solid var(--border); }
+.StatusRow .overview { display: block; width: 100%; min-height: 44px; padding: 0.2rem 0; background: none; color: inherit; font: inherit; text-align: left; touch-action: manipulation; }
+.StatusRow .primary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto auto; align-items: baseline; gap: 1ch; }
+.StatusRow .secondary { display: flex; gap: 2ch; justify-content: space-between; }
+.StatusRow .name, .StatusRow .activity, .StatusRow .cwd, .StatusRow .model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.StatusRow .activity { max-width: 40vw; }
+.StatusRow .cwd { flex: 1; }
+.StatusRow .model { flex: 0 1 auto; max-width: 75%; }
+.StatusRow :focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.StatusDetails { width: min(32rem, calc(var(--app-width, 100vw) - 1rem)); max-height: calc(var(--app-height, 100dvh) - 1rem); overflow-y: auto; padding: 0.7rem; background: var(--canvas); color: var(--text); border: 1px solid var(--border); overflow-wrap: anywhere; }
+.StatusDetails::backdrop { background: color-mix(in oklab, var(--canvas) 70%, transparent); }
+.StatusDetails .top { display: flex; align-items: center; justify-content: space-between; gap: 1ch; }
+.StatusDetails .top button { min-width: 44px; min-height: 44px; background: none; color: inherit; }
+.StatusDetails .fact { padding-block: 0.25rem; }
+.StatusDetails a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; text-decoration: underline; touch-action: manipulation; }
+.StatusDetails :focus-visible { outline: 2px solid var(--accent); }
+@media (pointer: coarse) { .StatusDetails { position: fixed; top: auto; bottom: calc(100dvh - var(--app-top, 0px) - var(--app-height, 100dvh) + 0.5rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; margin: 0; width: calc(var(--app-width, 100vw) - 1rem); } }
 @media (max-width: 40rem) { .StatusRow { padding-inline: max(0.6rem, env(safe-area-inset-left)) max(0.6rem, env(safe-area-inset-right)); } }
 .Composer { position: relative; z-index: 1; flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, calc(env(safe-area-inset-bottom) - (100dvh - var(--app-height, 100dvh)))) max(1rem, env(safe-area-inset-left)); }
 .Composer > #notice:empty { display: none; }

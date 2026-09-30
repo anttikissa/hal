@@ -542,7 +542,7 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 			// the first typed character can change its native scrollHeight.
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'x'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
 			await b.evaluate(`new Promise(resolve => requestAnimationFrame(resolve))`)
-			let frame = `(() => { let rect = (s) => document.querySelector(s).getBoundingClientRect(); return { transcript: rect('.Transcript').bottom, status: rect('.StatusRow').top, activity: rect('.Composer .status').top, entry: rect('.entry').top, composer: rect('.Composer').top } })()`
+			let frame = `(() => { let rect = (s) => document.querySelector(s).getBoundingClientRect(); return { transcript: rect('.Transcript').bottom, status: rect('.StatusRow').top, entry: rect('.entry').top, composer: rect('.Composer').top } })()`
 			let before = await b.evaluate(frame)
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/c'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
 			await b.waitFor(`document.querySelectorAll('.completions [role=option]').length > 1`)
@@ -554,12 +554,12 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 			expect(await b.evaluate(frame)).toEqual(before)
 			let covered = await b.evaluate(`(() => {
 				let menu = document.querySelector('.completions'), m = menu.getBoundingClientRect();
-				return ['.Composer .status', '.StatusRow'].map((selector) => {
+				return ['.StatusRow'].map((selector) => {
 					let s = document.querySelector(selector).getBoundingClientRect(), y = (Math.max(m.top, s.top) + Math.min(m.bottom, s.bottom)) / 2;
 					return { overlaps: m.top < s.bottom && m.bottom > s.top, onTop: menu.contains(document.elementFromPoint(m.left + m.width / 2, y)) };
 				});
 			})()`)
-			expect(covered).toEqual([{ overlaps: true, onTop: true }, { overlaps: true, onTop: true }])
+			expect(covered).toEqual([{ overlaps: true, onTop: true }])
 			// A request for the next character must not make an unchanged menu
 			// disappear for a frame or rebuild its rows when the answer arrives.
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/lo'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
@@ -929,3 +929,54 @@ test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to 
 		await b.close()
 	}
 }, 20000)
+
+test.skipIf(!chrome)('compact status keeps two lines and opens full live details without losing the draft', async () => {
+	providerHome()
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+		await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.startsWith('Session ')")
+		let id = await b.evaluate("location.pathname.slice(1)")
+		let meta = { id, cwd: '/tmp/very-long-parent-directory/project', model: 'fake/a-very-long-model-name', name: 'A long conversation name that must not wrap on a narrow phone', createdAt: new Date().toISOString() }
+		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta, stats: { context: 85000, window: 100000, sent: 9000, received: 2000, files: 4, effort: 'medium', plan: { account: 1, accounts: 1, windows: { '5h': 17 } } } })
+		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'running', phase: 'requesting' } })
+		await b.waitFor("document.querySelector('.StatusRow .status-hot')?.textContent === '85%' && document.querySelector('.activity')?.textContent.includes('processing')")
+		await b.evaluate("let draft = document.querySelector('textarea'); draft.value = 'draft survives details'; draft.dispatchEvent(new Event('input', { bubbles: true }))")
+		for (let width of [320, 390, 1024]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 760, deviceScaleFactor: 1, mobile: true })
+			let geometry = await b.evaluate(`(() => {
+				let q = s => document.querySelector(s), r = s => q(s).getBoundingClientRect();
+				return { height: r('.overview').height, lineHeight: parseFloat(getComputedStyle(q('.overview')).lineHeight), primary: r('.primary').height, secondary: r('.secondary').height, overflow: document.documentElement.scrollWidth > innerWidth, cwd: q('.cwd').textContent, duplicated: !!q('.Composer .status') };
+			})()`)
+			expect(geometry.height).toBeGreaterThanOrEqual(44)
+			expect(geometry.primary).toBeLessThanOrEqual(geometry.lineHeight + 1)
+			expect(geometry.secondary).toBeLessThanOrEqual(geometry.lineHeight + 1)
+			expect(geometry.overflow).toBe(false)
+			expect(geometry.cwd).toBe('project')
+			expect(geometry.duplicated).toBe(false)
+		}
+		await b.evaluate("document.querySelector('.overview').focus()")
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' })
+		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+		await b.waitFor("document.querySelector('.StatusDetails').open")
+		let text = await b.evaluate("document.querySelector('.StatusDetails').textContent")
+		expect(text).toContain(meta.name)
+		expect(text).toContain(meta.cwd)
+		expect(text).toContain('medium')
+		expect(text).toContain('5h 17%')
+		expect(await b.evaluate("[...document.querySelectorAll('.StatusDetails a')].map(a => a.getAttribute('href'))")).toEqual([`/changes/${id}`, `/context/${id}`])
+		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'paused' } })
+		await b.waitFor("document.querySelector('.StatusDetails p').textContent.startsWith('paused')")
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+		await b.waitFor("!document.querySelector('.StatusDetails').open")
+		expect(await b.evaluate("document.activeElement === document.querySelector('.overview')")).toBe(true)
+		expect(await b.evaluate("document.querySelector('textarea').value")).toBe('draft survives details')
+	} finally {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+}, 20_000)

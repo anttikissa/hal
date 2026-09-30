@@ -1,8 +1,7 @@
 /// <reference lib="dom" />
 // The bottom panel under the transcript: the messages waiting for the
-// turn (the inbox), the passing notice, a status line like the
-// terminal's (a pulsing dot while busy), the message box with its Send
-// button, and the key hints. The box grows with its text up to 40% of
+// turn (the inbox), the passing notice, the message box with its Send
+// button, and the key hints. Session activity lives in StatusRow. The box grows with its text up to 40% of
 // the window. An open question or the model picker owns the keys
 // meanwhile; the box keeps its text and takes the focus back when they
 // close. Enter is handled by keys.key (none during IME composition).
@@ -20,7 +19,7 @@ import { editor } from '../editor.ts'
 import { keys } from '../keys.ts'
 import { view, type ViewState } from '../view.ts'
 
-export function Composer(props: { view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; connected: boolean; dropping: boolean }) {
+export function Composer(props: { view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; dropping: boolean }) {
 	let input!: HTMLTextAreaElement
 	let picker!: HTMLInputElement
 	// Text at the caret, replacing the selection, as if typed.
@@ -51,8 +50,6 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 			if (!away) input.focus()
 		},
 	)
-	let line = () => view.line(props.view, props.connected)
-	let tone = () => ({ idle: '', busy: 'busy', warn: 'warning', error: 'error' })[line().tone]
 	let busy = () => !!props.view.transcript && states.busy(props.view.transcript.state)
 	let send = (queue = false) => {
 		app.send(queue)
@@ -62,12 +59,6 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 		<footer class="Composer">
 			<div id="notice" class="log">
 				{props.notice ?? ''}
-			</div>
-			<div class="status" aria-live="polite">
-				<span class={['dot', tone()]} aria-hidden="true">
-					●
-				</span>{' '}
-				<span class={tone()}>{line().text}</span>
 			</div>
 			<div class={['entry input', { dropping: props.dropping }]}>
 				{props.menu && (
