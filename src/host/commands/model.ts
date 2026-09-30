@@ -6,7 +6,7 @@ import { models } from '../models.ts'
 
 export const command: SlashCommand = {
 	help: () => '/model <provider/model or family>[:level]: switch this session from its next request; :default clears effort. /model alone opens the picker (Ctrl-M too).',
-	complete: (args) => [...new Set([...models.known(), 'gpt', 'claude', 'opus', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'])].filter((id) => id.startsWith(args)),
+	complete: (args) => [...new Set([...models.known(), 'gpt', 'gpt6.1', 'gpt6', 'gpt-6.1', 'gpt-6', 'claude', 'opus', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'])].filter((id) => id.startsWith(args)),
 	run(args, _answers, ctx) {
 		if (!args) return { say: `model: ${models.qualified(ctx.model, ctx.effort)}`, open: 'models' }
 		let choice = models.selection(args)

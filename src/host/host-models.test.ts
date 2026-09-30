@@ -104,6 +104,25 @@ test('family aliases choose a subscription before an API key, and explain missin
 	}
 })
 
+test('versioned GPT aliases complete and select their own generation', () => {
+	let saved = process.env.OPENAI_API_KEY
+	try {
+		process.env.OPENAI_API_KEY = 'test-key'
+		provider.state.providers = { openai: fake([]) }
+		models.state.lists.set('openai', { at: Date.now(), ids: ['openai/gpt-6.1-sol', 'openai/gpt-6-astra', 'openai/gpt-6-sol'] })
+		expect(models.resolve('gpt6.1').id).toBe('openai/gpt-6.1-sol')
+		expect(models.resolve('gpt6').id).toBe('openai/gpt-6-sol')
+		expect(models.resolve('gpt-6.1').id).toBe('openai/gpt-6.1-sol')
+		let c = client()
+		let id = created(c)
+		c.conn.send({ type: 'complete', sessionId: id, text: '/model gpt6' })
+		expect(c.of('completions').at(-1).items).toEqual(['/model gpt6.1', '/model gpt6'])
+	} finally {
+		if (saved === undefined) delete process.env.OPENAI_API_KEY
+		else process.env.OPENAI_API_KEY = saved
+	}
+})
+
 test('a provider that never answers does not hold up the list', async () => {
 	models.state.lists.clear()
 	provider.state.providers.slow = { ...fake([]), models: (signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))) }
