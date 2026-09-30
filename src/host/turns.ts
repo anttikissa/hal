@@ -33,7 +33,7 @@ import { subagents } from './subagents.ts'
 import { toolOutput } from './tool-output.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
-type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController }
+type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController; interrupt?: boolean }
 // Asks the open turn's human a durable question: in history first,
 // then shown; the turn stops running here and waits, blocked, for the
 // first answer (reply), which runs it again. Nothing waits in memory:
@@ -103,7 +103,8 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 	let refused = status.transition(id, event)
 	if (refused) return refused
 	let running = turns.state.running.get(id)
-	if (running) return void running.controller.abort()
+	// Escape wins over a pending steer restart.
+	if (running) return void ((running.interrupt = false), running.controller.abort())
 	// A turn parked at a question has its usage so far there.
 	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = { type: 'turn_end', status: 'paused', usage: forms.open(history.readSync(id))?.usage ?? {} }
 	if (reason !== undefined) end.pauseReason = reason
@@ -131,13 +132,10 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 // provider.ts) is tried again within the turn: retrying at a time, or
 // blocked on a login; only the user's Escape stops that.
 //
-// A synthetic model (synthetic.ts) runs here instead of a provider and
-// may end its round by asking a question, which parks the turn (ask).
-// So may a dangerous tool call (approval.ts): each one asks, one at a
-// time, before any of the round's calls runs; once all are answered
-// the turn, run again, finds the calls held (approval.held) and runs
-// them, or gives the declined ones an error result, before its next
-// round. A parked turn's usage so far is in its question and carried on.
+// A synthetic model (synthetic.ts) or a dangerous tool call (approval.ts,
+// one question at a time, before any call runs) may park the turn at a
+// question; run again, it runs the held calls or declines them. A parked
+// turn's usage so far is in its question and carried on.
 //
 // A turn never spirals: after settings.maxRounds() finished rounds it
 // pauses with a reason, and continuing gives it as many again. A round
@@ -164,7 +162,13 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		if (!scripted) {
 			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model, now: clock.now(), sessionId: id })
 			let defs = tools.defs()
-			return yield* turns.stream(model, { system, effort: running.effort, messages: await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model) }), tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id }, signal)
+			let messages = await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model) })
+			if (signal.aborted) return
+			for await (let event of turns.stream(model, { system, effort: running.effort, messages, tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id }, signal)) {
+				if (signal.aborted) return
+				yield event
+			}
+			return
 		}
 		let reply = scripted(await history.read(id), answers, id)
 		answers = undefined
@@ -183,8 +187,16 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let capped: string | undefined
 	try {
 		while (true) {
-			// The turn wanted to go on: a pause now stops it as paused.
-			let cancelled = () => signal.aborted && ((last = undefined), true)
+			// A steer cancels just this round. Replace its signal only after
+			// the provider and foreground tools have settled; Escape wins.
+			if (signal.aborted) {
+				last = undefined
+				if (!running.interrupt) break
+				running.interrupt = false
+				running.controller = new AbortController()
+				signal = running.controller.signal
+				status.transition(id, { type: 'request' })
+			}
 			let calls: ToolCallBlock[]
 			let decided = held?.decided ?? new Map<string, boolean>()
 			if (held) {
@@ -224,12 +236,9 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (last?.type === 'error' && last.failure && !last.cancelled && !signal.aborted) {
 					await turns.waitOut(id, last, failures++, signal)
 					if (turns.state.running.get(id) !== running) return
-					if (signal.aborted) {
-						last = undefined
-						break
-					}
 					continue
 				}
+				if (signal.aborted) continue
 				if (last?.type === 'done') {
 					failures = 0
 					rounds++
@@ -244,7 +253,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					continue
 				}
 			}
-			if (cancelled()) break
+			if (signal.aborted) continue
 			for (let call of calls) {
 				if (call.name === 'ask' && !askTool.answered(history.readSync(id), call)) {
 					// Bad model input is a tool error, not a broken turn.
@@ -261,6 +270,10 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let ending = false
 			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
 			for (let call of calls) {
+				if (signal.aborted) {
+					results.push({ type: 'tool_result', id: call.id, output: 'Tool call did not run: interrupted before dispatch.', isError: true })
+					continue
+				}
 				if (call.name !== 'ask' && decided.get(call.id) === false) { results.push(approval.declined(call)); continue }
 				let stream = call.name === 'bash' ? toolOutput.start(id, call.id) : undefined
 				try { results.push(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx)) }
@@ -269,7 +282,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			if (turns.state.running.get(id) !== running) return
 			let n = history.results(id, results)?.n
 			host.broadcast(id, n === undefined ? { type: 'tool-results', sessionId: id, results } : { type: 'tool-results', sessionId: id, results, n })
-			if (cancelled()) break
+			if (signal.aborted) continue
 			// A wait: the turn ends, done, unless steering waits to be read.
 			if (ending && !status.inboxOf(id).some((m) => !m.queue)) {
 				last = { type: 'done', reason: 'tool_use' }

@@ -101,14 +101,22 @@ progress, pause it with a reason.
 
 ## Talking while it works (task for the inbox)
 
-The user talks to models like a chat: several messages while the model
-is still working. Sending while a turn runs steers it: the messages go
-into the session inbox and the model gets them together at the next
-round boundary. Alt-Enter queues instead: it runs after the turn ends.
-A turn that streams nothing (retrying, blocked on a login) has nothing
-to steer: a message then joins the transcript at once, in the order
-typed, and the round after the wait takes it in. The user is just
-typing into the transcript; no (steering, waiting) labels.
+Ordinary submitted text immediately interrupts the active provider round,
+locally and remotely alike. The host durably receives it in the inbox
+before aborting the round signal, preserves partial output, settles any
+running foreground tool, and never dispatches pending calls after receipt.
+Only then does the same logical turn request again, delivering all waiting
+messages together in receipt order. Repeated submits during settlement
+coalesce without loss or duplication. Escape or closing the tab clears
+restart intent and leaves the inbox waiting until continue or a new submit.
+Interrupted rounds are not user pauses. Host recovery and command-ID
+deduplication use durable history; no private client interruption path.
+Alt-Enter queues instead and never interrupts: it runs after the turn ends.
+Advisory sends wait until the next round without aborting; send steer:true
+uses ordinary submission semantics. Neither advisory nor queue undoes an
+explicit pause. Ordinary submission also cancels retry/login waits; the
+next request re-evaluates the failure or login rather than stranding text.
+Slash commands retain their own immediate command behavior.
 A restart (Ctrl-R) never changes what the user sees.
 The inbox is always visible; nothing hides behind a command. The old
 queue told the user "1 message in the queue, use /queue" and sometimes

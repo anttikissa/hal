@@ -3,8 +3,9 @@
 //
 // Sending while a turn is busy puts the message in the session inbox
 // (src/common/inbox.ts), durable in history: steering messages go to
-// the model together before the turn's next request, queued ones run as
-// turns of their own once it has completed.
+// the model together after immediately cancelling its active round.
+// Queued and advisory messages never cancel a round; queued ones run
+// as turns of their own once it has completed.
 //
 // An edit of the last prompt (submit with `amend`, sent after the
 // client paused the turn) replaces that prompt when nothing with side
@@ -49,16 +50,21 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 	let call = commands.parse(text)
 	if (call) return slash.command(id, text, call, command, sender?.from)
 	let state = status.stateOf(id)
-	// A stalled turn (retrying, or blocked on a login) streams nothing:
-	// the user's message joins the transcript now, and its next round
-	// takes it in. Only a streaming turn has something to steer.
-	let stalled = state.type === 'retrying' || (state.type === 'blocked' && state.reason !== 'question')
-	if (stalled && !queue && sender?.from === undefined) return void prompts.deliver(id, [], { text }, command)
-	if (states.busy(state) || ((queue || sender?.from !== undefined) && state.type !== 'idle')) {
+	let interrupt = !queue && sender?.advisory !== true
+	if (turns.state.running.has(id) || states.busy(state) || ((queue || sender?.from !== undefined) && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
 		if (queue) record.queue = true
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
 		history.append(id, record)
+		// A steer aborts just this round; runTurn requests again with the
+		// inbox once the round's provider and tools have settled.
+		let running = turns.state.running.get(id)
+		if (interrupt && running) {
+			// Even just after Escape, while the turn still settles: it goes on.
+			status.transition(id, { type: 'submit' })
+			running.interrupt = true
+			running.controller.abort()
+		}
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		return
 	}

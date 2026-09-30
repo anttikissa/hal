@@ -151,6 +151,19 @@ test('a rate limit waits for the time the provider gave, visible in snapshots; E
 	expect(calls).toHaveLength(1)
 })
 
+test('a message sent during a rate-limit wait ends the wait and is read by the next request', async () => {
+	let a = client()
+	script = [[{ type: 'error', message: 'HTTP 429 from fake: quota', status: 429, failure: 'limited', retryAt: now + 3600_000 }]]
+	hold = true
+	let id = start(a)
+	await until(() => status.stateOf(id).type === 'retrying')
+	a.conn.send({ type: 'submit', sessionId: id, text: 'try again now' })
+	await until(() => calls.length === 2)
+	expect(JSON.stringify(calls[1]!.input.messages.at(-1))).toContain('try again now')
+	await until(() => a.ends().length)
+	expect(status.stateOf(id).type).toBe('idle')
+})
+
 test('a login in another tab resumes all quota waits without resuming paused or idle tabs', async () => {
 	let a = client()
 	let at = now + 3 * 3600_000

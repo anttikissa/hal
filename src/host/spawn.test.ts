@@ -73,14 +73,15 @@ test('wait with no subagent running says so at once and the turn goes on', async
 	expect(status.stateOf(p).type).toBe('running')
 })
 
-test('a wait does not end the turn while a message waits to be read', async () => {
+test('ordinary steering prevents pending spawn and wait calls from running', async () => {
 	let c = client()
 	let p = await parent(c)
 	c.conn.send({ type: 'submit', sessionId: p, text: 'also check docs' })
 	await until(() => status.inboxOf(p).length === 1)
 	calls[0]!.push(call('s1', 'spawn', { task: 'look around', mode: 'fresh' }), call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
 	let next = await callWith('also check docs')
-	expect(text(next)).toContain('Waiting for')
+	expect(text(next)).not.toContain('Waiting for')
+	expect(tabs.file().open).toEqual([p])
 	expect(status.stateOf(p).type).toBe('running')
 })
 

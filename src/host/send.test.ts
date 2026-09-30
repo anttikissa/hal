@@ -28,12 +28,15 @@ function pair(c: C, toolCwd = false): { a: string; b: string; by: string } {
 
 // Session b's model calls send; resolves once its next round started.
 async function send(c: C, b: string, input: Record<string, unknown>): Promise<number> {
-	let n = calls.length
+	let before = calls.length
+	let request = () => calls.findIndex((call, i) => i >= before && call.input.sessionId === b)
 	c.conn.send({ type: 'submit', sessionId: b, text: 'tell them' })
-	await until(() => calls.length === n + 1)
+	await until(() => request() >= 0)
+	let n = request()
 	calls[n]!.push(sendCall(input), { type: 'done', reason: 'tool_use' })
-	await until(() => calls.length >= n + 2)
-	return n + 1
+	let next = () => calls.findIndex((call, i) => i > n && call.input.sessionId === b)
+	await until(() => next() >= 0)
+	return next()
 }
 
 test('an advisory message reaches a working session with its next request, framed as not urgent, and names its sender', async () => {
@@ -85,18 +88,18 @@ test('steer is read like the user steering; queue waits for the turn to end', as
 	await until(() => calls.length === 1)
 	let next = await send(c, b, { to: '1', text: 'later', queue: true })
 	calls[next]!.push(sendCall({ to: '1', text: 'now', steer: true }, 's2'), { type: 'done', reason: 'tool_use' })
-	await until(() => calls.length === next + 2)
+	let recipient = () => calls.findIndex((call, i) => i > 0 && call.input.sessionId === a && lastText(i).endsWith('now'))
+	await until(() => recipient() >= 0)
 	expect(c.views.get(a)!.inbox.map((m) => [m.text, m.queue, m.advisory])).toEqual([
 		['later', true, undefined],
-		['now', undefined, undefined],
 	])
-	calls[0]!.push({ type: 'done', reason: 'end' })
-	await until(() => calls.length === next + 3)
-	expect(lastText(next + 2)).toMatch(new RegExp(`\\n\\[Inbox · ${by}\\]\\nnow$`))
-	calls[next + 2]!.push({ type: 'done', reason: 'end' })
-	// Only after the turn: the queued one, a turn of its own.
-	await until(() => calls.length === next + 4)
-	expect(lastText(next + 3)).toMatch(new RegExp(`\\n\\[Inbox · ${by}\\]\\nlater$`))
+	let steered = recipient()
+	expect(lastText(steered)).toMatch(new RegExp(`\\n\\[Inbox · ${by}\\]\\nnow$`))
+	calls[steered]!.push({ type: 'done', reason: 'end' })
+	// Only after the interrupted turn completes: the queued own turn.
+	let queued = () => calls.findIndex((call, i) => i > steered && call.input.sessionId === a)
+	await until(() => queued() >= 0)
+	expect(lastText(queued())).toMatch(new RegExp(`\\n\\[Inbox · ${by}\\]\\nlater$`))
 })
 
 test('sending to itself or to no session is an error result and delivers nothing', async () => {
@@ -127,12 +130,12 @@ test("an edit of the human's delivered message leaves another session's message 
 	await until(() => calls.length === 1)
 	calls[0]!.push(readCall())
 	await until(() => c.of('stream').length)
-	c.conn.send({ type: 'submit', sessionId: a, text: 'and hury' })
 	let next = await send(c, b, { to: '1', text: 'fyi' })
+	c.conn.send({ type: 'submit', sessionId: a, text: 'and hury' })
 	calls[0]!.push({ type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === next + 2)
 	let delivered = lastText(next + 1)
-	expect(delivered).toMatch(/and hury\n\n\[Inbox · [^\n]+\]\n<meta>[^\n]+<\/meta>\nfyi$/)
+	expect(delivered).toMatch(/\[Inbox · [^\n]+\]\n<meta>[^\n]+<\/meta>\nfyi\n\nand hury$/)
 	// Up edits the human's text, not the later one from the other session.
 	expect(amend.begin(c.views.get(a)!, '')?.editing.original).toBe('and hury')
 	c.conn.send({ type: 'pause', sessionId: a })
@@ -140,8 +143,8 @@ test("an edit of the human's delivered message leaves another session's message 
 	await until(() => calls.length === next + 3)
 	expect(lastText(next + 2)).toBe(delivered.replace('hury', 'hurry'))
 	expect(unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt').slice(-2))).toEqual([
-		{ type: 'prompt', text: 'and hurry' },
 		{ type: 'prompt', text: 'fyi', from: b, label: by, advisory: true },
+		{ type: 'prompt', text: 'and hurry' },
 	])
 })
 

@@ -15,7 +15,7 @@ useHost()
 const texts = (msg: any) => msg.blocks.map((b: any) => b.text)
 const inboxOf = (c: ReturnType<typeof client>, id: string) => c.views.get(id)!.inbox.map((m) => m.text)
 
-test('a message sent while a turn runs steers it: waiting messages reach the model together, before its next request', async () => {
+test('ordinary messages abort the round and coalesce before its replacement request', async () => {
 	let a = client()
 	let id = created(a)
 	let b = client()
@@ -28,12 +28,11 @@ test('a message sent while a turn runs steers it: waiting messages reach the mod
 	a.conn.send({ type: 'submit', sessionId: id, text: 'two', id: 'x2' })
 	expect([...a.of('rejected'), ...b.of('rejected')]).toEqual([])
 	expect(a.of('ack').map((e) => e.id)).toEqual(['x2'])
-	// Visible to everyone at once, and the round is not cut short.
+	// Visible to everyone immediately; no provider completion is needed.
 	expect(inboxOf(a, id)).toEqual(['one', 'two'])
 	expect(inboxOf(b, id)).toEqual(['one', 'two'])
 	expect((await fresh(id)).inbox.map((m) => m.text)).toEqual(['one', 'two'])
 	expect(calls.length).toBe(1)
-	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
 	expect(a.of('turn-end')).toEqual([])
 	// The earlier request is a prefix of this one: the prompt cache stays warm.
@@ -46,8 +45,9 @@ test('a message sent while a turn runs steers it: waiting messages reach the mod
 	expect(inboxOf(a, id)).toEqual([])
 	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)'])
 	// Again, and again the prefix holds.
+	calls[1]!.push({ type: 'text', text: 'ok' })
+	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
 	a.conn.send({ type: 'submit', sessionId: id, text: 'three' })
-	calls[1]!.push({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
 	await until(() => calls.length === 3)
 	let second = calls[1]!.input.messages
 	expect(calls[2]!.input.messages.slice(0, second.length)).toEqual(second)
@@ -71,7 +71,7 @@ test('a message sent while a turn runs steers it: waiting messages reach the mod
 	expect(a.of('turn-end')).toHaveLength(1)
 })
 
-test('steering during a tool round follows its results', async () => {
+test('steering before tool dispatch suppresses its call and pairs replay results', async () => {
 	let a = client()
 	let id = toolSession(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'look' })
@@ -82,7 +82,7 @@ test('steering during a tool round follows its results', async () => {
 	calls[0]!.push({ type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.slice(-2)).toEqual([
-		{ role: 'user', blocks: [{ type: 'tool_result', id: 't1', output: 'remember the milk\n' }] },
+		{ role: 'user', blocks: [{ type: 'tool_result', id: 't1', output: expect.stringContaining('did not run'), isError: true }] },
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('and hurry') }] },
 	])
 	calls[1]!.push({ type: 'done', reason: 'end' })
@@ -227,7 +227,9 @@ test('a steer resent to the next host is not added twice', async () => {
 	await until(() => b.views.get(id))
 	b.conn.send({ type: 'submit', sessionId: id, text: 'more', id: 'm1' })
 	expect(b.of('ack').map((e) => e.id)).toEqual(['m1'])
-	expect(inboxOf(b, id)).toEqual(['more'])
+	let pending = inboxOf(b, id).filter((text) => text === 'more').length
+	let delivered = (await records(id)).filter((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text' && b.text === 'more')).length
+	expect(pending + delivered).toBe(1)
 })
 
 // ── Editing the last prompt (tasks/j1/states.md) ──
@@ -365,7 +367,7 @@ test('a waiting message edited into a slash command runs as that command instead
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	a.conn.send({ type: 'submit', sessionId: id, text: '-help', id: 's1' })
+	a.conn.send({ type: 'submit', sessionId: id, text: '-help', queue: true, id: 's1' })
 	a.conn.send({ type: 'submit', sessionId: id, text: '/help', amend: true, edits: 's1' })
 	expect(inboxOf(a, id)).toEqual([])
 	expect(a.of('command').map((e) => e.text)).toEqual(['/help'])
