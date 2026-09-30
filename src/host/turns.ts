@@ -33,7 +33,7 @@ import { subagents } from './subagents.ts'
 import { toolOutput } from './tool-output.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
-type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController; interrupt?: boolean }
+type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController }
 // Asks the open turn's human a durable question: in history first,
 // then shown; the turn stops running here and waits, blocked, for the
 // first answer (reply), which runs it again. Nothing waits in memory:
@@ -103,8 +103,7 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 	let refused = status.transition(id, event)
 	if (refused) return refused
 	let running = turns.state.running.get(id)
-	// Escape wins over a pending steer restart.
-	if (running) return void ((running.interrupt = false), running.controller.abort())
+	if (running) return void running.controller.abort()
 	// A turn parked at a question has its usage so far there.
 	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = { type: 'turn_end', status: 'paused', usage: forms.open(history.readSync(id))?.usage ?? {} }
 	if (reason !== undefined) end.pauseReason = reason
@@ -187,15 +186,12 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let capped: string | undefined
 	try {
 		while (true) {
-			// A steer cancels just this round. Replace its signal only after
-			// the provider and foreground tools have settled; Escape wins.
+			// Aborted work has settled. A steer left a fresh controller
+			// (prompts.submit): go on with it. Escape aborted the current one.
 			if (signal.aborted) {
 				last = undefined
-				if (!running.interrupt) break
-				running.interrupt = false
-				running.controller = new AbortController()
+				if (running.controller.signal.aborted) break
 				signal = running.controller.signal
-				status.transition(id, { type: 'request' })
 			}
 			let calls: ToolCallBlock[]
 			let decided = held?.decided ?? new Map<string, boolean>()

@@ -56,14 +56,15 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 		if (queue) record.queue = true
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
 		history.append(id, record)
-		// A steer aborts just this round; runTurn requests again with the
-		// inbox once the round's provider and tools have settled.
+		// A steer swaps in a fresh controller and aborts the old one: the
+		// turn goes on with the inbox once the old work has settled.
 		let running = turns.state.running.get(id)
 		if (interrupt && running) {
 			// Even just after Escape, while the turn still settles: it goes on.
 			status.transition(id, { type: 'submit' })
-			running.interrupt = true
-			running.controller.abort()
+			let old = running.controller
+			running.controller = new AbortController()
+			old.abort()
 		}
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		return
