@@ -29,12 +29,16 @@ function init(): void {
 	find.state.undo = () => { history.append = append }
 }
 
+// Session meta is a live-file proxy (nested proxies too): postMessage
+// cannot clone it, and the throw would kill the host. Send plain data.
+function plain<T>(meta: T): T { return meta === undefined ? meta : JSON.parse(JSON.stringify(meta)) }
+
 function dirty(sessionId: string): void {
 	find.state.dirty.add(sessionId)
 	if (find.state.timer) return
 	find.state.timer = setTimeout(() => {
 		find.state.timer = undefined
-		for (let id of find.state.dirty) find.state.worker?.postMessage({ type: 'dirty', sessionId: id, meta: sessions.state.open.get(id) ? { ...sessions.state.open.get(id)! } : undefined })
+		for (let id of find.state.dirty) find.state.worker?.postMessage({ type: 'dirty', sessionId: id, meta: plain(sessions.state.open.get(id)) })
 		find.state.dirty.clear()
 	}, 0)
 }
@@ -44,7 +48,7 @@ function search(owner: object, request: string, query: string, kinds: FindFilter
 	if (find.state.error) { deliver({ type: 'find-results', request, tier: 'metadata', results: [], done: true, error: find.state.error }); return }
 	let channel = find.state.listeners.get(owner)?.channel ?? String(++find.state.serial)
 	find.state.listeners.set(owner, { channel, request, deliver })
-	find.state.worker!.postMessage({ type: 'search', channel, request, query, kinds, meta: [...sessions.state.open.values()].map((m) => ({ ...m })) })
+	find.state.worker!.postMessage({ type: 'search', channel, request, query, kinds, meta: [...sessions.state.open.values()].map(plain) })
 }
 
 function cancel(owner: object): void {
