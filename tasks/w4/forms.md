@@ -162,7 +162,7 @@ scroll. Typing into a search box never changes the height.
 ┌─ Model: anthropic/claude-opus-5-5 ─────────────────────────┐
 │ Search: _                                                   │
 │   ▶ hal                                                     │
-│   ▶ openai  (default: gpt-6-sol)                            │
+│   ▶ openai  (default: gpt-6.1-sol)                          │
 │   ▼ anthropic  (default: claude-opus-5-5)                   │
 │     ▼ opus  (default: claude-opus-5-5)                      │
 │ >     * 5.5          Claude Opus 5.5 · anthropic/claude-... │
@@ -185,7 +185,9 @@ the selected row is lit in the picker colour behind a `→`).
 Right opens the selected category and left closes it or the one the
 selection is in, also while searching;
 Enter on a category picks its default (the alias's model: gpt →
-gpt-6-sol, opus → claude-opus-5-5; else a family's or vendor's newest; a
+gpt-6.1-sol, opus → claude-opus-5-5; else a family's or vendor's
+newest. Promote a newer GPT default only after verifying it on the
+configured account; a
 provider has one only through an alias), and on one without a default
 opens or closes it. Typing ranks the models (`opus-5.5` finds
 claude-opus-5-5 first), shows only the matches with their categories

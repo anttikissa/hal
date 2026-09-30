@@ -110,18 +110,43 @@ test('versioned GPT aliases complete and select their own generation', () => {
 		process.env.OPENAI_API_KEY = 'test-key'
 		provider.state.providers = { openai: fake([]) }
 		models.state.lists.set('openai', { at: Date.now(), ids: ['openai/gpt-6.1-sol', 'openai/gpt-6-astra', 'openai/gpt-6-sol'] })
+		expect(models.resolve('gpt').id).toBe('openai/gpt-6.1-sol')
 		expect(models.resolve('gpt6.1').id).toBe('openai/gpt-6.1-sol')
 		expect(models.resolve('gpt6').id).toBe('openai/gpt-6-sol')
 		expect(models.resolve('gpt-6.1').id).toBe('openai/gpt-6.1-sol')
+		expect(models.resolve('astra').id).toBe('openai/gpt-6-astra')
+		expect(models.resolve('luna').id).toBe('openai/gpt-6-luna')
 		let c = client()
 		let id = created(c)
 		c.conn.send({ type: 'complete', sessionId: id, text: '/model gpt' })
+		c.conn.send({ type: 'complete', sessionId: id, text: '/model ast' })
+		expect(c.of('completions').at(-1)).toMatchObject({ items: ['/model astra'], descriptions: ['openai/gpt-6-astra'] })
+		c.conn.send({ type: 'complete', sessionId: id, text: '/model gpt' })
 		let reply = c.of('completions').at(-1)
 		expect(reply.items).toEqual(['/model gpt', '/model gpt-6.1', '/model gpt-6'])
-		expect(reply.descriptions).toEqual(['openai/gpt-6-sol', 'openai/gpt-6.1-sol', 'openai/gpt-6-sol'])
+		expect(reply.descriptions).toEqual(['openai/gpt-6.1-sol', 'openai/gpt-6.1-sol', 'openai/gpt-6-sol'])
+
 	} finally {
 		if (saved === undefined) delete process.env.OPENAI_API_KEY
 		else process.env.OPENAI_API_KEY = saved
+	}
+})
+
+test('popular GPT and Claude tier aliases select the intended model', () => {
+	let openaiKey = process.env.OPENAI_API_KEY
+	let anthropicKey = process.env.ANTHROPIC_API_KEY
+	try {
+		process.env.OPENAI_API_KEY = 'test-key'
+		process.env.ANTHROPIC_API_KEY = 'test-key'
+		provider.state.providers = { openai: fake([]), anthropic: fake([]) }
+		for (let [alias, id] of Object.entries({ gpt: 'openai/gpt-6.1-sol', astra: 'openai/gpt-6-astra', luna: 'openai/gpt-6-luna', sonnet: 'anthropic/claude-sonnet-5-5', fable: 'anthropic/claude-fable-5', haiku: 'anthropic/claude-haiku-4-5' })) {
+			expect(models.resolve(alias).id).toBe(id)
+		}
+	} finally {
+		if (openaiKey === undefined) delete process.env.OPENAI_API_KEY
+		else process.env.OPENAI_API_KEY = openaiKey
+		if (anthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY
+		else process.env.ANTHROPIC_API_KEY = anthropicKey
 	}
 })
 

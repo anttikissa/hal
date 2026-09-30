@@ -31,7 +31,7 @@ function rank(ids: string[], query: string, names: Record<string, string> = {}):
 
 // What the family aliases pick now (/model gpt, /model opus), and so the
 // default of their categories. Other categories default to their newest.
-const defaults: Record<string, string> = { gpt: 'openai/gpt-6-sol', opus: 'anthropic/claude-opus-5-5' }
+const defaults: Record<string, string> = { gpt: 'openai/gpt-6.1-sol', opus: 'anthropic/claude-opus-5-5' }
 // Providers in the old Hal's order; others follow in the host's order.
 const providers = ['hal', 'openai', 'anthropic', 'google', 'opencode-go', 'openrouter']
 const FAMILY = /(?:^|[-_])(fable|opus|sonnet|haiku|gpt|gemini|grok|kimi|qwen|deepseek|glm|minimax)(?=[-_.\d]|$)/i
