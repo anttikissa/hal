@@ -232,7 +232,7 @@ export type Event =
 	| { type: 'meta'; sessionId: string; meta: SessionMeta; stats?: Stats }
 	// Sent only to the client that asked: every full text `text` may
 	// complete to, none if nothing fits.
-	| { type: 'completions'; sessionId: string; text: string; items: string[] }
+	| { type: 'completions'; sessionId: string; text: string; items: string[]; descriptions?: string[] }
 	// Open the model picker: the session's model and every model id to
 	// offer. Sent to the client that asked (`models`), or to every
 	// follower when /model runs alone. `names`: display names models.dev
@@ -341,7 +341,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	output: { sessionId: 's', text: 's' },
 	divider: { sessionId: 's', text: 's' },
 	meta: { sessionId: 's', meta: 'o', stats: 'o?' },
-	completions: { sessionId: 's', text: 's', items: 'S' },
+	completions: { sessionId: 's', text: 's', items: 'S', descriptions: 'S?' },
 	models: { sessionId: 's', current: 's', items: 'S', effort: 's?', capabilities: 'o?' },
 	attached: { sessionId: 's', command: 's', blob: 's', marker: 's' },
 	warning: { text: 's' },
@@ -376,6 +376,7 @@ function invalidEvent(value: unknown): string | undefined {
 		if (v === undefined && kind.endsWith('?')) continue
 		if (!kinds[kind[0]!]!(v)) return `${value.type}: ${path} must be ${kindNames[kind[0]!]}`
 	}
+	if (value.type === 'completions' && value.descriptions !== undefined && (value.descriptions as string[]).length !== (value.items as string[]).length) return 'completions: descriptions must align with items'
 	if (value.type === 'tabs' && !(value.tabs as unknown[]).every((t) => isObject(t) && ['id', 'name', 'cwd'].every((k) => typeof t[k] === 'string'))) return 'tabs: every tab needs an id, name and cwd'
 	if (value.type === 'find-results') {
 		let tiers = ['metadata', 'user', 'assistant', 'thinking', 'tool-call', 'tool-output', 'other']

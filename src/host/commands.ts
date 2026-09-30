@@ -35,6 +35,8 @@ export type SlashCommand = {
 	help?(args: string): string
 	// Full argument texts `args` may complete to.
 	complete?(args: string, ctx: Context): string[]
+	// Optional detail for each candidate, resolved on the host.
+	describeCompletion?(args: string, ctx: Context): string
 	run(args: string, answers: Answers | undefined, ctx: Context): Reply | Promise<Reply>
 }
 
@@ -74,6 +76,15 @@ function complete(text: string, ctx: Context): string[] {
 	}
 }
 
+// Keep replacement strings compatible with terminal completion; optional
+// aligned descriptions let richer clients show the actual host-side choice.
+function suggestions(text: string, ctx: Context): { items: string[]; descriptions?: string[] } {
+	let items = commands.complete(text, ctx)
+	let parsed = commands.parse(text)
+	let cmd = parsed && commands.all().get(parsed.name)
+	return cmd?.describeCompletion ? { items, descriptions: items.map((item) => cmd.describeCompletion!(commands.parse(item)!.args, ctx)) } : { items }
+}
+
 // `path` as an absolute path: ~ is the home directory, and a relative
 // path starts at `cwd`.
 function expand(path: string, cwd: string): string {
@@ -87,5 +98,6 @@ export const commands = {
 	all,
 	parse,
 	complete,
+	suggestions,
 	expand,
 }

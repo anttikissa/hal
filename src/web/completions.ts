@@ -5,22 +5,22 @@ import { completion } from '../common/completion.ts'
 
 export type Choice = { value: string; label: string; description: string }
 export type Menu = { input: string; choices: Choice[]; selected: number }
-export type Known = { input: string; items: string[] }
+export type Known = { input: string; items: string[]; descriptions?: string[] }
 
 // Use the host's full candidate set for a longer prefix while its next
 // answer is in flight. A shorter prefix might have additional matches.
 function predict(text: string, known: Known | undefined, current?: Menu): Menu | undefined {
 	if (!known || !text.startsWith(known.input)) return current
-	return completions.receive(text, known.items.filter((item) => item.startsWith(text)), current)
+	return completions.receive(text, known.items.filter((item) => item.startsWith(text)), current, known.descriptions?.filter((_, i) => known.items[i]!.startsWith(text)))
 }
 
-function receive(input: string, items: string[], previous?: Menu): Menu | undefined {
+function receive(input: string, items: string[], previous?: Menu, descriptions?: string[]): Menu | undefined {
 	if (!items.length) return undefined
 	let short = completion.apply(input, items).choices
 	let choices = items.map((value, i) => {
 		let name = value.trimEnd().split(' ')[0]!
 		let label = short?.[i] ?? (name === value.trimEnd() ? name : value.slice(value.lastIndexOf(' ') + 1))
-		let description = (name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) ?? (value.endsWith('/') ? 'directory' : 'path')
+		let description = descriptions?.[i] ?? (name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) ?? (value.endsWith('/') ? 'directory' : 'path')
 		return previous?.choices.find((choice) => choice.value === value && choice.label === label && choice.description === description) ?? { value, label, description }
 	})
 	if (previous && choices.length === previous.choices.length && choices.every((choice, i) => choice === previous.choices[i])) return previous

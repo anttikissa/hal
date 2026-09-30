@@ -115,8 +115,10 @@ test('versioned GPT aliases complete and select their own generation', () => {
 		expect(models.resolve('gpt-6.1').id).toBe('openai/gpt-6.1-sol')
 		let c = client()
 		let id = created(c)
-		c.conn.send({ type: 'complete', sessionId: id, text: '/model gpt6' })
-		expect(c.of('completions').at(-1).items).toEqual(['/model gpt6.1', '/model gpt6'])
+		c.conn.send({ type: 'complete', sessionId: id, text: '/model gpt' })
+		let reply = c.of('completions').at(-1)
+		expect(reply.items).toEqual(['/model gpt', '/model gpt-6.1', '/model gpt-6'])
+		expect(reply.descriptions).toEqual(['openai/gpt-6-sol', 'openai/gpt-6.1-sol', 'openai/gpt-6-sol'])
 	} finally {
 		if (saved === undefined) delete process.env.OPENAI_API_KEY
 		else process.env.OPENAI_API_KEY = saved

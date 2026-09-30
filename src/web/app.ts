@@ -104,10 +104,10 @@ function onEvent(event: Event): void {
 	}
 	if (event.type === 'completions' && st.view.transcript?.meta.id === event.sessionId && st.text === event.text) {
 		if (st.suppressed === event.text) return
-		st.known = { input: event.text, items: event.items }
+		st.known = { input: event.text, items: event.items, descriptions: event.descriptions }
 		if (st.completedByTab === event.text) {
 			st.completedByTab = undefined
-			if (event.items.length > 1) st.menu = completions.receive(event.text, event.items, st.menu)
+			if (event.items.length > 1) st.menu = completions.receive(event.text, event.items, st.menu, event.descriptions)
 			else {
 				let done = view.completed(st.view, event, st.text)
 				if (done) {
@@ -118,7 +118,7 @@ function onEvent(event: Event): void {
 					st.suppressed = done.text
 				}
 			}
-		} else st.menu = completions.receive(event.text, event.items, st.menu)
+		} else st.menu = completions.receive(event.text, event.items, st.menu, event.descriptions)
 		app.changed()
 		return
 	}

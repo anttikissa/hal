@@ -287,7 +287,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		}
 		let page = pages.slices(pages.pageSteps(c.sessionId, c.before))
 		return page instanceof Promise ? page.then(answer) : answer(page)
-	} else if (c.type === 'complete') client.deliver({ type: 'completions', sessionId: c.sessionId, text: c.text, items: commands.complete(c.text, slash.context(c.sessionId)) })
+	} else if (c.type === 'complete') client.deliver({ type: 'completions', sessionId: c.sessionId, text: c.text, ...commands.suggestions(c.text, slash.context(c.sessionId)) })
 	return refused === undefined ? {} : { refused }
 }
 

@@ -136,15 +136,16 @@ test('typing opens host completions; keyboard choice is not sent, stale answers 
 // menu between the two is an observable layout jump, not loading feedback.
 test('a completion menu remains identical across input and an unchanged host reply', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
-	app.input('/lo')
-	app.onEvent({ type: 'completions', sessionId, text: '/lo', items: ['/login '] })
+	app.input('/model gp')
+	app.onEvent({ type: 'completions', sessionId, text: '/model gp', items: ['/model gpt-6.1'], descriptions: ['openai/gpt-6.1-sol'] })
 	let shown = app.state.menu
-	app.input('/log')
+	expect(shown?.choices[0]?.description).toBe('openai/gpt-6.1-sol')
+	app.input('/model gpt')
 	expect(app.state.menu).toBe(shown)
-	expect(sent.at(-1)).toMatchObject({ type: 'complete', text: '/log' })
-	app.onEvent({ type: 'completions', sessionId, text: '/lo', items: [] })
+	expect(sent.at(-1)).toMatchObject({ type: 'complete', text: '/model gpt' })
+	app.onEvent({ type: 'completions', sessionId, text: '/model gp', items: [] })
 	expect(app.state.menu).toBe(shown)
-	app.onEvent({ type: 'completions', sessionId, text: '/log', items: ['/login '] })
+	app.onEvent({ type: 'completions', sessionId, text: '/model gpt', items: ['/model gpt-6.1'], descriptions: ['openai/gpt-6.1-sol'] })
 	expect(app.state.menu).toBe(shown)
 })
 
