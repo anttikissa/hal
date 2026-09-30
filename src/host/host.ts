@@ -203,6 +203,7 @@ function answer(client: Client, c: Command, outcome: Outcome, repeat = true): vo
 // Carries out a valid command: what it did (a promise if that takes
 // slices), or undefined if it will answer later.
 function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined {
+	clients.input(client.record, c)
 	if (c.type === 'find') { find.search(client, c.request, c.query, c.kinds, client.deliver); return {} }
 	if (c.type === 'find-cancel') { find.cancel(client); return {} }
 	if (c.type === 'create' || c.type === 'open-newest') {

@@ -6,7 +6,7 @@ import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
-import { synthetic } from './synthetic.ts'
+import { profile } from './profile.ts'
 
 type Period = 'neutral' | 'morning' | 'afternoon' | 'evening'
 
@@ -72,9 +72,8 @@ const pool: Record<Period, string[]> = {
 }
 
 function period(timezone?: string, now = clock.now()): Period {
-	// There is currently no client-local timezone in the protocol. An
-	// absent/invalid profile zone must not fall back to the host's zone.
-	if (!timezone || !synthetic.timezone(timezone)) return 'neutral'
+	// An absent or invalid profile zone must not fall back to the host's.
+	if (!timezone || !profile.timezone(timezone)) return 'neutral'
 	let hour = Number(new Intl.DateTimeFormat('en', { timeZone: timezone, hour: 'numeric', hourCycle: 'h23' }).format(now))
 	return hour >= 7 && hour < 12 ? 'morning' : hour >= 12 && hour < 18 ? 'afternoon' : hour >= 18 && hour < 23 ? 'evening' : 'neutral'
 }
@@ -82,14 +81,14 @@ function period(timezone?: string, now = clock.now()): Period {
 function name(value?: string): string | undefined {
 	// Profile content is data, not terminal commands or Markdown. Refuse
 	// control/bidi characters rather than trying to repair escape sequences.
-	let text = synthetic.userValue(value)
+	let text = profile.value(value)
 	if (!text || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(text)) return undefined
 	return text.replace(/[\\`*_[\]()#|>&!/-]/g, '\\$&')
 }
 
-function choose(profile: string, previous?: string): string {
-	let name = greetings.name(synthetic.userField(profile, 'Name'))
-	let period = greetings.period(synthetic.userField(profile, 'Timezone'))
+function choose(text: string, previous?: string): string {
+	let name = greetings.name(profile.field(text, 'Name'))
+	let period = greetings.period(profile.field(text, 'Timezone'))
 	let candidates = [...pool.neutral, ...(period === 'neutral' ? [] : pool[period])]
 		.filter((text) => name !== undefined || !text.includes('{name}'))
 		.map((text) => text.replace('{name}', () => name ?? ''))
@@ -104,7 +103,7 @@ function open(id: string): void {
 	let previous = liveFiles.liveFile<{ last?: string }>(`${paths.stateDir()}/greetings.ason`, {}, { watch: false, mode: 0o600 })
 	try {
 		if (previous.last !== undefined && typeof previous.last !== 'string') throw new Error('greetings.ason: invalid last greeting')
-		let text = greetings.choose(synthetic.userText(), previous.last)
+		let text = greetings.choose(profile.text(), previous.last)
 		history.append(id, { type: 'output', text })
 		previous.last = text
 	} finally {

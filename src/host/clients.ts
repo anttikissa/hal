@@ -10,7 +10,9 @@ export type Kind = 'own' | 'peer' | 'remote' | 'web'
 export type ClientInfo = { kind: Kind; address?: string; userAgent?: string }
 // `open`: the sessions the connection follows, live; `followed`: what
 // it followed when it left.
-export type ClientRecord = ClientInfo & { connectedAt: number; lastAt: number; open: Set<string>; pid?: number; goneAt?: number; followed?: string[] }
+// `timezone`: the IANA zone the client reported on connecting (task wq),
+// for this connection only: never persisted or logged.
+export type ClientRecord = ClientInfo & { connectedAt: number; lastAt: number; open: Set<string>; pid?: number; goneAt?: number; followed?: string[]; timezone?: string }
 
 const goneMs = 24 * 60 * 60 * 1000
 
@@ -30,6 +32,39 @@ function hello(rec: ClientRecord, pid: number): Record<string, never> {
 	rec.pid = pid
 	for (let old of clients.state.records) if (old.goneAt !== undefined && old.kind === 'peer' && old.pid === pid) clients.state.records.delete(old)
 	return {}
+}
+
+// A zone a client reports is untrusted: a bounded name Intl knows, not a
+// numeric offset, else ignored.
+function zone(value: unknown): string | undefined {
+	if (typeof value !== 'string' || !value || value.length > 64 || /^[+-]|\d:?\d\d$/.test(value)) return undefined
+	try { new Intl.DateTimeFormat('en', { timeZone: value }); return value } catch { return undefined }
+}
+
+// What a command tells about its client: the zone of its handshake, or
+// that it gave a session input, which makes it that session's voice.
+function input(rec: ClientRecord, c: { type: string; sessionId?: string; timezone?: unknown }): void {
+	if (c.type === 'tab-start' || c.type === 'tab-resume') {
+		let tz = clients.zone(c.timezone)
+		if (tz) rec.timezone = tz
+		else delete rec.timezone
+	}
+	if ((c.type === 'submit' || c.type === 'answer') && c.sessionId) clients.state.senders.set(c.sessionId, rec)
+}
+
+// The zone of the client that last gave session `id` input, else of a
+// connected one following it; the host's own zone is clients.hostZone().
+function timezone(id: string): string | undefined {
+	let sender = clients.state.senders.get(id)?.timezone
+	if (sender) return sender
+	for (let rec of clients.state.records) if (rec.goneAt === undefined && rec.open.has(id) && rec.timezone) return rec.timezone
+	return undefined
+}
+
+// UTC and its aliases say nothing about where a person is: a server's
+// default, or a terminal over SSH.
+function utcLike(tz: string): boolean {
+	return /^(?:Etc\/.*|(?:Etc\/)?(?:UTC|UCT|GMT|Universal|Zulu|Greenwich)(?:[+-]0)?)$/i.test(tz)
 }
 
 function touch(rec: ClientRecord): void {
@@ -109,6 +144,10 @@ function draw(): string {
 
 function reset(): void {
 	clients.state.records.clear()
+	clients.state.senders.clear()
 }
 
-export const clients = { state: { records: new Set<ClientRecord>() }, join, hello, touch, leave, fromRequest, shortAgent, tty, draw, reset }
+export const clients = {
+	state: { records: new Set<ClientRecord>(), senders: new Map<string, ClientRecord>() },
+	hostZone: (): string => Intl.DateTimeFormat().resolvedOptions().timeZone,
+	join, hello, zone, input, timezone, utcLike, touch, leave, fromRequest, shortAgent, tty, draw, reset }

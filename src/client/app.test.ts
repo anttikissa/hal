@@ -545,7 +545,7 @@ test('connecting asks the host for the tab to show; its ack focuses and follows 
 	app.state.start = { cwd: '/w', last: 'b' }
 	app.onState({ type: 'connected', role: 'host' })
 	// It also asks for a code for its web links.
-	expect(sent).toEqual([{ type: 'tab-start', cwd: '/w', last: 'b' }, { type: 'auth', link: true }])
+	expect(sent).toEqual([{ type: 'tab-start', cwd: '/w', last: 'b', timezone: expect.any(String) }, { type: 'auth', link: true }])
 	app.onEvent(tabsEvent('a', 'b'))
 	expect(shown()).toBeUndefined()
 	acked('b')
@@ -553,13 +553,13 @@ test('connecting asks the host for the tab to show; its ack focuses and follows 
 	expect(sent.at(-1)).toEqual({ type: 'open', sessionId: 'b' })
 	// A reconnect asks for the tab shown, in its own cwd.
 	app.onState({ type: 'connected', role: 'client' })
-	expect(sent.at(-2)).toEqual({ type: 'tab-start', cwd: '/b', last: 'b' })
+	expect(sent.at(-2)).toEqual({ type: 'tab-start', cwd: '/b', last: 'b', timezone: expect.any(String) })
 })
 
 test('a remote client starts without a cwd (it names nothing there) and its status names the host', () => {
 	app.state.start = { last: 'b' }
 	app.onState({ type: 'connected', role: 'client' })
-	expect(sent[0]).toEqual({ type: 'tab-start', last: 'b' })
+	expect(sent[0]).toEqual({ type: 'tab-start', last: 'b', timezone: expect.any(String) })
 	startOn(['a'])
 	let link = connection.state.link
 	connection.state.link = { type: 'connected', role: 'client' }

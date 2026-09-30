@@ -12,7 +12,9 @@ import { history } from './history.ts'
 import { naming } from './naming.ts'
 import { liveFiles } from './live-file.ts'
 import { models as modelList } from './models.ts'
+import { prompts } from './prompts.ts'
 import { sessions } from './sessions.ts'
+import { status } from './status.ts'
 import { host } from './host.ts'
 import { stats } from './stats.ts'
 import { turns } from './turns.ts'
@@ -98,6 +100,8 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 	if (reply.show !== undefined) host.broadcast(id, { type: 'output', sessionId: id, text: reply.show, ...slash.placed(id) })
 	if (reply.error !== undefined) slash.output(id, reply.error, true)
 	if (reply.open === 'models') void slash.models(id).then((e) => host.broadcast(id, e))
+	// The intro paused for this login (task vc): signed in, it goes on.
+	if (name === 'login' && !reply.ask && !reply.error && sessions.open(id).model === 'hal/intro' && status.stateOf(id).type === 'paused') prompts.resume(id)
 	if (!reply.ask) return reply
 	let problem = forms.invalid(reply.ask)
 	if (problem) {

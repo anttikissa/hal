@@ -304,7 +304,7 @@ test('a block address resumes even a closed session, retaining its hash and hist
 	address = 'http://h/2-bbb#5'
 	history = [address]
 	app.onState({ type: 'connected', role: 'client' })
-	expect(sent).toContainEqual({ type: 'tab-resume', id: expect.any(String), sessionId: '2-bbb' })
+	expect(sent).toContainEqual({ type: 'tab-resume', id: expect.any(String), sessionId: '2-bbb', timezone: expect.any(String) })
 	app.onEvent(tabsEvent(tab('1-aaa')))
 	expect(app.state.shown).toBeUndefined()
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))

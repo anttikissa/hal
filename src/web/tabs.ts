@@ -67,15 +67,16 @@ function onEvent(event: Event): boolean {
 
 // Each connection brings the tabs; tab-start picks the one to show.
 function connected(): void {
+	let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 	let addressed = router.parse(router.href())
 	if (!app.state.shown && addressed) {
 		app.state.landing = addressed
 		let id = connection.nextId()
 		app.state.asked.add(id)
-		connection.send({ type: 'tab-resume', id, sessionId: addressed })
+		connection.send({ type: 'tab-resume', id, sessionId: addressed, timezone })
 	} else {
 		let last = app.state.shown ?? router.store.load()
-		connection.send(last ? { type: 'tab-start', last } : { type: 'tab-start' })
+		connection.send(last ? { type: 'tab-start', last, timezone } : { type: 'tab-start', timezone })
 	}
 }
 

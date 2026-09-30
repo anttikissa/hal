@@ -136,13 +136,14 @@ export type Command = (
 	| { type: 'tab-close'; sessionId: string }
 	// Reopen that closed session, or the most recently closed one, where
 	// it was.
-	| { type: 'tab-resume'; sessionId?: string }
+	| { type: 'tab-resume'; sessionId?: string; timezone?: string }
 	| { type: 'tab-move'; sessionId: string; index: number }
 	// The tab a starting client shows: `last` if still open and in cwd,
 	// else the first open tab in cwd, else a new tab in cwd. With no cwd
 	// (the browser) any tab counts, and a new one goes in the host's
 	// working directory. The tabs themselves come on connecting.
-	| { type: 'tab-start'; cwd?: string; last?: string }
+	// `timezone` (both): the client's IANA zone, untrusted (task wq).
+	| { type: 'tab-start'; cwd?: string; last?: string; timezone?: string }
 	// A client showed the tab: it no longer wants attention.
 	| { type: 'tab-seen'; sessionId: string }
 	// An attachment for a later prompt (task 2a): `data` is base64 of a

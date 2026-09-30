@@ -22,6 +22,7 @@ const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
 const saved = { dir: commands.dir, home: commands.home }
 const origModels = synthetic.models
+const origPause = synthetic.pauseMs
 const origStream = turns.stream
 let home = ''
 let work = ''
@@ -37,6 +38,7 @@ beforeEach(() => {
 	liveFiles.onError = () => {}
 	commands.home = () => work
 	synthetic.models = { ...origModels }
+	synthetic.pauseMs = () => 0
 })
 
 afterEach(() => {
@@ -45,6 +47,7 @@ afterEach(() => {
 	history.state.running.clear()
 	Object.assign(commands, saved)
 	synthetic.models = origModels
+	synthetic.pauseMs = origPause
 	turns.stream = origStream
 	liveFiles.onError = origOnError
 	if (savedHome === undefined) delete process.env.HAL_HOME

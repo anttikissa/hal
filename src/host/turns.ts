@@ -156,6 +156,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	history.carry(id, running.provider, turns.parkedUsage(records))
 	let held = approval.held(records)
 	let asking: Form | undefined
+	let stopping: string | undefined
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
 		if (!scripted) {
@@ -172,8 +173,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		let reply = scripted(await history.read(id), answers, id)
 		answers = undefined
 		asking = reply.ask
-		if (reply.say) yield { type: 'text', text: reply.say }
-		yield { type: 'done', reason: 'end' }
+		stopping = reply.pause
+		yield* synthetic.paced(reply.say, signal)
 	}
 	let last: DoneEvent | ErrorEvent | undefined
 	let failure: string | undefined
@@ -241,6 +242,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					last = turns.stopped(last)
 				}
 				if (asking && last?.type === 'done' && !signal.aborted) return turns.ask(id, asking)
+				if (stopping && last?.type === 'done' && !signal.aborted) [capped, last] = [stopping, undefined]
+				if (capped) break
 				calls = round.blocks.filter((b) => b.type === 'tool_call')
 				if (last?.type !== 'done') break
 				// A finished answer with steering waiting: the model hears it.

@@ -147,7 +147,8 @@ function onState(state: LinkState): void {
 	if (state.type === 'connected') {
 		let tab = app.focusedTab()
 		let last = tab?.id ?? st.start.last, cwd = tab?.cwd ?? st.start.cwd
-		app.send({ type: 'tab-start', ...(cwd === undefined ? {} : { cwd }), ...(last === undefined ? {} : { last }) })
+		let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+		app.send({ type: 'tab-start', ...(cwd === undefined ? {} : { cwd }), ...(last === undefined ? {} : { last }), ...(timezone ? { timezone } : {}) })
 		// A code for the web links this terminal prints (task e3).
 		app.send({ type: 'auth', link: true })
 	}

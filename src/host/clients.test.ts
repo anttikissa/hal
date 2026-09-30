@@ -37,3 +37,21 @@ test('the diagram lists live peers beside the host and others below, gone ones m
 		delete (clients as any).tty
 	}
 })
+
+test('a reported timezone is kept only when valid, and a session hears its latest sender, else a follower', () => {
+	let a = clients.join(new Set(['s1'])), b = clients.join(new Set(['s1']))
+	clients.input(a, { type: 'tab-start', timezone: 'Europe/Helsinki' })
+	for (let bad of ['+05:30', 'UTC+02:00', 'Mars/Olympus', 'x'.repeat(100), 7]) {
+		clients.input(b, { type: 'tab-resume', timezone: bad })
+		expect(b.timezone).toBeUndefined()
+	}
+	clients.input(b, { type: 'tab-start', timezone: 'America/New_York' })
+	// No input yet: a connected follower's zone.
+	expect([a.timezone, b.timezone]).toContain(clients.timezone('s1'))
+	clients.input(b, { type: 'submit', sessionId: 's1' })
+	expect(clients.timezone('s1')).toBe('America/New_York')
+	clients.input(a, { type: 'answer', sessionId: 's1' })
+	expect(clients.timezone('s1')).toBe('Europe/Helsinki')
+	expect(clients.timezone('s2')).toBeUndefined()
+	expect(clients.utcLike('Etc/UTC') && clients.utcLike('GMT') && !clients.utcLike('Europe/London')).toBe(true)
+})
