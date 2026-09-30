@@ -64,7 +64,6 @@ function check(value: unknown): HistoryRecord {
 	}
 	return r
 }
-
 function file(id: string): string {
 	return `${paths.sessionDir(id)}/history.asonl`
 }
