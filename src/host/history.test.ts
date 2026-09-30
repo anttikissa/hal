@@ -10,11 +10,13 @@ import { pages } from './pages.ts'
 import { liveFiles } from './live-file.ts'
 import { provider } from './provider.ts'
 import { sessions } from './sessions.ts'
+import { naming } from './naming.ts'
 
 const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
 const origStream = provider.stream
 const origLog = diag.log
+const origPrepare = naming.prepare
 let home = ''
 let logged: string[] = []
 
@@ -22,6 +24,8 @@ beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-history-`)
 	process.env.HAL_HOME = home
 	liveFiles.onError = () => {}
+	// History contracts are independent of title reminder scheduling.
+	naming.prepare = () => {}
 	logged = []
 	diag.log = (m) => void logged.push(m)
 })
@@ -30,6 +34,7 @@ afterEach(() => {
 	sessions.closeAll()
 	history.state.running.clear()
 	provider.stream = origStream
+	naming.prepare = origPrepare
 	diag.log = origLog
 	liveFiles.onError = origOnError
 	if (savedHome === undefined) delete process.env.HAL_HOME

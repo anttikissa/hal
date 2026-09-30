@@ -428,7 +428,6 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	let conn = host.connect((e) => local.push(e))
 	conn.send({ type: 'create', cwd: '/tmp', model: 'fake/m' })
 	let id = (local.find((e) => e.type === 'snapshot') as any).sessionId
-	sessions.open(id).nameOwner = 'manual'
 
 	let w = await dial(await cookie())
 	expect(w.opened).toBe(true)
@@ -445,7 +444,7 @@ test('a submit streams to both a web and an in-memory client', async () => {
 	await until(() => w.events.some((e) => e.type === 'turn-end') && local.some((e) => e.type === 'turn-end'))
 	let seen = (events: any[]) => events.filter((e) => !['snapshot', 'rejected', 'tabs'].includes(e.type))
 	expect(seen(w.events)).toEqual(seen(local))
-	expect(seen(w.events).map((e) => e.type)).toEqual(['state', 'turn-start', 'state', 'stream', 'turn-end', 'state'])
+	expect(seen(w.events).map((e) => e.type)).toEqual(['state', 'meta', 'turn-start', 'state', 'stream', 'turn-end', 'state'])
 
 	// A closed browser is no longer a host client.
 	w.ws.close()
