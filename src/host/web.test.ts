@@ -484,7 +484,11 @@ async function launch() {
 			waiting.set(++next, resolve)
 			ws.send(JSON.stringify({ id: next, method, params }))
 		})
-	let evaluate = async (expression: string) => (await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result?.result?.value
+	let evaluate = async (expression: string) => {
+		let response = await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
+		if (response.result?.exceptionDetails) throw new Error(response.result.exceptionDetails.exception?.description ?? response.result.exceptionDetails.text)
+		return response.result?.result?.value
+	}
 	let waitFor = async (expression: string) => {
 		for (let i = 0; i < 250; i++) {
 			if (await evaluate(expression)) return
@@ -613,7 +617,7 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await b.waitFor(
 			`(() => { let t = document.querySelector('textarea'); t.value = 'hi'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`,
 		)
-		await b.waitFor(`document.querySelector('main').innerText.includes('hello from fake')`)
+		await b.waitFor(`document.querySelector('main')?.innerText.includes('hello from fake')`)
 		expect(await b.evaluate(`document.querySelector('.user').textContent`)).toMatch(/^\d\d:\d\d Youhi$/)
 		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('')
 		// Typing redraws the message box, not the transcript: the cards keep
@@ -683,7 +687,7 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await key('ArrowRight')
 		await b.waitFor(`document.querySelector('[aria-pressed=true]')?.textContent === 'no'`)
 		await key('Enter')
-		await b.waitFor(`!document.querySelector('form') && document.querySelector('main').innerText.includes('Create it?\\n  no')`)
+		await b.waitFor(`!document.querySelector('form') && document.querySelector('main')?.innerText.includes('Create it?\\n  no')`)
 		await b.waitFor(`document.activeElement === document.querySelector('textarea')`)
 		// Ctrl-M opens the model picker, which takes the keys; Escape
 		// closes it and gives the message box the focus back.
@@ -757,7 +761,7 @@ test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay
 		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
 		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
-		await b.waitFor(`document.querySelector('main').innerText.includes('thought 3') && !document.querySelector('main').innerText.includes('prompt 0')`)
+		await b.waitFor(`document.querySelector('main')?.innerText.includes('thought 3') && !document.querySelector('main')?.innerText.includes('prompt 0')`)
 		// Open the newest thinking card, then read up to the top until the
 		// first prompt has arrived.
 		await b.evaluate(`[...document.querySelectorAll('.Card.thinking')].at(-1).click()`)
@@ -903,7 +907,7 @@ test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to 
 		let enter = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '${text}'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })()`)
 		// Enter is refused with a notice until the session is open.
 		await b.waitFor(`(() => { let t = document.querySelector('textarea'); if (!t) return false; t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`)
-		await b.waitFor(`document.querySelector('main').innerText.includes('streaming now')`)
+		await b.waitFor(`document.querySelector('main')?.innerText.includes('streaming now')`)
 		await enter('/help')
 		await b.waitFor(`(() => { let c = document.querySelector('.Card.pending'); return c && c.textContent.endsWith('/help') && !c.getAnimations().some((a) => !(a instanceof CSSTransition)) })()`)
 		let moved = await b.evaluate(`(async () => {
@@ -1028,6 +1032,99 @@ test.skipIf(!chrome)('phone landscape shrinks chrome and bounds long drafts as t
 		let desktop = await geometry()
 		expect(desktop.transcriptFont).toBe(14)
 		expect(desktop.statusFont).toBe(portrait.statusFont)
+	} finally {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+}, 20000)
+
+test.skipIf(!chrome)('rotation preserves exclusive 40px edge gaps or the text at the viewport centre', async () => {
+	providerHome()
+	let id = tabs.create('/tmp')
+	let longReply = Array.from({ length: 100 }, (_, i) => `Paragraph ${i}: the separate activity row is gone. This uniquely numbered paragraph has enough text to wrap differently after rotating the phone, while its words retain their identity.`).join('\n\n')
+	turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> { yield { type: 'text', text: longReply }; yield { type: 'done', reason: 'end' } })()
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.startsWith('Session ')")
+		await b.evaluate("let t = document.querySelector('textarea'); t.value = 'reply'; t.dispatchEvent(new Event('input', { bubbles: true }))")
+		await b.evaluate("document.querySelector('.entry .actions button').click()")
+		await b.waitFor("document.querySelector('main')?.textContent.includes('Paragraph 99:') && document.querySelector('.activity').textContent.includes('idle')")
+		let resize = async (landscape: boolean) => {
+			let width = landscape ? 844 : 390, height = landscape ? 390 : 760
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+			await b.waitFor(`document.querySelector('.App').clientWidth === ${width} && document.querySelector('.App').clientHeight === ${height}`)
+			await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
+		}
+		let position = async (edge: 'top' | 'bottom' | 'middle', distance = 0) => {
+			await b.evaluate(`(() => {
+				let el = document.querySelector('main'); el.dispatchEvent(new WheelEvent('wheel', { bubbles: true }));
+				el.scrollTop = ${edge === 'top' ? distance : edge === 'bottom' ? `el.scrollHeight - el.clientHeight - ${distance}` : '(el.scrollHeight - el.clientHeight) * .45'};
+			})()`)
+			if (edge === 'middle') await b.evaluate(`(() => {
+				let el = document.querySelector('main'), r = el.getBoundingClientRect();
+				for (let d = 0; d < 40; d++) {
+					let c = document.caretRangeFromPoint(r.left + el.clientWidth / 2, r.top + el.clientHeight / 2 + d);
+					if (c?.startContainer.nodeType === Node.TEXT_NODE && c.startContainer.length) { el.scrollTop += d; break }
+				}
+			})()`)
+			await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
+		}
+		let gap = (edge: 'top' | 'bottom') => b.evaluate(`(() => { let el = document.querySelector('main'); return ${edge === 'top' ? 'el.scrollTop' : 'el.scrollHeight - el.clientHeight - el.scrollTop'} })()`)
+		let mark = () => b.evaluate(`(() => {
+			let el = document.querySelector('main'), rect = el.getBoundingClientRect();
+			let range;
+			for (let distance = 0; distance <= 40 && !range; distance++) for (let sign of [-1, 1]) {
+				let candidate = document.caretRangeFromPoint(rect.left + el.clientWidth / 2, rect.top + el.clientHeight / 2 + sign * distance);
+				if (candidate?.startContainer.nodeType === Node.TEXT_NODE && candidate.startContainer.length) { range = candidate; break }
+			}
+			if (!range || range.startContainer.nodeType !== Node.TEXT_NODE || !range.startContainer.length) throw Error('No centre text');
+			let node = range.startContainer, offset = Math.min(range.startOffset, node.length - 1);
+			range.setStart(node, offset); range.setEnd(node, offset + 1); window.rotationMarker = range;
+			let r = range.getBoundingClientRect(); return r.top + r.height / 2 - rect.top - el.clientHeight / 2;
+		})()`)
+		let markerOffset = () => b.evaluate(`(() => { let el = document.querySelector('main'), r = window.rotationMarker.getBoundingClientRect(); return r.top + r.height / 2 - el.getBoundingClientRect().top - el.clientHeight / 2 })()`)
+		for (let landscape of [true, false]) {
+			for (let edge of ['top', 'bottom'] as const) {
+				for (let distance of [0, 10, 40]) {
+					await resize(!landscape); await position(edge, distance); await resize(landscape)
+					expect(Math.abs(await gap(edge) - distance)).toBeLessThanOrEqual(1)
+				}
+				// At 41px the centre wins, not that nearby edge.
+				await resize(!landscape); await position(edge, 41)
+				let offset = await mark(); await resize(landscape)
+				expect(Math.abs(await markerOffset() - offset)).toBeLessThanOrEqual(1)
+			}
+			await resize(!landscape); await position('middle')
+			let offset = await mark(); await resize(landscape)
+			expect(Math.abs(await markerOffset() - offset)).toBeLessThanOrEqual(1)
+		}
+		// A nearly fitting transcript is close to BOTH edges: preserve centre.
+		// Restrict a new, naturally short conversation to 60px of overflow.
+		turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> { yield { type: 'text', text: 'Short paragraph one.\n\nShort paragraph two.\n\nShort paragraph three.\n\nShort paragraph four.' }; yield { type: 'done', reason: 'end' } })()
+		await resize(false)
+		let short = tabs.create('/tmp')
+		let seed = host.connect(() => {})
+		seed.send({ type: 'open', sessionId: short })
+		seed.send({ type: 'submit', sessionId: short, text: 'short' })
+		seed.close()
+		await b.call('Page.navigate', { url: `${base()}/${short}` })
+		await b.waitFor("document.querySelector('main')?.textContent.includes('Short paragraph four.') && document.querySelector('.activity').textContent.includes('idle')")
+		await b.evaluate(`(() => { let el = document.querySelector('main'), last = el.lastElementChild; el.dispatchEvent(new WheelEvent('wheel', { bubbles: true })); let contentHeight = last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop + parseFloat(getComputedStyle(el).paddingBottom); el.style.flex = 'none'; el.style.height = (contentHeight - 60) + 'px' })()`)
+		await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
+		await position('top', 30)
+		expect(await gap('bottom')).toBeLessThanOrEqual(40)
+		let offset = await mark()
+		await b.evaluate("let el = document.querySelector('main'); el.style.height = (el.clientHeight + 10) + 'px'")
+		await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
+		expect(Math.abs(await markerOffset() - offset)).toBeLessThanOrEqual(1)
+		await b.evaluate("document.querySelector('main').style.height = '600px'")
+		await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
+		expect(await gap('top')).toBe(0)
 	} finally {
 		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
 		await b.close()

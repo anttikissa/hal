@@ -14,6 +14,8 @@
 // send's glide ignores leftover wheel momentum, but a new finger
 // gesture always takes over and pauses following until release.
 
+import { reflow } from './reflow.ts'
+
 type Box = { scrollHeight: number; scrollTop: number; clientHeight: number }
 export type Mode = 'glide' | 'jump' | 'track'
 
@@ -94,6 +96,7 @@ function anchor(change: () => void): void {
 // the top.
 function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	scroll.state.el = el
+	let stopReflow = reflow.watch(el, () => { scroll.stop(); scroll.state.forced = false })
 	let scrolled = () => scroll.atTop() && onTop()
 	el.addEventListener('scroll', scrolled, { passive: true })
 	addEventListener('wheel', scroll.userScroll, { passive: true })
@@ -104,6 +107,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	return () => {
 		scroll.stop()
 		scroll.state.el = null
+		stopReflow()
 		el.removeEventListener('scroll', scrolled)
 		removeEventListener('wheel', scroll.userScroll)
 		el.removeEventListener('touchstart', scroll.touchStart)

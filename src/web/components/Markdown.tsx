@@ -4,11 +4,11 @@
 // model text never reaches the page as HTML. Lists are non-keyed, so a
 // streamed delta updates the blocks it touched in place.
 // While `streaming`, the root keeps the tallest height it was drawn at
-// as its min-height, until the page reloads: a streaming block never
-// shrinks. On the root, not the card, so a folded thinking card still
+// as its min-height within one layout: streamed reparsing never
+// shrinks it, but width/font reflow clears that obsolete height floor. On the root, not the card, so a folded thinking card still
 // folds. `children` (Hal's cursor) follows the last line.
 
-import { createEffect, createMemo, For, Match, Show, Switch } from 'solid-js'
+import { createEffect, createMemo, For, Match, onSettled, Show, Switch } from 'solid-js'
 import type { JSX } from '@solidjs/web'
 import { markdown, type Code, type Line, type Run, type Table } from '../../common/markdown.ts'
 
@@ -29,6 +29,19 @@ export function Markdown(props: { text: string; streaming?: boolean; children?: 
 	let blocks = createMemo(() => markdown.parse(props.text.trimEnd(), !!props.streaming))
 	let root: HTMLDivElement | undefined
 	let peak = 0
+	onSettled(() => {
+		let el = root!
+		let layout = () => { let css = getComputedStyle(el); return `${el.clientWidth}:${css.fontSize}:${css.lineHeight}` }
+		let previous = layout()
+		let observer = new ResizeObserver(() => {
+			let next = layout()
+			if (next === previous) return
+			previous = next; peak = 0; el.style.minHeight = ''
+			if (props.streaming) { peak = el.getBoundingClientRect().height; el.style.minHeight = `${peak}px` }
+		})
+		observer.observe(el)
+		return () => observer.disconnect()
+	})
 	createEffect(
 		() => [blocks(), props.streaming] as const,
 		([, streaming]) => {

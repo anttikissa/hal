@@ -88,3 +88,19 @@ runtime. Do not carry Solid 1 or React lifecycle patterns into this app.
 - Measure draft content height, but let native CSS max-height enforce
   the visible-viewport cap so a rotation or keyboard resize takes effect
   without a keystroke. Long drafts scroll inside the textarea.
+
+## Rotation and reading position (task 3y)
+
+- Disable native text inflation at 100% text-size-adjust; do not disable
+  pinch zoom. Cap app width by its container to avoid viewport feedback.
+- On reflow, preserve an exclusive top/bottom gap within 40 CSS pixels;
+  otherwise preserve the nearest text row at the viewport centre. This
+  includes short scrollback close to both edges. Native Range geometry
+  tracks text through wrapping; retained elements/pixels cover gaps or
+  removed content. Clamp only when the requested position is impossible.
+- Cache anchors before reflow; resize-induced scroll events cannot
+  replace them. Explicit anchoring replaces native overflow anchoring.
+- Markdown streaming height floors belong to one width/font layout,
+  not to all future orientations; reset obsolete floors on reflow.
+- CDP evaluation errors fail visibly; readiness checks tolerate missing
+  DOM through null-safe predicates, not silent runtime exceptions.

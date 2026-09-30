@@ -12,7 +12,7 @@
    (src/common/colors.ts; .page carries the page's own as variables). */
 :root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --fade-ms: 300ms; --toggle-ms: 250ms; }
 * { box-sizing: border-box; }
-html { background: var(--canvas); color: var(--text); overscroll-behavior: none; }
+html { background: var(--canvas); color: var(--text); overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
 /* Keep the document geometry still while Safari pans its visual viewport
    for the focused field. Move the app, not a fixed body whose layout top
@@ -20,12 +20,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; }
 body { height: 100dvh; }
 body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .App, .Chat { height: 100%; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
-.App { position: absolute; top: 0; left: 0; width: var(--app-width, 100%); height: var(--app-height, 100dvh); transform: translate(var(--app-left, 0px), var(--app-top, 0px)); }
+.App { position: absolute; top: 0; left: 0; width: var(--app-width, 100%); max-width: 100%; height: var(--app-height, 100dvh); transform: translate(var(--app-left, 0px), var(--app-top, 0px)); }
 /* The one scroller: nothing inside it scrolls; long lines wrap. */
 /* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
    corners and home indicator), so the edge rows pad themselves. */
-.Transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left)); }
+.Transcript { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; padding: 1rem max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left)); }
 .Transcript > * { margin: 0 0 0.6rem; }
 /* Cards and the open question share one shape: square, a lit bar on
    the left, the style's tint behind. */
