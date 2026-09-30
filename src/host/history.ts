@@ -92,7 +92,15 @@ function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord 
 	pages.note(id, line, full)
 	naming.committed(id, full)
 	if (full.type === 'turn_end' && !Object.keys(pages.marks(id).inbox).length) busy.drop(id)
+	for (let listener of history.state.listeners) listener(id, full)
 	return full
+}
+
+// Calls `listener` after every durable append (find.ts indexes them);
+// returns the unsubscribe. Listeners must stay cheap: appends are sync.
+function onAppend(listener: (id: string, record: HistoryRecord) => void): () => void {
+	history.state.listeners.add(listener)
+	return () => history.state.listeners.delete(listener)
 }
 
 // `command`: the client's id for the submit, so a resend is recognised.
@@ -363,14 +371,15 @@ export const history = {
 	// Sessions with a turn running in this host, and its current round.
 	// `cache`: each open session's complete records and the bytes they
 	// fill, kept while it is open. `next`: by history file, the next
-	// record number not given out yet.
-	state: { running: new Map<string, Running>(), cache: new Map<string, { size: number; records: HistoryRecord[] }>(), next: new Map<string, number>() },
+	// record number not given out yet. `listeners`: see onAppend.
+	state: { running: new Map<string, Running>(), cache: new Map<string, { size: number; records: HistoryRecord[] }>(), next: new Map<string, number>(), listeners: new Set<(id: string, record: HistoryRecord) => void>() },
 	check,
 	blockRecord,
 	started,
 	number,
 	file,
 	append,
+	onAppend,
 	submit,
 	load,
 	lastByte,

@@ -23,10 +23,8 @@ function init(): void {
 	}
 	worker.onerror = (event) => find.fail(event.message)
 	worker.postMessage({ type: 'init', home: paths.home() })
-	// Observe durable append without adding parsing/indexing to its path.
-	let append = history.append
-	history.append = (id, record) => { let full = append(id, record); find.dirty(id); return full }
-	find.state.undo = () => { history.append = append }
+	// Observe durable appends without adding parsing/indexing to their path.
+	find.state.undo = history.onAppend((id) => find.dirty(id))
 }
 
 // Session meta is a live-file proxy (nested proxies too): postMessage

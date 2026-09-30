@@ -5,7 +5,8 @@
 	notes: [
 		'Per-round usage was not in history (only the turn_end sum and last context), so this task adds the round record (history.record writes it after flush; replay.toMessages, transcript.recordShown and history.recordTypes ignore or list it). Existing tests that listed a turn records now include it. Old histories degrade to one approximate point per turn from turn_end.context.',
 		'Pruning checkpoints are not recorded anywhere (pruning.ts keeps only projection.ason), so the graph derives them the same way pruning does: completed turn_end count since the last compact/reset, per batchTurns. A pressure rewrite (0d) is therefore not labelled; its drop stays unlabelled. Making pruning write a history/diag mark would let it be named.',
-		'Live push hooks stats.round/stats.ended (not host.broadcast: host.ts sits at the 400-line limit). The status-row link text and the c4 page were checked in headless Chrome at 1200 and 390 px wide (coarse pointer via setTouchEmulationEnabled; setEmulatedMedia for pointer does not apply): no page overflow, y axis fixed while bars scroll, bar tap fills the info line, a round appended after load appears without reload, status link is 44px tall on touch.'
+		'Live push hooks stats.round/stats.ended (not host.broadcast: host.ts sits at the 400-line limit). The status-row link text and the c4 page were checked in headless Chrome at 1200 and 390 px wide (coarse pointer via setTouchEmulationEnabled; setEmulatedMedia for pointer does not apply): no page overflow, y axis fixed while bars scroll, bar tap fills the info line, a round appended after load appears without reload, status link is 44px tall on touch.',
+		"Considered and declined (30 Sep): reading a closed session's history in slices on page load. Decoding is about 4 ms/MB and histories are usually under 1 MB, so the one synchronous read costs a few ms; chunked async reading was not worth its code."
 	],
 	needs: ['k5', 'e3', '0d']
 }
