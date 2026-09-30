@@ -1130,3 +1130,38 @@ test.skipIf(!chrome)('rotation preserves exclusive 40px edge gaps or the text at
 		await b.close()
 	}
 }, 20000)
+
+test.skipIf(!chrome)('touch tab navigation does not focus the composer', async () => {
+	providerHome()
+	let b = await browser()
+	try {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await server.serve()
+		web.start()
+		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelector('textarea') && document.querySelector('.Tabs .strip [aria-current]')`)
+		expect(await b.evaluate(`matchMedia('(pointer: coarse)').matches`)).toBe(true)
+		expect(await b.evaluate(`document.activeElement === document.querySelector('textarea')`)).toBe(false)
+		let first = await b.evaluate('location.pathname')
+		// A question owns focus in this tab. Leaving it used to refocus the
+		// composer as soon as the next tab had no question.
+		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = '/cd ${home}/missing'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+		expect(await b.evaluate(`document.activeElement === document.querySelector('textarea')`)).toBe(true)
+		await b.evaluate(`document.querySelector('.Composer .actions button').click()`)
+		await b.waitFor(`document.querySelector('textarea').disabled`)
+		await b.evaluate(`document.querySelector('.Tabs .strip .new').click()`)
+		await b.waitFor(`location.pathname !== '${first}' && document.querySelector('textarea') && !document.querySelector('textarea').disabled`)
+		expect(await b.evaluate(`document.activeElement === document.querySelector('textarea')`)).toBe(false)
+		let second = await b.evaluate('location.pathname')
+		await b.evaluate(`document.querySelector('.Tabs .strip a[href="${first}"]').click()`)
+		await b.waitFor(`location.pathname === '${first}' && document.querySelector('textarea').disabled`)
+		await b.evaluate(`document.querySelector('.Tabs .strip a[href="${second}"]').click()`)
+		await b.waitFor(`location.pathname === '${second}' && !document.querySelector('textarea').disabled`)
+		expect(await b.evaluate(`document.activeElement === document.querySelector('textarea')`)).toBe(false)
+		await b.evaluate(`document.querySelector('textarea').focus()`)
+		expect(await b.evaluate(`document.activeElement === document.querySelector('textarea')`)).toBe(true)
+	} finally {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+})

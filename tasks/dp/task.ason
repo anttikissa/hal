@@ -1,0 +1,10 @@
+{
+	title: 'Touch tab navigation leaves the keyboard closed',
+	spec: 'On touch devices (pointer: coarse), the web composer does not automatically focus when mounted, when switching or creating session tabs, or when a session question or picker stops owning focus. Reading and navigating must not summon the on-screen keyboard. Tapping the message textarea still starts editing normally; explicit send/completion editing actions and desktop automatic focus behavior remain unchanged. A browser regression exercises coarse-pointer tab creation and switching with different form states and confirms the composer stays unfocused until deliberately focused.',
+	status: 'done',
+	notes: [
+		'Composer had an unconditional focus effect when neither form nor modal owned focus; changing from a question tab to a plain tab therefore summoned the touch keyboard. Gate that automatic focus with pointer: coarse, keeping explicit editing focus unchanged. Headless Chrome touch emulation verifies initial mount, new tab, and switching from a question tab; physical iOS keyboard behavior still needs a device check. Full ./test: 1292 passed, 1 skipped, 7 failures in terminal e2e/startup, status and spawn tests; all 25 host/web browser tests passed, type checking and lint passed.'
+	],
+	needs: ['4s'],
+	foldInto: ['4s']
+}

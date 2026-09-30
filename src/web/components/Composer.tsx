@@ -48,7 +48,8 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	createEffect(
 		() => !!props.view.form || !!props.view.modal,
 		(away) => {
-			if (!away) input.focus()
+			// Touch navigation is for reading; only deliberate editing opens the keyboard.
+			if (!away && !matchMedia('(pointer: coarse)').matches) input.focus()
 		},
 	)
 	let busy = () => !!props.view.transcript && states.busy(props.view.transcript.state)
