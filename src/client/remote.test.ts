@@ -56,6 +56,15 @@ test('a typed host becomes an origin: https unless it is this machine; paths and
 		expect(() => remote.origin(bad)).toThrow()
 })
 
+test('no code is asked before a Hal is known to answer at the host', async () => {
+	let other = Bun.serve({ port: 0, fetch: () => new Response('<html>not hal</html>') })
+	let asked = 0
+	try {
+		await expect(remote.signIn(`127.0.0.1:${other.port}`, { last: '', tokens: {} }, () => (asked++, 'x'), () => {})).rejects.toThrow('not a hal2 host')
+		await expect(remote.signIn('127.0.0.1:1', { last: '', tokens: {} }, () => (asked++, 'x'), () => {})).rejects.toThrow('cannot reach')
+	} finally { other.stop(true) }
+	expect(asked).toBe(0)
+})
 test('a wrong code is asked again, a right one is remembered, and a revoked token asks anew', async () => {
 	let at = await serve()
 	let saved: Saved = { last: '', tokens: {} }

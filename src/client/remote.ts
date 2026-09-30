@@ -51,6 +51,14 @@ async function login(at: string, code: string): Promise<string | undefined> {
 	throw new Error(`${at} answered the login without a session cookie; is it a hal2 host?`)
 }
 
+// Whether a Hal answers at `at`, checked before the user is asked for
+// anything: its public web manifest names it. Throws, saying why not.
+async function probe(at: string): Promise<void> {
+	let res = await request(at, '/manifest.webmanifest', {})
+	let name = res.ok ? (await res.json().catch(() => null))?.name : undefined
+	if (name !== 'Hal') throw new Error(`${at} answers (HTTP ${res.status}) but is not a hal2 host`)
+}
+
 // Whether the host still takes this token; throws if it can't be asked.
 async function valid(at: string, token: string): Promise<boolean> {
 	let res = await request(at, '/login', { headers: { cookie: cookie(token) } })
@@ -65,6 +73,7 @@ async function valid(at: string, token: string): Promise<boolean> {
 async function signIn(typed: string | undefined, saved: Saved, ask: (question: string) => string | null, say: (text: string) => void): Promise<{ origin: string; token: string }> {
 	if (!typed && !saved.last) throw new Error('no remembered host; use ./run -r <host>')
 	let at = remote.origin(typed || saved.last)
+	await remote.probe(at)
 	let token: string | undefined = saved.tokens[at]
 	if (token && !(await remote.valid(at, token))) {
 		say(`${at} no longer takes the saved login.\n`)
@@ -104,6 +113,7 @@ export const remote = {
 	fetch: (url: string, init?: RequestInit): Promise<Response> => globalThis.fetch(url, init),
 	origin,
 	login,
+	probe,
 	valid,
 	signIn,
 	dial,
