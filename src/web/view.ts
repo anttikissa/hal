@@ -83,7 +83,8 @@ function formKey(st: ViewState, k: Key): { state: ViewState; command?: unknown }
 // terminal's (the web's tab keys are shortcuts.ts).
 function commandKey(st: ViewState, k: Key, mac: boolean): unknown {
 	let c = commandList.byKey({ key: k.key, shift: !!k.shift, alt: !!k.alt, ctrl: !!k.ctrl, cmd: !!k.cmd })
-	if (!c || c.clientOnly || !commandList.onWeb(c.key!, mac) || !st.transcript) return undefined
+	// Ctrl-R (/restart local) stays the browser's own reload.
+	if (!c || c.clientOnly || c.name === 'restart' || !commandList.onWeb(c.key!, mac) || !st.transcript) return undefined
 	let sessionId = st.transcript.meta.id
 	return c.name === 'model' ? { type: 'models', sessionId } : { type: 'submit', sessionId, text: `/${c.name}` }
 }

@@ -263,6 +263,9 @@ export type Event =
 	// The host process's version (task n1), sent on connect once known
 	// and to every client when the host learns it.
 	| { type: 'version'; version: string }
+	// /restart all: restart once this host goes (terminal) or reload once
+	// it is back (web).
+	| { type: 'restart' }
 	// Cached models.dev display names for the open tabs, sent on connect,
 	// model switch and background catalog refresh.
 	| { type: 'model-names'; names: Record<string, string> }
@@ -353,6 +356,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },
 	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },
 	ack: { id: 's', tab: 's?' },
+	restart: {},
 	auth: { code: 's', link: 's?' },
 }
 

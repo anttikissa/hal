@@ -36,6 +36,7 @@ import { appView } from './app-view.ts'
 import { titles } from '../common/titles.ts'
 import { notices } from '../common/notices.ts'
 import { find } from './find.ts'
+import { command as restart } from './commands/restart.ts'
 
 // `form`: the session's open question as filled in here; while there is
 // one, keys go to it instead of the prompt.
@@ -98,6 +99,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'model-names') Object.assign(titles.names, event.names)
 	if (event.type === 'tabs') return app.onTabs(event.tabs)
 	if (event.type === 'notice') return notices.add(notices.fromEvent(event))
+	if (event.type === 'restart') return restart.withHost()
 	if (event.type === 'go') {
 		if (st.focus.tab === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) app.focusOn({ tab: event.tab })
 		return
@@ -137,6 +139,7 @@ function backfilled(event: Event & { type: 'snapshot' | 'history' }): void {
 // Every connection brings the tabs; tab-start asks the host to name the
 // tab to show: the focused one if any, else the start's.
 function onState(state: LinkState): void {
+	restart.linkChanged()
 	let st = app.state
 	st.notice = state.type === 'connected' ? undefined : 'host lost; reconnecting…'
 	// A new connection's host knows nothing this client watched.

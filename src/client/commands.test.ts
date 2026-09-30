@@ -60,7 +60,7 @@ test('each command key runs its command, the prompt left alone', () => {
 
 test('every command key shows in /keys', () => {
 	let shown = keyHelp.sections().flatMap((s) => s.rows)
-	for (let c of commandList.all().filter((c) => c.key)) expect(shown.find((r) => r.keys === c.key)?.command).toBe(c.name)
+	for (let c of commandList.all().filter((c) => c.key)) expect(shown.find((r) => r.keys === c.key)?.command).toBe(c.keyArgs ? `${c.name} ${c.keyArgs}` : c.name)
 })
 
 test('typed client-only commands run here and never reach the host', () => {

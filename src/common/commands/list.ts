@@ -8,7 +8,8 @@
 
 import { keyHelp, type Binding } from '../key-help.ts'
 
-export type CommandInfo = { name: string; description: string; category: string; key?: string; clientOnly?: true; modelUsable?: true; hidden?: true }
+// `keyArgs`: the arguments the key runs the command with, as /keys shows.
+export type CommandInfo = { name: string; description: string; category: string; key?: string; keyArgs?: string; clientOnly?: true; modelUsable?: true; hidden?: true }
 
 // Sorted by name.
 const list: CommandInfo[] = [
@@ -43,7 +44,9 @@ const list: CommandInfo[] = [
 	{ name: 'quit', description: 'quit', category: 'app', key: 'ctrl-c', clientOnly: true },
 	{ name: 'redraw', description: 'redraw', category: 'app', key: 'ctrl-l', clientOnly: true },
 	{ name: 'rename', description: 'name or clear the session name', category: 'session', modelUsable: true },
-	{ name: 'restart', description: 'restart', category: 'app', key: 'ctrl-r', clientOnly: true },
+	// /restart and /restart local run in the client; host, both and all
+	// on the host (src/host/commands/restart.ts).
+	{ name: 'restart', description: 'restart this client (local), the host, both, or all', category: 'app', key: 'ctrl-r', keyArgs: 'local' },
 	{ name: 'resume', description: 'reopen the last closed tab', category: 'tabs', key: 'shift-ctrl-t', clientOnly: true },
 	{ name: 'send', description: 'send a prompt or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },

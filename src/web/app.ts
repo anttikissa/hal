@@ -37,7 +37,7 @@ import { diagnostics } from './diagnostics.ts'
 // the page can keep what the reader was reading in place.
 // `target`: the block the address links to (target.ts), `found` once
 // its card is in the transcript, `shown` once scrolled to.
-export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; landing?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; known?: Known; completedByTab?: string; suppressed?: string; cached: Map<string, ViewState>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout> }
+export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; landing?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; known?: Known; completedByTab?: string; suppressed?: string; cached: Map<string, ViewState>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout>; restart?: 'marked' | 'gone' }
 
 function createState(): AppState {
 	return { view: {}, text: '', tabs: [], asked: new Set(), older: new Map(), pages: 0, cached: new Map(), background: new Set(), painted: false }
@@ -89,6 +89,7 @@ function sendNow(command: unknown): boolean {
 function onEvent(event: Event): void {
 	let st = app.state
 	if (event.type === 'find-results') return find.event(event)
+	if (event.type === 'restart') return void (st.restart = 'marked')
 	if (event.type === 'tabs') push.badge(event.tabs)
 	if (tabs.onEvent(event)) return
 	let changed = drafts.onEvent(event)
@@ -181,6 +182,10 @@ function older(): void {
 }
 
 function onState(state: LinkState): void {
+	// Marked to restart with the host: reload once it has gone and is back.
+	let st = app.state
+	if (st.restart === 'marked' && state.type !== 'connected') st.restart = 'gone'
+	if (st.restart === 'gone' && state.type === 'connected') return location.reload()
 	if (state.type === 'connected') { tabs.connected(); push.visibility(app.state.shown) }
 	app.setNotice(state.type === 'connected' ? undefined : state.type === 'joining' ? 'connecting…' : 'disconnected; reconnecting…')
 }
@@ -282,6 +287,14 @@ function send(queue = false): void {
 		uploads.wait(id, queue)
 		return app.setNotice('sending once the upload is done')
 	}
+	// /restart and /restart local reload this page; /restart both marks
+	// it to reload once the restarted host is back.
+	let typed = st.text.trim()
+	if (/^\/restart(\s+local)?$/.test(typed)) {
+		app.input('')
+		return location.reload()
+	}
+	if (/^\/restart\s+both$/.test(typed)) st.restart = 'marked'
 	let { command, notice, keep } = view.submit(st.view, st.text, queue)
 	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; amend?: boolean; edits?: string } | undefined
 	// A prompt shows at once and waits, pending, for the host.

@@ -200,7 +200,7 @@ test('a command question asked while a turn streams leaves the turn streaming; a
 test('the host refuses a client-only command, whoever sent it, and runs nothing', async () => {
 	let a = client()
 	let id = created(a)
-	expect(prompts.submit(id, '/restart', undefined, false, { from: '7-abc' })).toBe('only a client can run /restart')
+	expect(prompts.submit(id, '/redraw', undefined, false, { from: '7-abc' })).toBe('only a client can run /redraw')
 	a.conn.send({ type: 'submit', sessionId: id, text: '/quit' })
 	expect(a.of('rejected').at(-1)).toMatchObject({ command: 'submit', reason: 'only a client can run /quit' })
 	expect(history.readSync(id).filter((r) => r.type === 'command')).toEqual([])

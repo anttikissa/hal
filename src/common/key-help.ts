@@ -29,7 +29,7 @@ function row(keys: string, description: string, sums?: string[]): KeyRow {
 // The row of command `name`, which has a key.
 function command(name: string): KeyRow {
 	let c = commandList.byName(name)!
-	return { ...row(c.key!, c.description), command: name }
+	return { ...row(c.key!, c.description), command: c.keyArgs ? `${name} ${c.keyArgs}` : name }
 }
 
 const digits = [...'1234567890'].map((d) => `alt-${d}`)
