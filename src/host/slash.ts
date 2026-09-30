@@ -18,20 +18,21 @@ import { stats } from './stats.ts'
 import { turns } from './turns.ts'
 import { effort } from './effort.ts'
 
-// Records a slash command as typed (by whom: `from`, else the human) and
+// Records a slash command (origin: model for Hal, from for another session,
+// otherwise the human) and
 // runs it. `command`: the client's id for the submit. Returns why it is
 // refused: no such command, or one only a client may run (a session may
 // not quit or restart the user's terminal).
-function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string, completed?: (reply: Reply) => void): string | undefined {
+function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string, completed?: (reply: Reply) => void, origin?: 'model'): string | undefined {
 	if (commandList.byName(call.name)?.clientOnly) return `only a client can run /${call.name}`
 	if (call.name === 'budget' && from !== undefined) return 'only a human can run /budget'
 	if (!commands.all().has(call.name)) return `unknown command /${call.name} (/help lists them)`
 	text = commands.all().get(call.name)!.record?.(call.args) ?? text
-	let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text }
+	let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text, ...(origin && { origin }) }
 	if (from !== undefined) record.from = from
 	if (command !== undefined) record.command = command
 	let { n, ts } = history.append(id, record)
-	host.broadcast(id, { type: 'command', sessionId: id, text, ...(from !== undefined && { from }), ts, n, ...(command !== undefined && { command }), ...slash.placed(id) })
+	host.broadcast(id, { type: 'command', sessionId: id, text, ...(origin && { origin }), ...(from !== undefined && { from }), ts, n, ...(command !== undefined && { command }), ...slash.placed(id) })
 	void slash.runCommand(id, call.name, call.args).then((reply) => completed?.(reply))
 }
 
@@ -137,8 +138,8 @@ function dismiss(id: string, question: string): void {
 }
 
 function output(id: string, text: string, error = false): void {
-	let { n } = history.append(id, error ? { type: 'output', text, error } : { type: 'output', text })
-	host.broadcast(id, error ? { type: 'output', sessionId: id, text, error, n, ...slash.placed(id) } : { type: 'output', sessionId: id, text, n, ...slash.placed(id) })
+	let { n, ts } = history.append(id, error ? { type: 'output', text, error } : { type: 'output', text })
+	host.broadcast(id, error ? { type: 'output', sessionId: id, text, error, n, ts, ...slash.placed(id) } : { type: 'output', sessionId: id, text, n, ts, ...slash.placed(id) })
 }
 
 // Where a command's record landed beside a running turn: before the

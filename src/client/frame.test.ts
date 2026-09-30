@@ -436,3 +436,21 @@ test('legacy rename controls never appear in terminal answers without a naming f
 	expect(text).not.toContain('Fix replay persistence')
 	expect(text).not.toContain('<rename>')
 })
+
+test('command outcomes appear once; unexecuted failures and other tool results stay visible', () => {
+	let v = view([
+		{ type: 'tool', id: 'rename', name: 'command', input: { command: '/rename New title' } },
+		{ type: 'command', text: '/rename New title', origin: 'model' },
+		{ type: 'output', text: 'Session renamed: Old title → New title' },
+		{ type: 'tool-result', id: 'rename', output: 'Session renamed: Old title → New title' },
+		{ type: 'tool', id: 'bad', name: 'command', input: { command: '/quit' } },
+		{ type: 'tool-result', id: 'bad', output: 'not available to the model', isError: true },
+		{ type: 'tool-result', id: 'other', output: 'unrelated output' },
+	])
+	let lines = plain(frame.layout(v, 120)!.lines).join('\n')
+	expect(lines.match(/Session renamed:/g)).toHaveLength(1)
+	expect(lines).toContain('Hal issued a command')
+	expect(lines).toContain('not available to the model')
+	expect(lines).toContain('unrelated output')
+	expect(v.transcript!.items.filter((i) => i.type === 'tool-result')).toHaveLength(3)
+})

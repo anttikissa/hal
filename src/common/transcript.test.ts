@@ -235,7 +235,7 @@ test('a command during a running turn goes where history has it: after finished 
 		{ type: 'stream', sessionId, event: { type: 'thinking', text: 'hm' }, n: 2, ts },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'wor' }, n: 3, ts },
 		{ type: 'command', sessionId, text: '/cd x', from: '2-xyz', ts, n: 4, streaming: true },
-		{ type: 'output', sessionId, text: 'no such directory', error: true, n: 5, streaming: true },
+		{ type: 'output', sessionId, text: 'no such directory', error: true, ts, n: 5, streaming: true },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'king' }, n: 3, ts },
 		{ type: 'stream', sessionId, event: { type: 'tool_call', id: 'c', name: 'ls', input: {} }, n: 6, ts },
 		// The round is done: every block is in history before this one.
@@ -250,7 +250,7 @@ test('a command during a running turn goes where history has it: after finished 
 		{ type: 'prompt', text: 'go', ts, key: '1' },
 		{ type: 'thinking', text: 'hm', ts, key: '2' },
 		{ type: 'command', text: '/cd x', from: '2-xyz', ts, key: '4' },
-		{ type: 'output', text: 'no such directory', error: true, key: '5' },
+		{ type: 'output', text: 'no such directory', error: true, ts, key: '5' },
 		{ type: 'text', text: 'working', ts, key: '3' },
 		{ type: 'tool', id: 'c', name: 'ls', input: {}, key: '6' },
 		{ type: 'command', text: '/help', ts, key: '7' },
@@ -288,4 +288,14 @@ test('attachment acknowledgements and picker replies cannot end a streaming turn
 	let next = transcript.fold(t, { type: 'stream', sessionId, event: { type: 'text', text: 'working' }, n: 2, ts })!
 	expect(next.items.at(-1)).toMatchObject({ type: 'text', text: 'still working' })
 	expect(next.live).toBeDefined()
+})
+
+test('command provenance and outcome timestamps survive live folding and reconnect', () => {
+	let command = { type: 'command' as const, text: '/rename New title', origin: 'model' as const, ts, n: 1 }
+	let output = { type: 'output' as const, text: 'Session renamed: Old title → New title', ts, n: 2 }
+	let live = fold([snap({ history: [] }), { ...command, sessionId }, { ...output, sessionId }])!
+	let restored = fold([snap({ history: [command, output] })])!
+	expect(live.items).toEqual(restored.items)
+	expect(restored.items[0]).toMatchObject({ origin: 'model', ts })
+	expect(restored.items[1]).toMatchObject({ ts })
 })

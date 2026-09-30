@@ -13,12 +13,12 @@ export const command: SlashCommand = {
 		}
 		if (!text || text === 'auto') {
 			ctx.setName!(undefined)
-			return { say: `/rename: ${previous} → ${sessions.open(ctx.sessionId).name}` }
+			return { say: `Session renamed: ${previous} → ${sessions.open(ctx.sessionId).name}` }
 		}
 		try {
 			let name = names.validate(text)
 			ctx.setName!(name)
-			return { say: `/rename: ${previous} → ${name}` }
+			return { say: `Session renamed: ${previous} → ${name}` }
 		} catch (e) { return { error: (e as Error).message } }
 	},
 }

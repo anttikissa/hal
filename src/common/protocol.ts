@@ -222,10 +222,10 @@ export type Event =
 	// `streaming`: the running round's last block was still streaming
 	// (not in history yet), so this goes before it; else after all the
 	// round's blocks (task rk).
-	| { type: 'command'; sessionId: string; text: string; from?: string; ts?: string; n?: number; command?: string; streaming?: true }
+	| { type: 'command'; sessionId: string; text: string; origin?: 'model'; from?: string; ts?: string; n?: number; command?: string; streaming?: true }
 	// What a command said, now in history; `error` if it failed.
 	// `streaming`: as in command.
-	| { type: 'output'; sessionId: string; text: string; error?: true; n?: number; streaming?: true }
+	| { type: 'output'; sessionId: string; text: string; ts?: string; error?: true; n?: number; streaming?: true }
 	// A context boundary was recorded (tasks bc, vh): `text`, its divider.
 	| { type: 'divider'; sessionId: string; text: string; n?: number; streaming?: true }
 	// The session's metadata changed (a /cd, a /model: then `stats` too).
@@ -337,8 +337,8 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	'turn-end': { sessionId: 's', status: 's', usage: 'o?', error: 's?', stats: 'o?' },
 	question: { sessionId: 's', id: 's', form: 'o' },
 	answer: { sessionId: 's', question: 's', answers: 'o', secrets: 'S?' },
-	command: { sessionId: 's', text: 's', from: 's?', command: 's?' },
-	output: { sessionId: 's', text: 's' },
+	command: { sessionId: 's', text: 's', from: 's?', origin: 's?', command: 's?' },
+	output: { sessionId: 's', text: 's', ts: 's?' },
 	divider: { sessionId: 's', text: 's' },
 	meta: { sessionId: 's', meta: 'o', stats: 'o?' },
 	completions: { sessionId: 's', text: 's', items: 'S', descriptions: 'S?' },
@@ -376,6 +376,7 @@ function invalidEvent(value: unknown): string | undefined {
 		if (v === undefined && kind.endsWith('?')) continue
 		if (!kinds[kind[0]!]!(v)) return `${value.type}: ${path} must be ${kindNames[kind[0]!]}`
 	}
+	if (value.type === 'command' && value.origin !== undefined && value.origin !== 'model') return 'command: origin must be model'
 	if (value.type === 'completions' && value.descriptions !== undefined && (value.descriptions as string[]).length !== (value.items as string[]).length) return 'completions: descriptions must align with items'
 	if (value.type === 'tabs' && !(value.tabs as unknown[]).every((t) => isObject(t) && ['id', 'name', 'cwd'].every((k) => typeof t[k] === 'string'))) return 'tabs: every tab needs an id, name and cwd'
 	if (value.type === 'find-results') {

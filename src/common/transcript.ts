@@ -31,10 +31,10 @@ export type Shown =
 	// `cancelled`: dismissed (Escape, or a newer question replaced it).
 	// `command`: a slash command asked; open in any session state.
 	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; cancelled?: true; command?: true }
-	// A slash command as typed; `from`: the session that sent it.
-	| { type: 'command'; text: string; from?: string; ts?: string }
+	// A slash command: origin identifies Hal; from identifies another session.
+	| { type: 'command'; text: string; origin?: 'model'; from?: string; ts?: string }
 	// What a command said.
-	| { type: 'output'; text: string; error?: true }
+	| { type: 'output'; text: string; error?: true; ts?: string }
 	// A context boundary (tasks bc, vh), drawn as a one-row rule.
 	| { type: 'divider'; text: string }
 
@@ -172,11 +172,11 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 }
 
 // A command, its output or a divider as shown, from a record or an event.
-function aside(r: { type: 'command'; text: string; from?: string; ts?: string } | { type: 'output'; text: string; error?: true } | { type: 'divider'; text: string } | { type: 'question'; id: string; form: Form }): Shown {
+function aside(r: { type: 'command'; text: string; origin?: 'model'; from?: string; ts?: string } | { type: 'output'; text: string; error?: true; ts?: string } | { type: 'divider'; text: string } | { type: 'question'; id: string; form: Form }): Shown {
 	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true }
 	if (r.type === 'divider') return { type: 'divider', text: r.text }
-	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.from !== undefined && { from: r.from }), ...(r.ts !== undefined && { ts: r.ts }) }
-	return r.error ? { type: 'output', text: r.text, error: true } : { type: 'output', text: r.text }
+	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.origin && { origin: r.origin }), ...(r.from !== undefined && { from: r.from }), ...(r.ts !== undefined && { ts: r.ts }) }
+	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.ts !== undefined && { ts: r.ts }) }
 }
 
 // The question waiting for an answer from this transcript, if any: a

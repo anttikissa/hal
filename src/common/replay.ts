@@ -65,9 +65,10 @@ export type HistoryRecord = Numbered &
 	// dismissed a command's question; nothing was answered.
 	| { type: 'answer'; question: string; answers: Answers; secrets?: string[]; cancelled?: true; ts: string }
 	// A slash command (src/host/commands/), as typed. `from`: the session
-	// that sent it; without it the human typed it. `command`: the
+	// that sent it; `origin: model` identifies Hal's command tool. Without
+	// either, the human typed it (legacy provenance is unknown). `command`: the
 	// client's id for the submit, so a resend is recognised.
-	| { type: 'command'; text: string; from?: string; command?: string; ts: string }
+	| { type: 'command'; text: string; origin?: 'model'; from?: string; command?: string; ts: string }
 	// What a command said; `error` if it failed.
 	| { type: 'output'; text: string; error?: true; ts: string }
 	// The session's cwd (/cd) or model changed. Not a turn; the model is

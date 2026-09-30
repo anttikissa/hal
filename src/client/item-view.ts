@@ -142,7 +142,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'command':
 			return ['', ...itemView.headed(item, ansi.wrap(item.text, width), width, session), '']
 		case 'output':
-			return markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item))
+			return markdownView.lines([titles.time(item.ts), item.text.trimEnd()].filter(Boolean).join(' '), width, streaming, itemView.itemStyle(item))
 		// One row: the text centred in a rule across the width.
 		case 'divider': {
 			let text = strings.clipVisual(` ${item.text} `, width)

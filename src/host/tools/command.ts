@@ -22,7 +22,7 @@ export const tool: Tool = {
 				let refused = slash.command(ctx.sessionId, text, call, undefined, undefined, (reply) => {
 					if (reply.error) reject(new Error(reply.error))
 					else resolve(reply.say ?? (reply.ask ? `/${call.name} needs an answer from the user` : `/${call.name} done`))
-				})
+				}, 'model')
 				if (refused) reject(new Error(refused))
 			} catch (error) { reject(error) }
 		})
