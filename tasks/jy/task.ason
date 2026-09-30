@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Provenance is explicit origin: model on command history/events, rather than inferred from user-role tool results or nearby slash text. Output timestamps already existed in history and now reach live clients too. Terminal suppression requires a matching command tool call and an already-visible equal outcome; rejected calls without an outcome remain visible. Raw results are preserved and accessible through the tool block link.',
-		'Final verification: 51 focused convention, command, transcript, terminal-frame and header checks pass; TypeScript and lint pass. Full ./test: 1311 pass, 1 skip, 8 fail. Remaining failures are five terminal end-to-end/startup checks, one catalog-dependent web status expectation, and two spawn/wait fixture-state failures. Full suite is not green; command provenance, reconnect, duplicate rendering and history line-limit checks pass.'
+		'Final verification: 51 focused convention, command, transcript, terminal-frame and header checks pass; TypeScript and lint pass. Full ./test: 1311 pass, 1 skip, 8 fail. Remaining failures are five terminal end-to-end/startup checks, one catalog-dependent web status expectation, and two spawn/wait fixture-state failures. Full suite is not green; command provenance, reconnect, duplicate rendering and history line-limit checks pass.',
+		'The web status and two spawn/wait full-suite failures pass in isolation both before (77c59f4) and after this change: suite-order state, not a regression. The five e2e failures are terminal timeouts on the loaded host.'
 	],
 	needs: ['tx']
 }
