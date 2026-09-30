@@ -160,6 +160,9 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 				<button type="button" class="new" onClick={newTab}>
 					+ New tab
 				</button>
+				<button type="button" class="reload" onClick={() => location.reload()}>
+					Reload page
+				</button>
 			</dialog>
 		</header>
 	)

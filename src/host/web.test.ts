@@ -702,10 +702,12 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		await b.waitFor(`document.querySelector('dialog.Picker').open`)
 		await b.evaluate(`document.querySelector('dialog.Picker .close').click()`)
 		await b.waitFor(closed)
-		// What is typed is the draft: it survives a reload.
-		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'half a thought'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
-		await b.call('Page.reload', {})
-		await b.waitFor(`document.querySelector('textarea')?.value === 'half a thought'`)
+		// The tab sheet's Reload page works without browser chrome, and
+		// the typed draft survives the navigation.
+		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = 'half a thought'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); window.__beforeReload = true; document.querySelector('.Tabs .menu').click() })()`)
+		await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
+		await b.evaluate(`document.querySelector('.Tabs .sheet .reload').click()`)
+		await b.waitFor(`document.querySelector('textarea')?.value === 'half a thought' && window.__beforeReload === undefined`)
 		// A key typed with the focus outside any field lands in the box,
 		// once (a real key event: keydown, then the text).
 		await b.evaluate(`document.activeElement.blur()`)
