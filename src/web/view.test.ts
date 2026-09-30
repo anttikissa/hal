@@ -304,3 +304,15 @@ test('Bash display hides successful status but keeps errors and the original sou
 	expect(view.show({ type: 'prompt', text: good.output, from: 's', label: 'bash #1813' })?.text).toBe(' M notes.md\n')
 	expect(good.output).toStartWith('[exit 0]')
 })
+
+test('question URLs preserve OAuth parameters and plain text, excluding prose punctuation', () => {
+	let url = 'https://example.com/oauth/authorize?client_id=abc-def&redirect_uri=https%3A%2F%2Fexample.org%2Fcallback&scope=user%3Aprofile&state=a_b#fragment'
+	let text = `Open (${url}).\nThen paste code#state; **literal** <script>bad()</script> javascript:bad() data:text/html,bad`
+	let parts = view.urlParts(text)
+	expect(parts.filter((p) => typeof p !== 'string')).toEqual([{ href: url, text: url }])
+	expect(parts.map((p) => typeof p === 'string' ? p : p.text).join('')).toBe(text)
+	expect(view.urlParts('See http://example.org/a_(b), then https://example.net/!')).toEqual([
+		'See ', { href: 'http://example.org/a_(b)', text: 'http://example.org/a_(b)' }, ', then ',
+		{ href: 'https://example.net/', text: 'https://example.net/' }, '!',
+	])
+})

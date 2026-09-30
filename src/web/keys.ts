@@ -36,6 +36,7 @@ import { find } from './find.ts'
 export type Target =
 	| { kind: 'message'; text: string; cursor: number; anchor?: number; write?: (edit: Splice, cursor: number, anchor: number) => void; coarse?: boolean }
 	| { kind: 'field' }
+	| { kind: 'link' }
 	| { kind: 'button'; submits: boolean }
 	| { kind: 'other' }
 
@@ -66,7 +67,7 @@ function key(e: KeyInput, target: Target): boolean {
 			find.key(k)
 			return true
 		}
-		if (target.kind === 'button' && (e.key === 'Enter' || e.key === ' ')) return false
+		if ((target.kind === 'button' || target.kind === 'link') && (e.key === 'Enter' || e.key === ' ')) return false
 		if (!k || e.ctrlKey || e.metaKey || e.altKey || !['left', 'right', 'enter', 'escape', 'up', 'down'].includes(k.key)) return false
 		app.modalKey(k)
 		return true
@@ -77,6 +78,8 @@ function key(e: KeyInput, target: Target): boolean {
 		return true
 	}
 	if (st.view.form) {
+		// Native Tab reaches every control and URL; Enter on a URL never answers.
+		if (e.key === 'Tab' || (target.kind === 'link' && e.key === 'Enter')) return false
 		// Text fields edit natively, a submit button submits, Cmd and Ctrl
 		// keys stay the browser's (Cmd-R, Cmd-L); the shared form keys
 		// decide the rest.

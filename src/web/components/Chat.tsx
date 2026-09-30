@@ -88,7 +88,8 @@ function target(e: Event): Target {
 	}
 	// An open sheet keeps its keys (the box behind it is inert).
 	if (t instanceof HTMLInputElement || (t instanceof Element && t.closest('dialog[open], [contenteditable]'))) return { kind: 'field' }
-	if (t instanceof HTMLButtonElement || t instanceof HTMLAnchorElement) return { kind: 'button', submits: t instanceof HTMLButtonElement && t.type === 'submit' }
+	if (t instanceof HTMLAnchorElement) return { kind: 'link' }
+	if (t instanceof HTMLButtonElement) return { kind: 'button', submits: t.type === 'submit' }
 	return { kind: 'other' }
 }
 

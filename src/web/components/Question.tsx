@@ -5,14 +5,16 @@
 // shared form state; keys go through keys.key (forms.step). ✕
 // dismisses it as Escape does.
 
-import { createEffect, For, Show } from 'solid-js'
+import { createEffect, createMemo, For, Show } from 'solid-js'
 import { forms, type FormState } from '../../common/forms.ts'
 import type { Shown as Item } from '../../common/transcript.ts'
 import { app } from '../app.ts'
+import { view } from '../view.ts'
 
 export function Question(props: { item: Item & { type: 'question' }; form: FormState }) {
 	let fields: HTMLElement[] = []
 	let form = () => props.item.form
+	let parts = createMemo(() => view.urlParts(form().text))
 	// The focused field takes the focus (its chosen option, for a group).
 	createEffect(
 		() => [props.form.focus, props.form.values[props.form.focus]] as const,
@@ -29,7 +31,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 	}
 	return (
 		<form class="Question warning" onSubmit={submit}>
-			<div class="text">? {form().text}</div>
+			<div class="text">? <For each={parts()}>{(part) => typeof part === 'string' ? part : <a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></div>
 			<button type="button" class="dismiss" aria-label="Dismiss" title="Dismiss (Esc)" onClick={() => app.sendForm({ type: 'cancel' })}>
 				✕
 			</button>

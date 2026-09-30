@@ -74,3 +74,16 @@ test('a paste outside any field goes into the box; in a field it stays native', 
 	expect(keys.paste(clip('x'), { kind: 'message', text: '', cursor: 0 })).toBe(false)
 	expect(typed).toEqual(['pasted'])
 })
+
+test('Tab and link Enter stay native in a pending question, while input Enter answers', () => {
+	app.onEvent({ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'blocked', reason: 'question' } } })
+	app.onEvent({ type: 'question', sessionId, id: 'q', form: { text: 'Open https://example.com/', fields: [{ type: 'text', name: 'code' }] } })
+	expect(app.state.view.form).toBeDefined()
+	expect(press('Enter', { kind: 'link' })).toBe(false)
+	expect(press('Tab', { kind: 'field' })).toBe(false)
+	expect(press('Tab', { kind: 'link' }, { shiftKey: true })).toBe(false)
+	expect(sent).toEqual([])
+	app.formInput(0, 'answer')
+	expect(press('Enter', { kind: 'field' })).toBe(true)
+	expect(sent).toContainEqual({ type: 'answer', sessionId, question: 'q', answers: { code: 'answer' } })
+})

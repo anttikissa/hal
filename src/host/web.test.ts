@@ -1165,3 +1165,33 @@ test.skipIf(!chrome)('touch tab navigation does not focus the composer', async (
 		await b.close()
 	}
 })
+
+test.skipIf(!chrome)('pending question URLs are safe native links and wrap at phone and desktop widths', async () => {
+	let id = sessions.create({ cwd: home, model: 'anthropic/claude-opus-5-5' }).id
+	let url = `https://example.com/oauth?state=a_b&redirect_uri=https%3A%2F%2Fexample.org%2Fcallback&scope=${'user%3Aprofile+'.repeat(30)}#fragment`
+	let text = `Open (${url}).\nThen paste code#state. <script>window.pwned=1</script> javascript:bad()`
+	history.append(id, { type: 'question', id: 'q-links', form: { text, fields: [{ type: 'text', name: 'code' }] }, from: { command: 'login', args: '' } })
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`!!document.querySelector('.Question .text a')`)
+		let link = await b.evaluate(`(() => { let q = document.querySelector('.Question'), a = q.querySelector('.text a'); return { href: a.getAttribute('href'), target: a.target, rel: a.rel, text: q.querySelector('.text').textContent, links: q.querySelectorAll('a').length, scripts: q.querySelectorAll('script').length } })()`)
+		expect(link).toEqual({ href: url, target: '_blank', rel: 'noopener noreferrer', text: `? ${text}`, links: 1, scripts: 0 })
+		for (let width of [390, 1280]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			await b.evaluate(`new Promise(resolve => requestAnimationFrame(resolve))`)
+			expect(await b.evaluate(`(() => { let q = document.querySelector('.Question'); return q.scrollWidth <= q.clientWidth && document.documentElement.scrollWidth <= innerWidth })()`)).toBe(true)
+		}
+		await b.evaluate(`document.querySelector('.Question input').focus()`)
+		for (let selector of ['.dismiss', 'a']) {
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 })
+			await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 })
+			expect(await b.evaluate(`document.activeElement === document.querySelector('.Question ${selector}')`)).toBe(true)
+		}
+		expect(history.readSync(id).some(r => r.type === 'answer')).toBe(false)
+	} finally {
+		await b.close()
+	}
+})
