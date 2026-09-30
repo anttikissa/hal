@@ -72,6 +72,14 @@ function watch(el: HTMLElement, onResize: () => void): () => void {
 		}
 		anchor = capture(el)
 	}
+	// Images acquire intrinsic height outside a controller redraw. Keep the
+	// pre-load reading anchor, including a card just revealed by a deep link.
+	let loaded = () => {
+		onResize()
+		restore(el, anchor)
+		anchor = capture(el)
+	}
+	el.addEventListener('load', loaded, true)
 	// A resize may clamp scrollTop and emit scroll before ResizeObserver.
 	// Detect the changed geometry there too, before replacing the anchor.
 	el.addEventListener('scroll', update, { passive: true })
@@ -80,6 +88,7 @@ function watch(el: HTMLElement, onResize: () => void): () => void {
 	let content = new MutationObserver(update)
 	content.observe(el, { childList: true, characterData: true, subtree: true })
 	return () => {
+		el.removeEventListener('load', loaded, true)
 		el.removeEventListener('scroll', update)
 		resize.disconnect(); content.disconnect()
 	}

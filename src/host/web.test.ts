@@ -806,7 +806,8 @@ test.skipIf(!chrome)('in a browser a block address loads its page, marks its car
 	// The linked tool result sits in the first turn, pages away from the tail.
 	let id = tabs.create('/tmp')
 	let output = Array.from({ length: 40 }, (_, i) => `row ${i + 1}`).join('\n')
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'prompt 0' }] })
+	let { blob } = blobs.store(id, 'image/gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'prompt 0' }, { type: 'image', blob, mediaType: 'image/gif' }] })
 	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'c0', name: 'bash', input: { command: 'seq 40' } } })
 	let result = history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'c0', output }] })
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
@@ -830,6 +831,21 @@ test.skipIf(!chrome)('in a browser a block address loads its page, marks its car
 			return { targets: document.querySelectorAll('.Card.target').length, visible: box.top < main.bottom && box.bottom > main.top, link: link && new URL(link.href).pathname + new URL(link.href).hash }
 		})()`)
 		expect(seen).toEqual({ targets: 1, visible: true, link: `/${id}#${result.n! - 1}` })
+		// Intrinsic image height can arrive after the linked card was revealed.
+		// Keep that card in place, not the old scrollTop above it.
+		await b.waitFor(`document.querySelector('.Card.image img')?.complete`)
+		let shifted = await b.evaluate(`(async () => {
+			let card = document.querySelector('.Card.target'), main = document.querySelector('main'), img = document.querySelector('.Card.image img')
+			let before = card.getBoundingClientRect().top - main.getBoundingClientRect().top
+			await new Promise((resolve, reject) => {
+				img.onload = resolve; img.onerror = reject
+				img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1500"></svg>')
+			})
+			await new Promise(requestAnimationFrame)
+			return { height: img.clientHeight, drift: Math.abs(card.getBoundingClientRect().top - main.getBoundingClientRect().top - before) }
+		})()`)
+		expect(shifted.height).toBeGreaterThan(200)
+		expect(shifted.drift).toBeLessThan(40)
 	} finally {
 		await b.close()
 	}
