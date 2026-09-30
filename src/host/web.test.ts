@@ -1141,7 +1141,7 @@ test.skipIf(!chrome)('rotation preserves exclusive 40px edge gaps or the text at
 		seed.close()
 		await b.call('Page.navigate', { url: `${base()}/${short}` })
 		await b.waitFor("document.querySelector('main')?.textContent.includes('Short paragraph four.') && document.querySelector('.activity').textContent.includes('idle')")
-		await b.evaluate(`(() => { let el = document.querySelector('main'), last = el.lastElementChild; el.dispatchEvent(new WheelEvent('wheel', { bubbles: true })); let contentHeight = last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop + parseFloat(getComputedStyle(el).paddingBottom); el.style.flex = 'none'; el.style.height = (contentHeight - 60) + 'px' })()`)
+		await b.evaluate(`(() => { let el = document.querySelector('main'), last = el.lastElementChild; el.dispatchEvent(new WheelEvent('wheel', { bubbles: true })); let contentHeight = last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop + parseFloat(getComputedStyle(last).marginBottom) + parseFloat(getComputedStyle(el).paddingBottom); el.style.flex = 'none'; el.style.height = (contentHeight - 60) + 'px' })()`)
 		await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
 		await position('top', 30)
 		expect(await gap('bottom')).toBeLessThanOrEqual(40)

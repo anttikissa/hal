@@ -1,0 +1,15 @@
+{
+	title: 'Web look after the ui-craft review',
+	spec: `The web page keeps the choices the user made on /demo/ui-review (task 86), after the review with skills/ui-craft (task z0):
+- Selection is reverse video in the text's own colour: the host's theme CSS gives every style class --fg and --sel-back (its fg), .page sets --sel-text to the canvas, and one ::selection rule uses them (also -webkit-text-fill-color, which filled text otherwise keeps). A solid block (a chosen question option, the selected completion, a quote mark) reverses back: canvas behind, its own colour as text. Plain variables only: in Chromium a var() fallback in ::selection resolved from the parent, not the element.
+- Focus: one style everywhere, a 2px outline in the control's own colour, 2px outside it (a zero-specificity :where(:focus-visible) rule). Exceptions: inside (-2px) where a clipping strip or list would cut it off (tab strip, picker list); flush (offset 0) against controls that already draw a 1px border, so it reads as a thicker border rather than a double one. Text fields keep their own focus look.
+- Spacing is the terminal grid: vertical steps in quarter lines (lh; eighths only for dense status rows), horizontal in whole ch. Cards, questions and the notice stack pad 0.25lh 1ch; items sit 0.5lh apart; edges of the transcript, status row and composer are 2ch (1ch on narrow screens).
+- The message box: one line of text, its placeholder and caret are centred in the 44px row the Send button sets (vertical padding (44px - 1lh) / 2); the textarea is exactly its content height, and grows up to its cap.
+- Tabs: no rule under the tab strip and none above the status row. A cell's content is centred; the current cell is tinted in the active colour with a 3px lit bar under it. An empty marker takes no width; when one appears it widens to 1ch in 150 ms (instant under reduced motion), moving that cell's content only.
+- Question: the Answer button has the options' colours (outline in the card colour) but a button's shape: not full width, at least 36px high (44px on touch), bold.
+- Notice bars are 3px, like every other lit bar. Hal's cursor line starts where card text starts (3px bar + 1ch).
+- The status row is 12px; landscape phones may go to 11px. Small text is fine where space is scarce; desktop text is never smaller than on phones.
+- Opening and closing a card animates its height (grid rows 0fr to 1fr, from demo.tsx [F12], designed with the user); tasks/README.md allows it.`,
+	status: 'done',
+	needs: ['4s', '3k', 'qm', '86']
+}

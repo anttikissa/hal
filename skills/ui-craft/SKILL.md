@@ -66,7 +66,7 @@ Record new design decisions in the project's canonical spec.
   intermediate, and wide container sizes, especially around wrap boundaries.
 - Let flex/grid children shrink where needed. Choose wrapping, scrolling, or
   truncation with a way to retrieve the full content; do not hide essential
-  actions, shrink text to fit, or clip overflow indiscriminately.
+  actions, shrink text below the product's minimum, or clip overflow indiscriminately.
 - Check text enlargement, font loading, and every supported theme.
 - On mobile, check safe areas and the software keyboard: the composer and actions
   must remain reachable. Desktop emulation does not verify keyboard behavior.

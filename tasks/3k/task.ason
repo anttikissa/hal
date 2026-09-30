@@ -2,7 +2,7 @@
 	title: 'Tab strips: equal cells, underline, pages; full-width web',
 	spec: `Tab strips in the terminal and on the web are one row of equal cells in real tab order, so Ctrl-N/P always move one cell right/left and no number ever shifts.
 
-Cells: every cell has the same width: the widest tab number, right-aligned, plus one marker slot (task fr's glyph, or a blank of the same width) and a gap. The current tab is shown by an underline on its number (colour of the active tab), never by brackets or padding that would move other cells. The terminal loses its [n] brackets.
+Cells: every cell has the same width: the widest tab number, right-aligned, plus one marker slot (task fr's glyph, or a blank of the same width) and a gap. The current tab never uses brackets or padding that would move other cells: in the terminal its number is underlined (colour of the active tab); on the web its cell is tinted with a lit bar under it (task gn). The terminal loses its [n] brackets.
 
 Names: only when every tab fits with a name at one fixed width (number, marker, name clipped to that width) do cells show names; otherwise all cells are numbers. No per-tab close button in the strip (the web closes with Ctrl-W, /close or the full list).
 

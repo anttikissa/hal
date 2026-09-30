@@ -79,7 +79,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 				}
 			</For>
 			<Show when={form().fields.some((f) => f.type !== 'choice') || form().fields.length > 1}>
-				<button>Answer</button>
+				<button class="answer">Answer</button>
 			</Show>
 		</form>
 	)

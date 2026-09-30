@@ -12,6 +12,15 @@
    (src/common/colors.ts; .page carries the page's own as variables). */
 :root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --fade-ms: 300ms; --toggle-ms: 250ms; }
 * { box-sizing: border-box; }
+/* Selection is reverse video in the text's own colour (each theme class
+   sets --sel-back); a solid block (bg in its colour) reverses back. */
+.page { --sel-text: var(--canvas); }
+::selection { background-color: var(--sel-back); color: var(--sel-text); -webkit-text-fill-color: var(--sel-text); }
+.Question button[aria-pressed="true"], .Composer .completions button[aria-selected="true"], .Question mark { --sel-back: var(--canvas); --sel-text: var(--fg); }
+/* Focus: one style, 2px in the control's own colour, outside it. Inside
+   where a clipping strip or list would cut it off; flush against a
+   control that already draws a border, so it reads as a thicker one. */
+:where(:focus-visible) { outline: 2px solid currentColor; outline-offset: 2px; }
 html { background: var(--canvas); color: var(--text); overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
 /* Keep the document geometry still while Safari pans its visual viewport
@@ -25,16 +34,16 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 /* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
    corners and home indicator), so the edge rows pad themselves. */
-.Transcript { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; padding: 1rem max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left)); }
-.Transcript > * { margin: 0 0 0.6rem; }
+.Transcript { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; padding: 0.5lh max(2ch, env(safe-area-inset-right)) 0.5lh max(2ch, env(safe-area-inset-left)); }
+.Transcript > * { margin: 0 0 0.5lh; }
 /* Cards and the open question share one shape: square, a lit bar on
    the left, the style's tint behind. */
 .Card, .Question { border-left: 3px solid currentColor; }
-.Card { padding: 0.4rem 0.7rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.Card { padding: 0.25lh 1ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Card.user::before { content: "> "; }
 .Card.image::before { content: none; }
 .Card.prompt::before { content: none; }
-.Card .who { color: var(--quiet); margin-bottom: 0.4rem; }
+.Card .who { color: var(--quiet); margin-bottom: 0.25lh; }
 .Card .who .call { color: inherit; text-decoration: underline; }
 .Card .exit { background: none; }
 /* A context boundary (tasks bc, vh): its text centred in a rule. */
@@ -48,30 +57,29 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card.pending { color: var(--quiet); transition-delay: 300ms; }
 .Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
 .Card.folds { padding: 0; cursor: pointer; }
-.Card .head { display: flex; gap: 0.6ch; width: 100%; padding: 0.4rem 0.7rem; background: none; color: inherit; text-align: left; }
-.Card .head:focus-visible { outline: 1px solid currentColor; outline-offset: -2px; }
+.Card .head { display: flex; gap: 0.6ch; width: 100%; padding: 0.25lh 1ch; background: none; color: inherit; text-align: left; }
 .Card .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .Card .head .error { background: none; margin-left: auto; }
 /* Each card links to itself (task 0z): a # in its top right corner,
    shown on hover or focus; the linked card is outlined. */
 .Card { position: relative; padding-right: 7ch; }
 .Card .head { padding-right: 7ch; }
-.Card > .link { position: absolute; top: 0; right: 0; padding: 0.4rem 0.7rem 0.4rem 0.5ch; color: inherit; text-decoration: none; user-select: none; color: var(--quiet); }
+.Card > .link { position: absolute; top: 0; right: 0; padding: 0.25lh 1ch 0.25lh 0.5ch; color: inherit; text-decoration: none; user-select: none; color: var(--quiet); }
 .Card > .link::before { content: attr(data-ref); }
 .Card > .link:hover, .Card > .link:focus-visible { color: inherit; text-decoration: underline; }
-.Card.target { outline: 1px solid currentColor; outline-offset: 2px; scroll-margin-top: 0.5rem; }
-.Card .more { display: block; margin-top: 0.3rem; background: none; color: inherit; text-decoration: underline; padding: 0; }
+.Card.target { outline: 1px solid currentColor; outline-offset: 2px; scroll-margin-top: 0.5lh; }
+.Card .more { display: block; margin-top: 0.25lh; background: none; color: inherit; text-decoration: underline; padding: 0; }
 @media (pointer: coarse) { .Card > .link { min-width: 44px; min-height: 44px; text-align: right; } .Card .more { min-height: 44px; } }
 /* Open and close animate the height (a one-row grid, 0fr to 1fr);
    closing is faster. Padding sits inside so closed is truly 0 high. */
 .Card .body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows calc(var(--toggle-ms) * 0.7) var(--ease-out); }
 .Card.open .body { grid-template-rows: 1fr; transition-duration: var(--toggle-ms); }
-.Card .contents { min-height: 0; overflow: hidden; padding: 0 0.7rem 0 calc(0.7rem + 2ch); }
-.Card .contents::after { content: ""; display: block; height: 0.4rem; }
+.Card .contents { min-height: 0; overflow: hidden; padding: 0 1ch 0 3ch; }
+.Card .contents::after { content: ""; display: block; height: 0.25lh; }
 /* Hal's cursor: inside the card that streams, right after its last
    character (dimmed while thinking), else on a line after the last
    item. */
-.cursor-line { min-height: 2.5rem; padding: 0.2rem 0 0.6rem; color: var(--cursor); }
+.cursor-line { min-height: 1.75lh; padding: 0.25lh 0 0.5lh calc(3px + 1ch); color: var(--cursor); }
 .cursor-line span, .Card .cursor { display: block; width: 1ch; height: 1lh; background: currentColor; animation: blink 1s steps(1, end) infinite; }
 .Card .cursor { display: inline-block; vertical-align: text-bottom; margin-left: 0.2ch; background: var(--cursor); }
 .Card.thinking .cursor { background: var(--quiet); }
@@ -82,7 +90,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
    is off to the right, that edge fades (a scroll-driven --fade). */
 .Markdown .line { min-height: 1lh; }
 .Markdown .line:has(+ .cursor) { display: inline; }
-.Markdown .h { margin-top: 0.3rem; }
+.Markdown .h { margin-top: 0.25lh; }
 .Markdown .li { display: flex; }
 .Markdown .li .marker { flex: none; }
 .Markdown .quote { border-left: 2px solid color-mix(in oklab, currentColor var(--mix-quote), transparent); padding-left: 1ch; }
@@ -90,49 +98,47 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Markdown .i { font-style: italic; }
 .Markdown .code, .Markdown pre { font-family: ui-monospace, monospace; }
 .Markdown a { color: inherit; }
-.Markdown pre { margin: 0.3rem 0; white-space: pre-wrap; }
+.Markdown pre { margin: 0.25lh 0; white-space: pre-wrap; }
 .Markdown pre[data-lang]::before { content: attr(data-lang); display: block; color: var(--quiet); }
-.Markdown .table { overflow-x: auto; margin: 0.3rem 0; white-space: normal; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
+.Markdown .table { overflow-x: auto; margin: 0.25lh 0; white-space: normal; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
 .Markdown table { border-collapse: collapse; }
-.Markdown th, .Markdown td { border: 1px solid color-mix(in oklab, currentColor var(--mix-table), transparent); padding: 0.15rem 0.5rem; text-align: left; vertical-align: top; overflow-wrap: normal; min-width: 6ch; }
+.Markdown th, .Markdown td { border: 1px solid color-mix(in oklab, currentColor var(--mix-table), transparent); padding: 0 1ch; text-align: left; vertical-align: top; overflow-wrap: normal; min-width: 6ch; }
 .Markdown td { white-space: pre-line; }
 @property --fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @keyframes md-fade { from { --fade: 2.5rem; } 99% { --fade: 2.5rem; } to { --fade: 0px; } }
 @keyframes blink { 50% { opacity: 0; } }
 /* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
 .Notices { position: relative; flex: none; height: 0; z-index: 2; }
-.Notices .stack { position: absolute; right: max(0.5rem, env(safe-area-inset-right)); bottom: 0.5rem; width: min(24rem, calc(100vw - 1rem)); display: flex; flex-direction: column; gap: 0.3rem; }
-.Notices .card { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.45rem 0.7rem; border-left: 0.4rem solid; text-decoration: none; animation: notice-in 200ms var(--ease-out); }
+.Notices .stack { position: absolute; right: max(1ch, env(safe-area-inset-right)); bottom: 0.5lh; width: min(24rem, calc(100vw - 1rem)); display: flex; flex-direction: column; gap: 0.25lh; }
+.Notices .card { display: flex; flex-direction: column; padding: 0.25lh 1ch; border-left: 3px solid; text-decoration: none; animation: notice-in 200ms var(--ease-out); }
 .Notices .card.done { border-color: var(--done-fg); } .Notices .card.done strong { color: var(--done-fg); }
 .Notices .card.failed { border-color: var(--failed-fg); } .Notices .card.failed strong { color: var(--failed-fg); }
 .Notices .card.attention { border-color: var(--attention-fg); } .Notices .card.attention strong { color: var(--attention-fg); }
 .Notices .card .line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.Notices .more { align-self: flex-end; padding: 0.2rem 0.7rem; }
+.Notices .more { align-self: flex-end; padding: 0 1ch; }
 @media (pointer: coarse) { .Notices .card { min-height: 44px; } }
 @keyframes notice-in { from { transform: translateY(0.5rem); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .Notices .card { animation: none; } }
 /* Two explicit lines, no accidental wrapping; the whole overview is a target. */
-.StatusRow { flex: none; padding: 0 max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left)); font-size: 0.85em; border-top: 1px solid var(--border); }
-.StatusRow .overview { display: block; width: 100%; min-height: 44px; padding: 0.2rem 0; background: none; color: inherit; font: inherit; text-align: left; touch-action: manipulation; }
+.StatusRow { flex: none; padding: 0 max(2ch, env(safe-area-inset-right)) 0 max(2ch, env(safe-area-inset-left)); font-size: 12px; }
+.StatusRow .overview { display: block; width: 100%; min-height: 44px; padding: 0.125lh 0; background: none; color: inherit; font: inherit; text-align: left; touch-action: manipulation; }
 .StatusRow .primary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto auto; align-items: baseline; gap: 1ch; }
 .StatusRow .secondary { display: flex; gap: 2ch; justify-content: space-between; }
 .StatusRow .name, .StatusRow .activity, .StatusRow .cwd, .StatusRow .model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .StatusRow .activity { max-width: 40vw; }
 .StatusRow .cwd { flex: 1; }
 .StatusRow .model { flex: 0 1 auto; max-width: 75%; }
-.StatusRow :focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.StatusDetails { width: min(32rem, calc(var(--app-width, 100vw) - 1rem)); max-height: calc(var(--app-height, 100dvh) - 1rem); overflow-y: auto; padding: 0.7rem; background: var(--canvas); color: var(--text); border: 1px solid var(--border); overflow-wrap: anywhere; }
+.StatusDetails { width: min(32rem, calc(var(--app-width, 100vw) - 1rem)); max-height: calc(var(--app-height, 100dvh) - 1rem); overflow-y: auto; padding: 0.5lh 1ch; background: var(--canvas); color: var(--text); border: 1px solid var(--border); overflow-wrap: anywhere; }
 .StatusDetails::backdrop { background: color-mix(in oklab, var(--canvas) 70%, transparent); }
 .StatusDetails .top { display: flex; align-items: center; justify-content: space-between; gap: 1ch; }
 .StatusDetails .top button { min-width: 44px; min-height: 44px; background: none; color: inherit; }
-.StatusDetails .fact { padding-block: 0.25rem; }
+.StatusDetails .fact { padding-block: 0.125lh; }
 .StatusDetails a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; text-decoration: underline; touch-action: manipulation; }
-.StatusDetails :focus-visible { outline: 2px solid var(--accent); }
 @media (pointer: coarse) { .StatusDetails { position: fixed; top: auto; bottom: calc(100dvh - var(--app-top, 0px) - var(--app-height, 100dvh) + 0.5rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; margin: 0; width: calc(var(--app-width, 100vw) - 1rem); } }
-@media (max-width: 40rem) { .StatusRow { padding-inline: max(0.6rem, env(safe-area-inset-left)) max(0.6rem, env(safe-area-inset-right)); } }
-.Composer { position: relative; z-index: 1; flex: none; padding: 0.4rem max(1rem, env(safe-area-inset-right)) max(0.8rem, calc(env(safe-area-inset-bottom) - (100dvh - var(--app-height, 100dvh)))) max(1rem, env(safe-area-inset-left)); }
+@media (max-width: 40rem) { .StatusRow { padding-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right)); } }
+.Composer { position: relative; z-index: 1; flex: none; padding: 0.25lh max(2ch, env(safe-area-inset-right)) max(0.5lh, calc(env(safe-area-inset-bottom) - (100dvh - var(--app-height, 100dvh)))) max(2ch, env(safe-area-inset-left)); }
 .Composer > #notice:empty { display: none; }
-.Composer .status { padding: 0.2rem 0; }
+.Composer .status { padding: 0.125lh 0; }
 /* Static footer chrome is not a scroll surface. Only the draft itself
    scrolls, without handing its edge gestures to Safari's viewport. */
 .StatusRow, .Composer .status, .entry > button, .entry .actions { touch-action: none; }
@@ -140,7 +146,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
    card: lit left bar, outline, names bright; the selected row solid in
    that colour with canvas text, as a chosen option is. */
 .Composer .completions { position: absolute; bottom: 100%; left: 0; right: 0; max-height: min(35dvh, 20rem); overflow-y: auto; background: var(--canvas); box-shadow: inset 0 0 0 1px currentColor; border-left: 3px solid currentColor; }
-.Composer .completions button { display: flex; flex-direction: column; width: 100%; min-height: 44px; padding: 0.4rem 0.7rem; text-align: left; background: transparent; color: inherit; }
+.Composer .completions button { display: flex; flex-direction: column; width: 100%; min-height: 44px; padding: 0.25lh 1ch; text-align: left; background: transparent; color: inherit; }
 .Composer .completions button:hover { background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent); }
 .Composer .completions button[aria-selected="true"] { background: currentColor; -webkit-text-fill-color: var(--canvas); }
 .Composer .completions span { color: var(--quiet); font-size: 0.85em; }
@@ -156,24 +162,25 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
 /* The example request: the input's faint blue, as in the terminal. It
    leaves fast as typing starts and returns a little slower. */
-.entry .hint { position: absolute; inset: 0.5rem 0.7rem auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
+/* One line of text sits centred in the 44px row the buttons set. */
+.entry .hint { position: absolute; inset: calc((44px - 1lh) / 2) 1ch auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
 .entry .hint.gone { opacity: 0; transition-duration: 80ms; }
-.entry textarea { overscroll-behavior: none; touch-action: pan-y pinch-zoom; max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: 0.5rem 0.7rem; }
-.entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
+.entry textarea { overscroll-behavior: none; touch-action: pan-y pinch-zoom; max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: calc((44px - 1lh) / 2) 1ch; }
+.entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 2ch; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
 .entry > button:hover:not(:disabled), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
 .entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; }
-.help { display: flex; flex-wrap: wrap; gap: 0 1.5ch; padding-top: 0.3rem; color: var(--description); }
+.help { display: flex; flex-wrap: wrap; gap: 0 2ch; padding-top: 0.25lh; color: var(--description); }
 .help b { color: var(--key); font-weight: 600; }
-textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 0.5rem 0.6rem; resize: none; outline: none; }
+textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 0.25lh 1ch; resize: none; outline: none; }
 textarea:focus, input:focus { border-color: var(--accent); }
 .input textarea { caret-color: var(--cursor); }
-button { background: var(--button); color: var(--text); border: 0; padding: 0.5rem; cursor: pointer; }
+button { background: var(--button); color: var(--text); border: 0; padding: 0.25lh 1ch; cursor: pointer; }
 button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 /* Phones: 16px fields, or iOS zooms in on focus. */
 /* Touch keyboards: Enter is a newline and Send sends, so the key hints
    do not apply. */
 @media (pointer: coarse) { .help { display: none; } textarea, input, .entry .hint { font-size: 16px; } }
-@media (max-width: 40rem) { textarea, input, .entry .hint { font-size: 16px; } .Transcript, .Composer { padding-left: max(0.6rem, env(safe-area-inset-left)); padding-right: max(0.6rem, env(safe-area-inset-right)); } .Transcript { padding-block: 0.6rem; } }
+@media (max-width: 40rem) { textarea, input, .entry .hint { font-size: 16px; } .Transcript, .Composer { padding-left: max(1ch, env(safe-area-inset-left)); padding-right: max(1ch, env(safe-area-inset-right)); } }
 /* Phone landscape preserves scarce height without shrinking touch targets. */
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   .Transcript { font-size: 12px; line-height: 1.4; padding-block: 6px; }
@@ -183,62 +190,70 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
   .Composer { padding-top: 4px; gap: 4px; }
   .entry textarea { max-height: min(80px, calc(var(--app-height, 100dvh) * .25)); overflow-y: auto; }
 }
-@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
-.Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.6rem; }
-.Question { position: relative; margin: 0 0 0.6rem; padding: 0.4rem 0.7rem; display: flex; flex-direction: column; gap: 0.4rem; }
+@media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button, .Tabs .strip .marker { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
+.Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.5lh; }
+.Question { position: relative; margin: 0 0 0.5lh; padding: 0.25lh 1ch; display: flex; flex-direction: column; gap: 0.25lh; }
 /* Options: outlined in the card's colour; the chosen one solid in it,
    its text the canvas colour (text-fill keeps currentColor the card's). */
-.Question button:not(.dismiss) { padding: 0.2rem 0.8rem; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px currentColor; }
+.Question button:not(.dismiss) { padding: 0.125lh 1ch; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px currentColor; }
 .Question button[aria-pressed="true"] { background: currentColor; -webkit-text-fill-color: var(--canvas); font-weight: 600; }
 .Question button:hover:not([aria-pressed="true"]) { background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent); }
 /* Options wrap with the same gap across and down. */
-.Question [role="group"] { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
-.Question .dismiss { position: absolute; top: 0; right: 0; background: none; color: inherit; padding: 0.4rem 0.7rem; }
+.Question [role="group"] { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5lh 1ch; }
+/* Answer: the options' colours, a button's shape. */
+.Question button.answer { align-self: flex-start; min-height: 36px; padding: 0 2ch; font-weight: 600; }
+.Question button:not(.dismiss):focus-visible { outline-offset: 0; }
+.Question .dismiss { position: absolute; top: 0; right: 0; background: none; color: inherit; padding: 0.25lh 1ch; }
 .Question .dismiss:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
 .Question > .text { padding-right: 3ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Question .text a { color: inherit; text-decoration: underline; }
-@media (pointer: coarse) { .Question .dismiss { min-width: 44px; min-height: 44px; } }
-.Question pre.quote { margin: 0 0 0 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+@media (pointer: coarse) { .Question .dismiss, .Question button.answer { min-width: 44px; min-height: 44px; } }
+.Question pre.quote { margin: 0 0 0 2ch; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .Question mark { background: currentColor; color: var(--canvas); }
-.Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--canvas); color: var(--text); border: 1px solid var(--border); padding: 0.6rem; }
-.Picker[open] { display: flex; flex-direction: column; gap: 0.4rem; }
+.Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--canvas); color: var(--text); border: 1px solid var(--border); padding: 0.5lh 1ch; }
+.Picker[open] { display: flex; flex-direction: column; gap: 0.25lh; }
 .Picker .top { display: flex; align-items: center; gap: 0.6ch; }
 .Picker .title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.Picker .close { background: transparent; color: inherit; padding: 0.2rem 0.6rem; }
+.Picker .close { background: transparent; color: inherit; padding: 0 1ch; }
 .Picker ul { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
-.Picker li { padding: 0 0.4rem; cursor: pointer; white-space: pre-wrap; overflow-wrap: anywhere; }
+.Picker li { padding: 0 1ch; cursor: pointer; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Picker li[aria-selected="true"] { background: var(--button); }
 .Picker li .match { color: var(--match); font-weight: bold; }
-.Picker .effort-controls { display: flex; gap: 0.5rem; flex: none; }
+.Picker .effort-controls { display: flex; gap: 1ch; flex: none; }
 .Picker .effort-controls button { min-height: 44px; min-width: 44px; }
 .Picker { max-height: calc(var(--app-height, 100dvh) - 1rem); overflow: hidden; }
 .Picker .input, .Picker .top, .Picker .filters, .Picker .log { flex: none; }
-.Picker .filters { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.Picker .filters { display: flex; flex-wrap: wrap; gap: 0.25lh 1ch; }
 .Picker .filters button { min-height: 44px; }
 .Picker ul { min-height: 0; overscroll-behavior: contain; }
-.Picker li a { display: block; min-height: 44px; padding-block: 0.4rem; color: inherit; text-decoration: none; }
-.Picker :focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.Picker li a { display: block; min-height: 44px; padding-block: 0.25lh; color: inherit; text-decoration: none; }
+.Picker li :focus-visible, .Picker li:focus-visible { outline-offset: -2px; }
 /* Apple HIG: touch targets at least 44x44pt. */
 @media (pointer: coarse) {
   .Picker { width: calc(var(--app-width, 100vw) - 1rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; max-width: none; height: calc(var(--app-height, 100dvh) - 1rem); max-height: none; top: calc(var(--app-top, 0px) + 0.5rem); bottom: auto; margin: 0; }
-  .Picker li { min-height: 44px; padding-block: 0.4rem; }
+  .Picker li { min-height: 44px; padding-block: 0.25lh; }
   .Picker .close { min-width: 44px; min-height: 44px; }
 }
 /* Tabs (task 3k): one row that never wraps or scrolls sideways (that
    fights the back-swipe): menu, equal cells (widths set by Tabs.tsx
    from common/tab-pages.ts), page edges, new tab. The shown tab's
-   number is underlined; nothing else moves. Under 50px tall. */
-.Tabs { flex: none; border-bottom: 1px solid var(--border); padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+   cell is tinted with a lit bar under it; its content is centred, and a
+   marker that appears widens it smoothly. Under 50px tall. */
+.Tabs { flex: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .Tabs .strip { display: flex; align-items: stretch; white-space: nowrap; overflow: hidden; }
 .Tabs .pages { position: relative; flex: 1; min-width: 0; display: flex; justify-content: center; overflow: hidden; }
 .Tabs .probe { position: absolute; visibility: hidden; pointer-events: none; }
-.Tabs .tab { display: flex; flex: none; align-items: center; width: var(--cell); padding: 0.3rem 0; background: none; text-decoration: none; color: var(--inactive-fg); }
-.Tabs .tab .n { display: inline-block; width: calc(var(--digits) * 1ch); text-align: right; }
+.Tabs .tab { display: flex; flex: none; align-items: center; justify-content: center; width: var(--cell); padding: 0.25lh 0; background: none; text-decoration: none; color: var(--inactive-fg); }
+.Tabs .sheet .tab .n { display: inline-block; width: calc(var(--digits) * 1ch); text-align: right; }
 .Tabs .tab[aria-current] { color: var(--active-fg); }
-.Tabs .tab[aria-current] .n { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; font-weight: 600; }
+.Tabs .strip .tab[aria-current] { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 0 -3px 0 var(--active-fg); font-weight: 600; }
+.Tabs .sheet .tab[aria-current] .n { font-weight: 600; }
 .Tabs .marker { display: inline-block; width: 1ch; text-align: left; }
+.Tabs .strip .marker { overflow: hidden; transition: width 150ms var(--ease-out); }
+.Tabs .strip .marker:not([aria-label]) { width: 0; }
+.Tabs .strip :focus-visible { outline-offset: -2px; }
 .Tabs .strip .name { width: 12ch; margin-left: 1ch; overflow: hidden; text-overflow: ellipsis; }
-.Tabs .edge { display: flex; flex: none; align-items: center; justify-content: center; width: var(--edge); padding: 0.3rem 0; text-decoration: none; color: var(--inactive-fg); }
+.Tabs .edge { display: flex; flex: none; align-items: center; justify-content: center; width: var(--edge); padding: 0.25lh 0; text-decoration: none; color: var(--inactive-fg); }
 .Tabs .edge[hidden] { display: none; }
 .Tabs .marker.blink { animation: pulse 1s steps(2) infinite; }
 .Tabs .marker.working { color: var(--active-fg); }
@@ -246,22 +261,22 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .marker.paused { color: var(--paused-fg); font-weight: 600; }
 .Tabs .marker.failed { color: var(--error-fg); }
 .Tabs .marker.done { color: var(--done-fg); }
-.Tabs button { flex: none; background: transparent; color: inherit; padding: 0.3rem 0.8rem; }
+.Tabs button { flex: none; background: transparent; color: inherit; padding: 0.25lh 1ch; }
 @media (hover: hover) and (pointer: fine) { .Tabs button:hover, .Tabs .tab:hover, .Tabs .edge:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
 .Tabs .tab, .Tabs .edge, .Tabs button { touch-action: manipulation; }
 .Tabs .menu, .Tabs .close { color: var(--inactive-fg); }
 @media (pointer: coarse) { .Tabs .strip { min-height: 44px; } .Tabs button { min-width: 44px; } }
-.Tabs .sheet { width: 100%; max-width: 100%; max-height: 80dvh; margin: auto 0 0; padding: 0.6rem 0.6rem max(0.6rem, env(safe-area-inset-bottom)); background: var(--canvas); color: var(--text); border: 0; border-top: 1px solid var(--border); }
-.Tabs .sheet[open] { display: flex; flex-direction: column; gap: 0.4rem; }
+.Tabs .sheet { width: 100%; max-width: 100%; max-height: 80dvh; margin: auto 0 0; padding: 0.5lh 1ch max(0.5lh, env(safe-area-inset-bottom)); background: var(--canvas); color: var(--text); border: 0; border-top: 1px solid var(--border); }
+.Tabs .sheet[open] { display: flex; flex-direction: column; gap: 0.25lh; }
 .Tabs .sheet ul { margin: 0; padding: 0; list-style: none; overflow-y: auto; }
 .Tabs .sheet li { display: flex; align-items: stretch; justify-content: space-between; }
 /* The shown tab in the list is lit like a card: bar on the left, tint. */
 .Tabs .sheet li:has([aria-current]) { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 3px 0 0 var(--active-fg); }
-.Tabs .sheet .tab { flex: 1; width: auto; justify-content: flex-start; gap: 1ch; padding: 0.6rem; }
+.Tabs .sheet .tab { flex: 1; width: auto; justify-content: flex-start; gap: 1ch; padding: 0.5lh 1ch; }
 .Tabs .sheet .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.Tabs .sheet .close { padding: 0.6rem 1rem; }
-.Tabs .sheet .new { padding: 0.6rem; background: var(--button); }
-.Tabs .sheet .reload { padding: 0.6rem; background: var(--button); }
+.Tabs .sheet .close { padding: 0.5lh 2ch; }
+.Tabs .sheet .new { padding: 0.5lh 1ch; background: var(--button); }
+.Tabs .sheet .reload { padding: 0.5lh 1ch; background: var(--button); }
 .Tabs .sheet::backdrop { background: color-mix(in oklab, var(--canvas) var(--mix-backdrop), transparent); }
 /* The theme (src/common/colors.ts), put here by the host. */
 /*COLORS*/

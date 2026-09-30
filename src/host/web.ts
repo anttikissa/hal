@@ -135,7 +135,8 @@ const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
 // background and any other colour as a custom property (--link-bg),
 // plus --quiet: the fg's quieter, still readable form (colors.quiet), for
 // secondary text, which never fades by opacity (tasks/README.md). The
-// page's is measured on its lightest surface, the button.
+// page's is measured on its lightest surface, the button. --fg and
+// --sel-back repeat the fg for the page's ::selection rule.
 function css(): string {
 	let rules: string[] = []
 	for (let [key, value] of Object.entries(colors)) {
@@ -153,6 +154,8 @@ function css(): string {
 		})
 		let fg = style.fg ?? style.text
 		if (fg) decls.push(`--quiet: ${oklch.toCss(colors.quiet(fg, style.bg ?? style.button ?? colors.screen()))}`)
+		// Selection is reverse video in the style's own colour (task gn).
+		if (fg) decls.push(`--fg: ${oklch.toCss(fg)}`, `--sel-back: ${oklch.toCss(fg)}`)
 		if (key === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}

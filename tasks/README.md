@@ -190,7 +190,9 @@ corporate-neutral (the user's words: "be-afraid-say-nothing"). No
 slate: no blue-grey surfaces or buttons in any theme, the default
 included. Colour
 changes are proposed to the user with options before they land; he
-decides. Readable text below still holds.
+decides. Spacing follows the terminal grid (quarter lines vertically,
+whole ch across), and small text is fine where space is scarce; task gn
+holds the rest of what the user chose (selection, focus, tabs). Readable text below still holds.
 
 ## Emergency keys (invariants)
 
@@ -209,7 +211,9 @@ decides. Readable text below still holds.
 
 ## Motion (web)
 
-After Emil Kowalski: animate only opacity, colour and transform; one
+After Emil Kowalski: animate only opacity, colour and transform (the
+user's exceptions: a card opening or closing animates its height, as
+in tasks/4s/demo.tsx [F12], and a tab marker appearing its width); one
 strong ease-out (--ease-out); short (80–300 ms), exits faster than
 entrances; nothing that happens in milliseconds (a round trip) may
 show, so state changes that are usually brief start after a delay;
