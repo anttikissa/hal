@@ -56,7 +56,7 @@ test('an advisory message reaches a working session with its next request, frame
 	let shown = unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt'))
 	expect(shown).toEqual([
 		{ type: 'prompt', text: 'go' },
-		{ type: 'prompt', text: 'check the tests', from: b, label: by },
+		{ type: 'prompt', text: 'check the tests', from: b, label: by, advisory: true },
 	])
 	calls[next + 1]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.views.get(a)!.state.type === 'idle')
@@ -141,7 +141,7 @@ test("an edit of the human's delivered message leaves another session's message 
 	expect(lastText(next + 2)).toBe(delivered.replace('hury', 'hurry'))
 	expect(unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt').slice(-2))).toEqual([
 		{ type: 'prompt', text: 'and hurry' },
-		{ type: 'prompt', text: 'fyi', from: b, label: by },
+		{ type: 'prompt', text: 'fyi', from: b, label: by, advisory: true },
 	])
 })
 

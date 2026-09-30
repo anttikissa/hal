@@ -27,7 +27,7 @@ function time(ts: string | undefined): string {
 function who(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt':
-			return (item.from === undefined ? 'You' : `Message from ${item.label ?? item.from}`) + (item.queued ? ' · from queue' : '')
+			return (item.from === undefined ? 'You' : `Message from ${item.label ?? item.from}`) + (item.steering ? ' (steering)' : item.advisory ? ' (advisory)' : item.queued ? ' · from queue' : '')
 		// A command is headed as the prompt it was typed as.
 		case 'command':
 			return item.origin === 'model' ? 'Hal issued a command' : item.from === undefined ? 'You' : `Message from ${item.from}`

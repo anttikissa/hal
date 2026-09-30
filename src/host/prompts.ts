@@ -144,7 +144,8 @@ function harmless(records: HistoryRecord[]): boolean {
 // `prompt` event, or with `quiet` nothing, as the caller's turn-start
 // carries it. Returns the prompt's record.
 function deliver(id: string, items: InboxItem[], extra?: Sender & { text: string }, command?: string, quiet = false): HistoryRecord & { type: 'user' } {
-	let blocks = prompts.blocks(id, extra ? [...items, extra] : items)
+	let parts = items.map((m) => ({ ...m, ...inbox.provenance(m) }))
+	let blocks = prompts.blocks(id, extra ? [...parts, extra] : parts)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, inbox: items.map((m) => m.id) }
 	if (command !== undefined) record.command = command
 	if (items.length === 1 && items[0]!.queue) {
@@ -170,7 +171,7 @@ function images(list: UserBlock[]): ImageBlock[] {
 function promptEvent(id: string, record: HistoryRecord & { type: 'user' }): Event {
 	let event: Event & { type: 'prompt' } = { type: 'prompt', sessionId: id, texts: prompts.texts(record.blocks) }
 	let who = prompts.senders(record.blocks)
-	if (who.some((s) => s.from !== undefined)) event.senders = who
+	if (who.some((s) => Object.keys(s).length)) event.senders = who
 	let shown = prompts.images(record.blocks)
 	if (shown.length) event.images = shown
 	if (record.queued) event.queued = true

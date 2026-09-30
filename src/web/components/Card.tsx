@@ -88,7 +88,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// thinking is headed by the terminal's header words and its first
 	// line. Prompts and model text show those words above their text
 	// (task hp).
-	let title = () => props.row.waiting ? `(${props.row.waiting})` : titles.title(props.row.item)
+	let title = () => titles.title(props.row.item)
 	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #(\d+)$/)?.[1]
 	let who = () => {
 		let ref = source(), t = title()

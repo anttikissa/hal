@@ -7,7 +7,7 @@
 
 import { blocks, type AssistantBlock, type ImageBlock, type Sender, type ToolResultBlock, type Usage } from './blocks.ts'
 import { forms, type Answers, type Form } from './forms.ts'
-import type { InboxItem } from './inbox.ts'
+import { inbox, type InboxItem } from './inbox.ts'
 import type { Event, LiveTurn, Snapshot, Stats, TurnStatus } from './protocol.ts'
 import { replay, type HistoryRecord } from './replay.ts'
 import type { SessionMeta } from './session.ts'
@@ -17,7 +17,7 @@ import type { SessionState } from './states.ts'
 export type Shown =
 	// `from`: the session that sent it, `label` naming it; without it,
 	// the human. `ts`: when it was sent (task hp).
-	| { type: 'prompt'; text: string; from?: string; label?: string; queued?: true; ts?: string }
+	| { type: 'prompt'; text: string; from?: string; label?: string; queued?: true; steering?: true; advisory?: true; ts?: string }
 	// An image attached to the prompt before it (task 2a).
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number }
 	// `ts`: when the block started; `model`, `effort`: what wrote it
@@ -99,9 +99,16 @@ function promptItem(text: string, s?: Sender, ts?: string, queued = false): Show
 	let item: Shown = { type: 'prompt', text }
 	if (s?.from !== undefined) item.from = s.from
 	if (s?.label !== undefined) item.label = s.label
+	if (s?.steering) item.steering = true
+	if (s?.advisory) item.advisory = true
 	if (ts !== undefined) item.ts = ts
 	if (queued) item.queued = true
 	return item
+}
+
+// Waiting messages are normal prompt items, not a second rendering format.
+function waitingItem(item: InboxItem): Item {
+	return { ...transcript.promptItem(item.text, inbox.provenance(item), undefined, !!item.queue), key: item.id }
 }
 
 function key(n: number | undefined, i: number, at: number): string {
@@ -202,9 +209,18 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	let prompt: number | undefined
 	let early = transcript.standIns(snapshot.earlier ?? [], snapshot.history)
 	let queued = new Set([...early, ...snapshot.history].flatMap((r) => r.type === 'inbox' && r.queue ? [r.id] : []))
+	let origins = new Map([...(snapshot.earlier ?? []), ...snapshot.history].flatMap((r) => r.type === 'inbox' ? [[r.id, r] as const] : []))
 	for (let r of [...early, ...replay.current(snapshot.history)]) {
 		// Older delivered records kept only their inbox IDs, not provenance.
 		if (r.type === 'user' && r.inbox?.some((id) => queued.has(id))) r = { ...r, queued: true }
+		if (r.type === 'user' && r.inbox?.length) {
+			let i = 0, ids = r.inbox
+			r = { ...r, blocks: r.blocks.map((b) => {
+				if (b.type !== 'text') return b
+				let origin = origins.get(ids[i++] ?? '')
+				return origin && inbox.provenance(origin).steering ? { ...b, steering: true } : b
+			}) }
+		}
 		if (replay.isPrompt(r)) prompt = items.length
 		if (r.type === 'answer') items = transcript.answered(items, r)
 		else items.push(...transcript.recordItems(r, items.length))
@@ -369,4 +385,4 @@ function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' 
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 
-export const transcript = { blockItems, turnItems, fresh, promptItem, key, href, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, boundary, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }
+export const transcript = { blockItems, turnItems, fresh, promptItem, waitingItem, key, href, keyed, imageItem, resultItem, recordItems, recordShown, endItem, settle, boundary, aside, answered, question, standIns, fromSnapshot, prepend, copyTurn, fold, prompted }

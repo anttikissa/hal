@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import type { AssistantBlock } from './blocks.ts'
 import type { Event, Snapshot } from './protocol.ts'
 import { transcript, type Transcript } from './transcript.ts'
+import { titles } from './titles.ts'
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id
@@ -298,4 +299,22 @@ test('command provenance and outcome timestamps survive live folding and reconne
 	expect(live.items).toEqual(restored.items)
 	expect(restored.items[0]).toMatchObject({ origin: 'model', ts })
 	expect(restored.items[1]).toMatchObject({ ts })
+})
+
+test('waiting and delivered steering use the same header, without labelling a following fresh prompt', () => {
+	let waiting = transcript.waitingItem({ id: 's1', text: 'interrupt' })
+	expect(titles.title(waiting)).toBe('You (steering)')
+	let live = fold([
+		snap({ history: [] }),
+		{ type: 'prompt', sessionId, texts: ['interrupt', 'fresh'], senders: [{ steering: true }, {}], n: 3 },
+	])!
+	let loaded = fold([snap({ history: [
+		{ type: 'inbox', id: 's1', text: 'interrupt', ts, n: 1 },
+		{ type: 'user', blocks: [{ type: 'text', text: 'interrupt' }, { type: 'text', text: 'fresh' }], inbox: ['s1'], ts, n: 3 },
+	] })])!
+	for (let t of [live, loaded]) {
+		expect(t.items.map((i) => titles.who(i))).toEqual(['You (steering)', 'You'])
+	}
+	expect(titles.who(transcript.waitingItem({ id: 'a', text: 'advice', from: '2-def', advisory: true }))).toBe('Message from 2-def (advisory)')
+	expect(titles.who(transcript.waitingItem({ id: 'q', text: 'later', queue: true }))).toBe('You · from queue')
 })

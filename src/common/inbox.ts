@@ -3,8 +3,8 @@
 // `inbox` records until a prompt record delivers them (its `inbox` ids).
 // A steering message goes to the model before the turn's next request; a
 // queued one (`queue`) runs as a turn of its own after the turn ends.
-// Not a state: every client shows the inbox beside any state, each
-// message saying why it waits.
+// Not a state: every client shows these as normal prompt cards, with
+// sender and kind in the header; why it waits belongs to the status.
 
 import type { Sender } from './blocks.ts'
 import type { HistoryRecord } from './replay.ts'
@@ -35,7 +35,14 @@ function sender(s: Sender): Sender {
 	if (s.from !== undefined) out.from = s.from
 	if (s.label !== undefined) out.label = s.label
 	if (s.advisory) out.advisory = true
+	if (s.steering) out.steering = true
 	return out
+}
+
+// Provenance a waiting message retains when delivered. Queue and
+// advisory messages are not steering; the kind belongs to each text.
+function provenance(item: InboxItem): Sender {
+	return { ...inbox.sender(item), ...(!item.queue && !item.advisory ? { steering: true as const } : {}) }
 }
 
 // The label in a word or two, for a message drawn as a prompt: its kind
@@ -46,4 +53,4 @@ function tag(item: InboxItem): string {
 	return kind + by
 }
 
-export const inbox = { pending, sender, tag }
+export const inbox = { pending, sender, provenance, tag }

@@ -277,7 +277,7 @@ function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 function withPending(rows: Row[], pending: { id: string; text: string }[], waiting: InboxItem[] = []): Row[] {
 	let keys = new Set(rows.map((r) => r.key))
 	let at = (rows.at(-1)?.at ?? -1) + 1
-	let queued = waiting.filter((m) => !keys.has(m.id)).map((m): Row => ({ item: { type: 'prompt', text: m.text, ...inbox.sender(m), key: m.id }, at, key: m.id, waiting: inbox.tag(m) }))
+	let queued = waiting.filter((m) => !keys.has(m.id)).map((m): Row => ({ item: transcript.waitingItem(m), at, key: m.id, waiting: inbox.tag(m) }))
 	for (let row of queued) keys.add(row.key)
 	let more = pending.filter((s) => !keys.has(s.id)).map((s): Row => ({ item: { type: 'prompt', text: s.text, key: s.id }, at, key: s.id, pending: true }))
 	return queued.length || more.length ? [...rows, ...queued, ...more] : rows

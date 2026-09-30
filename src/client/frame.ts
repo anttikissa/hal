@@ -15,9 +15,8 @@
 
 import { colors, type Style } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
-import { inbox } from '../common/inbox.ts'
 import type { ModalState } from '../common/modals.ts'
-import type { Item, Transcript } from '../common/transcript.ts'
+import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
 import { itemView } from './item-view.ts'
@@ -237,22 +236,15 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
 	}
 	let formCursor = view.form && past.target === undefined ? past.formCursor : undefined
-	// The transcript's tail, right after it (never across the full-mode
-	// padding): the inbox, each message drawn as the prompt it will
-	// become, (steering) > text, then prompts on their way to the host,
-	// drawn as the prompt card the host's copy will replace.
-	for (let text of view.pending ?? []) {
-		let rows = frame.itemRows({ type: 'prompt', text, key: '' }, cols)
+	// All unsent and waiting messages use the normal prompt renderer.
+	let tail: Item[] = [
+		...(view.transcript?.inbox ?? []).map((m) => transcript.waitingItem(m)),
+		...(view.pending ?? []).map((text): Item => ({ type: 'prompt', text, key: '' })),
+	]
+	for (let item of tail) {
+		let rows = frame.itemRows(item, cols, view.transcript?.meta.id)
 		if (rows.length && (lines.length || above)) lines.push('')
-		for (let r of rows) lines.push(r)
-	}
-	let tail = (view.transcript?.inbox ?? []).map((m) => ({ text: m.text, label: `(${inbox.tag(m)}) ` }))
-	for (let m of tail) {
-		// The tag takes at most half the row, so the text keeps room.
-		let tag = strings.clipVisual(m.label, Math.max(1, Math.floor(width / 2)))
-		let rows = promptView.mark(ansi.wrap(m.text, Math.max(1, width - strings.visLen(tag) - promptView.FIRST.length)))
-		let pad = ' '.repeat(strings.visLen(tag))
-		block(rows.map((r, i) => (i ? pad : ansi.quiet(tag, colors.user())) + r), colors.user())
+		lines.push(...rows)
 	}
 	// The idle Hal cursor: a blank row, its row, and the blank row that
 	// comes before the chrome. A question being answered has the cursor.

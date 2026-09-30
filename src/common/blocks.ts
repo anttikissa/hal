@@ -20,8 +20,9 @@ export type ImageBlock = { type: 'image'; blob: string; mediaType: string; bytes
 // Who sent a prompt's text (task rj): `from` is the session that sent
 // it, `label` names it for people and the model (tab, id and name as
 // they were then); none, the human. `advisory`: the model may read it
-// without dropping its work (the send tool's default).
-export type Sender = { from?: string; label?: string; advisory?: true }
+// without dropping its work (the send tool's default). `steering`:
+// this text was submitted to steer an active turn; retained for display.
+export type Sender = { from?: string; label?: string; advisory?: true; steering?: true }
 
 // A prompt's text, saying who sent it.
 export type UserText = TextBlock & Sender

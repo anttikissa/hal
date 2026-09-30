@@ -107,17 +107,15 @@ test('while a turn runs, Enter steers it, Alt-Enter queues, and Escape pauses it
 	])
 })
 
-test('waiting messages stay on screen, each saying why it waits', () => {
+test('waiting messages stay on screen as normal prompt cards with their kind', () => {
 	app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
 	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'a', text: 'steer me' }, { id: 'b', text: 'run me later', queue: true }] })
 	let rows = () => frame.build(appView.view(), 80).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
-	let steer = rows().find((r) => r.includes('steer me'))!
-	let later = rows().find((r) => r.includes('run me later'))!
-	expect(steer).not.toBe(later)
-	expect(steer.replace('steer me', '')).not.toBe(later.replace('run me later', ''))
-	// Drawn as the prompts they will become, kind first.
-	expect(steer).toBe('(steering) > steer me')
-	expect(later).toBe('(queued) > run me later')
+	expect(rows()).toContain('You (steering)')
+	expect(rows()).toContain('You · from queue')
+	expect(rows()).toContain('steer me')
+	expect(rows()).toContain('run me later')
+	expect(rows().join('\n')).not.toContain('> ')
 	app.onEvent({ type: 'state', sessionId: 's1', state: { type: 'paused' } })
 	expect(rows().join('\n')).toMatch(/paused/)
 	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [] })

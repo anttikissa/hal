@@ -44,6 +44,7 @@ test('a message sent while a turn runs steers it: waiting messages reach the mod
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('one\n\ntwo') }] },
 	])
 	expect(inboxOf(a, id)).toEqual([])
+	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)'])
 	// Again, and again the prefix holds.
 	a.conn.send({ type: 'submit', sessionId: id, text: 'three' })
 	calls[1]!.push({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
@@ -57,13 +58,14 @@ test('a message sent while a turn runs steers it: waiting messages reach the mod
 	expect(shown(view.items)).toEqual([
 		{ type: 'prompt', text: 'go' },
 		{ type: 'text', text: 'work' },
-		{ type: 'prompt', text: 'one' },
-		{ type: 'prompt', text: 'two' },
+		{ type: 'prompt', text: 'one', steering: true },
+		{ type: 'prompt', text: 'two', steering: true },
 		{ type: 'text', text: 'ok' },
-		{ type: 'prompt', text: 'three' },
+		{ type: 'prompt', text: 'three', steering: true },
 		{ type: 'text', text: 'done' },
 		{ type: 'turn-end', status: 'completed' },
 	])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)', 'You (steering)'])
 	expect(a.views.get(id)).toEqual(view)
 	expect(b.views.get(id)).toEqual(view)
 	expect(a.of('turn-end')).toHaveLength(1)
@@ -204,9 +206,10 @@ test('sending to a paused turn takes the waiting messages along, oldest first', 
 	let view = await fresh(id)
 	expect(shown(view.items.filter((i) => i.type === 'prompt'))).toEqual([
 		{ type: 'prompt', text: 'go' },
-		{ type: 'prompt', text: 'first' },
+		{ type: 'prompt', text: 'first', steering: true },
 		{ type: 'prompt', text: 'second' },
 	])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You'])
 	expect(a.views.get(id)).toEqual(view)
 })
 
