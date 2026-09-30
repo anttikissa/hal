@@ -18,7 +18,7 @@ test('/rename broadcasts to followers and tabs, clears, refuses invalid names, s
 	expect(b.views.get(id)?.meta.name).toBe('Alpha project')
 	expect(b.of('output').at(-1)?.text).toContain('60')
 	send('/rename')
-	await until(() => b.views.get(id)?.meta.nameOwner === 'auto')
+	await until(() => b.views.get(id)?.meta.name?.includes(id))
 	expect((await fresh(id)).meta.name).toContain(id)
 	send('/rename Persisted')
 	await until(() => b.views.get(id)?.meta.name === 'Persisted')

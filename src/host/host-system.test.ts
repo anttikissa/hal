@@ -53,7 +53,6 @@ function start() {
 	let conn = host.connect((e) => events.push(e))
 	conn.send({ type: 'create', cwd: work, model: 'anthropic/claude-test' })
 	let id = (events.find((e) => e.type === 'snapshot') as any).sessionId as string
-	sessions.open(id).nameOwner = 'manual'
 	let ended = () => events.filter((e) => e.type === 'turn-end').length
 	let prompt = async (text: string) => {
 		let n = ended()
@@ -94,9 +93,9 @@ test('/cd changes the system prompt and tells the model on its next prompt', asy
 	expect(system).not.toBe(requests[0]!.system)
 	expect(system).toContain(`${work}/sub`)
 	expect(system).toContain('SUB RULE')
-	expect(lastPrompt(requests[1]!.messages)).toMatch(new RegExp(`<meta>[^<]*${work}/sub[^<]*</meta>\\ntwo$`))
+	expect(lastPrompt(requests[1]!.messages)).toMatch(new RegExp(`<meta>[^<]*${work}/sub[^<]*</meta>\\ntwo`))
 	await s.prompt('three')
-	expect(lastPrompt(requests[2]!.messages)).not.toContain('<meta>')
+	expect(lastPrompt(requests[2]!.messages)).not.toContain('The working directory is now')
 	expect(requests[2]!.system).toBe(system)
 })
 
@@ -106,9 +105,9 @@ test('a model switch reaches the model as a note and in the system prompt', asyn
 	slash.context(s.id).setModel('openai/gpt-test')
 	await s.prompt('two')
 	expect(requests[1]!.system).toContain('openai/gpt-test')
-	expect(lastPrompt(requests[1]!.messages)).toMatch(/<meta>[^<]*openai\/gpt-test[^<]*<\/meta>\ntwo$/)
+	expect(lastPrompt(requests[1]!.messages)).toMatch(/<meta>[^<]*openai\/gpt-test[^<]*<\/meta>\ntwo/)
 	// Setting what it already is changes nothing.
 	slash.context(s.id).setModel('openai/gpt-test')
 	await s.prompt('three')
-	expect(lastPrompt(requests[2]!.messages)).not.toContain('<meta>')
+	expect(lastPrompt(requests[2]!.messages)).not.toContain('The model is now')
 })

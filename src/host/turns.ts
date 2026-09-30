@@ -18,7 +18,6 @@ import { turnRecovery } from './turn-recovery.ts'
 import { tool as askTool } from './tools/ask.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
-import { naming } from './naming.ts'
 import { models } from './models.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
@@ -173,10 +172,6 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		if (reply.say) yield { type: 'text', text: reply.say }
 		yield { type: 'done', reason: 'end' }
 	}
-	async function* namedStream(): AsyncGenerator<StreamEvent> {
-		let eligible = naming.pending(id) !== undefined
-		for await (let event of stream()) yield event.type === 'text' && eligible ? { ...event, naming: true } : event
-	}
 	let last: DoneEvent | ErrorEvent | undefined
 	let failure: string | undefined
 	// Failed rounds in a row, for the backoff.
@@ -209,7 +204,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				last = undefined
 				prompts.steer(id)
 				status.transition(id, { type: 'request' })
-				for await (let event of history.record(id, running.provider, namedStream(), running)) {
+				for await (let event of history.record(id, running.provider, stream(), running)) {
 					blocks.apply(round, event)
 					if (event.type === 'done' || event.type === 'error') {
 						last = event
@@ -245,10 +240,6 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (last?.type !== 'done') break
 				// A finished answer with steering waiting: the model hears it.
 				if (!calls.length) {
-					if (!signal.aborted) {
-						let final = round.blocks.findLast((b) => b.type === 'text')
-						if (final?.type === 'text') naming.accept(id, final.text)
-					}
 					if (signal.aborted || !status.inboxOf(id).some((m) => !m.queue)) break
 					continue
 				}

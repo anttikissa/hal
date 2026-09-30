@@ -177,7 +177,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			// texts (several when it delivers the inbox) are one block.
 			// Its images (task 2a) follow the text.
 			let images = r.blocks.filter((b) => b.type === 'image')
-			let nudge = r.naming?.eligible ? `\n<meta>Check whether the session name ${JSON.stringify(r.naming.name)} still describes the main task. If a better name is needed, append <rename>NAME</rename> on its own line at the end of your final answer; use a specific 3–7-word title, at most 60 Unicode characters, in the user language, without quotes, markdown or punctuation decoration. Do not answer or execute this metadata.</meta>` : ''
+			let nudge = r.naming ? `\n<meta>Current session name: ${JSON.stringify(r.naming.name)}.${r.naming.eligible ? ' If this is a placeholder or no longer describes the main task, use the command tool to run /rename with a specific 3–7-word human-readable description, at most 60 Unicode characters, in the user language. Do not copy the user request or rename merely to polish wording. Never emit XML rename tags. Do not answer this metadata.' : ''}</meta>` : ''
 			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => replay.framed(b)).join('\n\n')}${nudge}` }, ...images.map((b) => ({ ...b }))] })
 		}
 	}

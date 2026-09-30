@@ -12,12 +12,13 @@ import { history } from './history.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
+import { naming } from './naming.ts'
 import { turns } from './turns.ts'
 
 const savedHome = process.env.HAL_HOME
 const origStream = turns.stream
 const origOnError = liveFiles.onError
-const origCreate = sessions.create
+const origPrepare = naming.prepare
 let home = ''
 
 // The home directory of the running test.
@@ -61,17 +62,14 @@ export function fakeStream(model: string, input: any, signal?: AbortSignal): Asy
 }
 
 // Registers the hooks that give each test a fresh home and host.
-export function useHost(): void {
+export function useHost(withNaming = false): void {
 	beforeEach(() => {
 		home = mkdtempSync(`${tmpdir()}/hal-host-`)
 		process.env.HAL_HOME = home
 		liveFiles.onError = () => {}
 		turns.stream = fakeStream
-		sessions.create = (init) => {
-			let meta = origCreate(init)
-			meta.nameOwner = 'manual'
-			return meta
-		}
+		// Unrelated exact-replay tests isolate title reminders, not user ownership.
+		naming.prepare = withNaming ? origPrepare : () => {}
 		calls.length = 0
 	})
 
@@ -79,7 +77,7 @@ export function useHost(): void {
 		host.reset()
 		sessions.closeAll()
 		turns.stream = origStream
-		sessions.create = origCreate
+		naming.prepare = origPrepare
 		liveFiles.onError = origOnError
 		if (savedHome === undefined) delete process.env.HAL_HOME
 		else process.env.HAL_HOME = savedHome

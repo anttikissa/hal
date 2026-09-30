@@ -297,7 +297,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }
 		case 'text':
-			return { kind: 'assistant', text: item.naming ? names.strip(summary.strip(item.text)) : summary.strip(item.text) }
+			return { kind: 'assistant', text: names.strip(summary.strip(item.text)) }
 		case 'thinking':
 			return { kind: 'thinking', text: item.text }
 		case 'tool': {

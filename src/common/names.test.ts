@@ -15,3 +15,7 @@ test('titles validate the whole input before normalising, counting Unicode chara
 	expect(names.validate('😀'.repeat(60))).toHaveLength(120)
 	for (let text of ['', 'x'.repeat(61), 'safe\x1b[2J', 'safe\nunsafe', 'safe<em>unsafe</em>', 'safe\u202eunsafe']) expect(() => names.validate(text)).toThrow()
 })
+
+test('legacy tags hide without altering fenced or inline examples, including partial streaming', () => {
+	for (let text of ['Example: <rename>Title</rename>', '```xml\n<rename>Title', '```xml\n<rename>Title</rename>\n```', '> <rename>Title</rename>']) expect(names.strip(text)).toBe(text)
+})

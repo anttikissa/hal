@@ -85,7 +85,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			if (!item.text.trim() && !streaming) return []
 		// falls through
 		case 'text':
-			return itemView.headed(item, markdownView.lines((item.type === 'text' ? (item.naming ? names.strip(summary.strip(item.text)) : summary.strip(item.text)) : item.text).trimEnd(), width, streaming, itemView.itemStyle(item)), width)
+			return itemView.headed(item, markdownView.lines((item.type === 'text' ? names.strip(summary.strip(item.text)) : item.text).trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		case 'tool': {
 			let { command, description } = item.input
 			let row: string

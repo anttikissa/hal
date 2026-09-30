@@ -428,3 +428,11 @@ test('Bash results link to the call, hide a successful exit, and colour only a f
 	expect(failure.slice(failure.indexOf('[exit 123]') + 10)).not.toContain(errorColor)
 	expect(printed).toContain('Message from bash #1813')
 })
+
+test('legacy rename controls never appear in terminal answers without a naming flag', () => {
+	let f = frame.build(view([{ type: 'text', text: 'Done.\n<rename>Fix replay persistence</rename>\n<summary>Fixed</summary>' }]), 80)
+	let text = plain(f.lines).join('\n')
+	expect(text).toContain('Done.')
+	expect(text).not.toContain('Fix replay persistence')
+	expect(text).not.toContain('<rename>')
+})

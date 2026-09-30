@@ -34,7 +34,7 @@ function replyLine(id: string): string {
 		let told = summary.extract(r.block.text)
 		if (told) return told
 		let text = summary.strip(r.block.text)
-		let last = (r.block.naming ? names.strip(text) : text).split('\n').map((l) => l.trim()).filter(Boolean).at(-1)
+		let last = names.strip(text).split('\n').map((l) => l.trim()).filter(Boolean).at(-1)
 		if (last) return last
 	}
 	return ''

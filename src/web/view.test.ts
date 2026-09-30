@@ -316,3 +316,7 @@ test('question URLs preserve OAuth parameters and plain text, excluding prose pu
 		{ href: 'https://example.net/', text: 'https://example.net/' }, '!',
 	])
 })
+
+test('legacy rename suffixes stay hidden without a naming flag', () => {
+	expect(view.show({ type: 'text', text: 'Done.\n<rename>Fix replay persistence</rename>\n<summary>Fixed</summary>' })?.text).toBe('Done.')
+})

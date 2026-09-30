@@ -42,7 +42,7 @@ test('a model tool call can /go and /rename while its turn runs; results reach t
 	expect(a.of('go').at(-1).tab).toBe(target)
 	expect(sessions.open(id).name).toBe('New name')
 	let results = calls[1]!.input.messages.flatMap((m: any) => m.blocks).filter((b: any) => b.type === 'tool_result')
-	expect(results).toEqual([{ type: 'tool_result', id: 't1', output: '/go done' }, { type: 'tool_result', id: 't2', output: 'session name: New name' }])
+	expect(results).toEqual([{ type: 'tool_result', id: 't1', output: '/go done' }, { type: 'tool_result', id: 't2', output: `/rename: Session ${id} → New name` }])
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length)
 })

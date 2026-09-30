@@ -78,7 +78,6 @@ function create(init: { cwd: string; model?: string; name?: string }): SessionMe
 		createdAt: new Date().toISOString(),
 	}
 	meta.name = init.name ? names.validate(init.name) : names.fallback(id)
-	meta.nameOwner = init.name ? 'manual' : 'auto'
 	meta.nameVersion = 0
 	meta.nameTurns = 0
 	// Assigned, not passed as defaults: defaults alone are never written.
@@ -95,7 +94,6 @@ function open(id: string): SessionMeta {
 	if (existing) return existing
 	let meta = sessions.load(id, false)
 	sessions.state.open.set(id, meta)
-	if (meta.nameOwner === undefined) meta.nameOwner = meta.name?.trim() && meta.name !== id && meta.name !== names.fallback(id) ? 'manual' : 'auto'
 	if (!meta.name?.trim() || meta.name === id) meta.name = names.fallback(id)
 	liveFiles.save(meta)
 	return meta
