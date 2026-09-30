@@ -1,0 +1,16 @@
+{
+	title: 'Time-aware synthetic greetings for empty sessions',
+	spec: `New genuinely empty interactive sessions in terminal and web show a short synthetic greeting without any LLM or provider call. Subagents, sessions created with a supplied task or prompt, restored conversations, and the scripted onboarding flow do not receive an extra greeting. Greetings are display-only output, not a fake user or assistant conversation turn: they do not enter provider context, trigger a reply, change the selected model, or make an otherwise empty session ineligible for empty-session behavior.
+
+Greeting selection uses circumstances and the optional meaningful Name field from the private USER.md profile (task ky). Names appear sometimes rather than in every greeting; absent, blank, or placeholder names produce natural unnamed text. Treat profile text as data and render safely, including terminal control characters and web markup. Actual profile data never enters tracked files or new diagnostic logs.
+
+Time-specific greetings use the user's valid configured IANA Timezone, otherwise an available trustworthy client-local time signal, never a remote host timezone assumed to be the user's. With no trustworthy timezone use neutral wording. Morning is 07:00 through 11:59, afternoon 12:00 through 17:59, evening 18:00 through 22:59, with neutral greetings overnight. Good night is not an arrival greeting. No location inference or LLM call is needed.
+
+The authored pool contains dozens of natural variations, not five greetings rotated or arbitrary word combinations. Tone is courteous, plain, mildly mechanical HAL-like delivery, bland in wording but varied in delivery, without routine HAL 9000 jokes or forced enthusiasm. Most greetings are one short sentence, sometimes two; occasionally add a nudge such as What shall we do today? or What's up? Name inclusion, neutral versus time-aware openings, and optional nudges provide variety without awkward combinations. Avoid an identical greeting in consecutive eligible sessions.
+
+Choose a greeting at the session's initial empty interactive opening and retain that choice across tab switches, redraws, reconnects, and host restarts; clients following the same session agree rather than independently rerolling it. A stored greeting does not cause another greeting on reopening. Preserve ordinary onboarding and session lifecycle behavior and use existing output/history infrastructure where suitable; no new dependency is needed.
+
+Verify meaningful invariants with focused existing or minimal tests: eligible versus excluded sessions, absent and supplied name, local time boundaries and unknown-time neutral fallback, safe rendering of profile text, no immediate repeat, stable selection across reconnect/restart, and exclusion from provider input. Avoid tests that merely repeat the greeting catalogue or assert random wording.`,
+	status: 'planned',
+	needs: ['ky']
+}
