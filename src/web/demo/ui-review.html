@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en" class="page">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UI review: choose fixes</title>
+<style>
+/*COLORS*/
+/* The page's own layout. Spacing steps: 4, 8, 12, 16, 24, 32px. */
+:root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); }
+* { box-sizing: border-box; }
+html { background: var(--canvas); color: var(--text); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+main { padding: 24px max(16px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+h1 { font-size: 20px; margin: 0 0 8px; }
+h2 { font-size: 16px; margin: 0 0 4px; }
+p { margin: 0 0 8px; max-width: 72ch; }
+a { color: inherit; }
+.chrome ::selection, .chrome::selection { background: var(--text); color: var(--canvas); }
+.item { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border); }
+.variants { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); gap: 16px; margin-top: 12px; }
+.variant { border: 1px solid var(--border); min-width: 0; }
+.variant:has(input:checked) { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.variant > label { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.variant input[type="radio"] { margin: 0; width: 16px; height: 16px; flex: none; accent-color: var(--accent); }
+.variant > label b { color: var(--accent); }
+.preview { padding: 12px; min-width: 0; }
+.note { display: flex; align-items: center; gap: 8px; margin-top: 12px; max-width: 48rem; }
+.note input, #general, #out { flex: 1; min-width: 0; font: inherit; font-size: 16px; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; }
+.note input:focus, #general:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 8px; }
+.toggles label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.toggles input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+#general, #out { display: block; width: 100%; max-width: 48rem; resize: vertical; }
+#out { min-height: 16rem; margin-top: 12px; }
+.actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.actions button { min-height: 44px; padding: 0 16px; font: inherit; font-weight: 600; background: var(--button); color: var(--text); border: 0; cursor: pointer; }
+.actions button:focus-visible, .variant input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Samples: the app's own rules (src/web/index.html), copied for comparison. */
+.preview button, .preview textarea { font: inherit; }
+.Card, .Question { border-left: 3px solid currentColor; }
+.Card { padding: 0.4rem 0.7rem; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 0.6rem; }
+.Card.user::before { content: "> "; }
+.Card .b { font-weight: bold; }
+.md-code { color: var(--code); }
+.opt { padding: 0.2rem 0.8rem; background: transparent; color: inherit; border: 0; box-shadow: inset 0 0 0 1px currentColor; cursor: pointer; }
+.opt[aria-pressed="true"] { background: currentColor; -webkit-text-fill-color: var(--canvas); font-weight: 600; }
+
+/* 1. Selection */
+.sel-samples .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.6rem; }
+.sel-samples textarea { width: 100%; resize: none; border: 0; border-left: 3px solid currentColor; padding: 0.5rem 0.7rem; background: transparent; color: inherit; }
+.sel-samples .completion { padding: 0.4rem 0.7rem; background: currentColor; -webkit-text-fill-color: var(--canvas); border-left: 3px solid currentColor; margin-bottom: 0.6rem; }
+
+/* 2. Composer */
+.entry { position: relative; display: flex; align-items: stretch; border-left: 3px solid color-mix(in oklab, currentColor var(--mix-entry), transparent); }
+.entry:focus-within { border-left-color: var(--cursor); }
+.entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
+.entry textarea { flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: 0.5rem 0.7rem; resize: none; outline: none; caret-color: var(--cursor); max-height: 12rem; }
+.entry .hint { position: absolute; inset: 0.5rem 0.7rem auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.entry .hint.gone { opacity: 0; }
+.entry button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 1rem; border: 0; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); min-height: 44px; cursor: pointer; }
+.comp-b .entry textarea { padding-block: calc((44px - 1lh) / 2); }
+.comp-b .entry .hint { top: calc((44px - 1lh) / 2); }
+.comp-c .entry button { min-height: 0; }
+.phone-font .entry textarea, .phone-font .entry .hint { font-size: 16px; }
+.guides .entry::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--accent); pointer-events: none; }
+
+/* 3. Tabs */
+.strip { display: flex; align-items: stretch; white-space: nowrap; overflow: hidden; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.strip button { flex: none; background: transparent; color: var(--inactive-fg); border: 0; padding: 0.3rem 0.8rem; cursor: pointer; }
+.strip .pages { flex: 1; min-width: 0; display: flex; justify-content: center; overflow: hidden; }
+.strip .tab { display: flex; flex: none; align-items: center; width: var(--cell); padding: 0.3rem 0; text-decoration: none; color: var(--inactive-fg); }
+.strip .tab .n { display: inline-block; width: 1ch; text-align: right; }
+.strip .marker { display: inline-block; width: 1ch; text-align: left; }
+.strip .name { width: 12ch; margin-left: 1ch; overflow: hidden; text-overflow: ellipsis; }
+.strip .marker.working { color: var(--active-fg); }
+.strip .marker.asking { color: var(--warning-fg); font-weight: 600; }
+.strip .marker.done { color: var(--done-fg); }
+.strip .tab[aria-current] { color: var(--active-fg); }
+.strip .tab:hover, .strip button:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
+.tab-a .tab[aria-current] .n, .tab-b .tab[aria-current] .n { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; font-weight: 600; }
+.tab-b .tab, .tab-c .tab, .tab-d .tab { justify-content: center; }
+.tab-c .tab[aria-current] { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 0 -3px 0 var(--active-fg); font-weight: 600; }
+.tab-d .tab[aria-current] { background: var(--active-fg); color: var(--canvas); font-weight: 600; }
+.tab-d .tab[aria-current] .marker { color: var(--canvas); }
+.strip-label { color: var(--quiet); }
+
+/* 4. Question */
+.Question { position: relative; padding: 0.4rem 0.7rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.Question .dismiss { position: absolute; top: 0; right: 0; background: none; color: inherit; border: 0; padding: 0.4rem 0.7rem; cursor: pointer; }
+.Question .group { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
+.Question label.text-field { display: block; }
+.Question input { width: 100%; font: inherit; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 0.5rem 0.6rem; }
+.q-a .Question > .text { padding-right: 3ch; }
+.q-a .answer { padding: 0.2rem 0.8rem; background: transparent; color: inherit; border: 0; box-shadow: inset 0 0 0 1px currentColor; }
+.q-b .Question > .text, .q-c .Question > .text { padding-right: 44px; }
+.q-b .group, .q-c .group { align-items: center; }
+.q-b .answer, .q-c .answer { align-self: flex-start; min-height: 36px; padding: 0.2rem 1rem; border: 0; font-weight: 600; cursor: pointer; }
+.q-b .answer { background: currentColor; -webkit-text-fill-color: var(--canvas); }
+.q-c .answer { background: var(--button); color: var(--text); }
+.q-b .field-label, .q-c .field-label { font-weight: 600; }
+
+/* 5. Focus */
+.focus-samples { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.focus-samples > * { font: inherit; }
+.focus-samples .ftab { padding: 0.3rem 0.8rem; color: var(--active-fg); text-decoration: none; }
+.focus-samples .fsend { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; padding: 0.5rem 1rem; border: 0; }
+.focus-samples .fhead { background: none; color: inherit; border: 0; border-left: 3px solid currentColor; padding: 0.4rem 0.7rem; }
+.fv-a .ftab, .fv-a .fsend, .fv-a .opt { outline: auto; }
+.fv-a .fhead { outline: 1px solid currentColor; outline-offset: -2px; }
+.fv-b .focus-samples > *, .fv-b .focus-samples > *:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fv-c .focus-samples > *, .fv-c .focus-samples > *:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.fv-d .focus-samples > *, .fv-d .focus-samples > *:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 6. Notices */
+.ncard { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.45rem 0.7rem; margin-bottom: 0.6rem; text-decoration: none; }
+.ncard strong { color: var(--done-fg); }
+.nb-a .ncard { border-left: 0.4rem solid var(--done-fg); }
+.nb-b .ncard { border-left: 3px solid var(--done-fg); }
+
+/* 7. Spacing: one mini transcript, spaced by each scale. */
+.mini .Card { padding: var(--py) var(--px); margin-bottom: var(--gap); }
+.mini .Question { padding: var(--py) var(--px); gap: var(--inner); margin-bottom: var(--gap); }
+.mini .Question .group { gap: var(--opt); }
+.mini .entry textarea { padding: var(--py) var(--px); }
+.mini .entry button { padding: var(--py) calc(var(--px) * 1.5); min-height: 0; }
+.sp-a { --py: 0.4rem; --px: 0.7rem; --gap: 0.6rem; --inner: 0.4rem; --opt: 0.5rem; }
+.sp-b { --py: 8px; --px: 12px; --gap: 12px; --inner: 8px; --opt: 8px; }
+.sp-c { --py: 0.25lh; --px: 1ch; --gap: 0.5lh; --inner: 0.25lh; --opt: 0.5lh 1ch; }
+
+/* 8. Folding */
+.fold { padding: 0; cursor: pointer; }
+.fold .head { display: flex; gap: 0.6ch; width: 100%; padding: 0.4rem 0.7rem; background: none; color: inherit; border: 0; text-align: left; cursor: pointer; }
+.fold .body { display: grid; grid-template-rows: 0fr; }
+.fold.open .body { grid-template-rows: 1fr; }
+.fold .contents { min-height: 0; overflow: hidden; padding: 0 0.7rem 0 calc(0.7rem + 2ch); }
+.fold .contents::after { content: ""; display: block; height: 0.4rem; }
+.fo-a .fold .body { transition: grid-template-rows 175ms var(--ease-out); }
+.fo-a .fold.open .body { transition-duration: 250ms; }
+.fo-c .fold .contents { opacity: 0; }
+.fo-c .fold.open .contents { opacity: 1; transition: opacity 150ms var(--ease-out); }
+
+/* 9. Text size */
+.srow { border-top: 1px solid var(--border); padding: 0.2rem 0; margin-bottom: 12px; }
+.srow .primary, .srow .secondary { display: flex; gap: 1ch; justify-content: space-between; white-space: nowrap; overflow: hidden; }
+.srow .ctx { color: var(--highlight); }
+
+@media (prefers-reduced-motion: reduce) { .fo-a .fold .body, .fo-c .fold.open .contents { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+<header class="chrome">
+<h1>UI review: choose fixes</h1>
+<p>Each item shows the current look (marked “current”) beside alternatives, in Hal’s real theme colours. Pick one per item and add a note if you like. Your choices collect in the <a href="#paste">text to paste</a> at the bottom, and they survive a reload.</p>
+</header>
+
+<section class="item" data-title="Selection colour">
+<div class="chrome"><h2>1. Selection colour</h2>
+<p>Nothing sets <code>::selection</code>, so the browser's highlight sits behind coloured text. Drag across the samples, including inside the message box. The last row is a chosen completion: it's already a solid block, so a selection there has to stand out from it.</p></div>
+<template id="t-selection"><div class="sel-samples">
+<div class="Card user">refactor the tab strip so labels stay centred</div>
+<div class="Card assistant">The strip is laid out in <span class="b">Tabs.tsx</span>; widths come from <span class="md-code">tab-pages.ts</span>. I'll keep the cell width and centre the label.</div>
+<div class="Card tool-bash">$ rg -n "Tabs .tab" src/web/index.html</div>
+<div class="row warning"><button type="button" class="opt" aria-pressed="true">Lit bar and tint</button><button type="button" class="opt" aria-pressed="false">Solid block</button></div>
+<div class="completion input"><strong>/rename</strong> Rename this session</div>
+<div class="input"><textarea rows="2" aria-label="Sample message">Select some of this text in the message box too.</textarea></div>
+</div></template>
+<div class="variants">
+<div class="variant"><label><input type="radio" name="selection" value="A · browser default (current)"><span><b>A</b> · Browser default (current)</span></label><div class="preview" data-sel="a" data-template="t-selection"></div></div>
+<div class="variant"><label><input type="radio" name="selection" value="B · reverse video in the text's own colour"><span><b>B</b> · Reverse video in the text's own colour</span></label><div class="preview" data-sel="b" data-template="t-selection"></div></div>
+<div class="variant"><label><input type="radio" name="selection" value="C · one accent (cyan) everywhere, canvas text"><span><b>C</b> · One accent (cyan) everywhere</span></label><div class="preview" data-sel="c" data-template="t-selection"></div></div>
+<div class="variant"><label><input type="radio" name="selection" value="D · white block, canvas text (terminal reverse)"><span><b>D</b> · White block, like a terminal</span></label><div class="preview" data-sel="d" data-template="t-selection"></div></div>
+</div>
+<div class="note"><input type="text" aria-label="Note on selection colour" placeholder="Note (optional)"></div>
+</section>
+
+<section class="item" data-title="Composer vertical centring">
+<div class="chrome"><h2>2. Message box: vertical centring</h2>
+<p>The buttons make the row 44px tall, but the text box underneath is about 39px tall and sits at the top of it, so the text and caret end up above the button labels. Try one line, then several (Shift+Enter).</p>
+<div class="toggles"><label><input type="checkbox" data-toggle="guides" checked> Show centre line</label><label><input type="checkbox" data-toggle="phone-font"> Phone font (16px)</label></div></div>
+<template id="t-composer"><div class="entry input"><div class="field"><span class="hint">Ask Hal to change something…</span><textarea rows="1" aria-label="Sample message"></textarea></div><button type="button" aria-label="Attach file">+</button><button type="button">Send</button></div></template>
+<div class="variants composers guides">
+<div class="variant"><label><input type="radio" name="composer" value="A · as is (text sits high)"><span><b>A</b> · As is (current)</span></label><div class="preview comp-a" data-template="t-composer" data-grow="2"></div></div>
+<div class="variant"><label><input type="radio" name="composer" value="B · keep the 44px row; pad the text box to centre one line"><span><b>B</b> · 44px row, padding centres the text</span></label><div class="preview comp-b" data-template="t-composer" data-grow="0"></div></div>
+<div class="variant"><label><input type="radio" name="composer" value="C · compact 37px row on desktop (touch keeps B)"><span><b>C</b> · Compact row on desktop; touch keeps B</span></label><div class="preview comp-c" data-template="t-composer" data-grow="0"></div></div>
+</div>
+<div class="note"><input type="text" aria-label="Note on the message box" placeholder="Note (optional)"></div>
+</section>
+
+<section class="item" data-title="Tab label alignment and current tab">
+<div class="chrome"><h2>3. Tabs: label alignment and the current tab</h2>
+<p>Tab labels sit at the left of their cell with extra space on the right, so the hover highlight looks off-centre. On touch the cell is 44px wide and the label is squeezed into its left part. Tab 3 is the current tab; hover over the others.</p></div>
+<div class="variants">
+<div class="variant"><label><input type="radio" name="tabs" value="A · left-aligned, underlined number (current)"><span><b>A</b> · Left, underlined number (current)</span></label><div class="preview tab-a" data-tabs></div></div>
+<div class="variant"><label><input type="radio" name="tabs" value="B · centred, underlined number"><span><b>B</b> · Centred, underlined number</span></label><div class="preview tab-b" data-tabs></div></div>
+<div class="variant"><label><input type="radio" name="tabs" value="C · centred, current tab tinted with a lit bar under it"><span><b>C</b> · Centred, tint and lit bar</span></label><div class="preview tab-c" data-tabs></div></div>
+<div class="variant"><label><input type="radio" name="tabs" value="D · centred, current tab a solid block"><span><b>D</b> · Centred, solid block</span></label><div class="preview tab-d" data-tabs></div></div>
+</div>
+<div class="note"><input type="text" aria-label="Note on tabs" placeholder="Note (optional)"></div>
+</section>
+
+<section class="item" data-title="Question layout">
+<div class="chrome"><h2>4. Question: layout and Answer button</h2>
+<p>Right now the field label and help text share a wrapping row with the options, the Answer button looks like one more option, and the × can overlap the question text.</p></div>
+<template id="t-question"><form class="Question warning" onsubmit="return false">
+<div class="text">? Which look should the phone tab sheet use for the tab you're on? It shows up on every phone.</div>
+<button type="button" class="dismiss" aria-label="Dismiss">×</button>
+<div class="group" role="group" aria-label="Look"><span class="field-label">Look: </span><div class="help">Phones only; desktop keeps the strip.</div><button type="button" class="opt" aria-pressed="true">Lit bar and tint</button><button type="button" class="opt" aria-pressed="false">Solid block</button><button type="button" class="opt" aria-pressed="false">Underline only</button><button type="button" class="opt" aria-pressed="false">Something longer that has to wrap</button></div>
+<label class="text-field"><span class="field-label">Other: </span><input type="text" placeholder="Describe another look"></label>
+<button type="button" class="answer">Answer</button>
+</form></template>
+<div class="variants">
+<div class="variant"><label><input type="radio" name="question" value="A · as is"><span><b>A</b> · As is (current)</span></label><div class="preview q-a" data-template="t-question" data-inline></div></div>
+<div class="variant"><label><input type="radio" name="question" value="B · label and help above the options; Answer solid in the card colour"><span><b>B</b> · Label above; Answer solid in card colour</span></label><div class="preview q-b" data-template="t-question"></div></div>
+<div class="variant"><label><input type="radio" name="question" value="C · label and help above the options; Answer in the page button colour"><span><b>C</b> · Label above; Answer in page button colour</span></label><div class="preview q-c" data-template="t-question"></div></div>
+</div>
+<div class="note"><input type="text" aria-label="Note on questions" placeholder="Note (optional)"></div>
+</section>
+
+<section class="item" data-title="Focus style">
+<div class="chrome"><h2>5. Focus style</h2>
+<p>There are six different focus styles now. Every sample is drawn as if it had focus; press Tab to see the real ones.</p></div>
+<template id="t-focus"><div class="focus-samples"><a class="ftab tab" href="#paste" onclick="return false">3</a><button type="button" class="fhead assistant">▸ Thinking</button><span class="input"><button type="button" class="fsend">SEND</button></span><span class="warning"><button type="button" class="opt" aria-pressed="false">Option</button></span></div></template>
+<div class="variants">
+<div class="variant"><label><input type="radio" name="focus" value="A · as is (mixed)"><span><b>A</b> · Mixed (current)</span></label><div class="preview fv-a" data-template="t-focus"></div></div>
+<div class="variant"><label><input type="radio" name="focus" value="B · 2px accent, inside the control"><span><b>B</b> · 2px accent, inside</span></label><div class="preview fv-b" data-template="t-focus"></div></div>
+<div class="variant"><label><input type="radio" name="focus" value="C · 2px in the control's own colour, outside"><span><b>C</b> · 2px own colour, outside</span></label><div class="preview fv-c" data-template="t-focus"></div></div>
+<div class="variant"><label><input type="radio" name="focus" value="D · 2px accent, outside the control"><span><b>D</b> · 2px accent, outside</span></label><div class="preview fv-d" data-template="t-focus"></div></div>
+</div>
+<div class="note"><input type="text" aria-label="Note on focus" placeholder="Note (optional)"></div>
+</section>
+
+<section class="item" data-title="Notice bar width">
+<div class="chrome"><h2>6. Notice bar width</h2>
+<p>Notices have a 0.4rem (about 5.6px) bar on the left; cards, questions and the message box use 3px.</p></div>
+<template id="t-notice"><div class="Card user">run the tests</div><a class="ncard notice done" href="#paste" onclick="return false"><strong>Done · 12</strong><span>Tests pass; pushed to main.</span></a></template>
+<div class="variants">
+<div class="variant"><label><input type="radio" name="notice" value="A · keep 0.4rem"><span><b>A</b> · 0.4rem (current)</span></label><div class="preview nb-a" data-template="t-notice"></div></div>
+<div class="variant"><label><input type="radio" name="notice" value="B · 3px like every other bar"><span><b>B</b> · 3px, like the others</span></label><div class="preview nb-b" data-template="t-notice"></div></div>
+</div>
+<div class="note"><input type="text" aria-label="Note on notices" placeholder="Note (optional)"></div>
+</section>
+
+<section class="item" data-title="Spacing scale">
+<div class="chrome"><h2>7. Spacing scale</h2>
+<p>The CSS uses about a dozen different rem values. Choose one scale; each preview spaces the same screen with it.</p></div>
+<template id="t-mini"><div class="mini">
+<div class="Card user">make the tab labels centred</div>
+<div class="Card assistant">Done. Labels are centred in their cells; hover now covers them evenly.</div>
+<form class="Question warning" onsubmit="return false"><div class="text">? Push to main?</div><div class="group" role="group" aria-label="Push"><button type="button" class="opt" aria-pressed="true">Yes</button><button type="button" class="opt" aria-pressed="false">Not yet</button><button type="button" class="opt" aria-pressed="false">Show me the diff first</button></div></form>
+<div class="entry input"><div class="field"><textarea rows="1" aria-label="Sample message"></textarea></div><button type="button">Send</button></div>
+</div></template>
+<div class="variants">
+<div class="variant"><label><input type="radio" name="spacing" value="A · as is (about a dozen rem values)"><span><b>A</b> · As is (current)</span></label><div class="preview sp-a" data-template="t-mini"></div></div>
+<div class="variant"><label><input type="radio" name="spacing" value="B · 4px steps (4, 8, 12, 16px)"><span><b>B</b> · 4px steps: 4, 8, 12, 16px</span></label><div class="preview sp-b" data-template="t-mini"></div></div>
+<div class="variant"><label><input type="radio" name="spacing" value="C · terminal grid (vertical in quarter lines, horizontal in ch)"><span><b>C</b> · Terminal grid: lines and ch</span></label><div class="preview sp-c" data-template="t-mini"></div></div>
+</div>
+<div class="note"><input type="text" aria-label="Note on spacing" placeholder="Note (optional)"></div>
+</section>
+
+<section class="item" data-title="Card fold motion">
+<div class="chrome"><h2>8. Opening and closing cards</h2>
+<p>Cards animate their height when they open, but tasks/README.md says animate only opacity, colour and transform. Click a card to try it.</p></div>
+<template id="t-fold"><div class="Card thinking fold"><button type="button" class="head" aria-expanded="false">▸ Thinking</button><div class="body" inert><div class="contents">The strip centres its pages; each cell is (digits + 2)ch wide.
+Centring the label inside the cell keeps the width, so nothing reflows.
+The marker slot stays reserved so the number never jumps.</div></div></div><div class="Card tool-bash fold"><button type="button" class="head" aria-expanded="false">▸ $ ./test</button><div class="body" inert><div class="contents">1204 pass
+0 fail</div></div></div><div class="Card assistant">A card below, to see how it moves.</div></template>
+<div class="variants">
+<div class="variant"><label><input type="radio" name="fold" value="A · keep the height animation (and change the README rule to allow it)"><span><b>A</b> · Height animation (current; README changes)</span></label><div class="preview fo-a" data-template="t-fold"></div></div>
+<div class="variant"><label><input type="radio" name="fold" value="B · instant"><span><b>B</b> · Instant</span></label><div class="preview fo-b" data-template="t-fold"></div></div>
+<div class="variant"><label><input type="radio" name="fold" value="C · instant height, contents fade in (opacity)"><span><b>C</b> · Instant height, contents fade in</span></label><div class="preview fo-c" data-template="t-fold"></div></div>
+</div>
+<div class="note"><input type="text" aria-label="Note on folding" placeholder="Note (optional)"></div>
+</section>
+
+<section class="item" data-title="Small text">
+<div class="chrome"><h2>9. Small text</h2>
+<p>The status row uses 0.85em (about 11.9px), and landscape phones shrink it further, to 11px. The first row in each option is desktop; the second is a landscape phone.</p></div>
+<template id="t-status"><div class="srow status desk"><div class="primary"><span>hal2 · Editing the UI Craft Skill</span><span>writing</span><span class="ctx">ctx 61%</span></div><div class="secondary"><span>~/hal2</span><span>anthropic/claude-opus-5-5</span></div></div><div class="srow status land"><div class="primary"><span>hal2 · Editing the UI Craft Skill</span><span>writing</span><span class="ctx">ctx 61%</span></div><div class="secondary"><span>~/hal2</span><span>anthropic/claude-opus-5-5</span></div></div></template>
+<div class="variants">
+<div class="variant"><label><input type="radio" name="text" value="A · as is (11.9px; 11px on landscape phones)"><span><b>A</b> · 11.9px; 11px landscape (current)</span></label><div class="preview" data-template="t-status" data-sizes="11.9,11"></div></div>
+<div class="variant"><label><input type="radio" name="text" value="B · 14px everywhere"><span><b>B</b> · 14px everywhere</span></label><div class="preview" data-template="t-status" data-sizes="14,14"></div></div>
+<div class="variant"><label><input type="radio" name="text" value="C · 14px; 12px minimum on landscape phones"><span><b>C</b> · 14px; 12px on landscape phones</span></label><div class="preview" data-template="t-status" data-sizes="14,12"></div></div>
+</div>
+<div class="note"><input type="text" aria-label="Note on text size" placeholder="Note (optional)"></div>
+</section>
+
+<section class="item chrome" id="paste">
+<h2>Text to paste</h2>
+<p><label for="general">Anything else?</label></p>
+<textarea id="general" rows="3" placeholder="General notes (optional)"></textarea>
+<textarea id="out" readonly aria-label="Your choices as text"></textarea>
+<div class="actions"><button type="button" id="copy">Copy</button><span id="copied" role="status" aria-live="polite"></span></div>
+</section>
+</main>
+<script>
+(() => {
+	const KEY = 'hal-demo-ui-review'
+	// Fill each preview from its template.
+	for (let p of document.querySelectorAll('[data-template]')) p.append(document.getElementById(p.dataset.template).content.cloneNode(true))
+
+	// 3. Tab strips: the desktop cell ((digits + 2)ch), a 44px touch cell, and cells with names.
+	const tabs = [['', ''], ['done', '✓'], ['', ''], ['working', '•'], ['asking', '?'], ['', ''], ['', ''], ['working', '•'], ['', '']]
+	const names = ['hal2', 'Tab strip', 'Editing the UI Craft Skill', 'Restart design', 'Question', 'Notes', 'Build', 'Deploy', 'Scratch']
+	let strip = (label, cell, count, named) => {
+		let d = document.createElement('div')
+		d.innerHTML = `<div class="strip-label">${label}</div><nav class="strip tab" style="--cell: ${cell}"><button type="button" aria-label="All tabs">≡</button><div class="pages"></div><button type="button" aria-label="New tab">+</button></nav>`
+		let pages = d.querySelector('.pages')
+		let shown = tabs.slice(0, count)
+		shown.forEach(([kind, mark], i) => {
+			let a = document.createElement('a')
+			a.className = 'tab'
+			a.href = '#paste'
+			a.onclick = () => false
+			if (i === 2) a.setAttribute('aria-current', 'page')
+			a.innerHTML = `<span class="n">${i + 1}</span><span class="marker ${kind}">${mark}</span>` + (named ? `<span class="name">${names[i]}</span>` : '')
+			pages.append(a)
+		})
+		return d
+	}
+	for (let p of document.querySelectorAll('[data-tabs]')) p.append(strip('Desktop', '3ch', 9), strip('Touch (44px cells)', '44px', 6), strip('Wide, with names', '16ch', 2, true))
+
+	// 4. The current question puts label and help inline in the options row.
+	for (let p of document.querySelectorAll('[data-template="t-question"]:not([data-inline])')) {
+		let group = p.querySelector('.group')
+		let head = document.createElement('div')
+		head.append(group.querySelector('.field-label'), group.querySelector('.help'))
+		group.before(head)
+	}
+	for (let b of document.querySelectorAll('.opt')) b.addEventListener('click', () => {
+		for (let o of b.parentElement.querySelectorAll('.opt')) o.setAttribute('aria-pressed', String(o === b))
+	})
+
+	// 2. The message boxes grow like the real one: content height, plus 2px in the current code.
+	for (let p of document.querySelectorAll('[data-grow]')) {
+		let box = p.querySelector('textarea'), hint = p.querySelector('.hint')
+		let grow = () => {
+			box.style.height = 'auto'
+			box.style.height = `${box.scrollHeight + Number(p.dataset.grow)}px`
+			hint.classList.toggle('gone', !!box.value)
+		}
+		box.addEventListener('input', grow)
+		box.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) e.preventDefault() })
+		grow()
+		p.grow = grow
+	}
+	for (let t of document.querySelectorAll('[data-toggle]')) {
+		let apply = () => {
+			t.closest('.item').querySelector('.variants').classList.toggle(t.dataset.toggle, t.checked)
+			for (let p of document.querySelectorAll('[data-grow]')) p.grow()
+		}
+		t.addEventListener('change', apply)
+		apply()
+	}
+
+	// 8. Folding cards.
+	for (let card of document.querySelectorAll('.fold')) card.addEventListener('click', () => {
+		let open = card.classList.toggle('open')
+		card.querySelector('.head').setAttribute('aria-expanded', String(open))
+		card.querySelector('.body').inert = !open
+	})
+
+	// 9. Font sizes per row.
+	for (let p of document.querySelectorAll('[data-sizes]')) {
+		let [desk, land] = p.dataset.sizes.split(',')
+		p.querySelector('.desk').style.fontSize = `${desk}px`
+		p.querySelector('.land').style.fontSize = `${land}px`
+	}
+
+	// 1. Selection colours, computed from the theme at runtime: B uses each
+	// element's own text colour, C the accent, D the page text colour; the
+	// selected text is the canvas colour.
+	let probe = (value) => {
+		let s = document.createElement('span')
+		s.style.color = value
+		document.body.append(s)
+		let c = getComputedStyle(s).color
+		s.remove()
+		return c
+	}
+	let canvas = probe('var(--canvas)'), accent = probe('var(--accent)'), text = probe('var(--text)')
+	let sheet = new CSSStyleSheet()
+	let n = 0
+	for (let p of document.querySelectorAll('[data-sel]')) {
+		let kind = p.dataset.sel
+		if (kind === 'a') continue
+		for (let el of [p, ...p.querySelectorAll('*')]) {
+			let bg = kind === 'b' ? getComputedStyle(el).color : kind === 'c' ? accent : text
+			el.dataset.own = String(++n)
+			sheet.insertRule(`[data-own="${n}"]::selection { background-color: ${bg}; color: ${canvas}; -webkit-text-fill-color: ${canvas}; }`)
+		}
+	}
+	document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]
+
+	// Choices and notes: saved on every change, written out as text.
+	let items = [...document.querySelectorAll('section[data-title]')]
+	let general = document.getElementById('general'), out = document.getElementById('out')
+	let saved = {}
+	try { saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') } catch {}
+	items.forEach((item, i) => {
+		let pick = saved.picks?.[i]
+		for (let r of item.querySelectorAll('input[type="radio"]')) if (r.value === pick) r.checked = true
+		item.querySelector('.note input').value = saved.notes?.[i] ?? ''
+	})
+	general.value = saved.general ?? ''
+	let render = () => {
+		let picks = items.map((item) => item.querySelector('input[type="radio"]:checked')?.value ?? null)
+		let notes = items.map((item) => item.querySelector('.note input').value.trim())
+		try { localStorage.setItem(KEY, JSON.stringify({ picks, notes, general: general.value })) } catch {}
+		let lines = [`UI review choices (${location.pathname}):`]
+		items.forEach((item, i) => {
+			lines.push(`${i + 1}. ${item.dataset.title}: ${picks[i] ?? 'no choice'}`)
+			if (notes[i]) lines.push(`   Note: ${notes[i]}`)
+		})
+		if (general.value.trim()) lines.push('', 'Other notes:', general.value.trim())
+		out.value = lines.join('\n')
+	}
+	document.addEventListener('input', render)
+	document.addEventListener('change', render)
+	render()
+	document.getElementById('copy').addEventListener('click', async () => {
+		let status = document.getElementById('copied')
+		try { await navigator.clipboard.writeText(out.value); status.textContent = 'Copied.' }
+		catch { out.select(); status.textContent = document.execCommand('copy') ? 'Copied.' : 'Select the text above and copy it.' }
+	})
+})()
+</script>
+</body>
+</html>
