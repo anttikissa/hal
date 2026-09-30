@@ -362,7 +362,12 @@ async function waitFor(id: string, error: ErrorEvent, failures: number, signal: 
 	}
 	let at = error.retryAt ?? clock.now() + turns.backoffMs(failures)
 	status.transition(id, { type: 'retry', at: new Date(at).toISOString(), reason: error.message })
-	await clock.until(at, signal)
+	if (error.failure !== 'limited' || at <= clock.now()) return clock.until(at, signal)
+	// A new account can lift quota before the old account's reset time.
+	let waiting = new AbortController()
+	let either = AbortSignal.any([signal, waiting.signal])
+	try { await Promise.race([clock.until(at, either), auth.changed(either)]) }
+	finally { waiting.abort() }
 }
 
 // The wait before the next try after `failures` failed rounds in a

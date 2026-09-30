@@ -14,6 +14,7 @@ import { host } from './host.ts'
 import { status } from './status.ts'
 import { turns } from './turns.ts'
 import { liveFiles } from './live-file.ts'
+import { login } from './login.ts'
 import { sessions } from './sessions.ts'
 import { slash } from './slash.ts'
 
@@ -87,7 +88,7 @@ async function until(check: () => unknown): Promise<void> {
 
 function start(c: ReturnType<typeof client>): string {
 	c.conn.send({ type: 'create', cwd: '/tmp/w', model: 'fake/m1' })
-	let id = (c.events.find((e) => e.type === 'snapshot') as any).sessionId
+	let id = (c.events.filter((e) => e.type === 'snapshot').at(-1) as any).sessionId
 	c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	return id
 }
@@ -148,6 +149,39 @@ test('a rate limit waits for the time the provider gave, visible in snapshots; E
 	expect(a.ends()[0]).toMatchObject({ status: 'paused' })
 	expect(status.stateOf(id)).toEqual({ type: 'paused' })
 	expect(calls).toHaveLength(1)
+})
+
+test('a login in another tab resumes all quota waits without resuming paused or idle tabs', async () => {
+	let a = client()
+	let at = now + 3 * 3600_000
+	let limited: StreamEvent = { type: 'error', message: 'all accounts limited', failure: 'limited', retryAt: at }
+	// Keep wall time fixed: the deadline cannot be what resumes the turns.
+	clock.sleep = (ms, signal) => ms === auth.pollMs()
+		? orig.sleep(1, signal)
+		: new Promise<void>((r) => signal?.addEventListener('abort', () => r()))
+	let ids: string[] = []
+	for (let i = 0; i < 3; i++) {
+		script = [[limited]]
+		let id = start(a)
+		ids.push(id)
+		await until(() => status.stateOf(id).type === 'retrying')
+	}
+	a.conn.send({ type: 'pause', sessionId: ids[2]! })
+	await until(() => status.stateOf(ids[2]!).type === 'paused')
+	a.conn.send({ type: 'create', cwd: '/tmp/w', model: 'fake/m1' })
+	let idle = (a.events.filter((e) => e.type === 'snapshot').at(-1) as any).sessionId
+	expect(calls).toHaveLength(3)
+	await Bun.sleep(10)
+	expect(calls).toHaveLength(3) // No repeated requests without a change.
+	login.save({ accessToken: 'test-token', accountId: 'test-account' }, 'openai')
+	auth.state.logins++
+	script = [done, done]
+	await until(() => ids.slice(0, 2).every((id) => status.stateOf(id).type === 'idle'))
+	expect(calls).toHaveLength(5)
+	expect(now).toBeLessThan(at)
+	expect(status.stateOf(ids[2]!).type).toBe('paused')
+	expect(status.stateOf(idle).type).toBe('idle')
+	expect(a.ends().filter((e) => e.status === 'completed')).toHaveLength(2)
 })
 
 test('a rotation to another account retries at once', async () => {
