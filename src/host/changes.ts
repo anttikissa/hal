@@ -84,7 +84,11 @@ async function committed(_id: string, file: ChangedFile): Promise<string | undef
 	let name = relative(cwd, await fileChanges.canonical(file.path))
 	let since = new Date(Math.floor(Date.parse(file.ts) / 1000) * 1000).toISOString()
 	let log = await changes.run(['git', 'log', '--format=%H', `--since=${since}`, '--', name], cwd)
-	if (log.code) throw new Error('cannot read Git commit history')
+	if (log.code) {
+		// A repository with no commits yet has no history to label.
+		if ((await changes.run(['git', 'rev-parse', '-q', '--verify', 'HEAD'], cwd)).code) return
+		throw new Error('cannot read Git commit history')
+	}
 	for (let hash of log.bytes.toString().trim().split('\n').filter(Boolean)) {
 		if (file.after === null) {
 			let tree = await changes.run(['git', 'ls-tree', '-z', hash, '--', name], cwd)
