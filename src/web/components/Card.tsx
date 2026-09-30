@@ -17,7 +17,7 @@
 
 import { createEffect, createMemo, createSignal, flush, onSettled, Show } from 'solid-js'
 import { titles } from '../../common/titles.ts'
-import { bashResult } from '../../common/bash-result.ts'
+import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
 import { Markdown } from './Markdown.tsx'
 import { scroll } from '../scroll.ts'
@@ -69,9 +69,9 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		},
 	)
 	let shown = () => view.show(props.row.item)
-	let result = () => props.row.result && view.show(props.row.result, full(), props.row.item.type === 'tool' && props.row.item.name === 'bash')
+	let result = () => props.row.result && view.show(props.row.result, full())
 	// Whether the result is longer than its glimpse.
-	let long = () => (props.row.result ? (props.row.item.type === 'tool' && props.row.item.name === 'bash' ? bashResult.display(props.row.result.output) : props.row.result.output).replace(/\n$/, '').split('\n').length : 0) > view.resultRows()
+	let long = () => (props.row.result ? props.row.result.output.replace(/\n$/, '').split('\n').length : 0) > view.resultRows()
 	// The link shows the block's id, #35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
@@ -99,11 +99,16 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return match ? <>{s.slice(0, match.index)}<span class="error exit">{match[0]}</span>{s.slice(match.index + match[0].length)}</> : s
 	}
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
-	let head = () => (props.row.item.type === 'thinking' ? `${title()}: ${lines()[0]}` : lines()[0])
+	let head = () => {
+		let item = props.row.item
+		if (item.type === 'thinking') return `${title()}: ${lines()[0]}`
+		return item.type === 'tool' && typeof item.input.description === 'string' ? item.input.description.replace(/\s+/g, ' ').trim() || item.name : item.type === 'tool' ? item.name : lines()[0]
+	}
 	let body = () => {
-		let rest = props.row.item.type === 'thinking' ? lines() : lines().slice(1).map((l) => l.replace(/^ {2}/, ''))
+		let item = props.row.item
+		let rest = item.type === 'tool' ? toolDetails.lines(item.name, item.id, item.input) : lines()
 		let partial = props.row.item.type === 'tool' ? props.row.item.partial : undefined
-		return [...rest, ...(result() ? [result()!.text] : partial ? [partial] : [])].join('\n')
+		return [...rest, ...(result() ? ['', 'Recorded result:', result()!.text] : partial ? ['', 'Live output:', partial] : [])].join('\n')
 	}
 	let failed = () => !!props.row.result?.isError
 	let toggle = (e: MouseEvent) => {

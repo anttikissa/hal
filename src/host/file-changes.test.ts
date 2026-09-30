@@ -81,7 +81,7 @@ test('overlapping aliases wait across sessions; disjoint and undeclared calls do
 	let second = sessions.create({ cwd, model: 'fake/m' }).id
 	let chunks: string[] = []
 	let waiting = false
-	let next = fileChanges.begin({ ...context(second), onOutput: (c) => { chunks.push(c); waiting = true } }, ['alias'])
+	let next = fileChanges.begin({ ...context(second), onOutput: (c) => { chunks.push(c); waiting = true } }, [`${cwd}/alias`])
 	for (let i = 0; i < 100 && !waiting; i++) await Bun.sleep(5)
 	expect(chunks.join('')).toContain(`waiting for ${id} (editing file)`)
 	let disjoint = await fileChanges.begin(context(second), ['other'])
@@ -95,7 +95,7 @@ test('overlapping aliases wait across sessions; disjoint and undeclared calls do
 	writeFileSync(`${cwd}/file`, 'first')
 	await fileChanges.finish(owner)
 	let acquired = await next
-	expect(bytes(acquired.before.get('alias')).toString()).toBe('first')
+	expect(bytes(acquired.before.get(`${cwd}/alias`)).toString()).toBe('first')
 	acquired.release()
 	expect(fileChanges.state.locks).toHaveLength(0)
 })
@@ -114,11 +114,27 @@ test('background calls hold overlapping locks until exit and record final bytes'
 })
 
 test('invalid declarations never execute; failed commands still retain changes', async () => {
-	for (let modifies of ['file', [null], ['/tmp/file'], ['../file']]) {
+	for (let modifies of ['file', [null], ['/outside/file'], ['../file']]) {
 		expect((await bash('touch ran', modifies)).isError).toBe(true)
 	}
 	expect(changes()).toHaveLength(0)
 	let result = await bash('printf changed > file; exit 4', ['file'])
 	expect(result.output).toContain('[exit 4]')
 	expect(bytes(changes()[0]!.files[0]!.after).toString()).toBe('changed')
+})
+
+test('absolute scratch literals and globs snapshot files outside cwd', async () => {
+	let literal = `${cwd}/scratch.log`, pattern = `${home}/*.txt`
+	let result = await bash(`printf log > '${literal}'; printf glob > '${home}/new.txt'`, [literal, pattern])
+	expect(result.isError).toBeUndefined()
+	let files = changes()[0]!.files
+	expect(files.map((f) => f.path).sort()).toEqual([`${home}/new.txt`, literal].sort())
+	for (let f of files) {
+		expect(f.before).toBeNull()
+		expect(bytes(f.after).toString()).toBe(f.path === literal ? 'log' : 'glob')
+	}
+	let bad = await bash('touch ran', ['/tmp/../outside'])
+	expect(bad.output).toContain('modifies[0]')
+	expect(bad.output).toContain('parent traversal')
+	expect(bad.output).toContain('command did not run')
 })

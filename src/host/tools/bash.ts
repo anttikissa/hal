@@ -23,7 +23,7 @@ export const tool: Tool = {
 			},
 			timeout: { type: 'integer', description: 'Timeout in ms (default: 120000 foreground, 600000 background)' },
 			background: { type: 'boolean', description: 'Run in the background, e.g. a long build or a server' },
-			modifies: { type: 'array', items: { type: 'string' }, description: 'Paths or globs relative to cwd that this command creates, changes or deletes. Declare for every writing command.' },
+			modifies: { type: 'array', items: { type: 'string' }, description: 'Paths or globs relative to cwd, or absolute beneath /tmp; no .. components that this command creates, changes or deletes. Declare for every writing command.' },
 		},
 		required: ['command', 'description'],
 	},

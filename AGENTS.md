@@ -108,3 +108,13 @@ never recalled:
    same size, and cost since the last report and in total.
 4. A short numbered list of what needs the user: decisions, what
    isn't deployed, security items.
+
+## Plumbing visible (UI guide)
+
+Hal keeps its plumbing visible everywhere. Friendly summaries are an
+entry point, never a substitute for inspection: opening a tool shows
+every model-supplied argument, including invalid and unfamiliar ones,
+execution controls, failures and access to the complete recorded output.
+Use readable labels, lists and preserved multiline text, not JSON/ASON.
+Distinguish supplied values from defaults and missing values; never hide
+the information needed to explain why Hal accepted or rejected a call.

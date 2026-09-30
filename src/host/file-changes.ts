@@ -16,8 +16,13 @@ type Observation = { ctx: ToolContext; patterns: string[]; before: Map<string, F
 
 function validate(input: unknown): string[] {
 	if (input === undefined) return []
-	if (!Array.isArray(input) || input.some((p) => typeof p !== 'string' || !p || p.includes('\0') || isAbsolute(p) || p.split('/').includes('..'))) throw new Error('modifies must be a list of paths or globs relative to cwd, without ..')
-	return input.map((p) => relative('/cwd', resolve('/cwd', p)) || '.')
+	let help = 'Use a list of relative paths/globs or absolute paths/globs beneath /tmp, without ..; the command did not run'
+	if (!Array.isArray(input)) throw new Error(`modifies must be a list, received ${JSON.stringify(input)}. ${help}`)
+	for (let [i, p] of input.entries()) {
+		let reason = typeof p !== 'string' ? 'not a string' : !p ? 'empty path' : p.includes('\0') ? 'contains NUL' : p.split('/').includes('..') ? 'contains parent traversal' : isAbsolute(p) && (!p.startsWith('/tmp/') || resolve(p) === '/tmp') ? 'absolute path outside /tmp' : undefined
+		if (reason) throw new Error(`modifies[${i}] (${JSON.stringify(p)}): ${reason}. ${help}`)
+	}
+	return input.map((p) => isAbsolute(p) ? resolve(p) : relative('/cwd', resolve('/cwd', p)) || '.')
 }
 
 // Canonicalise missing files through their nearest existing ancestor too.
@@ -32,7 +37,7 @@ async function expand(cwd: string, patterns: string[]): Promise<string[]> {
 	let found = new Set<string>()
 	for (let p of patterns) {
 		if (!/[*?[\]{}]/.test(p)) found.add(p)
-		else for await (let name of new Bun.Glob(p).scan({ cwd, dot: true, onlyFiles: true })) found.add(name)
+		else for await (let name of new Bun.Glob(isAbsolute(p) ? relative(cwd, p) : p).scan({ cwd, dot: true, onlyFiles: true })) found.add(isAbsolute(p) ? resolve(cwd, name) : name)
 	}
 	return [...found].sort()
 }
@@ -145,8 +150,9 @@ async function finish(observation: Observation): Promise<void> {
 			if (JSON.stringify(a) !== JSON.stringify(b)) files.push({ path, before: a, after: b })
 		}
 		let after = await fileChanges.status(ctx.cwd)
+		let declaredPaths = new Set([...declared].map((p) => resolve(ctx.cwd, p)))
 		for (let path of new Set([...status.keys(), ...after.keys()])) {
-			if (!declared.has(path) && status.get(path) !== after.get(path)) files.push({ path, undeclared: true, statusBefore: status.get(path) ?? null, statusAfter: after.get(path) ?? null })
+			if (!declaredPaths.has(resolve(ctx.cwd, path)) && status.get(path) !== after.get(path)) files.push({ path, undeclared: true, statusBefore: status.get(path) ?? null, statusAfter: after.get(path) ?? null })
 		}
 		neighbours.record(ctx.sessionId, ctx.cwd, files.map((f) => f.path))
 		if (patterns.length || files.length) {
