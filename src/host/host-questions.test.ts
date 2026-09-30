@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
+import type { HistoryRecord } from '../common/replay.ts'
 import type { Answers } from '../common/forms.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
@@ -82,7 +83,7 @@ test('hal/intro asks a name, any client answers, the first answer wins and the m
 	b.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { name: 'Dave' } })
 	a.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { name: 'Eve' } })
 	expect(a.of('rejected').at(-1)).toMatchObject({ command: 'answer', reason: expect.stringMatching(/not open/) })
-	await until(() => transcript.question(a.views.get(id))?.form.fields[0]?.name === 'about')
+	await until(() => transcript.question(a.views.get(id))?.form.fields[0]?.name === 'language')
 	let view = a.views.get(id)!
 	expect(view.state).toEqual({ type: 'blocked', reason: 'question' })
 	expect(texts(view)[1]).toContain('Dave')
@@ -107,7 +108,7 @@ test('an open question survives a restart, is not continued by the new host, and
 	expect(transcript.question(b.views.get(id))?.id).toBe(q.id)
 	expect(b.views.get(id)!.items.filter((i) => i.type === 'question')).toHaveLength(1)
 	b.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { name: '' } })
-	await until(() => transcript.question(b.views.get(id))?.form.fields[0]?.name === 'about')
+	await until(() => transcript.question(b.views.get(id))?.form.fields[0]?.name === 'language')
 })
 
 test('Escape while a question waits pauses the turn; continuing asks again', async () => {
@@ -152,7 +153,7 @@ test('a secret reaches whoever asked but history only records that it was given;
 	expect(a.of('answer')[0]).toMatchObject({ answers: { save: 'yes' }, secrets: ['key'] })
 })
 
-test('intro resumes through name, about, login, model and secret search setup', async () => {
+test('intro resumes through profile, login, model and secret search setup', async () => {
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
 	let answer = async (field: string, value: string, next?: string) => {
@@ -162,15 +163,17 @@ test('intro resumes through name, about, login, model and secret search setup', 
 		c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { [field]: value } })
 		if (next) await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === next)
 	}
-	await answer('name', 'Rowan', 'about')
+	await answer('name', 'Rowan', 'language')
 	// A restart between steps keeps answers in history and the USER.md note.
 	host.reset()
 	sessions.closeAll()
 	history.state.running.clear()
 	let resumed = await opened(id)
 	c = resumed
-	await answer('about', 'Builds tools; likes short answers', 'login')
-	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Rowan\n\n## About\n\nBuilds tools; likes short answers\n')
+	await answer('language', 'English (UK); French on request', 'timezone')
+	await answer('timezone', 'Europe/Paris', 'about')
+	await answer('about', 'Likes short answers', 'login')
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Rowan\n\nLanguage preference: English (UK); French on request\n\nTimezone: Europe/Paris\n\n## Working preferences\n\nLikes short answers\n')
 	await answer('login', 'Skip', 'model')
 	let q = transcript.question(c.views.get(id))!
 	let chosen = q.form.fields[0]!.type === 'choice' ? q.form.fields[0]!.options.find((x) => x.startsWith('anthropic/'))! : ''
@@ -187,7 +190,7 @@ test('intro resumes through name, about, login, model and secret search setup', 
 })
 
 test('an existing user and accounts skip their questions, while a stored Serper key skips search', async () => {
-	writeFileSync(`${home}/USER.md`, '# User\n\nName: Alex\n\n## About\n\nPrefers plain English.\n')
+	writeFileSync(`${home}/USER.md`, '# User\n\nName: Alex\nLanguage preference: English\nTimezone: Europe/Paris\n\n## About\n\nPrefers plain English.\n')
 	apiKeys.save('serper', 'existing-key')
 	apiKeys.save('opencode-go', 'existing-login')
 	let c = client(), id = created(c)
@@ -199,13 +202,13 @@ test('an existing user and accounts skip their questions, while a stored Serper 
 	let chosen = q.form.fields[0]!.type === 'choice' ? q.form.fields[0]!.options[0]! : ''
 	c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { model: chosen } })
 	await until(() => c.of('turn-end').length)
-	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Alex\n\n## About\n\nPrefers plain English.\n')
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Alex\nLanguage preference: English\nTimezone: Europe/Paris\n\n## About\n\nPrefers plain English.\n')
 })
 
 test('choosing provider login starts its real slash command, then the guide continues', async () => {
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
-	for (let [field, value] of [['name', ''], ['about', ''], ['login', '/login opencode']]) {
+	for (let [field, value] of [['name', ''], ['language', ''], ['timezone', ''], ['about', ''], ['login', '/login opencode']]) {
 		await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === field)
 		let q = transcript.question(c.views.get(id))!
 		c.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { [field!]: value! } })
@@ -218,4 +221,52 @@ test('choosing provider login starts its real slash command, then the guide cont
 	expect(apiKeys.get('opencode-go')).toBe('test-key')
 	c.conn.send({ type: 'submit', sessionId: id, text: 'continue' })
 	await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === 'model')
+})
+
+test('skipped profile fields remain skipped after host recovery without creating a profile', async () => {
+	let c = client(), id = created(c)
+	c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
+	for (let field of ['name', 'language', 'timezone']) {
+		await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === field)
+		c.conn.send({ type: 'answer', sessionId: id, question: transcript.question(c.views.get(id))!.id, answers: { [field]: '' } })
+	}
+	await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === 'about')
+	host.reset()
+	sessions.closeAll()
+	history.state.running.clear()
+	await turns.recover()
+	c = await opened(id)
+	c.conn.send({ type: 'answer', sessionId: id, question: transcript.question(c.views.get(id))!.id, answers: { about: '' } })
+	await until(() => transcript.question(c.views.get(id))?.form.fields[0]?.name === 'login')
+	expect(existsSync(`${home}/USER.md`)).toBe(false)
+})
+
+test('intro preserves freeform notes and empty or placeholder fields while appending only supplied values', () => {
+	let intro = synthetic.models.intro!
+	let records: HistoryRecord[] = []
+	let answer = (field: string, value: string) => {
+		records.push({ type: 'answer', question: field, answers: { [field]: value }, ts: new Date().toISOString() })
+		return intro(records)
+	}
+	let original = 'Personal notes, kept verbatim.\nName: <name>\nName: \n\nLanguage preference: Not specified\n## Other durable context\nLikes quiet rooms.'
+	writeFileSync(`${home}/USER.md`, original)
+	expect(intro(records).ask?.fields[0]?.name).toBe('name')
+	expect(answer('name', 'Rowan').ask?.fields[0]?.name).toBe('language')
+	expect(answer('language', 'English (UK); French on request').ask?.fields[0]?.name).toBe('timezone')
+	let beforeZone = readFileSync(`${home}/USER.md`, 'utf8')
+	// Nothing, including the host clock or question examples, pre-fills a timezone.
+	expect(intro(records).ask?.fields[0]).not.toHaveProperty('initial')
+	for (let invalid of ['+05:30', 'UTC+02:00', 'Mars/Olympus']) {
+		expect(answer('timezone', invalid).ask?.fields[0]?.name).toBe('timezone')
+		expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe(beforeZone)
+	}
+	expect(answer('timezone', 'America/New_York').ask?.fields[0]?.name).toBe('login')
+	let written = readFileSync(`${home}/USER.md`, 'utf8')
+	expect(written.startsWith(original)).toBe(true)
+	expect(written.slice(original.length)).toContain('\nTimezone: America/New_York\n')
+	// Replaying old answers neither duplicates fields nor overrides a correction.
+	let corrected = written.replace('Language preference: English (UK); French on request', 'Language preference: French; English on request')
+	writeFileSync(`${home}/USER.md`, corrected)
+	expect(intro(records).ask?.fields[0]?.name).toBe('login')
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe(corrected)
 })

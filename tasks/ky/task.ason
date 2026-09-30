@@ -7,7 +7,11 @@ hal/intro asks for the user name when it is not already known and writes the sup
 Profile writes preserve user-authored content and existing facts. Adding a missing field must not truncate or rewrite the rest of the file; changes to an existing preference require an explicit user correction. Store only durable personal facts and preferences, never secrets, temporary progress, or project-specific requirements. Actual profile contents must never enter tracked tasks, examples, logs added for this feature, or commits. USER.md remains gitignored and protected by the project rebuild keep list; generic templates, if needed, contain no real profile data. The profile remains optional and its absence does not prevent normal operation.
 
 Verify behavior with focused checks for missing and existing profiles, skipped fields across intro resume, preserving user-authored text, confirmed versus unconfirmed timezone suggestions, and the gitignore/rebuild protection. Prefer existing onboarding coverage and avoid tests that merely restate template text.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Intro uses optional Markdown field lines, not a profile schema: it preserves freeform text byte-for-byte and appends only supplied values. Blank, Not specified, unknown, N/A and angle-bracket placeholders do not count as known fields. Legacy About sections remain valid; new optional context uses Working preferences. SYSTEM.md describes the same private briefing format and explicit-correction rule.',
+		'Name, language and timezone skips use the existing durable named answer records, so host recovery does not re-ask them. Timezone is a simple unprefilled question with Intl IANA validation: no browser integration, server timezone suggestion or automatic inference. Invalid timezone input is not written and can be corrected or skipped. Existing meaningful profile fields take precedence over replayed answers.'
+	],
 	needs: ['n2', 'vc'],
 	foldInto: ['n2', 'vc']
 }

@@ -29,6 +29,23 @@ function userAppend(text: string): void {
 	appendFileSync(path, (existsSync(path) ? '' : '# User\n') + text, { mode: 0o600 })
 }
 
+// A few optional Markdown fields, not a schema: freeform notes stay raw.
+function userValue(value: string | undefined): string | undefined {
+	let text = value?.trim().replace(/[\r\n]+/g, ' ')
+	return text && !/<[^>]*>/.test(text) && !/^(?:not specified|unknown|n\/a|unspecified)$/i.test(text) ? text : undefined
+}
+
+function userField(text: string, label: string): string | undefined {
+	return [...text.matchAll(new RegExp(`^${label}:[ \t]*(.*)$`, 'gmi'))]
+		.map((m) => synthetic.userValue(m[1])).findLast((value) => value !== undefined)
+}
+
+function timezone(value: string): boolean {
+	// Intl also accepts numeric offsets on some runtimes; those are not IANA IDs.
+	if (/^[+-]/.test(value)) return false
+	try { new Intl.DateTimeFormat('en', { timeZone: value }); return true } catch { return false }
+}
+
 function answered(records: HistoryRecord[], field: string): string | undefined {
 	for (let i = records.length - 1; i >= 0; i--) {
 		let record = records[i]!
@@ -58,23 +75,35 @@ function accounts(): { names: string[]; providers: string[] } {
 
 function intro(records: HistoryRecord[], answers?: Answers, sessionId?: string): Reply {
 	let user = synthetic.userText()
-	let name = user.match(/^Name:\s*(.+)$/m)?.[1]?.trim()
-	let saidName = synthetic.answered(records, 'name')
-	if (!name && saidName === undefined) return {
-		say: 'Hello. I am HAL 9001. I have learned from my predecessor that opening the pod bay doors is best handled as a form question. Let us get acquainted; every question can be skipped.',
-		ask: { text: 'How should I call you?', fields: [{ type: 'text', name: 'name', placeholder: 'leave empty to stay nameless' }] },
-	}
-	if (!name && saidName?.trim()) {
-		name = saidName.trim().replace(/[\r\n]+/g, ' ')
-		synthetic.userAppend(`\nName: ${name}\n`)
-		user = synthetic.userText()
+	let name = synthetic.userField(user, 'Name')
+	for (let [field, label, question] of [
+		['name', 'Name', 'How should I call you?'],
+		['language', 'Language preference', 'What is your default language or spelling variety? You can also list alternatives; using one in a conversation will not change your default.'],
+		['timezone', 'Timezone', 'What is your IANA timezone (for example, Europe/Paris or America/New_York)? The server timezone may not be yours and is never assumed.'],
+	] as const) {
+		let known = synthetic.userField(user, label)
+		if (known && (field !== 'timezone' || synthetic.timezone(known))) continue
+		let said = synthetic.answered(records, field)
+		let value = synthetic.userValue(said)
+		let invalid = value !== undefined && field === 'timezone' && !synthetic.timezone(value)
+		if (said === undefined || invalid) return {
+			say: invalid ? 'That is not an IANA timezone. Please enter a timezone identifier, or leave empty to skip.'
+				: field === 'name' ? 'Hello. I am HAL 9001. I have learned from my predecessor that opening the pod bay doors is best handled as a form question. Let us get acquainted; every question can be skipped.'
+				: field === 'language' ? (name ? `Nice to meet you, ${name}.` : 'Glad to meet you.') : undefined,
+			ask: { text: question, fields: [{ type: 'text', name: field, placeholder: 'leave empty to skip' }] },
+		}
+		if (value) {
+			synthetic.userAppend(`\n${label}: ${value}\n`)
+			user = synthetic.userText()
+			if (field === 'name') name = value
+		}
 	}
 	let about = synthetic.answered(records, 'about')
-	if (!/^## About\b/m.test(user) && about === undefined) return {
-		say: name ? `Nice to meet you, ${name}.` : 'Glad to meet you.',
-		ask: { text: 'What do you mostly work on, and how do you like answers? (Optional; no secrets.)', fields: [{ type: 'text', name: 'about', placeholder: 'leave empty to skip' }] },
+	let hasContext = /^## (?:About|Working preferences|Other durable context)\b/im.test(user)
+	if (!hasContext && about === undefined) return {
+		ask: { text: 'Any durable working or answer preferences? (Optional; no secrets, project requirements, or temporary progress.)', fields: [{ type: 'text', name: 'about', placeholder: 'leave empty to skip' }] },
 	}
-	if (!/^## About\b/m.test(user) && about?.trim()) synthetic.userAppend(`\n## About\n\n${about.trim().replace(/[\r\n]+/g, ' ')}\n`)
+	if (!hasContext && synthetic.userValue(about)) synthetic.userAppend(`\n## Working preferences\n\n${synthetic.userValue(about)}\n`)
 
 	let loggedIn = synthetic.accounts()
 	let login = synthetic.answered(records, 'login')
@@ -123,6 +152,9 @@ export const synthetic = {
 	find,
 	userText,
 	userAppend,
+	userValue,
+	userField,
+	timezone,
 	answered,
 	accounts,
 }
