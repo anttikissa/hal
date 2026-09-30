@@ -1,0 +1,10 @@
+{
+	title: 'Clients report their local timezone',
+	spec: `Terminal and web clients report the local IANA timezone of the device they run on, read with Intl.DateTimeFormat().resolvedOptions().timeZone, when they connect. The host treats it as untrusted input: it accepts only a bounded string that Intl accepts as a timezone and that is not a numeric UTC offset, and ignores anything else. The value belongs to the live connection only; it is not persisted, logged or written to tracked files.
+
+The host exposes, for a session, the timezone of the client that most recently sent input to that session, falling back to a connected client currently viewing it, otherwise nothing. The host's own timezone is available separately so consumers can compare the two. A terminal client running over SSH reports the remote shell's zone, which usually equals the host's; consumers that need the user's real zone treat UTC-like zones (UTC, Etc/*, GMT) as uninformative rather than as a confirmed location.
+
+Keep it to one small field in the existing connection handshake of each client; no location services, IP lookup or new dependency. A focused check covers accepting a valid zone, ignoring an invalid one, and per-session lookup of the most recent sender.`,
+	status: 'planned',
+	needs: []
+}
