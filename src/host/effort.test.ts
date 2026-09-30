@@ -20,7 +20,7 @@ test('qualifiers preserve exact colon ids, parse only final effort and reject un
 		expect(models.selection('openrouter/vendor/model:high')).toEqual({ id: 'openrouter/vendor/model:high' })
 		expect(models.selection('openrouter/vendor/model:free:default')).toEqual({ id: 'openrouter/vendor/model:free' })
 		expect(models.selection('openai/gpt-6-sol:max')).toEqual({ id: 'openai/gpt-6-sol', effort: 'max' })
-		expect(models.selection('gpt:high')).toEqual({ id: 'openai/gpt-6-sol', effort: 'high' })
+		expect(models.selection('gpt:high')).toEqual({ id: 'openai/gpt-6.1-sol', effort: 'high' })
 		expect(() => models.selection('opus:none')).toThrow('unsupported effort')
 		expect(() => models.selection('openai/gpt-6-sol:banana')).toThrow('unknown effort')
 		expect(() => models.selection('openai/gpt-6.1-sol:none')).toThrow('allowed: low, medium, high, xhigh, max')
