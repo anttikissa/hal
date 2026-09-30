@@ -347,6 +347,8 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		let items = [...done, ...transcript.keyed(event.results.map((b) => transcript.resultItem(b)), event.n, done.length)]
 		return { ...t, items, live: { start: items.length, turn: transcript.fresh(t.live.turn) } }
 	}
+	// Attachments, notices and other session events are not turn ends.
+	if (event.type !== 'question' && event.type !== 'turn-end') return t
 	// Asking stops the running turn: its output is in history.
 	let end = question ?? transcript.endItem(event as Event & { type: 'turn-end' })
 	let { live: _live, ...rest } = t

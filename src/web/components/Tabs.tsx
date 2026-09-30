@@ -17,6 +17,7 @@ import { tabPages } from '../../common/tab-pages.ts'
 import { router } from '../router.ts'
 import { tabs } from '../tabs.ts'
 import { push } from '../push.ts'
+import { diagnostics } from '../diagnostics.ts'
 
 // Characters a name gets in a cell.
 const NAME = 12
@@ -160,6 +161,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 				<button type="button" class="new" onClick={newTab}>
 					+ New tab
 				</button>
+				<button type="button" onClick={() => { diagnostics.record('manual'); diagnostics.report() }}>Send diagnostics</button>
 				<button type="button" class="reload" onClick={() => location.reload()}>
 					Reload page
 				</button>

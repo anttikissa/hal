@@ -11,7 +11,6 @@
 //
 // Tabs are the host's (task 0a); which one shows is this page's, named
 // by the address (tabs.ts, router.ts).
-
 import { backfill, type Backfill } from '../common/backfill.ts'
 import { connection, type LinkState } from '../common/connection.ts'
 import { drafts, type Local, type Sending } from '../common/drafts.ts'
@@ -28,6 +27,7 @@ import { tabs } from './tabs.ts'
 import { target, type Target } from './target.ts'
 import { view, type ViewState } from './view.ts'
 import { find } from './find.ts'
+import { diagnostics } from './diagnostics.ts'
 
 // `kill`: the last text Ctrl-K/U or Alt-D killed, for Ctrl-Y.
 // `tabs`: the host's, in order; `shown`: the tab this page shows;
@@ -326,8 +326,8 @@ function start(): void {
 		dial: () => new WebSocket(`${scheme}://${location.host}/ws?v=${document.documentElement.dataset.version}`),
 		reload: () => location.reload(),
 		authorized: () => app.authorized(),
-		onEvent: (e) => app.onEvent(e),
-		onState: (s) => app.onState(s),
+		onEvent: (e) => { diagnostics.record('event', e.type); app.onEvent(e) },
+		onState: (s) => { diagnostics.record('connection', s.type); diagnostics.report(); app.onState(s) },
 	})
 	addEventListener('popstate', () => tabs.onPopState())
 	addEventListener('hashchange', () => app.aim())
@@ -370,7 +370,7 @@ export const app = {
 	setView,
 	setNotice,
 	sendNow,
-	backgroundStep: tabs.backgroundStep,
+	backgroundStep: () => tabs.backgroundStep(),
 	onEvent,
 	settled,
 	aim,

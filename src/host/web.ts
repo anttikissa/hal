@@ -48,6 +48,7 @@ import { contextPage } from './context-page.ts'
 import { host } from './host.ts'
 import { push } from './push.ts'
 import { webAuth } from './web-auth.ts'
+import { webDiagnostics } from './web-diagnostics.ts'
 import { webLinks } from './web-links.ts'
 
 const cookieName = 'hal'
@@ -216,13 +217,15 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	if (get && pathname === '/sw.js') return new Response(Bun.file(`${import.meta.dir}/../web/sw.js`), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store', 'service-worker-allowed': '/' } })
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
 	let check = pathname === '/login' && get
-	if (!check && !blob && pathname !== '/ws') return new Response('not found\n', { status: 404 })
+	let diagnostic = pathname === '/web-diagnostics' && req.method === 'POST'
+	if (!check && !blob && pathname !== '/ws' && !diagnostic) return new Response('not found\n', { status: 404 })
 	// A page asked for without a login gets the gate, which reloads it
 	// after the login; the API gets a bare 401.
 	if (!web.authorized(req)) return blob ? web.gate() : new Response('log in first\n', { status: 401 })
 	if (blob) return contextPage.owns(pathname) ? contextPage.serve(req, web.css(), (r) => srv.timeout(r, 0)) : changesPage.owns(pathname) ? changesPage.serve(url, web.css()) : web.blob(pathname)
 	if (check) return new Response(null, { status: 204 })
 	if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
+	if (diagnostic) return webDiagnostics.receive(req)
 	return web.upgrade(req, srv)
 }
 
@@ -288,6 +291,7 @@ async function stop(): Promise<void> {
 	settings.state.listeningPort = undefined
 	web.state.sockets.clear()
 	webAuth.close()
+	webDiagnostics.reset()
 	await srv?.stop(true)
 }
 

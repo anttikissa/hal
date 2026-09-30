@@ -275,3 +275,17 @@ test('a command during a running turn goes where history has it: after finished 
 	expect(late.items).toEqual(t.items)
 	expect(t.meta.cwd).toBe('/x')
 })
+
+test('attachment acknowledgements and picker replies cannot end a streaming turn', () => {
+	let t = fold([snap({ history: [] }),
+		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1, ts },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'still ' }, n: 2, ts },
+	])!
+	for (let event of [
+		{ type: 'attached', sessionId, command: 'upload', blob: '123abc', marker: '[image/example.png]' },
+		{ type: 'models', sessionId, current: 'fake/m', items: ['fake/m'] },
+	] satisfies Event[]) expect(transcript.fold(t, event)).toBe(t)
+	let next = transcript.fold(t, { type: 'stream', sessionId, event: { type: 'text', text: 'working' }, n: 2, ts })!
+	expect(next.items.at(-1)).toMatchObject({ type: 'text', text: 'still working' })
+	expect(next.live).toBeDefined()
+})
