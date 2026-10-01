@@ -79,7 +79,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 /* Hal's cursor: inside the card that streams, right after its last
    character (dimmed while thinking), else on a line after the last
    item. */
-.cursor-line { min-height: 1.75lh; padding: 0.25lh 0 0.5lh calc(3px + 1ch); color: var(--cursor); }
+.cursor-line { min-height: 1.25lh; padding: 0.25lh 0 0 calc(3px + 1ch); color: var(--cursor); }
 .cursor-line span, .Card .cursor { display: block; width: 1ch; height: 1lh; background: currentColor; animation: blink 1s steps(1, end) infinite; }
 .Card .cursor { display: inline-block; vertical-align: text-bottom; margin-left: 0.2ch; background: var(--cursor); }
 .Card.thinking .cursor { background: var(--quiet); }
@@ -166,7 +166,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 /* One line of text sits centred in the 44px row the buttons set. */
 .entry .hint { position: absolute; inset: calc((44px - 1lh) / 2) 1ch auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
 .entry .hint.gone { opacity: 0; transition-duration: 80ms; }
-.entry textarea { overscroll-behavior: none; touch-action: pan-y pinch-zoom; max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: calc((44px - 1lh) / 2) 1ch; }
+.entry textarea { field-sizing: content; overscroll-behavior: none; touch-action: pan-y pinch-zoom; max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: calc((44px - 1lh) / 2) 1ch; }
 .entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 2ch; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
 .entry > button:hover:not(:disabled), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
 .entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; }
