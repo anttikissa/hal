@@ -10,3 +10,5 @@ a task and remove it here.
   reopen a closed tab. Wait for the first user to complain.
 - Linux browsers could get Alt-T/W/N/P for tabs; the user
   only has a Mac.
+- Restart (Ctrl-R) still flashes for about one frame, too fast to see
+  what. Record a screen video to find which frame it is.
