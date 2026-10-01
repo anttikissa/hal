@@ -48,25 +48,31 @@ function load(id: string, watch: boolean): SessionMeta {
 	return data as SessionMeta
 }
 
-// "<day>-<word>": day counts whole days since this home's epoch
-// (state/epoch.ason, set by the first session; copy old Hal's to keep
-// its numbering). The word comes from session-words.txt, sorted and cut
-// into 24 slots by local hour, so a day's ids list roughly in creation
-// order: three tries in this hour's slot, two more with its neighbours,
-// five from the whole list, then random letters. The directory is
-// claimed with a non-recursive mkdir, so two creators never share one.
+// "<day>-<word>" (tasks/tn). A Hal day runs 05:00-05:00 local time;
+// day 1 holds the home's epoch (state/epoch.ason, the first session's
+// UTC time). The word comes from session-words.txt cut into 24 slots,
+// slot 0 at 05:00, so a day's ids list roughly in creation order:
+// three tries in this hour's slot, two more with its neighbours, five
+// from the whole list, then random letters. The directory is claimed
+// with a non-recursive mkdir, so two creators never share one.
 function claimId(now = new Date()): string {
 	mkdirSync(paths.sessionsDir(), { recursive: true })
 	mkdirSync(paths.stateDir(), { recursive: true })
 	let epochFile = liveFiles.liveFile<{ epoch?: string }>(`${paths.stateDir()}/epoch.ason`, {}, { watch: false })
 	if (!epochFile.epoch) epochFile.epoch = now.toISOString()
-	let epoch = Date.parse(epochFile.epoch)
+	let epoch = new Date(epochFile.epoch)
 	liveFiles.close(epochFile)
-	if (Number.isNaN(epoch)) throw new Error(`${paths.stateDir()}/epoch.ason: invalid epoch`)
-	let day = String(Math.max(0, Math.floor((now.getTime() - epoch) / 86_400_000))).padStart(2, '0')
-	let words = readFileSync(`${import.meta.dir}/session-words.txt`, 'utf8').split(/\s+/).filter(Boolean)
+	if (Number.isNaN(epoch.getTime())) throw new Error(`${paths.stateDir()}/epoch.ason: invalid epoch`)
+	let halDay = (t: Date) => {
+		let d = new Date(t.getTime() - 5 * 3_600_000)
+		return { date: Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000, hour: d.getHours() }
+	}
+	let { date, hour } = halDay(now)
+	let dayNo = Math.max(1, date - halDay(epoch).date + 1)
+	let day = String(dayNo).padStart(2, '0')
+	let extra = { 3: ['cpo'], 49: ['ers'], 123: ['ntp'], 179: ['bgp'], 445: ['smb'], 631: ['ipp'] }[dayNo] ?? []
+	let words = [...new Set([...readFileSync(`${import.meta.dir}/session-words.txt`, 'utf8').split(/\s+/).filter(Boolean), ...extra])].sort()
 	let slot = (h: number) => words.slice(Math.floor((h * words.length) / 24), Math.floor(((h + 1) * words.length) / 24))
-	let hour = now.getHours()
 	for (let attempt = 0; ; attempt++) {
 		let pool = attempt < 3 ? slot(hour) : attempt < 5 ? [hour - 1, hour, hour + 1].flatMap((h) => (h < 0 || h > 23 ? [] : slot(h))) : words
 		let word = attempt < 10 ? pool[Math.floor(Math.random() * pool.length)] : Array.from({ length: 3 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('')
