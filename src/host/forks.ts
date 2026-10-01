@@ -6,6 +6,8 @@ import { subagents } from './subagents.ts'
 import { tabs } from './tabs.ts'
 import { models } from './models.ts'
 import { liveFiles } from './live-file.ts'
+import { drafts } from './drafts.ts'
+import { commands } from './commands.ts'
 
 function create(parent: string): string {
 	let meta = sessions.open(parent)
@@ -14,6 +16,10 @@ function create(parent: string): string {
 	child.name = `${Array.from(meta.name ?? parent).slice(0, 53).join('').trimEnd()} (fork)`
 	liveFiles.save(child)
 	subagents.fork(parent, child.id)
+	// The unsent draft is part of the session; a slash command in it is
+	// the /fork being submitted.
+	let draft = drafts.get(parent).text
+	if (draft.trim() && !commands.parse(draft)) drafts.set(child.id, draft)
 	let at = tabs.file().open.indexOf(parent)
 	tabs.insert(child.id, at < 0 ? tabs.file().open.length : at + 1)
 	tabs.publish()

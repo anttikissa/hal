@@ -3,6 +3,7 @@ import { commandList } from '../common/commands/list.ts'
 import { keyHelp } from '../common/key-help.ts'
 import { commands } from './commands.ts'
 import { command as help } from './commands/help.ts'
+import { drafts } from './drafts.ts'
 import { history } from './history.ts'
 import { calls, client, toolSession, until, useHost } from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
@@ -25,8 +26,11 @@ test('fork snapshots completed blocks, leaves the parent running, and focuses on
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'unfinished stream' })
 	await until(() => history.live(parent)?.blocks.length)
+	drafts.set(parent, 'half-typed idea')
 	await slash.runCommand(parent, 'fork', '')
 	let child = tabs.file().open[1]!
+	expect(drafts.get(child).text).toBe('half-typed idea')
+	expect(drafts.get(parent).text).toBe('half-typed idea')
 	expect(tabs.file().open).toEqual([parent, child, unrelated])
 	expect(sessions.open(child)).toMatchObject({ cwd: sessions.open(parent).cwd, model: 'fake/m1', name: 'Work (fork)' })
 	expect(sessions.open(child).parent).toBeUndefined()
