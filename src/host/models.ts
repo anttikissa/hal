@@ -99,7 +99,8 @@ function valid(id: string): boolean {
 // Short names choose the family's preferred model, then a provider we can
 // actually use. Subscriptions take precedence over metered API keys.
 function resolve(input: string): { id?: string; login?: string } {
-	let family = input.toLowerCase()
+	// sol is the old Hal's other name for gpt.
+	let family = input.toLowerCase() === 'sol' ? 'gpt' : input.toLowerCase()
 	let version = /^gpt-?(6(?:\.1)?)$/.exec(family)?.[1]
 	if (!version && !['gpt', 'claude', 'opus', 'astra', 'luna', 'sonnet', 'fable', 'haiku', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'].includes(family)) return { id: input }
 	let popular: Record<string, string> = { astra: 'openai/gpt-6-astra', luna: 'openai/gpt-6-luna', sonnet: 'anthropic/claude-sonnet-5-5', fable: 'anthropic/claude-fable-5', haiku: 'anthropic/claude-haiku-4-5' }
