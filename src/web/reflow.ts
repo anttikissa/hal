@@ -63,20 +63,20 @@ function restore(el: HTMLElement, anchor: Anchor): void {
 	el.scrollTop = Math.max(0, Math.min(target, el.scrollHeight - el.clientHeight))
 }
 
-function watch(el: HTMLElement, onResize: () => void): () => void {
+// `onResize` returns true when it keeps the view itself (a glide to the
+// bottom is running), so the anchor is left alone.
+function watch(el: HTMLElement, onResize: () => boolean): () => void {
 	let anchor = capture(el)
 	let update = () => {
 		if (el.clientWidth !== anchor.width || el.clientHeight !== anchor.height) {
-			onResize()
-			restore(el, anchor)
+			if (!onResize()) restore(el, anchor)
 		}
 		anchor = capture(el)
 	}
 	// Images acquire intrinsic height outside a controller redraw. Keep the
 	// pre-load reading anchor, including a card just revealed by a deep link.
 	let loaded = () => {
-		onResize()
-		restore(el, anchor)
+		if (!onResize()) restore(el, anchor)
 		anchor = capture(el)
 	}
 	el.addEventListener('load', loaded, true)

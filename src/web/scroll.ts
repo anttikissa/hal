@@ -96,7 +96,14 @@ function anchor(change: () => void): void {
 // the top.
 function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	scroll.state.el = el
-	let stopReflow = reflow.watch(el, () => { scroll.stop(); scroll.state.forced = false })
+	// A resize mid-glide (the message box grows, an image loads) must not
+	// cancel it: the glide re-aims at the moving bottom every frame, while
+	// the reading anchor was taken mid-way and would strand the view.
+	let stopReflow = reflow.watch(el, () => {
+		if (scroll.state.frame) return true
+		scroll.state.forced = false
+		return false
+	})
 	let scrolled = () => scroll.atTop() && onTop()
 	el.addEventListener('scroll', scrolled, { passive: true })
 	addEventListener('wheel', scroll.userScroll, { passive: true })
