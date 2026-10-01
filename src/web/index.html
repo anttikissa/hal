@@ -102,8 +102,8 @@ body, textarea { tab-size: 4; }
 .Markdown .line { min-height: 1lh; }
 .Markdown .line:has(+ .cursor) { display: inline; }
 .Markdown .h { margin-top: 0.25lh; }
-.Markdown .li { display: flex; }
-.Markdown .li .marker { flex: none; }
+/* Inline flow keeps native selection from separating marker and body. */
+.Markdown .li { padding-left: 2ch; text-indent: -2ch; }
 .Markdown .quote { border-left: 2px solid color-mix(in oklab, currentColor var(--mix-quote), transparent); padding-left: 1ch; }
 .Markdown .b { font-weight: bold; }
 .Markdown .i { font-style: italic; }

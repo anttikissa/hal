@@ -1,0 +1,10 @@
+{
+	title: 'Native web copy keeps list markers with text',
+	spec: 'Selecting and copying rendered Markdown in the web client keeps each bullet or numbered marker on the same clipboard line as its item text. Wrapped list items retain hanging indentation. The browser copy path stays native; list layout must not introduce a newline between the marker and item body.',
+	status: 'done',
+	notes: [
+		'Invariant restored: native browser selection keeps list markers with item text. Chromium reproduced display:flex blockifying sibling spans as "-\\nFirst item"; normal inline flow with hanging indentation copies "- First item". Verified against the actual stylesheet with wrapped bullets, numbered items, bold text and links. No clipboard interception or parser change is needed.'
+	],
+	needs: ['fn'],
+	foldInto: ['fn']
+}
