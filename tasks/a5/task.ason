@@ -2,11 +2,10 @@
 	title: 'Bash output streams live while the command runs',
 	spec: "While a foreground bash call runs, its combined output reaches every client live: the host sends the growing output (throttled to at most ~10 updates a second, and only the new bytes) as an event of the running tool call, so a late joiner's snapshot shows the same partial output as a client that watched it stream. The terminal shows the last few lines (at most 5) of the running call under its row, replaced by the normal result when the call ends; the web tool card shows the output growing. Live output is display state only: the model still gets the one final result, and history records only that (streamed view == snapshot rule from task sj). A background job (task v0) does not stream. Artifact old-bash.ts (reference; see its onOutput). Tests: events arrive before the result; the final result is unchanged; a late joiner sees partial output; the throttle bounds the event count for a chatty command.",
 	status: 'done',
-	needs: [
-		'1r'
-	],
 	notes: [
 		'Stream only foreground bash stdout/stderr already merged by jobs.exec. tool-output events carry new text plus an offset for clients joining between throttled updates; toolOutput.state powers snapshots. The partial display is capped at 1 MB; the final result stays uncapped until the bz blob-preserving result cap, and only that final result enters history. Terminal shows five wrapped preview lines; web expands the running card.',
-		'In busy parallel test runs, a fixed 500 ms wait before checking a chatty bash result was flaky; the tests now wait up to 2 s for the result instead of assuming wall-clock command duration.'
-	]
+		'In busy parallel test runs, a fixed 500 ms wait before checking a chatty bash result was flaky; the tests now wait up to 2 s for the result instead of assuming wall-clock command duration.',
+		'Web: a running bash card opens only after streaming for 1 s and then stays open. Invariant: a card never closes by itself. Opening on the first output and closing on the result made quick calls flash open and shut and jolted the transcript scroll.'
+	],
+	needs: ['1r']
 }

@@ -57,7 +57,16 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	onSettled(() => root && enter(root))
 	let open = () => opened().has(id())
 	let setOpen = (on: boolean) => setOpened(toggled(opened(), id(), on))
-	let expanded = () => open() || (props.row.item.type === 'tool' && !!props.row.item.partial && !props.row.result)
+	let expanded = open
+	// A tool still streaming after a second opens and stays open (task
+	// a5): opening at once and closing on the result made quick calls
+	// flash and jolted the scroll.
+	let running = () => props.row.item.type === 'tool' && !!props.row.item.partial && !props.row.result
+	createEffect(running, (on) => {
+		if (!on) return
+		let t = setTimeout(() => running() && setOpen(true), 1000)
+		return () => clearTimeout(t)
+	})
 	let full = () => whole().has(id())
 	let setFull = (on: boolean) => setWhole(toggled(whole(), id(), on))
 	createEffect(
