@@ -247,6 +247,13 @@ test('Ctrl-K, Ctrl-U, Alt-D, Alt-Backspace and Ctrl-Y edit the box through the s
 	// Alt-Backspace deletes a whitespace word, past the punctuation.
 	expect(press('Backspace', box('cat src/a.ts', 12), { altKey: true })).toBe(true)
 	expect(app.state.text).toBe('cat ')
+	// Alt-Left crosses a blank line (Chrome's native one sticks), and
+	// Shift extends the selection.
+	edits.length = 0
+	expect(press('ArrowLeft', box('a b\n\nc', 5), { altKey: true })).toBe(true)
+	expect(edits).toEqual([[{ start: 6, end: 6, text: '' }, 2]])
+	press('ArrowLeft', { kind: 'message', text: 'a b', cursor: 3, write: (...a) => void edits.push(a) }, { altKey: true, shiftKey: true })
+	expect(edits[1]).toEqual([{ start: 3, end: 3, text: '' }, 2, 3])
 })
 
 test('Tab and Shift-Tab indent a selection that spans lines; otherwise they move focus', () => {
@@ -277,7 +284,7 @@ test('Ctrl-Y replaces the selection in the box', () => {
 
 test('keys the browser already handles stay native in the box', () => {
 	app.onEvent(snapshot({ type: 'idle' }))
-	for (let [key, mods] of [['ArrowLeft', { altKey: true }], ['Backspace', {}], ['a', { ctrlKey: true }], ['e', { ctrlKey: true }], ['z', { metaKey: true }]] as const)
+	for (let [key, mods] of [['ArrowRight', { altKey: true }], ['Backspace', {}], ['a', { ctrlKey: true }], ['e', { ctrlKey: true }], ['z', { metaKey: true }]] as const)
 		expect(press(key, message('hello world', 5), mods)).toBe(false)
 	expect(app.state.text).toBe('hello world')
 })

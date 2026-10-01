@@ -10,8 +10,6 @@ The terminal decoder (src/client/keys.ts) yields what these need, legacy and kit
 Web: the textarea keeps native typing, IME, selection, clipboard and undo. A keydown whose meaning differs from the browser's (Ctrl-K/U/Y and Alt-D everywhere, Enter, Alt-Enter, Escape, and the keys later editor tasks add) runs step() on the textarea's value and selection, writes the result back and prevents the default. Which keys stay native is one table in src/web, unit-tested.
 Test step() with a table of (text with a cursor mark, key) -> expected text and cursor, at both ends and in the middle, with multi-code-point graphemes, and each kill followed by a yank.`,
 	status: 'done',
-	needs: ['1b'],
-	foldInto: ['11', 'xk'],
 	notes: [
 		'old-prompt.ts is module-global state with snapshot/restore wrappers around it; hal2 wants the reverse: pure functions over a state value, owned by the client (one per session). Lift behaviour and test cases, not structure.',
 		"The old editor used string indexes (text[i]) for word moves; keep hal2's grapheme boundaries (Intl.Segmenter) and test with emoji and combining marks.",
@@ -19,6 +17,9 @@ Test step() with a table of (text with a cursor mark, key) -> expected text and 
 		"Web write-back: setting textarea.value wipes the browser's undo stack. setRangeText() or document.execCommand('insertText') keep native Cmd-Z working; pick one and note which.",
 		'On macOS, Option-Left/Right in a browser already moves by word natively; leave native what already matches, and route through step() only where Hal differs.',
 		"Done as src/common/prompt.ts (prompt.step; the kill buffer is PromptState.kill, kept across submit by prompt.cleared). Alt-Backspace and Alt-D used the same word tokens as Alt-Left/Right (task h9 restored the old whitespace words for them), and Alt-Backspace deletes without killing, as in the old Hal. Web: src/web/editor.ts holds the routed-key table and write-back via execCommand('insertText'/'delete') with setRangeText as fallback, and an empty edit (unchanged text) writes nothing, since 'delete' on a caret deletes the character before it (a settled upload whose marker was already final lost its ']'); Enter/Alt-Enter/Escape stay on app.key's own paths (Ctrl/Cmd-Enter also send there, unlike step). macOS Option-letters arrive as symbols (Option-D is '∂'), so view.key names Alt keys by KeyboardEvent.code.",
-		'Decoder: rxvt Home/End (CSI 7~ / 8~) were missing and are added; Ctrl-A no longer inserts nothing but moves to line start, so tests needing an ignored control byte use Ctrl-G.'
-	]
+		'Decoder: rxvt Home/End (CSI 7~ / 8~) were missing and are added; Ctrl-A no longer inserts nothing but moves to line start, so tests needing an ignored control byte use Ctrl-G.',
+		"Web Option-Left is routed through step(), not native: Chrome's moveWordLeft sticks at the start of a line that follows a blank line (verified with headless Chrome via CDP). Invariant: Alt-Left in the box always reaches the previous token, across blank lines. keys.edit therefore writes back moves too (an empty splice sets only caret and selection). Option-Right stays native; Chrome steps over newlines one at a time there."
+	],
+	needs: ['1b'],
+	foldInto: ['11', 'xk']
 }

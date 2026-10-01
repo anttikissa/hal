@@ -11,8 +11,9 @@ test('only the keys whose meaning differs from a textarea leave native editing',
 	expect(routed('d', { alt: true })).toBe(true)
 	expect(routed('d', { ctrl: true })).toBe(false)
 	expect(routed('backspace', { alt: true })).toBe(true)
-	// Native already matches: typing, arrows and word moves, deleting, undo.
-	for (let [k, mods] of [['a', {}], ['left', { alt: true }], ['right', { cmd: true }], ['backspace', {}], ['home', {}], ['z', { cmd: true }], ['a', { ctrl: true }]] as const) expect(routed(k, mods)).toBe(false)
+	expect(routed('left', { alt: true })).toBe(true)
+	// Native already matches: typing, arrows, word-right, deleting, undo.
+	for (let [k, mods] of [['a', {}], ['right', { alt: true }], ['right', { cmd: true }], ['backspace', {}], ['home', {}], ['z', { cmd: true }], ['a', { ctrl: true }]] as const) expect(routed(k, mods)).toBe(false)
 })
 
 test('splice finds the smallest replacement between two texts, never splitting a surrogate pair', () => {

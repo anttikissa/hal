@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // The message box's editing keys. The textarea keeps native typing,
 // IME, selection, clipboard, undo and the moves that already match
-// Hal's (arrows, Option/Alt word moves, Home/End, Backspace). The keys
+// Hal's (arrows, Option/Alt-Right, Home/End, Backspace). The keys
 // in `table` mean something else in Hal (readline kills and yank, and
 // Alt-Backspace, which deletes a whitespace word; the browser lacks,
 // stops elsewhere or binds these), so keys.key runs them
@@ -24,6 +24,8 @@ const table: { key: string; ctrl?: true; alt?: true }[] = [
 	{ key: 'd', alt: true },
 	// Deletes a whitespace word; browsers stop at punctuation.
 	{ key: 'backspace', alt: true },
+	// Chrome's word-left sticks at a line after a blank line.
+	{ key: 'left', alt: true },
 ]
 
 function routed(k: Key): boolean {

@@ -144,7 +144,8 @@ function edit(k: Key, target: Extract<Target, { kind: 'message' }>): boolean {
 	let at = { text: st.text, cursor: target.cursor, kill: st.kill }
 	let { state } = prompt.step(target.anchor === undefined ? at : { ...at, anchor: target.anchor }, k)
 	st.kill = state.kill
-	if (state.text !== st.text) target.write?.(editor.splice(st.text, state.text), state.cursor, state.anchor ?? state.cursor)
+	// A move writes an empty edit: only the caret and selection change.
+	target.write?.(editor.splice(st.text, state.text), state.cursor, state.anchor ?? state.cursor)
 	app.input(state.text)
 	return true
 }
