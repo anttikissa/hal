@@ -221,7 +221,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Question .text a { color: inherit; text-decoration: underline; }
 @media (pointer: coarse) { .Question .dismiss, .Question button.answer { min-width: 44px; min-height: 44px; } }
 .Question pre.quote { margin: 0 0 0 2ch; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-.Question mark { background: currentColor; color: var(--canvas); }
+.Question mark { background: currentColor; color: inherit; -webkit-text-fill-color: var(--canvas); }
 .Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--canvas); color: var(--text); border: 1px solid var(--border); padding: 0.5lh 1ch; }
 .Picker[open] { display: flex; flex-direction: column; gap: 0.25lh; }
 .Picker .top { display: flex; align-items: center; gap: 0.6ch; }
