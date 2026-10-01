@@ -1,0 +1,9 @@
+{
+	title: 'Concise repository agent guidance',
+	spec: 'AGENTS.md holds concise, sectioned guidance for Git, rebuildable tasks, spec writing, privacy, tests, minimal code, shared worktrees, orchestration, progress reports and inspectable UI. Preserve the rules in the AGENTS.md artifact, including commit trailers, task traceability, private-file exclusions and safety boundaries. Apply Strunk & White without weakening requirements. Git defaults to rebase and autostash, but agents disable autostash in shared worktrees and never stash uncommitted work. Documentation edits avoid unrelated paragraph reflow so wording changes remain reviewable.',
+	status: 'done',
+	notes: [
+		'The old Git paragraph requested autostash while the shared-tree rule forbade stashing uncommitted work. Keep the requested defaults but require --no-autostash for shared worktrees, commit before rebasing, and wait for others’ uncommitted work. Removed repeated task-tracking instructions and illustrative report output, not their requirements.'
+	],
+	needs: []
+}
