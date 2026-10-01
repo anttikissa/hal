@@ -251,3 +251,10 @@ test('read_blob fetches a numbered tool call and its result from history', async
 		expect((await blobRun('#999999')).isError).toBe(true)
 	} finally { paths.home = originalHome }
 })
+
+// Reminder the user asked for: the hidden ask tool (task hc) must be
+// deleted by then. Delete this test with it.
+test('the ask tool is deleted by 2026-10-15', () => {
+	if (Date.now() < Date.parse('2026-10-15')) return
+	expect(existsSync(`${tools.dir()}/ask.ts`)).toBe(false)
+})

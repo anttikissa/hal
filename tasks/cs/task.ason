@@ -1,0 +1,6 @@
+{
+	title: 'The ask tool is deleted',
+	spec: 'The hidden ask tool (task hc) is gone: src/host/tools/ask.ts, its turns.ts handling, tools.disabled and turns-ask.test.ts are deleted, and a migration removes ask tool calls, their questions, answers and results from existing session histories, so every session still opens. A reminder test in tools.test.ts fails from 2026-10-15 while src/host/tools/ask.ts exists; it is deleted with the tool.',
+	status: 'planned',
+	needs: ['hc']
+}
