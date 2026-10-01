@@ -4,7 +4,7 @@
 // A session needs no history to be valid. Malformed metadata is reported
 // and left on disk untouched; it is never replaced with defaults.
 
-import { existsSync, mkdirSync, readdirSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'fs'
 import type { SessionMeta } from '../common/session.ts'
 import { names } from '../common/names.ts'
 import { liveFiles } from './live-file.ts'
@@ -48,16 +48,29 @@ function load(id: string, watch: boolean): SessionMeta {
 	return data as SessionMeta
 }
 
-// "<n>-<abc>": n one past the highest in use, then three random letters.
-// The directory is claimed with a non-recursive mkdir, so two creators
-// never share one.
-function claimId(): string {
+// "<day>-<word>": day counts whole days since this home's epoch
+// (state/epoch.ason, set by the first session; copy old Hal's to keep
+// its numbering). The word comes from session-words.txt, sorted and cut
+// into 24 slots by local hour, so a day's ids list roughly in creation
+// order: three tries in this hour's slot, two more with its neighbours,
+// five from the whole list, then random letters. The directory is
+// claimed with a non-recursive mkdir, so two creators never share one.
+function claimId(now = new Date()): string {
 	mkdirSync(paths.sessionsDir(), { recursive: true })
-	let top = 0
-	for (let name of readdirSync(paths.sessionsDir())) top = Math.max(top, parseInt(name) || 0)
-	for (let n = top + 1; ; n++) {
-		let letters = Array.from({ length: 3 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('')
-		let id = `${n}-${letters}`
+	mkdirSync(paths.stateDir(), { recursive: true })
+	let epochFile = liveFiles.liveFile<{ epoch?: string }>(`${paths.stateDir()}/epoch.ason`, {}, { watch: false })
+	if (!epochFile.epoch) epochFile.epoch = now.toISOString()
+	let epoch = Date.parse(epochFile.epoch)
+	liveFiles.close(epochFile)
+	if (Number.isNaN(epoch)) throw new Error(`${paths.stateDir()}/epoch.ason: invalid epoch`)
+	let day = String(Math.max(0, Math.floor((now.getTime() - epoch) / 86_400_000))).padStart(2, '0')
+	let words = readFileSync(`${import.meta.dir}/session-words.txt`, 'utf8').split(/\s+/).filter(Boolean)
+	let slot = (h: number) => words.slice(Math.floor((h * words.length) / 24), Math.floor(((h + 1) * words.length) / 24))
+	let hour = now.getHours()
+	for (let attempt = 0; ; attempt++) {
+		let pool = attempt < 3 ? slot(hour) : attempt < 5 ? [hour - 1, hour, hour + 1].flatMap((h) => (h < 0 || h > 23 ? [] : slot(h))) : words
+		let word = attempt < 10 ? pool[Math.floor(Math.random() * pool.length)] : Array.from({ length: 3 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('')
+		let id = `${day}-${word}`
 		try {
 			mkdirSync(paths.sessionDir(id))
 			return id
@@ -141,19 +154,28 @@ function list(): SessionListing[] {
 }
 
 // The newest readable session, so a restart or another client comes
-// back to the same conversation. Found from directory names: only the
-// metadata of the newest (and of broken ones newer than it) is read.
+// back to the same conversation. Directory names give the day; only
+// the metadata of that day's sessions (and of broken newer ones) is
+// read, and the latest createdAt wins.
 function newest(): string | undefined {
 	if (!existsSync(paths.sessionsDir())) return undefined
 	let dirs = readdirSync(paths.sessionsDir(), { withFileTypes: true }).filter((e) => e.isDirectory() && /^\d+-/.test(e.name))
+	let best: { id: string; at: string } | undefined
 	for (let id of dirs.map((e) => e.name).sort((a, b) => parseInt(b) - parseInt(a))) {
-		if (sessions.state.open.has(id)) return id
-		try {
-			liveFiles.close(sessions.load(id, false))
-			return id
-		} catch {}
+		if (best && parseInt(id) < parseInt(best.id)) break
+		let at = sessions.state.open.get(id)?.createdAt
+		if (at === undefined) {
+			try {
+				let meta = sessions.load(id, false)
+				at = meta.createdAt
+				liveFiles.close(meta)
+			} catch {
+				continue
+			}
+		}
+		if (!best || at > best.at) best = { id, at }
 	}
-	return undefined
+	return best?.id
 }
 
 export const sessions = {

@@ -113,19 +113,13 @@ test('list reads every session on disk, open or not, and reports broken ones', (
 	expect(readFileSync(metaFile('bad'), 'utf8')).toBe('not ason {')
 })
 
-test('newest is found from directory names, reading only the metadata it needs', () => {
-	let ids = Array.from({ length: 12 }, (_, i) => sessions.create({ cwd: `/s${i}` }).id)
+test('newest is the latest-created readable session of the newest day', () => {
+	let metas = Array.from({ length: 3 }, (_, i) => sessions.create({ cwd: `/s${i}` }))
+	// Same day; words don't sort by creation, createdAt decides.
+	metas.forEach((m, i) => ((m.createdAt = new Date(Date.UTC(2026, 0, 1, 2 - i)).toISOString()), liveFiles.save(m)))
 	sessions.closeAll()
-	// A newer session whose metadata is broken is skipped.
+	// A newer day whose only session's metadata is broken is skipped.
 	mkdirSync(paths.sessionDir('99-bad'), { recursive: true })
 	writeFileSync(metaFile('99-bad'), 'not ason {')
-	let loaded: string[] = []
-	let load = sessions.load
-	sessions.load = (id, watch) => (loaded.push(id), load(id, watch))
-	try {
-		expect(sessions.newest()).toBe(ids.at(-1))
-		expect(loaded).toEqual(['99-bad', ids.at(-1)!])
-	} finally {
-		sessions.load = load
-	}
+	expect(sessions.newest()).toBe(metas[0]!.id)
 })
