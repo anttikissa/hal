@@ -1466,3 +1466,60 @@ test.skipIf(!chrome)('tool-header URLs navigate without toggling and remain sepa
 		await b.close()
 	}
 }, 20000)
+
+// Selection belongs to the browser: tests may inspect it; rendering must not.
+test.skipIf(!chrome)('streaming preserves native selection and Markdown text nodes without holding updates', async () => {
+	providerHome()
+	let b = await browser(), release = () => {}
+	try {
+		await server.serve()
+		web.start()
+		let id = tabs.create('/tmp')
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
+		for (let [seed, delta, selector] of [
+			['alpha bravo', ' charlie', '.line span span'],
+			['alpha bravo\n\nLater paragraph', ' charlie', '.line span span'],
+			['**alpha bravo', ' charlie**', '.b'],
+			['```txt\nalpha bravo', ' charlie\n```', 'code'],
+			['https://example.com/alpha', '/bravo', '.Markdown a'],
+			['| Name | Value |\n|---|---|\n| alpha | bravo |\n| charlie', ' | delta |\n\nnext', 'td span'],
+		]) {
+			let advance = () => {}, gate = new Promise<void>((r) => { advance = r })
+			let finish = new Promise<void>((r) => { release = r })
+			turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
+				yield { type: 'text', text: seed! }
+				await gate
+				yield { type: 'text', text: delta! }
+				await finish
+				yield { type: 'done', reason: 'end' }
+			})()
+			await b.waitFor(`getSelection().removeAllRanges(); (() => { let t = document.querySelector('textarea'); t.value = 'selection'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`)
+			await b.waitFor(`!![...document.querySelectorAll('.Card.assistant')].at(-1)?.querySelector('.cursor')`)
+			await b.evaluate(`(() => {
+				let root = [...document.querySelectorAll('.Card.assistant')].at(-1)
+				window.selectedElement = root.querySelector(${JSON.stringify(selector)})
+				window.selectedNode = selectedElement.firstChild
+				let range = document.createRange(); range.setStart(selectedNode, 1); range.setEnd(selectedNode, 4)
+				getSelection().removeAllRanges(); getSelection().addRange(range)
+				window.selectedText = getSelection().toString()
+			})()`)
+			let check = () => b.evaluate(`(() => {
+				let s = getSelection(), r = s.getRangeAt(0)
+				return { element: selectedElement.isConnected, node: selectedElement.firstChild === selectedNode,
+					start: r.startContainer === selectedNode && r.startOffset === 1,
+					end: r.endContainer === selectedNode && r.endOffset === 4, text: s.toString() === selectedText }
+			})()`)
+			advance()
+			await b.waitFor(`[...document.querySelectorAll('.Card.assistant')].at(-1)?.innerText.includes(${JSON.stringify(selector === 'td span' ? 'delta' : delta!.includes('charlie') ? 'charlie' : '/bravo')})`)
+			expect(await check()).toEqual({ element: true, node: true, start: true, end: true, text: true })
+			release()
+			await b.waitFor(`!!document.querySelector('.cursor-line')`)
+			expect(await check()).toEqual({ element: true, node: true, start: true, end: true, text: true })
+		}
+	} finally {
+		release()
+		await b.close()
+	}
+}, 20000)

@@ -12,14 +12,30 @@ import { createEffect, createMemo, For, Match, onSettled, Show, Switch } from 's
 import type { JSX } from '@solidjs/web'
 import { markdown, type Code, type Line, type Run, type Table } from '../../common/markdown.ts'
 
+// Solid's string binding assigns Text.data, which resets native Range
+// offsets even when text only grows. Edit only changed characters instead;
+// never inspect or manipulate the browser's selection (task 1j).
+function Text(props: { value: string }) {
+	let node = document.createTextNode('')
+	createEffect(() => props.value, (next) => {
+		let old = node.data, start = 0, end = 0
+		while (start < old.length && start < next.length && old[start] === next[start]) start++
+		while (end < old.length - start && end < next.length - start && old[old.length - end - 1] === next[next.length - end - 1]) end++
+		if (start + end !== old.length || start + end !== next.length)
+			node.replaceData(start, old.length - start - end, next.slice(start, next.length - end))
+	})
+	return node
+}
+
 function Runs(props: { runs: Run[] }) {
 	let cls = (r: Run) => [r.bold && 'b', r.italic && 'i', r.code && 'code']
 	return (
 		<For each={props.runs} keyed={false}>
 			{(r) => (
-				<Show when={r().href} fallback={<span class={cls(r())}>{r().text}</span>}>
-					{(href) => <a class={cls(r())} href={href()} target="_blank" rel="noopener noreferrer">{r().text}</a>}
-				</Show>
+				<Switch>
+					<Match when={!!r().href}><a class={cls(r())} href={r().href} target="_blank" rel="noopener noreferrer"><Text value={r().text} /></a></Match>
+					<Match when={!r().href}><span class={cls(r())}><Text value={r().text} /></span></Match>
+				</Switch>
 			)}
 		</For>
 	)
@@ -53,39 +69,36 @@ export function Markdown(props: { text: string; streaming?: boolean; children?: 
 	return (
 		<div ref={(e) => (root = e)} class="Markdown">
 			<For each={blocks()} keyed={false}>
-				{(b) => (
-					<Switch>
-						<Match when={b().type === 'line' && (b() as Line)}>
-							{(l) => (
-								<div class={['line', l().kind]}>
-									<Show when={l().kind === 'li'}><span class="marker">{l().marker}</span></Show>
-									<span><Runs runs={l().runs} /></span>
-								</div>
-							)}
+				{(b) => {
+					let l = () => b() as Line, c = () => b() as Code, t = () => b() as Table
+					return <Switch>
+						<Match when={b().type === 'line'}>
+							<div class={['line', l().kind]}>
+								<Show when={l().kind === 'li'}><span class="marker"><Text value={l().marker} /></span></Show>
+								<span><Runs runs={l().runs} /></span>
+							</div>
 						</Match>
-						<Match when={b().type === 'code' && (b() as Code)}>
-							{(c) => <pre data-lang={c().lang || undefined}><code>{c().lines.join('\n')}</code></pre>}
+						<Match when={b().type === 'code'}>
+							<pre data-lang={c().lang || undefined}><code><Text value={c().lines.join('\n')} /></code></pre>
 						</Match>
-						<Match when={b().type === 'table' && (b() as Table)}>
-							{(t) => (
-								<div class="table">
-									<table>
-										<thead>
-											<tr>
-												<For each={t().rows[0]} keyed={false}>{(c) => <th><Runs runs={c()} /></th>}</For>
-											</tr>
-										</thead>
-										<tbody>
-											<For each={t().rows.slice(1)} keyed={false}>
-												{(row) => <tr><For each={row()} keyed={false}>{(c) => <td><Runs runs={c()} /></td>}</For></tr>}
-											</For>
-										</tbody>
-									</table>
-								</div>
-							)}
+						<Match when={b().type === 'table'}>
+							<div class="table">
+								<table>
+									<thead>
+										<tr>
+											<For each={t().rows[0]} keyed={false}>{(c) => <th><Runs runs={c()} /></th>}</For>
+										</tr>
+									</thead>
+									<tbody>
+										<For each={t().rows.slice(1)} keyed={false}>
+											{(row) => <tr><For each={row()} keyed={false}>{(c) => <td><Runs runs={c()} /></td>}</For></tr>}
+										</For>
+									</tbody>
+								</table>
+							</div>
 						</Match>
 					</Switch>
-				)}
+				}}
 			</For>
 			{props.children}
 		</div>

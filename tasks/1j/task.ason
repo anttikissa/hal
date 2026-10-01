@@ -1,0 +1,10 @@
+{
+	title: 'Preserve native selection during web streaming',
+	spec: 'Web streaming preserves existing DOM and text-node identity for unchanged Markdown blocks and runs. Branches depend on stable primitive discriminants, not newly parsed objects or changing link addresses. Growing text edits only its changed character range, leaving unchanged characters untouched, including paragraphs, styled runs, links, tables and code. Native selection and clipboard behavior remain entirely browser-owned: never read, clear, save, restore or otherwise manipulate selection to accommodate rendering, and never pause streaming for selection. A browser regression selects existing text, streams more bytes and completes the turn, and verifies node identity, selection endpoints and selected text remain unchanged.',
+	status: 'done',
+	notes: [
+		'Solid 2 @solidjs/web string insertion assigns Text.data/nodeValue, resetting native Range offsets even when the existing text node stays connected. A real Chromium regression fails on baseline with node identity retained but selected text and offsets lost. Markdown Text uses a split-phase createEffect and replaceData on the changed middle only (common prefix/suffix untouched). Match conditions use block type and link presence booleans; a growing href updates the same anchor. Selection is accessed only by browser tests, never by this renderer. Regression covers current and earlier paragraphs, bold, fenced code, growing URLs and retained table cells, during streaming and after completion. Streaming parser holds back a partial last table row; the fixture needs another row to expose the selected cell.'
+	],
+	needs: ['fn', '4s'],
+	foldInto: ['fn', '4s']
+}
