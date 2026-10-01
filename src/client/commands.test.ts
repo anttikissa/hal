@@ -52,7 +52,7 @@ test('each command key runs its command, the prompt left alone', () => {
 		ran = []
 		app.onKeys([keyHelp.parse(c.key!)])
 		if (c.name === 'find') { expect(app.state.modal?.find).toBeDefined(); expect(sent).toEqual([]); app.close(); sent = [] }
-		else if (c.clientOnly) expect(ran).toEqual([c.name])
+		else if (clientCommands.all[c.name]) expect(ran).toEqual([c.name])
 		else expect(sent).toEqual([c.name === 'model' ? { type: 'models', sessionId: 'a' } : { type: 'submit', sessionId: 'a', text: `/${c.name}` }])
 		expect(app.state.prompt.text).toBe('draft')
 	}
@@ -65,7 +65,7 @@ test('every command key shows in /keys', () => {
 
 test('typed client-only commands run here and never reach the host', () => {
 	open()
-	for (let name of ['quit', 'restart', 'suspend', 'redraw', 'new', 'resume', 'close']) {
+	for (let name of ['quit', 'restart', 'suspend', 'redraw']) {
 		ran = []
 		expect(app.submit(`/${name}`)).toBe(true)
 		expect(ran).toEqual([name])
@@ -81,13 +81,4 @@ test('typed /restart exits with the restart code, like Ctrl-R', () => {
 	terminal.onData('\x12')
 	app.submit('/restart')
 	expect(codes).toEqual([terminal.restartCode, terminal.restartCode])
-})
-
-test('tab commands act on the focused tab', () => {
-	Object.assign(clientCommands.all, saved.all)
-	open()
-	app.submit('/new')
-	app.submit('/close')
-	app.submit('/resume')
-	expect(sent).toEqual([{ type: 'tab-new', cwd: '/a', after: 'a' }, { type: 'tab-close', sessionId: 'a' }, { type: 'tab-resume' }])
 })

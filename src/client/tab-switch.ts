@@ -12,6 +12,7 @@ import { transcript } from '../common/transcript.ts'
 import { recall } from '../common/recall.ts'
 import { app, type AppState } from './app.ts'
 import type { KeyEvent } from './keys.ts'
+import { tabKeys } from '../common/tab-keys.ts'
 import { tabs, type Focus } from './tabs.ts'
 
 // What each tab keeps while another is shown.
@@ -133,7 +134,7 @@ function watch(): void {
 // Tab keys: next, previous, go to 1-10. True if handled.
 function tabKey(k: KeyEvent): boolean {
 	let tab = app.focusedTab()
-	let r = tab && tabs.key(k, tab, app.state.tabs.map((t) => t.id))
+	let r = tab && tabKeys.key(k, tab.id, app.state.tabs.map((t) => t.id))
 	if (!r) return false
 	if (r.focus !== undefined && r.focus !== tab!.id) app.focusOn({ tab: r.focus })
 	return true

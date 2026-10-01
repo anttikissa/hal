@@ -24,24 +24,4 @@ function focus(old: string[], next: string[], current: Focus, asked?: string): F
 	return to === undefined ? {} : { tab: to }
 }
 
-// The tab `step` places from `tab` (Ctrl-N 1, Ctrl-P -1), wrapping.
-function step(ids: string[], tab: string | undefined, by: number): string | undefined {
-	if (!ids.length) return undefined
-	let i = tab === undefined ? -1 : ids.indexOf(tab)
-	if (i < 0) return ids[0]
-	return ids[(((i + by) % ids.length) + ids.length) % ids.length]
-}
-
-type TabKey = { key: string; shift: boolean; alt: boolean; ctrl: boolean; cmd: boolean }
-
-// The tab a tab key focuses from tab `tab` among `ids`: next, previous,
-// go to 1-10. Undefined if `k` is no tab key. New, reopen and close are
-// commands (client/commands/).
-function key(k: TabKey, tab: { id: string }, ids: string[]): { focus?: string } | undefined {
-	if (k.cmd) return undefined
-	if (k.ctrl && !k.alt && !k.shift && (k.key === 'n' || k.key === 'p')) return { focus: tabs.step(ids, tab.id, k.key === 'n' ? 1 : -1) }
-	if (k.alt && !k.ctrl && !k.shift && /^[0-9]$/.test(k.key)) return { focus: ids[(Number(k.key) + 9) % 10] }
-	return undefined
-}
-
-export const tabs = { focus, step, key }
+export const tabs = { focus }

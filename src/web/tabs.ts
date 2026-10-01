@@ -2,21 +2,22 @@
 // Which of the host's tabs (task 0a) this page shows, named by the
 // address (router.ts): the tabs as they arrive, switching (following
 // the new tab's session, no longer the old one; each keeps its draft
-// and scroll place), Back and Forward, and the tab keys (shortcuts.ts).
+// and scroll place), Back and Forward, and the tab keys (key()).
 // The state lives in app.state (tabs, shown, asked).
 
 import { backfill } from '../common/backfill.ts'
+import { commandList } from '../common/commands/list.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
 import { notices } from '../common/notices.ts'
 import { recall } from '../common/recall.ts'
 import type { Event, Tab } from '../common/protocol.ts'
+import { tabKeys } from '../common/tab-keys.ts'
 import { app } from './app.ts'
 import type { KeyInput } from './keys.ts'
 import { router } from './router.ts'
 import { push } from './push.ts'
 import { scroll } from './scroll.ts'
-import { shortcuts, type TabAction } from './shortcuts.ts'
 import { view } from './view.ts'
 
 // A hidden tab receives live updates but must not change the visible DOM.
@@ -80,11 +81,29 @@ function connected(): void {
 	}
 }
 
-// A tab key: true if it was one (and is done).
+// A tab key, as in the terminal: switching (common/tab-keys.ts), or the
+// key of /new, /close or /resume (common/commands/list.ts), sent
+// unrecorded. Keys the browser keeps (commandList.onWeb) stay its own.
+// Alt-digits match by physical key, since Alt types symbols on macOS.
+// True if it was one (and is done).
 function key(e: KeyInput): boolean {
-	let a = shortcuts.action(e, tabs.mac())
-	if (a) tabs.tabAction(a)
-	return !!a
+	if (e.isComposing) return false
+	let digit = e.altKey ? /^Digit([0-9])$/.exec(e.code ?? '')?.[1] : undefined
+	let b = { key: digit ?? e.key.toLowerCase(), shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey, cmd: e.metaKey }
+	let label = `${b.shift ? 'shift-' : ''}${b.alt ? 'alt-' : ''}${b.ctrl ? 'ctrl-' : ''}${b.cmd ? 'cmd-' : ''}${b.key}`
+	if (!commandList.onWeb(label, tabs.mac())) return false
+	let { tabs: list, shown } = app.state
+	let r = shown === undefined ? undefined : tabKeys.key(b, shown, list.map((t) => t.id))
+	if (r) {
+		if (r.focus !== undefined && r.focus !== shown) tabs.show(r.focus, false)
+		return true
+	}
+	let name = commandList.byKey(b)?.name
+	if (name === 'new') tabs.newTab()
+	else if (name === 'close') { if (shown) tabs.closeTab(shown) }
+	else if (name === 'resume') tabs.resume()
+	else return false
+	return true
 }
 
 // The tabs changed. If the shown one is gone (or none shows yet), the
@@ -162,14 +181,11 @@ function closeTab(id: string): void {
 	connection.send({ type: 'tab-close', sessionId: id })
 }
 
-function tabAction(a: TabAction): void {
-	let { tabs: list, shown } = app.state
-	if (a.type === 'new') return tabs.newTab()
-	if (a.type === 'close') return shown ? tabs.closeTab(shown) : undefined
-	let at = list.findIndex((t) => t.id === shown)
-	let to = a.type === 'go' ? a.index : (at + (a.type === 'next' ? 1 : -1) + list.length) % list.length
-	let tab = list[to]
-	if (tab) tabs.show(tab.id, false)
+// Reopens the last closed tab; it shows once reopened.
+function resume(): void {
+	let id = connection.nextId()
+	app.state.asked.add(id)
+	connection.send({ type: 'tab-resume', id })
 }
 
 export const tabs = {
@@ -184,7 +200,7 @@ export const tabs = {
 	seen,
 	newTab,
 	closeTab,
-	tabAction,
-	// Whether Ctrl-T/W/N/P are the page's (shortcuts.ts).
+	resume,
+	// Whether the browser gives Ctrl-T and the like to the page.
 	mac: (): boolean => /Mac|iPhone|iPad/.test(navigator.platform),
 }

@@ -4,7 +4,8 @@
 // src/host/commands/<name>.ts; a `clientOnly` one runs in the client
 // from src/client/commands/<name>.ts and never reaches the host.
 // `key`: a label as common/key-help.ts writes them; pressing it runs the
-// command with no arguments, as if `/<name>` were typed and sent.
+// command with no arguments, as if `/<name>` were typed and sent,
+// except the tab keys, which act unrecorded (client/commands.ts).
 
 import { keyHelp, type Binding } from '../key-help.ts'
 
@@ -20,7 +21,7 @@ const list: CommandInfo[] = [
 	{ name: 'changes', description: 'list observed file changes and diffs, or clear the list', category: 'session' },
 	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session', modelUsable: true },
 	{ name: 'clients', description: 'show who is connected to the host', category: 'debug' },
-	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w', clientOnly: true },
+	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w' },
 	{ name: 'compact', description: 'summarise the context so far', category: 'session', modelUsable: true },
 	{ name: 'config', description: 'show or change settings', category: 'app' },
 	{ name: 'find', description: 'search all sessions', category: 'session', key: 'ctrl-f', modelUsable: true },
@@ -32,7 +33,7 @@ const list: CommandInfo[] = [
 	{ name: 'mem', description: 'show host memory use', category: 'debug', modelUsable: true },
 	{ name: 'model', description: 'pick the model', category: 'session', key: 'ctrl-m', modelUsable: true },
 	{ name: 'move', description: 'move this tab to a numbered position', category: 'tabs', modelUsable: true },
-	{ name: 'new', description: 'new tab', category: 'tabs', key: 'ctrl-t', clientOnly: true },
+	{ name: 'new', description: 'new tab', category: 'tabs', key: 'ctrl-t' },
 	{ name: 'pause', description: 'pause the turn', category: 'session' },
 	{ name: 'perf', description: 'show startup timing marks', category: 'debug', modelUsable: true },
 	{ name: 'plugins', description: 'list loaded plugins and their hooks', category: 'debug', modelUsable: true },
@@ -47,7 +48,7 @@ const list: CommandInfo[] = [
 	// /restart and /restart local run in the client; host, both and all
 	// on the host (src/host/commands/restart.ts).
 	{ name: 'restart', description: 'restart this client (local), the host, both, or all', category: 'app', key: 'ctrl-r', keyArgs: 'local' },
-	{ name: 'resume', description: 'reopen the last closed tab', category: 'tabs', key: 'shift-ctrl-t', clientOnly: true },
+	{ name: 'resume', description: 'reopen the last closed tab', category: 'tabs', key: 'shift-ctrl-t' },
 	{ name: 'send', description: 'send a prompt or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
 	{ name: 'status', description: 'show account usage windows', category: 'session', modelUsable: true },
@@ -58,7 +59,7 @@ const list: CommandInfo[] = [
 ]
 
 // Keys a browser keeps for itself except on macOS, where they are Cmd.
-const browserKeys = ['ctrl-t', 'shift-ctrl-t', 'ctrl-w', 'ctrl-n']
+const browserKeys = ['ctrl-t', 'shift-ctrl-t', 'ctrl-w', 'ctrl-n', 'ctrl-p']
 
 function all(): CommandInfo[] {
 	return list
