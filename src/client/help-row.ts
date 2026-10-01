@@ -2,7 +2,7 @@
 // row, so the prompt never jumps when what it says changes. In
 // priority order: the keys of an open question, the hint while editing
 // the last prompt, tab completion's choices, else the key hints for
-// the session's state (then 'ctrl-r: load new code' when a new commit
+// the session's state (then 'ctrl-r: reload client' when a new commit
 // is checked out) with '/keys: shortcuts' at the right. Keys in
 // the help key colour, descriptions in its description colour, as in
 // the old Hal. Pure.
@@ -65,7 +65,7 @@ function row(v: HelpInput, cols: number): string {
 	if (v.editing) return line(v.editing, colors.warning().fg!)
 	if (v.choices?.length) return line(ansi.clean(v.choices.join('  ')))
 	let hints = helpRow.keys(v.transcript?.state, v.prompt.text.trim() !== '')
-	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'load new code']] : hints)
+	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'reload client']] : hints)
 	let right = helpRow.paint([['/keys', 'shortcuts']])
 	let rw = strings.visLen(right)
 	if (rw + 1 > width) return line(left)
