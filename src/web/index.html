@@ -272,7 +272,13 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
    marker that appears widens it smoothly. Under 50px tall. */
 .Tabs { flex: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .Tabs .strip { display: flex; align-items: stretch; white-space: nowrap; overflow: hidden; }
-.Tabs .pages { position: relative; flex: 1; min-width: 0; display: flex; justify-content: center; overflow: hidden; }
+.Tabs .pages { position: relative; flex: 1; min-width: 0; display: flex; overflow: hidden; }
+.Tabs .track { display: flex; flex: 1; min-width: 0; overflow: hidden; scroll-snap-type: x mandatory; }
+.Tabs .track .tab { scroll-snap-align: start; }
+.Tabs .track:not(:has(.name)) .tab { flex-grow: 1; }
+.Tabs .edge:disabled { opacity: .5; cursor: default; }
+.Tabs .edge.offscreen { color: var(--active-fg); border-bottom: 3px dashed var(--active-fg); }
+.Tabs .strip .edge { padding-inline: 0; min-width: 44px; min-height: 44px; }
 .Tabs .probe { position: absolute; visibility: hidden; pointer-events: none; }
 .Tabs .tab { display: flex; flex: none; align-items: center; justify-content: center; width: var(--cell); padding: 0.25lh 0; background: none; text-decoration: none; color: var(--inactive-fg); }
 .Tabs .sheet .tab .n { display: inline-block; width: calc(var(--digits) * 1ch); text-align: right; }

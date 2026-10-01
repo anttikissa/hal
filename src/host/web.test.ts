@@ -15,6 +15,7 @@ import { turns } from './turns.ts'
 import { paths } from './paths.ts'
 import { server } from './server.ts'
 import { sessions } from './sessions.ts'
+import { status } from './status.ts'
 import { web } from './web.ts'
 import { webAuth } from './web-auth.ts'
 
@@ -921,6 +922,68 @@ test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to 
 		})()`)
 		expect(moved).toEqual({ wasAfter: true, same: true, nowBefore: true, fading: false, fresh: true, copies: 1 })
 		release()
+	} finally {
+		await b.close()
+	}
+}, 20000)
+
+
+test.skipIf(!chrome)('web tab paging scrolls with overlap without selecting, and selection recenters', async () => {
+	providerHome()
+	let ids = Array.from({ length: 21 }, () => sessions.create({ cwd: home }).id)
+	tabs.file().open = ids
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true })
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await b.call('Page.navigate', { url: `${base()}/${ids[0]}?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelectorAll('.track .tab').length === 21 && document.querySelector('.edge.left')?.disabled`)
+		let geometry = `(() => {
+			let track = document.querySelector('.track'), r = track.getBoundingClientRect(), links = [...track.querySelectorAll('.tab')];
+			let visible = links.filter(a => { let t = a.getBoundingClientRect(); return t.left >= r.left - 1 && t.right <= r.right + 1 });
+			let left = document.querySelector('.edge.left'), right = document.querySelector('.edge.right');
+			return { first: links.indexOf(visible[0]), last: links.indexOf(visible.at(-1)), path: location.pathname, scroll: track.scrollLeft, leftDisabled: left.disabled, rightDisabled: right.disabled, opacity: getComputedStyle(left).opacity, target: left.getBoundingClientRect().width, height: left.getBoundingClientRect().height, dashed: left.classList.contains('offscreen'), gap: Math.abs(visible[0].getBoundingClientRect().left - r.left), snap: getComputedStyle(track).scrollSnapType };
+		})()`
+		let scrollPage = (side: 'left' | 'right') => b.evaluate(`new Promise(resolve => { let track = document.querySelector('.track'); track.addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelector('.edge.${side}').click() })`)
+		let first = await b.evaluate(geometry)
+		expect(first.first).toBe(0)
+		expect(first.last).toBeGreaterThan(0)
+		expect(first.opacity).toBe('0.5')
+		expect(first.target).toBeGreaterThanOrEqual(44)
+		expect(first.height).toBeGreaterThanOrEqual(44)
+		expect(first.gap).toBeLessThanOrEqual(1)
+		expect(first.snap).toBe('x mandatory')
+		expect(await b.evaluate("[...document.querySelectorAll('.edge')].every(e => !/[0-9]/.test(e.textContent))")).toBe(true)
+		await scrollPage('right')
+		await b.waitFor(`(${geometry}).first === ${first.last} && (${geometry}).gap <= 1`)
+		let next = await b.evaluate(geometry)
+		expect(next.path).toBe(`/${ids[0]}`)
+		expect(next.dashed).toBe(true)
+		// Urgent hidden status redraws its edge, but never recenters.
+		status.transition(ids[0]!, { type: 'submit' })
+		status.transition(ids[0]!, { type: 'end', error: 'test failure' })
+		await b.waitFor("!!document.querySelector('.edge.left .failed')")
+		expect((await b.evaluate(geometry)).scroll).toBeCloseTo(next.scroll, 0)
+		await scrollPage('left')
+		await b.waitFor(`(${geometry}).first === 0 && (${geometry}).leftDisabled`)
+		// Select a hidden session using its native link; selection reveals it.
+		await b.evaluate("document.querySelectorAll('.track .tab')[10].click()")
+		await b.waitFor(`location.pathname === '/${ids[10]}' && (${geometry}).first > 0 && (${geometry}).last >= 10 && (${geometry}).first <= 10`)
+		let centered = await b.evaluate(geometry)
+		expect(Math.abs((centered.first + centered.last) / 2 - 10)).toBeLessThanOrEqual(.5)
+		// Page all the way to the end without changing that selection.
+		for (let i = 0; i < 21; i++) {
+			let before = await b.evaluate(geometry)
+			if (before.rightDisabled) break
+			await scrollPage('right')
+			await b.waitFor(`(${geometry}).first > ${before.first} && (${geometry}).gap <= 1`)
+		}
+		let end = await b.evaluate(geometry)
+		expect(end.rightDisabled).toBe(true)
+		expect(end.last).toBe(20)
+		expect(end.path).toBe(`/${ids[10]}`)
 	} finally {
 		await b.close()
 	}
