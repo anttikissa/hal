@@ -193,47 +193,6 @@ function line(st: ViewState, connected: boolean): Line {
 	return { text, tone: s.type === 'error' ? 'error' : s.type === 'running' || s.type === 'retrying' ? 'busy' : 'warn' }
 }
 
-// Full status facts for the details dialog; the overview keeps context.
-// Heat classes come from the shared theme, never colour literals.
-export type StatusPart = { text: string; heat?: 'cool' | 'warm' | 'hot' }
-// `path`: cut from the start when too wide, keeping the directory's name.
-export type StatusGroup = { parts: StatusPart[]; path?: true; href?: string }
-
-function heat(percent: number): StatusPart['heat'] { return percent >= 85 ? 'hot' : percent >= 60 ? 'warm' : 'cool' }
-
-function context(st: ViewState): StatusPart | undefined {
-	let stats = st.transcript?.stats
-	if (!stats?.window) return
-	let percent = Math.round((stats.context ?? 0) / stats.window * 100)
-	return { text: `${percent}%`, heat: heat(percent) }
-}
-
-function status(st: ViewState): StatusGroup[] {
-	let t = st.transcript
-	if (!t) return []
-	let { meta, stats } = t
-	let count = (n: number) => n < 1000 ? `${n}` : n < 9950 ? `${(n / 1000).toFixed(1)}k` : n < 999500 ? `${Math.round(n / 1000)}k` : n < 9950000 ? `${(n / 1e6).toFixed(1)}M` : `${Math.round(n / 1e6)}M`
-	let kilo = (n: number) => n < 1000 ? String(n) : `${Math.round(n / 1000)}k`
-	let groups: StatusGroup[] = [
-		{ parts: [{ text: meta.id }, ...(meta.name ? [{ text: `: ${meta.name}` }] : [])] },
-		{ parts: [{ text: meta.cwd }], path: true },
-		{ parts: [{ text: `${titles.modelName(meta.model)} (${stats?.effort ?? 'default/unknown'})` }] },
-	]
-	if (stats?.files) groups.push({ parts: [{ text: `${stats.files} files` }], href: `/changes/${meta.id}` })
-	if (stats?.window) {
-		let percent = Math.round((stats.context ?? 0) / stats.window * 100)
-		groups.push({ parts: [{ text: `${kilo(stats.context ?? 0)}/${kilo(stats.window)} (` }, { text: `${percent}%`, heat: heat(percent) }, { text: ')' }], href: `/context/${meta.id}` })
-	} else if (stats?.context) groups.push({ parts: [{ text: kilo(stats.context) }], href: `/context/${meta.id}` })
-	if (stats) groups.push({ parts: [{ text: `↑${count(stats.sent)} ↓${count(stats.received)}` }] })
-	if (stats?.plan) {
-		let plan = stats.plan
-		let parts: StatusPart[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}/${plan.accounts}` : ''}` }]
-		for (let [name, percent] of Object.entries(plan.windows)) parts.push({ text: `${parts.length === 1 ? ': ' : ', '}${name} ` }, { text: `${percent}%`, heat: heat(percent) })
-		groups.push({ parts })
-	}
-	return groups
-}
-
 function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: string][] {
 	let busy = st.transcript && states.busy(st.transcript.state)
 	let enter = completions.chooses(text, menu) ? 'choose' : busy ? 'steer' : 'send'
@@ -393,8 +352,6 @@ export const view = {
 	pause,
 	streaming,
 	line,
-	status,
-	context,
 	hints,
 	rows,
 	withPending,

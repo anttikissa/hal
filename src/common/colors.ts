@@ -24,7 +24,7 @@ export type Look = { [K in keyof Colors]?: (base: Colors[K], ...args: Parameters
 
 // Fields that derive a colour from others, so take arguments; every
 // other field is a value or a style, read with no arguments.
-export const DERIVED = ['quiet', 'blinkDim'] as const
+export const DERIVED = ['quiet', 'blinkDim', 'heat'] as const
 
 export const colors = {
 	// The lightest dark background we design for: where a style has no
@@ -44,6 +44,10 @@ export const colors = {
 	// on bg. blinkDim: a blinking tab mark in its dark phase.
 	quiet: (fg: Oklch, bg: Oklch): Oklch => oklch.quiet(fg, bg),
 	blinkDim: (fg: Oklch): Oklch => [fg[0] * 0.65, fg[1], fg[2]],
+	// A percentage used (context, quota) as one continuous colour: green
+	// when little is used, through yellow and orange, to red when all is.
+	// The web gets it as classes .heat-0 to .heat-100 (host/web.ts).
+	heat: (used: number): Oklch => [0.78, 0.14, 145 - 1.2 * Math.max(0, Math.min(100, used))],
 	// Web only, percentages: how much of the current colour tints a
 	// hovered control (hover; a choice, choiceHover) or the current tab
 	// (tab), draws the prompt box bar (entry), quote bar (quote) and
@@ -85,7 +89,7 @@ export const colors = {
 	fork: (): Style => ({ fg: [0.8, 0.16, 320], bg: [0.28, 0.06, 320] }),
 	// Status line: neutral, with a highlight for what matters.
 	status: (): Style => ({ fg: [0.68, 0, 0], highlight: [0.9, 0.01, 250] }),
-	// Distinct readable heat steps for the web's status percentages.
+	// Three distinct readable steps: the context graph's token kinds.
 	statusCool: (): Style => ({ fg: [0.78, 0.14, 145] }),
 	statusWarm: (): Style => ({ fg: [0.86, 0.16, 95] }),
 	statusHot: (): Style => ({ fg: [0.76, 0.16, 25] }),

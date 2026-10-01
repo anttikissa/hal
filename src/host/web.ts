@@ -160,6 +160,8 @@ function css(): string {
 		if (key === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
+	// Percentages used, one class per whole percent (colors.heat).
+	for (let used = 0; used <= 100; used++) rules.push(`.heat-${used} { --heat: ${oklch.toCss(colors.heat(used))}; color: var(--heat) }`)
 	return rules.join('\n')
 }
 

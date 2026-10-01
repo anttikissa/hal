@@ -5,18 +5,14 @@ import { auth, jwtClaims, type Kind } from './auth.ts'
 import { clock } from './clock.ts'
 import { usage, type Windows } from './usage.ts'
 import { liveFiles } from './live-file.ts'
+import { usageWindows } from '../common/usage-windows.ts'
 import { version } from './version.ts'
 import { web } from './web.ts'
 
 type Account = ReturnType<typeof auth.all>['list'][number]
 export type UsageRow = { provider: Kind; slot: string; account: string; plan?: string; error?: string; windows: Windows; apiKey: boolean }
 
-function reset(at: string, now = clock.now()): string {
-	let date = new Date(at)
-	let today = new Date(now)
-	let time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
-	return date.toDateString() === today.toDateString() ? time : `${time} on ${date.getDate()} ${date.toLocaleString(undefined, { month: 'short' })}`
-}
+const reset = (at: string, now = clock.now()): string => usageWindows.reset(at, now)
 
 function bar(percent: number): string {
 	let eighths = Math.round(Math.max(0, Math.min(100, percent)) * 14 * 8 / 100)

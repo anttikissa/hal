@@ -43,13 +43,19 @@ function plan(id: string, model: string): Plan | undefined {
 		let key = `${kind}:${next.name}`
 		let previous = stats.state.windows.get(key)
 		let windows: Record<string, number>
-		if (previous && clock.now() - previous.at < 60_000) windows = previous.windows
+		let resets: Record<string, string>
+		if (previous && clock.now() - previous.at < 60_000) ({ windows, resets } = previous)
 		else {
 			windows = {}
-			for (let [name, w] of Object.entries(usage.windows(kind, next.name))) if (!/^\d+[a-z]+[-_]/.test(name)) windows[name] = Math.round(w.used)
-			stats.state.windows.set(key, { at: clock.now(), windows })
+			resets = {}
+			for (let [name, w] of Object.entries(usage.windows(kind, next.name))) {
+				if (/^\d+[a-z]+[-_]/.test(name)) continue
+				windows[name] = Math.round(w.used)
+				if (w.resets) resets[name] = w.resets
+			}
+			stats.state.windows.set(key, { at: clock.now(), windows, resets })
 		}
-		return { account: subs.indexOf(next) + 1, accounts: subs.length, windows }
+		return { account: subs.indexOf(next) + 1, accounts: subs.length, windows, ...(Object.keys(resets).length && { resets }) }
 	} catch {
 		// No login yet, or a broken credentials file: a turn says why.
 		return undefined
@@ -100,7 +106,7 @@ function ended(id: string, end: HistoryRecord & { type: 'turn_end' }): Stats {
 export const stats = {
 	// Per session, since this host started: tokens of its turns, and the
 	// context of its last turn end.
-	state: { tokens: new Map<string, { sent: number; received: number }>(), context: new Map<string, number>(), live: new Map<string, { sent: number; received: number }>(), windows: new Map<string, { at: number; windows: Record<string, number> }>() },
+	state: { tokens: new Map<string, { sent: number; received: number }>(), context: new Map<string, number>(), live: new Map<string, { sent: number; received: number }>(), windows: new Map<string, { at: number; windows: Record<string, number>; resets: Record<string, string> }>() },
 	lastContext,
 	plan,
 	of,

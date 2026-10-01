@@ -31,11 +31,6 @@ function count(n: number): string {
 // A context size in whole thousands: 87k, 1000k.
 const kilo = (n: number): string => (n < 1000 ? String(n) : `${Math.round(n / 1000)}k`)
 
-// Green when little is used, through yellow, to red when all is.
-function heat(pct: number): Oklch {
-	return [0.78, 0.14, 145 - 1.2 * Math.max(0, Math.min(100, pct))]
-}
-
 // The context used as a percentage of the window; none without one.
 function percent(s: Stats | undefined): number | undefined {
 	return s?.window ? Math.round(((s.context ?? 0) / s.window) * 100) : undefined
@@ -53,7 +48,7 @@ function left(info: StatusInfo): Part[][] {
 	if (s?.files) out.push([{ text: `${s.files} files`, href: `/changes/${info.id}` }])
 	let pct = statusRow.percent(s)
 	if (pct !== undefined) {
-		let fg = statusRow.heat(pct)
+		let fg = colors.heat(pct)
 		out.push([{ text: kilo(s!.context ?? 0), fg }, { text: `/${kilo(s!.window!)} (` }, { text: `${pct}%`, fg }, { text: ')' }].map((p) => ({ ...p, href: `/context/${info.id}` })))
 	} else if (s?.context) out.push([{ text: kilo(s.context), href: `/context/${info.id}` }])
 	return out
@@ -70,7 +65,7 @@ function right(info: StatusInfo): Part[][] {
 	let plan = s?.plan
 	if (plan) {
 		let parts: Part[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}/${plan.accounts}` : ''}` }]
-		Object.entries(plan.windows).forEach(([name, pct], i) => parts.push({ text: `${i ? ', ' : ': '}${name} ` }, { text: `${pct}%`, fg: statusRow.heat(pct) }))
+		Object.entries(plan.windows).forEach(([name, pct], i) => parts.push({ text: `${i ? ', ' : ': '}${name} ` }, { text: `${pct}%`, fg: colors.heat(pct) }))
 		out.push(parts)
 	}
 	return out
@@ -117,4 +112,4 @@ function row(info: StatusInfo, cols: number): string {
 	return ansi.PAD + base + out + (link ? ansi.LINK_OFF : '') + ansi.UNCOLOR
 }
 
-export const statusRow = { count, heat, percent, left, right, fit, row }
+export const statusRow = { count, percent, left, right, fit, row }

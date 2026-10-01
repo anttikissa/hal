@@ -128,11 +128,28 @@ body, textarea { tab-size: 4; }
 .StatusRow { flex: none; padding: 0 max(2ch, env(safe-area-inset-right)) 0 max(2ch, env(safe-area-inset-left)); font-size: 12px; }
 .StatusRow .overview { display: block; width: 100%; min-height: 44px; padding: 0.125lh 0; background: none; color: inherit; font: inherit; text-align: left; touch-action: manipulation; }
 .StatusRow .primary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto auto; align-items: baseline; gap: 1ch; }
+.StatusRow { container-type: inline-size; }
 .StatusRow .secondary { display: flex; gap: 2ch; justify-content: space-between; }
-.StatusRow .name, .StatusRow .activity, .StatusRow .cwd, .StatusRow .model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.StatusRow .name, .StatusRow .activity, .StatusRow .cwd, .StatusRow .model, .StatusRow .windows { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .StatusRow .activity { max-width: 40vw; }
 .StatusRow .cwd { flex: 1; }
 .StatusRow .model { flex: 0 1 auto; max-width: 75%; }
+.StatusRow .windows { flex: 0 1 auto; display: flex; gap: 2ch; }
+.StatusRow .window .bar { display: inline-block; width: 6ch; height: 0.7em; border: 1px solid var(--heat); vertical-align: baseline; }
+.StatusRow .window .bar > span { display: block; height: 100%; background: var(--heat); }
+.StatusRow .id, .StatusRow .cwd .full { display: none; }
+/* Wide: id, full cwd (cut from the start) and windows; detail drops as room shrinks. */
+@container (min-width: 60ch) { .StatusRow .id { display: inline; } .StatusRow .cwd .last { display: none; } .StatusRow .cwd .full { display: inline; } .StatusRow .cwd { direction: rtl; text-align: left; } }
+@container (max-width: 140ch) { .StatusRow .window .reset { display: none; } }
+@container (max-width: 110ch) { .StatusRow .window .bar { display: none; } }
+@container (min-width: 80ch) { .StatusRow .model.quota { color: inherit; } }
+/* Narrow, without the windows: the model name fills with the quota left,
+   a hard stop clipped to the glyphs. */
+@container (max-width: 80ch) {
+  .StatusRow .windows { display: none; }
+  .StatusRow .model.quota { color: transparent; background: linear-gradient(to right, var(--heat) var(--fill), var(--fg) var(--fill)); -webkit-background-clip: text; background-clip: text; }
+}
+.hidden-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .StatusDetails { width: min(32rem, calc(var(--app-width, 100vw) - 1rem)); max-height: calc(var(--app-height, 100dvh) - 1rem); overflow-y: auto; padding: 0.5lh 1ch; background: var(--canvas); color: var(--text); border: 1px solid var(--border); overflow-wrap: anywhere; }
 .StatusDetails::backdrop { background: color-mix(in oklab, var(--canvas) 70%, transparent); }
 .StatusDetails .top { display: flex; align-items: center; justify-content: space-between; gap: 1ch; }

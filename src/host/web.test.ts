@@ -961,24 +961,29 @@ test.skipIf(!chrome)('compact status keeps two lines and opens full live details
 		web.start()
 		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.startsWith('Session ')")
+		await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.includes(': Session ')")
 		let id = await b.evaluate("location.pathname.slice(1)")
 		let meta = { id, cwd: '/tmp/very-long-parent-directory/project', model: 'fake/a-very-long-model-name', name: 'A long conversation name that must not wrap on a narrow phone', createdAt: new Date().toISOString() }
 		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta, stats: { context: 85000, window: 100000, sent: 9000, received: 2000, files: 4, effort: 'medium', plan: { account: 1, accounts: 1, windows: { '5h': 17 } } } })
 		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'running', phase: 'requesting' } })
-		await b.waitFor("document.querySelector('.StatusRow .status-hot')?.textContent === '85%' && document.querySelector('.activity')?.textContent.includes('processing')")
+		await b.waitFor("document.querySelector('.StatusRow .heat-85')?.textContent === '85%' && document.querySelector('.activity')?.textContent.includes('processing')")
 		await b.evaluate("let draft = document.querySelector('textarea'); draft.value = 'draft survives details'; draft.dispatchEvent(new Event('input', { bubbles: true }))")
-		for (let width of [320, 390, 1024]) {
+		for (let width of [320, 390, 1024, 1600]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 760, deviceScaleFactor: 1, mobile: true })
+			await b.evaluate('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))')
 			let geometry = await b.evaluate(`(() => {
 				let q = s => document.querySelector(s), r = s => q(s).getBoundingClientRect();
-				return { height: r('.overview').height, lineHeight: parseFloat(getComputedStyle(q('.overview')).lineHeight), primary: r('.primary').height, secondary: r('.secondary').height, overflow: document.documentElement.scrollWidth > innerWidth, cwd: q('.cwd').textContent, duplicated: !!q('.Composer .status') };
+				return { height: r('.overview').height, lineHeight: parseFloat(getComputedStyle(q('.overview')).lineHeight), primary: r('.primary').height, secondary: r('.secondary').height, overflow: document.documentElement.scrollWidth > innerWidth, cwd: q('.cwd').innerText, id: q('.id').checkVisibility() ? q('.id').innerText : '', windows: q('.windows').checkVisibility() ? q('.windows').innerText.replace(/\\s+/g, ' ') : '', fill: getComputedStyle(q('.model')).getPropertyValue('--fill'), duplicated: !!q('.Composer .status') };
 			})()`)
 			expect(geometry.height).toBeGreaterThanOrEqual(44)
 			expect(geometry.primary).toBeLessThanOrEqual(geometry.lineHeight + 1)
 			expect(geometry.secondary).toBeLessThanOrEqual(geometry.lineHeight + 1)
 			expect(geometry.overflow).toBe(false)
-			expect(geometry.cwd).toBe('project')
+			// Wide layouts use their room: id, full cwd, usage windows.
+			expect(geometry.cwd).toBe(width < 600 ? 'project' : meta.cwd)
+			expect(geometry.id).toBe(width < 600 ? '' : `${id}: `)
+			expect(geometry.windows).toBe(width < 600 ? '' : '5h 17% used')
+			expect(geometry.fill).toBe('83%')
 			expect(geometry.duplicated).toBe(false)
 		}
 		await b.evaluate("document.querySelector('.overview').focus()")
@@ -1013,7 +1018,7 @@ test.skipIf(!chrome)('phone landscape shrinks chrome and bounds long drafts as t
 		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
 		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
-		await b.waitFor("document.querySelector('textarea') && document.querySelector('.StatusRow .name')?.textContent.startsWith('Session ')")
+		await b.waitFor("document.querySelector('textarea') && document.querySelector('.StatusRow .name')?.textContent.includes('Session ')")
 		let draft = Array.from({ length: 30 }, (_, i) => `Draft line ${i}: preserve this text`).join('\n')
 		await b.evaluate(`let t = document.querySelector('textarea'); t.value = ${JSON.stringify(draft)}; t.dispatchEvent(new Event('input', { bubbles: true }))`)
 		let geometry = (height?: number) => b.evaluate(`(() => {
@@ -1069,7 +1074,7 @@ test.skipIf(!chrome)('rotation preserves exclusive 40px edge gaps or the text at
 		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
 		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
-		await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.startsWith('Session ')")
+		await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.includes('Session ')")
 		await b.evaluate("let t = document.querySelector('textarea'); t.value = 'reply'; t.dispatchEvent(new Event('input', { bubbles: true }))")
 		await b.evaluate("document.querySelector('.entry .actions button').click()")
 		await b.waitFor("document.querySelector('main')?.textContent.includes('Paragraph 99:') && document.querySelector('.activity').textContent.includes('idle')")
