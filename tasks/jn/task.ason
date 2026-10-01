@@ -1,0 +1,10 @@
+{
+	title: 'Terminal background blocks have padding rows',
+	spec: 'In the terminal, every block drawn with a background (prompt and command cards, tool calls, images, questions open or answered, error turn ends) has one row of its background above its text and one below, as the prompt card always had; its block id sits on the first text row. A stack of queued rows (task 16) is one block: one background row above the first queued row and one below the last, none between them. Blocks without a background get no padding. Blank rows between blocks are unchanged.',
+	status: 'done',
+	notes: [
+		'Padding lives in frame.itemRows (any item whose style has bg) and frame.build (open question form, queued stack); itemView.itemLines no longer pads prompts and commands itself. Host tests that failed while this landed fail identically on a clean HEAD copy.'
+	],
+	needs: ['hp', '16'],
+	foldInto: ['hp']
+}

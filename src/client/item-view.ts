@@ -64,8 +64,7 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 // `streaming`: the item is still growing.
 function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>): string[] {
 	switch (item.type) {
-		// A prompt card has a row of its background above the header and
-		// below the body, as in the old Hal.
+		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
 			let bash = (/^bash (?:#\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
 			let body = ansi.wrap(bash ? bashResult.display(item.text) : item.text, width).map(ansi.links)
@@ -73,7 +72,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let status = /^\[exit [1-9]\d*\]/.exec(body[0]!)![0]
 				body[0] = ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: colors.user().fg! }) + body[0]!.slice(status.length)
 			}
-			return ['', ...itemView.headed(item, body, width, session), '']
+			return itemView.headed(item, body, width, session)
 		case 'image':
 			return [attachments.label(item)]
 		// Trailing blank lines the model streamed are not drawn: the one
@@ -140,7 +139,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		}
 		// Drawn as the prompt it was typed as: header, then its text.
 		case 'command':
-			return ['', ...itemView.headed(item, ansi.wrap(item.text, width), width, session), '']
+			return itemView.headed(item, ansi.wrap(item.text, width), width, session)
 		case 'output':
 			return markdownView.lines([titles.time(item.ts), item.text.trimEnd()].filter(Boolean).join(' '), width, streaming, itemView.itemStyle(item))
 		// One row: the text centred in a rule across the width.

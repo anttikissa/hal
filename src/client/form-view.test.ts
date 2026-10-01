@@ -33,13 +33,13 @@ test('an open question shows its fields and takes the cursor into the focused te
 	let st = forms.step(forms.start('q1', item.form), { key: 'D', text: 'D' }).state
 	let f = frame.build({ ...v, form: st }, 40)
 	let rows = plain(f.lines)
-	expect(rows[0]).toBe('? How should I call you?')
-	expect(rows[1]).toBe('Name: D')
+	expect(rows[1]).toBe('? How should I call you?')
+	expect(rows[2]).toBe('Name: D')
 	// The cursor is just after the typed D, on the frame's row for it.
-	expect(f.cursor).toEqual({ row: 1, col: strip(f.lines[1]!).indexOf('D') + 1 })
+	expect(f.cursor).toEqual({ row: 2, col: strip(f.lines[2]!).indexOf('D') + 1 })
 	// An empty text shows its placeholder; the prompt stays below.
 	let empty = frame.build({ ...v, form: forms.start('q1', item.form) }, 40)
-	expect(plain(empty.lines)[1]).toBe('Name: leave empty')
+	expect(plain(empty.lines)[2]).toBe('Name: leave empty')
 	expect(plain(empty.lines)).toContain('draft')
 })
 
@@ -49,16 +49,16 @@ test('a secret is never on screen; the chosen option is marked', () => {
 	for (let c of 'sk-éé') st = forms.step(st, { key: c, text: c }).state
 	let f = frame.build({ ...view([item]), form: st }, 40)
 	expect(f.lines.join('\n')).not.toContain('sk-')
-	expect(plain(f.lines)[1]).toBe('Key: •••••')
-	expect(plain(f.lines)[2]).toBe('→ yes')
-	expect(plain(f.lines)[3]).toBe('no')
+	expect(plain(f.lines)[2]).toBe('Key: •••••')
+	expect(plain(f.lines)[3]).toBe('→ yes')
+	expect(plain(f.lines)[4]).toBe('no')
 })
 
 test('an answered question shows its answers, secrets only as given; one not answered says so', () => {
 	let done: Item = { type: 'question', id: 'q1', form: secretForm, answers: { ok: 'yes' }, secrets: ['key'] }
-	expect(plain(frame.build(view([done]), 40).lines).slice(0, 3)).toEqual(['? Log in', 'Key: (given)', 'yes'])
+	expect(plain(frame.build(view([done]), 40).lines).slice(0, 4)).toEqual(['', '? Log in', 'Key: (given)', 'yes'])
 	let left: Item = { type: 'question', id: 'q1', form: secretForm }
-	expect(plain(frame.build(view([left]), 40).lines).slice(0, 2)).toEqual(['? Log in', '(not answered)'])
+	expect(plain(frame.build(view([left]), 40).lines).slice(0, 3)).toEqual(['', '? Log in', '(not answered)'])
 })
 
 test('a quote shows under the question with its marked part highlighted on every row it wraps to', () => {

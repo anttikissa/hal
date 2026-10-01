@@ -106,8 +106,11 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	let { inner, mark } = frame.ref(item, cols, session, style)
 	let lines = itemView.itemLines(item, inner, !!hal, session, calls)
 	if (hal) lines = frame.withCursor(lines, hal, inner)
-	// The id goes on the header row, below a prompt's leading blank row.
-	mark(lines, item.type === 'prompt' ? 1 : 0)
+	// A block with a background has a row of it above and below its
+	// text, as the old Hal drew prompt cards; the id goes below the top.
+	let padded = !!style?.bg && lines.length > 0
+	if (padded) lines = ['', ...lines, '']
+	mark(lines, padded ? 1 : 0)
 	let rows = lines.flatMap((r) => ansi.paintRows(r, style, cols))
 	if (!hal) frame.state.rows.set(item, { key, rows })
 	return rows
@@ -218,10 +221,12 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 		}
 		if (item.type === 'question' && view.form?.id === item.id) {
 			let f = formView.formLines(view.form, width)
-			if (f.rows.length && lines.length) lines.push('')
-			for (let r of f.rows) lines.push(...ansi.paintRows(r, itemView.itemStyle(item), cols))
+			// Padded like every block with a background (itemRows).
+			let rows = f.rows.length ? ['', ...f.rows, ''] : []
+			if (rows.length && lines.length) lines.push('')
+			for (let r of rows) lines.push(...ansi.paintRows(r, itemView.itemStyle(item), cols))
 			// Counted from the end: the question above may flow on.
-			formCursor = { row: lines.length - (f.rows.length - f.cursor.row), col: ansi.PAD.length + f.cursor.col }
+			formCursor = { row: lines.length - (rows.length - 1 - f.cursor.row), col: ansi.PAD.length + f.cursor.col }
 		} else {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
 			let duplicate = item.type === 'tool-result' && commands.has(item.id) && outcomes.has(item.output)
@@ -264,14 +269,21 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 		...waiting.map((m) => ({ item: transcript.waitingItem(m, waiting), m })),
 		...(view.pending ?? []).map((text) => ({ item: { type: 'prompt', text, key: '' } as Item, m: undefined })),
 	]
+	// A stack of queued rows is one block: a padding row of its
+	// background above the first and below the last, none between.
 	let stacked = false
+	let edge = ansi.paint('', colors.user(), cols)
 	for (let { item, m } of tail) {
 		let tab = m?.from === undefined ? 0 : (view.tabs?.list.findIndex((t) => t.id === m.from) ?? -1) + 1
-		let rows = m?.queue && item.type === 'prompt' ? frame.queuedRows(item, inbox.note(m, tab || undefined), cols, session) : frame.itemRows(item, cols, session)
-		if (rows.length && (lines.length || above) && !(stacked && m?.queue)) lines.push('')
-		stacked = !!m?.queue
+		let queued = !!m?.queue && item.type === 'prompt'
+		let rows = queued ? frame.queuedRows(item as Item & { type: 'prompt' }, inbox.note(m!, tab || undefined), cols, session) : frame.itemRows(item, cols, session)
+		if (stacked && !queued) lines.push(edge)
+		if (rows.length && (lines.length || above) && !(stacked && queued)) lines.push('')
+		if (queued && !stacked) lines.push(edge)
+		stacked = queued
 		lines.push(...rows)
 	}
+	if (stacked) lines.push(edge)
 	// The idle Hal cursor: a blank row, its row, and the blank row that
 	// comes before the chrome. A question being answered has the cursor.
 	if (view.hal?.at === 'idle' && !formCursor) {
