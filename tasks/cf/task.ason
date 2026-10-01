@@ -5,5 +5,6 @@
 	notes: [
 		'Host code may not import client code (conventions.test.ts layers): the host command exits through restartProcess.run, which main.ts points at terminal.restart so raw mode is left first. Web restart state lives in src/web/restart.ts, and the web draft store in src/web/draft-store.ts, keeping web/app.ts under the 400-line limit.'
 	],
-	needs: ['ah', 'w6']
+	needs: ['ah', 'w6'],
+	foldInto: ['x0']
 }
