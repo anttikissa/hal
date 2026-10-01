@@ -390,6 +390,43 @@ test('a page built from other code than the host serves is told to reload; its o
 	expect(current.events[0].type).toBe('tabs')
 })
 
+test('manual-update pages stay connected through rebuilds and stale reconnects; auth still revokes them', async () => {
+	await server.serve()
+	web.start()
+	let version = await web.version()
+	let auth = await cookie()
+	let manual = await dial(auth, `?v=${version}&updates=manual`)
+	let legacy = await dial(auth, `?v=${version}`)
+	let terminal = await dial(auth)
+	let stale = await dial(auth, '?v=older&updates=manual')
+	await until(() => [manual, legacy, terminal, stale].every((w) => w.events.some((e) => e.type === 'tabs')))
+	expect(stale.events[0]).toEqual({ type: 'web-update' })
+	let build = web.build
+	try {
+		// Model a half-saved source edit without changing shared source files.
+		web.build = async () => { throw new Error('incomplete build') }
+		await web.refresh()
+		expect(await web.version()).toBeUndefined()
+		expect(manual.events.some((e) => e.type === 'web-update')).toBe(false)
+		expect(legacy.ws.readyState).toBe(WebSocket.OPEN)
+		web.build = async () => ({ html: '', version: 'rebuilt' })
+		await web.refresh()
+		await until(() => manual.events.some((e) => e.type === 'web-update'))
+		expect(await legacy.closed).toBe(4000)
+		expect(manual.ws.readyState).toBe(WebSocket.OPEN)
+		expect(terminal.ws.readyState).toBe(WebSocket.OPEN)
+		expect(terminal.events.some((e) => e.type === 'web-update')).toBe(false)
+		let reconnect = await dial(auth, `?v=${version}&updates=manual`)
+		await until(() => reconnect.events.some((e) => e.type === 'tabs'))
+		expect(reconnect.events[0]).toEqual({ type: 'web-update' })
+		web.revoke()
+		expect(await manual.closed).toBe(4001)
+		expect(await reconnect.closed).toBe(4001)
+	} finally {
+		web.build = build
+	}
+})
+
 test('a submit streams to both a web and an in-memory client', async () => {
 	let pushes: ((...e: StreamEvent[]) => void)[] = []
 	turns.stream = () =>
@@ -1261,6 +1298,66 @@ test.skipIf(!chrome)('pending question URLs are safe native links and wrap at ph
 	}
 })
 
+test.skipIf(!chrome)('manual reload notice preserves the draft and command actions stay distinct from steering', async () => {
+	providerHome()
+	let id = tabs.create('/tmp')
+	let finish = () => {}
+	turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
+		yield { type: 'text', text: 'Still working' }
+		await new Promise<void>((resolve) => { finish = resolve })
+		yield { type: 'done', reason: 'end' }
+	})()
+	let b = await browser()
+	let build = web.build
+	try {
+		await server.serve(); web.start()
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.waitFor("document.querySelector('.activity')?.textContent.includes('idle')")
+		let input = (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input', { bubbles: true })); })()`)
+		let actions = () => b.evaluate("[...document.querySelectorAll('.Composer .actions button')].map(b => b.textContent)")
+		await input('start')
+		await b.evaluate("document.querySelector('.Composer .actions button').click()")
+		await b.waitFor("document.querySelector('main').textContent.includes('Still working')")
+		await input('later')
+		expect(await actions()).toEqual(['Queue', 'Steer'])
+		await input('/model')
+		expect(await actions()).toEqual(['Run'])
+		expect(await b.evaluate("document.querySelector('.Composer .help').textContent.includes('queue')")).toBe(false)
+		await input('draft stays put')
+		await b.evaluate("document.querySelector('textarea').focus(); window.__beforeUpdate = document.querySelector('.Chat'); window.__oldText = document.querySelector('textarea')")
+		let page = await web.state.page!
+		web.build = async () => ({ html: page.html.replace(`data-version="${page.version}"`, 'data-version="updated"'), version: 'updated' })
+		await web.refresh()
+		await b.waitFor("document.querySelector('.source-update button')?.textContent === 'reload'")
+		let geometry = await b.evaluate(`(() => {
+			let button = document.querySelector('.source-update button'), r = button.getBoundingClientRect(), tabs = document.querySelector('.Tabs').getBoundingClientRect();
+			return { font: getComputedStyle(button).fontSize, height: r.height, width: r.width, clear: r.bottom <= tabs.top, focused: document.activeElement === window.__oldText, same: document.querySelector('.Chat') === window.__beforeUpdate, draft: document.querySelector('textarea').value };
+		})()`)
+		expect(geometry).toMatchObject({ font: '8px', clear: true, focused: true, same: true, draft: 'draft stays put' })
+		expect(geometry.height).toBeGreaterThanOrEqual(24)
+		expect(geometry.width).toBeGreaterThanOrEqual(44)
+		// A second rebuild keeps one persistent notice and the same page.
+		await web.refresh()
+		expect(await b.evaluate("document.querySelectorAll('.source-update').length")).toBe(1)
+		finish()
+		await b.waitFor("document.querySelector('.activity').textContent.includes('idle')")
+		await input('/help')
+		expect(await actions()).toEqual(['Run'])
+		await input('draft stays put')
+		await b.evaluate("document.querySelector('.source-update button').click()")
+		await b.waitFor("!window.__beforeUpdate && document.querySelector('textarea')?.value === 'draft stays put'")
+		expect(await b.evaluate("document.querySelector('.source-update') === null")).toBe(true)
+	} finally {
+		finish()
+		web.build = build
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+}, 20000)
+
 test.skipIf(!chrome)('completion dismissal follows pointer and focus without stealing choice clicks or Enter', async () => {
 	providerHome()
 	let b = await browser()
@@ -1331,7 +1428,7 @@ test.skipIf(!chrome)('completion dismissal follows pointer and focus without ste
 		expect(await b.evaluate(`document.activeElement.getAttribute('aria-label')`)).toBe('Attach file')
 		await type('/version')
 		await b.waitFor(`!!document.querySelector('.completions')`)
-		expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('send')
+		expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('run')
 		await press('Enter')
 		await b.waitFor(`document.querySelector('textarea').value === ''`)
 	} finally { await b.close() }

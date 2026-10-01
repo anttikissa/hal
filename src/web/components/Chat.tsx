@@ -6,7 +6,7 @@
 // routes page keys, pastes and file drops to keys.ts. The page takes
 // every file drag, so a dropped file never replaces it (task n5).
 
-import { createMemo, createSignal, flush, onSettled } from 'solid-js'
+import { createMemo, createSignal, flush, Show, onSettled } from 'solid-js'
 import { connection } from '../../common/connection.ts'
 import type { Sending } from '../../common/drafts.ts'
 import { notices } from '../../common/notices.ts'
@@ -23,7 +23,7 @@ import { Tabs } from './Tabs.tsx'
 import { StatusRow } from './StatusRow.tsx'
 import { Transcript } from './Transcript.tsx'
 
-const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, menu: app.state.menu, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration, notices: notices.state.entries })
+const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, menu: app.state.menu, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration, notices: notices.state.entries, updateAvailable: app.state.updateAvailable })
 type Snap = ReturnType<typeof snap>
 
 // A change to the transcript follows the bottom: a new prompt pending
@@ -102,6 +102,7 @@ export function Chat() {
 	let field = <K extends keyof Snap>(k: K) => createMemo(() => state()[k])
 	let [tabs, shown, view, text, menu, notice, placeholder, connected, linked, pushReady] = [field('tabs'), field('shown'), field('view'), field('text'), field('menu'), field('notice'), field('placeholder'), field('connected'), field('target'), field('pushReady')]
 	let stack = field('notices')
+	let updateAvailable = field('updateAvailable')
 	let pending = createMemo(() => state().pending, { equals: same })
 	// Files are dragged over the page: the box shows it takes them.
 	let [dropping, setDropping] = createSignal(false)
@@ -151,6 +152,9 @@ export function Chat() {
 	})
 	return (
 		<div class={['Chat', { offline: !connected() }]}>
+			<Show when={updateAvailable()}>
+				<div class="source-update"><button type="button" aria-label="Reload to update Hal" onClick={() => location.reload()}>reload</button></div>
+			</Show>
 			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} tabs={tabs()} />
 			<Notices entries={stack()} />

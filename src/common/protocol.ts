@@ -266,13 +266,11 @@ export type Event =
 	// The host process's version (task n1), sent on connect once known
 	// and to every client when the host learns it.
 	| { type: 'version'; version: string }
-	// /restart all: restart once this host goes (terminal) or reload once
-	// it is back (web).
-	| { type: 'restart' }
+	| { type: 'restart' } // /restart all: terminals exit; web waits for host return.
+	| { type: 'web-update' } // Opted-in pages wait for the user to reload.
 	// Repaint terminals following this session; no reload on the web.
 	| { type: 'redraw'; sessionId: string }
-	// Cached models.dev display names for the open tabs, sent on connect,
-	// model switch and background catalog refresh.
+	// Cached models.dev names on connect, model switch and catalog refresh.
 	| { type: 'model-names'; names: Record<string, string> }
 	// Another tab's turn ended or asks, sent only to clients watching
 	// some other tab (task qm); `session`, not sessionId, so no client
@@ -361,6 +359,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },
 	ack: { id: 's', tab: 's?' },
 	restart: {},
+	'web-update': {},
 	redraw: { sessionId: 's' },
 	auth: { code: 's', link: 's?' },
 }

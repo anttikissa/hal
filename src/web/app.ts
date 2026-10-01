@@ -39,7 +39,7 @@ import { diagnostics } from './diagnostics.ts'
 // the page can keep what the reader was reading in place.
 // `target`: the block the address links to (target.ts), `found` once
 // its card is in the transcript, `shown` once scrolled to.
-export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; landing?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; known?: Known; completedByTab?: string; suppressed?: string; cached: Map<string, ViewState>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout> }
+export type AppState = { view: ViewState; text: string; tabs: Tab[]; shown?: string; landing?: string; asked: Set<string>; kill?: string; older: Map<string, Backfill>; pages: number; target?: Target & { found?: true; shown?: true }; menu?: Menu; known?: Known; completedByTab?: string; suppressed?: string; cached: Map<string, ViewState>; background: Set<string>; painted: boolean; updateAvailable?: boolean; loading?: string; timer?: ReturnType<typeof setTimeout> }
 
 function createState(): AppState {
 	return { view: {}, text: '', tabs: [], asked: new Set(), older: new Map(), pages: 0, cached: new Map(), background: new Set(), painted: false }
@@ -92,6 +92,7 @@ function onEvent(event: Event): void {
 	let st = app.state
 	if (event.type === 'find-results') return find.event(event)
 	if (event.type === 'restart') return restart.mark()
+	if (event.type === 'web-update') { st.updateAvailable = true; return app.changed() }
 	if (event.type === 'redraw') return
 	if (event.type === 'tabs') push.badge(event.tabs)
 	if (tabs.onEvent(event)) return
@@ -292,6 +293,7 @@ function modalPick(index: number): void {
 function send(queue = false): void {
 	let st = app.state
 	let id = app.sessionId()
+	if (view.commandDraft(st.text)) queue = false
 	if (id && uploads.pending(id)) {
 		uploads.wait(id, queue)
 		return app.setNotice('sending once the upload is done')
@@ -318,7 +320,7 @@ function start(): void {
 	drafts.store = app.store
 	let scheme = location.protocol === 'https:' ? 'wss' : 'ws'
 	link.start({
-		dial: () => new WebSocket(`${scheme}://${location.host}/ws?v=${document.documentElement.dataset.version}`),
+		dial: () => new WebSocket(`${scheme}://${location.host}/ws?v=${document.documentElement.dataset.version}&updates=manual`),
 		reload: () => location.reload(),
 		authorized: () => app.authorized(),
 		onEvent: (e) => { diagnostics.record('event', e.type); app.onEvent(e) },

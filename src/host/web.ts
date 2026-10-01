@@ -19,7 +19,8 @@
 //                  command, each event one ASON message, like a socket
 //                  client's lines; the tabs come first. A page built
 //                  from other code than the host's (`?v=`,
-//                  web.version()) is closed with code 4000: reload.
+//                  web.version()) gets web-update when it opts into
+//                  manual updates; legacy pages close with code 4000.
 //                  /auth revoke closes every socket with code 4001.
 //   GET  /blob/<session>/<blob>  an attachment of that session
 //                  (cookie; host/blobs.ts): the id is matched whole,
@@ -37,6 +38,7 @@
 
 import type { BunPlugin, Server, ServerWebSocket } from 'bun'
 import { watch, type FSWatcher } from 'fs'
+import { ason } from '../common/ason.ts'
 import { colors, DERIVED, type Style } from '../common/colors.ts'
 import { oklch, type Oklch } from '../common/oklch.ts'
 import { session } from '../common/session.ts'
@@ -56,7 +58,7 @@ import { webLinks } from './web-links.ts'
 
 const cookieName = 'hal'
 
-type Data = { conn?: ReturnType<typeof host.adapt>; stale?: boolean; page?: string; info?: ClientInfo }
+type Data = { conn?: ReturnType<typeof host.adapt>; stale?: boolean; manualUpdates?: boolean; page?: string; info?: ClientInfo }
 type Socket = ServerWebSocket<Data>
 
 function authorized(req: Request): boolean {
@@ -238,12 +240,14 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	return web.upgrade(req, srv)
 }
 
-// A page built from other code than the host's (a restart onto newer
-// code) is told to reload: opened, then closed with code 4000.
+// A stale manual-update page stays connected with an update notice.
+// Legacy pages still reload when the socket closes with code 4000.
 async function upgrade(req: Request, srv: Server<Data>): Promise<Response | undefined> {
-	let v = new URL(req.url).searchParams.get('v')
+	let params = new URL(req.url).searchParams
+	let v = params.get('v')
+	let manualUpdates = v !== null && params.get('updates') === 'manual'
 	let stale = v !== null && v !== (await web.version())
-	if (srv.upgrade(req, { data: { stale, page: v ?? undefined, info: clients.fromRequest(req, srv.requestIP(req)?.address) } })) return undefined
+	if (srv.upgrade(req, { data: { stale, manualUpdates, page: v ?? undefined, info: clients.fromRequest(req, srv.requestIP(req)?.address) } })) return undefined
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
 }
 
@@ -260,7 +264,8 @@ function blob(pathname: string): Response {
 
 const websocket = {
 	open(ws: Socket) {
-		if (ws.data.stale) return ws.close(4000, 'reload')
+		if (ws.data.stale && !ws.data.manualUpdates) return ws.close(4000, 'reload')
+		if (ws.data.stale) ws.send(ason.stringify({ type: 'web-update' }, 'short'))
 		web.state.sockets.add(ws)
 		ws.data.conn = host.adapt((message) => ws.send(message), ws.data.info)
 	},
@@ -274,20 +279,25 @@ const websocket = {
 }
 
 // Once a page was built, a change to src/web or src/common (task zz)
-// rebuilds it, and open pages built from older code are closed with
-// 4000 so they reload. Sockets without a page version (remote
-// terminals) stay; a failed build (a half-saved edit) reloads nothing.
+// rebuilds it, and notifies opted-in pages without dropping their link.
+// Legacy pages reload on code 4000. Remote terminals stay connected;
+// a failed build (a half-saved edit) notifies nothing.
+async function refresh(): Promise<void> {
+	web.state.page = web.build()
+	let v = await web.version()
+	if (v) for (let ws of web.state.sockets) if (ws.data.page && ws.data.page !== v) {
+		if (ws.data.manualUpdates) ws.send(ason.stringify({ type: 'web-update' }, 'short'))
+		else ws.close(4000, 'reload')
+	}
+}
+
 function watchSource(): FSWatcher | null {
 	let timer: Timer | undefined
 	try {
 		return watch(`${import.meta.dir}/..`, { recursive: true, persistent: false }, (_e, name) => {
 			if (!web.state.page || !name || !/^(web|common)\//.test(String(name)) || String(name).includes('.test.')) return
 			clearTimeout(timer)
-			timer = setTimeout(async () => {
-				web.state.page = web.build()
-				let v = await web.version()
-				if (v) for (let ws of web.state.sockets) if (ws.data.page && ws.data.page !== v) ws.close(4000, 'reload')
-			}, 300)
+			timer = setTimeout(() => void web.refresh(), 300)
 		})
 	} catch {
 		return null
@@ -350,6 +360,7 @@ export const web = {
 	compiler,
 	plugin,
 	build,
+	refresh,
 	version,
 	page,
 	gate,

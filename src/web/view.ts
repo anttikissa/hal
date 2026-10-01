@@ -193,11 +193,16 @@ function line(st: ViewState, connected: boolean): Line {
 	return { text, tone: s.type === 'error' ? 'error' : s.type === 'running' || s.type === 'retrying' ? 'busy' : 'warn' }
 }
 
+// Include an incomplete / command, but not an absolute file path.
+const commandDraft = (text: string) => /^\/(?:[a-z][a-z0-9-]*(?:\s|$)|$)/.test(text.trim())
+
 function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: string][] {
 	let busy = st.transcript && states.busy(st.transcript.state)
-	let enter = completions.chooses(text, menu) ? 'choose' : busy ? 'steer' : 'send'
-	if (menu) return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift+enter', 'newline'], ...(busy ? [['alt+enter', 'queue'] as [string, string]] : []), ['esc', 'dismiss']]
-	if (busy) return [['enter', enter], ['alt+enter', 'queue'], ['shift+enter', 'newline'], ['esc', 'pause']]
+	let command = view.commandDraft(text)
+	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'steer' : 'send'
+	let queue: [string, string][] = busy && !command ? [['alt+enter', 'queue']] : []
+	if (menu) return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift+enter', 'newline'], ...queue, ['esc', 'dismiss']]
+	if (busy) return [['enter', enter], ...queue, ['shift+enter', 'newline'], ['esc', 'pause']]
 	return [['enter', enter], ['shift+enter', 'newline'], ['↑', 'edit last'], ['tab', 'complete'], ['ctrl+m', 'model']]
 }
 
@@ -353,6 +358,7 @@ export const view = {
 	streaming,
 	line,
 	hints,
+	commandDraft,
 	rows,
 	withPending,
 	show,

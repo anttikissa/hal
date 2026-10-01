@@ -146,12 +146,12 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 					+
 				</button>
 				<div class="actions">
-					<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={() => send()}>
-						{busy() ? 'Steer' : 'Send'}
-					</button>
-					<Show when={busy()}>
+					<Show when={busy() && !view.commandDraft(props.text)}>
 						<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={() => send(true)}>Queue</button>
 					</Show>
+					<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={() => send()}>
+						{view.commandDraft(props.text) ? 'Run' : busy() ? 'Steer' : 'Send'}
+					</button>
 				</div>
 			</div>
 			<div class="help">

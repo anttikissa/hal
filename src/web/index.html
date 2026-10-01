@@ -31,6 +31,11 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 body, textarea { tab-size: 4; }
 .App, .Chat { height: 100%; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 .App { position: absolute; top: 0; left: 0; width: var(--app-width, 100%); max-width: 100%; height: var(--app-height, 100dvh); transform: translate(var(--app-left, 0px), var(--app-top, 0px)); }
+/* Developer update control: a tiny label with a separate hit target.
+   Normal flow reserves its row above tabs, including the top safe area. */
+.source-update { flex: none; text-align: right; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+.source-update button { font-size: 8px; line-height: 1; min-height: 24px; min-width: 44px; padding: 4px 8px; color: var(--text); background: var(--canvas); }
+.source-update + .Tabs { padding-top: 0; }
 /* The one scroller: nothing inside it scrolls; long lines wrap. */
 /* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
