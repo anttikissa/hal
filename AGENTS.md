@@ -22,10 +22,13 @@ the current version", not "initialise package.json at 0.1.0". Avoid
 `once`; preserve files needed for a rebuild as task artifacts.
 
 Put implementation lessons (surprises, misleading artifacts, decisions)
-in the task.ason `notes` list, never separate notes files. Read `tsk help`
-and the tsk README before inventing conventions.
-Use `tsk edit`/`tsk add-note`, not string surgery: a raw backtick can
-break an ASON template string. After any hand edit, run `tsk show <id>`.
+in the task.ason `notes` list, never separate notes files. Read
+`tsk --detailed-help` and the tsk README before inventing conventions.
+Before `tsk add`, search tasks/ for tasks covering the same behavior or
+files: set `needs` for prerequisites and `foldInto` when the new task
+corrects or extends an existing one. Use `tsk edit`/`tsk add-note`, not
+string surgery: a raw backtick can break an ASON template string. After
+any hand edit, run `tsk show <id>`.
 
 Before changing code, read tasks/README.md for architecture, module
 conventions and invariants, including emergency keys.
@@ -61,11 +64,14 @@ data-loss handling, security, accessibility or explicit requirements.
 # Shared worktrees
 
 Other agents may share the tree and index. Stage only your changes:
-never `git add -A` or whole files containing others' edits.
-Never `git checkout`, `git restore` or `git stash` over uncommitted work.
-Commit with `git commit <your paths>` or inspect `git diff --cached --stat`
-first so others' staged changes don't ride along. Avoid parallel edits
-to the same files; use separate worktrees if overlap is unavoidable.
+never `git add -A` or whole files containing others' edits. Never
+`git checkout`, `git restore` or `git stash` over uncommitted work.
+`git commit <paths>` commits whole files, including others' uncommitted
+edits in them. If others edited a file you changed, stage only your
+hunks (`git add -p`, or a blob via `git update-index --cacheinfo`),
+check `git diff --cached`, then run `git commit` without paths. Avoid
+parallel edits to the same files; use separate worktrees if overlap is
+unavoidable.
 
 ## Orchestration
 

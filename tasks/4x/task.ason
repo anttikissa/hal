@@ -3,7 +3,8 @@
 	spec: 'AGENTS.md holds concise, sectioned guidance for Git, rebuildable tasks, spec writing, privacy, tests, minimal code, shared worktrees, orchestration, progress reports and inspectable UI. Preserve the rules in the AGENTS.md artifact, including commit trailers, task traceability, private-file exclusions and safety boundaries. Apply Strunk & White without weakening requirements. Git defaults to rebase and autostash, but agents disable autostash in shared worktrees and never stash uncommitted work. Documentation edits avoid unrelated paragraph reflow so wording changes remain reviewable.',
 	status: 'done',
 	notes: [
-		'The old Git paragraph requested autostash while the shared-tree rule forbade stashing uncommitted work. Keep the requested defaults but require --no-autostash for shared worktrees, commit before rebasing, and wait for others’ uncommitted work. Removed repeated task-tracking instructions and illustrative report output, not their requirements.'
+		'The old Git paragraph requested autostash while the shared-tree rule forbade stashing uncommitted work. Keep the requested defaults but require --no-autostash for shared worktrees, commit before rebasing, and wait for others’ uncommitted work. Removed repeated task-tracking instructions and illustrative report output, not their requirements.',
+		"An agent added a correcting task without foldInto after reading only tsk help, and git commit <paths> swept another agent's uncommitted AGENTS.md edits into its commit. AGENTS.md now requires tsk --detailed-help, a search of tasks/ before tsk add with needs/foldInto set, and hunk staging with a pathless git commit when others edited the same file."
 	],
 	needs: []
 }
