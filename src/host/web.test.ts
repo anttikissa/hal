@@ -1433,3 +1433,36 @@ test.skipIf(!chrome)('completion dismissal follows pointer and focus without ste
 		await b.waitFor(`document.querySelector('textarea').value === ''`)
 	} finally { await b.close() }
 }, 15000)
+
+test.skipIf(!chrome)('tool-header URLs navigate without toggling and remain separate from the expansion button', async () => {
+	let id = tabs.create('/tmp')
+	let url = 'https://example.com/article?x=1&y=2'
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'url-call', name: 'read_url', input: { url } } })
+	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'url-call', output: 'Article text' }] })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.waitFor(`!!document.querySelector('.Card.tool .head a')`)
+		for (let width of [390, 1200]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false })
+			let seen = await b.evaluate(`(() => {
+				let card = document.querySelector('.Card.tool'), link = card.querySelector('.head a'), button = card.querySelector('.head button')
+				let followed = false
+				link.addEventListener('click', (e) => { followed = !e.defaultPrevented; e.preventDefault() }, { once: true })
+				link.click()
+				let stayedClosed = !card.classList.contains('open')
+				button.focus()
+				button.click()
+				return { href: link.href, target: link.target, protected: link.relList.contains('noopener'), nested: !!link.closest('button'), followed, stayedClosed, opened: card.classList.contains('open'), expanded: button.getAttribute('aria-expanded'), named: !!button.getAttribute('aria-label'), focused: document.activeElement === button }
+			})()`)
+			expect(seen).toEqual({ href: url, target: '_blank', protected: true, nested: false, followed: true, stayedClosed: true, opened: true, expanded: 'true', named: true, focused: true })
+			await b.evaluate(`document.querySelector('.Card.tool .head button').click()`)
+		}
+	} finally {
+		await b.close()
+	}
+}, 20000)

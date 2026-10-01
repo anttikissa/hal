@@ -15,7 +15,7 @@
 // result and can show all of it; the transcript holds all of it
 // (host tools cap what they keep), so nothing is fetched.
 
-import { createEffect, createMemo, createSignal, flush, onSettled, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, flush, For, onSettled, Show } from 'solid-js'
 import { titles } from '../../common/titles.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
@@ -115,6 +115,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (item.type === 'prompt' && item.summary) return item.summary
 		return item.type === 'tool' ? toolDetails.headline(item.name, item.input).text : lines()[0]
 	}
+	let headerParts = createMemo(() => view.urlParts(head() ?? ''))
 	let body = () => {
 		let item = props.row.item
 		if (item.type === 'prompt') return [title() ?? '', '', ...lines()].join('\n')
@@ -198,16 +199,16 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 				<Show when={folds()} fallback={plain(s)}>
 					<article ref={(e) => (root = e)} class={['Card', 'folds', ...s().kind.split(' '), expanded() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
 						{link()}
-						<button type="button" class="head" aria-expanded={expanded() ? 'true' : 'false'}>
-							<span class="mark" aria-hidden="true">
-								{expanded() ? '▾' : '▸'}
-							</span>
-							<span class="title">{head()}</span>
+						<div class="head">
+							<button type="button" class="mark" aria-label={head()} aria-expanded={expanded() ? 'true' : 'false'}>
+								<span aria-hidden="true">{expanded() ? '▾' : '▸'}</span>
+							</button>
+							<span class="title"><For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></span>
 							<Show when={props.cursor && !open()}>{cursor()}</Show>
 							<Show when={failed()}>
 								<span class="error">✗</span>
 							</Show>
-						</button>
+						</div>
 						<div class="body" inert={!expanded()}>
 							<div class="contents">
 								<Show when={md() && props.row.item.type === 'prompt'}><div class="who">{who()}</div></Show>

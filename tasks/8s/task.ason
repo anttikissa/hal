@@ -1,0 +1,10 @@
+{
+	title: 'Clickable URLs in tool-card headers',
+	spec: 'Web tool-card headers render HTTP(S) URLs as native links, including read_url addresses. Links open in a separate tab with opener protection and retain Cmd-click, middle-click and copy-link behavior. Following a link never toggles the card. The expansion button remains keyboard accessible with a descriptive name and aria-expanded; links are siblings, never interactive children of a button. Non-link header and card clicks still toggle, except after text selection. Preserve header layout and retained card identity. Reuse the existing plain-text URL parser; do not interpret header text as HTML or Markdown. Invariant: navigation in a collapsible card does not change its expansion state.',
+	status: 'done',
+	notes: [
+		'Reused view.urlParts rather than Markdown. The header is a flex row with a named native expansion button and sibling anchors; the existing delegated toggle excludes anchors. Browser regression checks at 390px and 1200px cover link defaults, no accidental expansion, focus, accessible naming and expansion state. The web file passes all 30 tests; typecheck and lint pass. Full-suite reruns hit varying host timing failures (latest: spawn handoff and max_tokens/refusal); all 28 tests in the affected host files pass in isolation.'
+	],
+	needs: ['4s'],
+	foldInto: ['4s']
+}

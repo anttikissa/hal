@@ -66,6 +66,8 @@ body, textarea { tab-size: 4; }
 .Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
 .Card.folds { padding: 0; cursor: pointer; }
 .Card .head { display: flex; gap: 0.6ch; width: 100%; padding: 0.25lh 1ch; background: none; color: inherit; text-align: left; }
+.Card .head .mark { flex: none; align-self: flex-start; padding: 0; background: none; color: inherit; }
+@media (pointer: coarse) { .Card .head .mark { min-width: 44px; min-height: 44px; } .Card .head a { display: inline-block; min-height: 44px; } }
 .Card .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .Card.open .title { white-space: normal; overflow-wrap: anywhere; }
 .Card .head .error { background: none; margin-left: auto; }
