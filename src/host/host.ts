@@ -342,9 +342,9 @@ function init(): void {
 function quitting(last: boolean): void {
 	host.state.pauseOnExit = last
 }
-
 // Forgets every client and turn (tests).
 function reset(): void {
+	history.stop(false)
 	find.reset()
 	for (let r of turns.state.running.values()) r.controller.abort()
 	turns.state.running.clear()
@@ -355,6 +355,7 @@ function reset(): void {
 	status.state.derived.clear()
 	for (let map of Object.values(stats.state)) map.clear()
 	pages.reset()
+	for (let map of [history.state.cache, history.state.next]) map.clear()
 	host.state.done.clear()
 	tabs.reset()
 	push.reset()
@@ -364,7 +365,6 @@ function reset(): void {
 	clients.reset()
 	host.state.pauseOnExit = false
 }
-
 export const host = {
 	state: {
 		clients: new Set<Client>(),

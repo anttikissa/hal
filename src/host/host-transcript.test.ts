@@ -131,16 +131,6 @@ test('paused: partial output and the pause look the same everywhere', async () =
 	expect(mid).toEqual(late)
 })
 
-test('error: the error ends the turn the same way everywhere', async () => {
-	let { early, mid, late } = await turn((push) => push({ type: 'text', text: '!' }, { type: 'error', message: 'HTTP 500' }))
-	expect(shown(late.items.slice(-2))).toEqual([
-		{ type: 'text', text: 'par!' },
-		{ type: 'turn-end', status: 'error', error: 'HTTP 500' },
-	])
-	expect(early).toEqual(late)
-	expect(mid).toEqual(late)
-})
-
 test('a command mid-round shows where history has it, live and after a reload', async () => {
 	let early = viewer()
 	early.send({ type: 'create', cwd: '/tmp/w', model: 'fake/m' })

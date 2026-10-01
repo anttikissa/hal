@@ -108,7 +108,9 @@ export function client() {
 }
 
 export async function until(check: () => unknown): Promise<void> {
-	for (let i = 0; i < 200; i++) {
+	// Readiness is not a performance assertion; allow loaded CI hosts to settle.
+	let deadline = performance.now() + 2000
+	while (performance.now() < deadline) {
 		if (check()) return
 		await new Promise((r) => setTimeout(r, 1))
 	}

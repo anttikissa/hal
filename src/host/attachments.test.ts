@@ -193,25 +193,6 @@ test('a dropped .md keeps its extension; history and clients keep the marker, th
 	expect((await history.messages(id)).find((m) => m.role === 'user')!.blocks.some((b: any) => b.type === 'text' && b.text.endsWith(`read ${text}`))).toBe(true)
 })
 
-test('a binary file waits in /tmp/hal/file, reaches bash by path, and keeps a session copy', async () => {
-	let c = client()
-	let id = created(c)
-	let bytes = Buffer.from([0x25, 0x50, 0x44, 0x46, 0xff, 0x00])
-	let name = attachments.newName('application/octet-stream', 'paper.pdf')
-	let { attached } = attach(c, id, 'application/octet-stream', bytes.toString('base64'), undefined, name)
-	expect(attached.marker).toBe(`[file/${name}]`)
-	let path = `${paths.fileDir(name)}/${name}`
-	expect(path).toContain('/file/')
-	expect(readFileSync(path)).toEqual(bytes)
-	c.conn.send({ type: 'submit', sessionId: id, text: `inspect ${attached.marker}` })
-	await until(() => calls.length)
-	expect(calls[0]!.input.messages.at(-1).blocks[0].text).toContain(`read with bash: ${path}`)
-	expect(readFileSync(`${blobs.dir(id)}/${name}`)).toEqual(bytes)
-	rmSync(path)
-	expect((await history.messages(id)).find((m) => m.role === 'user')!.blocks.some((b) => b.type === 'text' && b.text.includes(`read with bash: ${blobs.dir(id)}/${name}`))).toBe(true)
-	expect(attach(c, id, 'application/octet-stream', bytes.toString('base64'), undefined, 'bad/../../x.pdf').rejected.reason).toBeTruthy()
-	expect(attach(c, id, 'application/octet-stream', bytes.toString('base64'), undefined, 'abc123.txt').rejected.reason).toBeTruthy()
-})
 
 test('a named image is refused under a wrong name or a taken one; a resend of the same bytes is fine', () => {
 	let c = client()

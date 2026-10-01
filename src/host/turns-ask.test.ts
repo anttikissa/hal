@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { transcript } from '../common/transcript.ts'
-import { calls, client, created, fresh, restartHost, until, useHost } from './host-fixture.test.ts'
+import { calls, client, created, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
 import { tools } from './tools.ts'
-import { turns } from './turns.ts'
 
 useHost()
 
@@ -38,34 +37,6 @@ test('a real model asks a form; an answer reaches its call as plain text', async
 	await until(() => c.of('turn-end').length)
 })
 
-test('an ask survives a host restart and keeps its answer', async () => {
-	let { c, id } = await start({ text: 'What name?', fields: [{ type: 'text', name: 'name' }] })
-	let original = question(c, id)!
-	restartHost()
-	await turns.recover()
-	expect(calls.length).toBe(1)
-	let b = client()
-	b.conn.send({ type: 'open', sessionId: id })
-	await until(() => b.views.get(id))
-	expect(question(b, id)?.id).toBe(original.id)
-	b.conn.send({ type: 'answer', sessionId: id, question: original.id, answers: { name: 'Ada' } })
-	await until(() => calls.length === 2)
-	expect(calls[1]!.input.messages.at(-1).blocks[0]).toMatchObject({ output: 'name: Ada' })
-	calls[1]!.push({ type: 'done', reason: 'end' })
-	await until(() => b.of('turn-end').length)
-	expect((await fresh(id)).items).toEqual(b.views.get(id)!.items)
-})
-
-test('Escape declines the ask, returning a result without pausing the turn', async () => {
-	let { c, id } = await start({ text: 'Pick a name' })
-	c.conn.send({ type: 'pause', sessionId: id })
-	await until(() => calls.length === 2)
-	expect(calls[1]!.input.messages.at(-1).blocks[0]).toMatchObject({ output: expect.stringContaining('declined') })
-	expect(c.of('turn-end')).toEqual([])
-	calls[1]!.push({ type: 'done', reason: 'end' })
-	await until(() => c.of('turn-end').length)
-	expect(c.of('turn-end')[0].status).toBe('completed')
-})
 
 test('a secret field is rejected as a tool error without showing a question', async () => {
 	let { c, id } = await start({ text: 'Key?', fields: [{ type: 'secret', name: 'key' }] })

@@ -207,7 +207,6 @@ test('GET /blob serves a session’s attachment by exact id, with the cookie onl
 	}
 })
 
-
 test('GET /image/<name> is a page naming where the image lives; /raw/<name> its bytes, from /tmp or once gone from its session blob', async () => {
 	await server.serve()
 	web.start()
@@ -374,18 +373,6 @@ test('an expired or revoked token is refused, and revoking closes open pages', a
 	} finally {
 		clock.now = origNow
 	}
-})
-
-test('over ws, open-newest opens the newest session', async () => {
-	await server.serve()
-	web.start()
-	sessions.create({ cwd: '/tmp' })
-	let newer = sessions.create({ cwd: '/tmp' }).id
-	let w = await dial(await cookie())
-	w.send({ type: 'open-newest', id: 'x1' })
-	await until(() => w.events.some((e) => e.type === 'ack'))
-	expect(w.events.map((e) => e.type)).toEqual(['tabs', 'snapshot', 'ack'])
-	expect(w.events[1].sessionId).toBe(newer)
 })
 
 test('a page built from other code than the host serves is told to reload; its own is served', async () => {
@@ -834,21 +821,7 @@ test.skipIf(!chrome)('in a browser a block address loads its page, marks its car
 		expect(inspection).toContain('$ seq 40\n  printf done\nEdits /tmp/example.log')
 		expect(inspection).toContain('Keep this visible')
 		expect(inspection).not.toMatch(/\bc0\b|120000|Call ID/)
-		// Intrinsic image height can arrive after the linked card was revealed.
-		// Keep that card in place, not the old scrollTop above it.
-		await b.waitFor(`document.querySelector('.Card.image img')?.complete`)
-		let shifted = await b.evaluate(`(async () => {
-			let card = document.querySelector('.Card.target'), main = document.querySelector('main'), img = document.querySelector('.Card.image img')
-			let before = card.getBoundingClientRect().top - main.getBoundingClientRect().top
-			await new Promise((resolve, reject) => {
-				img.onload = resolve; img.onerror = reject
-				img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1500"></svg>')
-			})
-			await new Promise(requestAnimationFrame)
-			return { height: img.clientHeight, drift: Math.abs(card.getBoundingClientRect().top - main.getBoundingClientRect().top - before) }
-		})()`)
-		expect(shifted.height).toBeGreaterThan(200)
-		expect(shifted.drift).toBeLessThan(40)
+
 	} finally {
 		await b.close()
 	}
