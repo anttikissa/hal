@@ -12,6 +12,7 @@
 import type { AssistantBlock, StopReason, StreamEvent, Usage } from '../common/blocks.ts'
 import { auth, jwtClaims } from './auth.ts'
 import { modelsDev } from './models-dev.ts'
+import { diag } from './diag.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { effort } from './effort.ts'
 
@@ -214,13 +215,31 @@ function subscription(): boolean {
 // newer than client_version, so ask as a far-future client. API keys get
 // models.dev's list and the built-in ids.
 async function listModels(signal: AbortSignal): Promise<string[]> {
-	if (!openai.subscription()) return [...new Set([...modelsDev.ids('openai'), ...openai.knownModels()])]
-	let cred = await auth.openai()
-	let accountId = claims(cred.value).accountId ?? cred.accountId
-	let res = await fetch(openai.codexModelsUrl(), { signal, headers: { authorization: `Bearer ${cred.value}`, originator: 'hal', ...(accountId && { 'chatgpt-account-id': accountId }) } })
-	if (!res.ok) throw new Error(`HTTP ${res.status}`)
-	let body = (await res.json()) as { models?: { slug?: unknown; visibility?: unknown }[] }
-	return (body.models ?? []).filter((m) => m.visibility === 'list' && typeof m.slug === 'string').map((m) => m.slug as string)
+	let { data, list } = auth.all('openai')
+	let subscriptions = list.filter((a) => typeof a.entry.accessToken === 'string' && !claims(a.entry.accessToken).api)
+	if (subscriptions.length) list = subscriptions
+	let results = await Promise.allSettled(list.map(async (account) => {
+		let cred = await auth.credential(data, account, 'openai')
+		if (cred.type === 'api-key' || claims(cred.value).api) return [...new Set([...modelsDev.ids('openai'), ...openai.knownModels()])]
+		let accountId = claims(cred.value).accountId ?? cred.accountId
+		let res = await fetch(openai.codexModelsUrl(), { signal, headers: { authorization: `Bearer ${cred.value}`, originator: 'hal', ...(accountId && { 'chatgpt-account-id': accountId }) } })
+		if (!res.ok) throw new Error(`HTTP ${res.status}`)
+		let body = (await res.json()) as { models?: { slug?: unknown; visibility?: unknown }[] }
+		return (body.models ?? []).filter((m) => m.visibility === 'list' && typeof m.slug === 'string').map((m) => m.slug as string)
+	}))
+	for (let result of results) if (result.status === 'rejected') diag.log(`OpenAI model catalog: ${result.reason?.message ?? 'request failed'}`)
+	let good = results.filter((r) => r.status === 'fulfilled')
+	if (!good.length) throw new AggregateError(results.filter((r) => r.status === 'rejected').map((r) => r.reason), 'No OpenAI model catalog available')
+	return [...new Set(good.flatMap((r) => r.value))]
+}
+
+// Hash only; credential values never enter the model list or diagnostics.
+function modelsKey(): string {
+	try {
+		return String(Bun.hash(JSON.stringify(auth.all('openai').list.map((a) => a.entry))))
+	} catch {
+		return 'unavailable'
+	}
 }
 
 // A subscription caps input at 272k whatever the API model allows.
@@ -237,6 +256,7 @@ function init(): void {
 		rejected: (account) => auth.rejected(account, 'openai'),
 		spent: (account) => auth.spent(account, 'openai'),
 		models: (signal) => openai.listModels(signal),
+		modelsKey: () => openai.modelsKey(),
 		known: () => openai.knownModels(),
 		contextWindow: (model) => openai.contextWindow(model),
 		effort: (model) => openai.effort(model),
@@ -248,10 +268,11 @@ export const openai = {
 	codexUrl: () => 'https://chatgpt.com/backend-api/codex/responses',
 	codexModelsUrl: () => 'https://chatgpt.com/backend-api/codex/models?client_version=99.0.0',
 	listModels,
+	modelsKey,
 	// Reasoning effort for a model; undefined leaves the model's default.
 	effort: (_model: string): string | undefined => undefined,
-	// The old Hal's GPT ids, offered beside models.dev's list.
-	knownModels: () => ['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
+	// Verified GPT ids, including current alias targets, for offline discovery.
+	knownModels: () => ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
 	input,
 	body,
 	request,

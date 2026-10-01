@@ -1,0 +1,10 @@
+{
+	title: 'Keep account-scoped OpenAI model lists complete and fresh',
+	spec: 'Restore the invariant that direct OpenAI picker results include the visible models offered by every configured usable ChatGPT login, not only the account selected for a request. Query subscription catalogs concurrently and deduplicate their union; Keep subscription discovery separate from API-only models: use the API catalog only when no ChatGPT subscription is configured. A failed account does not hide another successful account; failures are diagnosed without credential values. Credential changes invalidate cached provider listings, including responses still in flight, without blocking initial picker rendering. The offline OpenAI fallback includes the verified current GPT alias targets, so Sol and Astra remain discoverable while catalogs warm or fail. Preserve hidden-model filtering, bounded discovery, credential privacy and existing alias targets. Test unequal account catalogs, partial failure and credential changes during cache lifetime and in-flight discovery.',
+	status: 'done',
+	notes: [
+		'Discovery formerly used auth.openai(), so one request-selected account defined the provider-wide catalog for an hour. Listing now unions subscription accounts independently of request routing. An optional provider modelsKey hashes credentials; cache reads and completed fetches reject a mismatched key. API-key catalogs stay separate when subscriptions exist. Verified current alias targets also belong in the built-in offline list. Focused OpenAI, host-model and picker tests pass; TypeScript and lint pass. Full suite reported 1336 passes and six failures in attachments, turns, pages, file-changes, effort-session and timezone tests; not a green full-suite result.'
+	],
+	needs: ['q7', '0x'],
+	foldInto: ['q7', '0x']
+}

@@ -21,12 +21,12 @@ import { synthetic } from './synthetic.ts'
 import { effort } from './effort.ts'
 
 // One provider's model ids ("provider/model") and when they were got.
-type Listing = { at: number; ids: string[] }
+type Listing = { at: number; ids: string[]; key?: string }
 
 async function fetchList(name: string): Promise<string[] | undefined> {
 	let p = provider.state.providers[name]
 	if (!p) return undefined
-	let cached = models.state.lists.get(name)
+	let cached = models.cached(name)
 	if (cached && Date.now() - cached.at < models.ttlMs()) return cached.ids
 	let own = p.models ? await models.ask(name, (signal) => p.models!(signal)) : undefined
 	if (own) return own
@@ -41,6 +41,7 @@ function fallback(name: string): string[] {
 
 // The provider's own list, or undefined if it failed or took too long.
 async function ask(name: string, list: (signal: AbortSignal) => Promise<string[]>): Promise<string[] | undefined> {
+	let key = provider.state.providers[name]?.modelsKey?.()
 	let controller = new AbortController()
 	let timer = setTimeout(() => controller.abort(), models.timeoutMs())
 	try {
@@ -48,7 +49,8 @@ async function ask(name: string, list: (signal: AbortSignal) => Promise<string[]
 			list(controller.signal),
 			new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error('timed out')))),
 		])).map((m) => `${name}/${m}`)
-		models.state.lists.set(name, { at: Date.now(), ids })
+		if (key !== provider.state.providers[name]?.modelsKey?.()) return undefined
+		models.state.lists.set(name, { at: Date.now(), ids, key })
 		return ids
 	} catch (e: any) {
 		diag.log(`models of ${name}: ${e?.message ?? e}`)
@@ -69,7 +71,7 @@ function list(current: string): string[] {
 // provider's cached list, else its models.dev and built-in ones.
 function known(): string[] {
 	let lists = Object.keys(provider.state.providers).map((name) => {
-		let ids = models.state.lists.get(name)?.ids
+		let ids = models.cached(name)?.ids
 		if (ids) return ids
 		return models.fallback(name).map((m) => `${name}/${m}`)
 	})
@@ -139,6 +141,10 @@ export const models = {
 	// How long a provider's list is kept, and how long it may take.
 	ttlMs: () => 3_600_000,
 	timeoutMs: () => 3000,
+	cached(name: string): Listing | undefined {
+		let entry = models.state.lists.get(name)
+		return entry?.key === provider.state.providers[name]?.modelsKey?.() ? entry : undefined
+	},
 	fetchList,
 	ask,
 	list,

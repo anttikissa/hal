@@ -216,3 +216,22 @@ test('/model completes model ids the host knows', async () => {
 	a.conn.send({ type: 'complete', sessionId: id, text: '/model acme/b' })
 	expect(a.of('completions').at(-1).items).toEqual(['/model acme/big-1'])
 })
+
+test('credential changes invalidate cached and in-flight model lists', async () => {
+	let key = 'first'
+	provider.state.providers.acme!.modelsKey = () => key
+	await models.fetchList('acme')
+	expect(models.known()).toContain('acme/big-1')
+	key = 'second'
+	expect(models.known()).not.toContain('acme/big-1')
+	let resolve!: (ids: string[]) => void
+	provider.state.providers.acme!.models = () => new Promise((done) => { resolve = done })
+	let pending = models.fetchList('acme')
+	key = 'third'
+	resolve(['stale'])
+	await pending
+	expect(models.known()).not.toContain('acme/stale')
+	provider.state.providers.acme!.models = async () => ['fresh']
+	await models.fetchList('acme')
+	expect(models.known()).toContain('acme/fresh')
+})

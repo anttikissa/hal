@@ -19,6 +19,7 @@ let home = ''
 let server: ReturnType<typeof Bun.serve>
 let seen: { path: string; headers: Headers; body: any }[] = []
 let reply: () => Response
+let catalogReply: ((req: Request) => Response) | undefined
 
 const jwt = (claims: object) => `h.${btoa(JSON.stringify(claims)).replace(/=+$/, '')}.s`
 const subscriptionToken = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-1' } })
@@ -32,6 +33,7 @@ beforeEach(() => {
 	mkdirSync(`${home}/state`)
 	delete process.env.OPENAI_API_KEY
 	seen = []
+	catalogReply = undefined
 	reply = () => sse(completed())
 	server = Bun.serve({
 		port: 0,
@@ -40,7 +42,7 @@ beforeEach(() => {
 			if (path === '/token') return Response.json({ access_token: subscriptionToken, refresh_token: 'r2', expires_in: 3600 })
 			if (path === '/codex/models') {
 				seen.push({ path, headers: req.headers, body: null })
-				return Response.json({ models: [{ slug: 'gpt-6-sol', visibility: 'list' }, { slug: 'gpt-reserve', visibility: 'hide' }] })
+				return catalogReply?.(req) ?? Response.json({ models: [{ slug: 'gpt-6-sol', visibility: 'list' }, { slug: 'gpt-reserve', visibility: 'hide' }] })
 			}
 			seen.push({ path, headers: req.headers, body: await req.json() })
 			return reply()
@@ -216,4 +218,21 @@ test('the picker offers models.dev ids and the known GPT ids; a subscription cap
 	writeAuth({ openai: { apiKey: 'sk-file' } })
 	auth.close()
 	expect(models.contextWindow('openai/gpt-5.5') ?? 0).not.toBe(272_000)
+})
+
+test('model discovery unions account catalogs rather than the request account and survives one failure', async () => {
+	let other = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-2' } })
+	writeAuth({ openai: [{ accessToken: subscriptionToken }, { accessToken: other }, { apiKey: 'sk-test' }] })
+	catalogReply = (req) => Response.json({ models: (req.headers.get('chatgpt-account-id') === 'acct-1'
+		? ['gpt-6-luna'] : ['gpt-6-luna', 'gpt-6-astra', 'gpt-6.1-sol']).map((slug) => ({ slug, visibility: 'list' })) })
+	expect(await openai.listModels(new AbortController().signal)).toEqual(['gpt-6-luna', 'gpt-6-astra', 'gpt-6.1-sol'])
+	let key = openai.modelsKey()
+	catalogReply = (req) => req.headers.get('chatgpt-account-id') === 'acct-1'
+		? new Response(null, { status: 401 }) : Response.json({ models: [{ slug: 'gpt-6-astra', visibility: 'list' }] })
+	expect(await openai.listModels(new AbortController().signal)).toEqual(['gpt-6-astra'])
+	auth.close()
+	writeAuth({ openai: { accessToken: other } })
+	expect(openai.modelsKey()).not.toBe(key)
+	catalogReply = () => new Response(null, { status: 401 })
+	await expect(openai.listModels(new AbortController().signal)).rejects.toThrow('No OpenAI model catalog available')
 })
