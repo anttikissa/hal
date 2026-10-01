@@ -10,9 +10,10 @@ import { neighbours } from './neighbours.ts'
 import type { ToolContext } from './tools.ts'
 import { host } from './host.ts'
 import { stats } from './stats.ts'
+import { commits } from './commits.ts'
 
 type Lock = { sessionId: string; paths: Set<string>; done: Promise<void>; release: () => void }
-type Observation = { ctx: ToolContext; patterns: string[]; before: Map<string, FileSnapshot>; status: Map<string, string>; release: () => void }
+type Observation = { ctx: ToolContext; patterns: string[]; before: Map<string, FileSnapshot>; status: Map<string, string>; commits?: Awaited<ReturnType<typeof commits.begin>>; release: () => void }
 
 function validate(input: unknown): string[] {
 	if (input === undefined) return []
@@ -119,15 +120,18 @@ async function git(cwd: string, args: string[]): Promise<{ code: number; text: s
 	return { code, text, error }
 }
 
-async function status(cwd: string): Promise<Map<string, string>> {
-	let root = await fileChanges.git(cwd, ['rev-parse', '--show-toplevel'])
+// Also the HEAD reflog's path for commit notices (commits.ts); worktrees have their own.
+async function status(cwd: string): Promise<{ files: Map<string, string>; log?: string }> {
+	let root = await fileChanges.git(cwd, ['rev-parse', '--show-toplevel', '--git-path', 'logs/HEAD'])
 	if (root.code) {
-		if (root.error.includes('not a git repository')) return new Map()
+		if (root.error.includes('not a git repository')) return { files: new Map() }
 		throw new Error(root.error)
 	}
+	let [top, log] = root.text.trimEnd().split('\n')
 	let result = await fileChanges.git(cwd, ['status', '--porcelain=v1', '-z', '--untracked-files=all'])
 	if (result.code) throw new Error(result.error)
-	return fileChanges.parseStatus(result.text, root.text.trimEnd(), await fileChanges.canonical(cwd))
+	// git-path is relative to cwd in a main checkout, absolute in a worktree.
+	return { files: fileChanges.parseStatus(result.text, top!, await fileChanges.canonical(cwd)), log: await fileChanges.canonical(resolve(cwd, log!)) }
 }
 
 async function begin(ctx: ToolContext, patterns: string[]): Promise<Observation> {
@@ -136,7 +140,8 @@ async function begin(ctx: ToolContext, patterns: string[]): Promise<Observation>
 		neighbours.record(ctx.sessionId, ctx.cwd, patterns)
 		let before = new Map<string, FileSnapshot>()
 		for (let path of await fileChanges.expand(ctx.cwd, patterns)) before.set(path, await fileChanges.snapshot(ctx, path))
-		return { ctx, patterns, before, status: await fileChanges.status(ctx.cwd), release }
+		let { files, log } = await fileChanges.status(ctx.cwd)
+		return { ctx, patterns, before, status: files, commits: log ? await commits.begin(ctx.sessionId, ctx.cwd, log) : undefined, release }
 	} catch (e) { release(); throw e }
 }
 
@@ -149,7 +154,7 @@ async function finish(observation: Observation): Promise<void> {
 			let a = before.get(path) ?? null, b = await fileChanges.snapshot(ctx, path)
 			if (JSON.stringify(a) !== JSON.stringify(b)) files.push({ path, before: a, after: b })
 		}
-		let after = await fileChanges.status(ctx.cwd)
+		let after = (await fileChanges.status(ctx.cwd)).files
 		let declaredPaths = new Set([...declared].map((p) => resolve(ctx.cwd, p)))
 		for (let path of new Set([...status.keys(), ...after.keys()])) {
 			if (!declaredPaths.has(resolve(ctx.cwd, path)) && status.get(path) !== after.get(path)) files.push({ path, undeclared: true, statusBefore: status.get(path) ?? null, statusAfter: after.get(path) ?? null })
@@ -159,7 +164,10 @@ async function finish(observation: Observation): Promise<void> {
 			history.append(ctx.sessionId, { type: 'file_changes', toolId: ctx.callId!, cwd: ctx.cwd, files })
 			host.broadcast(ctx.sessionId, { type: 'turn-stats', sessionId: ctx.sessionId, stats: stats.of(ctx.sessionId) })
 		}
-	} finally { release() }
+	} finally {
+		if (observation.commits) await commits.finish(observation.commits)
+		release()
+	}
 }
 
 export const fileChanges = {

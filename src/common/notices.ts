@@ -5,16 +5,17 @@
 // Beyond max() entries the oldest fold into one '+N more' line.
 // onChange is the client's repaint.
 
-export type NoticeKind = 'done' | 'failed' | 'attention'
-// What the host sends when another tab's turn ends or asks (host/notify.ts).
-export type NoticeEvent = { type: 'notice'; session: string; tab?: number; name: string; kind: NoticeKind; line: string }
+export type NoticeKind = 'done' | 'failed' | 'attention' | 'commit'
+// What the host sends when another tab's turn ends or asks (host/notify.ts)
+// or commits (host/commits.ts, its own key so it never replaces the others).
+export type NoticeEvent = { type: 'notice'; session: string; tab?: number; name: string; kind: NoticeKind; line: string; key?: string }
 export type Notice = { key: string; kind: NoticeKind; title: string; line: string; session?: string; tab?: number; stays?: true; at: number }
 export type Folded = { shown: Notice[]; more?: { count: number; tabs: number[] } }
 
-const WORDS: Record<NoticeKind, string> = { done: 'done', failed: 'failed', attention: 'needs your attention' }
+const WORDS: Record<NoticeKind, string> = { done: 'done', failed: 'failed', attention: 'needs your attention', commit: 'committed' }
 
 function fromEvent(e: NoticeEvent): Omit<Notice, 'at'> {
-	let n: Omit<Notice, 'at'> = { key: `session:${e.session}`, kind: e.kind, title: `${e.tab ?? ''} ${e.name} · ${WORDS[e.kind]}`.trim(), line: e.line, session: e.session }
+	let n: Omit<Notice, 'at'> = { key: e.key ?? `session:${e.session}`, kind: e.kind, title: `${e.tab ?? ''} ${e.name} · ${WORDS[e.kind]}`.trim(), line: e.line, session: e.session }
 	if (e.tab !== undefined) n.tab = e.tab
 	return n
 }

@@ -5,6 +5,7 @@ import { replay } from '../common/replay.ts'
 import { transcript } from '../common/transcript.ts'
 import { fileChanges } from './file-changes.ts'
 import { history } from './history.ts'
+import { host } from './host.ts'
 import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
 import type { ToolContext } from './tools.ts'
@@ -137,4 +138,24 @@ test('absolute scratch literals and globs snapshot files outside cwd', async () 
 	expect(bad.output).toContain('modifies[0]')
 	expect(bad.output).toContain('parent traversal')
 	expect(bad.output).toContain('command did not run')
+})
+
+// Task hy: a commit a bash call makes is announced once, to the committing
+// session, except to clients watching it; moving HEAD back is no commit.
+test('a commit in a bash call notifies other tabs once; a reset does not', async () => {
+	let other = sessions.create({ cwd, model: 'fake/m' }).id
+	let elsewhere: any[] = [], watching: any[] = []
+	let fakes = [{ visible: other, deliver: (e: any) => elsewhere.push(e) }, { visible: id, deliver: (e: any) => watching.push(e) }] as any[]
+	for (let c of fakes) host.state.clients.add(c)
+	try {
+		let git = 'git -c user.name=t -c user.email=t@example.com'
+		await bash(`printf a > a && ${git} add a && ${git} commit -qm 'first line' -m 'body'`)
+		let hash = (await fileChanges.git(cwd, ['rev-parse', 'HEAD'])).text.trim()
+		expect(elsewhere).toMatchObject([{ type: 'notice', session: id, kind: 'commit', key: `commit:${hash}`, line: `${hash.slice(0, 7)} first line` }])
+		await bash(`printf b > b && ${git} add b && ${git} commit -qm second && ${git} reset -q --hard HEAD~1`)
+		expect(elsewhere.map((e) => e.line.split(' ')[1])).toEqual(['first', 'second'])
+		await bash(`${git} reset -q --hard HEAD`)
+		expect(elsewhere).toHaveLength(2)
+		expect(watching).toEqual([])
+	} finally { for (let c of fakes) host.state.clients.delete(c) }
 })

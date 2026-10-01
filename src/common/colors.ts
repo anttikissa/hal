@@ -106,6 +106,8 @@ export const colors = {
 		doneFg: colors.tab().doneFg!,
 		failedFg: colors.error().fg!,
 		attentionFg: colors.tab().warningFg!,
+		// Commits (task hy): violet, apart from the session outcomes.
+		commitFg: [0.8, 0.16, 300],
 	}),
 	// Help bar: keys stand out from descriptions.
 	help: (): Style => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0] }),
