@@ -95,11 +95,29 @@ Avoid overlapping work. Use worktrees only if user insists.
 
 ## Orchestration
 
-Give each implementer a fresh subagent; it re-runs ./test before
-pushing. Size tasks for ~40–70 requests and under ~150k context (about
-$2–4); split larger ones. Reserve one spawn slot per task: slots don't
-return. Measure with scripts/sloc (non-blank, non-comment, non-test
-lines) and scripts/cost <session-id>... (Opus 5.5 list prices).
+Work directly by default. Use subagents only when the gain outweighs
+the extra tokens, delay and coordination:
+
+- Parallel work: substantial, independent tasks with separate files.
+- Independent review: a fresh assessment of a risky change or disputed
+  conclusion, not routine approval.
+- Context isolation: a lengthy investigation whose useful result is a
+  short report, keeping noise out of the main session.
+
+Do not delegate routine searches, small edits or tightly coupled work.
+Task count alone is no reason. State the benefit before spawning; use
+the fewest agents needed. Do not duplicate their work while they run.
+
+Give each delegate a bounded task, relevant context, an explicit
+deliverable and file ownership. Use a fresh subagent for each delegated
+implementation. The parent reviews and integrates the result; each
+implementer re-runs ./test before pushing.
+
+For delegated implementations, size tasks for ~40–70 requests and under
+~150k context (about $2–4); split larger ones. Reserve one spawn slot
+per task: slots don't return. Measure with scripts/sloc (non-blank,
+non-comment, non-test lines) and scripts/cost <session-id>... (Opus 5.5
+list prices).
 
 # Progress reports
 
