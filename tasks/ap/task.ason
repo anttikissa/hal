@@ -1,0 +1,10 @@
+{
+	title: 'Tool results under their call drop the call link',
+	spec: 'In the terminal, a tool result drawn right under its call (or under another result of the same call) shows no #<call block id> link: the position already ties it to the call. A result separated from its call by another block keeps the link. Background bash messages keep the #<call block id> in their header (task v0).',
+	status: 'done',
+	notes: [
+		"frame.layout passes attached to itemRows (part of the row cache key) and itemView.itemLines; render.ts's height estimate leaves it off, a few columns wider at most."
+	],
+	needs: ['wc'],
+	foldInto: ['wc']
+}

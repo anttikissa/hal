@@ -62,7 +62,9 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 
 // Rows for one item at `width` columns, without the side padding;
 // `streaming`: the item is still growing.
-function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>): string[] {
+// `attached`: a tool result drawn right under its call (or another of
+// its results), which needs no link back to it.
+function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, attached = false): string[] {
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
@@ -117,7 +119,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			if (more) shown.push(`… ${more} more lines`)
 			return shown.map((l, i) => {
 				let prefix = i ? '  ' : item.isError ? '✗ ' : '◂ '
-				let ref = !i && call && session && transcript.href(session, call)
+				let ref = !i && !attached && call && session && transcript.href(session, call)
 				if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07#${call}${ansi.LINK_OFF}> `
 				let line = ansi.quiet(strings.clipVisual(prefix + l, width), itemView.itemStyle(item))
 				if (call && /^\[exit [1-9]\d*\]/.test(l)) {

@@ -353,7 +353,7 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		let links = targets(lines).map((u) => new URL(u))
 		// Each resolves on the web to the card of that block (task 0z).
 		let blocks = links.map((u) => target.parse(u.href, u.pathname.slice(1)))
-		expect(blocks).toEqual(['4', '5', '6', '6', '7', '8'].map((key) => ({ session: 's', key })))
+		expect(blocks).toEqual(['4', '5', '6', '7', '8'].map((key) => ({ session: 's', key })))
 		// The id is the link's text, at the right edge of the row.
 		for (let key of ['4', '5', '6', '7', '8']) expect(plain(lines).some((l) => l.endsWith(` #${key}`) && l.length === 58)).toBe(true)
 		expect(plain(lines)).not.toContain('#6.1')
@@ -424,9 +424,14 @@ test('Bash results link to the call, hide a successful exit, and colour only a f
 	let lines = frame.build(v, 70).lines
 	let printed = plain(lines).join('\n')
 	expect(printed).not.toContain('[exit 0]')
-	expect(printed).toContain('◂ #1813>  M notes.md')
-	expect(printed).toContain('◂ #1813> [exit 123]')
-	expect(targets(lines)).toContain(`${settings.webUrl()}/s#1813`)
+	// Under its call, a result needs no link back to it; apart, it has one.
+	expect(printed).toContain('◂  M notes.md')
+	expect(printed).toContain('◂ [exit 123]')
+	expect(printed).not.toContain('#1813>')
+	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
+	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1817', '1814'][i]! }))
+	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('◂ #1813>  M notes.md')
+	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#1813`)
 	let failure = lines.find((line) => line.includes('[exit 123]'))!
 	let errorColor = ansi.sgr({ fg: colors.error().fg! })
 	expect(failure).toContain(errorColor + '[exit 123]')

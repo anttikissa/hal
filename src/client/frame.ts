@@ -96,15 +96,15 @@ function promptWidth(cols: number): number {
 // each is laid out once per width and look, not on every frame: a long
 // history stays cheap to redraw. A kept row keeps the link code it was
 // painted with (task e3 notes).
-function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>): string[] {
+function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, attached = false): string[] {
 	let style = itemView.itemStyle(item)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? calls?.get(item.id) ?? '' : ''} ${ansi.state.web.url}`
+	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${attached ? '^' : ''}` : ''} ${ansi.state.web.url}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, mark } = frame.ref(item, cols, session, style)
-	let lines = itemView.itemLines(item, inner, !!hal, session, calls)
+	let lines = itemView.itemLines(item, inner, !!hal, session, calls, attached)
 	if (hal) lines = frame.withCursor(lines, hal, inner)
 	// A block with a background has a row of it above and below its
 	// text, as the old Hal drew prompt cards; the id goes below the top.
@@ -237,7 +237,10 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 		} else {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
 			let duplicate = item.type === 'tool-result' && commands.has(item.id) && outcomes.has(item.output)
-			let rows = duplicate ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls)
+			// A result right under its call needs no #<call> link to it.
+			let prev = items[i - 1]
+			let attached = item.type === 'tool-result' && (prev?.type === 'tool' || prev?.type === 'tool-result') && prev.id === item.id
+			let rows = duplicate ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, attached)
 			rows = frame.highWater(rows, item, cols, session, streams)
 			if (rows.length && lines.length) lines.push('')
 			for (let r of rows) lines.push(r)
