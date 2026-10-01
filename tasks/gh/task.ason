@@ -1,0 +1,11 @@
+{
+	title: 'Remove redundant composer gap above the phone keyboard',
+	spec: 'The web composer does not add its normal bottom breathing room when the visual viewport has been reduced by the software keyboard. Subtract the space outside the visual viewport from both normal bottom padding and the bottom safe-area allowance, clamping at zero. With the keyboard absent retain the normal minimum spacing and home-indicator safe area. Preserve app viewport geometry, native iOS keyboard toolbar, editor focus and transcript scrolling. Restore the invariant that keyboard-visible bottom spacing does not reserve room already covered by browser keyboard chrome. Verify computed padding in a real browser; the final spacing against the native iOS toolbar requires user device verification.',
+	status: 'done',
+	notes: [
+		'The existing bottom-padding formula reduced the safe-area inset when the keyboard covered it, but kept an unconditional 0.5lh floor. Subtract hidden visual-viewport space from the larger of the normal gap and safe-area inset, then clamp at zero. A one-off real Chrome check measured 10.5px closed, 0px keyboard-reduced, and 10.5px restored. This checks CSS geometry, not native iOS toolbar margins; the user must verify the screenshot gap on the phone.',
+		'Full ./test: 1331 passed, one skipped, three failures outside this one-line CSS change (source module line limit, reconnect snapshot timeout, completion-dismissal browser behavior). TypeScript and lint passed. The focused Chrome padding check passed.'
+	],
+	needs: ['qn'],
+	foldInto: ['qn']
+}

@@ -158,7 +158,7 @@ body, textarea { tab-size: 4; }
 .StatusDetails a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; text-decoration: underline; touch-action: manipulation; }
 @media (pointer: coarse) { .StatusDetails { position: fixed; top: auto; bottom: calc(100dvh - var(--app-top, 0px) - var(--app-height, 100dvh) + 0.5rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; margin: 0; width: calc(var(--app-width, 100vw) - 1rem); } }
 @media (max-width: 40rem) { .StatusRow { padding-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right)); } }
-.Composer { position: relative; z-index: 1; flex: none; padding: 0.25lh max(2ch, env(safe-area-inset-right)) max(0.5lh, calc(env(safe-area-inset-bottom) - (100dvh - var(--app-height, 100dvh)))) max(2ch, env(safe-area-inset-left)); }
+.Composer { position: relative; z-index: 1; flex: none; padding: 0.25lh max(2ch, env(safe-area-inset-right)) max(0px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))) max(2ch, env(safe-area-inset-left)); }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.125lh 0; }
 /* Static footer chrome is not a scroll surface. Only the draft itself
