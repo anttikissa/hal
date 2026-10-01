@@ -96,7 +96,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 						return (
 							<li>
 								<a href={`/${path}`} target="_blank" rel="noopener" title={`Open ${path}`}>
-									{path.startsWith('image/') ? <img src={`/raw/${name}`} alt={path} onError={(e) => retry(e.currentTarget)} /> : path}
+									{path.startsWith('image/') ? <img src={`/raw/${name}`} alt={path} onLoad={(e) => (e.currentTarget.dataset.loaded = '')} onError={(e) => retry(e.currentTarget)} /> : path}
 								</a>
 								<button type="button" aria-label={`Remove ${path}`} title="Remove" onClick={() => remove(index())}>×</button>
 							</li>

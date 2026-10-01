@@ -162,7 +162,11 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .chips { display: flex; flex-wrap: wrap; gap: 1ch; margin: 0 0 0.25lh; padding: 0; list-style: none; }
 .chips li { display: flex; align-items: stretch; border: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
 .chips a { display: flex; align-items: center; padding: 0 1ch; color: inherit; }
-.chips img { display: block; height: 3lh; max-width: 12ch; object-fit: cover; margin: 0 -1ch; }
+.chips img { display: block; height: 3lh; width: 12ch; object-fit: cover; margin: 0 -1ch; }
+/* Until it loads (or while its upload is in flight) a thumbnail is a
+   blank tile of its final size, not a broken-image icon and alt text. */
+.chips img:not([data-loaded]) { opacity: 0; }
+.chips a:has(img:not([data-loaded])) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
 .chips button { min-width: 44px; min-height: 44px; background: transparent; color: var(--quiet); border: 0; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
 .chips button:hover { color: inherit; background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
 .entry .actions button { flex: 1; min-height: 44px; }
