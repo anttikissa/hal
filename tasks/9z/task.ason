@@ -7,7 +7,8 @@ Tab, with no Ctrl, Alt or Cmd, inserts a literal tab when the caret, with no sel
 Escape hatch: moving the caret with arrow keys, End, or Cmd-Up to a point after text or onto the first line makes the next Tab move focus. Escape is not the hatch (unlike CodeMirror) because it pauses a running turn. The terminal is unchanged.`,
 	status: 'done',
 	notes: [
-		'Research: CodeMirror leaves Tab unbound by default for WCAG 2.1.2; with indentWithTab, Escape then Tab moves focus, and Ctrl-M (Shift-Alt-M on macOS) toggles tab focus mode. VS Code offers Ctrl-M "Toggle Tab Key Moves Focus" and never traps Tab in read-only files. Hal uses caret context instead because Escape pauses turns.'
+		'Research: CodeMirror leaves Tab unbound by default for WCAG 2.1.2; with indentWithTab, Escape then Tab moves focus, and Ctrl-M (Shift-Alt-M on macOS) toggles tab focus mode. VS Code offers Ctrl-M "Toggle Tab Key Moves Focus" and never traps Tab in read-only files. Hal uses caret context instead because Escape pauses turns.',
+		'Browsers draw tabs 8 columns wide; index.html sets tab-size: 4 to match the terminal TAB_WIDTH in strings.ts, so the inserted tab looks the same in both.'
 	],
 	needs: [],
 	foldInto: ['9x']
