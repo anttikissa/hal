@@ -271,6 +271,11 @@ test('Tab and Shift-Tab indent a selection that spans lines; otherwise they move
 	expect(press('Tab', box('\tone\n\ttwo', 8, 0), { shiftKey: true })).toBe(true)
 	expect(app.state.text).toBe('one\ntwo')
 	expect(edits[1]).toEqual([{ start: 0, end: 6, text: 'one\n' }, 6, 0])
+	// In a later line's leading whitespace Tab indents; after text it moves focus.
+	expect(press('Tab', box('f() {\n', 6))).toBe(true)
+	expect(app.state.text).toBe('f() {\n\t')
+	expect(press('Tab', box('f() {\n\tx', 8))).toBe(false)
+	expect(press('Tab', box('f() {\nx', 6), { shiftKey: true })).toBe(false)
 })
 
 test('Ctrl-Y replaces the selection in the box', () => {

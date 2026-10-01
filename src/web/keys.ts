@@ -129,9 +129,13 @@ function key(e: KeyInput, target: Target): boolean {
 		connection.send(complete)
 		return true
 	}
-	// Tab and Shift-Tab indent a selection across lines; else they move
-	// focus, keeping the page keyboard-accessible.
-	if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && sel.includes('\n')) return keys.edit({ key: 'tab', shift: e.shiftKey }, target)
+	// Tab and Shift-Tab indent a selection across lines, or at a caret in
+	// a later line's leading whitespace; elsewhere they move focus, so
+	// moving the caret after text or to line 1 escapes the box (WCAG 2.1.2).
+	let start = st.text.lastIndexOf('\n', target.cursor - 1) + 1
+	let lead = !sel && start > 0 && /^[ \t]*$/.test(st.text.slice(start, target.cursor))
+	let indents = lead && (!e.shiftKey || /^[ \t]/.test(st.text.slice(start)))
+	if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && (sel.includes('\n') || indents)) return keys.edit({ key: 'tab', shift: e.shiftKey }, target)
 	if (e.key !== 'Enter' || e.shiftKey || (target.coarse && plain)) return false
 	app.send(e.altKey)
 	return true
