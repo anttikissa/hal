@@ -82,6 +82,7 @@ async function committed(_id: string, file: ChangedFile): Promise<string | undef
 	if (root.code) return
 	let cwd = root.bytes.toString().trim()
 	let name = relative(cwd, await fileChanges.canonical(file.path))
+	if (name === '..' || name.startsWith('../')) return
 	let since = new Date(Math.floor(Date.parse(file.ts) / 1000) * 1000).toISOString()
 	let log = await changes.run(['git', 'log', '--format=%H', `--since=${since}`, '--', name], cwd)
 	if (log.code) {

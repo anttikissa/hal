@@ -59,6 +59,8 @@ test('changes retain first/latest and steps through commits, exact content match
 	await changes.run(['git', 'add', 'a.txt'], home)
 	expect((await changes.run(['git', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Captured content'], home)).code).toBe(0)
 	expect(await changes.committed(id, file)).toMatch(/^[a-f0-9]{8}$/)
+	// Calls may observe temporary files outside their Git cwd.
+	expect(await changes.committed(id, { ...file, path: `${home}-backup.txt` })).toBeUndefined()
 	expect(changes.list(id)).toHaveLength(2)
 	history.append(id, { type: 'command', text: '/changes clear' })
 	expect(changes.list(id)).toHaveLength(0)
