@@ -109,6 +109,11 @@ Do not delegate routine searches, small edits or tightly coupled work.
 Task count alone is no reason. State the benefit before spawning; use
 the fewest agents needed. Do not duplicate their work while they run.
 
+Inspect a tab's current state before messaging it. Assume idle tabs no
+longer own files; do not ask them to release ownership or send routine
+coordination replies to old inbox messages. Message an idle tab only
+when a specific question needs its context or expertise.
+
 Give each delegate a bounded task, relevant context, an explicit
 deliverable and file ownership. Use a fresh subagent for each delegated
 implementation. The parent reviews and integrates the result; each
