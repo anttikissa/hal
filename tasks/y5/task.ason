@@ -1,6 +1,6 @@
 {
 	title: '/cd alone goes to Hal home; /cd - goes back',
-	spec: 'Bare /cd moves the session to Hal home: the directory Hal runs from (the checkout holding run and src/, e.g. ~/.hal), as old Hal did, so a prompt typed in the wrong place is one command from home. It no longer just prints the current directory; the transcript line "now in <dir>" already shows it, and the current directory stays visible in the tab and status. /cd - moves to the directory the session was in before its last directory change, and a second /cd - comes back, like the shell. Every directory change (typed /cd, /cd from another session or the command tool) remembers the directory it left; the previous directory is stored with the session, so /cd - works after a restart and on reopening. /cd - with no previous directory, or one that no longer exists, says so and stays put, without offering to create it. /cd help and /help describe both forms.',
+	spec: 'Bare /cd moves the session to the directory Hal runs from. /cd - returns to the previous directory, like the shell. Every directory change stores the directory it left with the session. /cd - with no previous directory says so and stays put; a previous directory that no longer exists is offered for re-creation, like any missing /cd target.',
 	status: 'planned',
 	needs: [],
 	foldInto: ['et']
