@@ -246,10 +246,11 @@ copy. Never read the old Hal directly: artifacts survive `tsk reset`.
 
 ## Plumbing visible (UI guide)
 
-Hal keeps its plumbing visible everywhere. Friendly summaries are an
-entry point, never a substitute for inspection: opening a tool shows
-every model-supplied argument, including invalid and unfamiliar ones,
-execution controls, failures and access to the complete recorded output.
-Use readable labels, lists and preserved multiline text, not JSON/ASON.
-Distinguish supplied values from defaults and missing values; never hide
-the information needed to explain why Hal accepted or rejected a call.
+Show everything relevant once: identifiers users act on, file paths,
+failures and complete output. Omit what nobody reads, such as tool call
+IDs, argument types and restated defaults; session files keep them.
+A closed tool says concisely what it does; opening it shows the detail
+and the whole output. Bash reads like a terminal: `$ command` (`&` when
+backgrounded), declared files as "Edits a.ts, src/*.ts", then streaming
+output. Show non-default controls, invalid or unfamiliar arguments and
+why Hal rejected a call. Use readable text, not JSON/ASON.
