@@ -13,7 +13,7 @@ useHost()
 type C = ReturnType<typeof client>
 const lastText = (n: number) => calls[n]!.input.messages.at(-1).blocks[0].text as string
 const resultOf = (n: number) => calls[n]!.input.messages.at(-1).blocks.find((b: any) => b.type === 'tool_result')
-const sendCall = (input: Record<string, unknown>, id = 's1') => ({ type: 'tool_call' as const, id, name: 'send', input })
+const sendCall = (input: Record<string, unknown>, id = 's1') => ({ type: 'tool_call' as const, id, name: 'send', input: { description: 'Ask for checks', ...input } })
 
 // Two sessions as tabs 1 and 2; the second, the sender, named.
 function pair(c: C, toolCwd = false): { a: string; b: string; by: string } {
@@ -49,7 +49,7 @@ test('an advisory message reaches a working session with its next request, frame
 	expect(resultOf(next).isError).toBeUndefined()
 	// Waiting, visibly from the other session.
 	let waiting = c.views.get(a)!.inbox
-	expect(waiting).toMatchObject([{ text: 'check the tests', from: b, label: by, advisory: true }])
+	expect(waiting).toMatchObject([{ text: 'check the tests', from: b, label: by, advisory: true, summary: 'Ask for checks' }])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === next + 2)
 	let text = lastText(next + 1)
@@ -57,7 +57,7 @@ test('an advisory message reaches a working session with its next request, frame
 	let shown = unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt'))
 	expect(shown).toEqual([
 		{ type: 'prompt', text: 'go' },
-		{ type: 'prompt', text: 'check the tests', from: b, label: by, advisory: true },
+		{ type: 'prompt', text: 'check the tests', from: b, label: by, advisory: true, summary: 'Ask for checks' },
 	])
 	calls[next + 1]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.views.get(a)!.state.type === 'idle')
@@ -75,7 +75,7 @@ test('an idle session gets the message as a turn of its own, with full attention
 	let theirs = calls.findIndex((call) => call.input.messages.length === 1 && !lastText(calls.indexOf(call)).endsWith('tell them'))
 	expect(resultOf(3 - theirs).isError).toBeUndefined()
 	expect(lastText(theirs)).toMatch(new RegExp(`\\n\\[Inbox · ${by}\\]\\nplease review$`))
-	expect(unkeyed(c.views.get(a)!.items)).toEqual([{ type: 'prompt', text: 'please review', from: b, label: by }])
+	expect(unkeyed(c.views.get(a)!.items)).toEqual([{ type: 'prompt', text: 'please review', from: b, label: by, summary: 'Ask for checks' }])
 	expect((await fresh(a)).items).toEqual(c.views.get(a)!.items)
 })
 
@@ -141,7 +141,7 @@ test("an edit of the human's delivered message leaves another session's message 
 	await until(() => calls.length === next + 3)
 	expect(lastText(next + 2)).toBe(delivered.replace('hury', 'hurry'))
 	expect(unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt').slice(-2))).toEqual([
-		{ type: 'prompt', text: 'fyi', from: b, label: by, advisory: true },
+		{ type: 'prompt', text: 'fyi', from: b, label: by, advisory: true, summary: 'Ask for checks' },
 		{ type: 'prompt', text: 'and hurry' },
 	])
 })

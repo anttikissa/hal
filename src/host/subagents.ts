@@ -13,6 +13,7 @@ import type { ToolResultBlock } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import type { SessionMeta, SpawnKind } from '../common/session.ts'
 import { states } from '../common/states.ts'
+import { summary } from '../common/summary.ts'
 import { blobs } from './blobs.ts'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
@@ -143,7 +144,7 @@ function report(id: string): void {
 	let deliver = () => {
 		// A child stopped by tab close must not wake an idle, now unseen parent.
 		if (tabs.file().closed.some((tab) => tab.id === parent) && !tabs.file().open.includes(parent)) return
-		let refused = prompts.submit(parent, text, undefined, false, { from: id, label, advisory: true })
+		let refused = prompts.submit(parent, text, undefined, false, { from: id, label, advisory: true, summary: summary.extract(text) })
 		if (refused) diag.log(`report ${id} to ${parent}: ${refused}`)
 	}
 	let ready = host.ready(parent)

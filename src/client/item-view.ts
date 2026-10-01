@@ -74,6 +74,11 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let status = /^\[exit [1-9]\d*\]/.exec(body[0]!)![0]
 				body[0] = ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: colors.user().fg! }) + body[0]!.slice(status.length)
 			}
+			// Another session's message: its summary, then a glimpse.
+			if (item.summary) {
+				let more = body.length - 3
+				body = [...ansi.wrap(item.summary, width), ...body.slice(0, 3).map((l) => ansi.quiet(l, itemView.itemStyle(item))), ...(more > 0 ? [`… ${more} more lines`] : [])]
+			}
 			return itemView.headed(item, body, width, session)
 		case 'image':
 			return [attachments.label(item)]

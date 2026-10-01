@@ -31,22 +31,27 @@ export const tool: Tool = {
 		properties: {
 			to: { type: 'string', description: 'Tab number or session id' },
 			text: { type: 'string', description: 'The message' },
+			description: {
+				type: 'string',
+				description: 'One short plain-language sentence for the user: what the message says or asks, e.g. "Ask tab 2 to rerun the tests"',
+			},
 			steer: { type: 'boolean', description: 'Steer as the user would instead of advising' },
 			queue: { type: 'boolean', description: "Run after the recipient's current turn" },
 		},
-		required: ['to', 'text'],
+		required: ['to', 'text', 'description'],
 	},
 	async run(input, ctx) {
-		let { to, text, steer, queue } = input
+		let { to, text, description, steer, queue } = input
 		if (typeof to !== 'string' || !to.trim()) throw new Error('to must be a tab number or session id')
 		if (typeof text !== 'string' || !text.trim()) throw new Error('text must be a non-empty string')
+		if (typeof description !== 'string' || !description.trim()) throw new Error('description must be a non-empty string')
 		for (let [k, v] of Object.entries({ steer, queue })) if (v !== undefined && typeof v !== 'boolean') throw new Error(`${k} must be a boolean`)
 		if (steer && queue) throw new Error('steer and queue exclude each other')
 		let id = target(to.trim())
 		if (!id) throw new Error(`no session ${to}`)
 		if (id === ctx.sessionId) throw new Error('cannot send to this session itself')
 		await (host.ready(id) ?? Promise.resolve())
-		let sender: Sender = { from: ctx.sessionId, label: tabs.label(ctx.sessionId) }
+		let sender: Sender = { from: ctx.sessionId, label: tabs.label(ctx.sessionId), summary: description.replace(/\s+/g, ' ').trim() }
 		if (!steer && !queue) sender.advisory = true
 		let refused = prompts.submit(id, text, undefined, queue === true, sender)
 		if (refused) throw new Error(refused)

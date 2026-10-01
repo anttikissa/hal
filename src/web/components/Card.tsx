@@ -92,7 +92,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			)}
 		</Show>
 	)
-	let folds = () => props.row.item.type === 'thinking' || props.row.item.type === 'tool'
+	// Another session's message with a summary folds under it.
+	let folds = () => props.row.item.type === 'thinking' || props.row.item.type === 'tool' || (props.row.item.type === 'prompt' && !!props.row.item.summary)
 	// A tool's first line (its description or call) heads the card;
 	// thinking is headed by the terminal's header words and its first
 	// line. Prompts and model text show those words above their text
@@ -111,10 +112,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let head = () => {
 		let item = props.row.item
 		if (item.type === 'thinking') return `${title()}: ${lines()[0]}`
+		if (item.type === 'prompt' && item.summary) return item.summary
 		return item.type === 'tool' ? toolDetails.headline(item.name, item.input).text : lines()[0]
 	}
 	let body = () => {
 		let item = props.row.item
+		if (item.type === 'prompt') return [title() ?? '', '', ...lines()].join('\n')
 		if (item.type !== 'tool') return lines().join('\n')
 		// The call once (task 8t), then its output: the result, or what
 		// has streamed so far.

@@ -38,6 +38,7 @@ function sender(s: Sender): Sender {
 	if (s.label !== undefined) out.label = s.label
 	if (s.advisory) out.advisory = true
 	if (s.steering) out.steering = true
+	if (s.summary) out.summary = s.summary
 	return out
 }
 

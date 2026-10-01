@@ -17,7 +17,7 @@ import type { SessionState } from './states.ts'
 export type Shown =
 	// `from`: the session that sent it, `label` naming it; without it,
 	// the human. `ts`: when it was sent (task hp).
-	| { type: 'prompt'; text: string; from?: string; label?: string; queued?: true; steering?: true; advisory?: true; ts?: string }
+	| { type: 'prompt'; text: string; from?: string; label?: string; queued?: true; steering?: true; advisory?: true; summary?: string; ts?: string }
 	// An image attached to the prompt before it (task 2a).
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number }
 	// `ts`: when the block started; `model`, `effort`: what wrote it
@@ -97,11 +97,7 @@ function turnItems(turn: LiveTurn, at: number): Item[] {
 
 // A prompt text as shown, saying who sent it if not the human.
 function promptItem(text: string, s?: Sender, ts?: string, queued = false): Shown {
-	let item: Shown = { type: 'prompt', text }
-	if (s?.from !== undefined) item.from = s.from
-	if (s?.label !== undefined) item.label = s.label
-	if (s?.steering) item.steering = true
-	if (s?.advisory) item.advisory = true
+	let item: Shown = { type: 'prompt', text, ...inbox.sender(s ?? {}) }
 	if (ts !== undefined) item.ts = ts
 	if (queued) item.queued = true
 	return item
