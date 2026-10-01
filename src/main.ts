@@ -21,6 +21,7 @@ import { diag } from './host/diag.ts'
 import { find } from './host/find.ts'
 import { host } from './host/host.ts'
 import { restartProcess } from './host/commands/restart.ts'
+import { restartNote } from './host/restart-note.ts'
 import { jobs } from './host/jobs.ts'
 import { liveFiles } from './host/live-file.ts'
 import { models } from './host/models.ts'
@@ -34,6 +35,7 @@ import { paths } from './host/paths.ts'
 import { plugins } from './host/plugins.ts'
 import { server } from './host/server.ts'
 import { slash } from './host/slash.ts'
+import { tabs } from './host/tabs.ts'
 import { web } from './host/web.ts'
 import { webAuth } from './host/web-auth.ts'
 
@@ -97,6 +99,16 @@ function init(): void {
 	// on the host socket) can carry them on (tasks/j1/states.md).
 	terminal.onQuit = () => host.quitting(server.state.sockets.size === 0)
 	restartProcess.run = () => terminal.restart()
+	let exit = terminal.restart
+	terminal.restart = () => {
+		if (server.state.listener) {
+			let shown = main.state.kept.split('\n')[0]
+			let on = ''
+			try { if (shown) on = ` on ${tabs.label(shown)}` } catch {}
+			restartNote.write(`Ctrl-R in the terminal${on}`)
+		}
+		exit()
+	}
 	// Which code this process runs (task n1), found after the first
 	// frame; the host tells its clients, a new commit offers ctrl-r.
 	version.found = (loaded) => {
@@ -157,6 +169,17 @@ function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) 
 async function becomeHost(): Promise<boolean> {
 	if (!(await server.serve())) return false
 	perf.mark('host')
+	// Who restarted Hal (task 2e): every client now, and those joining within a minute.
+	let restarted = restartNote.take()
+	if (restarted) {
+		for (let client of host.state.clients) client.deliver({ type: 'warning', text: restarted })
+		let warn = host.warn
+		host.warn = (client) => {
+			warn(client)
+			let text = restartNote.pending()
+			if (text) client.deliver({ type: 'warning', text })
+		}
+	}
 	main.later(() => {
 		find.init()
 		web.start()

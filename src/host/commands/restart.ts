@@ -7,6 +7,8 @@
 
 import type { SlashCommand } from '../commands.ts'
 import { host } from '../host.ts'
+import { restartNote } from '../restart-note.ts'
+import { tabs } from '../tabs.ts'
 
 const scopes = ['local', 'host', 'both', 'all']
 
@@ -31,10 +33,11 @@ export const command: SlashCommand = {
 			'When this client is the host, local and host restart the same process.',
 		].join('\n'),
 	complete: (args) => scopes.filter((s) => s.startsWith(args)),
-	run: (args) => {
+	run: (args, _answers, ctx) => {
 		let scope = args.trim()
 		if (scope === 'all') for (let client of host.state.clients) client.deliver({ type: 'restart' })
 		else if (scope !== 'host' && scope !== 'both') return { error: scope === '' || scope === 'local' ? 'only a client can restart itself; use /restart host' : `unknown scope ${scope}; use ${scopes.join(', ')}` }
+		restartNote.write(`${tabs.label(ctx.sessionId)} (/restart ${scope})`)
 		later()
 		return { say: scope === 'all' ? 'restarting the host and every client' : 'restarting the host' }
 	},
