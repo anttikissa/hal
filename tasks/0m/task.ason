@@ -1,0 +1,10 @@
+{
+	title: 'Remove flaky rate-limit submission test',
+	spec: 'src/host/turns-retry.test.ts omits the polling test named "a message sent during a rate-limit wait ends the wait and is read by the next request". Its intermittent timeout must not fail the suite. Ordinary submission still cancels retry waits as required by task 8p; this test removal does not change runtime behavior.',
+	status: 'done',
+	notes: [
+		'Removed at user request after the polling test timed out in the full suite and passed all 10 retry tests on isolated rerun. Runtime retry-wait cancellation requirements remain unchanged.'
+	],
+	needs: ['tf', '8p'],
+	foldInto: ['tf']
+}
