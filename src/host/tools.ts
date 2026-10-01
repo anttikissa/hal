@@ -129,7 +129,10 @@ export const tools = {
 	maxFileBytes: () => 20_000_000,
 	// Unknown tools count as having side effects.
 	readOnly: (name: string): boolean => tools.all().get(name)?.readOnly === true,
-	defs: (): ToolDef[] => [...tools.all().values()].map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
+	// Tools never offered to models (task hc): the user found ask's
+	// questions steal focus while he types. Its code stays for replay.
+	disabled: (): string[] => ['ask'],
+	defs: (): ToolDef[] => [...tools.all().values()].filter((t) => !tools.disabled().includes(t.name)).map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
 	killAfterMs: () => 2000,
 	page,
 	run,

@@ -101,6 +101,14 @@ function valid(id: string): boolean {
 function resolve(input: string): { id?: string; login?: string } {
 	// sol is the old Hal's other name for gpt.
 	let family = input.toLowerCase() === 'sol' ? 'gpt' : input.toLowerCase()
+	// opus-5.5, opus5.5, opus-5-5 (task kh): that Claude, if it exists.
+	let claude = /^(opus|sonnet|haiku|fable)-?(\d+)(?:[.-](\d+))?$/.exec(family)
+	if (claude) {
+		let id = `anthropic/claude-${claude[1]}-${claude[2]}${claude[3] ? `-${claude[3]}` : ''}`
+		if (!models.known().includes(id)) return { id: input }
+		let access = models.resolve(claude[1]!)
+		return access.id ? { id } : access
+	}
 	let version = /^gpt-?(6(?:\.1)?)$/.exec(family)?.[1]
 	if (!version && !['gpt', 'claude', 'opus', 'astra', 'luna', 'sonnet', 'fable', 'haiku', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'].includes(family)) return { id: input }
 	let popular: Record<string, string> = { astra: 'openai/gpt-6-astra', luna: 'openai/gpt-6-luna', sonnet: 'anthropic/claude-sonnet-5-5', fable: 'anthropic/claude-fable-5', haiku: 'anthropic/claude-haiku-4-5' }

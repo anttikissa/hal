@@ -1,11 +1,13 @@
 // Composition root: the one explicit startup path. Other modules do no
 // work on import; start() calls their init() functions in order.
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { appendFileSync, existsSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { join, resolve } from 'path'
+import { args, type Args } from './client/args.ts'
 import { app } from './client/app.ts'
 import { appView } from './client/app-view.ts'
 import { draftFile } from './client/draft-file.ts'
 import { link } from './client/link.ts'
+import { print } from './client/print.ts'
 import { remote as remoteClient, type Saved } from './client/remote.ts'
 import { render } from './client/render.ts'
 import { terminal } from './client/terminal.ts'
@@ -85,13 +87,18 @@ function keepTab(tab: Tab): void {
 	} catch {}
 }
 
-// Module init() calls go here, in order, once modules have them.
-function init(): void {
+// What any process that may host needs, terminal or not.
+function initHost(): void {
 	paths.init()
 	host.init()
 	anthropic.init()
 	openai.init()
 	openaiCompat.init()
+}
+
+// Module init() calls go here, in order, once modules have them.
+function init(): void {
+	main.initHost()
 	// Piped stdin (tests, scripts) has no raw mode and no emergency keys.
 	if (!terminal.available()) return
 	main.initTerminal()
@@ -295,7 +302,26 @@ async function remote(typed: string | undefined): Promise<void> {
 	})
 }
 
+// `hal -p` (task gw): joins the host, or hosts without the web or
+// recovery while it runs, and exits with the turn's outcome.
+async function printMode(job: Extract<Args, { kind: 'print' }>): Promise<void> {
+	let cwd = resolve(job.dir ?? process.cwd())
+	if (!statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) {
+		process.stderr.write(`hal: ${cwd} is not a directory\n`)
+		process.exit(2)
+	}
+	main.initHost()
+	let run = print.run({ prompt: job.prompt, cwd, ...(job.model && { model: job.model }) }, { out: (t) => process.stdout.write(t), err: (t) => process.stderr.write(t) })
+	await link.start({ socketPath: server.socketPath(), tryHost: () => server.serve(), local: (deliver) => host.connect(deliver), onEvent: run.onEvent })
+	run.begin()
+	process.exit(await run.done)
+}
+
 async function start(): Promise<void> {
+	// Checked before anything else, so a mistyped option starts nothing.
+	let parsed = args.parse(process.argv.slice(2))
+	if (parsed.kind === 'help') process.exit((process.stdout.write(args.usage()), 0))
+	if (parsed.kind === 'error') process.exit((process.stderr.write(`hal: ${parsed.message}\n\n${args.usage()}`), 2))
 	perf.state.epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || perf.state.epoch
 	perf.mark('imported')
 	// scripts/perf sets HAL_STALLS: every event-loop block over 10 ms is
@@ -308,7 +334,7 @@ async function start(): Promise<void> {
 		process.stderr.write(`hal2: ${problem}\n`)
 		process.exit(1)
 	}
-	if (process.argv[2] === 'auth') process.exit(await main.auth())
+	if (parsed.kind === 'auth') process.exit(await main.auth())
 	// config.ason first, so local.ts sees it and may override settings.*.
 	// Warnings about it reach every client connected to this host.
 	config.init(() => host.warnAll())
@@ -316,12 +342,13 @@ async function start(): Promise<void> {
 	perf.mark('local.ts')
 	await main.loadPlugins()
 	perf.mark('plugins')
-	if (process.argv[2] === '-r') {
+	if (parsed.kind === 'print') return main.printMode(parsed)
+	if (parsed.kind === 'remote') {
 		if (!terminal.available()) {
 			process.stderr.write('hal2 needs a terminal\n')
 			process.exit(1)
 		}
-		return main.remote(process.argv[3])
+		return main.remote(parsed.host)
 	}
 	main.init()
 	perf.mark('init')
@@ -345,6 +372,7 @@ export const main = {
 	localPath,
 	loadLocal,
 	loadPlugins,
+	initHost,
 	init,
 	initTerminal,
 	onEvent,
@@ -355,6 +383,7 @@ export const main = {
 	joinHost,
 	auth,
 	remote,
+	printMode,
 	start,
 }
 

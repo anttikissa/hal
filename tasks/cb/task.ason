@@ -1,0 +1,9 @@
+{
+	title: 'Command-line arguments are checked',
+	spec: 'hal (./run) accepts exactly: no arguments (the terminal), `auth` (task 8a), `-r [host]` (task tr), `-p` with its options (print mode), and `-h`, `--help` or `help`, which print the usage to stdout and exit 0. Anything else (`--auth`, `-x`, a stray word, a missing or repeated option value) prints the problem and the usage to stderr and exits 2 without starting Hal, taking the host lock or touching the home. Arguments are parsed once, first thing in main.start, by one pure function in src/client/args.ts.',
+	status: 'done',
+	notes: [
+		'Pure parser src/client/args.ts (args.test.ts); main.start parses before the socket-path check, config or local.ts. Usage goes to stdout for help, stderr with exit 2 for errors.'
+	],
+	needs: ['tr', '8a']
+}

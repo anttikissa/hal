@@ -1,0 +1,10 @@
+{
+	title: 'Versioned Claude aliases such as opus-5.5',
+	spec: '/model, hal -m and the model setting accept a Claude family with a version: opus-5.5, opus5.5 and opus-5-5 select anthropic/claude-opus-5-5, likewise sonnet, haiku and fable, with the same credential check and :effort suffix as the plain family aliases. A version Anthropic does not serve is refused like any unknown model.',
+	status: 'done',
+	notes: [
+		'models.resolve: a Claude family with a version maps to anthropic/claude-<family>-<major>[-<minor>] only if models.known() lists it, then checks access as the bare family does.'
+	],
+	needs: [],
+	foldInto: ['03']
+}

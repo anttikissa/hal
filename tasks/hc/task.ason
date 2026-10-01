@@ -1,0 +1,10 @@
+{
+	title: 'The ask tool is not offered to models',
+	spec: "The user found the ask tool useless: its questions take keyboard focus while he types. Models are no longer offered it: tools.disabled() (default ['ask']) names tools left out of the definitions sent to providers; local.ts may override it to bring ask back. The ask code stays, so histories with ask calls, parked questions included, still replay and resume. Command and approval questions are unaffected.",
+	status: 'done',
+	notes: [
+		'turns-ask.test.ts sets tools.disabled to [] to keep testing ask replay and resume.'
+	],
+	needs: [],
+	foldInto: ['bx']
+}

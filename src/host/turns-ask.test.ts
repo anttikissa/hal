@@ -1,10 +1,16 @@
-import { expect, test } from 'bun:test'
+import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { transcript } from '../common/transcript.ts'
 import { calls, client, created, fresh, restartHost, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
+import { tools } from './tools.ts'
 import { turns } from './turns.ts'
 
 useHost()
+
+// Not offered by default (task hc); local.ts can bring it back.
+let disabled = tools.disabled
+beforeAll(() => (tools.disabled = () => []))
+afterAll(() => (tools.disabled = disabled))
 
 const ask = (input: Record<string, unknown>, id = 'q1') => ({ type: 'tool_call' as const, id, name: 'ask', input })
 const question = (c: ReturnType<typeof client>, id: string) => transcript.question(c.views.get(id))
