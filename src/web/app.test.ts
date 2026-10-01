@@ -7,6 +7,7 @@ import { app } from './app.ts'
 import { keys, type Target } from './keys.ts'
 import { router } from './router.ts'
 import { tabs } from './tabs.ts'
+import { view } from './view.ts'
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id
@@ -512,4 +513,75 @@ test('scrolling near the top fetches the page before; it goes in front', () => {
 	sent = []
 	app.older()
 	expect(sent).toEqual([])
+})
+
+test('exact registered commands submit their typed arguments, never passive candidates', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	for (let text of ['/cd', '/cd /existing', '/cd /missing', '/model other']) {
+		for (let items of [undefined, [text + '-candidate/'], []]) {
+			app.input(text)
+			if (items) app.onEvent({ type: 'completions', sessionId, text, items })
+			expect(press('Enter', message(text))).toBe(true)
+			expect(sent.filter((c) => c.type === 'submit').at(-1)).toMatchObject({ text })
+			expect(app.state.text).toBe('')
+		}
+	}
+})
+
+test('partial Enter chooses; explicit arrows override exact commands until the next edit', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	app.input('/c')
+	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
+	expect(view.hints(app.state.view, app.state.text, app.state.menu)[0]).toEqual(['enter', 'choose'])
+	expect(press('Enter', message('/c'))).toBe(true)
+	expect(app.state.text).toBe('/cd ')
+	app.input('/cd /p')
+	let answer: Event = { type: 'completions', sessionId, text: '/cd /p', items: ['/cd /projects/', '/cd /private/'] }
+	app.onEvent(answer)
+	press('ArrowDown', message('/cd /p'))
+	app.onEvent(answer) // a reply must preserve deliberate navigation
+	press('Enter', message('/cd /p'))
+	expect(app.state.text).toBe('/cd /private/')
+	expect(sent.some((c) => c.type === 'submit')).toBe(false)
+	app.input('/cd /p')
+	app.onEvent(answer)
+	press('ArrowUp', message('/cd /p'))
+	app.input('/cd /pr') // same candidate array after prediction: reset intent anyway
+	app.onEvent({ ...answer, text: '/cd /pr' })
+	expect(view.hints(app.state.view, app.state.text, app.state.menu)[0]).toEqual(['enter', 'send'])
+	press('Enter', message('/cd /pr'))
+	expect(sent.some((c) => c.type === 'submit' && c.text === '/cd /pr')).toBe(true)
+})
+
+test('dismissal suppresses pending completions; Escape outside never pauses as well', () => {
+	app.onEvent(snapshot({ type: 'running', phase: 'streaming' }))
+	app.input('/c')
+	app.dismissMenu()
+	let answer: Event = { type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] }
+	app.onEvent(answer)
+	expect(app.state.menu).toBeUndefined()
+	expect(app.state.text).toBe('/c')
+	app.input('/cl')
+	app.input('/c')
+	app.onEvent(answer)
+	expect(app.state.menu).toBeDefined()
+	expect(press('Escape', { kind: 'other' })).toBe(true)
+	expect(sent.some((c) => c.type === 'pause')).toBe(false)
+	app.onEvent(answer)
+	expect(app.state.menu).toBeUndefined()
+})
+
+test('an open menu preserves touch and modified Enter and Tab contracts', () => {
+	app.onEvent(snapshot({ type: 'idle' }))
+	app.input('/c')
+	app.onEvent({ type: 'completions', sessionId, text: '/c', items: ['/cd ', '/clear '] })
+	expect(press('Enter', { kind: 'message', text: '/c', cursor: 2, coarse: true })).toBe(false)
+	expect(press('Enter', message('/c'), { shiftKey: true })).toBe(false)
+	expect(app.state.text).toBe('/c')
+	expect(press('Tab', message('/c'))).toBe(true)
+	expect(app.state.text).toBe('/cd ')
+	app.input('/cd')
+	app.onEvent({ type: 'completions', sessionId, text: '/cd', items: ['/cd /suggestion/'] })
+	press('Enter', message('/cd'), { altKey: true })
+	expect(sent.some((c) => c.type === 'submit' && c.text === '/cd')).toBe(true)
 })

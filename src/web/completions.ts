@@ -4,7 +4,7 @@ import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
 
 export type Choice = { value: string; label: string; description: string }
-export type Menu = { input: string; choices: Choice[]; selected: number }
+export type Menu = { input: string; choices: Choice[]; selected: number; explicit?: boolean }
 export type Known = { input: string; items: string[]; descriptions?: string[] }
 
 // Use the host's full candidate set for a longer prefix while its next
@@ -25,11 +25,16 @@ function receive(input: string, items: string[], previous?: Menu, descriptions?:
 	})
 	if (previous && choices.length === previous.choices.length && choices.every((choice, i) => choice === previous.choices[i])) return previous
 	let selected = previous ? choices.findIndex((choice) => choice.value === previous.choices[previous.selected]?.value) : -1
-	return { input, selected: Math.max(0, selected), choices }
+	return { input, selected: Math.max(0, selected), choices, explicit: selected >= 0 && previous?.explicit }
 }
 
 function step(menu: Menu, direction: number): Menu {
-	return { ...menu, selected: (menu.selected + direction + menu.choices.length) % menu.choices.length }
+	return { ...menu, explicit: true, selected: (menu.selected + direction + menu.choices.length) % menu.choices.length }
 }
 
-export const completions = { receive, predict, step }
+// Passive highlighting cannot replace an exact registered command's text.
+function chooses(text: string, menu?: Menu): boolean {
+	return !!menu && (!!menu.explicit || !commandList.byName(/^\/(\S+)/.exec(text)?.[1] ?? ''))
+}
+
+export const completions = { receive, predict, step, chooses }

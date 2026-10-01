@@ -1222,3 +1222,56 @@ test.skipIf(!chrome)('pending question URLs are safe native links and wrap at ph
 		await b.close()
 	}
 })
+
+test.skipIf(!chrome)('completion dismissal follows pointer and focus without stealing choice clicks or Enter', async () => {
+	providerHome()
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+		let type = async (text: string) => {
+			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+		}
+		let open = async () => {
+			await type('')
+			await type('/c')
+			await b.waitFor(`!!document.querySelector('.completions')`)
+		}
+		let press = (key: string) => b.call('Input.dispatchKeyEvent', { type: 'keyDown', key })
+		await open()
+		expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('choose')
+		await press('Enter')
+		await b.waitFor(`!document.querySelector('.completions')`)
+		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/cd ')
+		await open()
+		// Keyboard focus within the popup must retain it until the click.
+		await b.evaluate(`document.querySelector('.completions button').focus()`)
+		expect(await b.evaluate(`!!document.querySelector('.completions')`)).toBe(true)
+		await b.evaluate(`document.activeElement.click()`)
+		await b.waitFor(`!document.querySelector('.completions')`)
+		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/cd ')
+		for (let action of [
+			`document.querySelector('[aria-label="Attach file"]').focus()`,
+			`document.querySelector('textarea').blur()`,
+			`document.querySelector('.Transcript').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }))`,
+		]) {
+			await open()
+			await b.evaluate(action)
+			await b.waitFor(`!document.querySelector('.completions')`)
+			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/c')
+		}
+		// Departure before the host reply must also suppress it.
+		await type('')
+		await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = '/c'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); document.querySelector('[aria-label="Attach file"]').focus() })()`)
+		await Bun.sleep(100)
+		expect(await b.evaluate(`!!document.querySelector('.completions')`)).toBe(false)
+		expect(await b.evaluate(`document.activeElement.getAttribute('aria-label')`)).toBe('Attach file')
+		await type('/version')
+		await b.waitFor(`!!document.querySelector('.completions')`)
+		expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('send')
+		await press('Enter')
+		await b.waitFor(`document.querySelector('textarea').value === ''`)
+	} finally { await b.close() }
+}, 15000)

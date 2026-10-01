@@ -10,7 +10,7 @@
 // attachments (attach.ts): a placeholder at the caret, then the marker.
 // While files are dragged over the page the box is outlined.
 
-import { createEffect, For, Show } from 'solid-js'
+import { createEffect, For, Show, onSettled } from 'solid-js'
 import { states } from '../../common/states.ts'
 import { app } from '../app.ts'
 import { attach } from '../attach.ts'
@@ -52,6 +52,19 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 			if (!away && !matchMedia('(pointer: coarse)').matches) input.focus()
 		},
 	)
+	onSettled(() => {
+		let inside = (t: EventTarget | null) => t === input || (t instanceof Element && !!t.closest('.Composer .completions'))
+		let outside = (e: PointerEvent | FocusEvent) => { if (!inside(e.target)) app.dismissMenu() }
+		let leaving = (e: FocusEvent) => { if (inside(e.target) && !inside(e.relatedTarget)) app.dismissMenu() }
+		document.addEventListener('pointerdown', outside, true)
+		document.addEventListener('focusin', outside)
+		document.addEventListener('focusout', leaving)
+		return () => {
+			document.removeEventListener('pointerdown', outside, true)
+			document.removeEventListener('focusin', outside)
+			document.removeEventListener('focusout', leaving)
+		}
+	})
 	let busy = () => !!props.view.transcript && states.busy(props.view.transcript.state)
 	let send = (queue = false) => {
 		app.send(queue)
@@ -110,7 +123,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				</div>
 			</div>
 			<div class="help">
-				<For each={view.hints(props.view)}>
+				<For each={view.hints(props.view, props.text, props.menu)}>
 					{(h) => (
 						<span>
 							<b>{h[0]}</b> {h[1]}

@@ -3,6 +3,7 @@
 // passing notice, and what each item looks like as text. app.ts feeds
 // it the events from link.ts; the components draw it.
 
+import { completions, type Menu } from './completions.ts'
 import { amend, type Editing } from '../common/amend.ts'
 import { attachments } from '../common/attachments.ts'
 import { bashResult } from '../common/bash-result.ts'
@@ -237,11 +238,12 @@ function status(st: ViewState): StatusGroup[] {
 	return groups
 }
 
-// The key hints under the message box, for what Enter does now.
-function hints(st: ViewState): [key: string, does: string][] {
-	if (st.transcript && states.busy(st.transcript.state))
-		return [['enter', 'steer'], ['alt+enter', 'queue'], ['shift+enter', 'newline'], ['esc', 'pause']]
-	return [['enter', 'send'], ['shift+enter', 'newline'], ['↑', 'edit last'], ['tab', 'complete'], ['ctrl+m', 'model']]
+function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: string][] {
+	let busy = st.transcript && states.busy(st.transcript.state)
+	let enter = completions.chooses(text, menu) ? 'choose' : busy ? 'steer' : 'send'
+	if (menu) return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift+enter', 'newline'], ...(busy ? [['alt+enter', 'queue'] as [string, string]] : []), ['esc', 'dismiss']]
+	if (busy) return [['enter', enter], ['alt+enter', 'queue'], ['shift+enter', 'newline'], ['esc', 'pause']]
+	return [['enter', enter], ['shift+enter', 'newline'], ['↑', 'edit last'], ['tab', 'complete'], ['ctrl+m', 'model']]
 }
 
 // A transcript row: an item, and for a tool call its result once it

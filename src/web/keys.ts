@@ -91,10 +91,11 @@ function key(e: KeyInput, target: Target): boolean {
 		return true
 	}
 	let plain = !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey
-	if (plain && target.kind === 'message' && app.state.menu) {
+	if (plain && e.key === 'Escape' && st.menu) return app.menuKey('escape')
+	if (plain && target.kind === 'message' && st.menu && !(e.key === 'Enter' && target.coarse)) {
 		let menuKey = { ArrowUp: 'up', ArrowDown: 'down', Escape: 'escape', Enter: 'enter' } as const
 		let choice = menuKey[e.key as keyof typeof menuKey]
-		if (choice) return app.menuKey(choice)
+		if (choice && app.menuKey(choice)) return true
 	}
 	let edit = plain && target.kind === 'message' && arrows[e.key] ? view.editKey(st.view, arrows[e.key]!, st.text) : undefined
 	if (edit) {

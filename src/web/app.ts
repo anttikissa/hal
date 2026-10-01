@@ -198,6 +198,7 @@ function input(text: string): void {
 	st.text = text
 	if (text !== previous) {
 		st.suppressed = undefined
+		if (st.menu?.explicit) st.menu = { ...st.menu, explicit: false }
 		st.completedByTab = undefined
 		let request = view.complete(st.view, text)
 		if (!request || text.includes('\n')) { st.menu = undefined; st.known = undefined }
@@ -221,16 +222,24 @@ function choose(index: number): void {
 	app.changed()
 }
 
+// Also suppress an in-flight answer when the popup has not appeared yet.
+function dismissMenu(): void {
+	let st = app.state
+	st.suppressed = st.text
+	st.menu = undefined
+	st.known = undefined
+	st.completedByTab = undefined
+	app.changed()
+}
+
 function menuKey(key: 'up' | 'down' | 'escape' | 'enter'): boolean {
 	let menu = app.state.menu
 	if (!menu) return false
-	if (key === 'enter') app.choose(menu.selected)
-	else if (key === 'escape') {
-		app.state.suppressed = app.state.text
-		app.state.menu = undefined
-		app.state.known = undefined
-		app.changed()
-	} else {
+	if (key === 'enter') {
+		if (!completions.chooses(app.state.text, menu)) return false
+		app.choose(menu.selected)
+	} else if (key === 'escape') app.dismissMenu()
+	else {
 		app.state.menu = completions.step(menu, key === 'up' ? -1 : 1)
 		app.changed()
 	}
@@ -352,6 +361,7 @@ export const app = {
 	placeholder,
 	choose,
 	menuKey,
+	dismissMenu,
 	setView,
 	setNotice,
 	sendNow,
