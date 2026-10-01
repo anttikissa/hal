@@ -81,7 +81,9 @@ function choices(providers: string[]): Map<string, string> {
 function findZone(text: string): string | undefined {
 	let t = text.trim().toLowerCase().replace(/\s+/g, '_')
 	if (!t) return undefined
+	// Some ICU builds still list the old city name; both zone IDs are valid.
 	let all = Intl.supportedValuesOf('timeZone')
+	if (all.includes('Asia/Calcutta') && !all.includes('Asia/Kolkata')) all.push('Asia/Kolkata')
 	let city = (z: string) => z.split('/').at(-1)!.toLowerCase()
 	return all.find((z) => z.toLowerCase() === t) ?? all.find((z) => city(z) === t) ?? all.find((z) => city(z).startsWith(t)) ?? all.find((z) => z.toLowerCase().includes(t))
 }
