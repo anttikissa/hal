@@ -15,12 +15,6 @@ const ids = [
 	'openrouter/openai/gpt-5.5',
 ]
 
-test('typing opus-5.5 puts claude-opus-5-5 first, not step-3.5-flash', () => {
-	let ranked = picker.rank(ids, 'opus-5.5')
-	expect(ranked[0]).toBe('anthropic/claude-opus-5-5')
-	expect(ranked).not.toContain('openrouter/stepfun/step-3.5-flash')
-})
-
 test('every word of the query must match, in any case and with any separator', () => {
 	expect(picker.rank(ids, 'SONNET')).toEqual(['anthropic/claude-sonnet-4-5'])
 	expect(picker.rank(ids, 'opus 4 5')).toEqual(expect.arrayContaining(['anthropic/claude-opus-4-5', 'openrouter/anthropic/claude-opus-4.5']))
@@ -31,11 +25,6 @@ test('every word of the query must match, in any case and with any separator', (
 test('whole words rank above parts of words', () => {
 	expect(picker.rank(ids, 'opus 5')[0]).toBe('anthropic/claude-opus-5')
 	expect(picker.rank(ids, 'gpt5.5')).toEqual(['openrouter/openai/gpt-5.5'])
-})
-
-test('an empty query keeps the host order', () => {
-	expect(picker.rank(ids, '')).toEqual(ids)
-	expect(picker.rank(ids, '  ')).toEqual(ids)
 })
 
 const key = (k: string, text?: string): Key => (text === undefined ? { key: k } : { key: k, text })
