@@ -1,0 +1,7 @@
+{
+	title: 'Session ids: local Hal days from 05:00, easter eggs',
+	spec: "Session ids are '<day>-<word>' and list in roughly creation order. A Hal day runs from 05:00 to 05:00 local time; both the day number and the hour slots use it, so a day's ids never wrap from late-alphabet words back to early ones. day: 1 on the Hal day of the home's first session, then counted in local calendar days, unpadded. That first day is a local date in state/epoch.ason ({ firstDay: 'YYYY-MM-DD' }), written by the first session; a home continuing old Hal's sessions stores old Hal's first day (2026-04-24). word: three lowercase letters from src/host/session-words.txt (sorted; no crude or charged words), cut into 24 equal slots, slot 0 for 05-06 and slot 23 for 04-05. Tries: 3 from the current slot, 2 from it and its neighbours (not wrapping across 05:00), 5 from the whole list, then random letters until one is free; the directory is claimed by non-recursive mkdir. Special days try one word first, whatever the hour: 1 hal (the first session ever), 3 cpo, 8/16/32/64 bit, 42 why, every multiple of 365 yay, 404 huh, 418 tea, 2001 ody, 9000 hal. hal is not in the regular list. An invalid epoch file throws. No tests for the id choice.",
+	status: 'planned',
+	needs: [],
+	foldInto: ['pe']
+}
