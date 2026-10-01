@@ -306,6 +306,15 @@ test('an account out of credits is set aside and the host rotates at once, not a
 	expect(spent).toEqual(['k', 'k'])
 })
 
+test('a model refused for the account plan sets that account aside for the model and rotates at once', async () => {
+	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'a@x' }) })
+	fakeFetch(() => Response.json({ detail: "The 'm1' model is not supported when using Codex with a ChatGPT account." }, { status: 400 }))
+	let [e] = (await all(provider.stream('fake/m1', req))) as any[]
+	expect(e).toMatchObject({ failure: 'limited', retryAt: now })
+	expect(limits.until(limits.key('fake/m1', 'a@x'))).toBe(now + provider.planLimitMs())
+	expect(limits.until(limits.key('fake/m2', 'a@x'))).toBe(0)
+})
+
 test('errors thrown while building the request keep their failure and reset time', async () => {
 	provider.register('fake', {
 		...echo,

@@ -161,6 +161,13 @@ function noCredits(e: ErrorEvent): boolean {
 	return /insufficient_quota|billing_hard_limit_reached|billing_not_active|credit balance is too low/i.test(`${e.body ?? ''} ${e.message}`)
 }
 
+// The model is refused for this account's plan, not for everyone: OpenAI
+// answers 400 "model is not supported when using Codex with a ChatGPT
+// account" once a subscription lapses to free.
+function notOnAccount(e: ErrorEvent): boolean {
+	return (e.status === 400 || e.status === 403) && /not supported when using Codex with a ChatGPT account/i.test(`${e.body ?? ''} ${e.message}`)
+}
+
 // The provider's own words from an error body, for the user.
 function detail(body: string): string {
 	try {
@@ -216,6 +223,14 @@ function failed(p: Provider, modelId: string, account: string | undefined, e: Er
 		// aside and retry at once on the next, or block on login.
 		p.spent(account)
 		e.failure = 'auth'
+		e.retryAt = now
+		return e
+	}
+	if (account && provider.notOnAccount(e)) {
+		// This account cannot run the model (a ChatGPT plan lapsed to
+		// free): set it aside for this model and retry on the next.
+		limits.set(limits.key(modelId, account), now + provider.planLimitMs())
+		e.failure = 'limited'
 		e.retryAt = now
 		return e
 	}
@@ -333,10 +348,13 @@ export const provider = {
 	streamTimeoutMs: () => 120_000,
 	// How long an account that hit 429 without a reset time is skipped.
 	accountLimitMs: () => 60_000,
+	// How long an account stays aside for a model its plan refuses.
+	planLimitMs: () => 3_600_000,
 	fetch: (url: string, init: RequestInit): Promise<Response> => fetch(url, init),
 	register,
 	failure,
 	noCredits,
+	notOnAccount,
 	detail,
 	resetAt,
 	sse,

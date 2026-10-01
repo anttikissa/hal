@@ -1,7 +1,10 @@
 {
-	title: 'Provider errors name the account; lapsed plans surface',
-	spec: 'A provider HTTP error from a subscription account names it and its plan: "HTTP 400 from openai (bob@example.com, free): ..." (email, else the account name; never a token). When an OpenAI account\'s request is rejected (400 or 403), Hal re-reads its plan from the usage endpoint; if the plan changed since last seen, the error adds "plan changed plus → free", so a lapsed subscription that no longer offers the model is the visible cause. /status shows the same change as the account\'s error line ("plan changed: plus → free"). Invariant restored: a model refused because one account lost its plan never surfaces as an anonymous provider error. Tests: refresh reports plus → free.',
+	title: 'Lapsed plans rotate accounts; provider errors name the account',
+	spec: 'A provider HTTP error from a subscription account names it and its plan: "HTTP 400 from openai (bob@example.com, free): ..." (email, else the account name; never a token). When an OpenAI account\'s request is rejected (400 or 403), Hal re-reads its plan from the usage endpoint; if the plan changed since last seen, the error adds "plan changed plus → free". /status shows the same change as the account\'s error line ("plan changed: plus → free"). A 400/403 saying the model "is not supported when using Codex with a ChatGPT account" sets that account aside for that model only (limits.ts, provider.planLimitMs, one hour) and retries at once, so rotation picks the next account; other models stay usable on it. Invariants restored: a model refused because one account lost its plan never surfaces as an anonymous provider error, and never stops a turn while another account can run the model. Tests: refresh reports plus → free; a plan refusal limits only that account and model and retries at once.',
 	status: 'done',
+	notes: [
+		'The first version only named the plan change in the error; failed() never rotated on a 400, so the turn stayed on the lapsed account. Detection uses the refusal text, not the plan, because which models a plan offers is not known locally.'
+	],
 	needs: ['ab'],
 	foldInto: ['ne', 'ab']
 }
