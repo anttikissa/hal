@@ -92,6 +92,7 @@ function onEvent(event: Event): void {
 	let st = app.state
 	if (event.type === 'find-results') return find.event(event)
 	if (event.type === 'restart') return restart.mark()
+	if (event.type === 'redraw') return
 	if (event.type === 'tabs') push.badge(event.tabs)
 	if (tabs.onEvent(event)) return
 	let changed = drafts.onEvent(event)

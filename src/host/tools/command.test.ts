@@ -53,17 +53,3 @@ test('a model tool call can /go and /rename while its turn runs; results reach t
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length)
 })
-
-test('unsafe, unknown and malformed commands are rejected without recording or executing them', async () => {
-	let a = client()
-	let id = created(a, testHome())
-	for (let command of ['/login chatgpt', '/auth', '/auth revoke', '/quit', '/restart', '/budget 100', '/send 1 secret', '/pause', '/unknown', 'rename hidden', 17]) {
-		let result = await run(id, command)
-		expect(result.isError).toBe(true)
-	}
-	let ac = new AbortController()
-	ac.abort()
-	expect((await run(id, '/rename Hidden', ac.signal)).isError).toBe(true)
-	expect(sessions.open(id).name).toContain(id)
-	expect((await records(id)).filter((r) => r.type === 'command')).toEqual([])
-})

@@ -269,6 +269,8 @@ export type Event =
 	// /restart all: restart once this host goes (terminal) or reload once
 	// it is back (web).
 	| { type: 'restart' }
+	// Repaint terminals following this session; no reload on the web.
+	| { type: 'redraw'; sessionId: string }
 	// Cached models.dev display names for the open tabs, sent on connect,
 	// model switch and background catalog refresh.
 	| { type: 'model-names'; names: Record<string, string> }
@@ -276,7 +278,6 @@ export type Event =
 	// some other tab (task qm); `session`, not sessionId, so no client
 	// takes it as that session's event.
 	| NoticeEvent
-
 export type EventType = Event['type']
 
 const commandTypes: CommandType[] = ['find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'visibility', 'hello']
@@ -360,6 +361,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },
 	ack: { id: 's', tab: 's?' },
 	restart: {},
+	redraw: { sessionId: 's' },
 	auth: { code: 's', link: 's?' },
 }
 

@@ -48,7 +48,7 @@ function typed(text: string): boolean {
 	// /restart both goes on to the host, marking this client to follow.
 	if (/^\/restart\s+both$/.test(t)) restart.withHost()
 	let name = /^\/restart(\s+local)?$/.test(t) ? 'restart' : /^\/([a-z][a-z0-9-]*)$/.exec(t)?.[1]
-	if (name !== 'restart' && (!name || !commandList.byName(name)?.clientOnly || !clientCommands.all[name])) return false
+	if (name !== 'restart' && name !== 'redraw' && (!name || !commandList.byName(name)?.clientOnly || !clientCommands.all[name])) return false
 	let id = app.state.transcript?.meta.id
 	if (id !== undefined) drafts.edit(id, '')
 	clientCommands.run(name)

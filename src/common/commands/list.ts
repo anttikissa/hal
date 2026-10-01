@@ -10,52 +10,52 @@
 import { keyHelp, type Binding } from '../key-help.ts'
 
 // `keyArgs`: the arguments the key runs the command with, as /keys shows.
-export type CommandInfo = { name: string; description: string; category: string; key?: string; keyArgs?: string; clientOnly?: true; modelUsable?: true; hidden?: true }
+export type CommandInfo = { name: string; description: string; category: string; key?: string; keyArgs?: string; clientOnly?: true; hidden?: true }
 
 // Sorted by name.
 const list: CommandInfo[] = [
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
 	{ name: 'branch', description: 'alias for /fork', category: 'tabs', hidden: true },
 	{ name: 'budget', description: 'show or set spawn slots', category: 'session' },
-	{ name: 'cd', description: 'change the working directory', category: 'session', modelUsable: true },
+	{ name: 'cd', description: 'change the working directory', category: 'session' },
 	{ name: 'changes', description: 'list observed file changes and diffs, or clear the list', category: 'session' },
-	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session', modelUsable: true },
+	{ name: 'clear', description: 'start a fresh context in this tab', category: 'session' },
 	{ name: 'clients', description: 'show who is connected to the host', category: 'debug' },
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w' },
-	{ name: 'compact', description: 'summarise the context so far', category: 'session', modelUsable: true },
+	{ name: 'compact', description: 'summarise the context so far', category: 'session' },
 	{ name: 'config', description: 'show or change settings', category: 'app' },
-	{ name: 'find', description: 'search all sessions', category: 'session', key: 'ctrl-f', modelUsable: true },
+	{ name: 'find', description: 'search all sessions', category: 'session', key: 'ctrl-f' },
 	{ name: 'fork', description: 'fork this session into a new tab', category: 'tabs', key: 'ctrl-b' },
-	{ name: 'go', description: 'show a tab in windows watching this session', category: 'tabs', modelUsable: true },
-	{ name: 'help', description: 'list commands, or show one in detail', category: 'help', modelUsable: true },
-	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1', modelUsable: true },
+	{ name: 'go', description: 'show a tab in windows watching this session', category: 'tabs' },
+	{ name: 'help', description: 'list commands, or show one in detail', category: 'help' },
+	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1' },
 	{ name: 'login', description: 'log in to a provider', category: 'session' },
-	{ name: 'mem', description: 'show host memory use', category: 'debug', modelUsable: true },
-	{ name: 'model', description: 'pick the model', category: 'session', key: 'ctrl-m', modelUsable: true },
-	{ name: 'move', description: 'move this tab to a numbered position', category: 'tabs', modelUsable: true },
+	{ name: 'mem', description: 'show host memory use', category: 'debug' },
+	{ name: 'model', description: 'pick the model', category: 'session', key: 'ctrl-m' },
+	{ name: 'move', description: 'move this tab to a numbered position', category: 'tabs' },
 	{ name: 'new', description: 'new tab', category: 'tabs', key: 'ctrl-t' },
 	{ name: 'pause', description: 'pause the turn', category: 'session' },
-	{ name: 'perf', description: 'show startup timing marks', category: 'debug', modelUsable: true },
-	{ name: 'plugins', description: 'list loaded plugins and their hooks', category: 'debug', modelUsable: true },
+	{ name: 'perf', description: 'show startup timing marks', category: 'debug' },
+	{ name: 'plugins', description: 'list loaded plugins and their hooks', category: 'debug' },
 	{ name: 'queue', description: 'list, run or clear queued prompts', category: 'session' },
 	// Ctrl-C, Ctrl-Z and Ctrl-R are really caught by the emergency path:
 	// src/client/emergency.ts scans raw stdin and src/client/terminal.ts
 	// acts on them before any key decoding (tasks/README.md). Changing
 	// these three `key`s changes only what /keys shows, not the keys.
 	{ name: 'quit', description: 'quit', category: 'app', key: 'ctrl-c', clientOnly: true },
-	{ name: 'redraw', description: 'redraw', category: 'app', key: 'ctrl-l', clientOnly: true },
-	{ name: 'rename', description: 'name or clear the session name', category: 'session', modelUsable: true },
+	{ name: 'redraw', description: 'redraw', category: 'app', key: 'ctrl-l' },
+	{ name: 'rename', description: 'name or clear the session name', category: 'session' },
 	// /restart and /restart local run in the client; host, both and all
 	// on the host (src/host/commands/restart.ts).
 	{ name: 'restart', description: 'restart this client (local), the host, both, or all', category: 'app', key: 'ctrl-r', keyArgs: 'local' },
 	{ name: 'resume', description: 'reopen the last closed tab', category: 'tabs', key: 'shift-ctrl-t' },
 	{ name: 'send', description: 'send a prompt or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
-	{ name: 'status', description: 'show account usage windows', category: 'session', modelUsable: true },
-	{ name: 'system', description: 'show the assembled system prompt', category: 'session', modelUsable: true },
-	{ name: 'theme', description: 'list or switch the colour theme', category: 'app', modelUsable: true },
+	{ name: 'status', description: 'show account usage windows', category: 'session' },
+	{ name: 'system', description: 'show the assembled system prompt', category: 'session' },
+	{ name: 'theme', description: 'list or switch the colour theme', category: 'app' },
 	{ name: 'todo', description: 'file or list project TODO items', category: 'session' },
-	{ name: 'version', description: 'show which code the host runs', category: 'debug', modelUsable: true },
+	{ name: 'version', description: 'show which code the host runs', category: 'debug' },
 ]
 
 // Keys a browser keeps for itself except on macOS, where they are Cmd.

@@ -1,10 +1,11 @@
 {
 	title: 'command tool: the model runs slash commands',
-	spec: "A command tool lets the model run a slash command in its own session, as if the user typed it: /cd, /rename, /go, /model, /compact and the rest the command list marks as model-usable (not /quit, /restart, /login or anything that asks the user for secrets). The result is the command's output or error text. This replaces what the old Hal's agents used eval for most (research 29 Sep: 45 of 62 eval calls were /cd into or out of a worktree, 6 were /rename).",
+	spec: 'The command tool runs slash commands in its own session through the same history, output and guard path as human commands. Commands are allowed by default. A denylist prevents /login, /quit, /suspend, /budget, /restart, /queue and /send; /queue and /send errors tell the model to use the send tool instead. Unknown commands and malformed input still fail. /auth is allowed, but its ephemeral code remains client-only output and never enters the tool result or history. /redraw repaints following terminals through a host event without restarting or reloading clients; typed terminal /redraw and Ctrl-L remain local. /fork, /branch, /new, /close, /resume, /pause, /config, /changes, /clients and /todo are allowed. Ordinary command guards remain in force. Hidden commands, including /branch, do not appear in terminal or web autocomplete; explicitly typing them still works. Remove tests of model command eligibility; add no new tests for this change.',
 	status: 'done',
-	needs: [],
-	foldInto: ['2t'],
 	notes: [
-		'The model tool reuses slash.command, so it records the same command history and runs the same guards as typing a slash command. Eligibility is an explicit modelUsable registry flag, not inferred from server-side availability; slash.runCommand reports reply output/errors. Session-busy guards still prevent /clear and /compact while the model turn is active.'
-	]
+		'The model tool reuses slash.command, so it records the same command history and runs the same guards as typing a slash command. Eligibility is an explicit modelUsable registry flag, not inferred from server-side availability; slash.runCommand reports reply output/errors. Session-busy guards still prevent /clear and /compact while the model turn is active.',
+		'The denylist replaces the earlier modelUsable registry flags. /redraw needs a host command and a transient redraw event because the original command ran only in terminals. The shared host completion path filters hidden entries for both clients.'
+	],
+	needs: [],
+	foldInto: ['2t']
 }
