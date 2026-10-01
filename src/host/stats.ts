@@ -18,10 +18,12 @@ import { usage } from './usage.ts'
 import { effort as labels } from '../common/effort.ts'
 import { effort } from './effort.ts'
 
-// The context of the last turn end among `records` that has one.
+// The context of the last turn end among `records` that has one, unless
+// a compact or reset came after it: that context is gone.
 function lastContext(records: HistoryRecord[]): number | undefined {
 	for (let i = records.length - 1; i >= 0; i--) {
 		let r = records[i]!
+		if (r.type === 'compact' || r.type === 'reset') return undefined
 		if (r.type === 'turn_end' && r.context) return r.context
 	}
 	return undefined

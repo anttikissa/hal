@@ -318,7 +318,7 @@ function* snapshotSteps(id: string, budget = pages.budget()): Steps<Tail> {
 	let used = pages.state.bytesRead - read
 	let tail = yield* pages.pageSteps(id, undefined, Math.max(budget - used, 1))
 	let out: Tail = { history: tail.records, earlier: earlier.filter((l) => l.offset < tail.start).map((l) => l.record), end: tail.end }
-	if (tail.start > 0) out.older = tail.start
+	if (tail.start > 0 && !tail.records.some((r) => r.type === 'reset')) out.older = tail.start
 	return out
 }
 

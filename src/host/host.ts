@@ -282,7 +282,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	else if (c.type === 'history') {
 		let answer = (page: Page): Outcome => {
 			let reply: Event = { type: 'history', sessionId: c.sessionId, before: c.before, records: page.records }
-			if (page.start > 0) reply.older = page.start
+			if (page.start > 0 && !page.records.some((r) => r.type === 'reset')) reply.older = page.start // nothing before a /clear (vh)
 			return { reply }
 		}
 		let page = pages.slices(pages.pageSteps(c.sessionId, c.before))

@@ -228,7 +228,8 @@ export type Event =
 	// `streaming`: as in command.
 	| { type: 'output'; sessionId: string; text: string; ts?: string; error?: true; n?: number; streaming?: true }
 	// A context boundary was recorded (tasks bc, vh): `text`, its divider.
-	| { type: 'divider'; sessionId: string; text: string; n?: number; streaming?: true }
+	// `clear`: a /clear; clients drop everything shown before it.
+	| { type: 'divider'; sessionId: string; text: string; ts?: string; clear?: true; n?: number; streaming?: true }
 	// The session's metadata changed (a /cd, a /model: then `stats` too).
 	| { type: 'meta'; sessionId: string; meta: SessionMeta; stats?: Stats }
 	// Sent only to the client that asked: every full text `text` may

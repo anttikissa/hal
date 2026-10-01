@@ -35,7 +35,8 @@ export type Shown =
 	| { type: 'command'; text: string; origin?: 'model'; from?: string; ts?: string }
 	// What a command said.
 	| { type: 'output'; text: string; error?: true; ts?: string }
-	// A context boundary (tasks bc, vh), drawn as a one-row rule.
+	// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
+	// shows as an output: 'HH:MM context cleared'.
 	| { type: 'divider'; text: string }
 
 // `key`: the item's id (task w5), the same live, after a reconnect or
@@ -149,7 +150,8 @@ function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'file_changes' || r.type === 'round' || r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
 	if (r.type === 'question') return [r.from ? { type: 'question', id: r.id, form: r.form, command: true } : { type: 'question', id: r.id, form: r.form }]
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
-	if (r.type === 'compact' || r.type === 'reset') return [{ type: 'divider', text: transcript.boundary(r) }]
+	if (r.type === 'reset') return [{ type: 'output', text: transcript.boundary(r), ts: r.ts }]
+	if (r.type === 'compact') return [{ type: 'divider', text: transcript.boundary(r) }]
 	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b, r.ts, r.queued) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
 	return [transcript.endItem(r)]
 }
@@ -179,9 +181,9 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 }
 
 // A command, its output or a divider as shown, from a record or an event.
-function aside(r: { type: 'command'; text: string; origin?: 'model'; from?: string; ts?: string } | { type: 'output'; text: string; error?: true; ts?: string } | { type: 'divider'; text: string } | { type: 'question'; id: string; form: Form }): Shown {
+function aside(r: { type: 'command'; text: string; origin?: 'model'; from?: string; ts?: string } | { type: 'output'; text: string; error?: true; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form }): Shown {
 	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true }
-	if (r.type === 'divider') return { type: 'divider', text: r.text }
+	if (r.type === 'divider') return r.clear ? { type: 'output', text: r.text, ...(r.ts !== undefined && { ts: r.ts }) } : { type: 'divider', text: r.text }
 	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.origin && { origin: r.origin }), ...(r.from !== undefined && { from: r.from }), ...(r.ts !== undefined && { ts: r.ts }) }
 	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.ts !== undefined && { ts: r.ts }) }
 }
@@ -207,10 +209,14 @@ function standIns(earlier: HistoryRecord[], tail: HistoryRecord[]): HistoryRecor
 function fromSnapshot(snapshot: Snapshot): Transcript {
 	let items: Item[] = []
 	let prompt: number | undefined
-	let early = transcript.standIns(snapshot.earlier ?? [], snapshot.history)
+	// A /clear (task vh) hides everything before it.
+	let history = replay.current(snapshot.history)
+	let cleared = history.findLastIndex((r) => r.type === 'reset')
+	if (cleared >= 0) history = history.slice(cleared)
+	let early = cleared >= 0 ? [] : transcript.standIns(snapshot.earlier ?? [], snapshot.history)
 	let queued = new Set([...early, ...snapshot.history].flatMap((r) => r.type === 'inbox' && r.queue ? [r.id] : []))
 	let origins = new Map([...(snapshot.earlier ?? []), ...snapshot.history].flatMap((r) => r.type === 'inbox' ? [[r.id, r] as const] : []))
-	for (let r of [...early, ...replay.current(snapshot.history)]) {
+	for (let r of [...early, ...history]) {
 		// Older delivered records kept only their inbox IDs, not provenance.
 		if (r.type === 'user' && r.inbox?.some((id) => queued.has(id))) r = { ...r, queued: true }
 		if (r.type === 'user' && r.inbox?.length) {
@@ -312,6 +318,10 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	}
 	if (event.type === 'completions' || event.type === 'history') return t
 	// A command's question is an aside too: it never ends the turn.
+	if (event.type === 'divider' && event.clear && !t.live) {
+		let { prompt: _p, earlier: _e, ...rest } = t
+		return { ...rest, items: transcript.keyed([transcript.aside(event)], event.n, 0) }
+	}
 	if (event.type === 'command' || event.type === 'output' || event.type === 'divider' || (event.type === 'question' && event.command)) {
 		// Where history has it: after the running round's blocks already
 		// written, before the one still streaming (`streaming`), which
