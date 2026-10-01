@@ -233,10 +233,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	}
 	if (tabs.is(c)) return tabs.act(c)
 	if (c.type === 'auth' && c.link) webLinks.follow(client, client.deliver)
-	if (c.type === 'push-subscribe') {
-		push.subscribe({ endpoint: c.subscription.endpoint, ...c.subscription.keys })
-		return {}
-	}
+	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
 	if (c.type === 'hello') return clients.hello(client.record, c.pid)
 	if (c.type === 'visibility') {
 		// Not checked against open: a tab's open may still be pending.

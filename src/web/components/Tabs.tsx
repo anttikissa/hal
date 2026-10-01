@@ -10,6 +10,7 @@ import type { Edge } from '../../common/tab-pages.ts'
 import { tabMark, type Mark } from '../../common/tab-mark.ts'
 import { tabPages } from '../../common/tab-pages.ts'
 import { router } from '../router.ts'
+import { Notifications } from './Notifications.tsx'
 import { tabs } from '../tabs.ts'
 import { push } from '../push.ts'
 import { diagnostics } from '../diagnostics.ts'
@@ -72,6 +73,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 	let [requested, setRequested] = createSignal(false)
 	let enable = () => void push.enable().then(() => setRequested(true)).catch((e) => alert(`Notifications: ${e.message}`))
 	let [open, setOpen] = createSignal(false)
+	let [alerts, setAlerts] = createSignal(false)
 	let sheet!: HTMLDialogElement
 	createEffect(open, (o) => {
 		if (o && !sheet.open) {
@@ -199,11 +201,13 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 				<button type="button" class="new" onClick={newTab}>
 					+ New tab
 				</button>
+				<button type="button" onClick={() => { setOpen(false); setAlerts(true) }}>Notifications</button>
 				<button type="button" onClick={() => { diagnostics.record('manual'); diagnostics.report() }}>Send diagnostics</button>
 				<button type="button" class="reload" onClick={() => location.reload()}>
 					Reload page
 				</button>
 			</dialog>
+			<Notifications open={alerts()} onClose={() => setAlerts(false)} />
 		</header>
 	)
 }

@@ -15,7 +15,20 @@ test('VAPID key survives restart and state files have owner-only permissions', a
 	expect(statSync(`${paths.stateDir()}/push-subscriptions.ason`).mode & 0o777).toBe(0o600)
 	push.reset()
 	expect(await push.keys()).toEqual(first)
-	expect(push.store().subscriptions).toEqual([subscription])
+	expect(push.store().subscriptions).toEqual([{ ...subscription, added: expect.any(String) }])
+})
+
+test('a user can test and remove a named device, and removal survives a restart', async () => {
+	push.subscribe({ ...subscription, device: 'iPhone · Home Screen app' })
+	expect(push.devices()).toEqual([{ endpoint: subscription.endpoint, device: 'iPhone · Home Screen app', added: expect.any(String) }])
+	let original = push.request
+	let sent = 0
+	push.request = async () => (sent++, new Response(null, { status: 201 }))
+	try { expect(await push.test(subscription.endpoint)).toStartWith('Test sent') } finally { push.request = original }
+	expect(sent).toBe(1)
+	push.unsubscribe(subscription.endpoint)
+	push.reset()
+	expect(push.devices()).toEqual([])
 })
 
 test('expired endpoint is removed after 410, surviving a restart', async () => {

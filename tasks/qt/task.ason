@@ -7,7 +7,8 @@
 		'The event check is a field table in protocol.ts (eventFields, dotted paths for nested fields) and runs in connection.receive for every transport, in-process too; it is shallow (records, blocks, forms are not checked deeply). A failing event becomes a warning event, so both clients show it as their usual notice.',
 		'host-fixture client() asserts every event the host sends passes protocol.invalidEvent, so a new event type or field that the table misses fails the host tests at once. Tests that index events[0] on a fresh connection now see tabs first.',
 		'Web reload: the page carries data-version (Bun.hash of the built html) and dials /ws?v=...; the host builds the page if needed, compares, and closes a mismatched socket with code 4000, on which web/link.ts calls reload(). Bun allows srv.upgrade() after an await in fetch.',
-		'The socket path check runs first in main.start (before the terminal is taken), since a too-long path can neither host nor connect as a client; server.listen throws the same message for other callers.'
+		'The socket path check runs first in main.start (before the terminal is taken), since a too-long path can neither host nor connect as a client; server.listen throws the same message for other callers.',
+		'eventFields, kinds and invalidEvent live in common/event-check.ts (split out of protocol.ts at the 400-line limit); protocol.invalidEvent still exposes the check.'
 	],
 	needs: ['0a', 'r6', 'ja'],
 	foldInto: ['0a', 'r6', 'ja']

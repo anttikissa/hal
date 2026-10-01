@@ -95,6 +95,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'web-update') { st.updateAvailable = true; return app.changed() }
 	if (event.type === 'redraw') return
 	if (event.type === 'tabs') push.badge(event.tabs)
+	if (event.type === 'push-devices') return void push.setDevices(event)
 	if (tabs.onEvent(event)) return
 	let changed = drafts.onEvent(event)
 	let landed = uploads.settle(event)

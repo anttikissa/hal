@@ -1,12 +1,14 @@
 // Persistent web push identity/subscriptions and delivery. Nothing starts at import.
 import { mkdirSync } from 'fs'
+import type { Command, Event } from '../common/protocol.ts'
 import { settings } from '../common/settings.ts'
 import { diag } from './diag.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { pushCrypto, type PushKeys, type VapidKeys } from './push-crypto.ts'
 
-type Subscription = PushKeys & { endpoint: string }
+// device: the browser's own label ("iPhone · Home Screen"); added: ISO time.
+type Subscription = PushKeys & { endpoint: string; device?: string; added?: string }
 type Store = { subscriptions: Subscription[] }
 
 function valid(s: unknown): s is Subscription {
@@ -14,6 +16,8 @@ function valid(s: unknown): s is Subscription {
 	let v = s as Record<string, unknown>
 	if (typeof v.endpoint !== 'string' || v.endpoint.length > 2048 || typeof v.auth !== 'string' || typeof v.p256dh !== 'string') return false
 	let url = URL.parse(v.endpoint)
+	if (v.device !== undefined && (typeof v.device !== 'string' || v.device.length > 80)) return false
+	if (v.added !== undefined && (typeof v.added !== 'string' || v.added.length > 40)) return false
 	return !!url && url.protocol === 'https:' && !url.username && !url.password && !url.hash &&
 		v.auth.length === 22 && v.p256dh.length === 87 &&
 		/^[A-Za-z0-9_-]+$/.test(v.auth) && /^[A-Za-z0-9_-]+$/.test(v.p256dh) &&
@@ -50,8 +54,30 @@ async function keys(): Promise<VapidKeys> {
 function subscribe(value: unknown): void {
 	if (!push.valid(value)) throw new Error('invalid push subscription')
 	let data = push.store()
-	data.subscriptions = [...data.subscriptions.filter((s) => s.endpoint !== value.endpoint), value]
+	let added = data.subscriptions.find((s) => s.endpoint === value.endpoint)?.added ?? new Date().toISOString()
+	data.subscriptions = [...data.subscriptions.filter((s) => s.endpoint !== value.endpoint), { ...value, added }]
 	liveFiles.save(data)
+}
+
+function unsubscribe(endpoint: string): void {
+	let data = push.store()
+	data.subscriptions = data.subscriptions.filter((s) => s.endpoint !== endpoint)
+	liveFiles.save(data)
+}
+
+function devices(): { endpoint: string; device?: string; added?: string }[] {
+	return push.store().subscriptions.map(({ endpoint, device, added }) => ({ endpoint, device, added }))
+}
+
+// A test push straight to one device, even while it is watching.
+async function test(endpoint: string): Promise<string> {
+	if (!settings.push()) return 'Push is off in config.ason (push: false).'
+	let s = push.store().subscriptions.find((entry) => entry.endpoint === endpoint)
+	if (!s) return 'This device is not registered; turn notifications on first.'
+	try {
+		let error = await push.deliver(s, JSON.stringify({ id: '', title: 'Hal', body: 'Test notification: push works.' }))
+		return error ?? 'Test sent. It should appear in a few seconds.'
+	} catch (e: any) { return `Test failed: ${e?.message ?? e}` }
 }
 
 // Reuse per-origin tokens for up to 11 hours; Apple asks not to refresh
@@ -65,7 +91,8 @@ async function authorization(endpoint: string): Promise<string> {
 	return header
 }
 
-async function deliver(s: Subscription, message: string): Promise<void> {
+// Returns why delivery failed, if it did.
+async function deliver(s: Subscription, message: string): Promise<string | undefined> {
 	let body = await pushCrypto.encrypt(message, s)
 	let res = await push.request(s.endpoint, {
 		method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10_000), body,
@@ -75,7 +102,11 @@ async function deliver(s: Subscription, message: string): Promise<void> {
 		let data = push.store()
 		data.subscriptions = data.subscriptions.filter((entry) => entry.endpoint !== s.endpoint)
 		liveFiles.save(data)
-	} else if (!res.ok) diag.log(`push: service returned ${res.status}`)
+		return `The push service no longer knows this device (${res.status}); it was removed.`
+	}
+	if (res.ok) return undefined
+	diag.log(`push: service returned ${res.status}`)
+	return `The push service refused it (${res.status}).`
 }
 
 async function notify(id: string, name: string, line: string): Promise<void> {
@@ -84,6 +115,15 @@ async function notify(id: string, name: string, line: string): Promise<void> {
 	for (let s of push.store().subscriptions.slice()) {
 		try { await push.deliver(s, message) } catch (e: any) { diag.log(`push: ${e?.message ?? e}`) }
 	}
+}
+
+// A client's push command, answered with the device list.
+async function command(c: Extract<Command, { type: 'push-subscribe' | 'push' }>): Promise<Event> {
+	let result: string | undefined
+	if (c.type === 'push-subscribe') push.subscribe({ endpoint: c.subscription.endpoint, ...c.subscription.keys, ...(c.device ? { device: c.device } : {}) })
+	else if (c.action === 'remove' && c.endpoint) push.unsubscribe(c.endpoint)
+	else if (c.action === 'test' && c.endpoint) result = await push.test(c.endpoint)
+	return { type: 'push-devices', devices: push.devices(), ...(result ? { result } : {}) }
 }
 
 function reset(): void {
@@ -95,5 +135,5 @@ function reset(): void {
 export const push = {
 	state: { store: null as Store | null, keys: null as Promise<VapidKeys> | null, tokens: new Map<string, { header: string; until: number }>() },
 	request: (url: string, init: RequestInit) => fetch(url, init),
-	valid, store, keys, subscribe, authorization, deliver, notify, reset,
+	valid, store, keys, subscribe, unsubscribe, devices, test, command, authorization, deliver, notify, reset,
 }
