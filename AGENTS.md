@@ -12,6 +12,10 @@ pull.rebase=true and rebase.autoStash=true. When multiple agents share a
 checkout, use --no-autostash and never stash others’ changes. Rebase
 only when that checkout is clean and no other agent is editing it.
 
+Never use worktrees unless you have a compelling reason. Don't claim you
+have fixed something unless that commit sits in the directory Hal host
+runs from.
+
 # Tasks
 
 Use `tsk`. Trace every behavior and quality requirement to its
@@ -85,13 +89,12 @@ with `git checkout` or `git restore`. `git commit <paths>` commits whole
 files, including others' uncommitted edits in them. If others edited a
 file you changed, stage only your hunks (`git add -p`, or a blob via
 `git update-index --cacheinfo`), check `git diff --cached`, then run
-`git commit` without paths. Avoid parallel edits to the same files; use
-separate worktrees if overlap is unavoidable.
+`git commit` without paths. Avoid parallel edits to the same files.
 
 ## Orchestration
 
-Give each implementer a fresh subagent and its own worktree; it rebases
-onto origin/main and re-runs ./test before pushing. Size tasks for
+Give each implementer a fresh subagent; it re-runs ./test before
+pushing. Size tasks for
 ~40–70 requests and under ~150k context (about $2–4); split larger ones.
 Reserve one spawn slot per task: slots don't return. Measure with
 scripts/sloc (non-blank, non-comment, non-test lines) and scripts/cost
