@@ -141,8 +141,9 @@ test('absolute scratch literals and globs snapshot files outside cwd', async () 
 })
 
 // Task hy: a commit a bash call makes is announced once, to the committing
-// session, except to clients watching it; moving HEAD back is no commit.
-test('a commit in a bash call notifies other tabs once; a reset does not', async () => {
+// session, except to clients watching it; moving HEAD back is no commit;
+// an amend says 'amended'.
+test('a commit in a bash call notifies other tabs once; a reset does not; an amend says amended', async () => {
 	let other = sessions.create({ cwd, model: 'fake/m' }).id
 	let elsewhere: any[] = [], watching: any[] = []
 	let fakes = [{ visible: other, deliver: (e: any) => elsewhere.push(e) }, { visible: id, deliver: (e: any) => watching.push(e) }] as any[]
@@ -156,6 +157,9 @@ test('a commit in a bash call notifies other tabs once; a reset does not', async
 		expect(elsewhere.map((e) => e.line.split(' ')[1])).toEqual(['first', 'second'])
 		await bash(`${git} reset -q --hard HEAD`)
 		expect(elsewhere).toHaveLength(2)
+		await bash(`${git} commit -q --amend -m reworded`)
+		expect(elsewhere[2]).toMatchObject({ what: 'amended', line: expect.stringMatching(/ reworded$/) })
+		expect(elsewhere[0].what).toBeUndefined()
 		expect(watching).toEqual([])
 	} finally { for (let c of fakes) host.state.clients.delete(c) }
 })

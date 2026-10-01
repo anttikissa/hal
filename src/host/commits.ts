@@ -14,7 +14,7 @@ import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 
 type Watch = { sessionId: string; cwd: string; log: string; size: number; start: number }
-type Entry = { hash: string; time: number }
+type Entry = { hash: string; time: number; amend: boolean }
 
 // A missing reflog before the call counts as empty, so an initial commit shows.
 async function begin(sessionId: string, cwd: string, log: string): Promise<Watch> {
@@ -28,8 +28,8 @@ async function begin(sessionId: string, cwd: string, log: string): Promise<Watch
 // not pulls, rebases, resets, checkouts or fast-forwards.
 function parse(text: string): Entry[] {
 	return text.split('\n').flatMap((line) => {
-		let m = /^[0-9a-f]+ ([0-9a-f]+) .* (\d+) [+-]\d{4}\t(commit|revert|cherry-pick)/.exec(line)
-		return m ? [{ hash: m[1]!, time: Number(m[2]) }] : []
+		let m = /^[0-9a-f]+ ([0-9a-f]+) .* (\d+) [+-]\d{4}\t(commit \(amend\)|commit|revert|cherry-pick)/.exec(line)
+		return m ? [{ hash: m[1]!, time: Number(m[2]), amend: m[3] === 'commit (amend)' }] : []
 	})
 }
 
@@ -72,7 +72,7 @@ async function finish(watch: Watch): Promise<void> {
 		let info = new Map(out.text.split('\0').filter(Boolean).map((r) => { let [h, short, subject, body] = r.split('\x1f'); return [h!, { short: short!, subject: subject!, trailer: commits.trailer(body ?? '') }] }))
 		for (let e of fresh) {
 			let c = info.get(e.hash)
-			if (c) commits.announce(commits.attribute(watch, e, c.trailer), e.hash, c.short, c.subject)
+			if (c) commits.announce(commits.attribute(watch, e, c.trailer), e.hash, c.short, c.subject, e.amend)
 		}
 	} catch (e: any) {
 		diag.log(`commit notices: ${e?.message ?? e}`)
@@ -80,8 +80,9 @@ async function finish(watch: Watch): Promise<void> {
 }
 
 // Every client except those watching the session (they see it in its transcript); never a push.
-function announce(id: string, hash: string, short: string, subject: string): void {
+function announce(id: string, hash: string, short: string, subject: string, amend = false): void {
 	let notice: NoticeEvent = { type: 'notice', session: id, name: sessions.open(id).name ?? id, kind: 'commit', line: `${short} ${subject}`, key: `commit:${hash}` }
+	if (amend) notice.what = 'amended'
 	let tab = tabs.file().open.indexOf(id)
 	if (tab >= 0) notice.tab = tab + 1
 	for (let c of host.state.clients) if (c.visible !== id) c.deliver(notice)

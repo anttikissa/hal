@@ -351,7 +351,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	warning: { text: 's' },
 	version: { version: 's' },
 	'model-names': { names: 'o' },
-	notice: { session: 's', tab: 'i?', name: 's', kind: 's', line: 's' },
+	notice: { session: 's', tab: 'i?', name: 's', kind: 's', line: 's', key: 's?', what: 's?' },
 	tabs: { tabs: 'a' },
 	go: { sessionId: 's', tab: 's' },
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },
