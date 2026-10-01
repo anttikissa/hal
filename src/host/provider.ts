@@ -7,6 +7,8 @@ import { blocks, type ErrorEvent, type Message, type StreamEvent } from '../comm
 import { clock } from './clock.ts'
 import { limits } from './limits.ts'
 import { usage } from './usage.ts'
+import { auth } from './auth.ts'
+import { statusUsage } from './status-usage.ts'
 import type { Capability } from './effort.ts'
 
 export type ToolDef = { name: string; description: string; inputSchema: Record<string, unknown> }
@@ -192,6 +194,20 @@ function resetAt(headers: Headers, body: string): number | undefined {
 // limit (per account, or per model for providers without accounts)
 // and rejected credentials. With an account, the limit is that
 // account's: retry at once, which picks the next one (auth.ts).
+// Names the subscription account behind a failure, and its plan. A
+// rejected request re-reads the plan so a lapsed subscription (plus →
+// free) shows as the cause, not just a refused model.
+async function who(kind: string, name: string | undefined, status: number): Promise<string> {
+	if (!name || (kind !== 'openai' && kind !== 'anthropic')) return ''
+	let find = () => auth.all(kind).list.find((a) => a.name === name)
+	let account = find()
+	if (!account) return ` (${name})`
+	let changed = kind === 'openai' && (status === 400 || status === 403) ? await statusUsage.refresh(kind, account).catch(() => undefined) : undefined
+	let entry = find()?.entry ?? account.entry
+	let label = [entry.email ?? name, entry.plan].filter(Boolean).join(', ')
+	return ` (${label}${changed ? `; plan changed ${changed}` : ''})`
+}
+
 function failed(p: Provider, modelId: string, account: string | undefined, e: ErrorEvent, reset?: number): ErrorEvent {
 	e.failure ??= provider.failure(e.status)
 	let now = clock.now()
@@ -271,7 +287,7 @@ async function* stream(
 		usage.observe(id.provider, http.account, res.headers)
 		if (!res.ok || !res.body) {
 			let body = await res.text()
-			let message = `HTTP ${res.status} from ${id.provider}`
+			let message = `HTTP ${res.status} from ${id.provider}${await who(id.provider, http.account, res.status)}`
 			let text = provider.detail(body)
 			if (text) message += `: ${text}`
 			yield failed(p, modelId, http.account, { type: 'error', message, status: res.status, body }, provider.resetAt(res.headers, body))

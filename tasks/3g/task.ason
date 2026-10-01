@@ -1,0 +1,7 @@
+{
+	title: 'Provider errors name the account; lapsed plans surface',
+	spec: 'A provider HTTP error from a subscription account names it and its plan: "HTTP 400 from openai (bob@example.com, free): ..." (email, else the account name; never a token). When an OpenAI account\'s request is rejected (400 or 403), Hal re-reads its plan from the usage endpoint; if the plan changed since last seen, the error adds "plan changed plus → free", so a lapsed subscription that no longer offers the model is the visible cause. /status shows the same change as the account\'s error line ("plan changed: plus → free"). Invariant restored: a model refused because one account lost its plan never surfaces as an anonymous provider error. Tests: refresh reports plus → free.',
+	status: 'done',
+	needs: ['ab'],
+	foldInto: ['ne', 'ab']
+}

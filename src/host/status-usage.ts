@@ -73,7 +73,8 @@ function payload(kind: Kind, raw: any): Windows {
 	return out
 }
 
-async function refresh(kind: Kind, account: Account): Promise<void> {
+// Returns 'old → new' when the account's plan changed.
+async function refresh(kind: Kind, account: Account): Promise<string | undefined> {
 	let { data } = auth.all(kind)
 	let credential = await auth.credential(data, account, kind)
 	if (credential.type !== 'token') return
@@ -106,8 +107,10 @@ async function refresh(kind: Kind, account: Account): Promise<void> {
 			for (let [key, name] of auth.state.chosen) if (key.startsWith(`${kind} `) && name === account.name) auth.state.chosen.set(key, email)
 		}
 	}
+	let before = current.plan
 	if (kind === 'openai' && typeof raw?.plan_type === 'string' && /^[\w -]{1,32}$/.test(raw.plan_type)) current.plan = raw.plan_type
 	if (current.email || current.plan) liveFiles.save(data)
+	if (before && current.plan && before !== current.plan) return `${before} → ${current.plan}`
 }
 
 function problem(error: unknown): { text: string; login: boolean } {
@@ -142,7 +145,10 @@ async function show(sessionId: string, model: string): Promise<string> {
 			let recent = Math.max(0, ...Object.values(data).map((w) => Date.parse(w.observed ?? '') || 0))
 			let error: string | undefined
 			if (!apiKey && clock.now() - recent > 60_000) {
-				try { await statusUsage.refresh(kind, account) } catch (e) {
+				try {
+					let changed = await statusUsage.refresh(kind, account)
+					if (changed) error = `plan changed: ${changed}`
+				} catch (e) {
 					let failure = statusUsage.problem(e)
 					error = `${failure.text} — showing cached usage`
 					broken ||= failure.login

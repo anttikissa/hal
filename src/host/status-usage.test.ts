@@ -34,7 +34,7 @@ test('stale usage refreshes only subscriptions and failed auth leaves cached win
 })
 
 // A usage response can name a login previously identified only by slot.
-test('refresh learns email and plan and moves cached windows to the named account', async () => {
+test('refresh learns email and plan, reports a plan change, and moves cached windows to the named account', async () => {
 	let all = auth.all, credential = auth.credential, store = usage.store, save = liveFiles.save, fetchOld = globalThis.fetch
 	let entry: Record<string, any> = { accessToken: 'token' }
 	let account = { name: 'account 3', entry, replace: () => {} }
@@ -46,12 +46,14 @@ test('refresh learns email and plan and moves cached windows to the named accoun
 	liveFiles.save = (() => { saves++ }) as typeof save
 	globalThis.fetch = (async () => Response.json({ email: 'bob@example.com', plan_type: 'plus', rate_limit: { primary_window: { used_percent: 24, limit_window_seconds: 18000, reset_at: Math.floor(Date.now() / 1000) + 300 } } })) as unknown as typeof fetch
 	try {
-		await statusUsage.refresh('openai', account as any)
+		expect(await statusUsage.refresh('openai', account as any)).toBeUndefined()
 		expect(entry.email).toBe('bob@example.com')
 		expect(entry.plan).toBe('plus')
 		expect(records.openai?.['account 3']).toBeUndefined()
 		expect(records.openai?.['bob@example.com']?.['7d']?.used).toBe(70)
 		expect(records.openai?.['bob@example.com']?.['5h']?.used).toBe(24)
 		expect(saves).toBe(1)
+		globalThis.fetch = (async () => Response.json({ plan_type: 'free', rate_limit: { primary_window: { used_percent: 1, limit_window_seconds: 18000 } } })) as unknown as typeof fetch
+		expect(await statusUsage.refresh('openai', account as any)).toBe('plus → free')
 	} finally { auth.all = all; auth.credential = credential; usage.store = store; liveFiles.save = save; globalThis.fetch = fetchOld }
 })
