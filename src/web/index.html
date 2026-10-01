@@ -159,6 +159,12 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .entry:focus-within { border-left-color: var(--cursor); }
 .entry.dropping { outline: 2px dashed var(--cursor); outline-offset: 2px; }
 .entry .actions { display: flex; }
+.chips { display: flex; flex-wrap: wrap; gap: 1ch; margin: 0 0 0.25lh; padding: 0; list-style: none; }
+.chips li { display: flex; align-items: stretch; border: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
+.chips a { display: flex; align-items: center; padding: 0 1ch; color: inherit; }
+.chips img { display: block; height: 3lh; max-width: 12ch; object-fit: cover; margin: 0 -1ch; }
+.chips button { min-width: 44px; min-height: 44px; background: transparent; color: var(--quiet); border: 0; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
+.chips button:hover { color: inherit; background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
 .entry .actions button { flex: 1; min-height: 44px; }
 .entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
 /* The example request: the input's faint blue, as in the terminal. It

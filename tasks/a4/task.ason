@@ -1,0 +1,6 @@
+{
+	title: 'Web prompt: attachment chips above the box',
+	spec: "On the web, while a prompt holds [image/<name>], [paste/<name>] or [file/<name>] markers (attachments.fileMarker), a row above the message box shows one chip per marker, in text order: an image's thumbnail (/raw/<name>, retried while its upload is still in flight) or the marker path, inside a real <a href=/<path> target=_blank>, so cmd-click, middle-click and the context menu are the browser's own. Text in a textarea can never be a link; Hal does not emulate link clicks there. Each chip has an × button (aria-label Remove <path>, 44px target) that deletes that marker and one following space as an undoable edit (editor.write), keeping the caret on the same text. The prompt text is the only state: chips follow it, so deleting a marker by hand removes its chip. No row without markers.",
+	status: 'done',
+	needs: ['qy']
+}

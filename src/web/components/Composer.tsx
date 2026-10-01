@@ -9,8 +9,13 @@
 // or picked with the attach button, and long pasted text, become
 // attachments (attach.ts): a placeholder at the caret, then the marker.
 // While files are dragged over the page the box is outlined.
+// Above the box, each attachment marker in the text is a chip (task
+// a4): a real link (so the browser's own cmd-click and context menu
+// work; text in a textarea can never be a link) with an × that deletes
+// the marker as an undoable edit. The text stays the only state.
 
-import { createEffect, For, Show, onSettled } from 'solid-js'
+import { createEffect, createMemo, For, Show, onSettled } from 'solid-js'
+import { attachments } from '../../common/attachments.ts'
 import { states } from '../../common/states.ts'
 import { app } from '../app.ts'
 import { attach } from '../attach.ts'
@@ -57,6 +62,23 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 			document.removeEventListener('focusout', leaving)
 		}
 	})
+	// Marker paths ('image/abc123.png'): strings, so For keeps each chip's
+	// node (and its loaded thumbnail) while typing elsewhere.
+	let chips = createMemo(() => [...props.text.matchAll(attachments.fileMarker)].map((m) => m[1]!))
+	// Deletes the index-th marker and one space after it, the caret kept
+	// on the same text.
+	let remove = (index: number) => {
+		let m = [...input.value.matchAll(attachments.fileMarker)][index]
+		if (!m) return
+		let start = m.index, end = start + m[0].length + (input.value[start + m[0].length] === ' ' ? 1 : 0)
+		let c = input.selectionStart
+		editor.write(input, { start, end, text: '' }, c >= end ? c - (end - start) : Math.min(c, start))
+	}
+	// A thumbnail asked for before its upload finished is a 404: retry.
+	let retry = (img: HTMLImageElement) => {
+		let n = Number(img.dataset.tries ?? 0)
+		if (n < 20) setTimeout(() => ((img.dataset.tries = String(n + 1)), (img.src = `${img.src.split('?')[0]}?try=${n + 1}`)), 500)
+	}
 	let busy = () => !!props.view.transcript && states.busy(props.view.transcript.state)
 	let send = (queue = false) => {
 		app.send(queue)
@@ -67,6 +89,21 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 			<div id="notice" class="log">
 				{props.notice ?? ''}
 			</div>
+			<Show when={chips().length}>
+				<ul class="chips" aria-label="Attachments">
+					<For each={chips()}>{(path, index) => {
+						let name = path.split('/')[1]!
+						return (
+							<li>
+								<a href={`/${path}`} target="_blank" rel="noopener" title={`Open ${path}`}>
+									{path.startsWith('image/') ? <img src={`/raw/${name}`} alt={path} onError={(e) => retry(e.currentTarget)} /> : path}
+								</a>
+								<button type="button" aria-label={`Remove ${path}`} title="Remove" onClick={() => remove(index())}>×</button>
+							</li>
+						)
+					}}</For>
+				</ul>
+			</Show>
 			<div class={['entry input', { dropping: props.dropping }]}>
 				{props.menu && (
 					<div class="completions" role="listbox" aria-label="Completions">
