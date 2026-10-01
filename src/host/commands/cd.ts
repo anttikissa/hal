@@ -15,7 +15,9 @@ export const command: SlashCommand = {
 		let head = args.slice(0, args.lastIndexOf('/') + 1)
 		let base = args.slice(head.length)
 		let dir = commands.expand(head || '.', ctx.cwd)
+		// Sorted, so an exact match precedes its longer siblings (.hal before .hal-fresh).
 		return readdirSync(dir)
+			.sort()
 			.filter((name) => name.startsWith(base) && (base.startsWith('.') || !name.startsWith('.')) && isDir(`${dir}/${name}`))
 			.map((name) => `${head}${name}/`)
 	},
