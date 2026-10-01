@@ -29,6 +29,7 @@ function validate(id: string, data: Record<string, any>): void {
 	if (data.name !== undefined && typeof data.name !== 'string') throw new Error(`${path}: invalid name`)
 	if (data.nameOwner !== undefined && data.nameOwner !== 'auto' && data.nameOwner !== 'manual') throw new Error(`${path}: invalid nameOwner`)
 	for (let key of ['nameVersion', 'nameTurns']) if (data[key] !== undefined && (!Number.isSafeInteger(data[key]) || data[key] < 0)) throw new Error(`${path}: invalid ${key}`)
+	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string') throw new Error(`${path}: invalid previousCwd`)
 	if (data.effort !== undefined && typeof data.effort !== 'string') throw new Error(`${path}: invalid effort`)
 	let bg = data.background
 	if (bg !== undefined && !(Array.isArray(bg) && bg.every((b) => typeof b === 'string'))) throw new Error(`${path}: background must be a list of ids`)

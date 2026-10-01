@@ -3,13 +3,14 @@
 
 import { mkdirSync, readdirSync, statSync } from 'fs'
 import { commands, type Context, type SlashCommand } from '../commands.ts'
+import { paths } from '../paths.ts'
 
 function isDir(path: string): boolean {
 	return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false
 }
 
 export const command: SlashCommand = {
-	help: () => '/cd <dir>: change the working directory of this session (~ is home; relative to the current one). Offers to create a missing directory. /cd alone shows it.',
+	help: () => '/cd <dir>: change the working directory of this session (~ is home; relative to the current one). Offers to create a missing directory. /cd alone goes to the Hal home; /cd - goes back.',
 	complete(args: string, ctx: Context): string[] {
 		if (args === '~') return ['~/']
 		let head = args.slice(0, args.lastIndexOf('/') + 1)
@@ -22,8 +23,8 @@ export const command: SlashCommand = {
 			.map((name) => `${head}${name}/`)
 	},
 	run(args, answers, ctx) {
-		if (!args) return { say: ctx.cwd }
-		let path = commands.expand(args, ctx.cwd)
+		if (args === '-' && !ctx.previousCwd) return { say: `no previous directory; still in ${ctx.cwd}` }
+		let path = !args ? paths.home() : args === '-' ? ctx.previousCwd! : commands.expand(args, ctx.cwd)
 		let stat = statSync(path, { throwIfNoEntry: false })
 		if (stat && !stat.isDirectory()) return { error: `${path}: not a directory` }
 		if (!stat) {

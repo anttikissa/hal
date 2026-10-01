@@ -4,6 +4,8 @@ export interface SessionMeta {
 	id: string
 	// Working directory and provider/model id for the next turn.
 	cwd: string
+	// The directory the last /cd left, for /cd -.
+	previousCwd?: string
 	model: string
 	// Explicit request override; omitted uses provider policy.
 	effort?: string

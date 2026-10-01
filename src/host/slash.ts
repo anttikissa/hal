@@ -45,6 +45,7 @@ function context(id: string): Context {
 	return {
 		sessionId: id,
 		cwd: meta.cwd,
+		previousCwd: meta.previousCwd,
 		model: meta.model,
 		effort: meta.effort,
 		setCwd: (cwd) => slash.change(id, { cwd }),
@@ -64,7 +65,10 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 	let selection = patch.model === undefined ? undefined : modelList.selection(patch.model)
 	if (selection && (selection.id !== meta.model || selection.effort !== meta.effort)) changed.model = modelList.qualified(selection.id, selection.effort)
 	if (!Object.keys(changed).length) return
-	if (changed.cwd !== undefined) meta.cwd = changed.cwd
+	if (changed.cwd !== undefined) {
+		meta.previousCwd = meta.cwd
+		meta.cwd = changed.cwd
+	}
 	if (changed.model !== undefined && selection) {
 		meta.model = selection.id
 		if (selection.effort === undefined) delete meta.effort
