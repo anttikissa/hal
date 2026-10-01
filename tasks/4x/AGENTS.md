@@ -12,9 +12,10 @@ pull.rebase=true and rebase.autoStash=true. When multiple agents share a
 checkout, use --no-autostash and never stash others’ changes. Rebase
 only when that checkout is clean and no other agent is editing it.
 
-Never use worktrees unless you have a compelling reason. Don't claim you
-have fixed something unless that commit sits in the directory Hal host
-runs from.
+Use worktrees only read-only: to test your work when others' uncommitted
+edits break ./test, or to run or inspect another revision. Never commit
+in a worktree. Don't claim you have fixed something unless that commit
+sits in the directory Hal host runs from.
 
 # Tasks
 
@@ -91,7 +92,7 @@ file you changed, stage only your hunks (`git add -p`, or a blob via
 `git update-index --cacheinfo`), check `git diff --cached`, then run
 `git commit` without paths. Avoid parallel edits to the same files.
 
-Avoid overlapping work. Use worktrees only if user insists.
+Avoid overlapping work.
 
 ## Orchestration
 
