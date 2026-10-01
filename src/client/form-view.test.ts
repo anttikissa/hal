@@ -81,3 +81,21 @@ test('a quote shows under the question with its marked part highlighted on every
 	}
 	expect(plain(answered)).toContain('no')
 })
+
+test('a cached question gains visible choices when its blocked state arrives', () => {
+	frame.state.history = undefined
+	let form = { text: 'Continue?', fields: [{ type: 'choice' as const, name: 'go', options: ['Yes', 'No'] }] }
+	let v = view([{ type: 'question', id: 'q1', form }])
+	// The question event precedes the blocked-state event. Its first
+	// frame has no active form, but the second uses the same item.
+	frame.build(v, 40)
+	let st = forms.start('q1', form)
+	let open = frame.build({ ...v, form: st }, 40)
+	expect(plain(open.lines)).toContain('→ Yes')
+	expect(plain(open.lines)).toContain('No')
+	expect(plain(open.lines)[open.cursor.row]).toBe('→ Yes')
+	st = forms.step(st, { key: 'down' }).state
+	let moved = frame.build({ ...v, form: st }, 40)
+	expect(plain(moved.lines)[moved.cursor.row]).toBe('→ No')
+	frame.state.history = undefined
+})

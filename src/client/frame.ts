@@ -200,7 +200,14 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 	let look = `${cols} ${session} ${itemView.resultRows()} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
 	let kept = frame.state.history
 	let start = 0
-	if (kept?.look === look) while (start < kept.items.length && items[start] === kept.items[start]) start++
+	// A question can become active without its transcript item changing
+	// (the blocked-state event follows the question). Never reuse its
+	// inactive rows while the form is taking keys.
+	if (kept?.look === look) while (start < kept.items.length && items[start] === kept.items[start]) {
+		let item = items[start]!
+		if (item.type === 'question' && item.id === view.form?.id) break
+		start++
+	}
 	let lines = start ? kept!.lines.slice(0, kept!.ends[start - 1]) : []
 	let ends = kept && start ? kept.ends.slice(0, start) : []
 	let bash = kept && start ? kept.bash.filter((b) => b.at < start) : []
