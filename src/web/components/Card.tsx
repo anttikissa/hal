@@ -84,7 +84,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// The link shows the block's id, #35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
-	let href = () => (props.row.pending || props.row.waiting ? undefined : target.href(props.session, props.row.item.key))
+	let href = () => (props.row.pending || (props.row.waiting && props.row.note === undefined) ? undefined : target.href(props.session, props.row.item.key))
 	let link = () => (
 		<Show when={href()}>
 			{(h) => (
@@ -169,8 +169,20 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			<Show when={props.cursor && !md()}>{cursor()}</Show>
 		</div>
 	)
+	// A queued message's compact row (task 16): its note and text, no
+	// header, at most 3 lines until a click (or its link) opens it.
+	let queued = () => {
+		let all = `${props.row.note} ${text()}`.split('\n')
+		return expanded() || all.length <= 3 ? all.join('\n') : [...all.slice(0, 3), `… ${all.length - 3} more lines`].join('\n')
+	}
+	let compact = () => (
+		<div ref={(e) => (root = e)} class={['Card', 'user', 'prompt', 'queued', props.target ? 'target' : '']} onClick={(e) => !(e.target as Element).closest('a') && getSelection()?.isCollapsed && setOpen(!expanded())}>
+			{link()}
+			{queued()}
+		</div>
+	)
 	return (
-		<Show when={shown()}>
+		<Show when={props.row.note === undefined ? shown() : undefined} fallback={compact()}>
 			{(s) => (
 				<Show when={folds()} fallback={plain(s)}>
 					<article ref={(e) => (root = e)} class={['Card', 'folds', ...s().kind.split(' '), expanded() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>

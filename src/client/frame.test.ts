@@ -454,7 +454,6 @@ test('command outcomes appear once; unexecuted failures and other tool results s
 	])
 	let lines = plain(frame.layout(v, 120)!.lines).join('\n')
 	expect(lines.match(/Session renamed:/g)).toHaveLength(1)
-	expect(lines).toContain('Hal issued a command')
 	expect(lines).toContain('not available to the model')
 	expect(lines).toContain('unrelated output')
 	expect(v.transcript!.items.filter((i) => i.type === 'tool-result')).toHaveLength(3)

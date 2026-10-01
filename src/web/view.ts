@@ -167,12 +167,6 @@ function pause(st: ViewState): unknown {
 	return st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 }
 
-// The messages waiting for the turn, each with why it waits.
-function waiting(st: ViewState): { text: string; label: string }[] {
-	let t = st.transcript
-	return t ? t.inbox.map((m) => ({ text: m.text, label: inbox.tag(m) })) : []
-}
-
 // What the model is streaming into the last item, thinking or text:
 // Hal's cursor sits in that item's card (dimmed while thinking).
 function streaming(st: ViewState): 'thinking' | 'text' | undefined {
@@ -251,8 +245,9 @@ function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: strin
 // call's row), so rows keyed by position keep their DOM.
 // `key`: what keeps the row's card (task w5): the item's key, or for a
 // prompt or command this client sent, the command id it had while pending.
-// `pending`: sent, not yet acknowledged.
-export type Row = { item: Item; at: number; key: string; result?: Item & { type: 'tool-result' }; pending?: true; waiting?: string }
+// `pending`: sent, not yet acknowledged. `waiting`: in the inbox;
+// `note`: a queued message's compact row starts with it (task 16).
+export type Row = { item: Item; at: number; key: string; result?: Item & { type: 'tool-result' }; pending?: true; waiting?: true; note?: string }
 
 function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 	let out: Row[] = []
@@ -276,11 +271,17 @@ function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 
 // `rows` and after them the prompts still pending (`id`: the submit's
 // command id), but for one the host already put in the transcript: it
-// is a row already, under the same key, so its card stays.
-function withPending(rows: Row[], pending: { id: string; text: string }[], waiting: InboxItem[] = []): Row[] {
+// is a row already, under the same key, so its card stays. `tabs`: the
+// host's tab ids in order, numbering a queued message's sender.
+function withPending(rows: Row[], pending: { id: string; text: string }[], waiting: InboxItem[] = [], tabs: string[] = []): Row[] {
 	let keys = new Set(rows.map((r) => r.key))
 	let at = (rows.at(-1)?.at ?? -1) + 1
-	let queued = waiting.filter((m) => !keys.has(m.id)).map((m): Row => ({ item: transcript.waitingItem(m), at, key: m.id, waiting: inbox.tag(m) }))
+	let row = (m: InboxItem): Row => {
+		let r: Row = { item: transcript.waitingItem(m, waiting), at, key: m.id, waiting: true }
+		if (m.queue) r.note = inbox.note(m, m.from === undefined ? undefined : tabs.indexOf(m.from) + 1 || undefined)
+		return r
+	}
+	let queued = waiting.filter((m) => !keys.has(m.id)).map(row)
 	for (let row of queued) keys.add(row.key)
 	let more = pending.filter((s) => !keys.has(s.id)).map((s): Row => ({ item: { type: 'prompt', text: s.text, key: s.id }, at, key: s.id, pending: true }))
 	return queued.length || more.length ? [...rows, ...queued, ...more] : rows
@@ -388,7 +389,6 @@ export const view = {
 	complete,
 	completed,
 	pause,
-	inbox: waiting,
 	streaming,
 	line,
 	status,

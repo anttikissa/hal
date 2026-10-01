@@ -315,6 +315,4 @@ test('waiting and delivered steering use the same header, without labelling a fo
 	for (let t of [live, loaded]) {
 		expect(t.items.map((i) => titles.who(i))).toEqual(['You (steering)', 'You'])
 	}
-	expect(titles.who(transcript.waitingItem({ id: 'a', text: 'advice', from: '2-def', advisory: true }))).toBe('Message from 2-def (advisory)')
-	expect(titles.who(transcript.waitingItem({ id: 'q', text: 'later', queue: true }))).toBe('You · from queue')
 })

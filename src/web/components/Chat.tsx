@@ -152,7 +152,7 @@ export function Chat() {
 	return (
 		<div class={['Chat', { offline: !connected() }]}>
 			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
-			<Transcript view={view()} pending={pending()} target={linked() || undefined} />
+			<Transcript view={view()} pending={pending()} target={linked() || undefined} tabs={tabs()} />
 			<Notices entries={stack()} />
 			<StatusRow view={view()} connected={connected()} />
 			<Composer view={view()} text={text()} menu={menu()} notice={notice()} placeholder={placeholder()} dropping={dropping()} />

@@ -8,9 +8,11 @@
 
 import type { Sender } from './blocks.ts'
 import type { HistoryRecord } from './replay.ts'
+import { titles } from './titles.ts'
 
 // Sender fields: another session sent it (task rj); none, the human.
-export type InboxItem = { id: string; text: string; queue?: true } & Sender
+// `ts`: when it was first written to the inbox.
+export type InboxItem = { id: string; text: string; queue?: true; ts?: string } & Sender
 
 // Messages sent and not yet delivered, oldest first, as last edited.
 function pending(records: HistoryRecord[]): InboxItem[] {
@@ -19,7 +21,7 @@ function pending(records: HistoryRecord[]): InboxItem[] {
 		if (r.type === 'inbox' && r.withdrawn) waiting.delete(r.id)
 		else if (r.type === 'inbox') {
 			// An edit keeps the message's place: Map.set on a key keeps its order.
-			let item: InboxItem = { id: r.id, text: r.text }
+			let item: InboxItem = { id: r.id, text: r.text, ts: waiting.get(r.id)?.ts ?? r.ts }
 			if (r.queue) item.queue = true
 			Object.assign(item, inbox.sender(r))
 			waiting.set(r.id, item)
@@ -45,12 +47,13 @@ function provenance(item: InboxItem): Sender {
 	return { ...inbox.sender(item), ...(!item.queue && !item.advisory ? { steering: true as const } : {}) }
 }
 
-// The label in a word or two, for a message drawn as a prompt: its kind
-// and sender. Never why the session stalls: that is the status line.
-function tag(item: InboxItem): string {
-	let by = item.from === undefined ? '' : ` from ${item.label ?? item.from}`
-	let kind = item.queue ? 'queued' : item.advisory ? 'advisory' : 'steering'
-	return kind + by
+// What leads a queued message's compact row (task 16): '(Queued at
+// 15:29 by 76-cpo, tab 5)'. `tab`: the sender's tab number, if it has
+// one. Never why the session stalls: that is the status line.
+function note(item: InboxItem, tab?: number): string {
+	let at = titles.time(item.ts)
+	let by = item.from === undefined ? '' : ` by ${item.label ?? item.from}${tab === undefined ? '' : `, tab ${tab}`}`
+	return `(Queued${at ? ` at ${at}` : ''}${by})`
 }
 
-export const inbox = { pending, sender, provenance, tag }
+export const inbox = { pending, sender, provenance, note }

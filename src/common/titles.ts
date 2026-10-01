@@ -23,14 +23,20 @@ function time(ts: string | undefined): string {
 	return t
 }
 
+// 'who (a, b)': a sender and its tags, or the sender alone.
+function tagged(who: string, tags: (string | false | undefined)[]): string {
+	let list = tags.filter((t) => t)
+	return list.length ? `${who} (${list.join(', ')})` : who
+}
+
 // Who wrote `item`, or undefined for an item without a header.
 function who(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt':
-			return (item.from === undefined ? 'You' : `Message from ${item.label ?? item.from}`) + (item.steering ? ' (steering)' : item.advisory ? ' (advisory)' : item.queued ? ' · from queue' : '')
+			return tagged(item.from === undefined ? 'You' : `Message from ${item.label ?? item.from}`, [item.steering && 'steering', item.advisory && 'advisory', item.queued && 'queued'])
 		// A command is headed as the prompt it was typed as.
 		case 'command':
-			return item.origin === 'model' ? 'Hal issued a command' : item.from === undefined ? 'You' : `Message from ${item.from}`
+			return item.origin === 'model' ? tagged('Hal', ['command']) : item.from === undefined ? 'You' : `Message from ${item.from}`
 		case 'text':
 		case 'thinking': {
 			let parts = item.model ? [titles.modelName(item.model)] : []

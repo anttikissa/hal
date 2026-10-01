@@ -1,7 +1,12 @@
 {
 	title: 'Compact openable rows for queued messages',
 	spec: 'A queued message waiting to run is local sticky state, not conversation. Terminal and web draw it at the transcript tail (task 2r) as a compact row with no card header and no blank lines inside: "(Queued at 15:29) text", or "(Queued at 15:29 by 76-cpo, tab 5) text" when another session queued it. The time is when its inbox record was written (InboxItem carries that ts). The tab is the sender\'s current tab number, redrawn when tabs change and omitted when it has none. Several waiting messages stack in run order. Each row folds like a tool card: closed, it shows at most 3 lines, then "… N more lines". Its id is #q1, #q2… by run position, shown dim at the right on the terminal as an OSC 8 link to the web (transcript.href accepts q keys), where the card opens in full. The row gives no paused or blocked reason; the status line says why a session stalls. Steering and advisory messages keep the prompt card while waiting: steering waits only for cancelled work to settle. Once delivered, a queued message is a normal prompt card headed "10:53 You (queued)" or "10:53 Message from 76-cpo (queued)". titles.who builds every header as a sender plus a list of tags (steering, advisory, queued, command) rendered "who (a, b)", never as per-combination branches; a command the model issued is headed "Hal (command)". Tests make no assertions on label strings; they check that a message shows exactly once through the optimistic, waiting and delivered stages, and that queue origin survives a reload.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Queued waiting rows keep the submit id as their web Row key (optimistic → waiting continuity) while the item key is q<n>; transcript.waitingItem(m, list) numbers queued items by position among queued ones only. Terminal: frame.queuedRows; web: Card's compact branch when Row.note is set.",
+		"inbox.pending keeps a message's first ts across edits, so its Queued-at time does not jump when edited. web app.seek and Transcript's target hit look through withPending rows, so a #q link finds the waiting card.",
+		'On 1 Oct three host tests failed on origin/main independent of this change (scratch literals snapshot, effort persists, timezone saved unasked).'
+	],
 	needs: [],
 	foldInto: ['2r']
 }

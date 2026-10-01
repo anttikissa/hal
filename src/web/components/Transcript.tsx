@@ -10,6 +10,7 @@
 
 import { createMemo, For, onSettled, Show } from 'solid-js'
 import type { Sending } from '../../common/drafts.ts'
+import type { Tab } from '../../common/protocol.ts'
 import type { Item } from '../../common/transcript.ts'
 import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
@@ -22,18 +23,18 @@ const none: Item[] = []
 
 // `target`: the block the address links to (target.ts), whose card is
 // marked and opens.
-export function Transcript(props: { view: ViewState; pending: Sending[]; target?: string }) {
+export function Transcript(props: { view: ViewState; pending: Sending[]; target?: string; tabs?: Tab[] }) {
 	let el!: HTMLElement
 	onSettled(() => scroll.init(el, () => app.older()))
 	// Rows follow the items alone: redraws that leave them be (typing, the
 	// status) keep every row object, so no card binding runs again.
 	let items = createMemo(() => props.view.transcript?.items ?? none)
 	let rows = createMemo(() => view.rows(items(), props.view.sent))
-	let all = createMemo(() => view.withPending(rows(), props.pending, props.view.transcript?.inbox))
+	let all = createMemo(() => view.withPending(rows(), props.pending, props.view.transcript?.inbox, props.tabs?.map((t) => t.id)))
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorAt = () => (streaming() ? rows().length - 1 : -1)
-	let hit = createMemo(() => props.target && target.row(rows(), props.target)?.key)
+	let hit = createMemo(() => props.target && target.row(all(), props.target)?.key)
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
 	return (
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>

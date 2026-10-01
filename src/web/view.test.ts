@@ -286,7 +286,7 @@ test('a sent prompt shows pending, then as the host’s item under the same key,
 	// using the same key; it lives in the transcript, not the fixed footer.
 	let waiting = [{ id: 'c7', text: 'go', queue: true as const }]
 	let queued = view.withPending(view.rows(st.transcript!.items, st.sent), sending, waiting)
-	expect(queued.map((r) => [r.key, r.pending, r.waiting])).toEqual([['c7', undefined, 'queued']])
+	expect(queued.map((r) => [r.key, r.pending, r.waiting])).toEqual([['c7', undefined, true]])
 	expect(queued[0]!.item).toMatchObject({ queued: true })
 	let steering = view.withPending([], sending, [{ id: 'c7', text: 'go' }])
 	expect(steering).toHaveLength(1)

@@ -16,6 +16,7 @@
 import { colors, type Style } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
 import type { ModalState } from '../common/modals.ts'
+import { inbox } from '../common/inbox.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
@@ -102,22 +103,41 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? calls?.get(item.id) ?? '' : ''} ${ansi.state.web.url}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
+	let { inner, mark } = frame.ref(item, cols, session, style)
+	let lines = itemView.itemLines(item, inner, !!hal, session, calls)
+	if (hal) lines = frame.withCursor(lines, hal, inner)
+	// The id goes on the header row, below a prompt's leading blank row.
+	mark(lines, item.type === 'prompt' ? 1 : 0)
+	let rows = lines.flatMap((r) => ansi.paintRows(r, style, cols))
+	if (!hal) frame.state.rows.set(item, { key, rows })
+	return rows
+}
+
+// The text width beside an item's id, and how to put the id on row `at`.
+function ref(item: Item, cols: number, session: string | undefined, style: Style | undefined): { inner: number; mark: (lines: string[], at: number) => void } {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let ref = itemView.ref(item, session)
 	// On a very narrow terminal the text needs every column.
 	if (ref && width < 4 * strings.visLen(ref.text)) ref = undefined
 	let inner = ref ? Math.max(1, width - strings.visLen(ref.text) - 1) : width
-	let lines = itemView.itemLines(item, inner, !!hal, session, calls)
-	if (hal) lines = frame.withCursor(lines, hal, inner)
-	// The id goes on the header row, below a prompt's leading blank row.
-	let at = item.type === 'prompt' ? 1 : 0
-	if (ref && lines.length > at) {
+	let mark = (lines: string[], at: number) => {
+		if (!ref || lines.length <= at) return
 		let gap = ' '.repeat(Math.max(1, width - strings.visLen(lines[at]!) - strings.visLen(ref.text)))
 		lines[at] += gap + ansi.quiet(`\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}`, style)
 	}
-	let rows = lines.flatMap((r) => ansi.paintRows(r, style, cols))
-	if (!hal) frame.state.rows.set(item, { key, rows })
-	return rows
+	return { inner, mark }
+}
+
+// A queued message's compact row (task 16): `note`, then its text, no
+// header; at most 3 rows, then how many more. Its id links to the web,
+// where it opens in full.
+function queuedRows(item: Item & { type: 'prompt' }, note: string, cols: number, session?: string): string[] {
+	let style = itemView.itemStyle(item)
+	let { inner, mark } = frame.ref(item, cols, session, style)
+	let lines = ansi.wrap(`${note} ${item.text}`, inner)
+	if (lines.length > 3) lines = [...lines.slice(0, 3), `… ${lines.length - 3} more lines`]
+	mark(lines, 0)
+	return lines.flatMap((r) => ansi.paintRows(r, style, cols))
 }
 
 // A streaming block never shrinks (task fn): the tallest it was drawn
@@ -236,14 +256,20 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
 	}
 	let formCursor = view.form && past.target === undefined ? past.formCursor : undefined
-	// All unsent and waiting messages use the normal prompt renderer.
-	let tail: Item[] = [
-		...(view.transcript?.inbox ?? []).map((m) => transcript.waitingItem(m)),
-		...(view.pending ?? []).map((text): Item => ({ type: 'prompt', text, key: '' })),
+	// Unsent and waiting messages use the normal prompt renderer; queued
+	// ones stack as compact rows, the sender's tab number redrawn here.
+	let session = view.transcript?.meta.id
+	let waiting = view.transcript?.inbox ?? []
+	let tail = [
+		...waiting.map((m) => ({ item: transcript.waitingItem(m, waiting), m })),
+		...(view.pending ?? []).map((text) => ({ item: { type: 'prompt', text, key: '' } as Item, m: undefined })),
 	]
-	for (let item of tail) {
-		let rows = frame.itemRows(item, cols, view.transcript?.meta.id)
-		if (rows.length && (lines.length || above)) lines.push('')
+	let stacked = false
+	for (let { item, m } of tail) {
+		let tab = m?.from === undefined ? 0 : (view.tabs?.list.findIndex((t) => t.id === m.from) ?? -1) + 1
+		let rows = m?.queue && item.type === 'prompt' ? frame.queuedRows(item, inbox.note(m, tab || undefined), cols, session) : frame.itemRows(item, cols, session)
+		if (rows.length && (lines.length || above) && !(stacked && m?.queue)) lines.push('')
+		stacked = !!m?.queue
 		lines.push(...rows)
 	}
 	// The idle Hal cursor: a blank row, its row, and the blank row that
@@ -292,4 +318,4 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined }, layout, build, itemRows, highWater, glyph, withCursor, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined }, layout, build, itemRows, ref, queuedRows, highWater, glyph, withCursor, promptWidth }

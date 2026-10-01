@@ -54,6 +54,8 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 /* A prompt the host hasn't taken yet looks sent; only one that stays
    pending greys, after a delay, so a normal round trip shows nothing. */
 .Card.user { transition: color 300ms var(--ease-out); }
+.Transcript > .Card.queued:has(+ .Card.queued) { margin-bottom: 0; }
+.Card.queued { cursor: pointer; }
 .Card.pending { color: var(--quiet); transition-delay: 300ms; }
 .Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
 .Card.folds { padding: 0; cursor: pointer; }

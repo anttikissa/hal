@@ -3,7 +3,6 @@
 
 import { expect, test } from 'bun:test'
 import { amend } from '../common/amend.ts'
-import { inbox } from '../common/inbox.ts'
 import { history } from './history.ts'
 import { calls, client, created, fresh, readCall, shown as unkeyed, toolSession, until, useHost } from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
@@ -51,7 +50,6 @@ test('an advisory message reaches a working session with its next request, frame
 	// Waiting, visibly from the other session.
 	let waiting = c.views.get(a)!.inbox
 	expect(waiting).toMatchObject([{ text: 'check the tests', from: b, label: by, advisory: true }])
-	expect(inbox.tag(waiting[0]!)).toContain(by)
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === next + 2)
 	let text = lastText(next + 1)

@@ -98,8 +98,8 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	a.conn.send({ type: 'submit', sessionId: id, text: 'later', queue: true })
 	a.conn.send({ type: 'submit', sessionId: id, text: 'now' })
 	expect(a.views.get(id)!.inbox).toEqual([
-		{ id: expect.any(String), text: 'later', queue: true },
-		{ id: expect.any(String), text: 'now' },
+		{ id: expect.any(String), text: 'later', queue: true, ts: expect.any(String) },
+		{ id: expect.any(String), text: 'now', ts: expect.any(String) },
 	])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
@@ -112,7 +112,6 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	expect(inboxOf(a, id)).toEqual([])
 	let delivered = a.views.get(id)!.items.find((i) => i.type === 'prompt' && i.text === 'later')!
 	expect(delivered).toMatchObject({ queued: true })
-	expect(titles.title(delivered)).toContain('from queue')
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 2)
 	let view = await fresh(id)
@@ -385,7 +384,7 @@ test('a message another session sent waits unedited', async () => {
 	prompts.submit(id, 'from a peer', 'p1', false, { from: 'other' })
 	a.conn.send({ type: 'submit', sessionId: id, text: 'mine now', amend: true, edits: 'p1' })
 	expect(a.of('rejected')).toHaveLength(1)
-	expect(a.views.get(id)!.inbox).toEqual([{ id: 'p1', text: 'from a peer', from: 'other' }])
+	expect(a.views.get(id)!.inbox).toEqual([{ id: 'p1', text: 'from a peer', from: 'other', ts: expect.any(String) }])
 })
 
 test('an edit of a delivered steering message replaces it when only reading happened since', async () => {
