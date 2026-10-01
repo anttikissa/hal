@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
-import { tmpdir } from 'os'
 import { replay } from '../common/replay.ts'
 import { transcript } from '../common/transcript.ts'
 import { fileChanges } from './file-changes.ts'
@@ -13,7 +12,7 @@ import type { ToolContext } from './tools.ts'
 let home = '', cwd = '', id = ''
 const savedHome = process.env.HAL_HOME
 beforeEach(async () => {
-	home = mkdtempSync(`${tmpdir()}/hal-file-changes-`)
+	home = mkdtempSync('/tmp/hal-file-changes-')
 	process.env.HAL_HOME = home
 	cwd = `${home}/repo`
 	mkdirSync(cwd)
@@ -21,6 +20,7 @@ beforeEach(async () => {
 	await fileChanges.git(cwd, ['init', '-q'])
 })
 afterEach(() => {
+	host.reset()
 	sessions.closeAll()
 	if (savedHome === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = savedHome
