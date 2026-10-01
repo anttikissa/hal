@@ -1,7 +1,10 @@
 {
 	title: 'Web tool cards read like the terminal',
-	spec: 'Web tool cards follow the visible-plumbing rule (AGENTS.md). A closed card shows one line: the description, and the session-local call number on the right. An open Bash card reads like the terminal: `$ command` (`& command` when backgrounded), multiline commands preserved; declared modifies as one line, "Edits a.ts, src/commands/*.ts"; a non-default timeout only if set; then output streaming as it arrives, a tail of long output with a control that shows all of it, and the exit status when nonzero. Other tools show their meaningful arguments in readable text once, without labelled argument dumps. Cards never show call IDs, argument types, "omitted arguments and defaults" or execution-control sections; invalid or unfamiliar arguments and rejection reasons do show. src/common/tool-details.ts shrinks or goes to match; the terminal renderer is the reference and should share code where it reduces lines.',
-	status: 'planned',
+	spec: 'Web tool cards follow the visible-plumbing rule (AGENTS.md). A closed card shows one line: the description, and the session-local call number on the right. An open Bash card reads like the terminal: `$ command` (`& command` when backgrounded), multiline commands preserved; declared modifies as one line, "Edits a.ts, src/commands/*.ts"; a non-default timeout only if set; then output streaming as it arrives, a glimpse of long output, as in the terminal, with a control that shows all of it, and the exit status when nonzero. Other tools head the card with their description, else their name and first text argument (notify: its text); an open head wraps, so a one-line headline argument is not repeated below, and other arguments show once as "key: value". Results show without labels. Cards never show call IDs, argument types, "omitted arguments and defaults" or execution-control sections; invalid or unfamiliar arguments and rejection reasons do show. src/common/tool-details.ts shrinks or goes to match; the terminal renderer is the reference and should share code where it reduces lines.',
+	status: 'done',
+	notes: [
+		'The head wraps when open (index.html), so headline text is never repeated in the body. A timeout equal to its default is a restated default and stays hidden.'
+	],
 	needs: ['x1'],
 	foldInto: ['x1']
 }

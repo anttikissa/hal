@@ -831,12 +831,9 @@ test.skipIf(!chrome)('in a browser a block address loads its page, marks its car
 		})()`)
 		expect(seen).toEqual({ targets: 1, visible: true, link: `/${id}#${result.n! - 1}` })
 		let inspection = await b.evaluate(`document.querySelector('.Card.target .contents').textContent`)
-		expect(inspection).toContain('seq 40\n    printf done')
-		expect(inspection).toContain('/tmp/example.log')
-		expect(inspection).toContain('120000')
-		expect(inspection).toContain('false')
+		expect(inspection).toContain('$ seq 40\n  printf done\nEdits /tmp/example.log')
 		expect(inspection).toContain('Keep this visible')
-		expect(inspection).toContain('Description: not supplied (required)')
+		expect(inspection).not.toMatch(/\bc0\b|120000|Call ID/)
 		// Intrinsic image height can arrive after the linked card was revealed.
 		// Keep that card in place, not the old scrollTop above it.
 		await b.waitFor(`document.querySelector('.Card.image img')?.complete`)

@@ -111,13 +111,16 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let head = () => {
 		let item = props.row.item
 		if (item.type === 'thinking') return `${title()}: ${lines()[0]}`
-		return item.type === 'tool' && typeof item.input.description === 'string' ? item.input.description.replace(/\s+/g, ' ').trim() || item.name : item.type === 'tool' ? item.name : lines()[0]
+		return item.type === 'tool' ? toolDetails.headline(item.name, item.input).text : lines()[0]
 	}
 	let body = () => {
 		let item = props.row.item
-		let rest = item.type === 'tool' ? toolDetails.lines(item.name, item.id, item.input) : lines()
-		let partial = props.row.item.type === 'tool' ? props.row.item.partial : undefined
-		return [...rest, ...(result() ? ['', 'Recorded result:', result()!.text] : partial ? ['', 'Live output:', partial] : [])].join('\n')
+		if (item.type !== 'tool') return lines().join('\n')
+		// The call once (task 8t), then its output: the result, or what
+		// has streamed so far.
+		let call = toolDetails.lines(item.name, item.input)
+		let out = result()?.text ?? item.partial?.replace(/\n$/, '')
+		return [...call, ...(out ? [...(call.length ? [''] : []), out] : [])].join('\n')
 	}
 	let failed = () => !!props.row.result?.isError
 	let toggle = (e: MouseEvent) => {

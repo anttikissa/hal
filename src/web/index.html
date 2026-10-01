@@ -59,6 +59,7 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 .Card.folds { padding: 0; cursor: pointer; }
 .Card .head { display: flex; gap: 0.6ch; width: 100%; padding: 0.25lh 1ch; background: none; color: inherit; text-align: left; }
 .Card .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.Card.open .title { white-space: normal; overflow-wrap: anywhere; }
 .Card .head .error { background: none; margin-left: auto; }
 /* Each card links to itself (task 0z): a # in its top right corner,
    shown on hover or focus; the linked card is outlined. */
