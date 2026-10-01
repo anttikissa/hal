@@ -260,7 +260,9 @@ cursor position and flows downward.
 ### 2. Quit preserves the last frame
 
 On Ctrl-C / Ctrl-D, keep the last rendered content visible for copy/paste.
-Do not clear the screen or switch to alternate screen buffer.
+Do not clear the screen or switch to alternate screen buffer. Erase only the
+frame's last row (the help row) and leave the cursor there, so the shell prompt
+takes it and nothing scrolls: a restart then repaints without a jump.
 
 ### 3. ALWAYS write ALL history lines — NEVER slice to viewport
 

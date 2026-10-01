@@ -331,14 +331,16 @@ function show(view: View): void {
 }
 
 /**
- * Move the cursor to a fresh line below the frame and forget the frame,
- * so the shell (or the next paint) starts there. Never clears.
+ * Erase the frame's last row (the help row), leave the cursor at its
+ * start and forget the frame, so the shell prompt (or the next paint)
+ * takes that row: nothing scrolls, and a restart repaints in place.
+ * Clears nothing else.
  */
 function park(): void {
 	let st = render.state
 	if (!st.out || st.parked) return
 	st.parked = true
-	if (st.prev.length) st.out.write(move(st.cursorRow, st.prev.length - 1) + '\r\n' + SHOW_CURSOR)
+	if (st.prev.length) st.out.write(move(st.cursorRow, st.prev.length - 1) + `\r${CSI}2K` + SHOW_CURSOR)
 	st.prev = []
 	st.cursorRow = 0
 }

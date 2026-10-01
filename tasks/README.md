@@ -205,8 +205,10 @@ holds the rest of what the user chose (selection, focus, tabs). Readable text be
 - Handling is synchronous in the client (`src/client/terminal.ts`) and
   never waits on the host. No feature may rebind or capture them.
 - Quit and restart restore the terminal and never clear it or use the
-  alternate screen, so the last frame stays visible. Restart exits with
-  `terminal.restartCode` (100), which ./run answers by starting again.
+  alternate screen, so the last frame stays visible, all but its last
+  row (the help row), which the shell prompt takes without scrolling.
+  Restart exits with `terminal.restartCode` (100), which ./run answers
+  by starting again.
 - Suspend restores the terminal and SIGSTOPs the process group; on
   SIGCONT it re-enters raw mode and calls `terminal.redraw()`.
 

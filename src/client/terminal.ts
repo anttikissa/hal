@@ -4,7 +4,7 @@
 // Ctrl-R (restart) before it reaches the key decoder, and they are handled
 // right there, synchronously, without asking the host. Quit and restart
 // restore the terminal but never clear it, so the last frame stays on
-// screen; restart exits with restartCode, which ./run answers by starting
+// screen but its last row, which the shell prompt takes; restart exits with restartCode, which ./run answers by starting
 // again. See the invariants in tasks/README.md.
 import { emergency, type EmergencyAction, type EmergencyState } from './emergency.ts'
 import { keys, type DecoderState, type KeyEvent } from './keys.ts'
@@ -156,8 +156,8 @@ function enter(): void {
 	terminal.state.entered = true
 }
 
-// Restore the terminal for the shell. Leaves the screen content alone,
-// with the cursor parked below it.
+// Restore the terminal for the shell. Leaves the screen content alone
+// but the frame's last row, where the cursor is parked (render.park).
 function leave(): void {
 	let io = terminal.state.io
 	if (!io || !terminal.state.entered) return

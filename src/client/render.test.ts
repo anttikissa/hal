@@ -183,6 +183,13 @@ function show(list: Item[], text = '', cursor = text.length, force = false) {
 	render.draw(force)
 }
 
+// Rows as FakeTerminal.content shows them: no trailing blanks.
+function trimmed(rows: string[]): string[] {
+	let out = rows.map((r) => r.trimEnd())
+	while (out.at(-1) === '') out.pop()
+	return out
+}
+
 // What the renderer believes the whole frame is.
 function frameText(): string[] {
 	// What the fake terminal shows: styling dropped.
@@ -318,14 +325,19 @@ describe('resize', () => {
 })
 
 describe('leaving and coming back', () => {
-	test('park leaves the last frame and puts the cursor on a new line below it', () => {
+	test('park leaves the last frame but its last row, where the cursor goes, without scrolling', () => {
 		setup(10, 30, ['$ hal'])
 		show(items(2), 'draft', 2)
+		render.state.view.editing = 'hint'
+		render.draw()
 		let painted = frameText()
+		expect(painted.at(-1)).toContain('hint')
+		let top = term.top
 		term.written = ''
 		render.park()
-		expect(term.content()).toEqual(['$ hal', ...painted])
-		expect(term.top + term.row).toBe(1 + painted.length)
+		expect(term.content()).toEqual(trimmed(['$ hal', ...painted.slice(0, -1)]))
+		expect(term.top).toBe(top)
+		expect(term.top + term.row).toBe(painted.length)
 		expect(term.col).toBe(0)
 		for (let seq of ['[J', '[2J', '[3J', '[H']) expect(term.written).not.toContain(seq)
 	})
@@ -333,7 +345,7 @@ describe('leaving and coming back', () => {
 	test('while parked nothing paints; the forced redraw on resume paints below', () => {
 		setup(10, 30)
 		show(items(1))
-		let last = term.content()
+		let last = term.content().slice(0, -1)
 		render.park()
 		term.write('[1]+ Stopped\r\n$ fg\r\n')
 		show(items(2))
@@ -342,7 +354,7 @@ describe('leaving and coming back', () => {
 		expect(term.content()).toEqual([...last, '[1]+ Stopped', '$ fg', ...frameText()])
 	})
 
-	test('quit through the terminal parks below the frame', () => {
+	test('quit through the terminal parks on the last frame row', () => {
 		setup(10, 30)
 		let exits: number[] = []
 		terminal.init({
@@ -360,10 +372,11 @@ describe('leaving and coming back', () => {
 		render.init()
 		show(items(1), 'x')
 		let frameRows = term.content()
+		let height = frameText().length
 		terminal.quit()
 		expect(exits).toEqual([0])
-		expect(term.content()).toEqual(frameRows)
-		expect(term.row).toBe(frameRows.length)
+		expect(term.content()).toEqual(trimmed(frameRows.slice(0, -1)))
+		expect(term.row).toBe(height - 1)
 		terminal.reset()
 		Object.assign(terminal, { redraw: () => {}, onResize: () => {}, park: () => {} })
 	})
