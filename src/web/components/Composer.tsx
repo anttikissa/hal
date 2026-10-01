@@ -17,6 +17,7 @@ import { attach } from '../attach.ts'
 import type { Menu } from '../completions.ts'
 import { editor } from '../editor.ts'
 import { keys } from '../keys.ts'
+import { scroll } from '../scroll.ts'
 import { view, type ViewState } from '../view.ts'
 
 export function Composer(props: { view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; dropping: boolean }) {
@@ -40,9 +41,13 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	createEffect(
 		() => props.text,
 		() => {
+			// Measuring collapses the box for a moment, which grows the
+			// transcript and clamps a bottom reader's scroll: put it back.
+			let main = scroll.state.el, top = main?.scrollTop
 			input.style.height = 'auto'
 			// CSS caps content height against the changing visual viewport.
 			input.style.height = `${input.scrollHeight}px`
+			if (main) main.scrollTop = top!
 		},
 	)
 	createEffect(
