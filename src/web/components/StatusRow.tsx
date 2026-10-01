@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // Two stable overview lines; native modal details retain every pushed fact.
-// Wide layouts also show the session id, the full cwd and the usage
-// windows; the model name doubles as the quota left (task 5f).
+// The full cwd truncates from the start; wide layouts also show the session
+// id and usage windows. The model name doubles as quota left (task 5f).
 import { For } from 'solid-js'
 import { names } from '../../common/names.ts'
 import { titles } from '../../common/titles.ts'
@@ -40,7 +40,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean }) {
 					<span aria-hidden="true">▾</span>
 				</span>
 				<span class="secondary">
-					<span class="cwd"><span class="last">{cwd().split('/').at(-1) || '/'}</span><span class="full"><bdi>{cwd()}</bdi></span></span>
+					<span class="cwd"><bdi>{cwd()}</bdi></span>
 					<span class={['model', quota() && 'quota', heat(quota()?.used)]} style={{ '--fill': `${quota()?.remaining ?? 0}%` }}>{meta() ? titles.modelName(meta()!.model) : ''}</span>
 					<span class="windows" aria-hidden="true"><For each={names_()}>{(name) => (
 						<span class={['window', heat(win(name)?.used)]}>

@@ -132,14 +132,14 @@ body, textarea { tab-size: 4; }
 .StatusRow .secondary { display: flex; gap: 2ch; justify-content: space-between; }
 .StatusRow .name, .StatusRow .activity, .StatusRow .cwd, .StatusRow .model, .StatusRow .windows { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .StatusRow .activity { max-width: 40vw; }
-.StatusRow .cwd { flex: 1; }
+.StatusRow .cwd { flex: 1; direction: rtl; text-align: left; }
 .StatusRow .model { flex: 0 1 auto; max-width: 75%; }
 .StatusRow .windows { flex: 0 1 auto; display: flex; gap: 2ch; }
 .StatusRow .window .bar { display: inline-block; width: 6ch; height: 0.7em; border: 1px solid var(--heat); vertical-align: baseline; }
 .StatusRow .window .bar > span { display: block; height: 100%; background: var(--heat); }
-.StatusRow .id, .StatusRow .cwd .full { display: none; }
-/* Wide: id, full cwd (cut from the start) and windows; detail drops as room shrinks. */
-@container (min-width: 60ch) { .StatusRow .id { display: inline; } .StatusRow .cwd .last { display: none; } .StatusRow .cwd .full { display: inline; } .StatusRow .cwd { direction: rtl; text-align: left; } }
+.StatusRow .id { display: none; }
+/* Wide: id and windows; detail drops as room shrinks. */
+@container (min-width: 60ch) { .StatusRow .id { display: inline; } }
 @container (max-width: 140ch) { .StatusRow .window .reset { display: none; } }
 @container (max-width: 110ch) { .StatusRow .window .bar { display: none; } }
 @container (min-width: 80ch) { .StatusRow .model.quota { color: inherit; } }

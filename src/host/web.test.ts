@@ -952,8 +952,8 @@ test.skipIf(!chrome)('compact status keeps two lines and opens full live details
 			expect(geometry.primary).toBeLessThanOrEqual(geometry.lineHeight + 1)
 			expect(geometry.secondary).toBeLessThanOrEqual(geometry.lineHeight + 1)
 			expect(geometry.overflow).toBe(false)
-			// Wide layouts use their room: id, full cwd, usage windows.
-			expect(geometry.cwd).toBe(width < 600 ? 'project' : meta.cwd)
+			// Full cwd at every width; only id and windows depend on room.
+			expect(geometry.cwd).toBe(meta.cwd)
 			expect(geometry.id).toBe(width < 600 ? '' : `${id}: `)
 			expect(geometry.windows).toBe(width < 600 ? '' : '5h 17% used')
 			expect(geometry.fill).toBe('83%')
