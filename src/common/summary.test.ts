@@ -10,3 +10,10 @@ test('the summary is hidden from the answer, also while it streams in', () => {
 	expect(summary.strip('a < b')).toBe('a < b')
 	expect(summary.extract('no tag')).toBeUndefined()
 })
+
+test('a tag quoted in code is text, not the summary', () => {
+	let full = 'Reports use their `<summary>` line.\n\n<summary>Done.</summary>'
+	expect(summary.strip(full)).toBe('Reports use their `<summary>` line.')
+	expect(summary.extract(full)).toBe('Done.')
+	for (let n = 'Reports use their `<summary>` line.'.length; n <= full.length; n++) expect(summary.strip(full.slice(0, n))).toBe('Reports use their `<summary>` line.')
+})

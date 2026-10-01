@@ -3,7 +3,8 @@
 	spec: "SYSTEM.md asks the model to end a final answer with <summary>…</summary>: one line under 80 characters saying what happened. common/summary.ts extracts it and hides it: both clients draw a text block without its summary tags, and while the answer streams they also hide an unclosed tag and a trailing prefix of '<summary>', so no part of the tag ever flashes. A notice (task qm) shows the summary instead of the reply's last line (no tag: the last line of the text without tags), and a push for a completed turn reads 'done: <summary>'. A tag, not a tool: a tool call at the end of a turn would cost another request.",
 	status: 'done',
 	notes: [
-		'SYSTEM.md is read per request from the checkout, code only at start: after a pull, a host started earlier already asks for <summary> but shows the raw tag (in notices and answers) until Ctrl-R.'
+		'SYSTEM.md is read per request from the checkout, code only at start: after a pull, a host started earlier already asks for <summary> but shows the raw tag (in notices and answers) until Ctrl-R.',
+		'Invariant: a tag quoted in code (`<summary>`) is text. A non-greedy match from such a mention to the real closing tag hid everything between, cutting a final answer short; tags after a backtick no longer count.'
 	],
 	needs: ['qm']
 }
