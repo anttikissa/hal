@@ -1,0 +1,12 @@
+{
+	title: 'Render inter-tab message bodies as Markdown',
+	spec: 'Web inter-tab prompt bodies use the existing safe Markdown renderer, including expanded summary cards and expanded queued cards. Sender, timestamp, message identifiers, advisory or steering status and summary headers stay plain and visible; cards retain their existing colours and transcript placement. Compact queued previews retain their existing three-line contract until expanded. Human prompts and background Bash output stay literal. HTML and unsafe link schemes remain inert under the existing renderer. Rendering changes neither saved message text nor provider input. Restore the invariant that model-authored inter-tab prose is readable with the same Markdown formatting as assistant replies.',
+	status: 'done',
+	notes: [
+		'Card selects Markdown only for prompt items with a sender session, excluding current and legacy background Bash labels. Plain and expanded summary cards retain a separate literal sender header; queued previews remain compact, with Markdown after expansion. A one-off real Chrome check passed for plain and folded agent messages, bold and code blocks, literal summary and sender metadata, human/Bash exclusions, inert HTML and unsafe links. No new parser or dependencies.',
+		'The one-off Chrome check also passed for expanding a waiting queued agent card. Full-suite checks initially overlapped another agent changing tab paging and produced unrelated tab/turn timing failures; isolated retry-pause check passed, and typecheck/lint were clean.',
+		'Final focused Chrome check passed including an expanded queued message. Full-suite runs did not pass: the concurrently developed tab-paging test remained unstable, and one overlapping run also hit unrelated existing timing failures. No changes were made to those other tasks; TypeScript and lint checks passed.'
+	],
+	needs: ['fn', 'rj'],
+	foldInto: ['fn', 'rj']
+}

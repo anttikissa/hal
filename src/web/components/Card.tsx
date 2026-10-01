@@ -144,9 +144,13 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (!full()) button.scrollIntoView({ block: 'nearest' })
 	}
 	let cursor = () => <span class="cursor" aria-hidden="true" />
-	// Model text is markdown (task fn), Hal's cursor after its last line.
-	// A memo, so a new row object while streaming rebuilds nothing.
-	let md = createMemo(() => props.row.item.type === 'text' || props.row.item.type === 'thinking' || props.row.item.type === 'output')
+	// Model text and inter-tab prose are Markdown (tasks fn, sz); human
+	// prompts and background Bash output stay literal. A memo preserves DOM.
+	let md = createMemo(() => {
+		let item = props.row.item
+		return item.type === 'text' || item.type === 'thinking' || item.type === 'output' ||
+			(item.type === 'prompt' && !!item.from && !/^bash (?:#\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
+	})
 	let markdown = () => (
 		<Markdown text={shown()?.text ?? ''} streaming={props.cursor}>
 			<Show when={props.cursor}>{cursor()}</Show>
@@ -181,7 +185,11 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let compact = () => (
 		<div ref={(e) => (root = e)} class={['Card', 'user', 'prompt', 'queued', props.target ? 'target' : '']} onClick={(e) => !(e.target as Element).closest('a') && getSelection()?.isCollapsed && setOpen(!expanded())}>
 			{link()}
-			{queued()}
+			<Show when={expanded() && md()} fallback={queued()}>
+				<div class="who">{props.row.note}</div>
+				<Show when={title()}>{(_t) => <div class="who">{who()}</div>}</Show>
+				{markdown()}
+			</Show>
 		</div>
 	)
 	return (
@@ -202,6 +210,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						</button>
 						<div class="body" inert={!expanded()}>
 							<div class="contents">
+								<Show when={md() && props.row.item.type === 'prompt'}><div class="who">{who()}</div></Show>
 								{md() ? markdown() : props.row.item.type === 'tool' && props.row.item.name === 'bash' ? marked(body()) : body()}
 								<Show when={props.cursor && !md()}>{cursor()}</Show>
 								<Show when={long()}>
