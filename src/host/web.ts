@@ -36,6 +36,7 @@
 //   ?auth=<code> a file address redeems the code like a page (task e3).
 
 import type { BunPlugin, Server, ServerWebSocket } from 'bun'
+import { watch, type FSWatcher } from 'fs'
 import { colors, DERIVED, type Style } from '../common/colors.ts'
 import { oklch, type Oklch } from '../common/oklch.ts'
 import { session } from '../common/session.ts'
@@ -55,7 +56,7 @@ import { webLinks } from './web-links.ts'
 
 const cookieName = 'hal'
 
-type Data = { conn?: ReturnType<typeof host.adapt>; stale?: boolean; info?: ClientInfo }
+type Data = { conn?: ReturnType<typeof host.adapt>; stale?: boolean; page?: string; info?: ClientInfo }
 type Socket = ServerWebSocket<Data>
 
 function authorized(req: Request): boolean {
@@ -102,7 +103,7 @@ async function plugin(): Promise<BunPlugin> {
 }
 
 // The browser client (src/web/): index.html with main.tsx bundled into
-// it, built on first request and kept for the life of the server. The
+// it, built on first request and kept until its source changes. The
 // format is iife: esm output breaks an inline classic script. `version`,
 // a hash of the page, is also in it, so a page can tell whether it was
 // built from the host's code.
@@ -240,7 +241,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 async function upgrade(req: Request, srv: Server<Data>): Promise<Response | undefined> {
 	let v = new URL(req.url).searchParams.get('v')
 	let stale = v !== null && v !== (await web.version())
-	if (srv.upgrade(req, { data: { stale, info: clients.fromRequest(req, srv.requestIP(req)?.address) } })) return undefined
+	if (srv.upgrade(req, { data: { stale, page: v ?? undefined, info: clients.fromRequest(req, srv.requestIP(req)?.address) } })) return undefined
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
 }
 
@@ -270,6 +271,27 @@ const websocket = {
 	},
 }
 
+// Once a page was built, a change to src/web or src/common (task zz)
+// rebuilds it, and open pages built from older code are closed with
+// 4000 so they reload. Sockets without a page version (remote
+// terminals) stay; a failed build (a half-saved edit) reloads nothing.
+function watchSource(): FSWatcher | null {
+	let timer: Timer | undefined
+	try {
+		return watch(`${import.meta.dir}/..`, { recursive: true, persistent: false }, (_e, name) => {
+			if (!web.state.page || !name || !/^(web|common)\//.test(String(name)) || String(name).includes('.test.')) return
+			clearTimeout(timer)
+			timer = setTimeout(async () => {
+				web.state.page = web.build()
+				let v = await web.version()
+				if (v) for (let ws of web.state.sockets) if (ws.data.page && ws.data.page !== v) ws.close(4000, 'reload')
+			}, 300)
+		})
+	} catch {
+		return null
+	}
+}
+
 // Try the preferred port and the next free port through 9100. Other
 // failures (and an exhausted range) leave socket clients available.
 function start(): void {
@@ -278,6 +300,7 @@ function start(): void {
 	for (let port = preferred; port <= Math.max(preferred, 9100); port++) {
 		try {
 			web.state.server = Bun.serve({ hostname: '127.0.0.1', port, fetch: web.fetch, websocket })
+			web.state.watcher = watchSource()
 			settings.state.listeningPort = web.state.server.port
 			webLinks.moved()
 			return
@@ -294,6 +317,8 @@ async function stop(): Promise<void> {
 	let srv = web.state.server
 	web.state.server = null
 	web.state.page = null
+	web.state.watcher?.close()
+	web.state.watcher = null
 	settings.state.listeningPort = undefined
 	web.state.sockets.clear()
 	webAuth.close()
@@ -311,7 +336,7 @@ function revoke(): void {
 }
 
 export const web = {
-	state: { server: null as Server<Data> | null, page: null as Promise<{ html: string; version: string }> | null, sockets: new Set<Socket>() },
+	state: { server: null as Server<Data> | null, page: null as Promise<{ html: string; version: string }> | null, sockets: new Set<Socket>(), watcher: null as FSWatcher | null },
 	// config.ason's webPort; overridable from local.ts.
 	port: (): number => settings.webPort(),
 	authorized,

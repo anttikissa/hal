@@ -1,0 +1,6 @@
+{
+	title: 'Web page follows source changes without a restart',
+	spec: 'The host builds the web page on its first request, never at startup. Once built, a change under src/web or src/common (test files excepted) rebuilds it after a 300 ms pause, so a reload serves the new code without restarting the host. Open pages whose version differs from the new build are closed with code 4000 and reload themselves; their drafts survive. Sockets without a page version (remote terminals) are left alone, and a build that fails (a half-saved edit) reloads nothing. The watcher stops with the web server. Old Hal rebuilt the bundle on every /main.js request and had no reload.',
+	status: 'done',
+	needs: ['rr']
+}
