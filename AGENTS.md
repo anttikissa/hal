@@ -91,14 +91,15 @@ file you changed, stage only your hunks (`git add -p`, or a blob via
 `git update-index --cacheinfo`), check `git diff --cached`, then run
 `git commit` without paths. Avoid parallel edits to the same files.
 
+Avoid overlapping work. Use worktrees only if user insists.
+
 ## Orchestration
 
 Give each implementer a fresh subagent; it re-runs ./test before
-pushing. Size tasks for
-~40–70 requests and under ~150k context (about $2–4); split larger ones.
-Reserve one spawn slot per task: slots don't return. Measure with
-scripts/sloc (non-blank, non-comment, non-test lines) and scripts/cost
-<session-id>... (Opus 5.5 list prices).
+pushing. Size tasks for ~40–70 requests and under ~150k context (about
+$2–4); split larger ones. Reserve one spawn slot per task: slots don't
+return. Measure with scripts/sloc (non-blank, non-comment, non-test
+lines) and scripts/cost <session-id>... (Opus 5.5 list prices).
 
 # Progress reports
 
