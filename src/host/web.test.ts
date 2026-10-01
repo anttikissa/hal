@@ -1227,6 +1227,29 @@ test.skipIf(!chrome)('completion dismissal follows pointer and focus without ste
 		await b.evaluate(`document.activeElement.click()`)
 		await b.waitFor(`!document.querySelector('.completions')`)
 		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/cd ')
+		// Model Safari's button default: blur the editor without focusing
+		// the option. Cancelled gestures must retain both menu and draft.
+		for (let pointerType of ['mouse', 'touch']) {
+			await open()
+			let retained = await b.evaluate(`(() => {
+				let box = document.querySelector('textarea'), row = document.querySelector('.completions button');
+				if (row.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: '${pointerType}' }))) box.blur();
+				row.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerType: '${pointerType}' }));
+				return { focused: document.activeElement === box, menu: row.isConnected, text: box.value };
+			})()`)
+			expect(retained).toEqual({ focused: true, menu: true, text: '/c' })
+		}
+		// A real touch tap still produces click after pointerdown cancellation.
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await open()
+		let point = await b.evaluate(`(() => { let r = document.querySelector('.completions button').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+		await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+		expect(await b.evaluate(`document.activeElement === document.querySelector('textarea') && !!document.querySelector('.completions')`)).toBe(true)
+		await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+		await b.waitFor(`!document.querySelector('.completions')`)
+		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/cd ')
+		expect(history.readSync(await b.evaluate(`location.pathname.slice(1)`)).some(r => r.type === 'user')).toBe(false)
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
 		for (let action of [
 			`document.querySelector('[aria-label="Attach file"]').focus()`,
 			`document.querySelector('textarea').blur()`,
