@@ -58,8 +58,9 @@ function payload(kind: Kind, raw: any): Windows {
 		for (let [key, value] of Object.entries(raw ?? {})) {
 			let m = /^(five_hour|seven_day(?:_\w+)?)$/.exec(key)
 			if (m && value && typeof value === 'object') {
+				// Already percent (0..100), unlike the header fractions.
 				let v = value as { utilization?: number; resets_at?: string }
-				put(key === 'five_hour' ? '5h' : `7d${key.slice('seven_day'.length)}`, v.utilization === undefined ? undefined : v.utilization * 100, v.resets_at)
+				put(key === 'five_hour' ? '5h' : `7d${key.slice('seven_day'.length)}`, v.utilization, v.resets_at)
 			}
 		}
 	} else {

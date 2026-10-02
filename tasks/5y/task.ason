@@ -1,0 +1,10 @@
+{
+	title: '/status reads Anthropic usage-endpoint utilization as percent',
+	spec: "Anthropic's /api/oauth/usage reports five_hour and seven_day utilization already in percent (0..100, e.g. 9 or 70; checked against claude.ai's usage page on 2 Oct 2026), unlike the unified response headers, which are fractions 0..1. statusUsage.payload stores it unscaled. Invariant restored: an account's usage shown by /status equals claude.ai's; a refresh never turns partial use into 100%. Test: an endpoint payload with utilization 9 and 70 yields 9% and 70%.",
+	status: 'done',
+	notes: [
+		"Found 2 Oct 2026: remote /status showed antti@lippukiska.fi 100%/100% while claude.ai showed 8%/70%; payload multiplied the endpoint's percent by 100 and clamped. Headers (usage.ts) are fractions and stay x100. Verified against the live endpoint: 11%/71% and lex 31% weekly, matching claude.ai."
+	],
+	needs: ['ab'],
+	foldInto: ['ab']
+}

@@ -57,3 +57,10 @@ test('refresh learns email and plan, reports a plan change, and moves cached win
 		expect(await statusUsage.refresh('openai', account as any)).toBe('plus → free')
 	} finally { auth.all = all; auth.credential = credential; usage.store = store; liveFiles.save = save; globalThis.fetch = fetchOld }
 })
+
+// Shape of a real /api/oauth/usage answer (2 Oct 2026): percent, not a fraction.
+test('Anthropic usage endpoint utilization is already percent', () => {
+	let w = statusUsage.payload('anthropic', { five_hour: { utilization: 9, resets_at: '2026-10-02T10:09:59.848904+00:00' }, seven_day: { utilization: 70, resets_at: '2026-10-05T20:59:59.848929+00:00' } })
+	expect(w['5h']).toEqual({ used: 9, resets: '2026-10-02T10:09:59.848Z' })
+	expect(w['7d']?.used).toBe(70)
+})
