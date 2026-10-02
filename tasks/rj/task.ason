@@ -8,7 +8,8 @@
 		"The protocol's submit no longer has `from`: only the host (send tool calling prompts.submit with a Sender) marks a sender; a client's `from` is ignored. Tests that need another session's message call prompts.submit directly.",
 		"Decision: a message from another session to a paused, failed or blocked session waits in the inbox (like a queued one) instead of starting a turn, so an agent never undoes the user's pause; continue delivers it.",
 		"ToolContext now has sessionId (the calling session). prompts.amend edits the human's last text in the last prompt, keeping others' texts and their senders; a prompt with no human text makes the edit go on top.",
-		"Sender.summary rides the same paths as label (inbox.sender copies it). It is display-only: replay.framed ignores it, so the model's prompt is unchanged. GPT-6.1 Sol sent messages like 'Parenttracedpy65 PSIDWizballsubtune4…'; the summary keeps that noise folded."
+		"Sender.summary rides the same paths as label (inbox.sender copies it). It is display-only: replay.framed ignores it, so the model's prompt is unchanged. GPT-6.1 Sol sent messages like 'Parenttracedpy65 PSIDWizballsubtune4…'; the summary keeps that noise folded.",
+		'Bug fix: an opened report card showed its raw <summary> tag at the end of the body although the summary already heads the card. Invariant restored: a message carrying a summary displays its text without the summary tag (web body and terminal glimpse, via summary.strip); the model still receives the full text.'
 	],
 	needs: ['gr', 'dg', '2r']
 }

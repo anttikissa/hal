@@ -71,7 +71,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
 			let bash = (/^bash (?:#\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
-			let body = ansi.wrap(bash ? bashResult.display(item.text) : item.text, width).map(ansi.links)
+			let body = ansi.wrap(bash ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text, width).map(ansi.links)
 			if (bash && /^\[exit [1-9]\d*\]/.test(body[0] ?? '')) {
 				let status = /^\[exit [1-9]\d*\]/.exec(body[0]!)![0]
 				body[0] = ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: colors.user().fg! }) + body[0]!.slice(status.length)
