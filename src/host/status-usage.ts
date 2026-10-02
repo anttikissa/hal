@@ -2,6 +2,7 @@
 // Usage normally comes from response headers; stale subscriptions can be
 // refreshed from the provider's usage endpoint without sending a model turn.
 import { auth, jwtClaims, type Kind } from './auth.ts'
+import { clients } from './clients.ts'
 import { clock } from './clock.ts'
 import { usage, type Windows } from './usage.ts'
 import { liveFiles } from './live-file.ts'
@@ -12,7 +13,7 @@ import { web } from './web.ts'
 type Account = ReturnType<typeof auth.all>['list'][number]
 export type UsageRow = { provider: Kind; slot: string; account: string; plan?: string; error?: string; windows: Windows; apiKey: boolean }
 
-const reset = (at: string, now = clock.now()): string => usageWindows.reset(at, now)
+const reset = (at: string, now = clock.now(), zone?: string): string => usageWindows.reset(at, now, zone)
 
 function bar(percent: number): string {
 	let eighths = Math.round(Math.max(0, Math.min(100, percent)) * 14 * 8 / 100)
@@ -21,7 +22,7 @@ function bar(percent: number): string {
 	return '█'.repeat(whole) + (part ? '▏▎▍▌▋▊▉'[part - 1] : '') + '░'.repeat(14 - whole - (part ? 1 : 0))
 }
 
-function table(rows: UsageRow[]): string {
+function table(rows: UsageRow[], zone?: string): string {
 	let groups: string[] = []
 	for (let kind of ['anthropic', 'openai'] as const) {
 		let accounts = rows.filter((row) => row.provider === kind)
@@ -35,7 +36,7 @@ function table(rows: UsageRow[]): string {
 			let cells = cols.map((name) => {
 				if (row.apiKey) return 'API key'
 				let w = row.windows[name]
-				return w ? `${statusUsage.bar(w.used)}<br>${Math.round(w.used)}% used${w.resets ? ` (resets ${statusUsage.reset(w.resets)})` : ''}` : '?'
+				return w ? `${statusUsage.bar(w.used)}<br>${Math.round(w.used)}% used${w.resets ? ` (resets ${statusUsage.reset(w.resets, clock.now(), zone)})` : ''}` : '?'
 			})
 			lines.push(`| ${row.slot} | ${account} | ${cells.join(' | ')} |`)
 		}
@@ -123,10 +124,10 @@ function problem(error: unknown): { text: string; login: boolean } {
 	return { text: 'refresh failed', login: false }
 }
 
-function runtime(): string {
+function runtime(zone?: string): string {
 	let started = new Date(clock.now() - process.uptime() * 1000)
 	let uptime = Math.floor(process.uptime())
-	let date = `${started.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })} on ${started.getDate()} ${started.toLocaleString(undefined, { month: 'short' })} ${started.getFullYear()}`
+	let date = `${started.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: zone })} on ${started.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: zone })}`
 	return `Runtime:\nPID: ${process.pid} · version: ${version.state.loaded ?? 'unknown'}\nStarted: ${date} (${Math.floor(uptime / 3600)}h ${Math.floor(uptime % 3600 / 60)}m ago)${web.state.server ? `\nWeb: port ${web.state.server.port}${web.state.server.port !== web.port() ? ` (preferred ${web.port()} busy)` : ''}` : ''}`
 }
 
@@ -163,7 +164,9 @@ async function show(sessionId: string, model: string): Promise<string> {
 			rows.push({ provider: kind, slot: `${i + 1}/${list.length}${(account.name === selected || name === selected) ? ' *' : ''}`, account: name, plan, error, windows: apiKey ? {} : usage.windows(kind, key), apiKey })
 		}
 	}
-	return `${statusUsage.runtime()}\n\n${rows.length ? statusUsage.table(rows) : 'No accounts configured.'}${broken ? '\n\nTo log in again, run /login claude or /login chatgpt.' : ''}`
+	// Times show in the asking client's zone, as its status line does.
+	let zone = clients.timezone(sessionId)
+	return `${statusUsage.runtime(zone)}\n\n${rows.length ? statusUsage.table(rows, zone) : 'No accounts configured.'}${broken ? '\n\nTo log in again, run /login claude or /login chatgpt.' : ''}`
 }
 
 export const statusUsage = { reset, bar, table, payload, refresh, problem, runtime, show }
