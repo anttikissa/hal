@@ -16,6 +16,7 @@
 // (host tools cap what they keep), so nothing is fetched.
 
 import { createEffect, createMemo, createSignal, flush, For, onSettled, Show } from 'solid-js'
+import { markdown as parser } from '../../common/markdown.ts'
 import { titles } from '../../common/titles.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
@@ -112,7 +113,10 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
 	let head = () => {
 		let item = props.row.item
-		if (item.type === 'thinking') return `${titles.who(item)}: ${lines()[0]}`
+		// Folded thinking previews its first line as plain text (OpenAI
+		// summaries open with **Heading**); open, the body shows it, so
+		// the head is the header words alone (task hp).
+		if (item.type === 'thinking') return expanded() ? titles.who(item) : `${titles.who(item)}: ${parser.inline(lines()[0] ?? '').map((r) => r.text).join('')}`
 		if (item.type === 'prompt' && item.summary) return item.summary
 		return item.type === 'tool' ? toolDetails.headline(item.name, item.input).text : lines()[0]
 	}
