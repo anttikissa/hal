@@ -26,7 +26,7 @@ export const command: SlashCommand = {
 	complete: (args) => PROVIDERS.filter((p) => p.startsWith(args)),
 	async run(args, answers, ctx) {
 		let selected = args.trim()
-		if (!selected && !answers) return { ask: { text: 'Select authentication method. For ChatGPT subscription login, first turn on Enable device code sign-in at https://chatgpt.com/#settings/Security', fields: [{ type: 'choice', name: 'method', options: Object.keys(METHODS), initial: 0 }] } }
+		if (!selected && !answers) return { ask: { text: chatgptLogin.local() ? 'Select authentication method.' : 'Select authentication method. For ChatGPT subscription login, first turn on Enable device code sign-in at https://chatgpt.com/#settings/Security', fields: [{ type: 'choice', name: 'method', options: Object.keys(METHODS), initial: 0 }] } }
 		if (!selected) selected = METHODS[answers?.method ?? ''] ?? ''
 		let which = ALIASES[selected] ?? selected
 		if (!['claude', 'chatgpt', 'opencode', 'anthropic-key', 'openai-key', 'opencode-go-key', 'openrouter-key'].includes(which)) {
