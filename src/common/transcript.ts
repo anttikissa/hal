@@ -14,7 +14,7 @@ import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
 
 // An item as shown; Item adds its key.
-export type Shown =
+export type Shown = { originSession?: string } & (
 	// `from`: the session that sent it, `label` naming it; without it,
 	// the human. `ts`: when it was sent (task hp).
 	| { type: 'prompt'; text: string; from?: string; label?: string; queued?: true; steering?: true; advisory?: true; summary?: string; ts?: string }
@@ -38,6 +38,7 @@ export type Shown =
 	// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
 	// shows as an output: 'HH:MM Context cleared.'.
 	| { type: 'divider'; text: string }
+)
 
 // `key`: the item's id (task w5), the same live, after a reconnect or
 // reload and in a page of earlier history: its record's number `n`, with
@@ -140,8 +141,10 @@ function resultItem(b: ToolResultBlock): Shown {
 
 // Display items for one history record, going at `at`.
 function recordItems(r: HistoryRecord, at: number): Item[] {
-	if (r.type === 'assistant') return transcript.blockItems([r.block], r.n === undefined ? undefined : [r.n], at, { model: r.model, effort: r.effort, ts: [r.ts] })
-	return transcript.keyed(transcript.recordShown(r), r.n, at)
+	let items = r.type === 'assistant'
+		? transcript.blockItems([r.block], r.n === undefined ? undefined : [r.n], at, { model: r.model, effort: r.effort, ts: [r.ts] })
+		: transcript.keyed(transcript.recordShown(r), r.n, at)
+	return r.originSession === undefined ? items : items.map((item) => ({ ...item, originSession: r.originSession }))
 }
 
 function recordShown(r: HistoryRecord): Shown[] {

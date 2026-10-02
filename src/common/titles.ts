@@ -31,6 +31,11 @@ function tagged(who: string, tags: (string | false | undefined)[]): string {
 
 // Who wrote `item`, or undefined for an item without a header.
 function who(item: Shown): string | undefined {
+	let label = titles.author(item)
+	return label !== undefined && item.originSession !== undefined ? `${label} (in ${item.originSession})` : label
+}
+
+function author(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt':
 			return tagged(item.from === undefined ? 'You' : `Message from ${item.label ?? item.from}`, [item.steering && 'steering', item.advisory && 'advisory', item.queued && 'queued'])
@@ -55,4 +60,4 @@ function title(item: Shown): string | undefined {
 	return t ? `${t} ${w}` : w
 }
 
-export const titles = { names: {} as Record<string, string>, modelName, time, who, title }
+export const titles = { names: {} as Record<string, string>, modelName, time, author, who, title }

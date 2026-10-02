@@ -53,10 +53,10 @@ function addUsage(a: Usage, b: Usage): Usage {
 	for (let [k, v] of Object.entries(b)) if (v !== undefined) sum[k as keyof Usage] = (sum[k as keyof Usage] ?? 0) + v
 	return sum
 }
-
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
 	if (!r || typeof r !== 'object' || !recordTypes.has(r.type) || (r.n !== undefined && !Number.isSafeInteger(r.n))) throw new Error(`unknown record ${ason.stringify(value, 'short').slice(0, 80)}`)
+	if (r.originSession !== undefined && (typeof r.originSession !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(r.originSession))) throw new Error('invalid origin session')
 	if (r.type === 'command' && r.origin !== undefined && r.origin !== 'model') throw new Error('invalid command origin')
 	if (r.type === 'user' && r.naming !== undefined) {
 		let n = r.naming

@@ -1,0 +1,12 @@
+{
+	title: 'Show original session on forked messages',
+	spec: 'Forked history retains the session ID where each copied record originated. Terminal and web headers of copied user messages, assistant text and thinking, and slash commands append (in <session-id>) at normal contrast. New messages in the current session have no marker. Forks of forks preserve the original ID rather than replacing it with the immediate parent. Both ordinary /fork and spawn mode fork use this behavior. Attribution survives reconnect and loading earlier history, remains distinct from sender identity, and does not alter message content or provider replay. Legacy histories without origin metadata remain readable; do not guess or backfill existing forks.',
+	status: 'done',
+	notes: [
+		'The common fork copier stamps originSession only on copied records and preserves existing origins. Shared titles append the marker after sender/model tags without changing colors or message bodies. Existing fork histories have no reliable per-record origins and remain unmarked rather than being guessed. One nested-fork regression covers durable origins, command headers, new-message omission, and unchanged provider replay. Manual terminal/browser visual review remains unverified.',
+		'Final full ./test: 1341 pass, 1 skip, 2 fail; TypeScript and lint pass. Failures: host reconnect fixture timed out; browser streaming check observed 9 samples where it expects more than 10. Earlier full runs passed both checks and had different timing failures. The first run passed all behavior tests but found history.ts at 401 lines; removing an adjacent blank line restored its 400-line budget.',
+		'Focused verification after the full run: 64 tests pass across conventions, fork provenance, titles, transcript, host and browser suites, including both checks that failed in the full run.'
+	],
+	needs: ['px', 'hp'],
+	foldInto: ['px', 'hp']
+}

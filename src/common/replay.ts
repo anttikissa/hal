@@ -88,7 +88,8 @@ export type HistoryRecord = Numbered &
 	| { type: 'reset'; ts: string }
 	)
 
-type Numbered = { n?: number }
+// Copied records retain their original session through repeated forks (v6).
+type Numbered = { n?: number; originSession?: string }
 
 // Provider messages from history. Unsigned thinking (a cut-off stream) is
 // not replayable and is left out. Each tool call gets a result before the
