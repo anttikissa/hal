@@ -29,9 +29,10 @@ function view(): View {
 	if (st.form) v.form = st.form
 	if (st.modal) v.modal = st.modal
 	if (st.choices) v.choices = st.choices
-	// An example request for an empty prompt, another each turn.
+	// An example request for an empty prompt, another each turn; none
+	// for the intro, which can't take requests.
 	let t = st.transcript
-	if (t && !st.prompt.text) v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
+	if (t && !st.prompt.text && t.meta.model !== 'hal/intro') v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	if (v.tabs && tabBar.blinks(st.tabs)) v.tabs.lit = pulse.slow(pulse.beat())
 	let stopped = t && appView.why(t), notice = st.notice ?? versions.notice()
