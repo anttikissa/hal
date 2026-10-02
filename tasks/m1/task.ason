@@ -10,7 +10,8 @@
 		'Notify me appears after the HTTPS page registers /sw.js; on tap PushManager.subscribe is called synchronously before any await (iOS user gesture restriction). The host sends only a sanitized {id,title,body} payload; the worker validates id before opening/focusing same-origin session URL. VAPID JWT is reused per push-service origin for 11 hours (12-hour expiry) as Apple warns against refreshing more than hourly. Test on iPhone: add https://example.com to Home Screen via Safari Share, open that icon, log in with ./run auth code, tap Notify me and allow, background the app, then complete a turn in Hal with no visible client focused on the session; tap notification to return to it. Safari tabs alone have no iOS push.',
 		"Users could not see, test or remove devices: the only control was a Notify button that vanished once permission was granted, so a dead iPhone subscription was invisible. The device dialog lives beside task py's planned notification history; keep them separate sections.",
 		'Invariant: the dialog shows Turn on whenever the host does not list this device, and names why push is unavailable. A device removed from the list kept its browser subscription, so the dialog said On with no way back; a failed service worker start was swallowed. Pushes and skipped pushes are logged to diag.log.',
-		"The test push titles itself 'Test notification': a title of 'Hal' made iOS show 'Hal / from Hal'."
+		"The test push titles itself 'Test notification': a title of 'Hal' made iOS show 'Hal / from Hal'.",
+		'diag.log names why each turn end was not pushed: its tab on screen, or which clients were watching and for how long. A skipped push at 15:47 came 4 s after the phone reported hidden; the line exists to catch that case.'
 	],
 	needs: ['8a']
 }
