@@ -66,8 +66,8 @@ async function acquire(ctx: ToolContext, patterns: string[]): Promise<() => void
 		}
 		let editing = [...keys].find((p) => conflict.paths.has(p)) ?? [...conflict.paths][0]!
 		let tab = tabs.file().open.indexOf(conflict.sessionId)
-		let editor = tab >= 0 ? `Tab ${tab + 1}` : tabs.label(conflict.sessionId)
-		ctx.onOutput?.(`${editor} is editing ${relative(await fileChanges.canonical(ctx.cwd), editing)}.\nWaiting for that command to finish before starting ours.\n`)
+		let editor = tab >= 0 ? `tab ${tab + 1} (${conflict.sessionId})` : conflict.sessionId
+		ctx.onOutput?.(`Waiting for ${editor} to finish editing ${relative(await fileChanges.canonical(ctx.cwd), editing)}\n`)
 		await new Promise<void>((res, rej) => {
 			let abort = () => rej(new Error('cancelled; the command did not run'))
 			ctx.signal.addEventListener('abort', abort, { once: true })

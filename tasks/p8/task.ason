@@ -1,9 +1,10 @@
 {
 	title: 'Human-readable file-edit wait notices',
-	spec: 'File-lock waits report two separate lines: the blocker identified by its current visible tab number and overlapping file path(s), then a plain-language explanation that our command is waiting to start until the editing command finishes. Use a session label only when the blocker has no open tab. Do not describe an edit wait as an advisory review. Preserve overlapping-file serialization and lock release behavior.',
+	spec: 'A file-lock wait reports one line naming the blocking session by its current visible tab number and session ID, and the overlapping path: "Waiting for tab 8 (02-ana) to finish editing tasks/03/task.ason". A blocker without an open tab is named by session ID alone. The wait ends when the blocking bash call finishes (a background call: when its process exits). Preserve overlapping-file serialization and lock release behavior.',
 	status: 'done',
 	notes: [
-		'Wait notices use the current visible tab position, not tabs.label for open tabs: that helper includes the internal session ID and session name. Focused file-change tests pass (7). Two full-suite runs had differing timing/browser failures outside this change; the final run passed 1335 tests, skipped 1, and failed 5, with lint/type checks clean.'
+		'Wait notices use the current visible tab position, not tabs.label for open tabs: that helper includes the internal session ID and session name. Focused file-change tests pass (7). Two full-suite runs had differing timing/browser failures outside this change; the final run passed 1335 tests, skipped 1, and failed 5, with lint/type checks clean.',
+		'Changed to the single-line wording the user chose; it keeps the session ID beside the tab number so the blocker is identifiable even after tabs reorder.'
 	],
 	needs: ['8w'],
 	foldInto: ['8w']
