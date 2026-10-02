@@ -1,0 +1,11 @@
+{
+	title: 'Align folded card headers on touch screens',
+	spec: 'Collapsed transcript cards show their expansion arrow, single-line title and block reference on one visually aligned row on touch phones and desktop. The arrow remains a named native keyboard-accessible button with aria-expanded and at least a 44px touch target. Titles truncate without covering the reference; expanded multiline titles and native header links retain their existing behavior. Restore the invariant that increasing the expansion-button touch target does not leave the title at the top and arrow vertically displaced. Reuse the existing header layout and test actual browser geometry.',
+	status: 'done',
+	notes: [
+		'The touch media rule gives the arrow button a 44px box, but the flex header stretched a plain-text title from the top while the native button centered its glyph. A touch Chrome reproduction measured 11.5px vertical center mismatch; a URL header obscured it because the anchor also has a 44px box. Center collapsed header items and explicitly center the arrow glyph; retain top alignment for expanded multiline titles. Position touch folded-card references at the header content inset and center their glyph in the existing 44px target. One-off Chrome checks measured 0.5px residual font-glyph difference after the fix, retained 44x44px button, and successful expansion; existing native header-link checks passed.',
+		'Full ./test: 1334 passed, one skipped, three unrelated failures in credential-change retry, command process termination and reconnect snapshot timing. All browser tests passed; TypeScript and lint passed. Physical iOS appearance remains for user verification after reload.'
+	],
+	needs: ['8s'],
+	foldInto: ['8s']
+}
