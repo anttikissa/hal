@@ -119,6 +119,8 @@ export const colors = {
 		doneFg: colors.tab().doneFg!,
 		failedFg: colors.error().fg!,
 		attentionFg: colors.tab().warningFg!,
+		// A mid-turn update (task py) asks nothing: neutral.
+		updateFg: [0.9, 0, 0],
 		// Commits (task hy): violet, apart from the session outcomes.
 		commitFg: [0.8, 0.16, 300],
 	}),

@@ -43,6 +43,14 @@ test('a turn end reaches the user once: nothing if watched, a notice if another 
 	a.conn.send({ type: 'visibility', sessionId: two, visible: false })
 	expect(await turn(a, one, 'third')).toBe(1)
 	expect(a.of('notice')).toHaveLength(1)
+
+	// History keeps both the notice and the push, newest first, for a client that saw neither.
+	let c = client()
+	c.conn.send({ type: 'notice-history' })
+	await until(() => c.of('notice-history').length)
+	let entries = c.of('notice-history')[0]!.entries
+	expect(entries).toMatchObject([{ session: one, kind: 'done', line: 'third' }, { session: one, kind: 'done', line: 'tests pass, pushed to main' }])
+	expect(entries[0].block).toMatch(/^\d+$/)
 })
 
 test("a reply's <summary> is its notice line", async () => {

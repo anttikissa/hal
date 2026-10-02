@@ -338,6 +338,12 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .sheet ul { margin: 0; padding: 0; list-style: none; overflow-y: auto; }
 /* Initial dialog focus is structural, not another selected tab. */
 .Tabs .sheet ul:focus { outline: none; }
+/* Notification history (task py): newest first, scrolls inside the sheet. */
+.Notifications .history { margin: 0; padding: 0; list-style: none; overflow-y: auto; flex: 0 1 auto; min-height: 3lh; }
+.Notifications .history a { display: flex; flex-direction: column; padding: 0.25lh 1ch; border-left: 3px solid; color: inherit; text-decoration: none; min-height: 44px; justify-content: center; }
+.Notifications .history .done a { border-color: var(--done-fg); } .Notifications .history .failed a { border-color: var(--failed-fg); }
+.Notifications .history .attention a { border-color: var(--attention-fg); } .Notifications .history .commit a { border-color: var(--commit-fg); }
+.Notifications .history .line { overflow-wrap: anywhere; }
 .Tabs .sheet li { display: flex; align-items: stretch; justify-content: space-between; }
 /* The shown tab in the list is lit like a card: bar on the left, tint. */
 .Tabs .sheet li:has([aria-current]) { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 3px 0 0 var(--active-fg); }

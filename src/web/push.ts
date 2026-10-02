@@ -3,6 +3,7 @@
 import { createSignal } from 'solid-js'
 import { connection } from '../common/connection.ts'
 import type { Event, Tab } from '../common/protocol.ts'
+import type { NoticeEntry } from '../common/notices.ts'
 
 function supported(): boolean {
 	return typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && location.protocol === 'https:'
@@ -40,6 +41,27 @@ const [devices, setDevices] = createSignal<Devices>({ type: 'push-devices', devi
 const [mine, setMine] = createSignal<string | undefined>()
 const [ready, setReady] = createSignal(false)
 const [failed, setFailed] = createSignal<string | undefined>()
+// Notification history (task py), fetched while the dialog is open.
+const [history, setHistory] = createSignal<NoticeEntry[] | undefined>()
+let watching = false
+
+// Asks for the history now (`open`) and after each notice while open.
+function watchHistory(open: boolean): void {
+	watching = open
+	if (open) connection.send({ type: 'notice-history' })
+}
+
+// The host's replies to push and history commands; true if handled.
+function onEvent(event: Event): boolean {
+	if (event.type === 'push-devices') setDevices(event)
+	else if (event.type === 'notice-history') setHistory(event.entries)
+	else return false
+	return true
+}
+
+function noticed(): void {
+	if (watching) connection.send({ type: 'notice-history' })
+}
 
 // This device: unsupported (not an HTTPS Home Screen app), blocked in Settings, on or off.
 // On only while the host lists this device's endpoint.
@@ -114,4 +136,4 @@ function badge(tabs: Tab[]): void {
 	void (count ? navigator.setAppBadge(count) : navigator.clearAppBadge()).catch(() => {})
 }
 
-export const push = { state, supported, key, available, device, send, devices, setDevices, mine, status, problem, enable, disable, remove, test, start, visibility, badge }
+export const push = { onEvent, history, watchHistory, noticed, state, supported, key, available, device, send, devices, setDevices, mine, status, problem, enable, disable, remove, test, start, visibility, badge }

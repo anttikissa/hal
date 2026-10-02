@@ -9,6 +9,7 @@ import type { NoticeEvent, NoticeKind } from '../common/notices.ts'
 import type { Event } from '../common/protocol.ts'
 import { clients as clientInfo } from './clients.ts'
 import { diag } from './diag.ts'
+import { noticeHistory } from './notice-history.ts'
 import { pages } from './pages.ts'
 import { push } from './push.ts'
 import { sessions } from './sessions.ts'
@@ -34,18 +35,24 @@ function kind(event: Event): NoticeKind | undefined {
 // What the latest turn replied: its <summary> (common/summary.ts), else
 // the last non-blank line of its text.
 function replyLine(id: string): string {
+	return notify.reply(id).line
+}
+
+// The reply line and the key of the record it came from.
+function reply(id: string): { line: string; block?: string } {
 	let records = pages.page(id).records
 	for (let i = records.length - 1; i >= 0; i--) {
 		let r = records[i]!
 		if (r.type === 'user') break
 		if (r.type !== 'assistant' || r.block.type !== 'text') continue
 		let told = summary.extract(r.block.text)
-		if (told) return told
+		let block = r.n === undefined ? undefined : `${r.n}`
+		if (told) return { line: told, block }
 		let text = summary.strip(r.block.text)
 		let last = names.strip(text).split('\n').map((l) => l.trim()).filter(Boolean).at(-1)
-		if (last) return last
+		if (last) return { line: last, block }
 	}
-	return ''
+	return { line: '' }
 }
 
 // One line saying what happened: the reply's last line, the error, or the question.
@@ -60,15 +67,19 @@ function route(clients: Iterable<Watcher>, id: string, event: Event): void {
 	let all = [...clients]
 	if (all.some((c) => present(c) && c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let word = k === 'attention' ? 'needs an answer' : k === 'failed' ? 'failed' : 'done'
-	let told = k === 'done' ? notify.replyLine(id) : ''
-	notify.deliver(all, id, k, notify.line(id, event), told ? `${word}: ${told}` : word)
+	let told = k === 'done' ? notify.reply(id) : undefined
+	let block = event.type === 'question' ? (event.n === undefined ? undefined : `${event.n}`) : told?.block
+	let source = { ...(block ? { block } : {}), ...(event.type === 'question' ? { question: event.id } : {}) }
+	notify.deliver(all, id, k, notify.line(id, event), told?.line ? `${word}: ${told.line}` : word, source)
 }
 
 // The same routing for automatic events and a model's mid-turn notice.
-function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: string, pushText: string): void {
+// `source` names the triggering block and question for the history (task py).
+function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: string, pushText: string, source: { block?: string; question?: string } = {}): void {
 	let all = [...clients]
 	if (all.some((c) => present(c) && c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let name = sessions.open(id).name ?? id
+	noticeHistory.record({ session: id, name, kind: k, line, ...source })
 	let watching = all.filter(present)
 	if (!watching.length) return void push.notify(id, name, pushText).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
 	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: k, line }
@@ -79,4 +90,4 @@ function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: st
 	diag.log(`push: ${id} not pushed, watched: ${who.join('; ')}`)
 }
 
-export const notify = { kind, replyLine, line, route, deliver }
+export const notify = { kind, replyLine, reply, line, route, deliver }

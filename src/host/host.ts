@@ -24,6 +24,7 @@ import { greetings } from './greetings.ts'
 import { jobs } from './jobs.ts'
 import { pages, type Page, type Tail } from './pages.ts'
 import { notify } from './notify.ts'
+import { noticeHistory } from './notice-history.ts'
 import { push } from './push.ts'
 import { sessions } from './sessions.ts'
 import { snapshots } from './snapshots.ts'
@@ -234,6 +235,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	if (tabs.is(c)) return tabs.act(c)
 	if (c.type === 'auth' && c.link) webLinks.follow(client, client.deliver)
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
+	if (c.type === 'notice-history') return { reply: { type: 'notice-history', entries: noticeHistory.list() } }
 	if (c.type === 'hello') return clients.hello(client.record, c.pid)
 	if (c.type === 'visibility') {
 		// Not checked against open: a tab's open may still be pending.
@@ -356,6 +358,7 @@ function reset(): void {
 	host.state.done.clear()
 	tabs.reset()
 	push.reset()
+	noticeHistory.reset()
 	busy.reset()
 	drafts.reset()
 	webLinks.reset()
