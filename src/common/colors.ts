@@ -26,6 +26,10 @@ export type Look = { [K in keyof Colors]?: (base: Colors[K], ...args: Parameters
 // other field is a value or a style, read with no arguments.
 export const DERIVED = ['quiet', 'blinkDim', 'heat'] as const
 
+// Plain names for colors.project() p0..p7, so a model can answer "which
+// is the cyan project" (task jm).
+export const projectColorNames = ['magenta', 'pink', 'orange', 'amber', 'green', 'cyan', 'blue', 'violet']
+
 export const colors = {
 	// The lightest dark background we design for: where a style has no
 	// bg of its own, its text is checked against this (4.5:1, 3:1 for
