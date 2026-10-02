@@ -54,7 +54,7 @@ function context(id: string, sender?: Sender): Context {
 		setCwd: (cwd) => slash.change(id, { cwd }),
 		setModel: (model) => slash.change(id, { model }),
 		setName: (name) => slash.name(id, name),
-		say: (text) => slash.output(id, text),
+		say: (text) => slash.output(id, text, false, sender?.origin),
 	}
 }
 
@@ -103,9 +103,9 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 	} catch (e: any) {
 		reply = { error: String(e?.message ?? e) }
 	}
-	if (reply.say !== undefined) slash.output(id, reply.say)
+	if (reply.say !== undefined) slash.output(id, reply.say, false, sender?.origin)
 	if (reply.show !== undefined) host.broadcast(id, { type: 'output', sessionId: id, text: reply.show, ...slash.placed(id) })
-	if (reply.error !== undefined) slash.output(id, reply.error, true)
+	if (reply.error !== undefined) slash.output(id, reply.error, true, sender?.origin)
 	if (reply.open === 'models') void slash.models(id).then((e) => host.broadcast(id, e))
 	// The intro paused for this login (task vc): signed in, it goes on.
 	if (name === 'login' && !reply.ask && !reply.error && sessions.open(id).model === 'hal/intro' && status.stateOf(id).type === 'paused') prompts.resume(id)
@@ -148,9 +148,11 @@ function dismiss(id: string, question: string): void {
 	host.broadcast(id, { type: 'answer', sessionId: id, question, answers: {}, cancelled: true })
 }
 
-function output(id: string, text: string, error = false): void {
-	let { n, ts } = history.append(id, error ? { type: 'output', text, error } : { type: 'output', text })
-	host.broadcast(id, error ? { type: 'output', sessionId: id, text, error, n, ts, ...slash.placed(id) } : { type: 'output', sessionId: id, text, n, ts, ...slash.placed(id) })
+// What a command said. `origin: model` marks a model-run command's
+// outcome, which its tool card shows instead (task 9g).
+function output(id: string, text: string, error = false, origin?: 'model'): void {
+	let { n, ts } = history.append(id, { type: 'output', text, ...(error && { error: true as const }), ...(origin && { origin }) })
+	host.broadcast(id, { type: 'output', sessionId: id, text, ...(error && { error: true as const }), ...(origin && { origin }), n, ts, ...slash.placed(id) })
 }
 
 // Where a command's record landed beside a running turn: before the

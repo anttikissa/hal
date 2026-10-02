@@ -20,8 +20,10 @@ function value(input: unknown, indent = ''): string[] {
 let oneLine = (s: string) => s.replace(/\s+/g, ' ').trim()
 
 // The description, else the tool's name and its first text argument;
-// `key` names the argument shown.
+// `key` names the argument shown. A model-run slash command reads as
+// typed, "/rename …": the slash already says what it is (task 9g).
 function headline(name: string, input: Record<string, unknown>): { text: string; key?: string } {
+	if (name === 'command' && typeof input.command === 'string' && oneLine(input.command)) return { text: oneLine(input.command), key: 'command' }
 	if (typeof input.description === 'string' && oneLine(input.description)) return { text: oneLine(input.description), key: 'description' }
 	let first = Object.entries(input).find(([, v]) => typeof v === 'string' && oneLine(v))
 	return first ? { text: `${name}: ${oneLine(first[1] as string)}`, key: first[0] } : { text: name }

@@ -22,7 +22,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	question: { sessionId: 's', id: 's', form: 'o' },
 	answer: { sessionId: 's', question: 's', answers: 'o', secrets: 'S?' },
 	command: { sessionId: 's', text: 's', from: 's?', label: 's?', origin: 's?', command: 's?' },
-	output: { sessionId: 's', text: 's', ts: 's?' },
+	output: { sessionId: 's', text: 's', ts: 's?', origin: 's?' },
 	divider: { sessionId: 's', text: 's' },
 	meta: { sessionId: 's', meta: 'o', stats: 'o?' },
 	completions: { sessionId: 's', text: 's', items: 'S', descriptions: 'S?' },
@@ -66,7 +66,7 @@ function invalidEvent(value: unknown): string | undefined {
 	}
 	let senders = value.type === 'prompt' ? value.senders ?? [] : value.type === 'turn-start' && value.sender !== undefined ? [value.sender] : value.type === 'inbox' ? value.inbox : []
 	if (!Array.isArray(senders) || senders.some((s) => sender.invalid(s))) return `${value.type}: invalid sender metadata`
-	if (value.type === 'command' && value.origin !== undefined && value.origin !== 'model') return 'command: origin must be model'
+	if ((value.type === 'command' || value.type === 'output') && value.origin !== undefined && value.origin !== 'model') return `${value.type}: origin must be model`
 	if (value.type === 'completions' && value.descriptions !== undefined && (value.descriptions as string[]).length !== (value.items as string[]).length) return 'completions: descriptions must align with items'
 	if (value.type === 'tabs' && !(value.tabs as unknown[]).every((t) => isObject(t) && ['id', 'name', 'cwd'].every((k) => typeof t[k] === 'string'))) return 'tabs: every tab needs an id, name and cwd'
 	if (value.type === 'find-results') {

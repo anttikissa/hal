@@ -192,10 +192,6 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 	let items = view.transcript?.items ?? []
 	let session = view.transcript?.meta.id
 	let calls = new Map<string, string>()
-	// Keep the recorded result inspectable via the call's block link, but
-	// don't paint it twice when a command already said the same outcome.
-	let commands = new Set(items.flatMap((item) => item.type === 'tool' && item.name === 'command' ? [item.id] : []))
-	let outcomes = new Set(items.flatMap((item) => item.type === 'output' ? [item.text] : []))
 	let formCursor: Frame['cursor'] | undefined
 	let look = `${cols} ${session} ${itemView.resultRows()} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
 	let kept = frame.state.history
@@ -236,11 +232,10 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 			formCursor = { row: lines.length - (rows.length - 1 - f.cursor.row), col: ansi.PAD.length + f.cursor.col }
 		} else {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
-			let duplicate = item.type === 'tool-result' && commands.has(item.id) && outcomes.has(item.output)
 			// A result right under its call needs no #<call> link to it.
 			let prev = items[i - 1]
 			let attached = item.type === 'tool-result' && (prev?.type === 'tool' || prev?.type === 'tool-result') && prev.id === item.id
-			let rows = duplicate ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, attached)
+			let rows = frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, attached)
 			rows = frame.highWater(rows, item, cols, session, streams)
 			if (rows.length && lines.length) lines.push('')
 			for (let r of rows) lines.push(r)

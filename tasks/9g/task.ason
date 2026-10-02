@@ -1,7 +1,10 @@
 {
 	title: 'Model-run commands show as one tool card',
 	spec: 'A slash command the model runs through the command tool shows only as that tool\'s card, in terminal and web. The card\'s headline is the command itself, e.g. "/rename Em dash usage examples", as bash reads "$ ls"; the leading slash marks it as a command, so no "command:" prefix. The card\'s result is the command\'s outcome (e.g. "Session renamed: old → new"). The command record (origin: model) and its output records stay in history and keep their replay effects (such as /changes clear), but are not displayed: no "Hal (command)" block and no separate outcome row. Commands typed by the user, or sent from another session, display as before. Terminal headline formatting of tool cards (it currently prints raw JSON) is separate terminal work.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Outcome records of a model-run command carry origin: model (slash.output takes the sender's origin), so clients hide them by record, not by text. The terminal's old dedupe in frame.ts matched tool results against output text; it is gone. Model-command outputs recorded before this have no origin and show beside the card."
+	],
 	needs: [],
 	foldInto: ['jy']
 }

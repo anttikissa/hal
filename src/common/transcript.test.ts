@@ -291,14 +291,16 @@ test('attachment acknowledgements and picker replies cannot end a streaming turn
 	expect(next.live).toBeDefined()
 })
 
-test('command provenance and outcome timestamps survive live folding and reconnect', () => {
-	let command = { type: 'command' as const, text: '/rename New title', origin: 'model' as const, ts, n: 1 }
-	let output = { type: 'output' as const, text: 'Session renamed: Old title → New title', ts, n: 2 }
-	let live = fold([snap({ history: [] }), { ...command, sessionId }, { ...output, sessionId }])!
-	let restored = fold([snap({ history: [command, output] })])!
+test('a model-run command shows only as its tool card, live and restored; a typed one keeps its timestamps', () => {
+	let model = [
+		{ type: 'command' as const, text: '/rename New title', origin: 'model' as const, ts, n: 1 },
+		{ type: 'output' as const, text: 'Session renamed: Old title → New title', origin: 'model' as const, ts, n: 2 },
+	]
+	let typed = [{ type: 'command' as const, text: '/cd /tmp', ts, n: 3 }, { type: 'output' as const, text: 'cwd: /tmp', ts, n: 4 }]
+	let live = fold([snap({ history: [] }), ...[...model, ...typed].map((e) => ({ ...e, sessionId }))])!
+	let restored = fold([snap({ history: [...model, ...typed] })])!
 	expect(live.items).toEqual(restored.items)
-	expect(restored.items[0]).toMatchObject({ origin: 'model', ts })
-	expect(restored.items[1]).toMatchObject({ ts })
+	expect(restored.items).toMatchObject([{ type: 'command', text: '/cd /tmp', ts }, { type: 'output', text: 'cwd: /tmp', ts }])
 })
 
 test('waiting and delivered steering use the same header, without labelling a following fresh prompt', () => {

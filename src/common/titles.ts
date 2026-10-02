@@ -41,7 +41,7 @@ function author(item: Shown): string | undefined {
 			return tagged(item.from !== undefined ? `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.generatingCommand && `/${item.generatingCommand} continuation`, item.steering && 'steering', item.advisory && 'advisory', item.queued && 'queued'])
 		// A command is headed as the prompt it was typed as.
 		case 'command':
-			return item.origin === 'model' ? tagged('Hal', ['command']) : item.from === undefined ? 'You' : `Command from ${item.label ?? item.from}`
+			return item.from === undefined ? 'You' : `Command from ${item.label ?? item.from}`
 		case 'text':
 		case 'thinking': {
 			let parts = item.model ? [titles.modelName(item.model)] : []
