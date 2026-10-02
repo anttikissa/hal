@@ -1,0 +1,6 @@
+{
+	title: 'Thinking signatures live in blobs',
+	spec: 'Thinking signatures are stored as session text blobs (host/blobs.ts, sessions/<id>/blobs/), not inline in history.asonl: the thinking block holds the blob id instead of the signature, and providers read the signature back when they build a request, as they do image blobs. Provider replay is unchanged: the same signatures reach the same provider. Histories written before this keep their inline signatures and still replay; there is no migration. Measured before the change: signatures were 31% of one 153 kB session history (25 signatures, 47.7 kB, the largest 3.3 kB).',
+	status: 'planned',
+	needs: ['bz']
+}
