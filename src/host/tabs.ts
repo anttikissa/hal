@@ -18,6 +18,7 @@ import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
 import { pages } from './pages.ts'
 import { paths } from './paths.ts'
+import { projects } from './projects.ts'
 import { sessions } from './sessions.ts'
 import { states } from '../common/states.ts'
 import { subagents } from './subagents.ts'
@@ -48,13 +49,15 @@ function file(): TabsFile {
 // is left out rather than failing the rest.
 function list(): Tab[] {
 	let f = tabs.file()
-	return f.open.map((id) => {
+	let list = f.open.map((id) => {
 		let meta = sessions.open(id)
 		let tab: Tab = { id, name: meta.name ?? id, cwd: meta.cwd, model: meta.model, state: stateOf(id) }
 		if (f.attention.includes(id)) tab.attention = true
 		if (meta.cwd.replace(/\/+$/, '') === paths.repoRoot()) tab.hal = true
 		return tab
 	})
+	projects.paint(list)
+	return list
 }
 
 // Sends the tabs, then the model names they show, to a new client

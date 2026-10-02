@@ -139,7 +139,11 @@ body, textarea { tab-size: 4; }
 @keyframes notice-in { from { transform: translateY(0.5rem); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .Notices .card { animation: none; } }
 /* Two explicit lines, no accidental wrapping; the whole overview is a target. */
-.StatusRow { flex: none; padding: 0 max(2ch, env(safe-area-inset-right)) 0 max(2ch, env(safe-area-inset-left)); font-size: 12px; }
+/* --gutter: the composer's side padding in its own font, as a length, so
+   the smaller status row lines up with it (the cwd strip, task 22). */
+@property --gutter { syntax: '<length>'; inherits: true; initial-value: 0px; }
+.Chat { --gutter: 2ch; }
+.StatusRow { flex: none; padding: 0 max(var(--gutter), env(safe-area-inset-right)) 0 max(var(--gutter), env(safe-area-inset-left)); font-size: 12px; }
 .StatusRow .overview { display: block; width: 100%; min-height: 44px; padding: 0.125lh 0; background: none; color: inherit; font: inherit; text-align: left; touch-action: manipulation; }
 .StatusRow .primary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto auto; align-items: baseline; gap: 1ch; }
 .StatusRow { container-type: inline-size; }
@@ -147,6 +151,7 @@ body, textarea { tab-size: 4; }
 .StatusRow .name, .StatusRow .activity, .StatusRow .cwd, .StatusRow .model, .StatusRow .windows { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .StatusRow .activity { max-width: 40vw; }
 .StatusRow .cwd { flex: 1; direction: rtl; text-align: left; }
+.StatusRow .cwd[style*="--project"] { border-left: 3px solid var(--project); padding-left: 1ch; }
 .StatusRow .model { flex: 0 1 auto; max-width: 75%; }
 .StatusRow .windows { flex: 0 1 auto; display: flex; gap: 2ch; }
 .StatusRow .window .bar { display: inline-block; width: 6ch; height: 0.7em; border: 1px solid var(--heat); vertical-align: baseline; }
@@ -173,7 +178,7 @@ body, textarea { tab-size: 4; }
 .StatusDetails .fact { padding-block: 0.125lh; }
 .StatusDetails a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; text-decoration: underline; touch-action: manipulation; }
 @media (pointer: coarse) { .StatusDetails { position: fixed; top: auto; bottom: calc(100dvh - var(--app-top, 0px) - var(--app-height, 100dvh) + 0.5rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; margin: 0; width: calc(var(--app-width, 100vw) - 1rem); } }
-@media (max-width: 40rem) { .StatusRow { padding-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right)); } }
+@media (max-width: 40rem) { .Chat { --gutter: 1ch; } }
 .Composer { position: relative; z-index: 1; flex: none; padding: 0.25lh max(2ch, env(safe-area-inset-right)) max(0px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))) max(2ch, env(safe-area-inset-left)); }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.125lh 0; }
@@ -300,6 +305,9 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .tab { display: flex; flex: none; align-items: center; justify-content: center; width: var(--cell); padding: 0.25lh 0; background: none; text-decoration: none; color: var(--inactive-fg); }
 .Tabs .sheet .tab .n { display: inline-block; width: calc(var(--digits) * 1ch); text-align: right; }
 .Tabs .tab[aria-current] { color: var(--active-fg); }
+/* Project color (task 22): a bar over the tab number, a strip left of the cwd. */
+.Tabs .strip .tab { position: relative; }
+.Tabs .strip .tab[style*="--project"]::before { content: ''; position: absolute; top: 0; left: 20%; right: 20%; height: 3px; background: var(--project); }
 .Tabs .strip .tab[aria-current] { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 0 -3px 0 var(--active-fg); font-weight: 600; }
 .Tabs .sheet .tab[aria-current] .n { font-weight: 600; }
 .Tabs .marker { display: inline-block; width: 1ch; text-align: left; }

@@ -42,6 +42,7 @@ function Link(props: { tab: Tab; n: number; shown: boolean; name: boolean; onPic
 		<a
 			href={router.format(props.tab.id)}
 			class="tab"
+			style={props.tab.color === undefined ? undefined : { '--project': `var(--p${props.tab.color})` }}
 			aria-current={props.shown ? 'page' : undefined}
 			title={`${props.n} ${props.tab.name} · ${props.tab.cwd}`}
 			onClick={(e) => click(e, props.tab.id, props.onPick)}

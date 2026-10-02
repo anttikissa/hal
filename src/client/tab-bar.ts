@@ -16,7 +16,8 @@ import { tabMark, type Mark } from '../common/tab-mark.ts'
 import { tabPages, type Edge } from '../common/tab-pages.ts'
 import { ansi } from './ansi.ts'
 
-type Part = { text: string; fg?: Oklch; link?: string; dim?: Oklch; under?: boolean }
+// `over`: the project color drawn above this part (task 22).
+type Part = { text: string; fg?: Oklch; link?: string; dim?: Oklch; under?: boolean; over?: Oklch }
 type Hint = { text: string; priority: number }
 
 // The mark after a tab's number (common/tab-mark.ts, shared with the
@@ -68,8 +69,9 @@ function cells(list: Tab[], focused: string | undefined, start: number, end: num
 		let tab = list[i]!
 		let on = tab.id === focused
 		let n = String(i + 1)
-		parts.push({ text: ' '.repeat(d - n.length) }, { text: n, fg: on ? c.activeFg! : c.inactiveFg!, link: `/${tab.id}`, under: on })
-		parts.push(slot(tabBar.indicator(tab), lit), { text: ' ' })
+		let over = tab.color === undefined ? undefined : colors.project()[`p${tab.color}`]
+		parts.push({ text: ' '.repeat(d - n.length), over }, { text: n, fg: on ? c.activeFg! : c.inactiveFg!, link: `/${tab.id}`, under: on, over })
+		parts.push({ ...slot(tabBar.indicator(tab), lit), over }, { text: ' ' })
 	}
 	return parts
 }
@@ -131,4 +133,16 @@ function row(list: Tab[], focused: string | undefined, cols: number, lit = true)
 	return ansi.PAD + out.join('') + ansi.UNCOLOR
 }
 
-export const tabBar = { indicator, markPart, blinks, hints, fit, row }
+// The row above the tab bar: each cell's project color as ▁ over its
+// number and marker slot; none when no tab has a color.
+function overRow(list: Tab[], focused: string | undefined, cols: number): string | undefined {
+	if (!list.some((t) => t.color !== undefined)) return undefined
+	let width = Math.max(1, cols - 2 * ansi.PAD.length)
+	let out = fit(list, focused, width).map((p) => {
+		let n = strings.visLen(p.text)
+		return p.over ? ansi.sgr({ fg: p.over }) + '▁'.repeat(n) + ansi.UNCOLOR : ' '.repeat(n)
+	})
+	return ansi.PAD + out.join('')
+}
+
+export const tabBar = { indicator, markPart, blinks, hints, fit, row, overRow }

@@ -313,7 +313,9 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	let p = promptView.box(view.prompt, width, view.placeholder)
 	let input = colors.input()
 	let rule = (left: string, center = '') => ansi.sgr(input) + promptView.rule(cols, left, ansi.clean(center)) + ansi.UNCOLOR
-	if (lines.length || above) lines.push('')
+	let over = view.tabs?.list.length ? tabBar.overRow(view.tabs.list, view.tabs.focused, cols) : undefined
+	if (over !== undefined) lines.push(over)
+	else if (lines.length || above) lines.push('')
 	let anchor = lines.length
 	if (view.tabs?.list.length) lines.push(tabBar.row(view.tabs.list, view.tabs.focused, cols, view.tabs.lit ?? true))
 	lines.push(rule(p.above ? `↑${p.above}` : '', view.activity))
