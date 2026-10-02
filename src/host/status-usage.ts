@@ -4,6 +4,7 @@
 import { auth, jwtClaims, type Kind } from './auth.ts'
 import { clients } from './clients.ts'
 import { clock } from './clock.ts'
+import { diag } from './diag.ts'
 import { limits } from './limits.ts'
 import { usage, type Windows } from './usage.ts'
 import { liveFiles } from './live-file.ts'
@@ -176,4 +177,19 @@ async function show(sessionId: string, model: string): Promise<string> {
 	return `${statusUsage.runtime(zone)}\n\n${rows.length ? statusUsage.table(rows, zone) : 'No accounts configured.'}${broken ? '\n\nTo log in again, run /login claude or /login chatgpt.' : ''}`
 }
 
-export const statusUsage = { reset, bar, table, payload, refresh, problem, runtime, show }
+// Re-reads usage of the provider's skipped accounts; a refresh showing
+// room drops the skip and wakes waiting turns. Unforced, at most once per
+// host process and provider: skips found on disk after a restart may be
+// stale, later ones are fresh. Concurrent calls share one run.
+function recheck(kind: string, force = false): Promise<void> {
+	if (kind !== 'anthropic' && kind !== 'openai') return Promise.resolve()
+	let s = statusUsage.state
+	if (!force && s.checked.has(kind)) return s.running.get(kind) ?? Promise.resolve()
+	s.checked.add(kind)
+	let skipped = new Set(Object.keys(limits.store()).filter((k) => k.startsWith(`${kind}/`)).map((k) => k.slice(k.indexOf(' ') + 1)))
+	let run = s.running.get(kind) ?? Promise.all(auth.all(kind).list.filter((a) => skipped.has(a.name)).map((a) => statusUsage.refresh(kind, a).catch((e) => diag.log(`recheck ${kind} ${a.name}: ${e?.message ?? e}`)))).then(() => {}).finally(() => s.running.delete(kind))
+	s.running.set(kind, run)
+	return run
+}
+
+export const statusUsage = { state: { checked: new Set<string>(), running: new Map<string, Promise<void>>() }, reset, bar, table, payload, refresh, recheck, problem, runtime, show }
