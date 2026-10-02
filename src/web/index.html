@@ -150,6 +150,8 @@ body, textarea { tab-size: 4; }
 .StatusRow .windows { flex: 0 1 auto; display: flex; gap: 2ch; }
 .StatusRow .window .bar { display: inline-block; width: 6ch; height: 0.7em; border: 1px solid var(--heat); vertical-align: baseline; }
 .StatusRow .window .bar > span { display: block; height: 100%; background: var(--heat); }
+/* A window another full window outlasts cannot bind: quiet, no heat. */
+.StatusRow .window.moot { color: var(--quiet); --heat: var(--quiet); }
 .StatusRow .id { display: none; }
 /* Wide: id and windows; detail drops as room shrinks. */
 @container (min-width: 60ch) { .StatusRow .id { display: inline; } }
