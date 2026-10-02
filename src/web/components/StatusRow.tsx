@@ -25,6 +25,8 @@ export function StatusRow(props: { view: ViewState; connected: boolean }) {
 	// Window names are strings, so their nodes survive every push.
 	let names_ = () => windows().map((w) => w.name)
 	let win = (name: string) => windows().find((w) => w.name === name)
+	// Which subscription the windows belong to, as /status numbers its slots.
+	let slot = () => { let p = props.view.transcript?.stats?.plan; return p && p.accounts > 1 ? `${p.account}/${p.accounts} ` : '' }
 	let cwd = () => meta()?.cwd.replace(/(.)\/+$/, '$1') ?? ''
 	let outside = (e: MouseEvent) => {
 		let r = details.getBoundingClientRect()
@@ -42,7 +44,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean }) {
 				<span class="secondary">
 					<span class="cwd"><bdi>{cwd()}</bdi></span>
 					<span class={['model', quota() && 'quota', heat(quota()?.used)]} style={{ '--fill': `${quota()?.remaining ?? 0}%` }}>{meta() ? titles.modelName(meta()!.model) : ''}</span>
-					<span class="windows" aria-hidden="true"><For each={names_()}>{(name) => (
+					<span class="windows" aria-hidden="true">{slot()}<For each={names_()}>{(name) => (
 						<span class={['window', heat(win(name)?.used)]}>
 							{name} <span class="bar"><span style={{ width: `${win(name)?.used ?? 0}%` }} /></span> {win(name)?.used}% used<span class="reset">{win(name)?.resets ? ` (resets ${status.reset(win(name)!.resets!)})` : ''}</span>
 						</span>

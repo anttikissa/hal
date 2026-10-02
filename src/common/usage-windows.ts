@@ -17,11 +17,12 @@ function shortest(windows: Record<string, number>): string | undefined {
 	return names.reduce<string | undefined>((best, name) => (best === undefined || length(name) < length(best) ? name : best), undefined)
 }
 
-// "23:39", or "07:59 on 3 Oct" when not today.
-function reset(at: string, now = Date.now()): string {
+// "23:39", or "07:59 on 3 Oct" when not today, in timeZone (default local).
+function reset(at: string, now = Date.now(), timeZone?: string): string {
 	let date = new Date(at)
-	let time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
-	return date.toDateString() === new Date(now).toDateString() ? time : `${time} on ${date.getDate()} ${date.toLocaleString(undefined, { month: 'short' })}`
+	let time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone })
+	let day = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone })
+	return day(date) === day(new Date(now)) ? time : `${time} on ${day(date)}`
 }
 
 export const usageWindows = { minutes, shortest, reset }
