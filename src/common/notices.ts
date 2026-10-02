@@ -5,7 +5,7 @@
 // Beyond max() entries the oldest fold into one '+N more' line.
 // onChange is the client's repaint.
 
-export type NoticeKind = 'done' | 'failed' | 'attention' | 'commit'
+export type NoticeKind = 'done' | 'failed' | 'attention' | 'update' | 'commit'
 // What the host sends when another tab's turn ends or asks (host/notify.ts)
 // or commits (host/commits.ts, its own key so it never replaces the others;
 // `what` overrides the kind's word, as 'amended' for an amend).
@@ -13,7 +13,12 @@ export type NoticeEvent = { type: 'notice'; session: string; tab?: number; name:
 export type Notice = { key: string; kind: NoticeKind; title: string; line: string; session?: string; tab?: number; stays?: true; at: number }
 export type Folded = { shown: Notice[]; more?: { count: number; tabs: number[] } }
 
-const WORDS: Record<NoticeKind, string> = { done: 'done', failed: 'failed', attention: 'needs your attention', commit: 'committed' }
+// A history entry (task py, host/notice-history.ts): `block` is the
+// triggering record's key; `awaiting` whether a question is still open.
+export type NoticeEntry = { id: string; at: string; session: string; name: string; kind: NoticeKind; line: string; what?: string; block?: string; awaiting?: boolean }
+
+// 'update': a mid-turn notify-tool line, which neither ends the turn nor asks.
+const WORDS: Record<NoticeKind, string> = { done: 'done', failed: 'failed', attention: 'needs your attention', update: 'update', commit: 'committed' }
 
 function fromEvent(e: NoticeEvent): Omit<Notice, 'at'> {
 	let n: Omit<Notice, 'at'> = { key: e.key ?? `session:${e.session}`, kind: e.kind, title: `${e.tab ?? ''} ${e.name} · ${e.what ?? WORDS[e.kind]}`.trim(), line: e.line, session: e.session }
@@ -75,6 +80,7 @@ export const notices = {
 	ttl: (): number => 5000,
 	max: (): number => 3,
 	onChange: (): void => {},
+	words: WORDS,
 	fromEvent,
 	add,
 	remove,

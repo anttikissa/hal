@@ -9,6 +9,7 @@ import type { NoticeEvent } from '../common/notices.ts'
 import { diag } from './diag.ts'
 import { fileChanges } from './file-changes.ts'
 import { host } from './host.ts'
+import { noticeHistory } from './notice-history.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
@@ -83,6 +84,7 @@ async function finish(watch: Watch): Promise<void> {
 function announce(id: string, hash: string, short: string, subject: string, amend = false): void {
 	let notice: NoticeEvent = { type: 'notice', session: id, name: sessions.open(id).name ?? id, kind: 'commit', line: `${short} ${subject}`, key: `commit:${hash}` }
 	if (amend) notice.what = 'amended'
+	noticeHistory.record({ session: id, name: notice.name, kind: 'commit', line: notice.line, ...(amend ? { what: 'amended' } : {}) })
 	let tab = tabs.file().open.indexOf(id)
 	if (tab >= 0) notice.tab = tab + 1
 	for (let c of host.state.clients) if (c.visible !== id) c.deliver(notice)

@@ -11,7 +11,7 @@ export const tool: Tool = {
 		if (typeof input.text !== 'string' || !input.text.trim() || [...input.text].length >= 80 || /[\r\n\p{Cc}]/u.test(input.text)) throw new Error('text must be one non-empty line under 80 characters')
 		if (Object.keys(input).some((k) => k !== 'text')) throw new Error('notify accepts only text')
 		if (ctx.signal.aborted) throw new Error('cancelled; notice not sent')
-		notify.deliver(host.state.clients, ctx.sessionId, 'attention', input.text, input.text)
+		notify.deliver(host.state.clients, ctx.sessionId, 'update', input.text, input.text)
 		return 'sent'
 	},
 }

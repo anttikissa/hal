@@ -1,8 +1,24 @@
 /// <reference lib="dom" />
-// Push notifications for this device and the list of registered devices.
+// Push notifications for this device, the registered devices and the
+// history of past notices and pushes (task py).
 import { createEffect, For, Show } from 'solid-js'
 import { connection } from '../../common/connection.ts'
+import { notices, type NoticeEntry } from '../../common/notices.ts'
+import { transcript } from '../../common/transcript.ts'
+import { router } from '../router.ts'
+import { tabs } from '../tabs.ts'
 import { push } from '../push.ts'
+
+// Why an entry was sent, in words that claim no more than happened.
+function reason(e: NoticeEntry): string {
+	if (e.kind === 'attention') return e.awaiting ? 'waiting for an answer' : 'asked; answered'
+	return e.what ?? notices.words[e.kind]
+}
+
+function stamp(at: string): string {
+	let d = new Date(at)
+	return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 
 const said = {
 	unsupported: 'Not available here. On iPhone, Hal must be opened from its Home Screen icon.',
@@ -16,6 +32,7 @@ export function Notifications(props: { open: boolean; onClose: () => void }) {
 	createEffect(() => props.open, (o) => {
 		if (o && !dialog.open) { dialog.showModal(); connection.send({ type: 'push', action: 'list' }) }
 		if (!o && dialog.open) dialog.close()
+		push.watchHistory(o)
 	})
 	let fail = (e: any) => alert(`Notifications: ${e?.message ?? e}`)
 	return (
@@ -31,6 +48,30 @@ export function Notifications(props: { open: boolean; onClose: () => void }) {
 				<button type="button" onClick={() => void push.disable().catch(fail)}>Turn off</button>
 			</Show>
 			<Show when={push.devices().result}>{(r) => <p role="status">{r()}</p>}</Show>
+			<h3>History</h3>
+			<Show when={push.history()} fallback={<p role="status">Loading…</p>}>
+				{(list) => (
+					<ol class="history">
+						<For each={list()} fallback={<li>No notifications yet.</li>}>
+							{(e) => (
+								<li class={e.kind}>
+									<a href={(e.block && transcript.href(e.session, e.block)) || router.format(e.session)} onClick={(ev) => {
+										if (ev.button || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return
+										props.onClose()
+										if (e.block) return
+										ev.preventDefault()
+										tabs.show(e.session, false)
+									}}>
+										<span class="head"><time datetime={e.at}>{stamp(e.at)}</time> {e.name} · {reason(e)}</span>
+										<span class="line">{e.line}</span>
+									</a>
+								</li>
+							)}
+						</For>
+					</ol>
+				)}
+			</Show>
+			<p>Keeps the latest 200.</p>
 			<h3>Devices</h3>
 			<ul>
 				<For each={push.devices().devices} fallback={<li>None registered.</li>}>

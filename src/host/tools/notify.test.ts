@@ -22,7 +22,7 @@ test('mid-turn notify uses watch routing and the provider goes on after sent', a
 		await until(() => calls.length)
 		calls.shift()!.push({ type: 'tool_call', id: 'mid', name: 'notify', input: { text: 'The first approach failed' } }, { type: 'done', reason: 'tool_use' })
 		await until(() => calls.length)
-		expect(c.of('notice').at(-1)).toMatchObject({ session: id, kind: 'attention', line: 'The first approach failed' })
+		expect(c.of('notice').at(-1)).toMatchObject({ session: id, kind: 'update', line: 'The first approach failed' })
 		expect(c.of('tool-results').at(-1).results[0].output).toBe('sent')
 		expect(c.of('turn-end')).toEqual([])
 		calls.shift()!.push({ type: 'text', text: 'Trying another approach' }, { type: 'done', reason: 'end' })

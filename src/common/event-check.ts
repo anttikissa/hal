@@ -30,6 +30,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	attached: { sessionId: 's', command: 's', blob: 's', marker: 's' },
 	warning: { text: 's' },
 	'push-devices': { devices: 'a', result: 's?' },
+	'notice-history': { entries: 'a' },
 	version: { version: 's' },
 	'model-names': { names: 'o' },
 	notice: { session: 's', tab: 'i?', name: 's', kind: 's', line: 's', key: 's?', what: 's?' },

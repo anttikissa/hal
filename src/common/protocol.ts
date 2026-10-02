@@ -14,7 +14,7 @@
 import type { AssistantBlock, ImageBlock, Sender, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
 import type { InboxItem } from './inbox.ts'
-import type { NoticeEvent } from './notices.ts'
+import type { NoticeEntry, NoticeEvent } from './notices.ts'
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { FindBatch, FindFilter } from './find.ts'
@@ -164,6 +164,8 @@ export type Command = (
 	// Both push commands are answered, to this client only, with `push-devices`.
 	| { type: 'push-subscribe'; subscription: { endpoint: string; keys: { p256dh: string; auth: string } }; device?: string }
 	| { type: 'push'; action: 'list' | 'remove' | 'test'; endpoint?: string }
+	// Answered, to this client only, with `notice-history` (task py).
+	| { type: 'notice-history' }
 	| { type: 'visibility'; sessionId: string; visible: boolean }
 	// A peer on the host socket names its process, for /clients (task z8).
 	| { type: 'hello'; pid: number }
@@ -254,6 +256,8 @@ export type Event =
 	| { type: 'warning'; text: string }
 	// Every registered push device; `result` reports a push-test.
 	| { type: 'push-devices'; devices: { endpoint: string; device?: string; added?: string }[]; result?: string }
+	// Past notices and pushes, newest first (task py).
+	| { type: 'notice-history'; entries: NoticeEntry[] }
 	// The tabs changed, or the client just connected: every tab, in
 	// order. Sent to every client; which one a client shows is its own business.
 	| { type: 'tabs'; tabs: Tab[] }
@@ -285,7 +289,7 @@ export type Event =
 	| NoticeEvent
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'visibility', 'hello']
+const commandTypes: CommandType[] = ['find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -314,6 +318,7 @@ function invalid(value: unknown): string | undefined {
 		let device = c.device === undefined || (typeof c.device === 'string' && c.device.length <= 80)
 		return s && keys && device && typeof s.endpoint === 'string' && typeof keys.p256dh === 'string' && typeof keys.auth === 'string' ? undefined : 'push-subscribe: invalid subscription'
 	}
+	if (c.type === 'notice-history') return undefined
 	if (c.type === 'push') return ['list', 'remove', 'test'].includes(c.action as string) ? str('endpoint', c.action === 'list') : 'push: invalid action'
 	if (c.type === 'visibility') return str('sessionId') ?? (typeof c.visible === 'boolean' ? undefined : 'visibility: visible must be a boolean')
 	if (c.type === 'tab-start') return str('cwd', true) ?? str('last', true)
