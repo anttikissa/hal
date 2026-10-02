@@ -313,6 +313,8 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .sheet { width: 100%; max-width: 100%; max-height: 80dvh; margin: auto 0 0; padding: 0.5lh 1ch max(0.5lh, env(safe-area-inset-bottom)); background: var(--canvas); color: var(--text); border: 0; border-top: 1px solid var(--border); }
 .Tabs .sheet[open] { display: flex; flex-direction: column; gap: 0.25lh; }
 .Tabs .sheet ul { margin: 0; padding: 0; list-style: none; overflow-y: auto; }
+/* Initial dialog focus is structural, not another selected tab. */
+.Tabs .sheet ul:focus { outline: none; }
 .Tabs .sheet li { display: flex; align-items: stretch; justify-content: space-between; }
 /* The shown tab in the list is lit like a card: bar on the left, tint. */
 .Tabs .sheet li:has([aria-current]) { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 3px 0 0 var(--active-fg); }

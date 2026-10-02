@@ -898,6 +898,12 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 		// Closing the shown tab lands on its neighbour, replacing the entry.
 		let entries = await b.evaluate(`history.length`)
 		await b.evaluate(`document.querySelector('.Tabs .menu').click()`)
+		await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
+		expect(await b.evaluate(`document.activeElement === document.querySelector('.Tabs .sheet ul') && getComputedStyle(document.activeElement).outlineStyle === 'none'`)).toBe(true)
+		expect(await b.evaluate(`document.querySelector('.Tabs .sheet [aria-current]').getAttribute('href')`)).toBe(second)
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+		await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+		expect(await b.evaluate(`document.activeElement === document.querySelector('.Tabs .sheet a') && document.activeElement.matches(':focus-visible') && getComputedStyle(document.activeElement).outlineStyle !== 'none'`)).toBe(true)
 		await b.evaluate(`document.querySelector('.Tabs .sheet li:has([aria-current]) .close').click()`)
 		await b.waitFor(`document.querySelectorAll('.Tabs .strip a.tab').length === 1 && location.pathname === '${first}'`)
 		expect(await b.evaluate(`history.length`)).toBe(entries)

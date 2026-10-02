@@ -186,7 +186,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 				onClose={() => setOpen(false)}
 				onClick={(e) => e.target === e.currentTarget && setOpen(false)}
 			>
-				<ul>
+				<ul tabindex={-1} autofocus>
 					<For each={props.tabs}>
 						{(tab, i) => (
 							<li>
