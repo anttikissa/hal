@@ -313,3 +313,8 @@ test('a bare /login chatgpt never turns an idle tab into a working turn, includi
 		chatgptLogin.run = original
 	}
 })
+
+test('ordinary arguments keep whitespace normalization; clear preserves its literal raw tail', () => {
+	expect(commands.parse('/cd   src  ')).toEqual({ name: 'cd', args: 'src' })
+	expect(commands.parse('/clear   /rename literal\n"quotes" @file\n')).toEqual({ name: 'clear', args: '  /rename literal\n"quotes" @file\n' })
+})

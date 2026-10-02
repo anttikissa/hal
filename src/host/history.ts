@@ -8,6 +8,7 @@
 // unfinished, not broken: the host continues it (turns.recover).
 
 import { appendFileSync, existsSync, openSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
+import { historyCheck } from './history-check.ts'
 import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
 import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock, type Turn, type Usage, type UserBlock } from '../common/blocks.ts'
@@ -24,8 +25,6 @@ import { sessions, type SessionMeta } from './sessions.ts'
 import { naming } from './naming.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
-
-const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'change', 'compact', 'reset', 'file_changes', 'round'])
 
 // One running turn: its current provider round (`turn`), how many of
 // that round's blocks are on disk, and the usage of earlier rounds.
@@ -52,17 +51,6 @@ function addUsage(a: Usage, b: Usage): Usage {
 	let sum = { ...a }
 	for (let [k, v] of Object.entries(b)) if (v !== undefined) sum[k as keyof Usage] = (sum[k as keyof Usage] ?? 0) + v
 	return sum
-}
-function check(value: unknown): HistoryRecord {
-	let r = value as HistoryRecord
-	if (!r || typeof r !== 'object' || !recordTypes.has(r.type) || (r.n !== undefined && !Number.isSafeInteger(r.n))) throw new Error(`unknown record ${ason.stringify(value, 'short').slice(0, 80)}`)
-	if (r.originSession !== undefined && (typeof r.originSession !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(r.originSession))) throw new Error('invalid origin session')
-	if (r.type === 'command' && r.origin !== undefined && r.origin !== 'model') throw new Error('invalid command origin')
-	if (r.type === 'user' && r.naming !== undefined) {
-		let n = r.naming
-		if (!n || !Number.isSafeInteger(n.turn) || n.turn < 1 || !Number.isSafeInteger(n.version) || n.version < 0 || typeof n.name !== 'string' || typeof n.eligible !== 'boolean') throw new Error('invalid naming context')
-	}
-	return r
 }
 function file(id: string): string {
 	return `${paths.sessionDir(id)}/history.asonl`
@@ -91,7 +79,7 @@ function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord 
 	appendFileSync(history.file(id), line)
 	pages.note(id, line, full)
 	naming.committed(id, full)
-	if (full.type === 'turn_end' && !Object.keys(pages.marks(id).inbox).length) busy.drop(id)
+	if (full.type === 'turn_end' && !Object.keys(pages.marks(id).inbox).length && !pages.marks(id).transitions?.length) busy.drop(id)
 	for (let listener of history.state.listeners) listener(id, full)
 	return full
 }
@@ -373,7 +361,7 @@ export const history = {
 	// fill, kept while it is open. `next`: by history file, the next
 	// record number not given out yet. `listeners`: see onAppend.
 	state: { running: new Map<string, Running>(), cache: new Map<string, { size: number; records: HistoryRecord[] }>(), next: new Map<string, number>(), listeners: new Set<(id: string, record: HistoryRecord) => void>() },
-	check,
+	check: (value: unknown) => historyCheck.check(value),
 	blockRecord,
 	started,
 	number,

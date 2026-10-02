@@ -114,6 +114,7 @@ function owed(id: string, records: HistoryRecord[]): boolean {
 			if (!first) continue
 			starts = false
 			if (first.from === parent) owned = reports = true
+			else if (first.origin === 'model') reports = owned
 			else if (first.from === undefined) owned = reports = false
 			else reports = owned && (first.from === id || sessions.open(first.from).parent === id)
 		}

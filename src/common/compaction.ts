@@ -99,11 +99,11 @@ function omission(run: HistoryRecord[], label: (r: HistoryRecord, i: number) => 
 
 // The summary of `records` (a session's whole history), naming
 // `historyPath` for the rest, and how many prompts it covers; undefined
-// when there is no prompt to summarise.
+// when there is no conversation to summarise (an active prompt may be protected).
 function summary(records: HistoryRecord[], historyPath: string): { summary: string; prompts: number } | undefined {
 	let list = compaction.entries(records)
 	let keep = compaction.kept(list)
-	if (!keep.size) return undefined
+	if (!list.length) return undefined
 	// Each entry under its record number, the block id clients show.
 	let label = (r: HistoryRecord, i: number) => String(r.n ?? i + 1)
 	let lines = ['Context was compacted to avoid exceeding the token limit. Verify before assuming.', '', "Here's a summary of what happened (only user and assistant messages preserved):", '']

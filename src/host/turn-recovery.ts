@@ -2,6 +2,7 @@
 // it after a host restart without scanning closed, idle histories.
 import { existsSync } from 'fs'
 import { states } from '../common/states.ts'
+import { contextTransitions } from './context-transitions.ts'
 import { busy } from './busy.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
@@ -34,6 +35,16 @@ async function recover(): Promise<void> {
 		}
 		let records = history.readSync(id)
 		if (turns.state.running.has(id)) continue
+		let intent = contextTransitions.pending(id)
+		if (intent) {
+			if (intent.kind === 'clear') contextTransitions.settle(id)
+			if (intent.kind === 'clear' && history.unfinished(id)) {
+				history.append(id, { type: 'turn_end', status: intent.cancelled ? 'paused' : 'completed', usage: {} })
+				status.state.states.delete(id)
+			}
+			contextTransitions.apply(id)
+			if (intent.kind === 'clear') continue
+		}
 		let state = status.stateOf(id, records)
 		if (state.type === 'idle') {
 			prompts.next(id)
@@ -52,6 +63,7 @@ async function recover(): Promise<void> {
 
 function leftWork(id: string): boolean {
 	let m = pages.marks(id)
+	if (m.transitions?.length) return true
 	let path = history.file(id)
 	let last = m.turn === undefined ? undefined : pages.lineAt(path, m.turn).record
 	if (last && last.type !== 'turn_end') return true

@@ -48,14 +48,18 @@ test('/compact: the next request holds the summary and only later records; the t
 	expect(await history.messages(id)).toEqual(before)
 })
 
-test('/compact while a turn runs answers that it is busy', async () => {
-	let c = client()
-	let id = created(c)
+test('/compact during streaming waits for settlement and continues with its active prompt', async () => {
+	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'p1' })
-	await until(() => calls.length)
+	await until(() => calls.length === 1)
 	await command(c, id, '/compact')
-	expect(c.of('output').at(-1)).toMatchObject({ error: true, text: expect.stringContaining('busy') })
-	calls[0]!.push({ type: 'done', reason: 'end' })
+	expect(c.of('divider').length).toBe(0)
+	calls[0]!.push({ type: 'text', text: 'partial answer' }, { type: 'done', reason: 'end' })
+	await until(() => calls.length === 2)
+	expect(JSON.stringify(calls[1]!.input.messages)).toContain('p1')
+	expect(c.of('divider').length).toBe(1)
+	calls[1]!.push({ type: 'done', reason: 'end' })
+	await until(() => c.of('turn-end').length === 1)
 })
 
 test('/clear: the next request holds only later records; a compact after it summarises only what followed', async () => {

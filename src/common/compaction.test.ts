@@ -34,10 +34,10 @@ test('keeps the first prompt and answer, the last three prompts and answers, and
 	expect(lines.at(-1)).toContain('/h/history.asonl')
 })
 
-test('nothing to summarise without a prompt', () => {
+test('empty history has no summary; protected-prompt context still summarises remaining blocks', () => {
 	n = 0
 	expect(compaction.summary([], '/h')).toBeUndefined()
-	expect(compaction.summary([say('hi')], '/h')).toBeUndefined()
+	expect(compaction.summary([say('hi')], '/h')).toMatchObject({ prompts: 0, summary: expect.stringContaining('1 assistant block omitted') })
 })
 
 test('long assistant text keeps its head and tail with a size marker', () => {

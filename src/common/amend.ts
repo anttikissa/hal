@@ -22,10 +22,10 @@ export type Editing = { sessionId: string; original: string; inbox?: string }
 function begin(t: Transcript | undefined, text: string): { editing: Editing; command?: unknown } | undefined {
 	if (!t || text !== '') return undefined
 	let sessionId = t.meta.id
-	let waiting = t.inbox.findLast((m) => m.from === undefined)
+	let waiting = t.inbox.findLast((m) => m.from === undefined && m.origin !== 'model')
 	if (waiting) return { editing: { sessionId, original: waiting.text, inbox: waiting.id } }
 	if (!states.busy(t.state)) return undefined
-	let last = t.items.findLast((i) => i.type === 'prompt' && i.from === undefined)
+	let last = t.items.findLast((i) => i.type === 'prompt' && i.from === undefined && i.origin !== 'model')
 	if (last?.type !== 'prompt') return undefined
 	return { editing: { sessionId, original: last.text }, command: { type: 'pause', sessionId } }
 }
