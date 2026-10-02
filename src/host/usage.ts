@@ -125,6 +125,7 @@ function close(): void {
 
 export const usage = {
 	parse,
+	span,
 	store,
 	observe,
 	windows,

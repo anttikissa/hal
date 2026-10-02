@@ -1,0 +1,10 @@
+{
+	title: 'Usage refresh replaces windows and names them by span',
+	spec: "A /status usage-endpoint refresh replaces the account's stored windows with the ones it returns, including when the reading moves to a newly learnt email: windows of an old plan disappear instead of lingering until their reset in /status and rotation. OpenAI endpoint windows are named by their length like header windows (18000 s 5h, 604800 s 7d, a free plan's 2592000 s 30d), the raw primary/secondary only when no length is given. Response headers still merge, since one response may carry a subset. Invariant: stored windows are the provider's latest complete answer. Test: a refresh omitting a cached window drops it; a 30-day window is named 30d.",
+	status: 'done',
+	notes: [
+		"2 Oct 2026, found by fork 162-ftw: remote akissaniemi kept a free-plan 'primary' window (resets 31 Oct) after upgrading to plus, because refresh merged new windows into old ones. The old test required that merge (a cached 7d survived a refresh without it). Live plus accounts still read 5h/7d after the change."
+	],
+	needs: ['5y'],
+	foldInto: ['ab']
+}
