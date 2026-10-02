@@ -1,0 +1,6 @@
+{
+	title: 'Rate-limit waits are recorded and do not trip the loop guard',
+	spec: 'When a turn waits on a rate limit, the host appends a visible history record naming provider, model and until when. states.recoveries() stops counting continues at such a record: a turn that got a provider answer is not what stops the host. Invariant: restarting the host while sessions wait on limits never pauses them. Test: a limited turn survives six restarts unpaused. On hold (user, 2 Oct 2026): found when ~6 restarts while fixing rate limits paused every waiting OpenAI session.',
+	status: 'planned',
+	needs: ['j1']
+}
