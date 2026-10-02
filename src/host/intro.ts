@@ -21,7 +21,7 @@ import type { Reply } from './synthetic.ts'
 type Entry = Record<string, any>
 
 const greeting = 'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.'
-const saved = 'I saved your answers to'
+const saved = 'I saved your '
 const closing = "You're all set."
 const restart = 'Starting the intro.'
 const subscriptions = 'Hal works with your Claude, ChatGPT and OpenCode Go subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
@@ -166,7 +166,10 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	let store = (fields: Parameters<typeof profile.save>[0]) => {
 		if (!Object.values(fields).some((v) => profile.value(v))) return
 		profile.save(fields)
-		if (!said(run, saved)) say.push(`${saved} ${resolve(profile.file())}. You can edit it to update your personal preferences.`)
+		// Name exactly what was written: a timezone found unasked counts.
+		let what = Object.entries(fields).filter(([, v]) => profile.value(v)).map(([k, v]) => k === 'Name' ? 'name' : k === 'Timezone' ? `timezone (${v})` : 'language preference')
+		let list = what.length > 1 ? `${what.slice(0, -1).join(', ')} and ${what.at(-1)}` : what[0]
+		say.push(`${saved}${list} to ${resolve(profile.file())}.${said(run, saved) ? '' : ' You can edit it to update your personal preferences.'}`)
 	}
 	if (!said(run, saved)) store({ Name: name, Timezone: zone.zone })
 
@@ -179,9 +182,9 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 		ask: { text: 'Sign in now?', fields: [{ type: 'choice', name: 'login', options: ['/login claude', '/login chatgpt', '/login opencode', 'Skip'], initial: 0 }] },
 	})
 	if (!loggedIn.stored && login?.startsWith('/login ') && !run.some((r) => r.type === 'command' && r.text === login)) {
-		// Let the intro turn end, paused, before the command opens its form.
-		if (sessionId) setTimeout(() => slash.command(sessionId, login, { name: 'login', args: login.slice('/login '.length) }), 0)
-		return reply({ pause: 'waiting for /login' })
+		// The intro turn ends paused first; the command's records follow it.
+		let start = () => sessionId && slash.command(sessionId, login, { name: 'login', args: login.slice('/login '.length) })
+		return reply({ pause: 'waiting for /login', then: start })
 	}
 
 	let options = intro.choices(loggedIn.providers)

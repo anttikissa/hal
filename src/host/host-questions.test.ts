@@ -189,7 +189,7 @@ test('intro resumes through profile, timezone, save, model and secret search set
 	await reply(c, id, 'timezone', 'Yes', 'login')
 	await reply(c, id, 'login', 'Skip', 'model')
 	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Rowan\n\nTimezone: Europe/Helsinki\n')
-	expect(texts(c.views.get(id)!).join('\n')).toContain(`I saved your answers to ${home}/USER.md.`)
+	expect(texts(c.views.get(id)!).join('\n')).toContain(`I saved your name and timezone (Europe/Helsinki) to ${home}/USER.md.`)
 	let options = (field(c, id) as { options: string[] }).options
 	// Friendly names of the aliases a credential can use, never ids.
 	expect(options).toHaveLength(2)
@@ -220,6 +220,9 @@ test('with no credential the intro offers /login, pauses for it and goes on once
 	await reply(c, id, 'login', '/login opencode', 'key')
 	await until(() => c.views.get(id)!.state.type === 'paused')
 	expect(c.of('command').at(-1)?.text).toBe('/login opencode')
+	// The intro's paused turn end comes first, then the login it started.
+	let records = history.readSync(id)
+	expect(records.findLastIndex((r) => r.type === 'turn_end')).toBeLessThan(records.findLastIndex((r) => r.type === 'command'))
 	await reply(c, id, 'key', 'test-key', 'language')
 	await reply(c, id, 'language', '')
 	await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
