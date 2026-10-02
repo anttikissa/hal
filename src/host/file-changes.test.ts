@@ -7,6 +7,7 @@ import { history } from './history.ts'
 import { host } from './host.ts'
 import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
+import { tabs } from './tabs.ts'
 import type { ToolContext } from './tools.ts'
 
 let home = '', cwd = '', id = ''
@@ -78,13 +79,14 @@ test('sensitive paths and symlink aliases, and large files retain metadata not b
 test('overlapping aliases wait across sessions; disjoint and undeclared calls do not; waiting cancels', async () => {
 	writeFileSync(`${cwd}/file`, 'old')
 	symlinkSync('file', `${cwd}/alias`)
+	tabs.file().open = [...Array.from({ length: 7 }, (_, i) => `other-${i}`), id]
 	let owner = await fileChanges.begin(context(), ['file'])
 	let second = sessions.create({ cwd, model: 'fake/m' }).id
 	let chunks: string[] = []
 	let waiting = false
 	let next = fileChanges.begin({ ...context(second), onOutput: (c) => { chunks.push(c); waiting = true } }, [`${cwd}/alias`])
 	for (let i = 0; i < 100 && !waiting; i++) await Bun.sleep(5)
-	expect(chunks.join('')).toContain(`waiting for ${id} (editing file)`)
+	expect(chunks.join('')).toBe('Tab 8 is editing file.\nWaiting for that command to finish before starting ours.\n')
 	let disjoint = await fileChanges.begin(context(second), ['other'])
 	disjoint.release()
 	let undeclared = await fileChanges.begin(context(second), [])

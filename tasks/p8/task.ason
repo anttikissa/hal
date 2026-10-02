@@ -1,0 +1,10 @@
+{
+	title: 'Human-readable file-edit wait notices',
+	spec: 'File-lock waits report two separate lines: the blocker identified by its current visible tab number and overlapping file path(s), then a plain-language explanation that our command is waiting to start until the editing command finishes. Use a session label only when the blocker has no open tab. Do not describe an edit wait as an advisory review. Preserve overlapping-file serialization and lock release behavior.',
+	status: 'done',
+	notes: [
+		'Wait notices use the current visible tab position, not tabs.label for open tabs: that helper includes the internal session ID and session name. Focused file-change tests pass (7). Two full-suite runs had differing timing/browser failures outside this change; the final run passed 1335 tests, skipped 1, and failed 5, with lint/type checks clean.'
+	],
+	needs: ['8w'],
+	foldInto: ['8w']
+}

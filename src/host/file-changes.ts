@@ -11,6 +11,7 @@ import type { ToolContext } from './tools.ts'
 import { host } from './host.ts'
 import { stats } from './stats.ts'
 import { commits } from './commits.ts'
+import { tabs } from './tabs.ts'
 
 type Lock = { sessionId: string; paths: Set<string>; done: Promise<void>; release: () => void }
 type Observation = { ctx: ToolContext; patterns: string[]; before: Map<string, FileSnapshot>; status: Map<string, string>; commits?: Awaited<ReturnType<typeof commits.begin>>; release: () => void }
@@ -64,7 +65,9 @@ async function acquire(ctx: ToolContext, patterns: string[]): Promise<() => void
 			}
 		}
 		let editing = [...keys].find((p) => conflict.paths.has(p)) ?? [...conflict.paths][0]!
-		ctx.onOutput?.(`waiting for ${conflict.sessionId} (editing ${relative(await fileChanges.canonical(ctx.cwd), editing)})\n`)
+		let tab = tabs.file().open.indexOf(conflict.sessionId)
+		let editor = tab >= 0 ? `Tab ${tab + 1}` : tabs.label(conflict.sessionId)
+		ctx.onOutput?.(`${editor} is editing ${relative(await fileChanges.canonical(ctx.cwd), editing)}.\nWaiting for that command to finish before starting ours.\n`)
 		await new Promise<void>((res, rej) => {
 			let abort = () => rej(new Error('cancelled; the command did not run'))
 			ctx.signal.addEventListener('abort', abort, { once: true })
