@@ -2,7 +2,7 @@
 // profile endpoints, a temp HAL_HOME; never the real credentials file.
 
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import type { StreamEvent } from '../common/blocks.ts'
@@ -11,6 +11,7 @@ import { auth } from './auth.ts'
 import { command } from './commands/login.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { limits } from './limits.ts'
 import { liveFiles } from './live-file.ts'
 import { login } from './login.ts'
 import { sessions } from './sessions.ts'
@@ -196,6 +197,21 @@ test('ANTHROPIC_API_KEY alone needs no file; a login in the file comes first and
 	writeFileSync(file(), ason.stringify({ anthropic: { accessToken: 'file-token', expires: Date.now() + 3_600_000 } }), { mode: 0o600 })
 	auth.close()
 	expect(await auth.anthropic()).toMatchObject({ type: 'token', value: 'file-token' })
+})
+
+// 2 Oct 2026: a plan refusal set an account aside for an hour; logging
+// in again after upgrading the plan left it skipped.
+test('a login makes its account usable again at once, leaving other accounts\' limits', async () => {
+	writeFileSync(file(), ason.stringify({ anthropic: [{ accessToken: 'old', refreshToken: 'r', email: 'a@example.com' }, { accessToken: 'b', refreshToken: 'r', email: 'b@example.com' }] }), { mode: 0o600 })
+	let later = Date.now() + 3600_000
+	mkdirSync(`${home}/state`)
+	try {
+		for (let who of ['a@example.com', 'b@example.com']) limits.set(limits.key('anthropic/m', who), later)
+		expect((await error(() => auth.anthropic('m'))).message).toContain('rate limited')
+		await command.run('claude', { code: await pastedCode() }, ctx)
+		expect(await auth.anthropic('m')).toMatchObject({ value: 'new-access', account: 'a@example.com' })
+		expect(limits.until(limits.key('anthropic/m', 'b@example.com'))).toBe(later)
+	} finally { limits.close() }
 })
 
 test('a blocked turn accepts bare /login and /login claude, then resumes after success', async () => {

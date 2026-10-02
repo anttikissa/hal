@@ -10,6 +10,7 @@
 
 import { existsSync } from 'fs'
 import { auth, CLIENT_ID, type Kind } from './auth.ts'
+import { limits } from './limits.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
@@ -96,6 +97,10 @@ function save(entry: Entry, kind: Kind = 'anthropic'): void {
 	data[kind] = list.length === 1 ? list[0] : list
 	liveFiles.save(data)
 	if (created) liveFiles.close(data)
+	// The name auth.all gives this account; its old limits no longer hold.
+	let i = same >= 0 ? same : list.length - 1
+	let email = list[i]?.email
+	limits.forget(kind, auth.usable(email) ? email : `account ${i + 1}`)
 }
 
 export const login = {

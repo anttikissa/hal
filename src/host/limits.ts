@@ -36,6 +36,13 @@ function set(key: string, at: number): void {
 	if (at > clock.now()) data[key] = new Date(at).toISOString()
 }
 
+// Drops every limit on one account of a provider: a fresh login is new
+// evidence that outdates them (a plan refusal before an upgrade).
+function forget(kind: string, account: string): void {
+	let data = limits.store()
+	for (let k of Object.keys(data)) if (k.startsWith(`${kind}/`) && k.endsWith(` ${account}`)) delete data[k]
+}
+
 function close(): void {
 	let s = limits.state.store
 	limits.state.store = null
@@ -48,6 +55,7 @@ export const limits = {
 	store,
 	until,
 	set,
+	forget,
 	close,
 	state: { store: null as Record<string, string> | null, path: '' },
 }
