@@ -260,8 +260,9 @@ function oneLine(s: string): string {
 function show(item: ItemShown, full = false, bash = false): Shown {
 	switch (item.type) {
 		case 'prompt':
-			// Who sent it is in the card's head (task hp).
-			return { kind: 'user prompt', text: (/^bash (?:#\d+|b[0-9a-f]{6})$/.test(item.label ?? '')) ? bashResult.display(item.text) : item.text }
+			// Who sent it is in the card's head (task hp); a report's
+			// summary heads its card, so the body omits the tag (task rj).
+			return { kind: 'user prompt', text: (/^bash (?:#\d+|b[0-9a-f]{6})$/.test(item.label ?? '')) ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text }
 		case 'image':
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }
