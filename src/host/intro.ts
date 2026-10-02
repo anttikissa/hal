@@ -23,7 +23,7 @@ type Entry = Record<string, any>
 const greeting = 'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.'
 const saved = 'I saved your answers to'
 const closing = "You're all set."
-const subscriptions = 'Hal works with your Claude and ChatGPT subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
+const subscriptions = 'Hal works with your Claude, ChatGPT and OpenCode Go subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
 const yesNo = (name: string, text: string): Form => ({ text, fields: [{ type: 'choice', name, options: ['Yes', 'No'], initial: 0 }] })
 const words = ['no', 'one', 'two', 'three', 'four', 'five']
 
@@ -185,7 +185,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	let options = intro.choices(loggedIn.providers)
 	let chosen = answered(run, 'model')
 	if (options.size && chosen === undefined) return reply({
-		say: `Available logins: ${loggedIn.names.join(', ')}. ${subscriptions}`,
+		say: `Available logins: ${loggedIn.names.join(', ')}.${said(run, subscriptions) ? '' : ` ${subscriptions}`}`,
 		ask: { text: 'Which model should Hal use?', fields: [{ type: 'choice', name: 'model', options: [...options.keys(), 'Other'], initial: 0 }] },
 	})
 	let model = chosen === undefined ? undefined : options.get(chosen) ?? [...options.values()].find((id) => id.startsWith(/^claude/i.test(chosen) ? 'anthropic/' : /^gpt/i.test(chosen) ? 'openai/' : '-'))
@@ -212,7 +212,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	let now = model ? `This tab now uses ${chosen}, also the default for new tabs.`
 		: !loggedIn.names.length ? "You're not signed in yet, so no model can answer: run /login to sign in with Claude or ChatGPT or to add an API key, then /model or Ctrl-M picks a model."
 		: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
-	return reply({ say: `${closing} A few tips:\n- /login signs in with your Claude or ChatGPT subscription, or adds an API key.\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
+	return reply({ say: `${closing} A few tips:\n${said(run, subscriptions) ? '' : '- /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key.\n'}- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
 }
 
 export const intro = { run, answered, asked, accounts, choices, findZone, timezone }
