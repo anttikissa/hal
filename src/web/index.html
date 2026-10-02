@@ -43,17 +43,32 @@ body, textarea { tab-size: 4; }
 /* Cards and the open question share one shape: square, a lit bar on
    the left, the style's tint behind. */
 .Card, .Question { border-left: 3px solid currentColor; }
-.Card { padding: 0.25lh 1ch; white-space: pre-wrap; overflow-wrap: anywhere; }
-.Card.user::before { content: "> "; }
-.Card.image::before { content: none; }
-.Card.prompt::before { content: none; }
-.Card .who { color: var(--quiet); margin-bottom: 0.25lh; }
+.Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; }
+.Card .content { padding: 0.25lh 1ch; }
+.Card .sender { color: var(--quiet); margin-bottom: 0.25lh; }
+.Card .who { color: var(--quiet); }
 .Card .who .call { color: inherit; text-decoration: underline; }
 .Card .exit { background: none; }
+/* One header grid for metadata and folding cards; first-line alignment
+   stays the same when a label wraps. Touch height belongs to this row. */
+.CardHeader { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; column-gap: 1ch; padding-inline: 1ch; }
+.CardHeader:not(:has(.stamp)) { grid-template-columns: minmax(0, 1fr) auto; }
+.CardHeader .stamp, .CardHeader .title, .CardHeader .link { padding-block: 0.25lh; }
+.CardHeader .stamp { padding-inline: 0; background: none; color: inherit; font: inherit; text-align: left; white-space: nowrap; }
+.CardHeader .mark { display: flex; align-items: flex-start; justify-content: flex-start; }
+.CardHeader .title { display: flex; align-items: baseline; gap: 0.2ch; min-width: 0; }
+.CardHeader .label { min-width: 0; }
+.Card.folds:not(.open) .CardHeader .label { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
+.CardHeader .error { background: none; margin-left: 1ch; }
+@media (pointer: coarse) {
+  .CardHeader { min-height: 44px; }
+  .CardHeader .stamp, .CardHeader .link { min-width: 44px; min-height: 44px; }
+  .CardHeader .title a { padding-block: max(0px, calc((44px - 1lh) / 2)); }
+}
 /* A context boundary (tasks bc, vh): its text centred in a rule. */
 .Card.divider { display: flex; align-items: center; gap: 1ch; border-left: none; }
 .Card.divider::before, .Card.divider::after { content: ""; flex: 1; border-top: 1px solid currentColor; }
-.Card.image > a:not(.link) { display: block; touch-action: pan-y; }
+.Card.image .content > a { display: block; touch-action: pan-y; }
 .Card.image img { display: block; max-width: 100%; max-height: 24rem; }
 /* A prompt the host hasn't taken yet looks sent; only one that stays
    pending greys, after a delay, so a normal round trip shows nothing. */
@@ -62,31 +77,22 @@ body, textarea { tab-size: 4; }
 .Card.queued { cursor: pointer; }
 .Card.pending { color: var(--quiet); transition-delay: 300ms; }
 .Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
-.Card.folds { padding: 0; cursor: pointer; }
-.Card .head { display: flex; align-items: center; gap: 0; width: 100%; padding: 0.25lh 1ch; background: none; color: inherit; text-align: left; }
-.Card .head .mark { display: flex; align-items: center; justify-content: flex-start; flex: none; align-self: flex-start; padding: 0 1ch 0 0; background: none; color: inherit; font: inherit; }
-@media (pointer: coarse) { .Card .head .mark { min-width: 44px; min-height: 44px; } .Card .head a { display: inline-block; min-height: 44px; } }
-.Card .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.Card.open .head { align-items: flex-start; }
-.Card.open .title { white-space: normal; overflow-wrap: anywhere; }
-.Card .head .error { background: none; margin-left: auto; }
+.Card.folds { cursor: pointer; }
 /* Each card links to itself (task 0z): a # in its top right corner,
    shown on hover or focus; the linked card is outlined. */
-.Card { position: relative; padding-right: 7ch; }
-.Card .head { padding-right: 7ch; }
-.Card > .link { position: absolute; top: 0; right: 0; padding: 0.25lh 1ch 0.25lh 0.5ch; color: inherit; text-decoration: none; user-select: none; color: var(--quiet); }
-.Card > .link::before { content: attr(data-ref); }
-.Card > .link:hover, .Card > .link:focus-visible { color: inherit; text-decoration: underline; }
+.Card .link { color: var(--quiet); text-decoration: none; user-select: none; white-space: nowrap; }
+.Card > .link { position: absolute; top: 0; right: 1ch; padding-block: 0.25lh; }
+.Card:has(> .link) > .content { padding-right: 7ch; }
+.Card .link::before { content: attr(data-ref); }
+.Card .link:hover, .Card .link:focus-visible { color: inherit; text-decoration: underline; }
 .Card.target { outline: 1px solid currentColor; outline-offset: 2px; scroll-margin-top: 0.5lh; }
 .Card .more { display: block; margin-top: 0.25lh; background: none; color: inherit; text-decoration: underline; padding: 0; }
 @media (pointer: coarse) { .Card > .link { min-width: 44px; min-height: 44px; text-align: right; } .Card .more { min-height: 44px; } }
-@media (pointer: coarse) { .Card.folds > .link { top: 0.25lh; display: flex; align-items: center; justify-content: flex-end; } }
 /* Open and close animate the height (a one-row grid, 0fr to 1fr);
    closing is faster. Padding sits inside so closed is truly 0 high. */
 .Card .body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows calc(var(--toggle-ms) * 0.7) var(--ease-out); }
 .Card.open .body { grid-template-rows: 1fr; transition-duration: var(--toggle-ms); }
-.Card .contents { min-height: 0; overflow: hidden; padding: 0 1ch 0 3ch; }
-.Card .contents::after { content: ""; display: block; height: 0.25lh; }
+.Card .contents { min-height: 0; overflow: hidden; }
 /* Hal's cursor: inside the card that streams, right after its last
    character (dimmed while thinking), else on a line after the last
    item. */
@@ -94,7 +100,7 @@ body, textarea { tab-size: 4; }
 .cursor-line span, .Card .cursor { display: block; width: 1ch; height: 1lh; background: currentColor; animation: blink 1s steps(1, end) infinite; }
 .Card .cursor { display: inline-block; vertical-align: text-bottom; margin-left: 0.2ch; background: var(--cursor); }
 .Card.thinking .cursor { background: var(--quiet); }
-.Card .head .cursor { flex: none; align-self: center; }
+.CardHeader .cursor { vertical-align: text-bottom; }
 /* Model text as markdown (task fn). Each source line is a row, a blank
    one as tall as text; the last is inline so Hal's cursor follows it. A
    table too wide scrolls sideways in its own box, and while more of it
@@ -245,7 +251,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Question .dismiss:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
 .Question > .text { padding-right: 3ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Question .text a { color: inherit; text-decoration: underline; }
-@media (pointer: coarse) { .Question .dismiss, .Question button.answer { min-width: 44px; min-height: 44px; } }
+@media (pointer: coarse) { .Question button, .Question button.answer { min-width: 44px; min-height: 44px; } }
 .Question pre.quote { margin: 0 0 0 2ch; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .Question mark { background: currentColor; color: inherit; -webkit-text-fill-color: var(--canvas); }
 .Picker { width: min(80vw, 60rem); height: min(80vh, 50rem); background: var(--canvas); color: var(--text); border: 1px solid var(--border); padding: 0.5lh 1ch; }
@@ -270,6 +276,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 @media (pointer: coarse) {
   .Picker { width: calc(var(--app-width, 100vw) - 1rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; max-width: none; height: calc(var(--app-height, 100dvh) - 1rem); max-height: none; top: calc(var(--app-top, 0px) + 0.5rem); bottom: auto; margin: 0; }
   .Picker li { min-height: 44px; padding-block: 0.25lh; }
+  .Picker li:has(> a) { padding-block: 0; }
   .Picker .close { min-width: 44px; min-height: 44px; }
 }
 /* Tabs (tasks 3k, ce): one row with native momentum scrolling between

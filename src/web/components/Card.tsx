@@ -20,6 +20,7 @@ import { titles } from '../../common/titles.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
 import { Markdown } from './Markdown.tsx'
+import { CardHeader } from './CardHeader.tsx'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
@@ -101,7 +102,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let title = () => titles.title(props.row.item)
 	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #(\d+)$/)?.[1]
 	let who = () => {
-		let ref = source(), t = title()
+		let ref = source(), t = titles.who(props.row.item)
 		return ref && t?.endsWith(`#${ref}`) ? <>{t.slice(0, -ref.length - 1)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">#{ref}</a></> : t
 	}
 	let marked = (s: string) => {
@@ -118,7 +119,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let headerParts = createMemo(() => view.urlParts(head() ?? ''))
 	let body = () => {
 		let item = props.row.item
-		if (item.type === 'prompt') return [title() ?? '', '', ...lines()].join('\n')
 		if (item.type !== 'tool') return lines().join('\n')
 		// The call once (task 8t), then its output: the result, or what
 		// has streamed so far.
@@ -128,7 +128,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let failed = () => !!props.row.result?.isError
 	let toggle = (e: MouseEvent) => {
-		if (!folds() || (e.target as Element).closest('a, .more') || !getSelection()?.isCollapsed) return
+		if ((!folds() && props.row.note === undefined) || (e.target as Element).closest('a, .more') || !getSelection()?.isCollapsed) return
 		scroll.follow(() => {
 			setOpen(!expanded())
 			flush()
@@ -165,17 +165,19 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		let l = linked()
 		return typeof l === 'string' ? l : l.map((p) => (typeof p === 'string' ? p : <a href={p.href} target="_blank" rel="noopener">{p.text}</a>))
 	}
-	// Built once per card: the bindings follow a new row object, so the
-	// DOM (and its fade-in) stays when a snapshot or stream replaces it.
+	let time = () => titles.time((props.row.item as { ts?: string }).ts)
+	let heading = () => <CardHeader time={time()} label={who()} reference={link()} />
+	// Content branches share the shell, header and normal body inset.
 	let plain = (s: () => { kind: string; text: string }) => (
-		<div ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.target ? 'target' : '']}>
-			{link()}
-			<Show when={title()}>{(_t) => <div class="who">{who()}</div>}</Show>
-			<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : props.row.item.type === 'prompt' && source() ? marked(s().text) : parts()}>
-				{(img) => <a href={view.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={view.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
-			</Show>
-			<Show when={props.cursor && !md()}>{cursor()}</Show>
-		</div>
+		<>
+			<Show when={title()} fallback={link()}>{heading()}</Show>
+			<div class="content">
+				<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : props.row.item.type === 'prompt' && source() ? marked(s().text) : parts()}>
+					{(img) => <a href={view.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={view.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
+				</Show>
+				<Show when={props.cursor && !md()}>{cursor()}</Show>
+			</div>
+		</>
 	)
 	// A queued message's compact row (task 16): its note and text, no
 	// header, at most 3 lines until a click (or its link) opens it.
@@ -184,45 +186,37 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return expanded() || all.length <= 3 ? all.join('\n') : [...all.slice(0, 3), `… ${all.length - 3} more lines`].join('\n')
 	}
 	let compact = () => (
-		<div ref={(e) => (root = e)} class={['Card', 'user', 'prompt', 'queued', props.target ? 'target' : '']} onClick={(e) => !(e.target as Element).closest('a') && getSelection()?.isCollapsed && setOpen(!expanded())}>
-			{link()}
-			<Show when={expanded() && md()} fallback={queued()}>
-				<div class="who">{props.row.note}</div>
-				<Show when={title()}>{(_t) => <div class="who">{who()}</div>}</Show>
-				{markdown()}
+		<>
+			<Show when={expanded() && md()} fallback={<>{link()}<div class="content">{queued()}</div></>}>
+				{heading()}
+				<div class="content"><div class="sender">{props.row.note}</div>{markdown()}</div>
 			</Show>
-		</div>
+		</>
 	)
 	return (
-		<Show when={props.row.note === undefined ? shown() : undefined} fallback={compact()}>
+		<Show when={shown()}>
 			{(s) => (
-				<Show when={folds()} fallback={plain(s)}>
-					<article ref={(e) => (root = e)} class={['Card', 'folds', ...s().kind.split(' '), expanded() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
-						{link()}
-						<div class="head">
-							<button type="button" class="mark" aria-label={head()} aria-expanded={expanded() ? 'true' : 'false'}>
-								{titles.time((props.row.item as { ts?: string }).ts) || 'Details'}
-							</button>
-							<span class="title"><For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></span>
-							<Show when={props.cursor && !open()}>{cursor()}</Show>
-							<Show when={failed()}>
-								<span class="error">✗</span>
-							</Show>
-						</div>
-						<div class="body" inert={!expanded()}>
-							<div class="contents">
-								<Show when={md() && props.row.item.type === 'prompt'}><div class="who">{who()}</div></Show>
-								{md() ? markdown() : props.row.item.type === 'tool' && props.row.item.name === 'bash' ? marked(body()) : body()}
-								<Show when={props.cursor && !md()}>{cursor()}</Show>
-								<Show when={long()}>
-									<button type="button" class="more" onClick={more}>
-										{full() ? 'show less' : 'show all'}
-									</button>
-								</Show>
+				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folds() ? 'folds' : '', expanded() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
+					<Show when={props.row.note === undefined} fallback={compact()}>
+						<Show when={folds()} fallback={plain(s)}>
+							<CardHeader time={time()} name={head()} open={expanded()} reference={link()}
+								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
+								<Show when={props.cursor && !open()}>{cursor()}</Show>
+								<Show when={failed()}><span class="error">✗</span></Show>
+							</CardHeader>
+							<div class="body" inert={!expanded()}>
+								<div class="contents">
+									<div class="content">
+										<Show when={props.row.item.type === 'prompt'}><div class="sender">{who()}</div></Show>
+										{md() ? markdown() : props.row.item.type === 'tool' && props.row.item.name === 'bash' ? marked(body()) : body()}
+										<Show when={props.cursor && !md()}>{cursor()}</Show>
+										<Show when={long()}><button type="button" class="more" onClick={more}>{full() ? 'show less' : 'show all'}</button></Show>
+									</div>
+								</div>
 							</div>
-						</div>
-					</article>
-				</Show>
+						</Show>
+					</Show>
+				</article>
 			)}
 		</Show>
 	)

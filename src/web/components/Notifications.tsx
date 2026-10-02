@@ -19,7 +19,7 @@ export function Notifications(props: { open: boolean; onClose: () => void }) {
 	})
 	let fail = (e: any) => alert(`Notifications: ${e?.message ?? e}`)
 	return (
-		<dialog ref={(e) => (dialog = e)} class="sheet" aria-label="Notifications" onClose={props.onClose} onClick={(e) => e.target === e.currentTarget && props.onClose()}>
+		<dialog ref={(e) => (dialog = e)} class="Notifications sheet" aria-label="Notifications" onClose={props.onClose} onClick={(e) => e.target === e.currentTarget && props.onClose()}>
 			<h2>Notifications</h2>
 			<p role="status">{said[push.status()]}</p>
 			<Show when={push.status() === 'off'}>

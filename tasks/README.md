@@ -141,6 +141,11 @@ point to it.
 
 ## Web client (Solid)
 
+Before implementing or reviewing UI, read `skills/ui-craft/SKILL.md`.
+Catalogue equivalent variants, fix shared layout owners, and inspect their
+rendered short/long, open/closed and responsive states before claiming a
+visual fix. Passing tests alone does not establish visual quality.
+
 Solid 2 is not Solid 1: read the current tasks/1b/web.md before writing
 web code; tasks/1b/old-web.md is historical reference. The notes of
 1b and 4s cover specific implementation failures. Match

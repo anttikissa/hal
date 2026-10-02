@@ -566,6 +566,7 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 		// must not make this test type before the focused tab is ready.
 		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
 		for (let width of [390, 1280]) {
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: width === 390 })
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
 			await b.waitFor(`document.querySelector('.entry')?.getBoundingClientRect().bottom > 700`)
 			// Prime the textarea's auto-height before comparing menu geometry:
@@ -858,7 +859,7 @@ test.skipIf(!chrome)('in a browser a block address loads its page, marks its car
 		await b.waitFor(`!!document.querySelector('.Card.target.open')?.innerText.includes('row 40')`)
 		let seen = await b.evaluate(`(() => {
 			let card = document.querySelector('.Card.target'), box = card.getBoundingClientRect(), main = document.querySelector('main').getBoundingClientRect()
-			let link = card.querySelector(':scope > a.link')
+			let link = card.querySelector('a.link')
 			return { targets: document.querySelectorAll('.Card.target').length, visible: box.top < main.bottom && box.bottom > main.top, link: link && new URL(link.href).pathname + new URL(link.href).hash }
 		})()`)
 		expect(seen).toEqual({ targets: 1, visible: true, link: `/${id}#${result.n! - 1}` })
@@ -1302,7 +1303,7 @@ test.skipIf(!chrome)('pending question URLs are safe native links and wrap at ph
 	let id = sessions.create({ cwd: home, model: 'anthropic/claude-opus-5-5' }).id
 	let url = `https://example.com/oauth?state=a_b&redirect_uri=https%3A%2F%2Fexample.org%2Fcallback&scope=${'user%3Aprofile+'.repeat(30)}#fragment`
 	let text = `Open (${url}).\nThen paste code#state. <script>window.pwned=1</script> javascript:bad()`
-	history.append(id, { type: 'question', id: 'q-links', form: { text, fields: [{ type: 'text', name: 'code' }] }, from: { command: 'login', args: '' } })
+	history.append(id, { type: 'question', id: 'q-links', form: { text, fields: [{ type: 'text', name: 'code' }, { type: 'choice', name: 'mode', options: ['Continue', 'Cancel'] }] }, from: { command: 'login', args: '' } })
 	let b = await browser()
 	try {
 		await server.serve()
@@ -1316,6 +1317,10 @@ test.skipIf(!chrome)('pending question URLs are safe native links and wrap at ph
 			await b.evaluate(`new Promise(resolve => requestAnimationFrame(resolve))`)
 			expect(await b.evaluate(`(() => { let q = document.querySelector('.Question'); return q.scrollWidth <= q.clientWidth && document.documentElement.scrollWidth <= innerWidth })()`)).toBe(true)
 		}
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
+		await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+		expect(await b.evaluate(`[...document.querySelectorAll('.Question button')].every(b => b.getBoundingClientRect().height >= 44 && b.getBoundingClientRect().width >= 44)`)).toBe(true)
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
 		await b.evaluate(`document.querySelector('.Question input').focus()`)
 		for (let selector of ['.dismiss', 'a']) {
 			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 })
@@ -1524,6 +1529,82 @@ test.skipIf(!chrome)('tool-header URLs navigate without toggling and remain sepa
 		await b.close()
 	}
 }, 20000)
+
+
+test.skipIf(!chrome)('transcript card variants share first-line geometry in open and closed states', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	let ts = '2026-10-02T06:20:00Z'
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Human prompt body' }], ts })
+	history.append(id, { type: 'assistant', block: { type: 'text', text: 'Assistant body\n\nAnother paragraph' }, ts })
+	history.append(id, { type: 'output', text: 'Command output body', ts })
+	history.append(id, { type: 'command', text: '/help', ts })
+	let { blob } = blobs.store(id, 'image/gif', 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
+	history.append(id, { type: 'user', blocks: [{ type: 'image', blob, mediaType: 'image/gif' }], ts })
+	history.append(id, { type: 'question', id: 'answered', form: { text: 'Choose an option', fields: [{ type: 'choice', name: 'choice', options: ['Yes', 'No'] }] }, ts })
+	history.append(id, { type: 'answer', question: 'answered', answers: { choice: 'Yes' }, ts })
+
+	history.append(id, { type: 'assistant', block: { type: 'thinking', text: 'Consider the layout\n\nFurther thought' }, ts })
+	for (let [name, description] of [['short', 'Inspect files'], ['long', 'Put the one-space gap inside the timestamp tap target and rerun all checks before documenting the consistent card layout']]) {
+		history.append(id, { type: 'assistant', block: { type: 'tool_call', id: name!, name: 'bash', input: { description, command: 'printf example', modifies: [] } }, ts })
+		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: name!, output: 'Example output' }], ts })
+	}
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '**Message body**\n\nMore detail', from: 'reviewer', label: 'Review agent', summary: 'Review the card layout' }], ts })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '[exit 0]\nJob complete', from: 'worker', label: 'bash #6' }], ts })
+	history.append(id, { type: 'inbox', id: 'queued-review', text: '**Queued message**\n\nLine three\nLine four', queue: true, from: 'reviewer', label: 'Review agent', ts })
+	history.append(id, { type: 'compact', summary: 'Example context summary', prompts: 1, ts })
+	history.append(id, { type: 'turn_end', status: 'paused', usage: {}, ts })
+	history.append(id, { type: 'turn_end', status: 'error', error: 'Example turn failure', usage: {}, ts })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelectorAll('.Card.folds').length === 4 && !!document.querySelector('.Card.queued')`)
+		let geometry = `(() => {
+			let first = el => { let w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n; while (n = w.nextNode()) if (n.textContent.trim()) { let r = document.createRange(); r.setStart(n, 0); r.setEnd(n, 1); return r.getBoundingClientRect().toJSON() } };
+			return [...document.querySelectorAll('.CardHeader')].map(h => {
+				let c = h.closest('.Card'), stamp = h.querySelector('.stamp'), title = h.querySelector('.title'), ref = h.querySelector('.link');
+				let t = first(stamp ?? title), label = first(title), link = ref?.getBoundingClientRect(), box = h.getBoundingClientRect();
+				return { folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && title.getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth };
+			});
+		})()`
+		for (let [, width, height, touch] of [['portrait', 390, 800, true], ['narrow', 320, 760, true], ['landscape', 844, 390, true], ['desktop', 1200, 800, false]] as const) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
+			await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+			let closed = await b.evaluate(geometry)
+			let folded = closed.filter((r: any) => r.folds)
+			for (let row of closed) {
+				expect(Math.abs(row.baseline)).toBeLessThanOrEqual(1)
+				expect(row.inset).toBeCloseTo(closed[0].inset, 1)
+				expect(row.refTop).toBe(0)
+				expect(row.overlap).toBe(false)
+				expect(row.textWidth).toBeLessThanOrEqual(row.boxWidth + 1)
+			}
+			for (let row of folded) expect(row.height).toBeCloseTo(folded[0].height, 1)
+			if (touch) expect(folded[0].height).toBeGreaterThanOrEqual(44)
+			await b.evaluate(`document.querySelectorAll('.Card.folds .mark').forEach(b => b.click()); document.querySelector('.Card.queued').click()`)
+			await b.waitFor(`document.querySelectorAll('.Card.folds.open').length === 4 && !!document.querySelector('.Card.queued .CardHeader')`)
+			await Bun.sleep(300)
+			for (let row of await b.evaluate(geometry)) {
+				expect(Math.abs(row.baseline)).toBeLessThanOrEqual(1)
+				expect(row.inset).toBeCloseTo(closed[0].inset, 1)
+				expect(row.refTop).toBe(0)
+				expect(row.overlap).toBe(false)
+				expect(row.textWidth).toBeLessThanOrEqual(row.boxWidth + 1)
+			}
+			let insets = await b.evaluate(`(() => { let c = document.querySelectorAll('.Card.tool')[1], header = c.querySelector('.stamp'), body = c.querySelector('.content'); return { body: body.getBoundingClientRect().x + parseFloat(getComputedStyle(body).paddingLeft), header: header.getBoundingClientRect().x, wrapped: c.querySelector('.title').getBoundingClientRect().height > parseFloat(getComputedStyle(c).lineHeight) * 2, } })()`)
+			expect(insets.body).toBeCloseTo(insets.header, 1)
+			if (width <= 390) expect(insets.wrapped).toBe(true)
+
+			await b.evaluate(`document.querySelectorAll('.Card.folds .mark').forEach(b => b.click()); document.querySelector('.Card.queued').click()`)
+			await Bun.sleep(300)
+		}
+
+	} finally {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+}, 15000)
 
 // Selection belongs to the browser: tests may inspect it; rendering must not.
 test.skipIf(!chrome)('streaming preserves native selection and Markdown text nodes without holding updates', async () => {
