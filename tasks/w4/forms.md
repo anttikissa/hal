@@ -32,7 +32,10 @@ answerable. An open question's fields stand between blank rows, apart
 from the question text above and the key hint below. A text field's
 placeholder is drawn in oklch.faint of the block's colours, like the
 prompt's example request: deliberately below the readable-text minimum
-so it never reads as typed text (the user's decision). While a turn's question is open the session is
+so it never reads as typed text (the user's decision). A form marked
+`skip` changes Escape from pause to skip: the host records a cancelled
+answer and runs the asker again, which moves on; its hint says
+"Escape: skip". While a turn's question is open the session is
 `blocked (question)` (tasks/j1/states.md). A command's question is not
 a state: it sits beside whatever the session does (a turn blocked on a
 login, a turn streaming), like the inbox, and never changes the state

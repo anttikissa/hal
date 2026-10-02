@@ -177,12 +177,18 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 
 	let search = answered(run, 'search')
 	if (!auth.serperKey() && search === undefined) return reply({
-		say: 'Hal searches the web with the google tool through Serper (serper.dev), for every model; its free searches go a long way.',
-		ask: yesNo('search', 'Set up a Serper web search key?'),
+		say: 'I recommend using Serper for web search results ([serper.dev](https://serper.dev/signup)) - free tier goes a long way.',
+		ask: { text: 'Set up a Serper web search key?', fields: [{ type: 'choice', name: 'search', options: ['Yes', 'Maybe later'], initial: 0 }] },
 	})
+	// An empty key or Escape skips: the step must never trap the user.
 	if (search === 'Yes' && !auth.serperKey()) {
-		if (!answers?.key?.trim()) return reply({ ask: { text: 'Paste your Serper API key (it will not be shown or saved in conversation history).', fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }] } })
-		apiKeys.save('serper', answers.key.trim())
+		let q = run.findLast((r) => r.type === 'question')
+		let a = run.findLast((r) => r.type === 'answer')
+		let skipped = q?.type === 'question' && q.form.fields.some((f) => f.name === 'key') && a?.type === 'answer' && a.question === q.id && !!a.cancelled
+		if (answers?.key === undefined && !skipped) return reply({ ask: { text: 'Paste your Serper API key (it will not be shown or saved in conversation history). Empty skips.', fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }], skip: true } })
+		if (skipped) answers = { key: '' }
+		if (answers.key.trim()) apiKeys.save('serper', answers.key.trim())
+		else say.push('Skipped web search for now.')
 	}
 	if (model) {
 		config.init()
