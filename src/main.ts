@@ -9,6 +9,7 @@ import { draftFile } from './client/draft-file.ts'
 import { link } from './client/link.ts'
 import { print } from './client/print.ts'
 import { remote as remoteClient, type Saved } from './client/remote.ts'
+import { hostTheme } from './host/host-theme.ts'
 import { render } from './client/render.ts'
 import { terminal } from './client/terminal.ts'
 import { versions } from './client/versions.ts'
@@ -285,10 +286,11 @@ async function remote(typed: string | undefined): Promise<void> {
 	liveFiles.save(saved)
 	process.stderr.write(`Connecting to ${origin}…\n`)
 	main.initTerminal(origin)
+	await hostTheme.follow('hal')
 	remoteClient.start({
 		origin,
 		token,
-		onEvent: (event) => main.onEvent(event),
+		onEvent: (event) => (event.type === 'theme' ? void hostTheme.follow(event.name).then((text) => text && ((app.state.notice = text), app.show())) : main.onEvent(event)),
 		onState: (state) => app.onState(state),
 		// Revoked: forget the token and say how to log in again.
 		loggedOut: () => {
