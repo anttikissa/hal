@@ -3,6 +3,7 @@
 
 import type { FormState } from '../common/forms.ts'
 import { colors, type Style } from '../common/colors.ts'
+import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 import { itemView } from './item-view.ts'
@@ -19,8 +20,9 @@ function formLines(st: FormState, width: number): { rows: string[]; cursor: { ro
 	let rows = [...ansi.wrap(`? ${st.form.text}`, width), ...itemView.quoteLines(st.form.quote, width)]
 	let f = formView.fieldLines(st, width)
 	let hint = st.form.fields.length > 1 ? 'Enter: next · Tab: move · Escape: pause' : 'Enter: answer · Escape: pause'
-	let cursor = { row: rows.length + f.cursor.row, col: f.cursor.col }
-	return { rows: [...rows, ...f.rows, ansi.quiet(strings.clipVisual(`  ${hint}`, width), colors.warning())], cursor }
+	// The fields stand apart: a blank row above and below them.
+	let cursor = { row: rows.length + 1 + f.cursor.row, col: f.cursor.col }
+	return { rows: [...rows, '', ...f.rows, '', ansi.quiet(strings.clipVisual(`  ${hint}`, width), colors.warning())], cursor }
 }
 
 // Rows of a form's fields alone, and the cursor in them.
@@ -51,7 +53,12 @@ function fieldLines(st: FormState, width: number, style: Style = colors.warning(
 		let at = field.type === 'secret' ? dots(value.slice(0, st.cursor)).length : st.cursor
 		let indent = Math.min(strings.visLen(head), Math.max(0, width - 1))
 		let p = promptView.layoutPrompt(shown, at, Math.max(1, width - indent))
-		if (!value && field.type === 'text' && field.placeholder) p.rows[0] = ansi.quiet(strings.clipVisual(ansi.clean(field.placeholder), width - indent), style)
+		// The example stays well below typed text, like the prompt's
+		// (oklch.faint): dimmer than the readable-text minimum on purpose.
+		if (!value && field.type === 'text' && field.placeholder) {
+			let example = strings.clipVisual(ansi.clean(field.placeholder), width - indent)
+			p.rows[0] = ansi.mono() || !style.fg ? example : ansi.sgr({ fg: oklch.faint(style.fg, style.bg ?? colors.screen()) }) + example + ansi.sgr({ fg: style.fg })
+		}
 		if (focused) cursor = { row: rows.length + p.row, col: indent + p.col }
 		p.rows.forEach((r, j) => rows.push((j ? ' '.repeat(indent) : strings.clipVisual(head, indent)) + r))
 	})

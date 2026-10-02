@@ -185,6 +185,9 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => replay.framed(b)).join('\n\n')}${nudge}` }, ...images.map((b) => ({ ...b }))] })
 		}
 	}
+	// Providers want a user message first; a turn started without a
+	// prompt (the intro, tabs.create) leaves assistant text before it.
+	while (out[0]?.role === 'assistant') out.shift()
 	return out
 }
 

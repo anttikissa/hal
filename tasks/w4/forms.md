@@ -28,7 +28,11 @@ synthetic models (the intro), command confirmations. Written to history,
 shown as a block, answerable from any client (first answer wins),
 survive restart. An active terminal question always shows its fields and
 focused choice, even if the question block was cached before it became
-answerable. While a turn's question is open the session is
+answerable. An open question's fields stand between blank rows, apart
+from the question text above and the key hint below. A text field's
+placeholder is drawn in oklch.faint of the block's colours, like the
+prompt's example request: deliberately below the readable-text minimum
+so it never reads as typed text (the user's decision). While a turn's question is open the session is
 `blocked (question)` (tasks/j1/states.md). A command's question is not
 a state: it sits beside whatever the session does (a turn blocked on a
 login, a turn streaming), like the inbox, and never changes the state
