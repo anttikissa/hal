@@ -5,8 +5,9 @@
 export type TextBlock = { type: 'text'; text: string; naming?: true }
 
 // `signature` is opaque and only meaningful to `provider`, the provider
-// that produced it; others must not send it back.
-export type ThinkingBlock = { type: 'thinking'; text: string; signature?: string; provider?: string }
+// that produced it; others must not send it back. History keeps it in
+// the session blob `signatureBlob` instead (task s1).
+export type ThinkingBlock = { type: 'thinking'; text: string; signature?: string; signatureBlob?: string; provider?: string }
 
 export type ToolCallBlock = { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
 

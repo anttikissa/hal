@@ -122,6 +122,14 @@ function read(sessionId: string, blob: string): { bytes: Buffer; mediaType: stri
 	return found && { bytes: readFileSync(found.path), mediaType: found.mediaType }
 }
 
+// A text blob's content, such as a thinking signature (task s1). History
+// naming a missing blob is corrupt.
+function text(sessionId: string, blob: string): string {
+	let found = blobs.read(sessionId, blob)
+	if (!found) throw new Error(`no blob ${blob} in ${blobs.dir(sessionId)}`)
+	return found.bytes.toString('utf8')
+}
+
 // An image's bytes as base64, for a provider request.
 function base64(sessionId: string, blob: string): string | undefined {
 	return blobs.read(sessionId, blob)?.bytes.toString('base64')
@@ -191,7 +199,8 @@ function expand(sessionId: string, text: string): string {
 	return parts.join('')
 }
 
-// Raw tool output is not an attachment: no 5 MB upload limit applies.
+// Raw tool output and thinking signatures are not attachments: no 5 MB
+// upload limit applies.
 // Store it under the same checked, session-owned blob naming scheme.
 function storeOutput(sessionId: string, text: string): { blob: string; path: string } {
 	mkdirSync(blobs.dir(sessionId), { recursive: true, mode: 0o700 })
@@ -203,4 +212,4 @@ function storeOutput(sessionId: string, text: string): { blob: string; path: str
 	return { blob, path }
 }
 
-export const blobs = { dir, looksLike, decode, store, storeOutput, stage, staged, file, find, read, base64, named, unknown, resolve, expand }
+export const blobs = { dir, looksLike, decode, store, storeOutput, stage, staged, file, find, read, text, base64, named, unknown, resolve, expand }
