@@ -89,3 +89,22 @@ test('fresh usage with room clears the account skip and wakes waiting turns', as
 		expect(auth.state.logins).toBe(logins + 1)
 	} finally { auth.all = all; auth.credential = credential; usage.store = store; limits.store = lstore; liveFiles.save = save; globalThis.fetch = fetchOld }
 })
+
+// Enter on a waiting turn forces it; a limited wait after a restart runs
+// it once per provider, rereading only that provider's skipped accounts.
+test('recheck rereads only the provider\'s skipped accounts, once unless forced', async () => {
+	let all = auth.all, refresh = statusUsage.refresh, lstore = limits.store
+	let names = ['a@example.com', 'b@example.com']
+	auth.all = ((kind: string) => ({ data: {}, list: kind === 'openai' ? names.map((name) => ({ name, entry: {}, replace: () => {} })) : [] })) as typeof all
+	limits.store = () => ({ 'openai/m a@example.com': '2099-01-01T00:00:00Z', 'anthropic/m b@example.com': '2099-01-01T00:00:00Z' })
+	let read: string[] = []
+	statusUsage.refresh = (async (kind: string, a: { name: string }) => { read.push(`${kind} ${a.name}`) }) as typeof refresh
+	statusUsage.state.checked.clear()
+	try {
+		await Promise.all([statusUsage.recheck('openai'), statusUsage.recheck('openai')])
+		await statusUsage.recheck('openai')
+		expect(read).toEqual(['openai a@example.com'])
+		await statusUsage.recheck('openai', true)
+		expect(read).toEqual(['openai a@example.com', 'openai a@example.com'])
+	} finally { auth.all = all; statusUsage.refresh = refresh; limits.store = lstore; statusUsage.state.checked.clear() }
+})

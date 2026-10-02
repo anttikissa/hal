@@ -29,6 +29,7 @@ import { tools } from './tools.ts'
 import { host } from './host.ts'
 import { slash } from './slash.ts'
 import { status } from './status.ts'
+import { statusUsage } from './status-usage.ts'
 import { subagents } from './subagents.ts'
 import { turns } from './turns.ts'
 
@@ -224,6 +225,12 @@ function draft(id: string, changed: ReturnType<typeof drafts.get> | undefined, c
 
 // Continue: a paused turn goes on, a failed one retries.
 function resume(id: string): string | undefined {
+	// Enter on a waiting turn: re-read the skipped accounts, then retry now.
+	let running = turns.state.running.get(id)
+	if (running?.rewait && status.stateOf(id).type === 'retrying') {
+		void statusUsage.recheck(running.provider, true).then(() => running.rewait?.abort())
+		return
+	}
 	let refused = status.transition(id, { type: 'continue' })
 	if (refused) return refused
 	history.append(id, { type: 'continue' })

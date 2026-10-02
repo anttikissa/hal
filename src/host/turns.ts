@@ -29,6 +29,7 @@ import { prompts } from './prompts.ts'
 import { slash } from './slash.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
+import { statusUsage } from './status-usage.ts'
 import { subagents } from './subagents.ts'
 import { toolOutput } from './tool-output.ts'
 // A running turn settles when runTurn returns (task hp).
@@ -366,6 +367,7 @@ async function waitFor(id: string, error: ErrorEvent, failures: number, signal: 
 	let at = error.retryAt ?? clock.now() + turns.backoffMs(failures)
 	status.transition(id, { type: 'retry', at: new Date(at).toISOString(), reason: error.message })
 	if (error.failure !== 'limited' || at <= clock.now()) return clock.until(at, signal)
+	void statusUsage.recheck(turns.state.running.get(id)?.provider ?? '')
 	// A new account can lift quota before the old account's reset time.
 	let waiting = new AbortController()
 	let either = AbortSignal.any([signal, waiting.signal])
