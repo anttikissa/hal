@@ -1,0 +1,7 @@
+{
+	title: 'Question choices: focus follows the choice, hairline styles',
+	spec: "Restore the invariant that a web question choice never shows keyboard focus on one option and the selection on another. A choice group is one Tab stop (roving tabindex: the chosen option 0, the others -1); arrows move the choice and the focus with it, including back to an option that held focus before; native focus entering a group makes it the form's focused field. Options draw a hairline in the card colour at reduced strength; the chosen one is solid. Their focus ring, and the Answer button's, is a 1px outline 2px outside the control, not a flush 2px outline that reads as a thick border. This replaces task gn's flush exception. Verified in headless Chrome; the browser test checks focus follows Left and Right.",
+	status: 'done',
+	needs: [],
+	foldInto: ['gn', 'w4']
+}
