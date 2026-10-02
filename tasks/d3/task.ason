@@ -4,7 +4,7 @@
 	status: 'done',
 	notes: [
 		"A symlink target is resolved from the link's real directory: on macOS /var is /private/var, so a relative target computed from the unresolved path points nowhere. /theme computes it between real paths.",
-		"Open: a remote terminal (./run -r) loads its own machine's local.ts and plugins/, so /theme typed there changes the host while the screen keeps the client's theme. Following the host's theme by name (loading themes/<name>.ts from the client checkout, commit f08b46e) was reverted: it adds a third configuration source and hides version skew. Direction under discussion: code runs only on the host; clients get configuration as data (a resolved palette, as the web gets CSS); client-local files hold state (hosts, tokens, drafts), never configuration."
+		"Open: a remote terminal (./run -r) loads its own machine's local.ts and plugins/, so /theme typed there changes the host while the screen keeps the client's theme. Following the host's theme by name (loading themes/<name>.ts from the client checkout, commit f08b46e) was reverted. Undecided: the user has not chosen how remote terminals get configuration; do not implement any direction until a task states it."
 	],
 	needs: ['an']
 }
