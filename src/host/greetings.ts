@@ -104,7 +104,7 @@ function open(id: string): void {
 	try {
 		if (previous.last !== undefined && typeof previous.last !== 'string') throw new Error('greetings.ason: invalid last greeting')
 		let text = greetings.choose(profile.text(), previous.last)
-		history.append(id, { type: 'output', text })
+		history.append(id, { type: 'output', text, synthetic: true })
 		previous.last = text
 	} finally {
 		liveFiles.close(previous)

@@ -72,7 +72,7 @@ export type HistoryRecord = Numbered &
 	// client's id for the submit, so a resend is recognised.
 	| { type: 'command'; text: string; origin?: 'model'; from?: string; label?: string; command?: string; ts: string }
 	// What a command said; `error` if it failed.
-	| { type: 'output'; text: string; error?: true; transition?: ContextTransition; transitionDone?: string; transitionCancel?: string; ts: string }
+	| { type: 'output'; text: string; error?: true; synthetic?: true; transition?: ContextTransition; transitionDone?: string; transitionCancel?: string; ts: string }
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
 	// told in front of its next prompt.
 	| { type: 'change'; cwd?: string; model?: string; ts: string }

@@ -16,6 +16,7 @@ function check(value: unknown): HistoryRecord {
 		let t = r.transition
 		if (!t || typeof t.id !== 'string' || !['clear', 'compact'].includes(t.kind) || (t.prompt !== undefined && typeof t.prompt !== 'string') || (t.cancelled !== undefined && t.cancelled !== true) || sender.invalid(t.sender)) throw new Error('invalid context transition')
 	}
+	if (r.type === 'output' && r.synthetic !== undefined && r.synthetic !== true) throw new Error('invalid synthetic output')
 	if (r.type === 'output') for (let k of ['transitionDone', 'transitionCancel'] as const) if (r[k] !== undefined && typeof r[k] !== 'string') throw new Error(`invalid ${k}`)
 	if ((r.type === 'reset' || r.type === 'compact') && r.transition !== undefined && typeof r.transition !== 'string') throw new Error('invalid boundary transition')
 	if (r.type === 'user' && r.naming !== undefined) {

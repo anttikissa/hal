@@ -107,7 +107,7 @@ test('completed: every client shows the same finished turn', async () => {
 		pushes[1]!({ type: 'text', text: 'done' }, { type: 'usage', usage: { output: 1 } }, { type: 'done', reason: 'end' })
 	})
 	expect(shown(late.items)).toEqual([
-		{ type: 'output', text: expect.any(String) },
+		{ type: 'output', text: expect.any(String), synthetic: true },
 		{ type: 'prompt', text: 'go' },
 		{ type: 'thinking', text: 'hm' },
 		{ type: 'text', text: 'partial' },
