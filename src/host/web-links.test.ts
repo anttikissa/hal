@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { synthetic } from './synthetic.ts'
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import type { Event } from '../common/protocol.ts'
@@ -89,6 +90,8 @@ test('a link code is replaced before it is half its life old, and the old one st
 })
 
 test('no link code reaches any file of the home', async () => {
+	let pace = synthetic.pauseMs
+	synthetic.pauseMs = () => 0
 	let a = client()
 	a.conn.send({ type: 'create', cwd: home, model: 'hal/intro' })
 	let id = (a.events.find((e) => e.type === 'snapshot') as { sessionId: string }).sessionId
@@ -101,6 +104,7 @@ test('no link code reaches any file of the home', async () => {
 	let all = files.map((d) => readFileSync(`${d.parentPath}/${d.name}`, 'latin1')).join('\n')
 	expect(files.some((d) => d.name.endsWith('.asonl'))).toBe(true)
 	for (let { code } of a.codes()) expect(all).not.toContain(code)
+	synthetic.pauseMs = pace
 })
 
 test('a busy preferred web port falls back; the advertised URL and link codes follow the bound port', async () => {

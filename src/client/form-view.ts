@@ -23,11 +23,11 @@ function formLines(st: FormState, width: number): { rows: string[]; cursor: { ro
 	let hint = st.form.fields.length > 1 ? `Enter: next · Tab: move · ${escape}` : `Enter: answer · ${escape}`
 	// The fields stand apart: a blank row above and below them.
 	let cursor = { row: rows.length + 1 + f.cursor.row, col: f.cursor.col }
-	return { rows: [...rows, '', ...f.rows, '', ansi.quiet(strings.clipVisual(`  ${hint}`, width), colors.warning())], cursor }
+	return { rows: [...rows, '', ...f.rows, '', ansi.quiet(strings.clipVisual(`  ${hint}`, width), colors.question())], cursor }
 }
 
 // Rows of a form's fields alone, and the cursor in them.
-function fieldLines(st: FormState, width: number, style: Style = colors.warning()): { rows: string[]; cursor: { row: number; col: number } } {
+function fieldLines(st: FormState, width: number, style: Style = colors.question()): { rows: string[]; cursor: { row: number; col: number } } {
 	let rows: string[] = []
 	let cursor = { row: 0, col: 0 }
 	st.form.fields.forEach((field, i) => {
