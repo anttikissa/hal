@@ -17,13 +17,13 @@ Not secret, stays in state/:
 - web-sessions.ason: SHA-256 hashes of web tokens with expiries; the file alone logs nobody in.
 - host.lock, host.sock (guarded by state/ being 0700), epoch.ason, tabs.ason, busy.ason, greetings.ason, limits.ason, usage.ason, models-dev.json, effort-catalog.ason, restart.ason, reference-skills/.
 
-Incidental: may hold whatever a user pasted or a tool printed, so stays owner-only but is not moved:
-- sessions/ (transcripts and blobs), state/find.sqlite* (search index of session text), state/drafts/ and state/remote/<host>/drafts/, state/diag.log, state/web-diag.log*. sessions/ is chmod 0700 like state/ (it is 0755 today).
+Incidental: may hold whatever a user pasted or a tool printed, so it is not moved:
+- sessions/ (transcripts and blobs), state/find.sqlite* (search index of session text), state/drafts/ and state/remote/<host>/drafts/, state/diag.log, state/web-diag.log*.
 
 Private but not secret (no change): config.ason (names the web URL), USER.md.
 
 Migration: at startup the host moves auth.ason, push-vapid.ason and push-subscriptions.ason, and the terminal client moves remote.ason, from their old places into secrets/ with rename. It never overwrites: when both old and new exist, it keeps the new one, leaves the old in place and writes one diag line naming it. Error messages and docs that name these files show the new paths.`,
 	status: 'planned',
 	needs: ['p', 'b8', 'tr', 'm1'],
-	foldInto: ['p']
+	foldInto: ['p', 'b8']
 }
