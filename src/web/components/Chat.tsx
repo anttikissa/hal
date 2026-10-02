@@ -152,10 +152,10 @@ export function Chat() {
 	})
 	return (
 		<div class={['Chat', { offline: !connected() }]}>
+			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Show when={updateAvailable()}>
 				<div class="source-update"><button type="button" aria-label="Reload to update Hal" onClick={() => location.reload()}>reload</button></div>
 			</Show>
-			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} tabs={tabs()} />
 			<Notices entries={stack()} />
 			<StatusRow view={view()} connected={connected()} />

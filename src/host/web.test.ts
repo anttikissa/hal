@@ -1334,9 +1334,9 @@ test.skipIf(!chrome)('manual reload notice preserves the draft and command actio
 		await b.waitFor("document.querySelector('.source-update button')?.textContent === 'reload'")
 		let geometry = await b.evaluate(`(() => {
 			let button = document.querySelector('.source-update button'), r = button.getBoundingClientRect(), tabs = document.querySelector('.Tabs').getBoundingClientRect();
-			return { font: getComputedStyle(button).fontSize, height: r.height, width: r.width, clear: r.bottom <= tabs.top, focused: document.activeElement === window.__oldText, same: document.querySelector('.Chat') === window.__beforeUpdate, draft: document.querySelector('textarea').value };
+			return { font: getComputedStyle(button).fontSize, border: getComputedStyle(button).borderTopWidth, height: r.height, width: r.width, clear: r.top >= tabs.bottom, focused: document.activeElement === window.__oldText, same: document.querySelector('.Chat') === window.__beforeUpdate, draft: document.querySelector('textarea').value };
 		})()`)
-		expect(geometry).toMatchObject({ font: '8px', clear: true, focused: true, same: true, draft: 'draft stays put' })
+		expect(geometry).toMatchObject({ font: '16px', border: '1px', clear: true, focused: true, same: true, draft: 'draft stays put' })
 		expect(geometry.height).toBeGreaterThanOrEqual(24)
 		expect(geometry.width).toBeGreaterThanOrEqual(44)
 		// A second rebuild keeps one persistent notice and the same page.
