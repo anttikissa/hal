@@ -9,7 +9,15 @@ import type { Style } from '../common/colors.ts'
 import { ansi } from './ansi.ts'
 
 
-function styled(r: Run, text: string): string {
+// Code in the style's code colour, then back to its fg; plain in a
+// monochrome terminal or a style without one.
+function code(text: string, style: Style | undefined): string {
+	if (!style?.code || ansi.mono() || !text) return text
+	return ansi.sgr({ fg: style.code }) + text + (style.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
+}
+
+function styled(r: Run, text: string, style?: Style): string {
+	if (r.code) text = markdownView.code(text, style)
 	if (r.bold) text = `\x1b[1m${text}\x1b[22m`
 	if (r.italic) text = `\x1b[3m${text}\x1b[23m`
 	let href = r.href?.startsWith('/') ? ansi.webUrl(r.href) : r.href
@@ -20,7 +28,7 @@ function styled(r: Run, text: string): string {
 // takes the styles of the runs its columns came from. `keepLong`: a
 // word wider than `width` keeps a row of its own (ansi.paintRows lets
 // the terminal soft-wrap it); table cells break it instead.
-function wrapRuns(runs: Run[], width: number, keepLong = false): string[] {
+function wrapRuns(runs: Run[], width: number, keepLong = false, style?: Style): string[] {
 	let plain = runs.map((r) => r.text).join('')
 	let at = 0
 	return strings.wordWrap(plain, width, keepLong).map((row) => {
@@ -31,7 +39,7 @@ function wrapRuns(runs: Run[], width: number, keepLong = false): string[] {
 		for (let r of runs) {
 			let a = Math.max(from, pos)
 			let b = Math.min(at, pos + r.text.length)
-			if (a < b) out += markdownView.styled(r, r.text.slice(a - pos, b - pos))
+			if (a < b) out += markdownView.styled(r, r.text.slice(a - pos, b - pos), style)
 			pos += r.text.length
 		}
 		return out
@@ -73,7 +81,7 @@ function table(rows: Run[][][], width: number, style?: Style): string[] {
 					if (text) lines.at(-1)!.push(ri ? { ...r, text } : { ...r, text, bold: true })
 				})
 			}
-			return lines.flatMap((runs) => wrapRuns(runs, x))
+			return lines.flatMap((runs) => wrapRuns(runs, x, false, style))
 		})
 		let height = Math.max(...cells.map((c) => c.length))
 		for (let k = 0; k < height; k++) {
@@ -85,16 +93,18 @@ function table(rows: Run[][][], width: number, style?: Style): string[] {
 	return out.map((r) => strings.clipVisual(r, width))
 }
 
-// `style`: the item's, whose fg the quieter rules and fences come back to.
+// `style`: the item's, whose fg the quieter rules and labels come back to.
 function block(b: Block, width: number, style?: Style): string[] {
 	if (b.type === 'table') return markdownView.table(b.rows, width, style)
 	if (b.type === 'code') {
-		let fence = (s: string) => ansi.wrap(s, width).map((r) => ansi.quiet(r, style))
-		return [...fence(b.open), ...b.lines.flatMap((l) => ansi.wrap(l, width)), ...(b.close === undefined ? [] : fence(b.close))]
+		// Fences hidden as on the web; their rows stay, the opening one
+		// showing the language quietly, so a streaming fence never loses a row.
+		let lang = ansi.wrap(b.lang, width).map((r) => ansi.quiet(r, style))
+		return [...lang, ...b.lines.flatMap((l) => ansi.wrap(l, width).map((r) => markdownView.code(r, style))), ...(b.close === undefined ? [] : [''])]
 	}
 	let marker = b.kind === 'quote' ? ansi.quiet('│ ', style) : b.marker
 	let indent = strings.visLen(marker)
-	let rows = wrapRuns(b.runs, Math.max(1, width - indent), true)
+	let rows = wrapRuns(b.runs, Math.max(1, width - indent), true, style)
 	return rows.map((r, i) => (i && b.kind !== 'quote' ? ' '.repeat(indent) : marker) + r)
 }
 
@@ -104,4 +114,4 @@ function lines(text: string, width: number, streaming = false, style?: Style): s
 	return markdown.parse(source, streaming).flatMap((b) => markdownView.block(b, width, style))
 }
 
-export const markdownView = { lines, block, table, fit, styled }
+export const markdownView = { lines, block, table, fit, styled, code }
