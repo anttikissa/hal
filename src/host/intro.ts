@@ -196,7 +196,9 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 		liveFiles.save(config.state.data!)
 		if (sessionId) slash.change(sessionId, { model })
 	}
-	let now = model ? `This tab now uses ${chosen}, also the default for new tabs.` : 'This tab still runs the intro: /model or Ctrl-M picks any model.'
+	let now = model ? `This tab now uses ${chosen}, also the default for new tabs.`
+		: !loggedIn.names.length ? "You're not signed in yet, so no model can answer: run /login to sign in with Claude or ChatGPT or to add an API key, then /model or Ctrl-M picks a model."
+		: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
 	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
 }
 
