@@ -1,0 +1,7 @@
+{
+	title: 'Web thinking head: plain text, never repeated',
+	spec: 'Restores the invariant that a web card head never shows raw markdown marks. A folded thinking card heads with the header words and its first line as plain text: inline markdown (OpenAI summaries open each section with **Heading**) is parsed by common/markdown.ts and only its text shown. An open thinking card heads with the header words alone; its body, unchanged, shows that line rendered, so the line is never shown twice.',
+	status: 'done',
+	needs: ['hp'],
+	foldInto: ['hp']
+}
