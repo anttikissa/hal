@@ -19,7 +19,8 @@ A streaming block never shrinks, only grows (the user saw the web scroll positio
 		'Task v8 adds safe host-relative session links to Markdown: /<session id> with an optional #<numeric block id> or #<n>.<i>, in addition to http(s) links. These are needed for /find results and remain relative on the web; other protocols (javascript:, file:, etc.) are not recognized. Terminal markdown-view resolves host-relative hrefs through ansi.webUrl, preserving the one-time-code link contract of e3.',
 		'Task 3y supersedes the earlier note that a phone-width peak stays at desktop width: the high-water mark remains after streaming ends only within the same width/font layout. A native ResizeObserver clears obsolete floors on reflow, preventing a huge blank tail that makes bottom distances and reading anchors wrong.',
 		'Fence markers were once drawn verbatim in the terminal, so users saw ``` around code. Invariant: rendered Markdown never shows fence markers. Their rows stay (blank, or the quiet language) so a streaming fence never loses a row.',
-		'Code once looked like prose: both clients are monospace and neither used the theme code colour, so fences were the only cue. Invariant: code text is drawn in style.code.'
+		'Code once looked like prose: both clients are monospace and neither used the theme code colour, so fences were the only cue. Invariant: code text is drawn in style.code.',
+		"Reply items once passed only fg to markdownView (itemView.itemStyle), so code in the terminal stayed the text colour. Invariant: the style given to markdownView carries the item style's code colour."
 	],
 	needs: [],
 	foldInto: ['cc', '1b']

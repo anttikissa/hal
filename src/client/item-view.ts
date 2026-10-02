@@ -28,7 +28,7 @@ function itemStyle(item: Item): Style | undefined {
 		case 'image':
 			return colors.user()
 		case 'text':
-			return { fg: colors.assistant().fg! }
+			return { fg: colors.assistant().fg!, code: colors.assistant().code }
 		case 'thinking':
 			return { fg: colors.thinking().fg! }
 		case 'tool':
