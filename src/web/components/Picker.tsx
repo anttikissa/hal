@@ -21,11 +21,15 @@ function Match(props: { text: string }) { return <b class="match">{props.text}</
 
 export function Picker(props: { modal: ModalState | undefined }) {
 	let box!: HTMLDialogElement, search!: HTMLInputElement, list!: HTMLUListElement
+	// A new query reorders the list, so scroll from the top as the TUI
+	// does: the rows above the selection stay in view.
+	let query: string | undefined
 	createEffect(
-		() => props.modal?.selected,
-		(selected) => {
+		() => ({ selected: props.modal?.selected, query: props.modal?.query, items: props.modal?.items }),
+		({ selected, query: q }) => {
 			if (selected === undefined) { if (box.open) box.close(); return }
 			if (!box.open) { box.showModal(); search.focus() }
+			if (q !== query) { query = q; list.scrollTop = 0 }
 			list.children[selected]?.scrollIntoView({ block: 'nearest' })
 		},
 	)
