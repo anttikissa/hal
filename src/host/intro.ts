@@ -197,7 +197,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 
 	let search = answered(run, 'search')
 	if (!auth.serperKey() && search === undefined) return reply({
-		say: 'I recommend using Serper for web search results ([serper.dev](https://serper.dev/signup)) - free tier goes a long way.',
+		say: 'For web search I recommend Serper ([serper.dev](https://serper.dev/signup)): it gives Hal Google search results, and its free tier goes a long way.',
 		ask: { text: 'Set up a Serper web search key?', fields: [{ type: 'choice', name: 'search', options: ['Yes', 'Maybe later'], initial: 0 }] },
 	})
 	// An empty key or Escape skips: the step must never trap the user.
