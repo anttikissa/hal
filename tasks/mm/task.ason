@@ -1,0 +1,11 @@
+{
+	title: 'Complete explicit restart defaults',
+	spec: 'For an exact /restart command with or without trailing whitespace, Tab fills /restart local in terminal and web, including before a browser suggestion reply arrives. Passive suggestions never change the input or intercept Enter on an exact registered command: /cd and /restart still run their typed arguments; deliberate arrow selection retains its existing acceptance behavior. Restart suggestions offer local, host, both and all with scope descriptions; local is marked default, never path. Tab accepts a deliberately selected scope. Partial /rest completes the command name first without adding local. Shared command metadata declares the completion default independently of shortcut arguments; the host exposes all scopes for the exact command, and shared explicit completion uses the default only when present in the returned candidates. Preserve stale-reply rejection, menu identity and ordinary path/command completion.',
+	status: 'done',
+	notes: [
+		'The host previously treated bare /restart only as command-name completion; its scope candidates required a space. Shared CommandInfo.defaultArgs now lets the exact name expose all scopes while partial names still complete the name first. completion.apply fills a default only if the host actually returned it. Browser passive receive retains typed text and Enter rules; pending Tab replies apply the shared default even with multiple candidates. Restart descriptions use the existing host description channel. Shortcut keyArgs remains independent.',
+		'Validation: 43 targeted completion/controller tests pass; the Chromium completion regression passes at 390px and 1280px with all four scopes, the default description, Run hint, viewport-contained menu and Tab acceptance. Full ./test: 1346 pass, one skip, two timing failures (credential-file login wakeup and browser streaming frame count); both pass individual reruns. Typecheck and lint pass. Physical iOS keyboard behavior not checked.'
+	],
+	needs: ['cf', 'r7', 'kx'],
+	foldInto: ['cf', 'r7', 'kx']
+}

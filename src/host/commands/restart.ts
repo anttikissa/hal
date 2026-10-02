@@ -32,7 +32,8 @@ export const command: SlashCommand = {
 			'/restart all restarts the host and every client connected to it.',
 			'When this client is the host, local and host restart the same process.',
 		].join('\n'),
-	complete: (args) => scopes.filter((s) => s.startsWith(args)),
+	complete: (args) => scopes.filter((s) => s.startsWith(args.trim())),
+	describeCompletion: (args) => ({ local: 'restart this client (default)', host: 'restart the host', both: 'restart the host and this client', all: 'restart the host and every connected client' } as Record<string, string>)[args]!,
 	run: (args, _answers, ctx) => {
 		let scope = args.trim()
 		if (scope === 'all') for (let client of host.state.clients) client.deliver({ type: 'restart' })

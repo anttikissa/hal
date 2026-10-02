@@ -10,7 +10,8 @@
 import { keyHelp, type Binding } from '../key-help.ts'
 
 // `keyArgs`: the arguments the key runs the command with, as /keys shows.
-export type CommandInfo = { name: string; description: string; category: string; key?: string; keyArgs?: string; clientOnly?: true; hidden?: true }
+// `defaultArgs`: Tab fills these for an exact command without arguments.
+export type CommandInfo = { name: string; description: string; category: string; key?: string; keyArgs?: string; defaultArgs?: string; clientOnly?: true; hidden?: true }
 
 // Sorted by name.
 const list: CommandInfo[] = [
@@ -47,7 +48,7 @@ const list: CommandInfo[] = [
 	{ name: 'rename', description: 'name or clear the session name', category: 'session' },
 	// /restart and /restart local run in the client; host, both and all
 	// on the host (src/host/commands/restart.ts).
-	{ name: 'restart', description: 'restart this client (local), the host, both, or all', category: 'app', key: 'ctrl-r', keyArgs: 'local' },
+	{ name: 'restart', description: 'restart this client (local), the host, both, or all', category: 'app', key: 'ctrl-r', keyArgs: 'local', defaultArgs: 'local' },
 	{ name: 'resume', description: 'reopen the last closed tab', category: 'tabs', key: 'shift-ctrl-t' },
 	{ name: 'send', description: 'send a prompt or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },

@@ -3,15 +3,22 @@
 // (terminal, web, remote) gets the same answers; this is what a client
 // does with them, the same in both.
 
+import { commandList } from './commands/list.ts'
+
 // The command asking the host to complete `text`; only a slash command
 // is completed.
 function request(sessionId: string, text: string): unknown {
 	return text.startsWith('/') ? { type: 'complete', sessionId, text } : undefined
 }
 
-// One completion replaces `text`; several extend it as far as they all
-// agree and are listed by their last part (a name, a directory).
+// Explicit completion fills a declared default for a bare command.
+// Otherwise one replaces `text`; several extend their common prefix
+// and are listed by their last part (a name, a directory).
 function apply(text: string, items: string[]): { text: string; choices?: string[] } {
+	let bare = /^\/([a-z][a-z0-9-]*)\s*$/.exec(text)
+	let args = bare && commandList.byName(bare[1]!)?.defaultArgs
+	let preferred = args === undefined || !bare ? undefined : `/${bare[1]} ${args}`
+	if (preferred && items.includes(preferred)) return { text: preferred }
 	if (items.length <= 1) return { text: items[0] ?? text }
 	let shared = items.reduce((a, b) => {
 		let n = 0

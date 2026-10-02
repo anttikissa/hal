@@ -113,9 +113,9 @@ function onEvent(event: Event): void {
 		st.known = { input: event.text, items: event.items, descriptions: event.descriptions }
 		if (st.completedByTab === event.text) {
 			st.completedByTab = undefined
-			if (event.items.length > 1) st.menu = completions.receive(event.text, event.items, st.menu, event.descriptions)
+			let done = view.completed(st.view, event, st.text)
+			if (event.items.length > 1 && done?.notice) st.menu = completions.receive(event.text, event.items, st.menu, event.descriptions)
 			else {
-				let done = view.completed(st.view, event, st.text)
 				if (done) {
 					st.view = { ...st.view, notice: done.notice }
 					st.menu = undefined

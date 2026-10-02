@@ -1463,6 +1463,23 @@ test.skipIf(!chrome)('completion dismissal follows pointer and focus without ste
 		await Bun.sleep(100)
 		expect(await b.evaluate(`!!document.querySelector('.completions')`)).toBe(false)
 		expect(await b.evaluate(`document.activeElement.getAttribute('aria-label')`)).toBe('Attach file')
+		// Exact restart commands offer described scopes without changing Enter.
+		for (let width of [390, 1280]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			for (let text of ['/restart', '/restart ']) {
+				await type(text)
+				await b.waitFor(`document.querySelectorAll('.completions button').length === 4`)
+				expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(text)
+				expect(await b.evaluate(`document.querySelector('.completions button').textContent`)).toContain('(default)')
+				expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('run')
+				let bounds = await b.evaluate(`(() => { let r = document.querySelector('.completions').getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, width: innerWidth }; })()`)
+				expect(bounds.left).toBeGreaterThanOrEqual(0)
+				expect(bounds.right).toBeLessThanOrEqual(bounds.width)
+				expect(bounds.top).toBeGreaterThanOrEqual(0)
+				await press('Tab')
+				await b.waitFor(`document.querySelector('textarea').value === '/restart local' && !document.querySelector('.completions')`)
+			}
+		}
 		await type('/version')
 		await b.waitFor(`!!document.querySelector('.completions')`)
 		expect(await b.evaluate(`document.querySelector('.help').textContent`)).toContain('run')

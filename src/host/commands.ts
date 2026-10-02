@@ -65,7 +65,8 @@ function parse(text: string): { name: string; args: string } | undefined {
 // command completes its arguments to.
 function complete(text: string, ctx: Context): string[] {
 	let bare = /^\/([a-z0-9-]*)$/.exec(text)
-	if (bare) return commandList.all().filter((c) => !c.hidden).map((c) => c.name).filter((n) => n.startsWith(bare[1]!)).map((n) => `/${n} `)
+	if (bare && commandList.byName(bare[1]!)?.defaultArgs !== undefined) text += ' '
+	else if (bare) return commandList.all().filter((c) => !c.hidden).map((c) => c.name).filter((n) => n.startsWith(bare[1]!)).map((n) => `/${n} `)
 	let m = /^\/([a-z][a-z0-9-]*)\s([\s\S]*)$/.exec(text)
 	let cmd = m && commands.all().get(m[1]!)
 	if (!m || commandList.byName(m[1]!)?.hidden || !cmd?.complete) return []
