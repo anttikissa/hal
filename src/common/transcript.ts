@@ -32,7 +32,7 @@ export type Shown = { originSession?: string } & (
 	// `command`: a slash command asked; open in any session state.
 	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; cancelled?: true; command?: true }
 	// A slash command: origin identifies Hal; from identifies another session.
-	| { type: 'command'; text: string; origin?: 'model'; from?: string; label?: string; ts?: string }
+	| { type: 'command'; text: string; from?: string; label?: string; ts?: string }
 	// What a command said.
 	| { type: 'output'; text: string; error?: true; synthetic?: true; ts?: string }
 	// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
@@ -150,7 +150,7 @@ function recordItems(r: HistoryRecord, at: number): Item[] {
 function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'file_changes' || r.type === 'round' || r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
 	if (r.type === 'question') return [r.from ? { type: 'question', id: r.id, form: r.form, command: true } : { type: 'question', id: r.id, form: r.form }]
-	if (r.type === 'output' && r.transitionDone) return []
+	if ((r.type === 'output' && r.transitionDone) || ((r.type === 'command' || r.type === 'output') && r.origin === 'model')) return [] // model-run: its tool card shows it (9g)
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'reset') return [{ type: 'output', text: transcript.boundary(r), ts: r.ts }]
 	if (r.type === 'compact') return [{ type: 'divider', text: transcript.boundary(r) }]
@@ -183,10 +183,10 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 }
 
 // A command, its output or a divider as shown, from a record or an event.
-function aside(r: { type: 'command'; text: string; origin?: 'model'; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form }): Shown {
+function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form }): Shown {
 	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true }
 	if (r.type === 'divider') return r.clear ? { type: 'output', text: r.text, ...(r.ts !== undefined && { ts: r.ts }) } : { type: 'divider', text: r.text }
-	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.origin && { origin: r.origin }), ...(r.from !== undefined && { from: r.from }), ...(r.label !== undefined && { label: r.label }), ...(r.ts !== undefined && { ts: r.ts }) }
+	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.from !== undefined && { from: r.from }), ...(r.label !== undefined && { label: r.label }), ...(r.ts !== undefined && { ts: r.ts }) }
 	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.synthetic && { synthetic: true }), ...(r.ts !== undefined && { ts: r.ts }) }
 }
 
@@ -318,7 +318,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		})
 		return changed ? { ...t, items } : t
 	}
-	if (event.type === 'completions' || event.type === 'history') return t
+	if (event.type === 'completions' || event.type === 'history' || ((event.type === 'command' || event.type === 'output') && event.origin === 'model')) return t
 	// A command's question is an aside too: it never ends the turn.
 	if (event.type === 'divider' && event.clear && !t.live) {
 		let { prompt: _p, earlier: _e, ...rest } = t
