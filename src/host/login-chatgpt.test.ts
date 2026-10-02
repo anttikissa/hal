@@ -11,7 +11,7 @@ import { command } from './commands/login.ts'
 import { chatgptLogin } from './login-chatgpt.ts'
 
 const saved = { HAL_HOME: process.env.HAL_HOME, HOME: process.env.HOME, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
-const orig = { tokenUrl: auth.tokenUrl, deviceUrl: chatgptLogin.deviceUrl, timeoutMs: chatgptLogin.timeoutMs }
+const orig = { tokenUrl: auth.tokenUrl, deviceUrl: chatgptLogin.deviceUrl, timeoutMs: chatgptLogin.timeoutMs, local: chatgptLogin.local, callbackPort: chatgptLogin.callbackPort }
 let home = ''
 let server: ReturnType<typeof Bun.serve>
 let seen: { path: string; body: any; type: string | null }[] = []
@@ -54,13 +54,14 @@ beforeEach(() => {
 	})
 	auth.tokenUrl = () => `http://127.0.0.1:${server.port}/token`
 	chatgptLogin.deviceUrl = () => `http://127.0.0.1:${server.port}/device`
+	chatgptLogin.local = () => false
 })
 
 afterEach(() => {
 	auth.close()
 	server.stop(true)
 	Object.assign(auth, { tokenUrl: orig.tokenUrl })
-	Object.assign(chatgptLogin, { deviceUrl: orig.deviceUrl, timeoutMs: orig.timeoutMs })
+	Object.assign(chatgptLogin, { deviceUrl: orig.deviceUrl, timeoutMs: orig.timeoutMs, local: orig.local, callbackPort: orig.callbackPort })
 	for (let [k, v] of Object.entries(saved)) {
 		if (v === undefined) delete process.env[k]
 		else process.env[k] = v
@@ -153,4 +154,23 @@ test('OPENAI_API_KEY alone needs no file; no login at all names both ways', asyn
 	expect(await auth.openai()).toMatchObject({ type: 'api-key', value: 'sk-env', account: 'OPENAI_API_KEY' })
 	// An anthropic login is no openai login.
 	await expect(auth.anthropic()).rejects.toThrow('/login claude')
+})
+
+test('on this machine the browser flow logs in through the localhost redirect, no device code', async () => {
+	chatgptLogin.local = () => true
+	let port = 20000 + Math.floor(Math.random() * 20000)
+	chatgptLogin.callbackPort = () => port
+	let shown: string[] = []
+	let done = chatgptLogin.run((t) => shown.push(t))
+	await Bun.sleep(20)
+	let url = new URL(/https:\S+/.exec(shown[0]!)![0])
+	expect(url.searchParams.get('redirect_uri')).toBe(chatgptLogin.redirect())
+	let back = `${chatgptLogin.redirect()}?code=browser-code&state=`
+	// A wrong state is refused; the right one finishes the login.
+	expect((await fetch(back + 'wrong')).status).toBe(400)
+	expect((await fetch(back + url.searchParams.get('state'))).ok).toBe(true)
+	expect(await done).toBe('me@example.com')
+	expect(seen.map((r) => r.path)).toEqual(['/token'])
+	expect(seen[0]!.body).toMatchObject({ code: 'browser-code', redirect_uri: chatgptLogin.redirect() })
+	expect(disk().openai).toMatchObject({ accessToken: issued, email: 'me@example.com' })
 })
