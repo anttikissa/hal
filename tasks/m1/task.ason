@@ -12,7 +12,8 @@
 		'Invariant: the dialog shows Turn on whenever the host does not list this device, and names why push is unavailable. A device removed from the list kept its browser subscription, so the dialog said On with no way back; a failed service worker start was swallowed. Pushes and skipped pushes are logged to diag.log.',
 		"The test push titles itself 'Test notification': a title of 'Hal' made iOS show 'Hal / from Hal'.",
 		'diag.log names why each turn end was not pushed: its tab on screen, or which clients were watching and for how long. A skipped push at 15:47 came 4 s after the phone reported hidden; the line exists to catch that case.',
-		'Invariant: a client counts as watching only if heard from within 60 s; the web page re-sends its visibility every 20 s while shown. A killed iOS app sent no hidden event and its socket kept blocking pushes.'
+		'Invariant: a client counts as watching only if heard from within 60 s; the web page re-sends its visibility every 20 s while shown. A killed iOS app sent no hidden event and its socket kept blocking pushes.',
+		"The watcher that blocked pushes for 20 minutes was the host's own terminal (an SSH pty left open, no focus-out ever reported), logged as 'browser' for lack of a user agent. Quiet watchers now expire after 60 s; the log names terminals as terminals."
 	],
 	needs: ['8a']
 }
