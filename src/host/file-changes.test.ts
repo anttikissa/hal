@@ -86,7 +86,7 @@ test('overlapping aliases wait across sessions; disjoint and undeclared calls do
 	let waiting = false
 	let next = fileChanges.begin({ ...context(second), onOutput: (c) => { chunks.push(c); waiting = true } }, [`${cwd}/alias`])
 	for (let i = 0; i < 100 && !waiting; i++) await Bun.sleep(5)
-	expect(chunks.join('')).toBe('Tab 8 is editing file.\nWaiting for that command to finish before starting ours.\n')
+	expect(chunks.join('')).toBe(`Waiting for tab 8 (${id}) to finish editing file\n`)
 	let disjoint = await fileChanges.begin(context(second), ['other'])
 	disjoint.release()
 	let undeclared = await fileChanges.begin(context(second), [])
