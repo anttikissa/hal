@@ -2,6 +2,9 @@
 	title: "Fresh usage with room clears an account's skips",
 	spec: "When a /status usage refresh shows every window of an account below 100%, the account's skips in limits.ason are dropped and waiting turns are woken (auth.state.logins) to try it. Usage outranks an older skip, whether from a 429 or a plan refusal from before an upgrade; if the account still fails, the skip returns. Invariant: an account /status shows with room is tried, without /login. Test: a refresh at 100% keeps the skip; at 0% drops only that account's and wakes waiters.",
 	status: 'done',
+	notes: [
+		'Usage refresh assigns the fresh Object.fromEntries result directly; wrapping it in an object spread adds no value and violates the no-useless-spread lint rule.'
+	],
 	needs: ['c9'],
 	foldInto: ['c9']
 }
