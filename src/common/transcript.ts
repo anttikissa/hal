@@ -36,7 +36,7 @@ export type Shown =
 	// What a command said.
 	| { type: 'output'; text: string; error?: true; ts?: string }
 	// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
-	// shows as an output: 'HH:MM context cleared'.
+	// shows as an output: 'HH:MM Context cleared.'.
 	| { type: 'divider'; text: string }
 
 // `key`: the item's id (task w5), the same live, after a reconnect or
@@ -175,7 +175,7 @@ function answered(items: Item[], answer: { question: string; answers: Answers; s
 
 // What a context boundary's divider says.
 function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): string {
-	return r.type === 'reset' ? 'context cleared' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarised)`
+	return r.type === 'reset' ? 'Context cleared.' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarised)`
 }
 
 // A command, its output or a divider as shown, from a record or an event.
