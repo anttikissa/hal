@@ -1,0 +1,11 @@
+{
+	title: 'Preserve literal summary tags in Markdown code',
+	spec: 'Restore the invariant that notification summary extraction and display stripping never consume literal tags inside fenced code blocks or inline code spans, including multi-backtick spans, escaped backticks, longer fences and still-streaming code. Both extract and strip use the same generic Markdown code-range scanner, separate from notification semantics and rendering; no Markdown renderer depends on summary handling. Real summaries outside code retain existing complete and partial streaming behavior. SYSTEM.md tells models to enclose literal <summary> tags in backticks so users see them. Regression tests cover literal examples alone and followed by a real notification, and streaming prefixes.',
+	status: 'done',
+	notes: [
+		'Summary handling previously ignored only tags immediately preceded by a backtick; fenced examples and tags later in code spans were consumed. A browser-safe Markdown code mask preserves offsets, so summary extraction reads original content while locating only prose controls. The renderer remains unchanged. Unclosed inline spans are protected through the current line and unclosed fences through the remaining text for streaming.',
+		'Focused summary regressions pass. Full ./test on the shared checkout reported 1336 passing, one skipped, and four failures: web colour literals, lazy-history frame equality, browser streaming delta count, and tab paging. Concurrent tab UI edits were present; tsc and oxlint passed. These failures are not claimed fixed by this task.'
+	],
+	needs: ['x8'],
+	foldInto: ['x8']
+}
