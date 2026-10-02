@@ -1,0 +1,10 @@
+{
+	title: 'Tab drawer focus and close controls',
+	spec: 'The web tab drawer keeps a complete visible keyboard focus outline inside each tab link and close control, including the first row in its scrolling list. Restore the invariant that scroll clipping never removes edges of the focus indicator; focus remains distinct from selected-tab tint and causes no layout shift. Close buttons show a larger multiplication-sign glyph at 1.5em, centered in a target at least 44 by 44 CSS pixels on all pointer types. Long names wrap without covering or displacing the close action. Retain native links, labeled close buttons and existing close behavior. Review rendered phone and desktop states according to skills/ui-craft/SKILL.md, including focus, selection, wrapping and touch targets; report device-only checks not performed.',
+	status: 'done',
+	notes: [
+		'UI craft review used rendered before/after Chromium fixtures with the real stylesheet and generated theme CSS at 390, 768 and 1200 CSS px. The old first-row outline reproduced the screenshot L shape; the inset outline renders all four edges. Keyboard-visible focus stays distinct on selected rows and close controls. Long and unbroken names wrap without overlapping close actions or horizontal overflow. Close glyph grows from 14 to 21 CSS px; measured single-line target grows from 42x42 to 44x47.25 CSS px. Native tab-link, new, Back and close browser test passes. Full ./test: 1334 pass, 1 skip, 3 failures (push and maxRounds timeouts, streaming browser assertion); typecheck and lint pass. Physical iOS Safari, software keyboard, alternate themes and text enlargement remain unverified.'
+	],
+	needs: ['3k'],
+	foldInto: ['3k']
+}
