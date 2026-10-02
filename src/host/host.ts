@@ -46,7 +46,7 @@ export type Connection = {
 
 // `held`: commands waiting, by session, for its snapshot to be sent;
 // under '*', every command, until the tabs are sent.
-type Client = { deliver: (event: Event) => void; open: Set<string>; visible?: string; held: Map<string, unknown[]>; record: ClientRecord }
+type Client = { deliver: (event: Event) => void; open: Set<string>; visible?: string; visibleAt?: number; held: Map<string, unknown[]>; record: ClientRecord }
 // What a command did: refused (why), or done, naming a created session
 // (followed) or the tab a tab command created, reopened or picked, or
 // with the event that answered it (attached), sent again on a repeat.
@@ -237,7 +237,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	if (c.type === 'hello') return clients.hello(client.record, c.pid)
 	if (c.type === 'visibility') {
 		// Not checked against open: a tab's open may still be pending.
-		client.visible = c.visible ? c.sessionId : undefined
+		client.visible = c.visible ? c.sessionId : undefined; client.visibleAt = Date.now()
 		return {}
 	}
 	if (c.type === 'auth') return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } }

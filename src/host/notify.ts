@@ -7,6 +7,7 @@
 
 import type { NoticeEvent, NoticeKind } from '../common/notices.ts'
 import type { Event } from '../common/protocol.ts'
+import { clients as clientInfo } from './clients.ts'
 import { diag } from './diag.ts'
 import { pages } from './pages.ts'
 import { push } from './push.ts'
@@ -15,7 +16,7 @@ import { tabs } from './tabs.ts'
 import { summary } from '../common/summary.ts'
 import { names } from '../common/names.ts'
 
-type Watcher = { deliver: (event: Event) => void; visible?: string }
+type Watcher = { deliver: (event: Event) => void; visible?: string; visibleAt?: number; record?: { userAgent?: string } }
 
 function kind(event: Event): NoticeKind | undefined {
 	if (event.type === 'question') return 'attention'
@@ -50,7 +51,7 @@ function route(clients: Iterable<Watcher>, id: string, event: Event): void {
 	let k = notify.kind(event)
 	if (!k) return
 	let all = [...clients]
-	if (all.some((c) => c.visible === id)) return
+	if (all.some((c) => c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let word = k === 'attention' ? 'needs an answer' : k === 'failed' ? 'failed' : 'done'
 	let told = k === 'done' ? notify.replyLine(id) : ''
 	notify.deliver(all, id, k, notify.line(id, event), told ? `${word}: ${told}` : word)
@@ -59,7 +60,7 @@ function route(clients: Iterable<Watcher>, id: string, event: Event): void {
 // The same routing for automatic events and a model's mid-turn notice.
 function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: string, pushText: string): void {
 	let all = [...clients]
-	if (all.some((c) => c.visible === id)) return
+	if (all.some((c) => c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let name = sessions.open(id).name ?? id
 	let watching = all.filter((c) => c.visible !== undefined)
 	if (!watching.length) return void push.notify(id, name, pushText).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
@@ -67,7 +68,8 @@ function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: st
 	let tab = tabs.file().open.indexOf(id)
 	if (tab >= 0) notice.tab = tab + 1
 	for (let c of watching) c.deliver(notice)
-	diag.log(`push: ${id} not pushed, ${watching.length} client(s) watching other tabs`)
+	let who = watching.map((c) => `${clientInfo.shortAgent(c.record?.userAgent)} showing ${c.visible} for ${c.visibleAt ? Math.round((Date.now() - c.visibleAt) / 1000) : '?'}s`)
+	diag.log(`push: ${id} not pushed, watched: ${who.join('; ')}`)
 }
 
 export const notify = { kind, replyLine, line, route, deliver }
