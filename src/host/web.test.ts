@@ -555,6 +555,37 @@ function providerHome(): void {
 	writeFileSync(`${paths.sessionDir(id)}/session.ason`, ason.stringify({ id, cwd: '/tmp', model: 'anthropic/claude-opus-5-5', createdAt: new Date().toISOString() }) + '\n')
 }
 
+test.skipIf(!chrome)('draft arrows move natively through soft wraps instead of recalling history', async () => {
+	let id = tabs.create('/tmp')
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'previous prompt' }] })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+		for (let width of [390, 1280]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false })
+			let text = 'wrapped draft words '.repeat(30)
+			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })); t.focus(); t.setSelectionRange(t.value.length, t.value.length) })()`)
+			await b.evaluate(`new Promise(resolve => requestAnimationFrame(resolve))`)
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowUp', code: 'ArrowUp', windowsVirtualKeyCode: 38 })
+			await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowUp', code: 'ArrowUp', windowsVirtualKeyCode: 38 })
+			let up = await b.evaluate(`(() => { let t = document.querySelector('textarea'); return { text: t.value, cursor: t.selectionStart } })()`)
+			expect(up.text).toBe(text)
+			expect(up.cursor).toBeGreaterThan(0)
+			expect(up.cursor).toBeLessThan(text.length)
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 })
+			await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 })
+			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe(text)
+			expect(await b.evaluate(`document.querySelector('textarea').selectionStart`)).toBeGreaterThan(up.cursor)
+		}
+	} finally {
+		await b.close()
+	}
+}, 20000)
+
 test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tapped', async () => {
 	providerHome()
 	let b = await browser()

@@ -453,7 +453,7 @@ test('Ctrl-T/W/N/P stay the browser\'s off macOS', () => {
 	expect(sent).toEqual([])
 })
 
-test('Up on the first line and Down on the last browse the prompts sent; the draft stays the own text', () => {
+test('draft arrows stay native; an empty box starts history browsing until Down restores it', () => {
 	let user = (text: string) => ({ type: 'user', blocks: [{ type: 'text', text }], ts })
 	app.onEvent(snapshot({ type: 'idle' }, [user('first'), user('two\nlines')]))
 	let writes: [string, number][] = []
@@ -465,14 +465,21 @@ test('Up on the first line and Down on the last browse the prompts sent; the dra
 		write: (edit, at) => void writes.push([text.slice(0, edit.start) + edit.text + text.slice(edit.end), at]),
 	})
 	app.input('mine')
-	// A selection, or the caret after a newline, keeps the key native.
+	// Nonempty drafts keep native movement at every caret, with or
+	// without explicit newlines; a soft wrap must not trigger recall.
+	for (let text of ['mine', 'words '.repeat(40), 'mine\nx']) {
+		for (let cursor of [0, 2, text.length]) {
+			expect(press('ArrowUp', box(text, cursor))).toBe(false)
+			expect(press('ArrowDown', box(text, cursor))).toBe(false)
+		}
+	}
 	expect(press('ArrowUp', box('mine', 0, 4))).toBe(false)
-	expect(press('ArrowUp', box('mine\nx'))).toBe(false)
-	app.input('mine')
-	expect(press('ArrowUp', box('mine', 2))).toBe(true)
+	expect(writes).toEqual([])
+	app.input('')
+	expect(press('ArrowUp', box(''))).toBe(true)
 	expect(writes.at(-1)).toEqual(['two\nlines', 9])
 	expect(app.state.text).toBe('two\nlines')
-	expect(stored.get(sessionId)?.text).toBe('mine')
+	expect(stored.get(sessionId)?.text).toBe('')
 	expect(press('ArrowUp', box('two\nlines', 3))).toBe(true)
 	expect(writes.at(-1)).toEqual(['first', 5])
 	// The oldest: native Up goes to the start.
@@ -481,20 +488,22 @@ test('Up on the first line and Down on the last browse the prompts sent; the dra
 	expect(writes.at(-1)).toEqual(['two\nlines', 3])
 	expect(press('ArrowDown', box('two\nlines', 3))).toBe(false)
 	expect(press('ArrowDown', box('two\nlines'))).toBe(true)
-	expect(writes.at(-1)).toEqual(['mine', 4])
-	expect(app.state.text).toBe('mine')
+	expect(writes.at(-1)).toEqual(['', 0])
+	expect(app.state.text).toBe('')
 })
 
 test('an edited entry becomes the draft; sending an entry brings the own text back', () => {
 	app.onEvent(snapshot({ type: 'idle' }, [{ type: 'user', blocks: [{ type: 'text', text: 'first' }], ts }]))
-	app.input('mine')
-	press('ArrowUp', message('mine'))
+	app.input('')
+	press('ArrowUp', message(''))
 	expect(app.state.text).toBe('first')
 	app.input('first!')
 	expect(stored.get(sessionId)?.text).toBe('first!')
 	expect(press('ArrowDown', message('first!'))).toBe(false)
-	app.input('mine')
-	press('ArrowUp', message('mine'))
+	app.input('')
+	press('ArrowUp', message(''))
+	// A draft received underneath browsing is not replaced by recall.
+	drafts.edit(sessionId, 'mine')
 	press('Enter', message('first'))
 	expect(sent.findLast((c) => c.type === 'submit')).toMatchObject({ text: 'first' })
 	expect(app.state.text).toBe('mine')
