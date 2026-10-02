@@ -70,7 +70,7 @@ export const colors = {
 	thinking: (): Style => ({
 		fg: [0.72, 0.03, 250],
 		bold: [0.85, 0.02, 250],
-		code: [0.88, 0.02, 250],
+		code: [0.78, 0.03, 250],
 		linkBg: [0.2, 0.02, 250],
 	}),
 	// User messages and the prompt input: the same bright blue card.
