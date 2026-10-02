@@ -1006,7 +1006,7 @@ test.skipIf(!chrome)('web tab paging scrolls with overlap without selecting, and
 		await scrollPage('left')
 		await b.waitFor(`(${geometry}).first === 0 && (${geometry}).leftDisabled`)
 		// Select a hidden session using its native link; selection reveals it.
-		await b.evaluate("document.querySelectorAll('.track .tab')[10].click()")
+		await b.evaluate("new Promise(resolve => { document.querySelector('.track').addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelectorAll('.track .tab')[10].click() })")
 		await b.waitFor(`location.pathname === '/${ids[10]}' && (${geometry}).first > 0 && (${geometry}).last >= 10 && (${geometry}).first <= 10`)
 		let centered = await b.evaluate(geometry)
 		expect(Math.abs((centered.first + centered.last) / 2 - 10)).toBeLessThanOrEqual(.5)

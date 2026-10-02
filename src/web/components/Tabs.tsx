@@ -114,7 +114,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		if (!track) return
 		let cell = layout().cell
 		let target = Math.round(((current() + .5) * cell - track.clientWidth / 2) / cell) * cell
-		track.scrollTo({ left: Math.max(0, target), behavior: 'instant' })
+		track.scrollTo({ left: Math.max(0, target), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
 		measureVisible()
 	}
 	onSettled(() => {
@@ -164,7 +164,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 						<For each={props.tabs.map((tab) => tab.id)}>
 							{(id) => {
 								let tab = () => props.tabs.find((t) => t.id === id)!
-								return <Link tab={tab()} n={props.tabs.findIndex((t) => t.id === id) + 1} shown={id === props.shown} name={layout().names} />
+								return <Link tab={tab()} n={props.tabs.findIndex((t) => t.id === id) + 1} shown={id === props.shown} name={layout().names} onPick={() => requestAnimationFrame(center)} />
 							}}
 						</For>
 					</div>
