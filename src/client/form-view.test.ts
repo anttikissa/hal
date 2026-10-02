@@ -34,12 +34,15 @@ test('an open question shows its fields and takes the cursor into the focused te
 	let f = frame.build({ ...v, form: st }, 40)
 	let rows = plain(f.lines)
 	expect(rows[1]).toBe('? How should I call you?')
-	expect(rows[2]).toBe('Name: D')
+	// Blank rows set the field apart from the question and the hint.
+	expect(rows[2]).toBe('')
+	expect(rows[3]).toBe('Name: D')
+	expect(rows[4]).toBe('')
 	// The cursor is just after the typed D, on the frame's row for it.
-	expect(f.cursor).toEqual({ row: 2, col: strip(f.lines[2]!).indexOf('D') + 1 })
+	expect(f.cursor).toEqual({ row: 3, col: strip(f.lines[3]!).indexOf('D') + 1 })
 	// An empty text shows its placeholder; the prompt stays below.
 	let empty = frame.build({ ...v, form: forms.start('q1', item.form) }, 40)
-	expect(plain(empty.lines)[2]).toBe('Name: leave empty')
+	expect(plain(empty.lines)[3]).toBe('Name: leave empty')
 	expect(plain(empty.lines)).toContain('draft')
 })
 
@@ -49,9 +52,9 @@ test('a secret is never on screen; the chosen option is marked', () => {
 	for (let c of 'sk-éé') st = forms.step(st, { key: c, text: c }).state
 	let f = frame.build({ ...view([item]), form: st }, 40)
 	expect(f.lines.join('\n')).not.toContain('sk-')
-	expect(plain(f.lines)[2]).toBe('Key: •••••')
-	expect(plain(f.lines)[3]).toBe('→ yes')
-	expect(plain(f.lines)[4]).toBe('no')
+	expect(plain(f.lines)[3]).toBe('Key: •••••')
+	expect(plain(f.lines)[4]).toBe('→ yes')
+	expect(plain(f.lines)[5]).toBe('no')
 })
 
 test('an answered question shows its answers, secrets only as given; one not answered says so', () => {

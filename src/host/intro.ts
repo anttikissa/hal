@@ -141,7 +141,7 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 	let language = answered(run, 'language')
 	if (language === undefined) return {
 		say: name ? `Nice to meet you, ${name}.` : 'Nice to meet you.',
-		ask: { text: "What's your preferred language (e.g. US English)?", fields: [{ type: 'text', name: 'language' }] },
+		ask: { text: 'Any language or tone preferences? (E.g. "US English; spaces around em dash; friendly but concise")', fields: [{ type: 'text', name: 'language' }] },
 	}
 	let zone = intro.timezone(run, sessionId)
 	if (zone.ask) return zone.ask

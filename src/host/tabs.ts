@@ -142,6 +142,8 @@ function create(cwd: string, after?: string): string {
 	}).id
 	greetings.open(id)
 	tabs.insert(id, at < 0 ? open.length : at + 1)
+	// The guide speaks first: no prompt needed to start it.
+	if (first && !status.transition(id, { type: 'submit' })) turns.start(id)
 	return id
 }
 

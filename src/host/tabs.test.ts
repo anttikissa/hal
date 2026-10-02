@@ -26,11 +26,14 @@ const rejected = (c: C, id: string) => c.events.find((e: any) => e.type === 'rej
 // Opens a new tab and returns its id, as named in the answer.
 const newTab = (c: C, cwd = '/tmp/w', after?: string) => ack(c, send(c, { type: 'tab-new', cwd, ...(after ? { after } : {}) })).tab as string
 
-test('a fresh home opens the offline intro; later tabs use the configured provider model', () => {
+test('a fresh home opens the offline intro, which starts by itself; later tabs use the configured provider model', async () => {
 	let c = client()
 	let first = newTab(c)
 	expect(sessions.open(first).model).toBe('hal/intro')
 	expect(sessions.open(newTab(c)).model).not.toBe('hal/intro')
+	// The intro starts by itself and waits on its first question.
+	await until(() => status.stateOf(first).type === 'blocked')
+	expect(history.readSync(first).some((r) => r.type === 'user')).toBe(false)
 })
 
 
