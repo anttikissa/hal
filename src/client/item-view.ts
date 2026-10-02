@@ -38,7 +38,7 @@ function itemStyle(item: Item): Style | undefined {
 		case 'turn-end':
 			return item.status === 'error' ? colors.error() : { fg: colors.log().fg! }
 		case 'question':
-			return colors.warning()
+			return colors.question()
 		case 'command':
 			return colors.user()
 		case 'output':

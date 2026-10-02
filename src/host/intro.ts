@@ -37,6 +37,12 @@ function answered(records: HistoryRecord[], field: string): string | undefined {
 	return undefined
 }
 
+// Whether any question asking `field` got an answer, even a secret one
+// (kept out of history) or a skip.
+function replied(records: HistoryRecord[], field: string): boolean {
+	return records.some((a) => a.type === 'answer' && records.some((q) => q.type === 'question' && q.id === a.question && q.form.fields.some((f) => f.name === field)))
+}
+
 function said(records: HistoryRecord[], text: string): boolean {
 	return records.some((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(text))
 }
@@ -151,22 +157,17 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	}
 	let name = profile.value(answered(run, 'name'))
 	if (answered(run, 'name') === undefined) return { ask }
-	let language = answered(run, 'language')
-	if (language === undefined) return {
-		say: name ? `Nice to meet you, ${name}.` : 'Nice to meet you.',
-		ask: { text: 'Any language or tone preferences? (E.g. "US English; spaces around em dash; friendly but concise")', fields: [{ type: 'text', name: 'language' }] },
-	}
-	let zone = intro.timezone(run, sessionId)
-	if (zone.ask) return zone.ask
 	let say: string[] = []
-	if (!said(run, saved)) {
-		let fields = { Name: name, 'Language preference': profile.value(language), Timezone: zone.zone }
-		if (Object.values(fields).some((v) => v)) {
-			profile.save(fields)
-			say.push(`${saved} ${resolve(profile.file())}. You can edit it to update your personal preferences.`)
-		}
-	}
+	if (!said(run, 'Nice to meet you')) say.push(name ? `Nice to meet you, ${name}.` : 'Nice to meet you.')
 	let reply = (r: Reply): Reply => ({ ...r, say: [...say, r.say].filter((x) => x).join('\n\n') || undefined })
+	let zone = intro.timezone(run, sessionId)
+	if (zone.ask) return reply(zone.ask)
+	let store = (fields: Parameters<typeof profile.save>[0]) => {
+		if (!Object.values(fields).some((v) => profile.value(v))) return
+		profile.save(fields)
+		if (!said(run, saved)) say.push(`${saved} ${resolve(profile.file())}. You can edit it to update your personal preferences.`)
+	}
+	if (!said(run, saved)) store({ Name: name, Timezone: zone.zone })
 
 	let loggedIn = intro.accounts()
 	let login = answered(run, 'login')
@@ -198,11 +199,16 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	// An empty key or Escape skips: the step must never trap the user.
 	if (search === 'Yes' && !auth.serperKey()) {
 		// Secrets stay out of history: only this turn's answers hold the key.
-		let key = answers?.key ?? (answered(run, 'key') === '' ? '' : undefined)
+		let key = answers?.key ?? (replied(run, 'key') ? '' : undefined)
 		if (key === undefined) return reply({ ask: { text: 'Paste your Serper API key (it will not be shown or saved in conversation history). Empty skips.', fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }] } })
 		if (key.trim()) apiKeys.save('serper', key.trim())
-		else say.push('Skipped web search for now.')
+		else if (answers?.key !== undefined || !replied(run, 'language')) say.push('Skipped web search for now.')
 	}
+	// Language comes last: the scripted intro can't switch language
+	// mid-way, so asking earlier would promise what it can't do.
+	let language = answered(run, 'language')
+	if (language === undefined) return reply({ ask: { text: 'Any language or tone preferences? (E.g. "US English; spaces around em dash; friendly but concise")', fields: [{ type: 'text', name: 'language' }] } })
+	store({ 'Language preference': language })
 	if (model) {
 		config.init()
 		config.state.data!.model = model
@@ -210,9 +216,11 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 		if (sessionId) slash.change(sessionId, { model })
 	}
 	let now = model ? `This tab now uses ${chosen}, also the default for new tabs.`
-		: !loggedIn.names.length ? "You're not signed in yet, so no model can answer: run /login to sign in with Claude or ChatGPT or to add an API key, then /model or Ctrl-M picks a model."
+		: !loggedIn.names.length ? 'No model can answer yet: after /login, /model or Ctrl-M picks one.'
 		: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
-	return reply({ say: `${closing} A few tips:\n${said(run, subscriptions) ? '' : '- /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key.\n'}- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
+	// Not signed in (environment keys aside): the close always says how.
+	if (!loggedIn.stored) now += "\n\nYou're not signed in: /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key."
+	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
 }
 
 export const intro = { run, answered, asked, accounts, choices, findZone, timezone }

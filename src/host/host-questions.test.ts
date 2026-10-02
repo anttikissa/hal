@@ -93,7 +93,7 @@ test('hal/intro asks a name, any client answers, the first answer wins and the m
 	b.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { name: 'Dave' } })
 	a.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { name: 'Eve' } })
 	expect(a.of('rejected').at(-1)).toMatchObject({ command: 'answer', reason: expect.stringMatching(/not open/) })
-	await until(() => transcript.question(a.views.get(id))?.form.fields[0]?.name === 'language')
+	await until(() => !['name', undefined].includes(transcript.question(a.views.get(id))?.form.fields[0]?.name))
 	let view = a.views.get(id)!
 	expect(view.state).toEqual({ type: 'blocked', reason: 'question' })
 	expect(texts(view)[1]).toContain('Dave')
@@ -117,7 +117,7 @@ test('an open question survives a restart, is not continued by the new host, and
 	expect(transcript.question(b.views.get(id))?.id).toBe(q.id)
 	expect(b.views.get(id)!.items.filter((i) => i.type === 'question')).toHaveLength(1)
 	b.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { name: '' } })
-	await until(() => transcript.question(b.views.get(id))?.form.fields[0]?.name === 'language')
+	await until(() => !['name', undefined].includes(transcript.question(b.views.get(id))?.form.fields[0]?.name))
 })
 
 test('Escape while a question waits pauses the turn; continuing asks again', async () => {
@@ -175,21 +175,20 @@ test('intro resumes through profile, timezone, save, model and secret search set
 	clients.timezone = () => 'Europe/Helsinki'
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
-	await reply(c, id, 'name', 'Rowan', 'language')
+	await reply(c, id, 'name', 'Rowan', 'timezone')
 	expect(texts(c.views.get(id)!)[0]).toBe('Hello — I am HAL 9001, your personal agent harness. You can call me Hal.\n\nI have four questions for you.')
 	// A restart between steps keeps answers in history.
 	host.reset()
 	sessions.closeAll()
 	history.state.running.clear()
 	c = await opened(id)
-	await reply(c, id, 'language', 'US English', 'timezone')
 	// The device and the host disagree: ask, naming the city.
 	expect(transcript.question(c.views.get(id))!.form.text).toBe('It seems like you are in the Helsinki timezone (Europe/Helsinki). Correct?')
 	process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
 	// An environment key alone still gets the sign-in offer.
 	await reply(c, id, 'timezone', 'Yes', 'login')
 	await reply(c, id, 'login', 'Skip', 'model')
-	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Rowan\n\nLanguage preference: US English\n\nTimezone: Europe/Helsinki\n')
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Rowan\n\nTimezone: Europe/Helsinki\n')
 	expect(texts(c.views.get(id)!).join('\n')).toContain(`I saved your answers to ${home}/USER.md.`)
 	let options = (field(c, id) as { options: string[] }).options
 	// Friendly names of the aliases a credential can use, never ids.
@@ -197,10 +196,13 @@ test('intro resumes through profile, timezone, save, model and secret search set
 	expect(options.join()).not.toContain('/')
 	await reply(c, id, 'model', options[0]!, 'search')
 	await reply(c, id, 'search', 'Yes', 'key')
-	await reply(c, id, 'key', 'secret-SERPER-123')
+	await reply(c, id, 'key', 'secret-SERPER-123', 'language')
+	// Language comes last; it joins the saved profile.
+	await reply(c, id, 'language', 'US English')
 	await until(() => c.of('turn-end').length > 0)
 	expect(apiKeys.get('serper')).toBe('secret-SERPER-123')
 	expect(statSync(paths.authFile()).mode & 0o777).toBe(0o600)
+	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Rowan\n\nTimezone: Europe/Helsinki\n\nLanguage preference: US English\n')
 	expect(readFileSync(history.file(id), 'utf8')).not.toContain('secret-SERPER-123')
 	expect(JSON.stringify(c.events)).not.toContain('secret-SERPER-123')
 	expect(sessions.open(id).model).toStartWith('anthropic/')
@@ -212,14 +214,14 @@ test('with no credential the intro offers /login, pauses for it and goes on once
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
 	expect(texts(await (async () => { await until(() => field(c, id)); return c.views.get(id)! })())[0]).toContain('three questions')
-	await reply(c, id, 'name', '', 'language')
-	await reply(c, id, 'language', '', 'login')
+	await reply(c, id, 'name', '', 'login')
 	// Nothing answered, nothing saved.
 	expect(profile.text()).toBe('')
 	await reply(c, id, 'login', '/login opencode', 'key')
-	expect(c.views.get(id)!.state.type).toBe('paused')
+	await until(() => c.views.get(id)!.state.type === 'paused')
 	expect(c.of('command').at(-1)?.text).toBe('/login opencode')
-	await reply(c, id, 'key', 'test-key')
+	await reply(c, id, 'key', 'test-key', 'language')
+	await reply(c, id, 'language', '')
 	await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
 	expect(apiKeys.get('opencode-go')).toBe('test-key')
 	// No alias target runs on OpenCode Go: no model question, a pointer instead.
@@ -231,12 +233,12 @@ test('the Serper key step never traps: an empty key or Escape moves on', async (
 	for (let escape of [false, true]) {
 		let c = client(), id = created(c)
 		c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
-		await reply(c, id, 'name', '', 'language')
-		await reply(c, id, 'language', '', 'login')
+		await reply(c, id, 'name', '', 'login')
 		await reply(c, id, 'login', 'Skip', 'search')
 		await reply(c, id, 'search', 'Yes', 'key')
 		if (escape) c.conn.send({ type: 'pause', sessionId: id })
 		else await reply(c, id, 'key', '  ')
+		await reply(c, id, 'language', '')
 		await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
 		expect(texts(c.views.get(id)!).join('\n')).toContain('Skipped web search')
 		// Login was skipped: the close points to /login.
