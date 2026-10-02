@@ -1,0 +1,29 @@
+{
+	title: 'secrets/: one owner-only home for credentials',
+	spec: `Every file whose contents would grant access if leaked lives in one owner-only directory, secrets/ in the home, and nowhere else. state/ keeps only files without credentials. One place to back up, wipe or audit; a reviewer checks one rule instead of each writer's file mode.
+
+Layout:
+- paths.secretsDir() is <home>/secrets. paths.init() and the remote client create it and chmod it 0700 (chmod, not mkdir's umask-masked mode, as in task p). Every write into it uses mode 0600 through one helper, so no writer can forget.
+- .gitignore lists secrets/; the separate auth.ason entry goes.
+- tasks/README.md states the invariant: credentials, tokens and private keys live only in secrets/; logs, diagnostics, caches and transcripts never hold them.
+
+Secret files (move into secrets/):
+- auth.ason (now home root): Anthropic and OpenAI OAuth access and refresh tokens, provider API keys, the Serper key; also account emails and plans. Written by /login and refreshed in place by auth.ts; nobody copies it between hosts any more, since a copy breaks token refresh.
+- state/remote.ason (client side, task tr): the last remote host and a plaintext web session token per host. Each token is a working hal= cookie for that host and lasts tokenMs() (10 years).
+- state/push-vapid.ason (task m1): the VAPID private key; it lets anyone send push messages as this host.
+- state/push-subscriptions.ason (task m1): each browser's push endpoint with its auth and p256dh keys; together they let anyone push to that device.
+
+Not secret, stays in state/:
+- web-sessions.ason: SHA-256 hashes of web tokens with expiries; the file alone logs nobody in.
+- host.lock, host.sock (guarded by state/ being 0700), epoch.ason, tabs.ason, busy.ason, greetings.ason, limits.ason, usage.ason, models-dev.json, effort-catalog.ason, restart.ason, reference-skills/.
+
+Incidental: may hold whatever a user pasted or a tool printed, so stays owner-only but is not moved:
+- sessions/ (transcripts and blobs), state/find.sqlite* (search index of session text), state/drafts/ and state/remote/<host>/drafts/, state/diag.log, state/web-diag.log*. sessions/ is chmod 0700 like state/ (it is 0755 today).
+
+Private but not secret (no change): config.ason (names the web URL), USER.md.
+
+Migration: at startup the host moves auth.ason, push-vapid.ason and push-subscriptions.ason, and the terminal client moves remote.ason, from their old places into secrets/ with rename. It never overwrites: when both old and new exist, it keeps the new one, leaves the old in place and writes one diag line naming it. Error messages and docs that name these files show the new paths.`,
+	status: 'planned',
+	needs: ['p', 'b8', 'tr', 'm1'],
+	foldInto: ['p']
+}
