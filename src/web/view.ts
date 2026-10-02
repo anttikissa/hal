@@ -297,7 +297,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			// Drawn as the prompt it was typed as (Card heads it).
 			return { kind: 'user prompt', text: item.text }
 		case 'output':
-			return { kind: item.error ? 'output error' : 'output log', text: [titles.time(item.ts), item.text].filter(Boolean).join(' ') }
+			return { kind: item.error ? 'output error' : 'output log', text: item.text }
 		case 'divider':
 			return { kind: 'divider log', text: item.text }
 	}

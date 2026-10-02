@@ -2,6 +2,8 @@ import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
+import { transcript } from '../common/transcript.ts'
+import { itemView } from '../client/item-view.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
 import { blobs } from './blobs.ts'
@@ -1467,7 +1469,10 @@ test.skipIf(!chrome)('completion dismissal follows pointer and focus without ste
 test.skipIf(!chrome)('tool-header URLs navigate without toggling and remain separate from the expansion button', async () => {
 	let id = tabs.create('/tmp')
 	let url = 'https://example.com/article?x=1&y=2'
-	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'url-call', name: 'read_url', input: { url } } })
+	let ts = '2026-10-02T05:50:00Z'
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Compare timestamps' }], ts })
+	history.append(id, { type: 'output', text: 'command result', ts })
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'url-call', name: 'read_url', input: { url } }, ts })
 	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'url-call', output: 'Article text' }] })
 	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 	let b = await browser()
@@ -1477,8 +1482,28 @@ test.skipIf(!chrome)('tool-header URLs navigate without toggling and remain sepa
 		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
 		await b.waitFor(`!!document.querySelector('.Card.tool .head a')`)
+		let tool = transcript.recordItems(history.readSync(id).find(r => r.type === 'assistant' && r.block.type === 'tool_call')!, 0)[0]!
+		let terminalTime = itemView.itemLines(tool, 120)[0]!.slice(0, 5)
 		for (let width of [390, 1200]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false })
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: width === 390 })
+			let times = await b.evaluate(`(() => {
+				let button = document.querySelector('.Card.tool .head button'), prompt = [...document.querySelectorAll('.Card.prompt .who')].find(el => el.textContent.includes('You'));
+				return { tool: button.textContent, prompt: prompt.textContent.slice(0, 5), height: button.getBoundingClientRect().height, width: button.getBoundingClientRect().width };
+			})()`)
+			expect(times.tool).toBe(times.prompt)
+			expect(times.tool).toBe(terminalTime)
+			let layout = await b.evaluate(`(() => {
+				let prompt = document.querySelector('.Card.prompt'), output = document.querySelector('.Card.output'), button = document.querySelector('.Card.tool .mark'), headline = document.querySelector('.Card.tool .title');
+				let inset = card => card.querySelector('.who').getBoundingClientRect().y - card.getBoundingClientRect().y;
+				return { outputTime: output.querySelector('.who').textContent, promptInset: inset(prompt), outputInset: inset(output), font: getComputedStyle(button).fontSize, textFont: getComputedStyle(headline).fontSize, body: output.querySelector('.Markdown').textContent };
+			})()`)
+			expect(layout.outputTime).toBe(times.prompt)
+			expect(layout.outputInset).toBeCloseTo(layout.promptInset)
+			expect(layout.font).toBe(layout.textFont)
+			expect(layout.body).toBe('command result')
+
+			if (width === 390) { expect(times.height).toBeGreaterThanOrEqual(44); expect(times.width).toBeGreaterThanOrEqual(44) }
 			let seen = await b.evaluate(`(() => {
 				let card = document.querySelector('.Card.tool'), link = card.querySelector('.head a'), button = card.querySelector('.head button')
 				let followed = false
@@ -1490,9 +1515,12 @@ test.skipIf(!chrome)('tool-header URLs navigate without toggling and remain sepa
 				return { href: link.href, target: link.target, protected: link.relList.contains('noopener'), nested: !!link.closest('button'), followed, stayedClosed, opened: card.classList.contains('open'), expanded: button.getAttribute('aria-expanded'), named: !!button.getAttribute('aria-label'), focused: document.activeElement === button }
 			})()`)
 			expect(seen).toEqual({ href: url, target: '_blank', protected: true, nested: false, followed: true, stayedClosed: true, opened: true, expanded: 'true', named: true, focused: true })
-			await b.evaluate(`document.querySelector('.Card.tool .head button').click()`)
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' })
+			await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+			await b.waitFor(`document.querySelector('.Card.tool .head button').getAttribute('aria-expanded') === 'false'`)
 		}
 	} finally {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
 		await b.close()
 	}
 }, 20000)

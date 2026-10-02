@@ -51,7 +51,9 @@ function itemStyle(item: Item): Style | undefined {
 // A prompt, model text or thinking as the old Hal drew it (task hp):
 // its header ('10:52 Hal (Opus 5.5)'), clipped, a blank row, the body.
 function headed(item: Item, body: string[], width: number, session?: string): string[] {
-	let title = strings.clipVisual(ansi.clean(titles.title(item) ?? ''), width)
+	let title = titles.title(item)
+	if (title === undefined) return body
+	title = strings.clipVisual(ansi.clean(title), width)
 	let call = item.type === 'prompt' && item.label?.match(/^bash #(\d+)$/)?.[1]
 	if (call && session && title.endsWith(`#${call}`)) {
 		let href = transcript.href(session, call)
@@ -94,15 +96,17 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			return itemView.headed(item, markdownView.lines((item.type === 'text' ? names.strip(summary.strip(item.text)) : item.text).trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		case 'tool': {
 			let { command, description } = item.input
+			let time = titles.time(item.ts)
+			let prefix = time ? `${time} ` : ''
 			let row: string
 			if (typeof command === 'string' && typeof description === 'string') {
-				let head = strings.clipVisual(`▸ ${ansi.clean(description).replace(/\s+/g, ' ')}`, width)
+				let head = strings.clipVisual(`${prefix}${ansi.clean(description).replace(/\s+/g, ' ')}`, width)
 				let mark = item.input.background === true ? '&' : '$'
 				let commandLine = strings.clipVisual(`${mark} ${ansi.clean(command).replace(/\s+/g, ' ')}`, width)
 				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-5).flatMap((line) => ansi.wrap(ansi.clean(line), Math.max(1, width - 2), false)).slice(-5).map((line) => `  ${line}`) : [])]
 			} else {
 				let input = ansi.clean(JSON.stringify(item.input)).replace(/\s+/g, ' ')
-				row = strings.clipVisual(`▸ ${ansi.clean(item.name)} ${input}`, width)
+				row = strings.clipVisual(`${prefix}${ansi.clean(item.name)} ${input}`, width)
 			}
 			if (!item.partial) return [row]
 			let lines = item.partial.replace(/\n$/, '').split('\n').slice(-5)
@@ -148,7 +152,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'command':
 			return itemView.headed(item, ansi.wrap(item.text, width), width, session)
 		case 'output':
-			return markdownView.lines([titles.time(item.ts), item.text.trimEnd()].filter(Boolean).join(' '), width, streaming, itemView.itemStyle(item))
+			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		// One row: the text centred in a rule across the width.
 		case 'divider': {
 			let text = strings.clipVisual(` ${item.text} `, width)

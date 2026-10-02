@@ -24,7 +24,7 @@ export type Shown =
 	// (task hp). Records from before hp have none of them.
 	| { type: 'text'; text: string; naming?: true; ts?: string; model?: string; effort?: string }
 	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
-	| { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string }
+	| { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string; ts?: string }
 	| { type: 'tool-result'; id: string; output: string; isError?: boolean }
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string }
 	// A durable question; with `answers` once answered (secrets only named).
@@ -75,7 +75,7 @@ function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number
 	let out: Item[] = []
 	for (let [i, b] of list.entries()) {
 		let key = transcript.key(ns?.[i], 0, at + out.length)
-		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, key })
+		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, key, ...(by.ts?.[i] !== undefined && { ts: by.ts[i] }) })
 		else if (b.text) {
 			let item: Item & { type: 'text' | 'thinking' } = { type: b.type, text: b.text, key }
 			if (b.type === 'text' && b.naming) (item as Item & { type: 'text' }).naming = true

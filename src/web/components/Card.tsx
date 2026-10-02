@@ -111,7 +111,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
 	let head = () => {
 		let item = props.row.item
-		if (item.type === 'thinking') return `${title()}: ${lines()[0]}`
+		if (item.type === 'thinking') return `${titles.who(item)}: ${lines()[0]}`
 		if (item.type === 'prompt' && item.summary) return item.summary
 		return item.type === 'tool' ? toolDetails.headline(item.name, item.input).text : lines()[0]
 	}
@@ -201,7 +201,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						{link()}
 						<div class="head">
 							<button type="button" class="mark" aria-label={head()} aria-expanded={expanded() ? 'true' : 'false'}>
-								<span aria-hidden="true">{expanded() ? '▾' : '▸'}</span>
+								{titles.time((props.row.item as { ts?: string }).ts) || 'Details'}
 							</button>
 							<span class="title"><For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></span>
 							<Show when={props.cursor && !open()}>{cursor()}</Show>

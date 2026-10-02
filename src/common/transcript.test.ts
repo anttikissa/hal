@@ -40,7 +40,7 @@ test('a snapshot shows history as display items without provider details', () =>
 		{ type: 'prompt', text: 'hi', ts, key: '1' },
 		{ type: 'thinking', text: 'hmm', ts, key: '2' },
 		{ type: 'text', text: 'hello', ts, key: '4' },
-		{ type: 'tool', id: 't1', name: 'bash', input: { cmd: 'ls' }, key: '5' },
+		{ type: 'tool', id: 't1', name: 'bash', input: { cmd: 'ls' }, key: '5', ts },
 		{ type: 'turn-end', status: 'completed', usage: { input: 3 }, key: '6' },
 		// One record, two items; a record built without a number is keyed
 		// by its place.
@@ -127,7 +127,7 @@ test('tool results settle the round so far; the next round streams after them', 
 		snap({ history: [] }),
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1, ts },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'look' }, n: 2, ts },
-		{ type: 'stream', sessionId, event: call, n: 3 },
+		{ type: 'stream', sessionId, event: call, n: 3, ts },
 		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 't1', output: 'no such file', isError: true }], n: 4 },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'gone' }, n: 5, ts },
 	]
@@ -135,7 +135,7 @@ test('tool results settle the round so far; the next round streams after them', 
 	expect(t.items).toEqual([
 		{ type: 'prompt', text: 'go', ts, key: '1' },
 		{ type: 'text', text: 'look', ts, key: '2' },
-		{ type: 'tool', id: 't1', name: 'read', input: { path: 'a' }, key: '3' },
+		{ type: 'tool', id: 't1', name: 'read', input: { path: 'a' }, key: '3', ts },
 		{ type: 'tool-result', id: 't1', output: 'no such file', isError: true, key: '4' },
 		{ type: 'text', text: 'gone', ts, key: '5' },
 	])
@@ -253,7 +253,7 @@ test('a command during a running turn goes where history has it: after finished 
 		{ type: 'command', text: '/cd x', from: '2-xyz', ts, key: '4' },
 		{ type: 'output', text: 'no such directory', error: true, ts, key: '5' },
 		{ type: 'text', text: 'working', ts, key: '3' },
-		{ type: 'tool', id: 'c', name: 'ls', input: {}, key: '6' },
+		{ type: 'tool', id: 'c', name: 'ls', input: {}, key: '6', ts },
 		{ type: 'command', text: '/help', ts, key: '7' },
 		{ type: 'tool-result', id: 'c', output: 'ok', key: '8' },
 		{ type: 'turn-end', status: 'completed', key: '9' },

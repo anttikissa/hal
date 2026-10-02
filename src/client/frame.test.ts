@@ -360,7 +360,7 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		for (let u of links) expect(u.searchParams.get('auth')).toBe('k3x9qa')
 		let shown = lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, ''))
 		expect(shown.join('\n')).not.toContain('k3x9qa')
-		expect(plain(lines).join('\n')).toContain('▸ bash {"command":"ls"}')
+		expect(plain(lines).join('\n')).toContain('bash {"command":"ls"}')
 		expect(plain(lines).join('\n')).toContain('error: boom')
 		// A streaming block's Hal cursor follows its text, not its id.
 		let stream = view([{ type: 'text', text: 'Hel' }])
@@ -404,6 +404,25 @@ test('a narrow terminal clips the header and keeps the block id', () => {
 	expect(lines[0]).toMatch(/^10:51 Hal \(Opus 5.* #35$/)
 	expect(lines[0]).not.toContain('high')
 	expect(strings.visLen(frame.build(v, 24).lines[0]!)).toBeLessThanOrEqual(24)
+})
+
+test('tool timestamps and command-output headers match ordinary message time and spacing', () => {
+	let ts = new Date(2026, 9, 2, 8, 50).toISOString()
+	let f = frame.build(view([
+		{ type: 'text', text: 'Message body', ts },
+		{ type: 'tool', id: 'run', name: 'bash', input: { description: 'Inspect files', command: 'ls' }, ts },
+		{ type: 'tool', id: 'read', name: 'read', input: { path: 'example.txt' }, ts },
+		{ type: 'output', text: 'Command body', ts },
+	]), 80)
+	let lines = plain(f.lines)
+	let ordinary = lines.findIndex(line => line.startsWith('08:50 Hal'))
+	let output = lines.findIndex(line => line === '08:50')
+	expect(lines[ordinary + 1]).toBe('')
+	expect(lines[ordinary + 2]).toBe('Message body')
+	expect(lines[output + 1]).toBe('')
+	expect(lines[output + 2]).toBe('Command body')
+	expect(lines.some(line => line.startsWith('08:50 Inspect files'))).toBe(true)
+	expect(lines.some(line => line.startsWith('08:50 read '))).toBe(true)
 })
 
 test('finished thinking with no readable text draws nothing, not a bare header', () => {
