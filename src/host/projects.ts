@@ -1,34 +1,16 @@
-// Project colors (task 22): which project each tab's cwd belongs to and
-// the color index (colors.project) the tab bar and status row show for
-// it, only while open tabs span two or more projects.
+// Project colors (task 22): each tab's cwd is its project. Assigns the
+// color index (colors.project) the tab bar and status row show, only
+// while open tabs span two or more projects.
 
-import { existsSync } from 'fs'
-import { basename, dirname } from 'path'
+import { basename } from 'path'
 import { colors } from '../common/colors.ts'
 import type { Tab } from '../common/protocol.ts'
 
-// The nearest ancestor of cwd holding .git, else cwd itself.
-function root(cwd: string): string {
-	let cached = projects.state.roots.get(cwd)
-	if (cached) return cached
-	let dir = cwd.replace(/(.)\/+$/, '$1')
-	let found = dir
-	for (let d = dir; ; d = dirname(d)) {
-		if (existsSync(`${d}/.git`)) {
-			found = d
-			break
-		}
-		if (dirname(d) === d) break
-	}
-	projects.state.roots.set(cwd, found)
-	return found
-}
-
 // A project's preferred color: FNV-1a of its name, so ~/.hal and ~/hal
 // prefer the same color on every machine.
-function preferred(root: string, size: number): number {
+function preferred(cwd: string, size: number): number {
 	let h = 0x811c9dc5
-	for (let c of basename(root).replace(/^\.+/, '').toLowerCase()) h = Math.imul(h ^ c.codePointAt(0)!, 16777619) >>> 0
+	for (let c of basename(cwd).replace(/^\.+/, '').toLowerCase()) h = Math.imul(h ^ c.codePointAt(0)!, 16777619) >>> 0
 	return h % size
 }
 
@@ -53,18 +35,16 @@ function pick(want: number, used: Set<number>, size: number): number {
 // project keeps its color while it has open tabs.
 function paint(list: Tab[]): void {
 	let size = Object.keys(colors.project()).length
-	let roots = list.map((t) => root(t.cwd))
-	let open = new Set(roots)
+	let open = new Set(list.map((t) => t.cwd))
 	let assigned = projects.state.assigned
 	for (let r of assigned.keys()) if (!open.has(r)) assigned.delete(r)
 	for (let r of open) if (!assigned.has(r)) assigned.set(r, pick(preferred(r, size), new Set(assigned.values()), size))
 	if (open.size < 2) return
-	list.forEach((t, i) => (t.color = assigned.get(roots[i]!)!))
+	for (let t of list) t.color = assigned.get(t.cwd)!
 }
 
 export const projects = {
-	state: { roots: new Map<string, string>(), assigned: new Map<string, number>() },
-	root,
+	state: { assigned: new Map<string, number>() },
 	preferred,
 	pick,
 	paint,

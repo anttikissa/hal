@@ -1,14 +1,10 @@
 import { afterEach, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import type { Tab } from '../common/protocol.ts'
 import { projects } from './projects.ts'
 
-let dir = mkdtempSync('/tmp/hal-projects-')
 afterEach(() => {
-	projects.state.roots.clear()
 	projects.state.assigned.clear()
 })
-process.on('exit', () => rmSync(dir, { recursive: true, force: true }))
 
 let tab = (cwd: string): Tab => ({ id: cwd, name: '', cwd, model: '', state: { type: 'idle' } as Tab['state'] })
 let paint = (...cwds: string[]) => {
@@ -17,21 +13,18 @@ let paint = (...cwds: string[]) => {
 	return list.map((t) => t.color)
 }
 
-test('a subdirectory of a repo is the repo; dotted and plain names prefer one color', () => {
-	mkdirSync(`${dir}/.hal/.git`, { recursive: true })
-	mkdirSync(`${dir}/.hal/src`, { recursive: true })
-	expect(projects.root(`${dir}/.hal/src`)).toBe(`${dir}/.hal`)
-	expect(projects.preferred(`${dir}/.hal`, 8)).toBe(projects.preferred('/elsewhere/hal', 8))
+test('dotted and plain names prefer one color; a nested project differs from its parent', () => {
+	expect(projects.preferred('/root/.hal', 8)).toBe(projects.preferred('/elsewhere/hal', 8))
+	let [outer, inner] = paint('/p/a', '/p/a/b')
+	expect(outer).not.toBe(inner)
 })
 
 test('one project shows no color; two get different colors that stay while open', () => {
-	mkdirSync(`${dir}/a`, { recursive: true })
-	mkdirSync(`${dir}/b`, { recursive: true })
-	expect(paint(`${dir}/a`, `${dir}/a`)).toEqual([undefined, undefined])
-	let [a, b] = paint(`${dir}/a`, `${dir}/b`)
+	expect(paint('/p/a', '/p/a')).toEqual([undefined, undefined])
+	let [a, b] = paint('/p/a', '/p/b')
 	expect(a).not.toBe(b)
 	// Closing the first tab and reopening it later keeps b's color.
-	expect(paint(`${dir}/b`, `${dir}/a`)).toEqual([b, a])
+	expect(paint('/p/b', '/p/a')).toEqual([b, a])
 })
 
 test('a taken preference falls to the free color farthest from those in use', () => {
