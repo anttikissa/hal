@@ -1,0 +1,10 @@
+{
+	title: "A login clears its account's rate limits",
+	spec: "Saving a login (/login claude or /login chatgpt) removes every limits.ason entry for that provider's account (limits.forget), so rotation can pick it at once. A turn waiting on limits already wakes on the login (auth.changed) and now continues on that account. Other accounts' limits stay. Invariant restored: a fresh login makes its account eligible immediately; a limit set before the login (a plan refusal before an upgrade, a 429 on an old token) never outlives it. Test: two limited accounts, a login for one makes it the picked account while the other stays limited.",
+	status: 'done',
+	notes: [
+		"Found 2 Oct 2026: akissaniemi@gmail.com was free when gpt-6.1-sol was refused (3g's one-hour plan limit); /login chatgpt made it plus, /status showed 0% used, yet every tab kept retrying until the hour ended. /status does not show limits.ason at all; showing skips there is a separate, open question."
+	],
+	needs: ['tf', '3g'],
+	foldInto: ['tf']
+}
