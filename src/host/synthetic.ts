@@ -1,13 +1,14 @@
 // Scripted models run inside the host, no provider needed: hal/intro
 // (intro.ts). Each answered form is durable in history; a model derives
 // its next step from those records. A reply's paragraphs arrive with
-// a typing pace (pauseMs); `pause` ends the turn paused with that reason.
+// a typing pace (pauseMs); `pause` ends the turn paused with that reason,
+// and `then` runs once the turn has ended (a command the reply starts).
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Answers, Form } from '../common/forms.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { intro } from './intro.ts'
 
-export type Reply = { say?: string; ask?: Form; pause?: string }
+export type Reply = { say?: string; ask?: Form; pause?: string; then?: () => void }
 export type Synthetic = (records: HistoryRecord[], answers?: Answers, sessionId?: string) => Reply
 
 function find(model: string): Synthetic | undefined {
