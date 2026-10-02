@@ -99,7 +99,7 @@ test('a completed turn is stored as prompt, blocks and a turn end with usage', a
 	let records = await history.read(id)
 	expect(strip(records)).toEqual([
 		{ type: 'user', blocks: [{ type: 'text', text: 'hello' }] },
-		{ type: 'assistant', block: { type: 'thinking', text: 'hm', signature: 'sig', provider: 'fake' } },
+		{ type: 'assistant', block: { type: 'thinking', text: 'hm', signatureBlob: expect.any(String), provider: 'fake' } },
 		{ type: 'assistant', block: { type: 'text', text: 'hi there' } },
 		{ type: 'round', usage: { input: 10, output: 3 }, block: 2 },
 		{ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 10, output: 3 }, context: 10 },
@@ -164,7 +164,7 @@ test('a prompt after a failed turn is its own message, told of the failure', asy
 	])
 })
 
-test('thinking signatures replay exactly, rebuilt from disk alone', async () => {
+test('thinking signatures live in blobs and replay exactly, rebuilt from disk alone', async () => {
 	let id = newSession()
 	let signature = `{"type":"reasoning","id":"rs_1","encrypted_content":"gAAA\\u0000'\`\${x}"}\n\t\\ ä😀 ${'z'.repeat(5000)}`
 	let sent = fakeStream((input) =>
@@ -174,8 +174,10 @@ test('thinking signatures replay exactly, rebuilt from disk alone', async () => 
 	)
 	history.submit(id, 'q1')
 	await drain(history.turn(id))
-	// Every record is one line.
-	expect(readFileSync(history.file(id), 'utf8').trimEnd().split('\n')).toHaveLength(4)
+	// Every record is one line, and the signature is not among them.
+	let lines = readFileSync(history.file(id), 'utf8').trimEnd().split('\n')
+	expect(lines).toHaveLength(4)
+	expect(lines.join('\n')).not.toContain('zzzz')
 	sessions.closeAll()
 	await history.open(id)
 	history.submit(id, 'q2')

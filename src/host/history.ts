@@ -11,7 +11,7 @@ import { appendFileSync, existsSync, openSync, readSync as readFd, closeSync, st
 import { historyCheck } from './history-check.ts'
 import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
-import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ToolResultBlock, type Turn, type Usage, type UserBlock } from '../common/blocks.ts'
+import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ThinkingBlock, type ToolResultBlock, type Turn, type Usage, type UserBlock } from '../common/blocks.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { blobs } from './blobs.ts'
 import { busy } from './busy.ts'
@@ -208,7 +208,10 @@ async function open(id: string): Promise<SessionMeta> {
 // The session as provider messages, each prompt's paste markers
 // expanded to the pasted text (blobs.expand): history keeps markers.
 async function messages(id: string, budget: { overhead?: number; window?: number } = {}) {
-	let records = history.readSync(id).map((r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b) } : r)
+	// A thinking block as the provider sent it: its signature back from its blob.
+	let signed = ({ signatureBlob, ...b }: ThinkingBlock): ThinkingBlock => ({ ...b, signature: blobs.text(id, signatureBlob!) })
+	let records = history.readSync(id).map((r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b) }
+		: r.type === 'assistant' && r.block.type === 'thinking' && r.block.signatureBlob !== undefined ? { ...r, block: signed(r.block) } : r)
 	return replay.toMessages(pruning.project(id, records, budget))
 }
 
@@ -225,7 +228,7 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 	let { turn } = running
 	let flush = (upTo: number) => {
 		if (running.ended) return
-		for (; running.written < upTo; running.written++) history.append(id, history.blockRecord(running, running.written))
+		for (; running.written < upTo; running.written++) history.append(id, history.blockRecord(id, running, running.written))
 	}
 	history.state.running.set(id, running)
 	try {
@@ -250,9 +253,11 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 }
 
 // The record of the running turn's block `i`: started when it did, by
-// the turn's model and effort.
-function blockRecord(running: Running, i: number): NewRecord & { ts?: string } {
-	let r: NewRecord & { type: 'assistant'; ts?: string } = { type: 'assistant', block: running.turn.blocks[i]!, n: running.ns[i]! }
+// the turn's model and effort. A thinking signature goes to a blob.
+function blockRecord(id: string, running: Running, i: number): NewRecord & { ts?: string } {
+	let block = running.turn.blocks[i]!
+	if (block.type === 'thinking' && block.signature) { let { signature, ...rest } = block; block = { ...rest, signatureBlob: blobs.storeOutput(id, signature).blob } }
+	let r: NewRecord & { type: 'assistant'; ts?: string } = { type: 'assistant', block, n: running.ns[i]! }
 	if (running.by.model !== undefined) r.model = running.by.model
 	if (running.by.effort !== undefined) r.effort = running.by.effort
 	if (running.starts[i] !== undefined) r.ts = running.starts[i]
@@ -309,7 +314,7 @@ function stop(pause: boolean): void {
 		running.ended = true
 		let { turn } = running
 		try {
-			for (; running.written < turn.blocks.length; running.written++) history.append(id, history.blockRecord(running, running.written))
+			for (; running.written < turn.blocks.length; running.written++) history.append(id, history.blockRecord(id, running, running.written))
 			if (pause) history.append(id, { type: 'turn_end', status: 'paused', usage: addUsage(running.prior, turn.usage), ...contextOf(running) })
 		} catch (e: any) {
 			diag.log(`history ${id}: could not record the stopped turn: ${e?.message ?? e}`)
