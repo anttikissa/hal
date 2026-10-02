@@ -97,10 +97,12 @@ function table(rows: Run[][][], width: number, style?: Style): string[] {
 function block(b: Block, width: number, style?: Style): string[] {
 	if (b.type === 'table') return markdownView.table(b.rows, width, style)
 	if (b.type === 'code') {
-		// Fences hidden as on the web; their rows stay, the opening one
-		// showing the language quietly, so a streaming fence never loses a row.
-		let lang = ansi.wrap(b.lang, width).map((r) => ansi.quiet(r, style))
-		return [...lang, ...b.lines.flatMap((l) => ansi.wrap(l, width).map((r) => markdownView.code(r, style))), ...(b.close === undefined ? [] : [''])]
+		// Fences hidden as on the web; the language, if any, shown quietly.
+		let lang = b.lang ? ansi.wrap(b.lang, width).map((r) => ansi.quiet(r, style)) : []
+		// The closing fence's row stays blank so a streaming reply never loses
+		// a row; lines() drops the blank line after it, avoiding a double gap.
+		let close = b.close === undefined ? [] : ['']
+		return [...lang, ...b.lines.flatMap((l) => ansi.wrap(l, width).map((r) => markdownView.code(r, style))), ...close]
 	}
 	let marker = b.kind === 'quote' ? ansi.quiet('│ ', style) : b.marker
 	let indent = strings.visLen(marker)
@@ -111,7 +113,13 @@ function block(b: Block, width: number, style?: Style): string[] {
 // Rows of model text at `width` columns; `streaming`: it may still grow.
 function lines(text: string, width: number, streaming = false, style?: Style): string[] {
 	let source = strings.expandTabs(ansi.clean(text.replace(/\r\n?/g, '\n')))
-	return markdown.parse(source, streaming).flatMap((b) => markdownView.block(b, width, style))
+	// While streaming, hold back an unfinished last line that is empty or may
+	// still become a fence, so its row never appears and then vanishes.
+	if (streaming) source = source.replace(/(^|\n)( {0,3}(`{1,2}|~{1,2}))?$/, '')
+	let blocks = markdown.parse(source, streaming)
+	let gap = (b: Block | undefined) => b?.type === 'line' && b.kind === 'p' && !b.marker && !b.runs.length
+	let closed = (b: Block | undefined) => b?.type === 'code' && b.close !== undefined
+	return blocks.flatMap((b, i) => (gap(b) && closed(blocks[i - 1]) ? [] : markdownView.block(b, width, style)))
 }
 
 export const markdownView = { lines, block, table, fit, styled, code }
