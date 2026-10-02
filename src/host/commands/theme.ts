@@ -5,9 +5,7 @@
 
 import { lstatSync, mkdirSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync } from 'fs'
 import { basename, join, relative } from 'path'
-import type { Event } from '../../common/protocol.ts'
 import type { SlashCommand } from '../commands.ts'
-import { host } from '../host.ts'
 import { plugins } from '../plugins.ts'
 
 const themesDir = () => join(import.meta.dir, '../../../themes')
@@ -27,15 +25,6 @@ function active(): string | undefined {
 	}
 	return basename(readlinkSync(link()), '.ts')
 }
-
-// Remote terminals show the host's theme (host/host-theme.ts): each
-// hears it on connect, unless it is hal, the look they start in.
-function greet(client: { deliver: (event: Event) => void }): void {
-	let name = active()
-	if (name && name !== 'hal') client.deliver({ type: 'theme', name })
-}
-
-export const theme = { active, greet }
 
 export const command: SlashCommand = {
 	help: () => '/theme asks which colour theme to use, the active one chosen; /theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
@@ -64,7 +53,6 @@ export const command: SlashCommand = {
 			symlinkSync(relative(realpathSync(plugins.dir()), realpathSync(join(themesDir(), `${args}.ts`))), tmp)
 			renameSync(tmp, link())
 		}
-		for (let client of host.state.clients) client.deliver({ type: 'theme', name: args })
 		return { say: `theme ${args}; reload web pages to see it` }
 	},
 }

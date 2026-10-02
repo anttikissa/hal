@@ -12,7 +12,6 @@ import { ason } from '../common/ason.ts'
 import { protocol, type Command, type Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { commands } from './commands.ts'
-import { theme } from './commands/theme.ts'
 import { clients, type ClientInfo, type ClientRecord } from './clients.ts'
 import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
@@ -59,7 +58,6 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 	host.state.clients.add(client)
 	host.warn(client)
 	if (version.state.loaded) client.deliver({ type: 'version', version: version.state.loaded })
-	theme.greet(client)
 	// The tabs come with the first events, so no client has to ask; their
 	// states need the open tabs' marks, caught up in slices first.
 	let indexed = tabs.indexed()
