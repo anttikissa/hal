@@ -3,6 +3,7 @@ import { writeFileSync } from 'fs'
 import { markdown } from '../common/markdown.ts'
 import { replay } from '../common/replay.ts'
 import { greetings } from './greetings.ts'
+import { titles } from '../common/titles.ts'
 import { calls, client, created, fresh, restartHost, testHome, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
 import { sessions } from './sessions.ts'
@@ -69,6 +70,7 @@ test('new interactive tabs have one shared durable output, no provider turn, and
 	expect(status.stateOf(id).type).toBe('idle')
 	expect(calls).toHaveLength(0)
 	let shown = a.views.get(id)!.items
+	expect(titles.who(shown[0]!)).toBe('Hal (synthetic)')
 	expect((await fresh(id)).items).toEqual(shown)
 	let model = sessions.open(id).model
 	// Reopening is not another arrival, even after changing the profile.
