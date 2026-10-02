@@ -88,7 +88,7 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 	contextTransitions.cancel(id)
 	let records = history.readSync(id)
 	let open = forms.open(records)
-	if (!transition && !closing && open?.call && records.some((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === open.call && r.block.name === 'ask')) {
+	if (!transition && !closing && open && !open.from && (open.form.skip || (open.call && records.some((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === open.call && r.block.name === 'ask')))) {
 		let refused = status.transition(id, { type: 'answer' })
 		if (refused) return refused
 		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })

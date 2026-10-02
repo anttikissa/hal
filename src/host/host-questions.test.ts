@@ -224,6 +224,22 @@ test('with no credential the intro offers /login, pauses for it and goes on once
 	expect(sessions.open(id).model).toBe('hal/intro')
 })
 
+test('the Serper key step never traps: an empty key or Escape moves on', async () => {
+	for (let escape of [false, true]) {
+		let c = client(), id = created(c)
+		c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
+		await reply(c, id, 'name', '', 'language')
+		await reply(c, id, 'language', '', 'login')
+		await reply(c, id, 'login', 'Skip', 'search')
+		await reply(c, id, 'search', 'Yes', 'key')
+		if (escape) c.conn.send({ type: 'pause', sessionId: id })
+		else await reply(c, id, 'key', '  ')
+		await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
+		expect(texts(c.views.get(id)!).join('\n')).toContain('Skipped web search')
+		expect(apiKeys.get('serper')).toBeUndefined()
+	}
+})
+
 test('the timezone is saved unasked only when device and host agree on a real zone', () => {
 	let run: HistoryRecord[] = []
 	let ts = new Date().toISOString()

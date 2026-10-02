@@ -21,7 +21,9 @@ export type Field = { help?: string } & (
 // approve), with `marks`, [start, end) offsets, highlighted.
 export type Quote = { text: string; marks?: [number, number][] }
 
-export type Form = { text: string; quote?: Quote; fields: Field[] }
+// `skip`: Escape skips the question (a cancelled answer; whoever asked
+// runs again and moves on) instead of pausing the turn.
+export type Form = { text: string; quote?: Quote; fields: Field[]; skip?: true }
 
 // Field name → value. A choice's value is one of its options.
 export type Answers = Record<string, string>
@@ -48,6 +50,7 @@ function invalid(value: unknown): string | undefined {
 		let ok = (m: unknown) => Array.isArray(m) && m.length === 2 && Number.isInteger(m[0]) && Number.isInteger(m[1]) && 0 <= m[0] && m[0] <= m[1] && m[1] <= q.text.length
 		if (q.marks !== undefined && (!Array.isArray(q.marks) || !q.marks.every(ok))) return 'quote marks must be [start, end] offsets into its text'
 	}
+	if (f.skip !== undefined && f.skip !== true) return 'skip must be true'
 	let names = new Set<string>()
 	for (let field of f.fields) {
 		if (!field || typeof field.name !== 'string' || names.has(field.name)) return 'every field needs a unique name'

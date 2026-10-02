@@ -19,7 +19,8 @@ const { INVERSE, UNINVERSE } = ansi
 function formLines(st: FormState, width: number): { rows: string[]; cursor: { row: number; col: number } } {
 	let rows = [...ansi.wrap(`? ${st.form.text}`, width), ...itemView.quoteLines(st.form.quote, width)]
 	let f = formView.fieldLines(st, width)
-	let hint = st.form.fields.length > 1 ? 'Enter: next · Tab: move · Escape: pause' : 'Enter: answer · Escape: pause'
+	let escape = st.form.skip ? 'Escape: skip' : 'Escape: pause'
+	let hint = st.form.fields.length > 1 ? `Enter: next · Tab: move · ${escape}` : `Enter: answer · ${escape}`
 	// The fields stand apart: a blank row above and below them.
 	let cursor = { row: rows.length + 1 + f.cursor.row, col: f.cursor.col }
 	return { rows: [...rows, '', ...f.rows, '', ansi.quiet(strings.clipVisual(`  ${hint}`, width), colors.warning())], cursor }
