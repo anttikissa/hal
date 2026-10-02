@@ -6,7 +6,7 @@
 // restore the terminal but never clear it, so the last frame stays on
 // screen but its last row, which the shell prompt takes; restart exits with restartCode, which ./run answers by starting
 // again. See the invariants in tasks/README.md.
-import { emergency, type EmergencyAction, type EmergencyState } from './emergency.ts'
+import { emergency, type EmergencyAction, type EmergencyState } from '../common/emergency.ts'
 import { keys, type DecoderState, type KeyEvent } from './keys.ts'
 import { ansi } from './ansi.ts'
 import fs from 'fs'
@@ -209,13 +209,13 @@ const ACTIONS: Record<EmergencyAction, () => void> = {
 
 // Decoded forms of the emergency keys, already handled from raw input.
 function isEmergency(k: KeyEvent): boolean {
-	return k.ctrl && !k.alt && !k.cmd && (k.key === 'c' || k.key === 'z' || k.key === 'r')
+	return emergency.action(k) !== undefined
 }
 
 function onData(chunk: string | Uint8Array): void {
 	let st = terminal.state
 	for (let action of emergency.scan(st.emergency, chunk)) {
-		ACTIONS[action]()
+		emergency.handle(action, ACTIONS)
 		// Only reached when exit is faked (tests): deliver nothing more.
 		if (action !== 'suspend') return
 	}

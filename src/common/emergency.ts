@@ -1,6 +1,6 @@
 // Emergency keys: Ctrl-C quits, Ctrl-Z suspends, Ctrl-R restarts.
 //
-// Found in raw stdin before any stateful decoding (keys.ts), so neither a
+// Found in terminal raw stdin before any stateful decoding (keys.ts), so neither a
 // half-read escape sequence nor an unfinished paste can swallow them. The
 // legacy control bytes count wherever they appear — C0 controls are never
 // part of UTF-8 multi-byte characters, and terminals execute them even
@@ -15,8 +15,8 @@ export interface EmergencyState {
 	tail: string
 }
 
-const BYTES: Record<string, EmergencyAction> = { '\x03': 'quit', '\x1a': 'suspend', '\x12': 'restart' }
 const CODEPOINTS: Record<string, EmergencyAction> = { '99': 'quit', '122': 'suspend', '114': 'restart' }
+const BYTES = Object.fromEntries(Object.entries(CODEPOINTS).map(([cp, action]) => [String.fromCharCode(Number(cp) - 96), action]))
 
 // ESC [ code[:alternates] ; mods[:event] u
 const CSI_U = /\x1b\[(\d+)(?::[\d:]*)?;(\d+)(?::(\d+))?u/y
@@ -40,7 +40,7 @@ function createState(): EmergencyState {
 // Bytes as one char each (latin1), so control bytes keep their value.
 function toBinary(chunk: string | Uint8Array): string {
 	if (typeof chunk === 'string') return chunk
-	return Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength).toString('latin1')
+	return new TextDecoder('latin1').decode(chunk)
 }
 
 /** Every emergency key in this chunk, in order. */
@@ -73,4 +73,16 @@ function scan(st: EmergencyState, chunk: string | Uint8Array): EmergencyAction[]
 	return out
 }
 
-export const emergency = { createState, scan }
+// Both input adapters resolve and dispatch emergencies here, before UI state.
+function action(k: { key: string; ctrl?: boolean; alt?: boolean; cmd?: boolean }): EmergencyAction | undefined {
+	return k.key.length === 1 && k.ctrl && !k.alt && !k.cmd ? CODEPOINTS[String(k.key.toLowerCase().codePointAt(0))] : undefined
+}
+
+function handle(action: EmergencyAction | undefined, handlers: Partial<Record<EmergencyAction, () => void>>): boolean {
+	let run = action && handlers[action]
+	if (!run) return false
+	run()
+	return true
+}
+
+export const emergency = { createState, scan, action, handle }

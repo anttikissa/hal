@@ -206,7 +206,7 @@ holds the rest of what the user chose (selection, focus, tabs). Readable text be
 
 - Ctrl-C quits, Ctrl-Z suspends, Ctrl-R restarts — in every state,
   including the legacy bytes and the kitty CSI-u forms.
-- They are found in raw stdin (`src/client/emergency.ts`) before any
+- They are found in raw stdin (`src/common/emergency.ts`) before any
   stateful decoding; no escape parser, paste buffer, editor, modal,
   queue or host round-trip may sit in front of them or delay them.
 - Handling is synchronous in the client (`src/client/terminal.ts`) and

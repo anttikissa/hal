@@ -39,7 +39,7 @@ const list: CommandInfo[] = [
 	{ name: 'plugins', description: 'list loaded plugins and their hooks', category: 'debug' },
 	{ name: 'queue', description: 'list, run or clear queued prompts', category: 'session' },
 	// Ctrl-C, Ctrl-Z and Ctrl-R are really caught by the emergency path:
-	// src/client/emergency.ts scans raw stdin and src/client/terminal.ts
+	// src/common/emergency.ts scans raw stdin and src/client/terminal.ts
 	// acts on them before any key decoding (tasks/README.md). Changing
 	// these three `key`s changes only what /keys shows, not the keys.
 	{ name: 'quit', description: 'quit', category: 'app', key: 'ctrl-c', clientOnly: true },

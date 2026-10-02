@@ -25,6 +25,8 @@ import { tabs } from './tabs.ts'
 import { view } from './view.ts'
 import { commandList } from '../common/commands/list.ts'
 import { find } from './find.ts'
+import { restart } from './restart.ts'
+import { emergency } from '../common/emergency.ts'
 
 // Where a key was pressed: the message box (its text, the caret, and
 // `write`, which edits the box natively and leaves the selection from
@@ -54,6 +56,9 @@ const arrows: Record<string, 'up' | 'down' | 'escape'> = { ArrowUp: 'up', ArrowD
 // prevents the browser's default).
 function key(e: KeyInput, target: Target): boolean {
 	let st = app.state
+	let action = emergency.action({ key: e.key, ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey })
+	if (action === 'restart' && target.kind === 'message' && target.text !== st.text) app.input(target.text)
+	if (emergency.handle(action, { restart: restart.reload })) return true
 	if (e.isComposing) return false
 	if (tabs.key(e)) return true
 	// The message box may hold text no input event told us about.

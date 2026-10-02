@@ -86,7 +86,6 @@ const tabKeys = new Set(['new', 'close', 'resume'])
 
 function commandKey(st: ViewState, k: Key, mac: boolean): unknown {
 	let c = commandList.byKey({ key: k.key, shift: !!k.shift, alt: !!k.alt, ctrl: !!k.ctrl, cmd: !!k.cmd })
-	// Ctrl-R (/restart local) stays the browser's own reload.
 	if (!c || c.clientOnly || tabKeys.has(c.name) || c.name === 'restart' || !commandList.onWeb(c.key!, mac) || !st.transcript) return undefined
 	let sessionId = st.transcript.meta.id
 	return c.name === 'model' ? { type: 'models', sessionId } : { type: 'submit', sessionId, text: `/${c.name}` }

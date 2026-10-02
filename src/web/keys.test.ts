@@ -4,6 +4,7 @@ import { drafts } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
 import { app } from './app.ts'
 import { keys, type KeyInput, type Target } from './keys.ts'
+import { restart } from './restart.ts'
 
 const meta = { id: '1-abc', cwd: '/w', model: 'fake/m', createdAt: '2026-09-26T00:00:00Z' }
 const sessionId = meta.id
@@ -86,4 +87,26 @@ test('Tab and link Enter stay native in a pending question, while input Enter an
 	app.formInput(0, 'answer')
 	expect(press('Enter', { kind: 'field' })).toBe(true)
 	expect(sent).toContainEqual({ type: 'answer', sessionId, question: 'q', answers: { code: 'answer' } })
+})
+
+test('Ctrl-R reloads only this page in every view and saves the composer draft first', () => {
+	let original = restart.reload
+	let reloaded: string[] = []
+	restart.reload = () => { reloaded.push(drafts.text(sessionId)) }
+	try {
+		let target: Target = { kind: 'message', text: 'unsaved input', cursor: 13 }
+		expect(press('r', target, { ctrlKey: true })).toBe(true)
+		app.setView({ ...app.state.view, modal: { items: ['a/b'], selected: 0, search: '' } as any })
+		expect(press('r', { kind: 'field' }, { ctrlKey: true })).toBe(true)
+		app.setView({ ...app.state.view, modal: undefined })
+		app.onEvent({ type: 'question', sessionId, id: 'q', form: { text: 'Answer?', fields: [{ type: 'text', name: 'answer' }] } })
+		expect(press('r', { kind: 'field' }, { ctrlKey: true })).toBe(true)
+		expect(reloaded).toEqual(['unsaved input', 'unsaved input', 'unsaved input'])
+		expect(sent.filter((c) => c.type !== 'draft')).toEqual([])
+		for (let mods of [{ metaKey: true }, { ctrlKey: true, altKey: true }]) expect(press('r', other, mods)).toBe(false)
+		expect(press('R', other, { ctrlKey: true, shiftKey: true })).toBe(true)
+		expect(reloaded).toHaveLength(4)
+	} finally {
+		restart.reload = original
+	}
 })

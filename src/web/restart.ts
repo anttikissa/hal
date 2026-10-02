@@ -11,7 +11,7 @@ function typed(text: string): boolean {
 	let t = text.trim()
 	if (/^\/restart\s+both$/.test(t)) restart.mark()
 	if (!/^\/restart(\s+local)?$/.test(t)) return false
-	setTimeout(() => location.reload())
+	setTimeout(() => restart.reload())
 	return true
 }
 
@@ -19,8 +19,8 @@ function typed(text: string): boolean {
 function linkChanged(link: LinkState): boolean {
 	if (state.mark === 'marked' && link.type !== 'connected') state.mark = 'gone'
 	if (state.mark !== 'gone' || link.type !== 'connected') return false
-	location.reload()
+	restart.reload()
 	return true
 }
 
-export const restart = { state, typed, linkChanged, mark: (): void => void (state.mark = 'marked') }
+export const restart = { state, typed, linkChanged, reload: (): void => location.reload(), mark: (): void => void (state.mark = 'marked') }

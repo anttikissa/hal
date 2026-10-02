@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { emergency } from './emergency.ts'
+import { emergency } from '../common/emergency.ts'
 
 // Feed chunks through one scanner; returns every action found.
 function scan(...chunks: (string | Uint8Array)[]): string[] {

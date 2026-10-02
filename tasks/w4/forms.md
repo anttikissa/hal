@@ -94,7 +94,7 @@ dispatcher can never disagree.
   `/suspend` and `/restart` declare `key: 'ctrl-c'` (etc.) like any
   other command, with a comment above `key:` telling a programmer that
   the key is really caught by the emergency path: raw stdin is scanned
-  in `src/client/emergency.ts` and the action handled synchronously in
+  in `src/common/emergency.ts` and the action handled synchronously in
   `src/client/terminal.ts` before any key decoding, so changing `key:`
   in the command file changes only what `/keys` shows, not what the
   key does. There is no `emergency` flag; the key dispatcher simply
