@@ -181,7 +181,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	if (!loggedIn.stored && login?.startsWith('/login ') && !run.some((r) => r.type === 'command' && r.text === login)) {
 		// Let the intro turn end, paused, before the command opens its form.
 		if (sessionId) setTimeout(() => slash.command(sessionId, login, { name: 'login', args: login.slice('/login '.length) }), 0)
-		return reply({ say: `Starting ${login}. The intro goes on once you are signed in; Enter continues it anytime.`, pause: 'waiting for /login' })
+		return reply({ pause: 'waiting for /login' })
 	}
 
 	let options = intro.choices(loggedIn.providers)
