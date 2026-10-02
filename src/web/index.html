@@ -338,6 +338,11 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .sheet li:has([aria-current]) { background: color-mix(in oklab, var(--active-fg) var(--mix-tab), transparent); box-shadow: inset 3px 0 0 var(--active-fg); }
 .Tabs .sheet .tab { flex: 1; width: auto; justify-content: flex-start; gap: 1ch; padding: 0.5lh 1ch; }
 .Tabs .sheet .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* The tab list shows each cwd in a column, its project strip left of it
+   as in the status row; narrow screens keep only the bar over the number. */
+.Tabs .sheet .dir { flex: none; width: min(40%, 32ch); padding-left: 1ch; border-left: 3px solid transparent; color: var(--inactive-fg); overflow-wrap: anywhere; }
+.Tabs .sheet .tab[style*="--project"] .dir { border-left-color: var(--project); }
+@media (max-width: 40rem) { .Tabs .sheet .dir { display: none; } .Tabs .sheet .n { position: relative; } .Tabs .sheet .tab[style*="--project"] .n::before { content: ''; position: absolute; top: -5px; left: 0; right: 0; height: 3px; background: var(--project); } }
 .Tabs .sheet :focus-visible { outline-offset: -2px; }
 .Tabs .sheet .close { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; font-size: 1.5em; padding: 0.25lh 1ch; }
 .Tabs .sheet .new { padding: 0.5lh 1ch; background: var(--button); }

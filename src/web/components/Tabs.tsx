@@ -37,7 +37,7 @@ function click(e: MouseEvent, id: string, then?: () => void): void {
 	then?.()
 }
 
-function Link(props: { tab: Tab; n: number; shown: boolean; name: boolean; onPick?: () => void }) {
+function Link(props: { tab: Tab; n: number; shown: boolean; name: boolean; dir?: boolean; onPick?: () => void }) {
 	return (
 		<a
 			href={router.format(props.tab.id)}
@@ -50,6 +50,7 @@ function Link(props: { tab: Tab; n: number; shown: boolean; name: boolean; onPic
 			<span class="n">{props.n}</span>
 			<Marker mark={tabMark.mark(props.tab)} />
 			{props.name && <span class="name">{props.tab.name}</span>}
+			{props.dir && <span class="dir">{props.tab.cwd}</span>}
 		</a>
 	)
 }
@@ -191,7 +192,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 					<For each={props.tabs}>
 						{(tab, i) => (
 							<li>
-								<Link tab={tab} n={i() + 1} shown={tab.id === props.shown} name onPick={() => setOpen(false)} />
+								<Link tab={tab} n={i() + 1} shown={tab.id === props.shown} name dir onPick={() => setOpen(false)} />
 								<button type="button" class="close" aria-label={`Close ${tab.name}`} onClick={() => tabs.closeTab(tab.id)}>
 									×
 								</button>
