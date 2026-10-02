@@ -96,7 +96,7 @@ async function refresh(kind: Kind, account: Account): Promise<string | undefined
 	let observed = new Date(clock.now()).toISOString()
 	// The endpoint lists every current window: windows it omits (an old
 	// plan's) are gone, not merely unreported.
-	store[kind]![account.name] = { ...Object.fromEntries(Object.entries(windows).map(([name, w]) => [name, { ...w, observed }])) }
+	store[kind]![account.name] = Object.fromEntries(Object.entries(windows).map(([name, w]) => [name, { ...w, observed }]))
 	// Fresh usage with room in every window outranks an older skip (a 429,
 	// or a refusal from before a plan change): forget it and wake waiting
 	// turns to try the account. If it still fails, the skip comes back.
