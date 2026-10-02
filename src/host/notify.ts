@@ -16,7 +16,14 @@ import { tabs } from './tabs.ts'
 import { summary } from '../common/summary.ts'
 import { names } from '../common/names.ts'
 
-type Watcher = { deliver: (event: Event) => void; visible?: string; visibleAt?: number; record?: { userAgent?: string } }
+type Watcher = { deliver: (event: Event) => void; visible?: string; visibleAt?: number; record?: { userAgent?: string; lastAt?: number } }
+
+// iOS can drop a page without saying it is hidden, leaving its socket
+// "watching"; only a client heard from within a minute counts as present.
+const presentMs = 60_000
+function present(c: Watcher): boolean {
+	return c.visible !== undefined && (c.record?.lastAt === undefined || Date.now() - c.record.lastAt < presentMs)
+}
 
 function kind(event: Event): NoticeKind | undefined {
 	if (event.type === 'question') return 'attention'
@@ -51,7 +58,7 @@ function route(clients: Iterable<Watcher>, id: string, event: Event): void {
 	let k = notify.kind(event)
 	if (!k) return
 	let all = [...clients]
-	if (all.some((c) => c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
+	if (all.some((c) => present(c) && c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let word = k === 'attention' ? 'needs an answer' : k === 'failed' ? 'failed' : 'done'
 	let told = k === 'done' ? notify.replyLine(id) : ''
 	notify.deliver(all, id, k, notify.line(id, event), told ? `${word}: ${told}` : word)
@@ -60,9 +67,9 @@ function route(clients: Iterable<Watcher>, id: string, event: Event): void {
 // The same routing for automatic events and a model's mid-turn notice.
 function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: string, pushText: string): void {
 	let all = [...clients]
-	if (all.some((c) => c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
+	if (all.some((c) => present(c) && c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let name = sessions.open(id).name ?? id
-	let watching = all.filter((c) => c.visible !== undefined)
+	let watching = all.filter(present)
 	if (!watching.length) return void push.notify(id, name, pushText).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
 	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: k, line }
 	let tab = tabs.file().open.indexOf(id)
