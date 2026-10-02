@@ -121,8 +121,9 @@ test('an open question survives a restart, is not continued by the new host, and
 })
 
 test('Escape while a question waits pauses the turn; continuing asks again', async () => {
+	synthetic.models.asker = () => ({ ask: { text: 'Name?', fields: [{ type: 'text', name: 'name' }] } })
 	let a = client()
-	let id = created(a)
+	let id = created(a, 'hal/asker')
 	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
 	await until(() => transcript.question(a.views.get(id)))
 	let first = transcript.question(a.views.get(id))!
@@ -185,7 +186,9 @@ test('intro resumes through profile, timezone, save, model and secret search set
 	// The device and the host disagree: ask, naming the city.
 	expect(transcript.question(c.views.get(id))!.form.text).toBe('It seems like you are in the Helsinki timezone (Europe/Helsinki). Correct?')
 	process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
-	await reply(c, id, 'timezone', 'Yes', 'model')
+	// An environment key alone still gets the sign-in offer.
+	await reply(c, id, 'timezone', 'Yes', 'login')
+	await reply(c, id, 'login', 'Skip', 'model')
 	expect(readFileSync(`${home}/USER.md`, 'utf8')).toBe('# User\n\nName: Rowan\n\nLanguage preference: US English\n\nTimezone: Europe/Helsinki\n')
 	expect(texts(c.views.get(id)!).join('\n')).toContain(`I saved your answers to ${home}/USER.md.`)
 	let options = (field(c, id) as { options: string[] }).options

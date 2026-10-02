@@ -23,6 +23,7 @@ type Entry = Record<string, any>
 const greeting = 'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.'
 const saved = 'I saved your answers to'
 const closing = "You're all set."
+const subscriptions = 'Hal works with your Claude and ChatGPT subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
 const yesNo = (name: string, text: string): Form => ({ text, fields: [{ type: 'choice', name, options: ['Yes', 'No'], initial: 0 }] })
 const words = ['no', 'one', 'two', 'three', 'four', 'five']
 
@@ -30,6 +31,8 @@ function answered(records: HistoryRecord[], field: string): string | undefined {
 	for (let i = records.length - 1; i >= 0; i--) {
 		let record = records[i]!
 		if (record.type === 'answer' && Object.hasOwn(record.answers, field)) return record.answers[field]
+		// Escape skips an intro question: it reads as an empty answer.
+		if (record.type === 'answer' && record.cancelled && records.some((q) => q.type === 'question' && q.id === record.question && q.form.fields.some((f) => f.name === field))) return ''
 	}
 	return undefined
 }
@@ -48,9 +51,9 @@ function asked(records: HistoryRecord[], field: string): Form | undefined {
 // Who can use a provider: a nonempty file account (accessToken or
 // apiKey) or an environment key. Identities only, never the values;
 // malformed credentials fail rather than disappear.
-function accounts(): { names: string[]; providers: string[] } {
+function accounts(): { names: string[]; providers: string[]; stored: number } {
 	let data: Entry = existsSync(paths.authFile()) ? auth.store() : {}
-	let names: string[] = [], providers: string[] = []
+	let names: string[] = [], providers: string[] = [], stored = 0
 	for (let [kind, label, env] of [
 		['anthropic', 'Claude', 'ANTHROPIC_API_KEY'], ['openai', 'ChatGPT', 'OPENAI_API_KEY'],
 		['opencode-go', 'OpenCode Go', 'OPENCODE_API_KEY'],
@@ -59,10 +62,11 @@ function accounts(): { names: string[]; providers: string[] } {
 		for (let entry of entries) if ((typeof entry?.accessToken === 'string' && entry.accessToken.length > 0) || (typeof entry?.apiKey === 'string' && entry.apiKey.length > 0)) {
 			names.push(`${label}${entry.email ? ` (${entry.email})` : ''}`)
 			providers.push(kind)
+			stored++
 		}
 		if (process.env[env]) { names.push(`${label} (${env})`); providers.push(kind) }
 	}
-	return { names, providers }
+	return { names, providers, stored }
 }
 
 // The claude and gpt aliases' current targets a credential can use,
@@ -100,10 +104,12 @@ function timezone(run: HistoryRecord[], sessionId?: string): { zone?: string; as
 	if (!guess) return {}
 	let confirm = answered(run, 'timezone')
 	if (confirm === undefined) return { ask: { ask: yesNo('timezone', `It seems like you are in the ${cityOf(guess)} timezone (${guess}). Correct?`) } }
+	if (confirm === '') return {}
 	if (confirm === 'Yes') return { zone: zoneIn(intro.asked(run, 'timezone')?.text) ?? guess }
 	let picked = answered(run, 'zone')
 	let options = [...new Set([device && `This device (${device})`, `The server (${server})`].filter((x): x is string => !!x)), 'Other']
 	if (picked === undefined) return { ask: { ask: { text: 'Which timezone should I use?', fields: [{ type: 'choice', name: 'zone', options, initial: 0 }] } } }
+	if (picked === '') return {}
 	if (picked !== 'Other') return { zone: zoneIn(picked) }
 	let city = answered(run, 'city')
 	let found = city === undefined ? undefined : intro.findZone(city)
@@ -114,7 +120,14 @@ function timezone(run: HistoryRecord[], sessionId?: string): { zone?: string; as
 	} }
 }
 
+// Every intro question is skippable: Escape moves on instead of
+// pausing a scripted turn that only an answer can continue.
 function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): Reply {
+	let reply = step(records, answers, sessionId)
+	return reply.ask ? { ...reply, ask: { ...reply.ask, skip: true } } : reply
+}
+
+function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): Reply {
 	let start = records.findLastIndex((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(greeting))
 	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: 'Dave' }] }
 	let hello = (): Reply => ({ say: `${greeting}\n\nI have ${words[3 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
@@ -157,11 +170,13 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 
 	let loggedIn = intro.accounts()
 	let login = answered(run, 'login')
-	if (!loggedIn.names.length && login === undefined) return reply({
-		say: 'To use a real model, sign in: /login signs in with your Claude or ChatGPT subscription. API keys work too, in environment variables or through /login.',
+	// Environment keys alone still get the offer: a subscription may be
+	// what the user wants, and they may not know Hal found the key.
+	if (!loggedIn.stored && login === undefined) return reply({
+		say: `${subscriptions}${loggedIn.names.length ? ` Found: ${loggedIn.names.join(', ')}; Skip uses it.` : ''}`,
 		ask: { text: 'Sign in now?', fields: [{ type: 'choice', name: 'login', options: ['/login claude', '/login chatgpt', '/login opencode', 'Skip'], initial: 0 }] },
 	})
-	if (!loggedIn.names.length && login?.startsWith('/login ') && !run.some((r) => r.type === 'command' && r.text === login)) {
+	if (!loggedIn.stored && login?.startsWith('/login ') && !run.some((r) => r.type === 'command' && r.text === login)) {
 		// Let the intro turn end, paused, before the command opens its form.
 		if (sessionId) setTimeout(() => slash.command(sessionId, login, { name: 'login', args: login.slice('/login '.length) }), 0)
 		return reply({ say: `Starting ${login}. The intro goes on once you are signed in; Enter continues it anytime.`, pause: 'waiting for /login' })
@@ -170,7 +185,7 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 	let options = intro.choices(loggedIn.providers)
 	let chosen = answered(run, 'model')
 	if (options.size && chosen === undefined) return reply({
-		say: `Available logins: ${loggedIn.names.join(', ')}.`,
+		say: `Available logins: ${loggedIn.names.join(', ')}. ${subscriptions}`,
 		ask: { text: 'Which model should Hal use?', fields: [{ type: 'choice', name: 'model', options: [...options.keys(), 'Other'], initial: 0 }] },
 	})
 	let model = chosen === undefined ? undefined : options.get(chosen) ?? [...options.values()].find((id) => id.startsWith(/^claude/i.test(chosen) ? 'anthropic/' : /^gpt/i.test(chosen) ? 'openai/' : '-'))
@@ -182,12 +197,10 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 	})
 	// An empty key or Escape skips: the step must never trap the user.
 	if (search === 'Yes' && !auth.serperKey()) {
-		let q = run.findLast((r) => r.type === 'question')
-		let a = run.findLast((r) => r.type === 'answer')
-		let skipped = q?.type === 'question' && q.form.fields.some((f) => f.name === 'key') && a?.type === 'answer' && a.question === q.id && !!a.cancelled
-		if (answers?.key === undefined && !skipped) return reply({ ask: { text: 'Paste your Serper API key (it will not be shown or saved in conversation history). Empty skips.', fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }], skip: true } })
-		if (skipped) answers = { key: '' }
-		if (answers.key.trim()) apiKeys.save('serper', answers.key.trim())
+		// Secrets stay out of history: only this turn's answers hold the key.
+		let key = answers?.key ?? (answered(run, 'key') === '' ? '' : undefined)
+		if (key === undefined) return reply({ ask: { text: 'Paste your Serper API key (it will not be shown or saved in conversation history). Empty skips.', fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }] } })
+		if (key.trim()) apiKeys.save('serper', key.trim())
 		else say.push('Skipped web search for now.')
 	}
 	if (model) {
@@ -199,7 +212,7 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 	let now = model ? `This tab now uses ${chosen}, also the default for new tabs.`
 		: !loggedIn.names.length ? "You're not signed in yet, so no model can answer: run /login to sign in with Claude or ChatGPT or to add an API key, then /model or Ctrl-M picks a model."
 		: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
-	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
+	return reply({ say: `${closing} A few tips:\n- /login signs in with your Claude or ChatGPT subscription, or adds an API key.\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
 }
 
 export const intro = { run, answered, asked, accounts, choices, findZone, timezone }
