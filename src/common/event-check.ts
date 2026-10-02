@@ -31,7 +31,6 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	warning: { text: 's' },
 	'push-devices': { devices: 'a', result: 's?' },
 	version: { version: 's' },
-	theme: { name: 's' },
 	'model-names': { names: 'o' },
 	notice: { session: 's', tab: 'i?', name: 's', kind: 's', line: 's', key: 's?', what: 's?' },
 	tabs: { tabs: 'a' },
