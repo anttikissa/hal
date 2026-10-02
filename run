@@ -5,7 +5,13 @@
 # to the tab it left (src/main.ts).
 export HAL_TAB_FILE="$(mktemp "${TMPDIR:-/tmp}/hal-tab.XXXXXX")"
 trap 'rm -f "$HAL_TAB_FILE"' EXIT
-main="$(dirname "$(readlink -f "$0")")/src/main.ts"
+dir="$(dirname "$(readlink -f "$0")")"
+main="$dir/src/main.ts"
+# Without dependencies Hal starts but the web client can't build.
+if [ ! -d "$dir/node_modules" ]; then
+	echo "Dependencies are missing ($dir/node_modules): running ./install first."
+	"$dir/install" || exit
+fi
 while true; do
 	# This start's time in ms since the epoch, for perf marks (src/common/
 	# perf.ts). Bash 3.2 (macOS) lacks EPOCHREALTIME: then it is empty
