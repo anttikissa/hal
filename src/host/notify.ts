@@ -16,7 +16,7 @@ import { tabs } from './tabs.ts'
 import { summary } from '../common/summary.ts'
 import { names } from '../common/names.ts'
 
-type Watcher = { deliver: (event: Event) => void; visible?: string; visibleAt?: number; record?: { userAgent?: string; lastAt?: number } }
+type Watcher = { deliver: (event: Event) => void; visible?: string; visibleAt?: number; record?: { kind?: string; userAgent?: string; lastAt?: number } }
 
 // iOS can drop a page without saying it is hidden, leaving its socket
 // "watching"; only a client heard from within a minute counts as present.
@@ -75,7 +75,7 @@ function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: st
 	let tab = tabs.file().open.indexOf(id)
 	if (tab >= 0) notice.tab = tab + 1
 	for (let c of watching) c.deliver(notice)
-	let who = watching.map((c) => `${clientInfo.shortAgent(c.record?.userAgent)} showing ${c.visible} for ${c.visibleAt ? Math.round((Date.now() - c.visibleAt) / 1000) : '?'}s`)
+	let who = watching.map((c) => `${c.record?.kind === 'web' ? clientInfo.shortAgent(c.record.userAgent) : `${c.record?.kind} terminal`} showing ${c.visible} for ${c.visibleAt ? Math.round((Date.now() - c.visibleAt) / 1000) : '?'}s`)
 	diag.log(`push: ${id} not pushed, watched: ${who.join('; ')}`)
 }
 
