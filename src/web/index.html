@@ -50,7 +50,9 @@ body, textarea { tab-size: 4; }
 .Card .who .call { color: inherit; text-decoration: underline; }
 .Card .exit { background: none; }
 /* One header grid for metadata and folding cards; first-line alignment
-   stays the same when a label wraps. Touch height belongs to this row. */
+   stays the same when a label wraps. Touch height belongs to this row:
+   every slot shares one top inset that centres a single line in 44px,
+   so a wrapped label grows down from the timestamp's line. */
 .CardHeader { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; column-gap: 1ch; padding-inline: 1ch; }
 .CardHeader:not(:has(.stamp)) { grid-template-columns: minmax(0, 1fr) auto; }
 .CardHeader .stamp, .CardHeader .title, .CardHeader .link { padding-block: 0.25lh; }
@@ -62,7 +64,8 @@ body, textarea { tab-size: 4; }
 .CardHeader .error { background: none; margin-left: 1ch; }
 @media (pointer: coarse) {
   .CardHeader { min-height: 44px; }
-  .CardHeader .stamp, .CardHeader .link { min-width: 44px; min-height: 44px; }
+  .CardHeader .stamp, .CardHeader .title, .CardHeader .link { padding-block: calc((44px - 1lh) / 2); }
+  .CardHeader .stamp, .CardHeader .link { min-width: 44px; }
   .CardHeader .title a { padding-block: max(0px, calc((44px - 1lh) / 2)); }
 }
 /* A context boundary (tasks bc, vh): its text centred in a rule. */

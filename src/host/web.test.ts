@@ -1619,7 +1619,7 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 			return [...document.querySelectorAll('.CardHeader')].map(h => {
 				let c = h.closest('.Card'), stamp = h.querySelector('.stamp'), title = h.querySelector('.title'), ref = h.querySelector('.link');
 				let t = first(stamp ?? title), label = first(title), link = ref?.getBoundingClientRect(), box = h.getBoundingClientRect();
-				return { folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && title.getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth };
+				return { folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, offCentre: t.y + t.height / 2 - (c.getBoundingClientRect().y + c.getBoundingClientRect().height / 2), rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && title.getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth };
 			});
 		})()`
 		for (let [, width, height, touch] of [['portrait', 390, 800, true], ['narrow', 320, 760, true], ['landscape', 844, 390, true], ['desktop', 1200, 800, false]] as const) {
@@ -1637,6 +1637,8 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 			}
 			for (let row of folded) expect(row.height).toBeCloseTo(folded[0].height, 1)
 			if (touch) expect(folded[0].height).toBeGreaterThanOrEqual(44)
+			// A one-line touch header centres its text in the 44px row.
+			if (touch) for (let row of folded.filter((r: any) => r.height < 50)) expect(Math.abs(row.offCentre)).toBeLessThanOrEqual(1.5)
 			await b.evaluate(`document.querySelectorAll('.Card.folds .mark').forEach(b => b.click()); document.querySelector('.Card.queued').click()`)
 			await b.waitFor(`document.querySelectorAll('.Card.folds.open').length === 4 && !!document.querySelector('.Card.queued .CardHeader')`)
 			await Bun.sleep(300)
