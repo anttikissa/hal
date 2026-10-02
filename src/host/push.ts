@@ -96,7 +96,7 @@ async function deliver(s: Subscription, message: string): Promise<string | undef
 	let body = await pushCrypto.encrypt(message, s)
 	let res = await push.request(s.endpoint, {
 		method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10_000), body,
-		headers: { TTL: '14400', 'Content-Encoding': 'aes128gcm', Authorization: await push.authorization(s.endpoint) },
+		headers: { TTL: '14400', Urgency: 'high', 'Content-Encoding': 'aes128gcm', Authorization: await push.authorization(s.endpoint) },
 	})
 	if (res.status === 404 || res.status === 410) {
 		let data = push.store()
