@@ -10,20 +10,35 @@ const inspect = (sessionId: string, input: Record<string, unknown> = {}) => tool
 	{ cwd: '/tmp', signal: new AbortController().signal, sessionId },
 )
 
-test('shows tabs in their shared order, identifies caller, live state and clients without disclosing addresses', async () => {
+test('a bare call describes only the caller; scope widens it in tab order', async () => {
 	let a = client()
 	let first = created(a, '/tmp/first')
-	let b = client()
-	let second = created(b, '/tmp/second')
+	let second = created(client(), '/tmp/second')
+	let third = created(client(), '/tmp/first')
 	// A created session is not automatically a tab; the tab bar is the source of truth.
-	tabs.file().open.push(second, first)
-	let result = await inspect(first)
-	expect(result.isError).toBeUndefined()
-	expect(result.output).toMatch(/Clients: 2/)
-	expect(result.output.indexOf(second)).toBeLessThan(result.output.indexOf(first))
-	expect(result.output).toContain(`${first} (you)`)
-	expect(result.output).toContain('/tmp/first')
-	expect(result.output).toContain('idle')
-	expect(result.output).toMatch(/Host PID \d+; version .+; started .*; uptime \d+s/)
-	expect(result.output).not.toContain('token')
+	tabs.file().open.push(second, first, third)
+
+	let self = (await inspect(first)).output
+	expect(self).toContain(`id: ${first} (you)`)
+	expect(self).toContain('context: none')
+	expect(self).not.toContain(second)
+
+	let project = (await inspect(first, { scope: 'project', fields: 'id,cwd' })).output
+	expect(project.split('\n')).toEqual(['id\tcwd', `${first} (you)\t/tmp/first`, `${third}\t/tmp/first`])
+
+	let all = (await inspect(first, { scope: 'all', fields: 'tab,id,color' })).output
+	expect(all.indexOf(second)).toBeLessThan(all.indexOf(first))
+	expect(all).toMatch(/\t[a-z]+$/m)
+})
+
+test('host facts without addresses; unknown values list the valid ones', async () => {
+	created(client(), '/tmp/x')
+	let out = (await inspect('none', { what: 'host' })).output
+	expect(out).toMatch(/^pid: \d+$/m)
+	expect(out).toMatch(/^clients: 1$/m)
+	expect(out).not.toContain('token')
+	let bad = await inspect('none', { fields: 'name,bogus' })
+	expect(bad.isError).toBe(true)
+	expect(bad.output).toContain('context')
+	expect((await inspect('none', { scope: 'everyone' })).output).toContain('self, project, all')
 })

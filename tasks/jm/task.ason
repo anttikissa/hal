@@ -9,7 +9,10 @@ host: pid, version, started (ISO), uptime, clients (count). scope does not apply
 Output is plain text. One object prints 'field: value' lines; several print a header line of field names, then one tab-separated line per object. An unknown what, scope or field is an error listing the valid values, so a model learns them on first misuse. No secrets, client addresses or user agents.
 
 Follow-ups extend these views with more fields: who sent the last prompt (client kind), files being edited, client details and all non-secret configuration.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Color names come from rendered sRGB of the palette: p2 (47.5) is the true orange (255,124,0), p3 (87.5) renders amber (243,168,0), though task 22 calls ~/hal's color 3 orange. color is 'none' with a single project, since projects.paint sets no colors then. context reuses stats.of (live round context, else the last turn_end in history) and models.contextWindow."
+	],
 	needs: ['ed', '1g', '22'],
 	foldInto: ['ed']
 }
