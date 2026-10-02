@@ -335,6 +335,7 @@ function start(): void {
 	addEventListener('focus', visible)
 	addEventListener('blur', visible)
 	document.addEventListener('visibilitychange', visible)
+	setInterval(() => document.visibilityState === 'visible' && push.visibility(app.state.shown), 20_000) // heartbeat (notify.present)
 }
 
 async function login(code: string): Promise<string | undefined> {
