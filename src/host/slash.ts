@@ -2,6 +2,7 @@
 // run on the host, their output recorded and broadcast, and a question
 // they ask kept in history until answered (prompts.reply).
 
+import type { Sender } from '../common/blocks.ts'
 import { commandList } from '../common/commands/list.ts'
 import { forms, type Answers } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
@@ -25,25 +26,27 @@ import { effort } from './effort.ts'
 // runs it. `command`: the client's id for the submit. Returns why it is
 // refused: no such command, or one only a client may run (a session may
 // not quit or restart the user's terminal).
-function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string, completed?: (reply: Reply) => void, origin?: 'model'): string | undefined {
+function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string, completed?: (reply: Reply) => void, origin?: 'model', sender?: Sender): string | undefined {
 	if (commandList.byName(call.name)?.clientOnly) return `only a client can run /${call.name}`
 	if (call.name === 'budget' && from !== undefined) return 'only a human can run /budget'
 	if (!commands.all().has(call.name)) return `unknown command /${call.name} (/help lists them)`
 	text = commands.all().get(call.name)!.record?.(call.args) ?? text
 	let record: Omit<HistoryRecord & { type: 'command' }, 'ts'> = { type: 'command', text, ...(origin && { origin }) }
 	if (from !== undefined) record.from = from
+	if (sender?.label !== undefined) record.label = sender.label
 	if (command !== undefined) record.command = command
 	let { n, ts } = history.append(id, record)
-	host.broadcast(id, { type: 'command', sessionId: id, text, ...(origin && { origin }), ...(from !== undefined && { from }), ts, n, ...(command !== undefined && { command }), ...slash.placed(id) })
-	void slash.runCommand(id, call.name, call.args).then((reply) => completed?.(reply))
+	host.broadcast(id, { type: 'command', sessionId: id, text, ...(origin && { origin }), ...(from !== undefined && { from }), ...(sender?.label !== undefined && { label: sender.label }), ts, n, ...(command !== undefined && { command }), ...slash.placed(id) })
+	void slash.runCommand(id, call.name, call.args, undefined, { ...sender, ...(from !== undefined && { from }), ...(origin && { origin }) }).then((reply) => completed?.(reply))
 }
 
 // What a command runs with: its session, whose cwd and model it may
 // change.
-function context(id: string): Context {
+function context(id: string, sender?: Sender): Context {
 	let meta = sessions.open(id)
 	return {
 		sessionId: id,
+		sender,
 		cwd: meta.cwd,
 		previousCwd: meta.previousCwd,
 		model: meta.model,
@@ -91,12 +94,12 @@ function name(id: string, value?: string): void {
 }
 // Runs command `name` (again, with `answers`, once its question is
 // answered) and records what it said.
-async function runCommand(id: string, name: string, args: string, answers?: Answers): Promise<Reply> {
+async function runCommand(id: string, name: string, args: string, answers?: Answers, sender?: Sender): Promise<Reply> {
 	let reply: Reply
 	try {
 		let cmd = commands.all().get(name)
 		if (!cmd) throw new Error(`unknown command /${name}`)
-		reply = await cmd.run(args, answers, slash.context(id))
+		reply = await cmd.run(args, answers, slash.context(id, sender))
 	} catch (e: any) {
 		reply = { error: String(e?.message ?? e) }
 	}

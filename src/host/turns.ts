@@ -3,18 +3,19 @@
 // unfinished on disk. A turn with no end record is unfinished; whichever
 // process becomes host continues it (recover).
 
-import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type Sender, type StreamEvent, type ToolCallBlock, type ToolResultBlock, type Usage } from '../common/blocks.ts'
+import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type Sender, type StreamEvent, type ToolCallBlock, type ToolResultBlock } from '../common/blocks.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { settings } from '../common/settings.ts'
 import type { StateEvent } from '../common/states.ts'
 import { approval } from './approval.ts'
-import { auth } from './auth.ts'
 import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
+import { contextTransitions } from './context-transitions.ts'
 import { compact } from './compact.ts'
 import { turnRecovery } from './turn-recovery.ts'
+import { turnPolicy } from './turn-policy.ts'
 import { tool as askTool } from './tools/ask.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
@@ -29,7 +30,6 @@ import { prompts } from './prompts.ts'
 import { slash } from './slash.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
-import { statusUsage } from './status-usage.ts'
 import { subagents } from './subagents.ts'
 import { toolOutput } from './tool-output.ts'
 // A running turn settles when runTurn returns (task hp).
@@ -73,7 +73,7 @@ function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlo
 	if (prompt !== undefined) event.prompt = prompt
 	if (prompt !== undefined && record?.queued) event.queued = true
 	if (images?.length) event.images = images
-	if (prompt !== undefined && record?.sender?.from !== undefined) event.sender = record.sender
+	if (prompt !== undefined && record?.sender && Object.keys(record.sender).length) event.sender = record.sender
 	if (prompt !== undefined && record?.n !== undefined) event.n = record.n
 	if (prompt !== undefined && record?.command !== undefined) event.command = record.command
 	host.broadcast(id, event)
@@ -84,9 +84,11 @@ function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlo
 // it paused; one not running here (unfinished on disk) is paused on disk.
 // A command's open question is dismissed instead: nothing ran.
 function stop(id: string, reason?: string, closing = false): string | undefined {
+	let transition = contextTransitions.pending(id)
+	contextTransitions.cancel(id)
 	let records = history.readSync(id)
 	let open = forms.open(records)
-	if (!closing && open?.call && records.some((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === open.call && r.block.name === 'ask')) {
+	if (!transition && !closing && open?.call && records.some((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === open.call && r.block.name === 'ask')) {
 		let refused = status.transition(id, { type: 'answer' })
 		if (refused) return refused
 		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
@@ -105,6 +107,7 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 	if (refused) return refused
 	let running = turns.state.running.get(id)
 	if (running) return void running.controller.abort()
+	if (transition?.kind === 'clear') contextTransitions.settle(id)
 	// A turn parked at a question has its usage so far there.
 	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = { type: 'turn_end', status: 'paused', usage: forms.open(history.readSync(id))?.usage ?? {} }
 	if (reason !== undefined) end.pauseReason = reason
@@ -112,6 +115,7 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 	let ended: Event = { type: 'turn-end', sessionId: id, status: 'paused', n: recorded.n, stats: stats.ended(id, recorded) }
 	if (Object.keys(end.usage).length) ended.usage = end.usage
 	host.broadcast(id, ended)
+	contextTransitions.apply(id)
 	subagents.report(id)
 }
 
@@ -188,6 +192,12 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let capped: string | undefined
 	try {
 		while (true) {
+			let transition = contextTransitions.pending(id)
+			if (transition?.kind === 'clear') {
+				last = transition.cancelled ? undefined : { type: 'done', reason: 'end' }
+				break
+			}
+			if (transition?.kind === 'compact') contextTransitions.apply(id)
 			// Aborted work has settled. A steer left a fresh controller
 			// (prompts.submit): go on with it. Escape aborted the current one.
 			if (signal.aborted) {
@@ -236,7 +246,13 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					if (turns.state.running.get(id) !== running) return
 					continue
 				}
-				if (signal.aborted) continue
+				if (signal.aborted) {
+					if (contextTransitions.pending(id)?.kind === 'clear') {
+						let results = round.blocks.filter((b) => b.type === 'tool_call').map((b) => ({ type: 'tool_result' as const, id: b.id, output: 'Tool call did not run: clear accepted before dispatch.', isError: true }))
+						if (results.length) { let r = history.results(id, results); host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r?.n }) }
+					}
+					continue
+				}
 				if (last?.type === 'done') {
 					failures = 0
 					rounds++
@@ -249,6 +265,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (last?.type !== 'done') break
 				// A finished answer with steering waiting: the model hears it.
 				if (!calls.length) {
+					if (contextTransitions.pending(id)) continue
 					if (signal.aborted || !status.inboxOf(id).some((m) => !m.queue)) break
 					continue
 				}
@@ -270,7 +287,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let ending = false
 			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
 			for (let call of calls) {
-				if (signal.aborted) {
+				if (signal.aborted || contextTransitions.pending(id)?.kind === 'clear') {
 					results.push({ type: 'tool_result', id: call.id, output: 'Tool call did not run: interrupted before dispatch.', isError: true })
 					continue
 				}
@@ -297,6 +314,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	turns.state.running.delete(id)
 	let recorded: ReturnType<typeof history.readSync>[number] | undefined
 	try {
+		if (contextTransitions.pending(id)?.kind === 'clear') contextTransitions.settle(id)
 		history.end(id, failure !== undefined ? { type: 'error', message: failure } : last, capped)
 		recorded = history.readSync(id).at(-1)
 	} catch (e: any) {
@@ -314,71 +332,12 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	// Paused already, unless something other than the user aborted it.
 	if (end.status === 'paused') status.transition(id, capped === undefined ? { type: 'pause' } : { type: 'pause', reason: capped })
 	else status.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
+	if (contextTransitions.apply(id)) return
 	subagents.report(id)
 	if (end.status === 'completed') {
 		prompts.next(id)
 		subagents.finished(id)
 	}
-}
-
-// A round's end as the turn takes it: one cut off (max_tokens, or the
-// context window) or refused is an error saying why, so none of its
-// tool calls runs; any other end stands.
-function stopped(done: DoneEvent): DoneEvent | ErrorEvent {
-	if (done.reason === 'max_tokens') return { type: 'error', message: 'Response stopped: max_tokens' }
-	if (done.reason === 'refusal') return { type: 'error', message: `Refused: ${done.explanation ?? 'the provider gave no explanation'}` }
-	return done
-}
-
-// The usage an unfinished turn had when it was last parked at a
-// question, to go on from; none if it never was.
-function parkedUsage(records: HistoryRecord[]): Usage {
-	for (let i = records.length - 1; i >= 0; i--) {
-		let r = records[i]!
-		if (r.type === 'turn_end') break
-		if (r.type === 'question' && r.usage) return r.usage
-	}
-	return {}
-}
-
-// Waits out a failed round (tasks/j1/states.md, Failures) and shows
-// why: retrying at a time (temporary: at once, then backing off; rate
-// limited: when the provider said, or at once when another account can
-// take over), or blocked until the credentials file changes (a broken
-// login). Ends early on Escape (`signal`); a wake or a model switch
-// (the new model may not share the failure) retries at once.
-async function waitOut(id: string, error: ErrorEvent, failures: number, outer: AbortSignal): Promise<void> {
-	let running = turns.state.running.get(id)
-	let rewait = new AbortController()
-	if (running) running.rewait = rewait
-	let signal = AbortSignal.any([outer, rewait.signal])
-	try { await waitFor(id, error, failures, signal) }
-	finally { if (running?.rewait === rewait) delete running.rewait }
-}
-
-async function waitFor(id: string, error: ErrorEvent, failures: number, signal: AbortSignal): Promise<void> {
-	// Output cut off mid-answer: the model hears it was interrupted.
-	if (history.readSync(id).at(-1)?.type === 'assistant') history.append(id, { type: 'continue' })
-	if (error.failure === 'auth' && error.retryAt === undefined) {
-		status.transition(id, { type: 'block', reason: `log in: ${error.message}` })
-		await auth.changed(signal)
-		return
-	}
-	let at = error.retryAt ?? clock.now() + turns.backoffMs(failures)
-	status.transition(id, { type: 'retry', at: new Date(at).toISOString(), reason: error.message })
-	if (error.failure !== 'limited' || at <= clock.now()) return clock.until(at, signal)
-	void statusUsage.recheck(turns.state.running.get(id)?.provider ?? '')
-	// A new account can lift quota before the old account's reset time.
-	let waiting = new AbortController()
-	let either = AbortSignal.any([signal, waiting.signal])
-	try { await Promise.race([clock.until(at, either), auth.changed(either)]) }
-	finally { waiting.abort() }
-}
-
-// The wait before the next try after `failures` failed rounds in a
-// row: none at first, then doubling up to half a minute.
-function backoffMs(failures: number): number {
-	return failures === 0 ? 0 : Math.min(1000 * 2 ** (failures - 1), 30_000)
 }
 
 export const turns = {
@@ -393,8 +352,8 @@ export const turns = {
 	recover: () => turnRecovery.recover(),
 	leftWork: (id: string) => turnRecovery.leftWork(id),
 	runTurn,
-	parkedUsage,
-	stopped,
-	waitOut,
-	backoffMs,
+	parkedUsage: (...args: Parameters<typeof turnPolicy.parkedUsage>) => turnPolicy.parkedUsage(...args),
+	stopped: (...args: Parameters<typeof turnPolicy.stopped>) => turnPolicy.stopped(...args),
+	waitOut: (...args: Parameters<typeof turnPolicy.waitOut>) => turnPolicy.waitOut(...args),
+	backoffMs: (...args: Parameters<typeof turnPolicy.backoffMs>) => turnPolicy.backoffMs(...args),
 }

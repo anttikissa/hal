@@ -28,7 +28,7 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
-type Marks = { size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]>; changes?: number[]; changedPaths?: Record<string, true> }
+type Marks = { transitions?: number[]; size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]>; changes?: number[]; changedPaths?: Record<string, true> }
 type Raw = { offset: number; bytes: number; text: string }
 type Line = { offset: number; bytes: number; record: HistoryRecord }
 // `end`: the byte the page (or tail) ends at.
@@ -149,6 +149,9 @@ function lineAt(path: string, offset: number): Line {
 }
 
 function apply(m: Marks, r: HistoryRecord, offset: number): void {
+	if (r.type === 'output' && r.transition) m.transitions = [offset]
+	if (r.type === 'output' && r.transitionCancel) (m.transitions ??= []).push(offset)
+	if (r.type === 'output' && r.transitionDone) m.transitions = []
 	m.next = Math.max(m.next ?? 1, (r.n ?? offset + 1) + 1)
 	m.changes ??= []
 	m.changedPaths ??= {}
@@ -254,7 +257,7 @@ function marked(id: string): Line[] {
 
 function* markedSteps(id: string): Steps<Line[]> {
 	let m = yield* pages.catchUp(id)
-	let offsets = new Set([m.question, m.answer, m.turn, m.prompt, ...Object.values(m.inbox).flat()].filter((o) => o !== undefined))
+	let offsets = new Set([m.question, m.answer, m.turn, m.prompt, ...Object.values(m.inbox).flat(), ...(m.transitions ?? [])].filter((o) => o !== undefined))
 	let path = history.file(id)
 	let out: Line[] = []
 	for (let o of [...offsets].sort((a, b) => a - b)) {

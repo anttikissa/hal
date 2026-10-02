@@ -12,19 +12,21 @@ import { readdirSync } from 'fs'
 import { homedir } from 'os'
 import { resolve } from 'path'
 import { commandList } from '../common/commands/list.ts'
+import type { Sender } from '../common/blocks.ts'
 import type { Answers, Form } from '../common/forms.ts'
 
 // What a command did: something to say, a failure, or a question.
+// `result`: tool acknowledgement when durable output was already recorded.
 // `open`: a client modal to open on every client following the session
 // (tasks/w4/forms.md, Provenance): 'models' is the model picker.
 // `show`: said like `say` but never recorded, so it is gone on the next
 // snapshot (a one-time code, /auth).
-export type Reply = { say?: string; show?: string; error?: string; ask?: Form; askArgs?: string; open?: 'models' }
+export type Reply = { result?: string; say?: string; show?: string; error?: string; ask?: Form; askArgs?: string; open?: 'models' }
 
 // The session the command runs in.
 // setCwd and setModel also tell the model, on its next prompt; say
 // records output while the command still runs (a login that waits).
-export type Context = { sessionId: string; cwd: string; previousCwd?: string; model: string; effort?: string; setCwd(cwd: string): void; setModel(model: string): void; setName?(name?: string): void; say(text: string): void }
+export type Context = { sessionId: string; sender?: Sender; cwd: string; previousCwd?: string; model: string; effort?: string; setCwd(cwd: string): void; setModel(model: string): void; setName?(name?: string): void; say(text: string): void }
 
 export type SlashCommand = {
 	// Refuse a bad answer before recording it or closing the question.
@@ -57,8 +59,8 @@ function all(): Map<string, SlashCommand> {
 // "/name args" as its parts; undefined for anything else, such as a
 // prompt that starts with a path ("/tmp/x is broken").
 function parse(text: string): { name: string; args: string } | undefined {
-	let m = /^\/([a-z][a-z0-9-]*)(?:\s+([\s\S]*))?$/.exec(text.trim())
-	return m ? { name: m[1]!, args: m[2] ?? '' } : undefined
+	let m = /^\/([a-z][a-z0-9-]*)(?:\s([\s\S]*))?$/.exec(text.trimStart())
+	return m ? { name: m[1]!, args: m[1] === 'clear' ? m[2] ?? '' : (m[2] ?? '').trim() } : undefined
 }
 
 // Every full text `text` may complete to: a command name, or what the

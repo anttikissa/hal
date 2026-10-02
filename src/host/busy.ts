@@ -48,8 +48,8 @@ function drop(id: string): void {
 }
 
 // Whether writing `record` may leave work for a later host.
-function starts(record: { type: HistoryRecord['type'] }): boolean {
-	return record.type === 'user' || record.type === 'continue' || record.type === 'inbox'
+function starts(record: { type: HistoryRecord['type']; transition?: unknown }): boolean {
+	return (record.type === 'output' && record.transition !== undefined) || record.type === 'user' || record.type === 'continue' || record.type === 'inbox'
 }
 
 // Forgets the loaded files, writing pending changes (tests, restart).

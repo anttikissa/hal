@@ -3,6 +3,8 @@
 // these records alone, never from display state.
 
 import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
+import { titles } from './titles.ts'
+import type { ContextTransition } from './context-transition.ts'
 import type { Answers, Form } from './forms.ts'
 
 // `paused`: the user stopped the turn (tasks/j1/states.md); it can
@@ -39,7 +41,7 @@ export type HistoryRecord = Numbered &
 	// record with the same id is an edit of the waiting message (task
 	// dg): its new text, in the same place; `withdrawn` takes it out
 	// (edited into a slash command). `command`: the edit's command id.
-	| { type: 'inbox'; id: string; text: string; queue?: true; from?: string; label?: string; advisory?: true; summary?: string; withdrawn?: true; command?: string; ts: string }
+	| { type: 'inbox'; id: string; text: string; queue?: true; from?: string; label?: string; advisory?: true; summary?: string; withdrawn?: true; command?: string; origin?: 'model'; generatingCommand?: 'clear'; ts: string }
 	// One assistant block, appended as soon as it is complete.
 	// `ts`: when the block started streaming; `model`, `effort`: what
 	// wrote it (task hp; older records have neither).
@@ -68,9 +70,9 @@ export type HistoryRecord = Numbered &
 	// that sent it; `origin: model` identifies Hal's command tool. Without
 	// either, the human typed it (legacy provenance is unknown). `command`: the
 	// client's id for the submit, so a resend is recognised.
-	| { type: 'command'; text: string; origin?: 'model'; from?: string; command?: string; ts: string }
+	| { type: 'command'; text: string; origin?: 'model'; from?: string; label?: string; command?: string; ts: string }
 	// What a command said; `error` if it failed.
-	| { type: 'output'; text: string; error?: true; ts: string }
+	| { type: 'output'; text: string; error?: true; transition?: ContextTransition; transitionDone?: string; transitionCancel?: string; ts: string }
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
 	// told in front of its next prompt.
 	| { type: 'change'; cwd?: string; model?: string; ts: string }
@@ -82,10 +84,10 @@ export type HistoryRecord = Numbered &
 	| { type: 'round'; usage: Usage; model?: string; block?: number; ts: string }
 	// A context boundary: `keep` names this turn's prompts, replayed
 	// verbatim (including images) after the summary, not summarised into it.
-	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; ts: string }
+	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string; ts: string }
 	// A fresh context (/clear, task vh): provider input is rebuilt from
 	// the records after it alone, with no summary.
-	| { type: 'reset'; ts: string }
+	| { type: 'reset'; transition?: string; ts: string }
 	)
 
 // Copied records retain their original session through repeated forks (v6).
@@ -190,6 +192,8 @@ function toMessages(records: HistoryRecord[]): Message[] {
 // an [Inbox · sender] line (tab, id and name), an advisory one also
 // saying it needn't drop its work for it.
 function framed(b: UserText): string {
+	if (b.generatingCommand) return `[${titles.author({ ...b, type: 'prompt' })}]\n${b.text}`
+	if (b.origin === 'model') return `[Hal]\n${b.text}`
 	if (b.from === undefined) return b.text
 	let head = `[Inbox · ${b.label ?? b.from}]`
 	return b.advisory ? `${head}\n${replay.advisoryNote}\n${b.text}` : `${head}\n${b.text}`

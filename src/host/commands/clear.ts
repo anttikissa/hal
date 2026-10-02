@@ -1,16 +1,11 @@
-// /clear: a fresh context in the same tab (task vh). The model starts
-// over with the same system prompt, cwd and model; the screen shows only
-// what follows; the draft, the name and the tab stay.
+// /clear: a fresh context in the same tab (tasks vh, jf). Active work
+// settles first; an optional literal prompt starts an attributed turn.
+// The draft, name, cwd, model and tab stay.
 
 import type { SlashCommand } from '../commands.ts'
-import { states } from '../../common/states.ts'
-import { compact } from '../compact.ts'
-import { status } from '../status.ts'
+import { contextTransitions } from '../context-transitions.ts'
 
 export const command: SlashCommand = {
-	help: () => '/clear: start the model on a fresh context in this tab; the screen clears (history stays on disk). Only while the session is idle.',
-	run(_args, _answers, ctx) {
-		if (states.busy(status.stateOf(ctx.sessionId))) return { error: 'the session is busy; /clear when the turn is done' }
-		return compact.reset(ctx.sessionId) ? {} : { say: 'the context is already empty' }
-	},
+	help: () => '/clear [raw prompt]: end active work safely, clear context and the screen (history stays), then optionally start a fresh attributed turn. The prompt is literal, including newlines; Escape cancels automatic continuation.',
+	run: (args, _answers, ctx) => contextTransitions.request(ctx.sessionId, 'clear', args, ctx.sender),
 }

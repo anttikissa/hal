@@ -47,12 +47,12 @@ import { turns } from './turns.ts'
 // unless the session is idle, where it runs as a turn of its own and
 // so gets full attention (no longer advisory).
 function submit(id: string, text: string, command?: string, queue = false, sender?: Sender): string | undefined {
-	if (sender?.from === undefined) subagents.promote(id)
+	if (sender?.from === undefined && sender?.origin !== 'model') subagents.promote(id)
 	let call = commands.parse(text)
-	if (call) return slash.command(id, text, call, command, sender?.from)
+	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
 	let state = status.stateOf(id)
 	let interrupt = !queue && sender?.advisory !== true
-	if (turns.state.running.has(id) || states.busy(state) || ((queue || sender?.from !== undefined) && state.type !== 'idle')) {
+	if (turns.state.running.has(id) || states.busy(state) || ((queue || sender?.from !== undefined || sender?.origin === 'model') && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
 		if (queue) record.queue = true
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
@@ -107,7 +107,7 @@ function amend(id: string, text: string, command?: string): string | undefined {
 	let at = replay.lastPrompt(records)
 	let old = records[at]
 	let parts = old?.type === 'user' ? old.blocks.filter((b): b is UserText => b.type === 'text') : []
-	let mine = parts.findLastIndex((b) => b.from === undefined)
+	let mine = parts.findLastIndex((b) => b.from === undefined && b.origin !== 'model')
 	if (states.busy(status.stateOf(id, records)) || mine < 0 || !prompts.harmless(records.slice(at + 1))) return prompts.submit(id, text, command)
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return refused
@@ -128,7 +128,7 @@ function amend(id: string, text: string, command?: string): string | undefined {
 // user's to edit.
 function edit(id: string, message: string, text: string, command?: string): string | undefined {
 	let waiting = status.inboxOf(id).find((m) => m.id === message)
-	if (waiting?.from !== undefined) return 'that message was sent by another session'
+	if (waiting?.from !== undefined || waiting?.origin === 'model') return 'that message was not sent by the human'
 	let call = commands.parse(text)
 	if (!waiting) return call ? prompts.submit(id, text, command) : prompts.amend(id, text, command)
 	let refused = call ? slash.command(id, text, call, command) : undefined

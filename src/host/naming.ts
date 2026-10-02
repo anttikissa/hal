@@ -22,7 +22,7 @@ function manual(id: string, text?: string): void {
 	naming.save(id)
 }
 function prepare(id: string, record: Extract<HistoryRecord, { type: 'user' }>): void {
-	let text = record.blocks.slice(record.inbox?.length ?? 0).find((b) => b.type === 'text' && b.from === undefined && b.text.trim())
+	let text = record.blocks.slice(record.inbox?.length ?? 0).find((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model' && b.text.trim())
 	if (!text || text.type !== 'text') return
 	let meta = sessions.open(id)
 	// History commits the counter with the prompt; reconcile a crash before meta saved.

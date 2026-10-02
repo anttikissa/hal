@@ -18,7 +18,7 @@ function anything(records: HistoryRecord[]): boolean {
 	return records.slice(at + 1).some((r) => r.type === 'user' || r.type === 'assistant')
 }
 
-function boundary(id: string, record: { type: 'compact'; summary: string; prompts: number; keep?: number[] } | { type: 'reset' }): HistoryRecord {
+function boundary(id: string, record: { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string } | { type: 'reset'; transition?: string }): HistoryRecord {
 	let r = history.append(id, record)
 	host.broadcast(id, { type: 'divider', sessionId: id, text: transcript.boundary(record), ...(record.type === 'reset' && { ts: r.ts, clear: true as const }), ...(r.n !== undefined && { n: r.n }) })
 	// The status row's context figure measured the dropped context.
@@ -29,7 +29,7 @@ function boundary(id: string, record: { type: 'compact'; summary: string; prompt
 
 // Compacts earlier context. During a turn, its prompt records remain
 // outside the summary and are replayed after the boundary by number.
-function run(id: string, protect = false): number | undefined {
+function run(id: string, protect = false, transition?: string): number | undefined {
 	let records = history.readSync(id)
 	if (!compact.anything(records)) return undefined
 	let start = 0, edge = records.length
@@ -42,7 +42,7 @@ function run(id: string, protect = false): number | undefined {
 	let keep = protect ? records.slice(start).filter((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text')).map((r) => r.n!) : []
 	let made = compaction.summary(records.filter((r) => !keep.includes(r.n!)), history.file(id))
 	if (!made) return undefined
-	compact.boundary(id, { type: 'compact', ...made, ...(keep.length && { keep }) })
+	compact.boundary(id, { type: 'compact', ...made, ...(transition && { transition }), ...(keep.length && { keep }) })
 	return made.prompts
 }
 

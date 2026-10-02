@@ -137,7 +137,7 @@ test('commands show who sent them, and their output; a cancelled question says s
 	expect(texts[2]).toBe('/cd x')
 	// A command is drawn as the prompt it was typed as, its sender in the head.
 	expect(shown(st)[2]!.kind).toBe(shown(st)[0]!.kind)
-	expect(titles.who(st.transcript!.items[2]!)).toBe('Message from 7-abc')
+	expect(titles.who(st.transcript!.items[2]!)).toBe('Command from 7-abc')
 	expect(texts[3]).toContain('(cancelled)')
 	expect(shown(st)[4]!.kind).toContain('error')
 })

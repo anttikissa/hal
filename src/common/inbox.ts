@@ -34,6 +34,8 @@ function pending(records: HistoryRecord[]): InboxItem[] {
 // The sender fields of a record or item, and nothing else.
 function sender(s: Sender): Sender {
 	let out: Sender = {}
+	if (s.origin !== undefined) out.origin = s.origin
+	if (s.generatingCommand !== undefined) out.generatingCommand = s.generatingCommand
 	if (s.from !== undefined) out.from = s.from
 	if (s.label !== undefined) out.label = s.label
 	if (s.advisory) out.advisory = true
