@@ -38,9 +38,12 @@ function set(key: string, at: number): void {
 
 // Drops every limit on one account of a provider: a fresh login is new
 // evidence that outdates them (a plan refusal before an upgrade).
-function forget(kind: string, account: string): void {
+// Drops the account's skips; true if there were any.
+function forget(kind: string, account: string): boolean {
 	let data = limits.store()
-	for (let k of Object.keys(data)) if (k.startsWith(`${kind}/`) && k.endsWith(` ${account}`)) delete data[k]
+	let keys = Object.keys(data).filter((k) => k.startsWith(`${kind}/`) && k.endsWith(` ${account}`))
+	for (let k of keys) delete data[k]
+	return keys.length > 0
 }
 
 function close(): void {

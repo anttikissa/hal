@@ -4,6 +4,7 @@ import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { usage } from './usage.ts'
 import { liveFiles } from './live-file.ts'
+import { limits } from './limits.ts'
 
 
 
@@ -64,4 +65,27 @@ test('Anthropic usage endpoint utilization is already percent', () => {
 	let w = statusUsage.payload('anthropic', { five_hour: { utilization: 9, resets_at: '2026-10-02T10:09:59.848904+00:00' }, seven_day: { utilization: 70, resets_at: '2026-10-05T20:59:59.848929+00:00' } })
 	expect(w['5h']).toEqual({ used: 9, resets: '2026-10-02T10:09:59.848Z' })
 	expect(w['7d']?.used).toBe(70)
+})
+
+// 2 Oct 2026: a plan refusal from before an upgrade kept a plus account
+// skipped while /status showed it at 0%.
+test('fresh usage with room clears the account skip and wakes waiting turns', async () => {
+	let all = auth.all, credential = auth.credential, store = usage.store, lstore = limits.store, save = liveFiles.save, fetchOld = globalThis.fetch
+	let account = { name: 'a@example.com', entry: { accessToken: 't', email: 'a@example.com' }, replace: () => {} }
+	let skips: Record<string, string> = { 'openai/m a@example.com': new Date(Date.now() + 3600_000).toISOString(), 'openai/m b@example.com': new Date(Date.now() + 3600_000).toISOString() }
+	auth.all = (() => ({ data: {}, list: [account] })) as typeof all
+	auth.credential = (async () => ({ type: 'token', value: 't', account: account.name })) as typeof credential
+	usage.store = () => ({})
+	limits.store = () => skips
+	liveFiles.save = (() => {}) as typeof save
+	let logins = auth.state.logins
+	try {
+		globalThis.fetch = (async () => Response.json({ rate_limit: { primary_window: { used_percent: 100, limit_window_seconds: 18000 } } })) as unknown as typeof fetch
+		await statusUsage.refresh('openai', account as any)
+		expect(Object.keys(skips)).toHaveLength(2)
+		globalThis.fetch = (async () => Response.json({ rate_limit: { primary_window: { used_percent: 0, limit_window_seconds: 18000 } } })) as unknown as typeof fetch
+		await statusUsage.refresh('openai', account as any)
+		expect(Object.keys(skips)).toEqual(['openai/m b@example.com'])
+		expect(auth.state.logins).toBe(logins + 1)
+	} finally { auth.all = all; auth.credential = credential; usage.store = store; limits.store = lstore; liveFiles.save = save; globalThis.fetch = fetchOld }
 })

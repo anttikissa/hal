@@ -4,6 +4,7 @@
 import { auth, jwtClaims, type Kind } from './auth.ts'
 import { clients } from './clients.ts'
 import { clock } from './clock.ts'
+import { limits } from './limits.ts'
 import { usage, type Windows } from './usage.ts'
 import { liveFiles } from './live-file.ts'
 import { usageWindows } from '../common/usage-windows.ts'
@@ -95,6 +96,10 @@ async function refresh(kind: Kind, account: Account): Promise<string | undefined
 	// The endpoint lists every current window: windows it omits (an old
 	// plan's) are gone, not merely unreported.
 	store[kind]![account.name] = { ...Object.fromEntries(Object.entries(windows).map(([name, w]) => [name, { ...w, observed }])) }
+	// Fresh usage with room in every window outranks an older skip (a 429,
+	// or a refusal from before a plan change): forget it and wake waiting
+	// turns to try the account. If it still fails, the skip comes back.
+	if (Object.values(windows).every((w) => w.used < 100) && limits.forget(kind, account.name)) auth.state.logins++
 	let email = typeof raw?.email === 'string' && raw.email.includes('@') ? raw.email : jwtClaims(credential.value)?.['https://api.openai.com/profile']?.email
 	if (kind === 'anthropic' && !email && !account.entry.email && !account.name.includes('@')) {
 		try {
