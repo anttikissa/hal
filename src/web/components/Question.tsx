@@ -2,7 +2,9 @@
 // The open question as a form: its text, the quote (a command to
 // approve) with marked parts highlighted, a text or password input per
 // text field and a button per option. Values and focus follow the
-// shared form state; keys go through keys.key (forms.step). ✕
+// shared form state; keys go through keys.key (forms.step). A choice
+// is one Tab stop: focus sits on its chosen option and follows it, so
+// focus and choice never part. ✕
 // dismisses it as Escape does.
 
 import { createEffect, createMemo, For, Show } from 'solid-js'
@@ -20,9 +22,8 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 		() => [props.form.focus, props.form.values[props.form.focus]] as const,
 		([focus, value]) => {
 			let node = fields[focus]
-			if (!node || node.contains(document.activeElement)) return
-			let target = node instanceof HTMLInputElement ? node : [...node.querySelectorAll('button')].find((b) => b.value === value)
-			target?.focus()
+			let target = node instanceof HTMLInputElement ? node : [...(node?.querySelectorAll('button') ?? [])].find((b) => b.value === value)
+			if (target && target !== document.activeElement) target.focus()
 		},
 	)
 	let submit = (e: SubmitEvent) => {
@@ -51,7 +52,14 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 							<For each={field.options}>
 								{(option) => (
 									<>
-										<button type="button" value={option} aria-pressed={props.form.values[i()] === option ? 'true' : 'false'} onClick={() => app.pick(i(), option)}>
+										<button
+											type="button"
+											value={option}
+											aria-pressed={props.form.values[i()] === option ? 'true' : 'false'}
+											tabindex={props.form.values[i()] === option ? 0 : -1}
+											onFocus={() => app.formFocus(i())}
+											onClick={() => app.pick(i(), option)}
+										>
 											{option}
 										</button>
 									</>

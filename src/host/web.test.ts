@@ -744,6 +744,11 @@ test.skipIf(!chrome)('in a browser the page logs in, remembers it and streams a 
 		expect(await b.evaluate(`document.querySelector('textarea').disabled`)).toBe(true)
 		await key('ArrowRight')
 		await b.waitFor(`document.querySelector('[aria-pressed=true]')?.textContent === 'no'`)
+		// Focus follows the choice: Left back to "yes" moves it there too.
+		await key('ArrowLeft')
+		await b.waitFor(`document.activeElement?.textContent === 'yes' && document.activeElement.getAttribute('aria-pressed') === 'true'`)
+		await key('ArrowRight')
+		await b.waitFor(`document.activeElement?.textContent === 'no' && document.activeElement.getAttribute('aria-pressed') === 'true'`)
 		await key('Enter')
 		await b.waitFor(`!document.querySelector('form') && document.querySelector('main')?.innerText.includes('Create it?\\n  no')`)
 		await b.waitFor(`document.activeElement === document.querySelector('textarea')`)
