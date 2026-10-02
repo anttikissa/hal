@@ -68,7 +68,7 @@ function payload(kind: Kind, raw: any): Windows {
 		for (let name of ['primary', 'secondary']) {
 			let v = raw?.rate_limit?.[`${name}_window`]
 			let seconds = v?.limit_window_seconds
-			let label = seconds === 300 * 60 ? '5h' : seconds === 7 * 86400 ? '7d' : `${name}`
+			let label = seconds > 0 ? usage.span(Math.round(seconds / 60)) : name
 			put(label, v?.used_percent, v?.reset_at)
 		}
 	}
@@ -92,7 +92,9 @@ async function refresh(kind: Kind, account: Account): Promise<string | undefined
 	let store = usage.store()
 	store[kind] ??= {}
 	let observed = new Date(clock.now()).toISOString()
-	store[kind]![account.name] = { ...store[kind]![account.name], ...Object.fromEntries(Object.entries(windows).map(([name, w]) => [name, { ...w, observed }])) }
+	// The endpoint lists every current window: windows it omits (an old
+	// plan's) are gone, not merely unreported.
+	store[kind]![account.name] = { ...Object.fromEntries(Object.entries(windows).map(([name, w]) => [name, { ...w, observed }])) }
 	let email = typeof raw?.email === 'string' && raw.email.includes('@') ? raw.email : jwtClaims(credential.value)?.['https://api.openai.com/profile']?.email
 	if (kind === 'anthropic' && !email && !account.entry.email && !account.name.includes('@')) {
 		try {
@@ -104,7 +106,7 @@ async function refresh(kind: Kind, account: Account): Promise<string | undefined
 	if (typeof email === 'string' && email.includes('@') && !current.email) {
 		current.email = email
 		if (account.name !== email) {
-			store[kind]![email] = { ...store[kind]![email], ...store[kind]![account.name] }
+			store[kind]![email] = store[kind]![account.name]!
 			delete store[kind]![account.name]
 			for (let [key, name] of auth.state.chosen) if (key.startsWith(`${kind} `) && name === account.name) auth.state.chosen.set(key, email)
 		}

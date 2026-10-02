@@ -34,7 +34,7 @@ test('stale usage refreshes only subscriptions and failed auth leaves cached win
 })
 
 // A usage response can name a login previously identified only by slot.
-test('refresh learns email and plan, reports a plan change, and moves cached windows to the named account', async () => {
+test('refresh learns email and plan, reports a plan change, and replaces windows the endpoint no longer lists', async () => {
 	let all = auth.all, credential = auth.credential, store = usage.store, save = liveFiles.save, fetchOld = globalThis.fetch
 	let entry: Record<string, any> = { accessToken: 'token' }
 	let account = { name: 'account 3', entry, replace: () => {} }
@@ -50,11 +50,12 @@ test('refresh learns email and plan, reports a plan change, and moves cached win
 		expect(entry.email).toBe('bob@example.com')
 		expect(entry.plan).toBe('plus')
 		expect(records.openai?.['account 3']).toBeUndefined()
-		expect(records.openai?.['bob@example.com']?.['7d']?.used).toBe(70)
+		expect(records.openai?.['bob@example.com']?.['7d']).toBeUndefined()
 		expect(records.openai?.['bob@example.com']?.['5h']?.used).toBe(24)
 		expect(saves).toBe(1)
-		globalThis.fetch = (async () => Response.json({ plan_type: 'free', rate_limit: { primary_window: { used_percent: 1, limit_window_seconds: 18000 } } })) as unknown as typeof fetch
+		globalThis.fetch = (async () => Response.json({ plan_type: 'free', rate_limit: { primary_window: { used_percent: 1, limit_window_seconds: 30 * 86400 } } })) as unknown as typeof fetch
 		expect(await statusUsage.refresh('openai', account as any)).toBe('plus → free')
+		expect(Object.keys(records.openai?.['account 3'] ?? {})).toEqual(['30d'])
 	} finally { auth.all = all; auth.credential = credential; usage.store = store; liveFiles.save = save; globalThis.fetch = fetchOld }
 })
 
