@@ -1,0 +1,11 @@
+{
+	title: 'Keep web draft arrows native',
+	spec: 'In the web composer, plain Up/Down never recall history while editing a nonempty draft, including soft-wrapped text and explicit newlines. Native caret movement and selection remain browser-owned. History browsing begins with Up from an empty composer; while browsing, existing edge-line Up/Down navigation continues, and editing a recalled entry ends browsing. Preserve draft restoration, completion-menu precedence and empty-composer last-prompt editing. Terminal navigation is unchanged. Restore the invariant that history shortcuts cannot steal native vertical caret movement in a web draft. Regression coverage verifies native arrows in nonempty drafts and history entry, exit and editing behavior.',
+	status: 'done',
+	notes: [
+		'Task 91 deliberately treated the first web line as no newline before the caret. That approximation steals native Up on soft-wrapped drafts. The web-only recall guard uses existing browse state; shared terminal layout and recall behavior stay unchanged. Fold this correction by removing 91’s obsolete web logical-line exception.',
+		'Verified trusted Chromium Up/Down events in soft-wrapped nonempty drafts at 390px and 1280px: text stays intact and the caret moves natively. Web app tests also cover explicit lines, selections, empty-composer history, ending browsing on edit, and draft restoration on submit. Full ./test was run twice; shared-checkout failures outside this patch prevent a green full-suite result.'
+	],
+	needs: ['91'],
+	foldInto: ['91']
+}

@@ -6,10 +6,10 @@
 // Enter submits (steering a running turn; Alt+Enter queues after it,
 // Shift+Enter is a newline; on a touch keyboard Enter is a newline),
 // Escape pauses a running turn, Up on an empty box edits the last
-// prompt (src/common/amend.ts), Up on the box's first line and Down on
-// its last browse the prompts sent (src/common/recall.ts; a line ends
-// only at a newline here, as the page cannot know where the textarea
-// wraps), Tab completes a slash command, command keys (Ctrl-M, F1) run theirs,
+// prompt (src/common/amend.ts), Up on an empty box begins history
+// browsing (src/common/recall.ts). While browsing, first/last logical
+// line arrows recall entries; nonempty drafts keep native movement,
+// including soft wraps. Tab completes a slash command; command keys run theirs,
 // the readline keys in editor.table edit the box. A printable key
 // pressed outside any field types into the box.
 
@@ -167,6 +167,7 @@ function recallKey(dir: -1 | 1, target: Extract<Target, { kind: 'message' }>): b
 	let t = st.view.transcript
 	if (!t) return false
 	let id = t.meta.id
+	if (st.text && recall.shown(id) === undefined) return false
 	let shown = recall.step(id, recall.entries(t), st.text, target.cursor, dir, Infinity, drafts.text(id))
 	if (!shown) return false
 	target.write?.(editor.splice(st.text, shown.text), shown.cursor, shown.cursor)
