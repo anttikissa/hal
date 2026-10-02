@@ -75,7 +75,7 @@ async function test(endpoint: string): Promise<string> {
 	let s = push.store().subscriptions.find((entry) => entry.endpoint === endpoint)
 	if (!s) return 'This device is not registered; turn notifications on first.'
 	try {
-		let error = await push.deliver(s, JSON.stringify({ id: '', title: 'Hal', body: 'Test notification: push works.' }))
+		let error = await push.deliver(s, JSON.stringify({ id: '', title: 'Test notification', body: 'Push works on this device.' }))
 		return error ?? 'Test sent. It should appear in a few seconds.'
 	} catch (e: any) { return `Test failed: ${e?.message ?? e}` }
 }
