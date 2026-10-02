@@ -236,6 +236,8 @@ test('the Serper key step never traps: an empty key or Escape moves on', async (
 		else await reply(c, id, 'key', '  ')
 		await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
 		expect(texts(c.views.get(id)!).join('\n')).toContain('Skipped web search')
+		// Login was skipped: the close points to /login.
+		expect(texts(c.views.get(id)!).at(-1)).toContain('/login')
 		expect(apiKeys.get('serper')).toBeUndefined()
 	}
 })
