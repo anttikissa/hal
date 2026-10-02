@@ -31,6 +31,15 @@ function begin(sessionId: string, id: string, mediaType: string, from = ''): str
 	return placeholder
 }
 
+// Space newly inserted attachments, not ordinary pasted text. The caret
+// lands after the trailing space so immediate typing stays separated.
+function pad(text: string, before: string): string {
+	let pending = [...uploads.state.pending.values()]
+	let first = pending.some((u) => text.startsWith(u.placeholder))
+	let last = pending.some((u) => text.endsWith(u.placeholder))
+	return (first && /\S$/.test(before) ? ' ' : '') + text + (last ? ' ' : '')
+}
+
 // The attach command carrying `bytes`, with the name begin() chose.
 function command(sessionId: string, id: string, mediaType: string, bytes: Uint8Array): object {
 	let name = uploads.state.pending.get(id)?.name
@@ -106,4 +115,4 @@ function reset(): void {
 	uploads.state = createState()
 }
 
-export const uploads = { state: createState(), begin, command, tooBig, inFlight, pending, wait, settle, swap, long, base64, reset }
+export const uploads = { state: createState(), begin, pad, command, tooBig, inFlight, pending, wait, settle, swap, long, base64, reset }

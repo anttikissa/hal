@@ -17,6 +17,7 @@
 import { createEffect, createMemo, For, Show, onSettled } from 'solid-js'
 import { attachments } from '../../common/attachments.ts'
 import { states } from '../../common/states.ts'
+import { uploads } from '../../common/uploads.ts'
 import { app } from '../app.ts'
 import { attach } from '../attach.ts'
 import type { Menu } from '../completions.ts'
@@ -28,7 +29,10 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	let input!: HTMLTextAreaElement
 	let picker!: HTMLInputElement
 	// Text at the caret, replacing the selection, as if typed.
-	let insert = (text: string) => editor.write(input, { start: input.selectionStart, end: input.selectionEnd, text }, input.selectionStart + text.length)
+	let insert = (text: string) => {
+		text = uploads.pad(text, input.value.slice(0, input.selectionStart))
+		editor.write(input, { start: input.selectionStart, end: input.selectionEnd, text }, input.selectionStart + text.length)
+	}
 	// An upload's answer edits the box in place when it has the focus, so
 	// the caret stays where the user is typing.
 	let box = (e: HTMLTextAreaElement) => {

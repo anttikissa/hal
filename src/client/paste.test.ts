@@ -68,7 +68,7 @@ test('Ctrl-V with an image uploads it under the name its final marker shows', as
 	let { id, placeholder } = await pasteImage()
 	let name = placeholder.slice(7, -1)
 	expect(attaches()).toEqual([{ type: 'attach', id, sessionId: 's1', mediaType: 'image/png', data: Buffer.from(png).toString('base64'), name }])
-	type(' and')
+	type('and')
 	app.onEvent(attached(id, placeholder))
 	expect(text()).toBe(`see ${placeholder} and`)
 	expect(drafts.text('s1')).toBe(text())
@@ -83,9 +83,9 @@ test('a host that answers at once (the host process’s own terminal) still gets
 	}
 	app.onKeys([key('paste', Array.from({ length: 8 }, (_, i) => `line ${i}`).join('\n'))])
 	await tick()
-	expect(text()).toBe('[paste 0123456789ab, 8 lines]')
+	expect(text()).toBe('[paste 0123456789ab, 8 lines] ')
 	app.onKeys([key('enter')])
-	expect(submits()).toEqual(['[paste 0123456789ab, 8 lines]'])
+	expect(submits()).toEqual(['[paste 0123456789ab, 8 lines] '])
 })
 
 test('a refused upload leaves an error text in place of the placeholder', async () => {
@@ -103,7 +103,7 @@ test('Enter during an upload waits, then sends the prompt with the marker', asyn
 	app.onKeys([key('enter')])
 	expect(submits()).toEqual([])
 	app.onEvent(attached(id, placeholder))
-	expect(submits()).toEqual([`look ${placeholder}`])
+	expect(submits()).toEqual([`look ${placeholder} `])
 	expect(text()).toBe('')
 })
 
@@ -122,7 +122,7 @@ test('a pasted path of an existing image file attaches the file; other paths sta
 	app.onKeys([key('paste', `${dir}/shot\\ one.png`)])
 	await tick()
 	expect(attaches()).toMatchObject([{ mediaType: 'image/png', data: Buffer.from(png).toString('base64') }])
-	expect(text()).toBe(`[image/${attaches()[0].name}]`)
+	expect(text()).toBe(`[image/${attaches()[0].name}] `)
 	app.onKeys([key('paste', ` ${dir}/missing.png`)])
 	await tick()
 	expect(attaches()).toHaveLength(1)
@@ -138,7 +138,7 @@ test('several dropped files: images and text files attach, other paths stay as t
 	await tick()
 	expect(attaches().map((c) => c.mediaType)).toEqual(['text/plain', 'application/octet-stream', 'image/png'])
 	expect(Buffer.from(attaches()[0].data, 'base64').toString()).toBe('# hi')
-	expect(text()).toBe(`[paste/${attaches()[0].name}] [file/${attaches()[1].name}] [image/${attaches()[2].name}]`)
+	expect(text()).toBe(`[paste/${attaches()[0].name}] [file/${attaches()[1].name}] [image/${attaches()[2].name}] `)
 	app.onKeys([key('paste', ` ${dir}/shot\\ one.png is not ${dir}/notes.md`)])
 	await tick()
 	expect(attaches()).toHaveLength(3)
@@ -152,7 +152,7 @@ test('a dropped text file attaches like the web drop; one that is not UTF-8 stay
 	app.onKeys([key('paste', `${dir}/README`)])
 	await tick()
 	expect(attaches()).toMatchObject([{ mediaType: 'text/plain' }])
-	expect(text()).toBe(`[paste/${attaches()[0].name}]`)
+	expect(text()).toBe(`[paste/${attaches()[0].name}] `)
 	app.onKeys([key('paste', ` ${dir}/bad.txt`)])
 	await tick()
 	expect(attaches()).toHaveLength(1)
@@ -169,9 +169,9 @@ test('a paste longer than the setting becomes a text attachment; a short one sta
 	expect(Buffer.from(c.data, 'base64').toString()).toBe(long.replaceAll('\r\n', '\n'))
 	let marker = `[paste/${c.name}]`
 	expect(c.name).toMatch(/^[0-9a-z]{6}\.txt$/)
-	expect(text()).toBe(marker)
+	expect(text()).toBe(marker + ' ')
 	app.onEvent(attached(c.id, marker))
-	expect(text()).toBe(marker)
+	expect(text()).toBe(marker + ' ')
 
 	settings.state.raw = { pasteLines: 20 }
 	app.onKeys([key('paste', `\n${long}`)])
@@ -188,4 +188,22 @@ test('an image too large to send is not read or sent; an error text is pasted', 
 	app.onKeys([key('paste', big)])
 	expect(attaches()).toEqual([])
 	expect(text()).toContain('larger than 5 MB')
+})
+
+test('attachments separate text and consecutive pastes, including typing on an empty line', async () => {
+	app.onEvent(snapshot())
+	type('ab')
+	app.onKeys([key('left')])
+	await pasteImage()
+	await pasteImage()
+	let markers = text().match(/\[image\/[^\]]+\]/g)!
+	expect(text()).toBe(`a ${markers[0]} ${markers[1]} b`)
+	type('next')
+	expect(text()).toBe(`a ${markers[0]} ${markers[1]} nextb`)
+	app.onKeys([key('a', undefined, { cmd: true }), key('paste', 'line\n')])
+	await pasteImage()
+	let marker = text().match(/\[image\/[^\]]+\]/)![0]
+	expect(text()).toBe(`line\n${marker} `)
+	type('typed')
+	expect(text()).toBe(`line\n${marker} typed`)
 })

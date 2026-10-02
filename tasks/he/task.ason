@@ -1,0 +1,10 @@
+{
+	title: 'Separate inserted attachment markers',
+	spec: 'Invariant: uploaded or pasted attachment markers never hug adjacent text or each other when inserted in the web or terminal prompt. Add a leading space when the preceding character is non-whitespace; always insert a trailing space and leave the caret after it, including on an empty line, so typing immediately after an image is separated. Apply to images, long text pastes and picked/dropped files, in order, replacing selections and preserving existing text, native web undo, draft sync and synchronous upload completion. Ordinary text typing and short pastes remain unchanged. Regression checks cover insertion between text, consecutive attachments and typing after insertion on an empty line.',
+	status: 'done',
+	notes: [
+		'uploads.pad recognizes pending markers at the ends of an insertion. Both clients apply it before editor insertion, using the selection start for the preceding text. Leading whitespace is reused; a trailing space is always inserted without deleting existing text. Marker settlement leaves those spaces and the caret intact. Existing CDP drop coverage also checks the caret and immediate native typing. Full ./test: 1337 pass, 1 platform skip, 1 unrelated subagent-report timeout; that test and all 20 attachment tests pass on the isolated rerun. Type checking and lint pass.'
+	],
+	needs: ['zc', 'n5'],
+	foldInto: ['zc']
+}

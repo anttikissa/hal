@@ -253,6 +253,10 @@ function onKeys(events: KeyEvent[]): void {
 		if (promptKeys.history(st, k, frame.promptWidth(app.cols()))) continue
 		// A pasted image path or long text: its upload's placeholder.
 		let key = st.transcript ? paste.key(st.transcript.meta.id, k, app.send) : k
+		if (key.key === 'paste' && key.text) {
+			let start = prompt.selection(st.prompt)?.start ?? st.prompt.cursor
+			key = { ...key, text: uploads.pad(key.text, st.prompt.text.slice(0, start)) }
+		}
 		let { state, action } = prompt.step(st.prompt, key, frame.promptWidth(app.cols()))
 		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'

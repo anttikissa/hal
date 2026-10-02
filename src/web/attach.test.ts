@@ -5,6 +5,7 @@ import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
 import type { Event } from '../common/protocol.ts'
 import { settings } from '../common/settings.ts'
+import { uploads } from '../common/uploads.ts'
 import { config } from '../host/config.ts'
 import { paths } from '../host/paths.ts'
 import { web } from '../host/web.ts'
@@ -43,6 +44,7 @@ afterEach(() => {
 
 const insert = (text: string) => {
 	let t = app.state.text
+	text = uploads.pad(text, t.slice(0, caret))
 	app.input(t.slice(0, caret) + text + t.slice(caret))
 	caret += text.length
 }
@@ -56,12 +58,12 @@ test('a pasted image shows its final marker at the caret at once and uploads und
 	type('ab')
 	caret = 1
 	expect(attach.paste(clip([{ kind: 'string', type: 'text/html', getAsFile: () => null }, item(new Blob([png], { type: 'image/png' }))]), insert)).toBe(true)
-	let name = /^a\[image\/([0-9a-z]{6}\.png)\]b$/.exec(app.state.text)![1]
+	let name = /^a \[image\/([0-9a-z]{6}\.png)\] b$/.exec(app.state.text)![1]
 	await tick()
 	let [c] = attaches()
 	expect(c).toMatchObject({ sessionId, mediaType: 'image/png', data: Buffer.from(png).toString('base64'), name })
 	app.onEvent({ type: 'attached', sessionId, command: c.id, blob: name!.slice(0, 6), marker: `[image/${name}]` })
-	expect(app.state.text).toBe(`a[image/${name}]b`)
+	expect(app.state.text).toBe(`a [image/${name}] b`)
 	expect(drafts.text(sessionId)).toBe(app.state.text)
 })
 
@@ -83,7 +85,7 @@ test('Send during an upload waits and goes with the marker', async () => {
 	await tick()
 	let marker = `[image/${attaches()[0].name}]`
 	app.onEvent({ type: 'attached', sessionId, command: attaches()[0].id, blob: 'b', marker })
-	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ text: `see ${marker}` })
+	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ text: `see ${marker} ` })
 	expect(app.state.text).toBe('')
 })
 
@@ -91,9 +93,9 @@ test('long pasted text becomes a text attachment; short text pastes natively', a
 	let long = Array.from({ length: 9 }, (_, i) => `l${i}`).join('\n')
 	expect(attach.paste(clip([], 'short\ntext'), insert)).toBe(false)
 	expect(attach.paste(clip([], long), insert)).toBe(true)
-	expect(app.state.text).toMatch(/^\[paste\/[0-9a-z]{6}\.txt\]$/)
+	expect(app.state.text).toMatch(/^\[paste\/[0-9a-z]{6}\.txt\] $/)
 	await tick()
-	expect(app.state.text).toBe(`[paste/${attaches()[0].name}]`)
+	expect(app.state.text).toBe(`[paste/${attaches()[0].name}] `)
 	expect(Buffer.from(attaches()[0].data, 'base64').toString()).toBe(long)
 	expect(attaches()[0].mediaType).toBe('text/plain')
 })
@@ -101,9 +103,9 @@ test('long pasted text becomes a text attachment; short text pastes natively', a
 test('pasted PDF file uploads rather than pasting clipboard text', async () => {
 	let file = new File([new Uint8Array([0x25, 0x50, 0xff])], 'report.pdf', { type: 'application/pdf' })
 	expect(attach.paste(clip([item(file)], 'ordinary text'), insert)).toBe(true)
-	expect(app.state.text).toMatch(/^\[file\/[0-9a-z]{6}\.pdf\]$/)
+	expect(app.state.text).toMatch(/^\[file\/[0-9a-z]{6}\.pdf\] $/)
 	await tick()
-	expect(attaches()[0]).toMatchObject({ mediaType: 'application/octet-stream', name: app.state.text.slice(6, -1) })
+	expect(attaches()[0]).toMatchObject({ mediaType: 'application/octet-stream', name: app.state.text.trimEnd().slice(6, -1) })
 })
 
 test('dropped binary, image and text files become markers at the caret in order', async () => {
@@ -111,7 +113,7 @@ test('dropped binary, image and text files become markers at the caret in order'
 	caret = 1
 	let files = [new File([png], 'shot.png', { type: 'image/png' }), new File(['%PDF-1.4'], 'paper.pdf', { type: 'application/pdf' }), new File(['# hi\n'], 'notes.md', { type: '' })]
 	attach.files(files, insert)
-	let [, image, file, paste] = /^a\[image\/([0-9a-z]{6}\.png)\]\[file\/([0-9a-z]{6}\.pdf)\]\[paste\/([0-9a-z]{6}\.md)\]b$/.exec(app.state.text)!
+	let [, image, file, paste] = /^a \[image\/([0-9a-z]{6}\.png)\] \[file\/([0-9a-z]{6}\.pdf)\] \[paste\/([0-9a-z]{6}\.md)\] b$/.exec(app.state.text)!
 	await tick()
 	expect(attaches().map((c) => [c.name, c.mediaType, Buffer.from(c.data, 'base64').toString()])).toEqual([
 		[image, 'image/png', Buffer.from(png).toString()],
