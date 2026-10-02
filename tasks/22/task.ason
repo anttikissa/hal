@@ -1,0 +1,11 @@
+{
+	title: 'Project colors on tabs and the status row',
+	spec: `When open tabs span two or more projects, each tab shows its project color as a bar above its number: on the web a short bar at the top of the cell, in the terminal lower-one-eighth blocks (▁) in the row above the tab bar, over the cell number and marker slot. With one project there is no marker and the row above the tab bar stays blank. The shown tab's directory also carries its color: the web status row puts a 3px strip left of the cwd, aligned with the composer's left strip; the terminal colors the cwd text.
+
+A tab's project is the nearest ancestor of its cwd holding .git, else the cwd. The host (src/host/projects.ts) assigns colors and sends Tab.color, an index into colors.project (8 colors: L 0.778, C 0.225, hues 327.5 7.5 47.5 87.5 127.5 195 247.5 287.5; out-of-gamut colors are clipped by the display). A project's preferred color is FNV-1a of its root's basename, lowercased and without leading dots, modulo the palette size, so ~/.hal and ~/hal both prefer color 3 (orange) on any machine. A project keeps its color while it has open tabs. A new project whose preferred color is taken gets the free color farthest from those in use (palette order approximates hue order), ties to the one nearest its preference; with every color taken it uses its preference.`,
+	status: 'done',
+	notes: [
+		'Web strip alignment: the status row is 12px but the composer 14px, so equal ch padding left the cwd strip 2.4px off. A registered @property --gutter (a <length>) set on .Chat computes 2ch (1ch narrow) in the composer font; the status row pads with it. Plain FNV-1a already puts hal on color 3 (orange); no seed tuning.'
+	],
+	needs: ['3k', 'ce']
+}

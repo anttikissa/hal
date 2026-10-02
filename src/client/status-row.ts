@@ -13,7 +13,8 @@ import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 
 // `hal`: the cwd is the Hal repo; `home` is shortened to ~ in the cwd.
-export type StatusInfo = { id: string; name?: string; cwd: string; hal?: boolean; model: string; role?: string; stats?: Stats; home?: string }
+// `color`: the tab's project color (task 22).
+export type StatusInfo = { id: string; name?: string; cwd: string; hal?: boolean; color?: Oklch; model: string; role?: string; stats?: Stats; home?: string }
 
 type Part = { text: string; fg?: Oklch; href?: string }
 
@@ -42,7 +43,7 @@ function left(info: StatusInfo): Part[][] {
 	let out: Part[][] = [info.name ? [{ text: `${info.id}: ` }, { text: ansi.clean(info.name), fg: hi }] : [{ text: info.id }]]
 	let home = info.home
 	let cwd = home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
-	out.push([{ text: ansi.clean(cwd), fg: info.hal ? colors.assistant().fg! : hi }])
+	out.push([{ text: ansi.clean(cwd), fg: info.color ?? (info.hal ? colors.assistant().fg! : hi) }])
 	out.push([{ text: ansi.clean(`${titles.modelName(info.model)} (${info.stats?.effort ?? 'default/unknown'})`), fg: hi }])
 	let s = info.stats
 	if (s?.files) out.push([{ text: `${s.files} files`, href: `/changes/${info.id}` }])

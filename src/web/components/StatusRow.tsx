@@ -14,7 +14,7 @@ function Parts(props: { group: StatusGroup }) {
 	return <span dir="ltr"><For each={props.group.parts}>{(part) => <span class={heat(part.heat)}>{part.text}</span>}</For></span>
 }
 
-export function StatusRow(props: { view: ViewState; connected: boolean }) {
+export function StatusRow(props: { view: ViewState; connected: boolean; color?: number }) {
 	let details!: HTMLDialogElement
 	let meta = () => props.view.transcript?.meta
 	let line = () => view.line(props.view, props.connected)
@@ -42,7 +42,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean }) {
 					<span aria-hidden="true">▾</span>
 				</span>
 				<span class="secondary">
-					<span class="cwd"><bdi>{cwd()}</bdi></span>
+					<span class="cwd" style={props.color === undefined ? undefined : { '--project': `var(--p${props.color})` }}><bdi>{cwd()}</bdi></span>
 					<span class={['model', quota() && 'quota', heat(quota()?.used)]} style={{ '--fill': `${quota()?.remaining ?? 0}%` }}>{meta() ? titles.modelName(meta()!.model) : ''}</span>
 					<span class="windows" aria-hidden="true">{slot()}<For each={names_()}>{(name) => (
 						<span class={['window', win(name)?.moot ? 'moot' : heat(win(name)?.used)]}>

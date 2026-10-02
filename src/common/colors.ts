@@ -102,6 +102,9 @@ export const colors = {
 		errorFg: colors.error().fg!,
 		pausedFg: [0.86, 0.16, 95],
 	}),
+	// Project colors (task 22), CSS --p0..--p7: one L and C, hues spread
+	// with a single cyan; the display clips what is out of its gamut.
+	project: (): Style => Object.fromEntries([327.5, 7.5, 47.5, 87.5, 127.5, 195, 247.5, 287.5].map((h, i) => [`p${i}`, [0.778, 0.225, h] as Oklch])),
 	// The notice stack (task qm): a bar in the event's colour on near
 	// black, never slate.
 	notice: (): Style => ({

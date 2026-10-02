@@ -2,6 +2,7 @@
 // app state (client/app.ts), the status row's facts and the words for
 // a session's state. Reads only; app.show() paints it.
 
+import { colors } from '../common/colors.ts'
 import { amend } from '../common/amend.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
@@ -54,6 +55,8 @@ function status(t: Transcript): StatusInfo {
 	let s: StatusInfo = { id, cwd, model }
 	if (name) s.name = name
 	if (app.focusedTab()?.hal) s.hal = true
+	let color = app.focusedTab()?.color
+	if (color !== undefined) s.color = colors.project()[`p${color}`]
 	if (process.env.HOME) s.home = process.env.HOME
 	if (t.stats) s.stats = t.stats
 	let link = connection.state.link
