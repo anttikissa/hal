@@ -1607,6 +1607,8 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 		await server.serve(); web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
 		await b.waitFor(`document.querySelectorAll('.Card.folds').length === 4 && !!document.querySelector('.Card.queued')`)
+		// A streaming card's cursor sits in its header and must not shift the label.
+		await b.evaluate(`document.querySelector('.Card.thinking .CardHeader .title').insertAdjacentHTML('beforeend', '<span class="cursor"></span>')`)
 		let geometry = `(() => {
 			let first = el => { let w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n; while (n = w.nextNode()) if (n.textContent.trim()) { let r = document.createRange(); r.setStart(n, 0); r.setEnd(n, 1); return r.getBoundingClientRect().toJSON() } };
 			return [...document.querySelectorAll('.CardHeader')].map(h => {
