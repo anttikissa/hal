@@ -25,4 +25,11 @@ function reset(at: string, now = Date.now(), timeZone?: string): string {
 	return day(date) === day(new Date(now)) ? time : `${time} on ${day(date)}`
 }
 
-export const usageWindows = { minutes, shortest, reset }
+// Windows that cannot bind: another window is full until at least as
+// late (a full 7d makes the 5h moot). Shown quietly, not as quota.
+function moot(windows: { name: string; used: number; resets?: string }[]): Set<string> {
+	let end = (w: { resets?: string }) => (w.resets ? Date.parse(w.resets) : Infinity)
+	return new Set(windows.filter((w) => windows.some((o) => o !== w && o.used >= 100 && end(o) >= end(w))).map((w) => w.name))
+}
+
+export const usageWindows = { minutes, shortest, reset, moot }

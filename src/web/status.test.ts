@@ -37,6 +37,15 @@ test('the model name fills by the shortest window, not the most used, ignoring m
 	expect(status.windows(withStats({ sent: 0, received: 0, plan }))).toEqual([{ name: '5h', used: 30, resets: '2026-09-26T05:00:00Z' }, { name: '7d', used: 95 }])
 })
 
+test('a full 7d makes the 5h moot: quiet, and the name fills by the 7d', () => {
+	let plan = { account: 1, accounts: 1, windows: { '5h': 12, '7d': 100 }, resets: { '5h': '2026-10-02T10:10:00Z', '7d': '2026-10-05T21:00:00Z' } }
+	expect(status.windows(withStats({ sent: 0, received: 0, plan })).map((w) => [w.name, !!w.moot])).toEqual([['5h', true], ['7d', false]])
+	expect(status.quota(withStats({ sent: 0, received: 0, plan }))).toEqual({ window: '7d', used: 100, remaining: 0 })
+	// A full 5h that resets first leaves the 7d in play.
+	let short = { ...plan, windows: { '5h': 100, '7d': 40 } }
+	expect(status.windows(withStats({ sent: 0, received: 0, plan: short })).some((w) => w.moot)).toBe(false)
+})
+
 test('without quota data the name stays neutral and no windows show', () => {
 	let none = withStats({ sent: 0, received: 0 })
 	expect(status.quota(none)).toBeUndefined()

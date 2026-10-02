@@ -45,7 +45,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean }) {
 					<span class="cwd"><bdi>{cwd()}</bdi></span>
 					<span class={['model', quota() && 'quota', heat(quota()?.used)]} style={{ '--fill': `${quota()?.remaining ?? 0}%` }}>{meta() ? titles.modelName(meta()!.model) : ''}</span>
 					<span class="windows" aria-hidden="true">{slot()}<For each={names_()}>{(name) => (
-						<span class={['window', heat(win(name)?.used)]}>
+						<span class={['window', win(name)?.moot ? 'moot' : heat(win(name)?.used)]}>
 							{name} <span class="bar"><span style={{ width: `${win(name)?.used ?? 0}%` }} /></span> {win(name)?.used}% used<span class="reset">{win(name)?.resets ? ` (resets ${status.reset(win(name)!.resets!)})` : ''}</span>
 						</span>
 					)}</For></span>
