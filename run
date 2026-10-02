@@ -12,6 +12,9 @@ if [ ! -d "$dir/node_modules" ]; then
 	echo "Dependencies are missing ($dir/node_modules): running ./install first."
 	"$dir/install" || exit
 fi
+# A blank line between the shell's output and Hal's first frame; not
+# repeated on restarts.
+[ -t 1 ] && echo
 while true; do
 	# This start's time in ms since the epoch, for perf marks (src/common/
 	# perf.ts). Bash 3.2 (macOS) lacks EPOCHREALTIME: then it is empty
