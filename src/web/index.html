@@ -31,9 +31,9 @@ body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Men
 body, textarea { tab-size: 4; }
 .App, .Chat { height: 100%; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 .App { position: absolute; top: 0; left: 0; width: var(--app-width, 100%); max-width: 100%; height: var(--app-height, 100dvh); transform: translate(var(--app-left, 0px), var(--app-top, 0px)); }
-/* Developer update control stays below tabs in its own row. */
-.source-update { flex: none; text-align: right; padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
-.source-update button { font-size: 16px; line-height: 1; min-height: 24px; min-width: 44px; padding: 4px 8px; border: 1px solid currentColor; color: var(--text); background: var(--canvas); }
+/* Zero-height anchor: reload floats over text without moving it. */
+.source-update { position: relative; flex: none; height: 0; z-index: 2; pointer-events: none; }
+.source-update button { position: absolute; top: 4px; right: max(1ch, env(safe-area-inset-right)); pointer-events: auto; font-size: 16px; line-height: 1; min-height: 24px; min-width: 44px; padding: 4px 8px; border: 0; color: var(--text); background: color-mix(in oklab, var(--overlay-bg) 75%, transparent); }
 /* The one scroller: nothing inside it scrolls; long lines wrap. */
 /* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
@@ -272,20 +272,20 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
   .Picker li { min-height: 44px; padding-block: 0.25lh; }
   .Picker .close { min-width: 44px; min-height: 44px; }
 }
-/* Tabs (task 3k): one row that never wraps or scrolls sideways (that
-   fights the back-swipe): menu, equal cells (widths set by Tabs.tsx
-   from common/tab-pages.ts), page edges, new tab. The shown tab's
+/* Tabs (tasks 3k, ce): one row with native momentum scrolling between
+   narrow secondary chevrons; menu and new-tab stay fixed. Equal cell
+   widths are set by Tabs.tsx. The shown tab's
    cell is tinted with a lit bar under it; its content is centred, and a
    marker that appears widens it smoothly. Under 50px tall. */
 .Tabs { flex: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .Tabs .strip { display: flex; align-items: stretch; white-space: nowrap; overflow: hidden; }
 .Tabs .pages { position: relative; flex: 1; min-width: 0; display: flex; overflow: hidden; }
-.Tabs .track { display: flex; flex: 1; min-width: 0; overflow: hidden; scroll-snap-type: x mandatory; }
+.Tabs .track { display: flex; flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-snap-type: x proximity; overscroll-behavior-x: contain; touch-action: pan-x pinch-zoom; }
 .Tabs .track .tab { scroll-snap-align: start; }
 .Tabs .track:not(:has(.name)) .tab { flex-grow: 1; }
 .Tabs .edge:disabled { opacity: .5; cursor: default; }
-.Tabs .edge.offscreen { color: var(--active-fg); border-bottom: 3px dashed var(--active-fg); }
-.Tabs .strip .edge { padding-inline: 0; min-width: 44px; min-height: 44px; }
+.Tabs .edge.offscreen { color: var(--active-fg); font-weight: 700; }
+.Tabs .strip .edge { padding-inline: 0; min-width: 24px; min-height: 44px; }
 .Tabs .probe { position: absolute; visibility: hidden; pointer-events: none; }
 .Tabs .tab { display: flex; flex: none; align-items: center; justify-content: center; width: var(--cell); padding: 0.25lh 0; background: none; text-decoration: none; color: var(--inactive-fg); }
 .Tabs .sheet .tab .n { display: inline-block; width: calc(var(--digits) * 1ch); text-align: right; }

@@ -992,23 +992,40 @@ test.skipIf(!chrome)('web tab paging scrolls with overlap without selecting, and
 			let track = document.querySelector('.track'), r = track.getBoundingClientRect(), links = [...track.querySelectorAll('.tab')];
 			let visible = links.filter(a => { let t = a.getBoundingClientRect(); return t.left >= r.left - 1 && t.right <= r.right + 1 });
 			let left = document.querySelector('.edge.left'), right = document.querySelector('.edge.right');
-			return { first: links.indexOf(visible[0]), last: links.indexOf(visible.at(-1)), path: location.pathname, scroll: track.scrollLeft, leftDisabled: left.disabled, rightDisabled: right.disabled, opacity: getComputedStyle(left).opacity, target: left.getBoundingClientRect().width, height: left.getBoundingClientRect().height, dashed: left.classList.contains('offscreen'), gap: Math.abs(visible[0].getBoundingClientRect().left - r.left), snap: getComputedStyle(track).scrollSnapType };
+			return { first: links.indexOf(visible[0]), last: links.indexOf(visible.at(-1)), path: location.pathname, scroll: track.scrollLeft, leftDisabled: left.disabled, rightDisabled: right.disabled, opacity: getComputedStyle(left).opacity, target: left.getBoundingClientRect().width, height: left.getBoundingClientRect().height, offscreen: left.classList.contains('offscreen'), border: getComputedStyle(left).borderBottomWidth, weight: getComputedStyle(left).fontWeight, color: getComputedStyle(left).color, activeColor: getComputedStyle(track.querySelector('[aria-current]')).color, gap: Math.abs(visible[0].getBoundingClientRect().left - r.left), snap: getComputedStyle(track).scrollSnapType };
 		})()`
 		let scrollPage = (side: 'left' | 'right') => b.evaluate(`new Promise(resolve => { let track = document.querySelector('.track'); track.addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelector('.edge.${side}').click() })`)
 		let first = await b.evaluate(geometry)
 		expect(first.first).toBe(0)
 		expect(first.last).toBeGreaterThan(0)
 		expect(first.opacity).toBe('0.5')
-		expect(first.target).toBeGreaterThanOrEqual(44)
+		expect(first.target).toBe(24)
 		expect(first.height).toBeGreaterThanOrEqual(44)
 		expect(first.gap).toBeLessThanOrEqual(1)
-		expect(first.snap).toBe('x mandatory')
+		expect(first.snap).toBe('x') // CSSOM omits the default proximity value.
 		expect(await b.evaluate("[...document.querySelectorAll('.edge')].every(e => !/[0-9]/.test(e.textContent))")).toBe(true)
+		// Native touch scrolling moves only the strip, not the active session.
+		let swipe = await b.evaluate("(() => { let r = document.querySelector('.track').getBoundingClientRect(); return { x: r.right - 20, y: r.y + r.height / 2 } })()")
+		await b.call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [swipe] })
+		for (let i = 1; i <= 8; i++) {
+			await b.call('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: swipe.x - i * 15, y: swipe.y }] })
+			await Bun.sleep(16)
+		}
+		await b.call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+		await b.evaluate("new Promise(resolve => { let track = document.querySelector('.track'), last = track.scrollLeft, still = 0; let check = () => { let now = track.scrollLeft; still = now === last ? still + 1 : 0; last = now; if (still >= 10) resolve(); else requestAnimationFrame(check); }; requestAnimationFrame(check) })")
+		await b.waitFor(`(${geometry}).scroll > 0`)
+		expect((await b.evaluate(geometry)).path).toBe(`/${ids[0]}`)
+		// Tapping the already selected tab reveals it again smoothly.
+		await b.evaluate("new Promise(resolve => { document.querySelector('.track').addEventListener('scrollend', () => requestAnimationFrame(resolve), { once: true }); document.querySelector('.track [aria-current]').click() })")
+		await b.waitFor(`(${geometry}).first === 0 && (${geometry}).leftDisabled`)
 		await scrollPage('right')
 		await b.waitFor(`(${geometry}).first === ${first.last} && (${geometry}).gap <= 1`)
 		let next = await b.evaluate(geometry)
 		expect(next.path).toBe(`/${ids[0]}`)
-		expect(next.dashed).toBe(true)
+		expect(next.offscreen).toBe(true)
+		expect(next.border).toBe('0px')
+		expect(next.weight).toBe('700')
+		expect(next.color).toBe(next.activeColor)
 		// Urgent hidden status redraws its edge, but never recenters.
 		status.transition(ids[0]!, { type: 'submit' })
 		status.transition(ids[0]!, { type: 'end', error: 'test failure' })
@@ -1338,16 +1355,18 @@ test.skipIf(!chrome)('manual reload notice preserves the draft and command actio
 		expect(await actions()).toEqual(['Run'])
 		expect(await b.evaluate("document.querySelector('.Composer .help').textContent.includes('queue')")).toBe(false)
 		await input('draft stays put')
-		await b.evaluate("document.querySelector('textarea').focus(); window.__beforeUpdate = document.querySelector('.Chat'); window.__oldText = document.querySelector('textarea')")
+		await b.evaluate("document.querySelector('textarea').focus(); window.__beforeUpdate = document.querySelector('.Chat'); window.__oldText = document.querySelector('textarea'); window.__transcriptRect = document.querySelector('.Transcript').getBoundingClientRect().toJSON()")
 		let page = await web.state.page!
 		web.build = async () => ({ html: page.html.replace(`data-version="${page.version}"`, 'data-version="updated"'), version: 'updated' })
 		await web.refresh()
 		await b.waitFor("document.querySelector('.source-update button')?.textContent === 'reload'")
 		let geometry = await b.evaluate(`(() => {
 			let button = document.querySelector('.source-update button'), r = button.getBoundingClientRect(), tabs = document.querySelector('.Tabs').getBoundingClientRect();
-			return { font: getComputedStyle(button).fontSize, border: getComputedStyle(button).borderTopWidth, height: r.height, width: r.width, clear: r.top >= tabs.bottom, focused: document.activeElement === window.__oldText, same: document.querySelector('.Chat') === window.__beforeUpdate, draft: document.querySelector('textarea').value };
+			let transcript = document.querySelector('.Transcript').getBoundingClientRect();
+			return { unchanged: transcript.top === window.__transcriptRect.top && transcript.height === window.__transcriptRect.height, overlay: r.top >= transcript.top && r.bottom <= transcript.bottom, background: getComputedStyle(button).backgroundColor, anchor: document.querySelector('.source-update').getBoundingClientRect().height, font: getComputedStyle(button).fontSize, border: getComputedStyle(button).borderTopWidth, height: r.height, width: r.width, clear: r.top >= tabs.bottom, focused: document.activeElement === window.__oldText, same: document.querySelector('.Chat') === window.__beforeUpdate, draft: document.querySelector('textarea').value };
 		})()`)
-		expect(geometry).toMatchObject({ font: '16px', border: '1px', clear: true, focused: true, same: true, draft: 'draft stays put' })
+		expect(geometry).toMatchObject({ unchanged: true, overlay: true, anchor: 0, font: '16px', border: '0px', clear: true, focused: true, same: true, draft: 'draft stays put' })
+		expect(geometry.background).toContain('0.75')
 		expect(geometry.height).toBeGreaterThanOrEqual(24)
 		expect(geometry.width).toBeGreaterThanOrEqual(44)
 		// A second rebuild keeps one persistent notice and the same page.

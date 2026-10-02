@@ -127,6 +127,7 @@ export const colors = {
 	// picker's selected item too), and search matches. The terminal has its own.
 	page: (): Style => ({
 		canvas: [0.14, 0.01, 260],
+		overlayBg: [0, 0, 0],
 		text: [0.93, 0.01, 260],
 		accent: [0.86, 0.16, 200],
 		field: [0.18, 0.015, 260],

@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // The host's tabs above the conversation. Web overflow scrolls independently
 // of selection (task ce); terminal paging stays in common/tab-pages.ts.
-// Only edge buttons scroll, preserving the browser's back-swipe gesture.
+// Native horizontal momentum scrolling; edge buttons provide secondary paging.
 // Tab links retain native Cmd- and middle-click behavior.
 
 import { createEffect, createMemo, createSignal, For, onSettled } from 'solid-js'
@@ -96,7 +96,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		let named = base + (NAME + 1) * ch
 		let names = props.tabs.length * named <= width
 		let overflow = !names && props.tabs.length * base > width
-		let edge = Math.max(44, (d + 3) * ch)
+		let edge = 24
 		let available = Math.max(1, width - (overflow ? 2 * edge : 0))
 		let per = Math.max(1, Math.floor(available / base))
 		// Fill fractional leftover room instead of black gaps beside the cells.

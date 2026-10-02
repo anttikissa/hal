@@ -172,9 +172,11 @@ it only when building the page with Bun, not on the host startup path.
   copy link keep working). The browser never polls: the host pushes.
 - Phones: fields at least 16px, touch targets at least 44px, touch
   behaviour keyed on `pointer: coarse` rather than width, the page
-  sized from visualViewport (iOS keyboard), no sideways-scrolling strip,
+  sized from visualViewport (iOS keyboard), no horizontal page overflow,
   and text kept out of the safe area: viewport-fit=cover (else every
   env(safe-area-inset-*) is 0) and edge rows padded with them (4s).
+  The tab strip alone supports native horizontal momentum scrolling (ce);
+  its secondary chevrons are 24px wide but retain 44px height.
 - Decisions live in .ts modules with unit tests; looks are checked by
   hand in a real browser at phone and desktop widths. No tests that
   read source or copy CSS; CDP tests assert structure (nodes kept,
