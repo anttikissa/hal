@@ -67,6 +67,7 @@ function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: st
 	let tab = tabs.file().open.indexOf(id)
 	if (tab >= 0) notice.tab = tab + 1
 	for (let c of watching) c.deliver(notice)
+	diag.log(`push: ${id} not pushed, ${watching.length} client(s) watching other tabs`)
 }
 
 export const notify = { kind, replyLine, line, route, deliver }

@@ -112,9 +112,11 @@ async function deliver(s: Subscription, message: string): Promise<string | undef
 async function notify(id: string, name: string, line: string): Promise<void> {
 	if (!settings.push()) return
 	let message = JSON.stringify({ id, title: name.slice(0, 80), body: line.slice(0, 120) })
-	for (let s of push.store().subscriptions.slice()) {
-		try { await push.deliver(s, message) } catch (e: any) { diag.log(`push: ${e?.message ?? e}`) }
+	let all = push.store().subscriptions.slice(), sent = 0
+	for (let s of all) {
+		try { if (!(await push.deliver(s, message))) sent++ } catch (e: any) { diag.log(`push: ${e?.message ?? e}`) }
 	}
+	diag.log(`push: ${id} delivered to ${sent} of ${all.length} devices`)
 }
 
 // A client's push command, answered with the device list.

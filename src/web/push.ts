@@ -38,12 +38,24 @@ function send(subscription: PushSubscription): void {
 type Devices = Extract<Event, { type: 'push-devices' }>
 const [devices, setDevices] = createSignal<Devices>({ type: 'push-devices', devices: [] })
 const [mine, setMine] = createSignal<string | undefined>()
+const [ready, setReady] = createSignal(false)
+const [failed, setFailed] = createSignal<string | undefined>()
 
 // This device: unsupported (not an HTTPS Home Screen app), blocked in Settings, on or off.
+// On only while the host lists this device's endpoint.
 function status(): 'unsupported' | 'blocked' | 'on' | 'off' {
-	if (!push.supported() || !push.key() || !push.state.registration) return 'unsupported'
+	if (!push.supported() || !push.key() || !ready()) return 'unsupported'
 	if (Notification.permission === 'denied') return 'blocked'
-	return mine() ? 'on' : 'off'
+	let endpoint = mine()
+	return endpoint && devices().devices.some((d) => d.endpoint === endpoint) ? 'on' : 'off'
+}
+
+// Why push is unavailable here, for the dialog.
+function problem(): string | undefined {
+	if (!push.supported()) return location.protocol !== 'https:' ? 'page is not HTTPS' : 'this browser has no Push API'
+	if (!push.key()) return 'the host sent no push key'
+	if (!ready()) return failed() ?? 'the service worker is still starting'
+	return undefined
 }
 
 async function disable(): Promise<void> {
@@ -79,9 +91,12 @@ async function enable(): Promise<void> {
 
 async function start(changed: () => void = () => {}): Promise<void> {
 	if (!push.supported()) return
-	let ready = await navigator.serviceWorker.register('/sw.js')
-	let subscription = await ready.pushManager.getSubscription()
-	push.state.registration = ready
+	let registration: ServiceWorkerRegistration
+	try { registration = await navigator.serviceWorker.register('/sw.js') } catch (e: any) { setFailed(`service worker failed: ${e?.message ?? e}`); return changed() }
+	push.state.registration = registration
+	setReady(true)
+	// A lost subscription must not hide the Turn on button.
+	let subscription = await registration.pushManager.getSubscription().catch(() => null)
 	push.state.subscription = subscription
 	setMine(subscription?.endpoint)
 	if (subscription) push.send(subscription) // reconnect a persisted subscription
@@ -99,4 +114,4 @@ function badge(tabs: Tab[]): void {
 	void (count ? navigator.setAppBadge(count) : navigator.clearAppBadge()).catch(() => {})
 }
 
-export const push = { state, supported, key, available, device, send, devices, setDevices, mine, status, enable, disable, remove, test, start, visibility, badge }
+export const push = { state, supported, key, available, device, send, devices, setDevices, mine, status, problem, enable, disable, remove, test, start, visibility, badge }
