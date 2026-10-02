@@ -23,6 +23,7 @@ type Entry = Record<string, any>
 const greeting = 'Hello — I am HAL 9001, your personal agent harness. You can call me Hal.'
 const saved = 'I saved your answers to'
 const closing = "You're all set."
+const restart = 'Starting the intro.'
 const subscriptions = 'Hal works with your Claude, ChatGPT and OpenCode Go subscriptions: /login signs in. API keys work too, in environment variables or through /login.'
 const yesNo = (name: string, text: string): Form => ({ text, fields: [{ type: 'choice', name, options: ['Yes', 'No'], initial: 0 }] })
 const words = ['no', 'one', 'two', 'three', 'four', 'five']
@@ -137,7 +138,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	let start = records.findLastIndex((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(greeting))
 	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: 'Dave' }] }
 	let hello = (): Reply => ({ say: `${greeting}\n\nI have ${words[3 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
-	if (start < 0) return hello()
+	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
 	let run = records.slice(start + 1)
 	// Text typed while nothing was asked: the intro can't take it. Text
 	// sent while a question was open waited in the inbox; it is let be.
@@ -220,7 +221,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 		: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
 	// Not signed in (environment keys aside): the close always says how.
 	if (!loggedIn.stored) now += "\n\nYou're not signed in: /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key."
-	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
+	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts; /intro runs this guide again.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
 }
 
-export const intro = { run, answered, asked, accounts, choices, findZone, timezone }
+export const intro = { restart, run, answered, asked, accounts, choices, findZone, timezone }

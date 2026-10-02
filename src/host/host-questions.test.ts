@@ -247,6 +247,22 @@ test('the Serper key step never traps: an empty key or Escape moves on', async (
 	}
 })
 
+test('/intro switches a tab back to hal/intro and greets again at once', async () => {
+	apiKeys.save('serper', 'existing-key')
+	synthetic.models.asker = () => ({ say: 'ok' })
+	let c = client(), id = created(c, 'hal/asker')
+	c.conn.send({ type: 'submit', sessionId: id, text: '/intro' })
+	await until(() => field(c, id)?.name === 'name')
+	expect(sessions.open(id).model).toBe('hal/intro')
+	await reply(c, id, 'name', '', 'login')
+	await reply(c, id, 'login', 'Skip', 'language')
+	await reply(c, id, 'language', '')
+	await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
+	expect(texts(c.views.get(id)!).at(-1)).toContain('/intro')
+	c.conn.send({ type: 'submit', sessionId: id, text: '/intro' })
+	await until(() => texts(c.views.get(id)!).filter((t) => t.includes('HAL 9001')).length === 2 && field(c, id)?.name === 'name')
+})
+
 test('the timezone is saved unasked only when device and host agree on a real zone', () => {
 	let run: HistoryRecord[] = []
 	let ts = new Date().toISOString()

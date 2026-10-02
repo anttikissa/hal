@@ -29,6 +29,7 @@ const list: CommandInfo[] = [
 	{ name: 'fork', description: 'fork this session into a new tab', category: 'tabs', key: 'ctrl-b' },
 	{ name: 'go', description: 'show a tab in windows watching this session', category: 'tabs' },
 	{ name: 'help', description: 'list commands, or show one in detail', category: 'help' },
+	{ name: 'intro', description: 'run the first-run guide again', category: 'help' },
 	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1' },
 	{ name: 'login', description: 'log in to a provider', category: 'session' },
 	{ name: 'mem', description: 'show host memory use', category: 'debug' },
