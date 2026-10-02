@@ -7,7 +7,8 @@
 		'Per-tool colours are fields tool + Capitalised name (toolBash); aliases are functions calling another (toolGrep: () => colors.toolRead()). Unknown tools fall back to colors.tool; web view emits "tool tool-<name>" so CSS does the same fallback.',
 		'CSS is substituted into the cached page on every request, so eval/local.ts overrides show on reload. src/web never imports colors.ts.',
 		'Out-of-gamut OKLCH keeps hue and chroma and darkens until it fits (common/oklch.ts fit), down to the most vivid point of the hue at most; only past that, or for a colour already darker (a card background), does it lose chroma. Never per-channel clipping, and never keep lightness by losing chroma for a bright colour: that turned the bright orange of Hal into pale skin-pink peach in the terminal, while the web (unfitted, wide gamut) showed orange. The user wants vivid, like the old Hal.',
-		'Rows with a bg are painted as full-width cards (frame.paint); every styled row ends with SGR 39;49, so tests strip SGR (strings.walk) before comparing text.'
+		'Rows with a bg are painted as full-width cards (frame.paint); every styled row ends with SGR 39;49, so tests strip SGR (strings.walk) before comparing text.',
+		'Thinking code once sat too close to thinking fg (169,185,202 vs 151,167,183) to tell code from prose, the only cue now that fences are hidden. Invariant: a style used for Markdown has a code colour clearly apart from its fg.'
 	],
 	needs: ['cc']
 }
