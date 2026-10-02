@@ -5,7 +5,7 @@ import { connection } from '../../common/connection.ts'
 import { push } from '../push.ts'
 
 const said = {
-	unsupported: 'Not available here. On iPhone, open Hal from its Home Screen icon (Share → Add to Home Screen).',
+	unsupported: 'Not available here. On iPhone, Hal must be opened from its Home Screen icon.',
 	blocked: 'Blocked. Allow notifications for Hal in iOS Settings → Notifications.',
 	on: 'On for this device. Hal notifies when a turn ends while no screen shows that tab.',
 	off: 'Off for this device.',
@@ -22,6 +22,7 @@ export function Notifications(props: { open: boolean; onClose: () => void }) {
 		<dialog ref={(e) => (dialog = e)} class="Notifications sheet" aria-label="Notifications" onClose={props.onClose} onClick={(e) => e.target === e.currentTarget && props.onClose()}>
 			<h2>Notifications</h2>
 			<p role="status">{said[push.status()]}</p>
+			<Show when={push.problem()}>{(p) => <p>Reason: {p()}.</p>}</Show>
 			<Show when={push.status() === 'off'}>
 				<button type="button" class="new" onClick={() => void push.enable().catch(fail)}>Turn on</button>
 			</Show>
