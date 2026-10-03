@@ -22,6 +22,7 @@ import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
 import { Markdown } from './Markdown.tsx'
 import { CardHeader } from './CardHeader.tsx'
+import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
@@ -53,7 +54,9 @@ function enter(el: HTMLElement): void {
 }
 
 // An image row shows the image itself, from the session's blob.
-export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean }) {
+// `job`: the background job this Bash call started still runs; a Kill
+// button in the header sends /kill #<job>.
+export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string }) {
 	let id = () => `${props.session}#${props.row.key}`
 	let root: HTMLElement | undefined
 	onSettled(() => root && enter(root))
@@ -132,7 +135,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let failed = () => !!props.row.result?.isError
 	let toggle = (e: MouseEvent) => {
-		if ((!folds() && props.row.note === undefined) || (e.target as Element).closest('a, .more') || !getSelection()?.isCollapsed) return
+		if ((!folds() && props.row.note === undefined) || (e.target as Element).closest('a, .more, .kill') || !getSelection()?.isCollapsed) return
 		scroll.follow(() => {
 			setOpen(!expanded())
 			flush()
@@ -207,6 +210,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={failed()}><span class="error">✗</span></Show>
+								<Show when={props.job}>{(n) => <button type="button" class="kill" title={`Stop background job #${n()} (/kill #${n()})`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #${n()}` })}>kill</button>}</Show>
 							</CardHeader>
 							<div class="body" inert={!expanded()}>
 								<div class="contents">

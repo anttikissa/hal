@@ -31,6 +31,7 @@ const list: CommandInfo[] = [
 	{ name: 'help', description: 'list commands, or show one in detail', category: 'help' },
 	{ name: 'intro', description: 'run the first-run guide again', category: 'help' },
 	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1' },
+	{ name: 'kill', description: 'stop a background job', category: 'session' },
 	{ name: 'login', description: 'log in to a provider', category: 'session' },
 	{ name: 'mem', description: 'show host memory use', category: 'debug' },
 	{ name: 'model', description: 'pick the model', category: 'session', key: 'ctrl-m' },

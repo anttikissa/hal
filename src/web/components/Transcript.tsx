@@ -34,13 +34,15 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorAt = () => (streaming() ? rows().length - 1 : -1)
+	// Background jobs still running, by call key: their cards offer Kill.
+	let jobs = createMemo(() => view.jobs(all()))
 	let hit = createMemo(() => props.target && target.row(all(), props.target)?.key)
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
 	return (
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
 			<For each={all()} keyed={(row) => row.key}>
 				{(row, i) => (
-					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorAt() === i()} target={hit() === row().key} />}>
+					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorAt() === i()} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} />}>
 						{(q) => <Question item={q()} form={props.view.form!} />}
 					</Show>
 				)}
