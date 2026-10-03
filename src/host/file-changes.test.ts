@@ -107,11 +107,10 @@ test('background calls hold overlapping locks until exit and record final bytes'
 	history.append(id, { type: 'assistant', block: { type: 'tool_call', name: 'bash', id: 'bg', input: {} } })
 	let result = await tools.run({ type: 'tool_call', id: 'bg', name: 'bash', input: { command: 'sleep 0.3; printf background > file', description: 'Create later', background: true, modifies: ['file'] } }, context())
 	expect(result.output).toContain('started in background')
-	let seen = false
-	let other = sessions.create({ cwd, model: 'fake/m' }).id
-	let next = bash('printf foreground >> file', ['file'], { ...context(other), onOutput: () => { seen = true } })
-	await next
-	expect(seen).toBe(true)
+	// Its own session waits too, and the wait names the job, not the session.
+	let seen = ''
+	await bash('printf foreground >> file', ['file'], { ...context(), onOutput: (c) => { seen += c } })
+	expect(seen).toMatch(/^Waiting for background job #\d+ \(this session\) to exit; it declared file\n/)
 	expect(readFileSync(`${cwd}/file`, 'utf8')).toBe('backgroundforeground')
 	expect(bytes(changes()[0]!.files[0]!.after).toString()).toBe('background')
 })
