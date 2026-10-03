@@ -38,7 +38,7 @@ beforeEach(() => {
 	liveFiles.onError = () => {}
 	commands.home = () => work
 	synthetic.models = { ...origModels }
-	synthetic.pauseMs = () => 0
+	synthetic.pauseMs = 0
 })
 
 afterEach(() => {

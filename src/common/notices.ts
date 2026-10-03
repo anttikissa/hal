@@ -57,7 +57,7 @@ function remove(key: string): void {
 
 // Drops what outlived ttl() at `now`; true if anything went.
 function expire(now = Date.now()): boolean {
-	let left = notices.state.entries.filter((e) => e.stays || now - e.at < notices.ttl())
+	let left = notices.state.entries.filter((e) => e.stays || now - e.at < notices.ttl)
 	if (left.length === notices.state.entries.length) return false
 	notices.state.entries = left
 	return true
@@ -66,7 +66,7 @@ function expire(now = Date.now()): boolean {
 // One timer, for the next entry to go.
 function schedule(now = Date.now()): void {
 	clearTimeout(notices.state.timer)
-	let ends = notices.state.entries.filter((e) => !e.stays).map((e) => e.at + notices.ttl())
+	let ends = notices.state.entries.filter((e) => !e.stays).map((e) => e.at + notices.ttl)
 	if (!ends.length) return void (notices.state.timer = undefined)
 	notices.state.timer = setTimeout(() => {
 		if (notices.expire()) notices.onChange()
@@ -75,7 +75,7 @@ function schedule(now = Date.now()): void {
 }
 
 // What the stack shows: the newest max(), the rest counted with their tab numbers.
-function fold(entries: Notice[], max = notices.max()): Folded {
+function fold(entries: Notice[], max = notices.max): Folded {
 	if (entries.length <= max) return { shown: entries }
 	let hidden = entries.slice(0, entries.length - max)
 	let tabs = hidden.flatMap((e) => (e.tab === undefined ? [] : [e.tab]))
@@ -93,8 +93,8 @@ function reset(): void {
 
 export const notices = {
 	state: { entries: [] as Notice[], timer: undefined as ReturnType<typeof setTimeout> | undefined },
-	ttl: (): number => 5000,
-	max: (): number => 3,
+	ttl: 5000,
+	max: 3,
 	onChange: (): void => {},
 	words: WORDS,
 	reason,

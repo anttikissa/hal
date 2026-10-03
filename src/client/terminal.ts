@@ -229,7 +229,7 @@ function onData(chunk: string | Uint8Array): void {
 		st.escapeTimer = setTimeout(() => {
 			st.escapeTimer = null
 			terminal.deliver(keys.flush(st.decoder))
-		}, terminal.escapeMs())
+		}, terminal.escapeMs)
 	}
 }
 
@@ -264,7 +264,7 @@ export const terminal = {
 	/** Enable the kitty keyboard protocol; screen gets no query. */
 	kitty: (): boolean => !ansi.mono(),
 	/** How long a lone ESC waits for the rest of a sequence. */
-	escapeMs: () => 50,
+	escapeMs: 50,
 	/** Whether there is a terminal to take over; tests replace it. */
 	available: (): boolean => !!process.stdin.isTTY,
 	/** Receives decoded keys; replaced by the prompt. */

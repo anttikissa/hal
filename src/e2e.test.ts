@@ -120,7 +120,7 @@ terminal.realIO = () => ({
 	size: () => ({ rows: 40, cols: 200 }),
 	onResize() {},
 })
-anthropic.apiUrl = () => 'http://127.0.0.1:${server.port}/v1/messages'
+anthropic.apiUrl = 'http://127.0.0.1:${server.port}/v1/messages'
 `,
 	)
 })

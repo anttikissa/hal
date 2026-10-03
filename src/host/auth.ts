@@ -251,7 +251,7 @@ function rejected(name: string, kind: Kind = 'anthropic'): void {
 	let fp = fingerprint(account.entry)
 	let key = `${kind}:${name}`
 	let last = auth.state.retried.get(key)
-	if (usable(account.entry.refreshToken) && (last === undefined || clock.now() - last > auth.retryRejectedMs())) {
+	if (usable(account.entry.refreshToken) && (last === undefined || clock.now() - last > auth.retryRejectedMs)) {
 		auth.state.retried.set(key, clock.now())
 		auth.state.stale.add(fp)
 	} else auth.state.broken.set(fp, fail(`${kind} credentials for ${name} were rejected (401); ${LOG_INS[kind]}`).message)
@@ -280,7 +280,7 @@ async function changed(signal?: AbortSignal): Promise<void> {
 	}
 	let before = look()
 	while (!signal?.aborted) {
-		await clock.sleep(auth.pollMs(), signal)
+		await clock.sleep(auth.pollMs, signal)
 		if (look() !== before) {
 			auth.close()
 			return
@@ -349,9 +349,9 @@ export const auth = {
 	refreshMarginMs,
 	refreshTimeoutMs,
 	// How often a session blocked on login looks at the credentials file.
-	pollMs: () => 2000,
+	pollMs: 2000,
 	// A rejected token is refreshed at most this often per account.
-	retryRejectedMs: () => 10 * 60_000,
+	retryRejectedMs: 10 * 60_000,
 	// The environment's API key: the account after the file's.
 	envKey: (kind: Kind = 'anthropic'): string | undefined => process.env[ENV[kind]],
 	logIn: (kind: Kind): string => LOG_INS[kind],

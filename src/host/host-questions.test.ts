@@ -36,7 +36,7 @@ beforeEach(() => {
 	for (let key of keyNames) delete process.env[key]
 	liveFiles.onError = () => {}
 	synthetic.models = { ...origModels }
-	synthetic.pauseMs = () => 0
+	synthetic.pauseMs = 0
 	clients.timezone = () => undefined
 	clients.hostZone = () => 'UTC'
 	models.known = () => ['anthropic/test-claude', 'openai/test-gpt', 'opencode-go/test-go']

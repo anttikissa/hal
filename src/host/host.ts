@@ -143,12 +143,12 @@ function reject(client: Client, command: unknown, reason: string, sessionId?: un
 const once = new Set(['create', 'submit', 'draft', 'pause', 'continue', 'answer', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start'])
 
 // Records what a command with an id did, forgetting the oldest beyond
-// host.remembered().
+// host.remembered.
 function remember(id: string, outcome: Outcome): void {
 	let done = host.state.done
 	done.set(id, outcome)
 	for (let old of done.keys()) {
-		if (done.size <= host.remembered()) break
+		if (done.size <= host.remembered) break
 		done.delete(old)
 	}
 }
@@ -378,7 +378,7 @@ export const host = {
 	// Working directory for a session created without one.
 	cwd: (): string => process.cwd(),
 	// How many command ids the host remembers for spotting repeats.
-	remembered: () => 1000,
+	remembered: 1000,
 	connect,
 	adapt,
 	warn,

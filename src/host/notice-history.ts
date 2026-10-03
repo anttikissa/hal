@@ -27,7 +27,7 @@ function record(e: { session: string; name: string; kind: NoticeKind; line: stri
 		let data = store()
 		let entry: Stored = { id: `${data.next}`, at: new Date().toISOString(), ...e }
 		data.next++
-		data.entries = [...data.entries, entry].slice(-noticeHistory.limit())
+		data.entries = [...data.entries, entry].slice(-noticeHistory.limit)
 		liveFiles.save(data)
 	} catch (err: any) {
 		diag.log(`notice history: ${err?.message ?? err}`)
@@ -53,6 +53,6 @@ function reset(): void {
 
 export const noticeHistory = {
 	state: { store: null as Store | null },
-	limit: (): number => 200,
+	limit: 200,
 	store, record, list, reset,
 }

@@ -106,7 +106,7 @@ export const attachments = {
 	newName,
 	nameType,
 	// Largest attachment, decoded.
-	maxBytes: () => 5 * 1024 * 1024,
+	maxBytes: 5 * 1024 * 1024,
 	markers,
 	marker,
 	named,

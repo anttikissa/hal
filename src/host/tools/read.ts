@@ -42,7 +42,7 @@ export const tool: Tool<ToolOutput> = {
 		let file = Bun.file(path)
 		let head = await file.slice(0, 12).bytes()
 		let mediaType = Object.keys(attachments.types).find((type) => type.startsWith('image/') && blobs.looksLike(type, head))
-		let max = mediaType ? attachments.maxBytes() : tools.maxFileBytes()
+		let max = mediaType ? attachments.maxBytes : tools.maxFileBytes
 		if (st.size > max) throw new Error(`${input.path} is too large to read (${st.size} bytes)`)
 		let bytes = await file.slice(0, max + 1).bytes()
 		if (bytes.length > max) throw new Error(`${input.path} is too large to read (${bytes.length} bytes)`)

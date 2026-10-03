@@ -30,7 +30,7 @@ async function url(): Promise<string> {
 	let alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 	let verifier = Array.from(crypto.getRandomValues(new Uint8Array(43)), (b) => alphabet[b % 62]).join('')
 	let challenge = base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))))
-	let u = new URL(login.authorizeUrl())
+	let u = new URL(login.authorizeUrl)
 	let params = { code: 'true', client_id: CLIENT_ID, response_type: 'code', redirect_uri: REDIRECT, scope: SCOPE }
 	for (let [k, v] of Object.entries(params)) u.searchParams.set(k, v)
 	u.searchParams.set('code_challenge', challenge)
@@ -71,7 +71,7 @@ async function finish(pasted: string): Promise<string | undefined> {
 // The account's email, which names it in the file and in messages.
 async function email(token: string): Promise<string | undefined> {
 	try {
-		let res = await fetch(login.profileUrl(), { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) })
+		let res = await fetch(login.profileUrl, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) })
 		if (!res.ok) return undefined
 		let data: any = await res.json()
 		let found = data?.account?.email
@@ -104,8 +104,8 @@ function save(entry: Entry, kind: Kind = 'anthropic'): void {
 }
 
 export const login = {
-	authorizeUrl: () => 'https://claude.ai/oauth/authorize',
-	profileUrl: () => 'https://api.anthropic.com/api/oauth/profile',
+	authorizeUrl: 'https://claude.ai/oauth/authorize',
+	profileUrl: 'https://api.anthropic.com/api/oauth/profile',
 	url,
 	finish,
 	email,

@@ -49,7 +49,7 @@ function command(sessionId: string, id: string, mediaType: string, bytes: Uint8A
 // The error text for something too large to send (the host would refuse
 // it, and one message that big may break the connection), or undefined.
 function tooBig(size: number): string | undefined {
-	let max = attachments.maxBytes()
+	let max = attachments.maxBytes
 	return size > max ? `[upload failed: larger than ${max / 1024 / 1024} MB]` : undefined
 }
 

@@ -36,7 +36,7 @@ function fade(id: string, working: boolean, now: number): number {
 	if (!st.stopped.has(id)) return 1
 	let since = st.stopped.get(id) ?? now
 	st.stopped.set(id, since)
-	let ms = halCursor.fadeMs()
+	let ms = halCursor.fadeMs
 	// In steps, so a fade paints (and caches) a few colours, not one per beat.
 	return ms > 0 ? Math.min(1, Math.round(((now - since) / ms) * 10) / 10) : 1
 }
@@ -64,7 +64,7 @@ export const halCursor = {
 	// while it works).
 	state: { stopped: new Map<string, number | null>() },
 	/** How long a finished session's idle cursor takes to turn grey. */
-	fadeMs: () => 5000,
+	fadeMs: 5000,
 	streaming,
 	fade,
 	of,

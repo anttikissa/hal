@@ -8,7 +8,7 @@ useHost()
 
 // Not offered by default (task hc); local.ts can bring it back.
 let disabled = tools.disabled
-beforeAll(() => (tools.disabled = () => []))
+beforeAll(() => (tools.disabled = []))
 afterAll(() => (tools.disabled = disabled))
 
 const ask = (input: Record<string, unknown>, id = 'q1') => ({ type: 'tool_call' as const, id, name: 'ask', input })

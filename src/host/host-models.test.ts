@@ -154,7 +154,7 @@ test('a provider that never answers does not hold up the list', async () => {
 	models.state.lists.clear()
 	provider.state.providers.slow = { ...fake([]), models: (signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')))) }
 	let saved = models.timeoutMs
-	models.timeoutMs = () => 5
+	models.timeoutMs = 5
 	try {
 		models.list('acme/big-1')
 		await until(() => models.state.lists.has('acme'))

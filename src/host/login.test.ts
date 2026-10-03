@@ -46,7 +46,7 @@ beforeEach(() => {
 		},
 	})
 	auth.tokenUrl = () => `http://127.0.0.1:${server.port}/token`
-	login.profileUrl = () => `http://127.0.0.1:${server.port}/profile`
+	login.profileUrl = `http://127.0.0.1:${server.port}/profile`
 	liveFiles.onError = () => {}
 })
 
@@ -215,7 +215,7 @@ test('a login makes its account usable again at once, leaving other accounts\' l
 })
 
 test('a blocked turn accepts bare /login and /login claude, then resumes after success', async () => {
-	auth.pollMs = () => 5
+	auth.pollMs = 5
 	// A provider that needs a working anthropic login, as the real one does.
 	turns.stream = (): AsyncIterable<StreamEvent> =>
 		(async function* (): AsyncGenerator<StreamEvent> {

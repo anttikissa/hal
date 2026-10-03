@@ -173,7 +173,7 @@ test('abort before the request is sent yields cancelled without fetching', async
 test('a stalled stream times out as an error', async () => {
 	provider.register('fake', echo)
 	let original = provider.streamTimeoutMs
-	provider.streamTimeoutMs = () => 20
+	provider.streamTimeoutMs = 20
 	try {
 		fakeFetch(() => new Response(new ReadableStream({ start() {} })))
 		let events = await all(provider.stream('fake/m1', req))
@@ -311,7 +311,7 @@ test('a model refused for the account plan sets that account aside for the model
 	fakeFetch(() => Response.json({ detail: "The 'm1' model is not supported when using Codex with a ChatGPT account." }, { status: 400 }))
 	let [e] = (await all(provider.stream('fake/m1', req))) as any[]
 	expect(e).toMatchObject({ failure: 'limited', retryAt: now })
-	expect(limits.until(limits.key('fake/m1', 'a@x'))).toBe(now + provider.planLimitMs())
+	expect(limits.until(limits.key('fake/m1', 'a@x'))).toBe(now + provider.planLimitMs)
 	expect(limits.until(limits.key('fake/m2', 'a@x'))).toBe(0)
 })
 

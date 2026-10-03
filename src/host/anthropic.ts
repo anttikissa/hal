@@ -72,7 +72,7 @@ function adaptive(model: string): boolean {
 }
 
 function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
-	let maxTokens = req.maxTokens ?? anthropic.maxTokens()
+	let maxTokens = req.maxTokens ?? anthropic.maxTokens
 	let system: unknown[] = []
 	if (oauth) system.push({ type: 'text', text: IDENTITY })
 	// The model reads the blocks joined with no separator; a blank line
@@ -83,7 +83,7 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 	if (req.tools?.length) b.tools = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }))
 	if (adaptive(req.model)) b.thinking = { type: 'adaptive', display: 'summarized' }
 	else if (/^claude-(opus|sonnet)/.test(req.model) && maxTokens > MIN_THINKING) {
-		b.thinking = { type: 'enabled', budget_tokens: Math.max(MIN_THINKING, Math.min(anthropic.thinkingBudget(), maxTokens - 1024)) }
+		b.thinking = { type: 'enabled', budget_tokens: Math.max(MIN_THINKING, Math.min(anthropic.thinkingBudget, maxTokens - 1024)) }
 	}
 	Object.assign(b, effort.wire('anthropic', req.model, req.effort, maxTokens))
 	return b
@@ -108,13 +108,13 @@ async function headers(model?: string, req?: ProviderRequest): Promise<{ headers
 
 async function request(req: ProviderRequest) {
 	let { headers, oauth, account } = await anthropic.headers(req.model, req)
-	return { url: anthropic.apiUrl(), headers, body: anthropic.body(req, oauth), account }
+	return { url: anthropic.apiUrl, headers, body: anthropic.body(req, oauth), account }
 }
 
 // The models the account may use (GET /v1/models). On failure the
 // picker falls back to models.dev, then knownModels (host/models.ts).
 async function models(signal: AbortSignal): Promise<string[]> {
-	let url = new URL(anthropic.apiUrl())
+	let url = new URL(anthropic.apiUrl)
 	url.pathname = url.pathname.replace(/\/messages$/, '/models')
 	url.searchParams.set('limit', '1000')
 	let res = await provider.fetch(String(url), { headers: (await anthropic.headers()).headers, signal })
@@ -235,18 +235,18 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 
 // Registers the provider. Idempotent.
 function init(): void {
-	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse, rejected: (account) => auth.rejected(account), spent: (account) => auth.spent(account), models: (signal) => anthropic.models(signal), known: () => anthropic.knownModels() })
+	provider.register('anthropic', { request: anthropic.request, parse: anthropic.parse, rejected: (account) => auth.rejected(account), spent: (account) => auth.spent(account), models: (signal) => anthropic.models(signal), known: () => anthropic.knownModels })
 }
 
 export const anthropic = {
 	// ?beta=true is required for OAuth tokens; without it requests land
 	// on a pool that answers 529 overloaded far more often.
-	apiUrl: () => 'https://api.anthropic.com/v1/messages?beta=true',
+	apiUrl: 'https://api.anthropic.com/v1/messages?beta=true',
 	// Current Claude models allow at least 64k output: big file writes.
-	maxTokens: () => 64_000,
-	thinkingBudget: () => 10_000,
+	maxTokens: 64_000,
+	thinkingBudget: 10_000,
 	// Offered when neither the account's list nor models.dev has any.
-	knownModels: () => ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-opus-5', 'claude-fable-5', 'claude-sonnet-5'],
+	knownModels: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-opus-5', 'claude-fable-5', 'claude-sonnet-5'],
 	toMessages,
 	body,
 	headers,

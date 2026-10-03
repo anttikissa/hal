@@ -44,13 +44,13 @@ test('events fold into what the page shows, like the terminal transcript', () =>
 })
 
 test('long and failed tool results show a marked glimpse, and all of it in full', () => {
-	let output = Array.from({ length: view.resultRows() + 3 }, (_, i) => `l${i}`).join('\n')
+	let output = Array.from({ length: view.resultRows + 3 }, (_, i) => `l${i}`).join('\n')
 	let s = view.show({ type: 'tool-result', id: 't', output, isError: true })!
 	expect(s.kind).toContain('error')
 	expect(s.text.startsWith('✗ l0\n')).toBe(true)
-	expect(s.text.split('\n')).toHaveLength(view.resultRows() + 1)
+	expect(s.text.split('\n')).toHaveLength(view.resultRows + 1)
 	expect(s.text.endsWith('… 3 more lines')).toBe(true)
-	expect(view.show({ type: 'tool-result', id: 't', output }, true)!.text).toContain(`l${view.resultRows() + 2}`)
+	expect(view.show({ type: 'tool-result', id: 't', output }, true)!.text).toContain(`l${view.resultRows + 2}`)
 })
 
 test('a rejected command or a config warning becomes a notice and keeps the transcript', () => {

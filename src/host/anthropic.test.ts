@@ -49,7 +49,7 @@ beforeEach(() => {
 			return reply()
 		},
 	})
-	anthropic.apiUrl = () => `http://127.0.0.1:${server.port}/v1/messages?beta=true`
+	anthropic.apiUrl = `http://127.0.0.1:${server.port}/v1/messages?beta=true`
 	auth.tokenUrl = () => `http://127.0.0.1:${server.port}/token`
 	anthropic.init()
 })

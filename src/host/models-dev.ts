@@ -67,7 +67,7 @@ function parse(data: unknown): Catalog {
 async function refresh(picked: string[] = []): Promise<string[]> {
 	if (modelsDev.offline()) return []
 	try {
-		let res = await provider.fetch(modelsDev.url(), { signal: AbortSignal.timeout(modelsDev.timeoutMs()) })
+		let res = await provider.fetch(modelsDev.url, { signal: AbortSignal.timeout(modelsDev.timeoutMs) })
 		if (!res.ok) throw new Error(`HTTP ${res.status}`)
 		let next = modelsDev.parse(await res.json())
 		if (!Object.keys(next).length) throw new Error('no providers in the answer')
@@ -119,8 +119,8 @@ function contextWindow(id: string): number | undefined {
 
 export const modelsDev = {
 	state: { catalog: null as Catalog | null, path: '' },
-	url: () => 'https://models.dev/api.json',
-	timeoutMs: () => 10_000,
+	url: 'https://models.dev/api.json',
+	timeoutMs: 10_000,
 	// Tests (and ./run under bun test, which inherits NODE_ENV) never
 	// reach models.dev; unit tests replace this and fake the fetch.
 	offline: () => process.env.NODE_ENV === 'test',

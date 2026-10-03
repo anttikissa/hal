@@ -85,10 +85,10 @@ async function terminalShowing(id: string): Promise<{ lines: string[]; events: E
 test("the terminal's frame after the background load equals the frame from a full load", async () => {
 	let id = longSession()
 	await history.open(id)
-	pages.budget = () => 10_000_000
+	pages.budget = 10_000_000
 	let full = await terminalShowing(id)
 	expect(full.events.filter((e) => e.type === 'history')).toHaveLength(0)
-	pages.budget = () => 8_000
+	pages.budget = 8_000
 	let lazy = await terminalShowing(id)
 	let asked = lazy.events.filter((e) => e.type === 'history')
 	expect(asked.length).toBeGreaterThan(3)
@@ -99,7 +99,7 @@ test("the terminal's frame after the background load equals the frame from a ful
 
 test('the open question shows at once, before the rest of the history is in', () => {
 	let id = longSession()
-	pages.budget = () => 8_000
+	pages.budget = 8_000
 	let snap: any
 	let conn = host.connect((e) => {
 		if (e.type === 'snapshot') snap = e.snapshot

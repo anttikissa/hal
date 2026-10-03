@@ -146,7 +146,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let out = call ? bashResult.display(item.output) : item.output
 			// Only the lines shown are laid out (outputs run to megabytes);
 			// the rest are counted as source lines, as on the web.
-			let wide = width, max = itemView.resultRows()
+			let wide = width, max = itemView.resultRows
 			let lines = out.replace(/\n$/, '').split('\n')
 			let rows: string[] = []
 			let used = 0
@@ -250,7 +250,7 @@ function quoteLines(quote: Quote | undefined, width: number): string[] {
 
 export const itemView = {
 	// Rows of a tool result shown in the transcript.
-	resultRows: () => 3,
+	resultRows: 3,
 	toolStyle,
 	itemStyle,
 	itemLines,

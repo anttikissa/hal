@@ -37,7 +37,7 @@ function spawn(parent: string, s: Spawn): string {
 	let selected = models.selection(s.model ?? models.qualified(meta.model, meta.effort))
 	let limited = auth.limitedUntil(selected.id)
 	if (limited) throw new Error(`${selected.id} is rate limited until ${new Date(limited).toISOString().slice(0, 16).replace('T', ' ')} UTC; spawn with another model (inspect models shows which are limited)`)
-	let left = meta.slots ?? subagents.initialSlots()
+	let left = meta.slots ?? subagents.initialSlots
 	if (s.limit + 1 > left) throw new Error(`limit ${s.limit} needs ${s.limit + 1} spawn slots, but this session has ${left} left`)
 	meta.slots = left - s.limit - 1
 	let child = sessions.create({ cwd: s.cwd, model: models.qualified(selected.id, selected.effort), name: s.name })
@@ -174,7 +174,7 @@ function promote(id: string): void {
 
 export const subagents = {
 	// Slots of a session nobody spawned.
-	initialSlots: () => 5,
+	initialSlots: 5,
 	spawn,
 	prompt,
 	fork,

@@ -53,7 +53,7 @@ beforeEach(() => {
 		},
 	})
 	auth.tokenUrl = () => `http://127.0.0.1:${server.port}/token`
-	chatgptLogin.deviceUrl = () => `http://127.0.0.1:${server.port}/device`
+	chatgptLogin.deviceUrl = `http://127.0.0.1:${server.port}/device`
 	chatgptLogin.local = () => false
 })
 
@@ -114,7 +114,7 @@ test('the openai alias works, and logins are kept per ChatGPT account beside ant
 
 test('a login that is never finished times out, and failures never echo codes or tokens', async () => {
 	pending = Infinity
-	chatgptLogin.timeoutMs = () => 30
+	chatgptLogin.timeoutMs = 30
 	await expect(command.run('chatgpt', undefined, context().ctx) as Promise<unknown>).rejects.toThrow('timed out')
 	pending = 0
 	tokenStatus = 400
@@ -159,7 +159,7 @@ test('OPENAI_API_KEY alone needs no file; no login at all names both ways', asyn
 test('on this machine the browser flow logs in through the localhost redirect, no device code', async () => {
 	chatgptLogin.local = () => true
 	let port = 20000 + Math.floor(Math.random() * 20000)
-	chatgptLogin.callbackPort = () => port
+	chatgptLogin.callbackPort = port
 	let shown: string[] = []
 	let done = chatgptLogin.run((t) => shown.push(t))
 	await Bun.sleep(20)

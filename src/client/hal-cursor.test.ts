@@ -78,7 +78,7 @@ test('a full last row puts the cursor on the next row, never in the last column'
 	let at = r.indexOf(' ' + 'x'.repeat(18))
 	expect(r[at + 1]).toBe(' {hal}')
 	// Dark, the row stays: the frame's height never blinks.
-	now = pulse.ms()
+	now = pulse.ms
 	expect(rows(20).length).toBe(r.length)
 })
 
@@ -91,11 +91,11 @@ test('the cursor goes when the block ends; blank, cursor, blank rows follow the 
 	app.onEvent({ type: 'turn-end', sessionId: 's1', status: 'completed' })
 	state({ type: 'idle' })
 	// Finished: it fades from the Hal colour to grey.
-	now = halCursor.fadeMs() * 2
+	now = halCursor.fadeMs * 2
 	expect(below(' Hello')).toEqual(['', ' █', ''])
 	expect(rows().join('\n')).not.toContain('{hal}')
 	// It blinks: dark two beats later, the row stays.
-	now += 2 * pulse.ms()
+	now += 2 * pulse.ms
 	expect(below(' Hello')).toEqual(['', '', ''])
 })
 
@@ -119,18 +119,18 @@ test('no timer runs when nothing blinks', () => {
 test('a blink phase rewrites the cursor row alone', () => {
 	let written = ''
 	render.init({ write: (s) => void (written += s), size: () => ({ rows: 30, cols: 40 }) })
-	render.frameMs = () => 0
+	render.frameMs = 0
 	app.onEvent(snapshot())
 	for (let i = 0; i < 5; i++) app.onEvent({ type: 'command', sessionId: 's1', text: `/cmd${i}` } as any)
 	render.draw()
 	written = ''
-	now = 2 * pulse.ms()
+	now = 2 * pulse.ms
 	app.beat()
 	render.draw()
 	expect(written.split('\x1b[2K').length).toBe(2)
 	// A beat that changes nothing paints nothing.
 	written = ''
-	now = 2.5 * pulse.ms()
+	now = 2.5 * pulse.ms
 	app.beat()
 	expect(written).toBe('')
 })
@@ -138,7 +138,7 @@ test('a blink phase rewrites the cursor row alone', () => {
 test('the pulse beats on wall-clock beats until nobody keeps it', async () => {
 	pulse.now = saved.now
 	let ms = pulse.ms
-	pulse.ms = () => 5
+	pulse.ms = 5
 	let beats: number[] = []
 	pulse.keep((b) => beats.push(b))
 	await Bun.sleep(30)
@@ -161,11 +161,11 @@ test('a blinking tab indicator keeps the pulse and blinks with it', () => {
 	expect(pulse.running()).toBe(true)
 	let bar = () => frame.build(appView.view(), 40).lines.find((l) => l.includes('ctrl-t: new'))
 	let lit = bar()
-	now = 2 * pulse.ms()
+	now = 2 * pulse.ms
 	let count = shown.length
 	app.beat()
 	expect(shown.length).toBe(count + 1)
 	expect(bar()).not.toBe(lit)
-	now = 4 * pulse.ms()
+	now = 4 * pulse.ms
 	expect(bar()).toBe(lit)
 })

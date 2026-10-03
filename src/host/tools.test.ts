@@ -65,7 +65,7 @@ test('read returns a file relative to the session cwd, answering the call id', a
 })
 
 test('read pages through a long file and says how to continue', async () => {
-	tools.maxLines = () => 3
+	tools.maxLines = 3
 	writeFileSync(`${dir}/long.txt`, Array.from({ length: 10 }, (_, i) => `line ${i + 1}`).join('\n'))
 	let first = (await read({ path: 'long.txt' })).output
 	expect(first.startsWith('line 1\nline 2\nline 3\n')).toBe(true)
@@ -79,7 +79,7 @@ test('read pages through a long file and says how to continue', async () => {
 })
 
 test('no result exceeds the output bound, however long its lines', async () => {
-	tools.maxChars = () => 1000
+	tools.maxChars = 1000
 	writeFileSync(`${dir}/wide.txt`, 'x'.repeat(50_000) + '\nshort\n')
 	let { output, isError } = await read({ path: 'wide.txt' })
 	expect(isError).toBeUndefined()
@@ -143,7 +143,7 @@ test('cancel stops a running command, pipelines included, and a cancelled turn r
 })
 
 test('a stopped command is asked to end, then killed: a background job that ignores SIGTERM does not survive', async () => {
-	tools.killAfterMs = () => 300
+	tools.killAfterMs = 300
 	let marker = `31.${process.pid}2`
 	let alive = () => Bun.spawnSync(['pgrep', '-f', `sleep ${marker}`]).stdout.toString().trim() !== ''
 	let ac = new AbortController()
@@ -183,7 +183,7 @@ const blobRun = (id: string, options: { offset?: number; limit?: number } = {}) 
 test('large bash output is bounded, keeps both ends and the whole result in a session blob', async () => {
 	paths.home = () => dir
 	try {
-		tools.maxChars = () => 1000
+		tools.maxChars = 1000
 		let result = await bash({ command: "printf 'START\\n'; yes middle | head -c 80000; printf '\\nEND\\n'; exit 7", description: 'Produce long output and fail' })
 		expect(result.output.length).toBeLessThanOrEqual(1200)
 		expect(result.output).toContain('START')
@@ -220,11 +220,11 @@ test('read_blob pages large text and history blocks within the result cap', asyn
 	paths.home = () => dir
 	let max = tools.maxChars
 	try {
-		tools.maxChars = () => 900
+		tools.maxChars = 900
 		let lines = Array.from({ length: 50 }, (_, i) => `line ${i + 1}: ${'x'.repeat(60)}\n`)
 		let id = blobs.storeOutput('s', lines.join('')).blob
 		let first = (await blobRun(id)).output
-		expect(first.length).toBeLessThanOrEqual(tools.maxChars())
+		expect(first.length).toBeLessThanOrEqual(tools.maxChars)
 		let next = Number(first.match(/continue with offset (\d+)/)?.[1])
 		expect(next).toBeGreaterThan(1)
 		expect((await blobRun(id, { offset: next })).output).toContain(`line ${next}:`)
@@ -234,7 +234,7 @@ test('read_blob pages large text and history blocks within the result cap', asyn
 		expect((await blobRun(id, { offset: 51 })).isError).toBe(true)
 		let record = history.append('s', { type: 'user', blocks: lines.map((text) => ({ type: 'text' as const, text })) })
 		let block = (await blobRun(`#${record.n}`)).output
-		expect(block.length).toBeLessThanOrEqual(tools.maxChars())
+		expect(block.length).toBeLessThanOrEqual(tools.maxChars)
 		expect(block).toContain('continue with offset')
 		expect((await blobRun(id, { offset: 0 })).isError).toBe(true)
 	} finally { paths.home = originalHome; tools.maxChars = max }

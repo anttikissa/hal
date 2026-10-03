@@ -63,7 +63,7 @@ afterEach(() => {
 test('a refresh is cached and serves context windows and lists offline, after a restart', async () => {
 	expect(modelsDev.contextWindow('anthropic/claude-big-2')).toBeUndefined()
 	expect(await modelsDev.refresh()).toEqual([])
-	expect(fetched).toEqual([modelsDev.url()])
+	expect(fetched).toEqual([modelsDev.url])
 	// A new host: nothing in memory, and the network is gone.
 	modelsDev.state.catalog = null
 	answer = () => Promise.reject(new Error('offline'))

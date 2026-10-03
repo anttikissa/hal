@@ -8,7 +8,7 @@ import type { SlashCommand } from '../commands.ts'
 import { noticeHistory } from '../notice-history.ts'
 
 export const command: SlashCommand = {
-	help: () => `/notifications lists past notifications, oldest first: time, tab name, why it was sent and its text, linked to where it happened. Shows the latest 10; /notifications N shows N (Infinity for all the ${noticeHistory.limit()} kept).`,
+	help: () => `/notifications lists past notifications, oldest first: time, tab name, why it was sent and its text, linked to where it happened. Shows the latest 10; /notifications N shows N (Infinity for all the ${noticeHistory.limit} kept).`,
 	run(args) {
 		let count = args ? Number(args) : 10
 		if (!(count >= 1) || !(Number.isInteger(count) || count === Infinity)) return { error: 'usage: /notifications [count | Infinity]' }

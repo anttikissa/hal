@@ -86,7 +86,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let shown = () => view.show(props.row.item)
 	let result = () => props.row.result && view.show(props.row.result, full())
 	// Whether the result is longer than its glimpse.
-	let long = () => (props.row.result ? props.row.result.output.replace(/\n$/, '').split('\n').length : 0) > view.resultRows()
+	let long = () => (props.row.result ? props.row.result.output.replace(/\n$/, '').split('\n').length : 0) > view.resultRows
 	// The link shows the block's id, #35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.

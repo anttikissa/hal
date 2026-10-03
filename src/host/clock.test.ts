@@ -27,9 +27,9 @@ test('a tick that comes far too late is a wake; normal ticks are not', () => {
 	let wakes = 0
 	clock.onWake(() => wakes++)
 	clock.tick()
-	now += clock.tickMs()
+	now += clock.tickMs
 	clock.tick()
-	now += clock.tickMs() + 100
+	now += clock.tickMs + 100
 	clock.tick()
 	expect(wakes).toBe(0)
 	now += 3600_000
@@ -40,7 +40,7 @@ test('a tick that comes far too late is a wake; normal ticks are not', () => {
 test('until waits in short slices, so a long wait never oversleeps a jump', async () => {
 	let slept = fake()
 	await clock.until(now + 10_500)
-	expect(Math.max(...slept)).toBeLessThanOrEqual(clock.tickMs())
+	expect(Math.max(...slept)).toBeLessThanOrEqual(clock.tickMs)
 	expect(now).toBe(1_000_000 + 10_500)
 	// Wall time jumped past the target (a sleep): no more waiting.
 	slept.length = 0

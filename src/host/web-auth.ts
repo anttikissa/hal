@@ -53,7 +53,7 @@ function issue(): string {
 	let code: string
 	do code = random(6)
 	while (codes.has(code))
-	codes.set(code, now + webAuth.codeMs())
+	codes.set(code, now + webAuth.codeMs)
 	return code
 }
 
@@ -63,7 +63,7 @@ function redeem(typed: unknown): { token: string } | { refused: 'wrong' | 'limit
 	let now = clock.now()
 	let st = webAuth.state
 	st.wrong = st.wrong.filter((t) => t > now - minute)
-	if (st.wrong.length >= webAuth.maxWrong()) return { refused: 'limited' }
+	if (st.wrong.length >= webAuth.maxWrong) return { refused: 'limited' }
 	let code = typeof typed === 'string' && typed.length <= 64 ? normalize(typed) : ''
 	let until = st.codes.get(code)
 	if (until === undefined || until <= now) {
@@ -74,7 +74,7 @@ function redeem(typed: unknown): { token: string } | { refused: 'wrong' | 'limit
 	let token = random(20)
 	let data = webAuth.store()
 	for (let [h, at] of Object.entries(data)) if (!(Date.parse(at) > now)) delete data[h]
-	data[hash(token)] = new Date(now + webAuth.tokenMs()).toISOString()
+	data[hash(token)] = new Date(now + webAuth.tokenMs).toISOString()
 	liveFiles.save(data)
 	return { token }
 }
@@ -114,9 +114,9 @@ export const webAuth = {
 		store: null as Record<string, string> | null,
 		path: '',
 	},
-	codeMs: (): number => 10 * minute,
-	tokenMs: (): number => 10 * 365 * 24 * 60 * minute,
-	maxWrong: (): number => 10,
+	codeMs: 10 * minute,
+	tokenMs: 10 * 365 * 24 * 60 * minute,
+	maxWrong: 10,
 	random,
 	normalize,
 	store,

@@ -12,7 +12,7 @@ import { ason } from './ason.ts'
 function decoder(
 	onValue: (value: unknown) => void,
 	onError: (error: Error) => void,
-	maxLine = lines.maxLine(),
+	maxLine = lines.maxLine,
 	parse: (line: string) => unknown = ason.parse,
 ): (chunk: string | Uint8Array) => void {
 	let text = new TextDecoder()
@@ -54,7 +54,7 @@ function encode(value: unknown): string {
 
 export const lines = {
 	// Snapshots carry whole conversations, so this is generous.
-	maxLine: () => 256 * 1024 * 1024,
+	maxLine: 256 * 1024 * 1024,
 	decoder,
 	encode,
 }

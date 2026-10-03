@@ -46,9 +46,9 @@ test('a snapshot read in slices misses no record appended meanwhile, and command
 	let id = created(a)
 	for (let i = 0; i < 30; i++) history.append(id, { type: 'output', text: `out ${i}` })
 	let saved = { sliceMs: pages.sliceMs, syncBytes: pages.syncBytes, budget: pages.budget, pageSteps: pages.pageSteps }
-	pages.sliceMs = () => 0
-	pages.syncBytes = () => 0
-	pages.budget = () => 300
+	pages.sliceMs = 0
+	pages.syncBytes = 0
+	pages.budget = 300
 	// The record lands once the tail has been read, before it is sent.
 	pages.pageSteps = function* (...args) {
 		let page = yield* saved.pageSteps(...args)

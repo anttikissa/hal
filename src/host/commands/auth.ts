@@ -16,7 +16,7 @@ export const command: SlashCommand = {
 			return { say: 'every web session ended; a browser needs a new code' }
 		}
 		if (args) return { error: 'usage: /auth or /auth revoke' }
-		let minutes = Math.round(webAuth.codeMs() / 60_000)
+		let minutes = Math.round(webAuth.codeMs / 60_000)
 		return { show: `web login code: ${webAuth.issue()} (one login, ${minutes} minutes; not saved)` }
 	},
 }

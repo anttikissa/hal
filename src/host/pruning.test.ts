@@ -31,7 +31,7 @@ const providerBytes = (messages: Message[]) => anthropic.toMessages({ model: 'te
 
 
 test('provider prefix is byte-identical through many rounds, turns, retries and reopen; only checkpoints rewrite it', async () => {
-	pruning.pressureTokens = () => Infinity
+	pruning.pressureTokens = Infinity
 	let id = sessions.create({ cwd: home, model: 'anthropic/test' }).id
 	let frozen: string[] = []
 	let boundaries = 0
@@ -80,7 +80,7 @@ test('pressure omits only consumed work durably; original/capped recovery and co
 	let whole = 'first\n' + 'retained whole output\n'.repeat(4000)
 	let capped = tools.cap(whole, id)
 	let result = history.results(id, [{ type: 'tool_result', id: 'a', output: capped }])!
-	pruning.pressureTokens = () => 1
+	pruning.pressureTokens = 1
 	let protectedInput = await history.messages(id)
 	expect(JSON.stringify(protectedInput)).toContain('whole output in blob')
 	await round(id, [{ type: 'error', message: 'failed request' }])

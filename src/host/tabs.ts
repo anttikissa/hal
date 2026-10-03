@@ -170,7 +170,7 @@ function close(id: string): string | undefined {
 	f.open.splice(index, 1)
 	let closed = f.closed.filter((c) => c.id !== id)
 	closed.push({ id, index })
-	f.closed = closed.slice(-tabs.closedKept())
+	f.closed = closed.slice(-tabs.closedKept)
 	return undefined
 }
 
@@ -243,7 +243,7 @@ function reset(): void {
 export const tabs = {
 	state: { file: null as TabsFile | null },
 	// How many recently closed tabs are remembered.
-	closedKept: () => 50,
+	closedKept: 50,
 	file,
 	is,
 	list,

@@ -227,7 +227,7 @@ function later(work: () => void): void {
 	let st = main.state
 	if (st.shown) return void setTimeout(work)
 	st.later.push(work)
-	st.fallback ??= setTimeout(() => main.shown(), main.laterMs())
+	st.fallback ??= setTimeout(() => main.shown(), main.laterMs)
 }
 
 // The first tab is on screen: the work held for it runs, one task each.
@@ -245,7 +245,7 @@ function shown(): void {
 // a code from a process about to exit would log nobody in.
 async function auth(): Promise<number> {
 	let answer = await new Promise<{ code?: string; error?: string }>((resolve) => {
-		let timer = setTimeout(() => resolve({ error: 'the host did not answer' }), main.authWaitMs())
+		let timer = setTimeout(() => resolve({ error: 'the host did not answer' }), main.authWaitMs)
 		let done = (out: { code?: string; error?: string }) => {
 			clearTimeout(timer)
 			resolve(out)
@@ -268,7 +268,7 @@ async function auth(): Promise<number> {
 		process.stderr.write(`hal2: ${answer.error}\n`)
 		return 1
 	}
-	process.stdout.write(`web login code: ${answer.code} (one login, ${Math.round(webAuth.codeMs() / 60_000)} minutes)\n`)
+	process.stdout.write(`web login code: ${answer.code} (one login, ${Math.round(webAuth.codeMs / 60_000)} minutes)\n`)
 	return 0
 }
 
@@ -369,8 +369,8 @@ async function start(): Promise<void> {
 
 export const main = {
 	state: { kept: '', shown: false, later: [] as (() => void)[], fallback: undefined as Timer | undefined },
-	laterMs: () => 1000,
-	authWaitMs: () => 5000,
+	laterMs: 1000,
+	authWaitMs: 5000,
 	lastTab,
 	keepTab,
 	localPath,

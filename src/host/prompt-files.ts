@@ -99,7 +99,7 @@ function start(clients: Iterable<Watcher>): void {
 	promptFiles.state.tick = () => {
 		try { promptFiles.check(clients) } catch (e: any) { diag.log(`prompt files: ${e?.message ?? e}`) }
 	}
-	promptFiles.state.timer = setInterval(() => promptFiles.state.tick?.(), promptFiles.intervalMs())
+	promptFiles.state.timer = setInterval(() => promptFiles.state.tick?.(), promptFiles.intervalMs)
 	promptFiles.state.timer.unref?.()
 }
 
@@ -112,6 +112,6 @@ function stop(): void {
 
 export const promptFiles = {
 	state: { seen: new Map<string, string | null>(), timer: undefined as ReturnType<typeof setInterval> | undefined, soon: undefined as ReturnType<typeof setTimeout> | undefined, tick: undefined as (() => void) | undefined, watchers: new Map<string, FSWatcher>(), seq: 0 },
-	intervalMs: (): number => 1000,
+	intervalMs: 1000,
 	files, check, watchDirs, start, stop,
 }

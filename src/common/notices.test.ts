@@ -25,7 +25,7 @@ test('a newer notice from the same session replaces the old one and moves to the
 })
 
 test('each notice goes after its time, one that stays only when its source removes it', async () => {
-	notices.ttl = () => 20
+	notices.ttl = 20
 	let changes = 0
 	notices.onChange = () => void changes++
 	notices.add(done('a', 1))

@@ -27,7 +27,7 @@ function copied(value: unknown): string | undefined {
 }
 
 function argumentsOf(value: unknown, ref: string): unknown {
-	if (typeof value === 'string') return value.length > pruning.maxArgumentChars() ? pruning.marker('argument', ref) : value
+	if (typeof value === 'string') return value.length > pruning.maxArgumentChars ? pruning.marker('argument', ref) : value
 	if (Array.isArray(value)) return value.map((v) => pruning.argumentsOf(v, ref))
 	if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, pruning.argumentsOf(v, ref)]))
 	return value
@@ -80,9 +80,9 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}): History
 			if (r.n !== undefined) ages.set(r.n, completed)
 			if (r.type === 'turn_end' && r.status === 'completed') completed++
 		}
-		let checkpoint = Math.floor(completed / pruning.batchTurns()) * pruning.batchTurns()
+		let checkpoint = Math.floor(completed / pruning.batchTurns) * pruning.batchTurns
 		let apply = (set: Set<number>) => all.map((r) => r.n !== undefined && set.has(r.n) ? pruning.omit(id, r) : r)
-		let candidates = (old: boolean) => active.filter((r) => r.n !== undefined && !omitted.has(r.n) && consumed.has(r.n) && pruning.heavy(r) && (!old || checkpoint - (ages.get(r.n) ?? checkpoint) > pruning.retainTurns()))
+		let candidates = (old: boolean) => active.filter((r) => r.n !== undefined && !omitted.has(r.n) && consumed.has(r.n) && pruning.heavy(r) && (!old || checkpoint - (ages.get(r.n) ?? checkpoint) > pruning.retainTurns))
 		let add = (eligible: HistoryRecord[]) => {
 			let next = new Set(omitted)
 			for (let r of eligible) if (JSON.stringify(pruning.omit(id, r)).length < JSON.stringify(r).length) next.add(r.n!)
@@ -96,7 +96,7 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}): History
 			state.pressure = -1
 		}
 		let projected = apply(omitted)
-		let limit = Math.min(pruning.pressureTokens(), (budget.window ?? Infinity) * .75)
+		let limit = Math.min(pruning.pressureTokens, (budget.window ?? Infinity) * .75)
 		if (state.pressure !== checkpoint && pruning.estimate(replay.toMessages(projected), budget.overhead) > limit && add(candidates(false))) {
 			state.pressure = checkpoint
 			diag.log(`pruning ${id}: pressure boundary at checkpoint ${checkpoint}; omitted ${omitted.size} records`)
@@ -120,8 +120,8 @@ function consumed(id: string, records: HistoryRecord[]): void {
 
 export const pruning = {
 	saved, marker, copied, argumentsOf, omit, heavy, estimate, project, consumed,
-	batchTurns: () => 8,
-	retainTurns: () => 4,
-	maxArgumentChars: () => 1000,
-	pressureTokens: () => 180_000,
+	batchTurns: 8,
+	retainTurns: 4,
+	maxArgumentChars: 1000,
+	pressureTokens: 180_000,
 }

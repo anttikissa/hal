@@ -302,7 +302,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'tool-result': {
 			// A glimpse, like the terminal: the model sees all of it.
 			let rows = (bash ? bashResult.display(item.output) : item.output).replace(/\n$/, '').split('\n')
-			let shown = full ? rows : rows.slice(0, view.resultRows())
+			let shown = full ? rows : rows.slice(0, view.resultRows)
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
 			return { kind: item.isError ? 'result error' : 'result log', text: (item.isError ? '✗ ' : '◂ ') + shown.join('\n  ') }
 		}
@@ -366,7 +366,7 @@ export const view = {
 	urlParts,
 	links,
 	// Rows of a tool result shown in the transcript.
-	resultRows: () => 8,
+	resultRows: 8,
 	onEvent,
 	key,
 	formKey,
