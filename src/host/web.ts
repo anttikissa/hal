@@ -40,7 +40,7 @@ import type { BunPlugin, Server, ServerWebSocket } from 'bun'
 import { watch, type FSWatcher } from 'fs'
 import { ason } from '../common/ason.ts'
 import { colors, DERIVED, type Style } from '../common/colors.ts'
-import { oklch, type Oklch } from '../common/oklch.ts'
+import { oklch } from '../common/oklch.ts'
 import { session } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
 import { blobs } from './blobs.ts'
@@ -146,18 +146,18 @@ function css(): string {
 	for (let [key, value] of Object.entries(colors)) {
 		if ((DERIVED as readonly string[]).includes(key)) continue
 		if (key === 'mix') {
-			rules.push(`:root { ${Object.entries(colors.mix()).map(([k, v]) => `--mix-${kebab(k)}: ${v}%`).join('; ')} }`)
+			rules.push(`:root { ${Object.entries(colors.mix).map(([k, v]) => `--mix-${kebab(k)}: ${v}%`).join('; ')} }`)
 			continue
 		}
 		// Shared values (fgL, screen) are numbers or one colour, not styles.
-		let style = (value as () => unknown)() as Style | number | Oklch
-		if (typeof style !== 'object' || Array.isArray(style)) continue
+		if (typeof value !== 'function') continue
+		let style = (value as () => Style)()
 		let decls = Object.entries(style).map(([part, c]) => {
 			let prop = part === 'fg' ? 'color' : part === 'bg' ? 'background-color' : `--${kebab(part)}`
 			return `${prop}: ${oklch.toCss(c)}`
 		})
 		let fg = style.fg ?? style.text
-		if (fg) decls.push(`--quiet: ${oklch.toCss(colors.quiet(fg, style.bg ?? style.button ?? colors.screen()))}`)
+		if (fg) decls.push(`--quiet: ${oklch.toCss(colors.quiet(fg, style.bg ?? style.button ?? colors.screen))}`)
 		// Selection is reverse video in the style's own colour (task gn).
 		if (fg) decls.push(`--fg: ${oklch.toCss(fg)}`, `--sel-back: ${oklch.toCss(fg)}`)
 		if (fg && key.startsWith('tool')) decls.push(`--output: ${oklch.toCss(colors.toolOutput(fg))}`)

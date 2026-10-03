@@ -4,11 +4,11 @@ import type { Plugin } from '../src/host/plugins.ts'
 
 // Alien (1979): amber text, green phosphor for you, brown-black screen.
 export const look: Look = {
-	screen: () => [0.15, 0.015, 85],
-	fgL: () => 0.84,
-	fgC: () => 0.17,
-	bgL: () => 0.2,
-	bgC: () => 0.05,
+	screen: [0.15, 0.015, 85],
+	fgL: 0.84,
+	fgC: 0.17,
+	bgL: 0.2,
+	bgC: 0.05,
 	assistant: () => ({ fg: [0.84, 0.16, 75], cursor: [0.84, 0.16, 75], cursorIdle: [0.6, 0.04, 75], bold: [0.93, 0.12, 80], code: [0.88, 0.1, 80], linkFg: [0.9, 0.17, 80], linkBg: [0.28, 0.06, 75] }),
 	user: () => ({ fg: [0.87, 0.2, 145], bg: [0.2, 0.05, 145] }),
 	thinking: () => ({ fg: [0.74, 0.08, 85], bold: [0.86, 0.08, 85], code: [0.8, 0.08, 85], linkBg: [0.2, 0.03, 85] }),
@@ -20,6 +20,9 @@ export const look: Look = {
 
 // A theme is a plugin (task d3): /theme links it to plugins/color-theme.ts.
 export default (plugin: Plugin) => {
-	for (let [key, fn] of Object.entries(look)) plugin.around(colors, key as keyof typeof colors, fn as never)
+	for (let [key, v] of Object.entries(look)) {
+		if (typeof v === 'function') plugin.around(colors, key as never, v as never)
+		else plugin.set(colors, key as never, v as never)
+	}
 	plugin.onChange(() => terminal.redraw())
 }

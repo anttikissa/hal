@@ -7,7 +7,8 @@ plugin.set(obj, key, value) overrides a plain value with the same ownership as h
 Docs: README "Plugins" section, tasks/README.md module conventions and plugins/example-plugin.ts describe set and the plain-value rule.`,
 	status: 'done',
 	notes: [
-		"Migrated 79 constant settings with a regex script (pure literals only; command help strings, no-op callbacks and delegations stayed functions). colors.* stay functions: theme Looks (task d3) receive each field's base and call it, so converting colours means reworking the Look type and every theme; left for a separate decision."
+		"Migrated 79 constant settings with a regex script (pure literals only; command help strings, no-op callbacks and delegations stayed functions). Colours followed (next note).",
+		'colors: screen, fgL, fgC, bgL, bgC and mix are plain values now; styles stay functions even when constant, because themes extend them through the field they replace (status: (base) => ({ ...base(), ... })). Look types a value field as a value; themes apply value fields with plugin.set and functions with plugin.around (a ternary on the unbound method fails to typecheck: call each explicitly). plugins/color-theme.ts is a symlink to a tracked themes/ file, so there is no private colour theme to edit.'
 	],
 	needs: ['an'],
 	foldInto: ['an']

@@ -167,7 +167,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (call && /^\[exit [1-9]\d*\]/.test(l)) {
 					let status = /^\[exit [1-9]\d*\]/.exec(l)![0]
 					let at = line.indexOf(status)
-					if (at >= 0) line = line.slice(0, at) + ansi.sgr({ fg: colors.diff().removeFg! }) + status + ansi.sgr({ fg: tool ? style!.fg! : colors.quiet(style!.fg!, colors.screen()) }) + line.slice(at + status.length)
+					if (at >= 0) line = line.slice(0, at) + ansi.sgr({ fg: colors.diff().removeFg! }) + status + ansi.sgr({ fg: tool ? style!.fg! : colors.quiet(style!.fg!, colors.screen) }) + line.slice(at + status.length)
 				}
 				return line
 			})

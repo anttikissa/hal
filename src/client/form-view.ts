@@ -58,7 +58,7 @@ function fieldLines(st: FormState, width: number, style: Style = colors.question
 		// (oklch.faint): dimmer than the readable-text minimum on purpose.
 		if (!value && field.type === 'text' && field.placeholder) {
 			let example = strings.clipVisual(ansi.clean(field.placeholder), width - indent)
-			p.rows[0] = ansi.mono() || !style.fg ? example : ansi.sgr({ fg: oklch.faint(style.fg, style.bg ?? colors.screen()) }) + example + ansi.sgr({ fg: style.fg })
+			p.rows[0] = ansi.mono() || !style.fg ? example : ansi.sgr({ fg: oklch.faint(style.fg, style.bg ?? colors.screen) }) + example + ansi.sgr({ fg: style.fg })
 		}
 		if (focused) cursor = { row: rows.length + p.row, col: indent + p.col }
 		p.rows.forEach((r, j) => rows.push((j ? ' '.repeat(indent) : strings.clipVisual(head, indent)) + r))

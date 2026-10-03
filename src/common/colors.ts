@@ -1,8 +1,8 @@
 // The built-in look, hal, as code; other themes are plugins that
-// replace fields (themes/, task d3). Every top-level field is a function, read at call
-// time: shared values (fgL: () => 0.8, screen) and styles computed from
-// them, so overriding a value from local.ts (colors.fgL = () => 0.9, or
-// around(colors, 'fgL', ...) from a plugin, which can undo it) moves
+// replace fields (themes/, task d3). The shared values (fgL, screen, mix) are plain
+// values; every other top-level field is a function, read at call time:
+// styles computed from them, so overriding a value (colors.fgL = 0.9 from
+// local.ts, or plugin.set(colors, 'fgL', 0.9), which can undo it) moves
 // everything derived from it. A style names its colours: fg and bg, plus extras
 // such as bold, code or cursor for later renderers. Every colour is
 // OKLCH [lightness, chroma, hue]: equal L and C across hues look equally
@@ -20,10 +20,12 @@ export type Style = { [part: string]: Oklch }
 type Colors = typeof colors
 // A theme (task d3): replacements for some fields, each given the field
 // it replaces, so it can change one part of a style and keep the rest.
-export type Look = { [K in keyof Colors]?: (base: Colors[K], ...args: Parameters<Colors[K]>) => ReturnType<Colors[K]> }
+// A plain value (fgL, screen, mix) is replaced by a plain value (plugin.set).
+export type Look = { [K in keyof Colors]?: Colors[K] extends (...args: any[]) => unknown ? (base: Colors[K], ...args: Parameters<Colors[K]>) => ReturnType<Colors[K]> : Colors[K] }
 
 // Fields that derive a colour from others, so take arguments; every
-// other field is a value or a style, read with no arguments.
+// other field is a plain value (fgL, screen, mix) or a style, a function
+// read with no arguments.
 export const DERIVED = ['quiet', 'blinkDim', 'heat', 'toolOutput'] as const
 
 // Plain names for colors.project() p0..p7, so a model can answer "which
@@ -34,13 +36,13 @@ export const colors = {
 	// The lightest dark background we design for: where a style has no
 	// bg of its own, its text is checked against this (4.5:1, 3:1 for
 	// marks; tasks/README.md, readable text).
-	screen: (): Oklch => [0.16, 0.01, 260],
+	screen: [0.16, 0.01, 260] as Oklch,
 	// Shared lightness and chroma of the vivid foregrounds and the card
 	// backgrounds.
-	fgL: (): number => 0.85,
-	fgC: (): number => 0.16,
-	bgL: (): number => 0.2,
-	bgC: (): number => 0.05,
+	fgL: 0.85,
+	fgC: 0.16,
+	bgL: 0.2,
+	bgC: 0.05,
 
 	// Derived colours: code calls these, so a theme may override them
 	// like any field. quiet: a style's secondary text (hints, ids,
@@ -62,12 +64,12 @@ export const colors = {
 	// table lines (table) and the line before the prompt box's buttons
 	// (divider); how much canvas the phone tab sheet's backdrop
 	// is (backdrop), and how far the busy dot pulses (pulse).
-	mix: () => ({ hover: 14, choiceHover: 18, tab: 16, entry: 55, divider: 35, quote: 40, table: 30, backdrop: 60, pulse: 30 }),
+	mix: { hover: 14, choiceHover: 18, tab: 16, entry: 55, divider: 35, quote: 40, table: 30, backdrop: 60, pulse: 30 },
 
 	// Hal's responses: warm orange.
 	assistant: (): Style => ({
-		fg: [colors.fgL(), colors.fgC(), 57],
-		cursor: [colors.fgL(), colors.fgC(), 55],
+		fg: [colors.fgL, colors.fgC, 57],
+		cursor: [colors.fgL, colors.fgC, 55],
 		cursorIdle: [0.6, 0, 55],
 		bold: [0.9, 0.06, 55],
 		code: [0.86, 0.04, 55],
@@ -91,7 +93,7 @@ export const colors = {
 	// Warnings: amber, noticeable but not fatal.
 	warning: (): Style => ({ fg: [0.87, 0.18, 82], bg: [0.2, 0.05, 82], code: [0.92, 0.12, 82], linkBg: [0.28, 0.06, 82] }),
 	// Questions waiting on the user: green, apart from warnings.
-	question: (): Style => ({ fg: [colors.fgL(), colors.fgC(), 150], bg: [colors.bgL(), colors.bgC(), 150], code: [0.92, 0.1, 150], linkBg: [0.28, 0.06, 150] }),
+	question: (): Style => ({ fg: [colors.fgL, colors.fgC, 150], bg: [colors.bgL, colors.bgC, 150], code: [0.92, 0.1, 150], linkBg: [0.28, 0.06, 150] }),
 	// Errors: hot red.
 	error: (): Style => ({ fg: [0.72, 0.24, 25], bg: [0.2, 0.08, 25], code: [0.84, 0.16, 25], linkBg: [0.24, 0.07, 25] }),
 	info: (): Style => ({ fg: [0.74, 0.06, 55], bg: [0.22, 0.025, 55], code: [0.86, 0.04, 55], linkBg: [0.3, 0.025, 55] }),
@@ -158,14 +160,14 @@ export const colors = {
 	}),
 	// Tools: each kind its own hue. Red is kept for real failures. A
 	// tool without its own entry (tool + capitalised name) uses `tool`.
-	tool: (): Style => ({ fg: [colors.fgL(), colors.fgC(), 250], bg: [colors.bgL(), colors.bgC(), 250] }),
-	toolBash: (): Style => ({ fg: [colors.fgL(), colors.fgC(), 320], bg: [colors.bgL(), colors.bgC(), 320] }),
-	toolEval: (): Style => ({ fg: [colors.fgL(), colors.fgC(), 295], bg: [colors.bgL(), 0.06, 295] }),
-	toolRead: (): Style => ({ fg: [colors.fgL(), colors.fgC(), 155], bg: [colors.bgL(), colors.bgC(), 155] }),
+	tool: (): Style => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),
+	toolBash: (): Style => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
+	toolEval: (): Style => ({ fg: [colors.fgL, colors.fgC, 295], bg: [colors.bgL, 0.06, 295] }),
+	toolRead: (): Style => ({ fg: [colors.fgL, colors.fgC, 155], bg: [colors.bgL, colors.bgC, 155] }),
 	toolGrep: (): Style => colors.toolRead(),
 	toolGlob: (): Style => colors.toolRead(),
 	toolLs: (): Style => colors.toolRead(),
-	toolWrite: (): Style => ({ fg: [0.78, 0.12, 75], bg: [colors.bgL(), 0.04, 75] }),
-	toolEdit: (): Style => ({ fg: [0.76, 0.11, 190], bg: [colors.bgL(), 0.04, 190] }),
+	toolWrite: (): Style => ({ fg: [0.78, 0.12, 75], bg: [colors.bgL, 0.04, 75] }),
+	toolEdit: (): Style => ({ fg: [0.76, 0.11, 190], bg: [colors.bgL, 0.04, 190] }),
 }
 

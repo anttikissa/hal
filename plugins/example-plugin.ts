@@ -66,11 +66,11 @@ export default async (plugin: Plugin) => {
 // 		})
 // 	})
 //
-// 	// A theme: colours are OKLCH [lightness, chroma, hue], one typed
-// 	// around per colour; repaint whenever this file comes or goes.
-// 	plugin.around(colors, 'fgL', () => 0.85)
+// 	// A theme: colours are OKLCH [lightness, chroma, hue]. set replaces a
+// 	// shared value, around a style; repaint whenever this file comes or goes.
+// 	plugin.set(colors, 'fgL', 0.85)
 // 	plugin.around(colors, 'user', (fn) => ({ ...fn(), bg: [0.3, 0.06, 150] }))
-// 	plugin.around(colors, 'screen', () => [0.2, 0.01, 150])
+// 	plugin.set(colors, 'screen', [0.2, 0.01, 150])
 // 	plugin.onChange(() => terminal.redraw())
 //
 // 	// A sync target cannot wait for async work: fetch ahead (here while

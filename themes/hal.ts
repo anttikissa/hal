@@ -1,7 +1,7 @@
 // The built-in look, hal, written out as a theme (task d3): copy it to
 // themes/<name>.ts, change what you like, then /theme <name>. Every
 // colour is OKLCH [lightness, chroma, hue]; a style can read another
-// through colors (colors.fgL()), which sees this theme's values.
+// through colors (colors.fgL), which sees this theme's values.
 // Derived colours (quiet, blinkDim) are functions given the field they
 // replace first; every colour Hal draws comes from a field here.
 // It starts equal to src/common/colors.ts; nothing keeps them in step.
@@ -15,13 +15,13 @@ export const look: Look = {
 	// The lightest dark background we design for: where a style has no
 	// bg of its own, its text is checked against this (4.5:1, 3:1 for
 	// marks; tasks/README.md, readable text).
-	screen: () => [0.16, 0.01, 260],
+	screen: [0.16, 0.01, 260],
 	// Shared lightness and chroma of the vivid foregrounds and the card
 	// backgrounds.
-	fgL: () => 0.85,
-	fgC: () => 0.16,
-	bgL: () => 0.2,
-	bgC: () => 0.05,
+	fgL: 0.85,
+	fgC: 0.16,
+	bgL: 0.2,
+	bgC: 0.05,
 
 	// Derived colours: code calls these, so a theme may override them
 	// like any field. quiet: a style's secondary text (hints, ids,
@@ -35,12 +35,12 @@ export const look: Look = {
 	// table lines (table) and the line before the prompt box's buttons
 	// (divider); how much canvas the phone tab sheet's backdrop
 	// is (backdrop), and how far the busy dot pulses (pulse).
-	mix: () => ({ hover: 14, choiceHover: 18, tab: 16, entry: 55, divider: 35, quote: 40, table: 30, backdrop: 60, pulse: 30 }),
+	mix: { hover: 14, choiceHover: 18, tab: 16, entry: 55, divider: 35, quote: 40, table: 30, backdrop: 60, pulse: 30 },
 
 	// Hal's responses: warm orange.
 	assistant: () => ({
-		fg: [colors.fgL(), colors.fgC(), 57],
-		cursor: [colors.fgL(), colors.fgC(), 55],
+		fg: [colors.fgL, colors.fgC, 57],
+		cursor: [colors.fgL, colors.fgC, 55],
 		cursorIdle: [0.6, 0, 55],
 		bold: [0.9, 0.06, 55],
 		code: [0.86, 0.04, 55],
@@ -118,19 +118,22 @@ export const look: Look = {
 	}),
 	// Tools: each kind its own hue. Red is kept for real failures. A
 	// tool without its own entry (tool + capitalised name) uses `tool`.
-	tool: () => ({ fg: [colors.fgL(), colors.fgC(), 250], bg: [colors.bgL(), colors.bgC(), 250] }),
-	toolBash: () => ({ fg: [colors.fgL(), colors.fgC(), 320], bg: [colors.bgL(), colors.bgC(), 320] }),
-	toolEval: () => ({ fg: [colors.fgL(), colors.fgC(), 295], bg: [colors.bgL(), 0.06, 295] }),
-	toolRead: () => ({ fg: [colors.fgL(), colors.fgC(), 155], bg: [colors.bgL(), colors.bgC(), 155] }),
+	tool: () => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),
+	toolBash: () => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
+	toolEval: () => ({ fg: [colors.fgL, colors.fgC, 295], bg: [colors.bgL, 0.06, 295] }),
+	toolRead: () => ({ fg: [colors.fgL, colors.fgC, 155], bg: [colors.bgL, colors.bgC, 155] }),
 	toolGrep: () => colors.toolRead(),
 	toolGlob: () => colors.toolRead(),
 	toolLs: () => colors.toolRead(),
-	toolWrite: () => ({ fg: [0.78, 0.12, 75], bg: [colors.bgL(), 0.04, 75] }),
-	toolEdit: () => ({ fg: [0.76, 0.11, 190], bg: [colors.bgL(), 0.04, 190] }),
+	toolWrite: () => ({ fg: [0.78, 0.12, 75], bg: [colors.bgL, 0.04, 75] }),
+	toolEdit: () => ({ fg: [0.76, 0.11, 190], bg: [colors.bgL, 0.04, 190] }),
 }
 
 // A theme is a plugin (task d3): /theme links it to plugins/color-theme.ts.
 export default (plugin: Plugin) => {
-	for (let [key, fn] of Object.entries(look)) plugin.around(colors, key as keyof typeof colors, fn as never)
+	for (let [key, v] of Object.entries(look)) {
+		if (typeof v === 'function') plugin.around(colors, key as never, v as never)
+		else plugin.set(colors, key as never, v as never)
+	}
 	plugin.onChange(() => terminal.redraw())
 }
