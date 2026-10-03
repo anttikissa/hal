@@ -1613,18 +1613,21 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 			return [...document.querySelectorAll('.CardHeader')].map(h => {
 				let c = h.closest('.Card'), stamp = h.querySelector('.stamp'), title = h.querySelector('.title'), ref = h.querySelector('.link');
 				let t = first(stamp ?? title), label = first(title), link = ref?.getBoundingClientRect(), box = h.getBoundingClientRect(), body = c.querySelector(':scope > .content'), end = body && last(body);
-				return { folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, offCentre: t.y + t.height / 2 - (c.getBoundingClientRect().y + c.getBoundingClientRect().height / 2), rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && title.getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth, tail: end ? c.getBoundingClientRect().bottom - end.bottom : undefined };
+				return { compact: c.classList.contains('thinking') || c.classList.contains('assistant'), folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, offCentre: t.y + t.height / 2 - (c.getBoundingClientRect().y + c.getBoundingClientRect().height / 2), rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && title.getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth, tail: end ? c.getBoundingClientRect().bottom - end.bottom : undefined };
 			});
 		})()`
 		for (let [, width, height, touch] of [['portrait', 390, 800, true], ['narrow', 320, 760, true], ['landscape', 844, 390, true], ['desktop', 1200, 800, false]] as const) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
 			await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+			// Untinted cards (thinking, model text) share a half inset, the rest one.
 			let closed = await b.evaluate(geometry)
-			let folded = closed.filter((r: any) => r.folds)
+			let base = (row: any) => closed.find((r: any) => r.compact === row.compact).inset
+			expect(closed.find((r: any) => r.compact).inset).toBeLessThan(closed.find((r: any) => !r.compact).inset)
+			let folded = closed.filter((r: any) => r.folds && !r.compact)
 			for (let row of closed) {
 				expect(Math.abs(row.baseline)).toBeLessThanOrEqual(1)
-				expect(row.inset).toBeCloseTo(closed[0].inset, 1)
+				expect(row.inset).toBeCloseTo(base(row), 1)
 				expect(row.refTop).toBe(0)
 				expect(row.overlap).toBe(false)
 				expect(row.textWidth).toBeLessThanOrEqual(row.boxWidth + 1)
@@ -1640,7 +1643,7 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 			await Bun.sleep(300)
 			for (let row of await b.evaluate(geometry)) {
 				expect(Math.abs(row.baseline)).toBeLessThanOrEqual(1)
-				expect(row.inset).toBeCloseTo(closed[0].inset, 1)
+				expect(row.inset).toBeCloseTo(base(row), 1)
 				expect(row.refTop).toBe(0)
 				expect(row.overlap).toBe(false)
 				expect(row.textWidth).toBeLessThanOrEqual(row.boxWidth + 1)

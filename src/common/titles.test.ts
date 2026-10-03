@@ -13,8 +13,8 @@ test('headers: time and who wrote the block, with the catalog model name (else i
 	expect(titles.title({ type: 'prompt', text: 'hi', ts: at(10, 49) })).toBe('10:49 You')
 	expect(titles.title({ type: 'prompt', text: 'hi', from: '12-abc', label: 'tab 3: Review', ts: at(9, 5) })).toBe('09:05 Message from tab 3: Review')
 	expect(titles.title({ type: 'text', text: 'x', model: 'anthropic/claude-opus-5-5', ts: at(10, 52) })).toBe('10:52 Hal (Opus 5.5)')
-	expect(titles.title({ type: 'thinking', text: 'x', model: 'openai/gpt-5.5', effort: 'high', ts: at(23, 0) })).toBe('23:00 Hal (openai/gpt-5.5, thinking high)')
-	expect(titles.title({ type: 'thinking', text: 'x', model: 'anthropic/claude-opus-5-5', ts: at(0, 1) })).toBe('00:01 Hal (Opus 5.5, thinking)')
+	expect(titles.title({ type: 'thinking', text: 'x', model: 'openai/gpt-5.5', effort: 'high', ts: at(23, 0) })).toBe('23:00 Thinking (high)')
+	expect(titles.title({ type: 'thinking', text: 'x', model: 'anthropic/claude-opus-5-5', ts: at(0, 1) })).toBe('00:01 Thinking')
 })
 
 test('a header from another day puts the date before the time', () => {
@@ -23,7 +23,7 @@ test('a header from another day puts the date before the time', () => {
 
 test('old records without model, effort or time still get a header', () => {
 	expect(titles.title({ type: 'text', text: 'x' })).toBe('Hal')
-	expect(titles.title({ type: 'thinking', text: 'x' })).toBe('Hal (thinking)')
+	expect(titles.title({ type: 'thinking', text: 'x' })).toBe('Thinking')
 	expect(titles.title({ type: 'prompt', text: 'x' })).toBe('You')
 	expect(titles.title({ type: 'command', text: '/help' })).toBe('You')
 	expect(titles.title({ type: 'output', text: 'x' })).toBeUndefined()

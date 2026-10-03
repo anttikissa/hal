@@ -118,13 +118,16 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
 	let head = () => {
 		let item = props.row.item
-		// Folded thinking previews its first line as plain text (OpenAI
-		// summaries open with **Heading**); open, the body shows it, so
-		// the head is the header words alone (task hp).
-		if (item.type === 'thinking') return expanded() ? titles.who(item) : `${titles.who(item)}: ${parser.inline(lines()[0] ?? '').map((r) => r.text).join('')}`
+		// Folded thinking reads "Thinking (hard): <first line>", the line
+		// as plain text (OpenAI summaries open with **Heading**); open,
+		// the body shows it, so the head is "Thinking (hard)" (task hp).
+		if (item.type === 'thinking') {
+			let first = expanded() ? '' : parser.inline(lines()[0] ?? '').map((r) => r.text).join('').trim()
+			return first ? `${titles.who(item)}: ${first}` : titles.who(item)
+		}
 		if (item.type === 'prompt' && item.summary) return item.summary
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
-		return item.type === 'tool' ? toolDetails.headline(item.name, item.input).text : lines()[0]
+		return item.type === 'tool' ? toolDetails.headline(item.name, item.input, props.row.result?.output).text : lines()[0]
 	}
 	let headerParts = createMemo(() => view.urlParts(head() ?? ''))
 	let body = () => {
