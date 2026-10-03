@@ -73,11 +73,11 @@ function start(opts: LinkOptions): void {
 	let startOpts: Parameters<typeof connection.start>[0] = {
 		transport: wsLink.transport(opts.dial, opts.reload, opts.authorized),
 		onEvent: opts.onEvent,
-		baseMs: wsLink.baseMs(),
-		maxMs: wsLink.maxDelayMs(),
+		baseMs: wsLink.baseMs,
+		maxMs: wsLink.maxDelayMs,
 	}
 	if (opts.onState) startOpts.onState = opts.onState
 	void connection.start(startOpts)
 }
 
-export const wsLink = { baseMs: () => 250, maxDelayMs: () => 10_000, transport, start }
+export const wsLink = { baseMs: 250, maxDelayMs: 10_000, transport, start }
