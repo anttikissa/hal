@@ -60,6 +60,12 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 
 // A prompt, model text or thinking as the old Hal drew it (task hp):
 // its header ('10:52 Hal (Opus 5.5)'), clipped, a blank row, the body.
+// The label links to the image itself on the web endpoint.
+function imageLabel(item: Item & { type: 'image' }, session?: string): string {
+	let label = attachments.label(item)
+	return session ? `\x1b]8;;${ansi.webUrl(`/blob/${encodeURIComponent(session)}/${encodeURIComponent(item.blob)}`)}\x07${label}${ansi.LINK_OFF}` : label
+}
+
 function headed(item: Item, body: string[], width: number, session?: string): string[] {
 	let title = titles.title(item)
 	if (title === undefined) return body
@@ -76,7 +82,8 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 // `streaming`: the item is still growing.
 // `tool`: the name of the call a tool result is drawn right under (or
 // under another of its results); attached, it needs no link back.
-function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, tool?: string): string[] {
+// `images`: the image items of a prompt, drawn in its card (frame.layout).
+function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, tool?: string, images: Item[] = []): string[] {
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
@@ -91,10 +98,21 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let more = body.length - 3
 				body = [...ansi.wrap(item.summary, width), ...body.slice(0, 3).map((l) => ansi.quiet(l, itemView.itemStyle(item))), ...(more > 0 ? [`… ${more} more lines`] : [])]
 			}
-			return itemView.headed(item, body, width, session)
-		// The label links to the image itself on the web endpoint.
+			// Its images follow as labels packed into rows: a quick
+			// way to open those its markers name.
+			let rows: string[] = []
+			for (let img of images) {
+				if (img.type !== 'image') continue
+				let label = attachments.label(img)
+				let last = rows.length ? rows[rows.length - 1]! : undefined
+				let fits = last !== undefined && strings.visLen(last) + 1 + label.length <= width
+				let linked = itemView.imageLabel(img, session)
+				if (fits) rows[rows.length - 1] += ' ' + linked
+				else rows.push(linked)
+			}
+			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, width, session)
 		case 'image':
-			return [session ? `\x1b]8;;${ansi.webUrl(`/blob/${encodeURIComponent(session)}/${encodeURIComponent(item.blob)}`)}\x07${attachments.label(item)}${ansi.LINK_OFF}` : attachments.label(item)]
+			return [itemView.imageLabel(item, session)]
 		// Trailing blank lines the model streamed are not drawn: the one
 		// blank row between items (frame.build) is the only gap. Model
 		// text is markdown (task fn).
@@ -217,6 +235,7 @@ export const itemView = {
 	itemStyle,
 	itemLines,
 	headed,
+	imageLabel,
 	ref,
 	quoteLines,
 }
