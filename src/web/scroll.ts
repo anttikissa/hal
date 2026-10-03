@@ -8,6 +8,10 @@
 // opening or closing is tracked every frame while its height animates,
 // and sending glides to the very bottom from anywhere.
 //
+// A catch-up (a reconnect bringing many items) snaps to the bottom at
+// once: the rows are replaced and scrollTop resets, and a glide from
+// there would sweep the session past the reader.
+//
 // Wheel, touch or a scroll key cancel a glide: the reader takes over.
 // Only scroll keys, since cancelling on any key leaves a half-finished
 // scroll whose gap then falls outside `near` and stops the follow. A
@@ -17,7 +21,7 @@
 import { reflow } from './reflow.ts'
 
 type Box = { scrollHeight: number; scrollTop: number; clientHeight: number }
-export type Mode = 'glide' | 'jump' | 'track'
+export type Mode = 'glide' | 'jump' | 'snap' | 'track'
 
 // How far the view is above the bottom.
 function gap(el: Box): number {
@@ -149,7 +153,7 @@ function follow(change: () => void, mode: Mode = 'glide', force = false): void {
 	scroll.stop()
 	st.gap = g
 	st.forced = force
-	if (mode === 'jump' || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+	if (mode === 'jump' || mode === 'snap' || matchMedia('(prefers-reduced-motion: reduce)').matches) {
 		el.scrollTop = scroll.target(el, g)
 		return
 	}
