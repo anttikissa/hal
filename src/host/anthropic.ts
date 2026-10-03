@@ -81,7 +81,7 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 	let b: Record<string, unknown> = { model: req.model, max_tokens: maxTokens, stream: true, messages: anthropic.toMessages(req) }
 	if (system.length) b.system = system
 	if (req.tools?.length) b.tools = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }))
-	if (adaptive(req.model)) b.thinking = { type: 'adaptive' }
+	if (adaptive(req.model)) b.thinking = { type: 'adaptive', display: 'summarized' }
 	else if (/^claude-(opus|sonnet)/.test(req.model) && maxTokens > MIN_THINKING) {
 		b.thinking = { type: 'enabled', budget_tokens: Math.max(MIN_THINKING, Math.min(anthropic.thinkingBudget(), maxTokens - 1024)) }
 	}
