@@ -10,8 +10,10 @@ import { basename, dirname } from 'path'
 import type { NoticeEvent } from '../common/notices.ts'
 import { diag } from './diag.ts'
 import { paths } from './paths.ts'
+import { promptTrail } from './prompt-trail.ts'
 import { sessions } from './sessions.ts'
 import { systemPrompt } from './system-prompt.ts'
+import { tabs } from './tabs.ts'
 
 // `shown`: the tab a client shows even while its window lacks focus, so
 // a notice waits on screen for the user coming back from the editor.
@@ -49,12 +51,14 @@ function check(clients: Iterable<Watcher>): void {
 	let seen = promptFiles.state.seen
 	let all = new Set([...applies.values()].flatMap((s) => [...s]))
 	promptFiles.watchDirs(new Set([...all].map((p) => dirname(p))))
+	let changed = false
 	for (let path of all) {
 		let text = read(path)
 		if (!seen.has(path)) { seen.set(path, text); continue }
 		let before = seen.get(path)
 		if (before === text) continue
 		seen.set(path, text)
+		changed = true
 		let what = before === null ? 'created' : text === null ? 'deleted' : 'changed'
 		let to = watching.filter((c) => applies.get(c)!.has(path))
 		// Each change stacks as its own notice for its full time.
@@ -65,6 +69,9 @@ function check(clients: Iterable<Watcher>): void {
 			try { c.deliver(notice) } catch (e: any) { diag.log(`prompt files: deliver: ${e?.message ?? e}`) }
 		}
 	}
+	// The transcript note lands now, at the save, not after the next
+	// prompt (task ar); each open tab records only what concerns it.
+	if (changed) for (let id of tabs.file().open) promptTrail.check(id)
 }
 
 // Directory watchers make a save show at once; the poll still catches
