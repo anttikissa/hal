@@ -32,6 +32,7 @@ import { status } from './status.ts'
 import { statusUsage } from './status-usage.ts'
 import { subagents } from './subagents.ts'
 import { turns } from './turns.ts'
+import { promptTrail } from './prompt-trail.ts'
 
 // Returns why the submit is refused, if it is. `command` is the
 // client's id for it, kept with the prompt (or inbox message) so a
@@ -162,6 +163,8 @@ function deliver(id: string, items: InboxItem[], extra?: Sender & { text: string
 		record.command ??= items[0]!.id
 	}
 	naming.prepare(id, record as Extract<HistoryRecord, { type: 'user' }>)
+	// Before the prompt, so the model reads the change with it (task ar).
+	promptTrail.check(id)
 	let written = history.append(id, record) as HistoryRecord & { type: 'user' }
 	host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 	if (!quiet) host.broadcast(id, prompts.promptEvent(id, written))

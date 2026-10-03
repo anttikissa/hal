@@ -13,6 +13,7 @@ import { ansi } from './ansi.ts'
 import { markdownView } from './markdown-view.ts'
 import { summary } from '../common/summary.ts'
 import { names } from '../common/names.ts'
+import { promptChanges } from '../common/prompt-changes.ts'
 
 const { INVERSE, UNINVERSE } = ansi
 
@@ -183,8 +184,12 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		// Drawn as the prompt it was typed as: header, then its text.
 		case 'command':
 			return itemView.headed(item, ansi.wrap(item.text, width), width, session)
-		case 'output':
-			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
+		case 'output': {
+			// A prompt-file change: its summary and a line per change
+			// (task ar); the web card opens to the diffs.
+			let text = item.change ? promptChanges.outline(item.text) : item.text.trimEnd()
+			return itemView.headed(item, markdownView.lines(text, width, streaming, itemView.itemStyle(item)), width)
+		}
 		// One row: the text centred in a rule across the width.
 		case 'divider': {
 			let text = strings.clipVisual(` ${item.text} `, width)

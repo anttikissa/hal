@@ -32,6 +32,7 @@ import { tabBar } from './tab-bar.ts'
 import { helpRow } from './help-row.ts'
 import { statusRow, type StatusInfo } from './status-row.ts'
 import { strings } from '../common/strings.ts'
+import { promptChanges } from '../common/prompt-changes.ts'
 
 export interface View {
 	transcript?: Transcript
@@ -227,7 +228,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		let call = item.type === 'tool-result' ? batch.find((c) => c.type === 'tool' && c.id === item.id) : undefined
 		return n + (call?.type === 'tool' ? frame.itemRows(item, cols, session, undefined, undefined, call.name).length - 1 : frame.itemRows(item, cols, session).length + 1)
 	}, 0)
-	let items = frame.order(view.transcript?.items ?? [], (batch) => height(batch) <= screen)
+	let items = frame.order(promptChanges.group(view.transcript?.items ?? []), (batch) => height(batch) <= screen)
 	let calls = new Map<string, string>()
 	let formCursor: Frame['cursor'] | undefined
 	let look = `${cols} ${session} ${itemView.resultRows()} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
