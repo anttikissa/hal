@@ -1,5 +1,31 @@
-// Model selection. Config values are functions read at call time, so
-// local.ts can replace them (see tasks/README.md).
+// Model selection: the default model, short-name aliases, and the
+// model picker's list.
+//
+// Plugin surface (models.*):
+// - defaultModel(): the id a session uses until it picks one
+//   → config.ason `model`
+// - resolve(input): short name to an id, or the login granting access
+//   "opus" → { id: 'anthropic/claude-opus-5-5' } | { login: '/login claude' };
+//   a name it doesn't know → { id: input }
+// - selection(input): resolve plus an effort suffix
+//   "opus:high" → { id, effort: 'high' }; throws on no access
+// - qualified(model, effort?): the reverse → "anthropic/claude-opus-5-5:high"
+// - known(): ids offered without asking the network (synchronous)
+// - list(current): the model picker's ids, current first
+// - names(ids): display names from models.dev → { id: 'Claude Opus 5.5' }
+// - valid(id): whether a session may switch to id
+// - contextWindow(id): tokens id takes in, for the context meter
+// - effort(id, selected?): the reasoning effort requests send
+// - ttlMs(): how long a provider's list is kept → 1 hour
+// - timeoutMs(): how long asking a provider may take → 3 s
+// - fetchList(name): a provider's ids: cache, provider, then fallback
+// - ask(name, list): calls the provider's own list under timeoutMs
+// - fallback(name): models.dev ids, then the provider's built-in ones
+// - cached(name): the cached listing, if still for the current key
+// State: models.state.lists, provider name to its cached listing.
+//
+// Example: plugin.around(models, 'resolve', (next, input) =>
+//   input === 'fast' ? { id: 'anthropic/claude-haiku-4-5' } : next(input))
 //
 // The model picker's list (tasks/w4/forms.md, Model picker) comes from
 // here: every registered provider, plus Hal's synthetic models. A
