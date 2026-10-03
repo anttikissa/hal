@@ -96,15 +96,15 @@ function promptWidth(cols: number): number {
 // each is laid out once per width and look, not on every frame: a long
 // history stays cheap to redraw. A kept row keeps the link code it was
 // painted with (task e3 notes).
-function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, attached = false): string[] {
-	let style = itemView.itemStyle(item)
+function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, tool?: string): string[] {
+	let style = itemView.itemStyle(item, tool)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${attached ? '^' : ''}` : ''} ${ansi.state.web.url}`
+	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${ansi.state.web.url}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, mark } = frame.ref(item, cols, session, style)
-	let lines = itemView.itemLines(item, inner, !!hal, session, calls, attached)
+	let lines = itemView.itemLines(item, inner, !!hal, session, calls, tool)
 	if (hal) lines = frame.withCursor(lines, hal, inner)
 	// A block with a background has a row of it above and below its
 	// text, as the old Hal drew prompt cards; the id goes below the top.
@@ -232,12 +232,19 @@ function layout(view: View, cols: number, deadline = Infinity, save = true): Pas
 			formCursor = { row: lines.length - (rows.length - 1 - f.cursor.row), col: ansi.PAD.length + f.cursor.col }
 		} else {
 			let streams = i === items.length - 1 && view.hal?.at === 'stream'
-			// A result right under its call needs no #<call> link to it.
-			let prev = items[i - 1]
-			let attached = item.type === 'tool-result' && (prev?.type === 'tool' || prev?.type === 'tool-result') && prev.id === item.id
-			let rows = frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, attached)
+			// A result right under its call (or another of its results)
+			// continues the call's card: no #<call> link, and its padding
+			// row stands where the call's bottom one and the gap were.
+			let tool: string | undefined
+			if (item.type === 'tool-result') for (let j = i - 1; j >= 0; j--) {
+				let prev = items[j]!
+				if ((prev.type !== 'tool' && prev.type !== 'tool-result') || prev.id !== item.id) break
+				if (prev.type === 'tool') tool = prev.name
+			}
+			let rows = frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool)
 			rows = frame.highWater(rows, item, cols, session, streams)
-			if (rows.length && lines.length) lines.push('')
+			if (tool && rows.length && lines.length) lines.pop()
+			else if (rows.length && lines.length) lines.push('')
 			for (let r of rows) lines.push(r)
 			// A streaming block or a question being answered is redrawn
 			// every frame; so is everything after it.

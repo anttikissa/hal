@@ -22,7 +22,15 @@ function toolStyle(name: string): Style {
 	return typeof style === 'function' ? style() : colors.tool()
 }
 
-function itemStyle(item: Item): Style | undefined {
+// `tool`: the call a tool result is drawn under (attached), whose card
+// it continues: the same hue on a slightly darker background, its text
+// softer than the call's but not dimmed.
+function itemStyle(item: Item, tool?: string): Style | undefined {
+	if (item.type === 'tool-result' && tool) {
+		let { fg, bg } = itemView.toolStyle(tool)
+		if (!fg || !bg) return { fg: (item.isError ? colors.error() : colors.log()).fg! }
+		return { fg: item.isError ? colors.error().fg! : [fg[0] - 0.03, fg[1] / 3, fg[2]], bg: [bg[0] - 0.03, bg[1], bg[2]] }
+	}
 	switch (item.type) {
 		case 'prompt':
 		case 'image':
@@ -64,9 +72,9 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 
 // Rows for one item at `width` columns, without the side padding;
 // `streaming`: the item is still growing.
-// `attached`: a tool result drawn right under its call (or another of
-// its results), which needs no link back to it.
-function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, attached = false): string[] {
+// `tool`: the name of the call a tool result is drawn right under (or
+// under another of its results); attached, it needs no link back.
+function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, tool?: string): string[] {
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
@@ -104,14 +112,14 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let head = strings.clipVisual(`${prefix}${ansi.clean(description).replace(/\s+/g, ' ')}`, width)
 				let mark = item.input.background === true ? '&' : '$'
 				let commandLine = strings.clipVisual(`${mark} ${ansi.clean(command).replace(/\s+/g, ' ')}`, width)
-				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-5).flatMap((line) => ansi.wrap(ansi.clean(line), Math.max(1, width - 2), false)).slice(-5).map((line) => `  ${line}`) : [])]
+				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-5).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-5) : [])]
 			} else {
 				let input = ansi.clean(JSON.stringify(item.input)).replace(/\s+/g, ' ')
 				row = strings.clipVisual(`${prefix}${ansi.clean(item.name)} ${input}`, width)
 			}
 			if (!item.partial) return [row]
 			let lines = item.partial.replace(/\n$/, '').split('\n').slice(-5)
-			return [row, ...lines.flatMap((line) => ansi.wrap(ansi.clean(line), Math.max(1, width - 2), false)).slice(-5).map((line) => `  ${line}`)]
+			return [row, ...lines.flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-5)]
 		}
 		case 'tool-result': {
 			// A glimpse: tool output can be long, the model sees all of it.
@@ -119,7 +127,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let out = call ? bashResult.display(item.output) : item.output
 			// Only the lines shown are laid out (outputs run to megabytes);
 			// the rest are counted as source lines, as on the web.
-			let wide = Math.max(1, width - 2), max = itemView.resultRows()
+			let wide = width, max = itemView.resultRows()
 			let lines = out.replace(/\n$/, '').split('\n')
 			let rows: string[] = []
 			let used = 0
@@ -127,15 +135,20 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let shown = rows.slice(0, max)
 			let more = rows.length - shown.length + lines.length - used
 			if (more) shown.push(`… ${more} more lines`)
+			// Rows start at the margin: no marker, no indent (an error's
+			// first row says so, not only its colour). Attached, the card
+			// tells input from output; apart, the text is quieter.
+			let style = itemView.itemStyle(item, tool)
 			return shown.map((l, i) => {
-				let prefix = i ? '  ' : item.isError ? '✗ ' : '◂ '
-				let ref = !i && !attached && call && session && transcript.href(session, call)
+				let prefix = !i && item.isError ? '✗ ' : ''
+				let ref = !i && !tool && call && session && transcript.href(session, call)
 				if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07#${call}${ansi.LINK_OFF}> `
-				let line = ansi.quiet(strings.clipVisual(prefix + l, width), itemView.itemStyle(item))
+				let text = strings.clipVisual(prefix + l, width)
+				let line = tool ? text : ansi.quiet(text, style)
 				if (call && /^\[exit [1-9]\d*\]/.test(l)) {
 					let status = /^\[exit [1-9]\d*\]/.exec(l)![0]
 					let at = line.indexOf(status)
-					if (at >= 0) line = line.slice(0, at) + ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: colors.quiet(itemView.itemStyle(item)!.fg!, colors.screen()) }) + line.slice(at + status.length)
+					if (at >= 0) line = line.slice(0, at) + ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: tool ? style!.fg! : colors.quiet(style!.fg!, colors.screen()) }) + line.slice(at + status.length)
 				}
 				return line
 			})

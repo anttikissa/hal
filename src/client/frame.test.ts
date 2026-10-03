@@ -112,7 +112,7 @@ test('a tool result of megabytes is glimpsed in its first rows, each shown line 
 	let lines = plain(frame.build(view([{ type: 'tool-result', id: 't', output }]), 40).lines).filter((l) => /w|row|more/.test(l))
 	expect(performance.now() - started).toBeLessThan(50)
 	// 100 w's on 34 columns wrap to three rows: the first three shown.
-	expect(lines.slice(0, 3).every((l) => /^◂? ?w+$/.test(l))).toBe(true)
+	expect(lines.slice(0, 3).every((l) => /^w+$/.test(l))).toBe(true)
 	expect(lines.at(-1)).toBe('… 200000 more lines')
 })
 
@@ -444,12 +444,12 @@ test('Bash results link to the call, hide a successful exit, and colour only a f
 	let printed = plain(lines).join('\n')
 	expect(printed).not.toContain('[exit 0]')
 	// Under its call, a result needs no link back to it; apart, it has one.
-	expect(printed).toContain('◂  M notes.md')
-	expect(printed).toContain('◂ [exit 123]')
+	expect(printed).toContain('\nM notes.md')
+	expect(printed).toContain('[exit 123]')
 	expect(printed).not.toContain('#1813>')
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
 	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1817', '1814'][i]! }))
-	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('◂ #1813>  M notes.md')
+	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('#1813>  M notes.md')
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#1813`)
 	let failure = lines.find((line) => line.includes('[exit 123]'))!
 	let errorColor = ansi.sgr({ fg: colors.error().fg! })
