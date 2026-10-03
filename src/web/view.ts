@@ -19,6 +19,7 @@ import { transcript, type Item, type Shown as ItemShown, type Transcript } from 
 import { titles } from '../common/titles.ts'
 import { summary } from '../common/summary.ts'
 import { names } from '../common/names.ts'
+import { toolDetails } from '../common/tool-details.ts'
 
 // `form`: the open question as filled in on this page.
 // `editing`: the last prompt is in the input (src/common/amend.ts).
@@ -288,7 +289,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			let { command, description } = item.input
 			if (typeof command === 'string' && typeof description === 'string')
 				return { kind, text: `▸ ${oneLine(description)}\n  ${item.input.background === true ? '&' : '$'} ${command}` }
-			return { kind, text: `▸ ${item.name} ${JSON.stringify(item.input)}` }
+			return { kind, text: `▸ ${toolDetails.headline(item.name, item.input).text}` }
 		}
 		case 'tool-result': {
 			// A glimpse, like the terminal: the model sees all of it.

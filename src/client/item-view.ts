@@ -7,6 +7,7 @@ import { colors, type Style } from '../common/colors.ts'
 import { forms, type Quote } from '../common/forms.ts'
 import { strings } from '../common/strings.ts'
 import { titles } from '../common/titles.ts'
+import { toolDetails } from '../common/tool-details.ts'
 import { transcript, type Item as Keyed, type Shown as Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { markdownView } from './markdown-view.ts'
@@ -114,8 +115,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let commandLine = strings.clipVisual(`${mark} ${ansi.clean(command).replace(/\s+/g, ' ')}`, width)
 				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-5).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-5) : [])]
 			} else {
-				let input = ansi.clean(JSON.stringify(item.input)).replace(/\s+/g, ' ')
-				row = strings.clipVisual(`${prefix}${ansi.clean(item.name)} ${input}`, width)
+				row = strings.clipVisual(`${prefix}${ansi.clean(toolDetails.headline(item.name, item.input).text)}`, width)
 			}
 			if (!item.partial) return [row]
 			let lines = item.partial.replace(/\n$/, '').split('\n').slice(-5)

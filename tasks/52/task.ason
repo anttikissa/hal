@@ -1,0 +1,7 @@
+{
+	title: 'Tool headlines never show wire syntax',
+	spec: 'Terminal and web head a non-Bash tool call with the same shared headline (src/common/tool-details.ts headline): a model-run slash command reads as typed ("/rename X"), otherwise the description, else "name: first text argument", else the name. Tool input never appears as JSON or ASON in any transcript view (terminal rows, the web text view); only parse errors may quote raw input, in their error message. Invariant restored: the terminal printed tool input as raw JSON ("command {\\"command\\":\\"/rename X\\"}") while the web showed "/rename X".',
+	status: 'done',
+	needs: ['8t', '9g'],
+	foldInto: ['9g']
+}
