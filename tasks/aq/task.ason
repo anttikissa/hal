@@ -1,0 +1,10 @@
+{
+	title: 'Request visible Claude thinking summaries',
+	spec: 'Anthropic requests with adaptive thinking explicitly set display to summarized. Restore the invariant that generated, non-redacted thinking summaries reach the existing web and terminal thinking blocks even when the model defaults to omitted display. Preserve signatures, effort selection, streaming, and round-trip behavior. No renderer changes or forced thinking on simple prompts. Verification is manual by the user; do not add or run automated tests for this change.',
+	status: 'done',
+	notes: [
+		'Anthropic documentation confirms Opus 5.5 defaults to omitted display. Explicit summarized display uses the existing thinking-delta and signature path without UI changes. https://platform.claude.com/docs/en/build-with-claude/thinking'
+	],
+	needs: ['mq'],
+	foldInto: ['mq']
+}
