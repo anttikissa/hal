@@ -272,11 +272,11 @@ function results(id: string, list: ToolResultBlock[]): HistoryRecord | undefined
 
 // A failed turn's error as stored and shown: the message, then the
 // provider's body (the malformed input, the HTTP reply) unless the
-// message already holds it. Capped; nothing but the user's eyes reads it.
+// message already holds it. Never truncated: the end is often the fault.
 function errorText(e: ErrorEvent): string {
 	let body = e.body?.trim()
 	if (!body || e.message.includes(body)) return e.message
-	return `${e.message}\n${body.length > 2000 ? `${body.slice(0, 2000)}… [${body.length - 2000} more characters]` : body}`
+	return `${e.message}\n${body}`
 }
 
 // Ends the running turn, with the usage of all its rounds: `last` is
