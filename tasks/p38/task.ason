@@ -1,0 +1,10 @@
+{
+	title: 'Limit Claude effort cache notices to relevant changes',
+	spec: 'The model command warns about Anthropic effort cache invalidation only when the canonical model stays the same and its effective effort changes. Resolve omitted effort through the existing capability policy and default; choosing the explicit default is not a cache change. Do not warn on provider or model switches or unchanged selections. Describe message-cache invalidation, not a guaranteed reset of tool and system caches. Shared command behavior applies to terminal and web. Restore the invariant that cache notices describe the actual change rather than unrelated selection differences. Verification is manual; no automated tests for this change.',
+	status: 'done',
+	notes: [
+		'Anthropic prompt-caching documentation: top-level effort changes invalidate message blocks; effects on tool/system caches are model-specific. Explicit default equals omission. Cross-model thinking-block compatibility is distinct from shared prompt caches. https://platform.claude.com/docs/en/build-with-claude/prompt-caching'
+	],
+	needs: ['w7'],
+	foldInto: ['w7']
+}
