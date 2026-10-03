@@ -12,8 +12,9 @@ import { host } from './host.ts'
 import { stats } from './stats.ts'
 import { commits } from './commits.ts'
 import { tabs } from './tabs.ts'
+import { jobs } from './jobs.ts'
 
-type Lock = { sessionId: string; paths: Set<string>; done: Promise<void>; release: () => void }
+type Lock = { sessionId: string; callId?: string; paths: Set<string>; done: Promise<void>; release: () => void }
 type Observation = { ctx: ToolContext; patterns: string[]; before: Map<string, FileSnapshot>; status: Map<string, string>; commits?: Awaited<ReturnType<typeof commits.begin>>; release: () => void }
 
 function validate(input: unknown): string[] {
@@ -57,7 +58,7 @@ async function acquire(ctx: ToolContext, patterns: string[]): Promise<() => void
 		if (!conflict) {
 			let release!: () => void
 			let done = new Promise<void>((r) => { release = r })
-			let lock = { sessionId: ctx.sessionId, paths: keys, done, release }
+			let lock = { sessionId: ctx.sessionId, callId: ctx.callId, paths: keys, done, release }
 			fileChanges.state.locks.push(lock)
 			return () => {
 				fileChanges.state.locks = fileChanges.state.locks.filter((l) => l !== lock)
@@ -67,7 +68,12 @@ async function acquire(ctx: ToolContext, patterns: string[]): Promise<() => void
 		let editing = [...keys].find((p) => conflict.paths.has(p)) ?? [...conflict.paths][0]!
 		let tab = tabs.file().open.indexOf(conflict.sessionId)
 		let editor = tab >= 0 ? `tab ${tab + 1} (${conflict.sessionId})` : conflict.sessionId
-		ctx.onOutput?.(`Waiting for ${editor} to finish editing ${relative(await fileChanges.canonical(ctx.cwd), editing)}\n`)
+		let path = relative(await fileChanges.canonical(ctx.cwd), editing)
+		// A background job holds its lock until exit, even when its own session waits.
+		let n = conflict.callId ? history.readSync(conflict.sessionId).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === conflict.callId)?.n : undefined
+		let job = n !== undefined && jobs.state.running.has(`${conflict.sessionId}:${n}`) ? `#${n}` : undefined
+		let owner = conflict.sessionId === ctx.sessionId ? 'this session' : editor
+		ctx.onOutput?.(job ? `Waiting for background job ${job} (${owner}) to exit; it declared ${path}\n` : `Waiting for ${editor} to finish editing ${path}\n`)
 		await new Promise<void>((res, rej) => {
 			let abort = () => rej(new Error('cancelled; the command did not run'))
 			ctx.signal.addEventListener('abort', abort, { once: true })
