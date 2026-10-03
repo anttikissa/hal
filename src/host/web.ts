@@ -139,7 +139,8 @@ const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
 // plus --quiet: the fg's quieter, still readable form (colors.quiet), for
 // secondary text, which never fades by opacity (tasks/README.md). The
 // page's is measured on its lightest surface, the button. --fg and
-// --sel-back repeat the fg for the page's ::selection rule.
+// --sel-back repeat the fg for the page's ::selection rule; tool
+// styles add --output, their output text (colors.toolOutput).
 function css(): string {
 	let rules: string[] = []
 	for (let [key, value] of Object.entries(colors)) {
@@ -159,6 +160,7 @@ function css(): string {
 		if (fg) decls.push(`--quiet: ${oklch.toCss(colors.quiet(fg, style.bg ?? style.button ?? colors.screen()))}`)
 		// Selection is reverse video in the style's own colour (task gn).
 		if (fg) decls.push(`--fg: ${oklch.toCss(fg)}`, `--sel-back: ${oklch.toCss(fg)}`)
+		if (fg && key.startsWith('tool')) decls.push(`--output: ${oklch.toCss(colors.toolOutput(fg))}`)
 		if (key === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)
 		rules.push(`.${kebab(key)} { ${decls.join('; ')} }`)
 	}
