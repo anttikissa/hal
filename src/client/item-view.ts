@@ -189,9 +189,19 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// rows, no header; the web card opens to the diffs.
 			if (item.change) {
 				let d = colors.diff(), style = itemView.itemStyle(item as unknown as Item)
+				let paint = (t: string, tone: string) => (tone === 'head' ? t : tone === 'dim' ? ansi.quiet(t, style) : ansi.sgr({ fg: tone === 'add' ? d.addFg! : d.removeFg! }) + (tone === 'del' ? `\x1b[9m${t}\x1b[29m` : t) + ansi.sgr({ fg: (style ?? colors.log()).fg! }))
 				return promptChanges.rows(item).map((r) => {
-					let t = strings.clipVisual(r.text, width)
-					return r.tone === 'head' ? t : r.tone === 'dim' ? ansi.quiet(t, style) : ansi.sgr({ fg: r.tone === 'add' ? d.addFg! : d.removeFg! }) + t + ansi.sgr({ fg: (style ?? colors.log()).fg! })
+					if (!r.parts) return paint(strings.clipVisual(r.text, width), r.tone)
+					// Word by word, clipped to the width like a plain row.
+					let room = width, out = ''
+					for (let [k, p] of r.parts.entries()) {
+						let gap = k > 0 ? ' ' : ''
+						if (room <= gap.length) break
+						let cut = strings.clipVisual(p.text, room - gap.length)
+						room -= gap.length + strings.visLen(p.text)
+						out += gap + paint(cut, p.tone)
+					}
+					return out
 				})
 			}
 			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
