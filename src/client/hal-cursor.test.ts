@@ -159,7 +159,7 @@ test('a blinking tab indicator keeps the pulse and blinks with it', () => {
 	expect(pulse.running()).toBe(false)
 	app.onEvent({ type: 'tabs', tabs: [tab({ type: 'running', phase: 'tools' })] })
 	expect(pulse.running()).toBe(true)
-	let bar = () => frame.build(appView.view(), 40).lines.find((l) => l.includes('Tabs:'))
+	let bar = () => frame.build(appView.view(), 40).lines.find((l) => l.includes('ctrl-t: new'))
 	let lit = bar()
 	now = 2 * pulse.ms()
 	let count = shown.length

@@ -141,6 +141,12 @@ Keep reports to one screen. Measure every number now (git log,
 4. A numbered list of decisions, undeployed work and security issues
    needing the user.
 
+# UI: one set of rules for web and terminal
+
+The web and the terminal obey the same UI rules unless a task records
+an exception. When changing behavior on one, consider whether the other
+should change too, and always ask the user; never assume either way.
+
 # UI: visible plumbing
 
 Show everything relevant once: identifiers users act on, file paths,
