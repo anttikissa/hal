@@ -20,7 +20,7 @@ function value(input: unknown, indent = ''): string[] {
 let oneLine = (s: string) => s.replace(/\s+/g, ' ').trim()
 
 // A card's title: what the call does, in words (task jz). Each tool
-// reads as a verb and its object: Google for "words", Read <path or
+// reads as a verb and its object: Google "words", Read <path or
 // URL>, Inspect project (tab, id), Spawn "name" (tab 3, 31-swe),
 // Wait for 31-swe, 31-bux. Bash shows the model's description, marked
 // (background) when backgrounded; its command opens below. A
@@ -41,7 +41,7 @@ function headline(name: string, input: Record<string, unknown>, output?: string)
 			if (str('command')) return { text: str('command')!, key: 'command' }
 			break
 		case 'google':
-			if (str('query')) return { text: `Google for "${str('query')}"`, key: 'query' }
+			if (str('query')) return { text: `Google "${str('query')}"`, key: 'query' }
 			break
 		case 'read':
 		case 'read_url':
