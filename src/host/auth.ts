@@ -211,6 +211,19 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 	throw Object.assign(new Error(problems.join('; ')), { failure: 'auth' })
 }
 
+// Until when (epoch ms) every account that could run `modelId` is rate
+// limited; 0 if one is free now. Tells spawn and inspect which models
+// would only wait. A provider without accounts has one key per model.
+function limitedUntil(modelId: string): number {
+	let kind = modelId.split('/')[0]
+	let names: string[] = []
+	if (kind === 'anthropic' || kind === 'openai') {
+		try { names = auth.all(kind).list.map((a) => a.name) } catch {} // no login: the turn reports that
+	}
+	let until = names.length ? names.map((n) => limits.until(limits.key(modelId, n))) : [limits.until(limits.key(modelId))]
+	return until.includes(0) ? 0 : Math.min(...until)
+}
+
 async function credential(data: Entry, { entry, name, replace }: Account, kind: Kind = 'anthropic'): Promise<Credential> {
 	let email = typeof entry.email === 'string' ? entry.email : undefined
 	let base = { email, account: name, ...(usable(entry.accountId) && { accountId: entry.accountId }) }
@@ -346,6 +359,7 @@ export const auth = {
 	all,
 	accounts,
 	pickAccount,
+	limitedUntil,
 	pick,
 	anthropic: (model?: string, who?: For) => auth.pick('anthropic', model, who),
 	openai: (model?: string, who?: For) => auth.pick('openai', model, who),

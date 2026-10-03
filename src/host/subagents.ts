@@ -25,14 +25,18 @@ import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 import { models } from './models.ts'
+import { auth } from './auth.ts'
 
 export type Spawn = { kind: SpawnKind; task: string; fork: boolean; cwd: string; model?: string; name?: string; limit: number }
 
 // Opens the child and starts its first turn; returns its id. Throws,
-// spending nothing, when the parent has too few slots left.
+// spending nothing, when the parent has too few slots left or the
+// child's model is rate limited on every account (it would only wait).
 function spawn(parent: string, s: Spawn): string {
 	let meta = sessions.open(parent)
 	let selected = models.selection(s.model ?? models.qualified(meta.model, meta.effort))
+	let limited = auth.limitedUntil(selected.id)
+	if (limited) throw new Error(`${selected.id} is rate limited until ${new Date(limited).toISOString().slice(0, 16).replace('T', ' ')} UTC; spawn with another model (inspect models shows which are limited)`)
 	let left = meta.slots ?? subagents.initialSlots()
 	if (s.limit + 1 > left) throw new Error(`limit ${s.limit} needs ${s.limit + 1} spawn slots, but this session has ${left} left`)
 	meta.slots = left - s.limit - 1

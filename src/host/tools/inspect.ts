@@ -3,6 +3,7 @@
 // call describes only the caller; scope and fields widen or narrow it.
 import { projectColorNames } from '../../common/colors.ts'
 import type { Tab } from '../../common/protocol.ts'
+import { auth } from '../auth.ts'
 import { host } from '../host.ts'
 import { models } from '../models.ts'
 import { provider } from '../provider.ts'
@@ -10,6 +11,12 @@ import { stats } from '../stats.ts'
 import { tabs } from '../tabs.ts'
 import type { Tool } from '../tools.ts'
 import { version } from '../version.ts'
+
+// A model id, with until when it is rate limited on every account.
+function withLimit(id: string): string {
+	let until = auth.limitedUntil(id)
+	return until ? `${id} (rate limited until ${new Date(until).toISOString().slice(0, 16).replace('T', ' ')} UTC)` : id
+}
 
 const WHATS = ['sessions', 'host', 'models']
 const SCOPES = ['self', 'project', 'all']
@@ -64,7 +71,7 @@ function table(fields: string[], rows: string[][]): string {
 
 export const tool: Tool = {
 	name: 'inspect',
-	description: 'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider and the default. scope (sessions only): "self" (default, the caller), "project" (tabs sharing the caller\'s cwd) or "all". fields: comma-separated subset; default all.',
+	description: 'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. scope (sessions only): "self" (default, the caller), "project" (tabs sharing the caller\'s cwd) or "all". fields: comma-separated subset; default all.',
 	parameters: {
 		type: 'object',
 		properties: {
@@ -81,7 +88,7 @@ export const tool: Tool = {
 			let ids = models.known()
 			let lines = [`Default: ${models.defaultModel()}`]
 			for (let name of ['hal', ...Object.keys(provider.state.providers)]) {
-				lines.push(`${name}: ${ids.filter((id) => id.startsWith(`${name}/`)).join(', ') || '(none listed)'}`)
+				lines.push(`${name}: ${ids.filter((id) => id.startsWith(`${name}/`)).map(withLimit).join(', ') || '(none listed)'}`)
 			}
 			return lines.join('\n')
 		}
