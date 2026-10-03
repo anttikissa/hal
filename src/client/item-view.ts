@@ -25,12 +25,13 @@ function toolStyle(name: string): Style {
 
 // `tool`: the call a tool result is drawn under (attached), whose card
 // it continues: the same hue on a slightly darker background, its text
-// softer than the call's but not dimmed.
+// darker than the call's (less luminant, not just less vivid) but well
+// above 4.5:1.
 function itemStyle(item: Item, tool?: string): Style | undefined {
 	if (item.type === 'tool-result' && tool) {
 		let { fg, bg } = itemView.toolStyle(tool)
 		if (!fg || !bg) return { fg: (item.isError ? colors.error() : colors.log()).fg! }
-		return { fg: item.isError ? colors.error().fg! : [fg[0] - 0.03, fg[1] / 3, fg[2]], bg: [bg[0] - 0.03, bg[1], bg[2]] }
+		return { fg: item.isError ? colors.error().fg! : [fg[0] - 0.13, fg[1] / 2, fg[2]], bg: [bg[0] - 0.03, bg[1], bg[2]] }
 	}
 	switch (item.type) {
 		case 'prompt':
