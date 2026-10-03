@@ -15,6 +15,8 @@ type Output = Item & { type: 'output' }
 // The same run gives the same object, so the terminal's layout cache
 // (frame.ts) and the web's keyed rows keep it.
 const cache = new WeakMap<Item, { last: Item; count: number; day: string; merged: Item }>()
+// The changes each merged item stands for, for the terminal's rows.
+const runs = new WeakMap<Item, Output[]>()
 
 function hhmm(ts: string | undefined, now = Date.now()): string {
 	if (!ts) return ''
@@ -45,6 +47,7 @@ function group(items: Item[], now = Date.now()): Item[] {
 			let body = run.map((o) => `${promptChanges.line(o, now)}\n\`\`\`diff\n${o.change!.diff}\n\`\`\``)
 			hit = { last, count: run.length, day: new Date(now).toDateString(), merged: { ...item, text: [summary(run, now), ...body].join('\n\n') } }
 			cache.set(run[0]!, hit)
+			runs.set(hit.merged, run)
 		}
 		out.push(hit.merged)
 	}
@@ -58,15 +61,42 @@ function line(o: Output, now = Date.now()): string {
 	return `${hhmm(o.ts, now)} ${o.change!.name} ${o.change!.what} (+${n('+')} −${n('-')})`
 }
 
-// The lines outside the diffs: the summary and one per change, which
-// the terminal shows (it cannot open a card).
-function outline(text: string): string {
-	let fenced = false
-	return text.split('\n').filter((l) => {
-		if (l.startsWith('```')) fenced = !fenced
-		else if (!fenced && l) return true
-		return false
-	}).join('\n')
+// Added and removed lines of a change; `text` skips blank ones.
+function counts(o: Output): { add: number; del: number; text: string[] } {
+	let rows = o.change!.diff.split('\n').filter((r) => r[0] === '+' || r[0] === '-')
+	return { add: rows.filter((r) => r[0] === '+').length, del: rows.filter((r) => r[0] === '-').length, text: rows.filter((r) => r.slice(1).trim()) }
 }
 
-export const promptChanges = { summary, group, hhmm, line, outline }
+// Plain rows for a terminal, which cannot open a card. One change:
+// '11:25 AGENTS.md changed  +2 −0', then up to three changed lines.
+// A run: '11:14–11:25 3 changes to …', then one aligned row per change
+// with its first changed line. `tone` picks a row's colour.
+type Row = { text: string; tone: 'head' | 'add' | 'del' | 'dim' }
+function rows(item: object, now = Date.now()): Row[] {
+	let one = item as Output
+	let run = runs.get(item as Item) ?? (one.type === 'output' && one.change ? [one] : [])
+	if (!run.length) return []
+	let tally = (c: ReturnType<typeof counts>) => `+${c.add} −${c.del}`
+	let tone = (r: string): Row['tone'] => (r[0] === '+' ? 'add' : 'del')
+	let clean = (r: string) => `${r[0]} ${r.slice(1).trim()}`
+	if (run.length === 1) {
+		let c = counts(run[0]!)
+		let out: Row[] = [{ text: `${hhmm(run[0]!.ts, now)} ${summary(run, now)}  ${tally(c)}`, tone: 'head' }]
+		out.push(...c.text.slice(0, 3).map((r) => ({ text: `  ${clean(r)}`, tone: tone(r) })))
+		if (c.text.length > 3) out.push({ text: `  … ${c.text.length - 3} more`, tone: 'dim' })
+		else if (!c.text.length && c.add + c.del) out.push({ text: '  blank lines only', tone: 'dim' })
+		return out
+	}
+	let names = [...new Set(run.map((o) => o.change!.name))]
+	let pad = Math.max(...run.map((o) => o.change!.name.length))
+	let out: Row[] = [{ text: `${hhmm(run[0]!.ts, now)}–${hhmm(run.at(-1)!.ts, now)} ${run.length} changes to ${names.join(', ')}`, tone: 'head' }]
+	for (let o of run) {
+		let c = counts(o)
+		let first = c.text[0]
+		let note = [o.change!.what === 'changed' ? '' : o.change!.what, first ? clean(first) : c.add + c.del ? 'blank lines' : ''].filter(Boolean).join(' · ')
+		out.push({ text: `  ${hhmm(o.ts, now)}  ${o.change!.name.padEnd(pad)}  ${tally(c).padEnd(7)}  ${note}`.trimEnd(), tone: first ? tone(first) : 'dim' })
+	}
+	return out
+}
+
+export const promptChanges = { summary, group, hhmm, line, rows }

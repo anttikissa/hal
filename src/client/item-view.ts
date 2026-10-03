@@ -185,10 +185,16 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'command':
 			return itemView.headed(item, ansi.wrap(item.text, width), width, session)
 		case 'output': {
-			// A prompt-file change: its summary and a line per change
-			// (task ar); the web card opens to the diffs.
-			let text = item.change ? promptChanges.outline(item.text) : item.text.trimEnd()
-			return itemView.headed(item, markdownView.lines(text, width, streaming, itemView.itemStyle(item)), width)
+			// A prompt-file change (task ar): a head row and short colored
+			// rows, no header; the web card opens to the diffs.
+			if (item.change) {
+				let d = colors.diff(), style = itemView.itemStyle(item as unknown as Item)
+				return promptChanges.rows(item).map((r) => {
+					let t = strings.clipVisual(r.text, width)
+					return r.tone === 'head' ? t : r.tone === 'dim' ? ansi.quiet(t, style) : ansi.sgr({ fg: r.tone === 'add' ? d.addFg! : d.removeFg! }) + t + ansi.sgr({ fg: (style ?? colors.log()).fg! })
+				})
+			}
+			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		}
 		// One row: the text centred in a rule across the width.
 		case 'divider': {
