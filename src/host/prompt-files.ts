@@ -5,15 +5,17 @@
 // showing a tab whose prompt it is in: SYSTEM.md reaches all of them.
 // Keyed by path, so repeated saves replace one notice. A file first
 // seen is only remembered, so opening a tab announces nothing.
-import { readFileSync } from 'fs'
-import { basename } from 'path'
+import { readFileSync, watch, type FSWatcher } from 'fs'
+import { basename, dirname } from 'path'
 import type { NoticeEvent } from '../common/notices.ts'
 import { diag } from './diag.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { systemPrompt } from './system-prompt.ts'
 
-type Watcher = { deliver: (event: any) => void; visible?: string }
+// `shown`: the tab a client shows even while its window lacks focus, so
+// a notice waits on screen for the user coming back from the editor.
+type Watcher = { deliver: (event: any) => void; visible?: string; shown?: string }
 
 function read(path: string): string | null {
 	try { return readFileSync(path, 'utf8') } catch (e: any) {
@@ -35,17 +37,19 @@ function files(id: string): Set<string> {
 
 // One pass: compares each relevant file with what was last seen.
 function check(clients: Iterable<Watcher>): void {
-	let watching = [...clients].filter((c) => c.visible)
-	if (!watching.length) return
+	let watching = [...clients].filter((c) => c.shown ?? c.visible)
+	if (!watching.length) return promptFiles.watchDirs(new Set())
 	let applies = new Map<Watcher, Set<string>>()
 	for (let c of watching) {
-		try { applies.set(c, promptFiles.files(c.visible!)) } catch (e: any) {
-			diag.log(`prompt files: ${c.visible}: ${e?.message ?? e}`)
+		try { applies.set(c, promptFiles.files((c.shown ?? c.visible)!)) } catch (e: any) {
+			diag.log(`prompt files: ${c.shown ?? c.visible}: ${e?.message ?? e}`)
 			applies.set(c, new Set([systemPrompt.file()]))
 		}
 	}
 	let seen = promptFiles.state.seen
-	for (let path of new Set([...applies.values()].flatMap((s) => [...s]))) {
+	let all = new Set([...applies.values()].flatMap((s) => [...s]))
+	promptFiles.watchDirs(new Set([...all].map((p) => dirname(p))))
+	for (let path of all) {
 		let text = read(path)
 		if (!seen.has(path)) { seen.set(path, text); continue }
 		let before = seen.get(path)
@@ -53,29 +57,50 @@ function check(clients: Iterable<Watcher>): void {
 		seen.set(path, text)
 		let what = before === null ? 'created' : text === null ? 'deleted' : 'changed'
 		let to = watching.filter((c) => applies.get(c)!.has(path))
-		diag.log(`prompt files: ${path} ${what}; told ${to.map((c) => c.visible).join(', ')}`)
+		diag.log(`prompt files: ${path} ${what}; told ${to.map((c) => c.shown ?? c.visible).join(', ')}`)
 		for (let c of to) {
-			let notice: NoticeEvent = { type: 'notice', session: c.visible!, name: basename(path), kind: 'update', what, line: paths.display(path), key: `prompt-file:${path}` }
+			let notice: NoticeEvent = { type: 'notice', session: (c.shown ?? c.visible)!, name: basename(path), kind: 'update', what, line: paths.display(path), key: `prompt-file:${path}` }
 			try { c.deliver(notice) } catch (e: any) { diag.log(`prompt files: deliver: ${e?.message ?? e}`) }
 		}
 	}
 }
 
+// Directory watchers make a save show at once; the poll still catches
+// tab and cwd changes and filesystems without events. Directories, as
+// editors save by rename.
+function watchDirs(dirs: Set<string>): void {
+	let w = promptFiles.state.watchers
+	for (let [dir, watcher] of w) if (!dirs.has(dir)) { watcher.close(); w.delete(dir) }
+	for (let dir of dirs) {
+		if (w.has(dir)) continue
+		try {
+			w.set(dir, watch(dir, { persistent: false }, (_e, name) => {
+				if (name && !promptFiles.state.seen.has(`${dir === '/' ? '' : dir}/${name}`)) return
+				clearTimeout(promptFiles.state.soon)
+				promptFiles.state.soon = setTimeout(() => promptFiles.state.tick?.(), 30)
+			}))
+		} catch {}
+	}
+}
+
 function start(clients: Iterable<Watcher>): void {
 	if (promptFiles.state.timer) return
-	promptFiles.state.timer = setInterval(() => {
+	promptFiles.state.tick = () => {
 		try { promptFiles.check(clients) } catch (e: any) { diag.log(`prompt files: ${e?.message ?? e}`) }
-	}, promptFiles.intervalMs())
+	}
+	promptFiles.state.timer = setInterval(() => promptFiles.state.tick?.(), promptFiles.intervalMs())
 	promptFiles.state.timer.unref?.()
 }
 
 function stop(): void {
 	clearInterval(promptFiles.state.timer)
-	promptFiles.state = { seen: new Map(), timer: undefined }
+	clearTimeout(promptFiles.state.soon)
+	for (let w of promptFiles.state.watchers.values()) w.close()
+	promptFiles.state = { seen: new Map(), timer: undefined, soon: undefined, tick: undefined, watchers: new Map() }
 }
 
 export const promptFiles = {
-	state: { seen: new Map<string, string | null>(), timer: undefined as ReturnType<typeof setInterval> | undefined },
+	state: { seen: new Map<string, string | null>(), timer: undefined as ReturnType<typeof setInterval> | undefined, soon: undefined as ReturnType<typeof setTimeout> | undefined, tick: undefined as (() => void) | undefined, watchers: new Map<string, FSWatcher>() },
 	intervalMs: (): number => 1000,
-	files, check, start, stop,
+	files, check, watchDirs, start, stop,
 }
