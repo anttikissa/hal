@@ -12,7 +12,9 @@ export const command: SlashCommand = {
 		if (!args) return { say: `model: ${models.qualified(ctx.model, ctx.effort)}`, open: 'models' }
 		let choice = models.selection(args)
 		if (!models.valid(choice.id)) return { error: `${args}: no such model (want provider/model; /model lists them)` }
-		ctx.setModel(models.qualified(choice.id, choice.effort))
-		return { say: `model: ${models.qualified(choice.id, choice.effort)}${choice.id.startsWith('anthropic/') && ctx.effort !== choice.effort ? '; changing request effort restarts the Anthropic cache prefix' : ''}` }
+		let previous = models.qualified(ctx.model, ctx.effort)
+		let next = models.qualified(choice.id, choice.effort)
+		ctx.setModel(next)
+		return { say: `${previous === next ? `model: ${next} (unchanged)` : `Model changed: ${previous} → ${next}`}${choice.id.startsWith('anthropic/') && ctx.effort !== choice.effort ? '; changing request effort restarts the Anthropic cache prefix' : ''}` }
 	},
 }
