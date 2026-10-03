@@ -78,12 +78,14 @@ function accounts(): { names: string[]; providers: string[]; stored: number } {
 
 // The claude and gpt aliases' current targets a credential can use,
 // by display name: label → id.
+// Then local Ollama models, if the greeting's warm-up found any.
 function choices(providers: string[]): Map<string, string> {
 	let out = new Map<string, string>()
 	for (let [alias, family] of [['claude', 'Claude'], ['gpt', 'GPT']] as const) {
 		let id = models.resolve(alias).id
 		if (id && providers.includes(id.split('/')[0]!)) out.set(modelsDev.displayName(id) ?? family, id)
 	}
+	for (let id of models.cached('ollama')?.ids.slice(0, 4) ?? []) out.set(`${id.slice('ollama/'.length)} (Ollama, local)`, id)
 	return out
 }
 
@@ -137,7 +139,8 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): Reply {
 	let start = records.findLastIndex((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(greeting))
 	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: 'Dave' }] }
-	let hello = (): Reply => ({ say: `${greeting}\n\nI have ${words[3 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
+	// Local servers answer before the model question (task vc).
+	let hello = (): Reply => (void models.warm(), { say: `${greeting}\n\nI have ${words[3 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
 	let run = records.slice(start + 1)
 	// Text typed while nothing was asked: the intro can't take it. Text
@@ -190,7 +193,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	let options = intro.choices(loggedIn.providers)
 	let chosen = answered(run, 'model')
 	if (options.size && chosen === undefined) return reply({
-		say: `Available logins: ${loggedIn.names.join(', ')}.${said(run, subscriptions) ? '' : ` ${subscriptions}`}`,
+		say: `${loggedIn.names.length ? `Available logins: ${loggedIn.names.join(', ')}.` : 'Ollama runs models on this computer.'}${said(run, subscriptions) ? '' : ` ${subscriptions}`}`,
 		ask: { text: 'Which model should Hal use?', fields: [{ type: 'choice', name: 'model', options: [...options.keys(), 'Other'], initial: 0 }] },
 	})
 	let model = chosen === undefined ? undefined : options.get(chosen) ?? [...options.values()].find((id) => id.startsWith(/^claude/i.test(chosen) ? 'anthropic/' : /^gpt/i.test(chosen) ? 'openai/' : '-'))

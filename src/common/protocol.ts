@@ -246,8 +246,9 @@ export type Event =
 	// Open the model picker: the session's model and every model id to
 	// offer. Sent to the client that asked (`models`), or to every
 	// follower when /model runs alone. `names`: display names models.dev
-	// gives some of them, which the search matches too.
-	| { type: 'models'; sessionId: string; current: string; effort?: string; capabilities?: Record<string, EffortCapability>; items: string[]; names?: Record<string, string> }
+	// gives some of them, which the search matches too. `refresh`: lists
+	// arrived later; update a picker that is open, never open one.
+	| { type: 'models'; sessionId: string; current: string; effort?: string; capabilities?: Record<string, EffortCapability>; items: string[]; names?: Record<string, string>; refresh?: true }
 	// Sent only to the client that attached: the command `command` (its
 	// id) stored blob `blob`, which a prompt names with `marker`.
 	| { type: 'attached'; sessionId: string; command: string; blob: string; marker: string }

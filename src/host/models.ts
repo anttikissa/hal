@@ -63,8 +63,14 @@ async function ask(name: string, list: (signal: AbortSignal) => Promise<string[]
 // Build the first picker from disk and in-memory caches, never from HTTP.
 // Warm provider lists for later openings without holding this one up.
 function list(current: string): string[] {
-	for (let name of Object.keys(provider.state.providers)) void models.fetchList(name).catch((e) => diag.log(`models of ${name}: ${e}`))
+	void models.warm()
 	return [...new Set([current, models.selection(models.defaultModel()).id, ...models.known()])]
+}
+
+// Asks every provider for its list; settles when all have answered,
+// failed or timed out. Calls while one runs share it.
+function warm(): Promise<void> {
+	return (models.state.warming ??= Promise.all(Object.keys(provider.state.providers).map((name) => models.fetchList(name).catch((e) => diag.log(`models of ${name}: ${e}`)))).then(() => {}).finally(() => { models.state.warming = undefined }))
 }
 
 // The ids known without asking anyone: synthetic ones, and each
@@ -132,7 +138,7 @@ function resolve(input: string): { id?: string; login?: string } {
 }
 
 export const models = {
-	state: { lists: new Map<string, Listing>() },
+	state: { lists: new Map<string, Listing>(), warming: undefined as Promise<void> | undefined },
 	// provider/model id used when a session has not chosen one:
 	// config.ason's `model`.
 	defaultModel(): string {
@@ -148,6 +154,7 @@ export const models = {
 	fetchList,
 	ask,
 	list,
+	warm,
 	names,
 	resolve,
 	// Tokens `id` can take in, if known: for the context meter.

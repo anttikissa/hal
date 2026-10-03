@@ -207,6 +207,14 @@ function open(current: string, ids: string[], names: Record<string, string> = {}
 	return picker.refilter({ ...st, tree: { rows: [], open, current, capabilities, efforts: { [current]: selectedEffort }, currentEffort: selectedEffort } }, ids, names)
 }
 
+// The open picker `st` over a newer list, keeping its search and
+// selection: provider lists that arrive after opening.
+function refresh(st: ModalState, ids: string[], names: Record<string, string> = {}, capabilities?: Record<string, EffortCapability>): ModalState {
+	let t = st.tree!
+	let row = t.rows[st.selected]
+	return picker.refilter({ ...st, tree: { ...t, capabilities: capabilities ?? t.capabilities } }, ids, names, row?.id ?? row?.path)
+}
+
 // A key on the picker. Left and right are the tree's, whatever the
 // search box holds (Ctrl-A/E move in it): right opens the selected
 // category, left closes it or the one the selection is in. Enter on a
@@ -265,4 +273,4 @@ function canAdjust(st: ModalState, direction: 'left' | 'right'): boolean {
 	let selected = st.tree?.efforts?.[id] ?? cap.policy ?? cap.default
 	return selected === undefined || selected !== cap.levels[direction === 'left' ? 0 : cap.levels.length - 1]
 }
-export const picker = { defaults, rank, refilter, open, step, command, label, canAdjust }
+export const picker = { defaults, rank, refilter, refresh, open, step, command, label, canAdjust }

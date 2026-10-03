@@ -44,7 +44,11 @@ function onEvent(st: ViewState, event: Event): ViewState {
 		Object.assign(titles.names, event.names)
 		return { ...st }
 	}
-	if (event.type === 'models') return event.sessionId === st.transcript?.meta.id ? { ...st, modal: picker.open(event.current, event.items, event.names, event.capabilities, event.effort), models: event.items, names: event.names ?? {} } : st
+	if (event.type === 'models') {
+		if (event.sessionId !== st.transcript?.meta.id || (event.refresh && !st.modal?.tree)) return st
+		let modal = event.refresh ? picker.refresh(st.modal!, event.items, event.names, event.capabilities) : picker.open(event.current, event.items, event.names, event.capabilities, event.effort)
+		return { ...st, modal, models: event.items, names: event.names ?? {} }
+	}
 	let t = transcript.fold(st.transcript, event)
 	if (t === st.transcript) return st
 	let next: ViewState = { ...st, transcript: t }
