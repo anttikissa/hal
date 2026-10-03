@@ -4,6 +4,7 @@
 import { expect, test } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
 import { history } from './history.ts'
+import { limits } from './limits.ts'
 import { calls, client, toolSession, until, useHost } from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
@@ -133,6 +134,31 @@ test('a human prompt to a subagent keeps its tab open, and its turns report noth
 	await until(() => reports().some((r) => r.includes('job done')))
 	await Bun.sleep(20)
 	expect(reports().some((r) => r.includes('tidied'))).toBe(false)
+})
+
+test('a human slash command to a subagent leaves it closing when done', async () => {
+	let c = client()
+	await parent(c)
+	calls[0]!.push(call('s1', 'spawn', { task: 'model job' }), { type: 'done', reason: 'tool_use' })
+	let k = await callWith('model job')
+	let child = tabs.file().open[1]!
+	c.conn.send({ type: 'open', sessionId: child })
+	c.conn.send({ type: 'submit', sessionId: child, text: '/model fake/m1' })
+	await until(() => history.readSync(child).some((r) => r.type === 'command'))
+	expect(sessions.open(child).spawn).toBe('subagent')
+	calls[k]!.push({ type: 'text', text: 'done' }, { type: 'done', reason: 'end' })
+	await until(() => !tabs.file().open.includes(child))
+})
+
+test('spawning a model rate limited on every account is refused and spawns nothing', async () => {
+	let c = client()
+	await parent(c)
+	limits.set(limits.key('fake/m1'), Date.now() + 60_000)
+	calls[0]!.push(call('s1', 'spawn', { task: 'x' }), { type: 'done', reason: 'tool_use' })
+	await until(() => calls.length === 2)
+	limits.set(limits.key('fake/m1'), 0)
+	expect(resultOf(1, 's1')).toMatchObject({ isError: true, output: expect.stringContaining('fake/m1 is rate limited until') })
+	expect(tabs.file().open).toHaveLength(1)
 })
 
 // A child whose first turn ends as `end` says; the parent sits in wait.

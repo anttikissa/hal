@@ -47,8 +47,9 @@ import { turns } from './turns.ts'
 // unless the session is idle, where it runs as a turn of its own and
 // so gets full attention (no longer advisory).
 function submit(id: string, text: string, command?: string, queue = false, sender?: Sender): string | undefined {
-	if (sender?.from === undefined && sender?.origin !== 'model') subagents.promote(id)
 	let call = commands.parse(text)
+	// A command (/model, /pause) is not a prompt: the tab stays the parent's.
+	if (!call && sender?.from === undefined && sender?.origin !== 'model') subagents.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
 	let state = status.stateOf(id)
 	let interrupt = !queue && sender?.advisory !== true
