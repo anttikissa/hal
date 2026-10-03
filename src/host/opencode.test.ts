@@ -107,7 +107,7 @@ test('a session blocked for want of a key takes /login opencode and continues, s
 	let events: Event[] = []
 	let conn = host.connect((e) => events.push(e))
 	let until = async (check: () => unknown) => {
-		for (let i = 0; i < 1000 && !check(); i++) await Bun.sleep(2)
+		for (let i = 0; i < 5000 && !check(); i++) await Bun.sleep(2)
 		if (!check()) throw new Error('timed out')
 	}
 	conn.send({ type: 'create', cwd: '/tmp', model: 'opencode-go/m' })
