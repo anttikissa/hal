@@ -1,0 +1,10 @@
+{
+	title: 'Restore desktop typing-to-prompt focus',
+	spec: 'On the desktop web client, printable typing outside text fields and open dialogs focuses the current conversation composer and inserts the first character exactly once at its saved caret, including after pointer or keyboard tab switches and returning from another browser window. Preserve native field editing, IME, dialog keyboard ownership, browser shortcuts, selection and undo. Restore the typing-anywhere invariant of qn without forcing focus on touch navigation. Establish the reported failing transition before changing behavior; retain a focused browser regression only if it reproduces that transition. Terminal behavior stays unchanged unless the user requests parity.',
+	status: 'planned',
+	notes: [
+		'Desktop Chromium probe with existing non-intro sessions: four alternating tab selections with focus left on the tab link, followed by real CDP keyDown/keyUp for x. Each key focused the textarea and appeared exactly once; each tab retained its separate draft; no page errors or unhandled rejections. Temporary probe removed. First-run intro questions correctly owned keys and were excluded. The reported browser-page failure remains unreproduced; screenshot alone cannot identify activeElement, blocked JS or a stale client bundle.'
+	],
+	needs: ['qn'],
+	foldInto: ['qn']
+}
