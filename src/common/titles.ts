@@ -47,12 +47,12 @@ function author(item: Shown): string | undefined {
 		// A command is headed as the prompt it was typed as.
 		case 'command':
 			return item.from === undefined ? 'You' : `Command from ${item.label ?? item.from}`
+		// Thinking names its effort, not the model: the reply's header
+		// already does, and a closed card shows its first line instead.
+		case 'thinking':
+			return tagged('Thinking', [item.effort])
 		case 'text':
-		case 'thinking': {
-			let parts = item.model ? [titles.modelName(item.model)] : []
-			if (item.type === 'thinking') parts.push(item.effort ? `thinking ${item.effort}` : 'thinking')
-			return parts.length ? `Hal (${parts.join(', ')})` : 'Hal'
-		}
+			return item.model ? `Hal (${titles.modelName(item.model)})` : 'Hal'
 		// Hal's own words without a model, such as a greeting (task 8y).
 		case 'output':
 			return item.synthetic ? 'Hal (synthetic)' : undefined

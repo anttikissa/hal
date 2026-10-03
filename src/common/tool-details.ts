@@ -19,23 +19,63 @@ function value(input: unknown, indent = ''): string[] {
 
 let oneLine = (s: string) => s.replace(/\s+/g, ' ').trim()
 
-// The description, else the tool's name and its first text argument;
-// `key` names the argument shown. A model-run slash command reads as
-// typed, "/rename …": the slash already says what it is (task 9g).
-// inspect reads as the question it asks, every argument in one line:
-// "? inspect self (id, model, context)", "? inspect host".
-function headline(name: string, input: Record<string, unknown>): { text: string; key?: string; keys?: string[] } {
-	if (name === 'inspect' && [input.what, input.scope, input.fields].every((v) => v === undefined || typeof v === 'string')) {
-		let what = (input.what as string | undefined) ?? 'sessions'
-		let target = what === 'sessions' ? (input.scope as string | undefined) ?? 'self' : what
-		let fields = (input.fields as string | undefined)?.split(',').map((f) => f.trim()).filter(Boolean)
-		let text = `? inspect ${target}${what !== 'sessions' && input.scope !== undefined ? ` ${input.scope}` : ''}${fields?.length ? ` (${fields.join(', ')})` : ''}`
-		return { text, keys: ['what', 'scope', 'fields'] }
+// A card's title: what the call does, in words (task jz). Each tool
+// reads as a verb and its object: Google for "words", Read <path or
+// URL>, Inspect project (tab, id), Spawn "name" (tab 3, 31-swe),
+// Wait for 31-swe, 31-bux. Bash shows the model's description, marked
+// (background) when backgrounded; its command opens below. A
+// model-run slash command reads as typed, "/rename …" (task 9g).
+// `output`: the call's result, when known, adds what only the host
+// knew (the tab and id spawn opened, whom wait waits for). `key` and
+// `keys` name the arguments shown, which lines() then leaves out.
+function headline(name: string, input: Record<string, unknown>, output?: string): { text: string; key?: string; keys?: string[] } {
+	let str = (k: string) => (typeof input[k] === 'string' && oneLine(input[k] as string)) || undefined
+	// [tab, id] of each session the result names (tabs.label).
+	let ids = (re: RegExp) => [...(output ?? '').matchAll(re)].map((m) => [m[1], m[2]!] as const)
+	switch (name) {
+		case 'bash': {
+			let text = (str('description') ?? oneLine(String(input.command ?? '').split('\n')[0]!)) || 'bash'
+			return { text: input.background === true ? `${text} (background)` : text, key: str('description') ? 'description' : undefined }
+		}
+		case 'command':
+			if (str('command')) return { text: str('command')!, key: 'command' }
+			break
+		case 'google':
+			if (str('query')) return { text: `Google for "${str('query')}"`, key: 'query' }
+			break
+		case 'read':
+		case 'read_url':
+		case 'read_blob': {
+			let key = name === 'read' ? 'path' : name === 'read_url' ? 'url' : 'id'
+			if (str(key)) return { text: `Read ${str(key)}`, key }
+			break
+		}
+		case 'notify':
+			if (str('text')) return { text: `Notify "${str('text')}"`, key: 'text' }
+			break
+		case 'inspect': {
+			if (![input.what, input.scope, input.fields].every((v) => v === undefined || typeof v === 'string')) break
+			let what = (input.what as string | undefined) ?? 'sessions'
+			let target = what === 'sessions' ? (input.scope as string | undefined) ?? 'self' : what
+			let fields = (input.fields as string | undefined)?.split(',').map((f) => f.trim()).filter(Boolean)
+			let text = `Inspect ${target}${what !== 'sessions' && input.scope !== undefined ? ` ${input.scope}` : ''}${fields?.length ? ` (${fields.join(', ')})` : ''}`
+			return { text, keys: ['what', 'scope', 'fields'] }
+		}
+		case 'spawn': {
+			let what = str('name') ? `"${str('name')}"` : input.kind === 'interactive' ? 'interactive session' : 'subagent'
+			let at = ids(/^(?:Started|Opened) (?:tab (\d+) · )?(\d+-[a-z]+)/g).map(([tab, id]) => (tab ? `tab ${tab}, ${id}` : id))[0]
+			return { text: `Spawn ${what}${at ? ` (${at})` : ''}`, keys: str('name') ? ['name'] : [] }
+		}
+		case 'wait': {
+			if (output?.startsWith('No subagent')) return { text: 'Wait (no subagent running)' }
+			let who = ids(/(?:^Waiting for |, )(?:tab (\d+) · )?(\d+-[a-z]+)/g).map(([, id]) => id)
+			return { text: `Wait for ${who.length ? who.join(', ') : 'subagents'}` }
+		}
 	}
-	if (name === 'command' && typeof input.command === 'string' && oneLine(input.command)) return { text: oneLine(input.command), key: 'command' }
-	if (typeof input.description === 'string' && oneLine(input.description)) return { text: oneLine(input.description), key: 'description' }
+	if (str('description')) return { text: str('description')!, key: 'description' }
 	let first = Object.entries(input).find(([, v]) => typeof v === 'string' && oneLine(v))
-	return first ? { text: `${name}: ${oneLine(first[1] as string)}`, key: first[0] } : { text: name }
+	let verb = name.charAt(0).toUpperCase() + name.slice(1)
+	return first ? { text: `${verb} ${oneLine(first[1] as string)}`, key: first[0] } : { text: verb }
 }
 
 function lines(name: string, input: Record<string, unknown>): string[] {

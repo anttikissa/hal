@@ -129,7 +129,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let prefix = time ? `${time} ` : ''
 			let row: string
 			if (typeof command === 'string' && typeof description === 'string') {
-				let head = strings.clipVisual(`${prefix}${ansi.clean(description).replace(/\s+/g, ' ')}`, width)
+				let head = strings.clipVisual(`${prefix}${ansi.clean(toolDetails.headline(item.name, item.input).text)}`, width)
 				let mark = item.input.background === true ? '&' : '$'
 				let commandLine = strings.clipVisual(`${mark} ${ansi.clean(command).replace(/\s+/g, ' ')}`, width)
 				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-5).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-5) : [])]
