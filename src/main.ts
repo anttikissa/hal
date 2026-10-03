@@ -22,6 +22,7 @@ import { config } from './host/config.ts'
 import { diag } from './host/diag.ts'
 import { find } from './host/find.ts'
 import { host } from './host/host.ts'
+import { promptFiles } from './host/prompt-files.ts'
 import { restartProcess } from './host/commands/restart.ts'
 import { restartNote } from './host/restart-note.ts'
 import { jobs } from './host/jobs.ts'
@@ -94,6 +95,8 @@ function initHost(): void {
 	anthropic.init()
 	openai.init()
 	openaiCompat.init()
+	// Checks only while this process hosts: a peer has no clients.
+	promptFiles.start(host.state.clients)
 }
 
 // Module init() calls go here, in order, once modules have them.
