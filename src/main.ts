@@ -133,6 +133,7 @@ function init(): void {
 function initTerminal(remote?: string): void {
 	terminal.init()
 	render.init()
+	render.state.gap = true
 	render.painted = (view) => {
 		if (main.state.shown) return
 		perf.mark('frame', view.transcript ? view.transcript.meta.id : 'no tab yet')
