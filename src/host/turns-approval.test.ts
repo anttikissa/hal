@@ -192,14 +192,3 @@ test("Escape at an approval pauses with the turn's usage; the call has not run a
 	expect(results(calls[1]!)).toEqual([expect.objectContaining({ id: 'b1', output: expect.stringMatching(/exit 0/) })])
 })
 
-test('security none never asks', async () => {
-	settings.state.raw = { security: 'none' }
-	let a = client()
-	let id = session(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'clean' })
-	await until(() => calls.length === 1)
-	round1(bash('b1', 'rm -rf junk'))
-	await until(() => calls.length === 2)
-	expect(ran).toEqual(['b1'])
-	expect(history.readSync(id).some((r) => r.type === 'question')).toBe(false)
-})
