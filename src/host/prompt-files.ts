@@ -3,7 +3,7 @@
 // its includes, and the AGENTS.md / CLAUDE.md files for its cwd. A
 // change shows as a notice popup, never in scrollback, to clients
 // showing a tab whose prompt it is in: SYSTEM.md reaches all of them.
-// Keyed by path, so repeated saves replace one notice. A file first
+// Each save stacks as its own notice for its full time. A file first
 // seen is only remembered, so opening a tab announces nothing.
 import { readFileSync, watch, type FSWatcher } from 'fs'
 import { basename, dirname } from 'path'
@@ -57,9 +57,11 @@ function check(clients: Iterable<Watcher>): void {
 		seen.set(path, text)
 		let what = before === null ? 'created' : text === null ? 'deleted' : 'changed'
 		let to = watching.filter((c) => applies.get(c)!.has(path))
+		// Each change stacks as its own notice for its full time.
+		let seq = ++promptFiles.state.seq
 		diag.log(`prompt files: ${path} ${what}; told ${to.map((c) => c.shown ?? c.visible).join(', ')}`)
 		for (let c of to) {
-			let notice: NoticeEvent = { type: 'notice', session: (c.shown ?? c.visible)!, name: basename(path), kind: 'update', what, line: paths.display(path), key: `prompt-file:${path}` }
+			let notice: NoticeEvent = { type: 'notice', session: (c.shown ?? c.visible)!, name: basename(path), kind: 'update', what, line: paths.display(path), key: `prompt-file:${path}:${seq}` }
 			try { c.deliver(notice) } catch (e: any) { diag.log(`prompt files: deliver: ${e?.message ?? e}`) }
 		}
 	}
@@ -96,11 +98,11 @@ function stop(): void {
 	clearInterval(promptFiles.state.timer)
 	clearTimeout(promptFiles.state.soon)
 	for (let w of promptFiles.state.watchers.values()) w.close()
-	promptFiles.state = { seen: new Map(), timer: undefined, soon: undefined, tick: undefined, watchers: new Map() }
+	promptFiles.state = { seen: new Map(), timer: undefined, soon: undefined, tick: undefined, watchers: new Map(), seq: 0 }
 }
 
 export const promptFiles = {
-	state: { seen: new Map<string, string | null>(), timer: undefined as ReturnType<typeof setInterval> | undefined, soon: undefined as ReturnType<typeof setTimeout> | undefined, tick: undefined as (() => void) | undefined, watchers: new Map<string, FSWatcher>() },
+	state: { seen: new Map<string, string | null>(), timer: undefined as ReturnType<typeof setInterval> | undefined, soon: undefined as ReturnType<typeof setTimeout> | undefined, tick: undefined as (() => void) | undefined, watchers: new Map<string, FSWatcher>(), seq: 0 },
 	intervalMs: (): number => 1000,
 	files, check, watchDirs, start, stop,
 }
