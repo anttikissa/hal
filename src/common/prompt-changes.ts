@@ -67,15 +67,16 @@ function counts(o: Output): { add: number; del: number; text: string[] } {
 	return { add: rows.filter((r) => r[0] === '+').length, del: rows.filter((r) => r[0] === '-').length, text: rows.filter((r) => r.slice(1).trim()) }
 }
 
-// A one-line edit as each changed span with a word of context, gaps
-// as '…': 'Apply Strunk → Prunk & …', 'Before −changing code, … for
-// architecture, → , module'. Undefined unless the change replaces
-// exactly one non-blank line with another.
-function edit(o: Output): string | undefined {
+// A one-line edit as words: each changed span with a word of context,
+// gaps as '…'; removed words tone 'del' (struck through when drawn),
+// added 'add'. Undefined unless the change replaces exactly one
+// non-blank line with another.
+type Part = { text: string; tone: 'dim' | 'add' | 'del' }
+function edit(o: Output): Part[] | undefined {
 	let c = counts(o)
 	if (c.add !== 1 || c.del !== 1 || c.text.length !== 2) return undefined
-	let a = c.text.find((r) => r[0] === '-')!.slice(1).trim().split(' ')
-	let b = c.text.find((r) => r[0] === '+')!.slice(1).trim().split(' ')
+	let a = c.text.find((r) => r[0] === '-')!.slice(1).trim().split(/\s+/)
+	let b = c.text.find((r) => r[0] === '+')!.slice(1).trim().split(/\s+/)
 	// Word LCS table, then a walk emitting kept words and changed spans.
 	let L = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0))
 	for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) L[i]![j] = a[i] === b[j] ? L[i + 1]![j + 1]! + 1 : Math.max(L[i + 1]![j]!, L[i]![j + 1]!)
@@ -89,24 +90,26 @@ function edit(o: Output): string | undefined {
 		else span.add.push(b[j++]!)
 	}
 	let near = (k: number) => [k - 1, k + 1].some((n) => parts[n] && 'del' in parts[n]!)
-	let out: string[] = []
+	let out: Part[] = []
 	parts.forEach((p, k) => {
 		if ('keep' in p) {
-			if (near(k)) out.push(p.keep)
-			else if (out.at(-1) !== '…') out.push('…')
+			if (near(k)) out.push({ text: p.keep, tone: 'dim' })
+			else if (out.at(-1)?.text !== '…') out.push({ text: '…', tone: 'dim' })
 			return
 		}
-		let d = p.del.join(' '), n = p.add.join(' ')
-		out.push(!d ? `+${n}` : !n ? `−${d}` : `${d} → ${n}`)
+		if (p.del.length) out.push({ text: p.del.join(' '), tone: 'del' })
+		if (p.add.length) out.push({ text: p.add.join(' '), tone: 'add' })
 	})
-	return out.join(' ')
+	return out
 }
 
 // Plain rows for a terminal, which cannot open a card. One change:
 // '11:25 AGENTS.md changed  +2 −0', then up to three changed lines.
 // A run: '11:14–11:25 3 changes (one time if both match) to …', then one aligned row per change
 // with its first changed line. `tone` picks a row's colour.
-type Row = { text: string; tone: 'head' | 'add' | 'del' | 'dim' }
+// `parts`, when set, colours the row word by word; `text` is it plain.
+type Row = { text: string; tone: 'head' | 'add' | 'del' | 'dim'; parts?: Part[] }
+const plain = (p: Part[]) => p.map((x) => x.text).join(' ')
 function rows(item: object, now = Date.now()): Row[] {
 	let one = item as Output
 	let run = runs.get(item as Item) ?? (one.type === 'output' && one.change ? [one] : [])
@@ -119,7 +122,7 @@ function rows(item: object, now = Date.now()): Row[] {
 		let c = counts(run[0]!)
 		let out: Row[] = [{ text: `${hhmm(run[0]!.ts, now)} ${summary(run, now)}  ${tally(c)}`, tone: 'head' }]
 		let e = edit(run[0]!)
-		if (e) return [...out, { text: `  ${e}`, tone: 'dim' }]
+		if (e) return [...out, { text: `  ${plain(e)}`, tone: 'dim', parts: [{ text: ' ', tone: 'dim' }, ...e] }]
 		out.push(...c.text.slice(0, 3).map((r) => ({ text: `  ${clean(r)}`, tone: tone(r) })))
 		if (c.text.length > 3) out.push({ text: `  … ${c.text.length - 3} more`, tone: 'dim' })
 		else if (!c.text.length && c.add + c.del) out.push({ text: '  blank lines only', tone: 'dim' })
@@ -132,8 +135,9 @@ function rows(item: object, now = Date.now()): Row[] {
 		let c = counts(o)
 		let first = c.text[0]
 		let e = edit(o)
-		let note = [o.change!.what === 'changed' ? '' : o.change!.what, e ?? (first ? clean(first) : c.add + c.del ? 'blank lines' : '')].filter(Boolean).join(' · ')
-		out.push({ text: `  ${hhmm(o.ts, now)}  ${o.change!.name.padEnd(pad)}  ${tally(c).padEnd(7)}  ${note}`.trimEnd(), tone: e || !first ? 'dim' : tone(first) })
+		let note = [o.change!.what === 'changed' ? '' : o.change!.what, e ? plain(e) : first ? clean(first) : c.add + c.del ? 'blank lines' : ''].filter(Boolean).join(' · ')
+		let lead = `  ${hhmm(o.ts, now)}  ${o.change!.name.padEnd(pad)}  ${tally(c).padEnd(7)} `
+		out.push({ text: `${lead} ${note}`.trimEnd(), tone: e || !first ? 'dim' : tone(first), parts: e && [{ text: lead, tone: 'dim' }, ...e] })
 	}
 	return out
 }
