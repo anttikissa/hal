@@ -6,7 +6,8 @@
 		"Routing lives in src/host/notify.ts (host.broadcast calls notify.route); the stack in src/common/notices.ts (state, timer, fold), drawn by client/notice-view.ts over the rows above the terminal tab bar (modalView.overlay; a short frame grows at the top) and by web/components/Notices.tsx, a zero-height anchor before the StatusRow with the cards absolutely positioned above it (the web tab strip is at the top, so 'above the tabs' means above the status row there).",
 		"The notice event names its session in 'session', not 'sessionId': both clients route any event with a sessionId to that session's (hidden) tab and would swallow it.",
 		"host.ts used to accept 'visibility' only for a session already in client.open, but open is async (history.open) while visibility arrives right after it, so a freshly shown tab never counted as watched; the check is gone (close still clears it).",
-		"Terminal: CSI ?1004h is enabled with bracketed paste; keys.ts decodes CSI I / CSI O into 'focus-in'/'focus-out' keys, which app.onKeys consumes before anything else. tabSwitch.watch sends visibility only on change and forgets on reconnect. The reply's last line comes from the last assistant text record of the latest turn (pages.page), not from stream events."
+		"Terminal: CSI ?1004h is enabled with bracketed paste; keys.ts decodes CSI I / CSI O into 'focus-in'/'focus-out' keys, which app.onKeys consumes before anything else. tabSwitch.watch sends visibility only on change and forgets on reconnect. The reply's last line comes from the last assistant text record of the latest turn (pages.page), not from stream events.",
+		"Notices keyed session:<id> replaced each other, so a notify-tool line vanished when the next line or the turn end arrived. Invariant: each mid-turn (update) notice has its own key and stays its full 5 s, stacked; only a turn end or question replaces that session's previous end or question."
 	],
 	needs: ['m1']
 }

@@ -73,6 +73,8 @@ function route(clients: Iterable<Watcher>, id: string, event: Event): void {
 	notify.deliver(all, id, k, notify.line(id, event), told?.line ? `${word}: ${told.line}` : word, source)
 }
 
+let seq = 0
+
 // The same routing for automatic events and a model's mid-turn notice.
 // `source` names the triggering block and question for the history (task py).
 function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: string, pushText: string, source: { block?: string; question?: string } = {}): void {
@@ -83,6 +85,9 @@ function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: st
 	let watching = all.filter(present)
 	if (!watching.length) return void push.notify(id, name, pushText).catch((e: any) => diag.log(`push: ${e?.message ?? e}`))
 	let notice: NoticeEvent = { type: 'notice', session: id, name, kind: k, line }
+	// Mid-turn lines stack, each for its full time; a turn's end or question
+	// replaces only that session's previous end or question.
+	if (k === 'update') notice.key = `update:${id}:${++seq}`
 	let tab = tabs.file().open.indexOf(id)
 	if (tab >= 0) notice.tab = tab + 1
 	for (let c of watching) c.deliver(notice)
