@@ -146,6 +146,8 @@ Keep reports to one screen. Measure every number now (git log,
 The web and the terminal obey the same UI rules unless a task records
 an exception. When changing behavior on one, consider whether the other
 should change too, and always ask the user; never assume either way.
+Colours are the exception: they match everywhere, so change both without
+asking.
 
 # UI: visible plumbing
 
