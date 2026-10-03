@@ -468,10 +468,13 @@ test('legacy rename controls never appear in terminal answers without a naming f
 
 
 test('parallel results sit under their calls unless the batch overflows a screen', () => {
-	let call = (id: string) => ({ type: 'tool', id, name: 'inspect', input: {}, key: `t${id}` }) as Item
-	let result = (id: string) => ({ type: 'tool-result', id, output: 'x', key: `r${id}` }) as Item
+	type Row = Parameters<typeof frame.order>[0][number]
+	let call = (id: string) => ({ type: 'tool', id, name: 'inspect', input: {}, key: `t${id}` }) as Row
+	let result = (id: string) => ({ type: 'tool-result', id, output: 'x', key: `r${id}` }) as Row
 	let items = [call('a'), call('b'), result('b'), result('a')]
-	let order = (rows: number) => frame.order(items, rows).map((i) => i.key).join(' ')
-	expect(order(24)).toBe('ta ra tb rb')
-	expect(order(10)).toBe('ta tb rb ra')
+	let order = (fits: boolean) => frame.order(items, () => fits).map((i) => i.key).join(' ')
+	expect(order(true)).toBe('ta ra tb rb')
+	expect(order(false)).toBe('ta tb rb ra')
+	// Once split, a batch never flips back (that would rewrite scrollback).
+	expect(order(true)).toBe('ta tb rb ra')
 })

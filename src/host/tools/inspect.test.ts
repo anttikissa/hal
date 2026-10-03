@@ -42,3 +42,12 @@ test('host facts without addresses; unknown values list the valid ones', async (
 	expect(bad.output).toContain('context')
 	expect((await inspect('none', { scope: 'everyone' })).output).toContain('self, project, all')
 })
+
+test('clients report the terminal size they last sent', async () => {
+	let c = client()
+	let id = created(c, '/tmp/x')
+	c.conn.send({ type: 'screen', cols: 120, rows: 56, term: 'xterm-ghostty, truecolor' })
+	c.conn.send({ type: 'screen', cols: 100, rows: 40 })
+	let out = (await inspect(id, { what: 'clients', fields: 'size,term,follows' })).output
+	expect(out.split('\n')).toEqual(['size: 100x40', 'term: unknown', 'follows: yes'])
+})

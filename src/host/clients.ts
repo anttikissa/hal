@@ -12,7 +12,7 @@ export type ClientInfo = { kind: Kind; address?: string; userAgent?: string }
 // it followed when it left.
 // `timezone`: the IANA zone the client reported on connecting (task wq),
 // for this connection only: never persisted or logged.
-export type ClientRecord = ClientInfo & { connectedAt: number; lastAt: number; open: Set<string>; pid?: number; goneAt?: number; followed?: string[]; timezone?: string }
+export type ClientRecord = ClientInfo & { connectedAt: number; lastAt: number; open: Set<string>; pid?: number; goneAt?: number; followed?: string[]; timezone?: string; screen?: { cols: number; rows: number; term?: string } }
 
 const goneMs = 24 * 60 * 60 * 1000
 
@@ -31,6 +31,12 @@ function hello(rec: ClientRecord, pid: number): Record<string, never> {
 	if (rec.kind !== 'peer') return {}
 	rec.pid = pid
 	for (let old of clients.state.records) if (old.goneAt !== undefined && old.kind === 'peer' && old.pid === pid) clients.state.records.delete(old)
+	return {}
+}
+
+// A terminal client reports its size and terminal (validated by the protocol).
+function screen(rec: ClientRecord, s: { cols: number; rows: number; term?: string }): Record<string, never> {
+	rec.screen = { cols: s.cols, rows: s.rows, ...(s.term ? { term: s.term } : {}) }
 	return {}
 }
 
@@ -150,4 +156,4 @@ function reset(): void {
 export const clients = {
 	state: { records: new Set<ClientRecord>(), senders: new Map<string, ClientRecord>() },
 	hostZone: (): string => Intl.DateTimeFormat().resolvedOptions().timeZone,
-	join, hello, zone, input, timezone, utcLike, touch, leave, fromRequest, shortAgent, tty, draw, reset }
+	join, hello, screen, zone, input, timezone, utcLike, touch, leave, fromRequest, shortAgent, tty, draw, reset }

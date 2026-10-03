@@ -1,0 +1,7 @@
+{
+	title: 'inspect reports connected clients and terminal sizes',
+	spec: 'Terminal clients send a screen command (cols, rows, term: TERM, terminal program and version, COLORTERM) on connecting and on every resize. The host validates it (integers 1-10000, term at most 200 characters), keeps it on the connection record only, and inspect what "clients" lists connected clients with fields kind, pid, size (cols x rows), term and follows (shows the caller session). Lets the model reason about what the user sees, e.g. how many tool calls fit on screen.',
+	status: 'done',
+	needs: ['ed'],
+	foldInto: ['ed']
+}

@@ -198,6 +198,7 @@ function resumed(): void {
 // Only while we own the terminal; a resize during a suspend is answered
 // by the redraw on resume.
 function resized(): void {
+	terminal.onScreen()
 	if (terminal.state.entered) terminal.onResize()
 }
 
@@ -276,6 +277,8 @@ export const terminal = {
 	redraw: (): void => {},
 	/** Repaints after a terminal resize; replaced by the renderer. */
 	onResize: (): void => {},
+	/** Tells the host the new size; replaced by the app. */
+	onScreen: (): void => {},
 	/** Moves the cursor below the frame before the terminal is given
 	 * back; replaced by the renderer. Must not throw or clear. */
 	park: (): void => {},
