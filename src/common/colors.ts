@@ -140,7 +140,7 @@ export const colors = {
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
 	// Edit diffs and a failed command's exit status: soft pastels, easy on
 	// the eyes (the error red is too harsh for so many lines).
-	diff: (): Style => ({ addFg: [0.85, 0.12, 150], removeFg: [0.78, 0.11, 22] }),
+	diff: (): Style => ({ addFg: [0.84, 0.14, 148], removeFg: [0.76, 0.14, 26] }),
 	// The web page's own surfaces (custom properties on .page): canvas
 	// and text, the focus accent, form fields, borders, and buttons (the
 	// picker's selected item too), and search matches. The terminal has its own.
