@@ -59,6 +59,8 @@ body, textarea { tab-size: 4; }
 .Card .change .add { color: var(--add-fg); }
 .Card .change .del { color: var(--remove-fg); }
 .Card .change .dim { color: var(--quiet); }
+/* Removed text in the rows is struck through, as in the terminal. */
+.Card .change .row.del, .Card .change span.del { text-decoration: line-through; }
 .Card .change .head:not(:first-child) { margin-top: 0.5lh; }
 /* One header grid for metadata and folding cards; first-line alignment
    stays the same when a label wraps. The 44px height belongs to this row:
