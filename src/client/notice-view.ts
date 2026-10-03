@@ -2,6 +2,7 @@
 // over the rows just above the tab bar, at the right, newest lowest;
 // full width on a narrow terminal. Each notice is two rows behind a bar
 // in its kind's colour: bold "tab name · what happened", then its line.
+// A thin rule (▁) tops the stack, so its edge shows over the transcript.
 
 import { colors } from '../common/colors.ts'
 import type { Folded } from '../common/notices.ts'
@@ -18,7 +19,7 @@ function width(cols: number): number {
 function rows(stack: Folded, w: number): string[] {
 	let c = colors.notice()
 	let fill = (text: string, used: number) => text + ' '.repeat(Math.max(0, w - used - strings.visLen(text))) + ansi.UNCOLOR
-	let out: string[] = []
+	let out: string[] = [ansi.sgr({ fg: c.fg! }) + '▁'.repeat(w) + ansi.UNCOLOR]
 	if (stack.more) out.push(ansi.sgr({ fg: c.fg!, bg: c.bg! }) + fill(strings.clipVisual('  ' + notices.moreText(stack.more), w), 0))
 	for (let n of stack.shown) {
 		let on = ansi.sgr({ fg: c[`${n.kind}Fg`]!, bg: c.bg! })
