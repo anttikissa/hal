@@ -8,3 +8,9 @@ test('bash reads like the terminal; odd arguments show once, plumbing never', ()
 	expect(toolDetails.headline('notify', { text: 'Done' })).toEqual({ text: 'notify: Done', key: 'text' })
 	expect(toolDetails.lines('notify', { text: 'Done' })).toEqual([])
 })
+
+test('inspect heads with every argument once; unknown ones still show', () => {
+	expect(toolDetails.headline('inspect', { scope: 'self', fields: 'id,model,context' }).text).toBe('? inspect self (id, model, context)')
+	expect(toolDetails.headline('inspect', { what: 'host' }).text).toBe('? inspect host')
+	expect(toolDetails.lines('inspect', { scope: 'all', fields: 'tab', extra: 1 })).toEqual(['extra: 1'])
+})

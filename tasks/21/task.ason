@@ -1,0 +1,7 @@
+{
+	title: 'inspect calls read as a question',
+	spec: 'An inspect tool call heads its card, in terminal and web, with every argument on one line: "? inspect <scope>" for sessions (scope defaults to self), "? inspect host" or "? inspect models" otherwise, then the fields in parentheses, comma-separated: "? inspect self (id, model, context)". Opening the card repeats none of them; unknown arguments still show as "key: value". The shared headline in src/common/tool-details.ts implements it.',
+	status: 'done',
+	needs: ['52'],
+	foldInto: ['52']
+}
