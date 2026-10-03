@@ -7,13 +7,16 @@ expansion. `CardHeader` owns the first row: recorded time, readable label and
 block reference. Native controls and plain text occupy the same grid slots.
 All slots start on the first text line, not the centre of a multiline neighbour.
 
-On touch screens a header row and its controls are at least 44px high. The
-header has no additional outer vertical padding; each slot uses the same
-quarter-line text inset. Thus single-line folded cards share one row height.
-Desktop rows use their intrinsic line height plus that same inset.
+Card geometry is the same on every screen; nothing depends on pointer type.
+A header row and its controls are at least 44px high. The header has no
+additional outer vertical padding; each slot uses the same inset,
+(44px - 1lh) / 2, centring one line in the row. Thus single-line folded
+cards share one row height.
 
-Every body uses `.content`: quarter-line vertical padding and one-character
-horizontal padding. A folded body has an unpadded clipping wrapper, so its
+Every body uses `.content`: quarter-line top padding, one-character
+horizontal padding and the header's inset at the bottom, so a card's top
+and bottom whitespace match. A headless card's body uses that inset at
+the top as well. A folded body has an unpadded clipping wrapper, so its
 padding disappears with its content at zero grid height. Do not recreate an
 icon-column indent. Block references have their own header column; body text
 does not reserve a reference-width gutter down its entire length.
