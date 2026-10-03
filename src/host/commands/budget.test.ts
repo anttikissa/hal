@@ -13,7 +13,7 @@ test('/budget shows default, sets and adjusts slots, rejecting invalid or negati
 		await until(() => c.of('output').length > count)
 		return c.of('output').at(-1)
 	}
-	expect((await submit('/budget')).text).toContain(`${subagents.initialSlots()} spawn slots`)
+	expect((await submit('/budget')).text).toContain(`${subagents.initialSlots} spawn slots`)
 	expect((await submit('/budget 5')).text).toContain('5 spawn slots')
 	expect((await submit('/budget +3')).text).toContain('8 spawn slots')
 	expect((await submit('/budget -7')).text).toContain('1 spawn slot')

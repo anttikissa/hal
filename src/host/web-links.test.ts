@@ -74,7 +74,7 @@ test('a terminal gets the web address and a link code, a new one once it is used
 })
 
 test('a link code is replaced before it is half its life old, and the old one still works', async () => {
-	expect(webLinks.renewMs()).toBeLessThanOrEqual(webAuth.codeMs() - 5 * 60_000)
+	expect(webLinks.renewMs()).toBeLessThanOrEqual(webAuth.codeMs - 5 * 60_000)
 	webLinks.renewMs = () => 5
 	let a = client()
 	a.conn.send({ type: 'auth', link: true })
@@ -91,7 +91,7 @@ test('a link code is replaced before it is half its life old, and the old one st
 
 test('no link code reaches any file of the home', async () => {
 	let pace = synthetic.pauseMs
-	synthetic.pauseMs = () => 0
+	synthetic.pauseMs = 0
 	let a = client()
 	a.conn.send({ type: 'create', cwd: home, model: 'hal/intro' })
 	let id = (a.events.find((e) => e.type === 'snapshot') as { sessionId: string }).sessionId

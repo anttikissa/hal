@@ -61,7 +61,7 @@ test('bad schemes and HTTP errors cannot masquerade as successful content', asyn
 test('large text says how many characters were cut', async () => {
 	response = () => new Response('x'.repeat(55_000), { headers: { 'content-type': 'text/plain' } })
 	let result = await tools.run({ type: 'tool_call', id: '1', name: 'read_url', input: { url: url() } }, ctx())
-	expect(result.output.length).toBeLessThanOrEqual(tools.maxChars())
+	expect(result.output.length).toBeLessThanOrEqual(tools.maxChars)
 	let cut = Number(result.output.match(/\[output truncated: (\d+) more characters\]/)?.[1])
 	expect(result.output.startsWith('x'.repeat(1000))).toBe(true)
 	expect(result.output.slice(0, 55_000 - cut)).toBe('x'.repeat(55_000 - cut))
@@ -77,7 +77,7 @@ test('image is a stored image result replayable to Anthropic, not base64 history
 	let { blobs } = await import('../blobs.ts')
 	let messages = anthropic.toMessages({ model: 'claude-test', messages: [{ role: 'assistant', blocks: [{ type: 'tool_call', id: '1', name: 'read_url', input: {} }] }, { role: 'user', blocks: [result] }], image: (id) => blobs.base64('s', id) })
 	expect(messages[1].content[0].content[1].source.data).toBe(png.toString('base64'))
-	response = () => new Response(Buffer.alloc(attachments.maxBytes() + 1), { headers: { 'content-type': 'image/png' } })
+	response = () => new Response(Buffer.alloc(attachments.maxBytes + 1), { headers: { 'content-type': 'image/png' } })
 	let huge = await tools.run({ type: 'tool_call', id: '2', name: 'read_url', input: { url: url() } }, ctx())
 	expect(huge.isError).toBe(true)
 })
@@ -94,7 +94,7 @@ test('binary downloads go in the download directory with path, type and size', a
 
 test('an endless text body is read only up to its limit, and the cut is said', async () => {
 	let limit = tool.maxTextBytes
-	tool.maxTextBytes = () => 100_000
+	tool.maxTextBytes = 100_000
 	let pulls = 0
 	response = () => new Response(new ReadableStream({ pull: (c) => { pulls++; c.enqueue(new TextEncoder().encode('y'.repeat(10_000))) } }), { headers: { 'content-type': 'text/plain' } })
 	try {

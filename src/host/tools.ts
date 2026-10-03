@@ -54,16 +54,16 @@ function all(): Map<string, Tool<ToolOutput>> {
 
 // Lines offset..offset+limit-1 (1-based) of `text`, each at most
 // maxLineChars, stopping early at maxChars. Says how to continue.
-function page(text: string, offset = 1, limit = tools.maxLines()): string {
+function page(text: string, offset = 1, limit = tools.maxLines): string {
 	let lines = text.split(/(?<=\n)/)
 	if (offset > Math.max(lines.length, 1)) throw new Error(`offset ${offset} is past the end (${lines.length} lines)`)
 	let out = ''
 	let n = offset - 1
-	let lineMax = Math.min(tools.maxLineChars(), Math.max(1, tools.maxChars() - 200))
+	let lineMax = Math.min(tools.maxLineChars, Math.max(1, tools.maxChars - 200))
 	for (; n < lines.length && n < offset - 1 + limit; n++) {
 		let line = lines[n]!
 		if (line.length > lineMax) line = `${line.slice(0, lineMax)}… [line cut: ${line.length - lineMax} more characters]\n`
-		if (out.length + line.length > tools.maxChars() - 200 && n > offset - 1) break
+		if (out.length + line.length > tools.maxChars - 200 && n > offset - 1) break
 		out += line
 	}
 	if (n < lines.length) out += `${out.endsWith('\n') ? '' : '\n'}[lines ${offset}-${n} of ${lines.length}; continue with offset ${n + 1}]`
@@ -95,7 +95,7 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 // Retain the whole result when cut, and show both ends: a bash failure
 // usually says why at the end. Leave room for the recoverable reference.
 function cap(output: string, sessionId?: string): string {
-	let max = tools.maxChars()
+	let max = tools.maxChars
 	if (output.length <= max) return output
 	let saved = sessionId && blobs.storeOutput(sessionId, output)
 	let note = saved ? `\n[cut: ${Buffer.byteLength(output)} bytes total, whole output in blob ${saved.blob}; read_blob or cat ${saved.path}]` : `\n[output truncated: ${output.length - max} more characters]`
@@ -115,25 +115,25 @@ function killGroup(pgid: number): void {
 	} catch {
 		return
 	}
-	spawn('sh', ['-c', `sleep ${tools.killAfterMs() / 1000}; kill -9 -${pgid} 2>/dev/null`], { detached: true, stdio: 'ignore' }).unref()
+	spawn('sh', ['-c', `sleep ${tools.killAfterMs / 1000}; kill -9 -${pgid} 2>/dev/null`], { detached: true, stdio: 'ignore' }).unref()
 }
 
 export const tools = {
 	dir,
 	all,
 	// Largest result handed to the model, in characters.
-	maxChars: () => 50_000,
-	maxLines: () => 2000,
-	maxLineChars: () => 2000,
+	maxChars: 50_000,
+	maxLines: 2000,
+	maxLineChars: 2000,
 	// Larger files are refused rather than loaded whole.
-	maxFileBytes: () => 20_000_000,
+	maxFileBytes: 20_000_000,
 	// Unknown tools count as having side effects.
 	readOnly: (name: string): boolean => tools.all().get(name)?.readOnly === true,
 	// Tools never offered to models (task hc): the user found ask's
 	// questions steal focus while he types. Its code stays for replay.
-	disabled: (): string[] => ['ask'],
-	defs: (): ToolDef[] => [...tools.all().values()].filter((t) => !tools.disabled().includes(t.name)).map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
-	killAfterMs: () => 2000,
+	disabled: ['ask'],
+	defs: (): ToolDef[] => [...tools.all().values()].filter((t) => !tools.disabled.includes(t.name)).map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
+	killAfterMs: 2000,
 	page,
 	run,
 	cap,

@@ -121,7 +121,7 @@ test('after a restart the session hears the command was lost, and it no longer r
 
 test('a background command times out by default; a longer per-command timeout overrides it', async () => {
 	let original = jobs.backgroundMs
-	jobs.backgroundMs = () => 170
+	jobs.backgroundMs = 170
 	try {
 		let c = client()
 		let { id, job } = await started(c, 'sleep 5; echo never')
@@ -149,7 +149,7 @@ test('a background command times out by default; a longer per-command timeout ov
 
 test('an endless command keeps only both ends of its output in memory, counting the rest', async () => {
 	let keep = jobs.keepChars
-	jobs.keepChars = () => 1000
+	jobs.keepChars = 1000
 	try {
 		let out = await jobs.exec("printf 'START'; yes middle | head -c 100000; printf 'END'", '/tmp').done
 		expect(out.length).toBeLessThan(1200)

@@ -48,7 +48,7 @@ function reset(): void {
 
 export const webLinks = {
 	state: { holders: new Map<object, Holder>() },
-	renewMs: (): number => webAuth.codeMs() / 2 - 30_000,
+	renewMs: (): number => webAuth.codeMs / 2 - 30_000,
 	follow,
 	drop,
 	used,

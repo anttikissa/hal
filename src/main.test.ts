@@ -51,7 +51,7 @@ test('work held for the first tab runs after it is shown, or after laterMs witho
 	try {
 		let ran: string[] = []
 		Object.assign(main.state, { shown: false, later: [], fallback: undefined })
-		main.laterMs = () => 5_000
+		main.laterMs = 5_000
 		main.later(() => ran.push('web'))
 		await Bun.sleep(5)
 		expect(ran).toEqual([])
@@ -63,7 +63,7 @@ test('work held for the first tab runs after it is shown, or after laterMs witho
 		expect(ran).toEqual(['web', 'after'])
 
 		Object.assign(main.state, { shown: false, later: [], fallback: undefined })
-		main.laterMs = () => 10
+		main.laterMs = 10
 		main.later(() => ran.push('late'))
 		await Bun.sleep(40)
 		expect(ran.at(-1)).toBe('late')

@@ -42,7 +42,7 @@ test('local images are detected by bytes and stored for replay after source dele
 })
 
 test('image size cap accepts the boundary and rejects larger images; text and other binaries keep their behavior', async () => {
-	attachments.maxBytes = () => 32
+	attachments.maxBytes = 32
 	let png = Buffer.alloc(32)
 	png.set(Buffer.from('89504e470d0a1a0a', 'hex'))
 	writeFileSync(`${home}/limit.png`, png)

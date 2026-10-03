@@ -391,7 +391,7 @@ describe('request', () => {
 			writes++
 			write(s)
 		}
-		render.frameMs = () => 5
+		render.frameMs = 5
 		render.state.view = { transcript: transcript([]), prompt: { text: '', cursor: 0 } }
 		for (let i = 0; i < 50; i++) {
 			render.state.view = { transcript: transcript([{ type: 'text', text: `t${i}` }]), prompt: { text: '', cursor: 0 } }
@@ -402,7 +402,7 @@ describe('request', () => {
 		expect(writes).toBe(2)
 		// The trailing paint shows the latest view.
 		expect(term.content()).toContain(' t49')
-		render.frameMs = () => 16
+		render.frameMs = 16
 	})
 })
 
@@ -578,7 +578,7 @@ describe('terminal.redraw', () => {
 describe('a long history (task 7j)', () => {
 	test('is laid out in slices: the prompt paints meanwhile, and the end is the frame built at once', async () => {
 		let slice = render.sliceMs
-		render.sliceMs = () => -1
+		render.sliceMs = -1
 		try {
 			setup(8, 30)
 			let list = items(40)

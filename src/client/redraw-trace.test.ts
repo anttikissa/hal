@@ -90,7 +90,7 @@ test('hooks redraw callbacks installed after local configuration and restores th
 
 test('stops at its bound and does not overwrite a subsequent override', () => {
 	let base = render.paintParts
-	redrawTrace.maxRecords = () => 1
+	redrawTrace.maxRecords = 1
 	redrawTrace.start(file)
 	let wrapper = render.paintParts
 	let subsequent = (...args: Parameters<typeof base>) => wrapper(...args)

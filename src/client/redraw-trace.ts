@@ -54,7 +54,7 @@ function record(facts: Record<string, unknown>): void {
 			if (!n) throw new Error('trace write made no progress')
 			at += n
 		}
-		if (++st.count >= redrawTrace.maxRecords()) redrawTrace.stop()
+		if (++st.count >= redrawTrace.maxRecords) redrawTrace.stop()
 	} catch (e) {
 		st.error = String(e)
 		redrawTrace.stop()
@@ -151,6 +151,6 @@ function start(path: string | URL): void {
 export const redrawTrace = {
 	state: createState(),
 	/** A bounded diagnostic run; start again explicitly for another capture. */
-	maxRecords: () => 20000,
+	maxRecords: 20000,
 	start, stop, hook, cause, record,
 }

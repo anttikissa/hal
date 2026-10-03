@@ -18,7 +18,7 @@ function format(data: Answer): string {
 	return parts.length ? parts.join('\n\n') : 'No results found.'
 }
 
-export const tool: Tool & { url: () => string; format: typeof format } = {
+export const tool: Tool & { url: string; format: typeof format } = {
 	name: 'google',
 	description: 'Search the web with Google (through Serper). Returns titles, URLs and snippets.',
 	parameters: {
@@ -30,7 +30,7 @@ export const tool: Tool & { url: () => string; format: typeof format } = {
 		required: ['query'],
 	},
 	readOnly: true,
-	url: () => 'https://google.serper.dev/search',
+	url: 'https://google.serper.dev/search',
 	format,
 	async run(input, ctx) {
 		let query = typeof input.query === 'string' ? input.query.trim() : ''
@@ -38,7 +38,7 @@ export const tool: Tool & { url: () => string; format: typeof format } = {
 		let num = Math.min(10, Math.max(1, Number.isInteger(input.num) ? (input.num as number) : 5))
 		let key = auth.serperKey()
 		if (!key) throw new Error('no Serper API key: set serper: { apiKey } in the credentials file or SERPER_API_KEY')
-		let res = await fetch(tool.url(), {
+		let res = await fetch(tool.url, {
 			method: 'POST',
 			headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
 			body: JSON.stringify({ q: query, num }),

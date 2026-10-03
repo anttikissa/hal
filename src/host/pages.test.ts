@@ -62,7 +62,7 @@ test('a snapshot of a 20 MB history reads at most the budget and keeps an open q
 	sessions.closeAll()
 	pages.reset()
 	let { value: snap, bytes } = counted(() => pages.snapshot(id))
-	expect(bytes).toBeLessThanOrEqual(pages.budget())
+	expect(bytes).toBeLessThanOrEqual(pages.budget)
 	let all = [...snap.earlier, ...snap.history]
 	expect(snap.history.at(-1)).toMatchObject({ type: 'output', text: 'the very last output' })
 	expect(forms.open(all)?.id).toBe('q1')

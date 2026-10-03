@@ -101,7 +101,7 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	let style = itemView.itemStyle(item, tool)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${itemView.resultRows()} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url}`
+	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, mark } = frame.ref(item, cols, session, style)
@@ -231,7 +231,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let items = frame.order(promptChanges.group(view.transcript?.items ?? []), (batch) => height(batch) <= screen)
 	let calls = new Map<string, string>()
 	let formCursor: Frame['cursor'] | undefined
-	let look = `${cols} ${session} ${itemView.resultRows()} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
+	let look = `${cols} ${session} ${itemView.resultRows} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
 	let kept = frame.state.history
 	let start = 0
 	// A question can become active without its transcript item changing

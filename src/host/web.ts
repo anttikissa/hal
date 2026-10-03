@@ -81,7 +81,7 @@ function redeem(code: unknown, req: Request): { cookie?: string; refused?: 'wron
 	webLinks.used(webAuth.normalize(code as string))
 	let hostname = URL.parse(`http://${req.headers.get('host') ?? ''}`)?.hostname
 	let local = ['localhost', '127.0.0.1', '[::1]'].includes(hostname ?? '') && req.headers.get('x-forwarded-proto') !== 'https'
-	let maxAge = Math.floor(webAuth.tokenMs() / 1000)
+	let maxAge = Math.floor(webAuth.tokenMs / 1000)
 	let cookie = new Bun.Cookie(cookieName, out.token, { path: '/', httpOnly: true, secure: !local, sameSite: 'strict', maxAge })
 	return { cookie: cookie.serialize() }
 }

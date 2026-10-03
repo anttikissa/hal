@@ -96,10 +96,10 @@ async function snapshot(ctx: ToolContext, path: string): Promise<FileSnapshot> {
 		throw e
 	}
 	let canonical = await fileChanges.canonical(absolute)
-	if (!info.isFile() || info.size > fileChanges.maxBytes() || approval.sensitive(absolute) || approval.sensitive(canonical)) return { size: info.size, mtime: info.mtimeMs }
+	if (!info.isFile() || info.size > fileChanges.maxBytes || approval.sensitive(absolute) || approval.sensitive(canonical)) return { size: info.size, mtime: info.mtimeMs }
 	// Slice bounds the read even if another process grows the file after stat.
-	let bytes = Buffer.from(await Bun.file(absolute).slice(0, fileChanges.maxBytes() + 1).arrayBuffer())
-	if (bytes.length > fileChanges.maxBytes()) {
+	let bytes = Buffer.from(await Bun.file(absolute).slice(0, fileChanges.maxBytes + 1).arrayBuffer())
+	if (bytes.length > fileChanges.maxBytes) {
 		let latest = await stat(absolute)
 		return { size: latest.size, mtime: latest.mtimeMs }
 	}
@@ -181,6 +181,6 @@ async function finish(observation: Observation): Promise<void> {
 
 export const fileChanges = {
 	state: { locks: [] as Lock[] },
-	maxBytes: () => 1_000_000,
+	maxBytes: 1_000_000,
 	validate, canonical, expand, acquire, blobPath, snapshot, parseStatus, git, status, begin, finish,
 }

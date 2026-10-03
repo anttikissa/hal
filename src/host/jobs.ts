@@ -26,7 +26,7 @@ type Job = { sessionId: string; stop: () => void }
 
 // Starts `command` with bash -c in `cwd`, stdout and stderr merged.
 // `done` is the status line (`[exit N]`, `[timed out after Ns]`, …)
-// then the output, cut past tools.maxChars(); it waits for stdout to
+// then the output, cut past tools.maxChars; it waits for stdout to
 // close. `ms`: kill the group after that long.
 function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: string) => void): Run {
 	let child = spawn('bash', ['-c', `exec 2>&1\n${command}`], { cwd, detached: true, stdio: ['ignore', 'pipe', 'ignore'] })
@@ -35,9 +35,9 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 	let timedOut = false
 	let timer = ms === undefined ? undefined : setTimeout(() => ((timedOut = true), kill()), ms)
 	// Keep the whole result so the cap can retain it in a blob, up to
-	// jobs.keepChars(): past that only both ends stay (an endless command
+	// jobs.keepChars: past that only both ends stay (an endless command
 	// must not exhaust the host), the middle counted in a note.
-	let half = Math.floor(jobs.keepChars() / 2)
+	let half = Math.floor(jobs.keepChars / 2)
 	let head = ''
 	let tail = ''
 	let dropped = 0
@@ -64,7 +64,7 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 				dropped += tail.length - half
 				tail = tail.slice(-half)
 			}
-			let gap = dropped ? `\n[${dropped} characters dropped: over ${jobs.keepChars()} kept in memory]\n` : ''
+			let gap = dropped ? `\n[${dropped} characters dropped: over ${jobs.keepChars} kept in memory]\n` : ''
 			resolve(`[${status}]\n${head}${gap}${tail}`)
 		})
 	})
@@ -72,14 +72,14 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 }
 
 // Runs `command` for session `sessionId` in the background. One that
-// ends within jobs.graceMs() (not found, a syntax error) returns its
+// ends within jobs.graceMs (not found, a syntax error) returns its
 // result as a foreground one would; otherwise its id.
 async function start(sessionId: string, command: string, cwd: string, ms?: number, callId?: string, prepared?: () => Run): Promise<string> {
 	let call = callId ? history.readSync(sessionId).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === callId) : undefined
 	if (call?.n === undefined) throw new Error('background Bash call has no recorded block id')
 	let id = `${sessionId}:${call.n}`
 	let run = prepared ? prepared() : jobs.exec(command, cwd, ms)
-	let early = await Promise.race([run.done, Bun.sleep(jobs.graceMs()).then(() => undefined)])
+	let early = await Promise.race([run.done, Bun.sleep(jobs.graceMs).then(() => undefined)])
 	if (early !== undefined) return early
 	jobs.state.running.set(id, { sessionId, stop: run.stop })
 	let meta = sessions.open(sessionId)
@@ -186,11 +186,11 @@ export const jobs = {
 	// `running`: background commands of this process, by id.
 	state: { running: new Map<string, Job>() },
 	// How long a background call waits for a command that fails at once.
-	graceMs: () => 100,
+	graceMs: 100,
 	// Background jobs must not run unseen indefinitely; callers may override it.
-	backgroundMs: () => 600_000,
+	backgroundMs: 600_000,
 	// The most output one command keeps in memory (both ends past it).
-	keepChars: () => 32_000_000,
+	keepChars: 32_000_000,
 	exec,
 	start,
 	label,

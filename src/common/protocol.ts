@@ -151,7 +151,7 @@ export type Command = (
 	| { type: 'tab-seen'; sessionId: string }
 	// An attachment for a later prompt (task 2a): `data` is base64 of a
 	// png, jpeg, gif or webp image or of text/plain, at most
-	// attachments.maxBytes() decoded. Answered, to this client only, with
+	// attachments.maxBytes decoded. Answered, to this client only, with
 	// `attached`; a prompt names it by that event's marker. A paste's
 	// `name` (attachments.fileName, chosen by the client) makes its
 	// marker [image/<name>] or [paste/<name>] (tasks qy, 31).

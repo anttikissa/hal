@@ -16,8 +16,8 @@
 // - valid(id): whether a session may switch to id
 // - contextWindow(id): tokens id takes in, for the context meter
 // - effort(id, selected?): the reasoning effort requests send
-// - ttlMs(): how long a provider's list is kept → 1 hour
-// - timeoutMs(): how long asking a provider may take → 3 s
+// - ttlMs: how long a provider's list is kept → 1 hour
+// - timeoutMs: how long asking a provider may take → 3 s
 // - fetchList(name): a provider's ids: cache, provider, then fallback
 // - ask(name, list): calls the provider's own list under timeoutMs
 // - fallback(name): models.dev ids, then the provider's built-in ones
@@ -53,7 +53,7 @@ async function fetchList(name: string): Promise<string[] | undefined> {
 	let p = provider.state.providers[name]
 	if (!p) return undefined
 	let cached = models.cached(name)
-	if (cached && Date.now() - cached.at < models.ttlMs()) return cached.ids
+	if (cached && Date.now() - cached.at < models.ttlMs) return cached.ids
 	let own = p.models ? await models.ask(name, (signal) => p.models!(signal)) : undefined
 	if (own) return own
 	let fallback = models.fallback(name)
@@ -69,7 +69,7 @@ function fallback(name: string): string[] {
 async function ask(name: string, list: (signal: AbortSignal) => Promise<string[]>): Promise<string[] | undefined> {
 	let key = provider.state.providers[name]?.modelsKey?.()
 	let controller = new AbortController()
-	let timer = setTimeout(() => controller.abort(), models.timeoutMs())
+	let timer = setTimeout(() => controller.abort(), models.timeoutMs)
 	try {
 		let ids = (await Promise.race([
 			list(controller.signal),
@@ -171,8 +171,8 @@ export const models = {
 		return settings.model()
 	},
 	// How long a provider's list is kept, and how long it may take.
-	ttlMs: () => 3_600_000,
-	timeoutMs: () => 3000,
+	ttlMs: 3_600_000,
+	timeoutMs: 3000,
 	cached(name: string): Listing | undefined {
 		let entry = models.state.lists.get(name)
 		return entry?.key === provider.state.providers[name]?.modelsKey?.() ? entry : undefined

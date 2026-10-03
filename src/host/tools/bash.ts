@@ -38,7 +38,7 @@ export const tool: Tool = {
 		let launched = false
 		let launch = () => {
 			if (ctx.signal.aborted) throw new Error('cancelled; the command did not run')
-			let run = jobs.exec(input.command as string, ctx.cwd, given ?? (input.background ? jobs.backgroundMs() : 120_000), input.background ? undefined : ctx.onOutput)
+			let run = jobs.exec(input.command as string, ctx.cwd, given ?? (input.background ? jobs.backgroundMs : 120_000), input.background ? undefined : ctx.onOutput)
 			launched = true
 			return { ...run, done: run.done.finally(() => fileChanges.finish(observation)) }
 		}

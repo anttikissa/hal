@@ -24,7 +24,7 @@ function notes(sessionId: string, cwd: string): string[] {
 	let lines: string[] = []
 	for (let [id, entry] of neighbours.state.seen) {
 		let key = `${sessionId}|${id}`
-		let fresh = [...entry.paths].filter(([, at]) => now - at <= neighbours.windowMs())
+		let fresh = [...entry.paths].filter(([, at]) => now - at <= neighbours.windowMs)
 		if (id === sessionId || entry.cwd !== cwd || !sessions.state.open.has(id) || !fresh.length) { neighbours.state.sent.delete(key); continue }
 		// Shared paths first, then newest.
 		fresh.sort((a, b) => Number(own.has(b[0])) - Number(own.has(a[0])) || b[1] - a[1])
@@ -48,6 +48,6 @@ function append(output: string, sessionId: string, cwd: string): string {
 
 export const neighbours = {
 	state: { seen: new Map<string, Entry>(), sent: new Map<string, string>() },
-	windowMs: () => 15 * 60_000,
+	windowMs: 15 * 60_000,
 	record, notes, append,
 }

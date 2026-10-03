@@ -63,7 +63,7 @@ test('snapshots creations, edits, deletes and new glob matches; observes undecla
 test('sensitive paths and symlink aliases, and large files retain metadata not bytes', async () => {
 	writeFileSync(`${cwd}/.env`, 'private')
 	symlinkSync('.env', `${cwd}/alias`)
-	writeFileSync(`${cwd}/large`, Buffer.alloc(fileChanges.maxBytes() + 1))
+	writeFileSync(`${cwd}/large`, Buffer.alloc(fileChanges.maxBytes + 1))
 	await bash('printf changed-secret > .env; printf x >> large', ['.env', 'alias', 'large'])
 	let files = changes()[0]!.files
 	expect(files).toHaveLength(3)

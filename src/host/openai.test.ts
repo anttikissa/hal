@@ -48,9 +48,9 @@ beforeEach(() => {
 			return reply()
 		},
 	})
-	openai.apiUrl = () => `http://127.0.0.1:${server.port}/v1/responses`
-	openai.codexUrl = () => `http://127.0.0.1:${server.port}/codex/responses`
-	openai.codexModelsUrl = () => `http://127.0.0.1:${server.port}/codex/models`
+	openai.apiUrl = `http://127.0.0.1:${server.port}/v1/responses`
+	openai.codexUrl = `http://127.0.0.1:${server.port}/codex/responses`
+	openai.codexModelsUrl = `http://127.0.0.1:${server.port}/codex/models`
 	auth.tokenUrl = () => `http://127.0.0.1:${server.port}/token`
 	openai.init()
 })
@@ -208,11 +208,11 @@ test('a ChatGPT login lists only the models the Codex backend shows it', async (
 	expect(seen[0]!.headers.get('chatgpt-account-id')).toBe('acct-1')
 	writeAuth({ openai: { apiKey: 'sk-file' } })
 	auth.close()
-	expect(await openai.listModels(new AbortController().signal)).toEqual(expect.arrayContaining(openai.knownModels()))
+	expect(await openai.listModels(new AbortController().signal)).toEqual(expect.arrayContaining(openai.knownModels))
 })
 
 test('the picker offers models.dev ids and the known GPT ids; a subscription caps input at 272k', () => {
-	expect(models.known()).toEqual(expect.arrayContaining(openai.knownModels().map((m) => `openai/${m}`)))
+	expect(models.known()).toEqual(expect.arrayContaining(openai.knownModels.map((m) => `openai/${m}`)))
 	writeAuth({ openai: { accessToken: subscriptionToken } })
 	expect(models.contextWindow('openai/gpt-5.5')).toBe(272_000)
 	writeAuth({ openai: { apiKey: 'sk-file' } })

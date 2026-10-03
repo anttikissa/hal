@@ -156,7 +156,7 @@ test('a login in another tab resumes all quota waits without resuming paused or 
 	let at = now + 3 * 3600_000
 	let limited: StreamEvent = { type: 'error', message: 'all accounts limited', failure: 'limited', retryAt: at }
 	// Keep wall time fixed: the deadline cannot be what resumes the turns.
-	clock.sleep = (ms, signal) => ms === auth.pollMs()
+	clock.sleep = (ms, signal) => ms === auth.pollMs
 		? orig.sleep(1, signal)
 		: new Promise<void>((r) => signal?.addEventListener('abort', () => r()))
 	let ids: string[] = []

@@ -5,7 +5,10 @@
 plugin.set(obj, key, value) overrides a plain value with the same ownership as hooks: removed on reload, delete or expiry; when several files set one key the last in filename order wins, and removing it reveals the earlier one, then the original exactly. Its type allows only non-function keys and checks the value type; a missing or function key is a load error naming file and target (use around). /plugins lists it as "<module>.<key> set". Like hooks, set affects only future reads; repaints go through onChange.
 
 Docs: README "Plugins" section, tasks/README.md module conventions and plugins/example-plugin.ts describe set and the plain-value rule.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Migrated 79 constant settings with a regex script (pure literals only; command help strings, no-op callbacks and delegations stayed functions). colors.* stay functions: theme Looks (task d3) receive each field's base and call it, so converting colours means reworking the Look type and every theme; left for a separate decision."
+	],
 	needs: ['an'],
 	foldInto: ['an']
 }

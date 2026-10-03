@@ -108,7 +108,7 @@ function join(lines: string[], from = 0, to = lines.length): string {
 
 // All the rows, joined a piece at a time as they are written.
 function rowParts(lines: string[]): Part[] {
-	let n = render.chunkRows()
+	let n = render.chunkRows
 	if (lines.length <= n) return [join(lines)]
 	let parts: Part[] = []
 	for (let a = 0; a < lines.length; a += n) {
@@ -263,7 +263,7 @@ function draw(force = false): void {
 	// is, the tab's rows painted last stay; a tab not painted since the
 	// last full redraw shows its last screenful of items meanwhile.
 	let session = st.view.transcript?.meta.id
-	let past = frame.layout(st.view, cols, performance.now() + render.sliceMs(), true, rows)
+	let past = frame.layout(st.view, cols, performance.now() + render.sliceMs, true, rows)
 	if (!past) {
 		render.later()
 		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
@@ -306,7 +306,7 @@ function later(): void {
 	st.slicing = setTimeout(() => {
 		st.slicing = null
 		if (!st.out) return
-		if (frame.layout(st.view, st.out.size().cols, performance.now() + render.sliceMs(), true, st.out.size().rows)) render.request()
+		if (frame.layout(st.view, st.out.size().cols, performance.now() + render.sliceMs, true, st.out.size().rows)) render.request()
 		else render.later()
 	}, 0)
 }
@@ -328,7 +328,7 @@ function request(): void {
 		if (!st.dirty) return
 		st.dirty = false
 		render.request()
-	}, render.frameMs())
+	}, render.frameMs)
 }
 
 /** Show a new view (transcript and prompt). */
@@ -375,11 +375,11 @@ function reset(): void {
 export const render = {
 	state: createState(),
 	/** Minimum time between two paints. */
-	frameMs: () => 16,
+	frameMs: 16,
 	/** How long a slice of history layout may run before yielding. */
-	sliceMs: () => 4,
+	sliceMs: 4,
 	/** Rows joined per piece of a big repaint. */
-	chunkRows: () => 1000,
+	chunkRows: 1000,
 	/** Told every view painted (main.ts waits for the first tab's). */
 	painted: (_view: View): void => {},
 	paint,

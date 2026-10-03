@@ -42,7 +42,7 @@ function looksLike(mediaType: string, bytes: Uint8Array): boolean {
 // The bytes of an attachment's base64 `data`; throws why it is refused.
 function decode(mediaType: string, data: string): Buffer {
 	if (!attachments.types[mediaType] && mediaType !== 'application/octet-stream') throw new Error(`unsupported attachment type ${JSON.stringify(mediaType)}`)
-	let max = attachments.maxBytes()
+	let max = attachments.maxBytes
 	// Checked before decoding: base64 is 4 characters per 3 bytes.
 	if (data.length > Math.ceil(max / 3) * 4) throw new Error(`attachment larger than ${max / 1024 / 1024} MB`)
 	if (data.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) throw new Error('attachment data is not base64')
@@ -90,7 +90,7 @@ function staged(name: string): { bytes: Buffer; mediaType: string } | undefined 
 	let path = `${paths.fileDir(name)}/${name}`
 	if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return undefined
 	let bytes = readFileSync(path)
-	return bytes.length <= attachments.maxBytes() && blobs.looksLike(mediaType, bytes) ? { bytes, mediaType } : undefined
+	return bytes.length <= attachments.maxBytes && blobs.looksLike(mediaType, bytes) ? { bytes, mediaType } : undefined
 }
 
 // Pasted file `name` for the web (/image/<name>, /paste/<name>): its

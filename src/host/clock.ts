@@ -35,7 +35,7 @@ async function until(at: number, signal?: AbortSignal): Promise<void> {
 	let off = clock.onWake(() => (woke = true))
 	try {
 		// Guard for sleep: short slices, each re-reading wall time.
-		while (!woke && !signal?.aborted && clock.now() < at) await clock.sleep(Math.min(at - clock.now(), clock.tickMs()), signal)
+		while (!woke && !signal?.aborted && clock.now() < at) await clock.sleep(Math.min(at - clock.now(), clock.tickMs), signal)
 	} finally {
 		off()
 	}
@@ -53,7 +53,7 @@ function tick(): void {
 	let now = clock.now()
 	let last = clock.state.last
 	clock.state.last = now
-	if (last !== null && now - last > clock.tickMs() + clock.wakeGapMs()) clock.wake()
+	if (last !== null && now - last > clock.tickMs + clock.wakeGapMs) clock.wake()
 }
 
 function wake(): void {
@@ -70,7 +70,7 @@ function wake(): void {
 function init(): void {
 	if (clock.state.timer) return
 	clock.state.last = clock.now()
-	clock.state.timer = setInterval(() => clock.tick(), clock.tickMs())
+	clock.state.timer = setInterval(() => clock.tick(), clock.tickMs)
 	clock.state.timer.unref?.()
 }
 
@@ -85,8 +85,8 @@ export const clock = {
 	sleep,
 	until,
 	// Wake detector period, and how late a tick must be to count as a wake.
-	tickMs: () => 1000,
-	wakeGapMs: () => 4000,
+	tickMs: 1000,
+	wakeGapMs: 4000,
 	onWake,
 	tick,
 	wake,

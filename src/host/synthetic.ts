@@ -22,9 +22,9 @@ const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms))
 // streams meanwhile, so the prompt stays free.
 async function* paced(say: string | undefined, signal: AbortSignal): AsyncGenerator<StreamEvent> {
 	for (let [i, text] of (say?.split('\n\n') ?? []).entries()) {
-		if (i) await sleep(synthetic.pauseMs())
+		if (i) await sleep(synthetic.pauseMs)
 		for (let [j, word] of text.split(/(?<=\s)/).entries()) {
-			if (j) await sleep(synthetic.pauseMs() / 10)
+			if (j) await sleep(synthetic.pauseMs / 10)
 			if (signal.aborted) return
 			yield { type: 'text', text: i && !j ? `\n\n${word}` : word }
 		}
@@ -36,5 +36,5 @@ export const synthetic = {
 	models: { intro: (records, answers, id) => intro.run(records, answers, id) } as Record<string, Synthetic>,
 	find,
 	paced,
-	pauseMs: (): number => 400,
+	pauseMs: 400,
 }

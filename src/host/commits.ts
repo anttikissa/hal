@@ -67,7 +67,7 @@ async function finish(watch: Watch): Promise<void> {
 		let fresh = commits.parse(await commits.appended(watch.log, watch.size)).filter((e) => !commits.state.seen.includes(e.hash))
 		if (!fresh.length) return
 		// Claim before awaiting: concurrent calls read the same lines.
-		commits.state.seen = [...commits.state.seen, ...fresh.map((e) => e.hash)].slice(-commits.remember())
+		commits.state.seen = [...commits.state.seen, ...fresh.map((e) => e.hash)].slice(-commits.remember)
 		let out = await fileChanges.git(watch.cwd, ['log', '--no-walk=unsorted', '-z', '--format=%H%x1f%h%x1f%s%x1f%B', ...fresh.map((e) => e.hash)])
 		if (out.code) throw new Error(out.error)
 		let info = new Map(out.text.split('\0').filter(Boolean).map((r) => { let [h, short, subject, body] = r.split('\x1f'); return [h!, { short: short!, subject: subject!, trailer: commits.trailer(body ?? '') }] }))
@@ -94,6 +94,6 @@ function announce(id: string, hash: string, short: string, subject: string, amen
 
 export const commits = {
 	state: { active: new Set<Watch>(), seen: [] as string[] },
-	remember: (): number => 500,
+	remember: 500,
 	begin, parse, appended, trailer, attribute, finish, announce,
 }

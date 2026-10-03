@@ -821,7 +821,7 @@ test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay
 		history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n`.repeat(80) } })
 		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 	}
-	pages.budget = () => 1500
+	pages.budget = 1500
 	let b = await browser()
 	try {
 		await server.serve()
@@ -874,7 +874,7 @@ test.skipIf(!chrome)('in a browser a block address loads its page, marks its car
 		history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n`.repeat(80) } })
 		history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
 	}
-	pages.budget = () => 1500
+	pages.budget = 1500
 	let b = await browser()
 	try {
 		await server.serve()

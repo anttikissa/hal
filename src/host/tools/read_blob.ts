@@ -20,7 +20,7 @@ export const tool: Tool<ToolOutput> = {
 			if (input.charOffset === undefined) return tools.page(text, input.offset as number | undefined, input.limit as number | undefined)
 			let at = (input.charOffset as number) - 1
 			if (at > text.length) throw new Error(`charOffset ${input.charOffset} is past the end (${text.length} characters)`)
-			let end = Math.min(text.length, at + Math.max(1, tools.maxChars() - 200))
+			let end = Math.min(text.length, at + Math.max(1, tools.maxChars - 200))
 			return text.slice(at, end) + (end < text.length ? `\n[characters ${at + 1}-${end} of ${text.length}; continue with charOffset ${end + 1}]` : '')
 		}
 		let ref = /^(?:([\w-]+)\/)?([0-9a-f]{12}|[0-9a-z]{6})$/.exec(input.id)

@@ -3,7 +3,7 @@
 // its usage; a turn from before those records is one point from its
 // turn end (`approx`). Drop causes are named only where history knows
 // them: a compact or reset between two rounds, a pruning checkpoint
-// (every pruning.batchTurns() completed turns, task 0d) or a cache miss.
+// (every pruning.batchTurns completed turns, task 0d) or a cache miss.
 import type { HistoryRecord } from '../common/replay.ts'
 import { history } from './history.ts'
 import { models } from './models.ts'
@@ -40,7 +40,7 @@ function points(records: HistoryRecord[], window: (model?: string) => number | u
 		let w = window(p.model)
 		if (w) p.window = w
 		let prev = out.at(-1)
-		let now = Math.floor(completed / pruning.batchTurns())
+		let now = Math.floor(completed / pruning.batchTurns)
 		if (prev) {
 			if (p.total < prev.total * 0.9) {
 				if (boundary) p.cause = boundary

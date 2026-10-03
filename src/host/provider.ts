@@ -72,7 +72,7 @@ async function read(reader: ReadableStreamDefaultReader<Uint8Array>, signal?: Ab
 	if (signal?.aborted) throw new Cancelled()
 	let timer: ReturnType<typeof setTimeout> | undefined
 	let onAbort: (() => void) | undefined
-	let ms = provider.streamTimeoutMs()
+	let ms = provider.streamTimeoutMs
 	let stop = new Promise<never>((_, reject) => {
 		timer = setTimeout(() => reject(new Error(`Stream read timed out (no data for ${ms}ms)`)), ms)
 		onAbort = () => reject(new Cancelled())
@@ -229,14 +229,14 @@ function failed(p: Provider, modelId: string, account: string | undefined, e: Er
 	if (account && provider.notOnAccount(e)) {
 		// This account cannot run the model (a ChatGPT plan lapsed to
 		// free): set it aside for this model and retry on the next.
-		limits.set(limits.key(modelId, account), now + provider.planLimitMs())
+		limits.set(limits.key(modelId, account), now + provider.planLimitMs)
 		e.failure = 'limited'
 		e.retryAt = now
 		return e
 	}
 	if (e.status === 429) {
 		if (account) {
-			limits.set(limits.key(modelId, account), reset ?? now + provider.accountLimitMs())
+			limits.set(limits.key(modelId, account), reset ?? now + provider.accountLimitMs)
 			e.retryAt = now
 		} else if (reset !== undefined) {
 			limits.set(limits.key(modelId), reset)
@@ -345,11 +345,11 @@ export const provider = {
 	imageNote: (why: string): string => `<meta>An image was attached here, but ${why}.</meta>`,
 	state: { providers: {} as Record<string, Provider> },
 	// Longest silence tolerated mid-stream; chunks normally arrive every ~100ms.
-	streamTimeoutMs: () => 120_000,
+	streamTimeoutMs: 120_000,
 	// How long an account that hit 429 without a reset time is skipped.
-	accountLimitMs: () => 60_000,
+	accountLimitMs: 60_000,
 	// How long an account stays aside for a model its plan refuses.
-	planLimitMs: () => 3_600_000,
+	planLimitMs: 3_600_000,
 	fetch: (url: string, init: RequestInit): Promise<Response> => fetch(url, init),
 	register,
 	failure,

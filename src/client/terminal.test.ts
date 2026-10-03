@@ -263,7 +263,7 @@ describe('escape', () => {
 		let t = fixture()
 		t.type('\x1b')
 		expect(t.keys).toEqual([])
-		await Bun.sleep(terminal.escapeMs() + 30)
+		await Bun.sleep(terminal.escapeMs + 30)
 		expect(t.keys.map((k) => k.key)).toEqual(['escape'])
 	})
 
@@ -271,7 +271,7 @@ describe('escape', () => {
 		let t = fixture()
 		t.type('\x1b')
 		t.type('[A')
-		await Bun.sleep(terminal.escapeMs() + 30)
+		await Bun.sleep(terminal.escapeMs + 30)
 		expect(t.keys.map((k) => k.key)).toEqual(['up'])
 	})
 
@@ -279,7 +279,7 @@ describe('escape', () => {
 		let t = fixture()
 		t.type('\x1b')
 		terminal.reset()
-		await Bun.sleep(terminal.escapeMs() + 30)
+		await Bun.sleep(terminal.escapeMs + 30)
 		expect(t.keys).toEqual([])
 	})
 })

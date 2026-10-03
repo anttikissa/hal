@@ -7,7 +7,7 @@ export const command: SlashCommand = {
 	help: () => '/budget: show spawn slots left. /budget <n> sets them; /budget +n or -n adjusts them.',
 	run(args, _answers, ctx) {
 		let meta = sessions.open(ctx.sessionId)
-		let current = meta.slots ?? subagents.initialSlots()
+		let current = meta.slots ?? subagents.initialSlots
 		if (!args) return { say: `${current} spawn slot${current === 1 ? '' : 's'} left` }
 		if (!/^(?:[+-]?\d+)$/.test(args)) return { error: 'usage: /budget [<n>|+n|-n] (non-negative integer)' }
 		let value = Number(args)

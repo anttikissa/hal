@@ -102,7 +102,7 @@ function accept(socket: Socket): void {
 		lines.decoder(
 			(line) => conn.receive(line as string),
 			(e) => conn.unreadable(e.message),
-			lines.maxLine(),
+			lines.maxLine,
 			(line) => line,
 		),
 	)

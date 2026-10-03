@@ -40,7 +40,7 @@ async function init(): Promise<void> {
 	diag.log(`version ${st.loaded} (${version.dir()})`)
 	version.found(st.loaded)
 	if (hash === undefined) return
-	st.timer = setInterval(() => void version.check(), version.checkMs())
+	st.timer = setInterval(() => void version.check(), version.checkMs)
 	st.timer.unref?.()
 }
 
@@ -70,7 +70,7 @@ export const version = {
 	state: createState(),
 	/** The checkout this code was loaded from. */
 	dir: (): string => resolve(import.meta.dir, '../..'),
-	checkMs: (): number => 10_000,
+	checkMs: 10_000,
 	/** Told the loaded version once it is known (main.ts wires it). */
 	found: (_loaded: string): void => {},
 	/** Told once when a new commit is checked out. */

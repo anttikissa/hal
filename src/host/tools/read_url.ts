@@ -40,13 +40,13 @@ function htmlText(html: string): string {
 	return [title, body].filter(Boolean).join('\n\n')
 }
 
-export const tool: Tool<ToolOutput> & { maxTextBytes: () => number } = {
+export const tool: Tool<ToolOutput> & { maxTextBytes: number } = {
 	name: 'read_url',
 	description: 'Read a web page or text file, extracting readable text from HTML. Images are attached; other files are saved under /tmp.',
 	parameters: { type: 'object', properties: { url: { type: 'string', description: 'HTTP or HTTPS URL to read' } }, required: ['url'] },
 	readOnly: true,
 	// The most of a text or HTML body read before converting it.
-	maxTextBytes: () => 10_000_000,
+	maxTextBytes: 10_000_000,
 	async run(input, ctx) {
 		if (typeof input.url !== 'string') throw new Error('url must be an http(s) URL')
 		let url: URL
@@ -58,18 +58,18 @@ export const tool: Tool<ToolOutput> & { maxTextBytes: () => number } = {
 		let type = (res.headers.get('content-type') ?? 'application/octet-stream').split(';')[0]!.trim().toLowerCase()
 		if (type.startsWith('image/') && attachments.types[type] && type !== 'text/plain') {
 			let size = Number(res.headers.get('content-length'))
-			if (size > attachments.maxBytes()) throw new Error(`image larger than ${attachments.maxBytes()} bytes`)
-			let { bytes, cut } = await body(res, attachments.maxBytes())
-			if (cut) throw new Error(`image larger than ${attachments.maxBytes()} bytes`)
+			if (size > attachments.maxBytes) throw new Error(`image larger than ${attachments.maxBytes} bytes`)
+			let { bytes, cut } = await body(res, attachments.maxBytes)
+			if (cut) throw new Error(`image larger than ${attachments.maxBytes} bytes`)
 			return { text: `Image from ${res.url} (${type}, ${bytes.length} bytes)`, image: { mediaType: type, data: Buffer.from(bytes).toString('base64') } }
 		}
 		if (type === 'text/html' || type === 'application/xhtml+xml' || type.startsWith('text/') || type === 'application/json' || type.endsWith('+json')) {
-			let { bytes, cut } = await body(res, tool.maxTextBytes())
+			let { bytes, cut } = await body(res, tool.maxTextBytes)
 			let text = new TextDecoder().decode(bytes)
 			let readable = type === 'text/html' || type === 'application/xhtml+xml' ? htmlText(text) : text
 			if (!readable.trim()) return `No readable content found at ${res.url} (empty page or JavaScript-rendered page).`
-			let max = tools.maxChars() - 100
-			let more = cut ? `more than ${tool.maxTextBytes()} bytes; ` : ''
+			let max = tools.maxChars - 100
+			let more = cut ? `more than ${tool.maxTextBytes} bytes; ` : ''
 			if (readable.length > max) return `${readable.slice(0, max)}\n[output truncated: ${more}${readable.length - max} more characters]`
 			return cut ? `${readable}\n[output truncated: the page is ${more.slice(0, -2)}]` : readable
 		}

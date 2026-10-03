@@ -103,7 +103,7 @@ test('an empty key stores nothing', async () => {
 })
 
 test('a session blocked for want of a key takes /login opencode and continues, sending its id and User-Agent hal', async () => {
-	auth.pollMs = () => 5
+	auth.pollMs = 5
 	let events: Event[] = []
 	let conn = host.connect((e) => events.push(e))
 	let until = async (check: () => unknown) => {

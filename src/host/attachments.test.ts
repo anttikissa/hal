@@ -83,7 +83,7 @@ test('attach refuses other types, fakes, oversize data and bad base64, storing n
 		['image/png', 'not base64!'],
 		['image/png', ''],
 		['text/plain', Buffer.from([0xff, 0xfe, 0x00]).toString('base64')],
-		['image/png', Buffer.concat([png, Buffer.alloc(attachments.maxBytes())]).toString('base64')],
+		['image/png', Buffer.concat([png, Buffer.alloc(attachments.maxBytes)]).toString('base64')],
 	]
 	for (let [type, data] of bad) {
 		let { attached, rejected } = attach(c, id, type!, data!)

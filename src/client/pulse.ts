@@ -7,7 +7,7 @@
 
 // The beat now: a count of `ms()` periods since the epoch.
 function beat(): number {
-	return Math.floor(pulse.now() / pulse.ms())
+	return Math.floor(pulse.now() / pulse.ms)
 }
 
 // Lit on every other beat (a streaming cursor).
@@ -18,14 +18,14 @@ const slow = (b: number): boolean => b % 4 < 2
 
 function schedule(): void {
 	let now = pulse.now()
-	let next = (Math.floor(now / pulse.ms()) + 1) * pulse.ms()
+	let next = (Math.floor(now / pulse.ms) + 1) * pulse.ms
 	let st = pulse.state
 	st.timer = setTimeout(() => {
 		st.timer = null
 		let fn = st.onBeat
 		if (!fn) return
 		pulse.schedule()
-		fn(next / pulse.ms())
+		fn(next / pulse.ms)
 	}, Math.max(1, next - now))
 	// Blinking alone never keeps a process alive.
 	;(st.timer as { unref?: () => void }).unref?.()
@@ -47,7 +47,7 @@ const running = (): boolean => pulse.state.timer !== null
 export const pulse = {
 	state: { onBeat: null as ((beat: number) => void) | null, timer: null as ReturnType<typeof setTimeout> | null },
 	/** One beat's length. */
-	ms: () => 250,
+	ms: 250,
 	now: () => Date.now(),
 	beat,
 	fast,

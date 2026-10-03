@@ -40,20 +40,20 @@ async function post(url: string, body: unknown): Promise<Response> {
 
 // Asks for a user code to show.
 async function start(): Promise<Device> {
-	let res = await post(`${chatgptLogin.deviceUrl()}/usercode`, { client_id: OPENAI_CLIENT_ID })
+	let res = await post(`${chatgptLogin.deviceUrl}/usercode`, { client_id: OPENAI_CLIENT_ID })
 	if (res.status === 404) throw new Error('ChatGPT device-code login is unavailable: turn on Enable device code sign-in at https://chatgpt.com/#settings/Security (or ask your workspace admin)')
 	if (!res.ok) throw new Error(`ChatGPT device-code request failed: HTTP ${res.status}`)
 	let data: any = await res.json().catch(() => null)
 	if (typeof data?.device_auth_id !== 'string' || typeof data?.user_code !== 'string') throw new Error('ChatGPT device-code response is missing its code')
 	let interval = Number(data.interval)
-	return { id: data.device_auth_id, userCode: data.user_code, intervalMs: Math.max(0, Number.isFinite(interval) ? interval * 1000 : 5000), url: chatgptLogin.verifyUrl() }
+	return { id: data.device_auth_id, userCode: data.user_code, intervalMs: Math.max(0, Number.isFinite(interval) ? interval * 1000 : 5000), url: chatgptLogin.verifyUrl }
 }
 
 // Polls until the user has entered the code; 403 and 404 mean not yet.
 async function wait(device: Device): Promise<{ code: string; verifier: string }> {
-	let deadline = clock.now() + chatgptLogin.timeoutMs()
+	let deadline = clock.now() + chatgptLogin.timeoutMs
 	while (true) {
-		let res = await post(`${chatgptLogin.deviceUrl()}/token`, { device_auth_id: device.id, user_code: device.userCode })
+		let res = await post(`${chatgptLogin.deviceUrl}/token`, { device_auth_id: device.id, user_code: device.userCode })
 		if (res.ok) {
 			let data: any = await res.json().catch(() => null)
 			if (typeof data?.authorization_code !== 'string' || typeof data?.code_verifier !== 'string') throw new Error('ChatGPT device-code response is missing its authorization code')
@@ -108,7 +108,7 @@ async function browser(): Promise<{ url: string; grant: Promise<{ code: string; 
 	try {
 		server = Bun.serve({
 			hostname: '127.0.0.1',
-			port: chatgptLogin.callbackPort(),
+			port: chatgptLogin.callbackPort,
 			fetch(req) {
 				let u = new URL(req.url)
 				if (u.pathname !== '/auth/callback') return new Response('Not found', { status: 404 })
@@ -127,10 +127,10 @@ async function browser(): Promise<{ url: string; grant: Promise<{ code: string; 
 	} catch {
 		return undefined
 	}
-	let u = new URL(chatgptLogin.authorizeUrl())
+	let u = new URL(chatgptLogin.authorizeUrl)
 	let params = { response_type: 'code', client_id: OPENAI_CLIENT_ID, redirect_uri: chatgptLogin.redirect(), scope: 'openid profile email offline_access', code_challenge: challenge, code_challenge_method: 'S256', id_token_add_organizations: 'true', codex_cli_simplified_flow: 'true', state, originator: 'codex_cli_rs' }
 	for (let [k, v] of Object.entries(params)) u.searchParams.set(k, v)
-	let timer = setTimeout(() => fail(new Error('ChatGPT login timed out after 15 minutes; run /login chatgpt again')), chatgptLogin.timeoutMs())
+	let timer = setTimeout(() => fail(new Error('ChatGPT login timed out after 15 minutes; run /login chatgpt again')), chatgptLogin.timeoutMs)
 	let stop = () => { clearTimeout(timer); server.stop(true) }
 	return { url: u.toString(), grant: got.then((code) => ({ code, verifier })), stop }
 }
@@ -162,12 +162,12 @@ async function run(show: (text: string) => void): Promise<string | undefined> {
 }
 
 export const chatgptLogin = {
-	deviceUrl: () => 'https://auth.openai.com/api/accounts/deviceauth',
-	verifyUrl: () => 'https://auth.openai.com/codex/device',
-	timeoutMs: () => 15 * 60_000,
-	authorizeUrl: () => 'https://auth.openai.com/oauth/authorize',
-	callbackPort: () => 1455,
-	redirect: () => `http://localhost:${chatgptLogin.callbackPort()}/auth/callback`,
+	deviceUrl: 'https://auth.openai.com/api/accounts/deviceauth',
+	verifyUrl: 'https://auth.openai.com/codex/device',
+	timeoutMs: 15 * 60_000,
+	authorizeUrl: 'https://auth.openai.com/oauth/authorize',
+	callbackPort: 1455,
+	redirect: () => `http://localhost:${chatgptLogin.callbackPort}/auth/callback`,
 	local,
 	browser,
 	start,

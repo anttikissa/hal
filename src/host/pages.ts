@@ -51,7 +51,7 @@ function drive<T>(steps: Steps<T>): T {
 // of it shares one slice of sliceMs(), however many runs there are.
 function deadline(): number {
 	if (pages.state.until === undefined) {
-		pages.state.until = performance.now() + pages.sliceMs()
+		pages.state.until = performance.now() + pages.sliceMs
 		setImmediate(() => (pages.state.until = undefined))
 	}
 	return pages.state.until
@@ -65,7 +65,7 @@ function slices<T>(steps: Steps<T>): T | Promise<T> {
 	let decoded = 0
 	let run = (): IteratorResult<number, T> | undefined => {
 		for (;;) {
-			let small = decoded <= pages.syncBytes()
+			let small = decoded <= pages.syncBytes
 			if (!small && performance.now() >= pages.deadline()) return undefined
 			let r = steps.next()
 			if (r.done) return r
@@ -74,7 +74,7 @@ function slices<T>(steps: Steps<T>): T | Promise<T> {
 			// unless the slice has only just begun.
 			let now = performance.now()
 			let end = pages.deadline()
-			if (decoded > pages.syncBytes() && now > end - pages.sliceMs() + 0.5 && now + (r.value / 1e6) * pages.msPerMB() > end) return undefined
+			if (decoded > pages.syncBytes && now > end - pages.sliceMs + 0.5 && now + (r.value / 1e6) * pages.msPerMB > end) return undefined
 		}
 	}
 	let r = run()
@@ -222,8 +222,8 @@ function* catchUp(id: string): Steps<Marks> {
 		}
 		if (m.size >= size) return m
 		let base = m.size
-		let buf = pages.readBytes(path, base, Math.min(size, base + pages.chunk()))
-		for (let n = pages.chunk() * 2; buf.indexOf(NL) < 0 && base + buf.length < size; n *= 2) buf = pages.readBytes(path, base, Math.min(size, base + n))
+		let buf = pages.readBytes(path, base, Math.min(size, base + pages.chunk))
+		for (let n = pages.chunk * 2; buf.indexOf(NL) < 0 && base + buf.length < size; n *= 2) buf = pages.readBytes(path, base, Math.min(size, base + n))
 		// Only a torn last line is left.
 		if (buf.indexOf(NL) < 0) return m
 		let at = base
@@ -281,11 +281,11 @@ const turnStart = (r: HistoryRecord) => replay.isPrompt(r) && !(r.type === 'user
 // oldest first, reading about `budget` bytes, starting at a turn's
 // prompt when one is in reach. `start`: where the first record starts;
 // 0 when nothing earlier is left. Never empty unless the history is.
-function page(id: string, before?: number, budget = pages.budget()): Page {
+function page(id: string, before?: number, budget = pages.budget): Page {
 	return drive(pages.pageSteps(id, before, budget))
 }
 
-function* pageSteps(id: string, before?: number, budget = pages.budget()): Steps<Page> {
+function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<Page> {
 	let path = history.file(id)
 	let size = existsSync(path) ? statSync(path).size : 0
 	let end = before ?? size
@@ -311,11 +311,11 @@ function* pageSteps(id: string, before?: number, budget = pages.budget()): Steps
 }
 
 // What a client opening the session gets of its history.
-function snapshot(id: string, budget = pages.budget()): Tail {
+function snapshot(id: string, budget = pages.budget): Tail {
 	return drive(pages.snapshotSteps(id, budget))
 }
 
-function* snapshotSteps(id: string, budget = pages.budget()): Steps<Tail> {
+function* snapshotSteps(id: string, budget = pages.budget): Steps<Tail> {
 	let read = pages.state.bytesRead
 	let earlier = yield* pages.markedSteps(id)
 	let used = pages.state.bytesRead - read
@@ -353,15 +353,15 @@ export const pages = {
 	// `until`: when this turn's slice of sliced work ends.
 	state: { bytesRead: 0, marks: new Map<string, Marks>(), until: undefined as number | undefined },
 	// About how many bytes of history a snapshot or a page reads.
-	budget: () => 256 * 1024,
+	budget: 256 * 1024,
 	// The longest stretch sliced reading runs without yielding.
-	sliceMs: () => 5,
+	sliceMs: 5,
 	// Reading this much or less is never sliced.
-	syncBytes: () => 64 * 1024,
+	syncBytes: 64 * 1024,
 	// About how long decoding a megabyte of history takes.
-	msPerMB: () => 4,
+	msPerMB: 4,
 	// How much history catching up the marks reads at once.
-	chunk: () => 4 * 1024 * 1024,
+	chunk: 4 * 1024 * 1024,
 	drive,
 	deadline,
 	slices,

@@ -30,7 +30,7 @@ function gap(el: Box): number {
 function keep(measured: number, gliding?: number, force = false): number | undefined {
 	if (force) return 0
 	let g = gliding ?? measured
-	return g < scroll.near() ? g : undefined
+	return g < scroll.near ? g : undefined
 }
 
 // Where the view goes to be `gap` above the bottom.
@@ -77,7 +77,7 @@ function onKey(e: KeyboardEvent): void {
 // history is fetched (common/backfill.ts).
 function atTop(): boolean {
 	let el = scroll.state.el
-	return !!el && el.scrollTop < scroll.nearTop()
+	return !!el && el.scrollTop < scroll.nearTop
 }
 
 // Runs `change`, which puts earlier history above what is shown and
@@ -144,7 +144,7 @@ function follow(change: () => void, mode: Mode = 'glide', force = false): void {
 	}
 	let from = el.scrollTop
 	let started = performance.now()
-	let ms = mode === 'track' ? scroll.toggleMs() : scroll.glideMs()
+	let ms = mode === 'track' ? scroll.toggleMs : scroll.glideMs
 	let step = (now: number) => {
 		let t = Math.min(1, (now - started) / ms)
 		// The end moves while a card animates or text streams in.
@@ -175,11 +175,11 @@ function restore(id: string): void {
 }
 
 export const scroll = {
-	near: () => 50,
-	nearTop: () => 800,
-	glideMs: () => 200,
+	near: 50,
+	nearTop: 800,
+	glideMs: 200,
 	// A card's open and close animation (CSS --toggle-ms matches).
-	toggleMs: () => 250,
+	toggleMs: 250,
 	state: { el: null as Box | null, frame: 0, gap: 0, forced: false, touching: false, places: new Map<string, { top: number } | { gap: number }>() },
 	gap,
 	keep,

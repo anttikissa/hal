@@ -109,7 +109,7 @@ async function request(req: ProviderRequest) {
 		if (codex && !accountId) throw Object.assign(new Error(`the OpenAI token of ${cred.account} names no ChatGPT account; ${auth.logIn('openai')}`), { failure: 'auth' })
 		if (codex) Object.assign(headers, { originator: 'hal', 'chatgpt-account-id': accountId })
 	}
-	return { url: codex ? openai.codexUrl() : openai.apiUrl(), headers, body: openai.body(req, codex), account: cred.account }
+	return { url: codex ? openai.codexUrl : openai.apiUrl, headers, body: openai.body(req, codex), account: cred.account }
 }
 
 // Error codes in a stream, as HTTP statuses for retry decisions.
@@ -220,9 +220,9 @@ async function listModels(signal: AbortSignal): Promise<string[]> {
 	if (subscriptions.length) list = subscriptions
 	let results = await Promise.allSettled(list.map(async (account) => {
 		let cred = await auth.credential(data, account, 'openai')
-		if (cred.type === 'api-key' || claims(cred.value).api) return [...new Set([...modelsDev.ids('openai'), ...openai.knownModels()])]
+		if (cred.type === 'api-key' || claims(cred.value).api) return [...new Set([...modelsDev.ids('openai'), ...openai.knownModels])]
 		let accountId = claims(cred.value).accountId ?? cred.accountId
-		let res = await fetch(openai.codexModelsUrl(), { signal, headers: { authorization: `Bearer ${cred.value}`, originator: 'hal', ...(accountId && { 'chatgpt-account-id': accountId }) } })
+		let res = await fetch(openai.codexModelsUrl, { signal, headers: { authorization: `Bearer ${cred.value}`, originator: 'hal', ...(accountId && { 'chatgpt-account-id': accountId }) } })
 		if (!res.ok) throw new Error(`HTTP ${res.status}`)
 		let body = (await res.json()) as { models?: { slug?: unknown; visibility?: unknown }[] }
 		return (body.models ?? []).filter((m) => m.visibility === 'list' && typeof m.slug === 'string').map((m) => m.slug as string)
@@ -257,22 +257,22 @@ function init(): void {
 		spent: (account) => auth.spent(account, 'openai'),
 		models: (signal) => openai.listModels(signal),
 		modelsKey: () => openai.modelsKey(),
-		known: () => openai.knownModels(),
+		known: () => openai.knownModels,
 		contextWindow: (model) => openai.contextWindow(model),
 		effort: (model) => openai.effort(model),
 	})
 }
 
 export const openai = {
-	apiUrl: () => 'https://api.openai.com/v1/responses',
-	codexUrl: () => 'https://chatgpt.com/backend-api/codex/responses',
-	codexModelsUrl: () => 'https://chatgpt.com/backend-api/codex/models?client_version=99.0.0',
+	apiUrl: 'https://api.openai.com/v1/responses',
+	codexUrl: 'https://chatgpt.com/backend-api/codex/responses',
+	codexModelsUrl: 'https://chatgpt.com/backend-api/codex/models?client_version=99.0.0',
 	listModels,
 	modelsKey,
 	// Reasoning effort for a model; undefined leaves the model's default.
 	effort: (_model: string): string | undefined => undefined,
 	// Verified GPT ids, including current alias targets, for offline discovery.
-	knownModels: () => ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
+	knownModels: ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
 	input,
 	body,
 	request,
