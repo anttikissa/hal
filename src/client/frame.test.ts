@@ -360,7 +360,7 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		for (let u of links) expect(u.searchParams.get('auth')).toBe('k3x9qa')
 		let shown = lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, ''))
 		expect(shown.join('\n')).not.toContain('k3x9qa')
-		expect(plain(lines).join('\n')).toContain('bash {"command":"ls"}')
+		expect(plain(lines).join('\n')).toContain('bash: ls')
 		expect(plain(lines).join('\n')).toContain('error: boom')
 		// A streaming block's Hal cursor follows its text, not its id.
 		let stream = view([{ type: 'text', text: 'Hel' }])
