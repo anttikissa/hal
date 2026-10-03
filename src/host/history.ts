@@ -270,14 +270,9 @@ function results(id: string, list: ToolResultBlock[]): HistoryRecord | undefined
 	if (history.state.running.has(id)) return history.append(id, { type: 'user', blocks: list })
 }
 
-// A failed turn's error as stored and shown: the message, then the
-// provider's body (the malformed input, the HTTP reply) unless the
-// message already holds it. Never truncated: the end is often the fault.
-function errorText(e: ErrorEvent): string {
-	let body = e.body?.trim()
-	if (!body || e.message.includes(body)) return e.message
-	return `${e.message}\n${body}`
-}
+// A failed turn's error as stored and shown: the message, then the provider's
+// body (malformed input, HTTP reply) unless the message holds it. Never truncated.
+const errorText = (e: ErrorEvent): string => (e.body?.trim() && !e.message.includes(e.body.trim()) ? `${e.message}\n${e.body.trim()}` : e.message)
 
 // Ends the running turn, with the usage of all its rounds: `last` is
 // how its last round ended (none, or cancelled: the user paused it).
