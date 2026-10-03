@@ -1,7 +1,7 @@
 {
 	title: 'Attachments: images and long pastes reach the model',
 	spec: `A prompt can carry attachments. A client sends each once with an \`attach\` command { sessionId, mediaType, data (base64), name? }; the host checks it (png, jpeg, gif or webp images, or text/plain; at most 5 MB decoded; refused otherwise with a reason), stores it as sessions/<id>/blobs/<blobId>.<ext> with a random blob id, and answers that client with an \`attached\` event naming the command and the blob. The prompt text holds a marker for it: [image <blobId>] or [paste <blobId>, N lines]. When a prompt is submitted, the host resolves the markers of that session's blobs: an image becomes an image block { type: 'image', blob, mediaType } in the user record, and a paste becomes its text. History holds blob references, never the bytes. Providers read the bytes when they build a request: Anthropic as a base64 image source, OpenAI-compatible as an image_url data URL; replay and amend keep image blocks. A marker naming no blob of the session stays text, and the host tells the client.
-Clients show an image block as a line like [image 12 kB png] in the terminal and as the image in the web, served by an authenticated GET /blob/<sessionId>/<blobId> (the login cookie; only blobs of that session, only by exact id; no path from the request reaches the file system).
+Clients show an image block as a line like [image 12 kB png] in the terminal, an OSC 8 link (with the link code, task e3) to its /blob address, and as the image in the web, served by an authenticated GET /blob/<sessionId>/<blobId> (the login cookie; only blobs of that session, only by exact id; no path from the request reaches the file system).
 Tests: an attached png reaches both providers' request bodies as an image; history has no base64; a forged marker or a blob of another session is not resolved; the web route refuses a missing cookie and a path with slashes or dots. On the web an inline image is a keyboard-accessible native link that opens its authenticated image URL in a separate tab for isolated browser zoom. Inline image gestures allow vertical transcript panning, not whole-app pinch zoom; no lightbox or custom zoom library is needed.`,
 	status: 'done',
 	notes: [
@@ -14,7 +14,8 @@ Tests: an attached png reaches both providers' request bodies as an image; histo
 		"ImageBlock carries an optional `bytes` (decoded size) so clients can label it without reaching the blob; turn-start and prompt events carry `images` so a live transcript equals a snapshot's.",
 		'Providers get bytes through ProviderRequest.image(blob) (base64, read per request by blobs.base64); a missing file or an OpenAI-compatible endpoint with `images: false` becomes a <meta> text note (provider.imageNote).',
 		"A marker naming no blob of the session is answered with a `warning` event to the submitting client only. attach is in host's `once` set: a resend gets the same `attached` event, nothing stored twice. The attach `name` is accepted but not stored.",
-		'Blob ids are 12 lowercase hex digits; blobs.find tries each known extension, so the id is never joined to anything taken from a request. Stored bytes are checked against the media type (magic numbers, or valid UTF-8 for text/plain).'
+		'Blob ids are 12 lowercase hex digits; blobs.find tries each known extension, so the id is never joined to anything taken from a request. Stored bytes are checked against the media type (magic numbers, or valid UTF-8 for text/plain).',
+		'The terminal image label links via itemView.itemLines when the session is known; without one it stays plain text.'
 	],
 	needs: ['yq', '1b']
 }

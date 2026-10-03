@@ -82,8 +82,9 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				body = [...ansi.wrap(item.summary, width), ...body.slice(0, 3).map((l) => ansi.quiet(l, itemView.itemStyle(item))), ...(more > 0 ? [`… ${more} more lines`] : [])]
 			}
 			return itemView.headed(item, body, width, session)
+		// The label links to the image itself on the web endpoint.
 		case 'image':
-			return [attachments.label(item)]
+			return [session ? `\x1b]8;;${ansi.webUrl(`/blob/${encodeURIComponent(session)}/${encodeURIComponent(item.blob)}`)}\x07${attachments.label(item)}${ansi.LINK_OFF}` : attachments.label(item)]
 		// Trailing blank lines the model streamed are not drawn: the one
 		// blank row between items (frame.build) is the only gap. Model
 		// text is markdown (task fn).
