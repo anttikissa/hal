@@ -6,6 +6,7 @@
 // the right parts go from the end, then the left is clipped. Pure.
 
 import { titles } from '../common/titles.ts'
+import { usageWindows } from '../common/usage-windows.ts'
 import { colors } from '../common/colors.ts'
 import type { Oklch } from '../common/oklch.ts'
 import type { Stats } from '../common/protocol.ts'
@@ -66,7 +67,8 @@ function right(info: StatusInfo): Part[][] {
 	let plan = s?.plan
 	if (plan) {
 		let parts: Part[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}/${plan.accounts}` : ''}` }]
-		Object.entries(plan.windows).forEach(([name, pct], i) => parts.push({ text: `${i ? ', ' : ': '}${name} ` }, { text: `${pct}%`, fg: colors.heat(pct) }))
+		let moot = usageWindows.moot(Object.entries(plan.windows).map(([name, used]) => ({ name, used, resets: plan.resets?.[name] })))
+		Object.entries(plan.windows).filter(([name]) => !moot.has(name)).forEach(([name, pct], i) => parts.push({ text: `${i ? ', ' : ': '}${name} ` }, { text: `${pct}%`, fg: colors.heat(pct) }))
 		out.push(parts)
 	}
 	return out
