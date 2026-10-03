@@ -132,12 +132,13 @@ point to it.
   and calls its own functions through it (`foo.bar()`, not `bar()`), so
   eval, hot patches and `local.ts` overrides take effect. Mutable state
   goes in a `state` field on that object.
-- Config values are plain functions on these objects, such as
-  `models.defaultModel()`, read at call time — never captured at import.
-- Every overridable setting on a module object is a function, never a
-  plain value (`colors.fgL: () => 0.8`, not `fgL: 0.8`), so a plugin
-  can override it with `around(obj, key, ...)` and undo that. Only
-  `state` and constants nobody overrides may be plain values.
+- Settings that are constants are plain values on these objects
+  (`ttlMs: 3_600_000`, read as `models.ttlMs`); a plugin overrides one
+  with `plugin.set(obj, key, value)` and the loader undoes it (task
+  d41). Read them through the object at call time — never destructure
+  or capture them at import. Values that compute something (read
+  config.ason like `models.defaultModel()`, or derive from other
+  values) stay functions.
 
 ## Web client (Solid)
 

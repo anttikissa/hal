@@ -26,3 +26,23 @@ cd ~/.hal
 # might have to restart shell for $PATH to update, then:
 hal 
 ```
+
+# Plugins
+
+Hal has no plugin API in the usual sense. Each module exports one
+mutable object and calls its own functions through it
+(`models.resolve()`, not `resolve()`), so every function on every module
+is a hook point. The surface is wide and shallow: wide because nothing
+is off limits, shallow because functions are small and settings are
+plain values on the same objects, so a plugin overrides exactly one
+decision — which model `opus` means, how long a list stays cached —
+without copying the code around it. A `plugins/*.ts` file in the Hal
+home hooks functions with `before`, `after` or `around` and sets values
+with `set`; Hal reloads it on save and removes exactly its overrides
+when it changes, is deleted or expires.
+
+The price of that width is stability: the surface is Hal's internals,
+not a versioned contract, and names can change. To keep it navigable,
+each module's top comment documents its plugin surface: what each
+function decides, which ones are worth hooking, and what a hook must
+preserve.

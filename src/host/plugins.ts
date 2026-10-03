@@ -1,5 +1,5 @@
 // Plugins (task an): every plugins/*.ts in the home hooks functions on
-// module objects. A file exports `default (plugin) => {...}` and maybe
+// module objects, or sets their plain values (task d41). A file exports `default (plugin) => {...}` and maybe
 // `expires` (a UTC ISO time). Hooks are owned by their file: reloading,
 // deleting or expiring it removes exactly its hooks, and an emptied
 // chain puts the original function back. A reload is staged: the old
@@ -22,6 +22,7 @@ export type Plugin = {
 	before<T extends object, K extends Keys<T>>(obj: T, key: K, fn: (...args: Parameters<F<T, K>>) => void): void
 	after<T extends object, K extends Keys<T>>(obj: T, key: K, fn: (result: ReturnType<F<T, K>>, args: Parameters<F<T, K>>) => void): void
 	around<T extends object, K extends Keys<T>>(obj: T, key: K, fn: NoInfer<(next: F<T, K>, ...args: Parameters<F<T, K>>) => ReturnType<F<T, K>>>): void
+	set<T extends object, K extends Exclude<keyof T & string, Keys<T>>>(obj: T, key: K, value: NoInfer<T[K]>): void
 	unload(fn: () => void): void
 	onChange(fn: (change: Change) => unknown): void
 }
@@ -30,12 +31,13 @@ export type Plugin = {
 // version is coming in ('activate') or going out ('deactivate').
 export type Change = { reason: 'load' | 'reload' | 'delete' | 'expire'; phase: 'activate' | 'deactivate' }
 
-type Kind = 'before' | 'after' | 'around'
-type Hook = { file: string; seq: number; kind: Kind; obj: any; key: string; fn: Fn; target: string }
+type Kind = 'before' | 'after' | 'around' | 'set'
+type Hook = { file: string; seq: number; kind: Kind; obj: any; key: string; fn: Fn; value?: unknown; target: string }
 // What one call runs, replaced whole on every change, so a call already
 // underway finishes with the chain it started with.
 type Run = { befores: Fn[]; arounds: Fn[]; afters: Fn[] }
-type Patch = { original: Fn; wrapper: Fn; hooks: Hook[]; run: Run }
+// A value patch (set) holds the value it applied instead of a wrapper.
+type Patch = { original: any; wrapper: Fn; hooks: Hook[]; run: Run; value?: true; applied?: unknown }
 export type Loaded = { path: string; hash: string; expires?: string; expired?: true; error?: string; hooks: Hook[]; unloads: (() => void)[]; changes: Fn[]; active?: true; closed?: true; timer?: Timer }
 
 const srcDir = join(import.meta.dir, '..')
@@ -71,12 +73,14 @@ function patchOf(obj: any, key: string): Patch {
 	let map: Map<string, Patch> = (plugins.state.patches.get(obj) as any) ?? new Map()
 	plugins.state.patches.set(obj, map)
 	let patch = map.get(key)
-	// Someone replaced the wrapper (eval, local.ts): theirs is the base now.
-	if (patch && obj[key] === patch.wrapper) return patch
+	// Someone replaced the wrapper or value (eval, local.ts): theirs is
+	// the base now.
+	if (patch && obj[key] === (patch.value ? patch.applied : patch.wrapper)) return patch
 	let run: Run = { befores: [], arounds: [], afters: [] }
 	let original: Fn = obj[key]
 	let p: Patch = {
 		original,
+		...(typeof original === 'function' ? {} : { value: true as const }),
 		hooks: [],
 		run,
 		wrapper: function (this: unknown, ...args: unknown[]) {
@@ -93,15 +97,16 @@ function patchOf(obj: any, key: string): Patch {
 }
 
 // Rebuilds `patch`'s run from its hooks, in file order then
-// registration order; an empty chain restores the original exactly.
+// registration order; the last set wins. An empty chain restores the
+// original exactly.
 function settle(obj: any, key: string, patch: Patch): void {
 	let order = (a: Hook, b: Hook) => (a.file < b.file ? -1 : a.file > b.file ? 1 : a.seq - b.seq)
 	let hooks = patch.hooks.sort(order)
 	let of = (kind: Kind) => hooks.filter((h) => h.kind === kind).map((h) => h.fn)
 	patch.run = { befores: of('before'), arounds: of('around'), afters: of('after') }
-	if (hooks.length) obj[key] = patch.wrapper
+	if (hooks.length) obj[key] = patch.value ? (patch.applied = hooks.at(-1)!.value) : patch.wrapper
 	else {
-		if (obj[key] === patch.wrapper) obj[key] = patch.original
+		if (obj[key] === (patch.value ? patch.applied : patch.wrapper)) obj[key] = patch.original
 		plugins.state.patches.get(obj)?.delete(key)
 	}
 }
@@ -184,7 +189,11 @@ function recorder(path: string, entry: Loaded): Plugin {
 		if (!obj || typeof obj[key] !== 'function') throw new Error(`${path}: ${kind} target ${obj ? targetName(obj, key) : key} is not a function`)
 		entry.hooks.push({ file: basename(path), seq: entry.hooks.length, kind, obj, key, fn, target: `${targetName(obj, key)} ${kind}` })
 	}
-	return { before: add('before'), after: add('after'), around: add('around'), unload: (fn) => void (entry.closed ? runAll(path, 'unload', [fn]) : entry.unloads.push(fn)), onChange: (fn) => void entry.changes.push(fn) } as Plugin
+	let set = (obj: any, key: string, value: unknown) => {
+		if (!obj || !(key in obj) || typeof obj[key] === 'function') throw new Error(`${path}: set target ${obj ? targetName(obj, key) : key} is not a plain value; use around`)
+		entry.hooks.push({ file: basename(path), seq: entry.hooks.length, kind: 'set', obj, key, fn: () => value, value, target: `${targetName(obj, key)} set` })
+	}
+	return { before: add('before'), after: add('after'), around: add('around'), set, unload: (fn) => void (entry.closed ? runAll(path, 'unload', [fn]) : entry.unloads.push(fn)), onChange: (fn) => void entry.changes.push(fn) } as Plugin
 }
 
 // (Re)loads plugin file `path`. The file's old hooks stay unless the new

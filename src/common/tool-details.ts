@@ -2,17 +2,30 @@
 // visible plumbing", task 8t): a headline for the card's head, and the
 // lines an open card adds without repeating it. Bash reads like the
 // terminal; call IDs, argument types and defaults stay in session files.
+//
+// Plugin surface (toolDetails.*):
+// - headline(name, input): a card's closed title and the argument it shows
+//   bash → its description; command → "/rename …"; read → "Read src/main.ts"
+// - lines(name, input): what an open card adds below the title
+//   bash → "$ <command>" ("&" when backgrounded), "Edits a.ts, b.ts",
+//   "Timeout 30 s" when not the default; other tools → "key: value"
+//   for each argument the title didn't show
+// - value(input): any argument as readable lines, not JSON
+//   "" → "(empty string)", [] → "(empty list)", objects as "key:" blocks
+//
+// Example: plugin.around(toolDetails, 'headline', (next, name, input) =>
+//   name === 'bash' ? { text: `$ ${input.command}`, key: 'command' } : next(name, input))
 
 // A value in readable text rather than wire syntax.
 function value(input: unknown, indent = ''): string[] {
 	if (typeof input === 'string') return input === '' ? ['(empty string)'] : input.split('\n')
 	if (input === null) return ['(null)']
 	if (Array.isArray(input)) return input.length ? input.flatMap((v, i) => {
-		let lines = value(v, indent + '  ')
+		let lines = toolDetails.value(v, indent + '  ')
 		return [`${indent}${i + 1}. ${lines[0]}`, ...lines.slice(1).map((l) => `${indent}   ${l}`)]
 	}) : ['(empty list)']
 	if (typeof input === 'object') return Object.entries(input).length ? Object.entries(input).flatMap(([key, v]) => [
-		`${indent}${key}:`, ...value(v, indent + '  ').map((l) => `  ${l}`),
+		`${indent}${key}:`, ...toolDetails.value(v, indent + '  ').map((l) => `  ${l}`),
 	]) : ['(empty object)']
 	return [String(input)]
 }
@@ -81,7 +94,7 @@ function headline(name: string, input: Record<string, unknown>, output?: string)
 function lines(name: string, input: Record<string, unknown>): string[] {
 	let out: string[] = []
 	let shown = new Set<string>()
-	let head = headline(name, input)
+	let head = toolDetails.headline(name, input)
 	// The open head wraps, so a one-line headline argument is not repeated.
 	if (head.key && !String(input[head.key]).includes('\n')) shown.add(head.key)
 	for (let k of head.keys ?? []) shown.add(k)
@@ -105,7 +118,7 @@ function lines(name: string, input: Record<string, unknown>): string[] {
 	}
 	for (let [key, v] of Object.entries(input)) {
 		if (shown.has(key)) continue
-		let [first, ...rest] = value(v)
+		let [first, ...rest] = toolDetails.value(v)
 		out.push(`${key}: ${first}`, ...rest.map((l) => `  ${l}`))
 	}
 	return out
