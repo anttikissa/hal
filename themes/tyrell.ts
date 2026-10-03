@@ -5,11 +5,11 @@ import type { Plugin } from '../src/host/plugins.ts'
 // Blade Runner (1982): blue-black night, hot pink neon for Hal, neon
 // cyan for you, amber warnings.
 export const look: Look = {
-	screen: () => [0.15, 0.035, 275],
-	fgL: () => 0.8,
-	fgC: () => 0.2,
-	bgL: () => 0.21,
-	bgC: () => 0.07,
+	screen: [0.15, 0.035, 275],
+	fgL: 0.8,
+	fgC: 0.2,
+	bgL: 0.21,
+	bgC: 0.07,
 	assistant: () => ({ fg: [0.74, 0.22, 350], cursor: [0.74, 0.22, 350], cursorIdle: [0.58, 0.08, 350], bold: [0.88, 0.13, 350], code: [0.84, 0.09, 350], linkFg: [0.84, 0.17, 350], linkBg: [0.28, 0.08, 350] }),
 	user: () => ({ fg: [0.87, 0.15, 200], bg: [0.22, 0.06, 215] }),
 	thinking: () => ({ fg: [0.74, 0.08, 295], bold: [0.86, 0.07, 295], code: [0.8, 0.07, 295], linkBg: [0.22, 0.05, 295] }),
@@ -23,6 +23,9 @@ export const look: Look = {
 
 // A theme is a plugin (task d3): /theme links it to plugins/color-theme.ts.
 export default (plugin: Plugin) => {
-	for (let [key, fn] of Object.entries(look)) plugin.around(colors, key as keyof typeof colors, fn as never)
+	for (let [key, v] of Object.entries(look)) {
+		if (typeof v === 'function') plugin.around(colors, key as never, v as never)
+		else plugin.set(colors, key as never, v as never)
+	}
 	plugin.onChange(() => terminal.redraw())
 }

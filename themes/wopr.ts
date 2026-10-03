@@ -5,14 +5,14 @@ import type { Plugin } from '../src/host/plugins.ts'
 // WarGames (1983): one green phosphor in several brightnesses on
 // black, like a VT100. Only errors get another colour.
 const green = (l: number, c = 0.18): [number, number, number] => [l, c, 145]
-const tool = () => ({ fg: green(colors.fgL(), colors.fgC()), bg: green(colors.bgL(), colors.bgC()) })
+const tool = () => ({ fg: green(colors.fgL, colors.fgC), bg: green(colors.bgL, colors.bgC) })
 
 export const look: Look = {
-	screen: () => [0.1, 0.01, 145],
-	fgL: () => 0.85,
-	fgC: () => 0.19,
-	bgL: () => 0.15,
-	bgC: () => 0.04,
+	screen: [0.1, 0.01, 145],
+	fgL: 0.85,
+	fgC: 0.19,
+	bgL: 0.15,
+	bgC: 0.04,
 	assistant: () => ({ fg: green(0.86), cursor: green(0.86), cursorIdle: green(0.6, 0.08), bold: green(0.95, 0.14), code: green(0.9, 0.12), linkFg: green(0.93, 0.16), linkBg: green(0.24, 0.06) }),
 	thinking: () => ({ fg: green(0.72, 0.1), bold: green(0.84, 0.1), code: green(0.78, 0.1), linkBg: green(0.18, 0.04) }),
 	user: () => ({ fg: green(0.95, 0.12), bg: green(0.19, 0.06) }),
@@ -42,6 +42,9 @@ export const look: Look = {
 
 // A theme is a plugin (task d3): /theme links it to plugins/color-theme.ts.
 export default (plugin: Plugin) => {
-	for (let [key, fn] of Object.entries(look)) plugin.around(colors, key as keyof typeof colors, fn as never)
+	for (let [key, v] of Object.entries(look)) {
+		if (typeof v === 'function') plugin.around(colors, key as never, v as never)
+		else plugin.set(colors, key as never, v as never)
+	}
 	plugin.onChange(() => terminal.redraw())
 }

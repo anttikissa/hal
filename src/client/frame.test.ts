@@ -18,7 +18,7 @@ beforeEach(() => { originalNames = titles.names; titles.names = { 'anthropic/cla
 afterEach(() => { titles.names = originalNames })
 
 // Where text in `style`'s quieter colour starts (ansi.quiet).
-const quietOn = (style: { fg?: Oklch; bg?: Oklch }) => ansi.sgr({ fg: oklch.quiet(style.fg!, style.bg ?? colors.screen()) })
+const quietOn = (style: { fg?: Oklch; bg?: Oklch }) => ansi.sgr({ fg: oklch.quiet(style.fg!, style.bg ?? colors.screen) })
 
 // Visible text only: escape sequences removed.
 function strip(s: string): string {

@@ -4,8 +4,7 @@ import { colors, DERIVED, type Style } from './colors.ts'
 import { oklch, type Oklch } from './oklch.ts'
 
 // Shared values (fgL, screen) are a number or one colour; the rest are styles.
-const styles = () => Object.entries(colors).filter(([key]) => key !== 'mix' && !(DERIVED as readonly string[]).includes(key)).map(([key, value]) => [key, (value as () => unknown)()] as const)
-	.filter((e): e is [string, Style] => typeof e[1] === 'object' && !Array.isArray(e[1]))
+const styles = () => Object.entries(colors).filter(([key, value]) => typeof value === 'function' && !(DERIVED as readonly string[]).includes(key)).map(([key, value]) => [key, (value as () => Style)()] as const)
 
 test('every style is a set of OKLCH colours', () => {
 	for (let [key, style] of styles()) {
@@ -22,7 +21,7 @@ test('overriding a shared value moves every style derived from it, at call time'
 	let saved = colors.fgL
 	try {
 		let before = { assistant: colors.assistant().fg, bash: colors.toolBash().fg, grep: colors.toolGrep().fg }
-		colors.fgL = () => 0.9
+		colors.fgL = 0.9
 		expect(colors.assistant().fg![0]).toBe(0.9)
 		expect(colors.toolBash().fg![0]).toBe(0.9)
 		expect(colors.toolGrep().fg).toEqual(colors.toolRead().fg!)
@@ -56,7 +55,7 @@ function readable(): string[] {
 		if (r < min) low.push(`${name} ${r.toFixed(2)}`)
 	}
 	for (let [key, style] of styles()) {
-		let bg = style.bg ?? colors.screen()
+		let bg = style.bg ?? colors.screen
 		for (let [part, c] of Object.entries(style)) {
 			if (backgrounds.test(part)) continue
 			check(`${key}.${part}`, c, bg, marks.test(part) ? 3 : 4.5)
@@ -84,9 +83,9 @@ test('every shipped theme is readable too', async () => {
 		let { look } = await import(`${dir}/${name}`)
 		let saved = { ...colors }
 		try {
-			for (let [key, fn] of Object.entries(look as Record<string, (base: unknown) => unknown>)) {
+			for (let [key, v] of Object.entries(look as Record<string, unknown>)) {
 				let base = saved[key as keyof typeof colors]
-				;(colors as Record<string, unknown>)[key] = () => fn(base)
+				;(colors as Record<string, unknown>)[key] = typeof v === 'function' ? () => v(base) : v
 			}
 			expect(readable(), name).toEqual([])
 		} finally {

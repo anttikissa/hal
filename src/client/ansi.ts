@@ -87,7 +87,7 @@ function quiet(text: string, style: Style | undefined): string {
 	if (ansi.mono() || !text) return text
 	let fg = style?.fg ?? colors.log().fg!
 	let back = style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m'
-	return ansi.sgr({ fg: colors.quiet(fg, style?.bg ?? colors.screen()) }) + text + back
+	return ansi.sgr({ fg: colors.quiet(fg, style?.bg ?? colors.screen) }) + text + back
 }
 
 export const ansi = {
