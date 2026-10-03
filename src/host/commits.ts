@@ -85,8 +85,10 @@ function announce(id: string, hash: string, short: string, subject: string, amen
 	let notice: NoticeEvent = { type: 'notice', session: id, name: sessions.open(id).name ?? id, kind: 'commit', line: `${short} ${subject}`, key: `commit:${hash}` }
 	if (amend) notice.what = 'amended'
 	noticeHistory.record({ session: id, name: notice.name, kind: 'commit', line: notice.line, ...(amend ? { what: 'amended' } : {}) })
-	let tab = tabs.file().open.indexOf(id)
+	let list = tabs.list()
+	let tab = list.findIndex((t) => t.id === id)
 	if (tab >= 0) notice.tab = tab + 1
+	if (list[tab]?.color !== undefined) notice.color = list[tab]!.color
 	for (let c of host.state.clients) if (c.visible !== id) c.deliver(notice)
 }
 

@@ -9,8 +9,10 @@ export type NoticeKind = 'done' | 'failed' | 'attention' | 'update' | 'commit'
 // What the host sends when another tab's turn ends or asks (host/notify.ts)
 // or commits (host/commits.ts, its own key so it never replaces the others;
 // `what` overrides the kind's word, as 'amended' for an amend).
-export type NoticeEvent = { type: 'notice'; session: string; tab?: number; name: string; kind: NoticeKind; line: string; key?: string; what?: string }
-export type Notice = { key: string; kind: NoticeKind; title: string; line: string; session?: string; tab?: number; stays?: true; at: number }
+// `color`: the sending tab's project colour (colors.project p0..p7), set
+// when tabs have colours; the card takes it instead of the kind's.
+export type NoticeEvent = { type: 'notice'; session: string; tab?: number; color?: number; name: string; kind: NoticeKind; line: string; key?: string; what?: string }
+export type Notice = { key: string; kind: NoticeKind; title: string; line: string; session?: string; tab?: number; color?: number; stays?: true; at: number }
 export type Folded = { shown: Notice[]; more?: { count: number; tabs: number[] } }
 
 // A history entry (task py, host/notice-history.ts): `block` is the
@@ -36,6 +38,7 @@ function stamp(at: string, now = new Date()): string {
 function fromEvent(e: NoticeEvent): Omit<Notice, 'at'> {
 	let n: Omit<Notice, 'at'> = { key: e.key ?? `session:${e.session}`, kind: e.kind, title: `${e.tab ?? ''} ${e.name} · ${e.what ?? WORDS[e.kind]}`.trim(), line: e.line, session: e.session }
 	if (e.tab !== undefined) n.tab = e.tab
+	if (e.color !== undefined) n.color = e.color
 	return n
 }
 
