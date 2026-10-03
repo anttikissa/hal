@@ -2,8 +2,6 @@
 	title: 'A turn stops when it should: round cap, stop reasons, killed tools',
 	spec: 'A turn never spirals and never leaves a dangerous command running after the user stopped it. (1) Round cap: a turn runs at most `maxRounds` provider rounds (a config.ason setting in src/common/settings.ts, default 200; not shown in the UI beyond the pause reason); reaching it pauses the turn with a reason saying so, and Enter continues for another maxRounds. (2) Stop reasons, as the old Hal (~/.hal/src/server/providers/anthropic.ts, NORMAL_STOP_REASONS): a round that ends because of max_tokens (or context window exceeded) or a refusal runs none of its tool calls (a call cut off mid-input is not a call) and ends the turn as an error that says why ("Response stopped: max_tokens", or the refusal\'s explanation); any other ending runs the tool calls it holds. (3) Stopping kills tools: Escape, and quitting the last Hal process (Ctrl-C, SIGTERM, SIGHUP: all a deliberate stop, so the turn pauses as tasks/j1/states.md says for Ctrl-C), kill the process tree of every running bash call: SIGTERM, then SIGKILL after 2 s (the old Hal\'s bash.ts killProcessTree, which reaches background jobs of the detached group). The killed call\'s result says it was stopped. Tests: a fake provider that never stops asking for tools pauses at the cap; max_tokens with a tool call runs nothing and errors; Escape during `sleep 30 & sleep 30` leaves no sleep alive.',
 	status: 'done',
-	needs: ['1r'],
-	foldInto: ['sj', '1r', 'j1'],
 	notes: [
 		"Stop reasons stay neutral in the providers: parse yields done with reason max_tokens/refusal (DoneEvent.explanation carries Anthropic's stop_details.explanation); turns.stopped() turns that into the error, so fake providers in tests exercise it. A tool call whose JSON is broken is only an error when the stop reason is not max_tokens (anthropic defers it to message_stop; openai-compat skips it on finish_reason length).",
 		"Complete tool calls of a refused or max_tokens round stay in history unanswered; replay already tells the model 'Tool call did not run: the turn error.'",
@@ -11,6 +9,9 @@
 		"tools.killGroup SIGTERMs the group and has a detached `sh -c 'sleep 2; kill -9 -pgid'` send the SIGKILL, so it still arrives when Hal exits first. A setTimeout cannot: the exit handler (host.init) aborts every running turn when pauseOnExit, and timers never fire after exit. The SIGKILL is sent even if bash already closed: a background job with its output redirected keeps the group alive after the pipe closes.",
 		'SIGTERM/SIGHUP go through terminal.quit(code) in realIO, so they call onQuit (pause if last) like Ctrl-C. A headless process (no terminal) has no such handlers: SIGTERM leaves its turns unfinished for the next host.',
 		'Tests find leftover processes with pgrep -f on a unique sleep duration (sleep 30.<pid>1); bash children are detached, so the e2e afterEach group kill does not reach them.',
-		'Invariant (bug fix): a failed turn stores its error complete. history.end writes turn_end.error as the message plus the provider body (capped at 2000 characters), so the raw input or HTTP reply shows in both UIs under the red line. Before, only the message was kept and the body was dropped.'
-	]
+		'Invariant (bug fix): a failed turn stores its error complete. history.end writes turn_end.error as the message plus the provider body (capped at 2000 characters), so the raw input or HTTP reply shows in both UIs under the red line. Before, only the message was kept and the body was dropped.',
+		'Correction: the stored body is not capped. A 2000-character cap hid the end of a malformed tool call, where the fault was. history.errorText stores the whole body.'
+	],
+	needs: ['1r'],
+	foldInto: ['sj', '1r', 'j1']
 }
