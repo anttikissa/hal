@@ -249,7 +249,7 @@ test('stop reasons map to neutral ones; a call cut off by max_tokens is none; a 
 	expect(await run()).toEqual([{ type: 'done', reason: 'refusal', explanation: 'No.' }])
 })
 
-test('errors: HTTP status, error event mid-stream, stream cut short', async () => {
+test('errors: HTTP status, error event mid-stream, bad tool JSON, stream cut short', async () => {
 	reply = () => new Response('{"type":"error","error":{"type":"authentication_error","message":"bad token"}}', { status: 401 })
 	expect(await run()).toEqual([expect.objectContaining({ type: 'error', status: 401, failure: 'auth', body: expect.stringContaining('bad token') })])
 	// The rejected token is refreshed for the next request.
@@ -274,7 +274,7 @@ test('errors: HTTP status, error event mid-stream, stream cut short', async () =
 			{ type: 'content_block_stop', index: 0 },
 			...stop('tool_use'),
 		)
-	expect(await run()).toEqual([{ type: 'tool_call', id: 't', name: 'ls', input: { invalidJson: '{"pa' } }, { type: 'done', reason: 'tool_use' }])
+	expect(await run()).toEqual([expect.objectContaining({ type: 'error', message: expect.stringContaining('ls') })])
 
 	reply = () => sse(start(), { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
 	expect((await run()).map((e) => e.type)).toEqual(['error'])
