@@ -43,31 +43,31 @@ body, textarea { tab-size: 4; }
 /* Cards and the open question share one shape: square, a lit bar on
    the left, the style's tint behind. */
 .Card, .Question { border-left: 3px solid currentColor; }
-.Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; }
-.Card .content { padding: 0.25lh 1ch; }
+/* One geometry on every screen: the header row is a 44px touch target
+   with its line centred, and the body ends with that same inset, so a
+   card's top and bottom whitespace match. */
+.Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; --card-inset: calc((44px - 1lh) / 2); }
+.Card .content { padding: 0.25lh 1ch var(--card-inset); }
+.Card:not(:has(> .CardHeader)) > .content { padding-top: var(--card-inset); }
 .Card .sender { color: var(--quiet); margin-bottom: 0.25lh; }
 .Card .who { color: var(--quiet); }
 .Card .who .call { color: inherit; text-decoration: underline; }
 .Card .exit { background: none; }
 /* One header grid for metadata and folding cards; first-line alignment
-   stays the same when a label wraps. Touch height belongs to this row:
+   stays the same when a label wraps. The 44px height belongs to this row:
    every slot shares one top inset that centres a single line in 44px,
    so a wrapped label grows down from the timestamp's line. */
-.CardHeader { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; column-gap: 1ch; padding-inline: 1ch; }
+.CardHeader { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; column-gap: 1ch; padding-inline: 1ch; min-height: 44px; }
 .CardHeader:not(:has(.stamp)) { grid-template-columns: minmax(0, 1fr) auto; }
-.CardHeader .stamp, .CardHeader .title, .CardHeader .link { padding-block: 0.25lh; }
+.CardHeader .stamp, .CardHeader .title, .CardHeader .link { padding-block: var(--card-inset); }
 .CardHeader .stamp { padding-inline: 0; background: none; color: inherit; font: inherit; text-align: left; white-space: nowrap; }
 .CardHeader .mark { display: flex; align-items: flex-start; justify-content: flex-start; }
 .CardHeader .title { display: flex; align-items: flex-start; gap: 0.2ch; min-width: 0; }
 .CardHeader .label { min-width: 0; }
 .Card.folds:not(.open) .CardHeader .label { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
 .CardHeader .error { background: none; margin-left: 1ch; }
-@media (pointer: coarse) {
-  .CardHeader { min-height: 44px; }
-  .CardHeader .stamp, .CardHeader .title, .CardHeader .link { padding-block: calc((44px - 1lh) / 2); }
-  .CardHeader .stamp, .CardHeader .link { min-width: 44px; }
-  .CardHeader .title a { padding-block: max(0px, calc((44px - 1lh) / 2)); }
-}
+.CardHeader .stamp, .CardHeader .link { min-width: 44px; }
+.CardHeader .title a { padding-block: var(--card-inset); }
 /* A context boundary (tasks bc, vh): its text centred in a rule. */
 .Card.divider { display: flex; align-items: center; gap: 1ch; border-left: none; }
 .Card.divider::before, .Card.divider::after { content: ""; flex: 1; border-top: 1px solid currentColor; }
@@ -84,13 +84,13 @@ body, textarea { tab-size: 4; }
 /* Each card links to itself (task 0z): a # in its top right corner,
    shown on hover or focus; the linked card is outlined. */
 .Card .link { color: var(--quiet); text-decoration: none; user-select: none; white-space: nowrap; }
-.Card > .link { position: absolute; top: 0; right: 1ch; padding-block: 0.25lh; }
+.Card > .link { position: absolute; top: 0; right: 1ch; padding-block: var(--card-inset); min-width: 44px; text-align: right; }
 .Card:has(> .link) > .content { padding-right: 7ch; }
 .Card .link::before { content: attr(data-ref); }
 .Card .link:hover, .Card .link:focus-visible { color: inherit; text-decoration: underline; }
 .Card.target { outline: 1px solid currentColor; outline-offset: 2px; scroll-margin-top: 0.5lh; }
 .Card .more { display: block; margin-top: 0.25lh; background: none; color: inherit; text-decoration: underline; padding: 0; }
-@media (pointer: coarse) { .Card > .link { min-width: 44px; min-height: 44px; text-align: right; } .Card .more { min-height: 44px; } }
+.Card .more { min-height: 44px; }
 /* Open and close animate the height (a one-row grid, 0fr to 1fr);
    closing is faster. Padding sits inside so closed is truly 0 high. */
 .Card .body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows calc(var(--toggle-ms) * 0.7) var(--ease-out); }

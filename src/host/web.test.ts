@@ -1616,10 +1616,11 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 		await b.evaluate(`document.querySelector('.Card.thinking .CardHeader .title').insertAdjacentHTML('beforeend', '<span class="cursor"></span>')`)
 		let geometry = `(() => {
 			let first = el => { let w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n; while (n = w.nextNode()) if (n.textContent.trim()) { let r = document.createRange(); r.setStart(n, 0); r.setEnd(n, 1); return r.getBoundingClientRect().toJSON() } };
+			let last = el => { let w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n, end; while (n = w.nextNode()) if (n.textContent.trim()) end = n; if (!end) return; let i = end.textContent.trimEnd().length, r = document.createRange(); r.setStart(end, i - 1); r.setEnd(end, i); return r.getBoundingClientRect().toJSON() };
 			return [...document.querySelectorAll('.CardHeader')].map(h => {
 				let c = h.closest('.Card'), stamp = h.querySelector('.stamp'), title = h.querySelector('.title'), ref = h.querySelector('.link');
-				let t = first(stamp ?? title), label = first(title), link = ref?.getBoundingClientRect(), box = h.getBoundingClientRect();
-				return { folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, offCentre: t.y + t.height / 2 - (c.getBoundingClientRect().y + c.getBoundingClientRect().height / 2), rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && title.getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth };
+				let t = first(stamp ?? title), label = first(title), link = ref?.getBoundingClientRect(), box = h.getBoundingClientRect(), body = c.querySelector(':scope > .content'), end = body && last(body);
+				return { folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, offCentre: t.y + t.height / 2 - (c.getBoundingClientRect().y + c.getBoundingClientRect().height / 2), rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && title.getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth, tail: end ? c.getBoundingClientRect().bottom - end.bottom : undefined };
 			});
 		})()`
 		for (let [, width, height, touch] of [['portrait', 390, 800, true], ['narrow', 320, 760, true], ['landscape', 844, 390, true], ['desktop', 1200, 800, false]] as const) {
@@ -1636,9 +1637,11 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 				expect(row.textWidth).toBeLessThanOrEqual(row.boxWidth + 1)
 			}
 			for (let row of folded) expect(row.height).toBeCloseTo(folded[0].height, 1)
-			if (touch) expect(folded[0].height).toBeGreaterThanOrEqual(44)
-			// A one-line touch header centres its text in the 44px row.
-			if (touch) for (let row of folded.filter((r: any) => r.height < 50)) expect(Math.abs(row.offCentre)).toBeLessThanOrEqual(1.5)
+			// Every screen shares one geometry: a 44px header row centring its
+			// line, and a body ending with the header's top inset.
+			expect(folded[0].height).toBeCloseTo(44, 1)
+			for (let row of folded.filter((r: any) => r.height < 50)) expect(Math.abs(row.offCentre)).toBeLessThanOrEqual(1.5)
+			for (let row of closed.filter((r: any) => r.tail !== undefined)) expect(Math.abs(row.tail - row.inset)).toBeLessThanOrEqual(1.5)
 			await b.evaluate(`document.querySelectorAll('.Card.folds .mark').forEach(b => b.click()); document.querySelector('.Card.queued').click()`)
 			await b.waitFor(`document.querySelectorAll('.Card.folds.open').length === 4 && !!document.querySelector('.Card.queued .CardHeader')`)
 			await Bun.sleep(300)
