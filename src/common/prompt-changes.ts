@@ -67,25 +67,39 @@ function counts(o: Output): { add: number; del: number; text: string[] } {
 	return { add: rows.filter((r) => r[0] === '+').length, del: rows.filter((r) => r[0] === '-').length, text: rows.filter((r) => r.slice(1).trim()) }
 }
 
-// A one-line edit as its changed words with a word of context either
-// side: 'Apply Strunk → Prunk & …', '… end +now'. Undefined unless the change
-// replaces exactly one non-blank line with another.
+// A one-line edit as each changed span with a word of context, gaps
+// as '…': 'Apply Strunk → Prunk & …', 'Before −changing code, … for
+// architecture, → , module'. Undefined unless the change replaces
+// exactly one non-blank line with another.
 function edit(o: Output): string | undefined {
 	let c = counts(o)
 	if (c.add !== 1 || c.del !== 1 || c.text.length !== 2) return undefined
 	let a = c.text.find((r) => r[0] === '-')!.slice(1).trim().split(' ')
 	let b = c.text.find((r) => r[0] === '+')!.slice(1).trim().split(' ')
-	let pre = 0
-	while (pre < a.length && pre < b.length && a[pre] === b[pre]) pre++
-	let suf = 0
-	while (suf < a.length - pre && suf < b.length - pre && a.at(-1 - suf) === b.at(-1 - suf)) suf++
-	let from = Math.max(0, pre - 1)
-	let lead = from > 0 ? '… ' : ''
-	let tail = suf > 1 ? ' …' : ''
-	let words = (w: string[]) => w.slice(pre, w.length - suf).join(' ')
-	let mid = !words(a) ? `+${words(b)}` : !words(b) ? `−${words(a)}` : `${words(a)} → ${words(b)}`
-	let before = a.slice(from, pre).join(' '), after = suf ? a[a.length - suf]! : ''
-	return [lead + before, mid, after + tail].filter((x) => x.trim()).join(' ')
+	// Word LCS table, then a walk emitting kept words and changed spans.
+	let L = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0))
+	for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) L[i]![j] = a[i] === b[j] ? L[i + 1]![j + 1]! + 1 : Math.max(L[i + 1]![j]!, L[i]![j + 1]!)
+	let parts: ({ keep: string } | { del: string[]; add: string[] })[] = []
+	let i = 0, j = 0
+	while (i < a.length || j < b.length) {
+		if (i < a.length && j < b.length && a[i] === b[j]) { parts.push({ keep: a[i++]! }); j++; continue }
+		let last = parts.at(-1)
+		let span = last && 'del' in last ? last : (parts.push({ del: [], add: [] }), parts.at(-1) as { del: string[]; add: string[] })
+		if (j >= b.length || (i < a.length && L[i + 1]![j]! >= L[i]![j + 1]!)) span.del.push(a[i++]!)
+		else span.add.push(b[j++]!)
+	}
+	let near = (k: number) => [k - 1, k + 1].some((n) => parts[n] && 'del' in parts[n]!)
+	let out: string[] = []
+	parts.forEach((p, k) => {
+		if ('keep' in p) {
+			if (near(k)) out.push(p.keep)
+			else if (out.at(-1) !== '…') out.push('…')
+			return
+		}
+		let d = p.del.join(' '), n = p.add.join(' ')
+		out.push(!d ? `+${n}` : !n ? `−${d}` : `${d} → ${n}`)
+	})
+	return out.join(' ')
 }
 
 // Plain rows for a terminal, which cannot open a card. One change:
