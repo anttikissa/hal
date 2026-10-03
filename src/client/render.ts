@@ -55,6 +55,9 @@ interface RenderState {
 	past: { session: string | undefined; past: Past } | undefined
 	/** The next slice of that layout. */
 	slicing: ReturnType<typeof setTimeout> | null
+	/** A blank row goes above the first paint if that frame fits the
+	 * screen (task hd); main.ts sets it on a terminal. */
+	gap: boolean
 }
 
 const CSI = '\x1b['
@@ -77,6 +80,7 @@ function createState(): RenderState {
 		dirty: false,
 		past: undefined,
 		slicing: null,
+		gap: false,
 	}
 }
 
@@ -138,6 +142,9 @@ function paintParts(next: Frame, rows: number, force = false): Part[] {
 	let prev = st.prev
 	let lines = next.lines
 	let wasFull = st.fullscreen
+	// Off the shell's output above, unless the frame fills the screen.
+	let gap = st.gap && !prev.length && lines.length < rows ? '\r\n' : ''
+	st.gap = false
 	// The last written row, where the cursor is after the body below.
 	let row: number
 	let body: Part[]
@@ -152,7 +159,7 @@ function paintParts(next: Frame, rows: number, force = false): Part[] {
 	} else if (force || !prev.length) {
 		// Grow mode, or the first paint: from the top of our frame (the
 		// cursor, on a first paint) clear down and write everything.
-		body = ['\r' + move(st.cursorRow, 0) + `${CSI}J`, ...rowParts(lines)]
+		body = [gap + '\r' + move(st.cursorRow, 0) + `${CSI}J`, ...rowParts(lines)]
 		row = lines.length - 1
 	} else {
 		let first = 0
