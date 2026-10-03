@@ -3,6 +3,7 @@
 
 import type { SlashCommand } from '../commands.ts'
 import { models } from '../models.ts'
+import { effort } from '../effort.ts'
 
 export const command: SlashCommand = {
 	help: () => '/model <provider/model or family>[:level]: switch this session from its next request; :default clears effort. /model alone opens the picker (Ctrl-M too).',
@@ -14,7 +15,10 @@ export const command: SlashCommand = {
 		if (!models.valid(choice.id)) return { error: `${args}: no such model (want provider/model; /model lists them)` }
 		let previous = models.qualified(ctx.model, ctx.effort)
 		let next = models.qualified(choice.id, choice.effort)
+		let cap = effort.describe(choice.id)
+		let fallback = cap?.policy ?? cap?.default
+		let cacheChanged = ctx.model === choice.id && choice.id.startsWith('anthropic/') && (ctx.effort ?? fallback) !== (choice.effort ?? fallback)
 		ctx.setModel(next)
-		return { say: `${previous === next ? `model: ${next} (unchanged)` : `Model changed: ${previous} → ${next}`}${choice.id.startsWith('anthropic/') && ctx.effort !== choice.effort ? '; changing request effort restarts the Anthropic cache prefix' : ''}` }
+		return { say: `${previous === next ? `model: ${next} (unchanged)` : `Model changed: ${previous} → ${next}`}${cacheChanged ? '; changing request effort invalidates the Anthropic message cache' : ''}` }
 	},
 }
