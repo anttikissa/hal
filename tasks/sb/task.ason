@@ -1,9 +1,10 @@
 {
-	title: 'Status line quiets windows a full window outlasts',
-	spec: "A usage window is moot when another window of the same account is at 100% and resets no earlier (a full 7d makes the 5h moot; a full 5h resetting before the 7d does not). The status line shows moot windows in quiet text without heat, and the model name's quota fill ignores them, so it fills by the binding window (a full 7d shows 0% left). usageWindows.moot holds the rule for every client.",
+	title: 'Status lines hide windows a full window outlasts',
+	spec: "A usage window is moot when another window of the same account is at 100% and resets no earlier (a full 7d makes the 5h moot; a full 5h resetting before the 7d does not). The web and terminal status lines leave moot windows out entirely, and the web model name's quota fill uses the remaining (binding) window, so a full 7d shows 0% left. usageWindows.moot holds the rule for every client.",
 	status: 'done',
 	notes: [
-		'Wide layouts: the 5h at 12% beside a 100% 7d drew the eye though it cannot bind; the user asked for it hidden or quiet. Quiet uses --quiet, not opacity (readable-text rule). /status rows (status-usage.ts) are not yet quieted.'
+		'Wide layouts: the 5h at 12% beside a 100% 7d drew the eye though it cannot bind; the user asked for it hidden or quiet. Quiet uses --quiet, not opacity (readable-text rule). /status rows (status-usage.ts) are not yet quieted.',
+		"3 Oct 2026: user rejected dimming (fa67cb2): a window that cannot bind should not be mentioned at all, on web and terminal. Rotation already moves the status line to an account with room, so hiding by the shown account's windows matches 'all accounts limited'."
 	],
 	needs: ['5f'],
 	foldInto: ['5f']

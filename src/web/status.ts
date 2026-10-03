@@ -15,7 +15,7 @@ export type StatusGroup = { parts: StatusPart[]; path?: true; href?: string }
 // The model name as a quota indicator: the shortest window's name, its
 // percent used and remaining.
 export type Quota = { window: string; used: number; remaining: number }
-export type UsageWindow = { name: string; used: number; resets?: string; moot?: true }
+export type UsageWindow = { name: string; used: number; resets?: string }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
 // Model-specific windows (7d_sonnet) are left out, as in /status.
@@ -34,20 +34,21 @@ function quota(st: ViewState): Quota | undefined {
 	let plan = st.transcript?.stats?.plan
 	if (!plan) return
 	let all = windows(st)
-	let window = usageWindows.shortest(Object.fromEntries(all.filter((w) => !w.moot).map((w) => [w.name, w.used])))
+	let window = usageWindows.shortest(Object.fromEntries(all.map((w) => [w.name, w.used])))
 	if (window === undefined) return
 	let used = all.find((w) => w.name === window)!.used
 	return { window, used, remaining: 100 - used }
 }
 
-// The windows after the model name on wide layouts, shortest first.
+// The windows after the model name on wide layouts, shortest first;
+// windows a full one outlasts are left out.
 function windows(st: ViewState): UsageWindow[] {
 	let plan = st.transcript?.stats?.plan
 	if (!plan) return []
 	let length = (name: string) => usageWindows.minutes(name) ?? Infinity
 	let out: UsageWindow[] = general(plan).sort((a, b) => length(a) - length(b)).map((name) => ({ name, used: clamp(plan.windows[name]!), ...(plan.resets?.[name] && { resets: plan.resets[name] }) }))
 	let moot = usageWindows.moot(out)
-	return out.map((w) => (moot.has(w.name) ? { ...w, moot: true } : w))
+	return out.filter((w) => !moot.has(w.name))
 }
 
 // The details dialog's facts, one group per line.

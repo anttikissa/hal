@@ -26,7 +26,7 @@ function reset(at: string, now = Date.now(), timeZone?: string): string {
 }
 
 // Windows that cannot bind: another window is full until at least as
-// late (a full 7d makes the 5h moot). Shown quietly, not as quota.
+// late (a full 7d makes the 5h moot). Status lines leave them out.
 function moot(windows: { name: string; used: number; resets?: string }[]): Set<string> {
 	let end = (w: { resets?: string }) => (w.resets ? Date.parse(w.resets) : Infinity)
 	return new Set(windows.filter((w) => windows.some((o) => o !== w && o.used >= 100 && end(o) >= end(w))).map((w) => w.name))
