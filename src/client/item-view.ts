@@ -24,14 +24,13 @@ function toolStyle(name: string): Style {
 }
 
 // `tool`: the call a tool result is drawn under (attached), whose card
-// it continues: the same hue on a slightly darker background, its text
-// darker than the call's (less luminant, not just less vivid) but well
-// above 4.5:1.
+// it continues on the same background, its text darker than the call's
+// (less luminant, not less vivid) but well above 4.5:1.
 function itemStyle(item: Item, tool?: string): Style | undefined {
 	if (item.type === 'tool-result' && tool) {
 		let { fg, bg } = itemView.toolStyle(tool)
 		if (!fg || !bg) return { fg: (item.isError ? colors.error() : colors.log()).fg! }
-		return { fg: item.isError ? colors.error().fg! : colors.toolOutput(fg), bg: [bg[0] - 0.03, bg[1], bg[2]] }
+		return { fg: item.isError ? colors.error().fg! : colors.toolOutput(fg), bg }
 	}
 	switch (item.type) {
 		case 'prompt':

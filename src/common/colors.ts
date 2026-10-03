@@ -49,8 +49,9 @@ export const colors = {
 	quiet: (fg: Oklch, bg: Oklch): Oklch => oklch.quiet(fg, bg),
 	blinkDim: (fg: Oklch): Oklch => [fg[0] * 0.65, fg[1], fg[2]],
 	// toolOutput: a tool's output text under its call, from the call's
-	// fg: greyer and darker, so it reads below the command (task hr).
-	toolOutput: (fg: Oklch): Oklch => [fg[0] - 0.2, fg[1] / 2, fg[2]],
+	// fg: darker at full chroma, so it reads below the command without
+	// turning grey (task hr).
+	toolOutput: (fg: Oklch): Oklch => [fg[0] - 0.2, fg[1], fg[2]],
 	// A percentage used (context, quota) as one continuous colour: green
 	// when little is used, through yellow and orange, to red when all is.
 	// The web gets it as classes .heat-0 to .heat-100 (host/web.ts).
