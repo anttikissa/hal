@@ -135,6 +135,16 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 
 // The model picker's content for session `id`.
 async function models(id: string): Promise<Event & { type: 'models' }> {
+	let event = await slash.listing(id)
+	// Lists arriving while the picker is open update it in place (task 0x).
+	void modelList.warm().then(async () => {
+		let fresh = await slash.listing(id)
+		if (fresh.items.join() !== event.items.join()) host.broadcast(id, { ...fresh, refresh: true })
+	})
+	return event
+}
+
+async function listing(id: string): Promise<Event & { type: 'models' }> {
 	let current = sessions.open(id).model
 	let items = await modelList.list(current)
 	let capabilities = Object.fromEntries(items.flatMap((model) => { let cap = effort.describe(model); return cap ? [[model, cap]] : [] }))
@@ -164,6 +174,7 @@ function placed(id: string): { streaming?: true } {
 
 export const slash = {
 	command,
+	listing,
 	context,
 	change,
 	name,
