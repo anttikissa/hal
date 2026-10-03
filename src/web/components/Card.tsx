@@ -22,6 +22,7 @@ import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
 import { Markdown } from './Markdown.tsx'
 import { CardHeader } from './CardHeader.tsx'
+import { promptChanges } from '../../common/prompt-changes.ts'
 import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
@@ -189,6 +190,24 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			</div>
 		</>
 	)
+	// A prompt-file change (task ar): the terminal's rows in its diff
+	// colours, no header; open, each change's line and whole diff.
+	let tone = (r: string) => (r[0] === '+' ? 'add' : r[0] === '-' ? 'del' : 'dim')
+	// An item never turns into a change or out of one.
+	let isChange = props.row.item.type === 'output' && !!props.row.item.change
+	let change = () => (
+		<>
+			{link()}
+			<div class="content diff change">
+				<For each={promptChanges.rows(props.row.item)}>{(r) => <div class={r.tone}>{r.text}</div>}</For>
+				<Show when={expanded()}>
+					<For each={promptChanges.run(props.row.item)}>
+						{(o) => <><div class="head">{promptChanges.line(o)}</div><For each={o.change!.diff.split('\n')}>{(r) => <div class={tone(r)}>{r}</div>}</For></>}
+					</For>
+				</Show>
+			</div>
+		</>
+	)
 	// A queued message's compact row (task 16): its note and text, no
 	// header, at most 3 lines until a click (or its link) opens it.
 	let queued = () => {
@@ -208,6 +227,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			{(s) => (
 				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folds() ? 'folds' : '', expanded() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
 					<Show when={props.row.note === undefined} fallback={compact()}>
+						{isChange ? change() : (
 						<Show when={folds()} fallback={plain(s)}>
 							<CardHeader time={time()} name={head()} open={expanded()} reference={link()}
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
@@ -226,6 +246,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 								</div>
 							</div>
 						</Show>
+						)}
 					</Show>
 				</article>
 			)}
