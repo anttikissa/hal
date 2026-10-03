@@ -9,7 +9,8 @@
 		"tools.killGroup SIGTERMs the group and has a detached `sh -c 'sleep 2; kill -9 -pgid'` send the SIGKILL, so it still arrives when Hal exits first. A setTimeout cannot: the exit handler (host.init) aborts every running turn when pauseOnExit, and timers never fire after exit. The SIGKILL is sent even if bash already closed: a background job with its output redirected keeps the group alive after the pipe closes.",
 		'SIGTERM/SIGHUP go through terminal.quit(code) in realIO, so they call onQuit (pause if last) like Ctrl-C. A headless process (no terminal) has no such handlers: SIGTERM leaves its turns unfinished for the next host.',
 		'Tests find leftover processes with pgrep -f on a unique sleep duration (sleep 30.<pid>1); bash children are detached, so the e2e afterEach group kill does not reach them.',
-		'Invariant (bug fix): malformed tool-call JSON never ends a turn. anthropic.parse yields the broken call as tool_call with input { invalidJson: raw } (unless max_tokens); tools.run answers it with an error result telling the model to call again, so the model continues. Replaces the earlier turn error. OpenAI providers still end the turn in error (deliberately untouched).'
+		'Invariant (bug fix): malformed tool-call JSON never ends a turn. anthropic.parse yields the broken call as tool_call with input { invalidJson: raw } (unless max_tokens); tools.run answers it with an error result telling the model to call again, so the model continues. Replaces the earlier turn error. OpenAI providers still end the turn in error (deliberately untouched).',
+		'Invariant (bug fix): a failed turn stores its error complete. history.end writes turn_end.error as the message plus the provider body (capped at 2000 characters), so the raw input or HTTP reply shows in both UIs under the red line. Before, only the message was kept and the body was dropped.'
 	],
 	needs: ['1r'],
 	foldInto: ['sj', '1r', 'j1']

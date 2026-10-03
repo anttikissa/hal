@@ -151,6 +151,12 @@ asking.
 
 # UI: visible plumbing
 
+Never hide an error. Every failure reaches the user complete: message,
+provider body, raw input, path. Store it with the session and show it
+where it happened. A failure is never reduced to a headline or dropped
+between layers. A failure the model can act on also goes to the model
+as a tool error, so the turn continues.
+
 Show everything relevant once: identifiers users act on, file paths,
 failures and complete output. Omit what nobody reads, such as tool call
 IDs, argument types and restated defaults; session files keep them.
