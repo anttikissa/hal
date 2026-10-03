@@ -47,6 +47,7 @@ function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet
 // document, whose animations never run.
 let fade: KeyframeAnimationOptions | undefined
 function enter(el: HTMLElement): void {
+	if (scroll.state.quiet) return
 	if (!fade) {
 		let css = getComputedStyle(document.documentElement)
 		fade = { duration: parseFloat(css.getPropertyValue('--fade-ms')) || 0, easing: css.getPropertyValue('--ease-out').trim() || 'ease-out' }

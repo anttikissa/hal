@@ -8,7 +8,7 @@
 // streams (Card.tsx), else on a line of its own. The one scroller: Chat
 // and scroll.ts keep a bottom reader at the bottom.
 
-import { createMemo, For, onSettled, Show } from 'solid-js'
+import { createMemo, createSignal, flush, For, onSettled, Show } from 'solid-js'
 import type { Sending } from '../../common/drafts.ts'
 import type { Tab } from '../../common/protocol.ts'
 import type { Item } from '../../common/transcript.ts'
@@ -21,11 +21,29 @@ import { Question } from './Question.tsx'
 
 const none: Item[] = []
 
+// A tab shows its newest rows first: building every card of a long
+// session takes most of a second. Earlier rows are added a page at a
+// time as the reader nears the top, per session so a tab keeps its
+// rows when shown again.
+const first = 40
+const page = 60
+const [counts, setCounts] = createSignal<ReadonlyMap<string, number>>(new Map())
+
 // `target`: the block the address links to (target.ts), whose card is
 // marked and opens.
 export function Transcript(props: { view: ViewState; pending: Sending[]; target?: string; tabs?: Tab[] }) {
 	let el!: HTMLElement
-	onSettled(() => scroll.init(el, () => app.older()))
+	let id = () => props.view.transcript?.meta.id ?? ''
+	let count = () => counts().get(id()) ?? first
+	// Nearing the top: rows already loaded first, then earlier history.
+	let more = () => {
+		if (count() >= all().length) return app.older()
+		scroll.anchor(() => {
+			setCounts(new Map(counts()).set(id(), count() + page))
+			flush()
+		})
+	}
+	onSettled(() => scroll.init(el, more))
 	// Rows follow the items alone: redraws that leave them be (typing, the
 	// status) keep every row object, so no card binding runs again.
 	let items = createMemo(() => props.view.transcript?.items ?? none)
@@ -33,16 +51,22 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	let all = createMemo(() => view.withPending(rows(), props.pending, props.view.transcript?.inbox, props.tabs?.map((t) => t.id)))
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
-	let cursorAt = () => (streaming() ? rows().length - 1 : -1)
+	let cursorKey = () => (streaming() ? rows().at(-1)?.key : undefined)
 	// Background jobs still running, by call key: their cards offer Kill.
 	let jobs = createMemo(() => view.jobs(all()))
 	let hit = createMemo(() => props.target && target.row(all(), props.target)?.key)
+	// The linked card is always among the rows shown.
+	let shown = createMemo(() => {
+		let rows = all()
+		let linked = hit() ? rows.findIndex((r) => r.key === hit()) : -1
+		return rows.slice(Math.max(0, Math.min(rows.length - count(), linked < 0 ? rows.length : linked)))
+	})
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
 	return (
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
-			<For each={all()} keyed={(row) => row.key}>
-				{(row, i) => (
-					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorAt() === i()} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} />}>
+			<For each={shown()} keyed={(row) => row.key}>
+				{(row) => (
+					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} />}>
 						{(q) => <Question item={q()} form={props.view.form!} />}
 					</Show>
 				)}

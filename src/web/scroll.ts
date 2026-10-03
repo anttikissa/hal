@@ -88,8 +88,19 @@ function anchor(change: () => void): void {
 	if (!el) return change()
 	let below = el.scrollHeight - el.scrollTop
 	scroll.stop()
-	change()
+	scroll.quiet(change)
 	el.scrollTop = Math.max(0, el.scrollHeight - below)
+}
+
+// Runs `change` with new cards appearing at once: a tab's rows, or
+// earlier ones above the reader, are not news, so no fade.
+function quiet(change: () => void): void {
+	scroll.state.quiet = true
+	try {
+		change()
+	} finally {
+		scroll.state.quiet = false
+	}
 }
 
 // Follow `el`; returns the cleanup. `onTop`: the reader scrolled near
@@ -180,7 +191,7 @@ export const scroll = {
 	glideMs: 200,
 	// A card's open and close animation (CSS --toggle-ms matches).
 	toggleMs: 250,
-	state: { el: null as Box | null, frame: 0, gap: 0, forced: false, touching: false, places: new Map<string, { top: number } | { gap: number }>() },
+	state: { el: null as Box | null, quiet: false, frame: 0, gap: 0, forced: false, touching: false, places: new Map<string, { top: number } | { gap: number }>() },
 	gap,
 	keep,
 	target,
@@ -192,6 +203,7 @@ export const scroll = {
 	onKey,
 	atTop,
 	anchor,
+	quiet,
 	init,
 	follow,
 	save,

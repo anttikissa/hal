@@ -1,0 +1,7 @@
+{
+	title: 'Web tab switch is instant and shows the bottom',
+	spec: 'Showing a tab on the web takes about one frame however long its history. The transcript renders only the newest rows first (40), and adds 60 earlier ones as the reader nears the top, per session, kept when the tab is shown again; the linked block (target) is always among the rows. Rows loaded earlier come in above without moving the view (scroll.anchor). Cards created by a tab switch or by earlier rows arriving do not fade in (scroll.quiet); only news fades. A tab whose reader was at the bottom shows its last messages, never scrollback. Invariant restored: cost of a tab switch does not grow with history length, and nothing scrolls after the switch.',
+	status: 'done',
+	needs: ['ng', '4s'],
+	foldInto: ['ng']
+}

@@ -35,8 +35,10 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 	// Another tab's transcript: back to where the reader left it.
 	let id = next.view.transcript?.meta.id
 	if (id !== before.view.transcript?.meta.id) {
-		set(next)
-		flush()
+		scroll.quiet(() => {
+			set(next)
+			flush()
+		})
 		if (id) scroll.restore(id)
 		// A short transcript can't be scrolled up: fill the view first.
 		if (scroll.atTop()) app.older()
