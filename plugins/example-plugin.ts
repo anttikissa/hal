@@ -13,6 +13,8 @@
 // - plugin.before(obj, 'key', (...args) => {}) observes the arguments.
 // - plugin.after(obj, 'key', (result, args) => {}) observes the result as
 //   returned (a Promise for async functions; it is not awaited).
+// - plugin.set(obj, 'key', value) overrides a plain value (a setting such
+//   as models.ttlMs); the last file in filename order wins.
 // - plugin.around(obj, 'key', (fn, ...args) => result) replaces the call;
 //   call fn(...args) for the original (or the next around). Only around
 //   changes arguments or results. It keeps the target's return type: a
@@ -46,7 +48,8 @@ import type { Plugin } from '../src/host/plugins.ts'
 //
 // oxlint-disable-next-line no-unused-vars -- used once uncommented
 export default async (plugin: Plugin) => {
-// 	// A setting: around a config function.
+// 	// A setting: set a plain value, or around one read from config.
+// 	plugin.set(models, 'ttlMs', 600_000)
 // 	plugin.around(models, 'defaultModel', () => 'anthropic/claude-opus-5-5')
 //
 // 	// Observing: log every account choice.

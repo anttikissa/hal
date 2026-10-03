@@ -1,0 +1,11 @@
+{
+	title: 'Plain-value settings with plugin.set',
+	spec: `Settings that are constants are plain values on module objects (\`ttlMs: 3_600_000\`, read as \`models.ttlMs\`), not zero-argument functions. Code reads them through the object at call time, never destructured or captured at import. Values that compute something (read config.ason, derive from other values) stay functions.
+
+plugin.set(obj, key, value) overrides a plain value with the same ownership as hooks: removed on reload, delete or expiry; when several files set one key the last in filename order wins, and removing it reveals the earlier one, then the original exactly. Its type allows only non-function keys and checks the value type; a missing or function key is a load error naming file and target (use around). /plugins lists it as "<module>.<key> set". Like hooks, set affects only future reads; repaints go through onChange.
+
+Docs: README "Plugins" section, tasks/README.md module conventions and plugins/example-plugin.ts describe set and the plain-value rule.`,
+	status: 'planned',
+	needs: ['an'],
+	foldInto: ['an']
+}

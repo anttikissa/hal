@@ -56,6 +56,19 @@ test('removing each owner leaves the others, and the last puts the original back
 	expect(t.f(1)).toBe(2)
 })
 
+test('set: the last file wins, removing it reveals the earlier one, then the original; a function target is refused', async () => {
+	let a = await plugin('a.ts', `plugin.set(t, 'value', 4)`)
+	let b = await plugin('b.ts', `plugin.set(t, 'value', 5)`)
+	expect(t.value).toBe(5)
+	plugins.remove(b)
+	expect(t.value).toBe(4)
+	plugins.remove(a)
+	expect(t.value).toBe(3)
+	await plugin('c.ts', `plugin.set(t, 'f', 1)`)
+	expect(reports.join()).toContain('t.f')
+	expect(typeof t.f).toBe('function')
+})
+
 test('befores, then arounds with the first registered outermost, then afters; file order survives a reload', async () => {
 	let a = await plugin('a.ts', `plugin.before(t, 'f', () => t.log.push('a-before'))
 plugin.around(t, 'f', (fn: any, x: number) => { t.log.push('a-around'); return fn(x) })
