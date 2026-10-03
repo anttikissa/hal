@@ -155,6 +155,7 @@ function onState(state: LinkState): void {
 		app.send({ type: 'tab-start', ...(cwd === undefined ? {} : { cwd }), ...(last === undefined ? {} : { last }), ...(timezone ? { timezone } : {}) })
 		// A code for the web links this terminal prints (task e3).
 		app.send({ type: 'auth', link: true })
+		app.sendScreen()
 	}
 	app.show()
 }
@@ -314,8 +315,18 @@ function pick(event: Event & { type: 'models' }): void {
 // Takes keys from the terminal and paints the first frame. Idempotent.
 function init(): void {
 	terminal.onKeys = (events) => app.onKeys(events)
+	terminal.onScreen = () => app.sendScreen()
 	notices.onChange = () => app.show()
 	app.show()
+}
+
+// The terminal's size and kind, for the host's inspect tool.
+function sendScreen(): void {
+	let size = terminal.state.io?.size()
+	if (!size) return
+	let env = process.env
+	let term = [env.TERM, [env.TERM_PROGRAM, env.TERM_PROGRAM_VERSION].filter(Boolean).join(' '), env.COLORTERM].filter(Boolean).join(', ').slice(0, 200)
+	app.send({ type: 'screen', cols: size.cols, rows: size.rows, ...(term ? { term } : {}) })
 }
 
 function reset(): void {
@@ -359,4 +370,5 @@ export const app = {
 	pasted,
 	init,
 	reset,
+	sendScreen,
 }

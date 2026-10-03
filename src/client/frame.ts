@@ -188,12 +188,13 @@ export type Past = { lines: string[]; formCursor?: Frame['cursor']; target?: num
 // so the next call goes on from there: a long history is laid out in
 // slices (task 7j).
 // Display order: parallel calls each with their results right under
-// them, as web cards are; unless a batch's calls, each a header and up
-// to 5 output rows, would not fit on a screen of `rows`: then calls and
-// results stay separate blocks, each result linking to its call, so
-// finishing calls never rewrite scrollback. Later items keep their
-// place (background output arrives as its own block).
-function order(items: Item[], rows: number): Item[] {
+// them, as web cards are; unless the batch as drawn (`fits` measures
+// its rows) is taller than a screen: then calls and results stay
+// separate blocks, each result linking to its call, so finishing calls
+// never rewrite scrollback. A batch that once overflowed stays split,
+// so its layout never flips back. Later items keep their place
+// (background output arrives as its own block).
+function order(items: Item[], fits: (batch: Item[]) => boolean): Item[] {
 	let out: Item[] = []
 	for (let i = 0; i < items.length; ) {
 		let j = i
@@ -202,7 +203,9 @@ function order(items: Item[], rows: number): Item[] {
 		while (k < items.length && items[k]!.type === 'tool-result') k++
 		let calls = items.slice(i, j) as (Item & { type: 'tool' })[]
 		let results = items.slice(j, k) as (Item & { type: 'tool-result' })[]
-		if (calls.length < 2 || calls.length * 6 > rows) out.push(...items.slice(i, Math.max(k, i + 1)))
+		let split = calls.length > 1 && frame.state.split.has(calls[0]!.key)
+		if (calls.length > 1 && !split && !fits(items.slice(i, k))) frame.state.split.add(calls[0]!.key), (split = true)
+		if (calls.length < 2 || split) out.push(...items.slice(i, Math.max(k, i + 1)))
 		else {
 			for (let c of calls) out.push(c, ...results.filter((r) => r.id === c.id))
 			out.push(...results.filter((r) => !calls.some((c) => c.id === r.id)))
@@ -214,8 +217,17 @@ function order(items: Item[], rows: number): Item[] {
 
 function layout(view: View, cols: number, deadline = Infinity, save = true, screen = 24): Past | undefined {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
-	let items = frame.order(view.transcript?.items ?? [], screen)
 	let session = view.transcript?.meta.id
+	// The batch's rows as drawn grouped: each call and its gap; each
+	// result continues its call's card, replacing the bottom padding row.
+	// A call still waiting counts a one-row result (2 rows more), so a
+	// batch rarely groups first and splits once its results arrive.
+	let height = (batch: Item[]) => batch.reduce((n, item) => {
+		if (item.type === 'tool' && !batch.some((r) => r.type === 'tool-result' && r.id === item.id)) n += 2
+		let call = item.type === 'tool-result' ? batch.find((c) => c.type === 'tool' && c.id === item.id) : undefined
+		return n + (call?.type === 'tool' ? frame.itemRows(item, cols, session, undefined, undefined, call.name).length - 1 : frame.itemRows(item, cols, session).length + 1)
+	}, 0)
+	let items = frame.order(view.transcript?.items ?? [], (batch) => height(batch) <= screen)
 	let calls = new Map<string, string>()
 	let formCursor: Frame['cursor'] | undefined
 	let look = `${cols} ${session} ${itemView.resultRows()} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
@@ -369,4 +381,4 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined }, layout, build, itemRows, ref, queuedRows, highWater, order, glyph, withCursor, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, split: new Set<string>() }, layout, build, itemRows, ref, queuedRows, highWater, order, glyph, withCursor, promptWidth }

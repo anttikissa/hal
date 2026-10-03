@@ -236,7 +236,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	if (c.type === 'auth' && c.link) webLinks.follow(client, client.deliver)
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
 	if (c.type === 'notice-history') return { reply: { type: 'notice-history', entries: noticeHistory.list() } }
-	if (c.type === 'hello') return clients.hello(client.record, c.pid)
+	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid) : clients.screen(client.record, c)
 	if (c.type === 'visibility') {
 		// Not checked against open: a tab's open may still be pending.
 		client.visible = c.visible ? c.sessionId : undefined; client.visibleAt = Date.now()

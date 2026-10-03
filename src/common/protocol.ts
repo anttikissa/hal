@@ -169,6 +169,9 @@ export type Command = (
 	| { type: 'visibility'; sessionId: string; visible: boolean }
 	// A peer on the host socket names its process, for /clients (task z8).
 	| { type: 'hello'; pid: number }
+	// A terminal client's size and terminal (TERM, program, colour depth),
+	// on connecting and on every resize, for the inspect tool; untrusted.
+	| { type: 'screen'; cols: number; rows: number; term?: string }
 ) & { id?: string }
 
 export type CommandType = Command['type']
@@ -290,7 +293,7 @@ export type Event =
 	| NoticeEvent
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello']
+const commandTypes: CommandType[] = ['find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello', 'screen']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -303,6 +306,11 @@ function invalid(value: unknown): string | undefined {
 	let problem = str('id', true)
 	if (problem) return problem
 	if (c.type === 'hello') return Number.isInteger(c.pid) ? undefined : 'hello: pid must be an integer'
+	if (c.type === 'screen') {
+		let size = (n: unknown) => Number.isInteger(n) && (n as number) > 0 && (n as number) <= 10000
+		if (!size(c.cols) || !size(c.rows)) return 'screen: cols and rows must be integers from 1 to 10000'
+		return str('term', true) ?? (((c.term as string | undefined)?.length ?? 0) > 200 ? 'screen: term exceeds 200 characters' : undefined)
+	}
 	if (c.type === 'find-cancel') return undefined
 	if (c.type === 'find') {
 		let kinds = c.kinds
