@@ -162,8 +162,8 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 	let reason: StopReason | undefined
 	let explanation: string | undefined
 	// A call whose input is not JSON: cut off by max_tokens (then it is
-	// no call) or broken (then a call whose input holds the raw text).
-	let broken: { id: string; name: string; json: string }[] = []
+	// no call) or broken (an error once the stop reason says which).
+	let broken: { name: string; json: string } | undefined
 	for await (let m of messages) {
 		let ev = JSON.parse(m.data)
 		switch (ev.type) {
@@ -203,7 +203,7 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 					}
 				}
 				if (!input || typeof input !== 'object' || Array.isArray(input)) {
-					broken.push({ id: t.id, name: t.name, json: t.json })
+					broken ??= { name: t.name, json: t.json }
 					break
 				}
 				yield { type: 'tool_call', id: t.id, name: t.name, input: input as Record<string, unknown> }
@@ -217,8 +217,10 @@ async function* parse(messages: AsyncIterable<SseMessage>): AsyncGenerator<Strea
 				break
 			}
 			case 'message_stop': {
-				// The model sees its malformed call as a tool error and may retry.
-				if (reason !== 'max_tokens') for (let b of broken) yield { type: 'tool_call', id: b.id, name: b.name, input: { invalidJson: b.json } }
+				if (broken && reason !== 'max_tokens') {
+					yield { type: 'error', message: `Invalid JSON input for tool call '${broken.name}'`, body: broken.json }
+					return
+				}
 				yield { type: 'done', reason: reason ?? 'end', ...(explanation !== undefined && { explanation }) }
 				return
 			}

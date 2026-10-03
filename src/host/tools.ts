@@ -77,8 +77,6 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 	try {
 		let copied = pruning.copied(call.input)
 		if (copied) throw new Error(`Copied omission marker ${copied}: read the named record/blob with read_blob and retry with the actual value.`)
-		// A provider's call whose input was not a JSON object.
-		if (typeof call.input.invalidJson === 'string') throw new Error(`your input for '${call.name}' was not a valid JSON object (cut off or malformed); call it again with valid arguments. Input received: ${call.input.invalidJson}`)
 		let tool = tools.all().get(call.name)
 		if (!tool) throw new Error(`unknown tool '${call.name}'`)
 		let out = await tool.run(call.input, { ...ctx, callId: call.id })
