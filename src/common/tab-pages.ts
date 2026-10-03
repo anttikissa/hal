@@ -2,8 +2,8 @@
 // terminal's tab bar and the web's strip. Every cell has one width, so
 // Ctrl-N/P move one cell and no number shifts. Names show only when
 // every tab fits with one; else numbers; when not even those fit, the
-// tabs come in fixed pages (1..k, k+1..2k, ...) between two edges of
-// fixed width, and the page shown is the one holding the current tab:
+// tabs come in fixed pages (1..k, k+1..2k, ..., the last one ending at
+// the last tab) between two edges of fixed width, and the page shown is the one holding the current tab:
 // a pure function of (count, current, width), never of history.
 // Widths are in any one unit: terminal columns, CSS pixels.
 
@@ -39,6 +39,9 @@ function page(tabs: Tab[], current: number, width: number, sizes: Sizes): Page {
 	if (n * sizes.cell <= width) return { names: false, start: 0, end: n }
 	let per = Math.max(1, Math.floor((width - 2 * sizes.edge) / sizes.cell))
 	let start = Math.floor(Math.max(0, Math.min(current, n - 1)) / per) * per
+	// The last page ends at the last tab and is full like the others,
+	// overlapping the one before, so no strip ends in empty room.
+	if (start + per > n) start = Math.max(0, n - per)
 	let end = Math.min(n, start + per)
 	let edge = (side: Tab[]): Edge => {
 		let mark = tabPages.urgent(side)

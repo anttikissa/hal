@@ -23,14 +23,15 @@ test('names only when every tab fits with one, then numbers, then pages', () => 
 
 test('pages are fixed: the one holding the current tab, whatever came before', () => {
 	let list = tabs(23)
-	// (40 - 2 * 5) / 4 = 7 per page: 1..7, 8..14, 15..21, 22..23.
+	// (40 - 2 * 5) / 4 = 7 per page: 1..7, 8..14, 15..21, then a full
+	// last page 17..23 ending at the last tab.
 	let seen = list.map((_, i) => tabPages.page(list, i, 40, sizes))
 	seen.forEach((p, i) => {
-		expect(p.start).toBe(Math.floor(i / 7) * 7)
-		expect(p.end).toBe(Math.min(23, p.start + 7))
+		expect(p.start).toBe(i < 21 ? Math.floor(i / 7) * 7 : 16)
+		expect(p.end - p.start).toBe(7)
 		expect(p.left!.count + (p.end - p.start) + p.right!.count).toBe(23)
 	})
-	expect(seen[22]).toMatchObject({ start: 21, end: 23, right: { count: 0 } })
+	expect(seen[22]).toMatchObject({ start: 16, end: 23, right: { count: 0 } })
 	// A width too small for one cell still shows the current tab.
 	expect(tabPages.page(list, 5, 3, sizes)).toMatchObject({ start: 5, end: 6 })
 })

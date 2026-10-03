@@ -1,11 +1,11 @@
 // The tab bar row above the prompt (tasks/cc/terminal.md, Tabs):
-// "Tabs:", one equal cell per tab (its number right-aligned, a marker
-// slot, a gap; the focused number underlined), then key hints.
+// one equal cell per tab (its number right-aligned, a marker slot, a
+// gap; the focused number underlined), then key hints.
 // Indicators follow the old Hal's tabIndicator; the blinking ones go
 // with the shared pulse (pulse.ts): `lit` says which phase to draw.
 // It stays one row: hints go from the lowest priority up, then the
-// label, then the tabs come in pages (common/tab-pages.ts, task 3k)
-// between two display-only edges; a cell is never clipped.
+// tabs come in pages (common/tab-pages.ts, task 3k) between two
+// display-only edges at the row's ends; a cell is never clipped.
 // Each number is an OSC 8 link to that tab's web page.
 
 import { colors } from '../common/colors.ts'
@@ -76,16 +76,12 @@ function cells(list: Tab[], focused: string | undefined, start: number, end: num
 	return parts
 }
 
-// An edge `width` wide: ‹N or N› and the side's most urgent mark, or
-// blanks when that side is empty.
-function edge(e: Edge, left: boolean, width: number, lit: boolean): Part[] {
-	if (!e.count) return [{ text: ' '.repeat(width) }]
-	let text = left ? `‹${e.count}` : `${e.count}›`
+// An edge like the web's: ‹ or › and the side's most urgent mark, no
+// count; the arrow dimmed when that side is empty.
+function edge(e: Edge, left: boolean, lit: boolean): Part[] {
+	let fg = colors.status().fg!
 	let m = e.mark && tabBar.markPart(e.mark)
-	let pad = ' '.repeat(Math.max(0, width - text.length - 2))
-	let parts: Part[] = [{ text: left ? text : pad + text, fg: colors.status().fg! }, slot(m, lit), { text: ' ' }]
-	if (left) parts.push({ text: pad })
-	return parts
+	return [{ text: left ? '‹' : '›', fg: e.count ? fg : colors.blinkDim(fg) }, slot(m, lit)]
 }
 
 const plain = (parts: Part[]) => parts.map((p) => p.text).join('')
@@ -96,24 +92,26 @@ function fit(list: Tab[], focused: string | undefined, width: number, lit = true
 	let dim = colors.status().fg!
 	let all = cells(list, focused, 0, list.length, lit)
 	let left = [...hints(list.length)]
-	let bar = (label: boolean, hs: Hint[]): Part[] => [
-		...(label ? [{ text: 'Tabs: ', fg: dim }] : []),
+	let bar = (hs: Hint[]): Part[] => [
 		...all,
 		...(hs.length ? [{ text: ` ${hs.map((h) => h.text).join(', ')}`, fg: dim }] : []),
 	]
 	for (;;) {
-		let parts = bar(true, left)
+		let parts = bar(left)
 		if (strings.visLen(plain(parts)) <= width) return parts
 		if (!left.length) break
 		let low = left.reduce((a, b) => (b.priority < a.priority ? b : a))
 		left = left.filter((h) => h !== low)
 	}
-	if (strings.visLen(plain(all)) <= width) return all
 	let d = tabPages.digits(list.length)
-	let sizes = { cell: d + 2, edge: d + 3 }
+	// Left edge: arrow, mark, gap; right edge: arrow, mark, flush with
+	// the row's end, the spare columns before it.
+	let sizes = { cell: d + 2, edge: 3 }
 	let at = list.findIndex((t) => t.id === focused)
 	let p = tabPages.page(list, at, width, sizes)
-	return [...edge(p.left!, true, sizes.edge, lit), ...cells(list, focused, p.start, p.end, lit), ...edge(p.right!, false, sizes.edge, lit)]
+	let mid = cells(list, focused, p.start, p.end, lit)
+	let spare = Math.max(0, width - 5 - strings.visLen(plain(mid)))
+	return [...edge(p.left!, true, lit), { text: ' ' }, ...mid, { text: ' '.repeat(spare) }, ...edge(p.right!, false, lit)]
 }
 
 const UNDER = '\x1b[4m'

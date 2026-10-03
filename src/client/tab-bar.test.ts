@@ -32,7 +32,7 @@ test('each tab shows at most one indicator for what it needs', () => {
 		tab('g', { type: 'idle' }, true),
 		tab('h', { type: 'idle' }),
 	]
-	expect(bar(list, 'h', 200)).toStartWith(' Tabs: 1▪ 2◆ 3! 4✗ 5✗ 6! 7✓ 8  ')
+	expect(bar(list, 'h', 200)).toStartWith(' 1▪ 2◆ 3! 4✗ 5✗ 6! 7✓ 8  ')
 })
 
 // A tab's indicator as drawn: its glyph and SGR, lit or dark.
@@ -70,14 +70,14 @@ test('without colours a blinking indicator comes and goes', () => {
 	saved.mono = ansi.mono
 	ansi.mono = () => true
 	let list = [tab('a', { type: 'running', phase: 'streaming' }), tab('b', { type: 'paused' })]
-	expect(text(tabBar.row(list, 'b', 80, true))).toStartWith(' Tabs: 1▪ 2! ')
+	expect(text(tabBar.row(list, 'b', 80, true))).toStartWith(' 1▪ 2! ')
 	// The same width dark, so nothing after it moves.
-	expect(text(tabBar.row(list, 'b', 80, false))).toStartWith(' Tabs: 1  2! ')
+	expect(text(tabBar.row(list, 'b', 80, false))).toStartWith(' 1  2! ')
 	// The focused number is underlined even without colours.
 	expect(tabBar.row(list, 'b', 80)).toContain('\x1b[4m\x1b]8;;')
 })
 
-test('the bar stays one row: hints go, then the label, then it pages', () => {
+test('the bar stays one row: hints go, then it pages', () => {
 	let list = Array.from({ length: 12 }, (_, i) => tab(`t${i}`))
 	list[0] = tab('t0', { type: 'error', message: 'x' })
 	let seen: string[] = []
@@ -91,11 +91,12 @@ test('the bar stays one row: hints go, then the label, then it pages', () => {
 	let at = (s: string) => seen.findIndex((r) => !r.includes(s))
 	expect(at('ctrl-w')).toBeLessThan(at('ctrl-n/p'))
 	expect(at('ctrl-n/p')).toBeLessThan(at('alt-#'))
-	expect(at('alt-#')).toBeLessThan(at('Tabs:'))
+	expect(seen.some((r) => r.includes('Tabs:'))).toBe(false)
 	// Every cell is 4 wide (two digits, marker, gap), none clipped.
 	expect(seen).toContain('  1✗  2   3   4   5   6   7   8   9  10  11  12  ')
-	// Paged: 11 sits on the page 7..12 (6 per page in 36 columns), the
-	// left edge counts the 6 before it and carries tab 1's failure.
-	expect(bar(list, 't10', 38)).toBe(' ‹6✗   7   8   9  10  11  12       ')
-	expect(bar(list, 't0', 38)).toBe('       1✗  2   3   4   5   6   6›  ')
+	// Paged: 7 per page in 36 columns, edges at both ends with no count.
+	// The last page ends at tab 12 and is full; the left edge carries
+	// tab 1's failure.
+	expect(bar(list, 't10', 38)).toBe(' ‹✗  6   7   8   9  10  11  12     › ')
+	expect(bar(list, 't0', 38)).toBe(' ‹   1✗  2   3   4   5   6   7     › ')
 })
