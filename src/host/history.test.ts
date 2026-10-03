@@ -426,3 +426,11 @@ test('a number that is not an integer is corrupt history', async () => {
 	forget()
 	expect(() => history.readSync(id)).toThrow(new RegExp(id))
 })
+
+test('a failed turn stores the provider body with the message, never just a headline', async () => {
+	let id = newSession()
+	fakeStream(() => [{ type: 'error', message: 'Invalid JSON input', body: '{"command": "ls' }])
+	history.submit(id, 'go')
+	await drain(history.turn(id))
+	expect((await history.read(id)).at(-1)).toMatchObject({ type: 'turn_end', status: 'error', error: 'Invalid JSON input\n{"command": "ls' })
+})

@@ -270,6 +270,15 @@ function results(id: string, list: ToolResultBlock[]): HistoryRecord | undefined
 	if (history.state.running.has(id)) return history.append(id, { type: 'user', blocks: list })
 }
 
+// A failed turn's error as stored and shown: the message, then the
+// provider's body (the malformed input, the HTTP reply) unless the
+// message already holds it. Capped; nothing but the user's eyes reads it.
+function errorText(e: ErrorEvent): string {
+	let body = e.body?.trim()
+	if (!body || e.message.includes(body)) return e.message
+	return `${e.message}\n${body.length > 2000 ? `${body.slice(0, 2000)}… [${body.length - 2000} more characters]` : body}`
+}
+
 // Ends the running turn, with the usage of all its rounds: `last` is
 // how its last round ended (none, or cancelled: the user paused it).
 // Does nothing for a turn not running here, or already ended.
@@ -281,7 +290,7 @@ function end(id: string, last: DoneEvent | ErrorEvent | undefined, pauseReason?:
 	let usage = addUsage(running.prior, running.turn.usage)
 	let context = contextOf(running)
 	if (last?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: last.reason, usage, ...context })
-	else if (last?.type === 'error' && !last.cancelled) history.append(id, { type: 'turn_end', status: 'error', error: last.message, usage, ...context })
+	else if (last?.type === 'error' && !last.cancelled) history.append(id, { type: 'turn_end', status: 'error', error: errorText(last), usage, ...context })
 	else history.append(id, { type: 'turn_end', status: 'paused', usage, ...context, ...(pauseReason !== undefined && { pauseReason }) })
 }
 
