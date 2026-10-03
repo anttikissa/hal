@@ -87,12 +87,14 @@ function formKey(st: ViewState, k: Key): { state: ViewState; command?: unknown }
 // A host command's key (common/commands/list.ts), if the browser gives
 // it to the page: what to send. Ctrl-M only asks for the model picker;
 // others send `/<name>` as typed. Client-only commands are the
-// terminal's; the tab keys are tabs.ts, sent unrecorded.
+// terminal's; the tab keys are tabs.ts, sent unrecorded. Ctrl-L (redraw)
+// is the terminal's local repaint: the page has nothing to repaint, and
+// sending it would record a /redraw prompt.
 const tabKeys = new Set(['new', 'close', 'resume'])
 
 function commandKey(st: ViewState, k: Key, mac: boolean): unknown {
 	let c = commandList.byKey({ key: k.key, shift: !!k.shift, alt: !!k.alt, ctrl: !!k.ctrl, cmd: !!k.cmd })
-	if (!c || c.clientOnly || tabKeys.has(c.name) || c.name === 'restart' || !commandList.onWeb(c.key!, mac) || !st.transcript) return undefined
+	if (!c || c.clientOnly || tabKeys.has(c.name) || c.name === 'restart' || c.name === 'redraw' || !commandList.onWeb(c.key!, mac) || !st.transcript) return undefined
 	let sessionId = st.transcript.meta.id
 	return c.name === 'model' ? { type: 'models', sessionId } : { type: 'submit', sessionId, text: `/${c.name}` }
 }
