@@ -1,6 +1,6 @@
 {
 	title: '/notifications lists notification history',
-	spec: '/notifications prints the notification history (task py) in either client, newest first: time, session name, reason (the same words as the web Notifications sheet) and notice text, each linking to the web page of its triggering block, else its session. It takes no arguments and says when the history is empty. No key binding: it is rarely needed, and /no<Tab> completes it.',
+	spec: '/notifications prints the notification history (task py) in either client, oldest first so the newest is nearest the prompt: time, session name, reason (the same words as the web Notifications sheet) and notice text, each linking to the web page of its triggering block, else its session. By default it shows the latest 10 and says how many older ones exist; /notifications N shows the latest N, and Infinity shows all kept. Other arguments get a usage error. It says when the history is empty. No key binding: it is rarely needed, and /no<Tab> completes it.',
 	status: 'done',
 	notes: [
 		'reason() and stamp() live in common/notices.ts so the web sheet and the command word entries alike. Times use the host locale and timezone.'
