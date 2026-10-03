@@ -83,11 +83,11 @@ export const look: Look = {
 		errorFg: colors.error().fg!,
 		pausedFg: [0.86, 0.16, 95],
 	}),
-	// The notice stack (task qm): a bar in the event's colour on near
-	// black, never slate.
+	// The notice stack (task qm): a bar in the event's colour on a faint
+	// neutral grey, lighter than the screen so its shape shows; never slate.
 	notice: () => ({
 		fg: [0.9, 0, 0],
-		bg: [0.13, 0, 0],
+		bg: [0.22, 0, 0],
 		doneFg: colors.tab().doneFg!,
 		failedFg: colors.error().fg!,
 		attentionFg: colors.tab().warningFg!,
