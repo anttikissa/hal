@@ -67,9 +67,30 @@ function counts(o: Output): { add: number; del: number; text: string[] } {
 	return { add: rows.filter((r) => r[0] === '+').length, del: rows.filter((r) => r[0] === '-').length, text: rows.filter((r) => r.slice(1).trim()) }
 }
 
+// A one-line edit as its changed words with a word of context either
+// side: 'Apply Strunk → Prunk & …', '… end +now'. Undefined unless the change
+// replaces exactly one non-blank line with another.
+function edit(o: Output): string | undefined {
+	let c = counts(o)
+	if (c.add !== 1 || c.del !== 1 || c.text.length !== 2) return undefined
+	let a = c.text.find((r) => r[0] === '-')!.slice(1).trim().split(' ')
+	let b = c.text.find((r) => r[0] === '+')!.slice(1).trim().split(' ')
+	let pre = 0
+	while (pre < a.length && pre < b.length && a[pre] === b[pre]) pre++
+	let suf = 0
+	while (suf < a.length - pre && suf < b.length - pre && a.at(-1 - suf) === b.at(-1 - suf)) suf++
+	let from = Math.max(0, pre - 1)
+	let lead = from > 0 ? '… ' : ''
+	let tail = suf > 1 ? ' …' : ''
+	let words = (w: string[]) => w.slice(pre, w.length - suf).join(' ')
+	let mid = !words(a) ? `+${words(b)}` : !words(b) ? `−${words(a)}` : `${words(a)} → ${words(b)}`
+	let before = a.slice(from, pre).join(' '), after = suf ? a[a.length - suf]! : ''
+	return [lead + before, mid, after + tail].filter((x) => x.trim()).join(' ')
+}
+
 // Plain rows for a terminal, which cannot open a card. One change:
 // '11:25 AGENTS.md changed  +2 −0', then up to three changed lines.
-// A run: '11:14–11:25 3 changes to …', then one aligned row per change
+// A run: '11:14–11:25 3 changes (one time if both match) to …', then one aligned row per change
 // with its first changed line. `tone` picks a row's colour.
 type Row = { text: string; tone: 'head' | 'add' | 'del' | 'dim' }
 function rows(item: object, now = Date.now()): Row[] {
@@ -78,10 +99,13 @@ function rows(item: object, now = Date.now()): Row[] {
 	if (!run.length) return []
 	let tally = (c: ReturnType<typeof counts>) => `+${c.add} −${c.del}`
 	let tone = (r: string): Row['tone'] => (r[0] === '+' ? 'add' : 'del')
+	let span = (a: Output, b: Output) => (hhmm(a.ts, now) === hhmm(b.ts, now) ? hhmm(a.ts, now) : `${hhmm(a.ts, now)}–${hhmm(b.ts, now)}`)
 	let clean = (r: string) => `${r[0]} ${r.slice(1).trim()}`
 	if (run.length === 1) {
 		let c = counts(run[0]!)
 		let out: Row[] = [{ text: `${hhmm(run[0]!.ts, now)} ${summary(run, now)}  ${tally(c)}`, tone: 'head' }]
+		let e = edit(run[0]!)
+		if (e) return [...out, { text: `  ${e}`, tone: 'dim' }]
 		out.push(...c.text.slice(0, 3).map((r) => ({ text: `  ${clean(r)}`, tone: tone(r) })))
 		if (c.text.length > 3) out.push({ text: `  … ${c.text.length - 3} more`, tone: 'dim' })
 		else if (!c.text.length && c.add + c.del) out.push({ text: '  blank lines only', tone: 'dim' })
@@ -89,14 +113,20 @@ function rows(item: object, now = Date.now()): Row[] {
 	}
 	let names = [...new Set(run.map((o) => o.change!.name))]
 	let pad = Math.max(...run.map((o) => o.change!.name.length))
-	let out: Row[] = [{ text: `${hhmm(run[0]!.ts, now)}–${hhmm(run.at(-1)!.ts, now)} ${run.length} changes to ${names.join(', ')}`, tone: 'head' }]
+	let out: Row[] = [{ text: `${span(run[0]!, run.at(-1)!)} ${run.length} changes to ${names.join(', ')}`, tone: 'head' }]
 	for (let o of run) {
 		let c = counts(o)
 		let first = c.text[0]
-		let note = [o.change!.what === 'changed' ? '' : o.change!.what, first ? clean(first) : c.add + c.del ? 'blank lines' : ''].filter(Boolean).join(' · ')
-		out.push({ text: `  ${hhmm(o.ts, now)}  ${o.change!.name.padEnd(pad)}  ${tally(c).padEnd(7)}  ${note}`.trimEnd(), tone: first ? tone(first) : 'dim' })
+		let e = edit(o)
+		let note = [o.change!.what === 'changed' ? '' : o.change!.what, e ?? (first ? clean(first) : c.add + c.del ? 'blank lines' : '')].filter(Boolean).join(' · ')
+		out.push({ text: `  ${hhmm(o.ts, now)}  ${o.change!.name.padEnd(pad)}  ${tally(c).padEnd(7)}  ${note}`.trimEnd(), tone: e || !first ? 'dim' : tone(first) })
 	}
 	return out
 }
 
-export const promptChanges = { summary, group, hhmm, line, rows }
+// The changes a drawn item stands for: a merged run's, or its own.
+function run(item: Item): Output[] {
+	return runs.get(item) ?? (item.type === 'output' && item.change ? [item as Output] : [])
+}
+
+export const promptChanges = { summary, group, hhmm, line, rows, run }
