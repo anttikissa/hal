@@ -31,7 +31,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 	if (item.type === 'tool-result' && tool) {
 		let { fg, bg } = itemView.toolStyle(tool)
 		if (!fg || !bg) return { fg: (item.isError ? colors.error() : colors.log()).fg! }
-		return { fg: item.isError ? colors.error().fg! : [fg[0] - 0.2, fg[1] / 2, fg[2]], bg: [bg[0] - 0.03, bg[1], bg[2]] }
+		return { fg: item.isError ? colors.error().fg! : colors.toolOutput(fg), bg: [bg[0] - 0.03, bg[1], bg[2]] }
 	}
 	switch (item.type) {
 		case 'prompt':

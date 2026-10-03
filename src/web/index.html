@@ -48,6 +48,8 @@ body, textarea { tab-size: 4; }
    card's top and bottom whitespace match. */
 .Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; --card-inset: calc((44px - 1lh) / 2); }
 .Card .content { padding: 0.25lh 1ch var(--card-inset); }
+.Card .result-text { color: var(--output, inherit); }
+.Card .result-text.error { background: none; }
 .Card:not(:has(> .CardHeader)) > .content { padding-top: var(--card-inset); }
 .Card .sender { color: var(--quiet); margin-bottom: 0.25lh; }
 .Card .who { color: var(--quiet); }

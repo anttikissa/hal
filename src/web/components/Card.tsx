@@ -131,7 +131,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		// has streamed so far.
 		let call = toolDetails.lines(item.name, item.input)
 		let out = result()?.text ?? item.partial?.replace(/\n$/, '')
-		return [...call, ...(out ? [...(call.length ? [''] : []), out] : [])].join('\n')
+		let mark = item.name === 'bash' ? marked : (s: string) => s
+		return <>{[...call, ...(out && call.length ? [''] : [])].map((l) => l + '\n').join('')}{out ? <span class={failed() ? 'result-text error' : 'result-text'}>{mark(out)}</span> : ''}</>
 	}
 	let failed = () => !!props.row.result?.isError
 	let toggle = (e: MouseEvent) => {
@@ -216,7 +217,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 								<div class="contents">
 									<div class="content">
 										<Show when={props.row.item.type === 'prompt'}><div class="sender">{who()}</div></Show>
-										{md() ? markdown() : props.row.item.type === 'tool' && props.row.item.name === 'bash' ? marked(body()) : body()}
+										{md() ? markdown() : body()}
 										<Show when={props.cursor && !md()}>{cursor()}</Show>
 										<Show when={long()}><button type="button" class="more" onClick={more}>{full() ? 'show less' : 'show all'}</button></Show>
 									</div>
