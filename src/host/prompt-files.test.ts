@@ -6,11 +6,11 @@ import { systemPrompt } from './system-prompt.ts'
 
 useHost()
 
-test('AGENTS.md changes reach only tabs they apply to; SYSTEM.md changes reach all', () => {
+test('AGENTS.md changes reach only tabs they apply to; SYSTEM.md and its includes reach all', () => {
 	let root = `${testHome()}/proj`, other = `${testHome()}/other`
 	mkdirSync(`${root}/.git`, { recursive: true }); mkdirSync(`${root}/sub`); mkdirSync(other)
 	let system = `${testHome()}/SYSTEM.md`
-	writeFileSync(system, 'v1'); writeFileSync(`${root}/AGENTS.md`, 'v1')
+	writeFileSync(system, 'v1\n@inc.md\n'); writeFileSync(`${testHome()}/inc.md`, 'i1'); writeFileSync(`${root}/AGENTS.md`, 'v1')
 	let file = systemPrompt.file
 	systemPrompt.file = () => system
 	try {
@@ -28,10 +28,13 @@ test('AGENTS.md changes reach only tabs they apply to; SYSTEM.md changes reach a
 		expect(got.a.map((e) => [e.name, e.what])).toEqual([['AGENTS.md', 'changed'], ['CLAUDE.md', 'created']])
 		expect(got.b).toEqual([])
 
-		writeFileSync(system, 'v2'); rmSync(`${root}/AGENTS.md`)
+		writeFileSync(`${testHome()}/inc.md`, 'i2'); rmSync(`${root}/AGENTS.md`)
 		promptFiles.check(watchers)
-		expect(got.a.slice(2).map((e) => [e.name, e.what])).toEqual([['SYSTEM.md', 'changed'], ['AGENTS.md', 'deleted']])
-		expect(got.b.map((e) => [e.name, e.what, e.session])).toEqual([['SYSTEM.md', 'changed', elsewhere]])
+		expect(got.a.slice(2).map((e) => [e.name, e.what])).toEqual([['inc.md', 'changed'], ['AGENTS.md', 'deleted']])
+		expect(got.b.map((e) => [e.name, e.what, e.session])).toEqual([['inc.md', 'changed', elsewhere]])
+		writeFileSync(system, 'v2\n@inc.md\n')
+		promptFiles.check(watchers)
+		expect(got.b.map((e) => e.name)).toEqual(['inc.md', 'SYSTEM.md'])
 	} finally {
 		systemPrompt.file = file
 	}
