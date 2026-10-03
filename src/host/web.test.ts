@@ -1517,7 +1517,8 @@ test.skipIf(!chrome)('completion dismissal follows pointer and focus without ste
 test.skipIf(!chrome)('tool-header URLs navigate without toggling and remain separate from the expansion button', async () => {
 	let id = tabs.create('/tmp')
 	let url = 'https://example.com/article?x=1&y=2'
-	let ts = '2026-10-02T05:50:00Z'
+	// Today, so both stamps show only the time.
+	let ts = new Date().toISOString()
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Compare timestamps' }], ts })
 	history.append(id, { type: 'output', text: 'command result', ts })
 	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'url-call', name: 'read_url', input: { url } }, ts })
@@ -1527,6 +1528,8 @@ test.skipIf(!chrome)('tool-header URLs navigate without toggling and remain sepa
 	try {
 		await server.serve()
 		web.start()
+		// bun test runs in UTC; the browser must match to show the same time.
+		await b.call('Emulation.setTimezoneOverride', { timezoneId: Intl.DateTimeFormat().resolvedOptions().timeZone })
 		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
 		await b.waitFor(`!!document.querySelector('.Card.tool .head a')`)

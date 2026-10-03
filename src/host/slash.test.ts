@@ -209,7 +209,7 @@ test('an unknown command is refused; text that only starts with a path is a prom
 	await until(() => a.of('turn-start').length)
 })
 
-test('a command runs while a turn is busy instead of waiting in the inbox; /pause pauses it', async () => {
+test('a command runs while a turn is busy instead of waiting in the inbox; /pause skips a skippable question', async () => {
 	let a = client()
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
@@ -218,8 +218,9 @@ test('a command runs while a turn is busy instead of waiting in the inbox; /paus
 	await until(() => a.views.get(id)!.meta.cwd === `${work}/projects`)
 	expect(a.views.get(id)!.inbox).toEqual([])
 	expect(a.views.get(id)!.state).toEqual({ type: 'blocked', reason: 'question' })
+	let asked = transcript.question(a.views.get(id))!.id
 	a.conn.send({ type: 'submit', sessionId: id, text: '/pause' })
-	await until(() => a.views.get(id)!.state.type === 'paused')
+	await until(() => history.readSync(id).some((r) => r.type === 'answer' && r.question === asked && r.cancelled))
 })
 
 test('history records who sent a command', async () => {
