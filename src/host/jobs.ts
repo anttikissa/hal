@@ -5,7 +5,7 @@
 // A background command's result reaches its session as an advisory
 // message from 'bash <id>' once it exits (prompts.submit: into the
 // running turn, or a turn of its own when idle, waiting while paused).
-// Escape does not stop one; closing its tab does (tabs.close), and so
+// Escape does not stop one; /kill does (stop()), closing its tab does (tabs.close), and so
 // does this process exiting (host.init), since no command outlives the
 // Hal that ran it. The ids still running are kept in the session's
 // metadata (`background`), so the next host tells the session they
@@ -140,6 +140,23 @@ function kill(sessionId: string): void {
 	}
 }
 
+// Stops the session's background command `ref` (#t123, #123 or 123;
+// none: its only one), as /kill does. Its session hears it was stopped
+// by the user, as for any exit. Returns a refusal, or what it stopped.
+function stop(sessionId: string, ref: string): { refused?: string; stopped?: string } {
+	let ids = jobs.running(sessionId)
+	let n = ref.trim().match(/^#?t?(\d+)$/)?.[1]
+	let list = ids.map((id) => jobs.label(sessionId, id)).join(', ')
+	if (!ref.trim()) {
+		if (ids.length !== 1) return { refused: ids.length ? `several background jobs run (${list}); name one` : 'no background jobs running' }
+	} else if (n === undefined) return { refused: `not a job number: ${ref.trim()}` }
+	let id = n === undefined ? ids[0]! : `${sessionId}:${n}`
+	let job = jobs.state.running.get(id)
+	if (!job || job.sessionId !== sessionId) return { refused: `#${n} is not running${ids.length ? ` (running: ${list})` : ''}` }
+	job.stop()
+	return { stopped: jobs.label(sessionId, id) }
+}
+
 // This process exits: stops every background command, leaving the
 // metadata for the next host to report them lost. Synchronous.
 function killAll(): void {
@@ -182,6 +199,7 @@ export const jobs = {
 	tell,
 	running,
 	kill,
+	stop,
 	killAll,
 	lost,
 }

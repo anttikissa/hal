@@ -1,0 +1,10 @@
+{
+	title: 'Kill a background job: /kill and a card button',
+	spec: "/kill [#n] stops one of this session's running background Bash jobs, named by its call block number (#123, #t123 or 123); with no argument it stops the session's only job, and refuses naming the running ones when there are several, or when none runs. Completion offers the running jobs. The job's process group is killed and the session gets its result as for any exit, marked [stopped by the user], which also releases its file locks. In the web client, the header of a background Bash card whose job still runs (its result says started, and no 'bash #n' message has come back) has a kill button that sends /kill #n; a click on it does not fold the card, and on touch screens it is at least 44px. The host refuses a job that has just ended.",
+	status: 'done',
+	notes: [
+		'Running state in the web is derived from the transcript (view.jobs), not pushed: the host already sends everything needed, and a stale button only earns a refusal. The button submits the visible command, so the transcript shows /kill as if typed.'
+	],
+	needs: ['v0'],
+	foldInto: ['v0']
+}

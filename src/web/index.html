@@ -66,6 +66,8 @@ body, textarea { tab-size: 4; }
 .CardHeader .label { min-width: 0; }
 .Card.folds:not(.open) .CardHeader .label { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
 .CardHeader .error { background: none; margin-left: 1ch; }
+.CardHeader .kill { margin-left: 1ch; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; align-self: flex-start; }
+@media (pointer: coarse) { .CardHeader .kill { min-height: 44px; min-width: 44px; } }
 .CardHeader .stamp, .CardHeader .link { min-width: 44px; }
 .CardHeader .title a { padding-block: var(--card-inset); }
 /* A context boundary (tasks bc, vh): its text centred in a rule. */

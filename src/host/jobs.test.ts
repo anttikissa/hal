@@ -92,6 +92,19 @@ test('closing the tab kills the command and nothing is delivered', async () => {
 	expect(sessions.open(id).background).toBeUndefined()
 })
 
+test('/kill stops the job, which tells its session it was stopped by the user', async () => {
+	let c = client()
+	let { id, job } = await started(c, `sleep 0.5; touch ${testHome()}/ran`)
+	calls[1]!.push({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
+	await until(() => c.views.get(id)?.state.type === 'idle')
+	c.conn.send({ type: 'submit', sessionId: id, text: `/kill #t${job.slice(1)}` })
+	await slow(() => calls.length === 3)
+	expect(texts(2)).toContain(`[Inbox · bash ${job}]\n[stopped by the user]`)
+	await Bun.sleep(700)
+	expect(existsSync(`${testHome()}/ran`)).toBe(false)
+	expect(jobs.stop(id, job).refused).toBe(`${job} is not running`)
+})
+
 test('after a restart the session hears the command was lost, and it no longer runs', async () => {
 	let c = client()
 	let { id, job } = await started(c, `sleep 0.3; touch ${testHome()}/ran`)

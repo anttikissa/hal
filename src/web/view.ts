@@ -252,6 +252,19 @@ function withPending(rows: Row[], pending: { id: string; text: string }[], waiti
 	return queued.length || more.length ? [...rows, ...queued, ...more] : rows
 }
 
+// Keys of the background Bash calls whose job still runs: started (the
+// result says so) and no 'bash #<key>' message has come back. The host
+// refuses /kill for one that has just ended.
+function jobs(rows: Row[]): ReadonlySet<string> {
+	let done = new Set(rows.flatMap((r) => (r.item.type === 'prompt' && r.item.label?.startsWith('bash #') ? [r.item.label.slice(6)] : [])))
+	let out = new Set<string>()
+	for (let r of rows) {
+		let n = r.result?.output.match(/^started in background as #(\d+)/)?.[1]
+		if (n && !done.has(n)) out.add(n)
+	}
+	return out
+}
+
 function oneLine(s: string): string {
 	return s.replace(/\s+/g, ' ').trim()
 }
@@ -361,5 +374,6 @@ export const view = {
 	commandDraft,
 	rows,
 	withPending,
+	jobs,
 	show,
 }
