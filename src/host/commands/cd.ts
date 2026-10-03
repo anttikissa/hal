@@ -32,7 +32,8 @@ export const command: SlashCommand = {
 			if (answers.create !== 'yes') return { say: `still in ${ctx.cwd}` }
 			mkdirSync(path, { recursive: true })
 		}
+		let previous = ctx.cwd
 		ctx.setCwd(path)
-		return { say: `now in ${path}` }
+		return { say: `Directory changed: ${previous} → ${path}` }
 	},
 }
