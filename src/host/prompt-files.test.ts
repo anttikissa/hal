@@ -2,6 +2,9 @@ import { expect, test } from 'bun:test'
 import { mkdirSync, writeFileSync, rmSync } from 'fs'
 import { client, created, testHome, useHost } from './host-fixture.test.ts'
 import { promptFiles } from './prompt-files.ts'
+import { promptTrail } from './prompt-trail.ts'
+import { history } from './history.ts'
+import { replay } from '../common/replay.ts'
 import { systemPrompt } from './system-prompt.ts'
 
 useHost()
@@ -38,4 +41,20 @@ test('AGENTS.md changes reach only tabs they apply to; SYSTEM.md and its include
 	} finally {
 		systemPrompt.file = file
 	}
+})
+
+test('an AGENTS.md edit leaves one trail record the model reads with its next prompt', async () => {
+	let root = `${testHome()}/trail`
+	mkdirSync(`${root}/.git`, { recursive: true })
+	writeFileSync(`${root}/AGENTS.md`, 'Be terse.\n')
+	let id = created(client(), root)
+	promptTrail.check(id) // first sight: remembered
+	writeFileSync(`${root}/AGENTS.md`, 'Be terse.\nSay HOLA first.\n')
+	promptTrail.check(id)
+	promptTrail.check(id) // unchanged since: nothing more
+	let records = history.readSync(id).filter((r) => r.type === 'output')
+	expect(records.map((r) => r.type === 'output' && r.change)).toEqual([{ name: 'AGENTS.md', what: 'changed', diff: ' Be terse.\n+Say HOLA first.' }])
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'hello' }] })
+	let text = JSON.stringify(replay.toMessages(history.readSync(id)).at(-1))
+	expect(text).toContain('+Say HOLA first.')
 })

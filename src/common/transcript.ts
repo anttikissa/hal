@@ -9,7 +9,7 @@ import { blocks, type AssistantBlock, type ImageBlock, type Sender, type ToolRes
 import { forms, type Answers, type Form } from './forms.ts'
 import { inbox, type InboxItem } from './inbox.ts'
 import type { Event, LiveTurn, Snapshot, Stats, TurnStatus } from './protocol.ts'
-import { replay, type HistoryRecord } from './replay.ts'
+import { replay, type HistoryRecord, type PromptChange } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
 
@@ -34,7 +34,7 @@ export type Shown = { originSession?: string } & (
 	// A slash command: origin identifies Hal; from identifies another session.
 	| { type: 'command'; text: string; from?: string; label?: string; ts?: string }
 	// What a command said.
-	| { type: 'output'; text: string; error?: true; synthetic?: true; ts?: string }
+	| { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string }
 	// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
 	// shows as an output: 'HH:MM Context cleared.'.
 	| { type: 'divider'; text: string }
@@ -183,11 +183,11 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 }
 
 // A command, its output or a divider as shown, from a record or an event.
-function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form }): Shown {
+function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form }): Shown {
 	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true }
 	if (r.type === 'divider') return r.clear ? { type: 'output', text: r.text, ...(r.ts !== undefined && { ts: r.ts }) } : { type: 'divider', text: r.text }
 	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.from !== undefined && { from: r.from }), ...(r.label !== undefined && { label: r.label }), ...(r.ts !== undefined && { ts: r.ts }) }
-	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.synthetic && { synthetic: true }), ...(r.ts !== undefined && { ts: r.ts }) }
+	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.synthetic && { synthetic: true }), ...(r.change && { change: r.change }), ...(r.ts !== undefined && { ts: r.ts }) }
 }
 
 // The question waiting for an answer from this transcript, if any: a

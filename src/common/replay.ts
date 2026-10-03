@@ -6,6 +6,8 @@ import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserB
 import { titles } from './titles.ts'
 import type { ContextTransition } from './context-transition.ts'
 import type { Answers, Form } from './forms.ts'
+import type { PromptChange } from './prompt-changes.ts'
+export type { PromptChange }
 
 // `paused`: the user stopped the turn (tasks/j1/states.md); it can
 // continue. `cancelled` and `interrupted` are only in older histories
@@ -72,7 +74,9 @@ export type HistoryRecord = Numbered &
 	// client's id for the submit, so a resend is recognised.
 	| { type: 'command'; text: string; origin?: 'model'; from?: string; label?: string; command?: string; ts: string }
 	// What a command said; `error` if it failed.
-	| { type: 'output'; text: string; error?: true; origin?: 'model'; synthetic?: true; transition?: ContextTransition; transitionDone?: string; transitionCancel?: string; ts: string }
+	// `change`: a system-prompt file changed (host/prompt-trail.ts); the
+	// model reads `text` before its next prompt.
+	| { type: 'output'; text: string; error?: true; origin?: 'model'; synthetic?: true; change?: PromptChange; transition?: ContextTransition; transitionDone?: string; transitionCancel?: string; ts: string }
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
 	// told in front of its next prompt.
 	| { type: 'change'; cwd?: string; model?: string; ts: string }
@@ -117,7 +121,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	let pending: string[] = []
 	let status: TurnStatus | undefined
 	let note: string | undefined
-	let changed: { cwd?: string; model?: string } = {}
+	let changed: { cwd?: string; model?: string; prompt?: string[] } = {}
 	let push = (msg: Message) => {
 		let last = out.at(-1)
 		if (last?.role === msg.role) (last.blocks as unknown[]).push(...msg.blocks)
@@ -137,6 +141,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			if (r.model !== undefined) changed.model = r.model
 			continue
 		}
+		if (r.type === 'output' && r.change) (changed.prompt ??= []).push(r.text)
 		if (r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) {
@@ -260,10 +265,11 @@ function endNote(end: Extract<HistoryRecord, { type: 'turn_end' }>): string | un
 }
 
 // What changed since the last prompt, as notes for the next one.
-function changeNotes(changed: { cwd?: string; model?: string }): string[] {
+function changeNotes(changed: { cwd?: string; model?: string; prompt?: string[] }): string[] {
 	let out: string[] = []
 	if (changed.cwd !== undefined) out.push(`<meta>The working directory is now ${changed.cwd}</meta>`)
 	if (changed.model !== undefined) out.push(`<meta>The model is now ${changed.model}</meta>`)
+	for (let text of changed.prompt ?? []) out.push(`<meta>The user edited your instructions. The system prompt you see is current; earlier replies followed the old text. ${text}</meta>`)
 	return out
 }
 

@@ -98,7 +98,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		</Show>
 	)
 	// Another session's message with a summary folds under it.
-	let folds = () => props.row.item.type === 'thinking' || props.row.item.type === 'tool' || (props.row.item.type === 'prompt' && !!props.row.item.summary)
+	// Prompt-file changes fold under their summary (task ar).
+	let folds = () => props.row.item.type === 'thinking' || props.row.item.type === 'tool' || (props.row.item.type === 'prompt' && !!props.row.item.summary) || (props.row.item.type === 'output' && !!props.row.item.change)
 	// A tool's first line (its description or call) heads the card;
 	// thinking is headed by the terminal's header words and its first
 	// line. Prompts and model text show those words above their text
@@ -121,6 +122,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		// the head is the header words alone (task hp).
 		if (item.type === 'thinking') return expanded() ? titles.who(item) : `${titles.who(item)}: ${parser.inline(lines()[0] ?? '').map((r) => r.text).join('')}`
 		if (item.type === 'prompt' && item.summary) return item.summary
+		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
 		return item.type === 'tool' ? toolDetails.headline(item.name, item.input).text : lines()[0]
 	}
 	let headerParts = createMemo(() => view.urlParts(head() ?? ''))

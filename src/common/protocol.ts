@@ -21,6 +21,7 @@ import type { FindBatch, FindFilter } from './find.ts'
 import type { SessionState } from './states.ts'
 import type { EffortCapability } from './effort.ts'
 import { eventCheck } from './event-check.ts'
+import type { PromptChange } from './prompt-changes.ts'
 
 export type { TurnStatus } from './replay.ts'
 
@@ -237,7 +238,7 @@ export type Event =
 	| { type: 'command'; sessionId: string; text: string; origin?: 'model'; from?: string; label?: string; ts?: string; n?: number; command?: string; streaming?: true }
 	// What a command said, now in history; `error` if it failed.
 	// `streaming`: as in command.
-	| { type: 'output'; sessionId: string; text: string; ts?: string; error?: true; origin?: 'model'; n?: number; streaming?: true }
+	| { type: 'output'; sessionId: string; text: string; ts?: string; error?: true; origin?: 'model'; change?: PromptChange; n?: number; streaming?: true }
 	// A context boundary was recorded (tasks bc, vh): `text`, its divider.
 	// `clear`: a /clear; clients drop everything shown before it.
 	| { type: 'divider'; sessionId: string; text: string; ts?: string; clear?: true; n?: number; streaming?: true }
