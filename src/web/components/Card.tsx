@@ -112,7 +112,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let marked = (s: string) => {
 		let match = /\[exit [1-9]\d*\]/.exec(s)
-		return match ? <>{s.slice(0, match.index)}<span class="error exit">{match[0]}</span>{s.slice(match.index + match[0].length)}</> : s
+		return match ? <>{s.slice(0, match.index)}<span class="diff exit">{match[0]}</span>{s.slice(match.index + match[0].length)}</> : s
 	}
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
 	let head = () => {

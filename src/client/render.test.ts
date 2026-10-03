@@ -559,18 +559,18 @@ describe('terminal.redraw', () => {
 		// The exit status colour is painted inside the row, not part of
 		// the item's own style.
 		show([{ type: 'prompt', label: 'bash #1', text: '[exit 1] failed' }])
-		let error = colors.error
-		let red = ansi.sgr({ fg: colors.error().fg! })
+		let diff = colors.diff
+		let red = ansi.sgr({ fg: colors.diff().removeFg! })
 		let green = ansi.sgr({ fg: [0.8, 0.15, 145] })
 		expect(term.written).toContain(red)
 		try {
-			colors.error = () => ({ ...error(), fg: [0.8, 0.15, 145] })
+			colors.diff = () => ({ ...diff(), removeFg: [0.8, 0.15, 145] })
 			term.written = ''
 			terminal.redraw()
 			expect(term.written).toContain(green)
 			expect(term.written).not.toContain(red)
 		} finally {
-			colors.error = error
+			colors.diff = diff
 		}
 	})
 })
