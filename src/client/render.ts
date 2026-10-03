@@ -263,10 +263,10 @@ function draw(force = false): void {
 	// is, the tab's rows painted last stay; a tab not painted since the
 	// last full redraw shows its last screenful of items meanwhile.
 	let session = st.view.transcript?.meta.id
-	let past = frame.layout(st.view, cols, performance.now() + render.sliceMs())
+	let past = frame.layout(st.view, cols, performance.now() + render.sliceMs(), true, rows)
 	if (!past) {
 		render.later()
-		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false)!
+		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
 	}
 	st.past = { session, past }
 	let next = frame.build(st.view, cols, rows, st.fullscreen, past)
@@ -306,7 +306,7 @@ function later(): void {
 	st.slicing = setTimeout(() => {
 		st.slicing = null
 		if (!st.out) return
-		if (frame.layout(st.view, st.out.size().cols, performance.now() + render.sliceMs())) render.request()
+		if (frame.layout(st.view, st.out.size().cols, performance.now() + render.sliceMs(), true, st.out.size().rows)) render.request()
 		else render.later()
 	}, 0)
 }
