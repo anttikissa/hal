@@ -91,7 +91,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let body = ansi.wrap(bash ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text, width).map(ansi.links)
 			if (bash && /^\[exit [1-9]\d*\]/.test(body[0] ?? '')) {
 				let status = /^\[exit [1-9]\d*\]/.exec(body[0]!)![0]
-				body[0] = ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: colors.user().fg! }) + body[0]!.slice(status.length)
+				body[0] = ansi.sgr({ fg: colors.diff().removeFg! }) + status + ansi.sgr({ fg: colors.user().fg! }) + body[0]!.slice(status.length)
 			}
 			// Another session's message: its summary, then a glimpse.
 			if (item.summary) {
@@ -167,7 +167,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (call && /^\[exit [1-9]\d*\]/.test(l)) {
 					let status = /^\[exit [1-9]\d*\]/.exec(l)![0]
 					let at = line.indexOf(status)
-					if (at >= 0) line = line.slice(0, at) + ansi.sgr({ fg: colors.error().fg! }) + status + ansi.sgr({ fg: tool ? style!.fg! : colors.quiet(style!.fg!, colors.screen()) }) + line.slice(at + status.length)
+					if (at >= 0) line = line.slice(0, at) + ansi.sgr({ fg: colors.diff().removeFg! }) + status + ansi.sgr({ fg: tool ? style!.fg! : colors.quiet(style!.fg!, colors.screen()) }) + line.slice(at + status.length)
 				}
 				return line
 			})

@@ -135,8 +135,9 @@ export const colors = {
 	// Search matches in a modal's list: brighter than the items around.
 	popupMatch: (): Style => ({ fg: [0.95, 0.14, 95] }),
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
-	// Edit diffs: green additions, removals in the error hue.
-	diff: (): Style => ({ addFg: colors.tab().doneFg!, removeFg: colors.error().fg! }),
+	// Edit diffs and a failed command's exit status: soft pastels, easy on
+	// the eyes (the error red is too harsh for so many lines).
+	diff: (): Style => ({ addFg: [0.85, 0.12, 150], removeFg: [0.78, 0.11, 22] }),
 	// The web page's own surfaces (custom properties on .page): canvas
 	// and text, the focus accent, form fields, borders, and buttons (the
 	// picker's selected item too), and search matches. The terminal has its own.

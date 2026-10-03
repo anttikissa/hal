@@ -455,7 +455,7 @@ test('Bash results link to the call, hide a successful exit, and colour only a f
 	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('#1813>  M notes.md')
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#1813`)
 	let failure = lines.find((line) => line.includes('[exit 123]'))!
-	let errorColor = ansi.sgr({ fg: colors.error().fg! })
+	let errorColor = ansi.sgr({ fg: colors.diff().removeFg! })
 	expect(failure).toContain(errorColor + '[exit 123]')
 	expect(failure.slice(failure.indexOf('[exit 123]') + 10)).not.toContain(errorColor)
 	expect(printed).toContain('Message from bash #1813')
