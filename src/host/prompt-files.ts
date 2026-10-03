@@ -69,8 +69,8 @@ function check(clients: Iterable<Watcher>): void {
 			try { c.deliver(notice) } catch (e: any) { diag.log(`prompt files: deliver: ${e?.message ?? e}`) }
 		}
 	}
-	// The transcript note lands now, at the save, not after the next
-	// prompt (task ar); each open tab records only what concerns it.
+	// The transcript note (task ar); each open tab records only what
+	// concerns it.
 	if (changed) for (let id of tabs.file().open) promptTrail.check(id)
 }
 
@@ -94,6 +94,8 @@ function watchDirs(dirs: Set<string>): void {
 
 function start(clients: Iterable<Watcher>): void {
 	if (promptFiles.state.timer) return
+	// Edits made while the host was down: noted at once.
+	for (let id of tabs.file().open) promptTrail.check(id)
 	promptFiles.state.tick = () => {
 		try { promptFiles.check(clients) } catch (e: any) { diag.log(`prompt files: ${e?.message ?? e}`) }
 	}
