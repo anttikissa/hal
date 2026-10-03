@@ -244,6 +244,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					continue
 				}
 				if (last?.type === 'error' && last.failure && !last.cancelled && !signal.aborted) {
+					host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.failed(id) })
 					await turns.waitOut(id, last, failures++, signal)
 					if (turns.state.running.get(id) !== running) return
 					continue

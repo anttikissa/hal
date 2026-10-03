@@ -103,11 +103,20 @@ function ended(id: string, end: HistoryRecord & { type: 'turn_end' }): Stats {
 	return stats.of(id, [end])
 }
 
+// A failed round (a 429 is recorded at once, usage.observe): the cached
+// windows are stale, so the status row shows the rate limit now rather
+// than up to a minute later (or never, while the turn waits it out).
+function failed(id: string): Stats {
+	stats.state.windows.clear()
+	return stats.of(id)
+}
+
 export const stats = {
 	// Per session, since this host started: tokens of its turns, and the
 	// context of its last turn end.
 	state: { tokens: new Map<string, { sent: number; received: number }>(), context: new Map<string, number>(), live: new Map<string, { sent: number; received: number }>(), windows: new Map<string, { at: number; windows: Record<string, number>; resets: Record<string, string> }>() },
 	lastContext,
+	failed,
 	plan,
 	of,
 	round,
