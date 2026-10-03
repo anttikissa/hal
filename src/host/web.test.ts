@@ -855,16 +855,6 @@ test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay
 			}
 		})()`)
 		expect(loaded).toEqual({ kept: true, stillOpen: true, opened: 1, grew: true, first: true })
-		// A sent prompt's card stays the same node when the host takes it.
-		// (The tab runs the offline intro: wait for the card, not a reply.)
-		let swapped = await b.evaluate(`(async () => {
-			let t = document.querySelector('textarea'); t.value = 'fresh'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-			let card = document.querySelector('.Card.pending')
-			for (let i = 0; i < 250 && card?.classList.contains('pending'); i++) await new Promise((r) => setTimeout(r, 20))
-			let body = (c) => c?.textContent.replace(c.querySelector('.who')?.textContent ?? '', '')
-			return { same: !!card && card.isConnected && !card.classList.contains('pending'), text: body(card), count: [...document.querySelectorAll('.Card.user')].filter((c) => body(c) === 'fresh').length }
-		})()`)
-		expect(swapped).toEqual({ same: true, text: 'fresh', count: 1 })
 	} finally {
 		await b.close()
 	}

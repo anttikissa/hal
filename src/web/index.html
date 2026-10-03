@@ -55,6 +55,11 @@ body, textarea { tab-size: 4; }
 .Card .who { color: var(--quiet); }
 .Card .who .call { color: inherit; text-decoration: underline; }
 .Card .exit { background: none; color: var(--remove-fg); }
+.Card .change > div { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.Card .change .add { color: var(--add-fg); }
+.Card .change .del { color: var(--remove-fg); }
+.Card .change .dim { color: var(--quiet); }
+.Card .change .head:not(:first-child) { margin-top: 0.5lh; }
 /* One header grid for metadata and folding cards; first-line alignment
    stays the same when a label wraps. The 44px height belongs to this row:
    every slot shares one top inset that centres a single line in 44px,
