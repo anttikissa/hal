@@ -396,8 +396,11 @@ test('a [paste/<name>] marker links to its page; while its upload is in flight i
 })
 
 
+// Local h:m today: older headers carry a date (titles.time).
+let today = (h: number, m: number) => { let d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString() }
+
 test('a narrow terminal clips the header and keeps the block id', () => {
-	let item: Item = { type: 'thinking', text: 'x', model: 'anthropic/claude-opus-5-5', effort: 'high', ts: new Date(2026, 8, 28, 10, 51).toISOString() }
+	let item: Item = { type: 'thinking', text: 'x', model: 'anthropic/claude-opus-5-5', effort: 'high', ts: today(10, 51) }
 	let v = view([item])
 	v.transcript!.items[0]!.key = '35'
 	let lines = plain(frame.build(v, 24).lines)
@@ -407,7 +410,7 @@ test('a narrow terminal clips the header and keeps the block id', () => {
 })
 
 test('tool timestamps and command-output headers match ordinary message time and spacing', () => {
-	let ts = new Date(2026, 9, 2, 8, 50).toISOString()
+	let ts = today(8, 50)
 	let f = frame.build(view([
 		{ type: 'text', text: 'Message body', ts },
 		{ type: 'tool', id: 'run', name: 'bash', input: { description: 'Inspect files', command: 'ls' }, ts },
@@ -422,7 +425,7 @@ test('tool timestamps and command-output headers match ordinary message time and
 	expect(lines[output + 1]).toBe('')
 	expect(lines[output + 2]).toBe('Command body')
 	expect(lines.some(line => line.startsWith('08:50 Inspect files'))).toBe(true)
-	expect(lines.some(line => line.startsWith('08:50 read '))).toBe(true)
+	expect(lines.some(line => line.startsWith('08:50 read'))).toBe(true)
 })
 
 test('finished thinking with no readable text draws nothing, not a bare header', () => {

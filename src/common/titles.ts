@@ -9,16 +9,21 @@ function modelName(id: string): string {
 	return titles.names[id] ?? id
 }
 
-// Local HH:MM of an ISO time; '' without one. Parsed once per minute
-// string: a long history's headers share few (the startup budget, kn).
+// Local HH:MM of an ISO time, as '2 Oct HH:MM' if not today (local);
+// '' without one. "Today" is when rendered; nothing re-renders at
+// midnight. Parsed once per minute string and day: a long history's
+// headers share few (the startup budget, kn).
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const times = new Map<string, string>()
 function time(ts: string | undefined): string {
 	if (ts === undefined) return ''
-	let key = ts.endsWith('Z') ? ts.slice(0, 16) : ts
+	let today = new Date().toDateString()
+	let key = `${today} ${ts.endsWith('Z') ? ts.slice(0, 16) : ts}`
 	let hit = times.get(key)
 	if (hit !== undefined) return hit
 	let d = new Date(ts)
 	let t = Number.isNaN(d.getTime()) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+	if (t && d.toDateString() !== today) t = `${d.getDate()} ${months[d.getMonth()]} ${t}`
 	times.set(key, t)
 	return t
 }
