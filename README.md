@@ -2,6 +2,8 @@
 
 This is HAL 9001, an agent harness.
 
+![Hal in a terminal (left) and a web browser (right)](hal.png)
+
 Goals:
 
 - Lightweight and as few dependencies as possible.
