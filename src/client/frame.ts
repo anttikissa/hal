@@ -187,9 +187,34 @@ export type Past = { lines: string[]; formCursor?: Frame['cursor']; target?: num
 // returns nothing; what was laid out is kept (unless `save` is false),
 // so the next call goes on from there: a long history is laid out in
 // slices (task 7j).
-function layout(view: View, cols: number, deadline = Infinity, save = true): Past | undefined {
+// Display order: parallel calls each with their results right under
+// them, as web cards are; unless a batch's calls, each a header and up
+// to 5 output rows, would not fit on a screen of `rows`: then calls and
+// results stay separate blocks, each result linking to its call, so
+// finishing calls never rewrite scrollback. Later items keep their
+// place (background output arrives as its own block).
+function order(items: Item[], rows: number): Item[] {
+	let out: Item[] = []
+	for (let i = 0; i < items.length; ) {
+		let j = i
+		while (j < items.length && items[j]!.type === 'tool') j++
+		let k = j
+		while (k < items.length && items[k]!.type === 'tool-result') k++
+		let calls = items.slice(i, j) as (Item & { type: 'tool' })[]
+		let results = items.slice(j, k) as (Item & { type: 'tool-result' })[]
+		if (calls.length < 2 || calls.length * 6 > rows) out.push(...items.slice(i, Math.max(k, i + 1)))
+		else {
+			for (let c of calls) out.push(c, ...results.filter((r) => r.id === c.id))
+			out.push(...results.filter((r) => !calls.some((c) => c.id === r.id)))
+		}
+		i = Math.max(k, i + 1)
+	}
+	return out
+}
+
+function layout(view: View, cols: number, deadline = Infinity, save = true, screen = 24): Past | undefined {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
-	let items = view.transcript?.items ?? []
+	let items = frame.order(view.transcript?.items ?? [], screen)
 	let session = view.transcript?.meta.id
 	let calls = new Map<string, string>()
 	let formCursor: Frame['cursor'] | undefined
@@ -344,4 +369,4 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined }, layout, build, itemRows, ref, queuedRows, highWater, glyph, withCursor, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined }, layout, build, itemRows, ref, queuedRows, highWater, order, glyph, withCursor, promptWidth }

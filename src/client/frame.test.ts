@@ -466,3 +466,12 @@ test('legacy rename controls never appear in terminal answers without a naming f
 	expect(text).not.toContain('<rename>')
 })
 
+
+test('parallel results sit under their calls unless the batch overflows a screen', () => {
+	let call = (id: string) => ({ type: 'tool', id, name: 'inspect', input: {}, key: `t${id}` }) as Item
+	let result = (id: string) => ({ type: 'tool-result', id, output: 'x', key: `r${id}` }) as Item
+	let items = [call('a'), call('b'), result('b'), result('a')]
+	let order = (rows: number) => frame.order(items, rows).map((i) => i.key).join(' ')
+	expect(order(24)).toBe('ta ra tb rb')
+	expect(order(10)).toBe('ta tb rb ra')
+})
