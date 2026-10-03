@@ -37,6 +37,7 @@ const list: CommandInfo[] = [
 	{ name: 'model', description: 'pick the model', category: 'session', key: 'ctrl-m' },
 	{ name: 'move', description: 'move this tab to a numbered position', category: 'tabs' },
 	{ name: 'new', description: 'new tab', category: 'tabs', key: 'ctrl-t' },
+	{ name: 'notifications', description: 'list past notifications', category: 'session' },
 	{ name: 'pause', description: 'pause the turn', category: 'session' },
 	{ name: 'perf', description: 'show startup timing marks', category: 'debug' },
 	{ name: 'plugins', description: 'list loaded plugins and their hooks', category: 'debug' },
