@@ -20,6 +20,19 @@ export type NoticeEntry = { id: string; at: string; session: string; name: strin
 // 'update': a mid-turn notify-tool line, which neither ends the turn nor asks.
 const WORDS: Record<NoticeKind, string> = { done: 'done', failed: 'failed', attention: 'needs your attention', update: 'update', commit: 'committed' }
 
+// Why a history entry was sent, in words that claim no more than
+// happened (both clients' notification history).
+function reason(e: NoticeEntry): string {
+	if (e.kind === 'attention') return e.awaiting ? 'waiting for an answer' : 'asked; answered'
+	return e.what ?? WORDS[e.kind]
+}
+
+// An entry's time: hour and minute today, else with the date.
+function stamp(at: string, now = new Date()): string {
+	let d = new Date(at)
+	return d.toDateString() === now.toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 function fromEvent(e: NoticeEvent): Omit<Notice, 'at'> {
 	let n: Omit<Notice, 'at'> = { key: e.key ?? `session:${e.session}`, kind: e.kind, title: `${e.tab ?? ''} ${e.name} · ${e.what ?? WORDS[e.kind]}`.trim(), line: e.line, session: e.session }
 	if (e.tab !== undefined) n.tab = e.tab
@@ -81,6 +94,8 @@ export const notices = {
 	max: (): number => 3,
 	onChange: (): void => {},
 	words: WORDS,
+	reason,
+	stamp,
 	fromEvent,
 	add,
 	remove,
