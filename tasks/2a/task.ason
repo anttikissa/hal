@@ -16,7 +16,8 @@ Tests: an attached png reaches both providers' request bodies as an image; histo
 		"A marker naming no blob of the session is answered with a `warning` event to the submitting client only. attach is in host's `once` set: a resend gets the same `attached` event, nothing stored twice. The attach `name` is accepted but not stored.",
 		'Blob ids are 12 lowercase hex digits; blobs.find tries each known extension, so the id is never joined to anything taken from a request. Stored bytes are checked against the media type (magic numbers, or valid UTF-8 for text/plain).',
 		'The terminal image label links via itemView.itemLines when the session is known; without one it stays plain text.',
-		'Image items keep their own keys (#26.1); frame.layout draws them in the preceding prompt card and draws nothing for them alone; a link to one scrolls to that card.'
+		'Image items keep their own keys (#26.1); frame.layout draws them in the preceding prompt card and draws nothing for them alone; a link to one scrolls to that card.',
+		'UI exception (user, 2026-10-03): the web keeps one card per image, showing the image itself; only the terminal groups image labels inside the prompt card.'
 	],
 	needs: ['yq', '1b']
 }
