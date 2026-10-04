@@ -6,4 +6,6 @@ config.ason
 sessions/
 state/
 secrets/
+# Pre-secrets/ credential location; a copy can remain after migration.
+/auth.ason
 .DS_Store
