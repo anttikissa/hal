@@ -19,7 +19,8 @@ if (typeof document !== 'undefined') {
 			connected: connection.connected(), visible: document.visibilityState === 'visible', focused: document.hasFocus(),
 			standalone: matchMedia('(display-mode: standalone)').matches || !!(navigator as Navigator & { standalone?: boolean }).standalone,
 			width: innerWidth, height: innerHeight, viewportHeight: vv?.height ?? innerHeight, viewportTop: Math.max(0, vv?.offsetTop ?? 0),
-			scrollTop: Math.max(0, document.querySelector('.Transcript')?.scrollTop ?? 0) }
+			scrollTop: Math.max(0, document.querySelector('.Transcript')?.scrollTop ?? 0),
+			appHeight: parseFloat(document.documentElement.style.getPropertyValue('--app-height')) || innerHeight, composerFocused: !!document.activeElement?.closest('.Composer') }
 	})
 	settings.load(document.getElementById('settings')?.textContent)
 	render(() => <App />, document.body)

@@ -26,7 +26,8 @@ test('browser diagnostics enforce auth/origin, filter private data and rotate bo
 		expect((await post(body, { cookie, origin: 'https://wrong.example' })).status).toBe(403)
 		let headers = { cookie, origin: base }
 		expect((await post('{', headers)).status).toBe(400)
-		expect((await post(JSON.stringify({ ...report(), entries: [{ at: 1, kind: 'error', detail: 'private message' }] }), headers)).status).toBe(400)
+		// An unknown label (a newer page's, or text) is skipped, never logged.
+		expect((await post(JSON.stringify({ ...report(), entries: [{ at: 1, kind: 'error', detail: 'private message' }] }), headers)).status).toBe(204)
 		expect((await post('x'.repeat(16_385), headers)).status).toBe(413)
 		let dirty = { ...report(), url: 'https://private.example/?auth=secret', draft: 'private draft', context: { ...report().context, text: 'private prompt' }, entries: [{ ...report().entries[0], message: 'private error', stack: 'private URL' }] }
 		expect((await post(JSON.stringify(dirty), headers)).status).toBe(204)
