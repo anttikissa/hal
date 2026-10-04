@@ -24,7 +24,8 @@
 		'A missing result after `interrupted` is worded "may or may not have run": with the call recorded before running and the result after, the host can die in between. Read-only tools make that harmless; a first mutating tool (bash, write) needs to face it explicitly.',
 		'Tools run whenever a round ends `done` with tool calls, whatever the stop reason; there is no round limit (only Escape stops a loop).',
 		'Cancel landing between rounds: results already computed are still recorded, then the turn ends cancelled (not completed).',
-		"Gotcha: rewriting a whole function via scripted string replace on a shared file silently dropped a parallel agent's just-committed code (ah's `interrupt()`). Re-read shared files right before editing and diff against HEAD before committing."
+		"Gotcha: rewriting a whole function via scripted string replace on a shared file silently dropped a parallel agent's just-committed code (ah's `interrupt()`). Re-read shared files right before editing and diff against HEAD before committing.",
+		'4 Oct: ./test was red from five oxlint warnings that landed unchecked (prompt-changes, web.test imports, frame comma expression, intro). Invariant: main stays lint-clean; run ./test, not only tsc, before pushing.'
 	],
 	needs: ['b3']
 }

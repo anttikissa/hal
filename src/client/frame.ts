@@ -205,7 +205,10 @@ function order(items: Item[], fits: (batch: Item[]) => boolean): Item[] {
 		let calls = items.slice(i, j) as (Item & { type: 'tool' })[]
 		let results = items.slice(j, k) as (Item & { type: 'tool-result' })[]
 		let split = calls.length > 1 && frame.state.split.has(calls[0]!.key)
-		if (calls.length > 1 && !split && !fits(items.slice(i, k))) frame.state.split.add(calls[0]!.key), (split = true)
+		if (calls.length > 1 && !split && !fits(items.slice(i, k))) {
+			frame.state.split.add(calls[0]!.key)
+			split = true
+		}
 		if (calls.length < 2 || split) out.push(...items.slice(i, Math.max(k, i + 1)))
 		else {
 			for (let c of calls) out.push(c, ...results.filter((r) => r.id === c.id))

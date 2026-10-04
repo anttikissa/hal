@@ -187,7 +187,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	if (!loggedIn.stored && login?.startsWith('/login ') && !run.some((r) => r.type === 'command' && r.text === login)) {
 		// The intro turn ends paused first; the command's records follow it.
 		let start = () => sessionId && slash.command(sessionId, login, { name: 'login', args: login.slice('/login '.length) })
-		return reply({ pause: 'waiting for /login', then: start })
+		return reply({ pause: 'waiting for /login', after: start })
 	}
 
 	let options = intro.choices(loggedIn.providers)
