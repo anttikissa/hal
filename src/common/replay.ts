@@ -233,6 +233,8 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 		if (r.type === 'user' && r.replaces) {
 			let at = replay.lastPrompt(out)
 			if (at >= 0) out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'change')]
+			let { replaces: _replaces, ...projected } = r
+			r = projected
 		}
 		out.push(r)
 	}

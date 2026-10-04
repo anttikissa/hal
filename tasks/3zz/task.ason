@@ -7,7 +7,8 @@ Refused while the session runs a turn or waits on a question; the user pauses fi
 Old Hal reference: artifacts old-rebase.ts, old-rebase.test.ts, old-rebase-handler.ts (it wrote a new history file; here we append a record instead).`,
 	status: 'done',
 	notes: [
-		'Rebases project from the audit trail in record order; a newer plan with the same base supersedes its earlier plan, including empty undo. rebases.apply(id, plan, expectedBase) checks the current last written record; expectedBase defaults to plan.base and explicitly guards undo. Tool-result records with multiple results connect all their calls, and signed thinking connects its provider round. Rebased paging reads the audit trail to resolve cross-page groups and undo; ordinary paging remains bounded. Fork copies only projected records. Search rebuilds dirty sessions through replay, including unindexed fallback. Preserve prompt-replacement replay semantics when projecting before pruning to avoid applying replaces twice.'
+		'Rebases project from the audit trail in record order; a newer plan with the same base supersedes its earlier plan, including empty undo. rebases.apply(id, plan, expectedBase) checks the current last written record; expectedBase defaults to plan.base and explicitly guards undo. Tool-result records with multiple results connect all their calls, and signed thinking connects its provider round. Rebased paging reads the audit trail to resolve cross-page groups and undo; ordinary paging remains bounded. Fork copies only projected records. Search rebuilds dirty sessions through replay, including unindexed fallback. Preserve prompt-replacement replay semantics when projecting before pruning to avoid applying replaces twice.',
+		'Projected replacing prompts lose the consumed replaces flag so replay.current is idempotent: paging, compaction and provider pruning may safely project more than once. Compact and clear inspect projected boundaries, not raw ones.'
 	],
 	needs: []
 }

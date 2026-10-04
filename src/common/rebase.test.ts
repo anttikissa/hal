@@ -59,3 +59,13 @@ test('reset removal reveals earlier context and edits of the last prompt still c
 	let replaces = { ...prompt(5, 'replacement'), replaces: true } as HistoryRecord
 	expect(replay.current([...raw, plan(4, 3, [], [{ n: 3, text: 'edit' }]), replaces]).map((r) => r.n)).toEqual([1, 2, 5])
 })
+
+test('projection is idempotent for prompt replacement records before and after a rebase', () => {
+	let edited = { ...prompt(4, 'fixed'), replaces: true } as HistoryRecord
+	let raw = [prompt(1, 'earlier'), done, prompt(3, 'typo'), edited]
+	let first = replay.current(raw)
+	expect(first.map((r) => r.n)).toEqual([1, 8, 4])
+	expect(replay.current(first)).toEqual(first)
+	let rebased = replay.current([...raw, plan(5, 4, [], [{ n: 4, text: 'changed' }])])
+	expect(replay.current(rebased)).toEqual(rebased)
+})
