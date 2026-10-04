@@ -10,6 +10,8 @@ import { usage } from './usage.ts'
 import { auth } from './auth.ts'
 import { statusUsage } from './status-usage.ts'
 import type { Capability } from './effort.ts'
+import { tokenEstimates } from '../common/token-estimates.ts'
+import { tokenCalibration } from './token-calibration.ts'
 
 export type ToolDef = { name: string; description: string; inputSchema: Record<string, unknown> }
 
@@ -308,11 +310,17 @@ async function* stream(
 			yield failed(p, modelId, http.account, { type: 'error', message, status: res.status, body }, provider.resetAt(res.headers, body))
 			return
 		}
+		let counted: { input?: number; cacheRead?: number; cacheWrite?: number } = {}
 		for await (let event of p.parse(provider.sse(res.body, conn.signal))) {
 			if (signal?.aborted) throw new Cancelled()
 			if (event.type === 'error') {
 				yield failed(p, modelId, http.account, event)
 				return
+			}
+			if (event.type === 'usage') Object.assign(counted, event.usage)
+			if (event.type === 'done' && !input.messages.some((m) => m.blocks.some((b) => b.type === 'image' || (b.type === 'tool_result' && b.image)))) {
+				let chars = tokenEstimates.characters(input.messages, (input.system?.length ?? 0) + JSON.stringify(input.tools ?? []).length)
+				tokenCalibration.observe(modelId, chars, (counted.input ?? 0) + (counted.cacheRead ?? 0) + (counted.cacheWrite ?? 0))
 			}
 			yield event
 			if (event.type === 'done') return

@@ -207,7 +207,7 @@ async function open(id: string): Promise<SessionMeta> {
 
 // The session as provider messages, each prompt's paste markers
 // expanded to the pasted text (blobs.expand): history keeps markers.
-async function messages(id: string, budget: { overhead?: number; window?: number } = {}) {
+async function messages(id: string, budget: { overhead?: number; window?: number; model?: string } = {}) {
 	// A thinking block as the provider sent it: its signature back from its blob.
 	let signed = ({ signatureBlob, ...b }: ThinkingBlock): ThinkingBlock => ({ ...b, signature: blobs.text(id, signatureBlob!) })
 	let records = history.readSync(id).map((r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b) }
@@ -351,7 +351,7 @@ function started(id: string): string | undefined {
 // unanswered; the host's turns run them (host.ts).
 async function* turn(id: string, opts: Omit<ProviderRequest, 'model' | 'messages'> = {}, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
 	let modelId = sessions.open(id).model
-	let input = { ...opts, messages: await history.messages(id, { overhead: (opts.system?.length ?? 0) + JSON.stringify(opts.tools ?? []).length, window: models.contextWindow(modelId) }), image: (blob: string) => blobs.base64(id, blob) }
+	let input = { ...opts, messages: await history.messages(id, { overhead: (opts.system?.length ?? 0) + JSON.stringify(opts.tools ?? []).length, window: models.contextWindow(modelId), model: modelId }), image: (blob: string) => blobs.base64(id, blob) }
 	let providerName = blocks.parseModelId(modelId)?.provider ?? modelId
 	let last: DoneEvent | ErrorEvent | undefined
 	try {

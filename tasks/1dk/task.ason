@@ -1,6 +1,10 @@
 {
 	title: 'Token estimates are calibrated per model',
 	spec: "Hal learns each model's characters-per-token ratio from real provider usage: after a round, the input characters it sent and the input tokens the provider counted update a per-model ratio in state/calibration.ason (liveFile), smoothed so one odd round can't swing it. Pruning, compaction thresholds, rebase rows and the context page use calibrated estimates when a model has a ratio, and the fixed estimate otherwise. Old Hal reference: artifact old-token-calibration.ts.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Shared tokenEstimates.estimate(characters, model, ratios) is browser-safe; host tokenCalibration.estimateTokens loads state/calibration.ason through liveFile. Successful provider rounds merge cumulative usage and count uncached + cache-read + cache-write input. Neutral serialized message characters plus system/tools overhead use the same scale in learning and pruning. Image rounds do not teach text ratios; image bytes keep the conservative fixed estimate. Established ratios move by at most 2.5% per round (bounded sample, 0.1 weight). Corrupt ratios fail with the path and are never overwritten.',
+		'Task mq explicitly removed usage-threshold compaction; retain its provider-refusal-only retry invariant. The context graph has exact provider counts rather than character estimates, so calibration must not replace them. Task 01d receives the shared estimator for rebase rows. Compatibility provider tests now use disposable homes because real usage persists calibration.'
+	],
 	needs: []
 }
