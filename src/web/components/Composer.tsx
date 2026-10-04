@@ -184,9 +184,12 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 						</button>
 					</Show>
 					<Show when={busy() && !view.commandDraft(props.text)}>
-						<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={() => send(true)}>Queue</button>
+						<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} onClick={() => send(true)}>Queue</button>
 					</Show>
-					<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={() => send()}>
+					{/* The tap must not blur the draft before click: on iOS the blur
+					    starts hiding the keyboard and moving the composer, and the
+					    click was lost. send() blurs afterwards. */}
+					<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} onClick={() => send()}>
 						{view.commandDraft(props.text) ? 'Run' : busy() ? 'Steer' : 'Send'}
 					</button>
 				</div>
