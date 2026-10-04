@@ -1,10 +1,8 @@
 /// <reference lib="dom" />
-// Following the bottom of the transcript. A reader at the bottom
-// (within `near` px: sub-pixel scroll positions) stays there as content
-// grows (new items, streamed text, a card opening); one scrolled up at
-// all is left alone: nothing moves the view the reader did not ask for
-// (task 4s; a 50 px band moved readers who had stopped just short of
-// the bottom by a whole card). The gap is measured before a change, since afterwards
+// Following the bottom of the transcript. A reader within `near` px of
+// the bottom stays at the same distance from it as content grows (new
+// items, streamed text, a card opening); one scrolled further up is
+// left alone. The gap is measured before a change, since afterwards
 // the page is taller. New items glide there (strong ease-out),
 // streamed lines jump (a glide over one line looks janky), a card
 // opening or closing is tracked every frame while its height animates,
@@ -192,7 +190,7 @@ function restore(id: string): void {
 }
 
 export const scroll = {
-	near: 2,
+	near: 50,
 	nearTop: 800,
 	glideMs: 200,
 	// A card's open and close animation (CSS --toggle-ms matches).

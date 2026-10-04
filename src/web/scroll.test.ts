@@ -10,12 +10,12 @@ test('the gap is how far the view is above the bottom', () => {
 	expect(scroll.gap(box(400, 0, 400))).toBe(0)
 })
 
-test('a reader at the bottom stays there, one scrolled up at all is left alone; mid-glide the aim counts; sending lands at the bottom', () => {
+test('a reader near the bottom keeps their gap, one further up is left alone; mid-glide the aim counts; sending lands at the bottom', () => {
 	expect(scroll.keep(0)).toBe(0)
-	expect(scroll.keep(1)).toBe(1)
-	expect(scroll.keep(42)).toBeUndefined()
-	// A fast stream outruns the glide: measured 120 px up, heading for 0.
-	expect(scroll.keep(120, 0)).toBe(0)
+	expect(scroll.keep(49)).toBe(49)
+	expect(scroll.keep(50)).toBeUndefined()
+	// A fast stream outruns the glide: measured 120 px up, heading for 10.
+	expect(scroll.keep(120, 10)).toBe(10)
 	expect(scroll.keep(5000, undefined, true)).toBe(0)
 	expect(scroll.keep(30, 30, true)).toBe(0)
 })
@@ -75,7 +75,7 @@ test('a finger takes over a send glide and streamed updates do not fight its dra
 		scroll.touchStart()
 		expect(cancelled).toBe(7)
 		expect(scroll.state.frame).toBe(0)
-		// The finger has moved the reader 10px up.
+		// The reader has only moved 10px: still inside near-bottom range.
 		el.scrollTop = 590
 		scroll.follow(() => { el.scrollHeight += 100 }, 'jump')
 		expect(el.scrollTop).toBe(590)
