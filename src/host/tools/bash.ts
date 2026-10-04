@@ -12,7 +12,7 @@ export const tool: Tool = {
 	description:
 		'Run a command with bash -c in the working directory. Returns the exit status and stdout and stderr combined. ' +
 		'No stdin; long output is cut. After the timeout the command and its children are killed. ' +
-		'background: true returns at once with the recorded call block number (unless the command fails within 100 ms) and delivers the result later as a message from "bash #<number>".',
+		'background: true returns at once with the recorded call block number (unless the command fails within 100 ms) and delivers the result later as a message from "bash #t<number>".',
 	parameters: {
 		type: 'object',
 		properties: {

@@ -680,10 +680,10 @@ test('web links carry the latest link code only in their hidden target', () => {
 		expect(lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, '')).join('\n')).not.toContain('k3x9qa')
 		// A history item laid out before the server bound (on another port
 		// than the preferred one) links to where it really listens.
-		let item = () => frame.build(appView.view(), 60).lines.find((l) => l.includes('#1'))
-		expect(item()).toContain('https://h.example/a?auth=k3x9qa#1')
+		let item = () => frame.build(appView.view(), 60).lines.find((l) => l.includes('#s1'))
+		expect(item()).toContain('https://h.example/a?auth=k3x9qa#s1')
 		app.onEvent({ type: 'auth', code: 'k3x9qa', link: 'http://localhost:9003' })
-		expect(item()).toContain('http://localhost:9003/a?auth=k3x9qa#1')
+		expect(item()).toContain('http://localhost:9003/a?auth=k3x9qa#s1')
 		// A replaced code is what the next paint links with.
 		app.onEvent({ type: 'auth', code: 'm2p7rt', link: 'https://h.example' })
 		expect(frame.build(appView.view(), 60).lines.join('\n')).toContain('https://h.example/a?auth=m2p7rt')

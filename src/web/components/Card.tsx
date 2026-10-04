@@ -100,14 +100,15 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let result = () => props.row.result && view.show(props.row.result, full())
 	// Whether the result is longer than its glimpse.
 	let long = () => (props.row.result ? props.row.result.output.replace(/\n$/, '').split('\n').length : 0) > view.resultRows
-	// The link shows the block's id, #35, as the terminal does. Its
+	// The link shows the block's id, #t35, as the terminal does. Its
 	// text is drawn by CSS from data-ref, so copying the card's text
 	// leaves it out.
-	let href = () => (props.row.pending || (props.row.waiting && props.row.note === undefined) ? undefined : target.href(props.session, props.row.item.key))
+	let blockId = () => titles.blockId(props.row.item)
+	let href = () => (props.row.pending || (props.row.waiting && props.row.note === undefined) ? undefined : target.href(props.session, blockId()))
 	let link = () => (
 		<Show when={href()}>
 			{(h) => (
-				<a class="link" href={h()} data-ref={`#${props.row.item.key}`} title="Link to this block" aria-label={`Link to block ${props.row.item.key}`} />
+				<a class="link" href={h()} data-ref={`#${blockId()}`} title="Link to this block" aria-label={`Link to block ${blockId()}`} />
 			)}
 		</Show>
 	)
@@ -119,7 +120,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// line. Prompts and model text show those words above their text
 	// (task hp).
 	let title = () => titles.title(props.row.item)
-	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #(\d+)$/)?.[1]
+	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #(t?\d+)$/)?.[1]
 	let who = () => {
 		let ref = source(), t = titles.who(props.row.item)
 		return ref && t?.endsWith(`#${ref}`) ? <>{t.slice(0, -ref.length - 1)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">#{ref}</a></> : t
@@ -184,7 +185,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let md = createMemo(() => {
 		let item = props.row.item
 		return item.type === 'text' || item.type === 'thinking' || item.type === 'output' ||
-			(item.type === 'prompt' && !!item.from && !/^bash (?:#\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
+			(item.type === 'prompt' && !!item.from && !/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
 	})
 	let markdown = () => (
 		<Markdown text={shown()?.text ?? ''} streaming={props.cursor}>
@@ -270,7 +271,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={failed()}><span class="error">✗</span></Show>
-								<Show when={props.job}>{(n) => <button type="button" class="kill" title={`Stop background job #${n()} (/kill #${n()})`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #${n()}` })}><Icon name="stop" />kill</button>}</Show>
+								<Show when={props.job}>{(n) => <button type="button" class="kill" title={`Stop background job #t${n()} (/kill #t${n()})`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #t${n()}` })}><Icon name="stop" />kill</button>}</Show>
 							</CardHeader>
 							<div class="body" inert={!expanded()}>
 								<div class="contents">

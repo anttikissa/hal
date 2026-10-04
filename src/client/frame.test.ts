@@ -355,7 +355,7 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		let blocks = links.map((u) => target.parse(u.href, u.pathname.slice(1)))
 		expect(blocks).toEqual(['4', '5', '6', '7', '8'].map((key) => ({ session: 's', key })))
 		// The id is the link's text, at the right edge of the row.
-		for (let key of ['4', '5', '6', '7', '8']) expect(plain(lines).some((l) => l.endsWith(` #${key}`) && l.length === 58)).toBe(true)
+		for (let key of ['u4', 'a5', 't6', 's7', 's8']) expect(plain(lines).some((l) => l.endsWith(` #${key}`) && l.length === 58)).toBe(true)
 		expect(plain(lines)).not.toContain('#6.1')
 		for (let u of links) expect(u.searchParams.get('auth')).toBe('k3x9qa')
 		let shown = lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, ''))
@@ -367,7 +367,7 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		stream.transcript!.items[0]!.key = '9'
 		stream.hal = { at: 'stream', lit: true, color: colors.assistant().fg! }
 		let streamed = plain(frame.build(stream, 60).lines)
-		expect(streamed[0]).toMatch(/^Hal +#9$/)
+		expect(streamed[0]).toMatch(/^Hal +#a9$/)
 		expect(streamed[2]).toBe('Hel█')
 		// A block still streaming before it has a number is not linked.
 		let streaming = view([{ type: 'tool', id: 't2', name: 'bash', input: {} }])
@@ -404,7 +404,7 @@ test('a narrow thinking preview keeps time and block id without a label', () => 
 	let v = view([item])
 	v.transcript!.items[0]!.key = '35'
 	let lines = plain(frame.build(v, 24).lines)
-	expect(lines[0]).toMatch(/^10:51 x +#35$/)
+	expect(lines[0]).toMatch(/^10:51 x +#r35$/)
 	expect(lines[0]).not.toContain('high')
 	expect(strings.visLen(frame.build(v, 24).lines[0]!)).toBeLessThanOrEqual(24)
 })
@@ -452,8 +452,8 @@ test('Bash results link to the call, hide a successful exit, and colour only a f
 	expect(printed).not.toContain('#1813>')
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
 	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1817', '1814'][i]! }))
-	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('#1813>  M notes.md')
-	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#1813`)
+	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('#t1813>  M notes.md')
+	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#t1813`)
 	let failure = lines.find((line) => line.includes('[exit 123]'))!
 	let errorColor = ansi.sgr({ fg: colors.diff().removeFg! })
 	expect(failure).toContain(errorColor + '[exit 123]')

@@ -89,7 +89,7 @@ function promptWidth(cols: number): number {
 }
 
 // An item's painted rows on a terminal `cols` wide. An item with a
-// block id shows it dim at the right of its first row, `#35`, an OSC 8
+// block id shows it dim at the right of its first row, `#t35`, an OSC 8
 // link to the same block on the web (tasks wc, 0z); a gutter as wide
 // as the id is kept free on every row, as the web keeps a column for
 // it. `hal`: the item streams, so the Hal cursor follows its last

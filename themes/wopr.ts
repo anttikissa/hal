@@ -16,6 +16,8 @@ export const look: Look = {
 	assistant: () => ({ fg: green(0.86), cursor: green(0.86), cursorIdle: green(0.6, 0.08), bold: green(0.95, 0.14), code: green(0.9, 0.12), linkFg: green(0.93, 0.16), linkBg: green(0.24, 0.06) }),
 	thinking: () => ({ fg: green(0.72, 0.1), bold: green(0.84, 0.1), code: green(0.78, 0.1), linkBg: green(0.18, 0.04) }),
 	user: () => ({ fg: green(0.95, 0.12), bg: green(0.19, 0.06) }),
+	// Messages from other sessions: a yellower phosphor, apart from yours.
+	message: () => ({ fg: [0.9, 0.17, 115], bg: [0.17, 0.05, 115] }),
 	log: () => ({ fg: green(0.7, 0.08), code: green(0.78, 0.08), linkBg: green(0.26, 0.05) }),
 	warning: () => ({ fg: green(0.97, 0.1), bg: green(0.22, 0.07), code: green(0.98, 0.06), linkBg: green(0.3, 0.07) }),
 	error: () => ({ fg: [0.7, 0.22, 28], bg: [0.17, 0.06, 28], code: [0.84, 0.14, 28], linkBg: [0.26, 0.07, 28] }),

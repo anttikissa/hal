@@ -35,6 +35,8 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 	}
 	switch (item.type) {
 		case 'prompt':
+		case 'command':
+			return titles.letter(item) === 'm' ? colors.message() : colors.user()
 		case 'image':
 			return colors.user()
 		case 'text':
@@ -49,8 +51,6 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 			return item.status === 'error' ? colors.error() : { fg: colors.log().fg! }
 		case 'question':
 			return colors.question()
-		case 'command':
-			return colors.user()
 		case 'output':
 			return { fg: (item.error ? colors.error() : colors.log()).fg! }
 		case 'divider':
@@ -68,7 +68,7 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 	let title = titles.title(item)
 	if (title === undefined) return body
 	title = strings.clipVisual(ansi.clean(title), width)
-	let call = item.type === 'prompt' && item.label?.match(/^bash #(\d+)$/)?.[1]
+	let call = item.type === 'prompt' && item.label?.match(/^bash #(t?\d+)$/)?.[1]
 	if (call && session && title.endsWith(`#${call}`)) {
 		let href = transcript.href(session, call)
 		if (href) title = `${title.slice(0, -call.length - 1)}${ansi.quiet(`\x1b]8;;${ansi.webUrl(href)}\x07#${call}${ansi.LINK_OFF}`, itemView.itemStyle(item))}`
@@ -85,7 +85,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
-			let bash = (/^bash (?:#\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
+			let bash = (/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
 			let body = ansi.wrap(bash ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text, width).map(ansi.links)
 			if (bash && /^\[exit [1-9]\d*\]/.test(body[0] ?? '')) {
 				let status = /^\[exit [1-9]\d*\]/.exec(body[0]!)![0]
@@ -164,8 +164,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let style = itemView.itemStyle(item, tool)
 			return shown.map((l, i) => {
 				let prefix = !i && item.isError ? '✗ ' : ''
-				let ref = !i && !tool && call && session && transcript.href(session, call)
-				if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07#${call}${ansi.LINK_OFF}> `
+				let ref = !i && !tool && call && session && transcript.href(session, `t${call}`)
+				if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07#t${call}${ansi.LINK_OFF}> `
 				let text = strings.clipVisual(prefix + l, width)
 				let line = tool ? text : ansi.quiet(text, style)
 				if (call && /^\[exit [1-9]\d*\]/.test(l)) {
@@ -220,13 +220,14 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 	}
 }
 
-// The id `item` shows, `#35`, and where it links: the same block on
-// the web, /<session>#<key> (tasks wc, 0z). Every block with a block
+// The id `item` shows, `#t35` (its kind letter, task 9p), and where it
+// links: the same block on the web, /<session>#t35 (tasks wc, 0z). Every block with a block
 // id has one, except a tool result, which the web shows in its call's
 // block; an item whose key is no block id has none.
 function ref(item: Keyed, session: string | undefined): { text: string; href: string } | undefined {
-	let href = session && item.type !== 'tool-result' ? transcript.href(session, item.key) : undefined
-	return href ? { text: `#${item.key}`, href } : undefined
+	let id = titles.blockId(item)
+	let href = session && item.type !== 'tool-result' ? transcript.href(session, id) : undefined
+	return href ? { text: `#${id}`, href } : undefined
 }
 
 // Rows of a question's quote, indented, its marked parts in inverse.

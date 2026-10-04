@@ -1,6 +1,12 @@
 {
 	title: 'Block IDs carry a kind letter',
 	spec: "Every displayed block ID puts a kind letter before its number, e.g. #t19. The number stays the record's history line number n; the letter is derived from the record when shown, so the history format is unchanged and all kinds share one sequence. Letters say who produced the block: u, a prompt or command typed by the user; m, a message, prompt or command from another session; a, assistant text; r, thinking (reasoning); t, a tool call, including model-run commands; s, Hal's own output (command output, notices, background job results). The ID stays where it is now, at the right of the header, in terminal and web. Wherever a block ID is accepted (read_blob, <sessionId>#id, web anchors), a letter before the number is accepted. m blocks use a new message color: hot pink (OKLCH hue about 350), distinct from bash's magenta (320) and error red (25), in every theme except wopr, which picks its own shade. Green or teal then means only the user. No compatibility code; no tests for the letters or the resolver.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Letters live in titles.letter/blockId (common/titles.ts); item keys stay bare numbers, so rows, backfill and dropped checks need no change. transcript.href accepts an optional letter and target.parse strips it before looking up a row. Generated hrefs carry the letter (/s#t19).',
+		"Background bash results are prompts with from = their own session and label 'bash #t19': lettered s, not m, and kept in the user colour. jobs.label makes the #t labels; the label regexes in item-view, Card and view accept #t?N so already stored 'bash #19' labels still link.",
+		"message colour: fg [0.8,0.19,350] (#ff71bb), bg [bgL,0.07,350]; 7.3:1, quiet 4.6:1 on its bg in hal/nostromo/tron/tyrell. wopr picks a yellower phosphor [0.9,0.17,115] on [0.17,0.05,115]. Commands from another session (command items with from) are m too; on the web they get kind 'message prompt'.",
+		"Not lettered: /find result ids (FindKind cannot tell u from m) and the rebase plan's #n lines and messages (the plan parser reads bare numbers)."
+	],
 	needs: []
 }

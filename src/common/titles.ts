@@ -68,4 +68,34 @@ function title(item: Shown): string | undefined {
 	return t ? `${t} ${w}` : w
 }
 
-export const titles = { names: {} as Record<string, string>, modelName, time, author, who, title }
+// The kind letter of a block id (task 9p): who produced the block.
+// u the user typed it; m another session sent it; a assistant text; r
+// thinking; t a tool call or its result; s Hal's own output (command
+// output, notices, background job results).
+function letter(item: Shown): string {
+	switch (item.type) {
+		case 'prompt':
+			return item.from === undefined ? (item.origin === 'model' ? 's' : 'u') : item.label?.startsWith('bash ') ? 's' : 'm'
+		case 'image':
+			return 'u'
+		case 'command':
+			return item.from === undefined ? 'u' : 'm'
+		case 'text':
+			return 'a'
+		case 'thinking':
+			return 'r'
+		case 'tool':
+		case 'tool-result':
+			return 't'
+		default:
+			return 's'
+	}
+}
+
+// The block id `item` shows, 't19': its letter, then its key (the
+// record's history line number, task w5).
+function blockId(item: Shown & { key: string }): string {
+	return titles.letter(item) + item.key
+}
+
+export const titles = { names: {} as Record<string, string>, modelName, time, author, who, title, letter, blockId }
