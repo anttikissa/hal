@@ -1,0 +1,11 @@
+{
+	title: 'The web page logs no Solid reactivity warnings',
+	spec: 'The web client logs no Solid dev diagnostics (STRICT_READ_UNTRACKED and the like) in the browser console while loading, switching tabs, streaming, opening cards and overlays. Each flagged read either moves into a tracking scope (JSX, memo, effect compute) when it should update, or is wrapped in untrack() when it is a deliberate one-time snapshot; warnings are fixed, never silenced globally. The existing CDP test in host/web.test.ts fails when the page logs such a diagnostic.',
+	status: 'done',
+	notes: [
+		"Diagnostics were STRICT_READ_UNTRACKED only: Card's body-level isChange snapshot (now an accessor); Card setOpen/setFull reading opened()/whole() when the target effect calls them (untrack: a call-time snapshot); Composer measure reading stacked() in an effect callback (functional setter); Question refs reading the For index, and its focus effect whose focus() runs blur/focus handlers (dismissMenu → app.changed reads state) synchronously inside the effect (untrack around focus()).",
+		'Minified bundles name components <Xf>; to locate a finding, build with minify off and read CDP Runtime.consoleAPICalled stackTrace: lineNumber is 0-based in the served HTML (fetch(location.href)), not in the script. The CDP harness enables Runtime and browser().close() expects no [CODE] console messages since the previous close.'
+	],
+	needs: ['1b'],
+	foldInto: ['1b']
+}

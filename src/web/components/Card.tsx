@@ -15,7 +15,7 @@
 // result and can show all of it; the transcript holds all of it
 // (host tools cap what they keep), so nothing is fetched.
 
-import { createEffect, createMemo, createSignal, flush, For, onSettled, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
 import { markdown as parser } from '../../common/markdown.ts'
 import { titles } from '../../common/titles.ts'
 import { toolDetails } from '../../common/tool-details.ts'
@@ -74,7 +74,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let root: HTMLElement | undefined
 	onSettled(() => root && enter(root))
 	let open = () => opened().has(id())
-	let setOpen = (on: boolean) => setOpened(toggled(opened(), id(), on))
+	// The setters may run in an effect: they read the state as of the call.
+	let setOpen = (on: boolean) => untrack(() => setOpened(toggled(opened(), id(), on)))
 	let expanded = open
 	// A tool still streaming after a second opens and stays open (task
 	// a5): opening at once and closing on the result made quick calls
@@ -86,7 +87,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return () => clearTimeout(t)
 	})
 	let full = () => whole().has(id())
-	let setFull = (on: boolean) => setWhole(toggled(whole(), id(), on))
+	let setFull = (on: boolean) => untrack(() => setWhole(toggled(whole(), id(), on)))
 	createEffect(
 		() => props.target,
 		(on) => {
@@ -230,7 +231,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// colours, no header; open, each change's line and whole diff.
 	let tone = (r: string) => (r[0] === '+' ? 'add' : r[0] === '-' ? 'del' : 'dim')
 	// An item never turns into a change or out of one.
-	let isChange = props.row.item.type === 'output' && !!props.row.item.change
+	let isChange = () => props.row.item.type === 'output' && !!props.row.item.change
 	let change = () => (
 		<>
 			{link()}
@@ -263,7 +264,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			{(s) => (
 				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folds() ? 'folds' : '', expanded() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
 					<Show when={props.row.note === undefined} fallback={compact()}>
-						{isChange ? change() : (
+						{isChange() ? change() : (
 						<Show when={folds()} fallback={plain(s)}>
 							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} reference={link()}
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
