@@ -12,7 +12,9 @@ import { App } from './components/App.tsx'
 
 // The host's settings (config.ason) are read before the first render.
 if (typeof document !== 'undefined') {
-	diagnostics.init(() => {
+	settings.load(document.getElementById('settings')?.textContent)
+	// Off unless config.ason opts in (webDiagnostics).
+	if (settings.webDiagnostics()) diagnostics.init(() => {
 		let st = app.state, t = st.view.transcript, vv = visualViewport
 		return { tab: Math.max(0, st.tabs.findIndex((t) => t.id === st.shown) + 1), renderedTab: Number(document.querySelector('.Tabs .strip [aria-current] .n')?.textContent) || 0, tabs: st.tabs.length, cached: st.cached.size,
 			items: t?.items.length ?? 0, live: !!t?.live, modal: !!st.view.modal, form: !!st.view.form,
@@ -22,6 +24,5 @@ if (typeof document !== 'undefined') {
 			scrollTop: Math.max(0, document.querySelector('.Transcript')?.scrollTop ?? 0),
 			appHeight: parseFloat(document.documentElement.style.getPropertyValue('--app-height')) || innerHeight, composerFocused: !!document.activeElement?.closest('.Composer') }
 	})
-	settings.load(document.getElementById('settings')?.textContent)
 	render(() => <App />, document.body)
 }

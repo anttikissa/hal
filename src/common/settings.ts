@@ -56,6 +56,13 @@ const table: Setting[] = [
 	},
 	{ name: 'sessionRecap', type: { kind: 'boolean' }, default: false, description: 'Show a short session recap when returning to a tab idle for 24 hours (/recap always works).' },
 	{ name: 'push', type: { kind: 'boolean' }, default: true, description: 'Send web push notifications to subscribed devices.' },
+	{
+		name: 'webDiagnostics',
+		type: { kind: 'boolean' },
+		default: false,
+		description: "Web pages report structural diagnostics (no text) to this host's state/web-diag.log.",
+		browser: true,
+	},
 ]
 
 // Why `value` doesn't fit `type`, or undefined if it does.
@@ -141,4 +148,5 @@ export const settings = {
 	maxRounds: (): number => settings.value('maxRounds') as number,
 	sessionRecap: (): boolean => settings.value('sessionRecap') as boolean,
 	push: (): boolean => settings.value('push') as boolean,
+	webDiagnostics: (): boolean => settings.value('webDiagnostics') as boolean,
 }

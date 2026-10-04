@@ -53,6 +53,10 @@ remove repetition and empty phrases without weakening requirements.
 
 # Privacy
 
+Diagnostics and telemetry are opt-in, always: off by default, on only
+through an explicit setting. Never collect or send anything until the
+user turns it on.
+
 Gitignored files (plugins/, local.ts, auth, state) are private and
 exempt from task tracking. Nothing about them belongs in tracked files,
 including tasks, notes and commits. If unsure, ask. Personal hostnames,

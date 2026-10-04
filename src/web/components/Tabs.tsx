@@ -4,7 +4,8 @@
 // Native horizontal momentum scrolling; edge buttons provide secondary paging.
 // Tab links retain native Cmd- and middle-click behavior.
 
-import { createEffect, createMemo, createSignal, For, onSettled, untrack } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js'
+import { settings } from '../../common/settings.ts'
 import type { Tab } from '../../common/protocol.ts'
 import type { Edge } from '../../common/tab-pages.ts'
 import { tabMark, type Mark } from '../../common/tab-mark.ts'
@@ -207,7 +208,9 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 					<Icon name="plus" />New tab
 				</button>
 				<button type="button" onClick={() => { setOpen(false); setAlerts(true) }}><Icon name="bell" />Notifications</button>
-				<button type="button" onClick={() => { diagnostics.record('manual'); diagnostics.report() }}><Icon name="bug" />Send diagnostics</button>
+				<Show when={settings.webDiagnostics()}>
+					<button type="button" onClick={() => { diagnostics.record('manual'); diagnostics.report() }}><Icon name="bug" />Send diagnostics</button>
+				</Show>
 				<button type="button" class="reload" onClick={() => location.reload()}>
 					<Icon name="reload" />Reload page
 				</button>

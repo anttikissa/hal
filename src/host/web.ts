@@ -239,7 +239,7 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 		return new Response(null, { status: 303, headers: { location: '/', 'set-cookie': 'hal=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0', 'cache-control': 'no-store' } })
 	}
 	let check = pathname === '/login' && get
-	let diagnostic = pathname === '/web-diagnostics' && req.method === 'POST'
+	let diagnostic = pathname === '/web-diagnostics' && req.method === 'POST' && settings.webDiagnostics()
 	if (!check && !blob && pathname !== '/ws' && !diagnostic) return new Response('not found\n', { status: 404 })
 	// A page asked for without a login gets the gate, which reloads it
 	// after the login; the API gets a bare 401.
