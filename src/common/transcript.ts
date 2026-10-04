@@ -48,6 +48,7 @@ export type Shown = { originSession?: string } & (
 export type Item = Shown & { key: string }
 
 export type Transcript = {
+	dropped?: number[]
 	meta: SessionMeta
 	// The session's state, as the host last said (src/common/states.ts).
 	state: SessionState
@@ -235,6 +236,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	}
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
 	if (prompt !== undefined) t.prompt = prompt
+	if (snapshot.dropped) t.dropped = [...snapshot.dropped]
 	if (snapshot.stats) t.stats = snapshot.stats
 	if (early.length) t.earlier = transcript.fromSnapshot({ ...snapshot, history: early, earlier: [], turn: undefined }).items.length
 	if (snapshot.turn) {

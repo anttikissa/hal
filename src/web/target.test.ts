@@ -84,3 +84,18 @@ test('a block that is in no page gives up with a notice once every page is in', 
 	expect(app.notice()).toContain('#99')
 	expect(sent.filter((c) => c.type === 'history')).toHaveLength(1)
 })
+
+test('a dropped record link says why without fetching pages; undo makes it linkable again', () => {
+	address = `http://h/${sessionId}#3.1`
+	app.aim()
+	let snap = snapshot(late, 100) as Extract<Event, { type: 'snapshot' }>
+	snap.snapshot.dropped = [3]
+	app.onEvent(snap)
+	expect(app.state.target).toBeUndefined()
+	expect(app.notice()).toBe('Block #3.1 was dropped by rebase.')
+	expect(sent.filter((c) => c.type === 'history')).toEqual([])
+	app.onEvent(snapshot([...early, ...late]))
+	address = `http://h/${sessionId}#3`
+	app.aim()
+	expect(app.state.target?.found).toBe(true)
+})

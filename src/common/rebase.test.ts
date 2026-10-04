@@ -47,7 +47,7 @@ test('invalid, missing, uneditable and conflicting grouped targets fail loudly',
 	let raw = [prompt(1, 'go'), call(2, 'a'), result(3, 'a')]
 	expect(() => rebase.apply(raw, { base: 3, drop: [99], edit: [] })).toThrow('#99')
 	expect(() => rebase.apply(raw, { base: 3, drop: [2], edit: [{ n: 3, text: 'x' }] })).toThrow('group is dropped')
-	expect(() => rebase.apply(raw, { base: 3, drop: [], edit: [{ n: 2, text: 'x' }] })).toThrow('not editable')
+	expect(() => rebase.apply(raw.slice(0, 2), { base: 2, drop: [], edit: [{ n: 2, text: 'x' }] })).toThrow('not editable')
 	expect(rebase.invalid({ base: 3, drop: [1, 1], edit: [] })).toContain('duplicate')
 	expect(rebase.invalid({ base: 3, drop: [-1], edit: [] })).toContain('invalid')
 })
@@ -68,4 +68,12 @@ test('projection is idempotent for prompt replacement records before and after a
 	expect(replay.current(first)).toEqual(first)
 	let rebased = replay.current([...raw, plan(5, 4, [], [{ n: 4, text: 'changed' }])])
 	expect(replay.current(rebased)).toEqual(rebased)
+})
+
+test('tool-output edits do not cross prompts when providers reuse a call id', () => {
+	let raw = [prompt(1, 'first'), call(2, 'a'), result(3, 'a'), prompt(4, 'second'), call(5, 'a'), result(6, 'a')]
+	let current = replay.current([...raw, plan(7, 6, [], [{ n: 5, text: 'second output' }])])
+	expect(current.find((r) => r.n === 3)).toEqual(raw[2])
+	expect(current.find((r) => r.n === 6)).toMatchObject({ blocks: [{ output: 'second output' }] })
+	expect(() => rebase.apply(raw, { base: 6, drop: [], edit: [{ n: 5, text: 'call' }, { n: 6, text: 'result' }] })).toThrow('conflicting edits')
 })

@@ -21,7 +21,7 @@ function groups(records: HistoryRecord[]): Map<number, Set<number>> {
 		let all = new Set(ns.flatMap((n) => [...(out.get(n) ?? [])]))
 		for (let n of all) out.set(n, all)
 	}
-	let calls = new Map<string, number>(), round: number[] = [], signed = false
+	let calls = new Map<string, number>(), round: number[] = [], signed = false, command: number | undefined
 	let flush = () => { if (signed) join(round); round = []; signed = false }
 	for (let r of records) {
 		if (r.type === 'assistant' && r.n !== undefined) {
@@ -35,8 +35,10 @@ function groups(records: HistoryRecord[]): Map<number, Set<number>> {
 				if (n !== undefined && r.n !== undefined) join([n, r.n])
 				calls.delete(b.id)
 			}
-			if (r.blocks.some((b) => b.type === 'text')) calls.clear()
-		} else if (r.type === 'round' || r.type === 'turn_end' || r.type === 'compact' || r.type === 'reset') flush()
+			if (r.blocks.some((b) => b.type === 'text')) { calls.clear(); command = undefined }
+		} else if (r.type === 'command') command = r.n
+		else if (r.type === 'output' && command !== undefined && r.n !== undefined) join([command, r.n])
+		else if (r.type === 'round' || r.type === 'turn_end' || r.type === 'compact' || r.type === 'reset') flush()
 	}
 	flush()
 	return out
@@ -76,7 +78,31 @@ function apply(records: HistoryRecord[], plan: RebasePlan): HistoryRecord[] {
 	let groups = rebase.groups(records), dropped = new Set(plan.drop.flatMap((n) => [...(groups.get(n) ?? [n])]))
 	let edits = new Map(plan.edit.map((e) => [e.n, e.text]))
 	for (let n of edits.keys()) if (dropped.has(n)) throw new Error(`record #${n} is edited but its group is dropped`)
-	return records.filter((r) => !dropped.has(r.n!)).map((r) => edits.has(r.n!) ? rebase.edited(r, edits.get(r.n!)!) : r)
+	let results = new Map<number, Map<string, string>>()
+	for (let [n, text] of edits) {
+		let r = byNumber.get(n)!
+		if (r.type !== 'assistant' || r.block.type !== 'tool_call') continue
+		let id = r.block.id
+		let target: number | undefined
+		for (let next of records.slice(records.indexOf(r) + 1)) {
+			if (next.type === 'user' && next.blocks.some((b) => b.type === 'tool_result' && b.id === id)) { target = next.n; break }
+			if ((next.type === 'user' && next.blocks.some((b) => b.type === 'text')) || (next.type === 'assistant' && next.block.type === 'tool_call' && next.block.id === id)) break
+		}
+		if (target === undefined) throw new Error(`record #${n} is not editable: no tool result`)
+		if (edits.has(target)) throw new Error(`conflicting edits of tool result #${target}`)
+		let batch = results.get(target) ?? new Map<string, string>()
+		batch.set(id, text); results.set(target, batch); edits.delete(n)
+	}
+	return records.filter((r) => !dropped.has(r.n!)).map((r) => {
+		if (edits.has(r.n!)) return rebase.edited(r, edits.get(r.n!)!)
+		let batch = results.get(r.n!)
+		if (r.type !== 'user' || !batch) return r
+		return { ...r, blocks: r.blocks.map((b) => {
+			if (b.type !== 'tool_result' || !batch.has(b.id)) return b
+			let { image: _image, ...rest } = b
+			return { ...rest, output: batch.get(b.id)! }
+		}) }
+	})
 }
 
 // A newer plan against the same base replaces that plan; empty is undo.

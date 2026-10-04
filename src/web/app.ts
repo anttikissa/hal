@@ -160,11 +160,11 @@ function seek(): void {
 	let t = st.target
 	if (!t || t.found) return
 	let rows = view.withPending(view.rows(st.view.transcript?.items ?? []), [], st.view.transcript?.inbox)
-	let s = target.seek(t, app.sessionId(), rows, !backfill.complete(st.older, t.session))
+	let s = target.seek(t, app.sessionId(), rows, !backfill.complete(st.older, t.session), st.view.transcript?.dropped)
 	if (s === 'older') app.older()
-	else if (s === 'missing') {
+	else if (s === 'missing' || s === 'dropped') {
 		st.target = undefined
-		st.view = { ...st.view, notice: `no block #${t.key} in this session` }
+		st.view = { ...st.view, notice: s === 'dropped' ? `Block #${t.key} was dropped by rebase.` : `no block #${t.key} in this session` }
 	} else if (s !== 'wait') t.found = true
 }
 
