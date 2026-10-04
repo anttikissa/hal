@@ -167,6 +167,9 @@ function close(id: string): string | undefined {
 	if (index < 0) return 'not a tab'
 	if (f.open.length === 1) return 'cannot close the last tab'
 	tabs.stopOwned(id)
+	let meta = sessions.open(id)
+	meta.closedAt = new Date().toISOString()
+	liveFiles.save(meta)
 	f.open.splice(index, 1)
 	let closed = f.closed.filter((c) => c.id !== id)
 	closed.push({ id, index })

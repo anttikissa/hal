@@ -11,6 +11,8 @@ export interface SessionMeta {
 	effort?: string
 	// ISO timestamp.
 	createdAt: string
+	// Last tab closure, retained after reopening.
+	closedAt?: string
 	name?: string
 	nameOwner?: 'auto' | 'manual'
 	nameVersion?: number

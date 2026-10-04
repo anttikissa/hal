@@ -1,6 +1,9 @@
 {
 	title: '/tabs lists open and closed sessions; /history names the file',
 	spec: '/tabs lists the open tabs as "tab 3  157-gut  name", the caller marked; /tabs all adds closed sessions, newest first, with when they closed. Each id is a link (terminal OSC 8, web anchor) that opens the session, like /go. /history prints the session\'s history file path. Old Hal reference: artifact old-tabs.ts.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Session metadata records closedAt on tab closure, independent of the bounded resume cache; old sessions explicitly report an unrecorded closing time. Shared markdown links produce terminal OSC 8 and web anchors through existing renderers. /tabs all preserves unreadable sessions with their complete errors.'
+	],
 	needs: []
 }

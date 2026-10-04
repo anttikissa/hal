@@ -26,6 +26,7 @@ function validate(id: string, data: Record<string, any>): void {
 	for (let key of ['cwd', 'model', 'createdAt']) {
 		if (typeof data[key] !== 'string') throw new Error(`${path}: missing or invalid ${key}`)
 	}
+	if (data.closedAt !== undefined && (typeof data.closedAt !== 'string' || !Number.isFinite(Date.parse(data.closedAt)))) throw new Error(`${path}: invalid closedAt`)
 	if (data.name !== undefined && typeof data.name !== 'string') throw new Error(`${path}: invalid name`)
 	if (data.nameOwner !== undefined && data.nameOwner !== 'auto' && data.nameOwner !== 'manual') throw new Error(`${path}: invalid nameOwner`)
 	for (let key of ['nameVersion', 'nameTurns']) if (data[key] !== undefined && (!Number.isSafeInteger(data[key]) || data[key] < 0)) throw new Error(`${path}: invalid ${key}`)
