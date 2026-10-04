@@ -54,7 +54,7 @@ const table: Setting[] = [
 		default: '',
 		description: 'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
 	},
-	{ name: 'sessionRecap', type: { kind: 'boolean' }, default: true, description: 'Show a short session recap when returning after at least 3 minutes.' },
+	{ name: 'sessionRecap', type: { kind: 'boolean' }, default: false, description: 'Show a short session recap when returning to a tab idle for 24 hours (/recap always works).' },
 	{ name: 'push', type: { kind: 'boolean' }, default: true, description: 'Send web push notifications to subscribed devices.' },
 ]
 
