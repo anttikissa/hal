@@ -139,7 +139,7 @@ test('popular GPT and Claude tier aliases select the intended model', () => {
 		process.env.OPENAI_API_KEY = 'test-key'
 		process.env.ANTHROPIC_API_KEY = 'test-key'
 		provider.state.providers = { openai: fake([]), anthropic: fake([]) }
-		for (let [alias, id] of Object.entries({ gpt: 'openai/gpt-6.1-sol', sol: 'openai/gpt-6.1-sol', astra: 'openai/gpt-6-astra', luna: 'openai/gpt-6-luna', sonnet: 'anthropic/claude-sonnet-5-5', fable: 'anthropic/claude-fable-5', haiku: 'anthropic/claude-haiku-4-5' })) {
+		for (let [alias, id] of Object.entries({ gpt: 'openai/gpt-6.1-sol', sol: 'openai/gpt-6.1-sol', astra: 'openai/gpt-6-astra', luna: 'openai/gpt-6-luna', sonnet: 'anthropic/claude-sonnet-5-5', fable: 'anthropic/claude-fable-5-1', haiku: 'anthropic/claude-haiku-4-5' })) {
 			expect(models.resolve(alias).id).toBe(id)
 		}
 	} finally {

@@ -238,7 +238,10 @@ function failed(p: Provider, modelId: string, account: string | undefined, e: Er
 	}
 	if (e.status === 429) {
 		if (account) {
-			limits.set(limits.key(modelId.split('/')[0]!, account), reset ?? now + provider.accountLimitMs)
+			// A subscription's models share one quota, except a model with
+			// its own credits (Anthropic credits_required: Fable).
+			let own = /credits_required/.test(e.body ?? '') ? modelId : modelId.split('/')[0]!
+			limits.set(limits.key(own, account), reset ?? now + provider.accountLimitMs)
 			e.retryAt = now
 		} else if (reset !== undefined) {
 			limits.set(limits.key(modelId), reset)

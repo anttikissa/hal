@@ -146,7 +146,7 @@ function resolve(input: string): { id?: string; login?: string } {
 	}
 	let version = /^gpt-?(6(?:\.1)?)$/.exec(family)?.[1]
 	if (!version && !['gpt', 'claude', 'opus', 'astra', 'luna', 'sonnet', 'fable', 'haiku', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'].includes(family)) return { id: input }
-	let popular: Record<string, string> = { astra: 'openai/gpt-6-astra', luna: 'openai/gpt-6-luna', sonnet: 'anthropic/claude-sonnet-5-5', fable: 'anthropic/claude-fable-5', haiku: 'anthropic/claude-haiku-4-5' }
+	let popular: Record<string, string> = { astra: 'openai/gpt-6-astra', luna: 'openai/gpt-6-luna', sonnet: 'anthropic/claude-sonnet-5-5', fable: 'anthropic/claude-fable-5-1', haiku: 'anthropic/claude-haiku-4-5' }
 	let own = family === 'gpt' || version || family === 'astra' || family === 'luna' ? 'openai' : family === 'claude' || family === 'opus' || family === 'sonnet' || family === 'fable' || family === 'haiku' ? 'anthropic' : undefined
 	let needle = family === 'claude' || family === 'opus' ? 'opus' : family
 	let candidates = models.known().filter((id) => version ? id.startsWith(`openai/gpt-${version}-`) : id.split('/').slice(1).join('/').toLowerCase().includes(needle))

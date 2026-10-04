@@ -244,7 +244,7 @@ export const anthropic = {
 	maxTokens: 64_000,
 	thinkingBudget: 10_000,
 	// Offered when neither the account's list nor models.dev has any.
-	knownModels: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-opus-5', 'claude-fable-5', 'claude-sonnet-5'],
+	knownModels: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-fable-5', 'claude-sonnet-5'],
 	toMessages,
 	body,
 	headers,
