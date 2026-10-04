@@ -63,17 +63,20 @@ function counts(o: Output): { add: number; del: number; text: string[] } {
 
 // A one-line edit as words: each changed span with a word of context,
 // gaps as '…'; removed words tone 'del' (struck through when drawn),
-// added 'add'. Undefined unless the change replaces exactly one
-// non-blank line with another.
+// added 'add'. Removed and added lines are each read as one run of
+// words, so a rewrapped paragraph shows only its changed words.
+// Undefined unless the change both removes and adds words and, beyond
+// one line for another, keeps half the removed ones (else a rewrite).
 type Part = { text: string; tone: 'dim' | 'add' | 'del' }
 function edit(o: Output): Part[] | undefined {
 	let c = counts(o)
-	if (c.add !== 1 || c.del !== 1 || c.text.length !== 2) return undefined
-	let a = c.text.find((r) => r[0] === '-')!.slice(1).trim().split(/\s+/)
-	let b = c.text.find((r) => r[0] === '+')!.slice(1).trim().split(/\s+/)
+	let words = (sign: string) => c.text.filter((r) => r[0] === sign).flatMap((r) => r.slice(1).trim().split(/\s+/))
+	let a = words('-'), b = words('+')
+	if (!a.length || !b.length) return undefined
 	// Word LCS table, then a walk emitting kept words and changed spans.
 	let L = Array.from({ length: a.length + 1 }, () => Array.from({ length: b.length + 1 }, () => 0))
 	for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) L[i]![j] = a[i] === b[j] ? L[i + 1]![j + 1]! + 1 : Math.max(L[i + 1]![j]!, L[i]![j + 1]!)
+	if (c.text.length > 2 && L[0]![0]! * 2 < a.length) return undefined
 	let parts: ({ keep: string } | { del: string[]; add: string[] })[] = []
 	let i = 0, j = 0
 	while (i < a.length || j < b.length) {
@@ -109,7 +112,7 @@ function rows(item: object): Row[] {
 	let run = runs.get(item as Item) ?? (one.type === 'output' && one.change ? [one] : [])
 	if (!run.length) return []
 	let tally = (c: ReturnType<typeof counts>) => `+${c.add} −${c.del}`
-	let tone = (r: string): Row['tone'] => (r[0] === '+' ? 'add' : 'del')
+	let tone = (r: string): 'add' | 'del' => (r[0] === '+' ? 'add' : 'del')
 	let span = (a: Output, b: Output) => (titles.time(a.ts) === titles.time(b.ts) ? titles.time(a.ts) : `${titles.time(a.ts)}–${titles.time(b.ts)}`)
 	let clean = (r: string) => `${r[0]} ${r.slice(1).trim()}`
 	if (run.length === 1) {
@@ -131,7 +134,9 @@ function rows(item: object): Row[] {
 		let e = edit(o)
 		let note = [o.change!.what === 'changed' ? '' : o.change!.what, e ? plain(e) : first ? clean(first) : c.add + c.del ? 'blank lines' : ''].filter(Boolean).join(' · ')
 		let lead = `  ${titles.time(o.ts)}  ${o.change!.name.padEnd(pad)}  ${tally(c).padEnd(7)} `
-		out.push({ text: `${lead} ${note}`.trimEnd(), tone: e || !first ? 'dim' : tone(first), parts: e && [{ text: lead, tone: 'dim' }, ...e] })
+		// Only the changed text takes the diff colour; the lead stays dim.
+		let parts: Part[] = e ? [{ text: lead, tone: 'dim' }, ...e] : first ? [{ text: lead, tone: 'dim' }, { text: note, tone: tone(first) }] : []
+		out.push({ text: `${lead} ${note}`.trimEnd(), tone: 'dim', parts: parts.length ? parts : undefined })
 	}
 	return out
 }
