@@ -99,6 +99,15 @@ test('the cursor goes when the block ends; blank, cursor, blank rows follow the 
 	expect(below(' Hello')).toEqual(['', '', ''])
 })
 
+test('the idle cursor, the work now, sits above queued messages, the future', () => {
+	start()
+	stream({ type: 'text', text: 'Hello' })
+	app.onEvent({ type: 'tool-results', sessionId: 's1', results: [] } as any)
+	app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'q', text: 'later please', queue: true }] })
+	let r = rows()
+	expect(r.findIndex((l) => l.includes('{hal}'))).toBeLessThan(r.findIndex((l) => l.includes('later please')))
+})
+
 test('a finished session never seen working here shows the grey cursor at once', () => {
 	app.onEvent(snapshot())
 	let lines = frame.build(appView.view(), 40).lines
