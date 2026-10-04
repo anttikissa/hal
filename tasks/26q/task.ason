@@ -8,7 +8,8 @@
 		"The newest prompt's Edit button shows the bar too: 'Editing the last prompt · sending replaces it', or, when side-effect tools ran since, '· files changed since, so sending adds it as a new prompt' (prompts.amend decides on the host).",
 		'Web colour variables are scoped to their style class (host web.ts css()): var(--attention-fg) is undefined outside .notice, so the bar carries class notice.',
 		'Headless Chrome ignores hover/pointer in Emulation.setEmulatedMedia (matchMedia stays false); the desktop hover reveal was checked by injecting the rule.',
-		'While an Edit sets the draft aside, the page neither writes the box into the draft nor overwrites the box from draft events; Escape in the keys handler leaves the edit before Up/Down editing logic.'
+		'While an Edit sets the draft aside, the page neither writes the box into the draft nor overwrites the box from draft events; Escape in the keys handler leaves the edit before Up/Down editing logic.',
+		"The Edit button is one text line tall and borderless (underlined text) inside the header's title line; on touch an invisible ::after gives it the 44px target, so it never makes the header taller. The user found a 44px boxed button too tall."
 	],
 	needs: ['dg', 'z71', 'bzf']
 }
