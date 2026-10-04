@@ -238,7 +238,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 				<For each={promptChanges.rows(props.row.item)}>{(r) => <div class={`row ${r.tone}`}>{r.parts ? <For each={r.parts}>{(w, k) => <>{k() ? ' ' : ''}<span class={w.tone}>{w.text}</span></>}</For> : r.text}</div>}</For>
 				<Show when={expanded()}>
 					<For each={promptChanges.run(props.row.item)}>
-						{(o) => <><div class="head">{promptChanges.line(o)}</div><For each={o.change!.diff.split('\n')}>{(r) => <div class={tone(r)}>{r}</div>}</For></>}
+						{(o) => <><div class="head">{promptChanges.line(o)}</div><div class="lines"><For each={o.change!.diff.split('\n')}>{(r) => <div class={tone(r)}>{r}</div>}</For></div></>}
 					</For>
 				</Show>
 			</div>
