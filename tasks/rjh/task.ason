@@ -1,0 +1,11 @@
+{
+	title: 'Thinking previews without a visible prefix',
+	spec: 'Thinking previews in web and terminal start with the text, not Thinking: or an effort label. Keep timestamps, block links and shared thinking colors unchanged. Collapsed web cards retain an accessible name identifying thinking; expanded cards keep their thinking/effort header and full body. Terminal thinking begins with timestamp and text on one line, without a separate label or blank header row; preserve readable Markdown, streaming and omission of completed empty thinking. Preserve fork-origin attribution in both clients. Check narrow and wide, short and long previews, and web open/closed behavior.',
+	status: 'done',
+	notes: [
+		'Web expanded headers already omit the colon when there is no inline summary; keep that existing behavior. Terminal thinking now has its own Markdown path, so the later generic text branch must no longer narrow to thinking. Browser checks reuse the existing four-viewport open/closed geometry test.',
+		'Verification: terminal preview and four-viewport browser checks pass, and typechecking passes. Full-suite runs each passed 1381 tests with one skip but hit different timing failures: quota-wait login, subagent prompt, then Escape stopping background commands. Login and subagent tests pass on isolated rerun. Do not treat these full-suite runs as clean passes.'
+	],
+	needs: ['hp', '4v'],
+	foldInto: ['hp', '4v']
+}

@@ -1362,6 +1362,9 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
 			await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+			let thinking = await b.evaluate(`(() => { let c = document.querySelector('.Card.thinking'); return { text: c.querySelector('.title').textContent, name: c.querySelector('.mark').getAttribute('aria-label') } })()`)
+			expect(thinking.text).toBe('Consider the layout')
+			expect(thinking.name).toBe('Thinking: Consider the layout')
 			// Untinted cards (thinking, model text) share a half inset, the rest one.
 			let closed = await b.evaluate(geometry)
 			let base = (row: any) => closed.find((r: any) => r.compact === row.compact).inset
@@ -1390,6 +1393,8 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 				expect(row.overlap).toBe(false)
 				expect(row.textWidth).toBeLessThanOrEqual(row.boxWidth + 1)
 			}
+			expect(await b.evaluate(`document.querySelector('.Card.thinking .title').textContent`)).toBe('Thinking')
+			expect(await b.evaluate(`document.querySelector('.Card.thinking .content').textContent`)).toContain('Further thought')
 			let insets = await b.evaluate(`(() => { let c = document.querySelectorAll('.Card.tool')[1], header = c.querySelector('.stamp'), body = c.querySelector('.content'); return { body: body.getBoundingClientRect().x + parseFloat(getComputedStyle(body).paddingLeft), header: header.getBoundingClientRect().x, wrapped: c.querySelector('.title').getBoundingClientRect().height > parseFloat(getComputedStyle(c).lineHeight) * 2, } })()`)
 			expect(insets.body).toBeCloseTo(insets.header, 1)
 			if (width <= 390) expect(insets.wrapped).toBe(true)
