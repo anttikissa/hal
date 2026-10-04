@@ -21,7 +21,7 @@ function anything(records: HistoryRecord[]): boolean {
 
 function boundary(id: string, record: { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string } | { type: 'reset'; transition?: string }): HistoryRecord {
 	let r = history.append(id, record)
-	host.broadcast(id, { type: 'divider', sessionId: id, text: transcript.boundary(record), ...(record.type === 'reset' && { ts: r.ts, clear: true as const }), ...(r.n !== undefined && { n: r.n }) })
+	host.broadcast(id, { type: 'divider', sessionId: id, text: transcript.boundary(record), ts: r.ts, ...(record.type === 'reset' && { clear: true as const }), ...(r.n !== undefined && { n: r.n }) })
 	// The status row's context figure measured the dropped context.
 	stats.state.context.delete(id)
 	host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.of(id, [r]) })

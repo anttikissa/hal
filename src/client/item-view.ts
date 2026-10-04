@@ -118,8 +118,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		// draws nothing, not a bare header (task hp).
 		case 'thinking': {
 			if (!item.text.trim() && !streaming) return []
-			let stamp = [titles.time(item.ts), item.originSession ? `(in ${item.originSession})` : ''].filter(Boolean).join(' ')
-			let prefix = stamp ? `${stamp} ` : ''
+			let prefix = titles.stamp(item.ts, item.originSession ? `(in ${item.originSession}) ` : '')
 			// Leave at least one text column even on a very narrow terminal.
 			prefix = strings.clipVisual(prefix, Math.max(0, width - 1))
 			let body = markdownView.lines(item.text.trimEnd(), width - strings.visLen(prefix), streaming, itemView.itemStyle(item))
@@ -129,8 +128,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			return itemView.headed(item, markdownView.lines(names.strip(summary.strip(item.text)).trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		case 'tool': {
 			let { command, description } = item.input
-			let time = titles.time(item.ts)
-			let prefix = time ? `${time} ` : ''
+			let prefix = titles.stamp(item.ts, '')
 			let row: string
 			if (typeof command === 'string' && typeof description === 'string') {
 				let head = strings.clipVisual(`${prefix}${ansi.clean(toolDetails.headline(item.name, item.input).text)}`, width)
@@ -164,6 +162,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let style = itemView.itemStyle(item, tool)
 			return shown.map((l, i) => {
 				let prefix = !i && item.isError ? '✗ ' : ''
+				// Apart from its call, a result is its own block: it leads with its time.
+				if (!i && !tool) prefix = titles.stamp(item.ts, prefix)
 				let ref = !i && !tool && call && session && transcript.href(session, `t${call}`)
 				if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07#t${call}${ansi.LINK_OFF}> `
 				let text = strings.clipVisual(prefix + l, width)
@@ -177,9 +177,9 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			})
 		}
 		case 'turn-end':
-			if (item.status === 'error') return ansi.wrap(`error: ${item.error ?? 'turn failed'}`, width)
+			if (item.status === 'error') return ansi.wrap(titles.stamp(item.ts, `error: ${item.error ?? 'turn failed'}`), width)
 			if (item.status === 'completed') return []
-			return [`[${item.status}]`]
+			return [titles.stamp(item.ts, `[${item.status}]`)]
 		case 'question': {
 			let rows = [...ansi.wrap(`? ${item.form.text}`, width), ...itemView.quoteLines(item.form.quote, width)]
 			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
@@ -212,7 +212,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		}
 		// One row: the text centred in a rule across the width.
 		case 'divider': {
-			let text = strings.clipVisual(` ${item.text} `, width)
+			let text = strings.clipVisual(` ${titles.stamp(item.ts, item.text)} `, width)
 			let rest = Math.max(0, width - strings.visLen(text))
 			let left = Math.floor(rest / 2)
 			return ['─'.repeat(left) + text + '─'.repeat(rest - left)]

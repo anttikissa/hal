@@ -127,7 +127,7 @@ test('a dangerous call asks y/N showing the offending part; No tells the model a
 	expect(results(calls[1]!)).toEqual([{ type: 'tool_result', id: 'b1', output: expect.stringMatching(/declined/), isError: true }])
 	finish(calls[1]!)
 	await until(() => a.of('turn-end').length)
-	expect(a.of('turn-end')).toEqual([{ type: 'turn-end', sessionId: id, status: 'completed', usage: { input: 30, output: 6 }, n: expect.any(Number), stats: expect.any(Object) }])
+	expect(a.of('turn-end')).toEqual([{ type: 'turn-end', sessionId: id, status: 'completed', usage: { input: 30, output: 6 }, n: expect.any(Number), ts: expect.any(String), stats: expect.any(Object) }])
 	expect(ran).toEqual([])
 	expect(existsSync(`${home}/junk`)).toBe(true)
 })

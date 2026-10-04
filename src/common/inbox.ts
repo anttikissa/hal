@@ -50,13 +50,12 @@ function provenance(item: InboxItem): Sender {
 	return { ...inbox.sender(item), ...(!item.queue && !item.advisory ? { steering: true as const } : {}) }
 }
 
-// What leads a queued message's compact row (task 16): '(Queued at
-// 15:29 by 76-cpo, tab 5)'. `tab`: the sender's tab number, if it has
+// What leads a queued message's compact row (task 16): '15:29 (Queued
+// by 76-cpo, tab 5)'. `tab`: the sender's tab number, if it has
 // one. Never why the session stalls: that is the status line.
 function note(item: InboxItem, tab?: number): string {
-	let at = titles.time(item.ts)
 	let by = item.from === undefined ? '' : ` by ${item.label ?? item.from}${tab === undefined ? '' : `, tab ${tab}`}`
-	return `(Queued${at ? ` at ${at}` : ''}${by})`
+	return titles.stamp(item.ts, `(Queued${by})`)
 }
 
 export const inbox = { pending, sender, provenance, note }

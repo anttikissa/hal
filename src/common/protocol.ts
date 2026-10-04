@@ -231,9 +231,9 @@ export type Event =
 	| { type: 'tool-output'; sessionId: string; id: string; at: number; chunk: string }
 	// The host ran the round's tool calls and recorded these results; the
 	// turn goes on with a new provider round, streamed after them.
-	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[]; n?: number }
+	| { type: 'tool-results'; sessionId: string; results: ToolResultBlock[]; n?: number; ts?: string }
 	| { type: 'turn-stats'; sessionId: string; stats: Stats }
-	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string; n?: number; stats?: Stats }
+	| { type: 'turn-end'; sessionId: string; status: TurnStatus; usage?: Usage; error?: string; n?: number; ts?: string; stats?: Stats }
 	// A question, now in history. A turn's waits for an answer with no
 	// turn running (the state says blocked). `command`: a slash command
 	// asked, beside whatever the session does, placed like `command`
