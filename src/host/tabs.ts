@@ -94,6 +94,9 @@ function indexed(): Promise<void> | undefined {
 				try {
 					status.derive(id, (yield* pages.markedSteps(id)).map((l) => l.record))
 				} catch {}
+				// Each tab costs as much as a big read: 60 small ones at once
+				// blocked the event loop for ~100 ms (task 7j).
+				yield pages.syncBytes
 			}
 		})(),
 	)
