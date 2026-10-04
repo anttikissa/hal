@@ -16,6 +16,7 @@ let reply: () => Response = () => new Response('{}')
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-auth-`)
+	mkdirSync(`${home}/secrets`)
 	process.env.HAL_HOME = home
 	process.env.HOME = `${home}/user`
 	// Real keys never reach a test, even run outside ./test.
@@ -45,7 +46,7 @@ afterEach(() => {
 	rmSync(home, { recursive: true, force: true })
 })
 
-const file = () => `${home}/auth.ason`
+const file = () => `${home}/secrets/auth.ason`
 const write = (data: unknown) => writeFileSync(file(), ason.stringify(data) + '\n', { mode: 0o600 })
 const disk = () => ason.parse(readFileSync(file(), 'utf8')) as any
 const later = () => Date.now() + 3_600_000

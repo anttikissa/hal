@@ -11,8 +11,8 @@ const subscription = { endpoint: 'https://push.example.test/s/abc', p256dh: 'BCV
 test('VAPID key survives restart and state files have owner-only permissions', async () => {
 	let first = await push.keys()
 	push.subscribe(subscription)
-	expect(statSync(`${paths.stateDir()}/push-vapid.ason`).mode & 0o777).toBe(0o600)
-	expect(statSync(`${paths.stateDir()}/push-subscriptions.ason`).mode & 0o777).toBe(0o600)
+	expect(statSync(`${paths.secretsDir()}/push-vapid.ason`).mode & 0o777).toBe(0o600)
+	expect(statSync(`${paths.secretsDir()}/push-subscriptions.ason`).mode & 0o777).toBe(0o600)
 	push.reset()
 	expect(await push.keys()).toEqual(first)
 	expect(push.store().subscriptions).toEqual([{ ...subscription, added: expect.any(String) }])

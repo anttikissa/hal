@@ -1,10 +1,10 @@
 // Persistent web push identity/subscriptions and delivery. Nothing starts at import.
-import { mkdirSync } from 'fs'
 import type { Command, Event } from '../common/protocol.ts'
 import { settings } from '../common/settings.ts'
 import { diag } from './diag.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
+import { secrets } from './secrets.ts'
 import { pushCrypto, type PushKeys, type VapidKeys } from './push-crypto.ts'
 
 // device: the browser's own label ("iPhone · Home Screen"); added: ISO time.
@@ -26,11 +26,10 @@ function valid(s: unknown): s is Subscription {
 
 function store(): Store {
 	if (push.state.store) return push.state.store
-	mkdirSync(paths.stateDir(), { recursive: true, mode: 0o700 })
-	let data = liveFiles.liveFile<Store>(`${paths.stateDir()}/push-subscriptions.ason`, { subscriptions: [] }, { watch: false, mode: 0o600 })
+	let data = secrets.file<Store>(`${paths.secretsDir()}/push-subscriptions.ason`, { subscriptions: [] }, { watch: false })
 	if (!Array.isArray(data.subscriptions) || !data.subscriptions.every(push.valid)) {
 		liveFiles.close(data)
-		throw new Error('push-subscriptions.ason: invalid subscriptions')
+		throw new Error(`${paths.display(`${paths.secretsDir()}/push-subscriptions.ason`)}: invalid subscriptions`)
 	}
 	return (push.state.store = data)
 }
@@ -38,11 +37,10 @@ function store(): Store {
 async function keys(): Promise<VapidKeys> {
 	if (!push.state.keys) {
 		push.state.keys = (async () => {
-			mkdirSync(paths.stateDir(), { recursive: true, mode: 0o700 })
-			let data = liveFiles.liveFile<Partial<VapidKeys>>(`${paths.stateDir()}/push-vapid.ason`, {}, { watch: false, mode: 0o600 })
+			let data = secrets.file<Partial<VapidKeys>>(`${paths.secretsDir()}/push-vapid.ason`, {}, { watch: false })
 			try {
 				if (!data.privateKey && !data.publicKey) Object.assign(data, await pushCrypto.generate())
-				if (!data.publicKey || !data.privateKey || Buffer.from(data.publicKey, 'base64url').length !== 65) throw new Error('push-vapid.ason: invalid key pair')
+				if (!data.publicKey || !data.privateKey || Buffer.from(data.publicKey, 'base64url').length !== 65) throw new Error(`${paths.display(`${paths.secretsDir()}/push-vapid.ason`)}: invalid key pair`)
 				liveFiles.save(data)
 				return { publicKey: data.publicKey, privateKey: data.privateKey }
 			} finally { liveFiles.close(data) }

@@ -45,17 +45,22 @@ function fileDir(name?: string): string {
 	return type === 'text/plain' ? `${paths.tmpDir()}/paste` : type === 'application/octet-stream' ? `${paths.tmpDir()}/file` : paths.imageDir()
 }
 
-// Everything else: socket, host lock, diagnostics, later peer and access
-// keys. Owner-only.
+// Everything else without credentials: socket, host lock, diagnostics,
+// caches. Owner-only.
 function stateDir(): string {
 	return `${paths.home()}/state`
 }
 
-// This home's credentials: copied in by the user or written by /login
-// claude (src/host/login.ts); refreshed OAuth tokens go back here
-// (src/host/auth.ts).
+// Credentials, tokens and private keys, and nothing else (task de):
+// owner-only, every file 0600, written through src/host/secrets.ts.
+function secretsDir(): string {
+	return `${paths.home()}/secrets`
+}
+
+// This home's provider credentials: written by /login (src/host/login.ts)
+// or copied in; refreshed OAuth tokens go back here (src/host/auth.ts).
 function authFile(): string {
-	return `${paths.home()}/auth.ason`
+	return `${paths.secretsDir()}/auth.ason`
 }
 
 // Common settings, user-edited like a dotfile (src/host/config.ts).
@@ -64,11 +69,13 @@ function configFile(): string {
 }
 
 // Idempotent. chmod (unlike mkdir's mode) ignores umask and also tightens
-// a state/ created earlier with looser permissions.
+// a state/ or secrets/ created earlier with looser permissions.
 function init(): void {
 	mkdirSync(paths.sessionsDir(), { recursive: true })
-	mkdirSync(paths.stateDir(), { recursive: true })
-	chmodSync(paths.stateDir(), 0o700)
+	for (let dir of [paths.stateDir(), paths.secretsDir()]) {
+		mkdirSync(dir, { recursive: true })
+		chmodSync(dir, 0o700)
+	}
 }
 
 // ~/… form for showing paths to the user.
@@ -80,4 +87,4 @@ function display(path: string): string {
 	return path
 }
 
-export const paths = { repoRoot: (): string => repoRoot, home, sessionsDir, sessionDir, tmpDir, imageDir, fileDir, stateDir, authFile, configFile, init, display }
+export const paths = { repoRoot: (): string => repoRoot, home, sessionsDir, sessionDir, tmpDir, imageDir, fileDir, stateDir, secretsDir, authFile, configFile, init, display }

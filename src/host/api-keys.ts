@@ -9,6 +9,7 @@ import { existsSync } from 'fs'
 import { auth } from './auth.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
+import { secrets } from './secrets.ts'
 
 // The key stored for `name`, if any. An entry without one is corrupt.
 function get(name: string): string | undefined {
@@ -27,7 +28,7 @@ function save(name: string, key: string): void {
 	try {
 		let path = paths.authFile()
 		let created = !existsSync(path)
-		let data = created ? liveFiles.liveFile(path, {} as Record<string, any>, { mode: 0o600, watch: false }) : auth.store()
+		let data = created ? secrets.file(path, {} as Record<string, any>, { watch: false }) : auth.store()
 		if (name === 'anthropic' || name === 'openai') {
 			// A provider may have subscription accounts: adding its API key must
 			// not discard their refresh tokens. Re-entering the key replaces it.

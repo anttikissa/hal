@@ -13,6 +13,7 @@ import { auth, CLIENT_ID, type Kind } from './auth.ts'
 import { limits } from './limits.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
+import { secrets } from './secrets.ts'
 
 type Entry = Record<string, any>
 
@@ -87,7 +88,7 @@ async function email(token: string): Promise<string | undefined> {
 function save(entry: Entry, kind: Kind = 'anthropic'): void {
 	let path = paths.authFile()
 	let created = !existsSync(path)
-	let data: Entry = created ? liveFiles.liveFile(path, {}, { mode: 0o600, watch: false }) : auth.store()
+	let data: Entry = created ? secrets.file(path, {}, { watch: false }) : auth.store()
 	let old = data[kind]
 	let list: Entry[] = old === undefined ? [] : Array.isArray(old) ? old : [old]
 	let id = kind === 'openai' ? 'accountId' : 'email'

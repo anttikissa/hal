@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { auth } from '../auth.ts'
 import { tool } from './google.ts'
@@ -14,6 +14,7 @@ const ctx = () => ({ cwd: home, signal: new AbortController().signal, sessionId:
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-google-`)
+	mkdirSync(`${home}/secrets`)
 	process.env.HAL_HOME = home
 	delete process.env.SERPER_API_KEY
 	seen = []
@@ -39,7 +40,7 @@ afterEach(() => {
 })
 
 test('formats answer box, knowledge graph and hits; key from the credentials file', async () => {
-	writeFileSync(`${home}/auth.ason`, "{ serper: { apiKey: 'filekey' } }\n")
+	writeFileSync(`${home}/secrets/auth.ason`, "{ serper: { apiKey: 'filekey' } }\n")
 	process.env.SERPER_API_KEY = 'envkey'
 	answer = () =>
 		Response.json({

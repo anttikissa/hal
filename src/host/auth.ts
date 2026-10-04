@@ -1,4 +1,4 @@
-// Anthropic and OpenAI credentials: this home's <home>/auth.ason (the
+// Anthropic and OpenAI credentials: this home's secrets/auth.ason (the
 // old Hal's file, single-entry or array shape per provider, copied in or
 // written by /login claude or /login chatgpt: login.ts, login-chatgpt.ts),
 // then ANTHROPIC_API_KEY or OPENAI_API_KEY from the environment as the
@@ -30,6 +30,7 @@ import { clock } from './clock.ts'
 import { limits } from './limits.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
+import { secrets } from './secrets.ts'
 import { usage } from './usage.ts'
 
 // `accountId`: the ChatGPT account an OpenAI entry was saved with.
@@ -94,7 +95,7 @@ function store(): Entry {
 	if (!existsSync(path)) throw fail(`missing; ${LOG_IN}`)
 	// liveFile's own errors name the file and never quote its content.
 	try {
-		auth.state.store = liveFiles.liveFile(path, {}, { mode: 0o600 })
+		auth.state.store = secrets.file(path, {})
 	} catch (e: any) {
 		throw Object.assign(e, { failure: 'auth' })
 	}

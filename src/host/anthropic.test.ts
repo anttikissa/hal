@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import { blocks, type Message, type StreamEvent } from '../common/blocks.ts'
@@ -27,13 +27,14 @@ function sse(...events: any[]): Response {
 }
 
 function writeAuth(entry: unknown) {
-	writeFileSync(`${home}/auth.ason`, ason.stringify({ anthropic: entry }) + '\n', { mode: 0o600 })
+	writeFileSync(`${home}/secrets/auth.ason`, ason.stringify({ anthropic: entry }) + '\n', { mode: 0o600 })
 }
 
 beforeEach(() => {
 	seen = []
 	models = () => Response.json({ data: [{ id: 'claude-new-9' }, { id: 'claude-old-1' }] })
 	home = mkdtempSync(`${tmpdir()}/hal-anthropic-`)
+	mkdirSync(`${home}/secrets`)
 	process.env.HAL_HOME = home
 	writeAuth({ accessToken: 'fake-oauth-token', refreshToken: 'r', expires: Date.now() + 3_600_000 })
 	server = Bun.serve({
@@ -109,7 +110,7 @@ test('an API key credential uses x-api-key and no OAuth betas', async () => {
 })
 
 test('missing credentials: an error naming the file, no request', async () => {
-	rmSync(`${home}/auth.ason`)
+	rmSync(`${home}/secrets/auth.ason`)
 	let events = await run()
 	expect(events).toEqual([expect.objectContaining({ type: 'error', message: expect.stringContaining('auth.ason') })])
 	expect(seen).toHaveLength(0)

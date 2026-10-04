@@ -25,10 +25,11 @@ const jwt = (claims: object) => `h.${btoa(JSON.stringify(claims)).replace(/=+$/,
 const subscriptionToken = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-1' } })
 const sse = (...events: object[]) => new Response(events.map((e) => `event: ${(e as any).type}\ndata: ${JSON.stringify(e)}\n\n`).join(''), { headers: { 'content-type': 'text/event-stream' } })
 const completed = (usage?: object) => ({ type: 'response.completed', response: { status: 'completed', ...(usage && { usage }) } })
-const writeAuth = (data: object) => writeFileSync(`${home}/auth.ason`, ason.stringify(data) + '\n', { mode: 0o600 })
+const writeAuth = (data: object) => writeFileSync(`${home}/secrets/auth.ason`, ason.stringify(data) + '\n', { mode: 0o600 })
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-openai-`)
+	mkdirSync(`${home}/secrets`)
 	process.env.HAL_HOME = home
 	mkdirSync(`${home}/state`)
 	delete process.env.OPENAI_API_KEY
@@ -86,7 +87,7 @@ test('a ChatGPT token goes to the Codex backend with its account id; an API key 
 	expect(seen[0]!.body).toMatchObject({ model: 'gpt-5.5', store: false, stream: true, instructions: 'be brief', prompt_cache_key: 'sess-1' })
 	expect(seen[0]!.body.max_output_tokens).toBeUndefined()
 
-	rmSync(`${home}/auth.ason`)
+	rmSync(`${home}/secrets/auth.ason`)
 	auth.close()
 	process.env.OPENAI_API_KEY = 'sk-test'
 	await run(hi, { maxTokens: 1000 })
