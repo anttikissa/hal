@@ -1305,7 +1305,7 @@ test.skipIf(!chrome)('completion dismissal follows pointer and focus without ste
 				expect(bounds.right).toBeLessThanOrEqual(bounds.width)
 				expect(bounds.top).toBeGreaterThanOrEqual(0)
 				await press('Tab')
-				await b.waitFor(`document.querySelector('textarea').value === '/restart local' && !document.querySelector('.completions')`)
+				await b.waitFor(`document.querySelector('textarea').value === '/restart all' && !document.querySelector('.completions')`)
 			}
 		}
 		await type('/version')

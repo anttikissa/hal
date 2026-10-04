@@ -8,7 +8,7 @@ import { router } from './router.ts'
 import { restart } from './restart.ts'
 
 const sessionId = 'restart-test'
-const items = ['/restart local', '/restart host', '/restart both', '/restart all']
+const items = ['/restart all', '/restart host', '/restart both', '/restart local']
 let sent: any[] = []
 const original = { send: connection.send, connected: connection.connected, store: drafts.store, href: router.href, write: router.write, changed: app.changed, typed: restart.typed }
 
@@ -38,20 +38,20 @@ afterEach(() => {
 })
 
 const press = (key: string) => keys.key({ key, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false }, { kind: 'message', text: app.state.text, cursor: app.state.text.length })
-const reply = (text: string) => app.onEvent({ type: 'completions', sessionId, text, items, descriptions: ['restart this client (default)', 'restart the host', 'restart both', 'restart all'] })
+const reply = (text: string) => app.onEvent({ type: 'completions', sessionId, text, items, descriptions: ['restart all (default)', 'restart the host', 'restart both', 'restart this client'] })
 
-test('restart Tab fills local before or after suggestions arrive, without submission', () => {
+test('restart Tab fills all before or after suggestions arrive, without submission', () => {
 	for (let text of ['/restart', '/restart ']) {
 		for (let ready of [false, true]) {
 			app.input(text)
 			if (ready) {
 				reply(text)
 				expect(app.state.text).toBe(text)
-				expect(app.state.menu?.choices[0]).toMatchObject({ label: 'local', description: 'restart this client (default)' })
+				expect(app.state.menu?.choices[0]).toMatchObject({ label: 'all', description: 'restart all (default)' })
 			}
 			expect(press('Tab')).toBe(true)
 			if (!ready) reply(text)
-			expect(app.state.text).toBe('/restart local')
+			expect(app.state.text).toBe('/restart all')
 		}
 	}
 	expect(sent.some((c) => c.type === 'submit')).toBe(false)
