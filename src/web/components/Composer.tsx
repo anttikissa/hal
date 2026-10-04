@@ -35,6 +35,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	// An upload's answer edits the box in place when it has the focus, so
 	// the caret stays where the user is typing.
 	let picker!: HTMLInputElement
+	let typing = false
 	let box = (e: HTMLTextAreaElement) => {
 		input = e
 		keys.insert = insert
@@ -135,7 +136,6 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				/>
 				</div>
 				<input
-					ref={(e) => (picker = e)}
 					type="file"
 					class="hidden-text"
 					tabindex={-1}
@@ -145,9 +145,13 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 					onChange={(e) => {
 						attach.files(e.currentTarget.files ?? [], insert)
 						e.currentTarget.value = ''
+						if (typing) input.focus()
 					}}
+					ref={(e) => { picker = e; e.addEventListener('cancel', () => { if (typing) input.focus() }) }}
 				/>
-				<button type="button" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onClick={() => picker.click()}>
+				{/* Keep the keyboard: the tap leaves the draft focused, and the
+				    draft takes the focus back when the picker closes. */}
+				<button type="button" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onPointerDown={(e) => { typing = document.activeElement === input; e.preventDefault() }} onClick={() => picker.click()}>
 					+
 				</button>
 				<div class="actions">
