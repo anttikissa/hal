@@ -27,13 +27,17 @@ function Text(props: { value: string }) {
 	return node
 }
 
+// A home-screen web app on iOS opens every link inside itself, even with
+// target="_blank"; the x-safari- prefix hands web links to Safari.
+export let external = (href: string) => ((navigator as { standalone?: boolean }).standalone && /^https?:/.test(href) ? `x-safari-${href}` : href)
+
 function Runs(props: { runs: Run[] }) {
 	let cls = (r: Run) => [r.bold && 'b', r.italic && 'i', r.code && 'code']
 	return (
 		<For each={props.runs} keyed={false}>
 			{(r) => (
 				<Switch>
-					<Match when={!!r().href}><a class={cls(r())} href={r().href} target="_blank" rel="noopener noreferrer"><Text value={r().text} /></a></Match>
+					<Match when={!!r().href}><a class={cls(r())} href={external(r().href!)} target="_blank" rel="noopener noreferrer"><Text value={r().text} /></a></Match>
 					<Match when={!r().href}><span class={cls(r())}><Text value={r().text} /></span></Match>
 				</Switch>
 			)}
