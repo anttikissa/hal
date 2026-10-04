@@ -7,12 +7,13 @@
 // The cache is JSON, not ASON: it is ~650 kB and rewritten whole at
 // every start, and ASON takes ~100 ms to write and read it back.
 
+import type { Pricing } from '../common/pricing.ts'
 import { readFileSync, renameSync, writeFileSync } from 'fs'
 import { diag } from './diag.ts'
 import { paths } from './paths.ts'
 import { provider } from './provider.ts'
 
-export type ModelInfo = { name?: string; context?: number }
+export type ModelInfo = { name?: string; context?: number; pricing?: Pricing }
 // models.dev provider id -> model id (without "provider/") -> info.
 export type Catalog = Record<string, Record<string, ModelInfo>>
 
@@ -53,6 +54,14 @@ function parse(data: unknown): Catalog {
 			let info: ModelInfo = {}
 			if (typeof raw?.name === 'string') info.name = raw.name
 			if (typeof raw?.limit?.context === 'number' && raw.limit.context > 0) info.context = raw.limit.context
+			let cost = raw?.cost
+			if (typeof cost?.input === 'number' && typeof cost?.output === 'number') {
+				let prices: Pricing = { input: cost.input, output: cost.output }
+				if (typeof cost.cache_read === 'number') prices.cacheRead = cost.cache_read
+				if (typeof cost.cache_write === 'number') prices.cacheWrite = cost.cache_write
+				if (Object.values(prices).some((n) => !Number.isFinite(n) || n < 0)) throw new Error(`models.dev: invalid cost for ${name}/${id}`)
+				info.pricing = prices
+			}
 			list[id] = info
 		}
 		out[name] = list

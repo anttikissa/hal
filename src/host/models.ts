@@ -33,6 +33,7 @@
 // one that cannot, or fails or is slow (asked again next time), gets
 // its list from the models.dev cache (task qq) plus its built-in one.
 
+import type { Pricing } from '../common/pricing.ts'
 import { blocks } from '../common/blocks.ts'
 import { picker } from '../common/picker.ts'
 import { settings } from '../common/settings.ts'
@@ -183,6 +184,10 @@ export const models = {
 	warm,
 	names,
 	resolve,
+	// List prices, not subscription charges. Unknown prices stay unknown.
+	pricing(id: string): Pricing | undefined {
+		return modelsDev.info(id)?.pricing ?? (id === 'anthropic/claude-opus-5-5' ? { input: 4, output: 20, cacheRead: .2, cacheWrite: 5 } : undefined)
+	},
 	// Tokens `id` can take in, if known: for the context meter.
 	contextWindow(id: string): number | undefined {
 		let parsed = blocks.parseModelId(id)

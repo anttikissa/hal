@@ -1,6 +1,10 @@
 {
 	title: 'scripts/cost and report numbers read this home',
 	spec: "scripts/cost <session ids...> (and with --since <time>, every session) totals API cost from this home's sessions/*/history.asonl round and turn_end usage at each model's list price (src/host/models.ts pricing), split by provider and model. Progress reports in AGENTS.md use it; no report needs the old Hal's state directory.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'scripts/cost is a Bun entry point into host/cost.ts, using paths.home (HAL_HOME for tests), validated session metadata and history records. Authoritative round usage is counted once; turn_end supplies the legacy fallback only for turns with no rounds. Paused/failed turns continued with continue keep their rounds or final cumulative aggregate, not repeated end totals. --since filters usage-record timestamps and omitted session ids mean every session; reads never open sessions or write state.',
+		'models.pricing reads cached models.dev list prices; models-dev parsing retains input/output/cache_read/cache_write USD per million tokens. The prior cost script supplies the verified Opus 5.5 fallback (4/20/0.2/5). Unknown models or missing prices for used cache tokens say UNPRICED and make the total explicitly incomplete, never guessed or silently zero. Run reports session/model rows plus provider and model subtotals, exact token totals, and USD to four decimals. The script does not fetch the network; catalogs cached before this task need the normal host refresh to gain prices.'
+	],
 	needs: []
 }
