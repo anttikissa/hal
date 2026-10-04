@@ -1,0 +1,8 @@
+{
+	title: 'Rebase rows: what each record costs and holds',
+	spec: `One shared, browser-safe module (src/common/) turns a session's current records into rebase rows, used by the terminal todo file and the web view alike. One row per prompt, assistant text, thinking block, tool call with its result (one row), command and output, compact or reset boundary. Each row: #n, time (HH:MM, date when it changes), kind, a one-line summary (prompt's first line, tool name and command or path, thinking's first words), its size in estimated tokens and characters, and what it carries: images, blobs (with their size), a cut or pruned output. Sums at the top: rows, tokens now, tokens after the planned changes, and from which record the prompt cache would be rebuilt.
+Token estimates use the calibrated chars-per-token ratio when there is one (task 1dk), otherwise the pruning estimate.
+Rendering a plan to todo text and parsing it back live here too (format in tasks/3zz/rebase.md), with errors naming the line.`,
+	status: 'planned',
+	needs: ['3zz']
+}

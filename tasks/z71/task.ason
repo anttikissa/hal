@@ -1,0 +1,8 @@
+{
+	title: '/rebase on the host: plan, apply, undo',
+	spec: `The /rebase command (src/host/commands/rebase.ts) answers with a plan: the session's rows (task 01d) and the base record number; it opens the rebase view in the client that ran it (terminal: editor, task 7ke; web: view, task bzf). The client sends back the actions; the host checks the base, the session state and the pairing rules of tasks/3zz/rebase.md, appends the rebase record, and every client hears a history event that reloads the session's transcript from the changed record on. Queue lines become prompts sent right after, in order. /rebase undo reverts the last rebase. Errors (a stale base, a running turn, a bad line) are shown whole and change nothing.
+The transcript shows the rebase as one divider row: "History rewritten: 14 dropped, 2 edited · cache rebuilds from #120 · undo".
+Also the model may not run /rebase through the command tool.`,
+	status: 'planned',
+	needs: ['01d']
+}

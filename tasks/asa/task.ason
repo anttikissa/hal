@@ -1,0 +1,6 @@
+{
+	title: 'scripts/cost and report numbers read this home',
+	spec: "scripts/cost <session ids...> (and with --since <time>, every session) totals API cost from this home's sessions/*/history.asonl round and turn_end usage at each model's list price (src/host/models.ts pricing), split by provider and model. Progress reports in AGENTS.md use it; no report needs the old Hal's state directory.",
+	status: 'planned',
+	needs: []
+}

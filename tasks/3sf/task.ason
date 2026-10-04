@@ -1,0 +1,6 @@
+{
+	title: '/what sums up other tabs without disturbing them',
+	spec: "/what [tab or name or all] asks a model for a short summary of what other sessions are doing and where they stand, without sending them anything or pausing them: it reads their recent records (bounded per session and in total), summarises each in two or three lines (goal, last action, state: working, waiting on the user, done, failed) and shows the result as one output in the asking session. Default: every other open tab. Runs in the background so the asking session stays usable; the summary is stored with the session like any command output. Uses the session's model unless a cheaper default is configured. Old Hal reference: artifact old-what.ts.",
+	status: 'planned',
+	needs: []
+}

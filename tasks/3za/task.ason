@@ -1,0 +1,6 @@
+{
+	title: '/logout revokes web logins',
+	spec: "/clients names each web login (device, browser, first and last seen); /logout <client> or /logout all revokes them by deleting their token hashes from state/web-sessions.ason, and a revoked browser's open sockets close at once and fall back to the login page. The current browser can log itself out from the web status details. Replaces the TODO.md item.",
+	status: 'planned',
+	needs: []
+}

@@ -1,0 +1,10 @@
+{
+	title: 'Rebase: rewrite a session history, append-only',
+	spec: `A session's context can be rewritten after the fact: records dropped, prompt or assistant text edited, tool output replaced by a short note. Design: tasks/3zz/rebase.md (rows, actions, durable form, both clients); later rebase tasks follow it.
+Durable form: one appended record { type: 'rebase', base: n, drop: [n...], edit: [{ n, text }], ts } and nothing rewritten on disk. replay.current applies the latest rebases in order, like replaces: dropped records leave provider input and the transcript, edited ones carry the new text. A dropped tool call drops its result and vice versa, so provider input stays valid; a turn's records are never split in a way the providers refuse (a tool result without its call, thinking without its signature block). Undo is another rebase that restores (an empty drop/edit list against the same base reverts to the records as written).
+Compaction, clear, pruning, fork, find and lazy pages read through replay.current, so a dropped or edited record is gone everywhere except the raw file. The context graph marks a rebase as a cause (letter R). The record numbers n stay stable: links to #n of a dropped record show it as dropped, not missing.
+Refused while the session runs a turn or waits on a question; the user pauses first. Applying checks base equals the last record number when the plan was built, so nothing appended in between is lost.
+Old Hal reference: artifacts old-rebase.ts, old-rebase.test.ts, old-rebase-handler.ts (it wrote a new history file; here we append a record instead).`,
+	status: 'planned',
+	needs: []
+}
