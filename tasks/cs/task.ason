@@ -1,6 +1,10 @@
 {
 	title: 'The ask tool is deleted',
 	spec: 'The hidden ask tool (task hc) is gone: src/host/tools/ask.ts, its turns.ts handling, tools.disabled and turns-ask.test.ts are deleted, and a migration removes ask tool calls, their questions, answers and results from existing session histories, so every session still opens. A reminder test in tools.test.ts fails from 2026-10-15 while src/host/tools/ask.ts exists; it is deleted with the tool.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'No migration convention existed. history-migration.ts runs under the exclusive host lock before socket clients can open sessions; state/migrations.ason marks completion. Each affected history is replaced by atomic rename. Parse failures include path and raw input; a torn final write remains for normal history repair. Call IDs may be reused, so ask association follows the latest call. Mixed user records retain other results and prompts; command, approval and synthetic questions remain.',
+		'Rewritten histories materialize legacy byte-offset record numbers and retain the original numbering high-water mark in rebuilt marks. Context-surgery plans drop references to removed records. Byte-offset projections and the disposable search database must be invalidated before rewrite because numbered legacy histories can grow. tabs.test.ts used ask to park a turn; it now uses a dangerous bash approval that never executes.'
+	],
 	needs: ['hc']
 }

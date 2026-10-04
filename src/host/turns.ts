@@ -16,7 +16,6 @@ import { contextTransitions } from './context-transitions.ts'
 import { compact } from './compact.ts'
 import { turnRecovery } from './turn-recovery.ts'
 import { turnPolicy } from './turn-policy.ts'
-import { tool as askTool } from './tools/ask.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { models } from './models.ts'
@@ -88,7 +87,7 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 	contextTransitions.cancel(id)
 	let records = history.readSync(id)
 	let open = forms.open(records)
-	if (!transition && !closing && open && !open.from && (open.form.skip || (open.call && records.some((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === open.call && r.block.name === 'ask')))) {
+	if (!transition && !closing && open && !open.from && open.form.skip) {
 		let refused = status.transition(id, { type: 'answer' })
 		if (refused) return refused
 		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
@@ -275,12 +274,6 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			}
 			if (signal.aborted) continue
 			for (let call of calls) {
-				if (call.name === 'ask' && !askTool.answered(history.readSync(id), call)) {
-					// Bad model input is a tool error, not a broken turn.
-					let form: Form
-					try { form = askTool.form(call.input) } catch { continue }
-					return turns.ask(id, form, call.id)
-				}
 				let form = decided.has(call.id) ? undefined : approval.form(call)
 				if (form) return turns.ask(id, form, call.id)
 			}
@@ -294,7 +287,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					results.push({ type: 'tool_result', id: call.id, output: 'Tool call did not run: interrupted before dispatch.', isError: true })
 					continue
 				}
-				if (call.name !== 'ask' && decided.get(call.id) === false) { results.push(approval.declined(call)); continue }
+				if (decided.get(call.id) === false) { results.push(approval.declined(call)); continue }
 				let stream = call.name === 'bash' ? toolOutput.start(id, call.id) : undefined
 				try { results.push(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx)) }
 				finally { stream?.stop() }

@@ -252,13 +252,6 @@ test('read_blob fetches a numbered tool call and its result from history', async
 	} finally { paths.home = originalHome }
 })
 
-// Reminder the user asked for: the hidden ask tool (task hc) must be
-// deleted by then. Delete this test with it.
-test('the ask tool is deleted by 2026-10-15', () => {
-	if (Date.now() < Date.parse('2026-10-15')) return
-	expect(existsSync(`${tools.dir()}/ask.ts`)).toBe(false)
-})
-
 test('a call whose input was not valid JSON becomes an error result the model can act on', async () => {
 	let r = await tools.run({ type: 'tool_call', id: 'x', name: 'bash', input: { invalidJson: '{"command": "ls' } }, { sessionId: 's', cwd: '/tmp', signal: new AbortController().signal } as any)
 	expect(r).toMatchObject({ id: 'x', isError: true, output: expect.stringContaining('call it again') })
