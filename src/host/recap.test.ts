@@ -103,3 +103,11 @@ test('provider recap input and output are bounded and no tools are available', a
 		expect(input.messages[0].blocks[0].text.length).toBeLessThan(recap.digestChars + 200)
 	} finally { provider.stream = original }
 })
+
+
+test('unknown visibility reports are rejected before recap history access', () => {
+	let c = client()
+	c.conn.send({ type: 'visibility', sessionId: '../missing', visible: true })
+	expect(c.of('rejected').at(-1).reason).toContain('visibility:')
+	expect(host.state.clients.values().next().value?.visible).toBeUndefined()
+})
