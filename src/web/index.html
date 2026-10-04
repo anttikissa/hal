@@ -227,6 +227,8 @@ body, textarea { tab-size: 4; }
 .chips button { min-width: 44px; min-height: 44px; background: transparent; color: var(--quiet); border: 0; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
 @media (hover: hover) and (pointer: fine) { .chips button:hover { color: inherit; background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
 .entry .actions button { flex: 1; min-height: 44px; }
+.entry .actions button.toggle { flex: none; display: grid; place-items: center; width: 44px; padding: 0; }
+.entry .actions button.toggle svg { width: 14px; height: 14px; fill: currentColor; }
 .entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
 /* The example request: the input's faint blue, as in the terminal. It
    leaves fast as typing starts and returns a little slower. */
