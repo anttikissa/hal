@@ -1338,6 +1338,7 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	let ts = '2026-10-02T06:20:00Z'
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Human prompt body' }], ts })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Delivered queued prompt body', queuedAt: '2026-10-01T23:13:07.456Z' }], queued: true, ts })
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'Assistant body\n\nAnother paragraph' }, ts })
 	history.append(id, { type: 'output', text: 'Command output body', ts })
 	history.append(id, { type: 'command', text: '/help', ts })
@@ -1351,7 +1352,7 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 		history.append(id, { type: 'assistant', block: { type: 'tool_call', id: name!, name: 'bash', input: { description, command: 'printf example', modifies: [] } }, ts })
 		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: name!, output: 'Example output' }], ts })
 	}
-	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '**Message body**\n\nMore detail', from: 'reviewer', label: 'Review agent', summary: 'Review the card layout' }], ts })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '**Message body**\n\nMore detail', from: 'reviewer', label: 'Review agent', summary: 'Review the card layout', queuedAt: '2026-10-01T23:13:07.456Z' }], queued: true, ts })
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '[exit 0]\nJob complete', from: 'worker', label: 'bash #6' }], ts })
 	history.append(id, { type: 'inbox', id: 'queued-review', text: '**Queued message**\n\nLine three\nLine four', queue: true, from: 'reviewer', label: 'Review agent', ts })
 	history.append(id, { type: 'compact', summary: 'Example context summary', prompts: 1, ts })

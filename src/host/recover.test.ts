@@ -4,7 +4,7 @@
 import { expect, test } from 'bun:test'
 import { busy } from './busy.ts'
 import { history } from './history.ts'
-import { calls, client, restartHost, stamped, testHome, until, useHost } from './host-fixture.test.ts'
+import { calls, client, restartHost, testHome, until, useHost } from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
@@ -16,7 +16,7 @@ const texts = (message: any) => message.blocks.map((b: any) => b.text)
 test('a queued message written 1 MB before the end of history runs after a host restart', async () => {
 	let id = sessions.create({ cwd: '/tmp/w', model: 'fake/m1' }).id
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'go' }] })
-	history.append(id, { type: 'inbox', id: 'q1', text: 'later', queue: true })
+	let queuedAt = history.append(id, { type: 'inbox', id: 'q1', text: 'later', queue: true }).ts
 	// The turn goes on for a megabyte of tool rounds, then the host dies
 	// after its end, before the queued prompt.
 	for (let i = 0; i < 100; i++) {
@@ -27,7 +27,7 @@ test('a queued message written 1 MB before the end of history runs after a host 
 	restartHost()
 	await turns.recover()
 	await until(() => calls.length === 1)
-	expect(texts(calls[0]!.input.messages.at(-1))).toEqual([stamped('later')])
+	expect(texts(calls[0]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Queued at ${queuedAt}.</meta>\nlater`)])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => !turns.state.running.has(id))
 	// Nothing is left: the next host runs nothing and drops it as busy.

@@ -1,0 +1,10 @@
+{
+	title: 'Protect queued messages while editing',
+	spec: 'Terminal and web support editing a human queued message without allowing it to be dequeued during the edit. Up in an empty terminal composer recalls a queued human message when one waits, and the editor identifies it as a queue edit rather than a delivered-prompt edit. Starting a queue edit atomically protects its inbox identity on the host before exposing editable text, and pauses the session; if delivery won the race, do not pretend the message remains queued. Saving replaces that inbox message in the same position; cancelling leaves it unchanged. Preserve the pre-existing draft and original queue receipt timestamp. Continue cannot bypass an active queue edit from either client; delivered-prompt editing retains its separate continue behavior. Reconnects, concurrent clients and closing or losing an editing client must not lose text, leave an unexplained permanent hold or permit silent dequeue during a live edit. Final resume and multiple-message navigation behavior require user agreement before implementation. Queue links are not required.',
+	status: 'planned',
+	notes: [
+		'User raised the race explicitly: a queue message must not be dequeued while it is being edited. Current amend.begin recalls the latest human inbox item without pausing; this is insufficient. Proposed, not yet agreed: newest queued message first, and resume on save/cancel only when beginning the edit caused the pause. Delivered-prompt edits remain distinct. Host acquisition must precede opening the editor; a client-local pause or disabled button is not a concurrency guarantee.'
+	],
+	needs: ['dg', 'r2s'],
+	foldInto: ['dg']
+}

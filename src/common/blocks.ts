@@ -24,7 +24,8 @@ export type ImageBlock = { type: 'image'; blob: string; mediaType: string; bytes
 // without dropping its work (the send tool's default). `steering`:
 // this text was submitted to steer an active turn; retained for display.
 // `summary`: one line for the user, heading the message folded.
-export type Sender = { from?: string; label?: string; advisory?: true; steering?: true; summary?: string; origin?: 'model'; generatingCommand?: 'clear' }
+// queuedAt: original inbox receipt time, retained after queue delivery.
+export type Sender = { queuedAt?: string; from?: string; label?: string; advisory?: true; steering?: true; summary?: string; origin?: 'model'; generatingCommand?: 'clear' }
 
 // A prompt's text, saying who sent it.
 export type UserText = TextBlock & Sender

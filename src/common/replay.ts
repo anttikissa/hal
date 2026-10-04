@@ -204,11 +204,12 @@ function toMessages(records: HistoryRecord[]): Message[] {
 // an [Inbox · sender] line (tab, id and name), an advisory one also
 // saying it needn't drop its work for it.
 function framed(b: UserText): string {
-	if (b.generatingCommand) return `[${titles.author({ ...b, type: 'prompt' })}]\n${b.text}`
-	if (b.origin === 'model') return `[Hal]\n${b.text}`
-	if (b.from === undefined) return b.text
+	let text = b.queuedAt === undefined ? b.text : `<meta>Queued at ${b.queuedAt}.</meta>\n${b.text}`
+	if (b.generatingCommand) return `[${titles.author({ ...b, type: 'prompt' })}]\n${text}`
+	if (b.origin === 'model') return `[Hal]\n${text}`
+	if (b.from === undefined) return text
 	let head = `[Inbox · ${b.label ?? b.from}]`
-	return b.advisory ? `${head}\n${replay.advisoryNote}\n${b.text}` : `${head}\n${b.text}`
+	return b.advisory ? `${head}\n${replay.advisoryNote}\n${text}` : `${head}\n${text}`
 }
 
 // Whether the record is a prompt: a user record with text.
