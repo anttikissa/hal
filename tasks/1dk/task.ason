@@ -1,0 +1,6 @@
+{
+	title: 'Token estimates are calibrated per model',
+	spec: "Hal learns each model's characters-per-token ratio from real provider usage: after a round, the input characters it sent and the input tokens the provider counted update a per-model ratio in state/calibration.ason (liveFile), smoothed so one odd round can't swing it. Pruning, compaction thresholds, rebase rows and the context page use calibrated estimates when a model has a ratio, and the fixed estimate otherwise. Old Hal reference: artifact old-token-calibration.ts.",
+	status: 'planned',
+	needs: []
+}

@@ -1,0 +1,6 @@
+{
+	title: 'Web rebase view',
+	spec: "The web client shows /rebase as a full-height overlay over the transcript (one scroller, the overlay's own). Read skills/ui-craft/SKILL.md first. Each row shows #n, time, kind, the summary and its tokens as a number plus a bar scaled to the largest row, so heavy rows stand out; tapping a row opens it in place to show the whole text, images and blob previews (no JSON). Each row has keep, drop and edit; edit is an inline textarea. Shift-click (desktop) or a range mode (phone) acts on a run of rows. Quick actions: drop tool output over a size, drop everything before a row. The footer always shows tokens now, tokens after and where the cache rebuilds, with Apply and Cancel; Escape cancels, nothing applies without Apply. Works on a phone (44px targets, keyboard-safe). Check the look by hand at phone and desktop widths.",
+	status: 'planned',
+	needs: ['z71']
+}
