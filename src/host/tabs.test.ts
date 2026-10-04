@@ -140,7 +140,7 @@ test('closing a tab blocked on a question cancels it instead of restarting the t
 	a.conn.send({ type: 'open', sessionId: id })
 	send(a, { type: 'submit', sessionId: id, text: 'ask' })
 	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'tool_call', id: 'ask1', name: 'ask', input: { text: 'Why?' } }, { type: 'done', reason: 'tool_use' })
+	calls[0]!.push({ type: 'tool_call', id: 'b1', name: 'bash', input: { command: 'git reset --hard', description: 'Reset work' } }, { type: 'done', reason: 'tool_use' })
 	await until(() => a.of('question').length)
 	send(a, { type: 'tab-close', sessionId: id })
 	expect(status.stateOf(id).type).toBe('paused')
