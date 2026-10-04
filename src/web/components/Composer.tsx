@@ -85,6 +85,11 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 		if (n < 20) setTimeout(() => ((img.dataset.tries = String(n + 1)), (img.src = `${img.src.split('?')[0]}?try=${n + 1}`)), 500)
 	}
 	let busy = () => !!props.view.transcript && states.busy(props.view.transcript.state)
+	let paused = () => props.view.transcript?.state.type === 'paused'
+	let toggle = () => {
+		let t = props.view.transcript
+		if (t) app.sendNow(paused() ? { type: 'continue', sessionId: t.meta.id } : view.pause(props.view))
+	}
 	let send = (queue = false) => {
 		app.send(queue)
 		input.focus()
@@ -155,6 +160,12 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 					+
 				</button>
 				<div class="actions">
+					{/* Pause and continue without Escape (task v0g); the tap keeps the keyboard. */}
+					<Show when={busy() || paused()}>
+						<button type="button" class="toggle" aria-label={paused() ? 'Continue' : 'Pause (Esc)'} title={paused() ? 'Continue' : 'Pause (Esc)'} onPointerDown={(e) => e.preventDefault()} onClick={toggle}>
+							<svg viewBox="0 0 16 16" aria-hidden="true">{paused() ? <path d="M4 2.5v11l9-5.5z" /> : <path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z" />}</svg>
+						</button>
+					</Show>
 					<Show when={busy() && !view.commandDraft(props.text)}>
 						<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={() => send(true)}>Queue</button>
 					</Show>
