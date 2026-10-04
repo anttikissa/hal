@@ -9,7 +9,6 @@ export const tool: Tool = {
 	name: 'wait',
 	description: 'Wait for the next subagent session to report back. Ends this turn; its message starts the next one.',
 	parameters: { type: 'object', properties: {} },
-	readOnly: true,
 	async run(_input, ctx) {
 		let active = subagents.running(ctx.sessionId)
 		if (!active.length) return 'No subagent of this session is running: none was spawned, or all have finished. Go on without waiting.'

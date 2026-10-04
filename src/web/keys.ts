@@ -6,7 +6,8 @@
 // Enter submits (steering a running turn; Alt+Enter queues after it,
 // Shift+Enter is a newline; on a touch keyboard Enter is a newline),
 // Escape pauses a running turn, Up on an empty box edits the last
-// prompt (src/common/amend.ts), Up on an empty box begins history
+// prompt (src/common/amend.ts; Escape also cancels a card's Edit,
+// edit-prompt.ts), Up on an empty box begins history
 // browsing (src/common/recall.ts). While browsing, first/last logical
 // line arrows recall entries; nonempty drafts keep native movement,
 // including soft wraps. Tab completes a slash command; command keys run theirs,
@@ -21,6 +22,7 @@ import { recall } from '../common/recall.ts'
 import { app } from './app.ts'
 import { attach, type Pasted } from './attach.ts'
 import { editor, type Splice } from './editor.ts'
+import { editPrompt } from './edit-prompt.ts'
 import { tabs } from './tabs.ts'
 import { view } from './view.ts'
 import { commandList } from '../common/commands/list.ts'
@@ -105,6 +107,8 @@ function key(e: KeyInput, target: Target): boolean {
 		let choice = menuKey[e.key as keyof typeof menuKey]
 		if (choice && app.menuKey(choice)) return true
 	}
+	// An edit from a card's Edit button (task 26q): Escape cancels it anywhere.
+	if (plain && e.key === 'Escape' && st.view.editing?.aside) return editPrompt.leave()
 	let edit = plain && target.kind === 'message' && arrows[e.key] ? view.editKey(st.view, arrows[e.key]!, st.text) : undefined
 	if (edit) {
 		st.view = edit.view

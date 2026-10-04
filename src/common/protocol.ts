@@ -115,9 +115,11 @@ export type Command = (
 	// history whether it replaces that prompt or is sent on top; with
 	// `edits` too, an edit of that inbox message while it still waits.
 	// A slash command (/name args) runs on the host at once instead.
+	// `rewind`: the text replaces prompt record #n, which and everything
+	// after it a rebase drops first (task 26q).
 	// Always the human's: another session's messages come from the host
 	// (the send tool), never from what a client claims (task rj).
-	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean; edits?: string }
+	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number }
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }
@@ -362,6 +364,7 @@ function invalid(value: unknown): string | undefined {
 		return str('sessionId') ?? str('question') ?? (strings ? undefined : 'answer: answers must map names to strings')
 	}
 	if (c.type === 'attach') return str('sessionId') ?? str('mediaType') ?? str('data') ?? str('name', true)
+	if (c.type === 'submit' && c.rewind !== undefined && !(Number.isSafeInteger(c.rewind) && (c.rewind as number) > 0)) return 'submit: rewind must be a record number'
 	if (c.type === 'submit') return str('sessionId') ?? str('text') ?? str('edits', true)
 	return str('sessionId') ?? (c.type === 'draft' || c.type === 'complete' ? str('text') : undefined)
 }

@@ -24,6 +24,7 @@ import { external, Markdown } from './Markdown.tsx'
 import { CardHeader } from './CardHeader.tsx'
 import { promptChanges } from '../../common/prompt-changes.ts'
 import { app } from '../app.ts'
+import { editPrompt } from '../edit-prompt.ts'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
@@ -58,7 +59,9 @@ function enter(el: HTMLElement): void {
 // An image row shows the image itself, from the session's blob.
 // `job`: the background job this Bash call started still runs; a Kill
 // button in the header sends /kill #<job>.
-export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string }) {
+// `edit`: a prompt the user may edit and resend; its header offers Edit
+// (task 26q, edit-prompt.ts), which loads it into the box.
+export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean }) {
 	let id = () => `${props.session}#${props.row.key}`
 	let root: HTMLElement | undefined
 	onSettled(() => root && enter(root))
@@ -142,7 +145,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let failed = () => !!props.row.result?.isError
 	let toggle = (e: MouseEvent) => {
-		if ((!folds() && props.row.note === undefined) || (e.target as Element).closest('a, .more, .kill') || !getSelection()?.isCollapsed) return
+		if ((!folds() && props.row.note === undefined) || (e.target as Element).closest('a, .more, .kill, .edit') || !getSelection()?.isCollapsed) return
 		scroll.follow(() => {
 			setOpen(!expanded())
 			flush()
@@ -182,7 +185,18 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let time = () => titles.time((props.row.item as { ts?: string }).ts)
 	// A history rewrite's divider (task z71) offers its undo.
 	let undo = () => props.row.item.type === 'divider' && props.row.item.text.startsWith('History rewritten · /rebase undo ·')
-	let heading = () => <CardHeader time={time()} label={who()} reference={link()} />
+	let edit = () => {
+		if (!editPrompt.edit(props.row.item.key)) return
+		flush()
+		let box = document.querySelector<HTMLTextAreaElement>('.Composer textarea')
+		box?.focus()
+		box?.setSelectionRange(box.value.length, box.value.length)
+	}
+	let heading = () => (
+		<CardHeader time={time()} label={who()} reference={link()}>
+			<Show when={props.edit}><button type="button" class="edit" title="Edit this prompt and send it again from here" onClick={edit}>edit</button></Show>
+		</CardHeader>
+	)
 	// Content branches share the shell, header and normal body inset.
 	let plain = (s: () => { kind: string; text: string }) => (
 		<>

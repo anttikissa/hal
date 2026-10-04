@@ -19,8 +19,9 @@ import type { Event } from './protocol.ts'
 
 // `queue`: run after the current turn instead of steering it. `amend`:
 // an edit of the last message (src/common/amend.ts); `edits`: the id of
-// the waiting inbox message it edits.
-export type Sending = { id: string; text: string; queue?: boolean; amend?: boolean; edits?: string }
+// the waiting inbox message it edits; `rewind`: the earlier prompt
+// record it replaces, rewinding there (task 26q).
+export type Sending = { id: string; text: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number }
 
 export type Local = {
 	// What the editor holds.
@@ -64,7 +65,7 @@ function local(id: string): Local {
 // as no draft rather than breaking the client.
 function valid(l: Local | undefined): Local | undefined {
 	if (!l || typeof l.text !== 'string' || typeof l.base !== 'number' || !Array.isArray(l.sending)) return undefined
-	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.queue === undefined || typeof s.queue === 'boolean') && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string'))
+	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.queue === undefined || typeof s.queue === 'boolean') && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.rewind === undefined || Number.isSafeInteger(s.rewind)))
 	return { text: l.text, base: l.base, dirty: l.dirty === true, sending }
 }
 
@@ -108,12 +109,13 @@ function flush(id: string): void {
 // Sends `text` as a prompt, pending. The draft empties if it was what
 // was sent; a draft that holds more (an entry recalled from history was
 // sent, not the draft) stays, as the host keeps it too.
-function submit(id: string, text: string, queue = false, amend = false, edits?: string): void {
+function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> = {}): void {
 	let l = drafts.local(id)
 	let sending: Sending = { id: drafts.nextId(), text }
-	if (queue) sending.queue = true
-	if (amend) sending.amend = true
-	if (edits !== undefined) sending.edits = edits
+	if (how.queue) sending.queue = true
+	if (how.amend) sending.amend = true
+	if (how.edits !== undefined) sending.edits = how.edits
+	if (how.rewind !== undefined) sending.rewind = how.rewind
 	l.sending.push(sending)
 	if (!l.text.trim() || text.includes(l.text.trim())) {
 		l.text = ''
@@ -125,7 +127,7 @@ function submit(id: string, text: string, queue = false, amend = false, edits?: 
 }
 
 function command(sessionId: string, s: Sending): object {
-	return { type: 'submit', sessionId, text: s.text, ...(s.queue ? { queue: true } : {}), ...(s.amend ? { amend: true } : {}), ...(s.edits === undefined ? {} : { edits: s.edits }), id: s.id }
+	return { type: 'submit', sessionId, text: s.text, ...(s.queue ? { queue: true } : {}), ...(s.amend ? { amend: true } : {}), ...(s.edits === undefined ? {} : { edits: s.edits }), ...(s.rewind === undefined ? {} : { rewind: s.rewind }), id: s.id }
 }
 
 // Folds a host event in. True if the session's editor text changed.

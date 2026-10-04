@@ -130,7 +130,7 @@ function onEvent(event: Event): void {
 	}
 	let id = app.sessionId()
 	// A recalled entry stays in the box; the draft changes underneath.
-	if (id && (changed || event.type === 'snapshot')) st.text = recall.shown(id) ?? drafts.text(id)
+	if (id && (changed || event.type === 'snapshot') && !st.view.editing?.aside) st.text = recall.shown(id) ?? drafts.text(id)
 	app.seek()
 	app.changed()
 	if (event.type === 'snapshot' && event.sessionId === st.shown) {
@@ -211,7 +211,7 @@ function input(text: string): void {
 		}
 	}
 	let id = app.sessionId()
-	if (id && recall.typed(id, text)) drafts.edit(id, text)
+	if (id && !st.view.editing?.aside && recall.typed(id, text)) drafts.edit(id, text)
 	app.changed()
 }
 
@@ -301,15 +301,15 @@ function send(queue = false): void {
 	}
 	if (restart.typed(st.text)) return app.input('')
 	let { command, notice, keep } = view.submit(st.view, st.text, queue)
-	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; amend?: boolean; edits?: string } | undefined
+	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number } | undefined
 	// A prompt shows at once and waits, pending, for the host.
-	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c.queue, c.amend, c.edits)
+	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c)
 	else if (c) connection.send(c)
 	if (!keep) {
+		// A recalled entry was sent, or an edit set the draft aside: the user's own text comes back.
+		let back = (c?.type === 'submit' && recall.stop(c.sessionId)) || st.view.editing?.aside
 		st.view = { ...st.view, editing: undefined }
-		// A recalled entry was sent: the user's own text comes back.
-		let back = c?.type === 'submit' && recall.stop(c.sessionId)
-		app.input(back ? drafts.text(c!.sessionId) : '')
+		app.input(back && id ? drafts.text(id) : '')
 	}
 	app.setNotice(notice)
 }

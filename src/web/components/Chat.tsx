@@ -17,6 +17,7 @@ import { scroll } from '../scroll.ts'
 import { push } from '../push.ts'
 import { viewport } from '../viewport.ts'
 import { Composer } from './Composer.tsx'
+import { EditBar } from './EditBar.tsx'
 import { Notices } from './Notices.tsx'
 import { Picker } from './Picker.tsx'
 import { Rebase } from './Rebase.tsx'
@@ -166,6 +167,7 @@ export function Chat() {
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} tabs={tabs()} />
 			<Notices entries={stack()} />
 			<StatusRow view={view()} connected={connected()} color={tabs().find((t) => t.id === shown())?.color} />
+			<EditBar view={view()} />
 			<Composer view={view()} text={text()} menu={menu()} notice={notice()} placeholder={placeholder()} dropping={dropping()} />
 			<Picker modal={view().modal} />
 			<Rebase />

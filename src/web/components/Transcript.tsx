@@ -11,6 +11,7 @@
 import { createMemo, createSignal, flush, For, onSettled, Show } from 'solid-js'
 import type { Sending } from '../../common/drafts.ts'
 import type { Tab } from '../../common/protocol.ts'
+import { amend } from '../../common/amend.ts'
 import type { Item } from '../../common/transcript.ts'
 import { app } from '../app.ts'
 import { scroll } from '../scroll.ts'
@@ -54,6 +55,8 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	let cursorKey = () => (streaming() ? rows().at(-1)?.key : undefined)
 	// Background jobs still running, by call key: their cards offer Kill.
 	let jobs = createMemo(() => view.jobs(all()))
+	// Prompts the user may edit and resend (task 26q): their cards offer Edit.
+	let editable = createMemo(() => amend.editable(items()))
 	let hit = createMemo(() => props.target && target.row(all(), props.target)?.key)
 	// The linked card is always among the rows shown.
 	let shown = createMemo(() => {
@@ -66,7 +69,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
 			<For each={shown()} keyed={(row) => row.key}>
 				{(row) => (
-					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} />}>
+					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && !row().waiting && editable().has(row().item.key)} />}>
 						{(q) => <Question item={q()} form={props.view.form!} />}
 					</Show>
 				)}
