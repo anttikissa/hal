@@ -90,7 +90,7 @@ test('dropped signed blocks are never expanded', async () => {
 test('edited tool output survives an omission saved before the rebase', async () => {
  history.submit(id, 'go')
  history.append(id, {type:'assistant',block:{type:'tool_call',id:'call',name:'bash',input:{}}})
- await history.results(id, [{type:'tool_result',id:'call',output:'long original '.repeat(1000)}])
+ history.append(id, {type:'user',blocks:[{type:'tool_result',id:'call',output:'long original '.repeat(1000)}]})
  history.append(id, {type:'turn_end',status:'completed',usage:{}})
  writeFileSync(`${paths.sessionDir(id)}/projection.ason`, '{boundary:0, checkpoint:0, pressure:-1, omitted:[3], consumed:[2,3]}')
  expect(JSON.stringify(await history.messages(id))).toContain('[pruned')
