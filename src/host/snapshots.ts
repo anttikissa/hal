@@ -2,6 +2,7 @@
 // of its history (pages.snapshot, or one read in slices and caught up
 // with pages.since) and its live state now.
 
+import { replay } from '../common/replay.ts'
 import type { Snapshot } from '../common/protocol.ts'
 import { diag } from './diag.ts'
 import { drafts } from './drafts.ts'
@@ -16,6 +17,11 @@ import { turns } from './turns.ts'
 function build(id: string, tail: Tail = pages.snapshot(id)): Snapshot {
 	let records = [...tail.earlier, ...tail.history]
 	let snap: Snapshot = { meta: { ...sessions.open(id) }, history: tail.history, state: status.stateOf(id, records), inbox: status.inboxOf(id, records), stats: stats.of(id, records) }
+	if (pages.marks(id).rebase !== undefined) {
+		let raw = history.readSync(id)
+		let kept = new Set(replay.current(raw).map((r) => r.n))
+		snap.dropped = replay.current(raw.filter((r) => r.type !== 'rebase')).flatMap((r) => r.n !== undefined && !kept.has(r.n) ? [r.n] : [])
+	}
 	let output = toolOutput.state.get(id)
 	if (output?.output) snap.toolOutput = { ...output }
 	if (tail.older !== undefined) Object.assign(snap, { older: tail.older, earlier: tail.earlier })

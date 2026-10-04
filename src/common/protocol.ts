@@ -56,6 +56,8 @@ export type Draft = { text: string; rev: number }
 // records from before the tail that the state needs, such as an open
 // question or the last prompt of a turn the tail cuts.
 export type Snapshot = {
+	// Stable numbers removed by rebase, for links without transcript placeholders.
+	dropped?: number[]
 	meta: SessionMeta
 	history: HistoryRecord[]
 	state: SessionState

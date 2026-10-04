@@ -25,8 +25,9 @@ function row(rows: Row[], key: string): Row | undefined {
 
 // What to do for target `t` given the shown session's rows: show a
 // row, fetch an earlier page (`more`: some are left), or give up.
-function seek(t: Target, session: string | undefined, rows: Row[], more: boolean): { row: Row } | 'older' | 'missing' | 'wait' {
+function seek(t: Target, session: string | undefined, rows: Row[], more: boolean, dropped: number[] = []): { row: Row } | 'older' | 'missing' | 'dropped' | 'wait' {
 	if (session !== t.session) return 'wait'
+	if (dropped.includes(Number(t.key.split('.')[0]))) return 'dropped'
 	let hit = target.row(rows, t.key)
 	if (hit) return { row: hit }
 	return more ? 'older' : 'missing'

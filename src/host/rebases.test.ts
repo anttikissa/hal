@@ -7,6 +7,7 @@ import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { rebases } from './rebases.ts'
+import { snapshots } from './snapshots.ts'
 import { status } from './status.ts'
 import { findIndex } from './find-index.ts'
 import { context } from './context.ts'
@@ -39,6 +40,7 @@ test('apply is append-only; provider input, pages, index and links project edits
 	findIndex.init(); await findIndex.catchup(id)
 	let applied = rebases.apply(id, { base: 4, drop: [2], edit: [{ n: 1, text: 'newneedle' }] })
 	expect(applied.n).toBe(5)
+	expect(snapshots.build(id).dropped).toEqual([2])
 	expect(readFileSync(history.file(id)).subarray(0, prefix.length)).toEqual(prefix)
 	expect(JSON.stringify(await history.messages(id))).toContain('newneedle')
 	expect(JSON.stringify(await history.messages(id))).not.toContain('oldanswer')
@@ -52,6 +54,7 @@ test('apply is append-only; provider input, pages, index and links project edits
 	expect(JSON.stringify(texts)).not.toContain('oldanswer')
 	rebases.apply(id, { base: 4, drop: [], edit: [] }, 5)
 	expect(JSON.stringify(await history.messages(id))).toContain('oldanswer')
+	expect(snapshots.build(id).dropped).toEqual([])
 	expect(pages.page(id, undefined, 1).records.map((r) => r.n)).toEqual([1, 2, 3, 4])
 })
 
