@@ -12,6 +12,8 @@ import { client, created, until, useHost } from './host-fixture.test.ts'
 useHost(false, false, true)
 let saved = { generate: recap.generate, now: clock.now, raw: settings.state.raw }
 afterEach(() => { recap.generate = saved.generate; clock.now = saved.now; settings.state.raw = saved.raw })
+// The automatic recap is opt-in (sessionRecap, default off).
+const optIn = () => void (settings.state.raw = { sessionRecap: true })
 function turns(id: string, count = 3): void {
 	for (let i = 0; i < count; i++) {
 		history.submit(id, `goal ${i}`)
@@ -37,6 +39,7 @@ test('recap resolves other tabs without input and persists only in the requester
 })
 
 test('automatic recap is prepared away, ready on return, and never repeated last', async () => {
+	optIn()
 	let c = client(), id = created(c)
 	turns(id)
 	let calls = 0
@@ -60,16 +63,19 @@ test('automatic recap is prepared away, ready on return, and never repeated last
 test('automatic recap honors setting, minimum turns and subagent exclusion', async () => {
 	let c = client(), id = created(c)
 	turns(id, 2)
+	optIn()
 	expect(await recap.eligible(id)).toBeUndefined()
 	turns(id, 1)
-	settings.state.raw = { sessionRecap: false }
-	expect(await recap.eligible(id)).toBeUndefined()
 	settings.state.raw = {}
+	expect(await recap.eligible(id)).toBeUndefined()
+	optIn()
+	expect(await recap.eligible(id)).toBeDefined()
 	sessions.open(id).spawn = 'subagent-leave-open'
 	expect(await recap.eligible(id)).toBeUndefined()
 })
 
 test('recap failures retain the full provider body and stale success never lands', async () => {
+	optIn()
 	let c = client(), id = created(c)
 	turns(id)
 	clock.now = () => Date.now() + recap.awayMs

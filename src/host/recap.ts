@@ -137,6 +137,6 @@ function reset(): void {
 
 export const recap = {
 	state: { epoch: 0, cache: new Map<string, Cached>(), showing: new Set<string>() },
-	awayMs: 180_000, digestChars: 24_000, maxRecords: 80,
+	awayMs: 24 * 3600_000, digestChars: 24_000, maxRecords: 80,
 	targets, recent, digest, generate, summary, human, watching, eligible, prepare, returned, visibility, reset,
 }
