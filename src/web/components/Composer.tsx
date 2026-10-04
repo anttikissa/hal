@@ -14,7 +14,7 @@
 // work; text in a textarea can never be a link) with an × that deletes
 // the marker as an undoable edit. The text stays the only state.
 
-import { createEffect, createMemo, createSignal, For, Show, onSettled } from 'solid-js'
+import { createEffect, createMemo, For, Show, onSettled } from 'solid-js'
 import { attachments } from '../../common/attachments.ts'
 import { states } from '../../common/states.ts'
 import { uploads } from '../../common/uploads.ts'
@@ -92,19 +92,6 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 		let t = props.view.transcript
 		if (t) app.sendNow(paused() ? { type: 'continue', sessionId: t.meta.id } : view.pause(props.view))
 	}
-	// On a phone, once the draft wraps, the buttons move to their own row
-	// above it and the text gets the full width. It stays stacked until
-	// the draft empties, so the wider box never flips it back mid-typing.
-	let phone = matchMedia('(pointer: coarse), (max-width: 40rem)')
-	let [stacked, setStacked] = createSignal(false)
-	let measure = () => setStacked((was) => phone.matches && !!input.value && (was || input.scrollHeight > 60))
-	createEffect(() => props.text, () => void measure())
-	onSettled(() => {
-		let watch = new ResizeObserver(measure)
-		watch.observe(input)
-		phone.addEventListener('change', measure)
-		return () => (watch.disconnect(), phone.removeEventListener('change', measure))
-	})
 	// Steering keeps the phone keyboard up for the next steer; Send and
 	// Queue hide it so the reply is visible. A mouse keeps the focus.
 	// The main button's icon, name and tooltip: run a command, steer a
@@ -136,7 +123,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 					}}</For>
 				</ul>
 			</Show>
-			<div class={['entry input', { dropping: props.dropping, stacked: stacked() }]}>
+			<div class={['entry input', { dropping: props.dropping }]}>
 				{props.menu && (
 					<div class="completions" role="listbox" aria-label="Completions">
 						{/* Keep the editor focused: iOS may blur without focusing the button,
