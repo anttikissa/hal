@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 // Native modal shell and search box shared by the model picker and find.
-import { createEffect, For, Show } from 'solid-js'
+import { createEffect, For, Show, untrack } from 'solid-js'
 import { fuzzy } from '../../common/fuzzy.ts'
 import { findDialog } from '../../common/find-dialog.ts'
 import type { ModalState } from '../../common/modals.ts'
@@ -28,8 +28,9 @@ export function Picker(props: { modal: ModalState | undefined }) {
 	createEffect(
 		() => ({ selected: props.modal?.selected, query: props.modal?.query, items: props.modal?.items }),
 		({ selected, query: q }) => {
-			if (selected === undefined) { if (box.open) box.close(); return }
-			if (!box.open) { box.showModal(); search.focus() }
+			// Moving focus runs focus handlers here; they read state untracked.
+			if (selected === undefined) { if (box.open) untrack(() => box.close()); return }
+			if (!box.open) untrack(() => { box.showModal(); search.focus() })
 			if (q !== query) { query = q; list.scrollTop = 0 }
 			list.children[selected]?.scrollIntoView({ block: 'nearest' })
 		},

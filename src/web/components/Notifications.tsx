@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // Push notifications for this device, the registered devices and the
 // history of past notices and pushes (task py).
-import { createEffect, For, Show } from 'solid-js'
+import { createEffect, For, Show, untrack } from 'solid-js'
 import { connection } from '../../common/connection.ts'
 import { notices } from '../../common/notices.ts'
 import { transcript } from '../../common/transcript.ts'
@@ -20,8 +20,9 @@ const said = {
 export function Notifications(props: { open: boolean; onClose: () => void }) {
 	let dialog!: HTMLDialogElement
 	createEffect(() => props.open, (o) => {
-		if (o && !dialog.open) { dialog.showModal(); connection.send({ type: 'push', action: 'list' }) }
-		if (!o && dialog.open) dialog.close()
+		// Moving focus runs focus handlers here; they read state untracked.
+		if (o && !dialog.open) { untrack(() => dialog.showModal()); connection.send({ type: 'push', action: 'list' }) }
+		if (!o && dialog.open) untrack(() => dialog.close())
 		push.watchHistory(o)
 	})
 	let fail = (e: any) => alert(`Notifications: ${e?.message ?? e}`)
