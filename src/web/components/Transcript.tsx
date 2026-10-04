@@ -8,7 +8,7 @@
 // streams (Card.tsx), else on a line of its own. The one scroller: Chat
 // and scroll.ts keep a bottom reader at the bottom.
 
-import { createEffect, createMemo, createSignal, flush, For, onSettled, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
 import type { Sending } from '../../common/drafts.ts'
 import type { Tab } from '../../common/protocol.ts'
 import { amend } from '../../common/amend.ts'
@@ -25,22 +25,34 @@ const none: Item[] = []
 // A tab shows its newest rows first: building every card of a long
 // session takes most of a second. Earlier rows are added a page at a
 // time as the reader nears the top, per session so a tab keeps its
-// rows when shown again.
+// rows when shown again. The first shown row is kept by key, so new
+// rows only add below: a row once shown never leaves the top, and text
+// a reader is reading or selecting never moves.
 const first = 40
 const page = 60
-const [counts, setCounts] = createSignal<ReadonlyMap<string, number>>(new Map())
+const [starts, setStarts] = createSignal<ReadonlyMap<string, string>>(new Map())
 
 // `target`: the block the address links to (target.ts), whose card is
 // marked and opens.
 export function Transcript(props: { view: ViewState; pending: Sending[]; target?: string; tabs?: Tab[] }) {
 	let el!: HTMLElement
 	let id = () => props.view.transcript?.meta.id ?? ''
-	let count = () => counts().get(id()) ?? first
+	// Index of the first shown row; set once per session, then moved
+	// only up.
+	let start = () => {
+		let rows = all(), key = starts().get(id())
+		let i = key === undefined ? -1 : rows.findIndex((r) => r.key === key)
+		return i >= 0 ? i : Math.max(0, rows.length - first)
+	}
+	let setStart = (i: number) => untrack(() => {
+		let key = all()[i]?.key
+		if (key !== undefined && starts().get(id()) !== key) setStarts(new Map(starts()).set(id(), key))
+	})
 	// Nearing the top: rows already loaded first, then earlier history.
 	let more = () => {
-		if (count() >= all().length) return app.older()
+		if (start() === 0) return app.older()
 		scroll.anchor(() => {
-			setCounts(new Map(counts()).set(id(), count() + page))
+			setStart(Math.max(0, start() - page))
 			flush()
 		})
 	}
@@ -78,8 +90,10 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	let shown = createMemo(() => {
 		let rows = all()
 		let linked = hit() ? rows.findIndex((r) => r.key === hit()) : -1
-		return rows.slice(Math.max(0, Math.min(rows.length - count(), linked < 0 ? rows.length : linked)))
+		return rows.slice(Math.max(0, Math.min(start(), linked < 0 ? rows.length : linked)))
 	})
+	// Pin the first shown row once the tab has rows.
+	createEffect(() => (all().length && !starts().has(id()) ? start() : -1), (i) => void (i >= 0 && setStart(i)))
 	createEffect(shown, () => void requestAnimationFrame(check))
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
 	return (

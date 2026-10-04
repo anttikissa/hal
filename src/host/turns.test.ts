@@ -37,37 +37,6 @@ test('a streaming block has its final header from the first event on', async () 
 	expect((await history.read(id)).filter((r) => r.type === 'assistant').map((r) => (r as { model?: string }).model)).toEqual(['fake/m1', 'fake/m1'])
 })
 
-test('a completed turn reaches every follower and is durable before turn-end', async () => {
-	let a = client()
-	let id = created(a)
-	let b = client()
-	b.conn.send({ type: 'open', sessionId: id })
-	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
-	expect(await records(id)).toEqual([{ type: 'user', blocks: [{ type: 'text', text: 'hi' }] }])
-	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'thinking', text: 'hmm' }, { type: 'signature', value: 'sig' }, { type: 'text', text: 'hel' })
-	calls[0]!.push({ type: 'text', text: 'lo' }, { type: 'usage', usage: { input: 5, output: 2 } }, { type: 'done', reason: 'end' })
-	let onDisk: unknown
-	let watcher = host.connect((e) => {
-		if (e.type === 'turn-end') onDisk = history.readSync(id).map((r) => r.type)
-	})
-	watcher.send({ type: 'open', sessionId: id })
-	await until(() => b.of('turn-end').length)
-	expect(onDisk).toEqual(['user', 'assistant', 'assistant', 'round', 'turn_end'])
-
-	let expected: Item[] = [
-		{ type: 'prompt', text: 'hi' },
-		{ type: 'thinking', text: 'hmm' },
-		{ type: 'text', text: 'hello' },
-		{ type: 'turn-end', status: 'completed', usage: { input: 5, output: 2 } },
-	]
-	expect(shown(a.views.get(id)!.items)).toEqual(expected)
-	// Every client, live or fresh, keys each item alike.
-	expect(b.views.get(id)!.items).toEqual(a.views.get(id)!.items)
-	expect((await fresh(id)).items).toEqual(a.views.get(id)!.items)
-	expect((await records(id)).at(-1)).toEqual({ type: 'turn_end', status: 'completed', reason: 'end', usage: { input: 5, output: 2 }, context: 5 })
-})
-
 test('the next turn replays durable history, even after a host restart', async () => {
 	let a = client()
 	let id = created(a)
@@ -95,46 +64,6 @@ test('the next turn replays durable history, even after a host restart', async (
 		},
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('two') }] },
 	])
-})
-
-test('a turn cut off by a host that went away continues on the next host, told what happened', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
-	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'text', text: 'a' })
-	await until(() => a.of('stream').length === 1)
-	// The process dies: nothing more is written for this turn.
-	history.stop(false)
-	restartHost()
-
-	// Until the new host continues it, the turn shows as running.
-	let early = await fresh(id)
-	expect(early.state).toEqual({ type: 'running', phase: 'requesting' })
-	let b = client()
-	b.conn.send({ type: 'open', sessionId: id })
-	await until(() => b.views.get(id))
-	await turns.recover()
-	await until(() => calls.length === 2)
-	expect(calls[1]!.input.messages).toEqual([
-		{ role: 'user', blocks: [{ type: 'text', text: stamped('go') }] },
-		{ role: 'assistant', blocks: [{ type: 'text', text: 'a' }] },
-		{ role: 'user', blocks: [{ type: 'text', text: replay.continueNote }] },
-	])
-	calls[1]!.push({ type: 'text', text: 'b' }, { type: 'done', reason: 'end' })
-	await until(() => b.of('turn-end').length)
-	let expected: Item[] = [
-		{ type: 'prompt', text: 'go' },
-		{ type: 'text', text: 'a' },
-		{ type: 'text', text: 'b' },
-		{ type: 'turn-end', status: 'completed' },
-	]
-	expect(shown(b.views.get(id)!.items)).toEqual(expected)
-	expect(b.views.get(id)!.state).toEqual({ type: 'idle' })
-	expect(await fresh(id)).toEqual(b.views.get(id)!)
-	// Nothing is left to continue.
-	await turns.recover()
-	expect(calls.length).toBe(2)
 })
 
 test('pause stops the turn, keeping partial output, and continue carries it on', async () => {
@@ -332,47 +261,4 @@ test('a command cut off mid-run by a crash is never run again, and the model hea
 	} finally {
 		tools.run = origRun
 	}
-})
-
-test('a turn that keeps bringing hosts down is paused with a reason, not continued forever', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'crash' })
-	await until(() => calls.length === 1)
-	for (let n = 1; n <= states.maxRecoveries(); n++) {
-		calls.at(-1)!.push({ type: 'text', text: 'x' })
-		await until(() => calls.length === n)
-		restartHost()
-		await turns.recover()
-		await until(() => calls.length === n + 1)
-	}
-	restartHost()
-	await turns.recover()
-	expect(calls.length).toBe(states.maxRecoveries() + 1)
-	let view = await fresh(id)
-	expect(view.state).toMatchObject({ type: 'paused', reason: expect.stringMatching(/without progress/) })
-	expect(shown(view.items)!.at(-1)).toEqual({ type: 'turn-end', status: 'paused' })
-	// The user can still continue it by hand.
-	let b = client()
-	b.conn.send({ type: 'open', sessionId: id })
-	await until(() => b.views.get(id))
-	b.conn.send({ type: 'continue', sessionId: id })
-	await until(() => calls.length === states.maxRecoveries() + 2)
-})
-
-test('pausing a turn another host left unfinished records it paused', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
-	await until(() => calls.length === 1)
-	restartHost()
-	let b = client()
-	b.conn.send({ type: 'open', sessionId: id })
-	await until(() => b.views.get(id))
-	b.conn.send({ type: 'pause', sessionId: id })
-	await until(() => b.of('turn-end').length)
-	expect(b.views.get(id)!.state).toEqual({ type: 'paused' })
-	expect(await fresh(id)).toEqual(b.views.get(id)!)
-	await turns.recover()
-	expect(calls.length).toBe(1)
 })

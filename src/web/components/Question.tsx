@@ -22,8 +22,11 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 	let form = () => props.item.form
 	let parts = createMemo(() => view.urlParts(form().text))
 	// The focused field takes the focus (its chosen option, for a group).
+	// The memo gates on equality: other updates re-run an effect's
+	// callback, and a focus() then would clear a reader's selection.
+	let at = createMemo(() => [props.form.focus, props.form.values[props.form.focus]] as const, { equals: (a, b) => a[0] === b[0] && a[1] === b[1] })
 	createEffect(
-		() => [props.form.focus, props.form.values[props.form.focus]] as const,
+		at,
 		([focus, value]) => {
 			let node = fields[focus]
 			let target = node instanceof HTMLInputElement ? node : [...(node?.querySelectorAll('button') ?? [])].find((b) => b.value === value)

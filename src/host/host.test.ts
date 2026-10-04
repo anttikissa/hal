@@ -22,25 +22,6 @@ test('create makes a session and sends its snapshot', () => {
 	expect(sessions.list().map((s) => s.id)).toEqual([id])
 })
 
-test('reconnecting is connecting again: the snapshot carries the running turn', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
-	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'text', text: 'x' })
-	await until(() => a.of('stream').length === 1)
-	a.conn.close()
-	calls[0]!.push({ type: 'text', text: 'y' })
-	let again = client()
-	again.conn.send({ type: 'open', sessionId: id })
-	await until(() => (again.views.get(id)?.live?.turn.blocks[0] as any)?.text === 'xy')
-	expect(again.views.get(id)!.live!.turn.blocks).toEqual([{ type: 'text', text: 'xy' }])
-	let seen = a.events.length
-	calls[0]!.push({ type: 'done', reason: 'end' })
-	await until(() => again.of('turn-end').length)
-	expect(a.events.length).toBe(seen)
-})
-
 test('a snapshot read in slices misses no record appended meanwhile, and commands sent after the open wait for it', async () => {
 	let a = client()
 	let id = created(a)

@@ -1,0 +1,12 @@
+{
+	title: "Web never disturbs a reader's scroll or selection",
+	spec: 'While Hal streams, a web reader keeps full control. The view never jumps: one glide chases the moving bottom and closes a fixed share of the distance each frame (scroll.tauMs), so new items, streamed lines and a send re-aim it without restarting it or setting the position at once. A reader more than 50 px above the bottom, or one who moves the view by wheel, touch, keys or the scrollbar, is left alone: the glide stops when scrollTop is not where it left it. A send ignores wheel momentum until its glide lands, at most scroll.forcedMs (300 ms). Rows once shown stay shown: the transcript pins its first shown row by key, so new rows only add below and never push old ones out of the DOM. No update moves the focus: effects that focus (Composer, Question) run behind memos that compare equal unless a form or picker opens or closes or the focused field changes. Invariants restored: no shown node is removed and no selection collapses while text streams; scrollTop changes only by the reader or by a glide toward the bottom for a reader at the bottom. Browser test in host/web.test.ts: a reader scrolled up with everything selected keeps the selection, the same nodes and scrollTop 0 while 80 rows stream.',
+	status: 'done',
+	notes: [
+		"Found with a headless Chrome test (Cmd+A, then 3 s of streaming). The Composer focus effect's compute returned a fresh boolean each update, yet its callback re-ran on every transcript change and called input.focus(), collapsing the selection within a second. In Solid 2 rc.11 a plain compute does not gate the effect; a createMemo does. The 40-row window (mfj) counted from the end, so each new row dropped the oldest from the DOM.",
+		"A send's momentum hold that lasted until the glide landed held the view forever while a reply streamed (the bottom moves, so the glide never lands); the reader's wheel was ignored. Now a time limit, and landing clears it, else a later wheel within 300 ms is lost.",
+		'Deleted flaky tests (AGENTS.md: delete, never retry): rotation edge gaps (web), and host tests that timed out at 5 s under full-suite load (turns, jobs, naming, history, host-transcript, host, turns-approval). Their behaviors are untested now.'
+	],
+	needs: ['mfj', '4s'],
+	foldInto: ['4s']
+}

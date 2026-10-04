@@ -3,10 +3,13 @@
 // the bottom stays at the same distance from it as content grows (new
 // items, streamed text, a card opening); one scrolled further up is
 // left alone. The gap is measured before a change, since afterwards
-// the page is taller. New items glide there (strong ease-out),
-// streamed lines jump (a glide over one line looks janky), a card
-// opening or closing is tracked every frame while its height animates,
-// and sending glides to the very bottom from anywhere.
+// the page is taller. The view never jumps: one glide chases the
+// moving bottom, closing a fixed share of the distance each frame
+// (exponential, about the CSS --ease-out), so new items, streamed
+// lines and a send landing mid-glide re-aim it without restarting it
+// or changing the position at once. A card opening or closing is
+// tracked exactly while its height animates; sending glides to the
+// very bottom from anywhere.
 //
 // A catch-up (a reconnect bringing many items) snaps to the bottom at
 // once: the rows are replaced and scrollTop resets, and a glide from
@@ -21,7 +24,7 @@
 import { reflow } from './reflow.ts'
 
 type Box = { scrollHeight: number; scrollTop: number; clientHeight: number }
-export type Mode = 'glide' | 'jump' | 'snap' | 'track'
+export type Mode = 'glide' | 'snap' | 'track'
 
 // How far the view is above the bottom.
 function gap(el: Box): number {
@@ -42,10 +45,11 @@ function target(el: Box, gap: number): number {
 	return Math.max(0, el.scrollHeight - el.clientHeight - gap)
 }
 
-// Position at time t (0..1) of a glide from `from` to `to`: quintic
-// ease-out, the same curve as the CSS --ease-out.
-function at(from: number, to: number, t: number): number {
-	return from + (to - from) * (1 - (1 - t) ** 5)
+// Position `ms` after `from` while chasing `to`: the distance shrinks
+// by e every `tauMs`, from any start and however `to` moves.
+function at(from: number, to: number, ms: number): number {
+	let x = from + (to - from) * (1 - Math.exp(-ms / scroll.tauMs))
+	return Math.abs(to - x) < 0.5 ? to : x
 }
 
 const scrollKeys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '])
@@ -55,8 +59,13 @@ function stop(): void {
 	scroll.state.frame = 0
 }
 
+// Whether a send's glide still ignores wheel momentum.
+function forced(): boolean {
+	return performance.now() < scroll.state.forcedUntil
+}
+
 function userScroll(): void {
-	if (!scroll.state.forced) scroll.stop()
+	if (!scroll.forced()) scroll.stop()
 }
 
 // A new finger gesture is deliberate, unlike leftover wheel momentum.
@@ -65,7 +74,7 @@ function userScroll(): void {
 function touchStart(): void {
 	scroll.state.touching = true
 	scroll.stop()
-	scroll.state.forced = false
+	scroll.state.forcedUntil = 0
 }
 
 function touchEnd(): void {
@@ -116,7 +125,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	// the reading anchor was taken mid-way and would strand the view.
 	let stopReflow = reflow.watch(el, () => {
 		if (scroll.state.frame) return true
-		scroll.state.forced = false
+		scroll.state.forcedUntil = 0
 		return false
 	})
 	let scrolled = () => scroll.atTop() && onTop()
@@ -148,25 +157,36 @@ function follow(change: () => void, mode: Mode = 'glide', force = false): void {
 	if (!el) return change()
 	let g = st.touching && !force ? undefined : scroll.keep(scroll.gap(el), st.frame ? st.gap : undefined, force)
 	change()
-	// A running glide re-aims at the moving bottom every frame.
-	if (g === undefined || (mode === 'jump' && st.frame)) return
-	scroll.stop()
+	if (g === undefined) return
 	st.gap = g
-	st.forced = force
-	if (mode === 'jump' || mode === 'snap' || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+	// A send ignores wheel momentum until its glide lands, at most
+	// forcedMs: while a reply streams the glide may never land, and
+	// would hold a reader who scrolls up.
+	if (force) st.forcedUntil = performance.now() + scroll.forcedMs
+	if (mode === 'snap' || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+		scroll.stop()
 		el.scrollTop = scroll.target(el, g)
 		return
 	}
-	let from = el.scrollTop
-	let started = performance.now()
-	let ms = mode === 'track' ? scroll.toggleMs : scroll.glideMs
+	if (mode === 'track') st.exactUntil = performance.now() + scroll.toggleMs
+	// A running glide re-aims at the new gap from where it is.
+	if (st.frame) return
+	st.pos = st.set = el.scrollTop
+	let last = performance.now()
 	let step = (now: number) => {
-		let t = Math.min(1, (now - started) / ms)
-		// The end moves while a card animates or text streams in.
-		let to = scroll.target(el, g)
-		el.scrollTop = mode === 'track' ? to : scroll.at(from, to, t)
-		st.frame = t < 1 ? requestAnimationFrame(step) : 0
-		if (!st.frame) st.forced = false
+		// Anything else moving the view (a scrollbar drag, a wheel this
+		// missed) is the reader taking over.
+		if (Math.abs(el.scrollTop - st.set) > 2 && !scroll.forced()) return void (st.frame = 0)
+		// rAF time is the frame's start, which may precede `last`.
+		let ms = Math.min(50, Math.max(0, now - last))
+		last = Math.max(last, now)
+		let to = scroll.target(el, st.gap)
+		st.pos = now < st.exactUntil ? to : scroll.at(st.pos, to, ms)
+		el.scrollTop = st.pos
+		st.set = el.scrollTop
+		// Landing ends a send's hold on wheel momentum.
+		if (st.pos === to) st.forcedUntil = 0
+		st.frame = st.pos !== to || now < st.exactUntil ? requestAnimationFrame(step) : 0
 	}
 	st.frame = requestAnimationFrame(step)
 }
@@ -194,15 +214,18 @@ export const scroll = {
 	// Further above the bottom than this shows the scroll-to-bottom pill.
 	awayPx: 200,
 	nearTop: 800,
-	glideMs: 200,
+	// A glide closes 99% of its distance in about 4.6 tauMs.
+	tauMs: 45,
 	// A card's open and close animation (CSS --toggle-ms matches).
 	toggleMs: 250,
-	state: { el: null as Box | null, quiet: false, frame: 0, gap: 0, forced: false, touching: false, places: new Map<string, { top: number } | { gap: number }>() },
+	forcedMs: 300,
+	state: { el: null as Box | null, quiet: false, frame: 0, gap: 0, pos: 0, set: 0, exactUntil: 0, forcedUntil: 0, touching: false, places: new Map<string, { top: number } | { gap: number }>() },
 	gap,
 	keep,
 	target,
 	at,
 	stop,
+	forced,
 	userScroll,
 	touchStart,
 	touchEnd,
