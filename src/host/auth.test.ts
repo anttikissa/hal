@@ -378,3 +378,22 @@ test('rotation takes the least used subscription, skips a limited one, and keeps
 		usage.close()
 	}
 })
+
+test('a model counts as limited while every account has spent a window all models share', async () => {
+	let { paths } = await import('./paths.ts')
+	let { usage } = await import('./usage.ts')
+	paths.init()
+	let secs = (ms: number) => String(Math.floor(ms / 1000))
+	let spent = (resets: number, used = '1') => new Headers({ 'x-codex-primary-used-percent': String(Number(used) * 100), 'x-codex-primary-window-minutes': '300', 'x-codex-primary-reset-at': secs(resets) })
+	try {
+		write({ openai: [{ accessToken: 'a', expires: later(), email: 'a@x' }, { accessToken: 'b', expires: later(), email: 'b@x' }] })
+		usage.observe('openai', 'a@x', spent(now() + 3_600_000))
+		usage.observe('openai', 'b@x', spent(now() + 7_200_000, '0.9'))
+		// One account still has room: any OpenAI model can run.
+		expect(auth.limitedUntil('openai/gpt-x')).toBe(0)
+		usage.observe('openai', 'b@x', spent(now() + 7_200_000))
+		// Every account spent: limited until the first window resets, for every model.
+		let until = auth.limitedUntil('openai/gpt-y')
+		expect(Math.abs(until - (now() + 3_600_000))).toBeLessThan(2000)
+	} finally { usage.close() }
+})

@@ -37,7 +37,7 @@ function spawn(parent: string, s: Spawn): string {
 	let meta = sessions.open(parent)
 	let selected = models.selection(s.model ?? models.qualified(meta.model, meta.effort))
 	let limited = auth.limitedUntil(selected.id)
-	if (limited) throw new Error(`${selected.id} is rate limited until ${new Date(limited).toISOString().slice(0, 16).replace('T', ' ')} UTC; spawn with another model (inspect models shows which are limited)`)
+	if (limited) throw new Error(`${selected.id} is rate limited until ${new Date(limited).toISOString().slice(0, 16).replace('T', ' ')} UTC on every ${selected.id.split('/')[0]} account`)
 	let left = meta.slots ?? subagents.initialSlots
 	if (s.limit + 1 > left) throw new Error(`limit ${s.limit} needs ${s.limit + 1} spawn slots, but this session has ${left} left`)
 	meta.slots = left - s.limit - 1

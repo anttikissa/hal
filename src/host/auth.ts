@@ -220,7 +220,15 @@ function limitedUntil(modelId: string): number {
 	if (kind === 'anthropic' || kind === 'openai') {
 		try { names = auth.all(kind).list.map((a) => a.name) } catch {} // no login: the turn reports that
 	}
-	let until = names.length ? names.map((n) => limits.until(limits.key(modelId, n))) : [limits.until(limits.key(modelId))]
+	// An account is out until its recorded 429 ends or, when a usage
+	// window it shares across models is spent, until that window resets.
+	let spent = (n: string) => {
+		let t = usage.tightest(kind, n)
+		return t.used >= 100 && Number.isFinite(t.resets) ? t.resets : 0
+	}
+	let until = names.length
+		? names.map((n) => Math.max(limits.until(limits.key(modelId, n)), spent(n)))
+		: [limits.until(limits.key(modelId))]
 	return until.includes(0) ? 0 : Math.min(...until)
 }
 
