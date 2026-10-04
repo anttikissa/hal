@@ -5,7 +5,7 @@
 
 import type { ErrorEvent } from '../common/blocks.ts'
 import { compaction } from '../common/compaction.ts'
-import type { HistoryRecord } from '../common/replay.ts'
+import { replay, type HistoryRecord } from '../common/replay.ts'
 import { transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
@@ -14,6 +14,7 @@ import { stats } from './stats.ts'
 
 // Whether the context holds any conversation since the latest boundary.
 function anything(records: HistoryRecord[]): boolean {
+	records = replay.current(records)
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	return records.slice(at + 1).some((r) => r.type === 'user' || r.type === 'assistant')
 }
@@ -30,7 +31,7 @@ function boundary(id: string, record: { type: 'compact'; summary: string; prompt
 // Compacts earlier context. During a turn, its prompt records remain
 // outside the summary and are replayed after the boundary by number.
 function run(id: string, protect = false, transition?: string): number | undefined {
-	let records = history.readSync(id)
+	let records = replay.current(history.readSync(id))
 	if (!compact.anything(records)) return undefined
 	let start = 0, edge = records.length
 	for (let i = records.length - 1; i >= 0; i--) {
@@ -49,7 +50,7 @@ function run(id: string, protect = false, transition?: string): number | undefin
 // Starts the session's context afresh; false when it is fresh already
 // (a compact's summary is context: /clear after /compact drops it).
 function reset(id: string): boolean {
-	let records = history.readSync(id)
+	let records = replay.current(history.readSync(id))
 	let last = records.findLast((r) => r.type === 'compact' || r.type === 'reset')
 	if (last?.type !== 'compact' && !compact.anything(records)) return false
 	compact.boundary(id, { type: 'reset' })
