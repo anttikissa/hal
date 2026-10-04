@@ -15,22 +15,20 @@ type Total = { session: string; model: string; rounds: number; usage: Usage; cos
 function samples(records: HistoryRecord[], fallback: string): Sample[] {
 	let out: Sample[] = [], pending: Sample[] = []
 	let model = fallback
-	let end: Sample | undefined
-	// A paused/failed end carries cumulative usage on continue. Count its
-	// rounds once, or the last aggregate if this legacy turn has no rounds.
 	let flush = () => {
-		out.push(...(pending.length ? pending : end ? [end] : []))
+		out.push(...pending)
 		pending = []
-		end = undefined
 	}
 	for (let r of records) {
 		if (r.type === 'change' && r.model) model = r.model
 		if (r.type === 'assistant' && r.model) model = r.model
-		if (r.type === 'user' && end && r.blocks.some((b) => b.type === 'text')) flush()
 		if (r.type === 'round') pending.push({ model: r.model ?? model, usage: r.usage, ts: r.ts })
 		if (r.type === 'turn_end') {
-			end = { model, usage: r.usage, ts: r.ts }
-			if (r.status === 'completed') flush()
+			// Every end aggregates the rounds since the previous end, not
+			// a paused turn's previous ends. Questions carry usage without
+			// writing an end, so their rounds are already in pending.
+			if (!pending.length) pending.push({ model, usage: r.usage, ts: r.ts })
+			flush()
 		}
 	}
 	flush()
