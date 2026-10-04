@@ -58,11 +58,14 @@ import { webLinks } from './web-links.ts'
 
 const cookieName = 'hal'
 
-type Data = { conn?: ReturnType<typeof host.adapt>; stale?: boolean; manualUpdates?: boolean; page?: string; info?: ClientInfo }
+type Data = { loginHash?: string; conn?: ReturnType<typeof host.adapt>; stale?: boolean; manualUpdates?: boolean; page?: string; info?: ClientInfo }
 type Socket = ServerWebSocket<Data>
 
 function authorized(req: Request): boolean {
-	return webAuth.valid(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
+	let h = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
+	if (!webAuth.validHash(h)) return false
+	webAuth.touch(h)
+	return true
 }
 
 // Whether a WebSocket request comes from a page of this host: its
@@ -76,7 +79,7 @@ function sameOrigin(req: Request): boolean {
 // Swaps a code for a session cookie: Secure unless the browser is on
 // this machine over plain HTTP; or why not.
 function redeem(code: unknown, req: Request): { cookie?: string; refused?: 'wrong' | 'limited' } {
-	let out = webAuth.redeem(code)
+	let out = webAuth.redeem(code, clients.shortAgent(req.headers.get('user-agent') ?? undefined))
 	if ('refused' in out) return out
 	webLinks.used(webAuth.normalize(code as string))
 	let hostname = URL.parse(`http://${req.headers.get('host') ?? ''}`)?.hostname
@@ -228,6 +231,13 @@ function fetch(req: Request, srv: Server<Data>): Response | Promise<Response | u
 	if (get && (pathname === '/icon-192.png' || pathname === '/icon-512.png')) return new Response(Bun.file(`${import.meta.dir}/../web${pathname}`), { headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' } })
 	if (get && pathname === '/sw.js') return new Response(Bun.file(`${import.meta.dir}/../web/sw.js`), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store', 'service-worker-allowed': '/' } })
 	if (pathname === '/login' && req.method === 'POST') return web.login(req)
+	if (pathname === '/logout' && req.method === 'POST') {
+		if (!web.sameOrigin(req)) return new Response('wrong origin\n', { status: 403 })
+		let h = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
+		if (!webAuth.validHash(h)) return new Response('log in first\n', { status: 401 })
+		webAuth.list(); web.revoke((webAuth.store()[h!] as import('./web-auth.ts').WebLogin).id)
+		return new Response(null, { status: 303, headers: { location: '/', 'set-cookie': 'hal=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0', 'cache-control': 'no-store' } })
+	}
 	let check = pathname === '/login' && get
 	let diagnostic = pathname === '/web-diagnostics' && req.method === 'POST'
 	if (!check && !blob && pathname !== '/ws' && !diagnostic) return new Response('not found\n', { status: 404 })
@@ -249,7 +259,9 @@ async function upgrade(req: Request, srv: Server<Data>): Promise<Response | unde
 	let v = params.get('v')
 	let manualUpdates = v !== null && params.get('updates') === 'manual'
 	let stale = v !== null && v !== (await web.version())
-	if (srv.upgrade(req, { data: { stale, manualUpdates, page: v ?? undefined, info: clients.fromRequest(req, srv.requestIP(req)?.address) } })) return undefined
+	let loginHash = webAuth.tokenHash(new Bun.CookieMap(req.headers.get('cookie') ?? '').get(cookieName))
+	if (!webAuth.validHash(loginHash)) return new Response('log in first\n', { status: 401 })
+	if (srv.upgrade(req, { data: { loginHash, stale, manualUpdates, page: v ?? undefined, info: clients.fromRequest(req, srv.requestIP(req)?.address) } })) return undefined
 	return new Response('expected a WebSocket upgrade\n', { status: 400 })
 }
 
@@ -266,12 +278,16 @@ function blob(pathname: string): Response {
 
 const websocket = {
 	open(ws: Socket) {
+		if (!webAuth.validHash(ws.data.loginHash)) return ws.close(4001, 'logged out')
+		webAuth.touch(ws.data.loginHash)
 		if (ws.data.stale && !ws.data.manualUpdates) return ws.close(4000, 'reload')
 		if (ws.data.stale) ws.send(ason.stringify({ type: 'web-update' }, 'short'))
 		web.state.sockets.add(ws)
 		ws.data.conn = host.adapt((message) => ws.send(message), ws.data.info)
 	},
 	message(ws: Socket, message: string | Buffer) {
+		if (!webAuth.validHash(ws.data.loginHash)) return ws.close(4001, 'logged out')
+		webAuth.touch(ws.data.loginHash)
 		ws.data.conn?.receive(String(message))
 	},
 	close(ws: Socket) {
@@ -342,11 +358,15 @@ async function stop(): Promise<void> {
 
 // /auth revoke: every session token and unused code is void, and every
 // open page is closed with code 4001, on which it reloads to the gate.
-function revoke(): void {
-	webAuth.revoke()
-	for (let ws of web.state.sockets) ws.close(4001, 'logged out')
-	web.state.sockets.clear()
+function revoke(id = 'all'): number {
+	let hashes = webAuth.revoke(id)
+	for (let ws of web.state.sockets) if (hashes.includes(ws.data.loginHash!)) {
+		ws.data.conn?.close()
+		ws.close(4001, 'logged out')
+		web.state.sockets.delete(ws)
+	}
 	contextPage.closeAll()
+	return hashes.length
 }
 
 export const web = {

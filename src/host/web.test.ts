@@ -591,7 +591,7 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 			expect(covered).toEqual([{ overlaps: true, onTop: true }])
 			// A request for the next character must not make an unchanged menu
 			// disappear for a frame or rebuild its rows when the answer arrives.
-			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/lo'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = '/logi'; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
 			await b.waitFor(`document.querySelector('.completions button')?.textContent.includes('/login') && document.querySelectorAll('.completions button').length === 1`)
 			await b.evaluate(`(() => {
 				let menu = document.querySelector('.completions'), row = menu.querySelector('button'), box = document.querySelector('textarea');
@@ -599,7 +599,7 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 				let watch = window.__completionWatch;
 				watch.observer = new MutationObserver((list) => { watch.changes += list.filter((m) => m.target === menu.parentNode || menu.contains(m.target)).length });
 				watch.observer.observe(menu.parentNode, { subtree: true, childList: true, attributes: true, characterData: true });
-				box.value = '/log'; box.dispatchEvent(new InputEvent('input', { bubbles: true }));
+				box.value = '/login'; box.dispatchEvent(new InputEvent('input', { bubbles: true }));
 			})()`)
 			await Bun.sleep(100)
 			let stable = await b.evaluate(`(() => { let w = window.__completionWatch; w.observer.disconnect(); return { sameMenu: w.menu === document.querySelector('.completions'), sameRow: w.row === document.querySelector('.completions button'), connected: w.row.isConnected, changes: w.changes, y: document.querySelector('textarea').getBoundingClientRect().top - w.y } })()`)
@@ -1463,3 +1463,78 @@ test.skipIf(!chrome)('streaming preserves native selection and Markdown text nod
 		await b.close()
 	}
 }, 20000)
+
+test('/logout targets every socket of one login, persists refusal, and leaves other logins connected', async () => {
+	await server.serve(); web.start()
+	let first = await cookie()
+	let id = webAuth.list()[0]!.id
+	let second = await cookie()
+	let a = await dial(first), b = await dial(first), other = await dial(second)
+	await until(() => [a, b, other].every((w) => w.events.some((e) => e.type === 'tabs')))
+	let caller = sessions.create({ cwd: home, model: 'hal/intro' }).id
+	let { command } = await import('./commands/logout.ts')
+	expect(command.run(id, undefined, { sessionId: caller, cwd: home, model: 'hal/intro', setCwd() {}, setModel() {}, say() {} })).toMatchObject({ say: '1 web login(s) revoked; a browser needs a new code' })
+	expect(await a.closed).toBe(4001); expect(await b.closed).toBe(4001)
+	expect(other.ws.readyState).toBe(WebSocket.OPEN)
+	webAuth.close()
+	expect((await fetch(`${base()}/login`, { headers: { cookie: first } })).status).toBe(401)
+	expect((await dial(first)).opened).toBe(false)
+	expect((await fetch(`${base()}/login`, { headers: { cookie: second } })).status).toBe(204)
+	command.run('all', undefined, { sessionId: caller, cwd: home, model: 'hal/intro', setCwd() {}, setModel() {}, say() {} })
+	expect(await other.closed).toBe(4001)
+})
+
+test('self logout is same-origin POST only and cannot revoke another login', async () => {
+	await server.serve(); web.start()
+	let first = await cookie(), second = await cookie()
+	let a = await dial(first), other = await dial(second)
+	expect((await fetch(`${base()}/logout`, { headers: { cookie: first } })).status).toBe(404)
+	expect((await fetch(`${base()}/logout`, { method: 'POST', headers: { cookie: first, origin: 'https://example.com' } })).status).toBe(403)
+	expect(webAuth.list()).toHaveLength(2)
+	let res = await fetch(`${base()}/logout`, { method: 'POST', headers: { cookie: first, origin: base() }, redirect: 'manual' })
+	expect(res.status).toBe(303)
+	expect(res.headers.get('set-cookie')).toContain('Max-Age=0')
+	expect(await a.closed).toBe(4001)
+	expect(other.ws.readyState).toBe(WebSocket.OPEN)
+	expect((await fetch(`${base()}/login`, { headers: { cookie: first } })).status).toBe(401)
+})
+
+test.skipIf(!chrome)('browser status logout fits phone and desktop and returns to the login gate', async () => {
+	providerHome()
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Page.navigate', { url: `${base()}/?auth=${webAuth.issue()}` })
+		await b.waitFor(`!!document.querySelector('.entry .hint')?.textContent`)
+		for (let width of [390, 1280]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			await b.evaluate(`document.querySelector('.StatusRow .overview').click()`)
+			await b.waitFor(`document.querySelector('.StatusDetails').open`)
+			let r = await b.evaluate(`(() => { let b = document.querySelector('.StatusDetails form button'), r = b.getBoundingClientRect(); return { text: b.textContent, height: r.height, left: r.left, right: r.right, viewport: innerWidth }; })()`)
+			expect(r.text).toBe('Log out this browser')
+			expect(r.height).toBeGreaterThanOrEqual(44)
+			expect(r.left).toBeGreaterThanOrEqual(0); expect(r.right).toBeLessThanOrEqual(r.viewport)
+			await b.evaluate(`document.querySelector('.StatusDetails').close()`)
+		}
+		await b.evaluate(`document.querySelector('.StatusRow .overview').click(); document.querySelector('.StatusDetails form button').click()`)
+		await b.waitFor(`!!document.querySelector('.Login')`)
+		expect(webAuth.list()).toHaveLength(0)
+	} finally { await b.close() }
+}, 15000)
+
+test('revocation while an upgrade awaits the page build refuses the socket', async () => {
+	await server.serve(); web.start()
+	let auth = await cookie()
+	let original = web.version
+	let waiting = false
+	let release!: (v: string) => void
+	web.version = () => { waiting = true; return new Promise((r) => { release = r }) }
+	try {
+		let pending = dial(auth, '?v=building&updates=manual')
+		await until(() => waiting)
+		web.revoke(webAuth.list()[0]!.id)
+		release('building')
+		expect((await pending).opened).toBe(false)
+		expect(web.state.sockets.size).toBe(0)
+	} finally { web.version = original }
+})

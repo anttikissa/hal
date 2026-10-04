@@ -34,6 +34,7 @@ const list: CommandInfo[] = [
 	{ name: 'keys', description: 'list the keys', category: 'help', key: 'f1' },
 	{ name: 'kill', description: 'stop a background job', category: 'session' },
 	{ name: 'login', description: 'log in to a provider', category: 'session' },
+	{ name: 'logout', description: 'revoke a web login or all web logins', category: 'app' },
 	{ name: 'mem', description: 'show host memory use', category: 'debug' },
 	{ name: 'model', description: 'pick the model', category: 'session', key: 'ctrl-m' },
 	{ name: 'move', description: 'move this tab to a numbered position', category: 'tabs' },

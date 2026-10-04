@@ -120,3 +120,24 @@ test('./run auth prints a code from the running host, or says none is running', 
 	let code = /\b([0-9a-hjkmnp-tv-z]{6})\b/.exec(await new Response(asked.stdout).text())![1]!
 	expect('token' in webAuth.redeem(code)).toBe(true)
 })
+
+test('legacy login hashes retain their tokens and stable public ids across restart without inventing first seen', () => {
+	let redeemed = webAuth.redeem(webAuth.issue(), 'Safari on iPhone')
+	if (!('token' in redeemed)) throw new Error('code refused')
+	let h = webAuth.tokenHash(redeemed.token)!
+	let record = webAuth.store()[h]
+	if (typeof record === 'string') throw new Error('expected login metadata')
+	webAuth.store()[h] = record!.expires
+	let legacy = webAuth.list()[0]!
+	expect(legacy.firstSeen).toBeUndefined()
+	expect(legacy.lastSeen).toBeUndefined()
+	expect(webAuth.valid(redeemed.token)).toBe(true)
+	webAuth.touch(h)
+	webAuth.close()
+	expect(webAuth.list()[0]).toMatchObject({ id: legacy.id, lastSeen: expect.any(String) })
+	expect(webAuth.valid(redeemed.token)).toBe(true)
+	expect(everyFile(home)).not.toContain(redeemed.token)
+	webAuth.revoke(legacy.id)
+	webAuth.close()
+	expect(webAuth.valid(redeemed.token)).toBe(false)
+})
