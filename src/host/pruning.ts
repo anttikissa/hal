@@ -5,9 +5,11 @@ import { replay, type HistoryRecord } from '../common/replay.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 import { diag } from './diag.ts'
+import { tokenEstimates } from '../common/token-estimates.ts'
+import { tokenCalibration } from './token-calibration.ts'
 
 type Saved = { boundary: number; checkpoint: number; pressure: number; omitted: number[]; consumed: number[] }
-type Budget = { overhead?: number; window?: number }
+type Budget = { overhead?: number; window?: number; model?: string }
 
 function saved(id: string): Saved {
 	return liveFiles.liveFile(`${paths.sessionDir(id)}/projection.ason`, { boundary: 0, checkpoint: 0, pressure: -1, omitted: [], consumed: [] } as Saved, { watch: false })
@@ -55,9 +57,9 @@ function heavy(r: HistoryRecord): boolean {
 }
 
 // Conservative character estimate, including image payloads and system/tools.
-function estimate(messages: Message[], overhead = 0): number {
+function estimate(messages: Message[], overhead = 0, model?: string): number {
 	let images = messages.reduce((sum, m) => sum + m.blocks.reduce((n, b) => n + (b.type === 'image' ? b.bytes ?? 0 : b.type === 'tool_result' ? b.image?.bytes ?? 0 : 0), 0), 0)
-	return (JSON.stringify(messages).length + overhead) / 3 + images / 3
+	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + tokenEstimates.estimate(images)
 }
 
 function project(id: string, all: HistoryRecord[], budget: Budget = {}): HistoryRecord[] {
@@ -97,7 +99,7 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}): History
 		}
 		let projected = apply(omitted)
 		let limit = Math.min(pruning.pressureTokens, (budget.window ?? Infinity) * .75)
-		if (state.pressure !== checkpoint && pruning.estimate(replay.toMessages(projected), budget.overhead) > limit && add(candidates(false))) {
+		if (state.pressure !== checkpoint && pruning.estimate(replay.toMessages(projected), budget.overhead, budget.model) > limit && add(candidates(false))) {
 			state.pressure = checkpoint
 			diag.log(`pruning ${id}: pressure boundary at checkpoint ${checkpoint}; omitted ${omitted.size} records`)
 			projected = apply(omitted)

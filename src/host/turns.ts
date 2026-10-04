@@ -168,7 +168,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		if (!scripted) {
 			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model, now: clock.now(), sessionId: id })
 			let defs = tools.defs()
-			let messages = await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model) })
+			let messages = await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model), model })
 			if (signal.aborted) return
 			for await (let event of turns.stream(model, { system, effort: running.effort, messages, tools: defs, image: (blob) => blobs.base64(id, blob), sessionId: id }, signal)) {
 				if (signal.aborted) return
