@@ -31,3 +31,10 @@ test('old records without model, effort or time still get a header', () => {
 	expect(titles.title({ type: 'command', text: '/help' })).toBe('You')
 	expect(titles.title({ type: 'output', text: 'x' })).toBeUndefined()
 })
+
+test('folded messages identify the sender before the summary, keeping full attribution in details', () => {
+	let item = { type: 'prompt' as const, text: 'Done', from: '163-gad', label: 'tab 4 · 163-gad · Review', summary: 'Report completion', advisory: true as const }
+	expect(titles.messageHead(item)).toBe('From tab 4 (163-gad) (advisory): Report completion')
+	expect(titles.who(item)).toBe('From tab 4 (163-gad), Review (advisory)')
+	expect(titles.messageHead({ ...item, label: undefined })).toBe('From 163-gad (advisory): Report completion')
+})

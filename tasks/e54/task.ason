@@ -1,0 +1,11 @@
+{
+	title: 'Message headers state source and destination',
+	spec: 'Incoming cross-session message headers identify the source as From tab N (session-id), with the summary in the folded web title and below the terminal header. Outgoing send-tool headers say To tab N (session-id): description when the browser receives a successful destination result, and To tab N: description or To session-id: description before resolution and in the terminal. Labels without an open tab retain the session ID. Direction labels contain no middle-dot separators; session names remain available in opened message details. Both clients show explicit direction, retaining summary, provenance tags, full text and failures. Preserve host-established attribution and recorded send-time identities rather than guessing current tab mappings. Restore the invariant that a collapsed cross-session card identifies its source or destination without opening it.',
+	status: 'done',
+	notes: [
+		'Incoming labels and successful send results retain the recorded send-time identity. Browser send headers resolve tab and session ID from the successful result; terminal send headers use the requested target because terminal tool-row rendering does not receive the result. No live tab lookup is used, so reordering cannot silently relabel a historical send. Existing steering, advisory, queued, continuation and fork-origin tags remain visible.',
+		'Validation: 19 focused title/tool/continuation tests pass. Isolated full ./test on 8a0a51e plus this change: 1441 pass, 1 skip, 4 failures outside changed files (existing common/transcript.ts exceeds 400 lines; pulse timing; malformed history in history.test.ts; slash-question timeout). Typecheck and lint pass in isolation; browser integration tests pass, but the new labels have not been manually visually inspected. The shared checkout has concurrent queue-edit changes and additional failures, so it cannot be rebased safely.'
+	],
+	needs: ['rj', 'vwh'],
+	foldInto: ['rj', 'vwh']
+}

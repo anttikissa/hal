@@ -62,6 +62,21 @@ function tagged(who: string, tags: (string | false | undefined)[]): string {
 	return list.length ? `${who} (${list.join(', ')})` : who
 }
 
+// A recorded tabs.label without middle dots; a short card address
+// retains the send-time tab and id, while details also keep the name.
+function address(label: string, short = false): string {
+	let [first, id, ...name] = label.split(' · ')
+	if (!id) return label
+	let who = /^tab \d+$/.test(first!) ? `${first} (${id})` : first!
+	let rest = /^tab \d+$/.test(first!) ? name : [id, ...name]
+	return !short && rest.length ? `${who}, ${rest.join(', ')}` : who
+}
+
+function messageHead(item: Shown & { type: 'prompt' }): string {
+	let who = titles.who(item.from === undefined ? item : { ...item, label: titles.address(item.label ?? item.from, true) })
+	return `${who}: ${item.summary}`
+}
+
 // Who wrote `item`, or undefined for an item without a header.
 function who(item: Shown): string | undefined {
 	let label = titles.author(item)
@@ -71,7 +86,7 @@ function who(item: Shown): string | undefined {
 function author(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt':
-			return tagged(item.from !== undefined ? `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.generatingCommand && `/${item.generatingCommand} continuation`, item.steering && 'interrupt', item.advisory && 'next round', item.queued && (item.queuedAt ? `after this turn, sent at ${titles.time(item.queuedAt)}` : 'after this turn')])
+			return tagged(item.from !== undefined ? item.summary ? `From ${titles.address(item.label ?? item.from)}` : `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.generatingCommand && `/${item.generatingCommand} continuation`, item.steering && 'interrupt', item.advisory && 'next round', item.queued && (item.queuedAt ? `after this turn, sent at ${titles.time(item.queuedAt)}` : 'after this turn')])
 		// A command is headed as the prompt it was typed as.
 		case 'command':
 			return item.from === undefined ? 'You' : `Command from ${item.label ?? item.from}`
@@ -130,4 +145,4 @@ function blockId(item: Shown & { key: string }): string {
 	return titles.letter(item) + item.key
 }
 
-export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, learn, time, stamp, ended, author, who, title, letter, blockId }
+export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, learn, time, stamp, ended, address, messageHead, author, who, title, letter, blockId }
