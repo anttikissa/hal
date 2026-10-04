@@ -1,6 +1,5 @@
 // Host protocol: durable history before live events, shared by all transports.
-// Snapshot reads yield in slices; commands wait until their snapshot is sent
-// and are then carried out in order (task 7j).
+// Sliced snapshots hold commands until sent, then run them in order (task 7j).
 
 import { ason } from '../common/ason.ts'
 import { protocol, type Command, type Event } from '../common/protocol.ts'
@@ -234,7 +233,8 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	if (c.type === 'notice-history') return { reply: { type: 'notice-history', entries: noticeHistory.list() } }
 	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid) : clients.screen(client.record, c)
 	if (c.type === 'visibility') {
-		// Not checked against open: a tab's open may still be pending.
+		// A known tab may still be waiting for its open snapshot.
+		if (!client.open.has(c.sessionId) && !tabs.file().open.includes(c.sessionId)) return { refused: 'visibility: session is not an open tab or followed session' }
 		let previous = client.visible
 		client.visible = c.visible ? c.sessionId : undefined; client.shown = c.sessionId; client.visibleAt = Date.now()
 		recap.visibility(previous, client.visible)
