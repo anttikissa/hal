@@ -66,7 +66,11 @@ body, textarea { tab-size: 4; }
 .Card .who { color: var(--quiet); }
 .Card .who .call { color: inherit; text-decoration: underline; }
 .Card .exit { background: none; color: var(--remove-fg); }
-.Card .change > div { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.Card .change > div:not(.lines) { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+/* An opened diff keeps whole lines and scrolls sideways as one box, its
+   right edge fading while more is off screen, like a wide table. */
+.Card .change .lines { overflow-x: auto; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
+.Card .change .lines > div { white-space: pre; width: max-content; min-width: 100%; }
 .Card .change .add { color: var(--add-fg); }
 .Card .change .del { color: var(--remove-fg); }
 .Card .change .dim { color: var(--quiet); }
