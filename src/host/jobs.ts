@@ -21,7 +21,7 @@ import { tabs } from './tabs.ts'
 import { tools } from './tools.ts'
 import { busy } from './busy.ts'
 
-export type Run = { done: Promise<string>; stop: () => void }
+export type Run = { done: Promise<string>; stop: (why?: string) => void }
 type Job = { sessionId: string; stop: () => void }
 
 // Starts `command` with bash -c in `cwd`, stdout and stderr merged.
@@ -31,7 +31,7 @@ type Job = { sessionId: string; stop: () => void }
 function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: string) => void): Run {
 	let child = spawn('bash', ['-c', `exec 2>&1\n${command}`], { cwd, detached: true, stdio: ['ignore', 'pipe', 'ignore'] })
 	let kill = () => child.pid !== undefined && tools.killGroup(child.pid)
-	let stopped = false
+	let stopped: string | undefined
 	let timedOut = false
 	let timer = ms === undefined ? undefined : setTimeout(() => ((timedOut = true), kill()), ms)
 	// Keep the whole result so the cap can retain it in a blob, up to
@@ -59,7 +59,7 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 		child.on('error', (e) => (clearTimeout(timer), reject(e)))
 		child.on('close', (code, sig) => {
 			clearTimeout(timer)
-			let status = stopped ? 'stopped by the user' : timedOut ? `timed out after ${ms! / 1000}s` : sig ? `killed by ${sig}` : `exit ${code}`
+			let status = stopped ?? (timedOut ? `timed out after ${ms! / 1000}s` : sig ? `killed by ${sig}` : `exit ${code}`)
 			if (tail.length > half) {
 				dropped += tail.length - half
 				tail = tail.slice(-half)
@@ -68,7 +68,7 @@ function exec(command: string, cwd: string, ms?: number, onOutput?: (chunk: stri
 			resolve(`[${status}]\n${head}${gap}${tail}`)
 		})
 	})
-	return { done, stop: () => ((stopped = true), kill()) }
+	return { done, stop: (why = 'stopped by the user') => ((stopped = why), kill()) }
 }
 
 // Runs `command` for session `sessionId` in the background. One that
@@ -182,7 +182,17 @@ async function lost(): Promise<void> {
 	}
 }
 
+// Why a tool's signal fired. A message sent mid-turn (task 8p) aborts
+// with `steered`: the model must read that the user spoke, never that
+// the user wanted the work stopped.
+const steered = 'steered'
+function why(signal: AbortSignal, stopped = 'cancelled'): string {
+	return signal.reason === steered ? 'interrupted by a new user message, which follows; nothing was cancelled: read it, then carry on' : `${stopped} by the user`
+}
+
 export const jobs = {
+	steered,
+	why,
 	// `running`: background commands of this process, by id.
 	state: { running: new Map<string, Job>() },
 	// How long a background call waits for a command that fails at once.

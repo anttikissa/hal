@@ -32,12 +32,12 @@ export const tool: Tool = {
 		if (typeof input.description !== 'string' || !input.description.trim()) throw new Error('description must be a non-empty sentence; the command did not run')
 		if (input.background !== undefined && typeof input.background !== 'boolean') throw new Error('background must be a boolean; the command did not run')
 		let patterns = fileChanges.validate(input.modifies)
-		if (ctx.signal.aborted) throw new Error('cancelled; the command did not run')
+		if (ctx.signal.aborted) throw new Error(`${jobs.why(ctx.signal)}; the command did not run`)
 		let given = Number(input.timeout) > 0 ? Number(input.timeout) : undefined
 		let observation = await fileChanges.begin(ctx, patterns)
 		let launched = false
 		let launch = () => {
-			if (ctx.signal.aborted) throw new Error('cancelled; the command did not run')
+			if (ctx.signal.aborted) throw new Error(`${jobs.why(ctx.signal)}; the command did not run`)
 			let run = jobs.exec(input.command as string, ctx.cwd, given ?? (input.background ? jobs.backgroundMs : 120_000), input.background ? undefined : ctx.onOutput)
 			launched = true
 			return { ...run, done: run.done.finally(() => fileChanges.finish(observation)) }
@@ -48,8 +48,9 @@ export const tool: Tool = {
 			let note = (out: string) => neighbours.append(out, ctx.sessionId, ctx.cwd)
 			if (input.background) return note(await jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId, launch))
 			let run = launch()
-			ctx.signal.addEventListener('abort', run.stop, { once: true })
-			try { return note(await run.done) } finally { ctx.signal.removeEventListener('abort', run.stop) }
+			let stop = () => run.stop(jobs.why(ctx.signal, 'stopped'))
+			ctx.signal.addEventListener('abort', stop, { once: true })
+			try { return note(await run.done) } finally { ctx.signal.removeEventListener('abort', stop) }
 		} finally {
 			if (!launched) observation.release()
 		}

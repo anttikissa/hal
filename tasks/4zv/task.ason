@@ -1,0 +1,10 @@
+{
+	title: 'A message sent mid-turn never reads as a cancel',
+	spec: "When a user message interrupts a turn (task 8p), any tool call it stops or keeps from running says so in its result: 'interrupted by a new user message, which follows; nothing was cancelled: read it, then carry on'. The model must read that the user spoke and carry on with its work after answering, never that the user wanted the work cancelled. Only Escape, a close or another real stop says 'cancelled by the user' (not started) or 'stopped by the user' (killed). This holds for a command waiting on another tab's declared files, one about to launch, one running, and calls not yet dispatched. The steer aborts with the reason jobs.steered; jobs.why(signal) words it.",
+	status: 'done',
+	notes: [
+		"Invariant restored: a steer is never reported to the model as a cancel. Before, every abort said 'cancelled; the command did not run', and the model told the user it had been cancelled and stopped working."
+	],
+	needs: ['8p'],
+	foldInto: ['8p']
+}

@@ -26,6 +26,7 @@ import { systemPrompt } from './system-prompt.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
+import { jobs } from './jobs.ts'
 import { slash } from './slash.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
@@ -284,7 +285,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
 			for (let call of calls) {
 				if (signal.aborted || contextTransitions.pending(id)?.kind === 'clear') {
-					results.push({ type: 'tool_result', id: call.id, output: 'Tool call did not run: interrupted before dispatch.', isError: true })
+					results.push({ type: 'tool_result', id: call.id, output: `Tool call did not run: ${jobs.why(signal)} before dispatch.`, isError: true })
 					continue
 				}
 				if (decided.get(call.id) === false) { results.push(approval.declined(call)); continue }
