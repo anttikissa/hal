@@ -182,7 +182,7 @@ test('a 429 limits that account until resets_in_seconds and the next account tak
 	let end = (await run()).at(-1) as any
 	expect(end).toMatchObject({ type: 'error', failure: 'limited' })
 	expect(end.message).toContain('limit reached')
-	let until = limits.until(limits.key('openai/gpt-5.5', 'a@x'))
+	let until = limits.on('openai/gpt-6-luna', 'a@x')
 	expect(until).toBeGreaterThanOrEqual(before + 3_600_000 - 1000)
 	reply = () => sse(completed())
 	await run()
