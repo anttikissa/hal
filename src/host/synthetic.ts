@@ -2,7 +2,7 @@
 // (intro.ts). Each answered form is durable in history; a model derives
 // its next step from those records. A reply's paragraphs arrive with
 // a typing pace (pauseMs); `pause` ends the turn paused with that reason,
-// and `then` runs once the turn has ended (a command the reply starts).
+// and `after` runs once the turn has ended (a command the reply starts).
 // `stream` replaces the paced text with raw events, tool calls included;
 // the turn runs those and asks the model again, as with a provider.
 import type { StreamEvent } from '../common/blocks.ts'
@@ -11,7 +11,7 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { intro } from './intro.ts'
 import { scrollTest } from './scroll-test.ts'
 
-export type Reply = { say?: string; stream?: AsyncGenerator<StreamEvent>; ask?: Form; pause?: string; then?: () => void }
+export type Reply = { say?: string; stream?: AsyncGenerator<StreamEvent>; ask?: Form; pause?: string; after?: () => void }
 export type Synthetic = (records: HistoryRecord[], answers?: Answers, sessionId?: string) => Reply
 
 function find(model: string): Synthetic | undefined {

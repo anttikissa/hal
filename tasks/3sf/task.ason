@@ -1,6 +1,7 @@
 {
-	title: '/what sums up other tabs without disturbing them',
-	spec: "/what [tab or name or all] asks a model for a short summary of what other sessions are doing and where they stand, without sending them anything or pausing them: it reads their recent records (bounded per session and in total), summarises each in two or three lines (goal, last action, state: working, waiting on the user, done, failed) and shows the result as one output in the asking session. Default: every other open tab. Runs in the background so the asking session stays usable; the summary is stored with the session like any command output. Uses the session's model unless a cheaper default is configured. Old Hal reference: artifact old-what.ts.",
+	title: '/recap: a short summary of where a session stands',
+	spec: `Like Claude Code's session recap (https://code.claude.com/docs/en/interactive-mode, Session recap). /recap shows a summary of at most 400 characters of what happened in the session so far and where it stands: the goal, what got done, what it waits on. /recap <tab, name or id> recaps another session instead, and /recap all gives one line per other open tab; neither sends that session anything or pauses it. The recap is a model call on the session's recent records (bounded), run in the background so the session stays usable, and is stored as the command's output.
+Automatic recap: when the user comes back to a tab (a client focuses it, or the terminal or browser window regains focus) after at least 3 minutes since its last finished turn, the session has at least 3 turns, and the last thing shown there is not already a recap, Hal shows one, generated in the background while the user was away so it's ready on return. A boolean setting sessionRecap (default on, in /config) turns it off. Never in subagent sessions, which have no human watching. Old Hal reference for reading other sessions: artifact old-what.ts.`,
 	status: 'planned',
 	needs: []
 }

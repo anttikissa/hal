@@ -162,7 +162,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let held = approval.held(records)
 	let asking: Form | undefined
 	let stopping: string | undefined
-	let then: (() => void) | undefined
+	let after: (() => void) | undefined
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
 		if (!scripted) {
@@ -180,7 +180,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		answers = undefined
 		asking = reply.ask
 		stopping = reply.pause
-		then = reply.then
+		after = reply.after
 		yield* reply.stream ?? synthetic.paced(reply.say, signal)
 	}
 	let last: DoneEvent | ErrorEvent | undefined
@@ -336,7 +336,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	if (end.status === 'paused') status.transition(id, capped === undefined ? { type: 'pause' } : { type: 'pause', reason: capped })
 	else status.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
 	// After the turn's own records, so what it starts lands below them.
-	if (end.status === 'paused' && capped !== undefined) then?.()
+	if (end.status === 'paused' && capped !== undefined) after?.()
 	if (contextTransitions.apply(id)) return
 	subagents.report(id)
 	if (end.status === 'completed') {

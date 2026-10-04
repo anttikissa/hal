@@ -78,7 +78,7 @@ function edit(o: Output): Part[] | undefined {
 	let a = c.text.find((r) => r[0] === '-')!.slice(1).trim().split(/\s+/)
 	let b = c.text.find((r) => r[0] === '+')!.slice(1).trim().split(/\s+/)
 	// Word LCS table, then a walk emitting kept words and changed spans.
-	let L = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0))
+	let L = Array.from({ length: a.length + 1 }, () => Array.from({ length: b.length + 1 }, () => 0))
 	for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) L[i]![j] = a[i] === b[j] ? L[i + 1]![j + 1]! + 1 : Math.max(L[i + 1]![j]!, L[i]![j + 1]!)
 	let parts: ({ keep: string } | { del: string[]; add: string[] })[] = []
 	let i = 0, j = 0
