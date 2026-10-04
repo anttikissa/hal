@@ -15,7 +15,9 @@ function clean(v: unknown): BrowserReport | undefined {
 	for (let key of diagnosticBooleans) { if (v.context[key] !== undefined && typeof v.context[key] !== 'boolean') return; if (v.context[key] !== undefined) context[key] = v.context[key] }
 	let entries: BrowserReport['entries'] = []
 	for (let e of v.entries) {
-		if (!object(e) || !number(e.at) || !diagnosticKinds.includes(e.kind) || !diagnosticDetails.includes(e.detail) || (e.line !== undefined && !number(e.line)) || (e.column !== undefined && !number(e.column))) return
+		if (!object(e) || !number(e.at) || (e.line !== undefined && !number(e.line)) || (e.column !== undefined && !number(e.column))) return
+		// A page newer than this host may know labels it does not: skip them.
+		if (!diagnosticKinds.includes(e.kind) || !diagnosticDetails.includes(e.detail)) continue
 		entries.push({ at: e.at, kind: e.kind, detail: e.detail, ...(e.line !== undefined && { line: e.line }), ...(e.column !== undefined && { column: e.column }) })
 	}
 	return { page: v.page, version: v.version, at: v.at, context, entries }

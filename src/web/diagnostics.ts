@@ -31,7 +31,8 @@ async function send(): Promise<void> {
 	try {
 		let body = JSON.stringify({ page, version: document.documentElement.dataset.version ?? 'unknown', at: Date.now(), context: { ...read(), lag }, entries: batch })
 		let res = await fetch('/web-diagnostics', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body, keepalive: true, signal: AbortSignal.timeout(10_000) })
-		if (!res.ok) throw new Error('not accepted')
+		// A rejected report would be rejected again: drop it.
+		if (!res.ok && res.status !== 400) throw new Error('not accepted')
 	} catch { entries = [...batch, ...entries].slice(-32) }
 	finally { busy = false }
 }
