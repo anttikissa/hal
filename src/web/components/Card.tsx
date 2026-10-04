@@ -143,11 +143,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return item.type === 'tool' ? toolDetails.headline(item.name, item.input, props.row.result?.output).text : lines()[0]
 	}
 	// Folded cards name their kind with an icon: thinking, another
-	// session's message (the send tool's bubble), or the tool.
+	// session's message or command (the send tool's bubble, which
+	// unfolded ones show too), or the tool.
 	let kindIcon = (): IconName | undefined => {
 		let item = props.row.item
 		if (item.type === 'thinking') return 'thinking'
-		if (item.type === 'prompt' && item.from !== undefined) return 'message'
+		if (titles.letter(item) === 'm') return 'message'
 		if (item.type !== 'tool') return undefined
 		if (item.name === 'bash' && typeof item.input.command === 'string' && runsPython.test(item.input.command)) return 'python'
 		return toolIcons[item.name]
@@ -213,7 +214,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		box?.setSelectionRange(box.value.length, box.value.length)
 	}
 	let heading = () => (
-		<CardHeader time={time()} label={who()} reference={link()}>
+		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} label={who()} reference={link()}>
 			<Show when={props.edit}><button type="button" class="edit" aria-label="Edit prompt" title="Edit this prompt and send it again from here" onClick={edit}><Icon name="edit" /></button></Show>
 		</CardHeader>
 	)
