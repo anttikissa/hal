@@ -48,6 +48,9 @@ test('automatic recap is prepared away, ready on return, and never repeated last
 	c.conn.send({ type: 'visibility', sessionId: id, visible: true })
 	await until(() => c.of('output').some((e) => e.text.startsWith('Recap: ')))
 	expect(calls).toBe(1)
+	let end = history.readSync(id).findLast((r) => r.type === 'turn_end')! as any
+	history.append(id, { type: 'round', usage: end.usage, ts: end.ts })
+	history.append(id, { type: 'turn_end', status: end.status, usage: end.usage, ts: end.ts })
 	c.conn.send({ type: 'visibility', sessionId: id, visible: false })
 	c.conn.send({ type: 'visibility', sessionId: id, visible: true })
 	await Bun.sleep(5)

@@ -78,7 +78,7 @@ function watching(id: string): boolean {
 async function eligible(id: string): Promise<{ records: HistoryRecord[]; end: HistoryRecord & { type: 'turn_end' } } | undefined> {
 	if (!settings.sessionRecap() || !recap.human(id) || sessions.open(id).model.startsWith('hal/')) return
 	let records = await recap.recent(id)
-	let last = records.at(-1)
+	let last = records.findLast((r) => r.type !== 'round' && r.type !== 'file_changes' && !(r.type === 'turn_end' && !r.error && !r.pauseReason))
 	if (last?.type === 'output' && last.text.startsWith('Recap: ')) return
 	let end = records.findLast((r) => r.type === 'turn_end')
 	if (!end || end.type !== 'turn_end' || history.unfinished(id)) return
