@@ -4,12 +4,7 @@
 // in two) plus the few earlier records its state needs; clients page
 // back through the rest by byte offsets from the end.
 //
-// What the state needs from earlier is found through sessions/<id>/
-// marks.ason: the offsets of the last question, the last answer, the last record of a turn, the last prompt and every inbox
-// message not yet delivered. It is a cache of history, which stays the
-// truth: `size` says how much of the file it covers, and whatever was
-// appended since is read and folded in; a file shorter than that, or no
-// marks at all, rebuilds it from the whole history.
+// marks.ason caches offsets needed for state, caught up with each append.
 //
 // Reading is written as steps: generators that pause before decoding
 // each record, yielding its size in bytes, so one code path serves both
@@ -28,7 +23,7 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
-type Marks = { transitions?: number[]; size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]>; changes?: number[]; changedPaths?: Record<string, true> }
+type Marks = { rebaseVersion?: 1; rebase?: number; transitions?: number[]; size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]>; changes?: number[]; changedPaths?: Record<string, true> }
 type Raw = { offset: number; bytes: number; text: string }
 type Line = { offset: number; bytes: number; record: HistoryRecord }
 // `end`: the byte the page (or tail) ends at.
@@ -149,6 +144,7 @@ function lineAt(path: string, offset: number): Line {
 }
 
 function apply(m: Marks, r: HistoryRecord, offset: number): void {
+	if (r.type === 'rebase') m.rebase = offset
 	if (r.type === 'output' && r.transition) m.transitions = [offset]
 	if (r.type === 'output' && r.transitionCancel) (m.transitions ??= []).push(offset)
 	if (r.type === 'output' && r.transitionDone) m.transitions = []
@@ -216,9 +212,9 @@ function* catchUp(id: string): Steps<Marks> {
 		let size = existsSync(path) ? statSync(path).size : 0
 		// Marks from before `next`, or with `close` (an answer or a turn
 		// end, before answers were kept apart), are rebuilt.
-		if (m.size < 0 || m.size > size || (m.size > 0 && (m.next === undefined || m.changes === undefined)) || 'close' in m) {
+		if (m.size < 0 || m.size > size || (m.size > 0 && (m.next === undefined || m.changes === undefined || !('rebaseVersion' in m))) || 'close' in m) {
 			for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
-			Object.assign(m, { size: 0, inbox: {}, changes: [], changedPaths: {} })
+			Object.assign(m, { size: 0, inbox: {}, changes: [], changedPaths: {}, rebaseVersion: 1 })
 		}
 		if (m.size >= size) return m
 		let base = m.size
@@ -271,6 +267,7 @@ function* markedSteps(id: string): Steps<Line[]> {
 // alone, states.fromHistory, inbox.pending and forms.open answer as
 // they would from the whole history.
 function essentials(id: string): HistoryRecord[] {
+	if (pages.marks(id).rebase !== undefined) return replay.current(history.readSync(id))
 	return pages.marked(id).map((l) => l.record)
 }
 
@@ -290,6 +287,17 @@ function* pageSteps(id: string, before?: number, budget = pages.budget): Steps<P
 	let size = existsSync(path) ? statSync(path).size : 0
 	let end = before ?? size
 	if (end > size || end < 0 || (before !== undefined && end > 0 && pages.readBytes(path, end - 1, end)[0] !== NL)) throw new Error(`${path}: ${before} is not a record boundary`)
+	// Rebase undo and cross-page groups need the audit trail.
+	if (pages.marks(id).rebase !== undefined) {
+		let all = pages.lines(path, pages.readBytes(path, 0, size), 0)
+		let current = new Map(replay.current(all.map((l) => l.record)).map((r) => [r.n, r]))
+		let found = all.filter((l) => l.offset < end && current.has(l.record.n))
+		let at = found.findIndex((l) => l.offset >= end - budget)
+		if (at < 0) at = Math.max(0, found.length - 1)
+		while (at > 0 && !turnStart(found[at]!.record)) at--
+		found = found.slice(at)
+		return { records: found.map((l) => current.get(l.record.n)!), start: found[0]?.offset ?? 0, end }
+	}
 	for (let n = Math.min(Math.max(budget, 1), end); ; n = Math.min(n * 2, end)) {
 		let from = end - n
 		let buf = pages.readBytes(path, from, end)
@@ -318,6 +326,10 @@ function snapshot(id: string, budget = pages.budget): Tail {
 function* snapshotSteps(id: string, budget = pages.budget): Steps<Tail> {
 	let read = pages.state.bytesRead
 	let earlier = yield* pages.markedSteps(id)
+	if (pages.marks(id).rebase !== undefined) {
+		let current = new Map(replay.current(history.readSync(id)).map((r) => [r.n, r]))
+		earlier = earlier.filter((l) => current.has(l.record.n)).map((l) => ({ ...l, record: current.get(l.record.n)! }))
+	}
 	let used = pages.state.bytesRead - read
 	let tail = yield* pages.pageSteps(id, undefined, Math.max(budget - used, 1))
 	let out: Tail = { history: tail.records, earlier: earlier.filter((l) => l.offset < tail.start).map((l) => l.record), end: tail.end }

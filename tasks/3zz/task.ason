@@ -5,6 +5,9 @@ Durable form: one appended record { type: 'rebase', base: n, drop: [n...], edit:
 Compaction, clear, pruning, fork, find and lazy pages read through replay.current, so a dropped or edited record is gone everywhere except the raw file. The context graph marks a rebase as a cause (letter R). The record numbers n stay stable: links to #n of a dropped record show it as dropped, not missing.
 Refused while the session runs a turn or waits on a question; the user pauses first. Applying checks base equals the last record number when the plan was built, so nothing appended in between is lost.
 Old Hal reference: artifacts old-rebase.ts, old-rebase.test.ts, old-rebase-handler.ts (it wrote a new history file; here we append a record instead).`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Rebases project from the audit trail in record order; a newer plan with the same base supersedes its earlier plan, including empty undo. rebases.apply(id, plan, expectedBase) checks the current last written record; expectedBase defaults to plan.base and explicitly guards undo. Tool-result records with multiple results connect all their calls, and signed thinking connects its provider round. Rebased paging reads the audit trail to resolve cross-page groups and undo; ordinary paging remains bounded. Fork copies only projected records. Search rebuilds dirty sessions through replay, including unindexed fallback. Preserve prompt-replacement replay semantics when projecting before pruning to avoid applying replaces twice.'
+	],
 	needs: []
 }

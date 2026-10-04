@@ -12,6 +12,7 @@ import { lines } from '../common/lines.ts'
 import type { ToolResultBlock } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import type { SessionMeta, SpawnKind } from '../common/session.ts'
+import { replay } from '../common/replay.ts'
 import { states } from '../common/states.ts'
 import { summary } from '../common/summary.ts'
 import { blobs } from './blobs.ts'
@@ -74,7 +75,7 @@ function prompt(parent: string, task: string, kind: SpawnKind, slots: number): s
 // are, without the parent's waiting inbox. The parent's turn is still
 // running this round's calls, so the copy answers them and ends it.
 function fork(parent: string, child: string): void {
-	let records = history.readSync(parent).filter((r) => r.type !== 'inbox').map((r) => ({ ...r, originSession: r.originSession ?? parent }))
+	let records = replay.current(history.readSync(parent)).filter((r) => r.type !== 'inbox').map((r) => ({ ...r, originSession: r.originSession ?? parent }))
 	writeFileSync(history.file(child), records.map((r) => lines.encode(r)).join(''))
 	if (existsSync(blobs.dir(parent))) cpSync(blobs.dir(parent), blobs.dir(child), { recursive: true })
 	let pending: string[] = []

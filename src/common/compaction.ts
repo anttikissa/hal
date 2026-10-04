@@ -43,8 +43,9 @@ function trim(text: string): string {
 // from the latest reset on. Earlier summaries are not in it: a second
 // compact summarises from the start again.
 function entries(records: HistoryRecord[]): HistoryRecord[] {
+	records = replay.current(records)
 	let from = records.findLastIndex((r) => r.type === 'reset')
-	return replay.current(records.slice(from + 1)).filter((r) => r.type === 'user' || r.type === 'assistant')
+	return records.slice(from + 1).filter((r) => r.type === 'user' || r.type === 'assistant')
 }
 
 function promptText(r: HistoryRecord): string {

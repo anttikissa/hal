@@ -11,7 +11,7 @@ import { pruning } from './pruning.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
 
-export type Cause = 'compaction' | 'clear' | 'pruning checkpoint' | 'cache miss'
+export type Cause = 'rebase' | 'compaction' | 'clear' | 'pruning checkpoint' | 'cache miss'
 export type Point = { n: number; ts: string; turn: number; round: number; input: number; cacheRead: number; cacheWrite: number; total: number; block?: number; model?: string; approx?: true; cause?: Cause; window?: number }
 
 function points(records: HistoryRecord[], window: (model?: string) => number | undefined = () => undefined): Point[] {
@@ -20,6 +20,7 @@ function points(records: HistoryRecord[], window: (model?: string) => number | u
 	let boundary: Cause | undefined
 	let checkpoint = 0
 	for (let r of records) {
+		if (r.type === 'rebase') boundary = 'rebase'
 		if (r.type === 'compact' || r.type === 'reset') {
 			boundary = r.type === 'compact' ? 'compaction' : 'clear'
 			completed = 0
@@ -42,7 +43,8 @@ function points(records: HistoryRecord[], window: (model?: string) => number | u
 		let prev = out.at(-1)
 		let now = Math.floor(completed / pruning.batchTurns)
 		if (prev) {
-			if (p.total < prev.total * 0.9) {
+			if (boundary === 'rebase') p.cause = boundary
+			else if (p.total < prev.total * 0.9) {
 				if (boundary) p.cause = boundary
 				else if (now > checkpoint) p.cause = 'pruning checkpoint'
 			} else if (prev.cacheRead > 1000 && p.cacheRead < prev.cacheRead * 0.1) p.cause = 'cache miss'
