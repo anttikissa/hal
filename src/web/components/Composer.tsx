@@ -34,6 +34,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	}
 	// An upload's answer edits the box in place when it has the focus, so
 	// the caret stays where the user is typing.
+	let picker!: HTMLInputElement
 	let box = (e: HTMLTextAreaElement) => {
 		input = e
 		keys.insert = insert
@@ -133,27 +134,22 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 					onPaste={(e) => e.clipboardData && attach.paste(e.clipboardData, insert) && e.preventDefault()}
 				/>
 				</div>
-				{/* A label, not a button calling click(): iOS opens the picker
-				    natively for a label tap, while a scripted click() on the
-				    file input works only every other time there. The input
-				    stays rendered (WebKit ignores display:none file inputs)
-				    and focusable, so the keyboard still reaches it. */}
-				<label class="attach" title="Attach file">
-					<input
-						type="file"
-						class="hidden-text"
-						aria-label="Attach file"
-						accept={attach.accept}
-						multiple
-						disabled={!!props.view.form}
-						onChange={(e) => {
-							attach.files(e.currentTarget.files ?? [], insert)
-							// The same file may be picked again.
-							e.currentTarget.value = ''
-						}}
-					/>
-					<span aria-hidden="true">+</span>
-				</label>
+				<input
+					ref={(e) => (picker = e)}
+					type="file"
+					class="hidden-text"
+					tabindex={-1}
+					aria-hidden="true"
+					accept={attach.accept}
+					multiple
+					onChange={(e) => {
+						attach.files(e.currentTarget.files ?? [], insert)
+						e.currentTarget.value = ''
+					}}
+				/>
+				<button type="button" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onClick={() => picker.click()}>
+					+
+				</button>
 				<div class="actions">
 					<Show when={busy() && !view.commandDraft(props.text)}>
 						<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={() => send(true)}>Queue</button>

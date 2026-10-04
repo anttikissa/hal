@@ -9,7 +9,8 @@
 		'Not checked by hand in a real browser: the dashed outline while dragging, at phone and desktop widths.',
 		'Task 6y supersedes the previous refusal of PDF/HEIC/zip: non-text, non-supported-image types upload as opaque application/octet-stream; their safe file extension is preserved where possible. The previous note describing rejected unsupported files records the old state only.',
 		'Invariant: the attach button opens the file picker on iOS. Its file input stays rendered but invisible (class hidden-text, tabindex -1, aria-hidden): WebKit ignores click() on a display:none file input, so the hidden attribute left the button dead on iPhone while desktop worked.',
-		"Invariant: the attach control is a label wrapping the file input, never a button calling input.click(). On iOS a scripted click() on a file input opened the picker only every other tap; a label tap is handled natively. The input stays rendered (class hidden-text, since WebKit ignores display:none file inputs), focusable and labelled 'Attach file', so keyboard and screen reader users reach it; the label shows the focus ring via :has(:focus-visible) and greys out via :has(:disabled)."
+		"Invariant: the attach control is a label wrapping the file input, never a button calling input.click(). On iOS a scripted click() on a file input opened the picker only every other tap; a label tap is handled natively. The input stays rendered (class hidden-text, since WebKit ignores display:none file inputs), focusable and labelled 'Attach file', so keyboard and screen reader users reach it; the label shows the focus ring via :has(:focus-visible) and greys out via :has(:disabled).",
+		'Supersedes the label note: + is again a plain button calling picker.click(); the file input is only visually hidden (class hidden-text, tabindex -1, aria-hidden), never display:none.'
 	],
 	needs: ['31'],
 	foldInto: ['zc']

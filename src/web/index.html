@@ -102,7 +102,8 @@ body, textarea { tab-size: 4; }
 .Card > .link { position: absolute; top: 0; right: 1ch; padding-block: var(--card-inset); min-width: 44px; text-align: right; }
 .Card:has(> .link) > .content { padding-right: 7ch; }
 .Card .link::before { content: attr(data-ref); }
-.Card .link:hover, .Card .link:focus-visible { color: inherit; text-decoration: underline; }
+.Card .link:focus-visible { color: inherit; text-decoration: underline; }
+@media (hover: hover) and (pointer: fine) { .Card .link:hover { color: inherit; text-decoration: underline; } }
 .Card.target { outline: 1px solid currentColor; outline-offset: 2px; scroll-margin-top: 0.5lh; }
 .Card .more { display: block; margin-top: 0.25lh; background: none; color: inherit; text-decoration: underline; padding: 0; }
 .Card .more { min-height: 44px; }
@@ -200,15 +201,12 @@ body, textarea { tab-size: 4; }
 .Composer { position: relative; z-index: 1; flex: none; padding: 0.25lh max(2ch, env(safe-area-inset-right)) max(0px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))) max(2ch, env(safe-area-inset-left)); }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.125lh 0; }
-/* Static footer chrome is not a scroll surface. Only the draft itself
-   scrolls, without handing its edge gestures to Safari's viewport. */
-.StatusRow, .Composer .status, .entry > button, .entry > .attach, .entry .actions { touch-action: none; }
 /* Completions: a panel in the box's own colour (the input style), like a
    card: lit left bar, outline, names bright; the selected row solid in
    that colour with canvas text, as a chosen option is. */
 .Composer .completions { position: absolute; bottom: 100%; left: 0; right: 0; max-height: min(35dvh, 20rem); overflow-y: auto; background: var(--canvas); box-shadow: inset 0 0 0 1px currentColor; border-left: 3px solid currentColor; }
 .Composer .completions button { display: flex; flex-direction: column; width: 100%; min-height: 44px; padding: 0.25lh 1ch; text-align: left; background: transparent; color: inherit; }
-.Composer .completions button:hover { background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent); }
+@media (hover: hover) and (pointer: fine) { .Composer .completions button:hover { background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent); } }
 .Composer .completions button[aria-selected="true"] { background: currentColor; -webkit-text-fill-color: var(--canvas); }
 .Composer .completions span { color: var(--quiet); font-size: 0.85em; }
 .status .busy { color: var(--highlight); }
@@ -227,7 +225,7 @@ body, textarea { tab-size: 4; }
    blank tile of its final size, not a broken-image icon and alt text. */
 .chips img:not([data-loaded]) { opacity: 0; }
 .chips button { min-width: 44px; min-height: 44px; background: transparent; color: var(--quiet); border: 0; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
-.chips button:hover { color: inherit; background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
+@media (hover: hover) and (pointer: fine) { .chips button:hover { color: inherit; background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
 .entry .actions button { flex: 1; min-height: 44px; }
 .entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
 /* The example request: the input's faint blue, as in the terminal. It
@@ -236,11 +234,9 @@ body, textarea { tab-size: 4; }
 .entry .hint { position: absolute; inset: calc((44px - 1lh) / 2) 1ch auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
 .entry .hint.gone { opacity: 0; transition-duration: 80ms; }
 .entry textarea { field-sizing: content; overscroll-behavior: none; touch-action: pan-y pinch-zoom; max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: calc((44px - 1lh) / 2) 1ch; }
-.entry > button, .entry > .attach, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 2ch; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
-.entry > button:hover:not(:disabled), .entry > .attach:hover:not(:has(:disabled)), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
-.entry > button:disabled, .entry > .attach:has(:disabled), .entry .actions button:disabled { color: var(--quiet); cursor: default; }
-.entry > .attach { position: relative; display: flex; align-items: center; cursor: pointer; }
-.entry > .attach:has(:focus-visible) { outline: 2px solid currentColor; outline-offset: -2px; }
+.entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 2ch; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .entry > button:hover:not(:disabled), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
+.entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; }
 .help { display: flex; flex-wrap: wrap; gap: 0 2ch; padding-top: 0.25lh; color: var(--description); }
 .help b { color: var(--key); font-weight: 600; }
 textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 0.25lh 1ch; resize: none; outline: none; }
@@ -271,14 +267,14 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
    second, thicker border. */
 .Question button:not(.dismiss) { padding: 0.125lh 1ch; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px color-mix(in oklab, currentColor 55%, transparent); }
 .Question button[aria-pressed="true"] { background: currentColor; -webkit-text-fill-color: var(--canvas); font-weight: 600; }
-.Question button:hover:not([aria-pressed="true"]) { background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent); }
+@media (hover: hover) and (pointer: fine) { .Question button:hover:not([aria-pressed="true"]) { background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent); } }
 /* Options wrap with the same gap across and down. */
 .Question [role="group"] { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5lh 1ch; }
 /* Answer: the options' colours, a button's shape. */
 .Question button.answer { align-self: flex-start; min-height: 36px; padding: 0 2ch; font-weight: 600; }
 .Question button:not(.dismiss):focus-visible { outline-width: 1px; outline-offset: 2px; }
 .Question .dismiss { position: absolute; top: 0; right: 0; background: none; color: inherit; padding: 0.25lh 1ch; }
-.Question .dismiss:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
+@media (hover: hover) and (pointer: fine) { .Question .dismiss:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
 .Question > .text { padding-right: 3ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Question .text a { color: inherit; text-decoration: underline; }
 @media (pointer: coarse) { .Question button, .Question button.answer { min-width: 44px; min-height: 44px; } }
