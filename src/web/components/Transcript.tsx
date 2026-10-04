@@ -53,6 +53,13 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorKey = () => (streaming() ? rows().at(-1)?.key : undefined)
+	// Otherwise its own line after the last row, before waiting and
+	// pending messages: the cursor is the work now, they the future.
+	let line = () => (
+		<div class="cursor-line" aria-hidden="true">
+			<span />
+		</div>
+	)
 	// Background jobs still running, by call key: their cards offer Kill.
 	let jobs = createMemo(() => view.jobs(all()))
 	// Prompts the user may edit and resend (task 26q): their cards offer Edit.
@@ -69,16 +76,15 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
 			<For each={shown()} keyed={(row) => row.key}>
 				{(row) => (
+					<>
 					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && !row().waiting && editable().has(row().item.key)} />}>
 						{(q) => <Question item={q()} form={props.view.form!} />}
 					</Show>
+					<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>
+					</>
 				)}
 			</For>
-			<Show when={!streaming()}>
-				<div class="cursor-line" aria-hidden="true">
-					<span />
-				</div>
-			</Show>
+			<Show when={!streaming() && !rows().length}>{line()}</Show>
 		</main>
 	)
 }

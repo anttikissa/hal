@@ -320,6 +320,13 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 		for (let r of rows) lines.push(...ansi.paintRows(r, style, cols))
 	}
 	let formCursor = view.form && past.target === undefined ? past.formCursor : undefined
+	// The idle Hal cursor: a blank row, its row, and the blank row that
+	// comes before the chrome. A question being answered has the cursor.
+	// It is the work now, so it comes before waiting messages (the future).
+	if (view.hal?.at === 'idle' && !formCursor) {
+		if (lines.length || above) lines.push('')
+		lines.push(ansi.PAD + frame.glyph(view.hal))
+	}
 	// Unsent and waiting messages use the normal prompt renderer; queued
 	// ones stack as compact rows, the sender's tab number redrawn here.
 	let session = view.transcript?.meta.id
@@ -343,12 +350,6 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 		lines.push(...rows)
 	}
 	if (stacked) lines.push(edge)
-	// The idle Hal cursor: a blank row, its row, and the blank row that
-	// comes before the chrome. A question being answered has the cursor.
-	if (view.hal?.at === 'idle' && !formCursor) {
-		if (lines.length || above) lines.push('')
-		lines.push(ansi.PAD + frame.glyph(view.hal))
-	}
 	// The chrome, built apart to know its height for the padding.
 	let history = lines
 	lines = []

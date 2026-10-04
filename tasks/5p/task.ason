@@ -9,7 +9,8 @@
 		"Idle colour: bright (assistant cursor) while states.busy(state); after this client saw it busy and then not, it fades to cursorIdle over halCursor.fadeMs() (5 s) in ten steps (few distinct colours, so oklch's rgb cache stays small). A session never seen working here is grey at once.",
 		"The idle rows are a blank row plus the cursor row appended to the history part of the frame; the chrome's own leading blank row is the third. They are skipped while a question form is open (it owns the cursor). Dark phases keep the row (empty), so the frame height never blinks; a full last text row puts the cursor on a row of its own (the last column stays unused), dark or lit.",
 		'render.paint used to rewrite from the first changed row to the end; it now skips unchanged rows after it, so a blink writes one row. Appended rows still come in with CRLF from the row above, and a shrink erases below the new last row.',
-		"startup.test.ts's joining-UI budget (100 ms) was already borderline on the base commit under load (99-103 ms); it can fail on a busy machine without any change."
+		"startup.test.ts's joining-UI budget (100 ms) was already borderline on the base commit under load (99-103 ms); it can fail on a busy machine without any change.",
+		"Hal's idle cursor is the work now, so in both clients it sits after the last transcript row and above waiting, queued and pending messages (the future); it used to sit below them."
 	],
 	needs: [],
 	foldInto: ['cc']
