@@ -19,6 +19,10 @@ function init(): void {
 	paths.init()
 	let db = new Database(`${paths.stateDir()}/find.sqlite`, { create: true })
 	findIndex.state.db = db
+	// The projection is disposable; version changes reindex immutable history.
+	if ((db.query('PRAGMA user_version').get() as { user_version: number }).user_version !== 1) {
+		db.exec('DROP TABLE IF EXISTS docs; DROP TABLE IF EXISTS words; DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS marks; PRAGMA user_version=1;')
+	}
 	db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;
 		CREATE TABLE IF NOT EXISTS marks (sessionId TEXT PRIMARY KEY, offset INTEGER, size INTEGER, mtime REAL);
 		CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY, sessionId TEXT, blockId TEXT, kind TEXT, ts REAL, text TEXT, UNIQUE(sessionId,blockId));
@@ -74,6 +78,11 @@ async function rows(sessionId: string, r: HistoryRecord): Promise<FindRow[]> {
 			else if (b.type === 'tool_call') await add('tool-call', `${b.name} ${ason.stringify(b.input, 'short')}`, i)
 			else if (b.type === 'tool_result') await add('tool-output', b.output, i)
 		}
+	} else if (r.type === 'command' || r.type === 'output') {
+		// Older successful rename replies lack the command name. Keep them
+		// discoverable without changing history or maintaining a title store.
+		let legacyRename = r.type === 'output' && !r.error && r.text.startsWith('Session renamed: ')
+		await add('other', legacyRename ? `/rename ${r.text}` : r.text)
 	} else await add('other', ason.stringify(r, 'short'))
 	return out
 }

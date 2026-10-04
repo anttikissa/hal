@@ -12,6 +12,7 @@ import { history } from './history.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { blobs } from './blobs.ts'
+import { pages } from './pages.ts'
 
 let savedHome = process.env.HAL_HOME, home = '', originalIndexed = find.indexed
 beforeEach(() => {
@@ -102,4 +103,39 @@ test('unindexed history is searched and a new query suppresses the old stream', 
 	expect(batches.some((b) => (b.scanning ?? 0) > 0)).toBe(true)
 	let hits = batches.flatMap((b) => b.results)
 	expect(hits.some((h) => h.href === `/${a.id}#${Buffer.byteLength(prefix) + 1}`)).toBe(true)
+}, 10000)
+
+test('rename search exposes old and new titles from both origins, including old history and stale projections', async () => {
+	let a = sessions.create({ cwd: '/example', model: 'example/model', name: 'Current topic' })
+	history.append(a.id, { type: 'command', text: '/rename Human topic' })
+	history.append(a.id, { type: 'output', text: 'Session renamed: Earlier topic → Human topic' })
+	history.append(a.id, { type: 'command', text: '/rename Model topic', origin: 'model' })
+	history.append(a.id, { type: 'output', text: '/rename: Human topic → Model topic', origin: 'model' })
+	for (let i = 0; i < 80; i++) history.submit(a.id, `Later conversation ${i}`)
+	// A small opening page leaves the rename records loaded on demand.
+	let tail = pages.snapshot(a.id, 1024)
+	expect(tail.older).toBeDefined()
+	expect(tail.history.some((r) => r.type === 'command' || r.type === 'output')).toBe(false)
+	let before = readFileSync(history.file(a.id))
+	let ready = caughtUp(); find.init(); await ready
+	let verify = async () => {
+		let hits = await find.top('/rename')
+		expect(hits.filter((h) => h.kind === 'other').map((h) => h.blockId).sort()).toEqual(['1', '2', '3', '4'])
+		expect(hits.find((h) => h.blockId === '2')?.snippet).toContain('Earlier topic → Human topic')
+		expect(hits.find((h) => h.blockId === '4')?.snippet).toContain('Human topic → Model topic')
+		expect(hits.find((h) => h.blockId === '2')?.href).toBe(`/${a.id}#2`)
+		expect(hits.find((h) => h.blockId === '4')?.href).toBe(`/${a.id}#4`)
+	}
+	await verify()
+	find.reset()
+	// An old fully caught-up projection must be rebuilt, not just its tail.
+	let db = new Database(`${home}/state/find.sqlite`)
+	db.exec("DELETE FROM docs WHERE blockId='2'; PRAGMA user_version=0;")
+	db.close()
+	ready = caughtUp(); find.init(); await ready
+	await verify()
+	// Unnotified appends exercise the same projection during fallback scans.
+	appendFileSync(history.file(a.id), lines.encode({ type: 'output', text: 'Session renamed: Model topic → Final topic', origin: 'model', n: 85, ts: new Date().toISOString() }))
+	expect((await find.top('/rename')).find((h) => h.blockId === '85')?.snippet).toContain('Model topic → Final topic')
+	expect(readFileSync(history.file(a.id)).subarray(0, before.length)).toEqual(before)
 }, 10000)

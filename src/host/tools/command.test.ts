@@ -18,7 +18,7 @@ test('model commands use the same slash path as typed commands, including state,
 	b.conn.send({ type: 'open', sessionId: id })
 	await until(() => b.views.has(id))
 	let renamed = await run(id, '/rename Work in progress')
-	expect(renamed.output).toBe(`Session renamed: Session ${id} → Work in progress`)
+	expect(renamed.output).toBe(`/rename: Session ${id} → Work in progress`)
 	expect(a.of('command').at(-1).origin).toBe('model')
 	expect((await records(id)).find((r) => r.type === 'command')).toMatchObject({ origin: 'model' })
 	expect(a.of('output').at(-1).ts).toBeString()
@@ -33,7 +33,7 @@ test('model commands use the same slash path as typed commands, including state,
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rename Human title' })
 	await until(() => sessions.open(id).name === 'Human title')
 	expect(a.of('command').at(-1).origin).toBeUndefined()
-	expect(a.of('output').at(-1).text).toBe('Session renamed: Work in progress → Human title')
+	expect(a.of('output').at(-1).text).toBe('/rename: Work in progress → Human title')
 })
 
 test('a model tool call can /go and /rename while its turn runs; results reach the next provider round', async () => {
@@ -49,7 +49,7 @@ test('a model tool call can /go and /rename while its turn runs; results reach t
 	expect(a.of('go').at(-1).tab).toBe(target)
 	expect(sessions.open(id).name).toBe('New name')
 	let results = calls[1]!.input.messages.flatMap((m: any) => m.blocks).filter((b: any) => b.type === 'tool_result')
-	expect(results).toEqual([{ type: 'tool_result', id: 't1', output: '/go done' }, { type: 'tool_result', id: 't2', output: `Session renamed: Session ${id} → New name` }])
+	expect(results).toEqual([{ type: 'tool_result', id: 't1', output: '/go done' }, { type: 'tool_result', id: 't2', output: `/rename: Session ${id} → New name` }])
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length)
 })
