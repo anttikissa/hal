@@ -7,12 +7,9 @@
 		'Chat.tsx listens for dragover, dragleave and drop on the document (only drags whose types include Files; a text drag into the box stays native) and routes drops to keys.drop, which ignores them while a question or the picker is open. The dragging flag is a Chat signal passed to Composer as `dropping` (class on .entry, a dashed outline in index.html); it clears on drop or on a dragleave without relatedTarget, which is leaving the window.',
 		'CDP: Input.dispatchDragEvent with data.files (real paths) drives a genuine OS-style file drop in headless Chrome, dragEnter/dragOver/drop at a point outside the textarea; the old textarea-only handler would let the page navigate there.',
 		'Not checked by hand in a real browser: the dashed outline while dragging, at phone and desktop widths.',
-		'Task 6y supersedes the previous refusal of PDF/HEIC/zip: non-text, non-supported-image types upload as opaque application/octet-stream; their safe file extension is preserved where possible. The previous note describing rejected unsupported files records the old state only.'
+		'Task 6y supersedes the previous refusal of PDF/HEIC/zip: non-text, non-supported-image types upload as opaque application/octet-stream; their safe file extension is preserved where possible. The previous note describing rejected unsupported files records the old state only.',
+		'Invariant: the attach button opens the file picker on iOS. Its file input stays rendered but invisible (class hidden-text, tabindex -1, aria-hidden): WebKit ignores click() on a display:none file input, so the hidden attribute left the button dead on iPhone while desktop worked.'
 	],
-	needs: [
-		'31'
-	],
-	foldInto: [
-		'zc'
-	]
+	needs: ['31'],
+	foldInto: ['zc']
 }

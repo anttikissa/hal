@@ -139,7 +139,11 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 					type="file"
 					accept={attach.accept}
 					multiple
-					hidden
+					// Rendered but invisible: WebKit (iOS) ignores click() on a
+					// display:none file input, so `hidden` left + dead there.
+					class="hidden-text"
+					tabindex={-1}
+					aria-hidden="true"
 					onChange={(e) => {
 						attach.files(e.currentTarget.files ?? [], insert)
 						// The same file may be picked again.
