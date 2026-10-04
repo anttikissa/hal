@@ -1,0 +1,7 @@
+{
+	title: 'Phone composer keeps buttons beside the draft',
+	spec: 'Restore the invariant that the composer buttons (attach, pause/continue, Queue, Send/Steer/Run) sit in the same row beside the message field on every screen width, however many lines the draft wraps to. Task f63 moved them to a row above a wrapped phone draft; that row was mostly empty space between two buttons and appeared only once typing began. Remove the stacked layout entirely: the stacked class, its CSS, the matchMedia/ResizeObserver measurement and its signal. Keep the iOS one-tap invariant from f63 notes (Send, Steer and Queue prevent pointerdown default so the tap never blurs the draft before click). Touch targets stay at least 44px; desktop is unchanged.',
+	status: 'planned',
+	needs: ['f63'],
+	foldInto: ['f63', 'qn']
+}
