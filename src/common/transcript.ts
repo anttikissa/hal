@@ -29,7 +29,7 @@ export type Shown = { originSession?: string } & (
 	// A durable question; with `answers` once answered (secrets only named).
 	// `cancelled`: dismissed (Escape, or a newer question replaced it).
 	// `command`: a slash command asked; open in any session state.
-	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; cancelled?: true; command?: true }
+	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; cancelled?: true; command?: true; ts?: string }
 	// A slash command: origin identifies Hal; from identifies another session.
 	| { type: 'command'; text: string; from?: string; label?: string; ts?: string }
 	// What a command said.
@@ -150,7 +150,7 @@ function recordItems(r: HistoryRecord, at: number): Item[] {
 function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'rate_limit') return [{ type: 'output', text: r.text, ts: r.ts }]
 	if (r.type === 'rebase' || r.type === 'file_changes' || r.type === 'round' || r.type === 'continue' || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' || r.type === 'assistant') return []
-	if (r.type === 'question') return [r.from ? { type: 'question', id: r.id, form: r.form, command: true } : { type: 'question', id: r.id, form: r.form }]
+	if (r.type === 'question') return [{ type: 'question', id: r.id, form: r.form, ...(r.from && { command: true as const }), ts: r.ts }]
 	if ((r.type === 'output' && r.transitionDone) || ((r.type === 'command' || r.type === 'output') && r.origin === 'model')) return [] // model-run: its tool card shows it (9g)
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'reset') return [{ type: 'output', text: transcript.boundary(r), ts: r.ts }]
@@ -180,8 +180,8 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 	return r.type === 'reset' ? 'Context cleared.' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarised)`
 }
 
-function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form }): Shown {
-	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true }
+function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form; ts?: string }): Shown {
+	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true, ...(r.ts !== undefined && { ts: r.ts }) }
 	if (r.type === 'divider') return r.clear ? { type: 'output', text: r.text, ...(r.ts !== undefined && { ts: r.ts }) } : { type: 'divider', text: r.text }
 	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.from !== undefined && { from: r.from }), ...(r.label !== undefined && { label: r.label }), ...(r.ts !== undefined && { ts: r.ts }) }
 	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.synthetic && { synthetic: true }), ...(r.change && { change: r.change }), ...(r.ts !== undefined && { ts: r.ts }) }
@@ -341,7 +341,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		let items: Item[] = [...t.items, ...transcript.keyed([transcript.promptItem(event.prompt, event.sender, event.ts, event.queued), ...(event.images ?? []).map((b) => transcript.imageItem(b))], event.n, t.items.length)]
 		return { ...t, items, prompt: t.items.length, live: { start: items.length, turn: transcript.fresh(event) } }
 	}
-	let question: Shown | undefined = event.type === 'question' ? { type: 'question', id: event.id, form: event.form } : undefined
+	let question: Shown | undefined = event.type === 'question' ? { type: 'question', id: event.id, form: event.form, ...(event.ts !== undefined && { ts: event.ts }) } : undefined
 	let ended = (items: Item[], end: Shown): Item[] => [...items, ...transcript.keyed([end], (event as { n?: number }).n, items.length)]
 	// A turn left unfinished by another host ends without running here.
 	if (!t.live) {

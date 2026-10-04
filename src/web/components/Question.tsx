@@ -14,6 +14,8 @@ import { external } from './Markdown.tsx'
 import { app } from '../app.ts'
 import { view } from '../view.ts'
 import { Icon } from './Icon.tsx'
+import { CardHeader } from './CardHeader.tsx'
+import { titles } from '../../common/titles.ts'
 
 export function Question(props: { item: Item & { type: 'question' }; form: FormState }) {
 	let fields: HTMLElement[] = []
@@ -36,6 +38,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 	}
 	return (
 		<form class="Question question" onSubmit={submit}>
+			<Show when={titles.time(props.item.ts)}>{(time) => <CardHeader time={time()} />}</Show>
 			<div class="text">? <For each={parts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></div>
 			<button type="button" class="dismiss" aria-label="Dismiss" title="Dismiss (Esc)" onClick={() => app.sendForm({ type: 'cancel' })}>
 				<Icon name="close" />

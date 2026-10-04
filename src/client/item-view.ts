@@ -183,7 +183,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'question': {
 			let rows = [...ansi.wrap(`? ${item.form.text}`, width), ...itemView.quoteLines(item.form.quote, width)]
 			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
-			return [...rows, ...said.flatMap((l) => ansi.wrap(l, width - 2).map((r) => `  ${r}`))]
+			return itemView.headed(item, [...rows, ...said.flatMap((l) => ansi.wrap(l, width - 2).map((r) => `  ${r}`))], width)
 		}
 		// Drawn as the prompt it was typed as: header, then its text.
 		case 'command':
