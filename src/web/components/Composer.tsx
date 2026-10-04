@@ -90,9 +90,13 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 		let t = props.view.transcript
 		if (t) app.sendNow(paused() ? { type: 'continue', sessionId: t.meta.id } : view.pause(props.view))
 	}
+	// Steering keeps the phone keyboard up for the next steer; Send and
+	// Queue hide it so the reply is visible. A mouse keeps the focus.
 	let send = (queue = false) => {
+		let steer = busy() && !queue
 		app.send(queue)
-		input.focus()
+		if (steer || !matchMedia('(pointer: coarse)').matches) input.focus()
+		else input.blur()
 	}
 	return (
 		<footer class="Composer">
