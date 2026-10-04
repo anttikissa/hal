@@ -48,7 +48,7 @@ async function expand(cwd: string, patterns: string[]): Promise<string[]> {
 async function acquire(ctx: ToolContext, patterns: string[]): Promise<() => void> {
 	if (!patterns.length) return () => {}
 	for (;;) {
-		if (ctx.signal.aborted) throw new Error('cancelled; the command did not run')
+		if (ctx.signal.aborted) throw new Error(`${jobs.why(ctx.signal)}; the command did not run`)
 		let names = await fileChanges.expand(ctx.cwd, patterns)
 		let keys = new Set(await Promise.all(names.map((p) => fileChanges.canonical(resolve(ctx.cwd, p)))))
 		// Reserve glob expressions too: identical globs with no current matches
@@ -73,9 +73,10 @@ async function acquire(ctx: ToolContext, patterns: string[]): Promise<() => void
 		let n = conflict.callId ? history.readSync(conflict.sessionId).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === conflict.callId)?.n : undefined
 		let job = n !== undefined && jobs.state.running.has(`${conflict.sessionId}:${n}`) ? `#t${n}` : undefined
 		let owner = conflict.sessionId === ctx.sessionId ? 'this session' : editor
-		ctx.onOutput?.(job ? `Waiting for background job ${job} (${owner}) to exit; it declared ${path}\n` : `Waiting for ${editor} to finish editing ${path}\n`)
+		let waiting = job ? `waiting for background job ${job} (${owner}) to exit; it declared ${path}` : `waiting for ${editor} to finish editing ${path}`
+		ctx.onOutput?.(`${waiting[0]!.toUpperCase()}${waiting.slice(1)}\n`)
 		await new Promise<void>((res, rej) => {
-			let abort = () => rej(new Error('cancelled; the command did not run'))
+			let abort = () => rej(new Error(`${jobs.why(ctx.signal)} while ${waiting}; the command did not run`))
 			ctx.signal.addEventListener('abort', abort, { once: true })
 			conflict.done.then(res).finally(() => ctx.signal.removeEventListener('abort', abort))
 			if (ctx.signal.aborted) abort()

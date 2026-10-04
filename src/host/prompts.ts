@@ -27,6 +27,7 @@ import { history } from './history.ts'
 import { naming } from './naming.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
+import { jobs } from './jobs.ts'
 import { slash } from './slash.ts'
 import { status } from './status.ts'
 import { statusUsage } from './status-usage.ts'
@@ -66,7 +67,7 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 			status.transition(id, { type: 'submit' })
 			let old = running.controller
 			running.controller = new AbortController()
-			old.abort()
+			old.abort(jobs.steered)
 		}
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		return
