@@ -114,3 +114,52 @@ test('a token revoked while away logs out on the refused reconnect instead of re
 	remote.start({ origin: at, token, onEvent: () => {}, onState: () => {}, loggedOut: () => loggedOut++ })
 	await until(() => loggedOut > 0)
 })
+
+test('saved-login startup retains the token through a gateway failure, but not other HTTP refusals', async () => {
+	let original = remote.fetch
+	let saved: Saved = { last: 'https://example.com', tokens: { 'https://example.com': 'private-token' } }
+	let output: string[] = []
+	let requests: string[] = []
+	let body = '<html>temporary gateway failure\nupstream unavailable</html>'
+	try {
+		remote.fetch = async (url) => {
+			requests.push(url)
+			return new Response(body, { status: 502 })
+		}
+		expect(await remote.signIn(undefined, saved, () => { throw new Error('must not ask') }, (text) => output.push(text)))
+			.toEqual({ origin: saved.last, token: 'private-token' })
+		expect(requests).toEqual(['https://example.com/login'])
+		expect(output.join('')).toContain('https://example.com/login: HTTP 502')
+		expect(output.join('')).toContain(body)
+		expect(output.join('')).not.toContain('private-token')
+		expect(saved.tokens[saved.last]).toBe('private-token')
+
+		remote.fetch = async () => new Response('rate limited', { status: 429 })
+		await expect(remote.signIn(undefined, saved, () => null, () => {})).rejects.toThrow('HTTP 429\nrate limited')
+		// A first connection still fails before asking for a code.
+		remote.fetch = async () => new Response(body, { status: 502 })
+		await expect(remote.signIn(saved.last, { last: '', tokens: {} }, () => { throw new Error('must not ask') }, () => {}))
+			.rejects.toThrow('not a hal2 host')
+	} finally { remote.fetch = original }
+})
+
+test('a remote terminal starting while its host is down reconnects when the host returns', async () => {
+	let at = await serve()
+	let saved: Saved = { last: '', tokens: {} }
+	let first = await remote.signIn(at, saved, () => webAuth.issue(), () => {})
+	let port = web.state.server!.port!
+	await web.stop()
+	let output: string[] = []
+	let login = await remote.signIn(undefined, saved, () => { throw new Error('must not ask') }, (text) => output.push(text))
+	expect(login).toEqual(first)
+	expect(output.join('')).toContain(`cannot reach ${at}/login`)
+	let states: LinkState[] = []
+	let loggedOut = 0
+	remote.start({ ...login, onEvent: () => {}, onState: (s) => states.push(s), loggedOut: () => loggedOut++ })
+	await until(() => states.some((s) => s.type === 'disconnected'))
+	web.port = () => port
+	web.start()
+	await until(() => states.some((s) => s.type === 'connected'))
+	expect(loggedOut).toBe(0)
+	expect(saved.tokens[at]).toBe(first.token)
+})

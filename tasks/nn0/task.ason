@@ -1,0 +1,11 @@
+{
+	title: 'Remote terminal startup survives temporary host outages',
+	spec: 'Restore the invariant that a remote terminal with a saved login survives temporary host unavailability, including client restart while its host restarts. Saved-login startup checks GET /login without requiring a manifest probe. Network failures and HTTP 5xx keep the saved token and enter the existing indefinite WebSocket reconnect loop; the startup failure remains visible with its origin, path, HTTP status and complete response body. A definitive 401 still asks for a new code; other HTTP refusals remain errors. First-time login still verifies the Hal manifest before asking for a code, and tokens never appear in output. Tests cover saved-login startup through a 502 and a network outage, recovery over the WebSocket, and unchanged revoked-token and first-login behavior. Browser behavior is unchanged.',
+	status: 'done',
+	notes: [
+		'The restart path re-enters main.remote and previously ran the first-login manifest probe even with a saved token. A transient reverse-proxy 502 therefore exited before wsLink could retry. Saved-login startup now checks /login directly; only network failures and HTTP 5xx fall through to the existing authenticated WebSocket reconnect loop. No transport, browser, credential storage or host authorization changes were needed.',
+		'Validation: remote regression tests pass, including a real stopped web listener returning on the same port. Type-check and changed-file lint pass. Full ./test had two host-test failures that passed on rerun, plus five existing lint warnings in unchanged files; these unrelated issues were left untouched.'
+	],
+	needs: ['tr'],
+	foldInto: ['tr']
+}
