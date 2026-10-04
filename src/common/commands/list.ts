@@ -50,6 +50,7 @@ const list: CommandInfo[] = [
 	// these three `key`s changes only what /keys shows, not the keys.
 	{ name: 'quit', description: 'quit', category: 'app', key: 'ctrl-c', clientOnly: true },
 	{ name: 'recap', description: 'recall session goals, progress and blockers', category: 'session' },
+	{ name: 'rebase', description: 'rewrite session history, or undo the last rewrite', category: 'session' },
 	{ name: 'redraw', description: 'redraw', category: 'app', key: 'ctrl-l' },
 	{ name: 'rename', description: 'name or clear the session name', category: 'session' },
 	// /restart and /restart local run in the client; host, both and all

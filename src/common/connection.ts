@@ -172,7 +172,7 @@ function receive(event: Event): void {
 		st.pending.delete(event.id)
 		if (command?.type === 'open' && command.sessionId) st.followed.delete(command.sessionId)
 	}
-	st.opts?.onEvent(event)
+	st.opts?.onEvent(event.type === 'history-rewritten' ? { type: 'snapshot', sessionId: event.sessionId, snapshot: event.snapshot } : event)
 }
 
 function nextId(): string {
