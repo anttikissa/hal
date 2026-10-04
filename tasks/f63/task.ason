@@ -3,7 +3,8 @@
 	spec: 'On phones (pointer: coarse or width up to 40rem), once the draft wraps past one line, the attach, pause and send/queue buttons move to their own row above the message field, which then takes the full width. The layout stays stacked until the draft empties or the phone media query stops matching, so the wider field never flips it back mid-typing. Desktop layout, button order, 44px touch targets and the textarea DOM node (focus, caret, IME) are unchanged; only CSS order moves the field. Checked by hand on a phone.',
 	status: 'done',
 	notes: [
-		'Invariant: one tap on Send, Steer or Queue submits on iOS. These buttons prevent pointerdown default, as pause and attach do, so the tap never blurs the draft before click; send() blurs afterwards for Send and Queue. A stacked draft lost the click while the blur began hiding the keyboard.'
+		'Invariant: one tap on Send, Steer or Queue submits on iOS. These buttons prevent pointerdown default, as pause and attach do, so the tap never blurs the draft before click; send() blurs afterwards for Send and Queue. A stacked draft lost the click while the blur began hiding the keyboard.',
+		'User feedback: the stacked row wastes space — an empty bar between attach and send that appears only once the draft wraps. Side-by-side buttons are preferred even with a field about 25 characters wide. A better design is to come; until then this layout stays.'
 	],
 	needs: ['qn'],
 	foldInto: ['qn']
