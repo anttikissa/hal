@@ -209,3 +209,19 @@ test('a change is not a turn: withoutCommands drops it', () => {
 	let records: HistoryRecord[] = [say('hi'), end('completed'), { type: 'change', cwd: '/x', ts }]
 	expect(replay.withoutCommands(records).at(-1)).toEqual(end('completed'))
 })
+
+test('queued texts retain exact receipt timestamps independently of delivery and neighboring texts', () => {
+	let queuedAt = '2026-10-04T20:13:07.456Z'
+	let deliveredAt = '2026-10-04T20:17:42.123Z'
+	let msgs = replay.toMessages([{
+		type: 'user', ts: deliveredAt, queued: true,
+		blocks: [
+			{ type: 'text', text: 'That was the situation then.', queuedAt },
+			{ type: 'text', text: 'A fresh message.' },
+			{ type: 'text', text: 'A queued agent message.', from: 'reviewer', queuedAt },
+		],
+	}])
+	expect(prompts(msgs)).toEqual([
+		`[${day(deliveredAt)} ${hhmm(deliveredAt)}]\n<meta>Queued at ${queuedAt}.</meta>\nThat was the situation then.\n\nA fresh message.\n\n[Inbox · reviewer]\n<meta>Queued at ${queuedAt}.</meta>\nA queued agent message.`,
+	])
+})

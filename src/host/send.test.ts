@@ -91,13 +91,14 @@ test('steer is read like the user steering; queue waits for the turn to end', as
 	expect(c.views.get(a)!.inbox.map((m) => [m.text, m.queue, m.advisory])).toEqual([
 		['later', true, undefined],
 	])
+	let queuedAt = c.views.get(a)!.inbox[0]!.ts!
 	let steered = recipient()
 	expect(lastText(steered)).toMatch(new RegExp(`\\n\\[Inbox · ${by}\\]\\nnow$`))
 	calls[steered]!.push({ type: 'done', reason: 'end' })
 	// Only after the interrupted turn completes: the queued own turn.
 	let queued = () => calls.findIndex((call, i) => i > steered && call.input.sessionId === a)
 	await until(() => queued() >= 0)
-	expect(lastText(queued())).toMatch(new RegExp(`\\n\\[Inbox · ${by}\\]\\nlater$`))
+	expect(lastText(queued())).toContain(`[Inbox · ${by}]\n<meta>Queued at ${queuedAt}.</meta>\nlater`)
 })
 
 test('sending to itself or to no session is an error result and delivers nothing', async () => {

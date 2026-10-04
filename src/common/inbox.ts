@@ -34,6 +34,7 @@ function pending(records: HistoryRecord[]): InboxItem[] {
 // The sender fields of a record or item, and nothing else.
 function sender(s: Sender): Sender {
 	let out: Sender = {}
+	if (s.queuedAt !== undefined) out.queuedAt = s.queuedAt
 	if (s.origin !== undefined) out.origin = s.origin
 	if (s.generatingCommand !== undefined) out.generatingCommand = s.generatingCommand
 	if (s.from !== undefined) out.from = s.from
@@ -47,7 +48,7 @@ function sender(s: Sender): Sender {
 // Provenance a waiting message retains when delivered. Queue and
 // advisory messages are not steering; the kind belongs to each text.
 function provenance(item: InboxItem): Sender {
-	return { ...inbox.sender(item), ...(!item.queue && !item.advisory ? { steering: true as const } : {}) }
+	return { ...inbox.sender(item), ...(item.queue && item.ts !== undefined ? { queuedAt: item.ts } : {}), ...(!item.queue && !item.advisory ? { steering: true as const } : {}) }
 }
 
 // What leads a queued message's compact row (task 16): '15:29 (Queued
