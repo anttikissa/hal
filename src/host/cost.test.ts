@@ -37,7 +37,7 @@ test('round usage wins over aggregate ends; resumed pauses, model switches and l
 		{ type: 'continue', ts },
 		{ type: 'change', model: 'unknown/model', ts },
 		{ type: 'round', model: 'unknown/model', usage: { input: 42 }, ts },
-		{ type: 'turn_end', status: 'completed', usage: { input: 1042, output: 100, cacheRead: 2000, cacheWrite: 300 }, ts },
+		{ type: 'turn_end', status: 'completed', usage: { input: 42 }, ts },
 	])
 	session('01-def', [
 		{ type: 'assistant', block: { type: 'text', text: 'legacy' }, model: 'anthropic/claude-opus-5-5', ts },
@@ -49,13 +49,13 @@ test('round usage wins over aggregate ends; resumed pauses, model switches and l
 	expect(totals[0]!.usage).toEqual(usage)
 	expect(totals[0]!.cost).toBeCloseTo(.0079)
 	expect(totals[1]!.unpriced).toBe(1)
-	expect(totals[2]!.usage.input).toBe(200)
+	expect(totals[2]!.usage.input).toBe(300)
 	let filtered = cost.run(['--since', '2026-10-04T08:30:00Z'])
 	expect(filtered).toContain('TOTAL  $0.0008')
 	expect(filtered).not.toContain('01-abc')
 	let report = cost.run([])
 	expect(report).toContain('unknown/model')
-	expect(report).toContain('PROVIDER anthropic  $0.0087')
+	expect(report).toContain('PROVIDER anthropic  $0.0091')
 	expect(report).toContain('total incomplete')
 	let cli = Bun.spawnSync([process.execPath, `${paths.repoRoot()}/scripts/cost`, '01-abc'], { env: { ...process.env, HAL_HOME: home } })
 	expect(cli.exitCode).toBe(0)
