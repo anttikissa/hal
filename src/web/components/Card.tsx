@@ -20,7 +20,7 @@ import { markdown as parser } from '../../common/markdown.ts'
 import { titles } from '../../common/titles.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
-import { Markdown } from './Markdown.tsx'
+import { external, Markdown } from './Markdown.tsx'
 import { CardHeader } from './CardHeader.tsx'
 import { promptChanges } from '../../common/prompt-changes.ts'
 import { app } from '../app.ts'
@@ -177,7 +177,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let linked = createMemo(() => (props.row.item.type === 'prompt' && text().includes('[image/') ? view.links(text()) : text()))
 	let parts = () => {
 		let l = linked()
-		return typeof l === 'string' ? l : l.map((p) => (typeof p === 'string' ? p : <a href={p.href} target="_blank" rel="noopener">{p.text}</a>))
+		return typeof l === 'string' ? l : l.map((p) => (typeof p === 'string' ? p : <a href={external(p.href)} target="_blank" rel="noopener">{p.text}</a>))
 	}
 	let time = () => titles.time((props.row.item as { ts?: string }).ts)
 	// A history rewrite's divider (task z71) offers its undo.
@@ -236,7 +236,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 						{isChange ? change() : (
 						<Show when={folds()} fallback={plain(s)}>
 							<CardHeader time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} reference={link()}
-								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
+								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={failed()}><span class="error">✗</span></Show>
 								<Show when={props.job}>{(n) => <button type="button" class="kill" title={`Stop background job #${n()} (/kill #${n()})`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #${n()}` })}>kill</button>}</Show>
