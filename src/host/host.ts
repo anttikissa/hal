@@ -33,6 +33,7 @@ import { webLinks } from './web-links.ts'
 import { wire } from './wire.ts'
 import { rebaseRows } from '../common/rebase-rows.ts'
 import { rebasePlans } from './rebase-plans.ts'
+import { queueEdits } from './queue-edits.ts'
 import { recap } from './recap.ts'
 
 export type Connection = {
@@ -69,6 +70,7 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 		},
 		close: () => {
 			host.state.clients.delete(client)
+			queueEdits.disconnect(client)
 			if (client.visible) void recap.prepare(client.visible)
 			clients.leave(client.record)
 			webLinks.drop(client)
@@ -162,7 +164,7 @@ function handle(client: Client, command: unknown): void {
 	if (problem) return host.reject(client, command, problem, (command as any)?.sessionId)
 	let c = command as Command
 	let repeat = c.id === undefined ? undefined : (host.state.done.get(c.id) ?? host.submitted(c))
-	if (repeat) return host.answer(client, c, repeat)
+	if (repeat) { queueEdits.repeated(client, c, repeat.refused); return host.answer(client, c, repeat) }
 	let outcome: Outcome | Promise<Outcome> | undefined
 	try {
 		outcome = host.act(client, c)
@@ -231,7 +233,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 			return {}
 		})()
 	}
-	if (tabs.is(c)) return tabs.act(c)
+	if (tabs.is(c)) { if (c.type === 'tab-close') queueEdits.suppress(c.sessionId); return tabs.act(c) }
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
 	if (c.type === 'notice-history') return { reply: { type: 'notice-history', entries: noticeHistory.list() } }
 	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid) : clients.screen(client.record, c)
@@ -245,17 +247,15 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	}
 	if (c.type === 'auth') { if (c.link) webLinks.follow(client, client.deliver); return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } } }
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
-	// An edit waits for the turn it paused to finish stopping, so nothing
-	// that turn still records lands after the edit.
-	// It goes through handle() again, so a resend that arrived meanwhile,
-	// deferred behind it on the same promise, is then seen as a repeat.
+	let queueEdit = queueEdits.intercept(client, c); if (queueEdit) return queueEdit
+	// Delivered-prompt edits wait for stopped work, then recheck dedup.
 	let stopping = c.type === 'submit' && (c.amend || c.rewind !== undefined) && status.stateOf(c.sessionId).type === 'paused' && turns.state.running.get(c.sessionId)?.done
 	if (stopping) {
 		stopping.then(() => host.state.clients.has(client) && host.handle(client, c))
 		return undefined
 	}
 	let refused: string | undefined
-	if (c.type === 'close') { client.open.delete(c.sessionId); if (client.visible === c.sessionId) client.visible = undefined; if (client.shown === c.sessionId) client.shown = undefined }
+	if (c.type === 'close') { queueEdits.suppress(c.sessionId); queueEdits.disconnect(client, c.sessionId); client.open.delete(c.sessionId); if (client.visible === c.sessionId) client.visible = undefined; if (client.shown === c.sessionId) client.shown = undefined }
 	else if (c.type === 'attach') {
 		let stored = c.name !== undefined ? blobs.stage(c.name, c.mediaType, c.data) : blobs.store(c.sessionId, c.mediaType, c.data)
 		return { reply: { type: 'attached', sessionId: c.sessionId, command: c.id ?? '', blob: stored.blob, marker: stored.marker } }
@@ -275,7 +275,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		if (changed) prompts.draft(c.sessionId, changed, c.id)
 		else return { reply: { type: 'draft', sessionId: c.sessionId, draft: drafts.get(c.sessionId), ...(c.id !== undefined ? { command: c.id } : {}) } }
 	} else if (c.type === 'continue') refused = prompts.resume(c.sessionId)
-	else if (c.type === 'pause') refused = turns.stop(c.sessionId)
+	else if (c.type === 'pause') { queueEdits.suppress(c.sessionId); refused = status.stateOf(c.sessionId).type === 'paused' ? undefined : turns.stop(c.sessionId) }
 	else if (c.type === 'answer') refused = prompts.reply(c.sessionId, c.question, c.answers)
 	else if (c.type === 'models') void slash.models(c.sessionId).then((e) => host.state.clients.has(client) && client.deliver(e))
 	else if (c.type === 'paste-text') return { reply: blobs.pasteText(c.sessionId, c.name) }
@@ -296,10 +296,10 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 function ready(id: string): Promise<void> | undefined {
 	let pending = host.state.opening.get(id)
 	if (pending) return pending
-	if (sessions.state.open.has(id)) return undefined
+	if (sessions.state.open.has(id)) { queueEdits.recover(id); return undefined }
 	pending = history
 		.open(id)
-		.then(() => {})
+		.then(() => queueEdits.recover(id))
 		.finally(() => host.state.opening.delete(id))
 	host.state.opening.set(id, pending)
 	return pending
@@ -346,6 +346,7 @@ function quitting(last: boolean): void {
 // Forgets every client and turn (tests).
 function reset(): void {
 	history.stop(false)
+	queueEdits.state.clear(); queueEdits.pending.clear()
 	find.reset()
 	recap.reset()
 	for (let r of turns.state.running.values()) r.controller.abort()

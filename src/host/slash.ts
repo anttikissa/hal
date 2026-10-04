@@ -15,6 +15,7 @@ import { naming } from './naming.ts'
 import { liveFiles } from './live-file.ts'
 import { models as modelList } from './models.ts'
 import { prompts } from './prompts.ts'
+import { queueEdits } from './queue-edits.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { host } from './host.ts'
@@ -28,6 +29,10 @@ import { effort } from './effort.ts'
 // refused: no such command, or one only a client may run (a session may
 // not quit or restart the user's terminal).
 function command(id: string, text: string, call: { name: string; args: string }, command?: string, from?: string, completed?: (reply: Reply) => void, origin?: 'model', sender?: Sender): string | undefined {
+	let hold = queueEdits.refused(id)
+	if (hold && !['queue', 'pause', 'close'].includes(call.name)) return hold
+	if (call.name === 'pause') queueEdits.suppress(id)
+	if (call.name === 'close') queueEdits.suppress()
 	if (commandList.byName(call.name)?.clientOnly) return `only a client can run /${call.name}`
 	if (call.name === 'budget' && from !== undefined) return 'only a human can run /budget'
 	if (!commands.all().has(call.name)) return `unknown command /${call.name} (/help lists them)`

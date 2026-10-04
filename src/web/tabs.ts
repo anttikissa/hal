@@ -8,6 +8,8 @@
 import { backfill } from '../common/backfill.ts'
 import { commandList } from '../common/commands/list.ts'
 import { connection } from '../common/connection.ts'
+import { queueEdit } from '../common/queue-edit.ts'
+import { queuedPrompt } from './queue-edit.ts'
 import { drafts } from '../common/drafts.ts'
 import { notices } from '../common/notices.ts'
 import { recall } from '../common/recall.ts'
@@ -143,7 +145,8 @@ function show(id: string, replace: boolean): void {
 	st.shown = id
 	st.view = st.cached.get(id) ?? {}
 	st.cached.delete(id)
-	st.text = recall.shown(id) ?? drafts.text(id)
+	st.text = queueEdit.editing(id) ? queueEdit.text(id) : recall.shown(id) ?? drafts.text(id)
+	queuedPrompt.sync()
 	router.store.save(id)
 	if (!st.background.has(id)) {
 		st.background.add(id)

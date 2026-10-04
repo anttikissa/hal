@@ -40,11 +40,7 @@ export type Shown = { originSession?: string } & (
 	| { type: 'divider'; text: string; ts?: string }
 )
 
-// `key`: the item's id (task w5), the same live, after a reconnect or
-// reload and in a page of earlier history: its record's number `n`, with
-// `.<i>` for the i-th item after the first of a record that yields
-// several (a prompt's images, a round's tool results). Only a record or
-// event without a number (built by hand) falls back to `~<position>`.
+// Stable key: record n, n.i for extra items; unnumbered events use ~position.
 export type Item = Shown & { key: string }
 
 export type Transcript = {
@@ -55,13 +51,12 @@ export type Transcript = {
 	state: SessionState
 	// Messages waiting for the turn (src/common/inbox.ts); always shown.
 	inbox: InboxItem[]
+	queueHold?: string
 	// Everything to show, in order, including the running turn's output.
 	items: Item[]
-	// Where the last prompt's items start: an edit of it replaces them
-	// and everything after.
+	// Where a last-prompt edit replaces items and everything after.
 	prompt?: number
-	// The running turn: items from `start` on are its output so far, and
-	// `turn` is the raw fold they are drawn from.
+	// Running output starts here, drawn from this raw turn.
 	live?: { start: number; turn: LiveTurn }
 	// How many items at the start stand in for history not loaded yet
 	// (standIns); loading it (prepend) replaces them.
@@ -243,6 +238,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	if (snapshot.rewrites) t.rewrites = snapshot.rewrites
 	if (snapshot.dropped) t.dropped = [...snapshot.dropped]
 	if (snapshot.stats) t.stats = snapshot.stats
+	if (snapshot.queueHold) t.queueHold = snapshot.queueHold
 	if (early.length) t.earlier = transcript.fromSnapshot({ ...snapshot, history: early, earlier: [], turn: undefined }).items.length
 	if (snapshot.turn) {
 		let turn = transcript.copyTurn(snapshot.turn)
@@ -309,6 +305,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if ((event.type === 'snapshot' || event.type === 'history-rewritten')) return t && t.meta.id !== event.sessionId ? t : transcript.fromSnapshot(event.snapshot)
 	if (!t || !('sessionId' in event) || event.type === 'rejected' || event.type === 'draft' || event.sessionId !== t.meta.id) return t
 	if (event.type === 'state') return { ...t, state: event.state }
+	if (event.type === 'queue-hold') { let { queueHold: _hold, ...rest } = t; return event.message ? { ...rest, queueHold: event.message } : rest }
 	if (event.type === 'inbox') return { ...t, inbox: event.inbox }
 	if (event.type === 'answer') return { ...t, items: transcript.answered(t.items, event) }
 	if (event.type === 'meta') return { ...t, meta: { ...event.meta }, ...(event.stats && { stats: event.stats }) }

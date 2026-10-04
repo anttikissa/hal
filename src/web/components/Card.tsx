@@ -209,15 +209,16 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// A history rewrite's divider (task z71) offers its undo.
 	let undo = () => props.row.item.type === 'divider' && props.row.item.text.startsWith('History rewritten · /rebase undo ·')
 	let edit = () => {
-		if (!editPrompt.edit(props.row.item.key)) return
+		if (!editPrompt.edit(props.row.waiting ? props.row.key : props.row.item.key)) return
 		flush()
 		let box = document.querySelector<HTMLTextAreaElement>('.Composer textarea')
 		box?.focus()
 		box?.setSelectionRange(box.value.length, box.value.length)
 	}
+	let editButton = () => <Show when={props.edit}><button type="button" class="edit" aria-label={props.row.waiting ? 'Edit queued message' : 'Edit prompt'} title={props.row.waiting ? 'Edit in the queue without changing its position' : 'Edit this prompt and send it again from here'} onClick={edit}><Icon name="edit" /></button></Show>
 	let heading = () => (
 		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} label={who()} reference={link()}>
-			<Show when={props.edit}><button type="button" class="edit" aria-label="Edit prompt" title="Edit this prompt and send it again from here" onClick={edit}><Icon name="edit" /></button></Show>
+			{editButton()}
 		</CardHeader>
 	)
 	// Content branches share the shell, header and normal body inset.
@@ -259,7 +260,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let compact = () => (
 		<>
-			<Show when={expanded() && md()} fallback={<>{link()}<div class="content">{queued()}</div></>}>
+			<Show when={expanded() && md()} fallback={<>{link()}{editButton()}<div class="content">{queued()}</div></>}>
 				{heading()}
 				<div class="content"><div class="sender">{props.row.note}</div>{markdown()}</div>
 			</Show>

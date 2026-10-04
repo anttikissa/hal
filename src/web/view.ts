@@ -3,6 +3,7 @@
 // passing notice, and what each item looks like as text. app.ts feeds
 // it the events from link.ts; the components draw it.
 
+import { queueEdit } from '../common/queue-edit.ts'
 import { completions, type Menu } from './completions.ts'
 import { amend, type Editing } from '../common/amend.ts'
 import { attachments } from '../common/attachments.ts'
@@ -163,7 +164,7 @@ function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { 
 
 // The passing notice, else the hint while editing the last prompt.
 function notice(st: ViewState): string | undefined {
-	return st.notice ?? (st.editing && !st.editing.aside ? amend.hint(st.editing) : undefined)
+	return st.notice ?? (st.transcript && queueEdit.notice(st.transcript.meta.id)) ?? (st.editing && !st.editing.aside ? amend.hint(st.editing) : undefined)
 }
 
 // Tab in the message box with `text` (the caret at its end): the
@@ -205,6 +206,7 @@ function line(st: ViewState, connected: boolean): Line {
 	if (!connected) return { text: 'reconnecting', tone: 'error' }
 	if (!t) return { text: 'connecting', tone: 'busy' }
 	let s = t.state
+	if (t.queueHold) return { text: 'editing queue', tone: 'warn' }
 	if (s.type === 'idle') return { text: 'idle', tone: 'idle' }
 	let text = states.describe(s, undefined, t.items) ?? ''
 	return { text, tone: s.type === 'error' ? 'error' : s.type === 'running' || s.type === 'retrying' ? 'busy' : 'warn' }
@@ -214,6 +216,9 @@ function line(st: ViewState, connected: boolean): Line {
 const commandDraft = (text: string) => /^\/(?:[a-z][a-z0-9-]*(?:\s|$)|$)/.test(text.trim())
 
 function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: string][] {
+	if (st.editing?.queueEdit) return [['enter', 'save queue edit'], ['shift+enter', 'newline'], ['esc', 'cancel']]
+	if (st.transcript?.queueHold) return [['shift+enter', 'newline'], ['↑', 'edit queued']]
+
 	let busy = st.transcript && states.busy(st.transcript.state)
 	let command = view.commandDraft(text)
 	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'interrupt' : 'send'

@@ -27,6 +27,7 @@ import { tools } from './tools.ts'
 import { host } from './host.ts'
 import { prompts } from './prompts.ts'
 import { jobs } from './jobs.ts'
+import { queueEdits } from './queue-edits.ts'
 import { slash } from './slash.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
@@ -66,6 +67,9 @@ function ask(id: string, form: Form, call?: string): void {
 // the prompt's, whose number, command id and sender (of its first text)
 // they are told.
 function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender; queued?: true; ts?: string }): void {
+	let hold = queueEdits.refused(id)
+	if (hold) throw new Error(hold)
+	queueEdits.paused(id, false)
 	let model = sessions.open(id).model
 	let running: Running = { provider: '', controller: new AbortController() }
 	let effort = target(running, model, sessions.open(id).effort)
