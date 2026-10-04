@@ -182,7 +182,7 @@ test('a question and its answer fold like the snapshot that follows them, and on
 	let live = fold([
 		snap({ history: [prompt('hi', 1)], turn: { provider: 'hal', blocks: [], usage: {}, ns: [] } }),
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'Hello.' }, n: 2, ts },
-		{ type: 'question', sessionId, id: 'q1', form, n: 3 },
+		{ type: 'question', sessionId, id: 'q1', form, n: 3, ts },
 		{ type: 'state', sessionId, state: asking },
 	])!
 	let stored = fold([snap({ history: [prompt('hi', 1), said({ type: 'text', text: 'Hello.' }, 2), { type: 'question', id: 'q1', form, ts, n: 3 }] }), { type: 'state', sessionId, state: asking }])!
@@ -190,7 +190,7 @@ test('a question and its answer fold like the snapshot that follows them, and on
 	expect(live.live).toBeUndefined()
 	expect(transcript.question(live)?.id).toBe('q1')
 	let answered = fold([{ type: 'answer', sessionId, question: 'q1', answers: {}, secrets: ['key'] }, { type: 'state', sessionId, state: { type: 'idle' } }], live)!
-	expect(answered.items.at(-1)).toEqual({ type: 'question', id: 'q1', form, answers: {}, secrets: ['key'], key: '3' })
+	expect(answered.items.at(-1)).toEqual({ type: 'question', id: 'q1', form, answers: {}, secrets: ['key'], key: '3', ts })
 	expect(transcript.question(answered)).toBeUndefined()
 	let later = fold([
 		snap({ history: [prompt('hi', 1), said({ type: 'text', text: 'Hello.' }, 2), { type: 'question', id: 'q1', form, ts, n: 3 }, { type: 'answer', question: 'q1', answers: {}, secrets: ['key'], ts, n: 4 }] }),

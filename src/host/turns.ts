@@ -52,8 +52,8 @@ function ask(id: string, form: Form, call?: string): void {
 	let record: Omit<HistoryRecord & { type: 'question' }, 'ts'> = { type: 'question', id: question, form }
 	if (call !== undefined) record.call = call
 	if (Object.keys(usage).length) record.usage = usage
-	let { n } = history.append(id, record)
-	host.broadcast(id, { type: 'question', sessionId: id, id: question, form, n })
+	let { n, ts } = history.append(id, record)
+	host.broadcast(id, { type: 'question', sessionId: id, id: question, form, n, ts })
 	status.transition(id, { type: 'block', reason: 'question' })
 }
 

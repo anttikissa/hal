@@ -1,0 +1,10 @@
+{
+	title: 'Questions show their timestamp',
+	spec: 'Invariant: questions (a command approval, a slash command question, any form) carry their history record timestamp, in live question events and snapshots alike, and both clients head them like command output: the shared titles.title HH:MM header, a blank row, then the question body. The web shows the same header on the open question form. A question without a timestamp invents none.',
+	status: 'done',
+	notes: [
+		'Question events lacked ts, so live and stored transcripts differ unless the host broadcasts the appended record ts (turns.ask, slash). titles.title treats questions like non-synthetic output (time only, no author), so Card, CardHeader and itemView.headed need no new code; Question.tsx reuses CardHeader for the open form.'
+	],
+	needs: [],
+	foldInto: ['ta']
+}

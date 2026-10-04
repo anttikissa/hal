@@ -61,7 +61,7 @@ function author(item: Shown): string | undefined {
 
 // '10:52 Hal (Opus 5.5)'; undefined for an item without a header.
 function title(item: Shown): string | undefined {
-	if (item.type === 'output' && !item.synthetic) return titles.time(item.ts) || undefined
+	if ((item.type === 'output' && !item.synthetic) || item.type === 'question') return titles.time(item.ts) || undefined
 	let w = titles.who(item)
 	if (w === undefined) return undefined
 	let t = titles.time((item as { ts?: string }).ts)

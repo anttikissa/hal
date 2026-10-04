@@ -238,7 +238,7 @@ export type Event =
 	// turn running (the state says blocked). `command`: a slash command
 	// asked, beside whatever the session does, placed like `command`
 	// (`streaming`).
-	| { type: 'question'; sessionId: string; id: string; form: Form; n?: number; command?: true; streaming?: true }
+	| { type: 'question'; sessionId: string; id: string; form: Form; n?: number; ts?: string; command?: true; streaming?: true }
 	// The first answer to it, as history keeps it (secrets only named).
 	// `cancelled`: Escape dismissed a command's question.
 	| { type: 'answer'; sessionId: string; question: string; answers: Answers; secrets?: string[]; cancelled?: true }

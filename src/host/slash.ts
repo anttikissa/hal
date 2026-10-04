@@ -128,8 +128,8 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 	}
 	if (open) slash.dismiss(id, open.id)
 	let question = crypto.randomUUID().slice(0, 8)
-	let { n } = history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args: reply.askArgs ?? args } })
-	host.broadcast(id, { type: 'question', sessionId: id, id: question, form: reply.ask, n, command: true, ...slash.placed(id) })
+	let { n, ts } = history.append(id, { type: 'question', id: question, form: reply.ask, from: { command: name, args: reply.askArgs ?? args } })
+	host.broadcast(id, { type: 'question', sessionId: id, id: question, form: reply.ask, n, ts, command: true, ...slash.placed(id) })
 	return reply
 }
 
