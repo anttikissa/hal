@@ -34,7 +34,7 @@ async function started(c: C, command: string): Promise<{ id: string; job: string
 	calls[0]!.push(bg(command), { type: 'done', reason: 'tool_use' })
 	await slow(() => calls.length === 2)
 	let job = /^started in background as (\S+)$/.exec(resultOf(1).output)?.[1]
-	expect(job).toMatch(/^#\d+$/)
+	expect(job).toMatch(/^#t\d+$/)
 	return { id, job: job! }
 }
 
@@ -97,7 +97,7 @@ test('/kill stops the job, which tells its session it was stopped by the user', 
 	let { id, job } = await started(c, `sleep 0.5; touch ${testHome()}/ran`)
 	calls[1]!.push({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
 	await until(() => c.views.get(id)?.state.type === 'idle')
-	c.conn.send({ type: 'submit', sessionId: id, text: `/kill #t${job.slice(1)}` })
+	c.conn.send({ type: 'submit', sessionId: id, text: `/kill ${job}` })
 	await slow(() => calls.length === 3)
 	expect(texts(2)).toContain(`[Inbox · bash ${job}]\n[stopped by the user]`)
 	await Bun.sleep(700)

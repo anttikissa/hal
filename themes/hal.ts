@@ -56,6 +56,8 @@ export const look: Look = {
 	}),
 	// User messages and the prompt input: the same bright blue card.
 	user: () => ({ fg: [0.86, 0.16, 215], bg: [0.21, 0.06, 215] }),
+	// Messages and commands from another session: hot pink.
+	message: () => ({ fg: [0.8, 0.19, 350], bg: [colors.bgL, 0.07, 350] }),
 	// placeholder: the example request in an empty prompt, readable but
 	// quieter than typed text.
 	input: () => ({ ...colors.user(), cursor: colors.user().fg!, placeholder: [0.5, 0.09, 215] }),

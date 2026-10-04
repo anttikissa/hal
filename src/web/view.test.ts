@@ -135,8 +135,10 @@ test('commands show who sent them, and their output; a cancelled question says s
 	expect(texts[0]).toBe('/help')
 	expect(texts[1]).toBe('Commands')
 	expect(texts[2]).toBe('/cd x')
-	// A command is drawn as the prompt it was typed as, its sender in the head.
-	expect(shown(st)[2]!.kind).toBe(shown(st)[0]!.kind)
+	// A command is drawn as the prompt it was typed as, its sender in the
+	// head; another session's in the message colour (task 9p).
+	expect(shown(st)[0]!.kind).toBe('user prompt')
+	expect(shown(st)[2]!.kind).toBe('message prompt')
 	expect(titles.who(st.transcript!.items[2]!)).toBe('Command from 7-abc')
 	expect(texts[3]).toContain('(cancelled)')
 	expect(shown(st)[4]!.kind).toContain('error')

@@ -266,10 +266,10 @@ function withPending(rows: Row[], pending: { id: string; text: string }[], waiti
 // result says so) and no 'bash #<key>' message has come back. The host
 // refuses /kill for one that has just ended.
 function jobs(rows: Row[]): ReadonlySet<string> {
-	let done = new Set(rows.flatMap((r) => (r.item.type === 'prompt' && r.item.label?.startsWith('bash #') ? [r.item.label.slice(6)] : [])))
+	let done = new Set(rows.flatMap((r) => (r.item.type === 'prompt' && r.item.label?.startsWith('bash #') ? [r.item.label.slice(6).replace(/^t/, '')] : [])))
 	let out = new Set<string>()
 	for (let r of rows) {
-		let n = r.result?.output.match(/^started in background as #(\d+)/)?.[1]
+		let n = r.result?.output.match(/^started in background as #t?(\d+)/)?.[1]
 		if (n && !done.has(n)) out.add(n)
 	}
 	return out
@@ -285,7 +285,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'prompt':
 			// Who sent it is in the card's head (task hp); a report's
 			// summary heads its card, so the body omits the tag (task rj).
-			return { kind: 'user prompt', text: (/^bash (?:#\d+|b[0-9a-f]{6})$/.test(item.label ?? '')) ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text }
+			return { kind: titles.letter(item) === 'm' ? 'message prompt' : 'user prompt', text: (/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? '')) ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text }
 		case 'image':
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }
@@ -318,7 +318,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		}
 		case 'command':
 			// Drawn as the prompt it was typed as (Card heads it).
-			return { kind: 'user prompt', text: item.text }
+			return { kind: item.from === undefined ? 'user prompt' : 'message prompt', text: item.text }
 		case 'output':
 			// A prompt-file change: the summary heads its card, so the body
 			// is the diffs (task ar).

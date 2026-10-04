@@ -117,10 +117,10 @@ function key(n: number | undefined, i: number, at: number): string {
 }
 
 // The address of block `key` of session `session`, the same in every
-// client (task 0z): /<session>#<key>; q1 for a queued message (task
-// 16). Undefined for any other key, as a hand-built item's `~<n>`.
+// client (task 0z): /<session>#<key>, any kind letter kept (t19, 9p);
+// q1 for a queued message (16). Undefined for any other key (`~<n>`).
 function href(session: string, key: string): string | undefined {
-	return /^(\d+(\.\d+)?|q\d+)$/.test(key) ? `/${session}#${key}` : undefined
+	return /^([umarts]?\d+(\.\d+)?|q\d+)$/.test(key) ? `/${session}#${key}` : undefined
 }
 
 // `shown` as the items of record (or event) number `n`, going at `at`.

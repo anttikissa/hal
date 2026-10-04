@@ -71,7 +71,7 @@ async function acquire(ctx: ToolContext, patterns: string[]): Promise<() => void
 		let path = relative(await fileChanges.canonical(ctx.cwd), editing)
 		// A background job holds its lock until exit, even when its own session waits.
 		let n = conflict.callId ? history.readSync(conflict.sessionId).findLast((r) => r.type === 'assistant' && r.block.type === 'tool_call' && r.block.id === conflict.callId)?.n : undefined
-		let job = n !== undefined && jobs.state.running.has(`${conflict.sessionId}:${n}`) ? `#${n}` : undefined
+		let job = n !== undefined && jobs.state.running.has(`${conflict.sessionId}:${n}`) ? `#t${n}` : undefined
 		let owner = conflict.sessionId === ctx.sessionId ? 'this session' : editor
 		ctx.onOutput?.(job ? `Waiting for background job ${job} (${owner}) to exit; it declared ${path}\n` : `Waiting for ${editor} to finish editing ${path}\n`)
 		await new Promise<void>((res, rej) => {

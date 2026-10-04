@@ -698,7 +698,7 @@ test.skipIf(!chrome)('in a browser a block address loads its page, marks its car
 			let link = card.querySelector('a.link')
 			return { targets: document.querySelectorAll('.Card.target').length, visible: box.top < main.bottom && box.bottom > main.top, link: link && new URL(link.href).pathname + new URL(link.href).hash }
 		})()`)
-		expect(seen).toEqual({ targets: 1, visible: true, link: `/${id}#${result.n! - 1}` })
+		expect(seen).toEqual({ targets: 1, visible: true, link: `/${id}#t${result.n! - 1}` })
 		let inspection = await b.evaluate(`document.querySelector('.Card.target .contents').textContent`)
 		expect(inspection).toContain('$ seq 40\n  printf done\nEdits /tmp/example.log')
 		expect(inspection).toContain('Keep this visible')
