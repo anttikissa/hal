@@ -2,5 +2,8 @@
 	title: 'Web: pause and continue button',
 	spec: "The web composer has an icon button before Queue/Steer/Send that pauses and continues the session, so a phone without Escape can stop a turn. While the session is busy (states.busy) it shows the pause icon (two bars) and sends what Escape sends (view.pause); while paused it shows the play icon (a triangle) and sends continue. Otherwise it is absent, so it never sits disabled. Icons are inline SVG in currentColor, square, 44px on touch; the label (aria-label and title) names the action: 'Pause (Esc)' or 'Continue'. The tap keeps the keyboard up as the attach button does. Terminal is unchanged: it pauses with Escape; whether it shows anything more is the user's decision.",
 	status: 'done',
+	notes: [
+		"src/host/web.test.ts lists the composer's action buttons by aria-label, then text: the toggle has no text, and it shows only while the turn runs."
+	],
 	needs: ['1b']
 }
