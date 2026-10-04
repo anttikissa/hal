@@ -92,7 +92,6 @@ function keepTab(tab: Tab): void {
 // What any process that may host needs, terminal or not.
 function initHost(): void {
 	paths.init()
-	secrets.migrate(['auth.ason', 'state/push-vapid.ason', 'state/push-subscriptions.ason'])
 	host.init()
 	anthropic.init()
 	openai.init()
