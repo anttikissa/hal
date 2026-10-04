@@ -9,7 +9,7 @@ import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 import { client, created, until, useHost } from './host-fixture.test.ts'
 
-useHost()
+useHost(false, false, true)
 let saved = { generate: recap.generate, now: clock.now, raw: settings.state.raw }
 afterEach(() => { recap.generate = saved.generate; clock.now = saved.now; settings.state.raw = saved.raw })
 function turns(id: string, count = 3): void {
