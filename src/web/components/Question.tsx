@@ -7,7 +7,7 @@
 // focus and choice never part. ✕
 // dismisses it as Escape does.
 
-import { createEffect, createMemo, For, Show } from 'solid-js'
+import { createEffect, createMemo, For, Show, untrack } from 'solid-js'
 import { forms, type FormState } from '../../common/forms.ts'
 import type { Shown as Item } from '../../common/transcript.ts'
 import { external } from './Markdown.tsx'
@@ -25,7 +25,9 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 		([focus, value]) => {
 			let node = fields[focus]
 			let target = node instanceof HTMLInputElement ? node : [...(node?.querySelectorAll('button') ?? [])].find((b) => b.value === value)
-			if (target && target !== document.activeElement) target.focus()
+			// focus() runs the focus and blur handlers here, inside the
+			// effect; they read the state as of the event.
+			if (target && target !== document.activeElement) untrack(() => target.focus())
 		},
 	)
 	let submit = (e: SubmitEvent) => {
@@ -48,7 +50,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 			<For each={form().fields}>
 				{(field, i) =>
 					field.type === 'choice' ? (
-						<div role="group" aria-label={field.label ?? form().text} ref={(el) => (fields[i()] = el)}>
+						<div role="group" aria-label={field.label ?? form().text} ref={(el) => (fields[untrack(i)] = el)}>
 							{field.label ? `${field.label}: ` : ''}
 							{field.help ? <div>{field.help}</div> : null}
 							<For each={field.options}>
@@ -73,7 +75,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 							{field.label ? `${field.label}: ` : ''}
 							{field.help ? <span>{field.help}</span> : null}
 							<input
-								ref={(el) => (fields[i()] = el)}
+								ref={(el) => (fields[untrack(i)] = el)}
 								class="input"
 								type={field.type === 'secret' ? 'password' : 'text'}
 								inputmode={field.type === 'integer' ? 'numeric' : undefined}

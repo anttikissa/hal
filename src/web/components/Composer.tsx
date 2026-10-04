@@ -97,7 +97,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	// the draft empties, so the wider box never flips it back mid-typing.
 	let phone = matchMedia('(pointer: coarse), (max-width: 40rem)')
 	let [stacked, setStacked] = createSignal(false)
-	let measure = () => setStacked(phone.matches && !!input.value && (stacked() || input.scrollHeight > 60))
+	let measure = () => setStacked((was) => phone.matches && !!input.value && (was || input.scrollHeight > 60))
 	createEffect(() => props.text, () => void measure())
 	onSettled(() => {
 		let watch = new ResizeObserver(measure)

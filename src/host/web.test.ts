@@ -499,9 +499,14 @@ async function launch() {
 	await new Promise((r) => (ws.onopen = r))
 	let next = 0
 	let waiting = new Map<number, (m: any) => void>()
+	// Solid dev diagnostics ("[STRICT_READ_UNTRACKED] …") the page logged.
+	let diagnostics: string[] = []
 	ws.onmessage = (m) => {
 		let msg = JSON.parse(String(m.data))
 		waiting.get(msg.id)?.(msg)
+		if (msg.method !== 'Runtime.consoleAPICalled') return
+		let text = msg.params.args.map((a: any) => a.value ?? a.description ?? '').join(' ')
+		if (/^\[[A-Z][A-Z_]+\]/.test(text)) diagnostics.push(text)
 	}
 	let call = (method: string, params: object) =>
 		new Promise<any>((resolve) => {
@@ -520,13 +525,14 @@ async function launch() {
 		}
 		throw new Error(`timed out waiting for ${expression}: ${await evaluate("location.href + document.documentElement.outerHTML.slice(-600)")}`)
 	}
+	await call('Runtime.enable', {})
 	let close = async () => {
 		ws.close()
 		proc.kill()
 		await proc.exited
 		rmSync(dir, { recursive: true, force: true })
 	}
-	return { call, evaluate, waitFor, close }
+	return { call, evaluate, waitFor, close, diagnostics }
 }
 
 // One Chrome for the file (a launch costs ~0.4 s). Closing a test's
@@ -539,6 +545,8 @@ async function browser() {
 		await b.call('Network.clearBrowserCookies', {})
 		await b.call('Emulation.clearDeviceMetricsOverride', {})
 		await b.call('Page.navigate', { url: 'about:blank' })
+		// The page logs no Solid reactivity diagnostics (task f09).
+		expect(b.diagnostics.splice(0)).toEqual([])
 	}
 	return { ...b, close }
 }
