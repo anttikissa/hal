@@ -231,7 +231,11 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		let call = item.type === 'tool-result' ? batch.find((c) => c.type === 'tool' && c.id === item.id) : undefined
 		return n + (call?.type === 'tool' ? frame.itemRows(item, cols, session, undefined, undefined, call.name).length - 1 : frame.itemRows(item, cols, session).length + 1)
 	}, 0)
-	let items = frame.order(promptChanges.group(view.transcript?.items ?? []), (batch) => height(batch) <= screen)
+	// Ordered once per transcript (updates replace its items): a sliced
+	// layout is called again and again (task 7j).
+	let src = view.transcript?.items ?? [], memo = frame.state.ordered, how = `${cols} ${screen} ${session} ${src.length}`
+	let items = memo?.src === src && memo.how === how ? memo.items : frame.order(promptChanges.group(src), (batch) => height(batch) <= screen)
+	frame.state.ordered = { src, how, items }
 	let calls = new Map<string, string>()
 	let formCursor: Frame['cursor'] | undefined
 	let look = `${cols} ${session} ${itemView.resultRows} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
@@ -392,4 +396,4 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, split: new Set<string>() }, layout, build, itemRows, ref, queuedRows, highWater, order, glyph, withCursor, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, split: new Set<string>(), ordered: undefined as { src: Item[]; how: string; items: Item[] } | undefined }, layout, build, itemRows, ref, queuedRows, highWater, order, glyph, withCursor, promptWidth }
