@@ -179,7 +179,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'turn-end':
 			if (item.status === 'error') return ansi.wrap(titles.stamp(item.ts, `error: ${item.error ?? 'turn failed'}`), width)
 			if (item.status === 'completed') return []
-			return [titles.stamp(item.ts, `[${item.status}]`)]
+			return [titles.ended(item.ts, item.status)]
 		case 'question': {
 			let rows = [...ansi.wrap(`? ${item.form.text}`, width), ...itemView.quoteLines(item.form.quote, width)]
 			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']

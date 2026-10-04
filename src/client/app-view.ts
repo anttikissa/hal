@@ -80,7 +80,7 @@ function activity(t: Transcript): string | undefined {
 function why(t: Transcript): string | undefined {
 	let s = t.state
 	if (s.type === 'running' || s.type === 'idle' || (s.type === 'blocked' && s.reason === 'question')) return undefined
-	// [paused] and the help row's enter: continue say the rest.
+	// Paused. and the help row's enter: continue say the rest.
 	if (s.type === 'paused') return s.reason || undefined
 	return states.describe(s, Date.now(), t.items)
 }
