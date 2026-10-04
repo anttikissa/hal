@@ -16,6 +16,8 @@
 // Example: plugin.around(toolDetails, 'headline', (next, name, input) =>
 //   name === 'bash' ? { text: `$ ${input.command}`, key: 'command' } : next(name, input))
 
+import { titles } from './titles.ts'
+
 // A value in readable text rather than wire syntax.
 function value(input: unknown, indent = ''): string[] {
 	if (typeof input === 'string') return input === '' ? ['(empty string)'] : input.split('\n')
@@ -49,6 +51,13 @@ function headline(name: string, input: Record<string, unknown>, output?: string)
 		case 'bash': {
 			let text = (str('description') ?? oneLine(String(input.command ?? '').split('\n')[0]!)) || 'bash'
 			return { text: input.background === true ? `${text} (background)` : text, key: str('description') ? 'description' : undefined }
+		}
+		case 'send': {
+			let to = str('to')
+			if (!to) break
+			let sent = output?.match(/^Sent to (.+)$/)?.[1]
+			let target = sent ? titles.address(sent, true) : /^\d+$/.test(to) ? `tab ${to}` : to
+			return { text: `To ${target}${str('description') ? `: ${str('description')}` : ''}`, keys: ['to', 'description'] }
 		}
 		case 'command':
 			if (str('command')) return { text: str('command')!, key: 'command' }

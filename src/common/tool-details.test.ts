@@ -22,3 +22,12 @@ test('spawn and wait name the sessions their result reports', () => {
 	expect(h('wait', {}, 'Waiting for tab 3 · 31-swe · Pass, one, tab 5 · 31-bux. This turn ends here')).toBe('Wait for 31-swe, 31-bux')
 	expect(h('bash', { command: 'serve', description: 'Start server', background: true })).toBe('Start server (background)')
 })
+
+test('send headers distinguish requested destinations from host-resolved ones', () => {
+	let input = { to: '2', description: 'Report completion', text: 'Done', queue: true }
+	expect(toolDetails.headline('send', input).text).toBe('To tab 2: Report completion')
+	expect(toolDetails.headline('send', input, 'Sent to tab 2 · 157-cms · Review').text).toBe('To tab 2 (157-cms): Report completion')
+	expect(toolDetails.headline('send', { ...input, to: '157-cms' }, 'no session 157-cms').text).toBe('To 157-cms: Report completion')
+	expect(toolDetails.headline('send', input, 'Sent to 157-cms · Review').text).toBe('To 157-cms: Report completion')
+	expect(toolDetails.lines('send', input)).toEqual(['text: Done', 'queue: true'])
+})

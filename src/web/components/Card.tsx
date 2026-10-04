@@ -140,7 +140,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			let first = expanded() ? '' : parser.inline(lines()[0] ?? '').map((r) => r.text).join('').trim()
 			return first ? `${first}${item.originSession ? ` (in ${item.originSession})` : ''}` : titles.who(item)
 		}
-		if (item.type === 'prompt' && item.summary) return item.summary
+		if (item.type === 'prompt' && item.summary) return titles.messageHead(item)
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
 		return item.type === 'tool' ? toolDetails.headline(item.name, item.input, props.row.result?.output).text : lines()[0]
 	}
