@@ -116,8 +116,9 @@ function fromHistory(records: HistoryRecord[]): SessionState {
 
 // How many times the turn has been continued without finishing a round
 // since: `continue` records at the end of history with only assistant
-// output between them. Partial output counts for nothing, as a turn
-// that crashes its host mid-stream leaves some every time.
+// output between them. A rate-limit wait ends the count: a provider
+// answered and the host is waiting, not crashing. Partial output counts
+// for nothing: a turn crashing mid-stream leaves some every time.
 function recoveries(records: HistoryRecord[]): number {
 	records = replay.withoutCommands(records)
 	let n = 0

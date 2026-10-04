@@ -57,6 +57,8 @@ export type HistoryRecord = Numbered &
 	| { type: 'turn_end'; status: TurnStatus; reason?: StopReason; error?: string; pauseReason?: string; usage: Usage; context?: number; ts: string }
 	// The turn goes on after a pause, a failure or a host that went away.
 	| { type: 'continue'; ts: string }
+	// A provider answered with a limit; waiting is progress, not a crash.
+	| { type: 'rate_limit'; provider: string; model: string; until: string; text: string; ts: string }
 	// A durable question (tasks/w4/forms.md): the turn waits, blocked,
 	// with nothing in memory, until an answer re-runs whoever asked.
 	// `call`: the tool call it asks approval for (host/approval.ts).
@@ -144,7 +146,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			continue
 		}
 		if (r.type === 'output' && r.change) (changed.prompt ??= []).push(r.text)
-		if (r.type === 'rebase' || r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
+		if (r.type === 'rate_limit' || r.type === 'rebase' || r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) {
 			note = undefined
