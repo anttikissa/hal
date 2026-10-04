@@ -5,7 +5,8 @@
 	notes: [
 		'Before, prompts.submit promoted before parsing, so /model on a spawned tab silently disabled its auto-close. The regression test must open the child first: a submit to an unopened tab is dropped and the test passed vacuously.',
 		'limitedUntil checks the limit key per account for anthropic/openai logins and the account-less key for other providers; with no login it reports free, so the turn reports the login problem.',
-		'Invariant restored 4 Oct: a spent shared usage window counts as a limit for every model. gpt-6.1-sol had a 429 while gpt-6-sol passed the check, though all four OpenAI subscriptions were at 100% of their 5h window.'
+		'Invariant restored 4 Oct: a spent shared usage window counts as a limit for every model. gpt-6.1-sol had a 429 while gpt-6-sol passed the check, though all four OpenAI subscriptions were at 100% of their 5h window.',
+		"4 Oct, real API: a model with its own credits (Fable) answers 429 rate_limit_error with details.error_code credits_required and a reset at the month's end. That limit stays per model; treating it as account-wide blocked Opus until 1 Nov."
 	],
 	needs: ['t0', 'tf', 'jm'],
 	foldInto: ['t0']

@@ -271,6 +271,16 @@ test('a 429 limits the whole account, every model on it, and the host may rotate
 	expect(limits.on('fake/m2', 'a@x')).toBe(now + 3600_000)
 })
 
+test("a model's own credits running out (credits_required) limits only that model", async () => {
+	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'a@x' }) })
+	// The body Anthropic sends when Fable's usage credits are spent (4 Oct).
+	let spent = '{"type":"error","error":{"type":"rate_limit_error","message":"Usage credits are required for this model.","details":{"error_code":"credits_required","disabled_reason":"out_of_credits","model":"claude-fable-5"}}}'
+	fakeFetch(() => new Response(spent, { status: 429, headers: { 'retry-after': '3600' } }))
+	await all(provider.stream('fake/fable', req))
+	expect(limits.on('fake/fable', 'a@x')).toBe(now + 3600_000)
+	expect(limits.on('fake/opus', 'a@x')).toBe(0)
+})
+
 test("every response's usage windows are kept for its account, a 429's too", async () => {
 	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'a@x' }) })
 	fakeFetch(() => new Response(body([sse({ type: 'done', reason: 'end' })]), { headers: { 'x-codex-primary-used-percent': '10', 'x-codex-primary-window-minutes': '300' } }))
