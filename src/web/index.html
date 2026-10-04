@@ -202,7 +202,7 @@ body, textarea { tab-size: 4; }
 .Composer .status { padding: 0.125lh 0; }
 /* Static footer chrome is not a scroll surface. Only the draft itself
    scrolls, without handing its edge gestures to Safari's viewport. */
-.StatusRow, .Composer .status, .entry > button, .entry .actions { touch-action: none; }
+.StatusRow, .Composer .status, .entry > button, .entry > .attach, .entry .actions { touch-action: none; }
 /* Completions: a panel in the box's own colour (the input style), like a
    card: lit left bar, outline, names bright; the selected row solid in
    that colour with canvas text, as a chosen option is. */
@@ -236,9 +236,11 @@ body, textarea { tab-size: 4; }
 .entry .hint { position: absolute; inset: calc((44px - 1lh) / 2) 1ch auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
 .entry .hint.gone { opacity: 0; transition-duration: 80ms; }
 .entry textarea { field-sizing: content; overscroll-behavior: none; touch-action: pan-y pinch-zoom; max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: calc((44px - 1lh) / 2) 1ch; }
-.entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 2ch; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
-.entry > button:hover:not(:disabled), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
-.entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; }
+.entry > button, .entry > .attach, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 2ch; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
+.entry > button:hover:not(:disabled), .entry > .attach:hover:not(:has(:disabled)), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
+.entry > button:disabled, .entry > .attach:has(:disabled), .entry .actions button:disabled { color: var(--quiet); cursor: default; }
+.entry > .attach { position: relative; display: flex; align-items: center; cursor: pointer; }
+.entry > .attach:has(:focus-visible) { outline: 2px solid currentColor; outline-offset: -2px; }
 .help { display: flex; flex-wrap: wrap; gap: 0 2ch; padding-top: 0.25lh; color: var(--description); }
 .help b { color: var(--key); font-weight: 600; }
 textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 0.25lh 1ch; resize: none; outline: none; }

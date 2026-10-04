@@ -27,7 +27,6 @@ import { view, type ViewState } from '../view.ts'
 
 export function Composer(props: { view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; dropping: boolean }) {
 	let input!: HTMLTextAreaElement
-	let picker!: HTMLInputElement
 	// Text at the caret, replacing the selection, as if typed.
 	let insert = (text: string) => {
 		text = uploads.pad(text, input.value.slice(0, input.selectionStart))
@@ -134,25 +133,27 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 					onPaste={(e) => e.clipboardData && attach.paste(e.clipboardData, insert) && e.preventDefault()}
 				/>
 				</div>
-				<input
-					ref={(e) => (picker = e)}
-					type="file"
-					accept={attach.accept}
-					multiple
-					// Rendered but invisible: WebKit (iOS) ignores click() on a
-					// display:none file input, so `hidden` left + dead there.
-					class="hidden-text"
-					tabindex={-1}
-					aria-hidden="true"
-					onChange={(e) => {
-						attach.files(e.currentTarget.files ?? [], insert)
-						// The same file may be picked again.
-						e.currentTarget.value = ''
-					}}
-				/>
-				<button type="button" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onClick={() => picker.click()}>
-					+
-				</button>
+				{/* A label, not a button calling click(): iOS opens the picker
+				    natively for a label tap, while a scripted click() on the
+				    file input works only every other time there. The input
+				    stays rendered (WebKit ignores display:none file inputs)
+				    and focusable, so the keyboard still reaches it. */}
+				<label class="attach" title="Attach file">
+					<input
+						type="file"
+						class="hidden-text"
+						aria-label="Attach file"
+						accept={attach.accept}
+						multiple
+						disabled={!!props.view.form}
+						onChange={(e) => {
+							attach.files(e.currentTarget.files ?? [], insert)
+							// The same file may be picked again.
+							e.currentTarget.value = ''
+						}}
+					/>
+					<span aria-hidden="true">+</span>
+				</label>
 				<div class="actions">
 					<Show when={busy() && !view.commandDraft(props.text)}>
 						<button type="button" disabled={!props.text.trim() || !!props.view.form} onClick={() => send(true)}>Queue</button>
