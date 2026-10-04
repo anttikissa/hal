@@ -34,3 +34,18 @@ test('the page follows the visual viewport as the keyboard opens, until stopped;
 	viewport.sync(undefined, { setProperty: () => void written++ })()
 	expect(written).toBe(0)
 })
+
+test('a stale keyboard-height visual viewport yields to the layout one while no field could hold a keyboard', () => {
+	let noop = () => {}
+	let source = { width: 393, height: 485, offsetLeft: 0, offsetTop: 0, addEventListener: noop, removeEventListener: noop }
+	let focus: (() => void) | undefined
+	let resume = { addEventListener: (_: string, f: () => void) => void (focus = f), removeEventListener: noop }
+	let typing = true
+	let css: Record<string, string> = {}
+	viewport.sync(source, { setProperty: (k: string, v: string | null) => void (css[k] = v ?? '') }, () => (typing ? undefined : { width: 393, height: 793, offsetLeft: 0, offsetTop: 0 }), [[resume, ['focusout']]])
+	expect(css['--app-height']).toBe('485px')
+	// The stale viewport fires nothing; the focus change re-reads it.
+	typing = false
+	focus!()
+	expect(css['--app-height']).toBe('793px')
+})

@@ -156,7 +156,7 @@ export function Chat() {
 		for (let [k, f] of drags) document.addEventListener(k, f)
 		document.addEventListener('keydown', onKey)
 		document.addEventListener('paste', onPaste)
-		let stop = viewport.sync(visualViewport ?? undefined, document.documentElement.style)
+		let stop = viewport.page()
 		app.start()
 		return () => {
 			document.removeEventListener('keydown', onKey)
