@@ -54,6 +54,7 @@ const table: Setting[] = [
 		default: '',
 		description: 'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
 	},
+	{ name: 'sessionRecap', type: { kind: 'boolean' }, default: true, description: 'Show a short session recap when returning after at least 3 minutes.' },
 	{ name: 'push', type: { kind: 'boolean' }, default: true, description: 'Send web push notifications to subscribed devices.' },
 ]
 
@@ -138,5 +139,6 @@ export const settings = {
 	promptRows: (): number => settings.value('promptRows') as number,
 	pasteLines: (): number => settings.value('pasteLines') as number,
 	maxRounds: (): number => settings.value('maxRounds') as number,
+	sessionRecap: (): boolean => settings.value('sessionRecap') as boolean,
 	push: (): boolean => settings.value('push') as boolean,
 }
