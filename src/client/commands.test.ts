@@ -65,20 +65,21 @@ test('every command key shows in /keys', () => {
 
 test('typed client-only commands run here and never reach the host', () => {
 	open()
-	for (let name of ['quit', 'restart', 'suspend', 'redraw']) {
+	for (let [text, name] of [['/quit', 'quit'], ['/restart local', 'restart'], ['/suspend', 'suspend'], ['/redraw', 'redraw']] as const) {
 		ran = []
-		expect(app.submit(`/${name}`)).toBe(true)
+		expect(app.submit(text)).toBe(true)
 		expect(ran).toEqual([name])
 	}
 	expect(sent.filter((c) => c.type === 'submit')).toEqual([])
 })
 
-test('typed /restart exits with the restart code, like Ctrl-R', () => {
+test('typed /restart local exits with the restart code, like Ctrl-R; bare goes to the host', () => {
 	Object.assign(clientCommands.all, saved.all)
 	let codes: number[] = []
 	let io = { exit: (c: number) => codes.push(c), write: () => {}, setRawMode: () => {} } as unknown as TerminalIO
 	terminal.state.io = io
 	terminal.onData('\x12')
-	app.submit('/restart')
+	app.submit('/restart local')
 	expect(codes).toEqual([terminal.restartCode, terminal.restartCode])
+	expect(clientCommands.typed('/restart')).toBe(false)
 })

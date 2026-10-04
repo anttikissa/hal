@@ -1,5 +1,5 @@
-// /restart host|both|all (bare and `local` run in the client,
-// src/client/commands/restart.ts). The host process exits with the
+// /restart [all]|host|both (`local`, Ctrl-R, runs in the client,
+// src/client/commands/restart.ts). Bare means all. The host process exits with the
 // restart code once its reply is recorded; its peers take over as
 // usual, whichever wins. `both`: the client that typed it restarts
 // with the host (it marked itself). `all`: every connected client is
@@ -10,7 +10,7 @@ import { host } from '../host.ts'
 import { restartNote } from '../restart-note.ts'
 import { tabs } from '../tabs.ts'
 
-const scopes = ['local', 'host', 'both', 'all']
+const scopes = ['all', 'host', 'both', 'local']
 
 // Exit 100, which ./run answers by starting again; main.ts has the
 // terminal leave raw mode first.
@@ -26,18 +26,18 @@ function later(): void {
 export const command: SlashCommand = {
 	help: () =>
 		[
-			'/restart or /restart local (ctrl-r) restarts this client; the web page reloads.',
+			'/restart or /restart all restarts the host and every client connected to it.',
 			'/restart host restarts the host; clients reconnect, and a peer may take over.',
 			'/restart both restarts the host and this client.',
-			'/restart all restarts the host and every client connected to it.',
+			'/restart local (ctrl-r) restarts this client; the web page reloads.',
 			'When this client is the host, local and host restart the same process.',
 		].join('\n'),
 	complete: (args) => scopes.filter((s) => s.startsWith(args.trim())),
-	describeCompletion: (args) => ({ local: 'restart this client (default)', host: 'restart the host', both: 'restart the host and this client', all: 'restart the host and every connected client' } as Record<string, string>)[args]!,
+	describeCompletion: (args) => ({ all: 'restart the host and every connected client (default)', host: 'restart the host', both: 'restart the host and this client', local: 'restart this client (ctrl-r)' } as Record<string, string>)[args]!,
 	run: (args, _answers, ctx) => {
-		let scope = args.trim()
+		let scope = args.trim() || 'all'
 		if (scope === 'all') for (let client of host.state.clients) client.deliver({ type: 'restart' })
-		else if (scope !== 'host' && scope !== 'both') return { error: scope === '' || scope === 'local' ? 'only a client can restart itself; use /restart host' : `unknown scope ${scope}; use ${scopes.join(', ')}` }
+		else if (scope !== 'host' && scope !== 'both') return { error: scope === 'local' ? 'only a client can restart itself; use /restart host' : `unknown scope ${scope}; use ${scopes.join(', ')}` }
 		restartNote.write(`${tabs.label(ctx.sessionId)} (/restart ${scope})`)
 		later()
 		return { say: scope === 'all' ? 'restarting the host and every client' : 'restarting the host' }

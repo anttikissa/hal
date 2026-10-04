@@ -1,4 +1,5 @@
-// /restart on the web (task cf): bare and `local` reload this page;
+// /restart on the web (task cf): `local` reloads this page (bare
+// means all and goes to the host);
 // `both`, or the host's `restart` event (/restart all), marks it to
 // reload once the restarted host has gone and is back.
 
@@ -10,7 +11,7 @@ const state: { mark?: 'marked' | 'gone' } = {}
 function typed(text: string): boolean {
 	let t = text.trim()
 	if (/^\/restart\s+both$/.test(t)) restart.mark()
-	if (!/^\/restart(\s+local)?$/.test(t)) return false
+	if (!/^\/restart\s+local$/.test(t)) return false
 	setTimeout(() => restart.reload())
 	return true
 }
