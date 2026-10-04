@@ -4,7 +4,7 @@
 
 Layout:
 - paths.secretsDir() is <home>/secrets. paths.init() and the remote client create it and chmod it 0700 (chmod, not mkdir's umask-masked mode, as in task p). Every write into it uses mode 0600 through one helper, so no writer can forget.
-- .gitignore lists secrets/; the separate auth.ason entry goes.
+- .gitignore lists secrets/ and keeps /auth.ason: a copy migration leaves behind (when both exist) must never be committable.
 - tasks/README.md states the invariant: credentials, tokens and private keys live only in secrets/; logs, diagnostics, caches and transcripts never hold them.
 
 Secret files (move into secrets/):
@@ -28,7 +28,8 @@ Migration: at startup the host moves auth.ason, push-vapid.ason and push-subscri
 		'One helper: secrets.file(path, defaults, options) in src/host/secrets.ts refuses a path not directly in secrets/, runs paths.init() (secrets/ and state/ chmod 0700; diag needs state/) and forces liveFile mode 0600. auth.ts, login.ts, api-keys.ts, push.ts and main.ts (remote) open credentials only through it.',
 		'Migration is secrets.migrate(paths relative to the home): main.initHost moves the auth file and the two push files right after paths.init(); main.remote moves state/remote.ason. existsSync then renameSync, then chmod 0600; a conflict leaves the old file and writes one diag line naming both paths, never contents.',
 		'Dropping the root auth file from .gitignore means a leftover old copy (the both-exist case, or a home not yet restarted on this code) shows as untracked in git status. Never git add -A in a home; delete the old copy once checked.',
-		'Tests that wrote the auth file into the bare temp home now mkdir secrets/ first; push tests used to rely on push.ts creating state/, which secrets.dir() now does via paths.init().'
+		'Tests that wrote the auth file into the bare temp home now mkdir secrets/ first; push tests used to rely on push.ts creating state/, which secrets.dir() now does via paths.init().',
+		'The /auth.ason .gitignore line stays (orchestrator 04-jug): with it gone, the live root auth file showed as untracked until restart, one git add -A from committing OAuth tokens; a left-behind copy after a conflict would too.'
 	],
 	needs: ['p', 'b8', 'tr', 'm1'],
 	foldInto: ['p', 'b8']
