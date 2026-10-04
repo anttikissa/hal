@@ -190,7 +190,7 @@ function submit(text: string, queue = false): boolean {
 	if (command) {
 		st.notice = undefined
 		let c = command as { type: string; text?: string; queue?: boolean; amend?: boolean; edits?: string }
-		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, c.queue, c.amend, c.edits)
+		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, c)
 		else app.send(command)
 	}
 	return true

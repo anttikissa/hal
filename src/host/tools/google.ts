@@ -29,7 +29,6 @@ export const tool: Tool & { url: string; format: typeof format } = {
 		},
 		required: ['query'],
 	},
-	readOnly: true,
 	url: 'https://google.serper.dev/search',
 	format,
 	async run(input, ctx) {

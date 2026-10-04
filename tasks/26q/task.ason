@@ -1,6 +1,14 @@
 {
 	title: 'Web: edit an earlier prompt and rewind the conversation there',
 	spec: "In the web transcript every prompt the user sent (no `from`, not model-originated) after the latest compaction or clear has an Edit button in its card header: revealed on hover or focus with a fine pointer, always shown on touch, a 44px target there. Editing the newest prompt is the existing last-prompt edit (tasks wb, dg). Editing an earlier one loads its text into the composer and shows a bar above it: 'Editing prompt #n · sending rewinds here: k later messages leave the context · Escape cancels'; when tools with side effects (not tools.readOnly) ran after it, the bar adds 'files changed since stay as they are'. The draft being written is kept, as in history browsing (task 91), and comes back on cancel (Escape or the bar's Cancel). A working session is paused when the edit begins and continued on cancel, as with Up. Enter sends one host command (submit with rewind: n and the command id) that the host carries out atomically: refuse unless n is a user prompt record still in the projected history and the session is idle or paused; append a rebase record (task 3zz) dropping every record from n on, except inbox items still waiting, then submit the edited text as a new prompt. The History rewritten divider's Undo restores the dropped records. A resend with the same id acts once. An emptied edit cancels; an edit that becomes a slash command runs it without rewinding. Errors show whole in the bar. Terminal is unchanged; whether it gets this is the user's decision.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'toolDetails.readOnly (src/common/tool-details.ts) lists the built-in read-only tools; host tools take readOnly from it, so the web can tell whether tools with side effects ran after a prompt.',
+		"Deviation: the bar closes when the edit is sent, so a host refusal does not show in the bar: drafts' rejected path puts the edited text back in the box ahead of the draft and the error shows whole in the notice over the box.",
+		"The newest prompt's Edit button shows the bar too: 'Editing the last prompt · sending replaces it', or, when side-effect tools ran since, '· files changed since, so sending adds it as a new prompt' (prompts.amend decides on the host).",
+		'Web colour variables are scoped to their style class (host web.ts css()): var(--attention-fg) is undefined outside .notice, so the bar carries class notice.',
+		'Headless Chrome ignores hover/pointer in Emulation.setEmulatedMedia (matchMedia stays false); the desktop hover reveal was checked by injecting the rule.',
+		'While an Edit sets the draft aside, the page neither writes the box into the draft nor overwrites the box from draft events; Escape in the keys handler leaves the edit before Up/Down editing logic.'
+	],
 	needs: ['dg', 'z71', 'bzf']
 }

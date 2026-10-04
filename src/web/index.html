@@ -81,6 +81,14 @@ body, textarea { tab-size: 4; }
 .CardHeader .error { background: none; margin-left: 1ch; }
 .CardHeader .kill { margin-left: 1ch; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; align-self: flex-start; }
 @media (pointer: coarse) { .CardHeader .kill { min-height: 44px; min-width: 44px; } }
+.CardHeader .edit { margin-left: auto; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; align-self: flex-start; }
+@media (hover: hover) and (pointer: fine) { .Card:not(:hover, :focus-within) .CardHeader .edit { opacity: 0; } }
+@media (pointer: coarse) { .CardHeader .edit { min-height: 44px; min-width: 44px; } }
+.EditBar { flex: none; display: flex; align-items: center; gap: 1ch; margin: 0 max(2ch, env(safe-area-inset-right)) 0 max(2ch, env(safe-area-inset-left)); padding: 0.25lh 1ch; border-left: 3px solid var(--attention-fg); }
+.EditBar .text { flex: 1; min-width: 0; }
+.EditBar button { flex: none; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; }
+@media (pointer: coarse) { .EditBar .keys { display: none; } .EditBar button { min-height: 44px; min-width: 44px; } }
+@media (max-width: 40rem) { .EditBar { margin-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right)); } }
 .CardHeader .stamp, .CardHeader .link { min-width: 44px; }
 .CardHeader .title a { padding-block: var(--card-inset); }
 /* A context boundary (tasks bc, vh): its text centred in a rule. */

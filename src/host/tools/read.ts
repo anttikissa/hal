@@ -28,7 +28,6 @@ export const tool: Tool<ToolOutput> = {
 		},
 		required: ['path'],
 	},
-	readOnly: true,
 	async run(input, ctx) {
 		if (typeof input.path !== 'string' || !input.path) throw new Error('path must be a non-empty string')
 		let offset = positive(input, 'offset')

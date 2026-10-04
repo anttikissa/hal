@@ -90,7 +90,6 @@ export const tool: Tool = {
 			fields: { type: 'string', description: 'Comma-separated fields, e.g. "name,cwd,context"' },
 		},
 	},
-	readOnly: true,
 	async run(input, ctx) {
 		let what = oneOf('what', input.what, WHATS) ?? 'sessions'
 		let scope = oneOf('scope', input.scope, SCOPES) ?? 'self'

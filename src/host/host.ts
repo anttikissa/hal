@@ -246,7 +246,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	// that turn still records lands after the edit.
 	// It goes through handle() again, so a resend that arrived meanwhile,
 	// deferred behind it on the same promise, is then seen as a repeat.
-	let stopping = c.type === 'submit' && c.amend && status.stateOf(c.sessionId).type === 'paused' && turns.state.running.get(c.sessionId)?.done
+	let stopping = c.type === 'submit' && (c.amend || c.rewind !== undefined) && status.stateOf(c.sessionId).type === 'paused' && turns.state.running.get(c.sessionId)?.done
 	if (stopping) {
 		stopping.then(() => host.state.clients.has(client) && host.handle(client, c))
 		return undefined
@@ -262,7 +262,8 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		let unknown = commands.parse(c.text) ? [] : blobs.unknown(c.sessionId, c.text)
 		if (unknown.length) client.deliver({ type: 'warning', text: `${unknown.join(', ')} names no attachment of this session; sent as text` })
 		let amending = c.amend && !c.queue && !commands.parse(c.text)
-		if (c.amend && !c.queue && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
+		if (c.rewind !== undefined && !commands.parse(c.text)) refused = rebasePlans.rewind(c.sessionId, c.rewind, c.text, c.id)
+		else if (c.amend && !c.queue && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
 		else if (commands.parse(c.text)?.name === 'rebase') refused = slash.command(c.sessionId, c.text, commands.parse(c.text)!, c.id, undefined, (reply) => { if (reply.rebase) client.deliver({ type: 'rebase-plan', sessionId: c.sessionId, snapshot: reply.rebase, todo: rebaseRows.render(c.sessionId, reply.rebase) }) })
 		else refused = amending ? prompts.amend(c.sessionId, c.text, c.id) : prompts.submit(c.sessionId, c.text, c.id, c.queue)
 		if (refused === undefined) prompts.sent(c.sessionId, c.text, c.id)

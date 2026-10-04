@@ -3,6 +3,7 @@ import { rebase, type RebasePlan } from '../common/rebase.ts'
 import { rebaseRows, type RebaseRows } from '../common/rebase-rows.ts'
 import type { Command, Event } from '../common/protocol.ts'
 import { forms } from '../common/forms.ts'
+import { replay } from '../common/replay.ts'
 import { states } from '../common/states.ts'
 import { readdirSync, statSync, existsSync } from 'fs'
 import { blobs } from './blobs.ts'
@@ -63,6 +64,24 @@ function undo(id: string): string {
 	return 'Rebase undone.'
 }
 
+// Edits prompt #n and rewinds there (task 26q), as one command: a
+// rebase dropping #n and every later record except inbox, answer and
+// change records (as a replacing prompt keeps them), then the edited
+// text sent as a new prompt. Returns why it is refused, if it is.
+function rewind(id: string, n: number, text: string, command?: string): string | undefined {
+	let raw = history.readSync(id), state = status.stateOf(id, raw).type
+	if (state !== 'idle' && state !== 'paused') return `Can't rewind while the session is ${state}; pause it first.`
+	let current = replay.current(raw), at = current.findIndex((r) => r.n === n), target = current[at]
+	let mine = target?.type === 'user' && target.blocks.some((b) => b.type === 'text' && b.from === undefined && b.origin !== 'model')
+	if (!mine) return `#${n} is not a prompt of yours in this session's history (rewritten meanwhile?).`
+	let later = current.slice(at)
+	if (later.some((r) => r.type === 'compact' || r.type === 'reset')) return `#${n} is before the latest compaction or clear.`
+	let drop = later.flatMap((r) => (r.n === undefined || r.type === 'inbox' || r.type === 'answer' || r.type === 'change' ? [] : [r.n]))
+	rebases.apply(id, { base: raw.at(-1)?.n ?? 0, drop, edit: [] })
+	rebasePlans.broadcast(id, n)
+	return prompts.submit(id, text, command)
+}
+
 function answer(c: Command & { type: 'rebase-apply' }): Event {
 	let result: Event & { type: 'rebase-result' } = { type: 'rebase-result', sessionId: c.sessionId, command: c.id, ok: true, text: '' }
 	try { result.text = rebasePlans.apply(c) }
@@ -74,4 +93,4 @@ function answer(c: Command & { type: 'rebase-apply' }): Event {
 	return result
 }
 
-export const rebasePlans = { build, broadcast, apply, undo, answer }
+export const rebasePlans = { build, broadcast, apply, undo, rewind, answer }

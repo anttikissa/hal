@@ -44,7 +44,6 @@ export const tool: Tool<ToolOutput> & { maxTextBytes: number } = {
 	name: 'read_url',
 	description: 'Read a web page or text file, extracting readable text from HTML. Images are attached; other files are saved under /tmp.',
 	parameters: { type: 'object', properties: { url: { type: 'string', description: 'HTTP or HTTPS URL to read' } }, required: ['url'] },
-	readOnly: true,
 	// The most of a text or HTML body read before converting it.
 	maxTextBytes: 10_000_000,
 	async run(input, ctx) {

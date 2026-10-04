@@ -123,10 +123,11 @@ function search(st: ViewState, text: string): ViewState {
 // What Enter with `text` does: send a prompt (steering a busy turn;
 // `queue`, Alt-Enter: after it), a continue (empty, on a paused or
 // failed turn), or show why not (the typed text stays).
-// While editing the last prompt, Enter sends the edit.
+// While editing a prompt, Enter sends the edit; emptied, an edit from
+// an Edit button cancels (task 26q).
 function submit(st: ViewState, text: string, queue = false): { command?: unknown; notice?: string; keep: boolean } {
 	if (st.editing) {
-		let command = amend.enter(st.editing, st.transcript, text, queue)
+		let command = st.editing.aside && !text.trim() ? amend.resume(st.editing, st.transcript) : amend.enter(st.editing, st.transcript, text, queue)
 		return command ? { command, keep: false } : { keep: false }
 	}
 	if (!st.transcript) return text.trim() ? { notice: 'no session yet', keep: true } : { keep: false }
@@ -144,7 +145,7 @@ function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { 
 		return begun ? { view: { ...st, editing: begun.editing }, command: begun.command, text: begun.editing.original } : undefined
 	}
 	let editing = st.editing
-	if (!editing || (key === 'down' && text !== editing.original)) return undefined
+	if (!editing || editing.aside || (key === 'down' && text !== editing.original)) return undefined
 	let command = amend.resume(editing, st.transcript)
 	let out: { view: ViewState; command?: unknown; text: string } = { view: { ...st, editing: undefined }, text: text === editing.original ? '' : text }
 	if (command) out.command = command
@@ -153,7 +154,7 @@ function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { 
 
 // The passing notice, else the hint while editing the last prompt.
 function notice(st: ViewState): string | undefined {
-	return st.notice ?? (st.editing && amend.hint(st.editing))
+	return st.notice ?? (st.editing && !st.editing.aside ? amend.hint(st.editing) : undefined)
 }
 
 // Tab in the message box with `text` (the caret at its end): the

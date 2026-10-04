@@ -12,6 +12,7 @@
 import { spawn } from 'child_process'
 import { readdirSync } from 'fs'
 import type { ToolCallBlock, ToolResultBlock } from '../common/blocks.ts'
+import { toolDetails } from '../common/tool-details.ts'
 import { blobs } from './blobs.ts'
 import type { ToolDef } from './provider.ts'
 import { pruning } from './pruning.ts'
@@ -26,7 +27,8 @@ export type ToolOutput = string | { text: string; image: { mediaType: string; da
 // read), exporting `tool`, so adding a tool touches nothing else.
 // `parameters` is the input's JSON schema. `readOnly`: running it
 // changes nothing, so an edited prompt may replace the turn that ran it
-// (prompts.amend). run returns the output; throwing makes an error
+// (prompts.amend); built-in tools are listed in toolDetails.readOnly
+// instead, so clients know too (task 26q). run returns the output; throwing makes an error
 // result with the message.
 export type Tool<Output = string> = {
 	name: string
@@ -130,7 +132,7 @@ export const tools = {
 	// Larger files are refused rather than loaded whole.
 	maxFileBytes: 20_000_000,
 	// Unknown tools count as having side effects.
-	readOnly: (name: string): boolean => tools.all().get(name)?.readOnly === true,
+	readOnly: (name: string): boolean => toolDetails.readOnly.has(name) || tools.all().get(name)?.readOnly === true,
 	// Tools never offered to models (task hc): the user found ask's
 	// questions steal focus while he types. Its code stays for replay.
 	disabled: ['ask'],
