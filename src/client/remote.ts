@@ -29,12 +29,14 @@ function origin(typed: string): string {
 
 const cookie = (token: string) => `hal=${token}`
 
+class Unavailable extends Error {}
+
 // A request to the host; not reaching it throws, naming it.
 async function request(at: string, path: string, init: RequestInit): Promise<Response> {
 	try {
 		return await remote.fetch(at + path, { ...init, redirect: 'manual' })
 	} catch (e: any) {
-		throw new Error(`cannot reach ${at}: ${e?.message ?? e}`)
+		throw new Unavailable(`cannot reach ${at}${path}: ${e?.message ?? e}`)
 	}
 }
 
@@ -64,7 +66,8 @@ async function valid(at: string, token: string): Promise<boolean> {
 	let res = await request(at, '/login', { headers: { cookie: cookie(token) } })
 	if (res.status === 204) return true
 	if (res.status === 401) return false
-	throw new Error(`${at}: HTTP ${res.status}`)
+	let message = `${at}/login: HTTP ${res.status}\n${await res.text()}`
+	throw res.status >= 500 ? new Unavailable(message) : new Error(message)
 }
 
 // A logged-in token for `typed` (or the saved last host), asking for
@@ -73,12 +76,21 @@ async function valid(at: string, token: string): Promise<boolean> {
 async function signIn(typed: string | undefined, saved: Saved, ask: (question: string) => string | null, say: (text: string) => void): Promise<{ origin: string; token: string }> {
 	if (!typed && !saved.last) throw new Error('no remembered host; use ./run -r <host>')
 	let at = remote.origin(typed || saved.last)
-	await remote.probe(at)
 	let token: string | undefined = saved.tokens[at]
-	if (token && !(await remote.valid(at, token))) {
-		say(`${at} no longer takes the saved login.\n`)
-		token = undefined
+	if (token) {
+		try {
+			if (!(await remote.valid(at, token))) {
+				say(`${at} no longer takes the saved login.\n`)
+				token = undefined
+			}
+		} catch (e) {
+			if (!(e instanceof Unavailable)) throw e
+			// The saved login lets the transport retry without asking for a
+			// code during an outage. The host still authenticates every socket.
+			say(`${e.message}\nReconnecting with the saved login.\n`)
+		}
 	}
+	if (!token) await remote.probe(at)
 	while (!token) {
 		let code = ask(`One-time code for ${at} (/auth or ./run auth there):`)?.trim()
 		if (!code) throw new Error('login cancelled')
