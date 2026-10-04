@@ -1,6 +1,9 @@
 {
 	title: 'Find rename history in the current session',
 	spec: 'Ctrl-F searches /rename in the current session across human and model command history, including older loaded-on-demand records. Results expose previous and new titles of successful renames and jump to the change in context, making prior titles discoverable after topic drift. Reuse current-session search and rename command/output history, not a separate title store.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Invariant: searching /rename exposes successful old → new title changes from human and model command/output history, including records outside the lazy opening page. Both clients keep the existing global Ctrl-F search and stable block navigation; no session-only scope or separate title store. Rename replies now include /rename. The shared index/fallback projection indexes plain command/output text and minimally prefixes legacy successful Session renamed: replies; immutable histories stay untouched. SQLite user_version invalidates older fully caught-up projections so prior replies are reindexed. Focused search, model/human commands, rename validation, terminal find and web lazy-target checks pass.'
+	],
 	needs: ['tx']
 }
