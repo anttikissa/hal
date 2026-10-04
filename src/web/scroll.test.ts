@@ -70,21 +70,21 @@ test('a finger takes over a send glide and streamed updates do not fight its dra
 	let cancelled = 0
 	globalThis.cancelAnimationFrame = (id) => { cancelled = id }
 	let el = box(1000, 600, 400)
-	Object.assign(scroll.state, { el, frame: 7, gap: 0, forced: true })
+	Object.assign(scroll.state, { el, frame: 7, gap: 0, forcedUntil: Infinity })
 	try {
 		scroll.touchStart()
 		expect(cancelled).toBe(7)
 		expect(scroll.state.frame).toBe(0)
 		// The reader has only moved 10px: still inside near-bottom range.
 		el.scrollTop = 590
-		scroll.follow(() => { el.scrollHeight += 100 }, 'jump')
+		scroll.follow(() => { el.scrollHeight += 100 }, 'glide')
 		expect(el.scrollTop).toBe(590)
 		scroll.touchEnd()
 		// The reader now has a real gap; later output leaves them alone.
-		scroll.follow(() => { el.scrollHeight += 100 }, 'jump')
+		scroll.follow(() => { el.scrollHeight += 100 }, 'glide')
 		expect(el.scrollTop).toBe(590)
 		// A deliberate send still takes them to the bottom.
-		scroll.follow(() => {}, 'jump', true)
+		scroll.follow(() => {}, 'snap', true)
 		expect(el.scrollTop).toBe(800)
 	} finally {
 		globalThis.cancelAnimationFrame = cancel

@@ -34,8 +34,8 @@ type Snap = ReturnType<typeof snap>
 const catchUp = 8
 
 // A change to the transcript follows the bottom: a new prompt pending
-// (sent) glides to the very bottom, new items glide, streamed text
-// jumps. Anything else (typing, the status) just redraws.
+// (sent) glides to the very bottom, new items and streamed text glide.
+// Anything else (typing, the status) just redraws.
 function redraw(before: Snap, set: (s: Snap) => void): void {
 	let next = snap()
 	let items = (s: Snap) => s.view.transcript?.items
@@ -64,13 +64,12 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 	if (items(next) === items(before) && next.view.transcript?.inbox === before.view.transcript?.inbox && next.pending.length === before.pending.length) return set(next)
 	let sent = next.pending.length > before.pending.length
 	let added = (items(next)?.length ?? 0) + (next.view.transcript?.inbox.length ?? 0) - (items(before)?.length ?? 0) - (before.view.transcript?.inbox.length ?? 0)
-	let grew = added > 0
 	scroll.follow(
 		() => {
 			set(next)
 			flush()
 		},
-		added > catchUp ? 'snap' : sent || grew ? 'glide' : 'jump',
+		added > catchUp ? 'snap' : 'glide',
 		sent,
 	)
 }

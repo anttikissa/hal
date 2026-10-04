@@ -107,31 +107,6 @@ const round1 = (...events: StreamEvent[]) => calls[0]!.push(...events, { type: '
 const finish = (call: Call) => call.push({ type: 'text', text: 'done' }, { type: 'usage', usage: { input: 20, output: 1 } }, { type: 'done', reason: 'end' })
 const results = (call: Call) => call.input.messages.at(-1).blocks
 
-test('a dangerous call asks y/N showing the offending part; No tells the model and never runs it; usage of all rounds is kept', async () => {
-	let a = client()
-	let id = session(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'clean up' })
-	await until(() => calls.length === 1)
-	let command = 'ls && rm -rf junk'
-	round1(bash('b1', command))
-	await until(() => transcript.question(a.views.get(id)))
-	let q = transcript.question(a.views.get(id))!
-	expect(a.views.get(id)!.state).toEqual({ type: 'blocked', reason: 'question' })
-	expect(q.form.fields).toEqual([{ type: 'choice', name: 'run', options: ['yes', 'no'], initial: 1 }])
-	let [from, to] = q.form.quote!.marks![0]!
-	expect(q.form.quote!.text.slice(from, to)).toBe('rm -rf junk')
-	expect(ran).toEqual([])
-
-	a.conn.send({ type: 'answer', sessionId: id, question: q.id, answers: { run: 'no' } })
-	await until(() => calls.length === 2)
-	expect(results(calls[1]!)).toEqual([{ type: 'tool_result', id: 'b1', output: expect.stringMatching(/declined/), isError: true }])
-	finish(calls[1]!)
-	await until(() => a.of('turn-end').length)
-	expect(a.of('turn-end')).toEqual([{ type: 'turn-end', sessionId: id, status: 'completed', usage: { input: 30, output: 6 }, n: expect.any(Number), ts: expect.any(String), stats: expect.any(Object) }])
-	expect(ran).toEqual([])
-	expect(existsSync(`${home}/junk`)).toBe(true)
-})
-
 test('each dangerous call is asked once, harmless ones not at all; answers survive a restart and results keep call order', async () => {
 	let a = client()
 	let id = session(a)

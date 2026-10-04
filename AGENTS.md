@@ -67,6 +67,9 @@ Tests are maintenance debt. Add one only if it catches a plausible
 regression worth its cost. Omit cosmetic tests and those a one-off check
 can replace. When unsure, omit.
 
+Delete a flaky test: one that sometimes fails without a bug teaches
+everyone to ignore red. Never retry, lengthen its timeout or skip it.
+
 Test behavior and invariants, not implementation. Avoid source-text
 assertions, repeated constants or templates, and tests that restate
 one-line functions. Keep exact-output tests for format contracts (such

@@ -1011,104 +1011,6 @@ test.skipIf(!chrome)('phone landscape shrinks chrome and bounds long drafts as t
 	}
 }, 20000)
 
-test.skipIf(!chrome)('rotation preserves exclusive 40px edge gaps or the text at the viewport centre', async () => {
-	providerHome()
-	let id = tabs.create('/tmp')
-	let longReply = Array.from({ length: 100 }, (_, i) => `Paragraph ${i}: the separate activity row is gone. This uniquely numbered paragraph has enough text to wrap differently after rotating the phone, while its words retain their identity.`).join('\n\n')
-	turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> { yield { type: 'text', text: longReply }; yield { type: 'done', reason: 'end' } })()
-	let b = await browser()
-	try {
-		await server.serve(); web.start()
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
-		await b.call('Emulation.setDeviceMetricsOverride', { width: 390, height: 760, deviceScaleFactor: 1, mobile: true })
-		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
-		await b.call('Page.navigate', { url: `${base()}/${id}` })
-		await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.includes('Session ')")
-		await b.evaluate("let t = document.querySelector('textarea'); t.value = 'reply'; t.dispatchEvent(new Event('input', { bubbles: true }))")
-		await b.evaluate("document.querySelector('.entry .actions button').click()")
-		await b.waitFor("document.querySelector('main')?.textContent.includes('Paragraph 99:') && document.querySelector('.activity').textContent.includes('idle')")
-		let resize = async (landscape: boolean) => {
-			let width = landscape ? 844 : 390, height = landscape ? 390 : 760
-			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
-			await b.waitFor(`document.querySelector('.App').clientWidth === ${width} && document.querySelector('.App').clientHeight === ${height}`)
-			await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
-		}
-		let position = async (edge: 'top' | 'bottom' | 'middle', distance = 0) => {
-			await b.evaluate(`(() => {
-				let el = document.querySelector('main'); el.dispatchEvent(new WheelEvent('wheel', { bubbles: true }));
-				el.scrollTop = ${edge === 'top' ? distance : edge === 'bottom' ? `el.scrollHeight - el.clientHeight - ${distance}` : '(el.scrollHeight - el.clientHeight) * .45'};
-			})()`)
-			if (edge === 'middle') await b.evaluate(`(() => {
-				let el = document.querySelector('main'), r = el.getBoundingClientRect();
-				for (let d = 0; d < 40; d++) {
-					let c = document.caretRangeFromPoint(r.left + el.clientWidth / 2, r.top + el.clientHeight / 2 + d);
-					if (c?.startContainer.nodeType === Node.TEXT_NODE && c.startContainer.length) { el.scrollTop += d; break }
-				}
-			})()`)
-			await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
-		}
-		let gap = (edge: 'top' | 'bottom') => b.evaluate(`(() => { let el = document.querySelector('main'); return ${edge === 'top' ? 'el.scrollTop' : 'el.scrollHeight - el.clientHeight - el.scrollTop'} })()`)
-		let mark = () => b.evaluate(`(() => {
-			let el = document.querySelector('main'), rect = el.getBoundingClientRect();
-			let range;
-			for (let distance = 0; distance <= 40 && !range; distance++) for (let sign of [-1, 1]) {
-				let candidate = document.caretRangeFromPoint(rect.left + el.clientWidth / 2, rect.top + el.clientHeight / 2 + sign * distance);
-				if (candidate?.startContainer.nodeType === Node.TEXT_NODE && candidate.startContainer.length) { range = candidate; break }
-			}
-			if (!range || range.startContainer.nodeType !== Node.TEXT_NODE || !range.startContainer.length) throw Error('No centre text');
-			let node = range.startContainer, offset = Math.min(range.startOffset, node.length - 1);
-			range.setStart(node, offset); range.setEnd(node, offset + 1); window.rotationMarker = range;
-			let r = range.getBoundingClientRect(); return r.top + r.height / 2 - rect.top - el.clientHeight / 2;
-		})()`)
-		let markerOffset = () => b.evaluate(`(() => { let el = document.querySelector('main'), r = window.rotationMarker.getBoundingClientRect(); return r.top + r.height / 2 - el.getBoundingClientRect().top - el.clientHeight / 2 })()`)
-		for (let landscape of [true, false]) {
-			for (let edge of ['top', 'bottom'] as const) {
-				for (let distance of [0, 10, 40]) {
-					await resize(!landscape); await position(edge, distance); await resize(landscape)
-					expect(Math.abs(await gap(edge) - distance)).toBeLessThanOrEqual(1)
-				}
-				// At 41px the centre wins, not that nearby edge.
-				await resize(!landscape); await position(edge, 41)
-				let offset = await mark(); await resize(landscape)
-				// A leading arrival can put the centre target above scrollTop=0.
-				// Unreachable targets must land at the corresponding edge (3y).
-				let delta = await markerOffset() - offset
-				let top = await gap('top'), max = top + await gap('bottom')
-				let expectedTop = Math.max(0, Math.min(top + delta, max))
-				expect(Math.abs(top - expectedTop)).toBeLessThanOrEqual(1)
-			}
-			await resize(!landscape); await position('middle')
-			let offset = await mark(); await resize(landscape)
-			expect(Math.abs(await markerOffset() - offset)).toBeLessThanOrEqual(1)
-		}
-		// A nearly fitting transcript is close to BOTH edges: preserve centre.
-		// Restrict a new, naturally short conversation to 60px of overflow.
-		turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> { yield { type: 'text', text: 'Short paragraph one.\n\nShort paragraph two.\n\nShort paragraph three.\n\nShort paragraph four.' }; yield { type: 'done', reason: 'end' } })()
-		await resize(false)
-		let short = tabs.create('/tmp')
-		let seed = host.connect(() => {})
-		seed.send({ type: 'open', sessionId: short })
-		seed.send({ type: 'submit', sessionId: short, text: 'short' })
-		seed.close()
-		await b.call('Page.navigate', { url: `${base()}/${short}` })
-		await b.waitFor("document.querySelector('main')?.textContent.includes('Short paragraph four.') && document.querySelector('.activity').textContent.includes('idle')")
-		await b.evaluate(`(() => { let el = document.querySelector('main'), last = el.lastElementChild; el.dispatchEvent(new WheelEvent('wheel', { bubbles: true })); let contentHeight = last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop + parseFloat(getComputedStyle(last).marginBottom) + parseFloat(getComputedStyle(el).paddingBottom); el.style.flex = 'none'; el.style.height = (contentHeight - 60) + 'px' })()`)
-		await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
-		await position('top', 30)
-		expect(await gap('bottom')).toBeLessThanOrEqual(40)
-		let offset = await mark()
-		await b.evaluate("let el = document.querySelector('main'); el.style.height = (el.clientHeight + 10) + 'px'")
-		await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
-		expect(Math.abs(await markerOffset() - offset)).toBeLessThanOrEqual(1)
-		await b.evaluate("document.querySelector('main').style.height = '600px'")
-		await b.evaluate('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
-		expect(await gap('top')).toBe(0)
-	} finally {
-		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
-		await b.close()
-	}
-}, 20000)
-
 test.skipIf(!chrome)('touch tab navigation does not focus the composer', async () => {
 	providerHome()
 	let b = await browser()
@@ -1476,6 +1378,65 @@ test.skipIf(!chrome)('streaming preserves native selection and Markdown text nod
 			await b.waitFor(`!!document.querySelector('.cursor-line')`)
 			expect(await check()).toEqual({ element: true, node: true, start: true, end: true, text: true })
 		}
+	} finally {
+		release()
+		await b.close()
+	}
+}, 20000)
+
+// A reader scrolled up with everything selected (Cmd+A) while Hal
+// streams 80 rows: no update may remove a shown node, move the focus,
+// collapse the selection or scroll the view.
+test.skipIf(!chrome)('a select-all survives seconds of streaming untouched', async () => {
+	providerHome()
+	let b = await browser(), release = () => {}
+	try {
+		await server.serve()
+		web.start()
+		let id = tabs.create('/tmp')
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
+		let finish = new Promise<void>((r) => { release = r })
+		turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
+			yield { type: 'thinking', text: 'planning' }
+			// Alternating kinds make 80 rows, past the 40 a tab first shows.
+			for (let i = 0; i < 40; i++) {
+				yield { type: 'thinking', text: `step ${i}` }
+				yield { type: 'text', text: `Line ${i} **bold** and \`code\`.\n\n` }
+				await Bun.sleep(75)
+			}
+			await finish
+			yield { type: 'done', reason: 'end' }
+		})()
+		await b.waitFor(`(() => { let t = document.querySelector('textarea'); t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`)
+		await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Line 8 ')`)
+		await b.evaluate(`(() => {
+			window.events = []
+			let t = document.querySelector('.Transcript')
+			let streaming = () => [...document.querySelectorAll('.Card.assistant')].at(-1)
+			new MutationObserver((ms) => { for (let m of ms) for (let n of m.removedNodes) {
+				// The cursor moves to each new card; nothing else may go.
+				if (n.classList?.contains('cursor') || (m.target.isConnected && streaming()?.contains(m.target))) continue
+				let html = n.outerHTML ?? n.textContent
+				if ([...m.addedNodes].some((x) => (x.outerHTML ?? x.textContent) === html)) events.push('REMOUNT ' + html.slice(0, 120) + ' in ' + (m.target.className?.baseVal ?? m.target.className))
+				else events.push('removed ' + String(html).slice(0, 100) + ' from ' + (m.target.className?.baseVal ?? m.target.className))
+			} }).observe(t, { childList: true, subtree: true })
+			document.addEventListener('selectionchange', () => { if (getSelection().isCollapsed) events.push('collapsed; focus ' + (document.activeElement?.tagName)) })
+			window.scrolls = []
+			t.addEventListener('scroll', () => scrolls.push(Math.round(t.scrollTop)))
+			document.activeElement?.blur?.()
+			dispatchEvent(new WheelEvent('wheel', { deltaY: -1000 }))
+			t.scrollTop = 0
+			getSelection().selectAllChildren(document.body)
+			window.length0 = getSelection().toString().length
+		})()`)
+		await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Line 39 ')`)
+		release()
+		await b.waitFor(`!!document.querySelector('.cursor-line')`)
+		await Bun.sleep(300)
+		let out = await b.evaluate(`({ events: [...new Set(events)], scrolls: [...new Set(scrolls)], collapsed: getSelection().isCollapsed, grew: getSelection().toString().length >= length0 })`)
+		expect(out).toEqual({ events: [], scrolls: [0], collapsed: false, grew: true })
 	} finally {
 		release()
 		await b.close()

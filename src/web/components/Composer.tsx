@@ -49,8 +49,12 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 			editor.write(e, editor.splice(e.value, p.text), p.cursor, p.anchor ?? p.cursor)
 		}
 	}
+	// A memo gates on equality: the effect runs only when a form or the
+	// picker opens or closes, never on other updates, so the focus never
+	// moves while the reader selects text.
+	let away = createMemo(() => !!props.view.form || !!props.view.modal)
 	createEffect(
-		() => !!props.view.form || !!props.view.modal,
+		away,
 		(away) => {
 			// Touch navigation is for reading; only deliberate editing opens the keyboard.
 			if (!away && !matchMedia('(pointer: coarse)').matches) input.focus()

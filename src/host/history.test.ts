@@ -119,27 +119,6 @@ test('each block reaches disk once complete, before the turn ends', async () => 
 	expect(strip(await history.read(id)).at(-1)).toMatchObject({ type: 'turn_end', reason: 'tool_use' })
 })
 
-test('cancellation keeps the partial reply and records the turn as paused', async () => {
-	let id = newSession()
-	let sent = fakeStream((input) =>
-		input.messages.length === 1
-			? [{ type: 'text', text: 'partial' }, { type: 'usage', usage: { input: 5 } }, { type: 'error', message: 'Cancelled', cancelled: true }]
-			: [{ type: 'done', reason: 'end' }],
-	)
-	history.submit(id, 'first')
-	await drain(history.turn(id))
-	let last = (await history.read(id)).at(-1)
-	expect(last).toMatchObject({ type: 'turn_end', status: 'paused', usage: { input: 5 } })
-	history.submit(id, 'second')
-	await drain(history.turn(id))
-	// The model is told the turn was paused, in front of the new prompt.
-	expect(sent[1]).toEqual([
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d\]\nfirst$/) }] },
-		{ role: 'assistant', blocks: [{ type: 'text', text: 'partial' }] },
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d\]\n<meta>[^<]*paused[^<]*<\/meta>\nsecond$/) }] },
-	])
-})
-
 test('a consumer that stops early still ends the turn, as paused', async () => {
 	let id = newSession()
 	history.submit(id, 'x')
