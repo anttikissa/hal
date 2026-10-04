@@ -176,7 +176,6 @@ function answered(items: Item[], answer: { question: string; answers: Answers; s
 	})
 }
 
-// What a context boundary's divider says.
 function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): string {
 	return r.type === 'reset' ? 'Context cleared.' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarised)`
 }
@@ -230,9 +229,10 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 		else if (r.type === 'rebase') items.push(...transcript.keyed([{ type: 'divider', text: rebaseDisplay.text(r, snapshot.history) }], r.n, items.length))
 		else items.push(...transcript.recordItems(r, items.length))
 	}
+	let promptKey = items[prompt ?? -1]?.key
 	items = rebaseDisplay.insert(items, snapshot.rewrites)
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
-	if (prompt !== undefined) t.prompt = prompt
+	if (prompt !== undefined) t.prompt = items.findIndex((item) => item.key === promptKey)
 	if (snapshot.rewrites) t.rewrites = snapshot.rewrites
 	if (snapshot.dropped) t.dropped = [...snapshot.dropped]
 	if (snapshot.stats) t.stats = snapshot.stats

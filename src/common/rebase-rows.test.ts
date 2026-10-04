@@ -51,7 +51,7 @@ test('todo round-trips keep, deletion drops paired records, and edits target the
 test('todo format header reports planned savings and preserves deterministic row layout', () => {
 	let snapshot = rebaseRows.build([prompt(12, 'First line\nrest'), say(13, 'answer')])
 	let text = rebaseRows.render('157-gut', snapshot, { base: 13, drop: [13], edit: [] })
-	expect(text).toBe("# Rebase 157-gut · 2 rows · 7 tokens → 5 after · cache rebuilds from #13\n# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels\n# edit opens the full text next; queue lines go last and are sent after\nkeep  #12  2026-10-04 09:00  prompt  5  First line\ndrop  #13  09:00  assistant  2  answer\n")
+	expect(text).toBe("# Rebase 157-gut · 2 rows · 7 tokens → 5 after · cache rebuilds from #13\n# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels\n# edit opens the full text next; queue lines go last and are sent after\nkeep  #12  2026-10-04 09:00  prompt     5  First line\ndrop  #13  09:00             assistant  2  answer\n")
 })
 
 test('todo rejects duplicate/unknown/reordered rows, queue placement and uneditable text with line numbers', () => {

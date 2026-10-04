@@ -16,7 +16,7 @@ function text(r: HistoryRecord & { type: 'rebase' }, raw: HistoryRecord[]): stri
 	let snapshot = rebaseRows.build(before), sums = rebaseRows.totals(snapshot, r)
 	let groups = rebase.groups(snapshot.records)
 	let dropped = new Set(r.drop.flatMap((n) => [...(groups.get(n) ?? [n])])).size
-	return `History rewritten: ${dropped} dropped, ${r.edit.length} edited · cache rebuilds from #${sums.cacheFrom} · undo: /rebase undo`
+	return `History rewritten · /rebase undo · ${dropped} dropped, ${r.edit.length} edited · cache rebuilds from #${sums.cacheFrom}`
 }
 
 function dividers(raw: HistoryRecord[]): { n: number; text: string; after?: number }[] {

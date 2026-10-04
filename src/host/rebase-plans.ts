@@ -1,7 +1,7 @@
 // Client-local plans; only the host validates and writes history (task z71).
 import { rebase, type RebasePlan } from '../common/rebase.ts'
 import { rebaseRows, type RebaseRows } from '../common/rebase-rows.ts'
-import type { Command } from '../common/protocol.ts'
+import type { Command, Event } from '../common/protocol.ts'
 import { forms } from '../common/forms.ts'
 import { states } from '../common/states.ts'
 import { readdirSync, statSync, existsSync } from 'fs'
@@ -11,6 +11,7 @@ import { host } from './host.ts'
 import { prompts } from './prompts.ts'
 import { pruning } from './pruning.ts'
 import { rebases } from './rebases.ts'
+import { slash } from './slash.ts'
 import { sessions } from './sessions.ts'
 import { snapshots } from './snapshots.ts'
 import { status } from './status.ts'
@@ -62,4 +63,15 @@ function undo(id: string): string {
 	return 'Rebase undone.'
 }
 
-export const rebasePlans = { build, broadcast, apply, undo }
+function answer(c: Command & { type: 'rebase-apply' }): Event {
+	let result: Event & { type: 'rebase-result' } = { type: 'rebase-result', sessionId: c.sessionId, command: c.id, ok: true, text: '' }
+	try { result.text = rebasePlans.apply(c) }
+	catch (error) {
+		result.ok = false
+		result.text = `${error instanceof Error ? error.message : String(error)}${c.recoveryPath ? `\nRebase files kept at ${c.recoveryPath}` : ''}`
+		slash.output(c.sessionId, result.text, true)
+	}
+	return result
+}
+
+export const rebasePlans = { build, broadcast, apply, undo, answer }

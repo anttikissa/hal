@@ -110,10 +110,11 @@ function totals(snapshot: RebaseRows, plan: RebasePlan = { base: snapshot.base, 
 function render(sessionId: string, snapshot: RebaseRows, plan: RebasePlan = { base: snapshot.base, drop: [], edit: [] }): string {
 	let sums = rebaseRows.totals(snapshot, plan)
 	let edits = new Set(plan.edit.map((e) => e.n)), drops = new Set(plan.drop)
+	let widths = [4, ...['n', 'time', 'kind'].map((key) => Math.max(...snapshot.rows.map((row) => String(row[key as 'n' | 'time' | 'kind']).length + (key === 'n' ? 1 : 0)), 0)), Math.max(...snapshot.rows.map((row) => kilo(row.tokens).length), 0)]
 	let header = `# Rebase ${oneLine(sessionId)} · ${sums.rows} rows · ${kilo(sums.tokens)} tokens → ${kilo(sums.after)} after · cache rebuilds ${sums.cacheFrom === undefined ? 'nowhere' : `from #${sums.cacheFrom}`}`
 	return [header, "# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels", '# edit opens the full text next; queue lines go last and are sent after', ...snapshot.rows.map((row) => {
 		let action = row.ns.some((n) => drops.has(n)) ? 'drop' : row.ns.some((n) => edits.has(n)) ? 'edit' : 'keep'
-		return `${action.padEnd(5)} #${row.n}  ${row.time}  ${row.kind}  ${kilo(row.tokens)}  ${row.summary}${row.carries.length ? `  (${row.carries.join('; ')})` : ''}`
+		return [action, `#${row.n}`, row.time, row.kind, kilo(row.tokens)].map((text, i) => text.padEnd(widths[i]!)).join('  ') + `  ${row.summary}${row.carries.length ? `  (${row.carries.join('; ')})` : ''}`
 	})].join('\n') + '\n'
 }
 
