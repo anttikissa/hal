@@ -7,6 +7,7 @@ import { names } from '../../common/names.ts'
 import { titles } from '../../common/titles.ts'
 import { view, type ViewState } from '../view.ts'
 import { status, type StatusGroup } from '../status.ts'
+import { Icon } from './Icon.tsx'
 
 const heat = (n: number | undefined) => (n === undefined ? '' : `heat-${n}`)
 
@@ -53,12 +54,12 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 				<span id="status-quota" class="hidden-text">{quota() ? `${quota()!.window} quota ${quota()!.remaining}% remaining` : ''}</span>
 			</button>
 			<dialog ref={(e) => (details = e)} class="StatusDetails" aria-label="Session details" onClick={outside} onKeyDown={(e) => e.stopPropagation()}>
-				<div class="top"><strong>Session details</strong><button type="button" aria-label="Close session details" onClick={() => details.close()}>✕</button></div>
+				<div class="top"><strong>Session details</strong><button type="button" aria-label="Close session details" onClick={() => details.close()}><Icon name="close" /></button></div>
 				<p class={tone()}>{line().text}</p>
 				<For each={status.groups(props.view)}>{(group) => <div class="fact">
 					{group.href ? <a href={group.href}><Parts group={group} /></a> : <Parts group={group} />}
 				</div>}</For>
-				<form method="post" action="/logout"><button type="submit">Log out this browser</button></form>
+				<form method="post" action="/logout"><button type="submit"><Icon name="logout" />Log out this browser</button></form>
 			</dialog>
 		</div>
 	)

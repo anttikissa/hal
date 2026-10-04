@@ -7,6 +7,7 @@ import type { ModalState } from '../../common/modals.ts'
 import { app } from '../app.ts'
 import { picker } from '../../common/picker.ts'
 import { find } from '../find.ts'
+import { Icon } from './Icon.tsx'
 
 function marked(text: string, query: string | undefined, literal = false) {
 	let out: (string | ReturnType<typeof Match>)[] = [], at = 0
@@ -42,7 +43,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		<dialog ref={(e) => (box = e)} class="Picker" aria-label={props.modal?.title ?? 'Picker'} onCancel={cancel} onClick={outside}>
 			<div class="top">
 				<div class="title">{props.modal?.title ?? ''}</div>
-				<button type="button" class="close" aria-label="Close" onClick={cancel}>✕</button>
+				<button type="button" class="close" aria-label="Close" onClick={cancel}><Icon name="close" /></button>
 			</div>
 			<input ref={(e) => (search = e)} class="input" type="text" aria-label="Search" autocomplete="off"
 				aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}

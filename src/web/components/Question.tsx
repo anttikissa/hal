@@ -13,6 +13,7 @@ import type { Shown as Item } from '../../common/transcript.ts'
 import { external } from './Markdown.tsx'
 import { app } from '../app.ts'
 import { view } from '../view.ts'
+import { Icon } from './Icon.tsx'
 
 export function Question(props: { item: Item & { type: 'question' }; form: FormState }) {
 	let fields: HTMLElement[] = []
@@ -35,7 +36,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 		<form class="Question question" onSubmit={submit}>
 			<div class="text">? <For each={parts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></div>
 			<button type="button" class="dismiss" aria-label="Dismiss" title="Dismiss (Esc)" onClick={() => app.sendForm({ type: 'cancel' })}>
-				✕
+				<Icon name="close" />
 			</button>
 			<Show when={form().quote}>
 				{(quote) => (
@@ -88,7 +89,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 				}
 			</For>
 			<Show when={form().fields.some((f) => f.type !== 'choice') || form().fields.length > 1}>
-				<button class="answer">Answer</button>
+				<button class="answer"><Icon name="check" />Answer</button>
 			</Show>
 		</form>
 	)

@@ -14,6 +14,7 @@ import { Notifications } from './Notifications.tsx'
 import { tabs } from '../tabs.ts'
 import { push } from '../push.ts'
 import { diagnostics } from '../diagnostics.ts'
+import { Icon } from './Icon.tsx'
 
 // Characters a name gets in a cell.
 const NAME = 12
@@ -155,7 +156,7 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 		<header class="Tabs tab" style={{ '--digits': layout().d, '--cell': `${layout().cell}px`, '--edge': `${layout().edge}px` }}>
 			<nav class="strip" aria-label="Tabs">
 				<button type="button" class="menu" aria-label="All tabs" aria-haspopup="dialog" aria-expanded={open() ? 'true' : 'false'} onClick={() => void setOpen(true)}>
-					≡
+					<Icon name="menu" />
 				</button>
 				<div class="pages" ref={(e) => (pages = e)}>
 					<span class="probe" ref={(e) => (probe = e)} aria-hidden="true">
@@ -173,11 +174,11 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 					{layout().overflow && <EdgeButton edge={edge(false)} left={false} active={current() >= visible().end} onClick={() => page(false)} />}
 				</div>
 				<button type="button" class="new" aria-label="New tab" onClick={newTab}>
-					+
+					<Icon name="plus" />
 				</button>
 				{props.pushReady && !requested() && push.available() && (
 					<button type="button" class="notify" onClick={enable}>
-						Notify
+						<Icon name="bell" />Notify
 					</button>
 				)}
 			</nav>
@@ -194,19 +195,19 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 							<li>
 								<Link tab={tab} n={i() + 1} shown={tab.id === props.shown} name dir onPick={() => setOpen(false)} />
 								<button type="button" class="close" aria-label={`Close ${tab.name}`} onClick={() => tabs.closeTab(tab.id)}>
-									×
+									<Icon name="close" />
 								</button>
 							</li>
 						)}
 					</For>
 				</ul>
 				<button type="button" class="new" onClick={newTab}>
-					+ New tab
+					<Icon name="plus" />New tab
 				</button>
-				<button type="button" onClick={() => { setOpen(false); setAlerts(true) }}>Notifications</button>
-				<button type="button" onClick={() => { diagnostics.record('manual'); diagnostics.report() }}>Send diagnostics</button>
+				<button type="button" onClick={() => { setOpen(false); setAlerts(true) }}><Icon name="bell" />Notifications</button>
+				<button type="button" onClick={() => { diagnostics.record('manual'); diagnostics.report() }}><Icon name="bug" />Send diagnostics</button>
 				<button type="button" class="reload" onClick={() => location.reload()}>
-					Reload page
+					<Icon name="reload" />Reload page
 				</button>
 			</dialog>
 			<Notifications open={alerts()} onClose={() => setAlerts(false)} />

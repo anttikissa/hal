@@ -11,6 +11,13 @@
 /* The one stylesheet: layout only. Colours come from the theme below
    (src/common/colors.ts; .page carries the page's own as variables). */
 :root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --fade-ms: 300ms; --toggle-ms: 250ms; }
+/* Icons (icons.ts): one stroke width, in 24-grid units, for both grids. */
+:root { --icon-stroke: 1.5; }
+.icon { width: 1.25em; height: 1.25em; flex: none; fill: currentColor; vertical-align: -0.3em; }
+.icon .s { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: calc(var(--icon-stroke) * 256 / 24); }
+.icon.g24 .s { stroke-width: var(--icon-stroke); }
+.icon.g48 .s { stroke-width: calc(var(--icon-stroke) * 2); }
+button:has(> .icon) { display: inline-flex; align-items: center; justify-content: center; gap: 0.75ch; }
 * { box-sizing: border-box; }
 /* Selection is reverse video in the text's own colour (each theme class
    sets --sel-back); a solid block (bg in its colour) reverses back. */
@@ -77,6 +84,7 @@ body, textarea { tab-size: 4; }
 .CardHeader .mark { display: flex; align-items: flex-start; justify-content: flex-start; }
 .CardHeader .title { display: flex; align-items: flex-start; gap: 0.2ch; min-width: 0; }
 .CardHeader .label { min-width: 0; }
+.CardHeader .title > .icon { height: 1lh; margin-right: 0.8ch; opacity: 0.8; }
 .Card.folds:not(.open) .CardHeader .label { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
 .CardHeader .error { background: none; margin-left: 1ch; }
 .CardHeader .kill { margin-left: 1ch; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; align-self: flex-start; }
@@ -117,6 +125,7 @@ body, textarea { tab-size: 4; }
 .Card.target { outline: 1px solid currentColor; outline-offset: 2px; scroll-margin-top: 0.5lh; }
 .Card .more { display: block; margin-top: 0.25lh; background: none; color: inherit; text-decoration: underline; padding: 0; }
 .Card .more { min-height: 44px; }
+.Card .more .icon { margin-right: 0.75ch; }
 /* Open and close animate the height (a one-row grid, 0fr to 1fr);
    closing is faster. Padding sits inside so closed is truly 0 high. */
 .Card .body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows calc(var(--toggle-ms) * 0.7) var(--ease-out); }
@@ -231,7 +240,8 @@ body, textarea { tab-size: 4; }
 .entry.stacked { flex-wrap: wrap; }
 .entry.stacked .field { order: 1; flex-basis: 100%; border-top: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
 .entry.stacked .actions { flex: 1; }
-.entry.stacked > button { border-left: 0; }
+.entry.stacked > button { border-right: 0; }
+.entry.stacked .actions { justify-content: flex-end; }
 .chips { display: flex; flex-wrap: wrap; gap: 1ch; margin: 0 0 0.25lh; padding: 0; list-style: none; }
 .chips li { display: flex; align-items: stretch; border: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
 .chips a { display: flex; align-items: center; padding: 0 1ch; color: inherit; }
@@ -242,8 +252,12 @@ body, textarea { tab-size: 4; }
 .chips button { min-width: 44px; min-height: 44px; background: transparent; color: var(--quiet); border: 0; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
 @media (hover: hover) and (pointer: fine) { .chips button:hover { color: inherit; background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
 .entry .actions button { flex: 1; min-height: 44px; }
-.entry .actions button.toggle { flex: none; display: grid; place-items: center; width: 44px; padding: 0; }
-.entry .actions button.toggle svg { width: 14px; height: 14px; fill: currentColor; }
+/* Attach on the left; on the right a narrow, quiet pause (turn control)
+   apart from the send actions, and steer/send in the accent colour. */
+.entry > button.attach { order: -1; border-left: 0; border-right: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); padding: 0; width: 44px; }
+.entry .actions button { padding: 0; width: 44px; flex: none; }
+.entry .actions button.toggle { width: 36px; color: var(--quiet); }
+.entry .actions button.go:not(:disabled) { color: var(--cursor); }
 .entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
 /* The example request: the input's faint blue, as in the terminal. It
    leaves fast as typing starts and returns a little slower. */

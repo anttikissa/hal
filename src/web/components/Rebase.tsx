@@ -10,6 +10,7 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show } from 'so
 import type { RebaseRow } from '../../common/rebase-rows.ts'
 import { rebaseView, type Action, type Part, type RebaseState } from '../rebase.ts'
 import { view } from '../view.ts'
+import { Icon } from './Icon.tsx'
 
 const labels: Action[] = ['keep', 'drop', 'edit']
 
@@ -115,7 +116,7 @@ export function Rebase() {
 				<>
 					<div class="top">
 						<div class="title">Rebase <span class="id">{s().sessionId}</span> · {s().snapshot.rows.length} rows</div>
-						<button type="button" class="close" aria-label="Cancel rebase" onClick={cancel}>✕</button>
+						<button type="button" class="close" aria-label="Cancel rebase" onClick={cancel}><Icon name="close" /></button>
 					</div>
 					<div class="quick">
 						<label>Drop outputs over <input type="number" inputmode="numeric" min="0" step="1000" value={s().threshold} onInput={(e) => rebaseView.threshold(e.currentTarget.valueAsNumber)} /> tokens</label>
@@ -128,15 +129,15 @@ export function Rebase() {
 					</ul>
 					<div class="foot">
 						<Show when={s().error}>
-							<div class="error" role="alert"><pre>{s().error}</pre><Show when={s().error?.startsWith('Rebase is stale')}><button type="button" onClick={() => rebaseView.rebuild()}>Reload rows</button></Show></div>
+							<div class="error" role="alert"><pre>{s().error}</pre><Show when={s().error?.startsWith('Rebase is stale')}><button type="button" onClick={() => rebaseView.rebuild()}><Icon name="reload" />Reload rows</button></Show></div>
 						</Show>
 						<div class="sums" role="status">
 							<span>{rebaseView.kilo(sums()?.tokens ?? 0)} → <b>{rebaseView.kilo(sums()?.after ?? 0)}</b> tokens</span>
 							<span>{sums()?.cacheFrom === undefined ? 'cache kept' : `cache rebuilds from #${sums()!.cacheFrom}`}</span>
 						</div>
 						<div class="buttons">
-							<button type="button" onClick={cancel} disabled={!!s().sending}>Cancel</button>
-							<button type="button" class="apply" disabled={!dirty() || !!s().sending} onClick={() => rebaseView.apply()}>{s().sending ? 'Applying…' : 'Apply'}</button>
+							<button type="button" onClick={cancel} disabled={!!s().sending}><Icon name="close" />Cancel</button>
+							<button type="button" class="apply" disabled={!dirty() || !!s().sending} onClick={() => rebaseView.apply()}><Icon name="check" />{s().sending ? 'Applying…' : 'Apply'}</button>
 						</div>
 					</div>
 				</>
