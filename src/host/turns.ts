@@ -181,7 +181,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		asking = reply.ask
 		stopping = reply.pause
 		then = reply.then
-		yield* synthetic.paced(reply.say, signal)
+		yield* reply.stream ?? synthetic.paced(reply.say, signal)
 	}
 	let last: DoneEvent | ErrorEvent | undefined
 	let failure: string | undefined

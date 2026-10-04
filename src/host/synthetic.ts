@@ -3,12 +3,15 @@
 // its next step from those records. A reply's paragraphs arrive with
 // a typing pace (pauseMs); `pause` ends the turn paused with that reason,
 // and `then` runs once the turn has ended (a command the reply starts).
+// `stream` replaces the paced text with raw events, tool calls included;
+// the turn runs those and asks the model again, as with a provider.
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Answers, Form } from '../common/forms.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { intro } from './intro.ts'
+import { scrollTest } from './scroll-test.ts'
 
-export type Reply = { say?: string; ask?: Form; pause?: string; then?: () => void }
+export type Reply = { say?: string; stream?: AsyncGenerator<StreamEvent>; ask?: Form; pause?: string; then?: () => void }
 export type Synthetic = (records: HistoryRecord[], answers?: Answers, sessionId?: string) => Reply
 
 function find(model: string): Synthetic | undefined {
@@ -33,7 +36,7 @@ async function* paced(say: string | undefined, signal: AbortSignal): AsyncGenera
 }
 
 export const synthetic = {
-	models: { intro: (records, answers, id) => intro.run(records, answers, id) } as Record<string, Synthetic>,
+	models: { intro: (records, answers, id) => intro.run(records, answers, id), 'scroll-test': (records) => scrollTest.run(records) } as Record<string, Synthetic>,
 	find,
 	paced,
 	pauseMs: 400,

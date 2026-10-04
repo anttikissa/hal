@@ -1,0 +1,6 @@
+{
+	title: 'hal/scroll-test: a scripted busy model for reproducing scroll jumps',
+	spec: 'hal/scroll-test is a synthetic model (synthetic.ts, scroll-test.ts) that streams like a busy agent so web scroll behaviour can be reproduced on a real device. Each round streams three thinking lines a second apart, then a real bash call printing 30 lines over three seconds; after 40 rounds since the last human prompt it answers and stops. It writes no files. A synthetic Reply may carry a raw event stream (stream) instead of paced text; the turn runs its tool calls and asks the model again, as with a provider.',
+	status: 'done',
+	needs: ['vc']
+}
