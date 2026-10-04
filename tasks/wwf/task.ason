@@ -1,6 +1,6 @@
 {
 	title: 'Icon candidates demo page',
-	spec: 'src/web/demo/icons.html, served at /demo/icons, compares ten candidate web-client icons (send, attach image, thinking, download, copy, bash, read file, edit file, web, pause/continue) from Lucide (ISC), Phosphor (MIT) and Tabler (MIT). It inlines the SVGs with their licence notices in page source, lets the user switch set (also via #lucide, #phosphor, #tabler), size and stroke, and shows them in sample composers and transcript cards using the real theme colours. Icon-only buttons carry aria-labels. The page is a design aid; adopting icons in the client is a separate decision.',
+	spec: 'src/web/demo/icons.html, served at /demo/icons, compares eleven candidate web-client icons (send, attach image, thinking, download, copy, bash, read file, edit file, edit/pencil, web, pause/continue) from Lucide (ISC), Phosphor (MIT) and Tabler (MIT). It inlines the SVGs with their licence notices in page source, lets the user switch set (also via #lucide, #phosphor, #tabler), stroke and size; the size slider (12–48px) scales every icon on the page, catalogue included. It shows them in sample composers and transcript cards using the real theme colours, including a pencil edit button on a sent prompt. Icon-only buttons carry aria-labels. The page is a design aid; adopting icons in the client is a separate decision.',
 	status: 'done',
 	needs: ['86']
 }
