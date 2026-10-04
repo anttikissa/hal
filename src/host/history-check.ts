@@ -4,7 +4,7 @@ import { rebase } from '../common/rebase.ts'
 import { sender } from '../common/sender.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 
-const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'change', 'compact', 'reset', 'file_changes', 'round', 'rebase'])
+const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'change', 'compact', 'reset', 'file_changes', 'round', 'rebase', 'rate_limit'])
 
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
@@ -24,6 +24,7 @@ function check(value: unknown): HistoryRecord {
 		let n = r.naming
 		if (!n || !Number.isSafeInteger(n.turn) || n.turn < 1 || !Number.isSafeInteger(n.version) || n.version < 0 || typeof n.name !== 'string' || typeof n.eligible !== 'boolean') throw new Error('invalid naming context')
 	}
+	if (r.type === 'rate_limit' && (typeof r.provider !== 'string' || typeof r.model !== 'string' || typeof r.text !== 'string' || typeof r.until !== 'string' || !Number.isFinite(Date.parse(r.until)))) throw new Error('invalid rate limit wait')
 	if (r.type === 'rebase') { let problem = rebase.invalid(r); if (problem) throw new Error(problem) }
 	return r
 }

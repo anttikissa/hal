@@ -4,6 +4,8 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { history } from './history.ts'
+import { host } from './host.ts'
+import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { statusUsage } from './status-usage.ts'
 import { turns } from './turns.ts'
@@ -52,6 +54,14 @@ async function waitFor(id: string, error: ErrorEvent, failures: number, signal: 
 		return
 	}
 	let at = error.retryAt ?? clock.now() + turns.backoffMs(failures)
+	if (error.failure === 'limited' && at > clock.now()) {
+		let model = sessions.open(id).model
+		let provider = turns.state.running.get(id)?.provider ?? model.split('/')[0]!
+		let until = new Date(at).toISOString()
+		let text = `Rate limit: ${provider}, ${model}, until ${until}\n${error.message}`
+		let r = history.append(id, { type: 'rate_limit', provider, model, until, text })
+		host.broadcast(id, { type: 'output', sessionId: id, text, ts: r.ts, n: r.n })
+	}
 	status.transition(id, { type: 'retry', at: new Date(at).toISOString(), reason: error.message })
 	if (error.failure !== 'limited' || at <= clock.now()) return clock.until(at, signal)
 	void statusUsage.recheck(turns.state.running.get(id)?.provider ?? '')

@@ -239,3 +239,33 @@ test('Escape while blocked pauses', async () => {
 	await until(() => a.ends().length)
 	expect(status.stateOf(id)).toEqual({ type: 'paused' })
 })
+
+test('a rate-limited turn survives six host recoveries without being paused', async () => {
+	let at = now + 3 * 3600_000
+	let limited: StreamEvent = { type: 'error', message: 'all accounts limited', failure: 'limited', retryAt: at }
+	hold = true
+	script = [[limited]]
+	let a = client()
+	let id = start(a)
+	await until(() => status.stateOf(id).type === 'retrying')
+	for (let restart = 0; restart < 6; restart++) {
+		let settling = turns.state.running.get(id)?.done
+		host.reset()
+		await settling
+		sessions.closeAll()
+		history.state.running.clear()
+		script = [[limited]]
+		await turns.recover()
+		await until(() => status.stateOf(id).type === 'retrying')
+		expect(status.stateOf(id)).toMatchObject({ type: 'retrying', at: new Date(at).toISOString() })
+	}
+	let records = history.readSync(id)
+	expect(records.filter((r) => r.type === 'rate_limit')).toHaveLength(7)
+	expect(records.some((r) => r.type === 'turn_end')).toBe(false)
+	let b = client()
+	b.conn.send({ type: 'open', sessionId: id })
+	let snapshot = (b.events.find((e) => e.type === 'snapshot') as any).snapshot
+	let wait = snapshot.history.find((r: any) => r.type === 'rate_limit')
+	expect(wait).toMatchObject({ provider: 'fake', model: 'fake/m1', until: new Date(at).toISOString() })
+	expect(wait.text).toContain('all accounts limited')
+})
