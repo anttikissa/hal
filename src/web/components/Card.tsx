@@ -119,12 +119,11 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
 	let head = () => {
 		let item = props.row.item
-		// Folded thinking reads "Thinking (hard): <first line>", the line
-		// as plain text (OpenAI summaries open with **Heading**); open,
-		// the body shows it, so the head is "Thinking (hard)" (task hp).
+		// Closed thinking spends its width on the preview, not a label.
+		// Open cards keep the effort header; controls retain a named kind.
 		if (item.type === 'thinking') {
 			let first = expanded() ? '' : parser.inline(lines()[0] ?? '').map((r) => r.text).join('').trim()
-			return first ? `${titles.who(item)}: ${first}` : titles.who(item)
+			return first ? `${first}${item.originSession ? ` (in ${item.originSession})` : ''}` : titles.who(item)
 		}
 		if (item.type === 'prompt' && item.summary) return item.summary
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
@@ -233,7 +232,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange ? change() : (
 						<Show when={folds()} fallback={plain(s)}>
-							<CardHeader time={time()} name={head()} open={expanded()} reference={link()}
+							<CardHeader time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} reference={link()}
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={failed()}><span class="error">✗</span></Show>

@@ -399,12 +399,12 @@ test('a [paste/<name>] marker links to its page; while its upload is in flight i
 // Local h:m today: older headers carry a date (titles.time).
 let today = (h: number, m: number) => { let d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString() }
 
-test('a narrow terminal clips the header and keeps the block id', () => {
+test('a narrow thinking preview keeps time and block id without a label', () => {
 	let item: Item = { type: 'thinking', text: 'x', model: 'anthropic/claude-opus-5-5', effort: 'high', ts: today(10, 51) }
 	let v = view([item])
 	v.transcript!.items[0]!.key = '35'
 	let lines = plain(frame.build(v, 24).lines)
-	expect(lines[0]).toMatch(/^10:51 Thinking \(h.* #35$/)
+	expect(lines[0]).toMatch(/^10:51 x +#35$/)
 	expect(lines[0]).not.toContain('high')
 	expect(strings.visLen(frame.build(v, 24).lines[0]!)).toBeLessThanOrEqual(24)
 })

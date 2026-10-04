@@ -58,8 +58,6 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 	}
 }
 
-// A prompt, model text or thinking as the old Hal drew it (task hp):
-// its header ('10:52 Hal (Opus 5.5)'), clipped, a blank row, the body.
 // The label links to the image itself on the web endpoint.
 function imageLabel(item: Item & { type: 'image' }, session?: string): string {
 	let label = attachments.label(item)
@@ -118,11 +116,17 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		// text is markdown (task fn).
 		// Finished thinking with no readable text (redacted or empty)
 		// draws nothing, not a bare header (task hp).
-		case 'thinking':
+		case 'thinking': {
 			if (!item.text.trim() && !streaming) return []
-		// falls through
+			let stamp = [titles.time(item.ts), item.originSession ? `(in ${item.originSession})` : ''].filter(Boolean).join(' ')
+			let prefix = stamp ? `${stamp} ` : ''
+			// Leave at least one text column even on a very narrow terminal.
+			prefix = strings.clipVisual(prefix, Math.max(0, width - 1))
+			let body = markdownView.lines(item.text.trimEnd(), width - strings.visLen(prefix), streaming, itemView.itemStyle(item))
+			return [prefix + (body[0] ?? ''), ...body.slice(1).map(line => ' '.repeat(strings.visLen(prefix)) + line)]
+		}
 		case 'text':
-			return itemView.headed(item, markdownView.lines((item.type === 'text' ? names.strip(summary.strip(item.text)) : item.text).trimEnd(), width, streaming, itemView.itemStyle(item)), width)
+			return itemView.headed(item, markdownView.lines(names.strip(summary.strip(item.text)).trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		case 'tool': {
 			let { command, description } = item.input
 			let time = titles.time(item.ts)
