@@ -25,6 +25,7 @@ import { tabs } from './tabs.ts'
 import { view } from './view.ts'
 import { commandList } from '../common/commands/list.ts'
 import { find } from './find.ts'
+import { rebaseView } from './rebase.ts'
 import { restart } from './restart.ts'
 import { emergency } from '../common/emergency.ts'
 
@@ -59,6 +60,8 @@ function key(e: KeyInput, target: Target): boolean {
 	let action = emergency.action({ key: e.key, ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey })
 	if (action === 'restart' && target.kind === 'message' && target.text !== st.text) app.input(target.text)
 	if (emergency.handle(action, { restart: restart.reload })) return true
+	// The rebase view is a native modal: its own keys, Escape cancels it.
+	if (rebaseView.state) return false
 	if (e.isComposing) return false
 	if (tabs.key(e)) return true
 	// The message box may hold text no input event told us about.

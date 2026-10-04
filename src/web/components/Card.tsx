@@ -180,6 +180,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return typeof l === 'string' ? l : l.map((p) => (typeof p === 'string' ? p : <a href={p.href} target="_blank" rel="noopener">{p.text}</a>))
 	}
 	let time = () => titles.time((props.row.item as { ts?: string }).ts)
+	// A history rewrite's divider (task z71) offers its undo.
+	let undo = () => props.row.item.type === 'divider' && props.row.item.text.startsWith('History rewritten · /rebase undo ·')
 	let heading = () => <CardHeader time={time()} label={who()} reference={link()} />
 	// Content branches share the shell, header and normal body inset.
 	let plain = (s: () => { kind: string; text: string }) => (
@@ -190,6 +192,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 					{(img) => <a href={view.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={view.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
 				</Show>
 				<Show when={props.cursor && !md()}>{cursor()}</Show>
+				<Show when={undo()}><button type="button" class="undo" title="Restore the history before this rewrite (/rebase undo)" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: '/rebase undo' })}>Undo</button></Show>
 			</div>
 		</>
 	)

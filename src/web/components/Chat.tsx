@@ -19,6 +19,7 @@ import { viewport } from '../viewport.ts'
 import { Composer } from './Composer.tsx'
 import { Notices } from './Notices.tsx'
 import { Picker } from './Picker.tsx'
+import { Rebase } from './Rebase.tsx'
 import { Tabs } from './Tabs.tsx'
 import { StatusRow } from './StatusRow.tsx'
 import { Transcript } from './Transcript.tsx'
@@ -86,14 +87,14 @@ function reveal(): void {
 
 function target(e: Event): Target {
 	let t = e.target
-	if (t instanceof HTMLTextAreaElement) {
+	if (t instanceof HTMLTextAreaElement && !t.closest('dialog[open]')) {
 		let back = t.selectionDirection === 'backward'
 		let [cursor, anchor] = back ? [t.selectionStart, t.selectionEnd] : [t.selectionEnd, t.selectionStart]
 		let coarse = matchMedia('(pointer: coarse)').matches
 		return { kind: 'message', text: t.value, cursor, anchor, coarse, write: (edit, at, from) => editor.write(t, edit, at, from) }
 	}
 	// An open sheet keeps its keys (the box behind it is inert).
-	if (t instanceof HTMLInputElement || (t instanceof Element && t.closest('dialog[open], [contenteditable]'))) return { kind: 'field' }
+	if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof Element && t.closest('dialog[open], [contenteditable]'))) return { kind: 'field' }
 	if (t instanceof HTMLAnchorElement) return { kind: 'link' }
 	if (t instanceof HTMLButtonElement) return { kind: 'button', submits: t.type === 'submit' }
 	return { kind: 'other' }
@@ -167,6 +168,7 @@ export function Chat() {
 			<StatusRow view={view()} connected={connected()} color={tabs().find((t) => t.id === shown())?.color} />
 			<Composer view={view()} text={text()} menu={menu()} notice={notice()} placeholder={placeholder()} dropping={dropping()} />
 			<Picker modal={view().modal} />
+			<Rebase />
 		</div>
 	)
 }

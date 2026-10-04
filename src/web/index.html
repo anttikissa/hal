@@ -372,6 +372,77 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Tabs .sheet .new { padding: 0.5lh 1ch; background: var(--button); }
 .Tabs .sheet .reload { padding: 0.5lh 1ch; background: var(--button); }
 .Tabs .sheet::backdrop { background: color-mix(in oklab, var(--canvas) var(--mix-backdrop), transparent); }
+/* The /rebase view (task bzf): a full-height modal over the app, its row
+   list the one scroller; header, quick actions and footer stay put, and
+   the footer rides above the phone keyboard (--app-height). */
+.Rebase { position: fixed; inset: auto; top: var(--app-top, 0px); left: var(--app-left, 0px); width: var(--app-width, 100vw); height: var(--app-height, 100dvh); max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: var(--canvas); color: var(--text); overflow: hidden; --gut: max(2ch, env(safe-area-inset-left)); --gut-r: max(2ch, env(safe-area-inset-right)); }
+.Rebase[open] { display: flex; flex-direction: column; }
+.Rebase::backdrop { background: var(--canvas); }
+.Rebase > .top, .Rebase > .quick, .Rebase > .foot { flex: none; padding-inline: var(--gut) var(--gut-r); }
+.Rebase > .top { display: flex; align-items: center; gap: 1ch; padding-top: env(safe-area-inset-top); border-bottom: 1px solid var(--border); }
+.Rebase .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--accent); }
+.Rebase .title .id { color: var(--text); }
+.Rebase .close { min-width: 44px; min-height: 44px; background: transparent; color: inherit; }
+.Rebase > .quick { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25lh 1ch; padding-block: 0.25lh; }
+.Rebase .quick input { width: 9ch; padding-block: 0; min-height: 36px; }
+.Rebase .quick button { min-height: 36px; }
+.Rebase .quick .hint { color: var(--quiet); }
+.Rebase .quick .range { display: none; }
+@media (pointer: coarse) { .Rebase .quick .range { display: inline-block; } .Rebase .quick .hint { display: none; } .Rebase .quick input, .Rebase .quick button { min-height: 44px; } }
+.Rebase .rows { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0 var(--gut-r) 0.5lh var(--gut); list-style: none; border-top: 1px solid var(--border); }
+.Rebase .date { padding: 0.5lh 0 0 calc(3px + 1ch); color: var(--accent); }
+.Rebase .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 1ch; border-left: 3px solid transparent; border-bottom: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
+.Rebase .row.drop, .Rebase .row.group { border-left-color: var(--remove-fg); }
+.Rebase .row.edit { border-left-color: var(--add-fg); }
+.Rebase .info { display: grid; grid-template-columns: 6ch 5ch 10ch 6ch 12ch minmax(0, 1fr); column-gap: 1ch; align-items: baseline; min-width: 0; min-height: 44px; padding: calc((44px - 1lh) / 2) 1ch; text-align: left; background: transparent; color: inherit; }
+.Rebase .info:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
+.Rebase .info:focus-visible, .Rebase .acts button:focus-visible { outline-offset: -2px; }
+.Rebase .info > span { min-width: 0; }
+.Rebase .n, .Rebase .time { color: var(--quiet); }
+.Rebase .kind, .Rebase .summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.Rebase .tokens { text-align: right; font-weight: 600; }
+.Rebase .bar { align-self: center; height: 0.6lh; }
+.Rebase .bar > span { display: block; height: 100%; background: currentColor; }
+.Rebase .carries { grid-column: 6; color: var(--quiet); overflow-wrap: anywhere; }
+.Rebase .row.drop .summary, .Rebase .row.group .summary { text-decoration: line-through; color: var(--remove-fg); }
+.Rebase .acts { display: flex; align-self: start; }
+.Rebase .acts button { min-width: 44px; min-height: 44px; padding: 0 1ch; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px color-mix(in oklab, currentColor var(--mix-divider), transparent); }
+.Rebase .acts button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); }
+.Rebase .acts button:disabled { color: var(--quiet); cursor: default; text-decoration: line-through; }
+.Rebase .acts .keep[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
+.Rebase .acts .drop[aria-pressed="true"] { background: var(--remove-fg); color: var(--canvas); }
+.Rebase .acts .edit[aria-pressed="true"] { background: var(--add-fg); color: var(--canvas); }
+.Rebase .edit:is(textarea) { grid-column: 1 / -1; margin: 0 0 0.5lh calc(3px + 1ch); width: calc(100% - 1ch - 3px); max-height: 50dvh; field-sizing: content; min-height: 3lh; resize: vertical; }
+.Rebase .detail { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 0.5lh; padding: 0 1ch 0.5lh; }
+.Rebase .part pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.Rebase .part pre.error { color: var(--remove-fg); }
+.Rebase .part .label, .Rebase .part.label { color: var(--quiet); }
+.Rebase .part a { color: inherit; }
+.Rebase .part img { display: block; max-width: 100%; max-height: 24rem; margin-top: 0.25lh; }
+.Rebase .before { align-self: flex-start; min-height: 44px; }
+.Rebase > .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25lh 2ch; padding-block: 0.25lh max(0.5lh, env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
+.Rebase .foot .error { flex: 1 0 100%; display: flex; align-items: flex-start; gap: 1ch; color: var(--remove-fg); max-height: 30dvh; overflow-y: auto; }
+.Rebase .foot .error pre { flex: 1; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.Rebase .foot .error button { min-height: 44px; flex: none; }
+.Rebase .sums { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 0 2ch; }
+.Rebase .sums span { white-space: nowrap; }
+.Rebase .sums b { color: var(--accent); }
+.Rebase .buttons { display: flex; gap: 1ch; margin-left: auto; }
+.Rebase .buttons button { min-height: 44px; padding: 0 2ch; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.Rebase .buttons .apply:not(:disabled) { background: var(--accent); color: var(--canvas); }
+.Rebase .buttons button:disabled { background: transparent; color: var(--quiet); box-shadow: inset 0 0 0 1px currentColor; cursor: default; }
+/* Phones: the meta on one line, the summary under it, the size bar a
+   strip along the row's foot; the actions keep their 44px. */
+@media (max-width: 40rem) {
+  .Rebase { --gut: max(1ch, env(safe-area-inset-left)); --gut-r: max(1ch, env(safe-area-inset-right)); }
+  .Rebase .info { position: relative; grid-template-columns: auto auto minmax(0, 1fr) auto; padding-inline: 0.5ch; }
+  .Rebase .summary, .Rebase .carries { grid-column: 1 / -1; }
+  .Rebase .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
+  .Rebase .acts button { padding: 0 0.5ch; }
+}
+/* A history rewrite's divider offers Undo (task z71). */
+.Card.divider .undo { margin-left: 1ch; padding: 0 1ch; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px currentColor; }
+@media (pointer: coarse) { .Card.divider .undo { min-height: 44px; min-width: 44px; } }
 /* The theme (src/common/colors.ts), put here by the host. */
 /*COLORS*/
 </style>
