@@ -47,6 +47,14 @@ body, textarea { tab-size: 4; }
    corners and home indicator), so the edge rows pad themselves. */
 .Transcript { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; padding: 0.5lh max(2ch, env(safe-area-inset-right)) 0.5lh max(2ch, env(safe-area-inset-left)); }
 .Transcript > * { margin: 0 0 0.5lh; }
+/* Scroll-to-bottom: a zero-height sticky row ending the transcript, so
+   it shares the cards' left edge; a 44px target whose vertical pill is
+   centred on their 3px bar. */
+.Transcript > .to-bottom { position: sticky; bottom: 0; height: 0; margin: 0; z-index: 1; }
+.to-bottom button { position: absolute; bottom: 0.5lh; left: calc(1.5px - 22px); width: 44px; height: 52px; padding: 0; border: 0; background: none; display: flex; align-items: center; justify-content: center; color: var(--text); animation: fade-in 150ms var(--ease-out); }
+.to-bottom .pill { display: flex; align-items: center; justify-content: center; width: 20px; height: 44px; border-radius: 10px; background: color-mix(in oklab, var(--canvas) 55%, transparent); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+.to-bottom svg { width: 10px; height: 14px; fill: currentColor; }
+@keyframes fade-in { from { opacity: 0; } }
 /* Cards and the open question share one shape: square, a lit bar on
    the left, the style's tint behind. */
 .Card, .Question { border-left: 3px solid currentColor; }

@@ -8,7 +8,7 @@
 // streams (Card.tsx), else on a line of its own. The one scroller: Chat
 // and scroll.ts keep a bottom reader at the bottom.
 
-import { createMemo, createSignal, flush, For, onSettled, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, flush, For, onSettled, Show } from 'solid-js'
 import type { Sending } from '../../common/drafts.ts'
 import type { Tab } from '../../common/protocol.ts'
 import { amend } from '../../common/amend.ts'
@@ -45,6 +45,15 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		})
 	}
 	onSettled(() => scroll.init(el, more))
+	// Scrolled well above the bottom: a pill on the cards' bar takes the
+	// reader back down. Checked on scroll and when rows change, since
+	// content growing below a still reader moves the bottom away.
+	let [away, setAway] = createSignal(false)
+	let check = () => el && setAway(scroll.gap(el) > scroll.awayPx)
+	onSettled(() => {
+		el.addEventListener('scroll', check, { passive: true })
+		return () => el.removeEventListener('scroll', check)
+	})
 	// Rows follow the items alone: redraws that leave them be (typing, the
 	// status) keep every row object, so no card binding runs again.
 	let items = createMemo(() => props.view.transcript?.items ?? none)
@@ -71,6 +80,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 		let linked = hit() ? rows.findIndex((r) => r.key === hit()) : -1
 		return rows.slice(Math.max(0, Math.min(rows.length - count(), linked < 0 ? rows.length : linked)))
 	})
+	createEffect(shown, () => void requestAnimationFrame(check))
 	let open = (row: Row) => (row.item.type === 'question' && props.view.form?.id === row.item.id ? row.item : undefined)
 	return (
 		<main class="Transcript" role="log" ref={(e) => (el = e)}>
@@ -85,6 +95,13 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 				)}
 			</For>
 			<Show when={!streaming() && !rows().length}>{line()}</Show>
+			<div class="to-bottom">
+				<Show when={away()}>
+					<button type="button" aria-label="Scroll to the bottom" title="Scroll to the bottom" onPointerDown={(e) => e.preventDefault()} onClick={() => scroll.follow(() => {}, 'glide', true)}>
+						<span class="pill"><svg viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10L6 7zM1 8h10l-5 6z" /></svg></span>
+					</button>
+				</Show>
+			</div>
 		</main>
 	)
 }

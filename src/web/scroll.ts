@@ -191,6 +191,8 @@ function restore(id: string): void {
 
 export const scroll = {
 	near: 50,
+	// Further above the bottom than this shows the scroll-to-bottom pill.
+	awayPx: 200,
 	nearTop: 800,
 	glideMs: 200,
 	// A card's open and close animation (CSS --toggle-ms matches).
