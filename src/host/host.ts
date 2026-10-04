@@ -31,6 +31,8 @@ import { turns } from './turns.ts'
 import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
 import { wire } from './wire.ts'
+import { rebaseRows } from '../common/rebase-rows.ts'
+import { rebasePlans } from './rebase-plans.ts'
 import { recap } from './recap.ts'
 
 export type Connection = {
@@ -218,8 +220,6 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 			host.follow(client, id, tail)
 			return {}
 		}
-		// Opening from disk or reading a big tail: the client's commands
-		// for the session wait for its snapshot.
 		client.held.set(id, [])
 		return (async () => {
 			await ready
@@ -257,20 +257,20 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		// A named paste waits in /tmp for its prompt (tasks qy, 31).
 		let stored = c.name !== undefined ? blobs.stage(c.name, c.mediaType, c.data) : blobs.store(c.sessionId, c.mediaType, c.data)
 		return { reply: { type: 'attached', sessionId: c.sessionId, command: c.id ?? '', blob: stored.blob, marker: stored.marker } }
+	} else if (c.type === 'rebase-apply') {
+		try { client.deliver({ type: 'output', sessionId: c.sessionId, text: rebasePlans.apply(c) }) }
+		catch (e) { slash.output(c.sessionId, String(e instanceof Error ? e.message : e), true) }
 	} else if (c.type === 'submit') {
 		let unknown = commands.parse(c.text) ? [] : blobs.unknown(c.sessionId, c.text)
 		if (unknown.length) client.deliver({ type: 'warning', text: `${unknown.join(', ')} names no attachment of this session; sent as text` })
-		// A slash command runs even when typed while editing a prompt.
-		// An edit of a waiting message may become one too (prompts.edit).
 		let amending = c.amend && !c.queue && !commands.parse(c.text)
 		if (c.amend && !c.queue && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
+		else if (commands.parse(c.text)?.name === 'rebase') refused = slash.command(c.sessionId, c.text, commands.parse(c.text)!, c.id, undefined, (reply) => { if (reply.rebase) client.deliver({ type: 'rebase-plan', sessionId: c.sessionId, snapshot: reply.rebase, todo: rebaseRows.render(c.sessionId, reply.rebase) }) })
 		else refused = amending ? prompts.amend(c.sessionId, c.text, c.id) : prompts.submit(c.sessionId, c.text, c.id, c.queue)
 		if (refused === undefined) prompts.sent(c.sessionId, c.text, c.id)
 	} else if (c.type === 'draft') {
 		let changed = drafts.set(c.sessionId, c.text, c.base)
 		if (changed) prompts.draft(c.sessionId, changed, c.id)
-		// Unchanged (the host already held this text): only the sender
-		// hears the draft, so its edit settles instead of being resent.
 		else return { reply: { type: 'draft', sessionId: c.sessionId, draft: drafts.get(c.sessionId), ...(c.id !== undefined ? { command: c.id } : {}) } }
 	} else if (c.type === 'continue') refused = prompts.resume(c.sessionId)
 	else if (c.type === 'pause') refused = turns.stop(c.sessionId)

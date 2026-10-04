@@ -7,6 +7,7 @@ import { blocks, type AssistantBlock, type ImageBlock, type Sender, type ToolRes
 import { forms, type Answers, type Form } from './forms.ts'
 import { inbox, type InboxItem } from './inbox.ts'
 import type { Event, LiveTurn, Snapshot, Stats, TurnStatus } from './protocol.ts'
+import { rebaseDisplay } from './rebase-display.ts'
 import { replay, type HistoryRecord, type PromptChange } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
@@ -47,6 +48,7 @@ export type Item = Shown & { key: string }
 
 export type Transcript = {
 	dropped?: number[]
+	rewrites?: Snapshot['rewrites']
 	meta: SessionMeta
 	// The session's state, as the host last said (src/common/states.ts).
 	state: SessionState
@@ -157,7 +159,6 @@ function recordShown(r: HistoryRecord): Shown[] {
 	return [transcript.endItem(r)]
 }
 
-// A turn end as shown, the same from a record or a live turn-end event.
 function endItem(end: { status: TurnStatus; usage?: Usage; error?: string }): Shown {
 	let item: Shown = { type: 'turn-end', status: end.status }
 	if (end.usage && Object.keys(end.usage).length) item.usage = end.usage
@@ -165,7 +166,6 @@ function endItem(end: { status: TurnStatus; usage?: Usage; error?: string }): Sh
 	return item
 }
 
-// Items with question `answer.question` shown answered.
 function answered(items: Item[], answer: { question: string; answers: Answers; secrets?: string[]; cancelled?: true }): Item[] {
 	return items.map((item) => {
 		if (item.type !== 'question' || item.id !== answer.question) return item
@@ -181,7 +181,6 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 	return r.type === 'reset' ? 'Context cleared.' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarised)`
 }
 
-// A command, its output or a divider as shown, from a record or an event.
 function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form }): Shown {
 	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true }
 	if (r.type === 'divider') return r.clear ? { type: 'output', text: r.text, ...(r.ts !== undefined && { ts: r.ts }) } : { type: 'divider', text: r.text }
@@ -210,15 +209,13 @@ function standIns(earlier: HistoryRecord[], tail: HistoryRecord[]): HistoryRecor
 function fromSnapshot(snapshot: Snapshot): Transcript {
 	let items: Item[] = []
 	let prompt: number | undefined
-	// A /clear (task vh) hides everything before it.
-	let history = replay.current(snapshot.history)
+	let history = rebaseDisplay.current(snapshot.history)
 	let cleared = history.findLastIndex((r) => r.type === 'reset')
 	if (cleared >= 0) history = history.slice(cleared)
 	let early = cleared >= 0 ? [] : transcript.standIns(snapshot.earlier ?? [], snapshot.history)
 	let queued = new Set([...early, ...snapshot.history].flatMap((r) => r.type === 'inbox' && r.queue ? [r.id] : []))
 	let origins = new Map([...(snapshot.earlier ?? []), ...snapshot.history].flatMap((r) => r.type === 'inbox' ? [[r.id, r] as const] : []))
 	for (let r of [...early, ...history]) {
-		// Older delivered records kept only their inbox IDs, not provenance.
 		if (r.type === 'user' && r.inbox?.some((id) => queued.has(id))) r = { ...r, queued: true }
 		if (r.type === 'user' && r.inbox?.length) {
 			let i = 0, ids = r.inbox
@@ -230,10 +227,13 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 		}
 		if (replay.isPrompt(r)) prompt = items.length
 		if (r.type === 'answer') items = transcript.answered(items, r)
+		else if (r.type === 'rebase') items.push(...transcript.keyed([{ type: 'divider', text: rebaseDisplay.text(r, snapshot.history) }], r.n, items.length))
 		else items.push(...transcript.recordItems(r, items.length))
 	}
+	items = rebaseDisplay.insert(items, snapshot.rewrites)
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
 	if (prompt !== undefined) t.prompt = prompt
+	if (snapshot.rewrites) t.rewrites = snapshot.rewrites
 	if (snapshot.dropped) t.dropped = [...snapshot.dropped]
 	if (snapshot.stats) t.stats = snapshot.stats
 	if (early.length) t.earlier = transcript.fromSnapshot({ ...snapshot, history: early, earlier: [], turn: undefined }).items.length
@@ -251,7 +251,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 // ins for it: as if the snapshot had held page and loaded together.
 // With `keep`, the stand-ins are from further back: they stay on top.
 function prepend(t: Transcript, loaded: HistoryRecord[], page: HistoryRecord[], keep = false): Transcript {
-	let base = { meta: t.meta, state: t.state }
+	let base = { meta: t.meta, state: t.state, rewrites: t.rewrites }
 	let full = transcript.fromSnapshot({ ...base, history: [...page, ...loaded] })
 	let prefix: Item[] = full.items.slice(0, Math.max(0, full.items.length - transcript.fromSnapshot({ ...base, history: loaded }).items.length))
 	if (keep && t.earlier) {
@@ -298,7 +298,7 @@ function fresh(like: { provider: string; model?: string; effort?: string }): Liv
 // The transcript after `event`; the same object if the event does not
 // concern it. Events before the first snapshot are ignored.
 function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
-	if (event.type === 'snapshot') return t && t.meta.id !== event.sessionId ? t : transcript.fromSnapshot(event.snapshot)
+	if ((event.type === 'snapshot' || event.type === 'history-rewritten')) return t && t.meta.id !== event.sessionId ? t : transcript.fromSnapshot(event.snapshot)
 	if (!t || !('sessionId' in event) || event.type === 'rejected' || event.type === 'draft' || event.sessionId !== t.meta.id) return t
 	if (event.type === 'state') return { ...t, state: event.state }
 	if (event.type === 'inbox') return { ...t, inbox: event.inbox }

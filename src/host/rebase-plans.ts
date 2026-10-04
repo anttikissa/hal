@@ -1,0 +1,65 @@
+// Client-local plans; only the host validates and writes history (task z71).
+import { rebase, type RebasePlan } from '../common/rebase.ts'
+import { rebaseRows, type RebaseRows } from '../common/rebase-rows.ts'
+import type { Command } from '../common/protocol.ts'
+import { forms } from '../common/forms.ts'
+import { states } from '../common/states.ts'
+import { readdirSync, statSync, existsSync } from 'fs'
+import { blobs } from './blobs.ts'
+import { history } from './history.ts'
+import { host } from './host.ts'
+import { prompts } from './prompts.ts'
+import { pruning } from './pruning.ts'
+import { rebases } from './rebases.ts'
+import { sessions } from './sessions.ts'
+import { snapshots } from './snapshots.ts'
+import { status } from './status.ts'
+import { tokenCalibration } from './token-calibration.ts'
+
+function build(id: string): RebaseRows {
+	let raw = history.readSync(id)
+	if (states.busy(status.stateOf(id)) || history.state.running.has(id) || forms.open(raw)) throw new Error('Pause the session and answer or dismiss its question before rebasing.')
+	let blobSizes: Record<string, number> = {}, dir = blobs.dir(id)
+	if (existsSync(dir)) for (let name of readdirSync(dir)) blobSizes[name.split('.')[0]!] = statSync(`${dir}/${name}`).size
+	return rebaseRows.build(raw, { model: sessions.open(id).model, ratios: tokenCalibration.ratios(), blobSizes, pruned: pruning.saved(id).omitted })
+}
+
+function broadcast(id: string, from: number): void {
+	host.broadcast(id, { type: 'history-rewritten', sessionId: id, from, snapshot: snapshots.build(id) })
+}
+
+function apply(c: Command & { type: 'rebase-apply' }): string {
+	let snapshot = rebasePlans.build(c.sessionId)
+	if (snapshot.base !== c.base) throw new Error(`Rebase is stale: base #${c.base}, latest record #${snapshot.base}. Rebuild the plan.`)
+	let parsed = c.todo === undefined ? undefined : rebaseRows.parse(c.todo, snapshot, c.replacements)
+	if (parsed?.aborted) return 'Rebase aborted.'
+	if (parsed?.edits.length) throw new Error(`Rebase edits missing full text: ${parsed.edits.map((n) => `#${n}`).join(', ')}`)
+	let plan = parsed?.plan ?? c.plan!, queue = parsed?.queue ?? []
+	if (plan.base !== c.base) throw new Error('Rebase plan base does not match the requested base.')
+	// Queue entries must be prompts, not a second channel for slash commands.
+	if (queue.some((text) => /^\s*\/[a-z][a-z0-9-]*(?:\s|$)/.test(text))) throw new Error('Rebase queue lines must be prompts, not slash commands.')
+	plan = { ...plan, edit: plan.edit.filter((e) => snapshot.rows.find((row) => row.editN === e.n)?.text !== e.text) }
+	let sums = rebaseRows.totals(snapshot, plan)
+	if (plan.drop.length || plan.edit.length) {
+		rebases.apply(c.sessionId, plan, c.base)
+		rebasePlans.broadcast(c.sessionId, sums.cacheFrom ?? c.base)
+	}
+	for (let [i, text] of queue.entries()) {
+		let refused = prompts.submit(c.sessionId, text, undefined, i > 0)
+		if (refused) throw new Error(refused)
+	}
+	return plan.drop.length || plan.edit.length ? `History rewritten.${queue.length ? ` Queued ${queue.length} prompts.` : ''}` : queue.length ? `Queued ${queue.length} prompts.` : 'Rebase unchanged.'
+}
+
+function undo(id: string): string {
+	let snapshot = rebasePlans.build(id), raw = history.readSync(id)
+	let last = rebase.latest(raw).findLast((r) => r.type === 'rebase' && (r.drop.length || r.edit.length))
+	if (!last || last.type !== 'rebase') throw new Error('No rebase to undo.')
+	let plan: RebasePlan = { base: last.base, drop: [], edit: [] }
+	rebases.apply(id, plan, snapshot.base)
+	let before = raw.slice(0, raw.findIndex((r) => r.n === last.n))
+	rebasePlans.broadcast(id, rebaseRows.totals(rebaseRows.build(before), last).cacheFrom ?? last.base)
+	return 'Rebase undone.'
+}
+
+export const rebasePlans = { build, broadcast, apply, undo }

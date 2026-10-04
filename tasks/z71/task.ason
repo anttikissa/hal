@@ -3,6 +3,9 @@
 	spec: `The /rebase command (src/host/commands/rebase.ts) answers with a plan: the session's rows (task 01d) and the base record number; it opens the rebase view in the client that ran it (terminal: editor, task 7ke; web: view, task bzf). The client sends back the actions; the host checks the base, the session state and the pairing rules of tasks/3zz/rebase.md, appends the rebase record, and every client hears a history event that reloads the session's transcript from the changed record on. Queue lines become prompts sent right after, in order. /rebase undo reverts the last rebase. Errors (a stale base, a running turn, a bad line) are shown whole and change nothing.
 The transcript shows the rebase as one divider row: "History rewritten: 14 dropped, 2 edited · cache rebuilds from #120 · undo".
 Also the model may not run /rebase through the command tool.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'The host returns requester-only rebase-plan { snapshot: RebaseRows, todo }. rebase-apply accepts base plus either plan (web) or todo and replacements keyed by row n (terminal); validates input at the protocol boundary, stale/busy/question state and grouping before appending. Unchanged replacements and no-op/abort plans append nothing. Queue is terminal-only, rejects slash commands and starts prompts in order. Model command tool explicitly denies /rebase; model and other-session slash invocations are refused too. history-rewritten broadcasts from plus fresh Snapshot and is normalized by common connection to snapshot for both clients. Snapshot.rewrites and Transcript.rewrites preserve keyed divider placement through reload/paging, because provider replay and host history pages deliberately remove rebase control records. Dividers name /rebase undo; undo replaces the latest active base with an empty append-only plan, restoring original text and dropped records. Integration tests cover two clients, restart/undo, stale and malformed input, running turns, the model denylist, cancellation/no-op and ordered queue prompts.'
+	],
 	needs: ['01d']
 }

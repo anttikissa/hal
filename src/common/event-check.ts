@@ -8,6 +8,8 @@ import type { EventType } from './protocol.ts'
 // ? for optional. Nested fields are named with a dot.
 const eventFields: Record<EventType, Record<string, string>> = {
 	'find-results': { request: 's', tier: 's', results: 'a', done: 'b', scanning: 'i?', error: 's?' },
+	'rebase-plan': { sessionId: 's', snapshot: 'o', 'snapshot.base': 'i', 'snapshot.rows': 'a', 'snapshot.records': 'a', 'snapshot.options': 'o', todo: 's' },
+	'history-rewritten': { sessionId: 's', from: 'i', snapshot: 'o', 'snapshot.meta': 'o', 'snapshot.history': 'a', 'snapshot.state': 'o' },
 	snapshot: { sessionId: 's', snapshot: 'o', 'snapshot.meta': 'o', 'snapshot.history': 'a', 'snapshot.state': 'o', 'snapshot.stats': 'o?' },
 	'turn-start': { sessionId: 's', provider: 's', model: 's?', effort: 's?', prompt: 's?', images: 'a?', command: 's?', ts: 's?' },
 	history: { sessionId: 's', before: 'i', records: 'a', older: 'i?' },
