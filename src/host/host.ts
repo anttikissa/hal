@@ -137,7 +137,7 @@ function reject(client: Client, command: unknown, reason: string, sessionId?: un
 // Commands whose effect outlives the connection. A repeat of one of
 // these ids is answered as before and not carried out again. Opening
 // and closing are per connection, so a repeat always acts.
-const once = new Set(['create', 'submit', 'draft', 'pause', 'continue', 'answer', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start'])
+const once = new Set(['rebase-apply', 'rebase-error', 'create', 'submit', 'draft', 'pause', 'continue', 'answer', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start'])
 
 // Records what a command with an id did, forgetting the oldest beyond
 // host.remembered.
@@ -254,13 +254,11 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	let refused: string | undefined
 	if (c.type === 'close') { client.open.delete(c.sessionId); if (client.visible === c.sessionId) client.visible = undefined; if (client.shown === c.sessionId) client.shown = undefined }
 	else if (c.type === 'attach') {
-		// A named paste waits in /tmp for its prompt (tasks qy, 31).
 		let stored = c.name !== undefined ? blobs.stage(c.name, c.mediaType, c.data) : blobs.store(c.sessionId, c.mediaType, c.data)
 		return { reply: { type: 'attached', sessionId: c.sessionId, command: c.id ?? '', blob: stored.blob, marker: stored.marker } }
-	} else if (c.type === 'rebase-apply') {
-		try { client.deliver({ type: 'output', sessionId: c.sessionId, text: rebasePlans.apply(c) }) }
-		catch (e) { slash.output(c.sessionId, String(e instanceof Error ? e.message : e), true) }
-	} else if (c.type === 'submit') {
+	} else if (c.type === 'rebase-error') slash.output(c.sessionId, c.text, true)
+	else if (c.type === 'rebase-apply') return { reply: rebasePlans.answer(c) }
+	else if (c.type === 'submit') {
 		let unknown = commands.parse(c.text) ? [] : blobs.unknown(c.sessionId, c.text)
 		if (unknown.length) client.deliver({ type: 'warning', text: `${unknown.join(', ')} names no attachment of this session; sent as text` })
 		let amending = c.amend && !c.queue && !commands.parse(c.text)

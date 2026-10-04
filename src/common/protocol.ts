@@ -105,7 +105,8 @@ export type Command = (
 	// page's `older`), about one snapshot's worth; answered, to this
 	// client only, with `history`.
 	| { type: 'history'; sessionId: string; before: number }
-	| { type: 'rebase-apply'; sessionId: string; base: number; plan?: RebasePlan; todo?: string; replacements?: Record<number, string> }
+	| { type: 'rebase-error'; sessionId: string; text: string }
+	| { type: 'rebase-apply'; sessionId: string; base: number; plan?: RebasePlan; todo?: string; replacements?: Record<number, string>; recoveryPath?: string }
 	// Stop following it. The session and any running turn carry on.
 	| { type: 'close'; sessionId: string }
 	// A prompt. While a turn is busy it waits in the inbox: steering, sent
@@ -197,6 +198,7 @@ export type Tab = { id: string; name: string; cwd: string; model: string; state:
 // went into. Clients key transcript items by it (task w5).
 export type Event =
 	| FindBatch
+	| { type: 'rebase-result'; sessionId: string; command?: string; ok: boolean; text: string }
 	| { type: 'rebase-plan'; sessionId: string; snapshot: RebaseRows; todo: string }
 	| { type: 'history-rewritten'; sessionId: string; from: number; snapshot: Snapshot }
 	| { type: 'snapshot'; sessionId: string; snapshot: Snapshot }
@@ -302,7 +304,7 @@ export type Event =
 	| NoticeEvent
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['rebase-apply', 'find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello', 'screen']
+const commandTypes: CommandType[] = ['rebase-error', 'rebase-apply', 'find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello', 'screen']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -314,13 +316,14 @@ function invalid(value: unknown): string | undefined {
 		(optional && c[key] === undefined) || typeof c[key] === 'string' ? undefined : `${c.type}: ${key} must be a string`
 	let problem = str('id', true)
 	if (problem) return problem
+	if (c.type === 'rebase-error') return str('sessionId') ?? str('text')
 	if (c.type === 'rebase-apply') {
 		let replacements = c.replacements
 		if (!Number.isSafeInteger(c.base) || (c.base as number) < 0) return 'rebase-apply: base must be a nonnegative record number'
 		if ((c.todo === undefined) === (c.plan === undefined)) return 'rebase-apply: provide exactly one of todo or plan'
 		if (c.todo !== undefined && typeof c.todo !== 'string') return 'rebase-apply: todo must be text'
 		if (replacements !== undefined && (!replacements || typeof replacements !== 'object' || Array.isArray(replacements) || Object.entries(replacements).some(([n, text]) => !/^[1-9]\d*$/.test(n) || typeof text !== 'string'))) return 'rebase-apply: replacements must map record numbers to text'
-		return str('sessionId') ?? (c.plan === undefined ? undefined : rebase.invalid(c.plan))
+		return str('sessionId') ?? str('recoveryPath', true) ?? (c.plan === undefined ? undefined : rebase.invalid(c.plan))
 	}
 	if (c.type === 'hello') return Number.isInteger(c.pid) ? undefined : 'hello: pid must be an integer'
 	if (c.type === 'screen') {

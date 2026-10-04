@@ -32,6 +32,13 @@ test('rebase plans are requester-local; changes, dividers and undo reach every f
 	expect(c.views.get(id)?.items.some((i) => i.type === 'text' && i.text === 'large answer')).toBe(true)
 	expect(c.views.get(id)?.items.some((i) => i.type === 'prompt' && i.text === 'original prompt')).toBe(true)
 	expect(history.readSync(id).filter((r) => r.type === 'rebase')).toHaveLength(2)
+	c.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
+	await until(() => c.of('rebase-plan').length)
+	let next = c.of('rebase-plan').at(-1)
+	let apply = { type: 'rebase-apply', id: 'rebase-dedup', sessionId: id, base: next.snapshot.base, plan: { base: next.snapshot.base, drop: [answer.n], edit: [] } }
+	c.conn.send(apply); c.conn.send(apply)
+	expect(history.readSync(id).filter((r) => r.type === 'rebase')).toHaveLength(3)
+	expect(c.of('rebase-result').slice(-2).map((r) => r.ok)).toEqual([true, true])
 })
 
 test('stale and malformed plans never append a rebase; busy sessions refuse; model cannot invoke rebase', async () => {
@@ -43,6 +50,7 @@ test('stale and malformed plans never append a rebase; busy sessions refuse; mod
 	await until(() => a.of('meta').length)
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo: start.todo })
 	expect(a.of('output').at(-1).text).toContain('stale')
+	expect(a.of('rebase-result').at(-1)).toMatchObject({ ok: false, text: expect.stringContaining('stale') })
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: 'wrong', todo: start.todo })
 	expect(a.of('rejected').at(-1).reason).toContain('base')
 	expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
@@ -68,6 +76,7 @@ test('todo replacement text is applied; queue prompts start in order; empty and 
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo, replacements: { [user.n!]: 'edited' } })
 	await until(() => calls.length === 1)
 	expect(a.of('turn-start').at(-1).prompt).toBe('first')
+	expect(history.readSync(id).findLast((r) => r.type === 'rebase')).toMatchObject({ edit: [{ n: user.n, text: 'edited' }] })
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
 	expect(a.of('turn-start').at(-1).prompt).toBe('second')

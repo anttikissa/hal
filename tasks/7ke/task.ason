@@ -2,6 +2,10 @@
 	title: 'Terminal /rebase opens the plan in the editor',
 	spec: `In the terminal, /rebase writes the plan as a todo file (format in tasks/3zz/rebase.md) and opens it in $VISUAL, else $EDITOR, else vi, on the user's own terminal (the client side, so it also works with ./run -r). The terminal is restored to the editor and back exactly as Ctrl-Z does. Saving applies; an empty file or any abort line cancels. An edit line opens that record's full text in the editor next, one file per edited record, as the old Hal did; unchanged text is no change.
 The file is in the spirit of git rebase -i and the old Hal's, but informative: aligned columns of action, #n, time, kind, tokens, summary; a header with the totals and the rules; images, blobs and cut outputs named in the row.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Terminal rebase uses VISUAL then EDITOR, a private 0700 temporary directory and 0600 UTF-8 files. The editor inherits a canonical tty while Hal input and painting pause. Shared parsing validates each edit round; abort removes files. An idempotent host rebase-result acknowledgment removes files only after success; editor, parse or stale-apply failure retains the path and persists the full error.',
+		'Manual terminal check used GNU screen because tmux is absent, with a scripted real vim -es as VISUAL and EDITOR=false. Canonical echo and isig were active; a full-text prompt replacement and assistant drop were durable, files disappeared only after acceptance, repaint returned, and /rebase undo restored the original transcript. Existing one-row dividers remain; undo precedes counts and frontier so it remains visible at 80 columns.'
+	],
 	needs: ['z71']
 }

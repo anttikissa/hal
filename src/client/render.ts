@@ -238,7 +238,7 @@ function column(col: number): string {
  */
 function draw(force = false): void {
 	let st = render.state
-	if (!st.out || (st.parked && !force)) return
+	if (terminal.state.external || !st.out || (st.parked && !force)) return
 	st.parked = false
 	let { rows, cols } = st.out.size()
 	// Two or more tabs means full mode for good, from the first paint

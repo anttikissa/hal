@@ -35,6 +35,7 @@ interface TerminalState {
 	/** Raw mode and our terminal modes are on. */
 	entered: boolean
 	suspended: boolean
+	external: boolean
 	/** Resolves a lone ESC once input goes idle (keys.flush). */
 	escapeTimer: ReturnType<typeof setTimeout> | null
 }
@@ -50,7 +51,7 @@ const KITTY_OFF = '\x1b[<u'
 const SHOW_CURSOR = '\x1b[?25h'
 
 function createState(): TerminalState {
-	return { io: null, decoder: keys.createState(), emergency: emergency.createState(), entered: false, suspended: false, escapeTimer: null }
+	return { io: null, decoder: keys.createState(), emergency: emergency.createState(), entered: false, suspended: false, external: false, escapeTimer: null }
 }
 
 // Output to `fd` that never holds the event loop (task 7j): a write to

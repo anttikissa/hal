@@ -23,6 +23,7 @@ import type { KeyEvent } from './keys.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
 import { recall } from '../common/recall.ts'
 import { render } from './render.ts'
+import { rebaseEditor } from './rebase-editor.ts'
 import { terminal } from './terminal.ts'
 import { clientCommands } from './commands.ts'
 import { frame } from './frame.ts'
@@ -88,6 +89,8 @@ function beat(): void {
 
 function onEvent(event: Event): void {
 	let st = app.state
+	if (event.type === 'rebase-result') return rebaseEditor.result(event, (text) => { st.notice = text; app.show() })
+	if (event.type === 'rebase-plan') return void rebaseEditor.open(event, app.send, (text) => { st.notice = text; app.show() })
 	if (event.type === 'find-results') return find.event(event)
 	// A recalled entry stays on screen; the draft changes underneath.
 	let mine = st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id ? event.sessionId : undefined
