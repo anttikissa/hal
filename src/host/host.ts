@@ -1,12 +1,6 @@
-// Host protocol: one owner of sessions, providers and state writes;
-// session modules act on commands, all transports deliver the same events.
-// Snapshot and live events are sent from the same synchronous step, so a
-// client that opens a session never misses or double-counts an event. A
-// big snapshot's history is read in slices first (pages.slices) and
-// caught up in that step; the client's commands for the session wait
-// until it is sent, so they act in the order sent (task 7j).
-// History is durable before clients hear it; snapshots and provider input
-// are read back from it, never reconstructed from display state.
+// Host protocol: durable history before live events, shared by all transports.
+// Snapshot reads yield in slices; commands wait until their snapshot is sent
+// and are then carried out in order (task 7j).
 
 import { ason } from '../common/ason.ts'
 import { protocol, type Command, type Event } from '../common/protocol.ts'
@@ -38,6 +32,7 @@ import { turns } from './turns.ts'
 import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
 import { wire } from './wire.ts'
+import { recap } from './recap.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -73,6 +68,7 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 		},
 		close: () => {
 			host.state.clients.delete(client)
+			if (client.visible) void recap.prepare(client.visible)
 			clients.leave(client.record)
 			webLinks.drop(client)
 			find.cancel(client)
@@ -239,7 +235,9 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid) : clients.screen(client.record, c)
 	if (c.type === 'visibility') {
 		// Not checked against open: a tab's open may still be pending.
+		let previous = client.visible
 		client.visible = c.visible ? c.sessionId : undefined; client.shown = c.sessionId; client.visibleAt = Date.now()
+		recap.visibility(previous, client.visible)
 		return {}
 	}
 	if (c.type === 'auth') return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } }
@@ -315,6 +313,7 @@ function follow(client: Client, id: string, tail?: Tail): void {
 function broadcast(id: string, event: Event): void {
 	for (let client of host.state.clients) if (client.open.has(id)) client.deliver(event)
 	tabs.observe(id, event)
+	if (event.type === 'turn-end') void recap.prepare(id)
 	notify.route(host.state.clients, id, event)
 }
 
@@ -345,6 +344,7 @@ function quitting(last: boolean): void {
 function reset(): void {
 	history.stop(false)
 	find.reset()
+	recap.reset()
 	for (let r of turns.state.running.values()) r.controller.abort()
 	turns.state.running.clear()
 	jobs.killAll()

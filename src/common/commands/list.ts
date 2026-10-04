@@ -49,6 +49,7 @@ const list: CommandInfo[] = [
 	// acts on them before any key decoding (tasks/README.md). Changing
 	// these three `key`s changes only what /keys shows, not the keys.
 	{ name: 'quit', description: 'quit', category: 'app', key: 'ctrl-c', clientOnly: true },
+	{ name: 'recap', description: 'recall session goals, progress and blockers', category: 'session' },
 	{ name: 'redraw', description: 'redraw', category: 'app', key: 'ctrl-l' },
 	{ name: 'rename', description: 'name or clear the session name', category: 'session' },
 	// /restart and /restart local run in the client; host, both and all
