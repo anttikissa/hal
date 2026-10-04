@@ -1,9 +1,7 @@
 // The transcript every client shows: one pure fold of a session snapshot
 // and the live events after it (src/common/protocol.ts). A client that
-// followed the events and one that connected later end up with equal
-// transcripts. This is display state only; provider input is rebuilt
-// from history on the host, never from here, so items drop what only a
-// provider needs (thinking signatures, their provider).
+// following live events and one reconnecting show the same transcript.
+// Provider input comes from host history; items omit provider-only fields.
 
 import { blocks, type AssistantBlock, type ImageBlock, type Sender, type ToolResultBlock, type Usage } from './blocks.ts'
 import { forms, type Answers, type Form } from './forms.ts'
