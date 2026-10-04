@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, rmSync } from 'fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { history } from './history.ts'
 import { host } from './host.ts'
@@ -75,4 +75,26 @@ test('a rebase marks the next graph point even when context grows', () => {
 	rebases.apply(id, { base: 4, drop: [2], edit: [] })
 	history.append(id, { type: 'round', usage: { input: 4000 } })
 	expect(context.points(history.readSync(id)).at(-1)?.cause).toBe('rebase')
+})
+
+test('dropped signed blocks are never expanded', async () => {
+	history.submit(id, 'go')
+	history.append(id, { type: 'assistant', block: { type: 'thinking', text: 'reason', signatureBlob: 'abcdef123456', provider: 'anthropic' } })
+	history.append(id, { type: 'assistant', block: { type: 'text', text: 'answer' } })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	rebases.apply(id, { base: 4, drop: [2], edit: [] })
+	expect(JSON.stringify(await history.messages(id))).not.toContain('reason')
+})
+
+
+test('edited tool output survives an omission saved before the rebase', async () => {
+ history.submit(id, 'go')
+ history.append(id, {type:'assistant',block:{type:'tool_call',id:'call',name:'bash',input:{}}})
+ history.results(id, [{type:'tool_result',id:'call',output:'long original '.repeat(1000)}])
+ history.append(id, {type:'turn_end',status:'completed',usage:{}})
+ writeFileSync(`${paths.sessionDir(id)}/projection.ason`, '{boundary:0, checkpoint:0, pressure:-1, omitted:[3], consumed:[2,3]}')
+ expect(JSON.stringify(await history.messages(id))).toContain('[pruned')
+ rebases.apply(id, {base:4, drop:[], edit:[{n:3,text:'retained edit'}]})
+ expect(JSON.stringify(await history.messages(id))).toContain('retained edit')
+ expect(JSON.stringify(await history.messages(id))).not.toContain('[pruned tool output')
 })
