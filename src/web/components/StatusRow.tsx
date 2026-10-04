@@ -58,6 +58,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 				<For each={status.groups(props.view)}>{(group) => <div class="fact">
 					{group.href ? <a href={group.href}><Parts group={group} /></a> : <Parts group={group} />}
 				</div>}</For>
+				<form method="post" action="/logout"><button type="submit">Log out this browser</button></form>
 			</dialog>
 		</div>
 	)

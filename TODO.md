@@ -12,5 +12,3 @@ a task and remove it here.
   only has a Mac.
 - Restart (Ctrl-R) still flashes for about one frame, too fast to see
   what. Record a screen video to find which frame it is.
-- `/logout` to revoke web login tokens: they last 10 years, and today
-  the only revocation is deleting a hash from state/web-sessions.ason.

@@ -1,6 +1,10 @@
 {
 	title: '/logout revokes web logins',
 	spec: "/clients names each web login (device, browser, first and last seen); /logout <client> or /logout all revokes them by deleting their token hashes from state/web-sessions.ason, and a revoked browser's open sockets close at once and fall back to the login page. The current browser can log itself out from the web status details. Replaces the TODO.md item.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Restored invariant: a revoked login cannot authenticate HTTP or WebSocket requests, receive further session events, or submit commands through existing sockets. Hashes are deleted before socket teardown; upgrades recheck after async page builds and at socket open, and messages recheck authentication. Tests cover targeted and all-login revocation, two sockets sharing a login, restart persistence, failed reconnection, the build/revocation race, and same-origin POST self-logout. Existing context event streams all close on revocation as a conservative security measure.',
+		'Login records retain only token hashes and carry independent public 10-character ids, device/browser labels and first/last seen. Expiry-only legacy records migrate without token rotation; unknown dates/device are stated, not invented. The status-details action is a native POST form, reusing existing 44px buttons; real Chrome checks phone/desktop fit and return to the login gate. /logout is shared by terminal and web; the browser-only self action is explicit in the spec. The new command makes /lo and /log ambiguous, so the completion retention test uses /logi then /login instead.'
+	],
 	needs: []
 }

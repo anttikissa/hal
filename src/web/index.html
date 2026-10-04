@@ -192,7 +192,7 @@ body, textarea { tab-size: 4; }
 .StatusDetails { width: min(32rem, calc(var(--app-width, 100vw) - 1rem)); max-height: calc(var(--app-height, 100dvh) - 1rem); overflow-y: auto; padding: 0.5lh 1ch; background: var(--canvas); color: var(--text); border: 1px solid var(--border); overflow-wrap: anywhere; }
 .StatusDetails::backdrop { background: color-mix(in oklab, var(--canvas) 70%, transparent); }
 .StatusDetails .top { display: flex; align-items: center; justify-content: space-between; gap: 1ch; }
-.StatusDetails .top button { min-width: 44px; min-height: 44px; background: none; color: inherit; }
+.StatusDetails button { min-width: 44px; min-height: 44px; background: none; color: inherit; }
 .StatusDetails .fact { padding-block: 0.125lh; }
 .StatusDetails a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; text-decoration: underline; touch-action: manipulation; }
 @media (pointer: coarse) { .StatusDetails { position: fixed; top: auto; bottom: calc(100dvh - var(--app-top, 0px) - var(--app-height, 100dvh) + 0.5rem); left: calc(var(--app-left, 0px) + 0.5rem); right: auto; margin: 0; width: calc(var(--app-width, 100vw) - 1rem); } }
