@@ -11,7 +11,6 @@ import { connection } from '../../common/connection.ts'
 import type { Sending } from '../../common/drafts.ts'
 import { notices } from '../../common/notices.ts'
 import { app } from '../app.ts'
-import { diagnostics } from '../diagnostics.ts'
 import { editor } from '../editor.ts'
 import { keys, type Target } from '../keys.ts'
 import { scroll } from '../scroll.ts'
@@ -122,14 +121,9 @@ export function Chat() {
 		}
 		notices.onChange = () => app.changed()
 		let onKey = (e: KeyboardEvent) => {
-			let t = target(e)
-			// Whether a character typed outside any field reached the box
-			// (task 6cm); never which key.
-			let outside = (t.kind === 'other' || t.kind === 'button' || t.kind === 'link') && [...e.key].length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey
-			if (keys.key(e, t)) e.preventDefault()
+			if (keys.key(e, target(e))) e.preventDefault()
 			// Show the outcome now, not a microtask later.
 			flush()
-			if (outside) { diagnostics.record('key', document.activeElement?.closest('.Composer') ? 'composer' : 'other'); diagnostics.report() }
 		}
 		let onPaste = (e: ClipboardEvent) => {
 			if (e.clipboardData && keys.paste(e.clipboardData, target(e))) e.preventDefault()

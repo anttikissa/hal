@@ -58,6 +58,18 @@ function init(context: () => DiagnosticContext): void {
 		record(name === 'click' ? 'click' : 'pointer', detail)
 		if (name === 'click') { let start = performance.now(); setTimeout(() => { lag = Math.max(0, Math.round(performance.now() - start)); record('settled', detail); report() }, 0) }
 	}, { capture: true, passive: true })
+	// A character typed while focus is anywhere but the message box:
+	// where focus was, then whether the key reached the box. Capture on
+	// window sees it even if a handler stops it. Never which key.
+	let box = (el: Element | null) => el instanceof HTMLTextAreaElement && !!el.closest('.Composer')
+	let focusArea = (el: Element | null): string =>
+		!el || el === document.body ? 'body' : el.closest('dialog[open]') ? 'dialog' : el.matches('input, textarea, select, [contenteditable]') ? 'field'
+			: el.closest('.Tabs') ? 'tabs' : el.closest('.Card') ? 'card' : el instanceof HTMLButtonElement ? 'button' : el instanceof HTMLAnchorElement ? 'link' : 'other'
+	addEventListener('keydown', (e: KeyboardEvent) => {
+		if ([...e.key].length !== 1 || e.ctrlKey || e.altKey || e.metaKey || e.isComposing || box(document.activeElement)) return
+		record('key', focusArea(document.activeElement))
+		setTimeout(() => { record('settled', box(document.activeElement) ? 'composer' : 'other'); report() }, 0)
+	}, { capture: true, passive: true })
 	document.addEventListener('visibilitychange', () => { record('visibility', document.visibilityState); report() })
 	addEventListener('pageshow', () => { record('pageshow'); report() })
 	addEventListener('focus', () => { record('focus'); report() })

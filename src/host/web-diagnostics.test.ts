@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
+import { settings } from '../common/settings.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
 import { server } from './server.ts'
@@ -22,9 +23,13 @@ test('browser diagnostics enforce auth/origin, filter private data and rotate bo
 		let cookie = auth.headers.get('set-cookie')!.split(';')[0]!
 		let post = (body: string, headers: Record<string, string> = {}) => fetch(`${base}/web-diagnostics`, { method: 'POST', body, headers: { 'content-type': 'application/json', ...headers } })
 		let body = JSON.stringify(report())
+		let headers = { cookie, origin: base }
+		// Opt-in: off by default, nothing is accepted or written.
+		expect((await post(body, headers)).status).toBe(404)
+		expect(existsSync(`${paths.stateDir()}/web-diag.log`)).toBe(false)
+		settings.state.raw = { webDiagnostics: true }
 		expect((await post(body)).status).toBe(401)
 		expect((await post(body, { cookie, origin: 'https://wrong.example' })).status).toBe(403)
-		let headers = { cookie, origin: base }
 		expect((await post('{', headers)).status).toBe(400)
 		// An unknown label (a newer page's, or text) is skipped, never logged.
 		expect((await post(JSON.stringify({ ...report(), entries: [{ at: 1, kind: 'error', detail: 'private message' }] }), headers)).status).toBe(204)
@@ -43,7 +48,7 @@ test('browser diagnostics enforce auth/origin, filter private data and rotate bo
 		for (let i = 0; i < 30; i++) await post(body, headers)
 		expect((await post(body, headers)).status).toBe(429)
 	} finally {
-		await server.stop(); host.reset(); web.port = port
+		await server.stop(); host.reset(); web.port = port; settings.state.raw = {}
 		if (saved === undefined) delete process.env.HAL_HOME; else process.env.HAL_HOME = saved
 		rmSync(home, { recursive: true, force: true })
 	}
