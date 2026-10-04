@@ -93,7 +93,7 @@ while true; do
 	if [ "$code" -ne 100 ] && [ "$code" -ne 42 ]; then
 		exit "$code"
 	fi
-	# Optional personal auto-deploy: the authenticated update hook exits with 42
+	# Optional personal auto-update: the authenticated update hook exits with 42
 	# after fetching a newer origin. Pull only by fast-forward before relaunching;
 	# on failure, preserve the checkout and restart the existing revision.
 	if [ "$code" -eq 42 ]; then

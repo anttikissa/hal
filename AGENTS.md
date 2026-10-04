@@ -56,8 +56,8 @@ remove repetition and empty phrases without weakening requirements.
 Gitignored files (plugins/, local.ts, auth, state) are private and
 exempt from task tracking. Nothing about them belongs in tracked files,
 including tasks, notes and commits. If unsure, ask. Personal hostnames,
-IPs, SSH aliases and deployment topology are private even when publicly
-resolvable. Keep deployment scripts and instructions local and
+IPs, SSH aliases and server setup are private even when publicly
+resolvable. Keep host-specific scripts and instructions local and
 gitignored; use reserved example domains in tracked examples. Permission
 to operate a host is not permission to publish its configuration.
 
@@ -138,7 +138,7 @@ Keep reports to one screen. Measure every number now (git log,
 3. A table against the previous report: source lines, tests, tasks
    done/planned, questions answered; when the old Hal reached the same
    size; cost since the last report and in total.
-4. A numbered list of decisions, undeployed work and security issues
+4. A numbered list of decisions, unrestarted work and security issues
    needing the user.
 
 # UI: one set of rules for web and terminal

@@ -7,4 +7,3 @@ config.ason
 sessions/
 state/
 .DS_Store
-scripts/deploy

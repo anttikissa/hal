@@ -303,7 +303,7 @@ The marker slot stays reserved so the number never jumps.</div></div></div><div 
 
 	// 3. Tab strips: the desktop cell ((digits + 2)ch), a 44px touch cell, and cells with names.
 	const tabs = [['', ''], ['done', '✓'], ['', ''], ['working', '•'], ['asking', '?'], ['', ''], ['', ''], ['working', '•'], ['', '']]
-	const names = ['hal2', 'Tab strip', 'Editing the UI Craft Skill', 'Restart design', 'Question', 'Notes', 'Build', 'Deploy', 'Scratch']
+	const names = ['hal2', 'Tab strip', 'Editing the UI Craft Skill', 'Restart design', 'Question', 'Notes', 'Build', 'Release', 'Scratch']
 	let strip = (label, cell, count, named) => {
 		let d = document.createElement('div')
 		d.innerHTML = `<div class="strip-label">${label}</div><nav class="strip tab" style="--cell: ${cell}"><button type="button" aria-label="All tabs">≡</button><div class="pages"></div><button type="button" aria-label="New tab">+</button></nav>`
