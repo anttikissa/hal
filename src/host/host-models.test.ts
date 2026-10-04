@@ -123,8 +123,8 @@ test('versioned GPT aliases complete and select their own generation', () => {
 		expect(c.of('completions').at(-1)).toMatchObject({ items: ['/model astra'], descriptions: ['openai/gpt-6-astra'] })
 		c.conn.send({ type: 'complete', sessionId: id, text: '/model gpt' })
 		let reply = c.of('completions').at(-1)
-		expect(reply.items).toEqual(['/model gpt', '/model gpt-6.1', '/model gpt-6'])
-		expect(reply.descriptions).toEqual(['openai/gpt-6.1-sol', 'openai/gpt-6.1-sol', 'openai/gpt-6-sol'])
+		expect(reply.items).toEqual(['/model gpt', '/model gpt-6.1', '/model gpt-6', '/model openai/gpt-6-astra'])
+		expect(reply.descriptions).toEqual(['openai/gpt-6.1-sol', 'openai/gpt-6.1-sol', 'openai/gpt-6-sol', 'openai/gpt-6-astra'])
 
 	} finally {
 		if (saved === undefined) delete process.env.OPENAI_API_KEY
@@ -215,6 +215,9 @@ test('/model completes model ids the host knows', async () => {
 	await models.list('hal/intro')
 	a.conn.send({ type: 'complete', sessionId: id, text: '/model acme/b' })
 	expect(a.of('completions').at(-1).items).toEqual(['/model acme/big-1'])
+	// A word inside the name matches too, after prefix matches.
+	a.conn.send({ type: 'complete', sessionId: id, text: '/model bi' })
+	expect(a.of('completions').at(-1).items).toContain('/model acme/big-1')
 })
 
 test('credential changes invalidate cached and in-flight model lists', async () => {
