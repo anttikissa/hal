@@ -29,6 +29,7 @@ import { tabs } from './tabs.ts'
 import { target, type Target } from './target.ts'
 import { view, type ViewState } from './view.ts'
 import { find } from './find.ts'
+import { rebaseView } from './rebase.ts'
 import { diagnostics } from './diagnostics.ts'
 
 // `kill`: the last text Ctrl-K/U or Alt-D killed, for Ctrl-Y.
@@ -93,7 +94,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'find-results') return find.event(event)
 	if (event.type === 'restart') return restart.mark()
 	if (event.type === 'web-update') { st.updateAvailable = true; return app.changed() }
-	if (event.type === 'redraw') return
+	if (event.type === 'redraw' || rebaseView.onEvent(event)) return
 	if (event.type === 'tabs') push.badge(event.tabs)
 	if (push.onEvent(event)) return
 	if (tabs.onEvent(event)) return
@@ -102,8 +103,7 @@ function onEvent(event: Event): void {
 	if (landed) app.settled(landed)
 	if (st.shown && 'sessionId' in event && event.sessionId && event.sessionId !== st.shown) return tabs.hiddenEvent(event)
 	st.view = view.onEvent(st.view, event)
-	if (event.type === 'snapshot') { st.menu = undefined; st.known = undefined; st.completedByTab = undefined; st.suppressed = undefined }
-	if (event.type === 'snapshot') backfill.onSnapshot(st.older, event)
+	if (event.type === 'snapshot') { st.menu = undefined; st.known = undefined; st.completedByTab = undefined; st.suppressed = undefined; backfill.onSnapshot(st.older, event) }
 	if (event.type === 'history' && backfill.onPage(st.older, event) && st.view.transcript?.meta.id === event.sessionId) {
 		st.view = { ...st.view, transcript: backfill.apply(st.older, st.view.transcript) }
 		st.pages++
