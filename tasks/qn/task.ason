@@ -8,7 +8,8 @@
 		"Cursor: view.streaming(st) is 'thinking' or 'text' while the running turn streams into its last item; Transcript passes cursor to that last row's Card and drops the .cursor-line meanwhile. A closed thinking card shows the cursor in its header, after the title (.title is no longer flex: 1 so the cursor sits right after it).",
 		'Viewport: viewport.sync mirrors visualViewport into --app-height/--app-top on <html>; the body is position: fixed at those, so iOS panning never scrolls a page behind. Checked in headless Chrome only (shrinking the emulated viewport moves the composer up); real iOS Safari with its keyboard was not available to the implementer, so check it there first if the prompt hides.',
 		'Touch: key hints are hidden under (pointer: coarse), where Enter is a newline and there is no Esc; fields are 16px there too, not only under 40rem.',
-		'The earlier viewport note describing a fixed body is superseded: apply visual-viewport height and a translateY offset to the app container, leaving body in normal document geometry. Phone Safari panning must be checked on a device; Chrome viewport emulation does not establish it.'
+		'The earlier viewport note describing a fixed body is superseded: apply visual-viewport height and a translateY offset to the app container, leaving body in normal document geometry. Phone Safari panning must be checked on a device; Chrome viewport emulation does not establish it.',
+		'touch-action: none on the status row and composer buttons was removed: nobody asked for it or saw the page scroll from there, and it was the suspect for buttons needing two taps on iOS.'
 	],
 	needs: ['4s'],
 	foldInto: ['4s']
