@@ -9,8 +9,8 @@ import { existsSync } from 'fs'
 import { paths } from './paths.ts'
 
 const W = 400, H = 340, AXIS = 44, L = 6, R = 12, T = 22, B = 34, SLOT = 14
-const LETTER: Record<Cause, string> = { compaction: 'C', clear: 'X', 'pruning checkpoint': 'P', 'cache miss': 'M' }
-const TONE: Record<Cause, string> = { compaction: 'tool-edit', clear: 'tool-edit', 'pruning checkpoint': 'fork', 'cache miss': 'assistant' }
+const LETTER: Record<Cause, string> = { rebase: 'R', compaction: 'C', clear: 'X', 'pruning checkpoint': 'P', 'cache miss': 'M' }
+const TONE: Record<Cause, string> = { rebase: 'tool-edit', compaction: 'tool-edit', clear: 'tool-edit', 'pruning checkpoint': 'fork', 'cache miss': 'assistant' }
 
 const escape = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const kilo = (n: number): string => (n < 1000 ? String(n) : `${Math.round(n / 100) / 10}k`)

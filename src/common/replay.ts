@@ -3,6 +3,7 @@
 // these records alone, never from display state.
 
 import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
+import { rebase } from './rebase.ts'
 import { titles } from './titles.ts'
 import type { ContextTransition } from './context-transition.ts'
 import type { Answers, Form } from './forms.ts'
@@ -91,6 +92,7 @@ export type HistoryRecord = Numbered &
 	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string; ts: string }
 	// A fresh context (/clear, task vh): provider input is rebuilt from
 	// the records after it alone, with no summary.
+	| ({ type: 'rebase'; ts: string } & import('./rebase.ts').RebasePlan)
 	| { type: 'reset'; transition?: string; ts: string }
 	)
 
@@ -142,7 +144,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			continue
 		}
 		if (r.type === 'output' && r.change) (changed.prompt ??= []).push(r.text)
-		if (r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
+		if (r.type === 'rebase' || r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) {
 			note = undefined
@@ -223,9 +225,11 @@ function lastPrompt(records: HistoryRecord[]): number {
 // and change records are kept: the inbox is read from every record, an
 // answer may be to a question asked before, and a change still holds.
 function current(records: HistoryRecord[]): HistoryRecord[] {
-	if (!records.some((r) => r.type === 'user' && r.replaces)) return records
+	records = rebase.latest(records)
+	if (!records.some((r) => r.type === 'rebase' || (r.type === 'user' && r.replaces))) return records
 	let out: HistoryRecord[] = []
 	for (let r of records) {
+		if (r.type === 'rebase') { out = rebase.apply(out, r); continue }
 		if (r.type === 'user' && r.replaces) {
 			let at = replay.lastPrompt(out)
 			if (at >= 0) out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'change')]
@@ -244,7 +248,7 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 function withoutCommands(records: HistoryRecord[]): HistoryRecord[] {
 	let questions = new Map(records.flatMap((r) => (r.type === 'question' ? [[r.id, r] as const] : [])))
 	return records.filter((r) => {
-		if (r.type === 'command' || r.type === 'output' || r.type === 'change' || r.type === 'compact' || r.type === 'reset') return false
+		if (r.type === 'rebase' || r.type === 'command' || r.type === 'output' || r.type === 'change' || r.type === 'compact' || r.type === 'reset') return false
 		if (r.type === 'question') return !r.from
 		return r.type !== 'answer' || (questions.has(r.question) && !questions.get(r.question)!.from)
 	})

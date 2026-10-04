@@ -5,6 +5,7 @@ import { findQuery, type FindBatch, type FindFilter, type FindKind, type FindQue
 import { history } from './history.ts'
 import { paths } from './paths.ts'
 import { findIndex, type FindRow } from './find-index.ts'
+import { replay } from '../common/replay.ts'
 import type { SessionMeta } from './sessions.ts'
 
 type Search = { channel: string; request: string; query: string; kinds?: FindFilter[]; meta?: SessionMeta[] }
@@ -71,7 +72,7 @@ async function search(c: Search): Promise<void> {
 					let stat = statSync(history.file(m.id), { throwIfNoEntry: false }), mark = findIndex.mark(m.id)
 					let offset = mark?.offset ?? 0
 					if (mark && stat && (stat.size < offset || (stat.size === mark.size && stat.mtimeMs !== mark.mtime))) { offset = 0; rebuilding.add(m.id) }
-					if ((stat?.size ?? 0) > offset) pending.push({ meta: m, offset })
+					if ((stat?.size ?? 0) > offset) { pending.push({ meta: m, offset }); rebuilding.add(m.id) }
 					if (performance.now() - started > 4) { await Bun.sleep(0); started = performance.now(); if (!current()) return }
 				}
 				pending.sort((a, b) => Date.parse(b.meta.createdAt) - Date.parse(a.meta.createdAt))
@@ -84,9 +85,11 @@ async function search(c: Search): Promise<void> {
 			}
 			send(top(), false, pending.length)
 			for (let [i, p] of pending.entries()) {
-				for await (let item of findIndex.records(p.meta.id, p.offset)) {
+				let raw = []
+				for await (let item of findIndex.records(p.meta.id, 0)) raw.push(item.record)
+				for (let record of replay.current(raw)) {
 					if (!current()) return
-					for (let row of await findIndex.rows(p.meta.id, item.record)) if (row.kind === tier) take(row)
+					for (let row of await findIndex.rows(p.meta.id, record)) if (row.kind === tier) take(row)
 				}
 				send(top(), false, pending.length - i - 1)
 				await Bun.sleep(0); if (!current()) return

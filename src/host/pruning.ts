@@ -63,6 +63,7 @@ function estimate(messages: Message[], overhead = 0, model?: string): number {
 }
 
 function project(id: string, all: HistoryRecord[], budget: Budget = {}): HistoryRecord[] {
+	if (all.some((r) => r.type === 'rebase')) all = replay.current(all).map((r) => r.type === 'user' && r.replaces ? { ...r, replaces: undefined } : r)
 	let records = replay.current(all)
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	let active = records.slice(at + 1)
@@ -83,7 +84,7 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}): History
 			if (r.type === 'turn_end' && r.status === 'completed') completed++
 		}
 		let checkpoint = Math.floor(completed / pruning.batchTurns) * pruning.batchTurns
-		let apply = (set: Set<number>) => all.map((r) => r.n !== undefined && set.has(r.n) ? pruning.omit(id, r) : r)
+		let apply = (set: Set<number>) => all.filter((r) => r.type !== 'rebase').map((r) => r.n !== undefined && set.has(r.n) ? pruning.omit(id, r) : r)
 		let candidates = (old: boolean) => active.filter((r) => r.n !== undefined && !omitted.has(r.n) && consumed.has(r.n) && pruning.heavy(r) && (!old || checkpoint - (ages.get(r.n) ?? checkpoint) > pruning.retainTurns))
 		let add = (eligible: HistoryRecord[]) => {
 			let next = new Set(omitted)

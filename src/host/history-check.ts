@@ -1,9 +1,10 @@
 // Validate durable conversation records; corruption fails loudly.
 import { ason } from '../common/ason.ts'
+import { rebase } from '../common/rebase.ts'
 import { sender } from '../common/sender.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 
-const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'change', 'compact', 'reset', 'file_changes', 'round'])
+const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'change', 'compact', 'reset', 'file_changes', 'round', 'rebase'])
 
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
@@ -23,6 +24,7 @@ function check(value: unknown): HistoryRecord {
 		let n = r.naming
 		if (!n || !Number.isSafeInteger(n.turn) || n.turn < 1 || !Number.isSafeInteger(n.version) || n.version < 0 || typeof n.name !== 'string' || typeof n.eligible !== 'boolean') throw new Error('invalid naming context')
 	}
+	if (r.type === 'rebase') { let problem = rebase.invalid(r); if (problem) throw new Error(problem) }
 	return r
 }
 export const historyCheck = { check }

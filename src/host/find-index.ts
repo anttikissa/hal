@@ -5,7 +5,7 @@ import { createReadStream, existsSync, readdirSync, statSync } from 'fs'
 import { ason } from '../common/ason.ts'
 import { attachments } from '../common/attachments.ts'
 import type { FindKind } from '../common/find.ts'
-import type { HistoryRecord } from '../common/replay.ts'
+import { replay, type HistoryRecord } from '../common/replay.ts'
 import { blobs } from './blobs.ts'
 import { history } from './history.ts'
 import { liveFiles } from './live-file.ts'
@@ -123,7 +123,16 @@ async function catchup(sessionId: string): Promise<void> {
 		db.query('INSERT OR REPLACE INTO marks VALUES(?,?,?,?)').run(sessionId, end, stat?.size ?? 0, stat?.mtimeMs ?? 0)
 		batch = []
 	})()
-	for await (let item of findIndex.records(sessionId, offset)) {
+	let items = []
+	for await (let item of findIndex.records(sessionId, offset)) items.push(item)
+	if (items.some((i) => i.record.type === 'rebase' || (i.record.type === 'user' && i.record.replaces))) {
+		items = []
+		for await (let item of findIndex.records(sessionId, 0)) items.push(item)
+		db.query('DELETE FROM docs WHERE sessionId=?').run(sessionId)
+		end = items.at(-1)?.end ?? 0
+		items = replay.current(items.map((i) => i.record)).map((record) => ({ record, end }))
+	}
+	for (let item of items) {
 		batch.push(...await findIndex.rows(sessionId, item.record)); end = item.end
 		if (batch.length >= 16) { flush(); await Bun.sleep(0) }
 	}

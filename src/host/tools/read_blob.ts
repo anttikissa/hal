@@ -1,4 +1,5 @@
 // Recover a whole stored tool result, attachment image, or history block.
+import { replay } from '../../common/replay.ts'
 import { attachments } from '../../common/attachments.ts'
 import { blobs } from '../blobs.ts'
 import { history } from '../history.ts'
@@ -30,7 +31,9 @@ export const tool: Tool<ToolOutput> = {
 			let n = Number(block[2])
 			if (!Number.isSafeInteger(n)) throw new Error('block number is too large')
 			let id = block[1] ?? ctx.sessionId
-			let record = history.readSync(id).find((r) => r.n === n)
+			let raw = history.readSync(id)
+			let record = replay.current(raw).find((r) => r.n === n)
+			if (!record && raw.some((r) => r.n === n)) return `Block ${input.id} was dropped by rebase.`
 			if (!record) throw new Error(`block ${input.id} not found`)
 			let value = record.type === 'assistant' ? record.block : record.type === 'user' && record.blocks.length === 1 ? record.blocks[0] : record
 			if (value?.type === 'tool_result') {
