@@ -1,10 +1,11 @@
 {
 	title: 'Rate-limited spawns fail; commands keep subagents closing',
-	spec: 'spawn refuses, spending no slot, a model rate limited on every account that could run it (auth.limitedUntil): the error names the model, the UTC time it frees up and points to inspect models. inspect models marks each model limited on every account with "(rate limited until <UTC time>)". A human slash command (/model, /pause) to a subagent is not a prompt: only a human prompt or amend promotes it to subagent-leave-open. Invariant restored: a subagent tab closes after its clean finish unless a human sent it a prompt.',
+	spec: 'spawn refuses, spending no slot, a model rate limited on every account that could run it (auth.limitedUntil): the error names the model, the UTC time it frees up and that every account of its provider is out. An account is out while it has a 429 for that model or a spent usage window shared by all its models (usage.ts), so one spent subscription rules out every model on it. inspect models marks each model limited on every account with "(rate limited until <UTC time>)". A human slash command (/model, /pause) to a subagent is not a prompt: only a human prompt or amend promotes it to subagent-leave-open. Invariant restored: a subagent tab closes after its clean finish unless a human sent it a prompt.',
 	status: 'done',
 	notes: [
 		'Before, prompts.submit promoted before parsing, so /model on a spawned tab silently disabled its auto-close. The regression test must open the child first: a submit to an unopened tab is dropped and the test passed vacuously.',
-		'limitedUntil checks the limit key per account for anthropic/openai logins and the account-less key for other providers; with no login it reports free, so the turn reports the login problem.'
+		'limitedUntil checks the limit key per account for anthropic/openai logins and the account-less key for other providers; with no login it reports free, so the turn reports the login problem.',
+		'Invariant restored 4 Oct: a spent shared usage window counts as a limit for every model. gpt-6.1-sol had a 429 while gpt-6-sol passed the check, though all four OpenAI subscriptions were at 100% of their 5h window.'
 	],
 	needs: ['t0', 'tf', 'jm'],
 	foldInto: ['t0']
