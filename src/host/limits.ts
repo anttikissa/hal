@@ -13,6 +13,13 @@ function key(modelId: string, account?: string): string {
 	return account ? `${modelId} ${account}` : modelId
 }
 
+// The latest limit on the model for the account: its own (a model the
+// plan lacks, or whose credits ran out) or the account's (a 429: the
+// subscription's quota is shared by all its models).
+function on(modelId: string, account: string): number {
+	return Math.max(limits.until(key(modelId, account)), limits.until(key(modelId.split('/')[0]!, account)))
+}
+
 // The live file for the current home; reopened if the home changes.
 function store(): Record<string, string> {
 	let path = `${paths.stateDir()}/limits.ason`
@@ -57,6 +64,7 @@ export const limits = {
 	key,
 	store,
 	until,
+	on,
 	set,
 	forget,
 	close,

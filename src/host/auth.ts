@@ -181,7 +181,7 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 			if (subscription(account)) skipped.push(`${account.name}: ${why}`)
 			continue
 		}
-		let until = model ? limits.until(limits.key(`${kind}/${model}`, account.name)) : 0
+		let until = model ? limits.on(`${kind}/${model}`, account.name) : 0
 		if (until) {
 			limitedUntil = Math.min(limitedUntil, until)
 			if (subscription(account)) skipped.push(`${account.name}: rate limited until ${new Date(until).toTimeString().slice(0, 5)}`)
@@ -215,7 +215,7 @@ async function pick(kind: Kind, model?: string, who: For = {}): Promise<Credenti
 // limited; 0 if one is free now. Tells spawn and inspect which models
 // would only wait. A provider without accounts has one key per model.
 function limitedUntil(modelId: string): number {
-	let kind = modelId.split('/')[0]
+	let kind = modelId.split('/')[0]!
 	let names: string[] = []
 	if (kind === 'anthropic' || kind === 'openai') {
 		try { names = auth.all(kind).list.map((a) => a.name) } catch {} // no login: the turn reports that
@@ -227,7 +227,7 @@ function limitedUntil(modelId: string): number {
 		return t.used >= 100 && Number.isFinite(t.resets) ? t.resets : 0
 	}
 	let until = names.length
-		? names.map((n) => Math.max(limits.until(limits.key(modelId, n)), spent(n)))
+		? names.map((n) => Math.max(limits.on(modelId, n), spent(n)))
 		: [limits.until(limits.key(modelId))]
 	return until.includes(0) ? 0 : Math.min(...until)
 }

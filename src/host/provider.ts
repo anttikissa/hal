@@ -238,7 +238,7 @@ function failed(p: Provider, modelId: string, account: string | undefined, e: Er
 	}
 	if (e.status === 429) {
 		if (account) {
-			limits.set(limits.key(modelId, account), reset ?? now + provider.accountLimitMs)
+			limits.set(limits.key(modelId.split('/')[0]!, account), reset ?? now + provider.accountLimitMs)
 			e.retryAt = now
 		} else if (reset !== undefined) {
 			limits.set(limits.key(modelId), reset)
@@ -284,7 +284,7 @@ async function* stream(
 	try {
 		let http = await p.request({ ...input, model: id.model })
 		if (signal?.aborted) throw new Cancelled()
-		let limited = limits.until(limits.key(modelId, http.account))
+		let limited = http.account ? limits.on(modelId, http.account) : limits.until(limits.key(modelId))
 		if (limited) {
 			yield { type: 'error', message: `${modelId} is rate limited`, failure: 'limited', retryAt: limited }
 			return

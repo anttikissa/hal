@@ -263,12 +263,12 @@ test('the reset time can come from a date, a unix time header or the body', asyn
 	}
 })
 
-test('an account that hits 429 is limited, and the host may rotate at once', async () => {
+test('a 429 limits the whole account, every model on it, and the host may rotate at once', async () => {
 	provider.register('fake', { ...echo, request: (r) => ({ ...(echo.request(r) as any), account: 'a@x' }) })
 	fakeFetch(() => new Response('{}', { status: 429, headers: { 'retry-after': '3600' } }))
 	let [e] = (await all(provider.stream('fake/m1', req))) as any[]
 	expect(e).toMatchObject({ failure: 'limited', retryAt: now })
-	expect(limits.until(limits.key('fake/m1', 'a@x'))).toBe(now + 3600_000)
+	expect(limits.on('fake/m2', 'a@x')).toBe(now + 3600_000)
 })
 
 test("every response's usage windows are kept for its account, a 429's too", async () => {
