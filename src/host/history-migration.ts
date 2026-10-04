@@ -1,6 +1,6 @@
 // Retire ask calls before the host accepts clients (task cs). Histories
 // are rewritten atomically; no legacy reader or dead tool remains.
-import { existsSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, linkSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
 import type { HistoryRecord } from '../common/replay.ts'
@@ -34,6 +34,8 @@ function strip(records: HistoryRecord[]): HistoryRecord[] {
 
 function migrate(path: string): boolean {
 	let text = readFileSync(path, 'utf8'), records: HistoryRecord[] = []
+	// Most histories never called ask; skip parsing them (sessions/ can hold gigabytes).
+	if (!text.includes("'ask'")) return false
 	let offset = 0, tail = ''
 	for (let raw of text.match(/[^\n]*\n|[^\n]+$/g) ?? []) {
 		if (!raw.trim()) { offset += Buffer.byteLength(raw); continue }
@@ -64,6 +66,8 @@ function migrate(path: string): boolean {
 	let temp = `${path}.migrate`
 	try {
 		writeFileSync(temp, stripped.map((r) => lines.encode(r)).join('') + tail, { mode: statSync(path).mode & 0o777 })
+		// The original stays beside it, so a stripping bug never loses history.
+		if (!existsSync(`${path}.before-cs`)) linkSync(path, `${path}.before-cs`)
 		renameSync(temp, path)
 	} finally { rmSync(temp, { force: true }) }
 	return true
