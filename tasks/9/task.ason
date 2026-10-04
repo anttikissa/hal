@@ -2,7 +2,7 @@
 	title: 'Local overrides',
 	spec: `An optional, gitignored local.ts in the repo root imports module objects and replaces their functions; startup loads it after modules are imported and before initialization. A missing local.ts is normal. ./test typechecks it and smoke-imports it in a separate process, but ordinary tests run without it. Prove it with one real config function, such as the default model.
 
-Private local configuration never enters tracked files, task descriptions, task notes or commit messages. This includes deployment scripts and instructions, personal hostnames and IP addresses, SSH aliases, usernames, paths, ports and process topology. Public resolvability does not waive privacy. The local scripts/deploy path is gitignored; it has no tracked content or personal task. Tracked hostname examples use reserved example domains. AGENTS.md records this boundary, including that permission to operate a host is not permission to publish its configuration.`,
+Private local configuration never enters tracked files, task descriptions, task notes or commit messages. This includes host-specific scripts and instructions, personal hostnames and IP addresses, SSH aliases, usernames, paths, ports and process topology. Public resolvability does not waive privacy. Tracked hostname examples use reserved example domains. AGENTS.md records this boundary, including that permission to operate a host is not permission to publish its configuration.`,
 	status: 'done',
 	notes: [
 		'tsc typechecks local.ts only because tsconfig.json has no `include` (it picks up every .ts in the root). Adding `include: ["src"]` would silently stop checking it; ./test would then only smoke-import it.',
