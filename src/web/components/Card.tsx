@@ -142,10 +142,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
 		return item.type === 'tool' ? toolDetails.headline(item.name, item.input, props.row.result?.output).text : lines()[0]
 	}
-	// Folded cards name their kind with an icon: thinking, or the tool.
+	// Folded cards name their kind with an icon: thinking, another
+	// session's message (the send tool's bubble), or the tool.
 	let kindIcon = (): IconName | undefined => {
 		let item = props.row.item
 		if (item.type === 'thinking') return 'thinking'
+		if (item.type === 'prompt' && item.from !== undefined) return 'message'
 		if (item.type !== 'tool') return undefined
 		if (item.name === 'bash' && typeof item.input.command === 'string' && runsPython.test(item.input.command)) return 'python'
 		return toolIcons[item.name]
