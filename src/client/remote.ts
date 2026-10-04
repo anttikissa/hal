@@ -2,14 +2,14 @@
 // <host>` logs in to the host's web endpoint like a browser (a one-time
 // code swapped for a session token, task 8a) and follows it over the
 // same WebSocket transport (common/ws-link.ts). The token is a secret:
-// it goes only into the saved file (state/remote.ason, 0600, kept by
+// it goes only into the saved file (secrets/remote.ason, 0600, kept by
 // main.ts) and the Cookie header, never onto the screen or into a log.
 
 import type { LinkState } from '../common/connection.ts'
 import type { Event } from '../common/protocol.ts'
 import { wsLink, type Socket } from '../common/ws-link.ts'
 
-// What main.ts keeps in state/remote.ason: the last host and a token
+// What main.ts keeps in secrets/remote.ason: the last host and a token
 // per host (origin).
 export type Saved = { last: string; tokens: Record<string, string> }
 

@@ -2,7 +2,7 @@
 // and JWTs, a temp HAL_HOME; never the real credentials file.
 
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import { auth } from './auth.ts'
@@ -27,6 +27,7 @@ let issued = access()
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-chatgpt-`)
+	mkdirSync(`${home}/secrets`)
 	process.env.HAL_HOME = home
 	process.env.HOME = `${home}/user`
 	delete process.env.OPENAI_API_KEY
@@ -69,7 +70,7 @@ afterEach(() => {
 	rmSync(home, { recursive: true, force: true })
 })
 
-const file = () => `${home}/auth.ason`
+const file = () => `${home}/secrets/auth.ason`
 const disk = () => ason.parse(readFileSync(file(), 'utf8')) as any
 function context() {
 	let said: string[] = []

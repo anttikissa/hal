@@ -3,7 +3,7 @@
 // for. A fake Chat Completions server and a temp HAL_HOME only.
 
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import type { Event } from '../common/protocol.ts'
@@ -27,6 +27,7 @@ let seen: Headers[] = []
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-opencode-`)
+	mkdirSync(`${home}/secrets`)
 	process.env.HAL_HOME = home
 	delete process.env.OPENCODE_API_KEY
 	seen = []
@@ -62,7 +63,7 @@ afterEach(() => {
 })
 
 const ctx = { sessionId: 's', cwd: '/tmp', model: 'opencode-go/m', setCwd() {}, setModel() {}, say() {} }
-const file = () => `${home}/auth.ason`
+const file = () => `${home}/secrets/auth.ason`
 
 async function send(sessionId?: string): Promise<{ events: string[]; message?: string }> {
 	let out: string[] = []

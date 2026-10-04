@@ -57,6 +57,11 @@ point to it.
 - Small ASON state files (config, metadata, credentials) go through
   `liveFiles.liveFile` in `src/host/live-file.ts`; never hand-roll
   reading, parsing or writing them.
+- Credentials, tokens and private keys live only in `secrets/` in the
+  home (task de): owner-only (0700), every file 0600, opened through
+  `secrets.file` in `src/host/secrets.ts`. Logs, diagnostics, caches
+  and transcripts never hold them; state/ keeps only files without
+  credentials.
 - Corrupt data is an error, not a case to handle: a malformed history
   record, metadata or ASON file throws with its path and stops that
   session (or startup), and nothing is skipped, reset or patched

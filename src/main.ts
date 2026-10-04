@@ -35,6 +35,7 @@ import { version } from './host/version.ts'
 import { openai } from './host/openai.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
+import { secrets } from './host/secrets.ts'
 import { plugins } from './host/plugins.ts'
 import { server } from './host/server.ts'
 import { slash } from './host/slash.ts'
@@ -91,6 +92,7 @@ function keepTab(tab: Tab): void {
 // What any process that may host needs, terminal or not.
 function initHost(): void {
 	paths.init()
+	secrets.migrate(['auth.ason', 'state/push-vapid.ason', 'state/push-subscriptions.ason'])
 	host.init()
 	anthropic.init()
 	openai.init()
@@ -274,10 +276,11 @@ async function auth(): Promise<number> {
 
 // `./run -r [host]` (task tr): the terminal follows a remote host over
 // its web endpoint, logging in with a one-time code the first time; the
-// host and its token are kept in state/remote.ason (0600).
+// host and its token are kept in secrets/remote.ason (0600).
 async function remote(typed: string | undefined): Promise<void> {
 	paths.init()
-	let saved = liveFiles.liveFile<Saved>(join(paths.stateDir(), 'remote.ason'), { last: '', tokens: {} }, { watch: false, mode: 0o600 })
+	secrets.migrate(['state/remote.ason'])
+	let saved = secrets.file<Saved>(join(paths.secretsDir(), 'remote.ason'), { last: '', tokens: {} }, { watch: false })
 	let origin: string
 	let token: string
 	try {

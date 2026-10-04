@@ -23,7 +23,13 @@ Incidental: may hold whatever a user pasted or a tool printed, so it is not move
 Private but not secret (no change): config.ason (names the web URL), USER.md.
 
 Migration: at startup the host moves auth.ason, push-vapid.ason and push-subscriptions.ason, and the terminal client moves remote.ason, from their old places into secrets/ with rename. It never overwrites: when both old and new exist, it keeps the new one, leaves the old in place and writes one diag line naming it. Error messages and docs that name these files show the new paths.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'One helper: secrets.file(path, defaults, options) in src/host/secrets.ts refuses a path not directly in secrets/, runs paths.init() (secrets/ and state/ chmod 0700; diag needs state/) and forces liveFile mode 0600. auth.ts, login.ts, api-keys.ts, push.ts and main.ts (remote) open credentials only through it.',
+		'Migration is secrets.migrate(paths relative to the home): main.initHost moves the auth file and the two push files right after paths.init(); main.remote moves state/remote.ason. existsSync then renameSync, then chmod 0600; a conflict leaves the old file and writes one diag line naming both paths, never contents.',
+		'Dropping the root auth file from .gitignore means a leftover old copy (the both-exist case, or a home not yet restarted on this code) shows as untracked in git status. Never git add -A in a home; delete the old copy once checked.',
+		'Tests that wrote the auth file into the bare temp home now mkdir secrets/ first; push tests used to rely on push.ts creating state/, which secrets.dir() now does via paths.init().'
+	],
 	needs: ['p', 'b8', 'tr', 'm1'],
 	foldInto: ['p', 'b8']
 }

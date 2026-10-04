@@ -28,6 +28,7 @@ let profileEmail: string | undefined
 
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-login-`)
+	mkdirSync(`${home}/secrets`)
 	process.env.HAL_HOME = home
 	process.env.HOME = `${home}/user`
 	delete process.env.ANTHROPIC_API_KEY
@@ -67,7 +68,7 @@ afterEach(() => {
 	rmSync(home, { recursive: true, force: true })
 })
 
-const file = () => `${home}/auth.ason`
+const file = () => `${home}/secrets/auth.ason`
 const disk = () => ason.parse(readFileSync(file(), 'utf8')) as any
 const ctx = { sessionId: 's', cwd: '/tmp', model: 'anthropic/m', setCwd() {}, setModel() {}, say() {} }
 
