@@ -6,7 +6,7 @@
 // Tapping a row opens its whole text, images and blobs. The footer
 // always shows tokens now → after and where the cache rebuilds; only
 // Apply sends (rebase.ts decides everything).
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js'
 import type { RebaseRow } from '../../common/rebase-rows.ts'
 import { rebaseView, type Action, type Part, type RebaseState } from '../rebase.ts'
 import { view } from '../view.ts'
@@ -101,8 +101,9 @@ export function Rebase() {
 		return () => { rebaseView.changed = () => {} }
 	})
 	createEffect(() => !!st(), (on) => {
-		if (on && !box.open) box.showModal()
-		else if (!on && box.open) box.close()
+		// Moving focus runs focus handlers here; they read state untracked.
+		if (on && !box.open) untrack(() => box.showModal())
+		else if (!on && box.open) untrack(() => box.close())
 	})
 	let gone = createMemo(() => { let s = st(); return s ? rebaseView.dropped(s) : new Set<number>() })
 	let max = createMemo(() => Math.max(0, ...(st()?.snapshot.rows.map((r) => r.tokens) ?? [])))

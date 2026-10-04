@@ -736,7 +736,9 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 		await b.waitFor(`location.pathname === '${second}'`)
 		// Closing the shown tab lands on its neighbour, replacing the entry.
 		let entries = await b.evaluate(`history.length`)
-		await b.evaluate(`document.querySelector('.Tabs .menu').click()`)
+		// A real click: focus moves, running focus handlers as the sheet opens.
+		let menu = JSON.parse(await b.evaluate(`JSON.stringify(document.querySelector('.Tabs .menu').getBoundingClientRect())`))
+		for (let type of ['mousePressed', 'mouseReleased']) await b.call('Input.dispatchMouseEvent', { type, x: menu.x + menu.width / 2, y: menu.y + menu.height / 2, button: 'left', clickCount: 1 })
 		await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
 		expect(await b.evaluate(`document.activeElement === document.querySelector('.Tabs .sheet ul') && getComputedStyle(document.activeElement).outlineStyle === 'none'`)).toBe(true)
 		expect(await b.evaluate(`document.querySelector('.Tabs .sheet [aria-current]').getAttribute('href')`)).toBe(second)
@@ -754,6 +756,13 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 		await b.evaluate(`document.querySelector('.Tabs .sheet .new').click()`)
 		await b.waitFor(`!document.querySelector('.Tabs .sheet').open && location.pathname !== '${first}'`)
 		expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
+		// The menu's Notifications sheet opens and closes.
+		await b.evaluate(`document.querySelector('.Tabs .menu').click()`)
+		await b.waitFor(`document.querySelector('.Tabs .sheet').open`)
+		await b.evaluate(`[...document.querySelectorAll('.Tabs .sheet button')].find(b => b.textContent === 'Notifications').click()`)
+		await b.waitFor(`document.querySelector('.Notifications').open && !document.querySelector('.Tabs .sheet').open`)
+		await b.evaluate(`[...document.querySelectorAll('.Notifications button')].find(b => b.textContent === 'Close').click()`)
+		await b.waitFor(`!document.querySelector('.Notifications').open`)
 	} finally {
 		host.cwd = origCwd
 		await b.close()

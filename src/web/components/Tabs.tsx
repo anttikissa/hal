@@ -4,7 +4,7 @@
 // Native horizontal momentum scrolling; edge buttons provide secondary paging.
 // Tab links retain native Cmd- and middle-click behavior.
 
-import { createEffect, createMemo, createSignal, For, onSettled } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onSettled, untrack } from 'solid-js'
 import type { Tab } from '../../common/protocol.ts'
 import type { Edge } from '../../common/tab-pages.ts'
 import { tabMark, type Mark } from '../../common/tab-mark.ts'
@@ -78,14 +78,16 @@ export function Tabs(props: { tabs: Tab[]; shown: string | undefined; pushReady:
 	let [open, setOpen] = createSignal(false)
 	let [alerts, setAlerts] = createSignal(false)
 	let sheet!: HTMLDialogElement
-	createEffect(open, (o) => {
+	// showModal()/close() move focus, running focus handlers (Composer's
+	// dismissMenu reads state) inside this effect: untracked, as of the event.
+	createEffect(open, (o) => untrack(() => {
 		if (o && !sheet.open) {
 			sheet.showModal()
 			// The list opens on the shown tab, however far down it is.
 			sheet.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest' })
 		}
 		if (!o && sheet.open) sheet.close()
-	})
+	}))
 	let pages!: HTMLElement
 	let track!: HTMLElement
 	let probe!: HTMLElement
