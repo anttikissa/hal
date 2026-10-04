@@ -210,9 +210,9 @@ async function open(id: string): Promise<SessionMeta> {
 async function messages(id: string, budget: { overhead?: number; window?: number; model?: string } = {}) {
 	// A thinking block as the provider sent it: its signature back from its blob.
 	let signed = ({ signatureBlob, ...b }: ThinkingBlock): ThinkingBlock => ({ ...b, signature: blobs.text(id, signatureBlob!) })
-	let records = history.readSync(id).map((r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b) }
+	let records = pruning.project(id, history.readSync(id), budget, (r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b) }
 		: r.type === 'assistant' && r.block.type === 'thinking' && r.block.signatureBlob !== undefined ? { ...r, block: signed(r.block) } : r)
-	return replay.toMessages(pruning.project(id, records, budget))
+	return replay.toMessages(records)
 }
 
 // One provider round of a turn. Passes stream events through,

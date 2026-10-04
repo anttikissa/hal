@@ -62,9 +62,11 @@ function estimate(messages: Message[], overhead = 0, model?: string): number {
 	return tokenCalibration.estimateTokens(tokenEstimates.characters(messages, overhead), model) + tokenEstimates.estimate(images)
 }
 
-function project(id: string, all: HistoryRecord[], budget: Budget = {}): HistoryRecord[] {
-	if (all.some((r) => r.type === 'rebase')) all = replay.current(all).map((r) => r.type === 'user' && r.replaces ? { ...r, replaces: undefined } : r)
+function project(id: string, all: HistoryRecord[], budget: Budget = {}, materialize: (r: HistoryRecord) => HistoryRecord = (r) => r): HistoryRecord[] {
+	let original = new Map(all.map((r) => [r.n, r]))
 	let records = replay.current(all)
+	let edited = new Set(records.filter((r) => JSON.stringify(r) !== JSON.stringify(original.get(r.n))).map((r) => r.n))
+	all = records = records.map(materialize)
 	let at = records.findLastIndex((r) => r.type === 'compact' || r.type === 'reset')
 	let active = records.slice(at + 1)
 	let boundary = records[at]?.n ?? 0
@@ -75,8 +77,8 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}): History
 			state.checkpoint = 0
 			state.pressure = -1
 		}
-		let consumed = new Set(state.consumed)
-		let omitted = new Set(state.omitted)
+		let consumed = new Set(state.consumed.filter((n) => !edited.has(n)))
+		let omitted = new Set(state.omitted.filter((n) => !edited.has(n)))
 		let completed = 0
 		let ages = new Map<number, number>()
 		for (let r of active) {
@@ -84,7 +86,7 @@ function project(id: string, all: HistoryRecord[], budget: Budget = {}): History
 			if (r.type === 'turn_end' && r.status === 'completed') completed++
 		}
 		let checkpoint = Math.floor(completed / pruning.batchTurns) * pruning.batchTurns
-		let apply = (set: Set<number>) => all.filter((r) => r.type !== 'rebase').map((r) => r.n !== undefined && set.has(r.n) ? pruning.omit(id, r) : r)
+		let apply = (set: Set<number>) => all.map((r) => r.n !== undefined && set.has(r.n) ? pruning.omit(id, r) : r)
 		let candidates = (old: boolean) => active.filter((r) => r.n !== undefined && !omitted.has(r.n) && consumed.has(r.n) && pruning.heavy(r) && (!old || checkpoint - (ages.get(r.n) ?? checkpoint) > pruning.retainTurns))
 		let add = (eligible: HistoryRecord[]) => {
 			let next = new Set(omitted)
