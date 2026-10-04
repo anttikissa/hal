@@ -7,7 +7,15 @@ import { effort } from '../effort.ts'
 
 export const command: SlashCommand = {
 	help: () => '/model <provider/model or family>[:level]: switch this session from its next request; :default clears effort. /model alone opens the picker (Ctrl-M too).',
-	complete: (args) => [...new Set([...models.known(), 'gpt', 'sol', 'gpt-6.1', 'gpt-6', 'claude', 'opus', 'sonnet', 'fable', 'haiku', 'astra', 'luna', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'])].filter((id) => id.startsWith(args)),
+	// Prefix matches first (aliases, full ids), then ids where a word of
+	// the name starts with it: "fab" finds anthropic/claude-fable-5-1.
+	complete: (args) => {
+		let all = [...new Set([...models.known(), 'gpt', 'sol', 'gpt-6.1', 'gpt-6', 'claude', 'opus', 'sonnet', 'fable', 'haiku', 'astra', 'luna', 'kimi', 'qwen', 'deepseek', 'glm', 'minimax'])]
+		let word = (id: string) => !id.startsWith(args) && id.split(/[/-]/).some((_, i, parts) => parts.slice(i).join('-').startsWith(args))
+		let first = all.filter((id) => id.startsWith(args))
+		let shown = new Set(first.map((id) => models.resolve(id).id ?? id))
+		return [...first, ...all.filter((id) => word(id) && !shown.has(id))]
+	},
 	describeCompletion: (args) => { let choice = models.resolve(args); return choice.id ?? choice.login ?? args },
 	run(args, _answers, ctx) {
 		if (!args) return { say: `model: ${models.qualified(ctx.model, ctx.effort)}`, open: 'models' }

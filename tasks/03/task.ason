@@ -5,7 +5,8 @@
 	notes: [
 		'Picker now renders cached models immediately; provider model lists warm asynchronously for the next opening. Aliases prefer credentialed subscriptions and fall back to API keys; grouping is shared by terminal and web.',
 		'Bug fix (/model sol had no completion and did not resolve): invariant: every alias /model accepts also appears in its completion with its resolved target.',
-		'4 Oct: fable → claude-fable-5-1 (the newest Fable); 5 and 5.1 both need usage credits.'
+		'4 Oct: fable → claude-fable-5-1 (the newest Fable); 5 and 5.1 both need usage credits.',
+		'/model completion matches a word inside an id after prefix matches ("fab" finds anthropic/claude-fable-5-1), skipping ids an alias already shows. Invariant: every known model is findable by name, alias or not.'
 	],
 	needs: [],
 	foldInto: ['0x']
