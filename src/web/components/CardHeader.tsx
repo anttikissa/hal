@@ -4,8 +4,10 @@
 // an independently centred glyph; every slot starts on the first line.
 import { Show } from 'solid-js'
 import type { JSX } from '@solidjs/web'
+import { Icon } from './Icon.tsx'
+import type { IconName } from '../icons.ts'
 
-export function CardHeader(props: { time?: string; label?: JSX.Element; reference?: JSX.Element; name?: string; open?: boolean; children?: JSX.Element }) {
+export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.Element; reference?: JSX.Element; name?: string; open?: boolean; children?: JSX.Element }) {
 	return (
 		<header class={['CardHeader', props.name === undefined ? 'who' : 'head']}>
 			<Show when={props.time || props.name}>
@@ -14,7 +16,7 @@ export function CardHeader(props: { time?: string; label?: JSX.Element; referenc
 				</Show>
 				<Show when={props.label}>{' '}</Show>
 			</Show>
-			<span class="title"><span class="label">{props.label}</span>{props.children}</span>
+			<span class="title"><Show when={props.icon}>{(name) => <Icon name={name()} />}</Show><span class="label">{props.label}</span>{props.children}</span>
 			{props.reference}
 		</header>
 	)

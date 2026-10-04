@@ -8,6 +8,7 @@ import { transcript } from '../../common/transcript.ts'
 import { router } from '../router.ts'
 import { tabs } from '../tabs.ts'
 import { push } from '../push.ts'
+import { Icon } from './Icon.tsx'
 
 const said = {
 	unsupported: 'Not available here. On iPhone, Hal must be opened from its Home Screen icon.',
@@ -30,11 +31,11 @@ export function Notifications(props: { open: boolean; onClose: () => void }) {
 			<p role="status">{said[push.status()]}</p>
 			<Show when={push.problem()}>{(p) => <p>Reason: {p()}.</p>}</Show>
 			<Show when={push.status() === 'off'}>
-				<button type="button" class="new" onClick={() => void push.enable().catch(fail)}>Turn on</button>
+				<button type="button" class="new" onClick={() => void push.enable().catch(fail)}><Icon name="bell" />Turn on</button>
 			</Show>
 			<Show when={push.status() === 'on'}>
-				<button type="button" onClick={push.test}>Send test notification</button>
-				<button type="button" onClick={() => void push.disable().catch(fail)}>Turn off</button>
+				<button type="button" onClick={push.test}><Icon name="send" />Send test notification</button>
+				<button type="button" onClick={() => void push.disable().catch(fail)}><Icon name="close" />Turn off</button>
 			</Show>
 			<Show when={push.devices().result}>{(r) => <p role="status">{r()}</p>}</Show>
 			<h3>History</h3>
@@ -71,12 +72,12 @@ export function Notifications(props: { open: boolean; onClose: () => void }) {
 								{d.endpoint === push.mine() ? ' (this device)' : ''}
 								{d.added ? ` · added ${new Date(d.added!).toLocaleDateString()}` : ''}
 							</span>
-							<button type="button" class="close" aria-label={`Remove ${d.device ?? 'device'}`} onClick={() => push.remove(d.endpoint)}>Remove</button>
+							<button type="button" class="close" aria-label={`Remove ${d.device ?? 'device'}`} onClick={() => push.remove(d.endpoint)}><Icon name="close" />Remove</button>
 						</li>
 					)}
 				</For>
 			</ul>
-			<button type="button" onClick={props.onClose}>Close</button>
+			<button type="button" onClick={props.onClose}><Icon name="close" />Close</button>
 		</dialog>
 	)
 }

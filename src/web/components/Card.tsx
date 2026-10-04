@@ -22,6 +22,8 @@ import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
 import { external, Markdown } from './Markdown.tsx'
 import { CardHeader } from './CardHeader.tsx'
+import { Icon } from './Icon.tsx'
+import type { IconName } from '../icons.ts'
 import { promptChanges } from '../../common/prompt-changes.ts'
 import { app } from '../app.ts'
 import { editPrompt } from '../edit-prompt.ts'
@@ -61,6 +63,12 @@ function enter(el: HTMLElement): void {
 // button in the header sends /kill #<job>.
 // `edit`: a prompt the user may edit and resend; its header offers Edit
 // (task 26q, edit-prompt.ts), which loads it into the box.
+// A bash command that starts Python in command position (line start or
+// after ; & | ( $( ), optionally behind env assignments or a wrapper.
+const runsPython = /(?:^|[;&|(]|\$\()\s*(?:\w+=\S*\s+|(?:env|exec|time|nice|uv run|timeout \S+)\s+)*(?:\S*\/)?python(?:3(?:\.\d+)?)?(?=[\s;&|)]|$)/m
+// Tool cards' header icons, by tool name.
+const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', read_url: 'web', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob' }
+
 export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean }) {
 	let id = () => `${props.session}#${props.row.key}`
 	let root: HTMLElement | undefined
@@ -132,6 +140,14 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (item.type === 'output' && item.change) return item.text.split('\n')[0]
 		return item.type === 'tool' ? toolDetails.headline(item.name, item.input, props.row.result?.output).text : lines()[0]
 	}
+	// Folded cards name their kind with an icon: thinking, or the tool.
+	let kindIcon = (): IconName | undefined => {
+		let item = props.row.item
+		if (item.type === 'thinking') return 'thinking'
+		if (item.type !== 'tool') return undefined
+		if (item.name === 'bash' && typeof item.input.command === 'string' && runsPython.test(item.input.command)) return 'python'
+		return toolIcons[item.name]
+	}
 	let headerParts = createMemo(() => view.urlParts(head() ?? ''))
 	let body = () => {
 		let item = props.row.item
@@ -194,7 +210,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let heading = () => (
 		<CardHeader time={time()} label={who()} reference={link()}>
-			<Show when={props.edit}><button type="button" class="edit" title="Edit this prompt and send it again from here" onClick={edit}>edit</button></Show>
+			<Show when={props.edit}><button type="button" class="edit" aria-label="Edit prompt" title="Edit this prompt and send it again from here" onClick={edit}><Icon name="edit" /></button></Show>
 		</CardHeader>
 	)
 	// Content branches share the shell, header and normal body inset.
@@ -206,7 +222,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 					{(img) => <a href={view.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={view.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
 				</Show>
 				<Show when={props.cursor && !md()}>{cursor()}</Show>
-				<Show when={undo()}><button type="button" class="undo" title="Restore the history before this rewrite (/rebase undo)" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: '/rebase undo' })}>Undo</button></Show>
+				<Show when={undo()}><button type="button" class="undo" title="Restore the history before this rewrite (/rebase undo)" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: '/rebase undo' })}><Icon name="undo" />Undo</button></Show>
 			</div>
 		</>
 	)
@@ -249,11 +265,11 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange ? change() : (
 						<Show when={folds()} fallback={plain(s)}>
-							<CardHeader time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} reference={link()}
+							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} reference={link()}
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={failed()}><span class="error">✗</span></Show>
-								<Show when={props.job}>{(n) => <button type="button" class="kill" title={`Stop background job #${n()} (/kill #${n()})`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #${n()}` })}>kill</button>}</Show>
+								<Show when={props.job}>{(n) => <button type="button" class="kill" title={`Stop background job #${n()} (/kill #${n()})`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #${n()}` })}><Icon name="stop" />kill</button>}</Show>
 							</CardHeader>
 							<div class="body" inert={!expanded()}>
 								<div class="contents">
@@ -261,7 +277,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 										<Show when={props.row.item.type === 'prompt'}><div class="sender">{who()}</div></Show>
 										{md() ? markdown() : body()}
 										<Show when={props.cursor && !md()}>{cursor()}</Show>
-										<Show when={long()}><button type="button" class="more" onClick={more}>{full() ? 'show less' : 'show all'}</button></Show>
+										<Show when={long()}><button type="button" class="more" onClick={more}><Icon name={full() ? 'less' : 'more'} />{full() ? 'show less' : 'show all'}</button></Show>
 									</div>
 								</div>
 							</div>

@@ -24,6 +24,7 @@ import { Rebase } from './Rebase.tsx'
 import { Tabs } from './Tabs.tsx'
 import { StatusRow } from './StatusRow.tsx'
 import { Transcript } from './Transcript.tsx'
+import { Icon } from './Icon.tsx'
 
 const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, menu: app.state.menu, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration, notices: notices.state.entries, updateAvailable: app.state.updateAvailable })
 type Snap = ReturnType<typeof snap>
@@ -162,7 +163,7 @@ export function Chat() {
 		<div class={['Chat', 'project', { offline: !connected() }]}>
 			<Tabs tabs={tabs()} shown={shown()} pushReady={pushReady()} />
 			<Show when={updateAvailable()}>
-				<div class="source-update"><button type="button" aria-label="Reload to update Hal" onClick={() => location.reload()}>reload</button></div>
+				<div class="source-update"><button type="button" aria-label="Reload to update Hal" onClick={() => location.reload()}><Icon name="reload" />reload</button></div>
 			</Show>
 			<Transcript view={view()} pending={pending()} target={linked() || undefined} tabs={tabs()} />
 			<Notices entries={stack()} />

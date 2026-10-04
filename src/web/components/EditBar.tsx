@@ -8,6 +8,7 @@ import { flush, Show } from 'solid-js'
 import { amend } from '../../common/amend.ts'
 import { editPrompt } from '../edit-prompt.ts'
 import type { ViewState } from '../view.ts'
+import { Icon } from './Icon.tsx'
 
 export function EditBar(props: { view: ViewState }) {
 	let editing = () => (props.view.editing?.aside ? props.view.editing : undefined)
@@ -21,7 +22,7 @@ export function EditBar(props: { view: ViewState }) {
 			{(e) => (
 				<div class="EditBar notice" role="status">
 					<span class="text">{amend.bar(e())}<span class="keys"> · Escape cancels</span></span>
-					<button type="button" onClick={cancel}>Cancel</button>
+					<button type="button" onClick={cancel}><Icon name="close" />Cancel</button>
 				</div>
 			)}
 		</Show>

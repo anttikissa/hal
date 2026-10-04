@@ -24,6 +24,8 @@ import type { Menu } from '../completions.ts'
 import { editor } from '../editor.ts'
 import { keys } from '../keys.ts'
 import { view, type ViewState } from '../view.ts'
+import { Icon } from './Icon.tsx'
+import type { IconName } from '../icons.ts'
 
 export function Composer(props: { view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; dropping: boolean }) {
 	let input!: HTMLTextAreaElement
@@ -105,6 +107,9 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	})
 	// Steering keeps the phone keyboard up for the next steer; Send and
 	// Queue hide it so the reply is visible. A mouse keeps the focus.
+	// The main button's icon, name and tooltip: run a command, steer a
+	// running turn or send.
+	let action = (): [IconName, string, string] => view.commandDraft(props.text) ? ['run', 'Run', 'Run command'] : busy() ? ['steer', 'Steer', 'Steer: send now, into this turn'] : ['send', 'Send', 'Send']
 	let send = (queue = false) => {
 		let steer = busy() && !queue
 		app.send(queue)
@@ -125,7 +130,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 								<a href={`/${path}`} target="_blank" rel="noopener" title={`Open ${path}`}>
 									{path.startsWith('image/') ? <img src={`/raw/${name}`} alt={path} onLoad={(e) => (e.currentTarget.dataset.loaded = '')} onError={(e) => retry(e.currentTarget)} /> : path}
 								</a>
-								<button type="button" aria-label={`Remove ${path}`} title="Remove" onClick={() => remove(index())}>×</button>
+								<button type="button" aria-label={`Remove ${path}`} title="Remove" onClick={() => remove(index())}><Icon name="close" /></button>
 							</li>
 						)
 					}}</For>
@@ -144,19 +149,6 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 						)}</For>
 					</div>
 				)}
-				{/* Our own placeholder, so it can fade as typing starts. */}
-				<div class="field">
-				<span class={['hint', { gone: !!props.text }]} aria-hidden="true">{props.placeholder}</span>
-				<textarea
-					ref={box}
-					rows={1}
-					aria-label="Message"
-					value={props.text}
-					disabled={!!props.view.form}
-					onInput={(e) => app.input(e.currentTarget.value)}
-					onPaste={(e) => e.clipboardData && attach.paste(e.clipboardData, insert) && e.preventDefault()}
-				/>
-				</div>
 				<input
 					type="file"
 					class="hidden-text"
@@ -173,24 +165,37 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				/>
 				{/* Keep the keyboard: the tap leaves the draft focused, and the
 				    draft takes the focus back when the picker closes. */}
-				<button type="button" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onPointerDown={(e) => { typing = document.activeElement === input; e.preventDefault() }} onClick={() => picker.click()}>
-					+
+				<button type="button" class="attach" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onPointerDown={(e) => { typing = document.activeElement === input; e.preventDefault() }} onClick={() => picker.click()}>
+					<Icon name="attach" />
 				</button>
+				{/* Our own placeholder, so it can fade as typing starts. */}
+				<div class="field">
+				<span class={['hint', { gone: !!props.text }]} aria-hidden="true">{props.placeholder}</span>
+				<textarea
+					ref={box}
+					rows={1}
+					aria-label="Message"
+					value={props.text}
+					disabled={!!props.view.form}
+					onInput={(e) => app.input(e.currentTarget.value)}
+					onPaste={(e) => e.clipboardData && attach.paste(e.clipboardData, insert) && e.preventDefault()}
+				/>
+				</div>
 				<div class="actions">
 					{/* Pause and continue without Escape (task v0g); the tap keeps the keyboard. */}
 					<Show when={busy() || paused()}>
 						<button type="button" class="toggle" aria-label={paused() ? 'Continue' : 'Pause (Esc)'} title={paused() ? 'Continue' : 'Pause (Esc)'} onPointerDown={(e) => e.preventDefault()} onClick={toggle}>
-							<svg viewBox="0 0 16 16" aria-hidden="true">{paused() ? <path d="M4 2.5v11l9-5.5z" /> : <path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z" />}</svg>
+							<Icon name={paused() ? 'play' : 'pause'} />
 						</button>
 					</Show>
 					<Show when={busy() && !view.commandDraft(props.text)}>
-						<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} onClick={() => send(true)}>Queue</button>
+						<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} aria-label="Queue" title="Queue: send after this turn" onClick={() => send(true)}><Icon name="queue" /></button>
 					</Show>
 					{/* The tap must not blur the draft before click: on iOS the blur
 					    starts hiding the keyboard and moving the composer, and the
 					    click was lost. send() blurs afterwards. */}
-					<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} onClick={() => send()}>
-						{view.commandDraft(props.text) ? 'Run' : busy() ? 'Steer' : 'Send'}
+					<button type="button" class="go" aria-label={action()[1]} title={action()[2]} disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} onClick={() => send()}>
+						<Icon name={action()[0]} />
 					</button>
 				</div>
 			</div>
