@@ -1,10 +1,9 @@
-// Anthropic and OpenAI credentials: this home's secrets/auth.ason (the
-// old Hal's file, single-entry or array shape per provider, copied in or
-// written by /login claude or /login chatgpt: login.ts, login-chatgpt.ts),
-// then ANTHROPIC_API_KEY or OPENAI_API_KEY from the environment as the
-// last account, so a key alone needs no file. Read through liveFile;
-// an expired OAuth token is refreshed and written back to this home's
-// file only, 0600. ~/.hal/auth.ason is never read or written.
+// Anthropic and OpenAI credentials: this home's secrets/auth.ason (old
+// Hal's single-entry or array shape per provider, copied in or written by
+// /login claude or chatgpt: login.ts, login-chatgpt.ts), then the
+// environment's ANTHROPIC_API_KEY or OPENAI_API_KEY as the last account,
+// so a key alone needs no file. Opened through secrets.file; an expired
+// OAuth token is refreshed and written back to this file only.
 //
 // Errors name the file and the problem, never a credential value, and
 // carry `failure` (provider.ts): 'auth' when only a human fixes it

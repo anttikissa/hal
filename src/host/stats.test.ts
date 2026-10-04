@@ -75,6 +75,7 @@ test('the plan is the subscription account the next request takes, with its wind
 		let c = client()
 		let id = created(c)
 		expect(stats.plan(id, 'anthropic/claude-opus-5-5')).toBeUndefined()
+		paths.init()
 		writeFileSync(paths.authFile(), ason.stringify({ anthropic: [{ accessToken: 'a', email: 'one' }, { accessToken: 'b', email: 'two' }, { apiKey: 'k' }] }), { mode: 0o600 })
 		let h = (u5: string, u7: string) => new Headers({ 'anthropic-ratelimit-unified-5h-utilization': u5, 'anthropic-ratelimit-unified-7d-utilization': u7 })
 		usage.observe('anthropic', 'one', h('0.9', '0.5'))
