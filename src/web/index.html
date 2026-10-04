@@ -225,6 +225,11 @@ body, textarea { tab-size: 4; }
 .entry:focus-within { border-left-color: var(--cursor); }
 .entry.dropping { outline: 2px dashed var(--cursor); outline-offset: 2px; }
 .entry .actions { display: flex; }
+/* Phone with a wrapped draft: buttons in a row above a full-width box. */
+.entry.stacked { flex-wrap: wrap; }
+.entry.stacked .field { order: 1; flex-basis: 100%; border-top: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
+.entry.stacked .actions { flex: 1; }
+.entry.stacked > button { border-left: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 1ch; margin: 0 0 0.25lh; padding: 0; list-style: none; }
 .chips li { display: flex; align-items: stretch; border: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
 .chips a { display: flex; align-items: center; padding: 0 1ch; color: inherit; }
