@@ -204,7 +204,7 @@ test('Escape pauses a turn; it stays paused over a restart and Enter continues i
 	await until('streaming output', () => seen(p, 'PART1'))
 	// A lone ESC, as a terminal without the kitty protocol sends it.
 	type(p, '\x1b')
-	await until('the turn to be paused', () => seen(p, '[paused]'))
+	await until('the turn to be paused', () => seen(p, 'Paused.'))
 	await until('the request to be aborted', () => aborted === 1)
 
 	let mark = p.out.length

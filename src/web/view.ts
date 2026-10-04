@@ -310,7 +310,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'turn-end':
 			if (item.status === 'error') return { kind: 'end error', text: titles.stamp(item.ts, `error: ${item.error ?? 'turn failed'}`) }
 			if (item.status === 'completed') return null
-			return { kind: 'end log', text: titles.stamp(item.ts, `[${item.status}]`) }
+			return { kind: 'end log', text: titles.ended(item.ts, item.status) }
 		case 'question': {
 			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
 			let quote = item.form.quote ? item.form.quote.text.split('\n').map((l) => `    ${l}`) : []

@@ -144,7 +144,7 @@ test('the activity says what the session does, and waiting for answer on a quest
 test('bare Enter continues a paused or failed turn, and says so', () => {
 	app.onEvent(snapshot('s1', { type: 'paused' }))
 	expect(appView.view().activity).toBe('paused')
-	// [paused] in the transcript and the help row's enter: continue say it all.
+	// Paused. in the transcript and the help row's enter: continue say it all.
 	expect(appView.view().why).toBeUndefined()
 	app.onEvent(snapshot('s1', { type: 'paused', reason: 'reached 200 rounds' }))
 	expect(appView.view().why).toBe('reached 200 rounds')

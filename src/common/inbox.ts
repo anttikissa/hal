@@ -51,10 +51,10 @@ function provenance(item: InboxItem): Sender {
 }
 
 // What leads a queued message's compact row (task 16): '15:29 (Queued
-// by 76-cpo, tab 5)'. `tab`: the sender's tab number, if it has
-// one. Never why the session stalls: that is the status line.
+// by 76-cpo, tab 5)'. `tab`: the sender's current tab number, if it
+// has one. Not the label: it already names the tab it had when sending. Never why the session stalls: that is the status line.
 function note(item: InboxItem, tab?: number): string {
-	let by = item.from === undefined ? '' : ` by ${item.label ?? item.from}${tab === undefined ? '' : `, tab ${tab}`}`
+	let by = item.from === undefined ? '' : ` by ${item.from}${tab === undefined ? '' : `, tab ${tab}`}`
 	return titles.stamp(item.ts, `(Queued${by})`)
 }
 
