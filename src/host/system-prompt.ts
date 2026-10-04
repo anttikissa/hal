@@ -21,7 +21,8 @@ const systemFile = resolve(import.meta.dir, '../../SYSTEM.md')
 function date(now: number): string {
 	let d = new Date(now)
 	let two = (n: number) => String(n).padStart(2, '0')
-	let weekday = d.toLocaleDateString('en-US', { weekday: 'long' })
+	// Not toLocaleDateString: building its formatter costs ~0.3 ms a call.
+	let weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()]
 	let off = -d.getTimezoneOffset()
 	let zone = off ? `UTC${off < 0 ? '-' : '+'}${two(Math.floor(Math.abs(off) / 60))}:${two(Math.abs(off) % 60)}` : 'UTC'
 	return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}, ${weekday}, ${zone}`

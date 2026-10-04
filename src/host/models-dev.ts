@@ -8,8 +8,9 @@
 // every start, and ASON takes ~100 ms to write and read it back.
 
 import type { Pricing } from '../common/pricing.ts'
-import { readFileSync, renameSync, writeFileSync } from 'fs'
+import { readFileSync } from 'fs'
 import { diag } from './diag.ts'
+import { modelsDevWorker } from './models-dev-worker.ts'
 import { paths } from './paths.ts'
 import { provider } from './provider.ts'
 
@@ -33,13 +34,45 @@ function catalog(): Catalog {
 		if (e?.code !== 'ENOENT') throw e
 		text = '{}'
 	}
-	try {
-		st.catalog = JSON.parse(text) as Catalog
-	} catch (e: any) {
-		throw new Error(`${modelsDev.file()}: ${e?.message ?? e}`)
-	}
+	st.catalog = modelsDev.lazy(text, modelsDev.file())
 	st.path = modelsDev.file()
 	return st.catalog
+}
+
+// The cache holds one provider per line (modelsDev.serialize): each is
+// parsed on first use, as parsing all ~1 MB took ~10 ms (task 7j). A
+// line that does not parse is an error naming `path`.
+function lazy(text: string, path: string): Catalog {
+	let parse = (s: string) => {
+		try {
+			return JSON.parse(s)
+		} catch (e: any) {
+			throw new Error(`${path}: ${e?.message ?? e}`)
+		}
+	}
+	let lines = text.split('\n')
+	if (lines.length < 3) return parse(text)
+	let out: Catalog = {}
+	for (let line of lines.slice(1, -1)) {
+		let key = line.match(/^"(?:[^"\\]|\\.)*"(?=:)/)?.[0]
+		if (!key) throw new Error(`${path}: not one provider per line: ${line.slice(0, 80)}`)
+		let name = parse(key) as string
+		Object.defineProperty(out, name, {
+			enumerable: true,
+			configurable: true,
+			get: () => {
+				let value = parse(`{${line.replace(/,$/, '')}}`)[name]
+				Object.defineProperty(out, name, { value, enumerable: true, configurable: true, writable: true })
+				return value
+			},
+		})
+	}
+	return out
+}
+
+// The catalog as cached: JSON, one provider per line.
+function serialize(catalog: Catalog): string {
+	return `{\n${Object.entries(catalog).map(([k, v]) => `${JSON.stringify(k)}:${JSON.stringify(v)}`).join(',\n')}\n}`
 }
 
 // Keeps name and context of every model in the api.json answer.
@@ -69,22 +102,19 @@ function parse(data: unknown): Catalog {
 	return out
 }
 
-// Fetches the catalog and replaces the cache (atomically: a crash
-// leaves the old one). Returns the ids ("provider/model") among
-// `picked` the old cache listed and the new one does not; failures go
-// to diagnostics only.
+// Fetches the catalog and replaces the cache (in a worker: task 7j).
+// Returns the ids ("provider/model") among `picked` the old cache
+// listed and the new one does not; failures go to diagnostics only.
 async function refresh(picked: string[] = []): Promise<string[]> {
 	if (modelsDev.offline()) return []
 	try {
 		let res = await provider.fetch(modelsDev.url, { signal: AbortSignal.timeout(modelsDev.timeoutMs) })
 		if (!res.ok) throw new Error(`HTTP ${res.status}`)
-		let next = modelsDev.parse(await res.json())
-		if (!Object.keys(next).length) throw new Error('no providers in the answer')
+		let body = await res.arrayBuffer()
 		let before = picked.filter((id) => modelsDev.info(id))
-		let tmp = `${modelsDev.file()}.${process.pid}.tmp`
-		writeFileSync(tmp, JSON.stringify(next), { mode: 0o600 })
-		renameSync(tmp, modelsDev.file())
-		modelsDev.state.catalog = next
+		let reply = await modelsDevWorker.run({ body, file: modelsDev.file(), tmp: `${modelsDev.file()}.${process.pid}.tmp` })
+		if ('error' in reply) throw new Error(reply.error)
+		modelsDev.state.catalog = modelsDev.lazy(reply.json, modelsDev.file())
 		modelsDev.state.path = modelsDev.file()
 		return before.filter((id) => !modelsDev.info(id))
 	} catch (e: any) {
@@ -130,6 +160,8 @@ export const modelsDev = {
 	state: { catalog: null as Catalog | null, path: '' },
 	url: 'https://models.dev/api.json',
 	timeoutMs: 10_000,
+	lazy,
+	serialize,
 	// Tests (and ./run under bun test, which inherits NODE_ENV) never
 	// reach models.dev; unit tests replace this and fake the fetch.
 	offline: () => process.env.NODE_ENV === 'test',

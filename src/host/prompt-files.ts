@@ -94,13 +94,26 @@ function watchDirs(dirs: Set<string>): void {
 
 function start(clients: Iterable<Watcher>): void {
 	if (promptFiles.state.timer) return
-	// Edits made while the host was down: noted at once.
-	for (let id of tabs.file().open) promptTrail.check(id)
+	// Edits made while the host was down: noted at once, in slices of
+	// sliceMs so many open tabs never block the event loop (task 7j).
+	void promptFiles.catchUp(tabs.file().open)
 	promptFiles.state.tick = () => {
 		try { promptFiles.check(clients) } catch (e: any) { diag.log(`prompt files: ${e?.message ?? e}`) }
 	}
 	promptFiles.state.timer = setInterval(() => promptFiles.state.tick?.(), promptFiles.intervalMs)
 	promptFiles.state.timer.unref?.()
+}
+
+async function catchUp(ids: string[]): Promise<void> {
+	let end = performance.now() + promptFiles.sliceMs
+	for (let id of ids) {
+		if (performance.now() > end) {
+			await new Promise((r) => setImmediate(r))
+			if (!promptFiles.state.timer) return
+			end = performance.now() + promptFiles.sliceMs
+		}
+		promptTrail.check(id)
+	}
 }
 
 function stop(): void {
@@ -113,5 +126,6 @@ function stop(): void {
 export const promptFiles = {
 	state: { seen: new Map<string, string | null>(), timer: undefined as ReturnType<typeof setInterval> | undefined, soon: undefined as ReturnType<typeof setTimeout> | undefined, tick: undefined as (() => void) | undefined, watchers: new Map<string, FSWatcher>(), seq: 0 },
 	intervalMs: 1000,
-	files, check, watchDirs, start, stop,
+	sliceMs: 4,
+	files, check, watchDirs, start, catchUp, stop,
 }
