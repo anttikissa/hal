@@ -13,6 +13,7 @@ import { sessions } from './sessions.ts'
 import { stats } from './stats.ts'
 import { status } from './status.ts'
 import { toolOutput } from './tool-output.ts'
+import { queueEdits } from './queue-edits.ts'
 import { turns } from './turns.ts'
 
 function build(id: string, tail: Tail = pages.snapshot(id)): Snapshot {
@@ -24,6 +25,8 @@ function build(id: string, tail: Tail = pages.snapshot(id)): Snapshot {
 		let kept = new Set(replay.current(raw).map((r) => r.n))
 		snap.dropped = replay.current(raw.filter((r) => r.type !== 'rebase')).flatMap((r) => r.n !== undefined && !kept.has(r.n) ? [r.n] : [])
 	}
+	let hold = queueEdits.state.get(id)
+	if (hold) snap.queueHold = hold.message
 	let output = toolOutput.state.get(id)
 	if (output?.output) snap.toolOutput = { ...output }
 	if (tail.older !== undefined) Object.assign(snap, { older: tail.older, earlier: tail.earlier })

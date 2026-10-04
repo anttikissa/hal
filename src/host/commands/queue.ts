@@ -3,6 +3,7 @@ import { states } from '../../common/states.ts'
 import type { SlashCommand } from '../commands.ts'
 import { history } from '../history.ts'
 import { host } from '../host.ts'
+import { queueEdits } from '../queue-edits.ts'
 import { prompts } from '../prompts.ts'
 import { status } from '../status.ts'
 import { turns } from '../turns.ts'
@@ -13,6 +14,7 @@ export const command: SlashCommand = {
 		let id = ctx.sessionId
 		let queued = status.inboxOf(id).filter((m) => m.queue)
 		if (!args) return { say: queued.length ? queued.map((m, i) => `${i + 1}. ${m.text}`).join('\n') : 'no messages waiting for after this turn' }
+		if ((args === 'clear' || args === 'next') && queueEdits.refused(id)) return { error: queueEdits.refused(id) }
 		if (args === 'clear') {
 			for (let item of queued) history.append(id, { type: 'inbox', id: item.id, text: item.text, withdrawn: true })
 			if (queued.length) host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })

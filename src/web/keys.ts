@@ -14,6 +14,8 @@
 // the readline keys in editor.table edit the box. A printable key
 // pressed outside any field types into the box.
 
+import { queueEdit } from '../common/queue-edit.ts'
+import { queuedPrompt } from './queue-edit.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
 import type { Key } from '../common/forms.ts'
@@ -121,7 +123,13 @@ function key(e: KeyInput, target: Target): boolean {
 		if (choice && app.menuKey(choice)) return true
 	}
 	// An edit from a card's Edit button (task 26q): Escape cancels it anywhere.
+	if (plain && e.key === 'Escape' && app.sessionId() && queueEdit.current(app.sessionId()!)?.active) return queuedPrompt.cancel()
 	if (plain && e.key === 'Escape' && st.view.editing?.aside) return editPrompt.leave()
+	if (plain && target.kind === 'message' && e.key === 'ArrowUp' && !st.text && !st.view.editing) {
+		let waiting = queueEdit.candidate(st.view.transcript)
+		if (waiting) return queuedPrompt.begin(waiting.id)
+	}
+	if (plain && e.key === 'ArrowDown' && st.view.editing?.queueEdit && st.text === st.view.editing.original) return queuedPrompt.cancel()
 	let edit = plain && target.kind === 'message' && arrows[e.key] ? view.editKey(st.view, arrows[e.key]!, st.text) : undefined
 	if (edit) {
 		st.view = edit.view
@@ -190,7 +198,7 @@ function edit(k: Key, target: Extract<Target, { kind: 'message' }>): boolean {
 function recallKey(dir: -1 | 1, target: Extract<Target, { kind: 'message' }>): boolean {
 	let st = app.state
 	let t = st.view.transcript
-	if (!t) return false
+	if (!t || st.view.editing?.queueEdit) return false
 	let id = t.meta.id
 	if (st.text && recall.shown(id) === undefined) return false
 	let shown = recall.step(id, recall.entries(t), st.text, target.cursor, dir, Infinity, drafts.text(id))

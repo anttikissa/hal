@@ -84,6 +84,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// Background jobs still running, by call key: their cards offer Kill.
 	let jobs = createMemo(() => view.jobs(all()))
 	// Prompts the user may edit and resend (task 26q): their cards offer Edit.
+	let editableWaiting = (r: Row) => r.note !== undefined && r.item.type === 'prompt' && r.item.from === undefined && r.item.origin !== 'model'
 	let editable = createMemo(() => amend.editable(items()))
 	let hit = createMemo(() => props.target && target.row(all(), props.target)?.key)
 	// The linked card is always among the rows shown.
@@ -101,7 +102,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			<For each={shown()} keyed={(row) => row.key}>
 				{(row) => (
 					<>
-					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && !row().waiting && editable().has(row().item.key)} />}>
+					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && (row().waiting ? editableWaiting(row()) : editable().has(row().item.key))} />}>
 						{(q) => <Question item={q()} form={props.view.form!} session={props.view.transcript?.meta.id ?? ''} />}
 					</Show>
 					<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>

@@ -5,6 +5,7 @@
 // the notice stack: a bar in the attention colour on faint grey.
 
 import { flush, Show } from 'solid-js'
+import { queueEdit } from '../../common/queue-edit.ts'
 import { amend } from '../../common/amend.ts'
 import { editPrompt } from '../edit-prompt.ts'
 import type { ViewState } from '../view.ts'
@@ -22,7 +23,7 @@ export function EditBar(props: { view: ViewState }) {
 			{(e) => (
 				<div class="EditBar notice" role="status">
 					<span class="text">{amend.bar(e())}<span class="keys"> · Escape cancels</span></span>
-					<button type="button" onClick={cancel}><Icon name="close" />Cancel</button>
+					<button type="button" disabled={!!props.view.transcript && !!queueEdit.current(props.view.transcript.meta.id)?.saving} onClick={cancel}><Icon name="close" />Cancel</button>
 				</div>
 			)}
 		</Show>

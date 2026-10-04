@@ -5,6 +5,8 @@
 
 import { backfill } from '../common/backfill.ts'
 import { connection } from '../common/connection.ts'
+import { queueEdit } from '../common/queue-edit.ts'
+import { queuedPrompt } from './queue-edit.ts'
 import { drafts } from '../common/drafts.ts'
 import { prompt } from '../common/prompt.ts'
 import type { Event, Tab } from '../common/protocol.ts'
@@ -28,6 +30,7 @@ function hiddenEvent(event: Event): void {
 		let kept = st.hidden.get(event.sessionId) ?? { prompt: prompt.empty() }
 		kept.transcript = transcript.fold(kept.transcript, event)
 		if (event.type === 'snapshot' && kept.transcript) kept.prompt = { text: drafts.text(event.sessionId), cursor: drafts.text(event.sessionId).length }
+		queuedPrompt.sync(kept, event)
 		st.hidden.set(event.sessionId, kept)
 	}
 	if (st.loading === event.sessionId && (event.type === 'snapshot' || event.type === 'rejected')) {
@@ -102,7 +105,7 @@ function focusOn(focus: Focus): void {
 		if (focus.tab !== undefined) {
 			st.hidden.delete(focus.tab)
 			if (!back) drafts.join(focus.tab, early)
-			if (!back) app.setPrompt(recall.shown(focus.tab) ?? drafts.text(focus.tab))
+			if (!back) app.setPrompt(queueEdit.editing(focus.tab) ? queueEdit.text(focus.tab) : recall.shown(focus.tab) ?? drafts.text(focus.tab))
 			if (!st.background.has(focus.tab)) {
 				st.background.add(focus.tab)
 				app.send({ type: 'open', sessionId: focus.tab })
@@ -112,6 +115,7 @@ function focusOn(focus: Focus): void {
 			}
 		}
 	}
+	queuedPrompt.sync(st)
 	let tab = app.focusedTab()
 	if (tab) app.focused(tab)
 	if (tab?.attention) app.send({ type: 'tab-seen', sessionId: tab.id })

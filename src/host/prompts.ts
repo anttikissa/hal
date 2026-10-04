@@ -32,6 +32,7 @@ import { slash } from './slash.ts'
 import { status } from './status.ts'
 import { statusUsage } from './status-usage.ts'
 import { subagents } from './subagents.ts'
+import { queueEdits } from './queue-edits.ts'
 import { turns } from './turns.ts'
 
 // Returns why the submit is refused, if it is. `command` is the
@@ -49,6 +50,10 @@ import { turns } from './turns.ts'
 // so gets full attention (no longer advisory).
 function submit(id: string, text: string, command?: string, queue = false, sender?: Sender): string | undefined {
 	let call = commands.parse(text)
+	if (call?.name === 'pause') queueEdits.suppress(id)
+	if (call?.name === 'close') queueEdits.suppress()
+	let hold = queueEdits.refused(id)
+	if (hold && (!queue || call) && !['queue', 'pause', 'close'].includes(call?.name ?? '')) return hold
 	// A command (/model, /pause) is not a prompt: the tab stays the parent's.
 	if (!call && sender?.from === undefined && sender?.origin !== 'model') subagents.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
@@ -113,6 +118,8 @@ function senders(list: UserBlock[]): Sender[] {
 // the other texts it delivered from the inbox stay. A prompt with no
 // text of the human's is not theirs to edit: the edit goes on top.
 function amend(id: string, text: string, command?: string): string | undefined {
+	let hold = queueEdits.refused(id)
+	if (hold) return hold
 	subagents.promote(id)
 	let records = history.readSync(id)
 	let at = replay.lastPrompt(records)
@@ -137,10 +144,13 @@ function amend(id: string, text: string, command?: string): string | undefined {
 // takes it out and runs. Delivered meanwhile, it is an edit of the last
 // prompt (prompts.amend). Messages from other sessions are not the
 // user's to edit.
-function edit(id: string, message: string, text: string, command?: string): string | undefined {
+function edit(id: string, message: string, text: string, command?: string, held = false): string | undefined {
+	let hold = queueEdits.refused(id)
+	if (hold && !held) return hold
 	let waiting = status.inboxOf(id).find((m) => m.id === message)
 	if (waiting?.from !== undefined || waiting?.origin === 'model') return 'that message was not sent by the human'
-	let call = commands.parse(text)
+	if (held && !waiting) return 'that human message is no longer queued'
+	let call = held ? undefined : commands.parse(text)
 	if (!waiting) return call ? prompts.submit(id, text, command) : prompts.amend(id, text, command)
 	let refused = call ? slash.command(id, text, call, command) : undefined
 	if (refused) return refused
@@ -163,6 +173,8 @@ function harmless(records: HistoryRecord[]): boolean {
 // `prompt` event, or with `quiet` nothing, as the caller's turn-start
 // carries it. Returns the prompt's record.
 function deliver(id: string, items: InboxItem[], extra?: Sender & { text: string }, command?: string, quiet = false): HistoryRecord & { type: 'user' } {
+	let hold = queueEdits.refused(id)
+	if (hold) throw new Error(hold)
 	let parts = items.map((m) => ({ ...m, ...inbox.provenance(m) }))
 	let blocks = prompts.blocks(id, extra ? [...parts, extra] : parts)
 	let record: Omit<HistoryRecord & { type: 'user' }, 'ts'> = { type: 'user', blocks, inbox: items.map((m) => m.id) }
@@ -203,12 +215,14 @@ function promptEvent(id: string, record: HistoryRecord & { type: 'user' }): Even
 
 // Before a request: delivers the steering messages waiting, if any.
 function steer(id: string): void {
+	if (queueEdits.refused(id)) return
 	let steering = status.inboxOf(id).filter((m) => !m.queue)
 	if (steering.length) prompts.deliver(id, steering)
 }
 
 // After a completed turn: runs the oldest queued message, if any.
 function next(id: string): void {
+	if (queueEdits.refused(id)) return
 	let queued = status.inboxOf(id).find((m) => m.queue)
 	if (!queued || status.transition(id, { type: 'submit' })) return
 	let record = prompts.deliver(id, [queued], undefined, undefined, true)
@@ -236,6 +250,8 @@ function draft(id: string, changed: ReturnType<typeof drafts.get> | undefined, c
 
 // Continue: a paused turn goes on, a failed one retries.
 function resume(id: string): string | undefined {
+	let hold = queueEdits.refused(id)
+	if (hold) return hold
 	// Enter on a waiting turn: re-read the skipped accounts, then retry now.
 	let running = turns.state.running.get(id)
 	if (running?.rewait && status.stateOf(id).type === 'retrying') {
@@ -254,6 +270,8 @@ function resume(id: string): string | undefined {
 // why it is refused: not the open question (someone answered first),
 // or answers that don't fit the form.
 function reply(id: string, question: string, answers: Answers): string | undefined {
+	let hold = queueEdits.refused(id)
+	if (hold) return hold
 	let open = forms.open(history.readSync(id))
 	// A command's question may be open beside a turn blocked on login.
 	if (!open || open.id !== question || (!open.from && turns.state.running.has(id))) return 'that question is not open (answered already?)'

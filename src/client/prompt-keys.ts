@@ -6,6 +6,7 @@
 import { amend, type Editing } from '../common/amend.ts'
 import { drafts } from '../common/drafts.ts'
 import { prompt, type PromptState } from '../common/prompt.ts'
+import { queuedPrompt } from './queue-edit.ts'
 import { clipboard } from './clipboard.ts'
 import { recall } from '../common/recall.ts'
 import type { Transcript } from '../common/transcript.ts'
@@ -19,6 +20,7 @@ const plain = (k: KeyEvent): boolean => !k.shift && !k.ctrl && !k.alt && !k.cmd
 // works starts it, Down unchanged or Escape leaves it. The editor text
 // is the draft, as ever. `send` takes the pause or continue.
 function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void): boolean {
+	if (queuedPrompt.key(st, k)) return true
 	if (!plain(k) || !st.transcript) return false
 	let id = st.transcript.meta.id
 	if (k.key === 'up' && !st.editing) {
@@ -47,7 +49,7 @@ function edit(st: PromptKeysState, k: KeyEvent, send: (command: unknown) => void
 // `width`: the previous or next prompt sent.
 function history(st: PromptKeysState, k: KeyEvent, width: number): boolean {
 	let t = st.transcript
-	if (!plain(k) || !t || (k.key !== 'up' && k.key !== 'down')) return false
+	if (st.editing?.queueEdit || !plain(k) || !t || (k.key !== 'up' && k.key !== 'down')) return false
 	let id = t.meta.id
 	let { text, cursor } = st.prompt
 	let shown = recall.step(id, recall.entries(t), text, cursor, k.key === 'up' ? -1 : 1, width, drafts.text(id))

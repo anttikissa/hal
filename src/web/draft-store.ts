@@ -12,7 +12,7 @@ export const store = {
 	},
 	save: (id: string, local: Local): void => {
 		try {
-			if (!local.text && !local.sending.length) localStorage.removeItem(`hal-draft:${id}`)
+			if (!local.text && !local.sending.length && !local.queueEdit) localStorage.removeItem(`hal-draft:${id}`)
 			else localStorage.setItem(`hal-draft:${id}`, JSON.stringify(local))
 		} catch {
 			// Storage full or disabled: the host still has the draft.

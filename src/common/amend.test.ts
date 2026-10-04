@@ -48,8 +48,8 @@ test('leaving the edit continues the paused turn, or the one whose pause is on i
 	expect(amend.resume({ ...editing, sessionId: 's2' }, session({ type: 'paused' }))).toBeUndefined()
 })
 
-test('Up edits a message still waiting in the inbox in place, without pausing', () => {
-	let t = { ...session({ type: 'paused' }), inbox: [{ id: 'm1', text: 'steer' }, { id: 'm2', text: 'latre', queue: true as const }] }
+test('Up edits a steering message still waiting in the inbox in place, without pausing', () => {
+	let t = { ...session({ type: 'paused' }), inbox: [{ id: 'm1', text: 'steer' }, { id: 'm2', text: 'latre' }] }
 	let begun = amend.begin(t, '')
 	expect(begun).toEqual({ editing: { sessionId: 's1', original: 'latre', inbox: 'm2' } })
 	expect(amend.enter(begun!.editing, t, 'later')).toEqual({ type: 'submit', sessionId: 's1', text: 'later', amend: true, edits: 'm2' })

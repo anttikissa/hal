@@ -6,6 +6,8 @@
 // until the host has it. It shows the host's tabs and one focused tab
 // (src/client/tabs.ts); each tab keeps its own client state meanwhile.
 
+import { queueEdit } from '../common/queue-edit.ts'
+import { queuedPrompt } from './queue-edit.ts'
 import { amend, type Editing } from '../common/amend.ts'
 import { backfill, type Backfill } from '../common/backfill.ts'
 import { completion } from '../common/completion.ts'
@@ -100,12 +102,13 @@ function beat(): void {
 
 function onEvent(event: Event): void {
 	let st = app.state
+	let queueChanged = queueEdit.onEvent(event)
 	if (event.type === 'rebase-result') return rebaseEditor.result(event, (text) => { st.notice = text; app.show() })
 	if (event.type === 'rebase-plan') return void rebaseEditor.open(event, app.send, (text) => { st.notice = text; app.show() })
 	if (event.type === 'find-results') return find.event(event)
 	// A recalled entry stays on screen; the draft changes underneath.
 	let mine = st.transcript && 'sessionId' in event && event.sessionId === st.transcript.meta.id ? event.sessionId : undefined
-	if (drafts.onEvent(event) && mine && !recall.shown(mine)) app.setPrompt(drafts.text(mine))
+	if (drafts.onEvent(event) && mine && !recall.shown(mine) && !st.editing?.queueEdit) app.setPrompt(drafts.text(mine))
 	// An upload landed; a submit waiting for it goes now.
 	let resume = paste.settled(st, event)?.resume
 	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: resume.queue, ctrl: false, cmd: false }])
@@ -135,9 +138,11 @@ function onEvent(event: Event): void {
 		let t = transcript.fold(st.transcript, event)
 		st.transcript = t
 		if (event.type === 'snapshot' || event.type === 'history') app.backfilled(event)
-		if (event.type === 'snapshot' && t) app.setPrompt(recall.shown(t.meta.id) ?? drafts.text(t.meta.id))
+		if (event.type === 'snapshot' && t) app.setPrompt(queueEdit.editing(t.meta.id) ? queueEdit.text(t.meta.id) : recall.shown(t.meta.id) ?? drafts.text(t.meta.id))
 		st.form = forms.follow(st.form, transcript.question(t))
 	}
+	queuedPrompt.sync(st, event)
+	if (queueChanged?.notice) st.notice = queueChanged.notice
 	app.show()
 	find.seek()
 	if (event.type === 'snapshot' && event.sessionId === shown) st.painted = true
@@ -156,6 +161,7 @@ function backfilled(event: Event & { type: 'snapshot' | 'history' }): void {
 // Every connection brings the tabs; tab-start asks the host to name the
 // tab to show: the focused one if any, else the start's.
 function onState(state: LinkState): void {
+	if (state.type !== 'connected') queueEdit.disconnected()
 	restart.linkChanged()
 	let st = app.state
 	st.notice = state.type === 'connected' ? undefined : 'host lost; reconnecting…'
@@ -177,6 +183,13 @@ function onState(state: LinkState): void {
 // or a continue on an empty prompt. Refuses (keeping the typed text) what the host would refuse anyway.
 function submit(text: string, queue = false): boolean {
 	let st = app.state
+	let id = st.transcript?.meta.id
+	if (id && queueEdit.current(id)?.active) {
+		queueEdit.input(id, text)
+		st.notice = queueEdit.save(id)
+		queuedPrompt.sync(st)
+		return false
+	}
 	if (clientCommands.typed(text)) return true
 	if (!st.transcript) {
 		if (!text.trim()) return true
@@ -278,7 +291,7 @@ function onKeys(events: KeyEvent[]): void {
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
 		st.prompt = state
 		let id = st.transcript?.meta.id
-		if (edited && id && recall.typed(id, state.text)) drafts.edit(id, state.text)
+		if (edited && id && !queueEdit.input(id, state.text) && recall.typed(id, state.text)) drafts.edit(id, state.text)
 		// A recalled entry was sent: the user's own text comes back.
 		if (action?.type === 'submit' && id && recall.stop(id)) app.setPrompt(drafts.text(id))
 		let pause = action?.type === 'cancel' && st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
@@ -361,6 +374,7 @@ function reset(): void {
 	halCursor.reset()
 	drafts.reset()
 	recall.reset()
+	queueEdit.disconnected()
 	uploads.reset()
 	notices.reset()
 }

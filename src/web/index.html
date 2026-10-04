@@ -125,6 +125,10 @@ body, textarea { tab-size: 4; }
 .Card.user { transition: color 300ms var(--ease-out); }
 .Transcript > .Card.queued:has(+ .Card.queued) { margin-bottom: 0; }
 .Card.queued { cursor: pointer; }
+/* Queue edits share the existing pencil, with a real 44px target beside
+   the reference; reserve both controls so long previews never overlap. */
+.Card.queued > .edit { position: absolute; top: 0; right: calc(1ch + 44px); width: 44px; height: 44px; padding: 0; background: transparent; color: inherit; }
+.Card.queued:has(> .edit) > .content { padding-right: calc(7ch + 44px); }
 .Card.pending { color: var(--quiet); transition-delay: 300ms; }
 .Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
 .Card.folds { cursor: pointer; }

@@ -66,6 +66,7 @@ export type Snapshot = {
 	history: HistoryRecord[]
 	state: SessionState
 	inbox?: InboxItem[]
+	queueHold?: string
 	turn?: LiveTurn
 	// Foreground bash output still in flight: not history or provider input.
 	toolOutput?: { id: string; output: string }
@@ -120,7 +121,9 @@ export type Command = (
 	// after it a rebase drops first (task 26q).
 	// Always the human's: another session's messages come from the host
 	// (the send tool), never from what a client claims (task rj).
-	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number }
+	| { type: 'queue-edit'; sessionId: string; message: string; edit: string }
+	| { type: 'queue-edit-cancel'; sessionId: string; edit: string }
+	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }
@@ -223,6 +226,8 @@ export type Event =
 	| { type: 'state'; sessionId: string; state: SessionState }
 	// The inbox changed: every message now waiting.
 	| { type: 'inbox'; sessionId: string; inbox: InboxItem[] }
+	| { type: 'queue-edit'; sessionId: string; edit: string; message: string; text: string }
+	| { type: 'queue-hold'; sessionId: string; message?: string }
 	// Inbox messages (and maybe a new prompt) are in history as one
 	// prompt, after the running turn's output so far. `replaces`: an edit
 	// that takes the place of the last prompt and everything after it.
@@ -326,7 +331,7 @@ export type Event =
 	| NoticeEvent
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['rebase-error', 'rebase-apply', 'find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'paste-text', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello', 'screen']
+const commandTypes: CommandType[] = ['queue-edit', 'queue-edit-cancel', 'rebase-error', 'rebase-apply', 'find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'paste-text', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello', 'screen']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -386,7 +391,11 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'attach') return str('sessionId') ?? str('mediaType') ?? str('data') ?? str('name', true)
 	if (c.type === 'paste-text') return str('sessionId') ?? str('name')
 	if (c.type === 'submit' && c.rewind !== undefined && !(Number.isSafeInteger(c.rewind) && (c.rewind as number) > 0)) return 'submit: rewind must be a record number'
-	if (c.type === 'submit') return str('sessionId') ?? str('text') ?? str('edits', true)
+	if (c.type === 'queue-edit' || c.type === 'queue-edit-cancel') return str('sessionId') ?? str('edit') ?? (c.type === 'queue-edit' ? str('message') : undefined)
+	if (c.type === 'submit') {
+		if (c.queueEdit !== undefined && (c.amend !== true || c.edits === undefined || c.queue === true || c.rewind !== undefined)) return 'submit: queueEdit requires amend and edits, without queue or rewind'
+		return str('sessionId') ?? str('text') ?? str('edits', true) ?? str('queueEdit', true)
+	}
 	return str('sessionId') ?? (c.type === 'draft' || c.type === 'complete' ? str('text') : undefined)
 }
 

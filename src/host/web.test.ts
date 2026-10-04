@@ -1535,3 +1535,57 @@ test('revocation while an upgrade awaits the page build refuses the socket', asy
 		expect(web.state.sockets.size).toBe(0)
 	} finally { web.version = original }
 })
+
+test.skipIf(!chrome)('queued message edits retain the draft and require host protection through save, cancel and reload', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	let ts = '2026-10-04T20:13:07.456Z'
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Earlier prompt' }], ts })
+	history.append(id, { type: 'inbox', id: 'queued-first', text: 'First queued message with a long line that wraps on phones and remains readable beside the pencil and reference.\nSecond line\nThird line\nFourth line', queue: true, ts })
+	history.append(id, { type: 'inbox', id: 'queued-last', text: 'Last queued message', queue: true, ts })
+	history.append(id, { type: 'turn_end', status: 'paused', usage: {}, ts })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelectorAll('[aria-label="Edit queued message"]').length === 2`)
+		let input = async (text: string) => b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+		for (let [name, width, height, touch] of [['portrait', 390, 800, true], ['landscape', 844, 390, true], ['desktop', 1200, 800, false]] as const) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
+			await input('My separate draft')
+			await b.evaluate(`document.querySelector('[aria-label="Edit queued message"]').click()`)
+			await b.waitFor(`document.querySelector('.EditBar')?.textContent.includes('Editing queued message') && document.querySelector('textarea').value.startsWith('First queued')`)
+			expect(await b.evaluate(`document.querySelector('[aria-label="Continue"]').disabled`)).toBe(true)
+			expect(await b.evaluate(`document.querySelector('[aria-label="Save queued message"]').disabled`)).toBe(false)
+			let geometry = await b.evaluate(`(() => { let cards = [...document.querySelectorAll('.Card.queued')]; return { overflow: document.documentElement.scrollWidth > innerWidth + 1, edits: cards.map(c => { let e = c.querySelector('.edit').getBoundingClientRect(), r = c.querySelector('.link')?.getBoundingClientRect(); return { width: e.width, height: e.height, overlap: !!r && e.right > r.left + 1, within: e.bottom <= c.getBoundingClientRect().bottom + 1 }; }) }; })()`)
+			expect(geometry.overflow).toBe(false)
+			for (let control of geometry.edits) expect(control).toMatchObject({ width: 44, height: 44, overlap: false, within: true })
+			let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
+			writeFileSync(`/tmp/hal-queue-edit-${name}.png`, Buffer.from(screenshot.result.data, 'base64'))
+			await b.evaluate(`document.querySelector('.EditBar button').click()`)
+			await b.waitFor(`!document.querySelector('.EditBar') && document.querySelector('textarea').value === 'My separate draft'`)
+		}
+		await b.evaluate(`document.querySelector('[aria-label="Edit queued message"]').click()`)
+		await b.waitFor(`document.querySelector('[aria-label="Save queued message"]')`)
+		await input('Corrected first message')
+		await b.evaluate(`document.querySelector('[aria-label="Save queued message"]').click()`)
+		await b.waitFor(`!document.querySelector('.EditBar') && document.querySelector('textarea').value === 'My separate draft'`)
+		expect(status.inboxOf(id).map((m) => [m.id, m.text, m.ts])).toEqual([
+			['queued-first', 'Corrected first message', ts], ['queued-last', 'Last queued message', ts],
+		])
+		// Empty composer Up chooses the newest, not the first visible queued row.
+		await input('')
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowUp' })
+		await b.waitFor(`document.querySelector('textarea').value === 'Last queued message'`)
+		await input('Unsaved newest edit')
+		await b.call('Page.reload', {})
+		await b.waitFor(`document.querySelector('textarea')?.value === 'Unsaved newest edit' && document.querySelector('.EditBar') && !document.querySelector('[aria-label="Save queued message"]').disabled`)
+		expect(status.inboxOf(id).map((m) => m.text)).toEqual(['Corrected first message', 'Last queued message'])
+		await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' })
+		await b.waitFor(`!document.querySelector('.EditBar') && document.querySelector('textarea').value === ''`)
+		expect(status.stateOf(id).type).toBe('paused')
+	} finally {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+}, 20000)

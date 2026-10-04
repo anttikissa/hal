@@ -1,16 +1,9 @@
 /// <reference lib="dom" />
-// The browser client's controller, without Solid or the DOM tree: the
-// view (view.ts) and the message box's text as plain state, changed
-// synchronously by host events and user input, then handed to the
-// components through `changed` (main.tsx points it at a signal). Keys
-// are keys.ts's job.
-//
-// The box is the session's draft (common/drafts.ts, kept in
-// localStorage too); a sent prompt shows at once, pending until the
-// host has it.
-//
-// Tabs are the host's (task 0a); which one shows is this page's, named
-// by the address (tabs.ts, router.ts).
+// Web controller: host events and input update plain view state; changed
+// feeds Solid. Keys live in keys.ts, drafts in common/drafts.ts, tabs in
+// tabs.ts and router.ts. Queue edits persist separately from the draft.
+import { queueEdit } from '../common/queue-edit.ts'
+import { queuedPrompt } from './queue-edit.ts'
 import { restart } from './restart.ts'
 import { store } from './draft-store.ts'
 import { backfill, type Backfill } from '../common/backfill.ts'
@@ -92,6 +85,7 @@ function sendNow(command: unknown): boolean {
 
 function onEvent(event: Event): void {
 	let st = app.state
+	let queueChanged = queueEdit.onEvent(event)
 	if (event.type === 'find-results') return find.event(event)
 	if (event.type === 'restart') return restart.mark()
 	if (event.type === 'restart-ask') delete restart.state.mark
@@ -131,6 +125,8 @@ function onEvent(event: Event): void {
 	let id = app.sessionId()
 	// A recalled entry stays in the box; the draft changes underneath.
 	if (id && (changed || event.type === 'snapshot') && !st.view.editing?.aside) st.text = recall.shown(id) ?? drafts.text(id)
+	queuedPrompt.sync()
+	if (queueChanged?.notice) st.view = { ...st.view, notice: queueChanged.notice }
 	app.seek()
 	app.changed()
 	if (event.type === 'snapshot' && event.sessionId === st.shown) {
@@ -186,6 +182,7 @@ function older(): void {
 }
 
 function onState(state: LinkState): void {
+	if (state.type !== 'connected') queueEdit.disconnected()
 	if (restart.linkChanged(state)) return
 	if (state.type === 'connected') { tabs.connected(); push.visibility(app.state.shown) }
 	app.setNotice(state.type === 'connected' ? undefined : state.type === 'joining' ? 'connecting…' : 'disconnected; reconnecting…')
@@ -210,7 +207,7 @@ function input(text: string): void {
 		}
 	}
 	let id = app.sessionId()
-	if (id && !st.view.editing?.aside && recall.typed(id, text)) drafts.edit(id, text)
+	if (id && !queueEdit.input(id, text) && !st.view.editing?.aside && recall.typed(id, text)) drafts.edit(id, text)
 	app.changed()
 }
 
@@ -294,6 +291,7 @@ function modalPick(index: number): void {
 function send(queue = false): void {
 	let st = app.state
 	let id = app.sessionId()
+	if (st.view.editing?.queueEdit || (id && queueEdit.current(id)?.active)) { queuedPrompt.save(); return }
 	if (view.commandDraft(st.text)) queue = false
 	if (id && uploads.pending(id)) {
 		uploads.wait(id, queue)
@@ -353,6 +351,7 @@ function reset(): void {
 	if (app.state.timer) clearTimeout(app.state.timer)
 	app.state = createState()
 	recall.reset()
+	queueEdit.disconnected()
 	uploads.reset()
 }
 

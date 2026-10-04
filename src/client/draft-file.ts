@@ -30,7 +30,7 @@ function save(id: string, local: Local): void {
 	let file = draftFile.path(id)
 	let tmp = `${file}.${process.pid}.tmp`
 	try {
-		if (!local.text && !local.sending.length) return rmSync(file, { force: true })
+		if (!local.text && !local.sending.length && !local.queueEdit) return rmSync(file, { force: true })
 		mkdirSync(draftFile.dir(), { recursive: true, mode: 0o700 })
 		writeFileSync(tmp, ason.stringify(local) + '\n', { mode: 0o600 })
 		renameSync(tmp, file)

@@ -859,3 +859,31 @@ test('the terminal watches the tab it shows until its window reports losing focu
 	expect(watched).toHaveLength(5)
 })
 
+
+test('Up opens a queued editor only after host protection, Alt-Enter saves in place and restores the draft', () => {
+	let send = connection.send
+	connection.send = record
+	try {
+		app.onEvent(snapshot('s1', { type: 'running', phase: 'streaming' }))
+		app.onEvent({ type: 'inbox', sessionId: 's1', inbox: [{ id: 'q1', text: 'queued text', queue: true }] })
+		app.onKeys([key('up')])
+		let acquire = sent.at(-1)
+		expect(acquire).toMatchObject({ type: 'queue-edit', message: 'q1' })
+		expect(app.state.prompt.text).toBe('')
+		expect(app.state.editing).toBeUndefined()
+		app.onEvent({ type: 'queue-hold', sessionId: 's1', message: 'q1' })
+		app.onEvent({ type: 'queue-edit', sessionId: 's1', edit: acquire.edit, message: 'q1', text: 'queued text' })
+		expect(app.state.prompt.text).toBe('queued text')
+		expect(appView.view().editing).toContain('queued message')
+		app.onEvent({ type: 'draft', sessionId: 's1', draft: { text: 'a separate draft', rev: 1 } })
+		expect(app.state.prompt.text).toBe('queued text')
+		type('!')
+		app.onKeys([{ ...key('enter'), alt: true }])
+		let save = sent.at(-1)
+		expect(save).toMatchObject({ type: 'submit', edits: 'q1', queueEdit: acquire.edit, text: 'queued text!' })
+		expect(save.queue).toBeUndefined()
+		app.onEvent({ type: 'ack', id: drafts.local('s1').queueEdit!.saving! })
+		expect(app.state.editing).toBeUndefined()
+		expect(app.state.prompt.text).toBe('a separate draft')
+	} finally { connection.send = send }
+})
