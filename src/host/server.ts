@@ -19,6 +19,7 @@ import { createServer, type Server, type Socket } from 'net'
 import { lines } from '../common/lines.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
+import { secrets } from './secrets.ts'
 import { web } from './web.ts'
 
 const LOCK_EX = 2
@@ -59,6 +60,10 @@ function tryLock(): boolean {
 async function serve(): Promise<boolean> {
 	if (server.state.listener) return true
 	if (!server.tryLock()) return false
+	// Only the lock holder moves credentials into secrets/ (task de): a
+	// peer doing it while an older host still refreshes tokens into
+	// auth.ason would leave a stale copy that wins.
+	secrets.migrate(['auth.ason', 'state/push-vapid.ason', 'state/push-subscriptions.ason'])
 	try {
 		server.state.listener = await server.listen(server.socketPath())
 	} catch (e) {
