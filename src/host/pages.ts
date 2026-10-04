@@ -54,13 +54,13 @@ function deadline(): number {
 
 // Runs `steps` in slices, yielding to the event loop between them: the
 // value at once if they fit what is left of this turn's slice, or decode
-// at most syncBytes() (small reads always finish at once), else a
-// promise.
+// at most syncBytes() (small reads finish at once unless their many
+// steps, one per open tab, take sliceMs), else a promise.
 function slices<T>(steps: Steps<T>): T | Promise<T> {
-	let decoded = 0
+	let decoded = 0, started = performance.now()
 	let run = (): IteratorResult<number, T> | undefined => {
 		for (;;) {
-			let small = decoded <= pages.syncBytes
+			let small = decoded <= pages.syncBytes && performance.now() - started < pages.sliceMs
 			if (!small && performance.now() >= pages.deadline()) return undefined
 			let r = steps.next()
 			if (r.done) return r
