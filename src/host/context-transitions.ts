@@ -54,7 +54,7 @@ function settle(id: string): void {
 	if (unanswered.size) {
 		let results = [...unanswered].map((id) => ({ type: 'tool_result' as const, id, output: 'No result: the host stopped before settlement; this call may or may not have run.', isError: true }))
 		let r = history.append(id, { type: 'user', blocks: results })
-		host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r.n })
+		host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r.n, ts: r.ts })
 	}
 }
 

@@ -4,6 +4,7 @@
 // inside. Both clients group with this before drawing.
 
 import type { Item } from './transcript.ts'
+import { titles } from './titles.ts'
 
 // `name`: the file as the user knows it (relative to the session's cwd
 // when inside it); `what`: changed, added or removed; `diff`: changed
@@ -18,18 +19,11 @@ const cache = new WeakMap<Item, { last: Item; count: number; day: string; merged
 // The changes each merged item stands for, for the terminal's rows.
 const runs = new WeakMap<Item, Output[]>()
 
-function hhmm(ts: string | undefined, now = Date.now()): string {
-	if (!ts) return ''
-	let d = new Date(ts)
-	let time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-	return new Date(now).toDateString() === d.toDateString() ? time : `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })} ${time}`
-}
-
 // The card's head line.
-function summary(list: Output[], now = Date.now()): string {
+function summary(list: Output[]): string {
 	let names = [...new Set(list.map((o) => o.change!.name))].join(', ')
 	if (list.length === 1) return `${names} ${list[0]!.change!.what === 'changed' ? 'changed' : list[0]!.change!.what === 'added' ? 'added to the system prompt' : 'removed from the system prompt'}`
-	return `${list.length} changes to ${names} since ${hhmm(list[0]!.ts, now)}`
+	return `${list.length} changes to ${names} since ${titles.time(list[0]!.ts)}`
 }
 
 // Runs of consecutive prompt-change outputs merged into their first:
@@ -44,8 +38,8 @@ function group(items: Item[], now = Date.now()): Item[] {
 		let last = run.at(-1)!
 		let hit = cache.get(run[0]!)
 		if (hit?.last !== last || hit.count !== run.length || hit.day !== new Date(now).toDateString()) {
-			let body = run.map((o) => `${promptChanges.line(o, now)}\n\`\`\`diff\n${o.change!.diff}\n\`\`\``)
-			hit = { last, count: run.length, day: new Date(now).toDateString(), merged: { ...item, text: [summary(run, now), ...body].join('\n\n') } }
+			let body = run.map((o) => `${promptChanges.line(o)}\n\`\`\`diff\n${o.change!.diff}\n\`\`\``)
+			hit = { last, count: run.length, day: new Date(now).toDateString(), merged: { ...item, text: [summary(run), ...body].join('\n\n') } }
 			cache.set(run[0]!, hit)
 			runs.set(hit.merged, run)
 		}
@@ -55,10 +49,10 @@ function group(items: Item[], now = Date.now()): Item[] {
 }
 
 // One change's line: '11:14 SYSTEM.md changed (+1 −2)'.
-function line(o: Output, now = Date.now()): string {
+function line(o: Output): string {
 	let rows = o.change!.diff.split('\n')
 	let n = (c: string) => rows.filter((r) => r.startsWith(c)).length
-	return `${hhmm(o.ts, now)} ${o.change!.name} ${o.change!.what} (+${n('+')} −${n('-')})`
+	return `${titles.time(o.ts)} ${o.change!.name} ${o.change!.what} (+${n('+')} −${n('-')})`
 }
 
 // Added and removed lines of a change; `text` skips blank ones.
@@ -110,17 +104,17 @@ function edit(o: Output): Part[] | undefined {
 // `parts`, when set, colours the row word by word; `text` is it plain.
 type Row = { text: string; tone: 'head' | 'add' | 'del' | 'dim'; parts?: Part[] }
 const plain = (p: Part[]) => p.map((x) => x.text).join(' ')
-function rows(item: object, now = Date.now()): Row[] {
+function rows(item: object): Row[] {
 	let one = item as Output
 	let run = runs.get(item as Item) ?? (one.type === 'output' && one.change ? [one] : [])
 	if (!run.length) return []
 	let tally = (c: ReturnType<typeof counts>) => `+${c.add} −${c.del}`
 	let tone = (r: string): Row['tone'] => (r[0] === '+' ? 'add' : 'del')
-	let span = (a: Output, b: Output) => (hhmm(a.ts, now) === hhmm(b.ts, now) ? hhmm(a.ts, now) : `${hhmm(a.ts, now)}–${hhmm(b.ts, now)}`)
+	let span = (a: Output, b: Output) => (titles.time(a.ts) === titles.time(b.ts) ? titles.time(a.ts) : `${titles.time(a.ts)}–${titles.time(b.ts)}`)
 	let clean = (r: string) => `${r[0]} ${r.slice(1).trim()}`
 	if (run.length === 1) {
 		let c = counts(run[0]!)
-		let out: Row[] = [{ text: `${hhmm(run[0]!.ts, now)} ${summary(run, now)}  ${tally(c)}`, tone: 'head' }]
+		let out: Row[] = [{ text: `${titles.time(run[0]!.ts)} ${summary(run)}  ${tally(c)}`, tone: 'head' }]
 		let e = edit(run[0]!)
 		if (e) return [...out, { text: `  ${plain(e)}`, tone: 'dim', parts: [{ text: ' ', tone: 'dim' }, ...e] }]
 		out.push(...c.text.slice(0, 3).map((r) => ({ text: `  ${clean(r)}`, tone: tone(r) })))
@@ -136,7 +130,7 @@ function rows(item: object, now = Date.now()): Row[] {
 		let first = c.text[0]
 		let e = edit(o)
 		let note = [o.change!.what === 'changed' ? '' : o.change!.what, e ? plain(e) : first ? clean(first) : c.add + c.del ? 'blank lines' : ''].filter(Boolean).join(' · ')
-		let lead = `  ${hhmm(o.ts, now)}  ${o.change!.name.padEnd(pad)}  ${tally(c).padEnd(7)} `
+		let lead = `  ${titles.time(o.ts)}  ${o.change!.name.padEnd(pad)}  ${tally(c).padEnd(7)} `
 		out.push({ text: `${lead} ${note}`.trimEnd(), tone: e || !first ? 'dim' : tone(first), parts: e && [{ text: lead, tone: 'dim' }, ...e] })
 	}
 	return out
@@ -147,4 +141,4 @@ function run(item: Item): Output[] {
 	return runs.get(item) ?? (item.type === 'output' && item.change ? [item as Output] : [])
 }
 
-export const promptChanges = { summary, group, hhmm, line, rows, run }
+export const promptChanges = { summary, group, line, rows, run }

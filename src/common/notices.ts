@@ -4,6 +4,7 @@
 // each goes after ttl() unless it `stays` until its source removes it.
 // Beyond max() entries the oldest fold into one '+N more' line.
 // onChange is the client's repaint.
+import { titles } from './titles.ts'
 
 export type NoticeKind = 'done' | 'failed' | 'attention' | 'update' | 'commit'
 // What the host sends when another tab's turn ends or asks (host/notify.ts)
@@ -29,10 +30,9 @@ function reason(e: NoticeEntry): string {
 	return e.what ?? WORDS[e.kind]
 }
 
-// An entry's time: hour and minute today, else with the date.
-function stamp(at: string, now = new Date()): string {
-	let d = new Date(at)
-	return d.toDateString() === now.toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+// An entry's time, as every transcript block shows it (task ta).
+function stamp(at: string): string {
+	return titles.time(at)
 }
 
 function fromEvent(e: NoticeEvent): Omit<Notice, 'at'> {

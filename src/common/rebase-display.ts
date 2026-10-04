@@ -19,20 +19,20 @@ function text(r: HistoryRecord & { type: 'rebase' }, raw: HistoryRecord[]): stri
 	return `History rewritten · /rebase undo · ${dropped} dropped, ${r.edit.length} edited · cache rebuilds from #${sums.cacheFrom}`
 }
 
-function dividers(raw: HistoryRecord[]): { n: number; text: string; after?: number }[] {
+function dividers(raw: HistoryRecord[]): { n: number; text: string; ts?: string; after?: number }[] {
 	let kept = new Set(replay.current(raw).map((r) => r.n)), after: number | undefined
 	return rebase.latest(raw).flatMap((r) => {
-		if (r.type === 'rebase') return [{ n: r.n!, text: rebaseDisplay.text(r, raw), after }]
+		if (r.type === 'rebase') return [{ n: r.n!, text: rebaseDisplay.text(r, raw), ts: r.ts, after }]
 		if (kept.has(r.n)) after = r.n
 		return []
 	})
 }
 
-function insert(items: Item[], dividers: { n: number; text: string; after?: number }[] = []): Item[] {
+function insert(items: Item[], dividers: { n: number; text: string; ts?: string; after?: number }[] = []): Item[] {
 	for (let d of dividers) {
 		let at = d.after === undefined ? 0 : items.findLastIndex((item) => item.key.split('.')[0] === String(d.after)) + 1
 		if (d.after !== undefined && !at) continue
-		items.splice(at, 0, { type: 'divider', text: d.text, key: String(d.n) })
+		items.splice(at, 0, { type: 'divider', text: d.text, ...(d.ts !== undefined && { ts: d.ts }), key: String(d.n) })
 	}
 	return items
 }

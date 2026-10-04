@@ -20,8 +20,9 @@ import type { Event } from './protocol.ts'
 // `queue`: run after the current turn instead of steering it. `amend`:
 // an edit of the last message (src/common/amend.ts); `edits`: the id of
 // the waiting inbox message it edits; `rewind`: the earlier prompt
-// record it replaces, rewinding there (task 26q).
-export type Sending = { id: string; text: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number }
+// record it replaces, rewinding there (task 26q). `ts`: when it was
+// sent, its time until the host's record replaces it (task ta).
+export type Sending = { id: string; text: string; ts?: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number }
 
 export type Local = {
 	// What the editor holds.
@@ -65,7 +66,7 @@ function local(id: string): Local {
 // as no draft rather than breaking the client.
 function valid(l: Local | undefined): Local | undefined {
 	if (!l || typeof l.text !== 'string' || typeof l.base !== 'number' || !Array.isArray(l.sending)) return undefined
-	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.queue === undefined || typeof s.queue === 'boolean') && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.rewind === undefined || Number.isSafeInteger(s.rewind)))
+	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.ts === undefined || typeof s.ts === 'string') && (s.queue === undefined || typeof s.queue === 'boolean') && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.rewind === undefined || Number.isSafeInteger(s.rewind)))
 	return { text: l.text, base: l.base, dirty: l.dirty === true, sending }
 }
 
@@ -111,7 +112,7 @@ function flush(id: string): void {
 // sent, not the draft) stays, as the host keeps it too.
 function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> = {}): void {
 	let l = drafts.local(id)
-	let sending: Sending = { id: drafts.nextId(), text }
+	let sending: Sending = { id: drafts.nextId(), text, ts: new Date().toISOString() }
 	if (how.queue) sending.queue = true
 	if (how.amend) sending.amend = true
 	if (how.edits !== undefined) sending.edits = how.edits

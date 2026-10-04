@@ -111,7 +111,7 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = { type: 'turn_end', status: 'paused', usage: forms.open(history.readSync(id))?.usage ?? {} }
 	if (reason !== undefined) end.pauseReason = reason
 	let recorded = history.append(id, end) as HistoryRecord & { type: 'turn_end' }
-	let ended: Event = { type: 'turn-end', sessionId: id, status: 'paused', n: recorded.n, stats: stats.ended(id, recorded) }
+	let ended: Event = { type: 'turn-end', sessionId: id, status: 'paused', n: recorded.n, ts: recorded.ts, stats: stats.ended(id, recorded) }
 	if (Object.keys(end.usage).length) ended.usage = end.usage
 	host.broadcast(id, ended)
 	contextTransitions.apply(id)
@@ -251,7 +251,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (signal.aborted) {
 					if (contextTransitions.pending(id)?.kind === 'clear') {
 						let results = round.blocks.filter((b) => b.type === 'tool_call').map((b) => ({ type: 'tool_result' as const, id: b.id, output: 'Tool call did not run: clear accepted before dispatch.', isError: true }))
-						if (results.length) { let r = history.results(id, results); host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r?.n }) }
+						if (results.length) { let r = history.results(id, results); host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r?.n, ts: r?.ts }) }
 					}
 					continue
 				}
@@ -293,8 +293,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				finally { stream?.stop() }
 			}
 			if (turns.state.running.get(id) !== running) return
-			let n = history.results(id, results)?.n
-			host.broadcast(id, n === undefined ? { type: 'tool-results', sessionId: id, results } : { type: 'tool-results', sessionId: id, results, n })
+			let r = history.results(id, results)
+			host.broadcast(id, r?.n === undefined ? { type: 'tool-results', sessionId: id, results, ts: r?.ts } : { type: 'tool-results', sessionId: id, results, n: r.n, ts: r.ts })
 			if (signal.aborted) continue
 			// A wait: the turn ends, done, unless steering waits to be read.
 			if (ending && !status.inboxOf(id).some((m) => !m.queue)) {
@@ -318,7 +318,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	}
 	let end: Event & { type: 'turn-end' } = { type: 'turn-end', sessionId: id, status: 'error', error: failure ?? 'turn end was not recorded' }
 	if (recorded?.type === 'turn_end') {
-		end = { type: 'turn-end', sessionId: id, status: recorded.status }
+		end = { type: 'turn-end', sessionId: id, status: recorded.status, ts: recorded.ts }
 		if (recorded.n !== undefined) end.n = recorded.n
 		if (Object.keys(recorded.usage).length) end.usage = recorded.usage
 		if (recorded.error !== undefined) end.error = recorded.error

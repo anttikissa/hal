@@ -18,14 +18,14 @@ export type Shown = { originSession?: string } & (
 	// the human. `ts`: when it was sent (task hp).
 	| ({ type: 'prompt'; text: string; queued?: true; ts?: string } & Sender)
 	// An image attached to the prompt before it (task 2a).
-	| { type: 'image'; blob: string; mediaType: string; bytes?: number }
+	| { type: 'image'; blob: string; mediaType: string; bytes?: number; ts?: string }
 	// `ts`: when the block started; `model`, `effort`: what wrote it
 	// (task hp). Records from before hp have none of them.
 	| { type: 'text'; text: string; naming?: true; ts?: string; model?: string; effort?: string }
 	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
 	| { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string; ts?: string }
-	| { type: 'tool-result'; id: string; output: string; isError?: boolean }
-	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string }
+	| { type: 'tool-result'; id: string; output: string; isError?: boolean; ts?: string }
+	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string; ts?: string }
 	// A durable question; with `answers` once answered (secrets only named).
 	// `cancelled`: dismissed (Escape, or a newer question replaced it).
 	// `command`: a slash command asked; open in any session state.
@@ -36,7 +36,7 @@ export type Shown = { originSession?: string } & (
 	| { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string }
 	// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
 	// shows as an output: 'HH:MM Context cleared.'.
-	| { type: 'divider'; text: string }
+	| { type: 'divider'; text: string; ts?: string }
 )
 
 // `key`: the item's id (task w5), the same live, after a reconnect or
@@ -109,7 +109,7 @@ function promptItem(text: string, s?: Sender, ts?: string, queued = false): Show
 // its run position, q1, q2… (task 16); its clients draw a compact row.
 function waitingItem(item: InboxItem, list: InboxItem[] = [item]): Item {
 	let key = item.queue ? `q${list.filter((m) => m.queue).indexOf(item) + 1}` : item.id
-	return { ...transcript.promptItem(item.text, inbox.provenance(item), undefined, !!item.queue), key }
+	return { ...transcript.promptItem(item.text, inbox.provenance(item), item.ts, !!item.queue), key }
 }
 
 function key(n: number | undefined, i: number, at: number): string {
@@ -128,15 +128,17 @@ function keyed(shown: Shown[], n: number | undefined, at: number): Item[] {
 	return shown.map((s, i) => ({ ...s, key: transcript.key(n, i, at + i) }) as Item)
 }
 
-function imageItem(b: ImageBlock): Shown {
+function imageItem(b: ImageBlock, ts?: string): Shown {
 	let item: Shown = { type: 'image', blob: b.blob, mediaType: b.mediaType }
 	if (b.bytes !== undefined) item.bytes = b.bytes
+	if (ts !== undefined) item.ts = ts
 	return item
 }
 
-function resultItem(b: ToolResultBlock): Shown {
+function resultItem(b: ToolResultBlock, ts?: string): Shown {
 	let item: Shown = { type: 'tool-result', id: b.id, output: b.output }
 	if (b.isError) item.isError = true
+	if (ts !== undefined) item.ts = ts
 	return item
 }
 
@@ -154,13 +156,14 @@ function recordShown(r: HistoryRecord): Shown[] {
 	if ((r.type === 'output' && r.transitionDone) || ((r.type === 'command' || r.type === 'output') && r.origin === 'model')) return [] // model-run: its tool card shows it (9g)
 	if (r.type === 'command' || r.type === 'output') return [transcript.aside(r)]
 	if (r.type === 'reset') return [{ type: 'output', text: transcript.boundary(r), ts: r.ts }]
-	if (r.type === 'compact') return [{ type: 'divider', text: transcript.boundary(r) }]
-	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b, r.ts, r.queued) : b.type === 'image' ? transcript.imageItem(b) : transcript.resultItem(b)))
+	if (r.type === 'compact') return [{ type: 'divider', text: transcript.boundary(r), ts: r.ts }]
+	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b, r.ts, r.queued) : b.type === 'image' ? transcript.imageItem(b, r.ts) : transcript.resultItem(b, r.ts)))
 	return [transcript.endItem(r)]
 }
 
-function endItem(end: { status: TurnStatus; usage?: Usage; error?: string }): Shown {
+function endItem(end: { status: TurnStatus; usage?: Usage; error?: string; ts?: string }): Shown {
 	let item: Shown = { type: 'turn-end', status: end.status }
+	if (end.ts !== undefined) item.ts = end.ts
 	if (end.usage && Object.keys(end.usage).length) item.usage = end.usage
 	if (end.error !== undefined) item.error = end.error
 	return item
@@ -182,7 +185,7 @@ function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): 
 
 function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form; ts?: string }): Shown {
 	if (r.type === 'question') return { type: 'question', id: r.id, form: r.form, command: true, ...(r.ts !== undefined && { ts: r.ts }) }
-	if (r.type === 'divider') return r.clear ? { type: 'output', text: r.text, ...(r.ts !== undefined && { ts: r.ts }) } : { type: 'divider', text: r.text }
+	if (r.type === 'divider') return { type: r.clear ? 'output' : 'divider', text: r.text, ...(r.ts !== undefined && { ts: r.ts }) }
 	if (r.type === 'command') return { type: 'command', text: r.text, ...(r.from !== undefined && { from: r.from }), ...(r.label !== undefined && { label: r.label }), ...(r.ts !== undefined && { ts: r.ts }) }
 	return { type: 'output', text: r.text, ...(r.error && { error: true }), ...(r.synthetic && { synthetic: true }), ...(r.change && { change: r.change }), ...(r.ts !== undefined && { ts: r.ts }) }
 }
@@ -226,7 +229,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 		}
 		if (replay.isPrompt(r)) prompt = items.length
 		if (r.type === 'answer') items = transcript.answered(items, r)
-		else if (r.type === 'rebase') items.push(...transcript.keyed([{ type: 'divider', text: rebaseDisplay.text(r, snapshot.history) }], r.n, items.length))
+		else if (r.type === 'rebase') items.push(...transcript.keyed([{ type: 'divider', text: rebaseDisplay.text(r, snapshot.history), ts: r.ts }], r.n, items.length))
 		else items.push(...transcript.recordItems(r, items.length))
 	}
 	let promptKey = items[prompt ?? -1]?.key
@@ -338,7 +341,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	}
 	if (event.type === 'turn-start') {
 		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: transcript.fresh(event) } }
-		let items: Item[] = [...t.items, ...transcript.keyed([transcript.promptItem(event.prompt, event.sender, event.ts, event.queued), ...(event.images ?? []).map((b) => transcript.imageItem(b))], event.n, t.items.length)]
+		let items: Item[] = [...t.items, ...transcript.keyed([transcript.promptItem(event.prompt, event.sender, event.ts, event.queued), ...(event.images ?? []).map((b) => transcript.imageItem(b, event.ts))], event.n, t.items.length)]
 		return { ...t, items, prompt: t.items.length, live: { start: items.length, turn: transcript.fresh(event) } }
 	}
 	let question: Shown | undefined = event.type === 'question' ? { type: 'question', id: event.id, form: event.form, ...(event.ts !== undefined && { ts: event.ts }) } : undefined
@@ -372,7 +375,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'tool-results') {
 		// The round's blocks are in history now; the next round starts empty.
 		let done = transcript.settle(t.items, t.live).map((item): Item => item.type === 'tool' && event.results.some((r) => r.id === item.id) ? { ...item, partial: undefined } : item)
-		let items = [...done, ...transcript.keyed(event.results.map((b) => transcript.resultItem(b)), event.n, done.length)]
+		let items = [...done, ...transcript.keyed(event.results.map((b) => transcript.resultItem(b, event.ts)), event.n, done.length)]
 		return { ...t, items, live: { start: items.length, turn: transcript.fresh(t.live.turn) } }
 	}
 	// Attachments, notices and other session events are not turn ends.
@@ -393,7 +396,7 @@ function settle(items: Item[], live: NonNullable<Transcript['live']>): Item[] {
 function prompted(t: Transcript, items: Item[], event: Event & { type: 'prompt' }): Transcript {
 	let keep = event.replaces && t.prompt !== undefined ? items.slice(0, t.prompt) : items
 	let { live: _live, ...rest } = t
-	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts, event.queued)), ...(event.images ?? []).map((b) => transcript.imageItem(b))]
+	let shown: Shown[] = [...event.texts.map((text, i) => transcript.promptItem(text, event.senders?.[i], event.ts, event.queued)), ...(event.images ?? []).map((b) => transcript.imageItem(b, event.ts))]
 	return { ...rest, items: [...keep, ...transcript.keyed(shown, event.n, keep.length)], prompt: keep.length }
 }
 

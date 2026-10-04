@@ -248,7 +248,7 @@ function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 // command id), but for one the host already put in the transcript: it
 // is a row already, under the same key, so its card stays. `tabs`: the
 // host's tab ids in order, numbering a queued message's sender.
-function withPending(rows: Row[], pending: { id: string; text: string }[], waiting: InboxItem[] = [], tabs: string[] = []): Row[] {
+function withPending(rows: Row[], pending: { id: string; text: string; ts?: string }[], waiting: InboxItem[] = [], tabs: string[] = []): Row[] {
 	let keys = new Set(rows.map((r) => r.key))
 	let at = (rows.at(-1)?.at ?? -1) + 1
 	let row = (m: InboxItem): Row => {
@@ -258,7 +258,7 @@ function withPending(rows: Row[], pending: { id: string; text: string }[], waiti
 	}
 	let queued = waiting.filter((m) => !keys.has(m.id)).map(row)
 	for (let row of queued) keys.add(row.key)
-	let more = pending.filter((s) => !keys.has(s.id)).map((s): Row => ({ item: { type: 'prompt', text: s.text, key: s.id }, at, key: s.id, pending: true }))
+	let more = pending.filter((s) => !keys.has(s.id)).map((s): Row => ({ item: { type: 'prompt', text: s.text, ts: s.ts, key: s.id }, at, key: s.id, pending: true }))
 	return queued.length || more.length ? [...rows, ...queued, ...more] : rows
 }
 
@@ -308,9 +308,9 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			return { kind: item.isError ? 'result error' : 'result log', text: (item.isError ? '✗ ' : '◂ ') + shown.join('\n  ') }
 		}
 		case 'turn-end':
-			if (item.status === 'error') return { kind: 'end error', text: `error: ${item.error ?? 'turn failed'}` }
+			if (item.status === 'error') return { kind: 'end error', text: titles.stamp(item.ts, `error: ${item.error ?? 'turn failed'}`) }
 			if (item.status === 'completed') return null
-			return { kind: 'end log', text: `[${item.status}]` }
+			return { kind: 'end log', text: titles.stamp(item.ts, `[${item.status}]`) }
 		case 'question': {
 			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
 			let quote = item.form.quote ? item.form.quote.text.split('\n').map((l) => `    ${l}`) : []
@@ -324,7 +324,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			// is the diffs (task ar).
 			return { kind: item.error ? 'output error' : 'output log', text: item.change ? item.text.slice(item.text.indexOf('\n') + 1).trimStart() : item.text }
 		case 'divider':
-			return { kind: 'divider log', text: item.text }
+			return { kind: 'divider log', text: titles.stamp(item.ts, item.text) }
 	}
 }
 

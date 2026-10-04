@@ -28,6 +28,12 @@ function time(ts: string | undefined): string {
 	return t
 }
 
+// A one-row block's text behind its time: '10:52 [paused]'.
+function stamp(ts: string | undefined, text: string): string {
+	let t = titles.time(ts)
+	return t ? `${t} ${text}` : text
+}
+
 // 'who (a, b)': a sender and its tags, or the sender alone.
 function tagged(who: string, tags: (string | false | undefined)[]): string {
 	let list = tags.filter((t) => t)
@@ -98,4 +104,4 @@ function blockId(item: Shown & { key: string }): string {
 	return titles.letter(item) + item.key
 }
 
-export const titles = { names: {} as Record<string, string>, modelName, time, author, who, title, letter, blockId }
+export const titles = { names: {} as Record<string, string>, modelName, time, stamp, author, who, title, letter, blockId }

@@ -41,12 +41,12 @@ test('a snapshot shows history as display items without provider details', () =>
 		{ type: 'thinking', text: 'hmm', ts, key: '2' },
 		{ type: 'text', text: 'hello', ts, key: '4' },
 		{ type: 'tool', id: 't1', name: 'bash', input: { cmd: 'ls' }, key: '5', ts },
-		{ type: 'turn-end', status: 'completed', usage: { input: 3 }, key: '6' },
+		{ type: 'turn-end', status: 'completed', usage: { input: 3 }, ts, key: '6' },
 		// One record, two items; a record built without a number is keyed
 		// by its place.
-		{ type: 'tool-result', id: 't1', output: 'x', key: '7' },
-		{ type: 'tool-result', id: 't2', output: 'y', key: '7.1' },
-		{ type: 'turn-end', status: 'interrupted', key: '~7' },
+		{ type: 'tool-result', id: 't1', output: 'x', ts, key: '7' },
+		{ type: 'tool-result', id: 't2', output: 'y', ts, key: '7.1' },
+		{ type: 'turn-end', status: 'interrupted', ts, key: '~7' },
 	])
 	expect(t.live).toBeUndefined()
 })
@@ -128,7 +128,7 @@ test('tool results settle the round so far; the next round streams after them', 
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1, ts },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'look' }, n: 2, ts },
 		{ type: 'stream', sessionId, event: call, n: 3, ts },
-		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 't1', output: 'no such file', isError: true }], n: 4 },
+		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 't1', output: 'no such file', isError: true }], n: 4, ts },
 		{ type: 'stream', sessionId, event: { type: 'text', text: 'gone' }, n: 5, ts },
 	]
 	let t = fold(events)!
@@ -136,7 +136,7 @@ test('tool results settle the round so far; the next round streams after them', 
 		{ type: 'prompt', text: 'go', ts, key: '1' },
 		{ type: 'text', text: 'look', ts, key: '2' },
 		{ type: 'tool', id: 't1', name: 'read', input: { path: 'a' }, key: '3', ts },
-		{ type: 'tool-result', id: 't1', output: 'no such file', isError: true, key: '4' },
+		{ type: 'tool-result', id: 't1', output: 'no such file', isError: true, ts, key: '4' },
 		{ type: 'text', text: 'gone', ts, key: '5' },
 	])
 	// A client that connects now sees the same.
@@ -242,8 +242,8 @@ test('a command during a running turn goes where history has it: after finished 
 		// The round is done: every block is in history before this one.
 		{ type: 'command', sessionId, text: '/help', ts, n: 7 },
 		{ type: 'meta', sessionId, meta: { ...meta, cwd: '/x' } },
-		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'c', output: 'ok' }], n: 8 },
-		{ type: 'turn-end', sessionId, status: 'completed', n: 9 },
+		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'c', output: 'ok' }], n: 8, ts },
+		{ type: 'turn-end', sessionId, status: 'completed', n: 9, ts },
 	])!
 	// The streaming block keeps the number it started with, written
 	// after the command numbered past it.
@@ -255,8 +255,8 @@ test('a command during a running turn goes where history has it: after finished 
 		{ type: 'text', text: 'working', ts, key: '3' },
 		{ type: 'tool', id: 'c', name: 'ls', input: {}, key: '6', ts },
 		{ type: 'command', text: '/help', ts, key: '7' },
-		{ type: 'tool-result', id: 'c', output: 'ok', key: '8' },
-		{ type: 'turn-end', status: 'completed', key: '9' },
+		{ type: 'tool-result', id: 'c', output: 'ok', ts, key: '8' },
+		{ type: 'turn-end', status: 'completed', ts, key: '9' },
 	])
 	let late = fold([
 		snap({
