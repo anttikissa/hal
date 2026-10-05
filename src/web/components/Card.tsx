@@ -123,7 +123,10 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let title = () => titles.title(props.row.item)
 	let source = () => props.row.item.type === 'prompt' && props.row.item.label?.match(/^bash #(t?\d+)$/)?.[1]
 	let who = () => {
-		let ref = source(), t = titles.who(props.row.item)
+		let item = props.row.item
+		// A question is headed by its text, its addresses links.
+		if (item.type === 'question') return <For each={view.urlParts(item.form.text)}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>
+		let ref = source(), t = titles.who(item)
 		return ref && t?.endsWith(`#${ref}`) ? <>{t.slice(0, -ref.length - 1)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">#{ref}</a></> : t
 	}
 	let marked = (s: string) => {

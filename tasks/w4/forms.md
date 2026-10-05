@@ -27,7 +27,13 @@ Questions that are part of the session: tool approval, questions from
 synthetic models (the intro), command confirmations. Written to history,
 shown as a block, answerable from any client (first answer wins),
 survive restart. Question blocks use colors.question (green, terminal
-and web), apart from amber warnings. An active terminal question always shows its fields and
+and web), apart from amber warnings. Open or answered, a question block
+is headed like every block: its time and its text on one row ("09:07
+Run this command? It matches a dangerous pattern."), wrapped, never
+clipped, with no "?" marker, then its block id (#q<n>) at the right in
+both clients; below come the quote and then the fields or the answer,
+each after a blank row. On the web the header is a CardHeader with no
+icon, like You and Hal cards. An active terminal question always shows its fields and
 focused choice, even if the question block was cached before it became
 answerable. An open question's fields stand between blank rows, apart
 from the question text above and the key hint below. A text field's

@@ -102,7 +102,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 				{(row) => (
 					<>
 					<Show when={open(row())} fallback={<Card row={row()} session={props.view.transcript?.meta.id ?? ''} cursor={cursorKey() === row().key} target={hit() === row().key} job={jobs().has(row().item.key) ? row().item.key : undefined} edit={!row().pending && !row().waiting && editable().has(row().item.key)} />}>
-						{(q) => <Question item={q()} form={props.view.form!} />}
+						{(q) => <Question item={q()} form={props.view.form!} session={props.view.transcript?.meta.id ?? ''} />}
 					</Show>
 					<Show when={!streaming() && row().key === rows().at(-1)?.key}>{line()}</Show>
 					</>

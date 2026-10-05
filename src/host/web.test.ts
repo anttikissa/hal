@@ -1074,9 +1074,9 @@ test.skipIf(!chrome)('pending question URLs are safe native links and wrap at ph
 		await server.serve()
 		web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`!!document.querySelector('.Question .text a')`)
-		let link = await b.evaluate(`(() => { let q = document.querySelector('.Question'), a = q.querySelector('.text a'); return { href: a.getAttribute('href'), target: a.target, rel: a.rel, text: q.querySelector('.text').textContent, links: q.querySelectorAll('a').length, scripts: q.querySelectorAll('script').length } })()`)
-		expect(link).toEqual({ href: url, target: '_blank', rel: 'noopener noreferrer', text: `? ${text}`, links: 1, scripts: 0 })
+		await b.waitFor(`!!document.querySelector('.Question .label a')`)
+		let link = await b.evaluate(`(() => { let q = document.querySelector('.Question'), a = q.querySelector('.label a'); return { href: a.getAttribute('href'), target: a.target, rel: a.rel, text: q.querySelector('.label').textContent, links: q.querySelectorAll('a').length, scripts: q.querySelectorAll('script').length } })()`)
+		expect(link).toEqual({ href: url, target: '_blank', rel: 'noopener noreferrer', text, links: 2, scripts: 0 })
 		for (let width of [390, 1280]) {
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
 			await b.evaluate(`new Promise(resolve => requestAnimationFrame(resolve))`)
@@ -1087,7 +1087,7 @@ test.skipIf(!chrome)('pending question URLs are safe native links and wrap at ph
 		expect(await b.evaluate(`[...document.querySelectorAll('.Question button')].every(b => b.getBoundingClientRect().height >= 44 && b.getBoundingClientRect().width >= 44)`)).toBe(true)
 		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
 		await b.evaluate(`document.querySelector('.Question input').focus()`)
-		for (let selector of ['.dismiss', 'a']) {
+		for (let selector of ['.dismiss', 'a.link', '.label a']) {
 			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 })
 			await b.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 })
 			expect(await b.evaluate(`document.activeElement === document.querySelector('.Question ${selector}')`)).toBe(true)

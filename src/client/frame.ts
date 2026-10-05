@@ -198,7 +198,6 @@ export type Past = { lines: string[]; formCursor?: Frame['cursor']; target?: num
 // so the next call goes on from there: a long history is laid out in
 // slices (task 7j).
 function layout(view: View, cols: number, deadline = Infinity, save = true, screen = 24): Past | undefined {
-	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let session = view.transcript?.meta.id
 	// The batch's rows as drawn grouped: each call and its gap; each
 	// result continues its call's card, replacing the bottom padding row.
@@ -249,9 +248,10 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			bash.push({ at: i, id: item.id, key: item.key })
 		}
 		if (item.type === 'question' && view.form?.id === item.id) {
-			let f = formView.formLines(view.form, width)
-			// Padded like every block with a background (itemRows).
-			let rows = f.rows.length ? ['', ...f.rows, ''] : []
+			let { inner, mark } = frame.ref(item, cols, session, itemView.itemStyle(item)) // its id, like every block's
+			let f = formView.formLines(view.form, inner, item.ts)
+			let rows = f.rows.length ? ['', ...f.rows, ''] : [] // padded like itemRows
+			mark(rows, 1)
 			if (rows.length && lines.length) lines.push('')
 			for (let r of rows) lines.push(...ansi.paintRows(r, itemView.itemStyle(item), cols))
 			// Counted from the end: the question above may flow on.
@@ -331,7 +331,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	let session = view.transcript?.meta.id
 	let waiting = view.transcript?.inbox ?? []
 	let tail = [
-		...waiting.map((m) => ({ item: transcript.waitingItem(m, waiting), m })),
+		...waiting.map((m) => ({ item: transcript.waitingItem(m), m })),
 		...(view.pending ?? []).map((text) => ({ item: { type: 'prompt', text, key: '' } as Item, m: undefined })),
 	]
 	// A stack of queued rows is one block: a padding row of its

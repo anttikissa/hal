@@ -5,6 +5,7 @@ import { forms, type FormState } from '../common/forms.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
+import { titles } from '../common/titles.ts'
 import { ansi } from './ansi.ts'
 import { itemView } from './item-view.ts'
 import { promptView } from './prompt-view.ts'
@@ -12,12 +13,14 @@ import { promptView } from './prompt-view.ts'
 const { INVERSE, UNINVERSE } = ansi
 
 /**
- * Rows of an open question being filled in, at `width` columns, and
+ * Rows of an open question being filled in, at `width` columns, headed
+ * by its time `ts` and text like every block, and
  * where the cursor goes in them: in the focused text, or on the
  * selected option.
  */
-function formLines(st: FormState, width: number): { rows: string[]; cursor: { row: number; col: number } } {
-	let rows = [...ansi.wrap(`? ${st.form.text}`, width), ...itemView.quoteLines(st.form.quote, width)]
+function formLines(st: FormState, width: number, ts?: string): { rows: string[]; cursor: { row: number; col: number } } {
+	let quote = itemView.quoteLines(st.form.quote, width)
+	let rows = [...ansi.wrap(titles.stamp(ts, st.form.text), width), ...(quote.length ? ['', ...quote] : [])]
 	let f = formView.fieldLines(st, width)
 	let escape = st.form.skip ? 'Escape: skip' : 'Escape: pause'
 	let hint = st.form.fields.length > 1 ? `Enter: next · Tab: move · ${escape}` : `Enter: answer · ${escape}`

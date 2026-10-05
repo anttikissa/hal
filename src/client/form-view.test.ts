@@ -33,7 +33,7 @@ test('an open question shows its fields and takes the cursor into the focused te
 	let st = forms.step(forms.start('q1', item.form), { key: 'D', text: 'D' }).state
 	let f = frame.build({ ...v, form: st }, 40)
 	let rows = plain(f.lines)
-	expect(rows[1]).toBe('? How should I call you?')
+	expect(rows[1]).toBe('How should I call you?')
 	// Blank rows set the field apart from the question and the hint.
 	expect(rows[2]).toBe('')
 	expect(rows[3]).toBe('Name: D')
@@ -59,9 +59,9 @@ test('a secret is never on screen; the chosen option is marked', () => {
 
 test('an answered question shows its answers, secrets only as given; one not answered says so', () => {
 	let done: Item = { type: 'question', id: 'q1', form: secretForm, answers: { ok: 'yes' }, secrets: ['key'] }
-	expect(plain(frame.build(view([done]), 40).lines).slice(0, 4)).toEqual(['', '? Log in', 'Key: (given)', 'yes'])
+	expect(plain(frame.build(view([done]), 40).lines).slice(0, 4)).toEqual(['', 'Log in', '', 'Key: (given)'])
 	let left: Item = { type: 'question', id: 'q1', form: secretForm }
-	expect(plain(frame.build(view([left]), 40).lines).slice(0, 3)).toEqual(['', '? Log in', '(not answered)'])
+	expect(plain(frame.build(view([left]), 40).lines).slice(0, 4)).toEqual(['', 'Log in', '', '(not answered)'])
 })
 
 test('a quote shows under the question with its marked part highlighted on every row it wraps to', () => {
