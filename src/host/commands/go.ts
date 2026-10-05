@@ -2,15 +2,10 @@
 import { resolve } from 'path'
 import { commands, type SlashCommand } from '../commands.ts'
 import { host } from '../host.ts'
-import { sessions } from '../sessions.ts'
 import { tabs } from '../tabs.ts'
+import { closedSessions } from './tabs.ts'
 
-// Closed sessions, newest closed first, as /tabs all orders them.
-const closed = () => {
-	let open = tabs.file().open
-	let when = (s: { meta?: { closedAt?: string; createdAt?: string } }) => s.meta?.closedAt ?? s.meta?.createdAt ?? ''
-	return sessions.list().filter((s) => s.meta && !open.includes(s.id)).sort((a, b) => when(b).localeCompare(when(a)))
-}
+const closed = () => closedSessions().filter((s) => s.meta)
 
 export const command: SlashCommand = {
 	help: () => '/go <tab number|session id|name|directory>: go to a session, reopening it if closed. A directory picks its first open tab, else its newest session.',
