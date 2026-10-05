@@ -149,8 +149,9 @@ export const colors = {
 	// Search matches in a modal's list: brighter than the items around.
 	popupMatch: (): Style => ({ fg: [0.95, 0.14, 95] }),
 	// Plumbing beside a modal row, such as the config.ason text of the
-	// selected setting: faint, for whoever looks for it.
-	popupNote: (): Style => ({ fg: [0.58, 0, 0] }),
+	// selected setting: dimmer than the row's text, yet readable on the
+	// selected row's popupCurrent background (L 0.42).
+	popupNote: (): Style => ({ fg: [0.8, 0, 0] }),
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
 	// Edit diffs and a failed command's exit status: soft pastels, easy on
 	// the eyes (the error red is too harsh for so many lines).
