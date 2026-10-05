@@ -1,6 +1,6 @@
 {
 	title: 'Steering spares unsafe-to-stop calls; restart warns',
-	spec: `Bash takes an optional unsafeToStop: true argument, described to the model only as: "Use when stopping halfway might leave broken state (e.g. disk partitioning, database migrations, server provisioning)." The description never says what the flag changes. The tool card shows the flag on the call ("unsafe to stop"), in the terminal and on the web.
+	spec: `Bash takes an optional unsafeToStop: true argument, described to the model only as: "Use when stopping halfway might leave broken state (e.g. disk partitioning, database migrations, server provisioning)." The description never says what the flag changes. The tool card shows the flag on the call as an italic "unsafe to stop" in the card's own title colour, never error red; terminal and web match.
 
 Steering (ordinary submission, send steer:true) changes as follows; task 8p holds the rest. A tool call that has not started never starts; its title status is "(cancelled)". A running call without the flag is stopped as before; its title status is "(stopped, 50.2s)" and its partial output stays. A running call with the flag is never stopped by steering: it stays in the foreground, its title keeps its elapsed time, and the new message waits visibly in the inbox; when the call ends, the model gets the result and the message together and the turn goes on. Steering never moves a call to the background. Escape, closing the tab and quitting stop every call, flagged or not.
 
