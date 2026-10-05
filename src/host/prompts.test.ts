@@ -82,7 +82,7 @@ test('steering before tool dispatch suppresses its call and pairs replay results
 	calls[0]!.push({ type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages.slice(-2)).toEqual([
-		{ role: 'user', blocks: [{ type: 'tool_result', id: 't1', output: expect.stringContaining('did not run'), isError: true }] },
+		{ role: 'user', blocks: [{ type: 'tool_result', id: 't1', output: expect.stringContaining('did not run'), interrupted: 'cancelled' }] },
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('and hurry') }] },
 	])
 	calls[1]!.push({ type: 'done', reason: 'end' })

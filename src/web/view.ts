@@ -309,8 +309,9 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			return { kind, text: `▸ ${toolDetails.headline(item.name, item.input).text}` }
 		}
 		case 'tool-result': {
-			// A glimpse, like the terminal: the model sees all of it.
-			let rows = (bash ? bashResult.display(item.output) : item.output).replace(/\n$/, '').split('\n')
+			// A glimpse, like the terminal; steering's note is the header's (ker).
+			if (item.interrupted === 'cancelled') return { kind: 'result log', text: '' }
+			let rows = (item.interrupted ? bashResult.display(item.output, true, true) : bash ? bashResult.display(item.output) : item.output).replace(/\n$/, '').split('\n')
 			let shown = full ? rows : rows.slice(0, view.resultRows)
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
 			return { kind: item.isError ? 'result error' : 'result log', text: (item.isError ? '✗ ' : '◂ ') + shown.join('\n  ') }

@@ -184,14 +184,17 @@ async function lost(): Promise<void> {
 
 // Why a tool's signal fired. A message sent mid-turn (task 8p) aborts
 // with `steered`: the model must read that the user spoke, never that
-// the user wanted the work stopped.
+// the user wanted the work stopped. `byMessage` marks such a result
+// (turns.ts: not a failure, task ker).
 const steered = 'steered'
+const byMessage = 'by a new user message, which follows; read it, then carry on'
 function why(signal: AbortSignal, stopped = 'cancelled'): string {
-	return signal.reason === steered ? 'interrupted by a new user message, which follows; nothing was cancelled: read it, then carry on' : `${stopped} by the user`
+	return `${stopped} ${signal.reason === steered ? byMessage : 'by the user'}`
 }
 
 export const jobs = {
 	steered,
+	byMessage,
 	why,
 	// `running`: background commands of this process, by id.
 	state: { running: new Map<string, Job>() },

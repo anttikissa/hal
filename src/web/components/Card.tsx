@@ -16,6 +16,7 @@
 // (host tools cap what they keep), so nothing is fetched.
 
 import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
+import { bashResult } from '../../common/bash-result.ts'
 import { markdown as parser } from '../../common/markdown.ts'
 import { titles } from '../../common/titles.ts'
 import { toolDetails } from '../../common/tool-details.ts'
@@ -273,6 +274,8 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} reference={link()}
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
+								<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>
+								<Show when={props.row.result && bashResult.interrupted(props.row.result)}>{(s) => <span class="status">({s()})</span>}</Show>
 								<Show when={failed()}><span class="error">✗</span></Show>
 								<Show when={props.job}>{(n) => <button type="button" class="kill" title={`Stop background job #t${n()} (/kill #t${n()})`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #t${n()}` })}><Icon name="stop" />kill</button>}</Show>
 							</CardHeader>

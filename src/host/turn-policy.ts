@@ -1,10 +1,11 @@
 // Turn completion and retry policy, shared by the turn loop (task jf).
-import type { DoneEvent, ErrorEvent, Usage } from '../common/blocks.ts'
+import type { DoneEvent, ErrorEvent, ToolResultBlock, Usage } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { jobs } from './jobs.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
 import { statusUsage } from './status-usage.ts'
@@ -17,6 +18,17 @@ function stopped(done: DoneEvent): DoneEvent | ErrorEvent {
 	if (done.reason === 'max_tokens') return { type: 'error', message: 'Response stopped: max_tokens' }
 	if (done.reason === 'refusal') return { type: 'error', message: `Refused: ${done.explanation ?? 'the provider gave no explanation'}` }
 	return done
+}
+
+// Steering cancelled or stopped a call (task ker): not a failure, but
+// the model reads what happened.
+function cancelled(id: string): ToolResultBlock {
+	return { type: 'tool_result', id, output: `Tool call did not run: cancelled ${jobs.byMessage}.`, interrupted: 'cancelled' }
+}
+function stoppedBy(result: ToolResultBlock, signal: AbortSignal): ToolResultBlock {
+	if (signal.reason !== jobs.steered || !result.output.includes(jobs.byMessage)) return result
+	let { isError: _, ...rest } = result
+	return { ...rest, interrupted: 'stopped' }
 }
 
 // The usage an unfinished turn had when it was last parked at a
@@ -78,4 +90,4 @@ function backoffMs(failures: number): number {
 	return failures === 0 ? 0 : Math.min(1000 * 2 ** (failures - 1), 30_000)
 }
 
-export const turnPolicy = { stopped, parkedUsage, waitOut, waitFor, backoffMs }
+export const turnPolicy = { stopped, cancelled, stoppedBy, parkedUsage, waitOut, waitFor, backoffMs }
