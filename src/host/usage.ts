@@ -105,15 +105,37 @@ function tightest(provider: string, account: string): { used: number; resets: nu
 	return best
 }
 
-// `accounts` least used first (leastUsed): by tightest window, and on a
-// tie the one whose tightest window resets sooner; otherwise in order.
+// Where an account stands for rotation (task 3vj). Eligible: every
+// shared window below nearly spent (5h under 95%, others under 98%).
+// `week`: when its 7d window resets, Infinity when unknown.
+function standing(provider: string, account: string): { eligible: boolean; week: number; used: number } {
+	let all = usage.windows(provider, account)
+	let eligible = Object.entries(all).every(([name, w]) => /^\d+[a-z]+[-_]/.test(name) || w.used < (name === '5h' ? 95 : 98))
+	let week = all['7d']?.resets ? Date.parse(all['7d'].resets) : Infinity
+	return { eligible, week, used: usage.tightest(provider, account).used }
+}
+
+// `accounts` in rotation order: eligible ones whose week resets soonest
+// first, so quota is spent before it expires, then the least used; the
+// nearly spent ones last, least used first. Full ties keep their order.
 function order<T>(provider: string, accounts: T[], name: (a: T) => string): T[] {
-	let t = new Map(accounts.map((a) => [a, usage.tightest(provider, name(a))]))
+	let t = new Map(accounts.map((a) => [a, usage.standing(provider, name(a))]))
 	return [...accounts].sort((a, b) => {
 		let x = t.get(a)!
 		let y = t.get(b)!
-		return x.used - y.used || (x.resets === y.resets ? 0 : x.resets < y.resets ? -1 : 1)
+		if (x.eligible !== y.eligible) return x.eligible ? -1 : 1
+		if (x.eligible && x.week !== y.week) return x.week < y.week ? -1 : 1
+		return x.used - y.used
 	})
+}
+
+// Whether a session on `mine` stays there rather than moving to `best`,
+// the first in order(): while it is eligible, unless best's week resets
+// within a day and sooner than mine's (its quota would otherwise expire).
+function keeps(provider: string, mine: string, best: string): boolean {
+	let m = usage.standing(provider, mine)
+	let b = usage.standing(provider, best)
+	return m.eligible && !(b.eligible && b.week < m.week && b.week <= clock.now() + 86400_000)
 }
 
 function close(): void {
@@ -130,7 +152,9 @@ export const usage = {
 	observe,
 	windows,
 	tightest,
+	standing,
 	order,
+	keeps,
 	close,
 	state: { store: null as Record<string, Record<string, Windows>> | null, path: '' },
 }

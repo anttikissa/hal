@@ -58,32 +58,42 @@ test("Codex's primary and secondary windows are named by their span", () => {
 	expect(usage.parse(new Headers({ 'content-type': 'text/event-stream' }))).toEqual({})
 })
 
-test('least used first: tightest window, then sooner reset; no data is unused; a reset window is over', () => {
-	let obs = (account: string, u5: number, r5: number, u7: number) =>
+test('rotation spends the week that resets soonest; nearly spent accounts come last; a reset window is over', () => {
+	const h = 3600_000
+	let obs = (account: string, u5: number, u7: number, r7: number) =>
 		usage.observe(
 			'anthropic',
 			account,
 			new Headers({
 				'anthropic-ratelimit-unified-5h-utilization': String(u5),
-				'anthropic-ratelimit-unified-5h-reset': secs(now + r5),
+				'anthropic-ratelimit-unified-5h-reset': secs(now + 3 * h),
 				'anthropic-ratelimit-unified-7d-utilization': String(u7),
-				'anthropic-ratelimit-unified-7d-reset': secs(now + 5 * 86400_000),
+				'anthropic-ratelimit-unified-7d-reset': secs(now + r7),
 			}),
 		)
-	// a: 7d 80% is its tightest; b: 5h 60%; c: 60% too but resets sooner.
-	obs('a', 0.1, 3600_000, 0.8)
-	obs('b', 0.6, 3 * 3600_000, 0.2)
-	obs('c', 0.6, 3600_000, 0.2)
-	let order = () => usage.order('anthropic', ['a', 'b', 'c', 'd'], (x) => x)
-	expect(order()).toEqual(['d', 'c', 'b', 'a'])
+	obs('a', 0.51, 0.86, 7 * h)
+	obs('b', 0.09, 0.81, 26 * h)
+	obs('c', 0.96, 0.2, 120 * h) // 5h nearly spent
+	obs('e', 0.1, 0.99, 2 * h) // week nearly spent
+	obs('f', 0.1, 0.5, 72 * h)
+	obs('g', 0.1, 0.1, 48 * h)
+	let order = () => usage.order('anthropic', ['a', 'b', 'c', 'd', 'e'], (x) => x)
+	// d has no data: eligible, but no known reset to spend first.
+	expect(order()).toEqual(['a', 'b', 'd', 'c', 'e'])
 	// Survives a restart.
 	usage.close()
-	expect(order()).toEqual(['d', 'c', 'b', 'a'])
-	// b's and c's 5h windows are over: both at 7d 20%, a tie kept in order.
-	now += 4 * 3600_000
-	expect(order()).toEqual(['d', 'b', 'c', 'a'])
+	expect(order()).toEqual(['a', 'b', 'd', 'c', 'e'])
+	// A session leaves its account for one whose week resets within a
+	// day and sooner, or when its own is nearly spent; otherwise it stays.
+	expect(usage.keeps('anthropic', 'b', 'a')).toBe(false)
+	expect(usage.keeps('anthropic', 'c', 'a')).toBe(false)
+	expect(usage.keeps('anthropic', 'f', 'g')).toBe(true)
+	expect(usage.keeps('anthropic', 'd', 'a')).toBe(false)
+	// 8 hours on: a's and e's weeks and every 5h window are over.
+	now += 8 * h
+	expect(order()).toEqual(['b', 'c', 'a', 'd', 'e'])
 	// Another provider's data is its own.
-	expect(usage.order('openai', ['a', 'd'], (x) => x)).toEqual(['a', 'd'])
+	expect(usage.order('openai', ['d', 'a'], (x) => x)).toEqual(['d', 'a'])
 })
 
 test('a Sonnet-only week does not steer another Claude model to a busier account', () => {
