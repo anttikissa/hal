@@ -25,6 +25,7 @@ const list: CommandInfo[] = [
 	{ name: 'close', description: 'close the tab', category: 'tabs', key: 'ctrl-w' },
 	{ name: 'compact', description: 'summarise the context so far', category: 'session' },
 	{ name: 'config', description: 'show or change settings', category: 'app' },
+	{ name: 'effort', description: 'set the model\'s effort', category: 'session' },
 	{ name: 'find', description: 'search all sessions', category: 'session', key: 'ctrl-f' },
 	{ name: 'fork', description: 'fork this session into a new tab', category: 'tabs', key: 'ctrl-b' },
 	{ name: 'go', description: 'show a tab in windows watching this session', category: 'tabs' },

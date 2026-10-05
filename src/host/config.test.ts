@@ -126,6 +126,6 @@ test('qualified config defaults create the same validated pair and reject bad ef
 	let chosen = models.selection(settings.model())
 	expect(chosen).toEqual({ id: 'openai/gpt-6-sol', effort: 'high' })
 	expect(sessions.create({ cwd: '/tmp' })).toMatchObject({ model: chosen.id, effort: chosen.effort })
-	expect(() => config.update({ model: 'openai/gpt-6.1-sol:none' })).toThrow('unsupported effort')
+	expect(() => config.update({ model: 'gpt:banana' })).toThrow('unknown effort')
 	expect(settings.model()).toBe('openai/gpt-6-sol:high')
 })

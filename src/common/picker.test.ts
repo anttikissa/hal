@@ -179,7 +179,8 @@ test('effort drafts clamp on leaves, preserve tags and filtering, keep row ident
 	st = picker.step(st, key('right'), ids).state
 	expect(picker.label(st, ids[0]!)).toBe('high')
 	st = picker.step(st, key('left'), ids).state
-	expect(picker.label(st, ids[0]!)).toBe('medium')
+	expect(picker.label(st, ids[0]!)).toBe('default (medium)')
+	expect(st.items[st.selected]).toEndWith('‹ default (medium) ›')
 	expect(st.tree!.rows[st.selected]).toBe(row)
 	st = picker.step(st, key('x', 'gpt-oss'), ids).state
 	st = picker.refilter(st, ids, {}, ids[0])
@@ -191,10 +192,10 @@ test('effort drafts clamp on leaves, preserve tags and filtering, keep row ident
 	let submit = picker.step(st, key('enter'), ids)
 	expect(picker.command('s', submit.state, submit.action as any)?.text).toBe('/model ollama/gpt-oss:20b:low')
 	let unknown = picker.open(ids[1]!, ids, {}, capabilities)
-	expect(picker.label(unknown, ids[1]!)).toBe('default/unknown')
+	expect(picker.label(unknown, ids[1]!)).toBe('default')
 	expect(picker.label(picker.step(unknown, key('right'), ids).state, ids[1]!)).toBe('none')
 	expect(picker.label(picker.step(unknown, key('left'), ids).state, ids[1]!)).toBe('max')
 	let unsupported = picker.open('hal/intro', ids, {}, capabilities)
 	expect(picker.step(unsupported, key('left'), ids).state).toBe(unsupported)
-	expect(picker.label(unsupported, 'hal/intro')).toBe('no effort control')
+	expect(picker.label(unsupported, 'hal/intro')).toBe('')
 })

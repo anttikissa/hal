@@ -56,6 +56,27 @@ function validate(id: string, level: string): EffortLevel {
 	if (!cap?.levels.includes(level as EffortLevel)) throw new Error(`${id}: unsupported effort '${level}'; allowed: ${cap?.levels.join(', ') || 'default only (no verified effort control)'}`)
 	return level as EffortLevel
 }
+// The supported level nearest `asked` by rank (none 0 … max 6), ties
+// rounding up; a level matching the model's default clears the
+// override. `note` says what changed (task 7vt).
+function nearest(id: string, asked: string): { level?: EffortLevel; note?: string } {
+	let ultra = asked === 'ultra'
+	let want = (ultra ? 'max' : asked) as EffortLevel
+	let rank = vocabulary.levels.indexOf(want)
+	if (rank < 0) throw new Error(`${id}: unknown effort '${asked}'; use default or ${effort.describe(id)?.levels.join(', ') || 'no verified effort control'}`)
+	let cap = effort.describe(id)
+	if (!cap?.levels.length) return { note: `${id} has no effort control; effort ${asked} dropped` }
+	let level = cap.levels.includes(want) ? want : [...cap.levels].sort((a, b) => {
+		let d = (l: EffortLevel) => Math.abs(vocabulary.levels.indexOf(l) - rank)
+		return d(a) - d(b) || vocabulary.levels.indexOf(b) - vocabulary.levels.indexOf(a)
+	})[0]
+	let notes = [
+		ultra && 'ultra → max (Hal has no Ultra mode; ask for subagents in the prompt)',
+		level !== want && `${want} → ${level} (closest supported by ${id})`,
+	].filter(Boolean)
+	let fallback = cap.policy ?? cap.default
+	return { ...(level !== fallback && { level }), ...(notes.length && { note: notes.join('; ') }) }
+}
 function wire(provider: string, model: string, selected?: string, maxTokens?: number): Record<string, unknown> {
 	let cap = effort.capability(provider, model)
 	let level = selected ?? cap?.policy
@@ -63,4 +84,4 @@ function wire(provider: string, model: string, selected?: string, maxTokens?: nu
 	effort.validate(`${provider}/${model}`, level)
 	return cap!.wire(level as EffortLevel, maxTokens)
 }
-export const effort = { capability, describe, validate, wire, vocabulary: vocabulary.levels }
+export const effort = { capability, describe, validate, nearest, wire, vocabulary: vocabulary.levels }

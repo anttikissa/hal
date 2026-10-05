@@ -44,7 +44,7 @@ export function StatusRow(props: { view: ViewState; connected: boolean; color?: 
 				</span>
 				<span class="secondary">
 					<span class="cwd" style={props.color === undefined ? undefined : { '--project': `var(--p${props.color})` }}><bdi>{cwd()}</bdi></span>
-					<span class={['model', quota() && 'quota', heat(quota()?.used)]} style={{ '--fill': `${quota()?.remaining ?? 0}%` }}>{meta() ? titles.modelName(meta()!.model) : ''}</span>
+					<span class={['model', quota() && 'quota', heat(quota()?.used)]} style={{ '--fill': `${quota()?.remaining ?? 0}%` }}>{meta() ? <><span class="full">{titles.modelLabel(meta()!.model, props.view.transcript?.stats?.effort, true)}</span><span class="short">{titles.modelLabel(meta()!.model, props.view.transcript?.stats?.effort)}</span></> : ''}</span>
 					<span class="windows" aria-hidden="true">{slot()}<For each={names_()}>{(name) => (
 						<span class={['window', heat(win(name)?.used)]}>
 							{name} <span class="bar"><span style={{ width: `${win(name)?.used ?? 0}%` }} /></span> {win(name)?.used}% used<span class="reset">{win(name)?.resets ? ` (resets ${status.reset(win(name)!.resets!)})` : ''}</span>

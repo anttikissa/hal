@@ -10,7 +10,7 @@ import { openaiCompat } from './openai-compat.ts'
 
 useHost()
 
-test('qualifiers preserve exact colon ids, parse only final effort and reject unknown/unsupported qualifiers', () => {
+test('qualifiers preserve exact colon ids, parse only final effort, snap missing levels and reject unknown words (task 7vt)', () => {
 	let known = models.known
 	let envKey = auth.envKey
 	auth.envKey = () => 'test-only'
@@ -21,11 +21,18 @@ test('qualifiers preserve exact colon ids, parse only final effort and reject un
 		expect(models.selection('openrouter/vendor/model:free:default')).toEqual({ id: 'openrouter/vendor/model:free' })
 		expect(models.selection('openai/gpt-6-sol:max')).toEqual({ id: 'openai/gpt-6-sol', effort: 'max' })
 		expect(models.selection('gpt:high')).toEqual({ id: 'openai/gpt-6.1-sol', effort: 'high' })
-		expect(() => models.selection('opus:none')).toThrow('unsupported effort')
+		// Nearest by rank, ties rounding up; every snap is said.
+		expect(models.selection('opus:none')).toMatchObject({ effort: 'low', note: expect.stringContaining('none → low') })
+		expect(models.selection('openai/gpt-5.5:max')).toMatchObject({ effort: 'xhigh' })
+		expect(models.selection('anthropic/claude-opus-4-6:xhigh')).toMatchObject({ effort: 'max' })
+		expect(models.selection('openai/gpt-6-luna:minimal')).toMatchObject({ effort: 'low' })
+		expect(models.selection('gpt:ultra')).toMatchObject({ effort: 'max', note: expect.stringContaining('no Ultra mode') })
+		// The default's own level is the default: no override.
+		expect(models.selection('openai/gpt-6-sol:medium')).toEqual({ id: 'openai/gpt-6-sol' })
+		// A bare model keeps the carried effort, snapped.
+		expect(models.selection('openai/gpt-5.5', 'max')).toMatchObject({ id: 'openai/gpt-5.5', effort: 'xhigh' })
+		expect(models.selection('ollama/qwen3:8b:high')).toEqual({ id: 'ollama/qwen3:8b', note: expect.stringContaining('no effort control') })
 		expect(() => models.selection('openai/gpt-6-sol:banana')).toThrow('unknown effort')
-		expect(() => models.selection('openai/gpt-6.1-sol:none')).toThrow('allowed: low, medium, high, xhigh, max')
-		expect(() => models.selection('openai/gpt-6-luna:minimal')).toThrow('unsupported effort')
-		expect(() => models.selection('ollama/qwen3:8b:high')).toThrow('no verified effort control')
 	} finally { models.known = known; auth.envKey = envKey }
 })
 

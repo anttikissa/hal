@@ -137,15 +137,15 @@ function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean)
 	let category = (n: Node) => {
 		if (!n.all.some((id) => kept.has(id))) return
 		let shown = open(n.path, !bucket(n) || !node.all.some((id) => kept.has(id) && !n.all.includes(id)))
-		let base = n.default?.slice(n.default.indexOf('/') + 1)
-		out.items.push(`${indent}${shown ? '▼' : '▶'} ${n.name}${base ? `  (default: ${base})` : ''}`)
+		out.items.push(`${indent}${shown ? '▼' : '▶'} ${n.name}`)
 		out.rows.push({ path: n.path, open: shown, ...(node.path ? { parent: node.path } : {}), ...(n.default ? { default: n.default } : {}) })
 		if (shown) rows(n, kept, open, current, names, depth + 1, out)
 	}
 	node.nodes.filter((n) => !bucket(n)).forEach(category)
 	for (let { id, leaf } of node.ids) {
 		if (!kept.has(id)) continue
-		out.items.push(`${indent}${id === current ? '✓ ' : '  '}${leaf.padEnd(12)} ${names[id] ? `${names[id]} · ` : ''}${id}`)
+		// ✓ the current model, • the group's default (task r7r).
+		out.items.push(`${indent}${id === current ? '✓ ' : id === node.default ? '• ' : '  '}${leaf.padEnd(12)} ${names[id] ?? id}`)
 		out.rows.push({ id, parent: node.path })
 	}
 	node.nodes.filter(bucket).forEach(category)
@@ -196,13 +196,22 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 	if (selected < 0) selected = Math.max(0, at(t.current))
 	let row = built.rows[selected]
 	let hint = row?.id ? 'leaf ←/→: lower/higher (clamped), enter: pick' : `${row?.default ? 'enter: pick default' : 'enter: open'}`
-	if (t.capabilities) built.items = built.items.map((text, i) => { let id = built.rows[i]?.id; return id ? text.replace(/^(\s*(?:✓ )?)/, `$1[${picker.label(st, id)}] `) : text })
-	return { ...st, items: built.items, query, tree: { ...t, rows: built.rows }, selected, hint: `${hint}, esc: cancel; category ←/→: close/open` }
+	// The selected row shows its effort choice; others only an override.
+	built.items = built.items.map((text, i) => {
+		let id = built.rows[i]?.id
+		let level = id && picker.label(st, id)
+		return !level ? text : i === selected ? `${text}  ‹ ${level} ›` : level.startsWith('default') ? text : `${text} ${level}`
+	})
+	let shownId = row?.id ?? row?.default ?? t.current
+	let chosen = t.efforts?.[shownId]
+	let cap = t.capabilities?.[shownId]
+	let title = `Model: ${shownId}${chosen && chosen !== (cap?.policy ?? cap?.default) ? `:${chosen}` : ''}`
+	return { ...st, title, items: built.items, query, tree: { ...t, rows: built.rows }, selected, hint: `${hint}, esc: cancel; category ←/→: close/open` }
 }
 
 // The picker over `ids`, on the current model, its categories open.
 function open(current: string, ids: string[], names: Record<string, string> = {}, capabilities?: Record<string, EffortCapability>, selectedEffort?: string): ModalState {
-	let st = modals.open({ title: `Model: ${current}${capabilities ? ` (${effort.label(capabilities[current], selectedEffort)})` : ''}`, form: { text: 'Switch model', fields: [{ type: 'text', name: 'search', label: 'Search' }] } })
+	let st = modals.open({ title: `Model: ${current}`, form: { text: 'Switch model', fields: [{ type: 'text', name: 'search', label: 'Search' }] } })
 	let open = ancestors(tree(ids, current), current)
 	return picker.refilter({ ...st, tree: { rows: [], open, current, capabilities, efforts: { [current]: selectedEffort }, currentEffort: selectedEffort } }, ids, names)
 }
@@ -262,9 +271,10 @@ function command(sessionId: string, st: ModalState, action: Extract<ModalAction,
 	let selected = id === undefined ? undefined : row?.id ? st.tree?.efforts?.[id] : id === st.tree?.current ? st.tree.currentEffort : undefined
 	return id === undefined ? undefined : { type: 'submit', sessionId, text: `/model ${id}${selected === undefined ? '' : `:${selected}`}` }
 }
+// The effort choice of `id`'s row; '' without effort control.
 function label(st: ModalState, id: string): string {
 	let cap = st.tree?.capabilities?.[id]
-	return cap?.levels.length ? effort.label(cap, st.tree?.efforts?.[id]) : 'no effort control'
+	return cap?.levels.length ? effort.label(cap, st.tree?.efforts?.[id]) : ''
 }
 function canAdjust(st: ModalState, direction: 'left' | 'right'): boolean {
 	let id = st.tree?.rows[st.selected]?.id

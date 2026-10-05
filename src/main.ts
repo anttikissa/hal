@@ -214,8 +214,8 @@ async function refreshModels(): Promise<void> {
 	void models.fetchList('openai').catch((e) => diag.log(`models of openai: ${e}`))
 	let picked = [settings.model(), ...sessions.openIds().map((id) => sessions.open(id).model)]
 	let gone = await modelsDev.refresh([...new Set(picked)])
-	let names = models.names([...new Set(picked)])
-	if (Object.keys(names).length) for (let client of host.state.clients) client.deliver({ type: 'model-names', names })
+	let names = models.nameEvent([...new Set(picked)])
+	if (names) for (let client of host.state.clients) client.deliver(names)
 	if (!gone.length) return
 	let text = `models.dev no longer lists ${gone.join(', ')}`
 	for (let client of host.state.clients) client.deliver({ type: 'warning', text })

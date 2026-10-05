@@ -83,8 +83,8 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 	if (changed.model) {
 		// A turn waiting out a failure tries the new model now.
 		turns.state.running.get(id)?.rewait?.abort()
-		let names = modelList.names([changed.model])
-		if (Object.keys(names).length) host.broadcast(id, { type: 'model-names', names })
+		let names = modelList.nameEvent([selection!.id])
+		if (names) host.broadcast(id, names)
 	}
 }
 

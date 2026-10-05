@@ -42,7 +42,7 @@ function onEvent(st: ViewState, event: Event): ViewState {
 	if (event.type === 'rejected') return { ...st, notice: `${event.command} refused: ${event.reason}` }
 	if (event.type === 'warning') return { ...st, notice: event.text }
 	if (event.type === 'model-names') {
-		Object.assign(titles.names, event.names)
+		titles.learn(event)
 		return { ...st }
 	}
 	if (event.type === 'models') {

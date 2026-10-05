@@ -3,7 +3,10 @@ export type EffortLevel = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhig
 export type EffortCapability = { levels: EffortLevel[]; default?: EffortLevel; policy?: EffortLevel }
 export const effort = {
 	levels: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as EffortLevel[],
+	// A picker row's choice: the level, or 'default (<level>)' for the
+	// model's default, its level named only here (task r7r).
 	label(cap?: EffortCapability, selected?: string): string {
-		return selected ?? (cap?.policy ? cap.policy : cap?.default ? `default (${cap.default})` : 'default/unknown')
+		let fallback = cap?.policy ?? cap?.default
+		return selected && selected !== fallback ? selected : fallback ? `default (${fallback})` : 'default'
 	},
 }

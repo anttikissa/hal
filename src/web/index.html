@@ -203,6 +203,8 @@ body, textarea { tab-size: 4; }
 .StatusRow .cwd { flex: 1; direction: rtl; text-align: left; }
 .StatusRow .cwd[style*="--project"] { border-left: 3px solid var(--project); padding-left: 1ch; }
 .StatusRow .model { flex: 0 1 auto; max-width: 75%; }
+/* The official model name where it fits, the short one when narrow (task r7r). */
+.StatusRow .model .short { display: none; }
 .StatusRow .windows { flex: 0 1 auto; display: flex; gap: 2ch; }
 .StatusRow .window .bar { display: inline-block; width: 6ch; height: 0.7em; border: 1px solid var(--heat); vertical-align: baseline; }
 .StatusRow .window .bar > span { display: block; height: 100%; background: var(--heat); }
@@ -217,6 +219,8 @@ body, textarea { tab-size: 4; }
    a hard stop clipped to the glyphs. */
 @container (max-width: 80ch) {
   .StatusRow .windows { display: none; }
+  .StatusRow .model .full { display: none; }
+  .StatusRow .model .short { display: inline; }
   .StatusRow .model.quota { color: transparent; background: linear-gradient(to right, var(--heat) var(--fill), var(--fg) var(--fill)); -webkit-background-clip: text; background-clip: text; }
 }
 .hidden-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
