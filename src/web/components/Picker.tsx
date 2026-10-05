@@ -11,6 +11,8 @@ import { app } from '../app.ts'
 import { picker } from '../../common/picker.ts'
 import { settings } from '../../common/settings.ts'
 import { find } from '../find.ts'
+import { folds } from '../folds.ts'
+import { forms } from '../../common/forms.ts'
 import { Icon } from './Icon.tsx'
 
 function marked(text: string, query: string | undefined, literal = false) {
@@ -70,7 +72,8 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			<Show when={props.modal?.form}>
 				<input ref={(e) => (search = e)} class="input" type="text" aria-label="Search" autocomplete="off"
 					aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
-					value={props.modal?.form?.values[0] ?? ''} onInput={(e) => app.search(e.currentTarget.value)} onFocus={() => find.focus(0)} />
+					placeholder={props.modal?.compact && props.modal.form ? forms.example(props.modal.form, 0, Date.now()).text : undefined}
+					value={props.modal?.form?.values[0] ?? ''} onInput={(e) => (props.modal?.compact ? folds.input(e.currentTarget.value) : app.search(e.currentTarget.value))} onFocus={() => find.focus(0)} />
 			</Show>
 			<Show when={props.modal?.restart}>{(r) => {
 				let lines = () => modals.restartLines(r().calls)
@@ -86,7 +89,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 					)}</For>
 				</div>
 			</Show>
-			<ul ref={(e) => (list = e)} role="listbox" aria-label={props.modal?.restart ? 'Choices' : 'Results'} tabindex={props.modal?.find || !props.modal?.form ? 0 : undefined}
+			<ul ref={(e) => (list = e)} hidden={props.modal?.compact} role="listbox" aria-label={props.modal?.restart ? 'Choices' : 'Results'} tabindex={props.modal?.find || !props.modal?.form ? 0 : undefined}
 				onFocus={() => find.focus(5)} aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}>
 				<For each={props.modal?.items ?? []}>{(item, i) => (
 					<li role="option" id={`modal-item-${i()}`} aria-selected={i() === props.modal?.selected ? 'true' : 'false'}
