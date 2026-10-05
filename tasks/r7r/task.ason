@@ -1,0 +1,13 @@
+{
+	title: 'Model and effort read as plain words; short names when tight',
+	spec: `The status row names the model and its effort as plain words: '<name>' at the model's default effort, '<name> <level>' otherwise, e.g. 'Opus 5.5' and 'Opus 5.5 high'. No parentheses, separator dot, 'default' or 'default/unknown'.
+
+<name> is the official display name (task qq) when the row fits, else a short name, in the terminal and on the web alike (so phones get the short name). Short names exist only for Claude and GPT, the most used families: Claude drops 'Claude' ('Claude Opus 5.5' → 'Opus 5.5'); GPT with a tier puts the tier first ('GPT-6.1 Sol' → 'Sol 6.1', 'GPT-6 Luna' → 'Luna 6', 'GPT-5.3 Codex' → 'Codex 5.3'); plain 'GPT-5.5' stays. Other names are already short and stay. One function in src/common derives both.
+
+The model picker (task pv) shows each label once, without stacked parentheses: group headers drop '(default: …)'; the default model row carries a mark instead; a leaf shows its effort as a bare level, and the default level as 'default (<level>)' — the only place the default's level is named. The picker title shows the selection as a model string, e.g. 'Model: anthropic/claude-opus-5-5:high'. effort.label in src/common/effort.ts no longer returns 'default/unknown' or nested parentheses.
+
+Tests: name shortening for Claude, tiered GPT, plain GPT and another family; status text at default and non-default effort.`,
+	status: 'planned',
+	needs: ['w7', 'pv', 'qq'],
+	foldInto: ['pv', 'w7']
+}
