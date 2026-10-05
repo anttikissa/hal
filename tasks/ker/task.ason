@@ -1,0 +1,15 @@
+{
+	title: 'Steering spares unsafe-to-stop calls; restart warns',
+	spec: `Bash takes an optional unsafeToStop: true argument, described to the model only as: "Use when stopping halfway might leave broken state (e.g. disk partitioning, database migrations, server provisioning)." The description never says what the flag changes. The tool card shows the flag on the call ("unsafe to stop"), in the terminal and on the web.
+
+Steering (ordinary submission, send steer:true) changes as follows; task 8p holds the rest. A tool call that has not started never starts; its title status is "(cancelled)". A running call without the flag is stopped as before; its title status is "(stopped, 50.2s)" and its partial output stays. A running call with the flag is never stopped by steering: it stays in the foreground, its title keeps its elapsed time, and the new message waits visibly in the inbox; when the call ends, the model gets the result and the message together and the turn goes on. Steering never moves a call to the background. Escape, closing the tab and quitting stop every call, flagged or not.
+
+Cancelled and stopped-by-steering calls are not failures: their status uses the muted colour and the card has no red error text. The model still receives a tool result saying the call was cancelled or stopped by a new user message. Red stays for real failures. The status sits where task wm0 puts exit status and duration: "(4s)" while running, "(exit 1, 3.2s)" when done, "(cancelled)", "(stopped, 50.2s)". Terminal and web match.
+
+Restart warning. When a flagged call runs in any session on the host, a restart that ends the host asks first: /restart host|both|all from any client (terminal, web, remote), and Ctrl-R in a terminal client that would restart that host. The dialog is a common/modals.ts modal listing each flagged call (block link, title, elapsed time), with "Wait" selected by default and "Restart anyway". Wait or Escape dismisses it and nothing restarts. A client-only restart never asks.
+
+Emergency-key exception: tasks/README.md (Emergency keys) records this as the only case where a modal may stand before Ctrl-R. The client decides from the session state it already holds, synchronously, never waiting on the host. Pressing Ctrl-R again while the dialog is open restarts at once, so Ctrl-R Ctrl-R always restarts, even when the host hangs. Ctrl-C and Ctrl-Z are unchanged.`,
+	status: 'planned',
+	needs: ['wm0'],
+	foldInto: ['8p']
+}
