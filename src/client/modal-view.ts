@@ -54,15 +54,19 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	let scroll = modalView.modalScroll(m, visible)
 	let cursor = fields.cursor ?? { row: m.find && m.find.focus > 0 && m.find.focus < 5 ? content.length - 1 : content.length, col: 0 }
 	// Settings-like rows: the items as a column as wide as the longest.
-	let column = m.values ? Math.min(Math.floor(inner / 2), Math.max(0, ...m.items.map((s) => strings.visLen(s)))) + 2 : 0
+	let column = m.values && !m.tree ? Math.min(Math.floor(inner / 2), Math.max(0, ...m.items.map((s) => strings.visLen(s)))) + 2 : 0
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
 		// Leading spaces are the picker's tree indentation: keep them.
 		let label = ansi.clean(m.items[i]!).replace(/[\r\n\t]+/g, ' ')
 		if (column) label = strings.clipVisual(label, column - 2).padEnd(column - 2) + '  '
 		let row = strings.clipVisual((i === m.selected ? `${formView.ARROW} ` : '  ') + label, inner)
 		if (m.query) row = modalView.highlight(row, m.query, i === m.selected ? current : undefined, !!m.find)
-		let value = modalView.cell(m, i, current)
-		if (value) row += strings.clipVisual(value.text, Math.max(0, inner - 2 - column))
+		let value = m.tree ? undefined : modalView.cell(m, i, current)
+		if (m.tree) {
+			let name = ansi.clean(m.values?.[i] ?? '')
+			let gap = inner - strings.visLen(row) - strings.visLen(name)
+			if (name && gap >= 2) row += ' '.repeat(gap) + (m.query ? modalView.highlight(name, m.query, i === m.selected ? current : undefined) : name)
+		} else if (value) row += strings.clipVisual(value.text, Math.max(0, inner - 2 - column))
 		if (value?.cursor !== undefined) cursor = { row: content.length, col: Math.min(inner - 1, 2 + column + value.cursor) }
 		if (i === m.selected) {
 			if (!fields.cursor && !m.edit && (!m.find || m.find.focus === 5)) cursor = { row: content.length, col: 0 }

@@ -11,8 +11,7 @@ function modelName(id: string): string {
 
 // The name where space is tight (task r7r): Claude and GPT only, the
 // most used; 'Claude Opus 5.5' → 'Opus 5.5', 'GPT-6.1 Sol' → 'Sol 6.1'.
-function shortName(id: string): string {
-	let name = titles.modelName(id)
+function shortName(id: string, name = titles.modelName(id)): string {
 	return name.replace(/^Claude (?=\S)/, '').replace(/^GPT-([\d.]+) (Sol|Luna|Terra|Astra|Codex)$/, '$2 $1')
 }
 

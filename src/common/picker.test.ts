@@ -43,7 +43,7 @@ const selected = (st: ReturnType<typeof picker.open>) => st.items[st.selected]!.
 test('the picker opens as a tree on the current model, its categories open', () => {
 	let st = picker.open('anthropic/claude-sonnet-4-5', tree, { 'anthropic/claude-opus-5-5': 'Opus 5.5' })
 	expect(st.title).toContain('anthropic/claude-sonnet-4-5')
-	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▶ openai', '▼ anthropic', '▶ opus', '✓ claude-sonnet-4-5 anthropic/claude-sonnet-4-5', '▶ openrouter'])
+	expect(st.items.map((r) => r.trim().split('  ')[0])).toEqual(['▶ hal', '▶ openai', '▼ anthropic', '▶ opus', '✓ anthropic/claude-sonnet-4-5', '▶ openrouter'])
 	expect(selected(st)).toContain('anthropic/claude-sonnet-4-5')
 	expect(enter(st)).toBe('/model anthropic/claude-sonnet-4-5')
 })
@@ -117,7 +117,7 @@ test('dated snapshots hide; versions past a family two newest wait under older',
 	expect(shown('hal/intro', ['anthropic', 'anthropic/opus', 'anthropic/opus/older'])).toMatch(/claude-opus-4-1$/m)
 	// A snapshot alone stays; the current model's categories open.
 	expect(closed).toContain('claude-haiku-3-20240307')
-	expect(picker.open('anthropic/claude-opus-4-1', all).items.join('\n')).toMatch(/✓ 4\.1 .*claude-opus-4-1$/m)
+	expect(picker.open('anthropic/claude-opus-4-1', all).items.join('\n')).toMatch(/✓ anthropic\/claude-opus-4-1$/m)
 })
 
 test('a family lists its flagships; variants and non-chat models wait in closed buckets, last', () => {
@@ -203,4 +203,42 @@ test('effort drafts clamp on leaves, preserve tags and filtering, keep row ident
 	let unsupported = picker.open('hal/intro', ids, {}, capabilities)
 	expect(picker.step(unsupported, key('left'), ids).state).toBe(unsupported)
 	expect(picker.label(unsupported, 'hal/intro')).toBe('')
+})
+
+// Exercise navigation, not just refilter: Up/Down used to move the
+// cursor without updating the help, title or effort marker (task r7r).
+test('moving rows keeps hints, effort, names and category defaults tied to the highlighted choice', () => {
+	let gpt = 'openai/gpt-6.1-sol', opus = 'anthropic/claude-opus-5-5', haiku = 'anthropic/claude-haiku-4-5-20251001'
+	let all = [gpt, 'openai/gpt-6-astra', opus, 'anthropic/claude-opus-5', haiku]
+	let names = { [gpt]: 'GPT-6.1 Sol', [opus]: 'Claude Opus 5.5', [haiku]: 'Claude Haiku 4.5' }
+	let capabilities: Record<string, EffortCapability> = { [gpt]: { levels: ['low', 'medium', 'high'], default: 'medium' }, [opus]: { levels: ['low', 'medium', 'high'], default: 'medium' }, 'anthropic/claude-opus-5': { levels: ['low', 'medium', 'high'], default: 'medium' } }
+	let st = picker.open(opus, all, names, capabilities, 'high')
+	let move = (direction: string) => { st = picker.step(st, key(direction), all, names).state }
+	let chosen = () => st.tree!.rows[st.selected]!
+	let marked = () => st.items.filter((s) => s.includes('‹'))
+	expect(marked()).toEqual([st.items[st.selected]!])
+	expect(st.values?.[st.selected]).toBe(names[opus])
+	move('up')
+	expect(chosen().path).toBe('anthropic/opus')
+	expect(st.hint).toBe('←/→: close/open, enter: pick default, esc: cancel')
+	expect(marked()).toEqual([])
+	move('down')
+	expect(st.hint).toBe('←/→: lower/higher effort, enter: pick, esc: cancel')
+	expect(marked()).toEqual([st.items[st.selected]!])
+	move('down')
+	expect(st.title).toBe('Model: anthropic/claude-opus-5:high')
+	move('down')
+	expect(chosen().id).toBe(haiku)
+	expect(st.items[st.selected]!.trim()).toBe('Haiku 4.5')
+	expect(st.values?.[st.selected]).toBe('')
+	expect(st.title).toBe(`Model: ${haiku}`)
+	expect(st.hint).toBe('enter: pick, esc: cancel')
+	expect(marked()).toEqual([])
+	// The closed provider still tells you what Enter picks.
+	while (st.selected > 0) move('up')
+	expect(chosen().path).toBe('openai')
+	expect(st.items[st.selected]).toContain(`default: ${names[gpt]}`)
+	expect(st.title).toBe(`Model: ${gpt}:high`)
+	expect(st.hint).toContain('enter: pick default')
+	expect(enter(st)).toBe(`/model ${gpt}:high`)
 })
