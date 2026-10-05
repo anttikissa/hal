@@ -135,8 +135,13 @@ function key(e: KeyInput, target: Target): boolean {
 	let sel = target.anchor === undefined ? '' : st.text.slice(Math.min(target.anchor, target.cursor), Math.max(target.anchor, target.cursor))
 	if (plain && !sel && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && keys.recall(e.key === 'ArrowUp' ? -1 : 1, target)) return true
 	if (k && editor.routed(k)) return keys.edit(k, target)
-	if (e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && st.menu) {
-		app.choose(st.menu.selected)
+	if (e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && st.menu && (st.menu.explicit || st.known?.input === st.text)) {
+		if (st.menu.explicit) app.choose(st.menu.selected)
+		else {
+			// Reuse the reply path so ready and pending Tab behave identically.
+			st.completedByTab = st.text
+			app.onEvent({ type: 'completions', sessionId: app.sessionId()!, text: st.text, items: st.menu.choices.map((c) => c.value), descriptions: st.menu.choices.map((c) => c.description) })
+		}
 		return true
 	}
 	let complete = e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && view.complete(st.view, st.text)

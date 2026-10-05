@@ -83,3 +83,33 @@ test('passive restart scopes leave Enter running the original command, like cd',
 	press('Enter')
 	expect(sent.find((c) => c.type === 'submit')).toMatchObject({ text: '/cd' })
 })
+
+test('Tab completes prefixes, not passive highlights, before or after model suggestions arrive', () => {
+	let models = ['/model astra', '/model openrouter/openai/gpt-6-astra', '/model openai/gpt-astra-latest']
+	let scenarios = [
+		{ input: '/model astr', expected: '/model astra', candidates: models },
+		{ input: '/model ast', expected: '/model astra', candidates: [...models, '/model astra-pro'] },
+		{ input: '/model big', expected: '/model acme/big-', candidates: ['/model acme/big-1', '/model acme/big-2'] },
+	]
+	for (let ready of [false, true]) {
+		for (let { input, expected, candidates } of scenarios) {
+			app.input(input)
+			let event = { type: 'completions' as const, sessionId, text: input, items: candidates, descriptions: candidates.map((s) => s.slice(7)) }
+			if (ready) { app.onEvent(event); expect(app.state.text).toBe(input) }
+			press('Tab')
+			if (!ready) app.onEvent(event)
+			expect(app.state.text).toBe(expected)
+			expect(drafts.text(sessionId)).toBe(expected)
+			expect(app.state.menu?.choices.map((c) => c.value)).toEqual(candidates)
+			app.onEvent(event)
+			expect(app.state.text).toBe(expected)
+		}
+	}
+	app.input('/model astr')
+	app.onEvent({ type: 'completions', sessionId, text: '/model astr', items: models })
+	press('ArrowDown')
+	press('Tab')
+	expect(app.state.text).toBe(models[1]!)
+	expect(app.state.menu).toBeUndefined()
+	expect(sent.some((c) => c.type === 'submit')).toBe(false)
+})

@@ -10,6 +10,7 @@ import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { pages } from './pages.ts'
 import { host } from './host.ts'
+import { models } from './models.ts'
 import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
 import { paths } from './paths.ts'
@@ -564,6 +565,8 @@ function providerHome(): void {
 test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tapped', async () => {
 	providerHome()
 	let b = await browser()
+	let known = models.known
+	models.known = () => ['openai/gpt-6-astra', 'openrouter/openai/gpt-6-astra', 'openai/gpt-astra-latest', 'acme/big-1', 'acme/big-2']
 	try {
 		await server.serve()
 		web.start()
@@ -616,9 +619,24 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 			await b.waitFor(`!document.querySelector('.completions')`)
 			expect(await b.evaluate(frame)).toEqual(before)
 			expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/login ')
+			// Prefix completion retains word matches; fallback still extends a
+			// common prefix. Both use native edits and leave the caret at the end.
+			for (let [text, expected] of [['/model astr', '/model astra'], ['/model bi', '/model acme/big-']]) {
+				await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.focus(); t.value = ${JSON.stringify(text)}; t.setSelectionRange(t.value.length, t.value.length); t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
+				await b.waitFor(text!.endsWith('astr') ? `[...document.querySelectorAll('.completions strong')].some((e) => e.textContent === 'openrouter/openai/gpt-6-astra')` : `document.querySelectorAll('.completions button').length === 2`)
+				if (text!.endsWith('astr')) expect(await b.evaluate(`document.querySelector('.completions strong').textContent`)).toBe('astra')
+				await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab' })
+				await b.waitFor(`document.querySelector('textarea').value === ${JSON.stringify(expected)}`)
+				expect(await b.evaluate(`document.querySelector('textarea').selectionStart`)).toBe(expected!.length)
+				expect(await b.evaluate(frame)).toEqual(before)
+				let bounds = await b.evaluate(`(() => { let r = document.querySelector('.completions').getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, width: innerWidth } })()`)
+				expect(bounds.left).toBeGreaterThanOrEqual(0)
+				expect(bounds.right).toBeLessThanOrEqual(bounds.width)
+				expect(bounds.top).toBeGreaterThanOrEqual(0)
+			}
 			await b.evaluate(`(() => { let t = document.querySelector('textarea'); t.value = ''; t.dispatchEvent(new InputEvent('input', { bubbles: true })) })()`)
 		}
-	} finally { await b.close() }
+	} finally { models.known = known; await b.close() }
 }, 15000)
 
 

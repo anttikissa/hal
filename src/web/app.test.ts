@@ -621,7 +621,10 @@ test('an open menu preserves touch and modified Enter and Tab contracts', () => 
 	expect(press('Enter', message('/c'), { shiftKey: true })).toBe(false)
 	expect(app.state.text).toBe('/c')
 	expect(press('Tab', message('/c'))).toBe(true)
-	expect(app.state.text).toBe('/cd ')
+	expect(app.state.text).toBe('/c') // no unambiguous extension
+	press('ArrowDown', message('/c'))
+	press('Tab', message('/c'))
+	expect(app.state.text).toBe('/clear ')
 	app.input('/cd')
 	app.onEvent({ type: 'completions', sessionId, text: '/cd', items: ['/cd /suggestion/'] })
 	press('Enter', message('/cd'), { altKey: true })

@@ -114,15 +114,13 @@ function onEvent(event: Event): void {
 		if (st.completedByTab === event.text) {
 			st.completedByTab = undefined
 			let done = view.completed(st.view, event, st.text)
-			if (event.items.length > 1 && done?.notice) st.menu = completions.receive(event.text, event.items, st.menu, event.descriptions)
-			else {
-				if (done) {
-					st.view = { ...st.view, notice: done.notice }
-					st.menu = undefined
-					st.known = undefined
-					app.input(done.text)
-					st.suppressed = done.text
-				}
+			if (done) {
+				let menu = event.items.length > 1 && done.notice ? completions.receive(event.text, event.items, st.menu, event.descriptions) : undefined
+				st.view = { ...st.view, notice: event.items.length ? undefined : done.notice }
+				if (done.text !== st.text) app.rewrite(() => ({ text: done.text, cursor: done.text.length }))
+				st.menu = menu
+				st.known = menu ? { input: event.text, items: event.items, descriptions: event.descriptions } : undefined
+				st.suppressed = menu ? undefined : done.text
 			}
 		} else st.menu = completions.receive(event.text, event.items, st.menu, event.descriptions)
 		app.changed()
