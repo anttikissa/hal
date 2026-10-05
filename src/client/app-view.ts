@@ -19,6 +19,7 @@ import type { StatusInfo } from './status-row.ts'
 import { tabBar } from './tab-bar.ts'
 import { versions } from './versions.ts'
 import { find } from './find.ts'
+import { folds } from './folds.ts'
 
 function view(): View {
 	let st = app.state
@@ -45,6 +46,8 @@ function view(): View {
 	if (activity) v.activity = activity
 	let hal = halCursor.of(st.transcript, pulse.beat())
 	if (hal) v.hal = hal
+	let states = t && folds.state.folds.get(t.meta.id)
+	if (states?.size) v.folds = { states, pastes: folds.state.pastes, sig: `${[...states].join()} ${[...folds.state.pastes.values()].filter((p) => p.text !== undefined || p.error).length}` }
 	let tick = t && appView.tick(t, Date.now())
 	if (tick) v.tick = tick
 	if (t) v.status = appView.status(t)

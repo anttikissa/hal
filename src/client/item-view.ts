@@ -14,6 +14,12 @@ import { markdownView } from './markdown-view.ts'
 import { summary } from '../common/summary.ts'
 import { names } from '../common/names.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
+import type { Fold } from '../common/toggle.ts'
+import { resolve } from 'path'
+
+// A block's fold state when toggled (task ghs), and the paste texts a
+// prompt shown inline needs (client/folds.ts).
+export type Look = { fold?: Fold; pastes?: Map<string, { text?: string; error?: string }> }
 
 const { INVERSE, UNINVERSE } = ansi
 
@@ -81,20 +87,28 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 // `tool`: the name of the call a tool result is drawn right under (or
 // under another of its results); attached, it needs no link back.
 // `images`: the image items of a prompt, drawn in its card (frame.layout).
-function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, tool?: string, images: Item[] = []): string[] {
+// `look`: the block's fold state, when toggled (task ghs), and the
+// pastes a prompt shown inline needs.
+function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, tool?: string, images: Item[] = [], look: Look = {}): string[] {
+	let fold = look.fold
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
 			let bash = (/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
 			// A job's message has no title to carry its status: a nonzero
 			// one stays its first row, in the warning colour (task wm0).
-			let body = ansi.wrap(bash ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text, width).map(ansi.links)
+			let source = bash ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text
+			if (fold === 'inline') source = itemView.inlined(source, look.pastes)
+			if (fold === 'closed' && !item.summary) return itemView.closedRow(item, source, width)
+			let body = ansi.wrap(source, width).map(ansi.links)
 			if (bash && /^\[exit [1-9]\d*\]/.test(body[0] ?? '')) {
 				let status = /^\[exit [1-9]\d*\]/.exec(body[0]!)![0]
 				body[0] = itemView.warn(status, itemView.itemStyle(item)) + body[0]!.slice(status.length)
 			}
-			// Another session's message: its summary, then a glimpse.
-			if (item.summary) {
+			// Another session's message: its summary, then a glimpse;
+			// opened, its whole text.
+			if (item.summary && (fold ?? 'closed') !== 'closed') body = [...ansi.wrap(item.summary, width), ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
+			else if (item.summary) {
 				let more = body.length - 3
 				body = [...ansi.wrap(item.summary, width), ...body.slice(0, 3).map((l) => ansi.quiet(l, itemView.itemStyle(item))), ...(more > 0 ? [`… ${more} more lines`] : [])]
 			}
@@ -121,12 +135,14 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'thinking': {
 			if (!item.text.trim() && !streaming) return []
 			let prefix = titles.stamp(item.ts, item.originSession ? `(in ${item.originSession}) ` : '')
+			if (fold === 'closed' && !streaming) return itemView.closedRow(item, item.text, width, prefix)
 			// Leave at least one text column even on a very narrow terminal.
 			prefix = strings.clipVisual(prefix, Math.max(0, width - 1))
 			let body = markdownView.lines(item.text.trimEnd(), width - strings.visLen(prefix), streaming, itemView.itemStyle(item))
 			return [prefix + (body[0] ?? ''), ...body.slice(1).map(line => ' '.repeat(strings.visLen(prefix)) + line)]
 		}
 		case 'text':
+			if (fold === 'closed' && !streaming) return itemView.closedRow(item, names.strip(summary.strip(item.text)), width)
 			return itemView.headed(item, markdownView.lines(names.strip(summary.strip(item.text)).trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		case 'tool': {
 			let { command, description } = item.input
@@ -157,7 +173,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			if (!out && tool && !item.isError) return []
 			// Only the lines shown are laid out (outputs run to megabytes);
 			// the rest are counted as source lines, as on the web.
-			let wide = width, max = itemView.resultRows
+			let wide = width, max = fold === 'open' ? itemView.openRows : itemView.resultRows
 			let lines = out.split('\n')
 			let rows: string[] = []
 			let used = 0
@@ -181,7 +197,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// Hidden lines are counted at the end of the last row, or on
 			// a row of their own when that one is too full.
 			if (more) {
-				let marker = ansi.quiet(`… ${more} more lines`, style)
+				let marker = ansi.quiet(`… ${more} more lines${fold === 'open' ? ` in ${itemView.fullAt(item.output, session, (item as Partial<Keyed>).key)}` : ''}`, style)
 				let last = res.at(-1)!
 				if (strings.visLen(last) + 2 + strings.visLen(marker) <= width) res[res.length - 1] = itemView.right(last, marker, width)
 				else res.push(marker)
@@ -306,9 +322,42 @@ function right(row: string, end: string, width: number): string {
 	return text + ' '.repeat(width - strings.visLen(text) - strings.visLen(end)) + end
 }
 
+// Text with each [paste/<name>] marker replaced by that paste's text;
+// one not here yet, or missing, keeps its marker and says so.
+function inlined(text: string, pastes: Look['pastes']): string {
+	return text.replace(/\[paste\/([0-9a-z]{6}\.[a-z0-9]{1,8})\]/g, (marker, name: string) => {
+		let got = pastes?.get(name)
+		return got?.text !== undefined ? bashResult.trim(got.text) : `${marker} (${got?.error ?? 'loading…'})`
+	})
+}
+
+// A closed block's one row (task ghs): its title (or `head`), then the
+// start of its text, quiet.
+function closedRow(item: Item, text: string, width: number, head = (titles.title(item) ?? '') + '  '): string[] {
+	head = ansi.clean(head)
+	let first = ansi.clean(text.split('\n').find((l) => l.trim()) ?? '').trim()
+	let row = strings.expandTabs(strings.clipVisual(head + first, width))
+	return [row.length > head.length ? row.slice(0, head.length) + ansi.quiet(row.slice(head.length), itemView.itemStyle(item)) : row]
+}
+
+// Where an open result's whole output is: the file its cut note names,
+// else its line in the session's history file.
+function fullAt(output: string, session: string | undefined, key = ''): string {
+	let cut = /cat (\S+)\]\s*$/.exec(output)?.[1]
+	if (cut) return cut
+	let home = process.env.HAL_HOME ?? resolve(import.meta.dir, '../..')
+	let path = `${home}/sessions/${session ?? '?'}/history.asonl`
+	if (process.env.HOME && path.startsWith(process.env.HOME + '/')) path = '~' + path.slice(process.env.HOME.length)
+	return `${path} line ${/^\d+/.exec(key)?.[0] ?? '?'}`
+}
+
 export const itemView = {
-	// Rows of a tool result shown in the transcript.
+	// Rows of a tool result shown in the transcript: closed, and opened.
 	resultRows: 3,
+	openRows: 200,
+	inlined,
+	closedRow,
+	fullAt,
 	toolStyle,
 	itemStyle,
 	itemLines,

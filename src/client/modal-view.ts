@@ -181,6 +181,8 @@ function overlay(line: string, row: string, left: number, width: number, cols: n
 // grows to hold it. Returns the cursor and the list's scroll.
 function withModal(lines: string[], m: ModalState, rows: number, cols: number): { cursor: Cursor; scroll: number } {
 	let box = modalView.modalBox(rows, cols)
+	// A dialog that is only a field (Ctrl-O, task ghs) is as tall as it.
+	if (m.compact && m.form) box.height = Math.min(box.height, m.form.form.fields.length + 2)
 	while (lines.length < box.height) lines.push('')
 	let screen = Math.min(lines.length, rows)
 	let top = lines.length - screen + Math.floor((screen - box.height) / 2)

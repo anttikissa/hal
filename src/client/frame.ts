@@ -21,14 +21,15 @@ import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
 import { batchOrder } from './batch-order.ts'
 import { formView } from './form-view.ts'
-import { itemView } from './item-view.ts'
+import { itemView, type Look } from './item-view.ts'
+import { toggle, type Fold } from '../common/toggle.ts'
 import { modalView } from './modal-view.ts'
 import { noticeView } from './notice-view.ts'
 import type { Folded } from '../common/notices.ts'
 import type { PromptState } from '../common/prompt.ts'
 import type { Tab } from '../common/protocol.ts'
 import { promptView } from './prompt-view.ts'
-import type { HalCursor } from './hal-cursor.ts'
+import { halCursor, type HalCursor } from './hal-cursor.ts'
 import { tabBar } from './tab-bar.ts'
 import { helpRow } from './help-row.ts'
 import { statusRow, type StatusInfo } from './status-row.ts'
@@ -69,6 +70,9 @@ export interface View {
 	newCode?: boolean
 	/** The notice stack, over the rows just above the tab bar (task qm). */
 	notices?: Folded
+	/** Toggled blocks' states and inline pastes (task ghs); `sig`
+	 * changes with them. */
+	folds?: Look & { states: Map<string, Fold>; sig: string }
 	/** The running tool call and its elapsed time, "12s" (task wm0). */
 	tick?: { call: string; label: string }
 }
@@ -101,16 +105,17 @@ function promptWidth(cols: number): number {
 // history stays cheap to redraw. A kept row keeps the link code it was
 // painted with (task e3 notes).
 // `status`: a tool call's, after its title (task wm0).
-function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, tool?: string, images: Item[] = [], status = ''): string[] {
+// `look`: its fold state and inline pastes (task ghs).
+function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, tool?: string, images: Item[] = [], status = '', look: Look = {}): string[] {
 	let style = itemView.itemStyle(item, tool)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status}`
+	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, mark } = frame.ref(item, cols, session, style, status)
-	let lines = itemView.itemLines(item, inner, !!hal, session, calls, tool, images)
-	if (hal) lines = frame.withCursor(lines, hal, inner)
+	let lines = itemView.itemLines(item, inner, !!hal, session, calls, tool, images, look)
+	if (hal) lines = halCursor.withCursor(lines, hal, inner)
 	// A block with a background has a row of it above and below its
 	// text, as the old Hal drew prompt cards; the id goes below the top.
 	let padded = !!style?.bg && lines.length > 0
@@ -167,27 +172,6 @@ function highWater(rows: string[], item: Item, cols: number, session: string | u
 	return [...rows, ...Array<string>(peak! - rows.length).fill(ansi.paint('', itemView.itemStyle(item), cols))]
 }
 
-// The Hal cursor's block, or nothing in its dark phase.
-function glyph(hal: HalCursor): string {
-	if (!hal.lit) return ''
-	let on = ansi.sgr({ fg: hal.color })
-	return on + '█' + (on && ansi.UNCOLOR)
-}
-
-// Rows `width` wide with the Hal cursor after the last character, on
-// a row of its own if that one is full.
-function withCursor(rows: string[], hal: HalCursor, width: number): string[] {
-	let last = rows.at(-1)
-	if (last === undefined) return rows
-	let g = frame.glyph(hal)
-	if (strings.visLen(last) < width) return [...rows.slice(0, -1), last + g]
-	return [...rows, g]
-}
-
-// The rows of the transcript's items, and where a question being
-// answered among them puts the cursor.
-// `tick`: the running call's title row with its elapsed time
-// (`labeled`) and without (`plain`), for build to choose.
 export type Past = { lines: string[]; formCursor?: Frame['cursor']; target?: number; tick?: { row: number; labeled: string; plain: string } }
 
 // Lays out the transcript's items. The rows of items drawn last time
@@ -214,9 +198,11 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let items = memo?.src === src && memo.how === how ? memo.items : frame.order(promptChanges.group(src), (batch) => height(batch) <= screen)
 	frame.state.ordered = { src, how, items }
 	let calls = new Map<string, string>()
+	// A result opens and closes with its call (task ghs).
+	let callKeys = new Map<string, string>()
 	let formCursor: Frame['cursor'] | undefined
 	let tick: Past['tick']
-	let look = `${cols} ${session} ${itemView.resultRows} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
+	let look = `${cols} ${session} ${itemView.resultRows} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url} ${view.folds?.sig ?? ''}`
 	let kept = frame.state.history
 	let start = 0
 	// A question can become active without its transcript item changing
@@ -243,6 +229,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			return undefined
 		}
 		let item = items[i]!
+		if (item.type === 'tool') callKeys.set(item.id, item.key)
+		let look: Look = { fold: view.folds?.states.get(item.type === 'tool-result' ? callKeys.get(item.id) ?? '' : item.key), pastes: view.folds?.pastes }
 		if (item.type === 'tool' && item.name === 'bash' && /^\d+(?:\.\d+)?$/.test(item.key)) {
 			calls.set(item.id, item.key)
 			bash.push({ at: i, id: item.id, key: item.key })
@@ -280,13 +268,13 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 				if (ticks) status = itemView.status(undefined, view.tick!.label, style)
 				else if (next?.type === 'tool-result' && next.id === item.id) status = itemView.resultStatus(next, item.name === 'bash', style)
 			}
-			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, status)
+			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, status, look)
 			rows = frame.highWater(rows, item, cols, session, streams)
 			if (tool && rows.length && lines.length) lines.pop()
 			else if (rows.length && lines.length) lines.push('')
 			for (let r of rows) lines.push(r)
 			if (ticks) {
-				let plain = frame.itemRows(item, cols, session, undefined, calls, tool, images)
+				let plain = frame.itemRows(item, cols, session, undefined, calls, tool, images, '', look)
 				let k = rows.findIndex((r, j) => r !== plain[j])
 				if (k >= 0 && rows.length === plain.length) tick = { row: lines.length - rows.length + k, labeled: rows[k]!, plain: plain[k]! }
 			}
@@ -324,7 +312,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	// It is the work now, so it comes before waiting messages (the future).
 	if (view.hal?.at === 'idle' && !formCursor) {
 		if (lines.length || above) lines.push('')
-		lines.push(ansi.PAD + frame.glyph(view.hal))
+		lines.push(ansi.PAD + halCursor.glyph(view.hal))
 	}
 	// Unsent and waiting messages use the normal prompt renderer; queued
 	// ones stack as compact rows, the sender's tab number redrawn here.
@@ -397,4 +385,4 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; items: Item[] } | undefined }, layout, build, itemRows, ref, queuedRows, highWater, order: batchOrder.order, glyph, withCursor, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; items: Item[] } | undefined }, layout, build, itemRows, ref, queuedRows, highWater, order: batchOrder.order, promptWidth }

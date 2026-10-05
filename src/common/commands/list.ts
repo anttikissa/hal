@@ -64,6 +64,7 @@ const list: CommandInfo[] = [
 	{ name: 'system', description: 'show the assembled system prompt', category: 'session' },
 	{ name: 'tabs', description: 'list open tabs or all saved sessions', category: 'tabs' },
 	{ name: 'theme', description: 'list or switch the colour theme', category: 'app' },
+	{ name: 'toggle', description: 'open or close blocks', category: 'session', key: 'ctrl-o' },
 	{ name: 'todo', description: 'file or list project TODO items', category: 'session' },
 	{ name: 'version', description: 'show which code the host runs', category: 'debug' },
 ]

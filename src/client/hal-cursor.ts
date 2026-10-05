@@ -10,6 +10,8 @@ import type { Oklch } from '../common/oklch.ts'
 import { states } from '../common/states.ts'
 import type { Transcript } from '../common/transcript.ts'
 import { pulse } from './pulse.ts'
+import { ansi } from './ansi.ts'
+import { strings } from '../common/strings.ts'
 
 // `stream`: after the last item's last character; `idle`: its own row.
 export type HalCursor = { at: 'stream' | 'idle'; lit: boolean; color: Oklch }
@@ -59,7 +61,30 @@ function of(t: Transcript | undefined, beat: number, now = pulse.now()): HalCurs
 	return { at: 'idle', lit: pulse.slow(beat), color }
 }
 
+// The Hal cursor's block, or nothing in its dark phase.
+function glyph(hal: HalCursor): string {
+	if (!hal.lit) return ''
+	let on = ansi.sgr({ fg: hal.color })
+	return on + '█' + (on && ansi.UNCOLOR)
+}
+
+// Rows `width` wide with the Hal cursor after the last character, on
+// a row of its own if that one is full.
+function withCursor(rows: string[], hal: HalCursor, width: number): string[] {
+	let last = rows.at(-1)
+	if (last === undefined) return rows
+	let g = halCursor.glyph(hal)
+	if (strings.visLen(last) < width) return [...rows.slice(0, -1), last + g]
+	return [...rows, g]
+}
+
+// The rows of the transcript's items, and where a question being
+// answered among them puts the cursor.
+// `tick`: the running call's title row with its elapsed time
+// (`labeled`) and without (`plain`), for build to choose.
 export const halCursor = {
+	glyph,
+	withCursor,
 	// `stopped`: per session seen working here, when it stopped (null
 	// while it works).
 	state: { stopped: new Map<string, number | null>() },

@@ -61,6 +61,8 @@ export type ModalState = {
 	/** The restart dialog's data: the /restart scope ('local': this
 	 * process, Ctrl-R) and the flagged calls it lists above the list. */
 	restart?: { scope: string; calls: FlaggedCall[] }
+	/** Only fields, no list: the box is as tall as they are (Ctrl-O). */
+	compact?: true
 	selected: number
 	/** The first list row in view; clients keep it with modals.scroll. */
 	scroll: number
