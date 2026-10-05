@@ -1,7 +1,7 @@
 // Open questions as the frame shows them: the question, its fields
 // and the cursor among them. Pure.
 
-import type { FormState } from '../common/forms.ts'
+import { forms, type FormState } from '../common/forms.ts'
 import { colors, type Style } from '../common/colors.ts'
 import { oklch } from '../common/oklch.ts'
 import { strings } from '../common/strings.ts'
@@ -26,8 +26,9 @@ function formLines(st: FormState, width: number): { rows: string[]; cursor: { ro
 	return { rows: [...rows, '', ...f.rows, '', ansi.quiet(strings.clipVisual(`  ${hint}`, width), colors.question())], cursor }
 }
 
-// Rows of a form's fields alone, and the cursor in them.
-function fieldLines(st: FormState, width: number, style: Style = colors.question()): { rows: string[]; cursor: { row: number; col: number } } {
+// Rows of a form's fields alone, and the cursor in them, at `now`
+// (Date.now(): where rotating placeholders are).
+function fieldLines(st: FormState, width: number, style: Style = colors.question(), now = Date.now()): { rows: string[]; cursor: { row: number; col: number } } {
 	let rows: string[] = []
 	let cursor = { row: 0, col: 0 }
 	st.form.fields.forEach((field, i) => {
@@ -56,8 +57,9 @@ function fieldLines(st: FormState, width: number, style: Style = colors.question
 		let p = promptView.layoutPrompt(shown, at, Math.max(1, width - indent))
 		// The example stays well below typed text, like the prompt's
 		// (oklch.faint): dimmer than the readable-text minimum on purpose.
-		if (!value && field.type === 'text' && field.placeholder) {
-			let example = strings.clipVisual(ansi.clean(field.placeholder), width - indent)
+		let placeholder = value ? '' : forms.example(st, i, now).text
+		if (placeholder) {
+			let example = strings.clipVisual(ansi.clean(placeholder), width - indent)
 			p.rows[0] = ansi.mono() || !style.fg ? example : ansi.sgr({ fg: oklch.faint(style.fg, style.bg ?? colors.screen) }) + example + ansi.sgr({ fg: style.fg })
 		}
 		if (focused) cursor = { row: rows.length + p.row, col: indent + p.col }

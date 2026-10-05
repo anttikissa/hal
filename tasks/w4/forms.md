@@ -33,7 +33,12 @@ answerable. An open question's fields stand between blank rows, apart
 from the question text above and the key hint below. A text field's
 placeholder is drawn in oklch.faint of the block's colours, like the
 prompt's example request: deliberately below the readable-text minimum
-so it never reads as typed text (the user's decision). A form marked
+so it never reads as typed text (the user's decision). A placeholder may
+be a list: it rotates (placeholders.rotate), the first one first, each
+held 3 s, erased a grapheme at a time and the next typed in, both
+quickly; the rest follow in seeded shuffled rounds, never one twice in
+a row. Both clients repaint only when the text next changes; the web
+keeps the first under prefers-reduced-motion. A form marked
 `skip` changes Escape from pause to skip: the host records a cancelled
 answer and runs the asker again, which moves on; its hint says
 "Escape: skip". While a turn's question is open the session is

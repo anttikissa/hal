@@ -7,10 +7,12 @@
 // (state, key) → state, so keys mean the same in terminal and web.
 
 import type { HistoryRecord } from './replay.ts'
+import { placeholders } from './placeholders.ts'
 
 export type Field = { help?: string } & (
 	// One line of text; may be left empty, or prefilled by the host.
-	| { type: 'text'; name: string; label?: string; placeholder?: string; initial?: string }
+	// A placeholder list rotates (placeholders.rotate), first one first.
+	| { type: 'text'; name: string; label?: string; placeholder?: string | string[]; initial?: string }
 	| { type: 'integer'; name: string; label?: string; initial?: string }
 	// Never put a secret's current value in the form (it goes to history).
 	| { type: 'secret'; name: string; label?: string }
@@ -33,7 +35,9 @@ export type Key = { key: string; text?: string; shift?: boolean; ctrl?: boolean;
 
 // A form being filled in: one value per field, the focused field and
 // the cursor (a UTF-16 offset on a grapheme boundary) in its text.
-export type FormState = { id: string; form: Form; values: string[]; focus: number; cursor: number }
+// `opened`: when this client showed it (Date.now()), the clock of
+// rotating placeholders.
+export type FormState = { id: string; form: Form; values: string[]; focus: number; cursor: number; opened?: number }
 
 export type FormAction = { type: 'submit'; answers: Answers } | { type: 'cancel' }
 
@@ -60,6 +64,7 @@ function invalid(value: unknown): string | undefined {
 		} else if (field.type !== 'text' && field.type !== 'secret' && field.type !== 'integer') return `${(field as Field).name}: unknown field type`
 		if ((field.type === 'text' || field.type === 'integer') && field.initial !== undefined && typeof field.initial !== 'string') return `${field.name}: initial must be a string`
 		if (field.help !== undefined && typeof field.help !== 'string') return `${field.name}: help must be a string`
+		if (field.type === 'text' && field.placeholder !== undefined && typeof field.placeholder !== 'string' && !(Array.isArray(field.placeholder) && field.placeholder.every((p) => typeof p === 'string'))) return `${field.name}: placeholder must be a string or a list of strings`
 	}
 	return undefined
 }
@@ -131,7 +136,15 @@ function summary(form: Form, answers: Answers, secrets: string[] = []): string[]
 
 function start(id: string, form: Form): FormState {
 	let values = form.fields.map((f) => (f.type === 'choice' ? f.options[Math.min(f.initial ?? 0, f.options.length - 1)]! : f.type === 'secret' ? '' : f.initial ?? ''))
-	return { id, form, values, focus: 0, cursor: values[0]!.length }
+	return { id, form, values, focus: 0, cursor: values[0]!.length, opened: Date.now() }
+}
+
+// The placeholder field `index` shows `now` (Date.now()); `next`: ms
+// until it changes (Infinity: never, as for a plain string).
+function example(st: FormState, index: number, now: number): { text: string; next: number } {
+	let f = st.form.fields[index]
+	let p = f?.type === 'text' ? f.placeholder : undefined
+	return Array.isArray(p) ? placeholders.rotate(p, now - (st.opened ?? now)) : { text: p ?? '', next: Infinity }
 }
 
 // The form state for question `open` (the transcript's open one): the
@@ -254,4 +267,4 @@ function command(sessionId: string, st: FormState, action: FormAction): unknown 
 	return { type: 'answer', sessionId, question: st.id, answers: action.answers }
 }
 
-export const forms = { invalid, check, redact, open, quoteParts, summary, start, follow, set, answers, focusOn, step, command }
+export const forms = { invalid, check, redact, open, quoteParts, summary, start, follow, example, set, answers, focusOn, step, command }

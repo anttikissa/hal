@@ -214,7 +214,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	// Language comes last: the scripted intro can't switch language
 	// mid-way, so asking earlier would promise what it can't do.
 	let language = answered(run, 'language')
-	if (language === undefined) return reply({ ask: { text: 'Any language or tone preferences? (E.g. "US English; spaces around em dash; friendly but concise")', fields: [{ type: 'text', name: 'language' }] } })
+	if (language === undefined) return reply({ ask: { text: 'Any language or tone preferences?', fields: [{ type: 'text', name: 'language', placeholder: intro.LANGUAGES }] } })
 	store({ 'Language preference': language })
 	if (model) {
 		config.init()
@@ -230,4 +230,16 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts; /intro runs this guide again.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
 }
 
-export const intro = { restart, run, answered, asked, accounts, choices, findZone, timezone }
+// Example answers the language field rotates through; the first opens.
+const LANGUAGES = [
+	'Simplified Technical English, please',
+	'US English; spaces around em dash',
+	'¡Háblame en español, por favor!',
+	'Puhu minulle suomea',
+	'Parle-moi en français, s’il te plaît',
+	'Bitte auf Deutsch, kurz und knapp',
+	'日本語でお願いします',
+	'British English, friendly but concise',
+]
+
+export const intro = { LANGUAGES, restart, run, answered, asked, accounts, choices, findZone, timezone }

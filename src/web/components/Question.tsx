@@ -7,7 +7,7 @@
 // focus and choice never part. ✕
 // dismisses it as Escape does.
 
-import { createEffect, createMemo, For, Show, untrack } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js'
 import { forms, type FormState } from '../../common/forms.ts'
 import type { Shown as Item } from '../../common/transcript.ts'
 import { external } from './Markdown.tsx'
@@ -35,6 +35,21 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 			if (target && target !== document.activeElement) untrack(() => target.focus())
 		},
 	)
+	// Rotating placeholders repaint when their text next changes; with
+	// reduced motion the first stays.
+	let [now, setNow] = createSignal(Date.now())
+	onSettled(() => {
+		if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+		let timer: ReturnType<typeof setTimeout> | undefined
+		let tick = () => {
+			let t = Date.now()
+			setNow(t)
+			let next = Math.min(...form().fields.map((_, i) => forms.example(props.form, i, t).next))
+			if (next < Infinity) timer = setTimeout(tick, next)
+		}
+		tick()
+		return () => clearTimeout(timer)
+	})
 	let submit = (e: SubmitEvent) => {
 		e.preventDefault()
 		app.submitForm()
@@ -87,7 +102,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 								inputmode={field.type === 'integer' ? 'numeric' : undefined}
 								aria-label={field.label ?? form().text}
 								autocomplete="off"
-								placeholder={field.type === 'text' ? field.placeholder : undefined}
+								placeholder={field.type === 'text' ? forms.example(props.form, i(), now()).text || undefined : undefined}
 								value={props.form.values[i()] ?? ''}
 								onInput={(e) => app.formInput(i(), e.currentTarget.value)}
 								onFocus={() => app.formFocus(i())}
