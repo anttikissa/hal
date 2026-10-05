@@ -67,7 +67,7 @@ export type AppState = {
 	modal?: ModalState
 	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
 	onModalKey?: (modal: ModalState, key: KeyEvent) => ReturnType<typeof modals.step>
-	older: Map<string, Backfill>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout>; choices?: string[]
+	older: Map<string, Backfill>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout>; typing?: ReturnType<typeof setTimeout>; choices?: string[]
 }
 
 function createState(): AppState {
@@ -75,10 +75,20 @@ function createState(): AppState {
 }
 
 // Paints the view; the pulse beats while something in it blinks.
+// A rotating placeholder in an empty field repaints when its text
+// next changes.
 function show(): void {
 	let v = appView.view()
 	pulse.keep(appView.blinks(v) ? app.beat : null)
 	render.show(v)
+	let st = app.state
+	clearTimeout(st.typing)
+	let f = st.form
+	let now = Date.now()
+	let next = Math.min(...(f?.values.map((v, i) => (v ? Infinity : forms.example(f, i, now).next)) ?? []))
+	if (next === Infinity) return
+	st.typing = setTimeout(app.show, next)
+	;(st.typing as { unref?: () => void }).unref?.()
 }
 
 // A beat of the pulse: a repaint, if a blink changed.

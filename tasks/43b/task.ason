@@ -1,0 +1,7 @@
+{
+	title: 'Forms: rotating text field placeholders',
+	spec: 'A text field placeholder may be a list of examples. It rotates as tasks/w4/forms.md describes: the first one first, held 3 s, then erased a grapheme at a time and the next typed in, quickly (src/common/placeholders.ts rotate, a pure function of the ms since the form opened; FormState.opened is that clock, forms.example reads a field). The terminal (src/client/app.ts show) and web (src/web/components/Question.tsx) repaint only when the text next changes; the web keeps the first under prefers-reduced-motion. Forms reject a placeholder that is neither a string nor a list of strings.',
+	status: 'done',
+	needs: [],
+	foldInto: ['w4']
+}
