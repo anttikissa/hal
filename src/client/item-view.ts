@@ -86,10 +86,12 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
 			let bash = (/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
+			// A job's message has no title to carry its status: a nonzero
+			// one stays its first row, in the warning colour (task wm0).
 			let body = ansi.wrap(bash ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text, width).map(ansi.links)
 			if (bash && /^\[exit [1-9]\d*\]/.test(body[0] ?? '')) {
 				let status = /^\[exit [1-9]\d*\]/.exec(body[0]!)![0]
-				body[0] = ansi.sgr({ fg: colors.diff().removeFg! }) + status + ansi.sgr({ fg: colors.user().fg! }) + body[0]!.slice(status.length)
+				body[0] = itemView.warn(status, itemView.itemStyle(item)) + body[0]!.slice(status.length)
 			}
 			// Another session's message: its summary, then a glimpse.
 			if (item.summary) {
@@ -145,22 +147,27 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'tool-result': {
 			// A glimpse: tool output can be long, the model sees all of it.
 			let call = calls?.get(item.id)
-			let out = call ? bashResult.display(item.output) : item.output
+			// No blank lines at either end, no bash status line: the
+			// status is in the title (task wm0).
+			let out = call ? bashResult.display(item.output, true) : bashResult.trim(item.output)
+			let style = itemView.itemStyle(item, tool)
+			// Attached, nothing to show draws nothing; apart, the header
+			// row stays, for its time, link and status.
+			if (!out && tool && !item.isError) return []
 			// Only the lines shown are laid out (outputs run to megabytes);
 			// the rest are counted as source lines, as on the web.
 			let wide = width, max = itemView.resultRows
-			let lines = out.replace(/\n$/, '').split('\n')
+			let lines = out.split('\n')
 			let rows: string[] = []
 			let used = 0
 			while (used < lines.length && rows.length <= max) rows.push(...ansi.wrap(lines[used++]!.slice(0, (max + 1) * wide * 4), wide, false))
 			let shown = rows.slice(0, max)
 			let more = rows.length - shown.length + lines.length - used
-			if (more) shown.push(`… ${more} more lines`)
 			// Rows start at the margin: no marker, no indent (an error's
 			// first row says so, not only its colour). Attached, the card
 			// tells input from output; apart, the text is quieter.
-			let style = itemView.itemStyle(item, tool)
-			return shown.map((l, i) => {
+			let status = tool ? '' : itemView.resultStatus(item, !!call, style)
+			let res = shown.map((l, i) => {
 				let prefix = !i && item.isError ? '✗ ' : ''
 				// Apart from its call, a result is its own block: it leads with its time.
 				if (!i && !tool) prefix = titles.stamp(item.ts, prefix)
@@ -168,13 +175,17 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (ref) prefix += `\x1b]8;;${ansi.webUrl(ref)}\x07#t${call}${ansi.LINK_OFF}> `
 				let text = strings.clipVisual(prefix + l, width)
 				let line = tool ? text : ansi.quiet(text, style)
-				if (call && /^\[exit [1-9]\d*\]/.test(l)) {
-					let status = /^\[exit [1-9]\d*\]/.exec(l)![0]
-					let at = line.indexOf(status)
-					if (at >= 0) line = line.slice(0, at) + ansi.sgr({ fg: colors.diff().removeFg! }) + status + ansi.sgr({ fg: tool ? style!.fg! : colors.quiet(style!.fg!, colors.screen) }) + line.slice(at + status.length)
-				}
-				return line
+				return !i && status ? itemView.right(line, status, width) : line
 			})
+			// Hidden lines are counted at the end of the last row, or on
+			// a row of their own when that one is too full.
+			if (more) {
+				let marker = ansi.quiet(`… ${more} more lines`, style)
+				let last = res.at(-1)!
+				if (strings.visLen(last) + 2 + strings.visLen(marker) <= width) res[res.length - 1] = itemView.right(last, marker, width)
+				else res.push(marker)
+			}
+			return res
 		}
 		case 'turn-end':
 			if (item.status === 'error') return ansi.wrap(titles.stamp(item.ts, `error: ${item.error ?? 'turn failed'}`), width)
@@ -253,6 +264,34 @@ function quoteLines(quote: Quote | undefined, width: number): string[] {
 	})
 }
 
+// `text` in the warning colour, then back to `style`'s.
+function warn(text: string, style: Style | undefined): string {
+	if (ansi.mono()) return text
+	return ansi.sgr({ fg: colors.warning().fg! }) + text + (style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
+}
+
+// The status after a tool card's title (task wm0), quiet: a nonzero
+// exit in the warning colour, then the time; '' with neither.
+function status(exit: string | undefined, time: string | undefined, style: Style | undefined): string {
+	if (!exit && !time) return ''
+	if (!exit) return ansi.quiet(`(${time})`, style)
+	return ansi.quiet('(', style) + itemView.warn(exit, style) + ansi.quiet(time ? `, ${time})` : ')', style)
+}
+
+// A finished call's status from its result; `bash`: a bash call's.
+function resultStatus(item: Item & { type: 'tool-result' }, bash: boolean, style: Style | undefined): string {
+	return itemView.status(bash ? bashResult.status(item.output) : undefined, bashResult.duration(item.ms), style)
+}
+
+// `row` with `end` at the right of `width` columns, two spaces apart
+// at least; the row is clipped to make room.
+function right(row: string, end: string, width: number): string {
+	let room = width - strings.visLen(end) - 2
+	if (room < 1) return row
+	let text = strings.visLen(row) > room ? strings.clipVisual(row, room) : row
+	return text + ' '.repeat(width - strings.visLen(text) - strings.visLen(end)) + end
+}
+
 export const itemView = {
 	// Rows of a tool result shown in the transcript.
 	resultRows: 3,
@@ -263,4 +302,8 @@ export const itemView = {
 	imageLabel,
 	ref,
 	quoteLines,
+	warn,
+	status,
+	resultStatus,
+	right,
 }

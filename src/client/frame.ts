@@ -19,6 +19,7 @@ import type { ModalState } from '../common/modals.ts'
 import { inbox } from '../common/inbox.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
+import { batchOrder } from './batch-order.ts'
 import { formView } from './form-view.ts'
 import { itemView } from './item-view.ts'
 import { modalView } from './modal-view.ts'
@@ -68,6 +69,8 @@ export interface View {
 	newCode?: boolean
 	/** The notice stack, over the rows just above the tab bar (task qm). */
 	notices?: Folded
+	/** The running tool call and its elapsed time, "12s" (task wm0). */
+	tick?: { call: string; label: string }
 }
 
 export interface Frame {
@@ -97,14 +100,15 @@ function promptWidth(cols: number): number {
 // each is laid out once per width and look, not on every frame: a long
 // history stays cheap to redraw. A kept row keeps the link code it was
 // painted with (task e3 notes).
-function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, tool?: string, images: Item[] = []): string[] {
+// `status`: a tool call's, after its title (task wm0).
+function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, tool?: string, images: Item[] = [], status = ''): string[] {
 	let style = itemView.itemStyle(item, tool)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url}`
+	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
-	let { inner, mark } = frame.ref(item, cols, session, style)
+	let { inner, mark } = frame.ref(item, cols, session, style, status)
 	let lines = itemView.itemLines(item, inner, !!hal, session, calls, tool, images)
 	if (hal) lines = frame.withCursor(lines, hal, inner)
 	// A block with a background has a row of it above and below its
@@ -117,17 +121,20 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	return rows
 }
 
-// The text width beside an item's id, and how to put the id on row `at`.
-function ref(item: Item, cols: number, session: string | undefined, style: Style | undefined): { inner: number; mark: (lines: string[], at: number) => void } {
+// The text width beside an item's id, and how to put the id on row
+// `at`, after `status` if there is one; the row is clipped to make room.
+function ref(item: Item, cols: number, session: string | undefined, style: Style | undefined, status = ''): { inner: number; mark: (lines: string[], at: number) => void } {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let ref = itemView.ref(item, session)
 	// On a very narrow terminal the text needs every column.
 	if (ref && width < 4 * strings.visLen(ref.text)) ref = undefined
 	let inner = ref ? Math.max(1, width - strings.visLen(ref.text) - 1) : width
 	let mark = (lines: string[], at: number) => {
-		if (!ref || lines.length <= at) return
-		let gap = ' '.repeat(Math.max(1, width - strings.visLen(lines[at]!) - strings.visLen(ref.text)))
-		lines[at] += gap + ansi.quiet(`\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}`, style)
+		if ((!ref && !status) || lines.length <= at) return
+		let link = ref ? ansi.quiet(`\x1b]8;;${ansi.webUrl(ref.href)}\x07${ref.text}${ansi.LINK_OFF}`, style) : ''
+		let end = status && link ? `${status} ${link}` : status || link
+		if (status) lines[at] = itemView.right(lines[at]!, end, width)
+		else lines[at] += ' '.repeat(Math.max(1, width - strings.visLen(lines[at]!) - strings.visLen(ref!.text))) + link
 	}
 	return { inner, mark }
 }
@@ -179,7 +186,9 @@ function withCursor(rows: string[], hal: HalCursor, width: number): string[] {
 
 // The rows of the transcript's items, and where a question being
 // answered among them puts the cursor.
-export type Past = { lines: string[]; formCursor?: Frame['cursor']; target?: number }
+// `tick`: the running call's title row with its elapsed time
+// (`labeled`) and without (`plain`), for build to choose.
+export type Past = { lines: string[]; formCursor?: Frame['cursor']; target?: number; tick?: { row: number; labeled: string; plain: string } }
 
 // Lays out the transcript's items. The rows of items drawn last time
 // and unchanged since are reused as they are: a frame costs what
@@ -188,37 +197,6 @@ export type Past = { lines: string[]; formCursor?: Frame['cursor']; target?: num
 // returns nothing; what was laid out is kept (unless `save` is false),
 // so the next call goes on from there: a long history is laid out in
 // slices (task 7j).
-// Display order: parallel calls each with their results right under
-// them, as web cards are; unless the batch as drawn (`fits` measures
-// its rows) is taller than a screen: then calls and results stay
-// separate blocks, each result linking to its call, so finishing calls
-// never rewrite scrollback. A batch that once overflowed stays split,
-// so its layout never flips back. Later items keep their place
-// (background output arrives as its own block).
-function order(items: Item[], fits: (batch: Item[]) => boolean): Item[] {
-	let out: Item[] = []
-	for (let i = 0; i < items.length; ) {
-		let j = i
-		while (j < items.length && items[j]!.type === 'tool') j++
-		let k = j
-		while (k < items.length && items[k]!.type === 'tool-result') k++
-		let calls = items.slice(i, j) as (Item & { type: 'tool' })[]
-		let results = items.slice(j, k) as (Item & { type: 'tool-result' })[]
-		let split = calls.length > 1 && frame.state.split.has(calls[0]!.key)
-		if (calls.length > 1 && !split && !fits(items.slice(i, k))) {
-			frame.state.split.add(calls[0]!.key)
-			split = true
-		}
-		if (calls.length < 2 || split) out.push(...items.slice(i, Math.max(k, i + 1)))
-		else {
-			for (let c of calls) out.push(c, ...results.filter((r) => r.id === c.id))
-			out.push(...results.filter((r) => !calls.some((c) => c.id === r.id)))
-		}
-		i = Math.max(k, i + 1)
-	}
-	return out
-}
-
 function layout(view: View, cols: number, deadline = Infinity, save = true, screen = 24): Past | undefined {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let session = view.transcript?.meta.id
@@ -238,15 +216,18 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	frame.state.ordered = { src, how, items }
 	let calls = new Map<string, string>()
 	let formCursor: Frame['cursor'] | undefined
+	let tick: Past['tick']
 	let look = `${cols} ${session} ${itemView.resultRows} ${items[0] ? ansi.sgr(itemView.itemStyle(items[0]) ?? {}) : ''} ${ansi.state.web.url}`
 	let kept = frame.state.history
 	let start = 0
 	// A question can become active without its transcript item changing
 	// (the blocked-state event follows the question). Never reuse its
 	// inactive rows while the form is taking keys.
+	// A call's title shows its result's status, or its running time.
 	if (kept?.look === look) while (start < kept.items.length && items[start] === kept.items[start]) {
 		let item = items[start]!
 		if (item.type === 'question' && item.id === view.form?.id) break
+		if (item.type === 'tool' && (item.id === view.tick?.call || items[start + 1] !== kept.items[start + 1])) break
 		start++
 	}
 	let lines = start ? kept!.lines.slice(0, kept!.ends[start - 1]) : []
@@ -290,14 +271,28 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			let images: Item[] = []
 			if (item.type === 'prompt') for (let j = i + 1; items[j]?.type === 'image'; j++) images.push(items[j]!)
 			let merged = item.type === 'image' && ['prompt', 'image'].includes(items[i - 1]?.type ?? '')
-			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images)
+			// A call shows its attached result's status, or while it
+			// runs, its elapsed time (task wm0).
+			let ticks = item.type === 'tool' && item.id === view.tick?.call
+			let status = ''
+			if (item.type === 'tool') {
+				let style = itemView.itemStyle(item), next = items[i + 1]
+				if (ticks) status = itemView.status(undefined, view.tick!.label, style)
+				else if (next?.type === 'tool-result' && next.id === item.id) status = itemView.resultStatus(next, item.name === 'bash', style)
+			}
+			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, status)
 			rows = frame.highWater(rows, item, cols, session, streams)
 			if (tool && rows.length && lines.length) lines.pop()
 			else if (rows.length && lines.length) lines.push('')
 			for (let r of rows) lines.push(r)
-			// A streaming block or a question being answered is redrawn
-			// every frame; so is everything after it.
-			if (stable === i && !streams) stable++
+			if (ticks) {
+				let plain = frame.itemRows(item, cols, session, undefined, calls, tool, images)
+				let k = rows.findIndex((r, j) => r !== plain[j])
+				if (k >= 0 && rows.length === plain.length) tick = { row: lines.length - rows.length + k, labeled: rows[k]!, plain: plain[k]! }
+			}
+			// A streaming block, a ticking call or a question being
+			// answered is redrawn every frame; so is everything after it.
+			if (stable === i && !streams && !ticks) stable++
 		}
 		ends.push(lines.length)
 	}
@@ -305,7 +300,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let at = view.target ? items.findIndex((i) => i.key === view.target) : -1
 	// An image drawn in its prompt's card is found at that card.
 	while (at > 0 && items[at]!.type === 'image' && ['prompt', 'image'].includes(items[at - 1]!.type)) at--
-	return { lines, ...(formCursor ? { formCursor } : {}), ...(at >= 0 ? { target: at ? ends[at - 1]! : 0 } : {}) }
+	return { lines, ...(formCursor ? { formCursor } : {}), ...(at >= 0 ? { target: at ? ends[at - 1]! : 0 } : {}), ...(tick ? { tick } : {}) }
 }
 
 // The frame for `view` on a terminal of `rows` × `cols`. `full`: full
@@ -385,6 +380,11 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	let chrome = lines
 	lines = history.concat(Array<string>(pad).fill(''), chrome)
 	let grown = view.notices ? noticeView.overlay(lines, view.notices, history.length + pad + anchor, cols) : 0
+	// A ticking time scrolled into scrollback would stay there stale,
+	// and rewriting it there forces a full repaint: off the screen, the
+	// row goes without it (task wm0).
+	let tick = past.tick
+	if (tick && lines.length - tick.row > rows && lines[tick.row] === tick.labeled) lines[tick.row] = tick.plain
 	top += history.length + pad + grown
 	let cursor = formCursor ?? { row: top + p.row, col: ansi.PAD.length + p.col }
 	let out = { lines, cursor, promptScroll: p.scroll, history: history.length + grown }
@@ -397,4 +397,4 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, split: new Set<string>(), ordered: undefined as { src: Item[]; how: string; items: Item[] } | undefined }, layout, build, itemRows, ref, queuedRows, highWater, order, glyph, withCursor, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; items: Item[] } | undefined }, layout, build, itemRows, ref, queuedRows, highWater, order: batchOrder.order, glyph, withCursor, promptWidth }

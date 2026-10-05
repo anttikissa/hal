@@ -292,7 +292,7 @@ test('Bash display hides successful status but keeps errors and the original sou
 	expect(view.show(good, false, true)?.text).toBe('◂  M notes.md')
 	expect(view.show(bad, false, true)?.text).toContain('[exit 123]\n  error: cannot access file')
 	expect(view.show(good, false, false)?.text).toContain('[exit 0]')
-	expect(view.show({ type: 'prompt', text: good.output, from: 's', label: 'bash #1813' })?.text).toBe(' M notes.md\n')
+	expect(view.show({ type: 'prompt', text: good.output, from: 's', label: 'bash #1813' })?.text).toBe(' M notes.md')
 	expect(good.output).toStartWith('[exit 0]')
 })
 
