@@ -25,8 +25,11 @@ function stopped(done: DoneEvent): DoneEvent | ErrorEvent {
 function cancelled(id: string): ToolResultBlock {
 	return { type: 'tool_result', id, output: `Tool call did not run: cancelled ${jobs.byMessage}.`, interrupted: 'cancelled' }
 }
+// A steer stopped the call if it failed (a tool's own abort error, any
+// wording) or is bash's stop line, built from the same `byMessage`; a
+// call that finished despite the steer stays as it is.
 function stoppedBy(result: ToolResultBlock, signal: AbortSignal): ToolResultBlock {
-	if (signal.reason !== jobs.steered || !result.output.includes(jobs.byMessage)) return result
+	if (signal.reason !== jobs.steered || !(result.isError || result.output.includes(jobs.byMessage))) return result
 	let { isError: _, ...rest } = result
 	return { ...rest, interrupted: 'stopped' }
 }
