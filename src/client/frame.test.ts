@@ -444,29 +444,32 @@ test('finished thinking with no readable text draws nothing, not a bare header',
 })
 
 
-test('Bash results link to the call, hide a successful exit, and colour only a failed status', () => {
+test('Bash results link to the call; a failed status and the time go in the title, in the warning colour (task wm0)', () => {
 	let v = view([
 		{ type: 'tool', id: 'run', name: 'bash', input: { description: 'Check files', command: 'git status --short' } },
 		{ type: 'tool-result', id: 'run', output: '[exit 0]\n M notes.md\n' },
-		{ type: 'tool-result', id: 'run', output: '[exit 123]\nerror: cannot access file\n' },
+		{ type: 'tool', id: 'bad', name: 'bash', input: { description: 'Read missing', command: 'cat nope' } },
+		{ type: 'tool-result', id: 'bad', output: '[exit 123]\nerror: cannot access file\n', ms: 3270 },
 		{ type: 'prompt', text: '[exit 123]\nmissing file\n', from: 's', label: 'bash #1813' },
 	])
-	v.transcript!.items = v.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1814', '1815', '1816'][i]! }))
+	v.transcript!.items = v.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1814', '1815', '1816', '1817'][i]! }))
 	let lines = frame.build(v, 70).lines
 	let printed = plain(lines).join('\n')
 	expect(printed).not.toContain('[exit 0]')
 	// Under its call, a result needs no link back to it; apart, it has one.
 	expect(printed).toContain('\nM notes.md')
-	expect(printed).toContain('[exit 123]')
 	expect(printed).not.toContain('#1813>')
+	let title = lines.find((line) => line.includes('Read missing'))!
+	expect(plain([title])[0]).toMatch(/Read missing +\(exit 123, 3\.2s\) #t1815$/)
+	expect(title).toContain(ansi.sgr({ fg: colors.warning().fg! }) + 'exit 123')
+	expect(printed).not.toContain('[exit 123]\nerror')
+	expect(printed).toContain('error: cannot access file')
+	// A job's message has no title for it: the status stays its first row.
+	expect(lines.find((line) => plain([line])[0]!.includes('[exit 123]'))).toContain(ansi.sgr({ fg: colors.warning().fg! }) + '[exit 123]')
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
-	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1817', '1814'][i]! }))
+	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1818', '1814'][i]! }))
 	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('#t1813>  M notes.md')
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#t1813`)
-	let failure = lines.find((line) => line.includes('[exit 123]'))!
-	let errorColor = ansi.sgr({ fg: colors.diff().removeFg! })
-	expect(failure).toContain(errorColor + '[exit 123]')
-	expect(failure.slice(failure.indexOf('[exit 123]') + 10)).not.toContain(errorColor)
 	expect(printed).toContain('Message from bash #1813')
 })
 

@@ -555,7 +555,7 @@ describe('terminal.redraw', () => {
 	})
 
 	test('repaints every row in the current colours, cached rows too', () => {
-		let diff = colors.diff, mono = ansi.mono
+		let warning = colors.warning, mono = ansi.mono
 		// Colour escapes exist only outside GNU screen (ansi.mono): a run
 		// inside screen without ./test must still paint in colour.
 		ansi.mono = () => false
@@ -564,16 +564,16 @@ describe('terminal.redraw', () => {
 			// The exit status colour is painted inside the row, not part
 			// of the item's own style.
 			show([{ type: 'prompt', label: 'bash #1', text: '[exit 1] failed' }])
-			let red = ansi.sgr({ fg: colors.diff().removeFg! })
+			let amber = ansi.sgr({ fg: colors.warning().fg! })
 			let green = ansi.sgr({ fg: [0.8, 0.15, 145] })
-			expect(term.written).toContain(red)
-			colors.diff = () => ({ ...diff(), removeFg: [0.8, 0.15, 145] })
+			expect(term.written).toContain(amber)
+			colors.warning = () => ({ ...warning(), fg: [0.8, 0.15, 145] })
 			term.written = ''
 			terminal.redraw()
 			expect(term.written).toContain(green)
-			expect(term.written).not.toContain(red)
+			expect(term.written).not.toContain(amber)
 		} finally {
-			colors.diff = diff
+			colors.warning = warning
 			ansi.mono = mono
 		}
 	})

@@ -2,6 +2,7 @@
 // app state (client/app.ts), the status row's facts and the words for
 // a session's state. Reads only; app.show() paints it.
 
+import { bashResult } from '../common/bash-result.ts'
 import { colors } from '../common/colors.ts'
 import { amend } from '../common/amend.ts'
 import { connection } from '../common/connection.ts'
@@ -44,6 +45,8 @@ function view(): View {
 	if (activity) v.activity = activity
 	let hal = halCursor.of(st.transcript, pulse.beat())
 	if (hal) v.hal = hal
+	let tick = t && appView.tick(t, Date.now())
+	if (tick) v.tick = tick
 	if (t) v.status = appView.status(t)
 	if (notices.state.entries.length) v.notices = notices.fold(notices.state.entries)
 	return v
@@ -85,10 +88,19 @@ function why(t: Transcript): string | undefined {
 	return states.describe(s, Date.now(), t.items)
 }
 
-// What blinks in `view`, as a key that changes with every blink phase.
+// The running tool call's elapsed time, from 1 s on (task wm0).
+function tick(t: Transcript, now: number): View['tick'] {
+	let s = t.state
+	if (s.type !== 'running' || s.phase !== 'tools' || !s.call || !s.since) return undefined
+	let label = bashResult.duration(now - Date.parse(s.since), true)
+	return label ? { call: s.call, label } : undefined
+}
+
+// What blinks in `view`, as a key that changes with every blink phase;
+// a ticking time counts.
 function blinks(view: View): string {
 	let lit = view.tabs?.lit
-	return view.hal || lit !== undefined ? JSON.stringify([view.hal, lit]) : ''
+	return view.hal || lit !== undefined || view.tick ? JSON.stringify([view.hal, lit, view.tick]) : ''
 }
 
 export const appView = {
@@ -99,5 +111,6 @@ export const appView = {
 	status,
 	activity,
 	why,
+	tick,
 	blinks,
 }
