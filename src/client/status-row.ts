@@ -39,13 +39,13 @@ function percent(s: Stats | undefined): number | undefined {
 }
 
 // The left side's groups: session, cwd, model, context.
-function left(info: StatusInfo): Part[][] {
+function left(info: StatusInfo, full = true): Part[][] {
 	let hi = colors.status().highlight!
 	let out: Part[][] = [info.name ? [{ text: `${info.id}: ` }, { text: ansi.clean(info.name), fg: hi }] : [{ text: info.id }]]
 	let home = info.home
 	let cwd = home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
 	out.push([{ text: ansi.clean(cwd), fg: info.color ?? (info.hal ? colors.assistant().fg! : hi) }])
-	out.push([{ text: ansi.clean(`${titles.modelName(info.model)} (${info.stats?.effort ?? 'default/unknown'})`), fg: hi }])
+	out.push([{ text: ansi.clean(titles.modelLabel(info.model, info.stats?.effort, full)), fg: hi }])
 	let s = info.stats
 	if (s?.files) out.push([{ text: `${s.files} files`, href: `/changes/${info.id}` }])
 	let pct = statusRow.percent(s)
@@ -92,8 +92,10 @@ function clip(parts: Part[], max: number): Part[] {
 // as many right groups as fit beside the whole left, at least one
 // column apart; the left clipped only when nothing is on the right.
 function fit(info: StatusInfo, cols: number): Part[] {
-	let l = join(statusRow.left(info))
 	let groups = statusRow.right(info)
+	// The official model name if the whole row fits, else the short one.
+	let l = join(statusRow.left(info))
+	if (width(l) + 1 + width(join(groups)) > cols) l = join(statusRow.left(info, false))
 	while (groups.length && width(l) + 1 + width(join(groups)) > cols) groups = groups.slice(0, -1)
 	if (!groups.length) return clip(l, cols)
 	let r = join(groups)

@@ -9,7 +9,10 @@ Effort lives in the model string: config.ason's model holds provider/id or alias
 /effort <level> changes only the current model's effort; /effort alone shows the current effort and the levels. It is listed in /help. Tab completion: /effort completes the current model's levels, default first as 'default (<level>)'; /model offers ':<level>' entries for the current model first, then model ids; after alias: or id: it completes that model's levels. /model :level equals /effort level.
 
 Tests: nearest-level ranking including ties and none, ultra alias, snap reported by spawn, carry-over on model switch, typo still errors.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Snapping lives in effort.nearest (src/host/effort.ts); models.selection(input, carry) calls it and returns { id, effort?, note? }. /model passes the session's effort as carry; spawn's own model does not, so a subagent given a bare model gets that model's default. A level equal to the model's policy/default returns no effort, which is how 'default and its level are one choice' holds. effort.validate still guards wire() against stale stored levels."
+	],
 	needs: ['w7', 'pv'],
 	foldInto: ['w7']
 }

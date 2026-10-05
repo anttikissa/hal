@@ -13,7 +13,7 @@ test('effort persists, inherits on fresh spawn/fork, resets on own model and ref
 	let c = client()
 	let id = created(c)
 	slash.change(id, { model: 'openai/gpt-6-sol:max' })
-	expect(() => slash.change(id, { model: 'openai/gpt-6.1-sol:none' })).toThrow('unsupported effort')
+	expect(() => slash.change(id, { model: 'gpt:banana' })).toThrow('unknown effort')
 	expect(sessions.open(id)).toMatchObject({ model: 'openai/gpt-6-sol', effort: 'max' })
 	let base = { kind: 'interactive' as const, task: '', fork: false, cwd: '/tmp', limit: 0 }
 	let inherited = subagents.spawn(id, base)

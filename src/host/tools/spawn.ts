@@ -48,11 +48,12 @@ export const tool: Tool = {
 		let task = text(input, 'task') ?? ''
 		if (!task && kind !== 'interactive') throw new Error('task is required unless kind is interactive')
 		let model = text(input, 'model')
-		if (model !== undefined) { let selected = models.selection(model); if (!models.valid(selected.id)) throw new Error(`unknown model ${model}`); model = models.qualified(selected.id, selected.effort) }
+		let note = ''
+		if (model !== undefined) { let selected = models.selection(model); if (!models.valid(selected.id)) throw new Error(`unknown model ${model}`); model = models.qualified(selected.id, selected.effort); if (selected.note) note = ` Effort: ${selected.note}.` }
 		let cwd = resolve(ctx.cwd, text(input, 'cwd') ?? '.')
 		if (!statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${cwd} is not a directory`)
 		let id = subagents.spawn(ctx.sessionId, { kind, task, fork: mode === 'fork', cwd, model, name: text(input, 'name'), limit })
-		if (kind === 'interactive') return `Opened ${tabs.label(id)} for the user${task ? ', working on the task' : ''}.`
-		return `Started ${tabs.label(id)}. Its last message comes back here when it finishes; wait ends this turn until then.`
+		if (kind === 'interactive') return `Opened ${tabs.label(id)} for the user${task ? ', working on the task' : ''}.${note}`
+		return `Started ${tabs.label(id)}. Its last message comes back here when it finishes; wait ends this turn until then.${note}`
 	},
 }

@@ -4,7 +4,7 @@ import { strings } from '../common/strings.ts'
 import { statusRow, type StatusInfo } from './status-row.ts'
 
 let originalNames: Record<string, string>
-beforeEach(() => { originalNames = titles.names; titles.names = { 'anthropic/claude-opus-5-5': 'Opus 5.5' } })
+beforeEach(() => { originalNames = titles.names; titles.names = { 'anthropic/claude-opus-5-5': 'Claude Opus 5.5' } })
 afterEach(() => { titles.names = originalNames })
 
 const info: StatusInfo = {
@@ -14,11 +14,13 @@ const info: StatusInfo = {
 	home: '/Users/me',
 	model: 'anthropic/claude-opus-5-5',
 	role: 'host',
-	stats: { context: 87_000, window: 1_000_000, sent: 252, received: 41_000, plan: { account: 1, accounts: 2, windows: { '5h': 18, '7d': 57 } } },
+	stats: { effort: 'high', context: 87_000, window: 1_000_000, sent: 252, received: 41_000, plan: { account: 1, accounts: 2, windows: { '5h': 18, '7d': 57 } } },
 }
 
 const text = (i: StatusInfo, cols: number) => statusRow.fit(i, cols).map((p) => p.text).join('')
-const LEFT = '156-way: Orchestrate v3 · ~/hal2 · Opus 5.5 (default/unknown) · 87k/1000k (9%)'
+const LEFT = '156-way: Orchestrate v3 · ~/hal2 · Claude Opus 5.5 high · 87k/1000k (9%)'
+// Where the whole row does not fit, the short model name (task r7r).
+const SHORT = LEFT.replace('Claude ', '')
 
 test('a wide row shows every part, the right side flush right', () => {
 	let row = text(info, 140)
@@ -32,11 +34,12 @@ test('narrowing drops the plan, then the tokens, then the role, then clips the l
 	for (let cols = 140; cols > 10; cols--) {
 		let row = text(info, cols)
 		expect(strings.visLen(row)).toBeLessThanOrEqual(cols)
-		let kind = row.includes('Sub') ? 'all' : row.includes('↑') ? 'tokens' : row.endsWith('host') ? 'role' : LEFT.startsWith(row.replace(/…$/, '')) ? 'left' : row
+		let kind = row.includes('Sub') ? 'all' : row.includes('↑') ? 'tokens' : row.endsWith('host') ? 'role' : SHORT.startsWith(row.replace(/…$/, '')) ? 'left' : row
 		if (seen.at(-1) !== kind) seen.push(kind)
+		if (kind !== 'all') expect(row).not.toContain('Claude')
 	}
 	expect(seen).toEqual(['all', 'tokens', 'role', 'left'])
-	expect(text(info, 20)).toBe(`${LEFT.slice(0, 19)}…`)
+	expect(text(info, 20)).toBe(`${SHORT.slice(0, 19)}…`)
 })
 
 test('the context is a heat-coloured percentage of the window', () => {

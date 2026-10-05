@@ -299,7 +299,7 @@ export type Event =
 	// Repaint terminals following this session; no reload on the web.
 	| { type: 'redraw'; sessionId: string }
 	// Cached models.dev names on connect, model switch and catalog refresh.
-	| { type: 'model-names'; names: Record<string, string> }
+	| { type: 'model-names'; names: Record<string, string>; defaults?: Record<string, string> }
 	// Another tab's turn ended or asks, sent only to clients watching
 	// some other tab (task qm); `session`, not sessionId, so no client
 	// takes it as that session's event.

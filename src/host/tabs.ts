@@ -69,8 +69,8 @@ function greet(client: { deliver: (event: Event) => void }, live: () => boolean)
 		queueMicrotask(() => {
 			if (!live()) return
 			try {
-				let names = models.names(openTabs.map((tab) => tab.model))
-				if (Object.keys(names).length) client.deliver({ type: 'model-names', names })
+				let names = models.nameEvent(openTabs.map((tab) => tab.model))
+				if (names) client.deliver(names)
 			} catch (e: any) {
 				client.deliver({ type: 'warning', text: String(e?.message ?? e) })
 			}

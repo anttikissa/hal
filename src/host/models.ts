@@ -8,7 +8,8 @@
 //   "opus" → { id: 'anthropic/claude-opus-5-5' } | { login: '/login claude' };
 //   a name it doesn't know → { id: input }
 // - selection(input): resolve plus an effort suffix
-//   "opus:high" → { id, effort: 'high' }; throws on no access
+//   "opus:high" → { id, effort: 'high' }; a missing level snaps to the
+//   nearest with a note; throws on no access
 // - qualified(model, effort?): the reverse → "anthropic/claude-opus-5-5:high"
 // - known(): ids offered without asking the network (synchronous)
 // - list(current): the model picker's ids, current first
@@ -112,6 +113,15 @@ function known(): string[] {
 }
 
 // Display names models.dev gives the ids it knows.
+// The model-names event for `ids`: display names, and each model's
+// default effort so clients can leave it unsaid (task r7r).
+function nameEvent(ids: string[]): { type: 'model-names'; names: Record<string, string>; defaults?: Record<string, string> } | undefined {
+	let names = models.names(ids)
+	let defaults: Record<string, string> = {}
+	for (let id of ids) { let level = models.effort(id); if (level) defaults[id] = level }
+	return Object.keys(names).length || Object.keys(defaults).length ? { type: 'model-names', names, ...(Object.keys(defaults).length && { defaults }) } : undefined
+}
+
 function names(ids: string[]): Record<string, string> {
 	let out: Record<string, string> = {}
 	for (let id of ids) {
@@ -183,6 +193,7 @@ export const models = {
 	list,
 	warm,
 	names,
+	nameEvent,
 	resolve,
 	// List prices, not subscription charges. Unknown prices stay unknown.
 	pricing(id: string): Pricing | undefined {
@@ -199,7 +210,8 @@ export const models = {
 		let parsed = blocks.parseModelId(id)
 		return selected ?? effort.describe(id)?.policy ?? (parsed && provider.state.providers[parsed.provider]?.effort?.(parsed.model))
 	},
-	selection(input: string): { id: string; effort?: string } {
+	// `carry` is the effort kept when input names none (task 7vt).
+	selection(input: string, carry?: string): { id: string; effort?: string; note?: string } {
 		let base = input
 		let level: string | undefined
 		if (!models.known().includes(input)) {
@@ -208,13 +220,16 @@ export const models = {
 				let suffix = input.slice(colon + 1)
 				let candidate = input.slice(0, colon)
 				let alias = models.resolve(candidate)
-				if (suffix === 'default' || effort.vocabulary.includes(suffix as any)) { base = candidate; level = suffix }
+				if (suffix === 'default' || suffix === 'ultra' || effort.vocabulary.includes(suffix as any)) { base = candidate; level = suffix }
 				else if (models.known().includes(candidate) || alias.id !== candidate || alias.login) throw new Error(`${candidate}: unknown effort '${suffix}'; use default or ${alias.id ? effort.describe(alias.id)?.levels.join(', ') || 'no verified effort control' : 'a supported level'}`)
 			}
 		}
 		let choice = models.resolve(base)
 		if (!choice.id) throw new Error(`${base}: no access; ${choice.login} to use it`)
-		return { id: choice.id, ...(level && level !== 'default' ? { effort: effort.validate(choice.id, level) } : {}) }
+		level ??= carry
+		if (!level || level === 'default') return { id: choice.id }
+		let snapped = effort.nearest(choice.id, level)
+		return { id: choice.id, ...(snapped.level && { effort: snapped.level }), ...(snapped.note && { note: snapped.note }) }
 	},
 	qualified(model: string, selected?: string): string { return selected === undefined ? model : `${model}:${selected}` },
 	fallback,

@@ -6,8 +6,13 @@
 
 The model picker (task pv) shows each label once, without stacked parentheses: group headers drop '(default: …)'; the default model row carries a mark instead; a leaf shows its effort as a bare level, and the default level as 'default (<level>)' — the only place the default's level is named. The picker title shows the selection as a model string, e.g. 'Model: anthropic/claude-opus-5-5:high'. effort.label in src/common/effort.ts no longer returns 'default/unknown' or nested parentheses.
 
+Block headers (tasks hp, vwh) always use the short name, whatever the width, since they repeat on every block: model text reads 'Hal (<short name>)' or 'Hal (<short name> <level>)', e.g. 'Hal (Opus 5.5 high)', with the effort the block recorded; thinking reads 'Thinking' alone, its reply header naming model and effort. The model repeats on every header because users switch models often; a plugin may override the title function.
+
 Tests: name shortening for Claude, tiered GPT, plain GPT and another family; status text at default and non-default effort.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Clients learn each model's default effort from the model-names event (defaults map, built by models.nameEvent), so headers can leave the default unsaid; the status row's Stats.effort is set by the host only when it differs from the default. The web status row renders both names and CSS swaps them below 80ch; the terminal swaps when left plus all right groups overflow."
+	],
 	needs: ['w7', 'pv', 'qq'],
 	foldInto: ['pv', 'w7']
 }

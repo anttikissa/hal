@@ -61,7 +61,7 @@ function groups(st: ViewState): StatusGroup[] {
 	let out: StatusGroup[] = [
 		{ parts: [{ text: meta.id }, ...(meta.name ? [{ text: `: ${meta.name}` }] : [])] },
 		{ parts: [{ text: meta.cwd }], path: true },
-		{ parts: [{ text: `${titles.modelName(meta.model)} (${stats?.effort ?? 'default/unknown'})` }] },
+		{ parts: [{ text: titles.modelLabel(meta.model, stats?.effort, true) }] },
 	]
 	if (stats?.files) out.push({ parts: [{ text: `${stats.files} files` }], href: `/changes/${meta.id}` })
 	let pct = status.context(st)

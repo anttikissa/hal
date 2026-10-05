@@ -9,6 +9,24 @@ function modelName(id: string): string {
 	return titles.names[id] ?? id
 }
 
+// The name where space is tight (task r7r): Claude and GPT only, the
+// most used; 'Claude Opus 5.5' → 'Opus 5.5', 'GPT-6.1 Sol' → 'Sol 6.1'.
+function shortName(id: string): string {
+	let name = titles.modelName(id)
+	return name.replace(/^Claude (?=\S)/, '').replace(/^GPT-([\d.]+) (Sol|Luna|Terra|Astra|Codex)$/, '$2 $1')
+}
+
+// '<name> <effort>', the effort left out at the model's default.
+function modelLabel(id: string, effort?: string, full = false): string {
+	let name = full ? titles.modelName(id) : titles.shortName(id)
+	return effort && effort !== titles.defaults[id] ? `${name} ${effort}` : name
+}
+
+function learn(event: { names: Record<string, string>; defaults?: Record<string, string> }): void {
+	Object.assign(titles.names, event.names)
+	Object.assign(titles.defaults, event.defaults)
+}
+
 // Local HH:MM of an ISO time, as '2 Oct HH:MM' if not today (local);
 // '' without one. "Today" is when rendered; nothing re-renders at
 // midnight. Parsed once per minute string and day: a long history's
@@ -58,12 +76,11 @@ function author(item: Shown): string | undefined {
 		// A command is headed as the prompt it was typed as.
 		case 'command':
 			return item.from === undefined ? 'You' : `Command from ${item.label ?? item.from}`
-		// Thinking names its effort, not the model: the reply's header
-		// already does, and a closed card shows its first line instead.
+		// The reply's header names model and effort (task r7r).
 		case 'thinking':
-			return tagged('Thinking', [item.effort])
+			return 'Thinking'
 		case 'text':
-			return item.model ? `Hal (${titles.modelName(item.model)})` : 'Hal'
+			return item.model ? `Hal (${titles.modelLabel(item.model, item.effort)})` : 'Hal'
 		// Hal's own words without a model, such as a greeting (task 8y).
 		case 'output':
 			return item.synthetic ? 'Hal (synthetic)' : undefined
@@ -109,4 +126,4 @@ function blockId(item: Shown & { key: string }): string {
 	return titles.letter(item) + item.key
 }
 
-export const titles = { names: {} as Record<string, string>, modelName, time, stamp, ended, author, who, title, letter, blockId }
+export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, learn, time, stamp, ended, author, who, title, letter, blockId }

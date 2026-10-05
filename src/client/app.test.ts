@@ -817,7 +817,7 @@ test('the status row sits below the prompt box and its numbers follow each turn 
 	let rows = () => frame.build(appView.view(), 100).lines.map((l) => l.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, '').trim())
 	let status = () => rows().at(-2)!
 	expect(rows().at(-3)).toMatch(/^─+$/)
-	expect(status()).toStartWith('s1: Fix it · /w · Opus 5.5 (default/unknown) · 0/200k (0%)')
+	expect(status()).toStartWith('s1: Fix it · /w · Opus 5.5 · 0/200k (0%)')
 	app.onEvent({ type: 'turn-start', sessionId: 's1', prompt: 'go', provider: 'anthropic' })
 	app.onEvent({ type: 'turn-end', sessionId: 's1', status: 'completed', stats: { context: 50_000, window: 200_000, sent: 1234, received: 5678 } })
 	expect(status()).toContain('50k/200k (25%)')

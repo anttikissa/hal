@@ -109,7 +109,7 @@ function onEvent(event: Event): void {
 	let resume = paste.settled(st, event)?.resume
 	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: resume.queue, ctrl: false, cmd: false }])
 	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
-	if (event.type === 'model-names') Object.assign(titles.names, event.names)
+	if (event.type === 'model-names') titles.learn(event)
 	if (event.type === 'tabs') return app.onTabs(event.tabs)
 	if (event.type === 'notice') return notices.add(notices.fromEvent(event))
 	if (event.type === 'restart') return restart.withHost()
