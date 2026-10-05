@@ -57,8 +57,9 @@ function paint(hints: Hint[]): string {
 	return hints.map(([k, d]) => `${key}${k}${desc}: ${d}`).join(`${desc}, `)
 }
 
-// The painted row for a terminal `cols` wide.
-function row(v: HelpInput, cols: number): string {
+// The painted row for a terminal `cols` wide; `resize` puts the prompt
+// resize keys first among the state's hints (task 0nj).
+function row(v: HelpInput, cols: number, resize = false): string {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
 	let h = colors.help()
 	let line = (text: string, fg = h.description!) => ansi.PAD + ansi.sgr({ fg }) + strings.clipVisual(text, width) + ansi.UNCOLOR
@@ -66,6 +67,7 @@ function row(v: HelpInput, cols: number): string {
 	if (v.editing) return line(v.editing, colors.warning().fg!)
 	if (v.choices?.length) return line(ansi.clean(v.choices.join('  ')))
 	let hints = helpRow.keys(v.transcript?.state, v.prompt.text.trim() !== '')
+	if (resize) hints = [['ctrl-=/-', 'resize prompt'], ...hints]
 	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'reload client']] : hints)
 	let right = helpRow.paint([['/keys', 'shortcuts']])
 	let rw = strings.visLen(right)

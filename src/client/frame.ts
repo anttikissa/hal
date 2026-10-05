@@ -377,7 +377,8 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	for (let r of p.rows) lines.push(ansi.paint(r, input, cols))
 	lines.push(rule(p.below ? `↓${p.below}` : ''))
 	lines.push(view.status ? statusRow.row(view.status, cols) : '')
-	lines.push(helpRow.row(view, cols))
+	// Text near the box's height earns the resize hint (task 0nj).
+	lines.push(helpRow.row(view, cols, !!view.prompt.text.trim() && p.total >= Math.max(1, p.limit - 2)))
 	// Keep the matched block's first row in the visible transcript area.
 	if (past.target !== undefined) history = history.slice(0, past.target + Math.max(1, rows - lines.length))
 	let pad = full ? Math.max(0, rows - lines.length - history.length) : 0
