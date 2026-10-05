@@ -57,7 +57,7 @@ const list: CommandInfo[] = [
 	// /restart local (Ctrl-R) runs in the client; bare (all), host and both
 	// on the host (src/host/commands/restart.ts).
 	{ name: 'restart', description: 'restart everything (all), the host, both, or this client (local)', category: 'app', key: 'ctrl-r', keyArgs: 'local', defaultArgs: 'all' },
-	{ name: 'resume', description: 'reopen the last closed tab', category: 'tabs', key: 'shift-ctrl-t' },
+	{ name: 'resume', description: 'reopen a closed session', category: 'tabs', key: 'shift-ctrl-t' },
 	{ name: 'send', description: 'send a prompt or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
 	{ name: 'status', description: 'show account usage windows', category: 'session' },

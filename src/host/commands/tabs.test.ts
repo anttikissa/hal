@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { client, useHost } from '../host-fixture.test.ts'
 import { command } from './tabs.ts'
 import { command as historyCommand } from './history.ts'
+import { command as resumeCommand } from './resume.ts'
 import { sessions } from '../sessions.ts'
 import { tabs } from '../tabs.ts'
 import { history } from '../history.ts'
@@ -27,4 +28,23 @@ test('/tabs includes all closed sessions beyond the resume cache and records clo
 	expect(all.indexOf(c)).toBeLessThan(all.indexOf(b))
 	expect(all).toContain('closed 2026-01-01T00:00:00.000Z')
 	expect(historyCommand.run('', undefined, ctx)).toEqual({ say: history.file(a) })
+})
+
+test('/resume lists the 20 most recently closed sessions; all lifts the cap', () => {
+	client()
+	let keep = sessions.create({ cwd: '/tmp', name: 'Keep' }).id
+	tabs.insert(keep, 0)
+	let ids = Array.from({ length: 22 }, (_, i) => {
+		let id = sessions.create({ cwd: '/tmp', name: `Closed ${i}` }).id
+		tabs.insert(id, 1)
+		tabs.close(id)
+		sessions.open(id).closedAt = new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString()
+		return id
+	})
+	let ctx = { sessionId: keep, cwd: '/tmp', model: 'hal/intro', setCwd() {}, setModel() {}, say() {} }
+	let rows = (resumeCommand.run('', undefined, ctx) as { say: string }).say.split('\n')
+	expect(rows[0]).toContain(ids[21]!)
+	expect(rows.filter((r) => r.startsWith('- closed'))).toHaveLength(20)
+	expect(rows.join('\n')).not.toContain(`[${ids[0]}]`)
+	expect((resumeCommand.run('all', undefined, ctx) as { say: string }).say).toContain(`[${ids[0]}]`)
 })
