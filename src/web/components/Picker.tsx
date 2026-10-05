@@ -33,6 +33,16 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		(index) => untrack(() => { if (index === undefined) { if (box.open) search.focus() } else edit?.focus() }),
 	)
 	let width = () => `${Math.max(0, ...(props.modal?.items ?? []).map((s) => s.length)) + 2}ch`
+	// Model picker table: postfix, effort, name and ID columns, each as
+	// wide as its longest model row (effort: its widest choice).
+	let columns = () => {
+		let m = props.modal, values = m?.values ?? []
+		let model = (i: number) => !!values[i]
+		let cell = (k: number) => Math.max(0, ...values.map((v) => (v.split('\t')[k] ?? '').length))
+		let label = Math.max(0, ...(m?.items ?? []).map((s, i) => (model(i) ? s.length : 0)))
+		// +1ch: marks such as ✓ may render wider than one cell.
+		return `${label + 1}ch ${m ? picker.effortWidth(m) : 0}ch ${cell(1)}ch auto`
+	}
 	// A new query reorders the list, so scroll from the top as the TUI
 	// does: the rows above the selection stay in view.
 	let query: string | undefined
@@ -74,14 +84,16 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				onFocus={() => find.focus(5)} aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}>
 				<For each={props.modal?.items ?? []}>{(item, i) => (
 					<li role="option" id={`modal-item-${i()}`} aria-selected={i() === props.modal?.selected ? 'true' : 'false'}
-						class={props.modal?.tree ? 'row model-row' : props.modal?.values ? 'row' : undefined} style={props.modal?.values && !props.modal.tree ? { '--label': width() } : undefined}
+						class={props.modal?.tree ? 'row model-row' : props.modal?.values ? 'row' : undefined} style={props.modal?.tree ? (props.modal.values?.[i()] ? { '--columns': columns() } : undefined) : props.modal?.values ? { '--label': width() } : undefined}
 						onClick={() => { if (!props.modal?.find) app.modalPick(i()) }}>
 						<Show when={props.modal?.values} fallback={
 						<Show when={props.modal?.find} fallback={marked(item, props.modal?.query)}>
 							<a href={props.modal?.find?.results[i()]?.href} tabindex={-1}>{marked(item, props.modal?.query, true)}</a>
 						</Show>}>
 							<span class="label">{marked(item, props.modal?.query)}</span>
-							<Show when={props.modal?.edit?.index === i()} fallback={<span class="value">{marked(props.modal?.values?.[i()] ?? '', props.modal?.query)}</span>}>
+							<Show when={props.modal?.edit?.index === i()} fallback={<Show when={props.modal?.tree} fallback={<span class="value">{marked(props.modal?.values?.[i()] ?? '', props.modal?.query)}</span>}>
+								<For each={props.modal?.values?.[i()] ? props.modal.values[i()]!.split('\t') : []}>{(cell, k) => <span class={k() === 0 ? 'effort' : 'value'}>{marked(cell, props.modal?.query)}</span>}</For>
+							</Show>}>
 								<input ref={(e) => (edit = e)} class="value input" autocomplete="off" aria-label={`${item}: value`}
 									type={props.modal?.edit?.form.form.fields[0]?.type === 'secret' ? 'password' : 'text'}
 									inputmode={settings.table.find((s) => s.name === props.modal?.settings?.names[i()])?.type.kind === 'integer' ? 'numeric' : undefined}
