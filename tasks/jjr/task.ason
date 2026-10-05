@@ -1,9 +1,10 @@
 {
-	title: 'hal --version shows version, commit and checkout',
-	spec: "package.json is named hal and holds the official version (0.0.1 for now). hal -v / --version prints three lines and exits 0 without starting a host: 'hal <package.json version>', 'git <HEAD short hash>[+<short hash of the uncommitted diff>]' (the same form as /version, computed at that invocation; 'unknown' outside a git checkout), and 'dir <checkout>'. The checkout is the directory main.ts was loaded from, so it is right when hal is a symlink to ./run. Either flag must be the only argument.",
+	title: 'hal --version and /version show the release, commit and checkout',
+	spec: "package.json is named hal and holds the official version. A release is an annotated tag v<version> on the commit that sets that version; tags travel with a normal clone and pull. hal -v / --version prints three lines and exits 0 without starting a host: the release line, 'git <HEAD short hash>[+<short hash of the uncommitted diff>]' ('unknown' outside a git checkout) and 'dir <checkout>' (the directory main.ts was loaded from, right when hal is a symlink to ./run). Either flag must be the only argument. The release line is 'hal <version> (release)' when the commit is the tag for package.json's version with no uncommitted changes; otherwise 'hal <version> +N commits', ', modified' for uncommitted changes, '(unreleased; v<tag> +N commits)' when package.json names a version without a tag, '(untagged)' without any v* tag, '(not a git checkout)' without git. /version prints the same release line for the commit the host started from, then its startup version and whether a newer commit is checked out. The release check (src/host/release.ts) loads only for these two, never on the startup path.",
 	status: 'done',
 	notes: [
-		"The version and git lines can diverge: package.json changes only on a release, the commit on every change. -v follows node, bun and npm. version.current() is shared with the host's startup lookup (task n1), so the CLI and /version print the same form."
+		"The version and git lines can diverge: package.json changes only on a release, the commit on every change. -v follows node, bun and npm. version.current() is shared with the host's startup lookup (task n1), so the CLI and /version print the same form.",
+		"release.ts reads package.json at the described commit (git show), so /version reports the started code even after a pull. git describe --long --match 'v*' is one call; no history walk."
 	],
 	needs: ['cb', 'n1']
 }
