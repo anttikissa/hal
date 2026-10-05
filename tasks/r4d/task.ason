@@ -1,0 +1,7 @@
+{
+	title: 'Web: /toggle and Ctrl-O',
+	spec: "The web obeys /toggle (task ghs) and Ctrl-O like the terminal: the same targets, ranges, kinds and dialog. A /toggle from the host flips the card as a click does, with the same animation. Ctrl-O calls preventDefault so the browser's open-file action does not run. Closing the block that the URL hash names (#t45) removes the hash from the URL without adding a history entry. Web cards keep their own fold presentation; the 200-row limit for open terminal results does not apply to the web.",
+	status: 'planned',
+	needs: ['ghs'],
+	foldInto: ['4s']
+}
