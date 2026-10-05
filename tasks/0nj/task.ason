@@ -1,0 +1,10 @@
+{
+	title: 'Terminal help row hints the prompt resize keys',
+	spec: "Terminal only; the web textarea grows by itself. When the prompt has non-blank text and its laid-out rows reach two fewer than the box height (the box height being the manual height from Ctrl-=/- or else the promptRows setting, default 10), the help row shows 'ctrl-=/-: resize prompt' first, before the state's key hints, as the old Hal did (artifact tasks/5p/old-render-status.ts, resizeHint). Users never learn the keys without it. The fold counts ↑N/↓N on the box rules (task p0) stay as they are. Test: the hint appears near the box height and not for short or blank text.",
+	status: 'done',
+	notes: [
+		"The threshold is measured against the box's limit (manual height or the promptRows setting), not its drawn height: auto height shrinks to the text, so text would always look 'near' it. promptView.box returns total and limit for this."
+	],
+	needs: ['p0', '8m'],
+	foldInto: ['p0']
+}

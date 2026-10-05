@@ -233,6 +233,15 @@ describe('prompt box', () => {
 		}
 	})
 
+	test('hints the resize keys once the text nears the box height', () => {
+		let help = (n: number, text = Array.from({ length: n }, (_, i) => `l${i}`).join('\n')) => plain(frame.build({ prompt: { text, cursor: 0 } }, 80).lines).at(-1)!
+		let near = settings.promptRows() - 2
+		expect(help(near)).toContain('ctrl-=/-')
+		expect(help(near - 1)).not.toContain('ctrl-=/-')
+		expect(help(30)).toContain('ctrl-=/-')
+		expect(help(30, '\n'.repeat(30))).not.toContain('ctrl-=/-')
+	})
+
 	test('shows at most the setting, scrolls with the cursor and says what it hides', () => {
 		let long = Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\n')
 		let f = frame.build({ prompt: { text: long, cursor: long.length } }, 40)
