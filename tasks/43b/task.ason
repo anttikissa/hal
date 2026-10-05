@@ -2,6 +2,9 @@
 	title: 'Forms: rotating text field placeholders',
 	spec: 'A text field placeholder may be a list of examples. It rotates as tasks/w4/forms.md describes: in list order, held 3 s (4.5 s if over 50 graphemes), then erased a grapheme at a time and the next typed in, quickly (src/common/placeholders.ts rotate, a pure function of the ms since the form opened, so every client shows the same; FormState.opened is that clock, forms.example reads a field). Whoever asks orders the list. The terminal (src/client/app.ts show) and web (src/web/components/Question.tsx) repaint only when the text next changes; the web keeps the first under prefers-reduced-motion. Forms reject a placeholder that is neither a string nor a list of strings.',
 	status: 'done',
+	notes: [
+		'Bug fix (web tabs at 100% CPU): rotate once replayed every cycle since the form opened, re-segmenting each string, so each call grew with open time (11 ms after 10 min, 200 ms after 4 h) while repaints come every 5-12 ms. Invariant: rotate costs O(list) at most, independent of elapsed time; graphemes and cycle length are cached per list and ms is taken modulo the cycle.'
+	],
 	needs: [],
 	foldInto: ['w4']
 }
