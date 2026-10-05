@@ -261,7 +261,7 @@ function withPending(rows: Row[], pending: { id: string; text: string; ts?: stri
 	let keys = new Set(rows.map((r) => r.key))
 	let at = (rows.at(-1)?.at ?? -1) + 1
 	let row = (m: InboxItem): Row => {
-		let r: Row = { item: transcript.waitingItem(m, waiting), at, key: m.id, waiting: true }
+		let r: Row = { item: transcript.waitingItem(m), at, key: m.id, waiting: true }
 		if (m.queue) r.note = inbox.note(m, m.from === undefined ? undefined : tabs.indexOf(m.from) + 1 || undefined)
 		return r
 	}
@@ -323,8 +323,8 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			return { kind: 'end log', text: titles.ended(item.ts, item.status) }
 		case 'question': {
 			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
-			let quote = item.form.quote ? item.form.quote.text.split('\n').map((l) => `    ${l}`) : []
-			return { kind: 'question warning', text: [`? ${item.form.text}`, ...quote, ...said.map((l) => `  ${l}`)].join('\n') }
+			let quote = item.form.quote ? [...item.form.quote.text.split('\n').map((l) => `    ${l}`), ''] : []
+			return { kind: 'question warning', text: [...quote, ...said.map((l) => `  ${l}`)].join('\n') }
 		}
 		case 'command':
 			// Drawn as the prompt it was typed as (Card heads it).

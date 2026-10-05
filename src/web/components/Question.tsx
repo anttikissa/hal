@@ -16,8 +16,9 @@ import { view } from '../view.ts'
 import { Icon } from './Icon.tsx'
 import { CardHeader } from './CardHeader.tsx'
 import { titles } from '../../common/titles.ts'
+import { target } from '../target.ts'
 
-export function Question(props: { item: Item & { type: 'question' }; form: FormState }) {
+export function Question(props: { item: Item & { type: 'question' } & { key: string }; form: FormState; session: string }) {
 	let fields: HTMLElement[] = []
 	let form = () => props.item.form
 	let parts = createMemo(() => view.urlParts(form().text))
@@ -56,8 +57,7 @@ export function Question(props: { item: Item & { type: 'question' }; form: FormS
 	}
 	return (
 		<form class="Question question" onSubmit={submit}>
-			<Show when={titles.time(props.item.ts)}>{(time) => <CardHeader time={time()} />}</Show>
-			<div class="text">? <For each={parts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For></div>
+			<CardHeader time={titles.time(props.item.ts)} label={<For each={parts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>} reference={<Show when={target.href(props.session, titles.blockId(props.item))}>{(h) => <a class="link" href={h()} data-ref={`#${titles.blockId(props.item)}`} title="Link to this block" aria-label={`Link to block ${titles.blockId(props.item)}`} />}</Show>} />
 			<button type="button" class="dismiss" aria-label="Dismiss" title="Dismiss (Esc)" onClick={() => app.sendForm({ type: 'cancel' })}>
 				<Icon name="close" />
 			</button>

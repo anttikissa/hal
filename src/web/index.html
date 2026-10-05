@@ -318,8 +318,8 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Question button:not(.dismiss):focus-visible { outline-width: 1px; outline-offset: 2px; }
 .Question .dismiss { position: absolute; top: 0; right: 0; background: none; color: inherit; padding: 0.25lh 1ch; }
 @media (hover: hover) and (pointer: fine) { .Question .dismiss:hover { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
-.Question > .text { padding-right: 3ch; white-space: pre-wrap; overflow-wrap: anywhere; }
-.Question .text a { color: inherit; text-decoration: underline; }
+.Question > .CardHeader { padding-inline: 0 4ch; min-height: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.Question > .CardHeader .label a { color: inherit; text-decoration: underline; }
 @media (pointer: coarse) { .Question button, .Question button.answer { min-width: 44px; min-height: 44px; } }
 .Question pre.quote { margin: 0 0 0 2ch; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .Question mark { background: currentColor; color: inherit; -webkit-text-fill-color: var(--canvas); }

@@ -86,9 +86,11 @@ function author(item: Shown): string | undefined {
 	}
 }
 
-// '10:52 Hal (Opus 5.5)'; undefined for an item without a header.
+// '10:52 Hal (Opus 5.5)', '10:52 Run this command? …' for a question;
+// undefined for an item without a header.
 function title(item: Shown): string | undefined {
-	if ((item.type === 'output' && !item.synthetic) || item.type === 'question') return titles.time(item.ts) || undefined
+	if (item.type === 'question') return stamp(item.ts, item.form.text)
+	if (item.type === 'output' && !item.synthetic) return titles.time(item.ts) || undefined
 	let w = titles.who(item)
 	if (w === undefined) return undefined
 	let t = titles.time((item as { ts?: string }).ts)
@@ -97,8 +99,9 @@ function title(item: Shown): string | undefined {
 
 // The kind letter of a block id (task 9p): who produced the block.
 // u the user typed it; m another session sent it; a assistant text; r
-// thinking; t a tool call or its result; s Hal's own output (command
-// output, notices, background job results).
+// thinking; t a tool call or its result; q a question, Hal's or the
+// intro's; s Hal's own output (command output, notices, background job
+// results).
 function letter(item: Shown): string {
 	switch (item.type) {
 		case 'prompt':
@@ -114,6 +117,8 @@ function letter(item: Shown): string {
 		case 'tool':
 		case 'tool-result':
 			return 't'
+		case 'question':
+			return 'q'
 		default:
 			return 's'
 	}

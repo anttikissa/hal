@@ -364,7 +364,7 @@ test('every block shows its id at the right of its first row, linked to the bloc
 		let blocks = links.map((u) => target.parse(u.href, u.pathname.slice(1)))
 		expect(blocks).toEqual(['4', '5', '6', '7', '8'].map((key) => ({ session: 's', key })))
 		// The id is the link's text, at the right edge of the row.
-		for (let key of ['u4', 'a5', 't6', 's7', 's8']) expect(plain(lines).some((l) => l.endsWith(` #${key}`) && l.length === 58)).toBe(true)
+		for (let key of ['u4', 'a5', 't6', 'q7', 's8']) expect(plain(lines).some((l) => l.endsWith(` #${key}`) && l.length === 58)).toBe(true)
 		expect(plain(lines)).not.toContain('#6.1')
 		for (let u of links) expect(u.searchParams.get('auth')).toBe('k3x9qa')
 		let shown = lines.map((l) => l.replace(/\x1b\]8;;[^\x07]*\x07/g, ''))

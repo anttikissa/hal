@@ -12,7 +12,8 @@ import { titles } from './titles.ts'
 
 // Sender fields: another session sent it (task rj); none, the human.
 // `ts`: when it was first written to the inbox.
-export type InboxItem = { id: string; text: string; queue?: true; ts?: string } & Sender
+// n: the history line of the inbox record that first sent it.
+export type InboxItem = { id: string; text: string; queue?: true; ts?: string; n?: number } & Sender
 
 // Messages sent and not yet delivered, oldest first, as last edited.
 function pending(records: HistoryRecord[]): InboxItem[] {
@@ -21,7 +22,10 @@ function pending(records: HistoryRecord[]): InboxItem[] {
 		if (r.type === 'inbox' && r.withdrawn) waiting.delete(r.id)
 		else if (r.type === 'inbox') {
 			// An edit keeps the message's place: Map.set on a key keeps its order.
-			let item: InboxItem = { id: r.id, text: r.text, ts: waiting.get(r.id)?.ts ?? r.ts }
+			let first = waiting.get(r.id)
+			let item: InboxItem = { id: r.id, text: r.text, ts: first?.ts ?? r.ts }
+			let n = first ? first.n : r.n
+			if (n !== undefined) item.n = n
 			if (r.queue) item.queue = true
 			Object.assign(item, inbox.sender(r))
 			waiting.set(r.id, item)

@@ -193,9 +193,11 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			if (item.status === 'completed') return []
 			return [titles.ended(item.ts, item.status)]
 		case 'question': {
-			let rows = [...ansi.wrap(`? ${item.form.text}`, width), ...itemView.quoteLines(item.form.quote, width)]
+			// Headed by its time and text, wrapped (never clipped), then
+			// the quote and the answer, as the open form draws them.
+			let quote = itemView.quoteLines(item.form.quote, width)
 			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
-			return itemView.headed(item, [...rows, ...said.flatMap((l) => ansi.wrap(l, width - 2).map((r) => `  ${r}`))], width)
+			return [...ansi.wrap(titles.title(item)!, width), '', ...quote, ...(quote.length ? [''] : []), ...said.flatMap((l) => ansi.wrap(l, width - 2).map((r) => `  ${r}`))]
 		}
 		// Drawn as the prompt it was typed as: header, then its text.
 		case 'command':

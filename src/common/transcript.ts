@@ -106,10 +106,10 @@ function promptItem(text: string, s?: Sender, ts?: string, queued = false): Show
 	return item
 }
 
-// Waiting messages are normal prompt items. A queued one is keyed by
-// its run position, q1, q2… (task 16); its clients draw a compact row.
-function waitingItem(item: InboxItem, list: InboxItem[] = [item]): Item {
-	let key = item.queue ? `q${list.filter((m) => m.queue).indexOf(item) + 1}` : item.id
+// Waiting messages are normal prompt items keyed by their first inbox
+// record's history line (task 9p); queued ones draw compact (task 16).
+function waitingItem(item: InboxItem): Item {
+	let key = item.n === undefined ? item.id : `${item.n}`
 	return { ...transcript.promptItem(item.text, inbox.provenance(item), item.ts, !!item.queue), key }
 }
 
@@ -118,10 +118,10 @@ function key(n: number | undefined, i: number, at: number): string {
 }
 
 // The address of block `key` of session `session`, the same in every
-// client (task 0z): /<session>#<key>, any kind letter kept (t19, 9p);
-// q1 for a queued message (16). Undefined for any other key (`~<n>`).
+// client (task 0z): /<session>#<key>, any kind letter kept (t19, 9p).
+// Undefined for any other key (`~<n>`, a waiting message's id).
 function href(session: string, key: string): string | undefined {
-	return /^([umarts]?\d+(\.\d+)?|q\d+)$/.test(key) ? `/${session}#${key}` : undefined
+	return /^[umartsq]?\d+(\.\d+)?$/.test(key) ? `/${session}#${key}` : undefined
 }
 
 // `shown` as the items of record (or event) number `n`, going at `at`.
