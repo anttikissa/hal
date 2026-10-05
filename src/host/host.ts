@@ -232,7 +232,6 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		})()
 	}
 	if (tabs.is(c)) return tabs.act(c)
-	if (c.type === 'auth' && c.link) webLinks.follow(client, client.deliver)
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
 	if (c.type === 'notice-history') return { reply: { type: 'notice-history', entries: noticeHistory.list() } }
 	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid) : clients.screen(client.record, c)
@@ -244,7 +243,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		recap.visibility(previous, client.visible)
 		return {}
 	}
-	if (c.type === 'auth') return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } }
+	if (c.type === 'auth') { if (c.link) webLinks.follow(client, client.deliver); return c.link ? {} : { reply: { type: 'auth', code: webAuth.issue() } } }
 	if (!client.open.has(c.sessionId)) return { refused: 'session is not open on this connection' }
 	// An edit waits for the turn it paused to finish stopping, so nothing
 	// that turn still records lands after the edit.
@@ -279,6 +278,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	else if (c.type === 'pause') refused = turns.stop(c.sessionId)
 	else if (c.type === 'answer') refused = prompts.reply(c.sessionId, c.question, c.answers)
 	else if (c.type === 'models') void slash.models(c.sessionId).then((e) => host.state.clients.has(client) && client.deliver(e))
+	else if (c.type === 'paste-text') return { reply: blobs.pasteText(c.sessionId, c.name) }
 	else if (c.type === 'history') {
 		let answer = (page: Page): Outcome => {
 			let reply: Event = { type: 'history', sessionId: c.sessionId, before: c.before, records: page.records }

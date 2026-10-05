@@ -115,10 +115,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'notice') return notices.add(notices.fromEvent(event))
 	if (event.type === 'restart') return restart.withHost()
 	if (event.type === 'restart-ask') return restart.ask(event, app.open)
-	if (event.type === 'redraw') {
-		if (st.focus.tab === event.sessionId) terminal.redraw()
-		return
-	}
+	if (event.type === 'redraw' || event.type === 'toggle' || event.type === 'paste-text') return clientCommands.event(event)
 	if (event.type === 'go') {
 		if (st.focus.tab === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) app.focusOn({ tab: event.tab })
 		return

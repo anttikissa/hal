@@ -18,6 +18,8 @@ import { command as restart } from './commands/restart.ts'
 import { command as resume } from './commands/resume.ts'
 import { command as suspend } from './commands/suspend.ts'
 import { find } from './find.ts'
+import { folds } from './folds.ts'
+import type { Event } from '../common/protocol.ts'
 
 export type ClientCommand = { run(): void }
 
@@ -27,6 +29,7 @@ const all: Record<string, ClientCommand> = { close, new: newTab, quit, redraw, r
 // this client alone and unrecorded (tasks/w4/forms.md, Provenance).
 function run(name: string): void {
 	if (name === 'find') return find.open()
+	if (name === 'toggle') return folds.open()
 	let local = clientCommands.all[name]
 	if (local) return local.run()
 	let id = app.state.transcript?.meta.id
@@ -44,6 +47,7 @@ function key(k: KeyEvent): boolean {
 // Typed `text` as a client-only command: true if it was one (and it
 // ran, the draft emptied first so a restart does not bring it back).
 function typed(text: string): boolean {
+	if (folds.typed(text)) return true
 	let t = text.trim()
 	// /restart both goes on to the host, marking this client to follow.
 	if (/^\/restart\s+both$/.test(t)) restart.withHost()
@@ -57,4 +61,11 @@ function typed(text: string): boolean {
 	return true
 }
 
-export const clientCommands = { all, run, key, typed }
+// A host event for this client's commands: /redraw, the model's
+// /toggle, and a paste's text for a prompt shown inline.
+function event(e: Event & { type: 'redraw' | 'toggle' | 'paste-text' }): void {
+	if (e.type !== 'redraw') return folds.event(e)
+	if (app.state.focus.tab === e.sessionId) redraw.run()
+}
+
+export const clientCommands = { all, run, key, typed, event }

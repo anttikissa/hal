@@ -127,6 +127,9 @@ export type Command = (
 	// Ctrl-M: the models to pick from; answered, to this client only,
 	// with `models`. Nothing is recorded.
 	| { type: 'models'; sessionId: string }
+	// The text of paste `name` ([paste/<name>]) of this session's
+	// prompts; answered, to this client only, with `paste-text`.
+	| { type: 'paste-text'; sessionId: string; name: string }
 	// Replace the session's draft. `base`: the draft rev the text was
 	// edited from. If another client changed the draft since, the host
 	// keeps both texts rather than lose one.
@@ -309,6 +312,12 @@ export type Event =
 	| { type: 'web-update' } // Opted-in pages wait for the user to reload.
 	// Repaint terminals following this session; no reload on the web.
 	| { type: 'redraw'; sessionId: string }
+	// Open or close the blocks `target` names (/toggle, task ghs); each
+	// client flips its own fold state.
+	| { type: 'toggle'; sessionId: string; target: string }
+	// A paste's text for a prompt shown inline (task ghs), to the client
+	// that asked; `error` if there is none to show.
+	| { type: 'paste-text'; sessionId: string; name: string; text?: string; error?: string }
 	// Cached models.dev names on connect, model switch and catalog refresh.
 	| { type: 'model-names'; names: Record<string, string>; defaults?: Record<string, string> }
 	// Another tab's turn ended or asks, sent only to clients watching
@@ -317,7 +326,7 @@ export type Event =
 	| NoticeEvent
 export type EventType = Event['type']
 
-const commandTypes: CommandType[] = ['rebase-error', 'rebase-apply', 'find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello', 'screen']
+const commandTypes: CommandType[] = ['rebase-error', 'rebase-apply', 'find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'paste-text', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello', 'screen']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -375,6 +384,7 @@ function invalid(value: unknown): string | undefined {
 		return str('sessionId') ?? str('question') ?? (strings ? undefined : 'answer: answers must map names to strings')
 	}
 	if (c.type === 'attach') return str('sessionId') ?? str('mediaType') ?? str('data') ?? str('name', true)
+	if (c.type === 'paste-text') return str('sessionId') ?? str('name')
 	if (c.type === 'submit' && c.rewind !== undefined && !(Number.isSafeInteger(c.rewind) && (c.rewind as number) > 0)) return 'submit: rewind must be a record number'
 	if (c.type === 'submit') return str('sessionId') ?? str('text') ?? str('edits', true)
 	return str('sessionId') ?? (c.type === 'draft' || c.type === 'complete' ? str('text') : undefined)

@@ -52,6 +52,7 @@ test('each command key runs its command, the prompt left alone', () => {
 		ran = []
 		app.onKeys([keyHelp.parse(c.key!)])
 		if (c.name === 'find') { expect(app.state.modal?.find).toBeDefined(); expect(sent).toEqual([]); app.close(); sent = [] }
+		else if (c.name === 'toggle') { expect(app.state.modal?.title).toBe('Toggle'); expect(sent).toEqual([]); app.close(); sent = [] }
 		else if (clientCommands.all[c.name]) expect(ran).toEqual([c.name])
 		else expect(sent).toEqual([c.name === 'model' ? { type: 'models', sessionId: 'a' } : { type: 'submit', sessionId: 'a', text: `/${c.name}` }])
 		expect(app.state.prompt.text).toBe('draft')

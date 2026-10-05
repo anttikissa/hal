@@ -11,6 +11,7 @@
 // becomes a path of its own. History holds references (ImageBlock),
 // never the bytes; providers read them through base64() per request.
 
+import type { Event } from '../common/protocol.ts'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { attachments, type Marker } from '../common/attachments.ts'
 import type { ImageBlock, UserBlock } from '../common/blocks.ts'
@@ -212,4 +213,13 @@ function storeOutput(sessionId: string, text: string): { blob: string; path: str
 	return { blob, path }
 }
 
-export const blobs = { dir, looksLike, decode, store, storeOutput, stage, staged, file, find, read, text, base64, named, unknown, resolve, expand }
+// A paste's text for a prompt shown inline (task ghs), answering a
+// client's paste-text command: only a name attachments.fileName
+// allows (file checks), only text, at most pasteMax bytes.
+function pasteText(sessionId: string, name: string): Event & { type: 'paste-text' } {
+	let found = blobs.file(name)
+	let error = !found || found.mediaType !== 'text/plain' ? `no paste ${name}` : found.bytes.length > blobs.pasteMax ? `paste ${name} is too big to show inline (${found.bytes.length} bytes): ${found.tmp ?? found.blobs[0]}` : undefined
+	return error ? { type: 'paste-text', sessionId, name, error } : { type: 'paste-text', sessionId, name, text: found!.bytes.toString('utf8') }
+}
+
+export const blobs = { pasteMax: 1_000_000, pasteText, dir, looksLike, decode, store, storeOutput, stage, staged, file, find, read, text, base64, named, unknown, resolve, expand }
