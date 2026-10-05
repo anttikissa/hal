@@ -144,15 +144,15 @@ function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean)
 		if (shown) rows(n, kept, open, current, names, depth + 1, out)
 	}
 	node.nodes.filter((n) => !bucket(n)).forEach(category)
-	for (let { id, leaf, family } of node.ids) {
+	for (let { id, family } of node.ids) {
 		if (!kept.has(id)) continue
 		// ✓ the current model, • the group's default (task r7r).
-		// A useful tree label at the left, catalog name at the right. A
-		// singleton (Haiku) or an unnamed model needs only one label.
+		// Human-readable name first; the complete ID is secondary.
+		// A singleton such as Haiku needs only its short name.
 		let name = names[id]
-		let label = family && name ? leaf : name ? titles.shortName(id, name) : id
+		let label = name ? family ? name : titles.shortName(id, name) : id
 		out.items.push(`${indent}${id === current ? '✓ ' : id === node.default ? '• ' : '  '}${label}`)
-		out.values.push(family && name ? name : '')
+		out.values.push(family && name ? id : '')
 		out.rows.push({ id, parent: node.path })
 	}
 	node.nodes.filter(bucket).forEach(category)

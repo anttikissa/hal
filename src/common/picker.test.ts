@@ -217,7 +217,8 @@ test('moving rows keeps hints, effort, names and category defaults tied to the h
 	let chosen = () => st.tree!.rows[st.selected]!
 	let marked = () => st.items.filter((s) => s.includes('‹'))
 	expect(marked()).toEqual([st.items[st.selected]!])
-	expect(st.values?.[st.selected]).toBe(names[opus])
+	expect(st.items[st.selected]).toContain('Claude Opus 5.5  ‹ high ›')
+	expect(st.values?.[st.selected]).toBe(opus)
 	move('up')
 	expect(chosen().path).toBe('anthropic/opus')
 	expect(st.hint).toBe('←/→: close/open, enter: pick default, esc: cancel')
