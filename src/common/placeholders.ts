@@ -27,40 +27,28 @@ function pick(hal: boolean, turn: number): string {
 }
 
 // A rotating example (a form field's placeholder list) `ms` after it
-// appeared: hold one, erase it a grapheme at a time, type the next.
-// The first always opens; then rounds of the whole list follow, each
-// shuffled (by a fixed seed), never showing one twice in a row.
-// `next`: ms until the text changes.
+// appeared: hold one, erase it a grapheme at a time, type the next, in
+// list order, round and round. A long one (over 50 graphemes) holds
+// longer, so there is time to read it. `next`: ms until the text
+// changes.
 const HOLD = 3000
-const ERASE = 7.5
-const TYPE = 17.5
+const LONG_HOLD = 4500
+const ERASE = 5
+const TYPE = 35 / 3
 function rotate(list: string[], ms: number): { text: string; next: number } {
 	let graphemes = (s: string) => [...new Intl.Segmenter().segment(s)].map((g) => g.segment)
 	if (list.length < 2) return { text: list[0] ?? '', next: Infinity }
-	let seed = 1
-	let random = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32
-	let queue: number[] = []
-	let i = 0
-	for (;;) {
-		if (!queue.length) {
-			queue = list.map((_, k) => k)
-			for (let k = queue.length - 1; k > 0; k--) {
-				let r = Math.floor(random() * (k + 1))
-				;[queue[k], queue[r]] = [queue[r]!, queue[k]!]
-			}
-			if (queue[0] === i) queue.push(queue.shift()!)
-		}
-		let j = queue.shift()!
+	for (let i = 0; ; i = (i + 1) % list.length) {
 		let shown = graphemes(list[i]!)
-		let coming = graphemes(list[j]!)
+		let coming = graphemes(list[(i + 1) % list.length]!)
+		let hold = shown.length > 50 ? LONG_HOLD : HOLD
 		let erase = shown.length * ERASE
-		if (ms < HOLD) return { text: shown.join(''), next: HOLD - ms }
-		ms -= HOLD
+		if (ms < hold) return { text: shown.join(''), next: hold - ms }
+		ms -= hold
 		if (ms < erase) return { text: shown.slice(0, shown.length - Math.floor(ms / ERASE) - 1).join(''), next: ERASE - (ms % ERASE) }
 		ms -= erase
 		if (ms < coming.length * TYPE) return { text: coming.slice(0, Math.floor(ms / TYPE) + 1).join(''), next: TYPE - (ms % TYPE) }
 		ms -= coming.length * TYPE
-		i = j
 	}
 }
 
