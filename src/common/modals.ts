@@ -28,7 +28,7 @@ import type { FindDialog } from './find-dialog.ts'
 // `opened`. A category row's `open` says how it is shown now. `current`
 // is the session's model.
 export type TreeRow = { id?: string; path?: string; parent?: string; default?: string; open?: boolean }
-export type Tree = { rows: TreeRow[]; open: string[]; closed?: string[]; opened?: string[]; current: string; capabilities?: Record<string, EffortCapability>; effort?: string }
+export type Tree = { rows: TreeRow[]; open: string[]; closed?: string[]; opened?: string[]; current: string; capabilities?: Record<string, EffortCapability>; effort?: string; searchEffort?: string }
 
 export type ModalState = {
 	title: string
