@@ -11,7 +11,10 @@ A running session keeps its account (task wg) while it is eligible. It moves to 
 Example: 2/3 at 86% of 7d resetting at 00:00 and 3/3 at 81% resetting at 19:00 the next day: 2/3 is used until midnight, then 3/3.
 
 Tests: ranking by soonest 7d reset among eligible accounts; a near-full account comes after eligible ones but before an API key; a session switches to an account resetting within 24 hours sooner than its own, and stays otherwise.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'usage.standing() gives eligible/week/used; usage.keeps(provider, mine, best) is the stickiness test pickAccount applies. Accounts without a known 7d reset rank after those with one, least used first, so a freshly reset week is spent last.'
+	],
 	needs: ['61', 'wg', 'wf'],
 	foldInto: ['61', 'wg']
 }

@@ -153,14 +153,14 @@ export type For = { session?: string }
 const subscription = (a: Account): boolean => usable(a.entry.accessToken)
 
 // One replaceable account chooser for local.ts. Its default ranks the
-// subscriptions by provider-wide usage, retaining the session's chosen
-// one first for its prompt cache, then the API keys in order: a key has
-// no usage windows, so ranked with them it would always look least used.
+// subscriptions by usage.order(), the session's own first while
+// usage.keeps(), then API keys in order: a key has no usage windows, so
+// ranked with them it would always look least used.
 function pickAccount(kind: Kind, list: Account[], who: For = {}): Account[] {
 	let out = usage.order(kind, list.filter(subscription), (a) => a.name)
 	let mine = who.session ? auth.state.chosen.get(`${kind} ${who.session}`) : undefined
 	let i = out.findIndex((a) => a.name === mine)
-	if (i > 0) out.unshift(...out.splice(i, 1))
+	if (i > 0 && usage.keeps(kind, mine!, out[0]!.name)) out.unshift(...out.splice(i, 1))
 	return [...out, ...list.filter((a) => !subscription(a))]
 }
 
