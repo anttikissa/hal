@@ -1,10 +1,11 @@
 {
-	title: 'Web scroll-to-bottom pill',
-	spec: 'When the web transcript is more than 200px above its bottom (scroll.awayPx), a pill appears at the bottom of the transcript, centered exactly on the cards\' 3px left bar: a translucent canvas-colored vertical pill (20x44px, inside a 44x52px target) holding two stacked downward triangles. Tapping it glides to the very bottom (the same forced glide as sending) and the pill fades away. It is a zero-height sticky row ending the transcript, so it shares the cards\' left edge at every width and safe-area inset. It is labeled "Scroll to the bottom" for screen readers and does not take focus from the draft. The terminal has no equivalent.',
+	title: 'Web scroll-to-bottom marker',
+	spec: 'When the web transcript is more than 200px above its bottom (scroll.awayPx), a marker appears 2px above the transcript\'s bottom edge, centered exactly on the cards\' 3px left bar: an upright square-cornered 20x44px rectangle in half-transparent black (like the notice outline) holding two stacked downward triangles, inside a 52x52px target that starts at the screen\'s left edge, since the transcript clips anything further left. Tapping it glides to the very bottom (the same forced glide as sending) and the pill fades away. It is a zero-height sticky row ending the transcript, so it shares the cards\' left edge at every width and safe-area inset. It is labeled "Scroll to the bottom" for screen readers and does not take focus from the draft. The terminal has no equivalent.',
 	status: 'done',
 	notes: [
-		"Status-bar tap to scroll up is task ddh.",
-		'An onCleanup inside onSettled halts Solid 2 reactivity (CLEANUP_IN_FORBIDDEN_SCOPE); return the cleanup from the onSettled callback instead. A pill placed outside the scroller cannot match the bar: the transcript padding differs by width (1ch on phones, 2ch wider) and font size, so it sits inside as a sticky row.'
+		'Status-bar tap to scroll up is task ddh.',
+		'An onCleanup inside onSettled halts Solid 2 reactivity (CLEANUP_IN_FORBIDDEN_SCOPE); return the cleanup from the onSettled callback instead. A pill placed outside the scroller cannot match the bar: the transcript padding differs by width (1ch on phones, 2ch wider) and font size, so it sits inside as a sticky row.',
+		"Invariant: the whole 52x52 target lies on screen. It was once centered on the bar (left: 1.5px - 22px), so the transcript's overflow clipped its left 12px or so on phones, leaving a ~32px-wide touch area."
 	],
 	needs: ['4s']
 }
