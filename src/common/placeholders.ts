@@ -35,12 +35,28 @@ const HOLD = 3000
 const LONG_HOLD = 4500
 const ERASE = 5
 const TYPE = 35 / 3
+// Each list's graphemes and cycle length, computed once: rotate runs on
+// every repaint (every few ms while typing), so its cost must not grow
+// with the time the form has been open.
+const segmenter = new Intl.Segmenter()
+const cycles = new WeakMap<string[], { items: string[][]; total: number }>()
+
+function cycle(list: string[]) {
+	let c = cycles.get(list)
+	if (c) return c
+	let items = list.map((s) => [...segmenter.segment(s)].map((g) => g.segment))
+	let total = items.reduce((sum, shown, i) => sum + (shown.length > 50 ? LONG_HOLD : HOLD) + shown.length * ERASE + items[(i + 1) % items.length]!.length * TYPE, 0)
+	cycles.set(list, (c = { items, total }))
+	return c
+}
+
 function rotate(list: string[], ms: number): { text: string; next: number } {
-	let graphemes = (s: string) => [...new Intl.Segmenter().segment(s)].map((g) => g.segment)
 	if (list.length < 2) return { text: list[0] ?? '', next: Infinity }
+	let { items, total } = cycle(list)
+	ms %= total
 	for (let i = 0; ; i = (i + 1) % list.length) {
-		let shown = graphemes(list[i]!)
-		let coming = graphemes(list[(i + 1) % list.length]!)
+		let shown = items[i]!
+		let coming = items[(i + 1) % list.length]!
 		let hold = shown.length > 50 ? LONG_HOLD : HOLD
 		let erase = shown.length * ERASE
 		if (ms < hold) return { text: shown.join(''), next: hold - ms }
