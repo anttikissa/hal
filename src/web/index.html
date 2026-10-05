@@ -331,9 +331,11 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker li .match { color: var(--match); font-weight: bold; }
 .Picker li.row { display: grid; grid-template-columns: var(--label) auto 1fr; column-gap: 2ch; align-items: baseline; }
 .Picker li.row .label { overflow: hidden; text-overflow: ellipsis; }
-.Picker li.model-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 2ch; }
+.Picker li.model-row { display: grid; grid-template-columns: var(--columns, 1fr); column-gap: 3ch; }
 .Picker li.model-row .label { min-width: 0; overflow: visible; }
-.Picker li.model-row .value { margin-left: auto; min-width: 0; text-align: right; }
+.Picker li.model-row .effort { white-space: pre; }
+.Picker li.model-row .value { min-width: 0; }
+@media (max-width: 40rem) { .Picker li.model-row { display: flex; flex-wrap: wrap; gap: 0 1ch; } .Picker li.model-row .effort:empty { display: none; } }
 .Picker li.model-row .note { display: none; }
 .Picker li.row .value.input { font: inherit; min-width: 20ch; }
 .Picker li.row .note { visibility: hidden; min-width: 0; overflow-wrap: anywhere; }

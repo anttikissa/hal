@@ -4,6 +4,7 @@
 import { colors, type Style } from '../common/colors.ts'
 import { fuzzy } from '../common/fuzzy.ts'
 import { modals, type ModalState } from '../common/modals.ts'
+import { picker } from '../common/picker.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
@@ -40,6 +41,16 @@ function border(l: string, r: string, text: string, right: string, width: number
  * selected item. The fields stay at the top; the list scrolls below
  * them, from `scroll` as little as it must to show the selection.
  */
+/** Column widths for the model picker table: postfix (with arrow),
+ * effort, name and ID, as many as fit in `inner` with three-space gaps. */
+function table(m: ModalState, inner: number): number[] {
+	let model = m.items.map((_, i) => !!m.values?.[i])
+	let widths = [Math.max(0, ...m.items.map((s, i) => (model[i] ? 2 + strings.visLen(ansi.clean(s)) : 0))), picker.effortWidth(m)]
+	for (let k = 1; k < 3; k++) widths.push(Math.max(0, ...(m.values ?? []).map((v) => strings.visLen(ansi.clean(v).split('\t')[k] ?? ''))))
+	while (widths.length > 1 && widths.reduce((a, b) => a + b, 0) + 3 * (widths.length - 1) > inner) widths.pop()
+	return widths
+}
+
 function modalLines(m: ModalState, width: number, height: number): { rows: string[]; cursor: Cursor; scroll: number } {
 	let inner = Math.max(0, width - 4)
 	let fields = m.form ? formView.fieldLines(m.form, inner, { fg: colors.popup().neutralFg! }) : { rows: [], cursor: undefined }
@@ -54,6 +65,10 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	let scroll = modalView.modalScroll(m, visible)
 	let cursor = fields.cursor ?? { row: m.find && m.find.focus > 0 && m.find.focus < 5 ? content.length - 1 : content.length, col: 0 }
 	// Settings-like rows: the items as a column as wide as the longest.
+	// Model picker: a table of postfix (with the selected row's effort),
+	// name and ID, each column as wide as its longest model row. Columns
+	// that do not fit drop from the right.
+	let table = m.tree ? modalView.table(m, inner) : undefined
 	let column = m.values && !m.tree ? Math.min(Math.floor(inner / 2), Math.max(0, ...m.items.map((s) => strings.visLen(s)))) + 2 : 0
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
 		// Leading spaces are the picker's tree indentation: keep them.
@@ -62,10 +77,10 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		let row = strings.clipVisual((i === m.selected ? `${formView.ARROW} ` : '  ') + label, inner)
 		if (m.query) row = modalView.highlight(row, m.query, i === m.selected ? current : undefined, !!m.find)
 		let value = m.tree ? undefined : modalView.cell(m, i, current)
-		if (m.tree) {
-			let name = ansi.clean(m.values?.[i] ?? '')
-			let gap = inner - strings.visLen(row) - strings.visLen(name)
-			if (name && gap >= 2) row += ' '.repeat(gap) + (m.query ? modalView.highlight(name, m.query, i === m.selected ? current : undefined) : name)
+		if (table && m.values?.[i]) {
+			let cells = ansi.clean(m.values[i]!).split('\t').slice(0, table.length - 1)
+			let line = cells.map((c, k) => c.padEnd(k < cells.length - 1 ? table[k + 1]! : 0)).join('   ').trimEnd()
+			if (line) row = strings.clipVisual(row, table[0]!).padEnd(table[0]!) + '   ' + (m.query ? modalView.highlight(line, m.query, i === m.selected ? current : undefined) : line)
 		} else if (value) row += strings.clipVisual(value.text, Math.max(0, inner - 2 - column))
 		if (value?.cursor !== undefined) cursor = { row: content.length, col: Math.min(inner - 1, 2 + column + value.cursor) }
 		if (i === m.selected) {
@@ -167,4 +182,4 @@ function withModal(lines: string[], m: ModalState, rows: number, cols: number): 
 	return { cursor: { row: top + drawn.cursor.row, col: box.left + drawn.cursor.col }, scroll: drawn.scroll }
 }
 
-export const modalView = { modalBox, border, modalLines, cell, footer, highlight, modalScroll, overlay, withModal }
+export const modalView = { table, modalBox, border, modalLines, cell, footer, highlight, modalScroll, overlay, withModal }

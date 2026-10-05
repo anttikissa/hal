@@ -152,7 +152,7 @@ function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean)
 		let name = names[id]
 		let label = family ? leaf : name ? titles.shortName(id, name) : id
 		out.items.push(`${indent}${id === current ? '✓ ' : id === node.default ? '• ' : '  '}${label}`)
-		out.values.push(family ? `${name ? `${name} · ` : ''}${id}` : '')
+		out.values.push(family ? `\t${name ?? ''}\t${id}` : '')
 		out.rows.push({ id, parent: node.path })
 	}
 	node.nodes.filter(bucket).forEach(category)
@@ -211,21 +211,24 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 // and sort the catalog. `previous` is the row losing its effort marker.
 function selection(st: ModalState, previous?: number): ModalState {
 	let t = st.tree!
-	let items = [...st.items]
-	// Strip by shape, not by recomputed text: the draft may have changed.
-	let bare = (i: number) => { if (items[i] !== undefined) items[i] = items[i]!.replace(/ ‹ [^‹›]* ›$/, '') }
-	if (previous !== undefined) bare(previous)
-	bare(st.selected)
+	// Model rows' values are effort, name and ID cells; only the selected
+	// row fills the effort cell.
+	let values = st.values ? [...st.values] : undefined
+	let effortCell = (i: number, text: string) => { let v = values?.[i]; if (v) values![i] = text + v.slice(v.indexOf('\t')) }
+	if (previous !== undefined) effortCell(previous, '')
+	effortCell(st.selected, '')
 	let row = t.rows[st.selected]
 	let shownId = row?.id ?? row?.default ?? t.current
 	let effortKeys = !!t.capabilities?.[shownId]?.levels.length
 	let hint = row?.id ? `${effortKeys ? '←/→: lower/higher effort, ' : ''}enter: pick` : `←/→: close/open, enter: ${row?.default ? 'pick default' : 'open'}`
 	let level = picker.label(st, shownId)
-	if (row?.id && level) items[st.selected] = `${items[st.selected]} ‹ ${level} ›`
+	// A chevron shows only where ←/→ can still move; the level keeps its
+	// column when the left one is gone.
+	if (row?.id && level) effortCell(st.selected, `${picker.canAdjust(st, 'left') ? '‹ ' : '  '}${level}${picker.canAdjust(st, 'right') ? ' ›' : ''}`)
 	let chosen = picker.level(st, shownId)
 	let cap = t.capabilities?.[shownId]
 	let title = `Model: ${shownId}${chosen && chosen !== (cap?.policy ?? cap?.default) ? `:${chosen}` : ''}`
-	return { ...st, title, items, hint: `${hint}, esc: cancel` }
+	return { ...st, title, ...(values && { values }), hint: `${hint}, esc: cancel` }
 }
 
 // The picker over `ids`, on the current model, its categories open.
@@ -309,6 +312,17 @@ function label(st: ModalState, id: string): string {
 	let cap = st.tree?.capabilities?.[id]
 	return cap?.levels.length ? effort.label(cap, picker.level(st, id)) : ''
 }
+// The effort column's width: the widest choice of any model row, with
+// both chevrons, so moving and ←/→ never shift the columns.
+function effortWidth(st: ModalState): number {
+	let widest = 0
+	for (let r of st.tree?.rows ?? []) {
+		let cap = r.id ? st.tree?.capabilities?.[r.id] : undefined
+		if (!cap?.levels.length) continue
+		for (let l of [undefined, ...cap.levels]) widest = Math.max(widest, effort.label(cap, l).length + 4)
+	}
+	return widest
+}
 function canAdjust(st: ModalState, direction: 'left' | 'right'): boolean {
 	let id = st.tree?.rows[st.selected]?.id
 	let cap = id ? st.tree?.capabilities?.[id] : undefined
@@ -316,4 +330,4 @@ function canAdjust(st: ModalState, direction: 'left' | 'right'): boolean {
 	let selected = picker.level(st, id) ?? cap.policy ?? cap.default
 	return selected === undefined || selected !== cap.levels[direction === 'left' ? 0 : cap.levels.length - 1]
 }
-export const picker = { defaults, rank, refilter, selection, refresh, open, step, command, level, label, canAdjust }
+export const picker = { defaults, rank, refilter, selection, refresh, open, step, command, level, label, canAdjust, effortWidth }
