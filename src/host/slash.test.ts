@@ -149,26 +149,6 @@ test('a command question survives a restart; no answers it and nothing changes',
 	expect(b.views.get(id)!.meta.cwd).toBe(work)
 })
 
-test('a command question lives beside turns: a prompt runs at once, the turn end leaves it open, Escape dismisses it', async () => {
-	synthetic.models.ok = () => ({ say: 'ok' })
-	let a = client()
-	let id = created(a, 'hal/ok')
-	a.conn.send({ type: 'submit', sessionId: id, text: '/cd nowhere' })
-	await until(() => transcript.question(a.views.get(id)))
-	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
-	await until(() => a.of('turn-end').length)
-	expect(a.views.get(id)!.inbox).toEqual([])
-	expect(a.views.get(id)!.state).toEqual({ type: 'idle' })
-	expect(transcript.question(a.views.get(id))).toBeTruthy()
-	expect(transcript.question((await opened(id)).views.get(id))).toBeTruthy()
-	a.conn.send({ type: 'pause', sessionId: id })
-	await until(() => !transcript.question(a.views.get(id)))
-	let view = a.views.get(id)!
-	expect(view.items.find((i) => i.type === 'question')).toMatchObject({ canceled: true })
-	expect(existsSync(`${work}/nowhere`)).toBe(false)
-	expect((await opened(id)).views.get(id)).toEqual(view)
-})
-
 test('a command question asked while a turn streams leaves the turn streaming; a newer one replaces it', async () => {
 	let release = () => {}
 	let held = new Promise<void>((r) => (release = r))

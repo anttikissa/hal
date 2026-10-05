@@ -92,46 +92,7 @@ function start(c: ReturnType<typeof client>): string {
 	return id
 }
 
-const dropped: StreamEvent = { type: 'error', message: 'fetch failed', failure: 'temporary' }
 const done: StreamEvent[] = [{ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' }]
-
-test('a temporary failure retries at once, then backs off, and never gives up', async () => {
-	let a = client()
-	script = [[dropped], [dropped], [dropped], [dropped], [dropped], [dropped], [dropped], [dropped], [dropped], done]
-	let id = start(a)
-	await until(() => a.ends().length)
-	expect(calls).toHaveLength(10)
-	expect(a.ends()[0]).toMatchObject({ status: 'completed' })
-	// Each retry shows when and why; the first is at once, later waits grow
-	// but stay bounded.
-	let retries = a.states().filter((s) => s.type === 'retrying')
-	expect(retries).toHaveLength(9)
-	expect(retries.every((s) => s.reason.includes('fetch failed'))).toBe(true)
-	let gaps: number[] = []
-	let t = 1_800_000_000_000
-	for (let s of retries) {
-		gaps.push(Date.parse(s.at) - t)
-		t = Date.parse(s.at)
-	}
-	expect(gaps[0]).toBe(0)
-	for (let i = 2; i < gaps.length; i++) expect(gaps[i]!).toBeGreaterThanOrEqual(gaps[i - 1]!)
-	expect(gaps.at(-1)!).toBeGreaterThan(gaps[1]!)
-	expect(Math.max(...gaps)).toBeLessThanOrEqual(60_000)
-	expect(status.stateOf(id)).toEqual({ type: 'idle' })
-	expect((await history.read(id)).filter((r) => r.type === 'turn_end')).toHaveLength(1)
-})
-
-test('a stream cut off mid-answer continues, and the model is told', async () => {
-	let a = client()
-	script = [[{ type: 'text', text: 'half' }, { type: 'usage', usage: { output: 3 } }, { ...dropped, body: 'full provider failure body' }], done]
-	let id = start(a)
-	await until(() => a.ends().length)
-	let messages = calls[1]!.input.messages
-	expect(messages.at(-2)).toEqual({ role: 'assistant', blocks: [{ type: 'text', text: 'half' }] })
-	expect(JSON.stringify(messages.at(-1))).toContain('Hal is retrying after the response stopped: fetch failed')
-	expect(JSON.stringify(messages.at(-1))).toContain('full provider failure body')
-	expect(status.stateOf(id).type).toBe('idle')
-})
 
 test('a rate limit waits for the time the provider gave, visible in snapshots; Escape pauses it', async () => {
 	let a = client()

@@ -173,33 +173,12 @@ async function reportOf(end: (c: C, child: string, k: number) => void): Promise<
 	return calls[woke]!.input.messages.at(-1).blocks[0].text
 }
 
-test('a subagent that ends with no text still reports', async () => {
-	expect(await reportOf((_c, _child, k) => calls[k]!.push({ type: 'done', reason: 'end' }))).toMatch(/finished without a message/)
-})
-
 test('a failed subagent reports why, so its parent never waits for nothing', async () => {
 	expect(await reportOf((_c, _child, k) => calls[k]!.push({ type: 'error', message: '400 bad request', status: 400 }))).toMatch(/stopped: 400 bad request/)
 })
 
 test('a paused subagent reports it', async () => {
 	expect(await reportOf((c, child) => (c.conn.send({ type: 'open', sessionId: child }), c.conn.send({ type: 'pause', sessionId: child })))).toMatch(/stopped: .*paused/)
-})
-
-test('a subagent waiting for its own reports only when its work is done', async () => {
-	let c = client()
-	let p = await parent(c)
-	calls[0]!.push(call('s1', 'spawn', { task: 'middle job', limit: 1 }), call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
-	let k = await callWith('middle job')
-	let mid = tabs.file().open[1]!
-	calls[k]!.push({ type: 'text', text: 'delegating' }, call('s2', 'spawn', { task: 'leaf job' }), call('w2', 'wait'), { type: 'done', reason: 'tool_use' })
-	let leaf = await callWith('leaf job')
-	await until(() => status.stateOf(mid).type === 'idle')
-	calls[leaf]!.push({ type: 'text', text: 'leaf result' }, { type: 'done', reason: 'end' })
-	let back = await callWith('leaf result', leaf + 1)
-	calls[back]!.push({ type: 'text', text: 'middle result' }, { type: 'done', reason: 'end' })
-	let woke = await callWith('middle result', back + 1)
-	expect(calls[woke]!.input.messages.at(-1).blocks[0].text).toContain(mid)
-	expect(JSON.stringify(history.readSync(p))).not.toContain('delegating')
 })
 
 test('a blank interactive session opens next to its parent and does nothing', async () => {

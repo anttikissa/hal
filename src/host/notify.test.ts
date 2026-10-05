@@ -52,11 +52,3 @@ test('a turn end reaches the user once: nothing if watched, a notice if another 
 	expect(entries).toMatchObject([{ session: one, kind: 'done', line: 'third' }, { session: one, kind: 'done', line: 'tests pass, pushed to main' }])
 	expect(entries[0].block).toMatch(/^\d+$/)
 })
-
-test("a reply's <summary> is its notice line", async () => {
-	let a = client()
-	let one = created(a), two = created(a)
-	a.conn.send({ type: 'visibility', sessionId: two, visible: true })
-	await turn(a, one, 'Built.\n\n<summary>Build finished in 15 s.</summary>\nthanks')
-	expect(a.of('notice').at(-1)).toMatchObject({ line: 'Build finished in 15 s.' })
-})

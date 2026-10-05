@@ -495,7 +495,7 @@ test('parallel results sit under their calls unless the batch overflows a screen
 })
 
 test('a closed card is one row: no padding rows (task ghs)', () => {
-	let item = { type: 'prompt', text: 'first line\nsecond line', key: 'u1' } as unknown as Item
+	let item = { type: 'prompt', text: 'first line\nsecond line', key: 'u1' } as unknown as Parameters<typeof frame.itemRows>[0]
 	let rows = frame.itemRows(item, 60, 'x', undefined, undefined, undefined, [], '', { fold: 'closed' })
 	expect(rows.map(strip).map((r) => r.trim()).filter(Boolean)).toHaveLength(1)
 	expect(rows).toHaveLength(1)

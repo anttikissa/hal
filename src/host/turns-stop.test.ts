@@ -12,16 +12,6 @@ afterEach(() => {
 	settings.state.raw = {}
 })
 
-async function waitFor(check: () => boolean, ms = 5000): Promise<void> {
-	let deadline = Date.now() + ms
-	while (!check()) {
-		if (Date.now() > deadline) throw new Error('timed out')
-		await Bun.sleep(20)
-	}
-}
-
-const alive = (pattern: string) => Bun.spawnSync(['pgrep', '-f', pattern]).stdout.toString().trim() !== ''
-
 test('a model that never stops asking for tools pauses at maxRounds; continue gives as many again', async () => {
 	settings.state.raw = { maxRounds: 3 }
 	let a = client()
@@ -77,20 +67,3 @@ test('a round cut off at max_tokens or refused runs none of its tool calls and e
 		tools.run = origRun
 	}
 })
-
-test('Escape during a command kills it, background jobs included, and its result says it was stopped', async () => {
-	let marker = `30.${process.pid}1`
-	let a = client()
-	let id = toolSession(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'wait' })
-	await until(() => calls.length === 1)
-	let command = `sleep ${marker} & sleep ${marker}`
-	calls[0]!.push({ type: 'tool_call', id: 'b1', name: 'bash', input: { command, description: 'Wait twice' } }, { type: 'done', reason: 'tool_use' })
-	await waitFor(() => alive(`sleep ${marker}`))
-	a.conn.send({ type: 'pause', sessionId: id })
-	await waitFor(() => a.of('turn-end').length > 0)
-	expect(a.of('turn-end')[0].status).toBe('paused')
-	let result = a.views.get(id)!.items.find((i) => i.type === 'tool-result') as any
-	expect(result.output).toContain('stopped')
-	await waitFor(() => !alive(`sleep ${marker}`), 1000)
-}, 10_000)

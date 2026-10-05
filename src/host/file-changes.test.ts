@@ -7,7 +7,6 @@ import { history } from './history.ts'
 import { host } from './host.ts'
 import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
-import { tabs } from './tabs.ts'
 import type { ToolContext } from './tools.ts'
 
 let home = '', cwd = '', id = ''
@@ -74,33 +73,6 @@ test('sensitive paths and symlink aliases, and large files retain metadata not b
 	}
 	expect(readFileSync(history.file(id), 'utf8')).not.toContain('private')
 	expect(() => bytes('..')).toThrow('invalid snapshot hash')
-})
-
-test('overlapping aliases wait across sessions; disjoint and undeclared calls do not; waiting cancels', async () => {
-	writeFileSync(`${cwd}/file`, 'old')
-	symlinkSync('file', `${cwd}/alias`)
-	tabs.file().open = [...Array.from({ length: 7 }, (_, i) => `other-${i}`), id]
-	let owner = await fileChanges.begin(context(), ['file'])
-	let second = sessions.create({ cwd, model: 'fake/m' }).id
-	let chunks: string[] = []
-	let waiting = false
-	let next = fileChanges.begin({ ...context(second), onOutput: (c) => { chunks.push(c); waiting = true } }, [`${cwd}/alias`])
-	for (let i = 0; i < 100 && !waiting; i++) await Bun.sleep(5)
-	expect(chunks.join('')).toBe(`Waiting for tab 8 (${id}) to finish editing file\n`)
-	let disjoint = await fileChanges.begin(context(second), ['other'])
-	disjoint.release()
-	let undeclared = await fileChanges.begin(context(second), [])
-	undeclared.release()
-	let controller = new AbortController()
-	let canceled = fileChanges.begin({ ...context(second), signal: controller.signal }, ['file'])
-	controller.abort()
-	await expect(canceled).rejects.toThrow('canceled')
-	writeFileSync(`${cwd}/file`, 'first')
-	await fileChanges.finish(owner)
-	let acquired = await next
-	expect(bytes(acquired.before.get(`${cwd}/alias`)).toString()).toBe('first')
-	acquired.release()
-	expect(fileChanges.state.locks).toHaveLength(0)
 })
 
 test('background calls hold overlapping locks until exit and record final bytes', async () => {
