@@ -12,7 +12,7 @@ Emergency-key exception: tasks/README.md (Emergency keys) records this as the on
 	status: 'planned',
 	notes: [
 		"Part A mechanism: prompts.submit defers a steer while running.unsafe is set (a flagged bash call runs) by setting running.steered; the tool loop's finally then calls prompts.interrupt, so later calls in the batch see the steered abort and get cancelled results. turns.stop clears steered, so Escape/close win. A submit after Escape interrupts at once (controller already aborted).",
-		"Results carry interrupted: 'cancelled' | 'stopped' (no isError); turnPolicy.stoppedBy marks a dispatched call stopped (see the next note). A steered provider round now also writes cancelled results for its streamed calls instead of leaving replay to pair them. Durations use wm0's format, so the spec's '(stopped, 50.2s)' reads '(stopped, 50s)'. The web had no title status (wm0 was terminal-only); it now shows only the steering status in the header, muted.",
+		"Results carry interrupted: 'cancelled' | 'stopped' (no isError); turnPolicy.stoppedBy marks a dispatched call stopped (see the next note). A steered provider round now also writes cancelled results for its streamed calls instead of leaving replay to pair them. The web had no title status (wm0 was terminal-only); it now shows only the steering status in the header, muted.",
 		"A call counts as stopped when a steer aborted it and it failed (any tool, any error wording) or carries bash's stop line, built from jobs.byMessage. Matching only that phrase left non-bash tools (read_url, google) red after a steer. Invariant: a call a steer aborted never shows red."
 	],
 	needs: ['wm0'],
