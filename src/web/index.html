@@ -65,7 +65,7 @@ html.typing .App { position: absolute; }
 .Transcript > .to-bottom { position: sticky; bottom: 0; height: 0; margin: 0; z-index: 1; }
 .to-bottom button { position: absolute; bottom: calc(2px - 0.5lh); left: calc(-1 * var(--gut)); width: 52px; height: 52px; padding: 0 0 0 calc(var(--gut) + 1.5px - 4px); border: 0; background: none; display: flex; align-items: center; justify-content: flex-start; color: var(--text); animation: fade-in 150ms var(--ease-out); }
 .to-bottom .pill { display: flex; align-items: center; justify-content: center; width: 8px; height: 52px; background: rgb(0 0 0 / 75%); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
-.to-bottom svg { width: 6px; height: 10px; fill: currentColor; }
+.to-bottom svg { flex: none; width: 10px; height: 14px; fill: currentColor; }
 @keyframes fade-in { from { opacity: 0; } }
 /* Cards and the open question share one shape: square, a lit bar on
    the left, the style's tint behind. */
