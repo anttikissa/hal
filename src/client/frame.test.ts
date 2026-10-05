@@ -493,3 +493,10 @@ test('parallel results sit under their calls unless the batch overflows a screen
 	// Once split, a batch never flips back (that would rewrite scrollback).
 	expect(order(true)).toBe('ta tb rb ra')
 })
+
+test('a closed card is one row: no padding rows (task ghs)', () => {
+	let item = { type: 'prompt', text: 'first line\nsecond line', key: 'u1' } as unknown as Item
+	let rows = frame.itemRows(item, 60, 'x', undefined, undefined, undefined, [], '', { fold: 'closed' })
+	expect(rows.map(strip).map((r) => r.trim()).filter(Boolean)).toHaveLength(1)
+	expect(rows).toHaveLength(1)
+})
