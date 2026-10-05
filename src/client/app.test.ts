@@ -375,6 +375,19 @@ test('Tab on a command asks the host to complete it; the answer fills the prompt
 	expect(app.state.prompt.text).toBe('/cd ~/project')
 })
 
+test('model Tab fills the alias while retaining qualified alternatives and rejecting a late reply', () => {
+	app.onEvent(snapshot())
+	type('/model astr')
+	app.onKeys([key('tab')])
+	let event = { type: 'completions' as const, sessionId: 's1', text: '/model astr', items: ['/model astra', '/model openrouter/openai/gpt-6-astra'] }
+	app.onEvent(event)
+	expect(app.state.prompt).toMatchObject({ text: '/model astra', cursor: 12 })
+	expect(drafts.text('s1')).toBe('/model astra')
+	expect(appView.view().choices).toEqual(['astra', 'openrouter/openai/gpt-6-astra'])
+	app.onEvent({ ...event, items: ['/model other'] })
+	expect(app.state.prompt.text).toBe('/model astra')
+})
+
 test("completion leaves other notices alone and never uncovers the tab's state by clearing one", () => {
 	app.onEvent(snapshot('s1', { type: 'error', message: 'no credits' }))
 	app.onEvent({ type: 'warning', text: 'Web is on port 9002' })

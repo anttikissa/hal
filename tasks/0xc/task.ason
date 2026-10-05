@@ -1,0 +1,12 @@
+{
+	title: 'Prefix-first Tab completion in both clients',
+	spec: 'Restore the invariant that word matches do not block prefix completion. In terminal and web, Tab uses candidates starting with the entire typed text when any exist: one completes fully, several extend only to their common prefix. With no prefix matches, use word-match candidates as before. Thus /model astr completes to /model astra despite provider-qualified astra alternatives. Keep all search alternatives visible with enough of their full identifiers to distinguish providers; host descriptions remain aligned. Browser Tab behaves identically before and after suggestions arrive, applies common-prefix extension even when several candidates remain, and accepts an explicitly arrow-selected alternative. Passive suggestions never edit the draft or change exact-command Enter semantics. Preserve declared command defaults, path and multi-word labels, stale-reply rejection, native browser edits, draft sync, menu identity and dismissal. Add focused behavioral regressions for mixed model matches and browser reply timing.',
+	status: 'done',
+	notes: [
+		'Shared completion keeps the full candidate set for labels but computes inserted text from prefix matches when present. Qualified alternatives therefore stay visible without blocking aliases. Browser Tab reuses its completion-reply path for an authoritative cached menu, waits for a new reply when its cached input differs, and accepts deliberate arrow selection. Pending replies previously failed to apply any common-prefix extension when several candidates remained. Native rewriting supplies the completed caret position and keeps draft sync.',
+		'Completion rendering is checked in Chrome at 390px and 1280px: qualified alternatives remain distinguishable, the caret stays at the completed end, menus fit the viewport, and composer/status geometry is unchanged. Canonical-model deduplication depends on available credentials, so the browser check asserts the alias and qualified alternative rather than a fixed candidate count.',
+		'Final validation: 99 focused completion/controller tests pass. Full ./test: 1436 pass, one failure from the existing 403-line src/common/transcript.ts (400-line limit). TypeScript passes. Changed files lint clean; repository lint retains five existing warnings in src/host/host.ts, turns.test.ts and jobs.test.ts. The credential-independent Chrome completion check passes in the full suite at both viewport sizes.'
+	],
+	needs: ['et', '03', 'kx', 'mm'],
+	foldInto: ['et', '03', 'kx']
+}
