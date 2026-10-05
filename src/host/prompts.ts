@@ -60,14 +60,15 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
 		history.append(id, record)
 		// A steer swaps in a fresh controller and aborts the old one: the
-		// turn goes on with the inbox once the old work has settled.
+		// turn goes on with the inbox once the old work has settled. A
+		// running call flagged unsafeToStop defers it until the call ends
+		// (task ker); after Escape nothing runs on to protect.
 		let running = turns.state.running.get(id)
 		if (interrupt && running) {
 			// Even just after Escape, while the turn still settles: it goes on.
 			status.transition(id, { type: 'submit' })
-			let old = running.controller
-			running.controller = new AbortController()
-			old.abort(jobs.steered)
+			if (running.unsafe && !running.controller.signal.aborted) running.steered = true
+			else prompts.interrupt(running)
 		}
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		return
@@ -83,6 +84,14 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 	}
 	prompts.deliver(id, steering, { text, ...own }, command)
 	turns.start(id)
+}
+
+// Steers `running`: a fresh controller for the turn to go on with, the
+// old one aborted so its pending work settles.
+function interrupt(running: { controller: AbortController }): void {
+	let old = running.controller
+	running.controller = new AbortController()
+	old.abort(jobs.steered)
 }
 
 // A prompt's blocks from its texts, each keeping who sent it, attachment
@@ -271,6 +280,7 @@ function reply(id: string, question: string, answers: Answers): string | undefin
 
 export const prompts = {
 	submit,
+	interrupt,
 	amend,
 	edit,
 	harmless,

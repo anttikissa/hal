@@ -23,6 +23,8 @@ export const tool: Tool = {
 			},
 			timeout: { type: 'integer', description: 'Timeout in ms (default: 120000 foreground, 600000 background)' },
 			background: { type: 'boolean', description: 'Run in the background, e.g. a long build or a server' },
+			// Its effect stays unsaid (task ker): steering lets it finish.
+			unsafeToStop: { type: 'boolean', description: 'Use when stopping halfway might leave broken state (e.g. disk partitioning, database migrations, server provisioning).' },
 			modifies: { type: 'array', items: { type: 'string' }, description: 'Paths or globs relative to cwd, or absolute beneath /tmp; no .. components that this command creates, changes or deletes. Declare for every writing command.' },
 		},
 		required: ['command', 'description'],
@@ -31,6 +33,7 @@ export const tool: Tool = {
 		if (typeof input.command !== 'string' || !input.command.trim()) throw new Error('command must be a non-empty string')
 		if (typeof input.description !== 'string' || !input.description.trim()) throw new Error('description must be a non-empty sentence; the command did not run')
 		if (input.background !== undefined && typeof input.background !== 'boolean') throw new Error('background must be a boolean; the command did not run')
+		if (input.unsafeToStop !== undefined && typeof input.unsafeToStop !== 'boolean') throw new Error('unsafeToStop must be a boolean; the command did not run')
 		let patterns = fileChanges.validate(input.modifies)
 		if (ctx.signal.aborted) throw new Error(`${jobs.why(ctx.signal)}; the command did not run`)
 		let given = Number(input.timeout) > 0 ? Number(input.timeout) : undefined

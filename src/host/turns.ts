@@ -34,7 +34,9 @@ import { subagents } from './subagents.ts'
 import { toolOutput } from './tool-output.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
-type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController }
+// `unsafe`: a call flagged unsafeToStop runs; `steered`: a steer waits
+// for it to end (prompts.submit, task ker).
+type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController; unsafe?: true; steered?: true }
 // Asks the open turn's human a durable question: in history first,
 // then shown; the turn stops running here and waits, blocked, for the
 // first answer (reply), which runs it again. Nothing waits in memory:
@@ -106,7 +108,7 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 	let refused = status.transition(id, event)
 	if (refused) return refused
 	let running = turns.state.running.get(id)
-	if (running) return void running.controller.abort()
+	if (running) return void (delete running.steered, running.controller.abort())
 	if (transition?.kind === 'clear') contextTransitions.settle(id)
 	// A turn parked at a question has its usage so far there.
 	let end: Omit<HistoryRecord & { type: 'turn_end' }, 'ts'> = { type: 'turn_end', status: 'paused', usage: forms.open(history.readSync(id))?.usage ?? {} }
@@ -250,8 +252,9 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					continue
 				}
 				if (signal.aborted) {
-					if (contextTransitions.pending(id)?.kind === 'clear') {
-						let results = round.blocks.filter((b) => b.type === 'tool_call').map((b) => ({ type: 'tool_result' as const, id: b.id, output: 'Tool call did not run: clear accepted before dispatch.', isError: true }))
+					let clear = contextTransitions.pending(id)?.kind === 'clear'
+					if (clear || signal.reason === jobs.steered) {
+						let results = round.blocks.filter((b) => b.type === 'tool_call').map((b) => clear ? { type: 'tool_result' as const, id: b.id, output: 'Tool call did not run: clear accepted before dispatch.', isError: true } : turnPolicy.cancelled(b.id))
 						if (results.length) { let r = history.results(id, results); host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r?.n, ts: r?.ts }) }
 					}
 					continue
@@ -284,6 +287,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let ending = false
 			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
 			for (let call of calls) {
+				if (signal.aborted && signal.reason === jobs.steered) { results.push(turnPolicy.cancelled(call.id)); continue }
 				if (signal.aborted || contextTransitions.pending(id)?.kind === 'clear') {
 					results.push({ type: 'tool_result', id: call.id, output: `Tool call did not run: ${jobs.why(signal)} before dispatch.`, isError: true })
 					continue
@@ -291,8 +295,14 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (decided.get(call.id) === false) { results.push(approval.declined(call)); continue }
 				status.transition(id, { type: 'tools', call: call.id, at: new Date().toISOString() })
 				let stream = call.name === 'bash' ? toolOutput.start(id, call.id) : undefined
-				try { results.push(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx)) }
-				finally { stream?.stop() }
+				if (call.name === 'bash' && call.input.unsafeToStop === true && call.input.background !== true) running.unsafe = true
+				try { results.push(turnPolicy.stoppedBy(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx), signal)) }
+				finally {
+					stream?.stop()
+					delete running.unsafe
+					// A steer that waited for the flagged call: later calls never start.
+					if (running.steered) { delete running.steered; prompts.interrupt(running) }
+				}
 			}
 			if (turns.state.running.get(id) !== running) return
 			let r = history.results(id, results)

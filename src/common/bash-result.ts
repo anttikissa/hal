@@ -6,8 +6,10 @@ const STATUS = /^\[exit (\d+)\]\n?/
 
 // The output to show: no blank lines at either end and no `[exit 0]`;
 // `titled`: no status line at all, the card's title shows it (the
-// terminal; job messages and the web keep a nonzero one).
-function display(output: string, titled = false): string {
+// terminal; job messages and the web keep a nonzero one). `interrupted`:
+// steering stopped it, so its first line is the stop note (task ker).
+function display(output: string, titled = false, interrupted = false): string {
+	if (titled && interrupted) return bashResult.trim(output.replace(/^\[[^\n]*\]\n?/, ''))
 	let status = titled || !bashResult.status(output) ? STATUS : ''
 	return bashResult.trim(output.replace(status, ''))
 }
@@ -32,4 +34,11 @@ function duration(ms: number | undefined, ticking = false): string | undefined {
 	return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
 }
 
-export const bashResult = { display, trim, status, duration }
+// Steering's status for a call (task ker): "cancelled", "stopped, 50.2s".
+function interrupted(r: { interrupted?: 'cancelled' | 'stopped'; ms?: number }): string | undefined {
+	if (r.interrupted !== 'stopped') return r.interrupted
+	let time = bashResult.duration(r.ms)
+	return time ? `stopped, ${time}` : 'stopped'
+}
+
+export const bashResult = { display, trim, status, duration, interrupted }

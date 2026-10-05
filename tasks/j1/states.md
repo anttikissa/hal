@@ -105,6 +105,8 @@ Ordinary submitted text immediately interrupts the active provider round,
 locally and remotely alike. The host durably receives it in the inbox
 before aborting the round signal, preserves partial output, settles any
 running foreground tool, and never dispatches pending calls after receipt.
+A running call flagged unsafeToStop is not stopped: the message waits in
+the inbox until the call ends (task ker).
 Only then does the same logical turn request again, delivering all waiting
 messages together in receipt order. Repeated submits during settlement
 coalesce without loss or duplication. Escape or closing the tab clears

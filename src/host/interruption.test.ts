@@ -89,7 +89,7 @@ for (let stop of ['none', 'pause', 'close'] as const) {
 				await until(() => calls.length === 2)
 				let blocks = calls[1]!.input.messages.flatMap((m: any) => m.blocks)
 				expect(blocks).toContainEqual({ type: 'tool_result', id: 'first', output: 'settled partial output' })
-				expect(blocks).toContainEqual({ type: 'tool_result', id: 'pending', output: expect.stringContaining('did not run'), isError: true })
+				expect(blocks).toContainEqual({ type: 'tool_result', id: 'pending', output: expect.stringContaining('did not run'), interrupted: 'cancelled' })
 				calls[1]!.push({ type: 'done', reason: 'end' })
 			}
 			await until(() => a.of('turn-end').length)
@@ -120,3 +120,49 @@ test('queue and advisory do not abort, while explicit steer does', async () => {
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.views.get(id)!.state.type === 'idle')
 })
+
+for (let escape of [false, true]) {
+	test(`steering waits for an unsafeToStop call, then cancels the rest${escape ? '; Escape still stops it' : ''}`, async () => {
+		let settling = gate()
+		let original = tools.run
+		let dispatched: string[] = []
+		let toolSignal: AbortSignal | undefined
+		tools.run = async (call, ctx) => {
+			dispatched.push(call.id)
+			toolSignal = ctx.signal
+			await settling.promise
+			return { type: 'tool_result', id: call.id, output: 'migrated' }
+		}
+		try {
+			let a = client()
+			let id = created(a)
+			a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+			await until(() => calls.length === 1)
+			calls[0]!.push(
+				{ type: 'tool_call', id: 'flagged', name: 'bash', input: { command: 'migrate', description: 'Migrate', unsafeToStop: true } },
+				{ type: 'tool_call', id: 'pending', name: 'bash', input: { command: 'must not run' } },
+				{ type: 'done', reason: 'tool_use' },
+			)
+			await until(() => dispatched.length)
+			a.conn.send({ type: 'submit', sessionId: id, text: 'steer' })
+			expect(toolSignal!.aborted).toBe(false)
+			expect(a.views.get(id)!.inbox.map((m) => m.text)).toEqual(['steer'])
+			if (escape) {
+				a.conn.send({ type: 'pause', sessionId: id })
+				expect(toolSignal!.aborted).toBe(true)
+			}
+			settling.release()
+			if (!escape) {
+				await until(() => calls.length === 2)
+				let messages = calls[1]!.input.messages
+				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual({ type: 'tool_result', id: 'flagged', output: 'migrated' })
+				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual({ type: 'tool_result', id: 'pending', output: expect.stringContaining('did not run'), interrupted: 'cancelled' })
+				expect(messages.at(-1).blocks.at(-1).text).toEqual(stamped('steer'))
+				calls[1]!.push({ type: 'done', reason: 'end' })
+			}
+			await until(() => a.of('turn-end').length)
+			expect(dispatched).toEqual(['flagged'])
+			if (escape) expect(a.views.get(id)!.state.type).toBe('paused')
+		} finally { settling.release(); tools.run = original }
+	})
+}

@@ -111,6 +111,8 @@ function lines(name: string, input: Record<string, unknown>): string[] {
 			shown.add('modifies')
 		}
 		if (typeof background === 'boolean') shown.add('background')
+		// The title's "unsafe to stop" label shows it (toolDetails.unsafe).
+		if (typeof input.unsafeToStop === 'boolean') shown.add('unsafeToStop')
 		if (typeof timeout === 'number') {
 			if (timeout !== (background === true ? 600_000 : 120_000)) out.push(`Timeout ${timeout / 1000} s`)
 			shown.add('timeout')
@@ -124,8 +126,11 @@ function lines(name: string, input: Record<string, unknown>): string[] {
 	return out
 }
 
+// A bash call flagged unsafeToStop: its title says "unsafe to stop" (task ker).
+const unsafe = (name: string, input: Record<string, unknown>): boolean => name === 'bash' && input.unsafeToStop === true
+
 // Built-in tools that change nothing (host tools.readOnly): an edit of
 // a prompt before them leaves the world as it was.
 const readOnly: ReadonlySet<string> = new Set(['read', 'inspect', 'google', 'wait', 'read_url'])
 
-export const toolDetails = { value, headline, lines, readOnly }
+export const toolDetails = { value, headline, lines, unsafe, readOnly }
