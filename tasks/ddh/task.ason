@@ -1,0 +1,10 @@
+{
+	title: 'Web status-bar tap scrolls the transcript to the top',
+	spec: 'On iOS, tapping the status bar glides the web transcript to its top. iOS scrolls only the document on that tap and sends no event, so the document is 1px taller than the screen and parked at scrollY 1 with the app fixed; reaching 0 counts as a tap (viewport.statusTap), after which the document is parked again. While a textarea or input has focus, html.typing restores the locked layout (no document scroll, app absolute) so the keyboard cannot pan the page, and jumps to 0 within 600 ms of a focus or visual-viewport change are ignored. The terminal has no equivalent.',
+	status: 'done',
+	notes: [
+		'Not testable headless; the user verified it on an iPhone. The on-device test page and its tab-menu entry were removed after verification.'
+	],
+	needs: ['ykr'],
+	foldInto: ['ykr']
+}

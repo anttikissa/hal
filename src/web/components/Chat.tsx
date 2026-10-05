@@ -151,12 +151,14 @@ export function Chat() {
 		document.addEventListener('keydown', onKey)
 		document.addEventListener('paste', onPaste)
 		let stop = viewport.page()
+		let stopTap = viewport.statusTap(() => document.querySelector('.Transcript')?.scrollTo({ top: 0, behavior: 'smooth' }))
 		app.start()
 		return () => {
 			document.removeEventListener('keydown', onKey)
 			document.removeEventListener('paste', onPaste)
 			for (let [k, f] of drags) document.removeEventListener(k, f)
 			stop()
+			stopTap()
 		}
 	})
 	return (

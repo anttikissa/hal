@@ -59,4 +59,35 @@ function page(): () => void {
 	return sync(vv, document.documentElement.style, full, [[window, ['resize', 'pageshow']], [document, ['focusin', 'focusout', 'visibilitychange']]])
 }
 
-export const viewport = { css, sync, page }
+// iOS scrolls the document to its top when the status bar is tapped,
+// and tells the page nothing else. The document is 1px taller than the
+// screen (index.html) and parked at scrollY 1, so reaching 0 means a tap
+// and `top` runs. Keyboard and viewport changes can also move the
+// document, so 0 within 600 ms of one is ignored, then re-parked.
+function statusTap(top: () => void): () => void {
+	let quietUntil = 0
+	let park = () => { if (scrollY !== 1 && !document.activeElement?.matches('textarea, input')) scrollTo(0, 1) }
+	let settle = () => { quietUntil = performance.now() + 600; setTimeout(park, 300) }
+	// Typing restores the locked layout (index.html, html.typing): the
+	// keyboard must not be able to pan a scrollable document.
+	let typing = () => {
+		let on = !!document.activeElement?.matches('textarea, input')
+		if (on === document.documentElement.classList.contains('typing')) return
+		quietUntil = performance.now() + 600
+		if (on) scrollTo(0, 0)
+		document.documentElement.classList.toggle('typing', on)
+	}
+	let focus = () => { typing(); settle() }
+	let onScroll = () => {
+		if (scrollY > 0) return
+		if (performance.now() > quietUntil) top()
+		requestAnimationFrame(park)
+	}
+	let vv = visualViewport
+	let on: [EventTarget | null, string, () => void][] = [[window, 'scroll', onScroll], [window, 'pageshow', settle], [document, 'focusin', focus], [document, 'focusout', () => setTimeout(focus)], [vv, 'resize', settle]]
+	for (let [t, k, f] of on) t?.addEventListener(k, f, { passive: true })
+	focus()
+	return () => { for (let [t, k, f] of on) t?.removeEventListener(k, f); document.documentElement.classList.remove('typing') }
+}
+
+export const viewport = { css, sync, page, statusTap }
