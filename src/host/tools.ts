@@ -76,6 +76,7 @@ function page(text: string, offset = 1, limit = tools.maxLines): string {
 // become error results.
 async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlock> {
 	let result: ToolResultBlock
+	let start = performance.now()
 	try {
 		let copied = pruning.copied(call.input)
 		if (copied) throw new Error(`Copied omission marker ${copied}: read the named record/blob with read_blob and retry with the actual value.`)
@@ -93,6 +94,9 @@ async function run(call: ToolCallBlock, ctx: ToolContext): Promise<ToolResultBlo
 		result = { type: 'tool_result', id: call.id, output: `Error: ${e?.message ?? e}`, isError: true }
 	}
 	result.output = call.name === 'read_blob' ? result.output : tools.cap(result.output, ctx.sessionId)
+	// Only a time worth showing (1 s or more, task wm0) is kept.
+	let ms = Math.round(performance.now() - start)
+	if (ms >= 1000) result.ms = ms
 	return result
 }
 
