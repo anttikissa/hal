@@ -146,12 +146,13 @@ function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean)
 	node.nodes.filter((n) => !bucket(n)).forEach(category)
 	for (let { id, leaf, family } of node.ids) {
 		if (!kept.has(id)) continue
-		// ✓ the current model, • the group's default (task r7r).
-		// The postfix follows the hierarchy; the full name and ID are
-		// details. A singleton such as Haiku needs only its short name.
+		// ✓ marks the current model; a • suffix marks the group's
+		// default, so the two never compete (task r7r). The postfix
+		// follows the hierarchy; the full name and ID are details. A
+		// singleton such as Haiku needs only its short name.
 		let name = names[id]
-		let label = family ? leaf : name ? titles.shortName(id, name) : id
-		out.items.push(`${indent}${id === current ? '✓ ' : id === node.default ? '• ' : '  '}${label}`)
+		let label = (family ? leaf : name ? titles.shortName(id, name) : id) + (id === node.default ? '•' : '')
+		out.items.push(`${indent}${id === current ? '✓ ' : '  '}${label}`)
 		out.values.push(family ? `\t${name ?? ''}\t${id}` : '')
 		out.rows.push({ id, parent: node.path })
 	}
