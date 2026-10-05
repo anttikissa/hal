@@ -34,10 +34,9 @@ from the question text above and the key hint below. A text field's
 placeholder is drawn in oklch.faint of the block's colours, like the
 prompt's example request: deliberately below the readable-text minimum
 so it never reads as typed text (the user's decision). A placeholder may
-be a list: it rotates (placeholders.rotate), the first one first, each
-held 3 s, erased a grapheme every 7.5 ms and the next typed in at
-17.5 ms each; the rest follow in seeded shuffled rounds, never one twice in
-a row. Both clients repaint only when the text next changes; the web
+be a list: it rotates (placeholders.rotate) in list order, each held
+3 s (4.5 s if over 50 graphemes), erased a grapheme every 5 ms and the
+next typed in at 35/3 ms each. Whoever asks orders the list. Both clients repaint only when the text next changes; the web
 keeps the first under prefers-reduced-motion. A form marked
 `skip` changes Escape from pause to skip: the host records a cancelled
 answer and runs the asker again, which moves on; its hint says
