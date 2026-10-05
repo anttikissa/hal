@@ -31,6 +31,8 @@ test('each tab keeps its place: a bottom reader returns to the (grown) bottom, o
 	scroll.state.el = el
 	try {
 		scroll.save('1-aaa')
+		// The reader scrolls up by hand: no longer pinned.
+		scroll.state.pinned = false
 		el.scrollTop = 100
 		scroll.save('2-bbb')
 		// Another tab shows, then each comes back, longer than before.

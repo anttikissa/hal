@@ -82,7 +82,8 @@ function reveal(): void {
 	let card = document.querySelector('.Transcript .Card.target')
 	if (!card) return
 	t.shown = true
-	scroll.stop()
+	// The reader asked for this card: leaving the bottom is theirs.
+	scroll.leave()
 	card.scrollIntoView({ block: 'start' })
 }
 
