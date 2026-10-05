@@ -1,0 +1,18 @@
+{
+	title: 'Terminal: /toggle and Ctrl-O open and close blocks',
+	spec: `/toggle opens and closes transcript blocks; Ctrl-O asks which.
+
+Targets: "/toggle #t24", "t24", "#24" and "24" all name block 24 (block keys are history line numbers, so the number alone is unique; a wrong letter is ignored). "/toggle 10-24" is an inclusive range. With no target, it toggles the latest tool block. An unknown block or a range with nothing to toggle is an error naming the target.
+
+Blocks that toggle: tool calls with their results (one block), thinking, assistant text, user prompts and messages from other sessions. Defaults stay as today: tools and thinking closed, session messages folded to their summary and glimpse, assistant text and prompts open. A single target flips that block. A range flips each block in it, except assistant text and user prompts, which only a single target toggles.
+
+Closed assistant text and closed prompts show one preview line with their block id, like closed thinking. A prompt with paste attachments has three states in turn: closed; open with [paste/<name>] markers; open with the pasted text inline. Without pastes it has two.
+
+Open tool results show the whole output up to 200 rows, then "… N more lines in <path>": the blob file when the output is blob-backed, else the session history file and line.
+
+Fold state is client state, in memory per client: not stored, not synced to other clients. /toggle is a host command (src/host/commands/), so the model may run it with the command tool; the host checks the target against the session's blocks and tells the clients showing that session to flip it.
+
+Ctrl-O opens a small transient dialog (not a question in history, like Ctrl-F find) with one field. Its placeholder rotates examples: "10-24   (toggle messages 10-24)", "25   (you can also close an assistant message)". Enter runs /toggle with the field; empty Enter toggles the latest tool block; Escape closes.`,
+	status: 'planned',
+	needs: ['wm0']
+}
