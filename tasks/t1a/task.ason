@@ -5,7 +5,8 @@
 	notes: [
 		"Found with a headless Chrome test (Cmd+A, then 3 s of streaming). The Composer focus effect's compute returned a fresh boolean each update, yet its callback re-ran on every transcript change and called input.focus(), collapsing the selection within a second. In Solid 2 rc.11 a plain compute does not gate the effect; a createMemo does. The 40-row window (mfj) counted from the end, so each new row dropped the oldest from the DOM.",
 		"A send's momentum hold that lasted until the glide landed held the view forever while a reply streamed (the bottom moves, so the glide never lands); the reader's wheel was ignored. Now a time limit, and landing clears it, else a later wheel within 300 ms is lost.",
-		'Deleted flaky tests (AGENTS.md: delete, never retry): rotation edge gaps (web), and host tests that timed out at 5 s under full-suite load (turns, jobs, naming, history, host-transcript, host, turns-approval). Their behaviors are untested now.'
+		'Deleted flaky tests (AGENTS.md: delete, never retry): rotation edge gaps (web), and host tests that timed out at 5 s under full-suite load (turns, jobs, naming, history, host-transcript, host, turns-approval). Their behaviors are untested now.',
+		"Also deleted as flaky (task jjr run): 'the next turn replays durable history, even after a host restart' timed out at 5 s under the full suite and passed alone."
 	],
 	needs: ['mfj', '4s'],
 	foldInto: ['4s']

@@ -1,0 +1,9 @@
+{
+	title: 'hal --version shows version, commit and checkout',
+	spec: "package.json is named hal and holds the official version (0.0.1 for now). hal -v / --version prints three lines and exits 0 without starting a host: 'hal <package.json version>', 'git <HEAD short hash>[+<short hash of the uncommitted diff>]' (the same form as /version, computed at that invocation; 'unknown' outside a git checkout), and 'dir <checkout>'. The checkout is the directory main.ts was loaded from, so it is right when hal is a symlink to ./run. Either flag must be the only argument.",
+	status: 'done',
+	notes: [
+		"The version and git lines can diverge: package.json changes only on a release, the commit on every change. -v follows node, bun and npm. version.current() is shared with the host's startup lookup (task n1), so the CLI and /version print the same form."
+	],
+	needs: ['cb', 'n1']
+}
