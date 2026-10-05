@@ -1,0 +1,11 @@
+{
+	title: 'Synthetic Hal uses a grayer assistant color',
+	spec: 'Terminal and web render output marked synthetic with Hal’s assistant hue and brightness, reducing foreground chroma by 25% for a slightly grayer orange in the built-in theme. Derive the style from colors.assistant at call time so theme changes follow it; retain assistant Markdown accents. Keep the Hal (synthetic) label. Errors take precedence and remain red; ordinary command output remains neutral. The shared colors.synthetic style drives terminal rendering and generated web CSS, with the same derivation in the hal theme template. Preserve readable-text contrast without opacity or faint text. Invariant: synthetic greetings look like Hal rather than unrelated neutral logs while staying explicitly distinguishable.',
+	status: 'done',
+	notes: [
+		'Both clients previously routed synthetic output through neutral log styling. colors.synthetic derives foreground from colors.assistant at call time with chroma multiplied by 0.75 and inherits its other Markdown colors; error routing takes precedence. Existing palette tests cover built-in and shipped theme contrast. One-off rendering checks verified synthetic, error and ordinary output routes and generated CSS; built-in synthetic foreground has 10.62:1 contrast against screen. Browser visual inspection was unavailable because Chromium is not installed.',
+		'Correction to the previous verification note: Chromium is available as /usr/bin/chromium-browser. Inspected static rendered comparisons using the real generated palette CSS and card stylesheet at 390px and 1000px widths, including short and wrapping synthetic text beside real Hal, neutral output and errors. The full ./test run passed type-check and lint but had two retry/effort test failures; all 12 tests in those two files passed on immediate focused rerun. Git push was rejected because origin/main advanced; no rebase was attempted while other agents have uncommitted edits.'
+	],
+	needs: ['8y', '1w'],
+	foldInto: ['8y', '1w']
+}

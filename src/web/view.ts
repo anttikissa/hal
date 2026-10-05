@@ -337,7 +337,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'output':
 			// A prompt-file change: the summary heads its card, so the body
 			// is the diffs (task ar).
-			return { kind: item.error ? 'output error' : 'output log', text: item.change ? item.text.slice(item.text.indexOf('\n') + 1).trimStart() : item.text }
+			return { kind: item.error ? 'output error' : item.synthetic ? 'output synthetic' : 'output log', text: item.change ? item.text.slice(item.text.indexOf('\n') + 1).trimStart() : item.text }
 		case 'divider':
 			return { kind: 'divider log', text: titles.stamp(item.ts, item.text) }
 	}
