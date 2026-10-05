@@ -123,7 +123,10 @@ function announce(loaded: string): void {
 // After config.ason changed: warns every client, refreshes /config modals.
 function warnAll(): void {
 	let refresh = { ...config.event(), refresh: true as const }
-	for (let client of host.state.clients) (host.warn(client), client.deliver(refresh))
+	for (let client of host.state.clients) {
+		host.warn(client)
+		client.deliver(refresh)
+	}
 }
 
 function reject(client: Client, command: unknown, reason: string, sessionId?: unknown): void {
