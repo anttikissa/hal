@@ -81,6 +81,16 @@ dependencies, especially on the host path. Never cut trust-boundary
 validation, data-loss handling, security, accessibility or explicit
 requirements.
 
+## Design checks
+
+- A convention never overrides the user's request. If they conflict,
+  explain the conflict and ask.
+- Do not invent requirements. Trace each requirement and its rationale
+  to the user's request or a concrete constraint; distinguish design
+  choices from requirements.
+- Before finishing, ask: "What does this cost after a day? With 10×
+  the data?" Check repeated work, elapsed-time loops and growing state.
+
 # Multiple agents sharing a checkout
 
 Agents in the same checkout share files and the Git index, even without
