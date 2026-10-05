@@ -269,7 +269,7 @@ async function auth(): Promise<number> {
 		process.stderr.write(`hal2: ${answer.error}\n`)
 		return 1
 	}
-	process.stdout.write(`web login code: ${answer.code} (one login, ${Math.round(webAuth.codeMs / 60_000)} minutes)\n`)
+	process.stdout.write(`${webAuth.message(answer.code)}\n`)
 	return 0
 }
 

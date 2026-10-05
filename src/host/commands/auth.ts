@@ -8,7 +8,7 @@ import { web } from '../web.ts'
 
 export const command: SlashCommand = {
 	help: () =>
-		'/auth shows a one-time code for logging a browser in to the web client: good for 10 minutes and one login, and never saved in the transcript. `./run auth` in a shell prints one too. /auth revoke logs every browser out.',
+		'/auth shows a one-time code for logging a browser in to the web client: it works once, for 10 minutes. `hal auth` in a shell prints one too. /auth revoke logs every browser out.',
 	complete: (args) => ('revoke'.startsWith(args) ? ['revoke'] : []),
 	run(args) {
 		if (args === 'revoke') {
@@ -16,7 +16,6 @@ export const command: SlashCommand = {
 			return { say: 'every web session ended; a browser needs a new code' }
 		}
 		if (args) return { error: 'usage: /auth or /auth revoke' }
-		let minutes = Math.round(webAuth.codeMs / 60_000)
-		return { show: `web login code: ${webAuth.issue()} (one login, ${minutes} minutes; not saved)` }
+		return { show: webAuth.message(webAuth.issue()) }
 	},
 }
