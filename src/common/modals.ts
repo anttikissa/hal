@@ -9,6 +9,12 @@
 // ends the modal, Escape dismisses it, and every other key edits the
 // fields. Whoever opened the modal refilters `items` when the fields
 // change.
+//
+// A list of settings-like rows adds, per item, a `values` column aligned
+// beside it, faint `notes` the selected row shows after its value, and
+// `details` wrapped below the list for the selected item. `edit` edits
+// one row's value in place; `error` says why a change was refused. A
+// 'send' action sends a command and keeps the modal open.
 
 import { forms, type Answers, type Form, type FormState, type Key } from './forms.ts'
 import type { EffortCapability } from './effort.ts'
@@ -35,12 +41,24 @@ export type ModalState = {
 	query?: string
 	/** The model picker's tree (common/picker.ts); other modals omit it. */
 	tree?: Tree
+	/** Per item: a second column, aligned beside the items. */
+	values?: string[]
+	/** Per item: faint text after the selected row's value. */
+	notes?: string[]
+	/** Per item: what it is, shown below the list while it is selected. */
+	details?: string[]
+	/** The item `index` whose value is edited in place, as a one-field form. */
+	edit?: { index: number; form: FormState }
+	/** Why the last change was refused, shown below the list. */
+	error?: string
+	/** The /config modal's data (common/settings-modal.ts). */
+	settings?: { values: Record<string, string>; stored: Record<string, string>; names: string[] }
 	selected: number
 	/** The first list row in view; clients keep it with modals.scroll. */
 	scroll: number
 }
 
-export type ModalAction = { type: 'submit'; answers: Answers; item?: number } | { type: 'cancel' }
+export type ModalAction = { type: 'submit'; answers: Answers; item?: number } | { type: 'cancel' } | { type: 'send'; command: unknown }
 
 function open(spec: { title: string; hint?: string; form?: Form; items?: string[] }): ModalState {
 	let st: ModalState = { title: spec.title, items: spec.items ?? [], selected: 0, scroll: 0 }

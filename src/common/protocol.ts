@@ -265,6 +265,12 @@ export type Event =
 	// gives some of them, which the search matches too. `refresh`: lists
 	// arrived later; update a picker that is open, never open one.
 	| { type: 'models'; sessionId: string; current: string; effort?: string; capabilities?: Record<string, EffortCapability>; items: string[]; names?: Record<string, string>; refresh?: true }
+	// Open the /config modal (common/settings-modal.ts) for `sessionId`,
+	// or with `refresh` (config.ason changed) update one already open.
+	// `values`: each setting's effective value as display text, a secret
+	// only 'set' or ''. `stored`: the config.ason text of each key it
+	// holds, such as `push: false`; a secret's value is never sent.
+	| { type: 'settings'; sessionId?: string; values: Record<string, string>; stored: Record<string, string>; refresh?: true }
 	// Sent only to the client that attached: the command `command` (its
 	// id) stored blob `blob`, which a prompt names with `marker`.
 	| { type: 'attached'; sessionId: string; command: string; blob: string; marker: string }

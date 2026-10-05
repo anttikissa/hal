@@ -1,6 +1,6 @@
 // Common settings: the one table of what config.ason (home root) may
 // hold. The table validates the file, documents it, and is what /config
-// renders: each type maps to a form field (tasks/w4/forms.md). Anything
+// lists, a row per setting (common/settings-modal.ts). Anything
 // not here is set by overriding functions from local.ts, which may also
 // replace these getters.
 //
@@ -15,20 +15,23 @@ export type SettingType =
 	| { kind: 'choice'; options: string[] }
 	| { kind: 'boolean' }
 
+// `label`: what /config shows for it (the name is config.ason's key).
 // `browser`: the web page needs it too, so the host writes it into the
 // page it serves (host/web.ts); the page reads it with settings.load.
-export type Setting = { name: string; type: SettingType; default: unknown; description: string; browser?: true }
+export type Setting = { name: string; label: string; type: SettingType; default: unknown; description: string; browser?: true }
 
 const table: Setting[] = [
-	{ name: 'model', type: { kind: 'text' }, default: 'anthropic/claude-opus-5-5', description: 'Default model (provider/id or alias, optional :effort or :default) for new sessions.' },
+	{ name: 'model', label: 'Default model', type: { kind: 'text' }, default: 'anthropic/claude-opus-5-5', description: 'Default model (provider/id or alias, optional :effort or :default) for new sessions.' },
 	{
 		name: 'security',
+		label: 'Security',
 		type: { kind: 'choice', options: ['best-effort', 'none'] },
 		default: 'best-effort',
 		description: 'Ask before tool calls matching dangerous patterns (best-effort), or never (none).',
 	},
 	{
 		name: 'promptRows',
+		label: 'Prompt rows',
 		type: { kind: 'integer', min: 1, max: 100 },
 		default: 10,
 		description: 'Rows the terminal prompt box shows before it scrolls.',
@@ -36,6 +39,7 @@ const table: Setting[] = [
 	},
 	{
 		name: 'pasteLines',
+		label: 'Paste attachment threshold',
 		type: { kind: 'integer', min: 1, max: 10000 },
 		default: 7,
 		description: 'Pasted text longer than this many lines becomes an attachment.',
@@ -43,21 +47,24 @@ const table: Setting[] = [
 	},
 	{
 		name: 'maxRounds',
+		label: 'Rounds per turn',
 		type: { kind: 'integer', min: 1, max: 100000 },
 		default: 200,
 		description: 'Provider rounds one turn may run before it pauses; Enter continues for as many again.',
 	},
-	{ name: 'webPort', type: { kind: 'integer', min: 1, max: 65535 }, default: 9001, description: 'Preferred port for the browser client (127.0.0.1); tries through 9100 if busy.' },
+	{ name: 'webPort', label: 'Web port', type: { kind: 'integer', min: 1, max: 65535 }, default: 9001, description: 'Preferred port for the browser client (127.0.0.1); tries through 9100 if busy.' },
 	{
 		name: 'webUrl',
+		label: 'Web address',
 		type: { kind: 'text', url: true },
 		default: '',
 		description: 'Public address of the browser client, such as https://hal.example.com; empty means http://localhost:<webPort>.',
 	},
-	{ name: 'sessionRecap', type: { kind: 'boolean' }, default: false, description: 'Show a short session recap when returning to a tab idle for 24 hours (/recap always works).' },
-	{ name: 'push', type: { kind: 'boolean' }, default: true, description: 'Send web push notifications to subscribed devices.' },
+	{ name: 'sessionRecap', label: 'Session recap', type: { kind: 'boolean' }, default: false, description: 'Show a short session recap when returning to a tab idle for 24 hours (/recap always works).' },
+	{ name: 'push', label: 'Push notifications', type: { kind: 'boolean' }, default: true, description: 'Send web push notifications to subscribed devices.' },
 	{
 		name: 'webDiagnostics',
+		label: 'Web diagnostics',
 		type: { kind: 'boolean' },
 		default: false,
 		description: "Web pages report structural diagnostics (no text) to this host's state/web-diag.log.",
@@ -84,6 +91,14 @@ function problem(type: SettingType, value: unknown): string | undefined {
 		case 'boolean':
 			return typeof value === 'boolean' ? undefined : 'expected true or false'
 	}
+}
+
+// The value typed text stands for: /config <name> <value> and the
+// modal's edits. Check the result with problem.
+function fromText(type: SettingType, text: string): unknown {
+	if (type.kind === 'integer') return /^-?\d+$/.test(text) ? Number(text) : NaN
+	if (type.kind === 'boolean') return text === 'true' ? true : text === 'false' ? false : text
+	return text
 }
 
 // Every declared setting's effective value, plus a warning for each
@@ -134,6 +149,7 @@ export const settings = {
 	table,
 	check,
 	problem,
+	fromText,
 	value,
 	forPage,
 	load,

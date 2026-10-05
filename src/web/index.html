@@ -329,6 +329,13 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 .Picker li { padding: 0 1ch; cursor: pointer; white-space: pre-wrap; overflow-wrap: anywhere; }
 .Picker li[aria-selected="true"] { background: var(--button); }
 .Picker li .match { color: var(--match); font-weight: bold; }
+.Picker li.row { display: grid; grid-template-columns: var(--label) auto 1fr; column-gap: 2ch; align-items: baseline; }
+.Picker li.row .label { overflow: hidden; text-overflow: ellipsis; }
+.Picker li.row .value.input { font: inherit; min-width: 20ch; }
+.Picker li.row .note { visibility: hidden; min-width: 0; overflow-wrap: anywhere; }
+.Picker li.row[aria-selected="true"] .note, .Picker li.row:hover .note, .Picker li.row:focus-within .note { visibility: visible; }
+.Picker .details, .Picker .refused { flex: none; white-space: pre-wrap; overflow-wrap: anywhere; }
+.Picker .refused { color: var(--error-fg); }
 .Picker .effort-controls { display: flex; gap: 1ch; flex: none; }
 .Picker .effort-controls button { min-height: 44px; min-width: 44px; }
 .Picker { max-height: calc(var(--app-height, 100dvh) - 1rem); overflow: hidden; }

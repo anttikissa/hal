@@ -1,76 +1,56 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { readFileSync, writeFileSync } from 'fs'
 import { ason } from '../../common/ason.ts'
-import { forms } from '../../common/forms.ts'
 import { settings } from '../../common/settings.ts'
 import { config } from '../config.ts'
 import { client, created, testHome, until, useHost } from '../host-fixture.test.ts'
 import { history } from '../history.ts'
-import { prompts } from '../prompts.ts'
+import { host } from '../host.ts'
 
 useHost()
-beforeEach(() => config.init())
+// As main.ts wires it: every change reaches the clients.
+beforeEach(() => config.init(() => host.warnAll()))
 afterEach(() => config.reset())
 
-async function open(c: ReturnType<typeof client>, id: string) {
-	c.conn.send({ type: 'submit', sessionId: id, text: '/config' })
-	await until(() => c.of('question').length)
-	return c.of('question').at(-1) as { id: string; form: Parameters<typeof forms.start>[1] }
-}
-
-test('the form prefills settings; invalid submissions stay open and write nothing; valid ones preserve other keys', async () => {
+test('bare /config opens the modal with values and what config.ason holds; a change refreshes it', async () => {
 	config.state.data!.extra = 'kept'
-	config.state.data!.model = 'test/first'
+	config.state.data!.push = false
 	let c = client(), id = created(c)
-	let q = await open(c, id)
-	let state = forms.start(q.id, q.form)
-	let answers = forms.answers(state)
-	expect(answers.model).toBe('test/first')
-	expect(q.form.fields.find((f) => f.name === 'webPort')?.type).toBe('integer')
-	answers.webPort = '1.5'
-	answers.model = 'test/second'
-	expect(prompts.reply(id, q.id, answers)).toContain('webPort: expected an integer')
-	expect(forms.open(history.readSync(id))?.id).toBe(q.id)
-	expect(settings.model()).toBe('test/first')
-	expect(history.readSync(id).some((r) => r.type === 'answer')).toBe(false)
-	answers.webPort = '4321'
-	expect(prompts.reply(id, q.id, answers)).toBeUndefined()
-	await until(() => c.of('output').length)
-	let saved = ason.parse(readFileSync(`${testHome()}/config.ason`, 'utf8'))
-	expect(saved).toEqual({ extra: 'kept', model: 'test/second', webPort: 4321 })
-	// The second answer loses, even before the asynchronous command reply.
-	expect(prompts.reply(id, q.id, answers)).toContain('not open')
+	c.conn.send({ type: 'submit', sessionId: id, text: '/config' })
+	await until(() => c.of('settings').length)
+	let opened = c.of('settings')[0]
+	expect(opened.sessionId).toBe(id)
+	expect(opened.values.push).toBe('false')
+	expect(opened.stored).toEqual({ push: 'push: false' })
+	expect(history.readSync(id).some((r) => r.type === 'question')).toBe(false)
+	c.conn.send({ type: 'submit', sessionId: id, text: '/config webPort 4321' })
+	await until(() => c.of('settings').length === 2)
+	expect(c.of('settings')[1]).toMatchObject({ refresh: true, stored: { push: 'push: false', webPort: 'webPort: 4321' } })
+	// The file points to /config; other keys and the user's comments stay.
+	let text = readFileSync(`${testHome()}/config.ason`, 'utf8')
+	expect(text).toStartWith('{\n\t// Every setting, its default and meaning: /config\n')
+	expect(ason.parse(text)).toEqual({ extra: 'kept', push: false, webPort: 4321 })
+	c.conn.send({ type: 'submit', sessionId: id, text: '/config push true' })
+	await until(() => c.of('settings').length === 3)
+	text = readFileSync(`${testHome()}/config.ason`, 'utf8')
+	expect(text.match(/\/config/g)?.length).toBe(1)
+	expect(ason.parse(text)).toEqual({ extra: 'kept', webPort: 4321 })
 })
 
-test('unchanged fields do not clobber intervening edits; defaults are removed on change', async () => {
-	config.update({ webPort: 4321 })
-	let c = client(), id = created(c)
-	let q = await open(c, id)
-	let answers = forms.answers(forms.start(q.id, q.form))
-	config.update({ model: 'test/external' })
-	answers.webPort = String(settings.table.find((s) => s.name === 'webPort')!.default)
-	expect(prompts.reply(id, q.id, answers)).toBeUndefined()
-	await until(() => c.of('output').length)
-	expect(config.state.data).toEqual({ model: 'test/external' })
-})
-
-test('secret settings never reach history, output, or warnings, through forms or direct sets', async () => {
-	settings.table.push({ name: 'testSecret', type: { kind: 'secret' }, default: 'default-secret', description: 'Test credential.' })
+test('secret settings never reach history, output, events, or warnings', async () => {
+	settings.table.push({ name: 'testSecret', label: 'Test secret', type: { kind: 'secret' }, default: 'default-secret', description: 'Test credential.' })
 	try {
 		config.update({ testSecret: 'old-secret' })
 		let c = client(), id = created(c)
-		let q = await open(c, id)
-		let answers = forms.answers(forms.start(q.id, q.form))
-		expect(answers.testSecret).toBe('')
-		answers.testSecret = 'form-secret'
-		expect(prompts.reply(id, q.id, answers)).toBeUndefined()
-		await until(() => c.of('output').length)
+		c.conn.send({ type: 'submit', sessionId: id, text: '/config' })
+		await until(() => c.of('settings').length)
+		expect(c.of('settings')[0]).toMatchObject({ values: { testSecret: 'set' }, stored: { testSecret: 'testSecret: (hidden)' } })
 		c.conn.send({ type: 'submit', sessionId: id, text: '/config testSecret direct-secret' })
-		await until(() => c.of('output').length === 2)
+		await until(() => c.of('output').length)
 		expect(settings.value('testSecret')).toBe('direct-secret')
 		let stored = JSON.stringify(history.readSync(id))
 		let events = JSON.stringify(c.events)
-		for (let secret of ['old-secret', 'form-secret', 'direct-secret', 'default-secret']) {
+		for (let secret of ['old-secret', 'direct-secret', 'default-secret']) {
 			expect(stored).not.toContain(secret)
 			expect(events).not.toContain(secret)
 		}

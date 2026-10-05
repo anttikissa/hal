@@ -215,6 +215,30 @@ by the matcher (common/fuzzy.ts) the find modal reuses. Emptying the search
 (Ctrl-U) brings back the tree and the current model. On the web a tap
 is Enter.
 
+## Settings (/config, task c0h)
+
+```
+┌─ Settings ──────────────────────────────────────────────┐
+│   Search: _                                             │
+│   Default model               anthropic/claude-opus-5-5 │
+│ → Push notifications          off   push: false         │
+│   Web diagnostics             on                        │
+│                                                         │
+│ Send web push notifications to subscribed devices.      │
+└─ type: search · enter/space: change · esc: close ───────┘
+```
+
+A row per setting: label, then value in an aligned column; the selected
+row adds what config.ason holds for it, faint (`name (default)` when
+absent; on the web also on hover and focus). Its description wraps at
+the bottom. Enter or Space cycles a boolean or choice, or edits the
+value in place (Enter saves, Escape restores; a refused value shows its
+reason and stays). Every change is sent at once as `/config <name>
+<value>`; the modal stays open and the host's `settings` refresh,
+after any edit of the file, updates it. The generic parts (`values`,
+`notes`, `details`, `edit`, `error`, the `send` action) live in
+common/modals.ts for later row-based modals.
+
 ## Find / filter (later task)
 
 ```

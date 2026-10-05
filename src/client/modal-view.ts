@@ -48,21 +48,32 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		if (m.find.focus !== 0) fields.cursor = undefined
 		content.push(strings.clipVisual(findDialog.labels.map((label, i) => `${m.find!.focus === i + 1 ? '›' : ''}[${m.find!.filters.includes(findDialog.filters[i]!) ? 'x' : ' '}] ${label}`).join('  '), inner))
 	}
-	let visible = Math.max(0, height - 2 - content.length)
-	let scroll = modalView.modalScroll(m, visible)
 	let current = colors.popupCurrent(colors.popup().neutralFg!)
+	let below = modalView.footer(m, inner)
+	let visible = Math.max(0, height - 2 - content.length - below.length)
+	let scroll = modalView.modalScroll(m, visible)
 	let cursor = fields.cursor ?? { row: m.find && m.find.focus > 0 && m.find.focus < 5 ? content.length - 1 : content.length, col: 0 }
+	// Settings-like rows: the items as a column as wide as the longest.
+	let column = m.values ? Math.min(Math.floor(inner / 2), Math.max(0, ...m.items.map((s) => strings.visLen(s)))) + 2 : 0
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
 		// Leading spaces are the picker's tree indentation: keep them.
-		let row = strings.clipVisual((i === m.selected ? `${formView.ARROW} ` : '  ') + ansi.clean(m.items[i]!).replace(/[\r\n\t]+/g, ' '), inner)
+		let label = ansi.clean(m.items[i]!).replace(/[\r\n\t]+/g, ' ')
+		if (column) label = strings.clipVisual(label, column - 2).padEnd(column - 2) + '  '
+		let row = strings.clipVisual((i === m.selected ? `${formView.ARROW} ` : '  ') + label, inner)
 		if (m.query) row = modalView.highlight(row, m.query, i === m.selected ? current : undefined, !!m.find)
+		let value = modalView.cell(m, i, current)
+		if (value) row += strings.clipVisual(value.text, Math.max(0, inner - 2 - column))
+		if (value?.cursor !== undefined) cursor = { row: content.length, col: Math.min(inner - 1, 2 + column + value.cursor) }
 		if (i === m.selected) {
-			if (!fields.cursor && (!m.find || m.find.focus === 5)) cursor = { row: content.length, col: 0 }
+			if (!fields.cursor && !m.edit && (!m.find || m.find.focus === 5)) cursor = { row: content.length, col: 0 }
 			// Monochrome: reverse video instead of the highlight colour.
 			row = (ansi.sgr(current) || ansi.INVERSE) + row + ' '.repeat(inner - strings.visLen(row)) + UNCOLOR + ansi.UNINVERSE
 		}
 		content.push(row)
 	}
+	// The footer sits at the bottom, below the list's empty rows.
+	while (content.length < height - 2 - below.length) content.push('')
+	content.push(...below)
 	let line = ansi.sgr({ fg: colors.popup().neutralFg! })
 	let side = (s: string) => (width >= 2 ? line + s + UNCOLOR : '')
 	let pad = (s: string) => {
@@ -70,14 +81,42 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		let fit = strings.clipVisual(s, inner)
 		return ' ' + fit + RESET + ' '.repeat(inner - strings.visLen(fit)) + ' '
 	}
-	let below = m.items.length - scroll - visible
-	let place = scroll > 0 || below > 0 ? `${m.selected + 1}/${m.items.length}` : ''
+	let after = m.items.length - scroll - visible
+	let place = scroll > 0 || after > 0 ? `${m.selected + 1}/${m.items.length}` : ''
 	let rows = [line + modalView.border('┌', '┐', m.title, '', width) + UNCOLOR]
 	for (let r = 0; r < height - 2; r++) rows.push(side('│') + pad(content[r] ?? '') + side('│'))
 	rows.push(line + modalView.border('└', '┘', m.hint ?? '', place, width) + UNCOLOR)
 	// A box too small for its fields still keeps the cursor inside it.
 	let at = { row: Math.min(height - 1, 1 + cursor.row), col: Math.max(0, Math.min(width - 1, 2 + cursor.col)) }
 	return { rows: rows.slice(0, height), cursor: at, scroll }
+}
+
+// Row `i`'s value column (modals.ts `values`), if the modal has one: the
+// value, or the edit field with where its cursor is; on the selected
+// row then the faint note, back to `current` (the selection's colour).
+function cell(m: ModalState, i: number, current: Style): { text: string; cursor?: number } | undefined {
+	if (!m.values) return undefined
+	if (m.edit?.index === i) {
+		let f = m.edit.form
+		let text = f.form.fields[0]?.type === 'secret' ? '•'.repeat(f.values[0]!.length) : f.values[0]!
+		return { text, cursor: strings.visLen(text.slice(0, f.cursor)) }
+	}
+	let value = ansi.clean(m.values[i] ?? '')
+	let note = i === m.selected && m.notes?.[i] ? ansi.clean(m.notes[i]!) : ''
+	if (!note) return { text: value }
+	let faint = ansi.mono() ? '' : ansi.sgr({ fg: colors.popupNote().fg! })
+	let back = ansi.mono() ? '' : current.fg ? ansi.sgr({ fg: current.fg }) : '\x1b[39m'
+	return { text: `${value}   ${faint}${note}${back}` }
+}
+
+// The rows below the list: the selected item's details, wrapped, and why
+// a change was refused.
+function footer(m: ModalState, width: number): string[] {
+	let detail = m.details?.[m.selected]
+	let rows: string[] = []
+	if (detail) rows.push('', ...strings.wordWrap(ansi.clean(detail), width))
+	if (m.error) rows.push(ansi.sgr({ fg: colors.error().fg! }) + strings.clipVisual(ansi.clean(m.error), width) + UNCOLOR)
+	return rows
 }
 
 // `row` (plain text) with the query's matches bold and bright, then back
@@ -124,4 +163,4 @@ function withModal(lines: string[], m: ModalState, rows: number, cols: number): 
 	return { cursor: { row: top + drawn.cursor.row, col: box.left + drawn.cursor.col }, scroll: drawn.scroll }
 }
 
-export const modalView = { modalBox, border, modalLines, highlight, modalScroll, overlay, withModal }
+export const modalView = { modalBox, border, modalLines, cell, footer, highlight, modalScroll, overlay, withModal }
