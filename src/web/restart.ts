@@ -1,7 +1,9 @@
 // /restart on the web (task cf): `local` reloads this page (bare
 // means all and goes to the host);
 // `both`, or the host's `restart` event (/restart all), marks it to
-// reload once the restarted host has gone and is back.
+// reload once the restarted host has gone and is back. A `both` the
+// host held for flagged calls (restart-ask, task ker) is unmarked; the
+// dialog's Restart anyway marks it again (app.modalKey).
 
 import type { LinkState } from '../common/connection.ts'
 

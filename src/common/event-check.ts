@@ -33,6 +33,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	attached: { sessionId: 's', command: 's', blob: 's', marker: 's' },
 	settings: { sessionId: 's?', values: 'o', stored: 'o' },
 	warning: { text: 's' },
+	'restart-ask': { sessionId: 's', scope: 's', calls: 'a' },
 	'push-devices': { devices: 'a', result: 's?' },
 	'notice-history': { entries: 'a' },
 	version: { version: 's' },

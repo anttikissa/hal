@@ -20,6 +20,7 @@ import type { SessionMeta } from './session.ts'
 import type { FindBatch, FindFilter } from './find.ts'
 import type { SessionState } from './states.ts'
 import type { EffortCapability } from './effort.ts'
+import type { FlaggedCall } from './modals.ts'
 import { rebase, type RebasePlan } from './rebase.ts'
 import type { RebaseRows } from './rebase-rows.ts'
 import { eventCheck } from './event-check.ts'
@@ -271,6 +272,10 @@ export type Event =
 	// only 'set' or ''. `stored`: the config.ason text of each key it
 	// holds, such as `push: false`; a secret's value is never sent.
 	| { type: 'settings'; sessionId?: string; values: Record<string, string>; stored: Record<string, string>; refresh?: true }
+	// /restart <scope> found calls flagged unsafeToStop running (task
+	// ker): followers of `sessionId` open the restart dialog, nothing
+	// restarts yet.
+	| { type: 'restart-ask'; sessionId: string; scope: string; calls: FlaggedCall[] }
 	// Sent only to the client that attached: the command `command` (its
 	// id) stored blob `blob`, which a prompt names with `marker`.
 	| { type: 'attached'; sessionId: string; command: string; blob: string; marker: string }

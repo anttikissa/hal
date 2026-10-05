@@ -19,6 +19,11 @@
 import { forms, type Answers, type Form, type FormState, type Key } from './forms.ts'
 import type { EffortCapability } from './effort.ts'
 import type { FindDialog } from './find-dialog.ts'
+import { bashResult } from './bash-result.ts'
+
+// A call flagged unsafeToStop running on the host (task ker): its block
+// id ('#t63'), its web address, title and time so far in ms.
+export type FlaggedCall = { block: string; href?: string; title: string; ms: number }
 
 // What each list row of a tree modal is: a model `id`, or a category
 // `path` ("anthropic/opus") with the model Enter picks for it. `parent` is
@@ -53,6 +58,9 @@ export type ModalState = {
 	error?: string
 	/** The /config modal's data (common/settings-modal.ts). */
 	settings?: { values: Record<string, string>; stored: Record<string, string>; names: string[] }
+	/** The restart dialog's data: the /restart scope ('local': this
+	 * process, Ctrl-R) and the flagged calls it lists above the list. */
+	restart?: { scope: string; calls: FlaggedCall[] }
 	selected: number
 	/** The first list row in view; clients keep it with modals.scroll. */
 	scroll: number
@@ -96,4 +104,24 @@ function scroll(scroll: number, selected: number, count: number, visible: number
 	return Math.max(0, Math.min(scroll, count - visible))
 }
 
-export const modals = { open, step, scroll }
+// The dialog a restart that ends the host opens while flagged calls run
+// (task ker): Wait (selected) or Restart anyway; Escape waits too.
+function restart(scope: string, calls: FlaggedCall[]): ModalState {
+	return { ...open({ title: 'Restart?', hint: 'enter: choose · esc: wait', items: ['Wait', 'Restart anyway'] }), restart: { scope, calls } }
+}
+
+// The restart dialog's text above its list, one row per call after the
+// first.
+function restartLines(calls: FlaggedCall[]): { head: string; calls: { block: string; href?: string; rest: string }[] } {
+	let head = calls.length === 1 ? 'A call unsafe to stop is running:' : `${calls.length} calls unsafe to stop are running:`
+	return { head, calls: calls.map((c) => ({ block: c.block, href: c.href, rest: `  ${c.title}  (${bashResult.duration(c.ms, true) ?? '0s'})` })) }
+}
+
+// What `action` on the restart dialog sends: /restart <scope> anyway for
+// Restart anyway on a host scope, nothing for Wait.
+function restartCommand(modal: ModalState, action: ModalAction, sessionId: string): unknown {
+	if (action.type !== 'submit' || action.item !== 1 || !modal.restart || modal.restart.scope === 'local') return undefined
+	return { type: 'submit', sessionId, text: `/restart ${modal.restart.scope} anyway` }
+}
+
+export const modals = { open, step, scroll, restart, restartLines, restartCommand }

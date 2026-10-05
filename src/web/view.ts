@@ -11,7 +11,7 @@ import { commandList } from '../common/commands/list.ts'
 import { completion } from '../common/completion.ts'
 import { forms, type FormState, type Key } from '../common/forms.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
-import type { ModalState } from '../common/modals.ts'
+import { modals, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
 import { settingsModal } from '../common/settings-modal.ts'
 import type { Event } from '../common/protocol.ts'
@@ -51,6 +51,7 @@ function onEvent(st: ViewState, event: Event): ViewState {
 		let modal = event.refresh ? picker.refresh(st.modal!, event.items, event.names, event.capabilities) : picker.open(event.current, event.items, event.names, event.capabilities, event.effort)
 		return { ...st, modal, models: event.items, names: event.names ?? {} }
 	}
+	if (event.type === 'restart-ask') return { ...st, modal: modals.restart(event.scope, event.calls) }
 	if (event.type === 'settings') {
 		if (event.refresh) return st.modal?.settings ? { ...st, modal: settingsModal.refresh(st.modal, event) } : st
 		return event.sessionId === st.transcript?.meta.id ? { ...st, modal: settingsModal.open(event) } : st
@@ -112,10 +113,10 @@ function closed(st: ViewState): ViewState {
 // A key on the open modal: the view after and the command Enter sends.
 function modalKey(st: ViewState, k: Key): { state: ViewState; command?: unknown } {
 	if (!st.modal || !st.transcript) return { state: st }
-	let { state, action } = st.modal.settings ? settingsModal.step(st.modal, k, st.transcript.meta.id) : picker.step(st.modal, k, st.models ?? [], st.names)
+	let { state, action } = st.modal.settings ? settingsModal.step(st.modal, k, st.transcript.meta.id) : st.modal.restart ? modals.step(st.modal, k) : picker.step(st.modal, k, st.models ?? [], st.names)
 	if (!action) return { state: { ...st, modal: state } }
 	if (action.type === 'send') return { state: { ...st, modal: state }, command: action.command }
-	let command = action.type === 'submit' ? picker.command(st.transcript.meta.id, state, action) : undefined
+	let command = state.restart ? modals.restartCommand(state, action, st.transcript.meta.id) : action.type === 'submit' ? picker.command(st.transcript.meta.id, state, action) : undefined
 	return command ? { state: closed(st), command } : { state: closed(st) }
 }
 
@@ -340,8 +341,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 // A prompt's text in parts, each [image/<name>] or [paste/<name>]
 // marker a link to its page (tasks qy, 31).
 function links(text: string): (string | { href: string; text: string })[] {
-	let out: (string | { href: string; text: string })[] = []
-	let from = 0
+	let out: (string | { href: string; text: string })[] = [], from = 0
 	for (let m of text.matchAll(attachments.fileMarker)) {
 		if (m.index > from) out.push(text.slice(from, m.index))
 		out.push({ href: `/${m[1]!}`, text: m[0] })

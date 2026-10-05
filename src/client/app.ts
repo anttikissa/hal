@@ -114,6 +114,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'tabs') return app.onTabs(event.tabs)
 	if (event.type === 'notice') return notices.add(notices.fromEvent(event))
 	if (event.type === 'restart') return restart.withHost()
+	if (event.type === 'restart-ask') return restart.ask(event, app.open)
 	if (event.type === 'redraw') {
 		if (st.focus.tab === event.sessionId) terminal.redraw()
 		return

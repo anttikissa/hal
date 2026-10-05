@@ -93,6 +93,7 @@ function onEvent(event: Event): void {
 	let st = app.state
 	if (event.type === 'find-results') return find.event(event)
 	if (event.type === 'restart') return restart.mark()
+	if (event.type === 'restart-ask') delete restart.state.mark
 	if (event.type === 'web-update') { st.updateAvailable = true; return app.changed() }
 	if (event.type === 'redraw' || rebaseView.onEvent(event)) return
 	if (event.type === 'tabs') push.badge(event.tabs)
@@ -277,6 +278,7 @@ function sendForm(action: FormAction): void {
 function modalKey(k: Key): void {
 	if (app.state.view.modal?.find) return find.key(k)
 	let { state, command } = view.modalKey(app.state.view, k)
+	if (command && app.state.view.modal?.restart?.scope === 'both') restart.mark()
 	app.setView(state)
 	if (command) app.sendNow(command)
 }

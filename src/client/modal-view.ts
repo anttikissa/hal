@@ -59,6 +59,13 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		if (m.find.focus !== 0) fields.cursor = undefined
 		content.push(strings.clipVisual(findDialog.labels.map((label, i) => `${m.find!.focus === i + 1 ? '›' : ''}[${m.find!.filters.includes(findDialog.filters[i]!) ? 'x' : ' '}] ${label}`).join('  '), inner))
 	}
+	// The restart dialog: its flagged calls above the list, each block id
+	// a link to its block on the web (task ker).
+	if (m.restart) {
+		let r = modals.restartLines(m.restart.calls)
+		let link = (c: (typeof r.calls)[number]) => (c.href ? `\x1b]8;;${ansi.webUrl(c.href)}\x07${c.block}${LINK_OFF}` : c.block)
+		content.push(strings.clipVisual(r.head, inner), ...r.calls.map((c) => strings.clipVisual(link(c) + ansi.clean(c.rest), inner)), '')
+	}
 	let current = colors.popupCurrent(colors.popup().neutralFg!)
 	let below = modalView.footer(m, inner)
 	let visible = Math.max(0, height - 2 - content.length - below.length)

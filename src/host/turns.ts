@@ -34,9 +34,10 @@ import { subagents } from './subagents.ts'
 import { toolOutput } from './tool-output.ts'
 // A running turn settles when runTurn returns (task hp).
 // `rewait`: ends the current wait out of a failed round (a model switch).
-// `unsafe`: a call flagged unsafeToStop runs; `steered`: a steer waits
-// for it to end (prompts.submit, task ker).
-type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController; unsafe?: true; steered?: true }
+// `unsafe`: a call flagged unsafeToStop runs (its id, since when), so a
+// steer waits for it to end (`steered`, prompts.submit) and a restart
+// asks first (commands/restart.ts; task ker).
+type Running = { provider: string; model?: string; effort?: string; controller: AbortController; done?: Promise<void>; rewait?: AbortController; unsafe?: { call: string; input: Record<string, unknown>; at: number }; steered?: true }
 // Asks the open turn's human a durable question: in history first,
 // then shown; the turn stops running here and waits, blocked, for the
 // first answer (reply), which runs it again. Nothing waits in memory:
@@ -295,7 +296,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (decided.get(call.id) === false) { results.push(approval.declined(call)); continue }
 				status.transition(id, { type: 'tools', call: call.id, at: new Date().toISOString() })
 				let stream = call.name === 'bash' ? toolOutput.start(id, call.id) : undefined
-				if (call.name === 'bash' && call.input.unsafeToStop === true && call.input.background !== true) running.unsafe = true
+				if (call.name === 'bash' && call.input.unsafeToStop === true && call.input.background !== true) running.unsafe = { call: call.id, input: call.input, at: Date.now() }
 				try { results.push(turnPolicy.stoppedBy(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx), signal)) }
 				finally {
 					stream?.stop()

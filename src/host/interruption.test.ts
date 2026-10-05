@@ -5,6 +5,7 @@ import { prompts } from './prompts.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
 import { tabs } from './tabs.ts'
+import { restartProcess } from './commands/restart.ts'
 
 useHost()
 
@@ -122,9 +123,12 @@ test('queue and advisory do not abort, while explicit steer does', async () => {
 })
 
 for (let escape of [false, true]) {
-	test(`steering waits for an unsafeToStop call, then cancels the rest${escape ? '; Escape still stops it' : ''}`, async () => {
+	test(`steering waits for an unsafeToStop call, then cancels the rest${escape ? '; Escape still stops it' : ''}; a restart asks meanwhile`, async () => {
 		let settling = gate()
 		let original = tools.run
+		let restarts = 0
+		let exit = restartProcess.run
+		restartProcess.run = () => void restarts++
 		let dispatched: string[] = []
 		let toolSignal: AbortSignal | undefined
 		tools.run = async (call, ctx) => {
@@ -147,6 +151,10 @@ for (let escape of [false, true]) {
 			a.conn.send({ type: 'submit', sessionId: id, text: 'steer' })
 			expect(toolSignal!.aborted).toBe(false)
 			expect(a.views.get(id)!.inbox.map((m) => m.text)).toEqual(['steer'])
+			// Restarting the host asks first; nothing restarts (task ker).
+			a.conn.send({ type: 'submit', sessionId: id, text: '/restart host' })
+			await until(() => a.of('restart-ask').length)
+			expect(a.of('restart-ask')[0]).toMatchObject({ scope: 'host', calls: [{ block: expect.stringMatching(/^#t\d+$/), title: 'Migrate' }] })
 			if (escape) {
 				a.conn.send({ type: 'pause', sessionId: id })
 				expect(toolSignal!.aborted).toBe(true)
@@ -163,6 +171,11 @@ for (let escape of [false, true]) {
 			await until(() => a.of('turn-end').length)
 			expect(dispatched).toEqual(['flagged'])
 			if (escape) expect(a.views.get(id)!.state.type).toBe('paused')
-		} finally { settling.release(); tools.run = original }
+			expect(restarts).toBe(0)
+			// With no flagged call left, it restarts without asking.
+			a.conn.send({ type: 'submit', sessionId: id, text: '/restart host' })
+			await until(() => restarts === 1)
+			expect(a.of('restart-ask')).toHaveLength(1)
+		} finally { settling.release(); tools.run = original; restartProcess.run = exit }
 	})
 }

@@ -234,6 +234,11 @@ holds the rest of what the user chose (selection, focus, tabs). Readable text be
   queue or host round-trip may sit in front of them or delay them.
 - Handling is synchronous in the client (`src/client/terminal.ts`) and
   never waits on the host. No feature may rebind or capture them.
+- One exception (task ker): Ctrl-R in the terminal that runs the host,
+  while a call flagged unsafeToStop runs there, opens the restart
+  dialog (Wait or Restart anyway) instead of restarting. The check is
+  synchronous, in the host process. This is the only modal that may
+  stand before Ctrl-R; Ctrl-C and Ctrl-Z never wait.
 - Quit and restart restore the terminal and never clear it or use the
   alternate screen, so the last frame stays visible, all but its last
   row (the help row), which the shell prompt takes without scrolling.
