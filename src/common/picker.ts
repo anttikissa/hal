@@ -8,7 +8,7 @@
 // ordinary command, `/model <id>`. Shared by terminal and web; the list
 // itself comes from the host (the `models` event).
 
-import type { Key } from './forms.ts'
+import { forms, type Key } from './forms.ts'
 import type { ModalAction, ModalState, TreeRow } from './modals.ts'
 import { fuzzy } from './fuzzy.ts'
 import { titles } from './titles.ts'
@@ -144,15 +144,15 @@ function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean)
 		if (shown) rows(n, kept, open, current, names, depth + 1, out)
 	}
 	node.nodes.filter((n) => !bucket(n)).forEach(category)
-	for (let { id, family } of node.ids) {
+	for (let { id, leaf, family } of node.ids) {
 		if (!kept.has(id)) continue
 		// ✓ the current model, • the group's default (task r7r).
-		// Human-readable name first; the complete ID is secondary.
-		// A singleton such as Haiku needs only its short name.
+		// The postfix follows the hierarchy; the full name and ID are
+		// details. A singleton such as Haiku needs only its short name.
 		let name = names[id]
-		let label = name ? family ? name : titles.shortName(id, name) : id
+		let label = family ? leaf : name ? titles.shortName(id, name) : id
 		out.items.push(`${indent}${id === current ? '✓ ' : id === node.default ? '• ' : '  '}${label}`)
-		out.values.push(family && name ? id : '')
+		out.values.push(family ? `${name ? `${name} · ` : ''}${id}` : '')
 		out.rows.push({ id, parent: node.path })
 	}
 	node.nodes.filter(bucket).forEach(category)
@@ -173,7 +173,10 @@ function ancestors(root: Node, id: string): string[] {
 // `select` (a category path or model id) if it is shown.
 function refilter(st: ModalState, ids: string[], names: Record<string, string> = {}, select?: string): ModalState {
 	let t = st.tree ?? { rows: [], open: [], current: '' }
-	let query = (st.form?.values[0] ?? '').trim()
+	let input = (st.form?.values[0] ?? '').trim()
+	let colon = ids.includes(input) ? -1 : input.lastIndexOf(':')
+	let query = colon < 0 ? input : input.slice(0, colon)
+	t = { ...t, searchEffort: colon < 0 || colon === input.length - 1 ? undefined : input.slice(colon + 1) }
 	let ranked = query ? picker.rank(ids, query, names) : ids
 	let closed = t.closed ?? []
 	let opened = t.opened ?? []
@@ -257,7 +260,12 @@ function step(st: ModalState, key: Key, ids: string[], names: Record<string, str
 		let selected = picker.level(st, id) ?? cap.policy ?? cap.default
 		let at = selected === undefined ? (key.key === 'right' ? -1 : cap.levels.length) : cap.levels.indexOf(selected as any)
 		let level = cap.levels[Math.max(0, Math.min(cap.levels.length - 1, at + (key.key === 'right' ? 1 : -1)))]!
-		return { state: picker.refilter({ ...st, tree: { ...t, effort: level } }, ids, names, id) }
+		let form = st.form
+		if (t.searchEffort !== undefined && form) {
+			let input = form.values[0]!
+			form = forms.set(form, 0, `${input.slice(0, input.lastIndexOf(':'))}:${level}`)
+		}
+		return { state: picker.refilter({ ...st, form, tree: { ...t, effort: level } }, ids, names, id) }
 	}
 	if (t && row && plain && (key.key === 'left' || key.key === 'right' || (key.key === 'enter' && row.path && !row.default))) {
 		let searching = !!(st.form?.values[0] ?? '').trim()
@@ -287,14 +295,15 @@ function step(st: ModalState, key: Key, ids: string[], names: Record<string, str
 function command(sessionId: string, st: ModalState, action: Extract<ModalAction, { type: 'submit' }>): { type: 'submit'; sessionId: string; text: string } | undefined {
 	let row = action.item === undefined ? undefined : st.tree?.rows[action.item]
 	let id = row?.id ?? row?.default
-	let selected = id === undefined ? undefined : picker.level(st, id)
+	let selected = st.tree?.searchEffort ?? (id === undefined ? undefined : picker.level(st, id))
 	return id === undefined ? undefined : { type: 'submit', sessionId, text: `/model ${id}${selected === undefined ? '' : `:${selected}`}` }
 }
 // The level the picker's effort draft gives `id`: its nearest one.
 function level(st: ModalState, id: string): string | undefined {
 	let cap = st.tree?.capabilities?.[id]
-	let draft = st.tree?.effort as EffortLevel | undefined
-	return draft && cap?.levels.length ? effort.closest(cap.levels, draft) : undefined
+	let asked = st.tree?.searchEffort ?? st.tree?.effort
+	let draft = (asked === 'ultra' ? 'max' : asked) as EffortLevel | undefined
+	return draft && effort.levels.includes(draft) && cap?.levels.length ? effort.closest(cap.levels, draft) : undefined
 }
 // The effort choice of `id`'s row; '' without effort control.
 function label(st: ModalState, id: string): string {
