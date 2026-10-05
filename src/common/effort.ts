@@ -9,10 +9,9 @@ export const effort = {
 		let rank = (l: EffortLevel) => effort.levels.indexOf(l)
 		return [...levels].sort((a, b) => Math.abs(rank(a) - rank(want)) - Math.abs(rank(b) - rank(want)) || rank(b) - rank(a))[0]
 	},
-	// A picker row's choice: the level, with • when it is the model's
-	// default, matching the • on the default model (task r7r).
+	// A picker row's choice: always the actual level; the picker title
+	// names the model's default (task r7r).
 	label(cap?: EffortCapability, selected?: string): string {
-		let fallback = cap?.policy ?? cap?.default
-		return selected && selected !== fallback ? selected : fallback ? `${fallback}•` : 'default'
+		return selected || cap?.policy || cap?.default || 'default'
 	},
 }

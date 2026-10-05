@@ -146,12 +146,12 @@ function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean)
 	node.nodes.filter((n) => !bucket(n)).forEach(category)
 	for (let { id, leaf, family } of node.ids) {
 		if (!kept.has(id)) continue
-		// ✓ marks the current model; a • suffix marks the group's
-		// default, so the two never compete (task r7r). The postfix
-		// follows the hierarchy; the full name and ID are details. A
-		// singleton such as Haiku needs only its short name.
+		// ✓ marks the current model; the category header names the
+		// default (task r7r). The postfix follows the hierarchy; the full
+		// name and ID are details. A singleton such as Haiku needs only
+		// its short name.
 		let name = names[id]
-		let label = (family ? leaf : name ? titles.shortName(id, name) : id) + (id === node.default ? '•' : '')
+		let label = family ? leaf : name ? titles.shortName(id, name) : id
 		out.items.push(`${indent}${id === current ? '✓ ' : '  '}${label}`)
 		out.values.push(family ? `\t${name ?? ''}\t${id}` : '')
 		out.rows.push({ id, parent: node.path })
@@ -228,7 +228,8 @@ function selection(st: ModalState, previous?: number): ModalState {
 	if (row?.id && level) effortCell(st.selected, `${picker.canAdjust(st, 'left') ? '‹ ' : '  '}${level}${picker.canAdjust(st, 'right') ? ' ›' : ''}`)
 	let chosen = picker.level(st, shownId)
 	let cap = t.capabilities?.[shownId]
-	let title = `Model: ${shownId}${chosen && chosen !== (cap?.policy ?? cap?.default) ? `:${chosen}` : ''}`
+	let fallback = cap?.levels.length ? cap.policy ?? cap.default : undefined
+	let title = `Model: ${shownId}${chosen && chosen !== fallback ? `:${chosen}` : ''}${fallback ? ` (default effort: ${fallback})` : ''}`
 	return { ...st, title, ...(values && { values }), hint: `${hint}, esc: cancel` }
 }
 
