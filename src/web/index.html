@@ -55,14 +55,16 @@ html.typing .App { position: absolute; }
 /* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
    corners and home indicator), so the edge rows pad themselves. */
-.Transcript { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; padding: 0.5lh max(2ch, env(safe-area-inset-right)) 0.5lh max(2ch, env(safe-area-inset-left)); }
+.Transcript { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; --gut: max(2ch, env(safe-area-inset-left)); padding: 0.5lh max(2ch, env(safe-area-inset-right)) 0.5lh var(--gut); }
 .Transcript > * { margin: 0 0 0.5lh; }
 /* Scroll-to-bottom: a zero-height sticky row ending the transcript, so
-   it shares the cards' left edge; a 44px target whose vertical pill is
-   centered on their 3px bar. */
+   it shares the cards' left edge; a 52px target from the screen edge
+   (the gutter clips anything further left) whose upright rectangle,
+   half-transparent black like the notice outline, is centered on their
+   3px bar, just above the transcript's foot. */
 .Transcript > .to-bottom { position: sticky; bottom: 0; height: 0; margin: 0; z-index: 1; }
-.to-bottom button { position: absolute; bottom: 0.5lh; left: calc(1.5px - 22px); width: 44px; height: 52px; padding: 0; border: 0; background: none; display: flex; align-items: center; justify-content: center; color: var(--text); animation: fade-in 150ms var(--ease-out); }
-.to-bottom .pill { display: flex; align-items: center; justify-content: center; width: 20px; height: 44px; border-radius: 10px; background: color-mix(in oklab, var(--canvas) 55%, transparent); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+.to-bottom button { position: absolute; bottom: calc(2px - 0.5lh); left: calc(-1 * var(--gut)); width: 52px; height: 52px; padding: 0 0 0 calc(var(--gut) + 1.5px - 10px); border: 0; background: none; display: flex; align-items: center; justify-content: flex-start; color: var(--text); animation: fade-in 150ms var(--ease-out); }
+.to-bottom .pill { display: flex; align-items: center; justify-content: center; width: 20px; height: 44px; background: rgb(0 0 0 / 50%); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
 .to-bottom svg { width: 10px; height: 14px; fill: currentColor; }
 @keyframes fade-in { from { opacity: 0; } }
 /* Cards and the open question share one shape: square, a lit bar on
@@ -308,7 +310,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 /* Touch keyboards: Enter is a newline and Send sends, so the key hints
    do not apply. */
 @media (pointer: coarse) { .help { display: none; } textarea, input, .entry .hint { font-size: 16px; } }
-@media (max-width: 40rem) { textarea, input, .entry .hint { font-size: 16px; } .Transcript, .Composer { padding-left: max(1ch, env(safe-area-inset-left)); padding-right: max(1ch, env(safe-area-inset-right)); } }
+@media (max-width: 40rem) { textarea, input, .entry .hint { font-size: 16px; } .Transcript { --gut: max(1ch, env(safe-area-inset-left)); } .Transcript, .Composer { padding-left: max(1ch, env(safe-area-inset-left)); padding-right: max(1ch, env(safe-area-inset-right)); } }
 /* Phone landscape preserves scarce height without shrinking touch targets. */
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
   .Transcript { font-size: 12px; line-height: 1.4; padding-block: 6px; }
