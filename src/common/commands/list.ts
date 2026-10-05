@@ -28,7 +28,7 @@ const list: CommandInfo[] = [
 	{ name: 'effort', description: 'set the model\'s effort', category: 'session' },
 	{ name: 'find', description: 'search all sessions', category: 'session', key: 'ctrl-f' },
 	{ name: 'fork', description: 'fork this session into a new tab', category: 'tabs', key: 'ctrl-b' },
-	{ name: 'go', description: 'show a tab in windows watching this session', category: 'tabs' },
+	{ name: 'go', description: 'go to a session, reopening it if closed', category: 'tabs' },
 	{ name: 'help', description: 'list commands, or show one in detail', category: 'help' },
 	{ name: 'history', description: 'show this session’s history file path', category: 'session' },
 	{ name: 'intro', description: 'run the first-run guide again', category: 'help' },
