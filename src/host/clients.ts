@@ -59,18 +59,12 @@ function input(rec: ClientRecord, c: { type: string; sessionId?: string; timezon
 }
 
 // The zone of the client that last gave session `id` input, else of a
-// connected one following it; the host's own zone is clients.hostZone().
+// connected one following it.
 function timezone(id: string): string | undefined {
 	let sender = clients.state.senders.get(id)?.timezone
 	if (sender) return sender
 	for (let rec of clients.state.records) if (rec.goneAt === undefined && rec.open.has(id) && rec.timezone) return rec.timezone
 	return undefined
-}
-
-// UTC and its aliases say nothing about where a person is: a server's
-// default, or a terminal over SSH.
-function utcLike(tz: string): boolean {
-	return /^(?:Etc\/.*|(?:Etc\/)?(?:UTC|UCT|GMT|Universal|Zulu|Greenwich)(?:[+-]0)?)$/i.test(tz)
 }
 
 function touch(rec: ClientRecord): void {
@@ -155,5 +149,4 @@ function reset(): void {
 
 export const clients = {
 	state: { records: new Set<ClientRecord>(), senders: new Map<string, ClientRecord>() },
-	hostZone: (): string => Intl.DateTimeFormat().resolvedOptions().timeZone,
-	join, hello, screen, zone, input, timezone, utcLike, touch, leave, fromRequest, shortAgent, tty, draw, reset }
+	join, hello, screen, zone, input, timezone, touch, leave, fromRequest, shortAgent, tty, draw, reset }
