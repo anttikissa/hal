@@ -25,11 +25,11 @@ function status(output: string): string | undefined {
 	return code && code !== '0' ? `exit ${code}` : undefined
 }
 
-// A call's wall time, when it is 1 s or more: 3.2s, 12s, 1m 05s;
+// A call's wall time, when it is 1 s or more: 3.2s, 50.2s, 1m 05s;
 // `ticking` (a call still running) counts whole seconds: 3s.
 function duration(ms: number | undefined, ticking = false): string | undefined {
 	if (ms === undefined || ms < 1000) return undefined
-	if (ms < 10_000 && !ticking) return `${(Math.floor(ms / 100) / 10).toFixed(1)}s`
+	if (ms < 60_000 && !ticking) return `${(Math.floor(ms / 100) / 10).toFixed(1)}s`
 	let s = Math.floor(ms / 1000)
 	return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
 }
