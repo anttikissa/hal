@@ -8,6 +8,8 @@ import { ansi } from '../client/ansi.ts'
 import { markdownView } from '../client/markdown-view.ts'
 import { host } from './host.ts'
 import { find } from './find.ts'
+import { findIndex } from './find-index.ts'
+import { findWorker } from './find-worker.ts'
 import { history } from './history.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
@@ -139,3 +141,19 @@ test('rename search exposes old and new titles from both origins, including old 
 	expect((await find.top('/rename')).find((h) => h.blockId === '85')?.snippet).toContain('Model topic → Final topic')
 	expect(readFileSync(history.file(a.id)).subarray(0, before.length)).toEqual(before)
 }, 10000)
+
+test('overlapping searches iterate SQLite candidates independently', () => {
+	// A search pauses mid-cursor; a newer one must not share its statement (SQLITE_MISUSE).
+	findIndex.init()
+	let db = findIndex.state.db!
+	for (let i = 0; i < 4; i++) db.query('INSERT INTO docs(sessionId,blockId,kind,ts,text) VALUES(?,?,?,?,?)').run('s', `b${i}`, 'user', 0, `needle ${i}`)
+	for (let query of ['w', 'needle']) {
+		let q = findQuery.parse(query, undefined)
+		let old = findWorker.candidates('user', q)[Symbol.iterator](); old.next()
+		let fresh = [...findWorker.candidates('user', q)]
+		expect(fresh.length).toBe(4)
+		expect(old.next().done).toBe(false)
+		old.return?.(undefined)
+	}
+	db.close()
+})

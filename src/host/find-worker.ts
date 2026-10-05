@@ -25,14 +25,20 @@ function hit(row: FindRow, q: FindQuery, now: number): FindResult | undefined {
 	return { sessionId: row.sessionId, name: meta.name ?? '', blockId: row.blockId, kind: row.kind, age, ...match, href: `/${row.sessionId}${row.blockId ? '#' + row.blockId : ''}` }
 }
 
-function candidates(kind: FindKind, q: FindQuery): Iterable<FindRow> {
+// Each call prepares its own statement. db.query() caches one statement per
+// SQL text, and search() pauses mid-iteration; a newer search reusing that
+// statement then failed with SQLITE_MISUSE ("bad parameter or other API
+// misuse") while the older cursor was still open.
+function* candidates(kind: FindKind, q: FindQuery): Generator<FindRow> {
 	let db = findIndex.state.db!, words = q.words.filter((w) => [...w].length >= 3)
-	if (!words.length) return db.query('SELECT * FROM docs WHERE kind=?').iterate(kind) as Iterable<FindRow>
 	let quote = (w: string) => '"' + w.replaceAll('"', '""') + '"'
 	let grams = words.map(quote).join(' AND ')
 	let tokens = q.words.filter((w) => /^[\p{L}\p{N}_]+$/u.test(w)).map((w) => quote(w) + '*').join(' AND ')
-	return db.query(`SELECT * FROM docs WHERE kind=? AND id IN
-		(SELECT rowid FROM grams WHERE grams MATCH ? ${tokens ? 'UNION SELECT rowid FROM words WHERE words MATCH ?' : ''})`).iterate(...(tokens ? [kind, grams, tokens] : [kind, grams])) as Iterable<FindRow>
+	let stmt = !words.length ? db.prepare('SELECT * FROM docs WHERE kind=?') : db.prepare(`SELECT * FROM docs WHERE kind=? AND id IN
+		(SELECT rowid FROM grams WHERE grams MATCH ? ${tokens ? 'UNION SELECT rowid FROM words WHERE words MATCH ?' : ''})`)
+	let args = !words.length ? [kind] : tokens ? [kind, grams, tokens] : [kind, grams]
+	try { yield* stmt.iterate(...args) as Iterable<FindRow> }
+	finally { stmt.finalize() }
 }
 
 async function search(c: Search): Promise<void> {
