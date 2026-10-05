@@ -8,7 +8,6 @@ import type { HistoryRecord } from '../common/replay.ts'
 import { settings } from '../common/settings.ts'
 import { apiKeys } from './api-keys.ts'
 import { auth } from './auth.ts'
-import { clients } from './clients.ts'
 import { config } from './config.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
@@ -133,13 +132,6 @@ function said(records: HistoryRecord[], text: string): boolean {
 	return records.some((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(text))
 }
 
-// The question the last answer to `field` answered.
-function asked(records: HistoryRecord[], field: string): Form | undefined {
-	let answer = records.findLast((r) => r.type === 'answer' && Object.hasOwn(r.answers, field))
-	let q = answer?.type === 'answer' ? records.findLast((r) => r.type === 'question' && r.id === answer.question) : undefined
-	return q?.type === 'question' ? q.form : undefined
-}
-
 // Who can use a provider: a nonempty file account (accessToken or
 // apiKey) or an environment key. Identities only, never the values;
 // malformed credentials fail rather than disappear.
@@ -174,46 +166,6 @@ function choices(providers: string[]): Map<string, string> {
 	return out
 }
 
-// The IANA zone matching `text`: the name, then its city, then a
-// city beginning with it, then one containing it; case-insensitive.
-function findZone(text: string): string | undefined {
-	let t = text.trim().toLowerCase().replace(/\s+/g, '_')
-	if (!t) return undefined
-	// Some ICU builds still list the old city name; both zone IDs are valid.
-	let all = Intl.supportedValuesOf('timeZone')
-	if (all.includes('Asia/Calcutta') && !all.includes('Asia/Kolkata')) all.push('Asia/Kolkata')
-	let city = (z: string) => z.split('/').at(-1)!.toLowerCase()
-	return all.find((z) => z.toLowerCase() === t) ?? all.find((z) => city(z) === t) ?? all.find((z) => city(z).startsWith(t)) ?? all.find((z) => z.toLowerCase().includes(t))
-}
-
-const cityOf = (zone: string) => zone.split('/').at(-1)!.replace(/_/g, ' ')
-const zoneIn = (text: string | undefined) => /\(([^()\s]+)\)(?:\. Correct\?)?$/.exec(text ?? '')?.[1]
-
-// The timezone step: a zone to save, none (unchanged), or a question.
-function timezone(run: HistoryRecord[], sessionId?: string): { zone?: string; ask?: Reply } {
-	let device = sessionId ? clients.timezone(sessionId) : undefined
-	let server = clients.hostZone()
-	if (device && device === server && !clients.utcLike(device)) return { zone: device }
-	let guess = device ?? (clients.utcLike(server) ? undefined : server)
-	if (!guess) return {}
-	let confirm = answered(run, 'timezone')
-	if (confirm === undefined) return { ask: { ask: yesNo('timezone', `It seems like you are in the ${cityOf(guess)} timezone (${guess}). Correct?`) } }
-	if (confirm === '') return {}
-	if (confirm === 'Yes') return { zone: zoneIn(intro.asked(run, 'timezone')?.text) ?? guess }
-	let picked = answered(run, 'zone')
-	let options = [...new Set([device && `This device (${device})`, `The server (${server})`].filter((x): x is string => !!x)), 'Other']
-	if (picked === undefined) return { ask: { ask: { text: 'Which timezone should I use?', fields: [{ type: 'choice', name: 'zone', options, initial: 0 }] } } }
-	if (picked === '') return {}
-	if (picked !== 'Other') return { zone: zoneIn(picked) }
-	let city = answered(run, 'city')
-	let found = city === undefined ? undefined : intro.findZone(city)
-	if (found || city?.trim() === '') return { zone: found }
-	return { ask: {
-		...(city !== undefined && { say: `I couldn't find a timezone for "${city.trim()}". Try a nearby big city, like Helsinki or New York.` }),
-		ask: { text: 'Which city is your timezone named after? (Empty skips.)', fields: [{ type: 'text', name: 'city', placeholder: 'Helsinki' }] },
-	} }
-}
-
 // Every intro question is skippable: Escape moves on instead of
 // pausing a scripted turn that only an answer can continue.
 function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): Reply {
@@ -223,7 +175,9 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 
 function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): Reply {
 	let start = records.findLastIndex((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(greeting))
-	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: 'Dave' }] }
+	// A rerun starts from the saved name: Enter keeps it.
+	let known = profile.field(profile.text(), 'Name')
+	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: 'Dave', ...(known && { initial: known }) }] }
 	// Local servers answer before the model question (task vc).
 	let hello = (): Reply => (void models.warm(), { say: `${greeting}\n\nI have ${words[3 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
@@ -249,17 +203,13 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	let say: string[] = []
 	if (!said(run, 'Nice to meet you')) say.push(name ? `Nice to meet you, ${name}.` : 'Nice to meet you.')
 	let reply = (r: Reply): Reply => ({ ...r, say: [...say, r.say].filter((x) => x).join('\n\n') || undefined })
-	let zone = intro.timezone(run, sessionId)
-	if (zone.ask) return reply(zone.ask)
 	let store = (fields: Parameters<typeof profile.save>[0]) => {
 		if (!Object.values(fields).some((v) => profile.value(v))) return
 		profile.save(fields)
-		// Name exactly what was written: a timezone found unasked counts.
-		let what = Object.entries(fields).filter(([, v]) => profile.value(v)).map(([k, v]) => k === 'Name' ? 'name' : k === 'Timezone' ? `timezone (${v})` : 'language preference')
-		let list = what.length > 1 ? `${what.slice(0, -1).join(', ')} and ${what.at(-1)}` : what[0]
+		let list = fields.Name ? 'name' : 'language preference'
 		say.push(`${saved}${list} to ${resolve(profile.file())}.${said(run, saved) ? '' : ' You can edit it to update your personal preferences.'}`)
 	}
-	if (!said(run, saved)) store({ Name: name, Timezone: zone.zone })
+	if (!said(run, saved)) store({ Name: name })
 
 	let loggedIn = intro.accounts()
 	let login = answered(run, 'login')
@@ -315,4 +265,4 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts; /intro runs this guide again.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
 }
 
-export const intro = { languages, restart, run, answered, asked, accounts, choices, findZone, timezone }
+export const intro = { languages, restart, run, answered, accounts, choices }

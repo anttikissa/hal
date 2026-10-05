@@ -53,5 +53,4 @@ test('a reported timezone is kept only when valid, and a session hears its lates
 	clients.input(a, { type: 'answer', sessionId: 's1' })
 	expect(clients.timezone('s1')).toBe('Europe/Helsinki')
 	expect(clients.timezone('s2')).toBeUndefined()
-	expect(clients.utcLike('Etc/UTC') && clients.utcLike('GMT') && !clients.utcLike('Europe/London')).toBe(true)
 })
