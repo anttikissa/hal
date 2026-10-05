@@ -96,7 +96,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'prompt':
 			let bash = (/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
 			// A job's message has no title to carry its status: a nonzero
-			// one stays its first row, in the warning colour (task wm0).
+			// one stays its first row, in the warning color (task wm0).
 			let source = bash ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text
 			if (fold === 'inline') source = itemView.inlined(source, look.pastes)
 			if (fold === 'closed' && !item.summary) return itemView.closedRow(item, source, width)
@@ -165,8 +165,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let call = calls?.get(item.id)
 			// No blank lines at either end, no bash status line: the
 			// status is in the title (task wm0).
-			// A cancelled call's note to the model: the title says "(cancelled)".
-			let out = item.interrupted === 'cancelled' ? '' : call ? bashResult.display(item.output, true, !!item.interrupted) : bashResult.trim(item.output)
+			// A canceled call's note to the model: the title says "(canceled)".
+			let out = item.interrupted === 'canceled' ? '' : call ? bashResult.display(item.output, true, !!item.interrupted) : bashResult.trim(item.output)
 			let style = itemView.itemStyle(item, tool)
 			// Attached, nothing to show draws nothing; apart, the header
 			// row stays, for its time, link and status.
@@ -284,21 +284,21 @@ function quoteLines(quote: Quote | undefined, width: number): string[] {
 }
 
 // A flagged call's title row with an italic "unsafe to stop" in the
-// title's own colour, never red (task ker); clipped to make room.
+// title's own color, never red (task ker); clipped to make room.
 function unsafe(row: string, item: Item & { type: 'tool' }, width: number): string {
 	let label = 'unsafe to stop'
 	if (!toolDetails.unsafe(item.name, item.input) || width < 3 * label.length) return row
 	return `${strings.clipVisual(row, width - label.length - 2)}  \x1b[3m${label}\x1b[23m`
 }
 
-// `text` in the warning colour, then back to `style`'s.
+// `text` in the warning color, then back to `style`'s.
 function warn(text: string, style: Style | undefined): string {
 	if (ansi.mono()) return text
 	return ansi.sgr({ fg: colors.warning().fg! }) + text + (style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
 }
 
 // The status after a tool card's title (task wm0), quiet: a nonzero
-// exit in the warning colour, then the time; '' with neither.
+// exit in the warning color, then the time; '' with neither.
 function status(exit: string | undefined, time: string | undefined, style: Style | undefined): string {
 	if (!exit && !time) return ''
 	if (!exit) return ansi.quiet(`(${time})`, style)
@@ -306,7 +306,7 @@ function status(exit: string | undefined, time: string | undefined, style: Style
 }
 
 // A finished call's status from its result; `bash`: a bash call's.
-// Steering's "(cancelled)" or "(stopped, 50.2s)" is quiet: no failure.
+// Steering's "(canceled)" or "(stopped, 50.2s)" is quiet: no failure.
 function resultStatus(item: Item & { type: 'tool-result' }, bash: boolean, style: Style | undefined): string {
 	let text = bashResult.interrupted(item)
 	if (text) return ansi.quiet(`(${text})`, style)

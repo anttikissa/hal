@@ -12,9 +12,9 @@ export type ThinkingBlock = { type: 'thinking'; text: string; signature?: string
 export type ToolCallBlock = { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
 
 // `ms`: the call's wall time (task wm0); records before it have none.
-// `interrupted`: a new user message cancelled the call before it started
+// `interrupted`: a new user message canceled the call before it started
 // or stopped it running (task ker); not a failure.
-export type ToolResultBlock = { type: 'tool_result'; id: string; output: string; isError?: boolean; image?: ImageBlock; ms?: number; interrupted?: 'cancelled' | 'stopped' }
+export type ToolResultBlock = { type: 'tool_result'; id: string; output: string; isError?: boolean; image?: ImageBlock; ms?: number; interrupted?: 'canceled' | 'stopped' }
 
 // An attached image (task 2a): a reference to the session's blob, never
 // its bytes; providers read those when they build a request. `bytes`:

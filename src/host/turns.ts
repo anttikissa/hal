@@ -259,7 +259,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				if (signal.aborted) {
 					let clear = contextTransitions.pending(id)?.kind === 'clear'
 					if (clear || signal.reason === jobs.steered) {
-						let results = round.blocks.filter((b) => b.type === 'tool_call').map((b) => clear ? { type: 'tool_result' as const, id: b.id, output: 'Tool call did not run: clear accepted before dispatch.', isError: true } : turnPolicy.cancelled(b.id))
+						let results = round.blocks.filter((b) => b.type === 'tool_call').map((b) => clear ? { type: 'tool_result' as const, id: b.id, output: 'Tool call did not run: clear accepted before dispatch.', isError: true } : turnPolicy.canceled(b.id))
 						if (results.length) { let r = history.results(id, results); host.broadcast(id, { type: 'tool-results', sessionId: id, results, n: r?.n, ts: r?.ts }) }
 					}
 					continue
@@ -292,7 +292,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			let ending = false
 			let ctx = { cwd, signal, sessionId: id, endTurn: () => (ending = true) }
 			for (let call of calls) {
-				if (signal.aborted && signal.reason === jobs.steered) { results.push(turnPolicy.cancelled(call.id)); continue }
+				if (signal.aborted && signal.reason === jobs.steered) { results.push(turnPolicy.canceled(call.id)); continue }
 				if (signal.aborted || contextTransitions.pending(id)?.kind === 'clear') {
 					results.push({ type: 'tool_result', id: call.id, output: `Tool call did not run: ${jobs.why(signal)} before dispatch.`, isError: true })
 					continue

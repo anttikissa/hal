@@ -119,7 +119,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 
 // Row `i`'s value column (modals.ts `values`), if the modal has one: the
 // value, or the edit field with where its cursor is; on the selected
-// row then the faint note, back to `current` (the selection's colour).
+// row then the faint note, back to `current` (the selection's color).
 function cell(m: ModalState, i: number, current: Style): { text: string; cursor?: number } | undefined {
 	if (!m.values) return undefined
 	if (m.edit?.index === i) {

@@ -6,7 +6,7 @@
 // So the visual viewport's height and offset go into CSS custom
 // properties (--app-height, --app-top) that size and translate the app;
 // without visualViewport the CSS keeps 100dvh. Chrome and Firefox
-// honour the meta tag, and the same numbers are right there too.
+// honor the meta tag, and the same numbers are right there too.
 //
 // The iOS Home Screen app's visual viewport can keep a keyboard-reduced
 // height (e.g. 485 of 793 px, offset 0) for minutes after the keyboard

@@ -125,8 +125,8 @@ function answered(records: HistoryRecord[], field: string): string | undefined {
 // Whether the last reply to `field` was an emptied field and Enter,
 // not Escape: on a rerun that removes the saved value.
 function cleared(records: HistoryRecord[], field: string): boolean {
-	let last = records.findLast((r) => r.type === 'answer' && (Object.hasOwn(r.answers, field) || (r.cancelled && records.some((q) => q.type === 'question' && q.id === r.question && q.form.fields.some((f) => f.name === field)))))
-	return last?.type === 'answer' && !last.cancelled && !last.answers[field]?.trim()
+	let last = records.findLast((r) => r.type === 'answer' && (Object.hasOwn(r.answers, field) || (r.canceled && records.some((q) => q.type === 'question' && q.id === r.question && q.form.fields.some((f) => f.name === field)))))
+	return last?.type === 'answer' && !last.canceled && !last.answers[field]?.trim()
 }
 
 // Whether any question asking `field` got an answer, even a secret one

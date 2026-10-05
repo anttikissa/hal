@@ -102,7 +102,7 @@ export const look: Look = {
 	// Help bar: keys stand out from descriptions.
 	help: () => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0] }),
 	popup: () => ({ neutralFg: [0.68, 0, 0], dangerFg: [0.86, 0.16, 85] }),
-	// The selected item: a lighter tint of the colour around it.
+	// The selected item: a lighter tint of the color around it.
 	popupCurrent: (_base, around) => {
 		let tint = around[1] >= 0.02
 		return { fg: [0.98, tint ? 0.04 : 0, around[2]], bg: [0.42, tint ? 0.11 : 0, around[2]] }
