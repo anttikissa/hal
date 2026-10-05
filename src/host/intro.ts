@@ -122,6 +122,13 @@ function answered(records: HistoryRecord[], field: string): string | undefined {
 	return undefined
 }
 
+// Whether the last reply to `field` was an emptied field and Enter,
+// not Escape: on a rerun that removes the saved value.
+function cleared(records: HistoryRecord[], field: string): boolean {
+	let last = records.findLast((r) => r.type === 'answer' && (Object.hasOwn(r.answers, field) || (r.cancelled && records.some((q) => q.type === 'question' && q.id === r.question && q.form.fields.some((f) => f.name === field)))))
+	return last?.type === 'answer' && !last.cancelled && !last.answers[field]?.trim()
+}
+
 // Whether any question asking `field` got an answer, even a secret one
 // (kept out of history) or a skip.
 function replied(records: HistoryRecord[], field: string): boolean {
@@ -175,9 +182,13 @@ function run(records: HistoryRecord[], answers?: Answers, sessionId?: string): R
 
 function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): Reply {
 	let start = records.findLastIndex((r) => r.type === 'assistant' && r.block.type === 'text' && r.block.text.includes(greeting))
-	// A rerun starts from the saved name: Enter keeps it.
-	let known = profile.field(profile.text(), 'Name')
-	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: 'Dave', ...(known && { initial: known }) }] }
+	// A rerun starts from the saved answers, like /config: Enter keeps
+	// one, an emptied field removes it, Escape leaves it alone.
+	let known = (label: 'Name' | 'Language preference') => {
+		let v = profile.field(profile.text(), label)
+		return v === undefined ? {} : { initial: v }
+	}
+	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: 'Dave', ...known('Name') }] }
 	// Local servers answer before the model question (task vc).
 	let hello = (): Reply => (void models.warm(), { say: `${greeting}\n\nI have ${words[3 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
@@ -203,13 +214,18 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	let say: string[] = []
 	if (!said(run, 'Nice to meet you')) say.push(name ? `Nice to meet you, ${name}.` : 'Nice to meet you.')
 	let reply = (r: Reply): Reply => ({ ...r, say: [...say, r.say].filter((x) => x).join('\n\n') || undefined })
-	let store = (fields: Parameters<typeof profile.save>[0]) => {
-		if (!Object.values(fields).some((v) => profile.value(v))) return
-		profile.save(fields)
-		let list = fields.Name ? 'name' : 'language preference'
-		say.push(`${saved}${list} to ${resolve(profile.file())}.${said(run, saved) ? '' : ' You can edit it to update your personal preferences.'}`)
+	let store = (label: 'Name' | 'Language preference', field: string) => {
+		let what = label === 'Name' ? 'name' : 'language preference'
+		let value = profile.value(answered(run, field))
+		if (value) {
+			profile.save({ [label]: value })
+			say.push(`${saved}${what} to ${resolve(profile.file())}.${said(run, saved) ? '' : ' You can edit it to update your personal preferences.'}`)
+		} else if (cleared(run, field) && profile.field(profile.text(), label) !== undefined) {
+			profile.save({ [label]: null })
+			say.push(`I removed your ${what} from ${resolve(profile.file())}.`)
+		}
 	}
-	if (!said(run, saved)) store({ Name: name })
+	if (!said(run, `${saved}name`)) store('Name', 'name')
 
 	let loggedIn = intro.accounts()
 	let login = answered(run, 'login')
@@ -249,8 +265,8 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	// Language comes last: the scripted intro can't switch language
 	// mid-way, so asking earlier would promise what it can't do.
 	let language = answered(run, 'language')
-	if (language === undefined) return reply({ ask: { text: 'Any language or tone preferences?', fields: [{ type: 'text', name: 'language', placeholder: intro.languages() }] } })
-	store({ 'Language preference': language })
+	if (language === undefined) return reply({ ask: { text: 'Any language or tone preferences?', fields: [{ type: 'text', name: 'language', placeholder: intro.languages(), ...known('Language preference') }] } })
+	store('Language preference', 'language')
 	if (model) {
 		config.init()
 		config.state.data!.model = model
