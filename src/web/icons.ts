@@ -1,6 +1,6 @@
 // Inline SVG icons for the web client (task 19m): Phosphor Regular on a
-// 256 grid, except steer (Tabler arrow-ramp-right) on a 24 grid
-// and python (IconPark snake-zodiac) on a 48 grid. Shapes
+// 256 grid, except steer (Tabler arrow-ramp-right) and python (Tabler
+// brand-python) on a 24 grid. Shapes
 // with class "s" are strokes, the rest fill; index.html sets one stroke
 // width for all grids. Regenerate from the upstream SVGs, never by hand.
 //
@@ -21,9 +21,6 @@
 // LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-//
-// IconPark: Apache License 2.0, Copyright (c) ByteDance; see
-// https://github.com/bytedance/IconPark/blob/master/LICENSE.
 
 const phosphor = {
 	attach: '<path d="M160,80,76.69,164.69a16,16,0,0,0,22.63,22.62L198.63,86.63a32,32,0,0,0-45.26-45.26L54.06,142.06a48,48,0,0,0,67.88,67.88L204,128" class="s"/>',
@@ -65,18 +62,14 @@ const phosphor = {
 
 const grid24 = {
 	steer: '<path class="s" d="M7 3l0 8.707"/><path class="s" d="M11 7l-4 -4l-4 4"/><path class="s" d="M17 14l4 -4l-4 -4"/><path class="s" d="M7 21a11 11 0 0 1 11 -11h3"/>',
+	python: '<path class="s" d="M12 9h-7a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h3"/><path class="s" d="M12 15h7a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-3"/><path class="s" d="M8 9v-4a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-4a2 2 0 0 0 -2 2v5a2 2 0 0 0 2 2h4a2 2 0 0 0 2 -2v-4"/><path class="s" d="M11 6l0 .01"/><path class="s" d="M13 18l0 .01"/>',
 }
 
-const grid48 = {
-	python: '<path class="s" d="m35.786 39.083l2.828-2.828a6 6 0 0 0 0-8.486v0a6 6 0 0 0-8.485 0l-2.462 2.462m-10.266-6.705l7.071-7.07a6 6 0 0 0 0-8.486v0a6 6 0 0 0-8.485 0l-7.071 7.071"/><path class="s" d="m18.283 22.645l-8.66 8.66a6 6 0 0 0 0 8.486v0a6 6 0 0 0 8.485 0l9.9-9.9"/><path class="s" d="M15 9H7"/>',
-}
-
-export type IconName = keyof typeof phosphor | keyof typeof grid24 | keyof typeof grid48
+export type IconName = keyof typeof phosphor | keyof typeof grid24
 
 export const icons = {
 	/** An icon's inner SVG markup and the grid it is drawn on. */
-	svg(name: IconName): { body: string; grid: 24 | 48 | 256 } {
-		if (name in grid48) return { body: grid48[name as keyof typeof grid48], grid: 48 }
+	svg(name: IconName): { body: string; grid: 24 | 256 } {
 		return name in grid24 ? { body: grid24[name as keyof typeof grid24], grid: 24 } : { body: phosphor[name as keyof typeof phosphor], grid: 256 }
 	},
 }
