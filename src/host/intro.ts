@@ -68,14 +68,11 @@ const LANGUAGES = [
 	'Speak like Yoda, you must',
 	'Like a 1940s noir detective',
 	'Narrate it like a nature documentary',
-	'Howdy, partner: cowboy talk',
-	'Like, totally Valley girl',
 	'Dry British sarcasm',
 	'Like a grumpy senior engineer',
 	'Haiku when possible',
 	'Werner Herzog narrating my bugs',
 	'Deadpan, like a Kaurismäki film',
-	'Take it easy, like The Dude',
 	'Punk zine energy, zero corporate speak',
 	'Like a 90s BBS sysop',
 	'lowercase only. no caps. ever.',
@@ -84,22 +81,15 @@ const LANGUAGES = [
 	'Logic only, like Spock',
 	'Stoic: what can I control here?',
 	'Terse as a Unix man page',
-	'Bob Ross: happy little bugs',
 	'Cryptic, like the Log Lady',
-	'Gen Z slang, no cap',
 	'RTFM energy, but kind',
 	'Like a Bond villain explaining the plan',
-	'Sports commentary, play by play',
 	'Like Clippy, but actually useful',
 	'Monty Python absurdism welcome',
-	'Cyberpunk street talk, choom',
-	'Drag queen sass, darling',
-	'Precise and symmetrical, like Wes Anderson',
 	'Question every assumption, comrade',
 	'Calm, like an airline pilot',
 	'A Zen koan when I’m stuck',
 	'Don’t panic: Hitchhiker’s Guide style',
-	'Fewer words, like Ron Swanson',
 	'Like a burnt-out sysadmin at 3 a.m.',
 	'Slow and grave, like Tarkovsky',
 	'Solarpunk optimism',
@@ -110,7 +100,7 @@ const LANGUAGES = [
 // examples live fourth, the rest shuffled.
 function languages(): string[] {
 	let mixed = LANGUAGES.map((s) => ({ s, k: Math.random() })).sort((a, b) => a.k - b.k).map((x) => x.s)
-	return ['Simplified Technical English, please', mixed[0]!, mixed[1]!, 'Psst — these come from src/host/intro.ts. Ask me later!', ...mixed.slice(2)]
+	return ['Simplified Technical English, please', mixed[0]!, mixed[1]!, 'Psst — check out these examples in src/host/intro.ts', ...mixed.slice(2)]
 }
 
 type Entry = Record<string, any>
