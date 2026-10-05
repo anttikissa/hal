@@ -12,7 +12,7 @@ import { forms, type FormState } from '../../common/forms.ts'
 import type { Shown as Item } from '../../common/transcript.ts'
 import { external } from './Markdown.tsx'
 import { app } from '../app.ts'
-import { view } from '../view.ts'
+import { hrefs } from '../hrefs.ts'
 import { Icon } from './Icon.tsx'
 import { CardHeader } from './CardHeader.tsx'
 import { titles } from '../../common/titles.ts'
@@ -21,7 +21,7 @@ import { target } from '../target.ts'
 export function Question(props: { item: Item & { type: 'question' } & { key: string }; form: FormState; session: string }) {
 	let fields: HTMLElement[] = []
 	let form = () => props.item.form
-	let parts = createMemo(() => view.urlParts(form().text))
+	let parts = createMemo(() => hrefs.urlParts(form().text))
 	// The focused field takes the focus (its chosen option, for a group).
 	// The memo gates on equality: other updates re-run an effect's
 	// callback, and a focus() then would clear a reader's selection.

@@ -9,14 +9,14 @@
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from 'solid-js'
 import type { RebaseRow } from '../../common/rebase-rows.ts'
 import { rebaseView, type Action, type Part, type RebaseState } from '../rebase.ts'
-import { view } from '../view.ts'
+import { hrefs } from '../hrefs.ts'
 import { Icon } from './Icon.tsx'
 
 const labels: Action[] = ['keep', 'drop', 'edit']
 
 // A text blob's first part, or its image; fetched when its row opens.
 function Blob(props: { session: string; id: string; size: string }) {
-	let url = () => view.blobUrl(props.session, props.id)
+	let url = () => hrefs.blobUrl(props.session, props.id)
 	let [shown, setShown] = createSignal<{ image?: true; text?: string; more?: boolean; error?: string }>({})
 	onSettled(() => {
 		let gone = false
@@ -45,7 +45,7 @@ function Detail(props: { st: RebaseState; row: RebaseRow }) {
 		<div class="detail">
 			<For each={parts()}>{(p: Part) => (
 				p.kind === 'text' ? <div class="part"><Show when={p.label}><div class="label">{p.label}</div></Show><pre>{p.text}</pre></div>
-				: p.kind === 'image' ? <div class="part"><div class="label">image{p.bytes ? ` · ${Math.round(p.bytes / 100) / 10} kB` : ''}</div><a href={view.blobUrl(props.st.sessionId, p.blob)} target="_blank" rel="noopener"><img src={view.blobUrl(props.st.sessionId, p.blob)} alt={`image ${p.blob}`} /></a></div>
+				: p.kind === 'image' ? <div class="part"><div class="label">image{p.bytes ? ` · ${Math.round(p.bytes / 100) / 10} kB` : ''}</div><a href={hrefs.blobUrl(props.st.sessionId, p.blob)} target="_blank" rel="noopener"><img src={hrefs.blobUrl(props.st.sessionId, p.blob)} alt={`image ${p.blob}`} /></a></div>
 				: <Blob session={props.st.sessionId} id={p.id} size={p.size} />
 			)}</For>
 			<Show when={!parts().length}><div class="part label">(no text)</div></Show>
