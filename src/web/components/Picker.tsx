@@ -6,7 +6,7 @@
 import { createEffect, For, Show, untrack } from 'solid-js'
 import { fuzzy } from '../../common/fuzzy.ts'
 import { findDialog } from '../../common/find-dialog.ts'
-import type { ModalState } from '../../common/modals.ts'
+import { modals, type ModalState } from '../../common/modals.ts'
 import { app } from '../app.ts'
 import { picker } from '../../common/picker.ts'
 import { settings } from '../../common/settings.ts'
@@ -25,12 +25,12 @@ function marked(text: string, query: string | undefined, literal = false) {
 function Match(props: { text: string }) { return <b class="match">{props.text}</b> }
 
 export function Picker(props: { modal: ModalState | undefined }) {
-	let box!: HTMLDialogElement, search!: HTMLInputElement, list!: HTMLUListElement
+	let box!: HTMLDialogElement, search: HTMLInputElement | undefined, list!: HTMLUListElement
 	let edit: HTMLInputElement | undefined
 	// An edit starting takes the focus; one ending gives it back.
 	createEffect(
 		() => props.modal?.edit?.index,
-		(index) => untrack(() => { if (index === undefined) { if (box.open) search.focus() } else edit?.focus() }),
+		(index) => untrack(() => { if (index === undefined) { if (box.open) search?.focus() } else edit?.focus() }),
 	)
 	let width = () => `${Math.max(0, ...(props.modal?.items ?? []).map((s) => s.length)) + 2}ch`
 	// Model picker table: postfix, effort, name and ID columns, each as
@@ -51,7 +51,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		({ selected, query: q }) => {
 			// Moving focus runs focus handlers here; they read state untracked.
 			if (selected === undefined) { if (box.open) untrack(() => box.close()); return }
-			if (!box.open) untrack(() => { box.showModal(); search.focus() })
+			if (!box.open) untrack(() => { box.showModal(); (props.modal?.form && search ? search : list).focus() })
 			if (q !== query) { query = q; list.scrollTop = 0 }
 			list.children[selected]?.scrollIntoView({ block: 'nearest' })
 		},
@@ -67,9 +67,15 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				<div class="title">{props.modal?.title ?? ''}</div>
 				<button type="button" class="close" aria-label="Close" onClick={cancel}><Icon name="close" /></button>
 			</div>
-			<input ref={(e) => (search = e)} class="input" type="text" aria-label="Search" autocomplete="off"
-				aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
-				value={props.modal?.form?.values[0] ?? ''} onInput={(e) => app.search(e.currentTarget.value)} onFocus={() => find.focus(0)} />
+			<Show when={props.modal?.form}>
+				<input ref={(e) => (search = e)} class="input" type="text" aria-label="Search" autocomplete="off"
+					aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
+					value={props.modal?.form?.values[0] ?? ''} onInput={(e) => app.search(e.currentTarget.value)} onFocus={() => find.focus(0)} />
+			</Show>
+			<Show when={props.modal?.restart}>{(r) => {
+				let lines = () => modals.restartLines(r().calls)
+				return <div class="details">{lines().head}<For each={lines().calls}>{(c) => <>{'\n'}<Show when={c.href} fallback={c.block}><a href={c.href}>{c.block}</a></Show>{c.rest}</>}</For></div>
+			}}</Show>
 			<Show when={props.modal?.find}>
 				<div class="filters" role="group" aria-label="Search kinds">
 					<For each={findDialog.labels}>{(label, i) => (
@@ -80,7 +86,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 					)}</For>
 				</div>
 			</Show>
-			<ul ref={(e) => (list = e)} role="listbox" aria-label="Results" tabindex={props.modal?.find ? 0 : undefined}
+			<ul ref={(e) => (list = e)} role="listbox" aria-label={props.modal?.restart ? 'Choices' : 'Results'} tabindex={props.modal?.find || !props.modal?.form ? 0 : undefined}
 				onFocus={() => find.focus(5)} aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}>
 				<For each={props.modal?.items ?? []}>{(item, i) => (
 					<li role="option" id={`modal-item-${i()}`} aria-selected={i() === props.modal?.selected ? 'true' : 'false'}

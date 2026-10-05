@@ -4,6 +4,7 @@ import { appendFileSync, existsSync, readFileSync, statSync, writeFileSync } fro
 import { join, resolve } from 'path'
 import { args, type Args } from './client/args.ts'
 import { app } from './client/app.ts'
+import { command as restart } from './client/commands/restart.ts'
 import { appView } from './client/app-view.ts'
 import { draftFile } from './client/draft-file.ts'
 import { link } from './client/link.ts'
@@ -23,7 +24,7 @@ import { diag } from './host/diag.ts'
 import { find } from './host/find.ts'
 import { host } from './host/host.ts'
 import { promptFiles } from './host/prompt-files.ts'
-import { restartProcess } from './host/commands/restart.ts'
+import { restartGuard, restartProcess } from './host/commands/restart.ts'
 import { restartNote } from './host/restart-note.ts'
 import { jobs } from './host/jobs.ts'
 import { liveFiles } from './host/live-file.ts'
@@ -109,17 +110,17 @@ function init(): void {
 	// Ctrl-C pauses running turns only if no other Hal process (a peer
 	// on the host socket) can carry them on (tasks/j1/states.md).
 	terminal.onQuit = () => host.quitting(server.state.sockets.size === 0)
-	restartProcess.run = () => terminal.restart()
 	let exit = terminal.restart
-	terminal.restart = () => {
+	let restartNow = (): void => {
 		if (server.state.listener) {
-			let shown = main.state.kept.split('\n')[0]
-			let on = ''
+			let shown = main.state.kept.split('\n')[0], on = ''
 			try { if (shown) on = ` on ${tabs.label(shown)}` } catch {}
 			restartNote.write(`Ctrl-R in the terminal${on}`)
 		}
 		exit()
 	}
+	restartProcess.run = restartNow
+	terminal.restart = () => restart.ask({ scope: 'local', calls: restartGuard.flagged() }, app.open, restartNow)
 	// Which code this process runs (task n1), found after the first
 	// frame; the host tells its clients, a new commit offers ctrl-r.
 	version.found = (loaded) => {
