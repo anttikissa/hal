@@ -194,8 +194,10 @@ html.typing .App { position: absolute; }
 @keyframes blink { 50% { opacity: 0; } }
 /* The notice stack (task qm): anchored to the transcript's foot, bottom right; full width on phones. */
 .Notices { position: relative; flex: none; height: 0; z-index: 2; }
-.Notices .stack { position: absolute; right: max(1ch, env(safe-area-inset-right)); bottom: 0.5lh; width: min(24rem, calc(100vw - 1rem)); display: flex; flex-direction: column; gap: 0.25lh; }
-.Notices .card { display: flex; flex-direction: column; padding: 0.25lh 1ch; border-left: 3px solid; text-decoration: none; animation: notice-in 200ms var(--ease-out); }
+.Notices { --gl: max(2ch, env(safe-area-inset-left)); --gr: max(2ch, env(safe-area-inset-right)); }
+@media (max-width: 40rem) { .Notices { --gl: max(1ch, env(safe-area-inset-left)); --gr: max(1ch, env(safe-area-inset-right)); } }
+.Notices .stack { position: absolute; right: var(--gr); bottom: 0.5lh; width: min(24rem, calc(100% - var(--gl) - var(--gr))); display: flex; flex-direction: column; gap: 0.25lh; }
+.Notices .card { display: flex; flex-direction: column; padding: 0.25lh 1ch; border-left: 3px solid; box-shadow: 0 0 0 2px rgb(0 0 0 / 50%); text-decoration: none; animation: notice-in 200ms var(--ease-out); }
 .Notices .card.done { border-color: var(--done-fg); } .Notices .card.done strong { color: var(--done-fg); }
 .Notices .card.failed { border-color: var(--failed-fg); } .Notices .card.failed strong { color: var(--failed-fg); }
 .Notices .card.attention { border-color: var(--attention-fg); } .Notices .card.attention strong { color: var(--attention-fg); }
