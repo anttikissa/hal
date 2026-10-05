@@ -6,7 +6,8 @@
 		'Own writes do not fire liveFile onChange, so config.update calls config.state.onChange itself; main wires it to host.warnAll, which now also sends the settings refresh to every client.',
 		'ASON keeps comments only on keys (COMMENTS), and a comment before the opening brace is dropped on save. The /config pointer therefore rides on the first key; deleting that key loses it and the next write adds it again; an empty {} holds none.',
 		'Refusals the client can check (settings.problem) stay in the modal. Host-only refusals, such as an unknown default model, land as command output in the transcript behind the modal.',
-		'Line limits: client/app.ts, web/app.ts, host/host.ts and web/view.ts sit at 398-400 lines, so the glue is compact; the web edit field reuses app.search(text, true).'
+		'Line limits: client/app.ts, web/app.ts, host/host.ts and web/view.ts sit at 398-400 lines, so the glue is compact; the web edit field reuses app.search(text, true).',
+		"The faint note first used L 0.58 grey, unreadable on the selected row's L 0.42 background; popupNote is L 0.8 so it stays dimmer than the row text (0.98) yet readable."
 	],
 	needs: ['zp', 'kv', 'pc'],
 	foldInto: ['zp']
