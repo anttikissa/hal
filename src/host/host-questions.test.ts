@@ -259,6 +259,15 @@ test('/intro switches a tab back to hal/intro and greets again at once', async (
 	c.conn.send({ type: 'submit', sessionId: id, text: '/intro' })
 	await until(() => texts(c.views.get(id)!).filter((t) => t.includes('HAL 9001')).length === 2 && field(c, id)?.name === 'name')
 	expect(field(c, id)).toMatchObject({ initial: 'Rowan' })
+	// An emptied field removes the saved value; Escape keeps it.
+	profile.save({ 'Language preference': 'Terse' })
+	await reply(c, id, 'name', '', 'login')
+	await reply(c, id, 'login', 'Skip', 'language')
+	expect(field(c, id)).toMatchObject({ initial: 'Terse' })
+	c.conn.send({ type: 'pause', sessionId: id })
+	await until(() => c.of('turn-end').filter((e) => e.status === 'completed').length === 2)
+	expect(profile.text()).toBe('# User\n\nLanguage preference: Terse\n')
+	expect(texts(c.views.get(id)!).join('\n')).toContain('I removed your name from')
 })
 
 test('text typed outside a question asks whether to go on; No ends the intro', () => {

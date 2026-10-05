@@ -5,7 +5,8 @@ import { existsSync, readFileSync, realpathSync, renameSync, writeFileSync } fro
 import { clients } from './clients.ts'
 import { paths } from './paths.ts'
 
-export type Fields = { Name?: string; 'Language preference'?: string; Timezone?: string }
+// null removes a field's lines.
+export type Fields = { Name?: string | null; 'Language preference'?: string | null; Timezone?: string | null }
 const labels = ['Name', 'Language preference', 'Timezone'] as const
 
 function file(): string {
@@ -37,12 +38,17 @@ function timezone(v: string): boolean {
 // after the # User header, else at the end. Nothing else changes. A new
 // file starts with the header; writes are atomic and 0600.
 function save(fields: Fields): void {
-	let given = labels.filter((l) => profile.value(fields[l]) !== undefined)
-	if (!given.length) return
+	let given = labels.filter((l) => profile.value(fields[l] ?? undefined) !== undefined)
+	let removed = labels.filter((l) => fields[l] === null)
+	if (!given.length && !removed.length) return
 	let lines = (profile.text() || '# User\n').split('\n')
 	let at = (label: string) => lines.findIndex((l) => new RegExp(`^${label}:`, 'i').test(l))
+	for (let label of removed) for (let i = at(label); i >= 0; i = at(label)) {
+		// A field line sits between blank lines: take one blank with it.
+		lines.splice(i, lines[i + 1] === '' && (i === 0 || lines[i - 1] === '') ? 2 : 1)
+	}
 	for (let label of given) {
-		let line = `${label}: ${profile.value(fields[label])}`
+		let line = `${label}: ${profile.value(fields[label] ?? undefined)}`
 		let i = at(label)
 		if (i >= 0) {
 			lines[i] = line
