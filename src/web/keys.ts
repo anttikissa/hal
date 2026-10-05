@@ -27,6 +27,7 @@ import { tabs } from './tabs.ts'
 import { view } from './view.ts'
 import { commandList } from '../common/commands/list.ts'
 import { find } from './find.ts'
+import { folds } from './folds.ts'
 import { rebaseView } from './rebase.ts'
 import { restart } from './restart.ts'
 import { emergency } from '../common/emergency.ts'
@@ -69,9 +70,17 @@ function key(e: KeyInput, target: Target): boolean {
 	// The message box may hold text no input event told us about.
 	if (target.kind === 'message' && target.text !== st.text) app.input(target.text)
 	let k = view.key(e)
-	if (k && commandList.byKey({ key: k.key.toLowerCase(), ctrl: !!k.ctrl, cmd: !!k.cmd, alt: !!k.alt, shift: !!k.shift })?.name === 'find') { find.open(); return true }
+	let named = k && commandList.byKey({ key: k.key.toLowerCase(), ctrl: !!k.ctrl, cmd: !!k.cmd, alt: !!k.alt, shift: !!k.shift })?.name
+	if (named === 'find') { find.open(); return true }
+	// Ctrl-O asks which blocks to toggle (task r4d), never the browser's open-file.
+	if (named === 'toggle') { folds.open(); return true }
 	// Find has native text editing; model arrows remain tree/effort keys.
 	if (st.view.modal) {
+		if (st.view.modal.compact) {
+			if (!k || e.ctrlKey || e.metaKey || e.altKey || !['enter', 'escape'].includes(k.key)) return false
+			folds.key(k)
+			return true
+		}
 		if (st.view.modal.find) {
 			if (!k || e.ctrlKey || e.metaKey || e.altKey || !['enter', 'escape', 'up', 'down'].includes(k.key)) return false
 			find.key(k)

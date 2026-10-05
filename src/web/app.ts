@@ -29,6 +29,7 @@ import { tabs } from './tabs.ts'
 import { target, type Target } from './target.ts'
 import { view, type ViewState } from './view.ts'
 import { find } from './find.ts'
+import { folds } from './folds.ts'
 import { rebaseView } from './rebase.ts'
 import { diagnostics } from './diagnostics.ts'
 
@@ -95,7 +96,7 @@ function onEvent(event: Event): void {
 	if (event.type === 'restart') return restart.mark()
 	if (event.type === 'restart-ask') delete restart.state.mark
 	if (event.type === 'web-update') { st.updateAvailable = true; return app.changed() }
-	if (event.type === 'redraw' || rebaseView.onEvent(event)) return
+	if (event.type === 'redraw' || folds.onEvent(event) || rebaseView.onEvent(event)) return
 	if (event.type === 'tabs') push.badge(event.tabs)
 	if (push.onEvent(event)) return
 	if (tabs.onEvent(event)) return
@@ -146,8 +147,7 @@ function onEvent(event: Event): void {
 // The address changed (loaded, a card's link followed, Back): aim at
 // the block it names, if any.
 function aim(): void {
-	let url = router.href()
-	app.state.target = target.parse(url, router.parse(url))
+	app.state.target = target.parse(router.href(), router.parse(router.href()))
 	app.seek()
 	app.changed()
 }
@@ -299,7 +299,7 @@ function send(queue = false): void {
 		uploads.wait(id, queue)
 		return app.setNotice('sending once the upload is done')
 	}
-	if (restart.typed(st.text)) return app.input('')
+	if (restart.typed(st.text) || folds.typed(st.text)) return app.input('')
 	let { command, notice, keep } = view.submit(st.view, st.text, queue)
 	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number } | undefined
 	// A prompt shows at once and waits, pending, for the host.

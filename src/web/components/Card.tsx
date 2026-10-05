@@ -31,17 +31,11 @@ import { editPrompt } from '../edit-prompt.ts'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
+import { folds } from '../folds.ts'
 
-const [opened, setOpened] = createSignal<ReadonlySet<string>>(new Set())
+const { opened, toggled } = folds
 // Tool cards showing their whole result, by the same key.
 const [whole, setWhole] = createSignal<ReadonlySet<string>>(new Set())
-
-function toggled(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
-	let next = new Set(set)
-	if (on) next.add(id)
-	else next.delete(id)
-	return next
-}
 
 // A new card fades in (--fade-ms, --ease-out from the page's CSS). A
 // script animation, not a CSS one: moving the card in the list, as when
@@ -76,8 +70,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	onSettled(() => root && enter(root))
 	let open = () => opened().has(id())
 	// The setters may run in an effect: they read the state as of the call.
-	let setOpen = (on: boolean) => untrack(() => setOpened(toggled(opened(), id(), on)))
-	let expanded = open
+	let setOpen = (on: boolean) => untrack(() => folds.set(id(), props.row.item, on, [props.row.key, ...(props.row.result ? [props.row.result.key] : [])], closable()))
+	// Assistant text and the user's prompts start open; /toggle closes
+	// them (task r4d), and a closed one folds like thinking.
+	let closable = () => props.row.note === undefined && folds.closable(props.row.item)
+	let shut = () => closable() && folds.closed().has(id())
+	let expanded = () => (closable() ? !shut() : open())
 	// A tool still streaming after a second opens and stays open (task
 	// a5): opening at once and closing on the result made quick calls
 	// flash and jolted the scroll.
@@ -115,7 +113,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	)
 	// Another session's message with a summary folds under it.
 	// Prompt-file changes fold under their summary (task ar).
-	let folds = () => props.row.item.type === 'thinking' || props.row.item.type === 'tool' || (props.row.item.type === 'prompt' && !!props.row.item.summary) || (props.row.item.type === 'output' && !!props.row.item.change)
+	let folding = () => shut() || props.row.item.type === 'thinking' || props.row.item.type === 'tool' || (props.row.item.type === 'prompt' && !!props.row.item.summary) || (props.row.item.type === 'output' && !!props.row.item.change)
 	// A tool's first line (its description or call) heads the card;
 	// thinking is headed by the terminal's header words and its first
 	// line. Prompts and model text show those words above their text
@@ -170,7 +168,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let failed = () => !!props.row.result?.isError
 	let toggle = (e: MouseEvent) => {
-		if ((!folds() && props.row.note === undefined) || (e.target as Element).closest('a, .more, .kill, .edit') || !getSelection()?.isCollapsed) return
+		if ((!folding() && props.row.note === undefined) || (e.target as Element).closest('a, .more, .kill, .edit') || !getSelection()?.isCollapsed) return
 		scroll.follow(() => {
 			setOpen(!expanded())
 			flush()
@@ -270,10 +268,10 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folds() ? 'folds' : '', expanded() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
+				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange() ? change() : (
-						<Show when={folds()} fallback={plain(s)}>
+						<Show when={folding()} fallback={plain(s)}>
 							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} reference={link()}
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
