@@ -20,6 +20,22 @@
 // scroll whose gap then falls outside `near` and stops the follow. A
 // send's glide ignores leftover wheel momentum, but a new finger
 // gesture always takes over and pauses following until release.
+//
+// Pinned (the user's rule): a reader at the very bottom stays there
+// until they leave it by hand. The 50 px rule alone kept whatever gap
+// it found, so anything else that moved the view a few pixels (a tab
+// in the background, tool output landing, the browser clamping
+// scrollTop) became the new gap, and the view stayed that far short
+// for good. While pinned, the gap kept is always 0 and any move or
+// growth the reader did not make is pulled back to the bottom.
+//
+// Only reader input unpins: wheel, touch, scroll keys or Tab, find
+// (Cmd/Ctrl+F or G, F3), a press on the scrollbar, a drag that moves
+// the view (a selection or middle-button autoscroll, a thumb drag),
+// or a link to a block. Unpinning too eagerly is safe, since the view
+// pins again whenever it is found at the very bottom; pulling back a
+// reader who left on purpose is not, so when unsure, unpin. A send
+// pins at once. Unpinned, the 50 px rule above applies as before.
 
 import { reflow } from './reflow.ts'
 
@@ -54,6 +70,10 @@ function at(from: number, to: number, ms: number): number {
 
 const scrollKeys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '])
 
+// At most this far above the bottom still counts as at the bottom:
+// scroll positions can be fractional.
+const atBottom = 1
+
 function stop(): void {
 	if (scroll.state.frame) cancelAnimationFrame(scroll.state.frame)
 	scroll.state.frame = 0
@@ -64,8 +84,17 @@ function forced(): boolean {
 	return performance.now() < scroll.state.forcedUntil
 }
 
+// The reader moved, or may be about to move, the view: stop any glide
+// and stop pulling the view back to the bottom.
+function leave(): void {
+	scroll.stop()
+	scroll.state.pinned = false
+}
+
+// Wheel and scroll keys. Leftover wheel momentum during a send's glide
+// is not a new decision, so it neither stops the glide nor unpins.
 function userScroll(): void {
-	if (!scroll.forced()) scroll.stop()
+	if (!scroll.forced()) scroll.leave()
 }
 
 // A new finger gesture is deliberate, unlike leftover wheel momentum.
@@ -73,7 +102,7 @@ function userScroll(): void {
 // the bottom, even before the gap has crossed the follow threshold.
 function touchStart(): void {
 	scroll.state.touching = true
-	scroll.stop()
+	scroll.leave()
 	scroll.state.forcedUntil = 0
 }
 
@@ -83,7 +112,44 @@ function touchEnd(): void {
 
 function onKey(e: KeyboardEvent): void {
 	let t = e.target as Element | null
-	if (scrollKeys.has(e.key) && !t?.closest?.('textarea, input')) scroll.userScroll()
+	// Find in page jumps to a match, from any field.
+	let find = e.key === 'F3' || ((e.metaKey || e.ctrlKey) && /^[fg]$/i.test(e.key))
+	if (find) return scroll.leave()
+	// Tab may focus a card off screen, and the browser scrolls it into view.
+	if ((scrollKeys.has(e.key) || e.key === 'Tab') && !t?.closest?.('textarea, input')) scroll.userScroll()
+}
+
+// Sets the view's position and remembers it as ours, so the scroll
+// event it causes is not mistaken for the reader dragging.
+function put(el: Box, top: number): void {
+	el.scrollTop = top
+	scroll.state.set = el.scrollTop
+}
+
+// Runs after anything that may have moved the view or grown the
+// content: a scroll event, a DOM change, the tab shown again. `why`
+// names the trigger for diagnostics (onPull).
+function check(why: string, scrolled = false): void {
+	let st = scroll.state, el = st.el
+	if (!el) return
+	// A move we did not make, while a mouse button or finger is down,
+	// is the reader dragging: selecting past the edge, middle-button
+	// autoscroll, or the scrollbar thumb.
+	if (scrolled && (st.pressing || st.touching) && Math.abs(el.scrollTop - st.set) > 2) scroll.leave()
+	let g = scroll.gap(el)
+	// At the very bottom, however it got there: pinned again. Not while
+	// a finger is down, since the drag may be heading up.
+	if (g <= atBottom) {
+		if (!st.touching) st.pinned = true
+		return
+	}
+	// Pinned but above the bottom, and no glide is already on its way:
+	// something other than the reader moved the view or grew the
+	// content. Pull back, unless a press is under way (a click or the
+	// start of a selection must not have the text slide under it).
+	if (!st.pinned || st.frame || st.pressing || st.touching) return
+	scroll.onPull(g, why)
+	scroll.follow(() => {})
 }
 
 // Whether the reader is within `nearTop` px of the top, where earlier
@@ -102,7 +168,7 @@ function anchor(change: () => void): void {
 	let below = el.scrollHeight - el.scrollTop
 	scroll.stop()
 	scroll.quiet(change)
-	el.scrollTop = Math.max(0, el.scrollHeight - below)
+	scroll.put(el, Math.max(0, el.scrollHeight - below))
 }
 
 // Runs `change` with new cards appearing at once: a tab's rows, or
@@ -125,11 +191,36 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	// the reading anchor was taken mid-way and would strand the view.
 	let stopReflow = reflow.watch(el, () => {
 		if (scroll.state.frame) return true
+		// Pinned: the bottom is the anchor, whatever the reading anchor says.
+		if (scroll.state.pinned) {
+			scroll.put(el, scroll.target(el, 0))
+			return true
+		}
 		scroll.state.forcedUntil = 0
 		return false
 	})
-	let scrolled = () => scroll.atTop() && onTop()
+	let scrolled = () => {
+		scroll.check('scroll', true)
+		if (scroll.atTop()) onTop()
+	}
 	el.addEventListener('scroll', scrolled, { passive: true })
+	// Streamed text and new cards change the DOM; a change that no
+	// follow() covered would otherwise leave a pinned view short.
+	let content = new MutationObserver(() => scroll.check('content'))
+	content.observe(el, { childList: true, characterData: true, subtree: true })
+	// A background tab gets no animation frames: catch up when shown.
+	let shown = () => { if (!document.hidden) scroll.check('shown') }
+	document.addEventListener('visibilitychange', shown)
+	// A press inside the transcript; on the scrollbar (right of the
+	// content box) it is the reader taking the view.
+	let press = (e: PointerEvent) => {
+		scroll.state.pressing = true
+		if (e.target === el && e.offsetX >= el.clientWidth) scroll.leave()
+	}
+	let release = () => { scroll.state.pressing = false }
+	el.addEventListener('pointerdown', press, { passive: true })
+	addEventListener('pointerup', release, { passive: true })
+	addEventListener('pointercancel', release, { passive: true })
 	addEventListener('wheel', scroll.userScroll, { passive: true })
 	el.addEventListener('touchstart', scroll.touchStart, { passive: true })
 	el.addEventListener('touchend', scroll.touchEnd, { passive: true })
@@ -140,6 +231,12 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		scroll.state.el = null
 		stopReflow()
 		el.removeEventListener('scroll', scrolled)
+		content.disconnect()
+		document.removeEventListener('visibilitychange', shown)
+		el.removeEventListener('pointerdown', press)
+		removeEventListener('pointerup', release)
+		removeEventListener('pointercancel', release)
+		scroll.state.pressing = false
 		removeEventListener('wheel', scroll.userScroll)
 		el.removeEventListener('touchstart', scroll.touchStart)
 		el.removeEventListener('touchend', scroll.touchEnd)
@@ -155,7 +252,9 @@ function follow(change: () => void, mode: Mode = 'glide', force = false): void {
 	let st = scroll.state
 	let el = st.el
 	if (!el) return change()
-	let g = st.touching && !force ? undefined : scroll.keep(scroll.gap(el), st.frame ? st.gap : undefined, force)
+	// A send pins; pinned, the gap to keep is 0 whatever was measured.
+	if (force) st.pinned = true
+	let g = st.touching && !force ? undefined : scroll.keep(scroll.gap(el), st.frame ? st.gap : undefined, force || st.pinned)
 	change()
 	if (g === undefined) return
 	st.gap = g
@@ -165,7 +264,7 @@ function follow(change: () => void, mode: Mode = 'glide', force = false): void {
 	if (force) st.forcedUntil = performance.now() + scroll.forcedMs
 	if (mode === 'snap' || matchMedia('(prefers-reduced-motion: reduce)').matches) {
 		scroll.stop()
-		el.scrollTop = scroll.target(el, g)
+		scroll.put(el, scroll.target(el, g))
 		return
 	}
 	if (mode === 'track') st.exactUntil = performance.now() + scroll.toggleMs
@@ -174,9 +273,10 @@ function follow(change: () => void, mode: Mode = 'glide', force = false): void {
 	st.pos = st.set = el.scrollTop
 	let last = performance.now()
 	let step = (now: number) => {
-		// Anything else moving the view (a scrollbar drag, a wheel this
-		// missed) is the reader taking over.
-		if (Math.abs(el.scrollTop - st.set) > 2 && !scroll.forced()) return void (st.frame = 0)
+		// Unpinned, anything else moving the view (a wheel this missed)
+		// is the reader taking over. Pinned, the reader's input would
+		// have unpinned first, so the move is not theirs: carry on.
+		if (Math.abs(el.scrollTop - st.set) > 2 && !scroll.forced() && !st.pinned) return void (st.frame = 0)
 		// rAF time is the frame's start, which may precede `last`.
 		let ms = Math.min(50, Math.max(0, now - last))
 		last = Math.max(last, now)
@@ -198,15 +298,19 @@ function save(id: string): void {
 	let el = scroll.state.el
 	if (!el) return
 	scroll.stop()
+	// A pinned reader comes back pinned, even if a drift was not yet
+	// pulled back.
 	let near = scroll.keep(scroll.gap(el)) !== undefined
-	scroll.state.places.set(id, near ? { gap: scroll.gap(el) } : { top: el.scrollTop })
+	scroll.state.places.set(id, scroll.state.pinned ? { gap: 0 } : near ? { gap: scroll.gap(el) } : { top: el.scrollTop })
 }
 
 function restore(id: string): void {
 	let el = scroll.state.el
 	if (!el) return
 	let place = scroll.state.places.get(id) ?? { gap: 0 }
-	el.scrollTop = 'top' in place ? place.top : scroll.target(el, place.gap)
+	// A tab never shown here opens pinned at the bottom.
+	scroll.state.pinned = 'gap' in place && place.gap <= atBottom
+	scroll.put(el, 'top' in place ? place.top : scroll.target(el, place.gap))
 }
 
 export const scroll = {
@@ -219,9 +323,17 @@ export const scroll = {
 	// A card's open and close animation (CSS --toggle-ms matches).
 	toggleMs: 250,
 	forcedMs: 300,
-	state: { el: null as Box | null, quiet: false, frame: 0, gap: 0, pos: 0, set: 0, exactUntil: 0, forcedUntil: 0, touching: false, places: new Map<string, { top: number } | { gap: number }>() },
+	// `pinned`: see the header. `pressing`: a mouse button or pen is down
+	// in the transcript. `set`: the last position this module set.
+	state: { el: null as Box | null, quiet: false, frame: 0, gap: 0, pos: 0, set: 0, exactUntil: 0, forcedUntil: 0, touching: false, pinned: true, pressing: false, places: new Map<string, { top: number } | { gap: number }>() },
+	// Called when a pinned view is pulled back to the bottom, with the
+	// gap found and the trigger. A diagnostics hook (drift.ts); no-op.
+	onPull: (_gap: number, _why: string): void => {},
 	gap,
 	keep,
+	leave,
+	put,
+	check,
 	target,
 	at,
 	stop,
