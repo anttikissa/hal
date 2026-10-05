@@ -8,6 +8,7 @@ import { settings } from '../common/settings.ts'
 import { connection } from '../common/connection.ts'
 import { app } from './app.ts'
 import { diagnostics } from './diagnostics.ts'
+import { drift } from './drift.ts'
 import { App } from './components/App.tsx'
 
 // The host's settings (config.ason) are read before the first render.
@@ -24,5 +25,6 @@ if (typeof document !== 'undefined') {
 			scrollTop: Math.max(0, document.querySelector('.Transcript')?.scrollTop ?? 0),
 			appHeight: parseFloat(document.documentElement.style.getPropertyValue('--app-height')) || innerHeight, composerFocused: !!document.activeElement?.closest('.Composer') }
 	})
+	if (settings.webDiagnostics()) drift.init()
 	render(() => <App />, document.body)
 }
