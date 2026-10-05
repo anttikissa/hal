@@ -289,6 +289,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					continue
 				}
 				if (decided.get(call.id) === false) { results.push(approval.declined(call)); continue }
+				status.transition(id, { type: 'tools', call: call.id, at: new Date().toISOString() })
 				let stream = call.name === 'bash' ? toolOutput.start(id, call.id) : undefined
 				try { results.push(await tools.run(call, stream ? { ...ctx, onOutput: stream.onOutput } : ctx)) }
 				finally { stream?.stop() }

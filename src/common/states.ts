@@ -17,8 +17,9 @@ export type Phase = 'requesting' | 'streaming' | 'tools'
 export type SessionState =
 	// Nothing to do; the last turn completed. Ended by the user sending.
 	| { type: 'idle' }
-	// A turn is in progress; ended by the turn itself.
-	| { type: 'running'; phase: Phase }
+	// A turn is in progress; ended by the turn itself. Running tools:
+	// `call` is the call running since `since` (ISO time, task wm0).
+	| { type: 'running'; phase: Phase; call?: string; since?: string }
 	// A failure the host is fixing on its own, again at `at` (ISO time).
 	| { type: 'retrying'; at: string; reason: string }
 	// Needs a human: a login, or an answer (reason `question`, the open
@@ -38,8 +39,8 @@ export type StateEvent =
 	| { type: 'request' }
 	// The round's first output arrived.
 	| { type: 'stream' }
-	// The round's tool calls are running.
-	| { type: 'tools' }
+	// The round's tool calls are running; `call` started at `at`.
+	| { type: 'tools'; call?: string; at?: string }
 	// Escape, Ctrl-C of the last Hal process, or the loop guard.
 	| { type: 'pause'; reason?: string }
 	// The turn ended: completed, or failed with `error`.
@@ -74,6 +75,7 @@ function step(state: SessionState, event: StateEvent): SessionState | string {
 		case 'tools': {
 			if (state.type !== 'running' && !(event.type === 'request' && (state.type === 'retrying' || state.type === 'blocked'))) return state
 			let phase: Phase = event.type === 'request' ? 'requesting' : event.type === 'stream' ? 'streaming' : 'tools'
+			if (event.type === 'tools' && event.call !== undefined) return { type: 'running', phase, call: event.call, ...(event.at !== undefined ? { since: event.at } : {}) }
 			return state.type === 'running' && state.phase === phase ? state : { type: 'running', phase }
 		}
 		case 'pause': {
