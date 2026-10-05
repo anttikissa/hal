@@ -20,10 +20,10 @@ function stopped(done: DoneEvent): DoneEvent | ErrorEvent {
 	return done
 }
 
-// Steering cancelled or stopped a call (task ker): not a failure, but
+// Steering canceled or stopped a call (task ker): not a failure, but
 // the model reads what happened.
-function cancelled(id: string): ToolResultBlock {
-	return { type: 'tool_result', id, output: `Tool call did not run: cancelled ${jobs.byMessage}.`, interrupted: 'cancelled' }
+function canceled(id: string): ToolResultBlock {
+	return { type: 'tool_result', id, output: `Tool call did not run: canceled ${jobs.byMessage}.`, interrupted: 'canceled' }
 }
 // A steer stopped the call if it failed (a tool's own abort error, any
 // wording) or is bash's stop line, built from the same `byMessage`; a
@@ -93,4 +93,4 @@ function backoffMs(failures: number): number {
 	return failures === 0 ? 0 : Math.min(1000 * 2 ** (failures - 1), 30_000)
 }
 
-export const turnPolicy = { stopped, cancelled, stoppedBy, parkedUsage, waitOut, waitFor, backoffMs }
+export const turnPolicy = { stopped, canceled, stoppedBy, parkedUsage, waitOut, waitFor, backoffMs }

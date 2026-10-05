@@ -5,7 +5,7 @@
 	notes: [
 		'Records are output records with a change field (no new record type): replay turns them into notes, transcript.aside carries change, and promptChanges.group merges runs at draw time in both clients (web view.rows, terminal frame.layout), memoized per run so keyed rows and the terminal layout cache keep the object.',
 		"Web: an opened change's diff lines stay whole and scroll sideways as one box, right edge fading, like a wide markdown table; only the collapsed summary rows are cut with an ellipsis. Truncated diff lines on a phone hid the change itself.",
-		'A multi-line edit used to show only its first changed line; a removed first line struck the whole row, time and file included, so an edit read as a deletion. Invariant: an edit shows its changed words, and the row lead never takes diff colours.'
+		'A multi-line edit used to show only its first changed line; a removed first line struck the whole row, time and file included, so an edit read as a deletion. Invariant: an edit shows its changed words, and the row lead never takes diff colors.'
 	],
 	needs: ['48']
 }

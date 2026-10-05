@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
-/* The one stylesheet: layout only. Colours come from the theme below
+/* The one stylesheet: layout only. Colors come from the theme below
    (src/common/colors.ts; .page carries the page's own as variables). */
 :root { color-scheme: dark; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --fade-ms: 300ms; --toggle-ms: 250ms; }
 /* Icons (icons.ts): one stroke width, in 24-grid units, for both grids. */
@@ -18,12 +18,12 @@
 .icon.g24 .s { stroke-width: var(--icon-stroke); }
 button:has(> .icon) { display: inline-flex; align-items: center; justify-content: center; gap: 0.75ch; }
 * { box-sizing: border-box; }
-/* Selection is reverse video in the text's own colour (each theme class
-   sets --sel-back); a solid block (bg in its colour) reverses back. */
+/* Selection is reverse video in the text's own color (each theme class
+   sets --sel-back); a solid block (bg in its color) reverses back. */
 .page { --sel-text: var(--canvas); }
 ::selection { background-color: var(--sel-back); color: var(--sel-text); -webkit-text-fill-color: var(--sel-text); }
 .Question button[aria-pressed="true"], .Composer .completions button[aria-selected="true"], .Question mark { --sel-back: var(--canvas); --sel-text: var(--fg); }
-/* Focus: one style, 2px in the control's own colour, outside it. Inside
+/* Focus: one style, 2px in the control's own color, outside it. Inside
    where a clipping strip or list would cut it off; flush against a
    control that already draws a border, so it reads as a thicker one. */
 :where(:focus-visible) { outline: 2px solid currentColor; outline-offset: 2px; }
@@ -59,7 +59,7 @@ html.typing .App { position: absolute; }
 .Transcript > * { margin: 0 0 0.5lh; }
 /* Scroll-to-bottom: a zero-height sticky row ending the transcript, so
    it shares the cards' left edge; a 44px target whose vertical pill is
-   centred on their 3px bar. */
+   centered on their 3px bar. */
 .Transcript > .to-bottom { position: sticky; bottom: 0; height: 0; margin: 0; z-index: 1; }
 .to-bottom button { position: absolute; bottom: 0.5lh; left: calc(1.5px - 22px); width: 44px; height: 52px; padding: 0; border: 0; background: none; display: flex; align-items: center; justify-content: center; color: var(--text); animation: fade-in 150ms var(--ease-out); }
 .to-bottom .pill { display: flex; align-items: center; justify-content: center; width: 20px; height: 44px; border-radius: 10px; background: color-mix(in oklab, var(--canvas) 55%, transparent); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
@@ -69,7 +69,7 @@ html.typing .App { position: absolute; }
    the left, the style's tint behind. */
 .Card, .Question { border-left: 3px solid currentColor; }
 /* One geometry on every screen: the header row is a 44px touch target
-   with its line centred, and the body ends with that same inset, so a
+   with its line centered, and the body ends with that same inset, so a
    card's top and bottom whitespace match. */
 .Card { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; --card-inset: calc((44px - 1lh) / 2); }
 .Card .content { padding: 0.25lh 1ch var(--card-inset); }
@@ -97,7 +97,7 @@ html.typing .App { position: absolute; }
 .Card .change .head:not(:first-child) { margin-top: 0.5lh; }
 /* One header grid for metadata and folding cards; first-line alignment
    stays the same when a label wraps. The 44px height belongs to this row:
-   every slot shares one top inset that centres a single line in 44px,
+   every slot shares one top inset that centers a single line in 44px,
    so a wrapped label grows down from the timestamp's line. */
 .CardHeader { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; column-gap: 1ch; padding-inline: 1ch; min-height: 44px; }
 .CardHeader:not(:has(.stamp)) { grid-template-columns: minmax(0, 1fr) auto; }
@@ -109,7 +109,7 @@ html.typing .App { position: absolute; }
 .CardHeader .title > .icon { height: 1lh; margin-right: 0.8ch; opacity: 0.8; }
 .Card.folds:not(.open) .CardHeader .label { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
 .CardHeader .error { background: none; margin-left: 1ch; }
-/* Steering's "(cancelled)" or "(stopped, 50.2s)" is no failure; a flagged call's label keeps the title colour (task ker). */
+/* Steering's "(canceled)" or "(stopped, 50.2s)" is no failure; a flagged call's label keeps the title color (task ker). */
 .CardHeader .status { margin-left: 1ch; color: var(--quiet); white-space: nowrap; }
 .CardHeader .unsafe { margin-left: 1ch; font-style: italic; white-space: nowrap; }
 .CardHeader .kill { margin-left: 1ch; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; align-self: flex-start; }
@@ -126,13 +126,13 @@ html.typing .App { position: absolute; }
 @media (max-width: 40rem) { .EditBar { margin-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right)); } }
 .CardHeader .stamp, .CardHeader .link { min-width: 44px; }
 .CardHeader .title a { padding-block: var(--card-inset); }
-/* A context boundary (tasks bc, vh): its text centred in a rule. */
+/* A context boundary (tasks bc, vh): its text centered in a rule. */
 .Card.divider { display: flex; align-items: center; gap: 1ch; border-left: none; }
 .Card.divider::before, .Card.divider::after { content: ""; flex: 1; border-top: 1px solid currentColor; }
 .Card.image .content > a { display: block; touch-action: pan-y; }
 .Card.image img { display: block; max-width: 100%; max-height: 24rem; }
 /* A prompt the host hasn't taken yet looks sent; only one that stays
-   pending greys, after a delay, so a normal round trip shows nothing. */
+   pending grays, after a delay, so a normal round trip shows nothing. */
 .Card.user { transition: color 300ms var(--ease-out); }
 .Transcript > .Card.queued:has(+ .Card.queued) { margin-bottom: 0; }
 .Card.queued { cursor: pointer; }
@@ -255,9 +255,9 @@ html.typing .App { position: absolute; }
 .Composer { position: relative; z-index: 1; flex: none; padding: 0.25lh max(2ch, env(safe-area-inset-right)) max(0px, calc(max(0.5lh, env(safe-area-inset-bottom)) - (100dvh - var(--app-height, 100dvh)))) max(2ch, env(safe-area-inset-left)); }
 .Composer > #notice:empty { display: none; }
 .Composer .status { padding: 0.125lh 0; }
-/* Completions: a panel in the box's own colour (the input style), like a
+/* Completions: a panel in the box's own color (the input style), like a
    card: lit left bar, outline, names bright; the selected row solid in
-   that colour with canvas text, as a chosen option is. */
+   that color with canvas text, as a chosen option is. */
 .Composer .completions { position: absolute; bottom: 100%; left: 0; right: 0; max-height: min(35dvh, 20rem); overflow-y: auto; background: var(--canvas); box-shadow: inset 0 0 0 1px currentColor; border-left: 3px solid currentColor; }
 .Composer .completions button { display: flex; flex-direction: column; width: 100%; min-height: 44px; padding: 0.25lh 1ch; text-align: left; background: transparent; color: inherit; }
 @media (hover: hover) and (pointer: fine) { .Composer .completions button:hover { background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent); } }
@@ -282,7 +282,7 @@ html.typing .App { position: absolute; }
 @media (hover: hover) and (pointer: fine) { .chips button:hover { color: inherit; background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
 .entry .actions button { flex: 1; min-height: 44px; }
 /* Attach on the left; on the right a narrow, quiet pause (turn control)
-   apart from the send actions, and steer/send in the accent colour. */
+   apart from the send actions, and steer/send in the accent color. */
 .entry > button.attach { order: -1; border-left: 0; border-right: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); padding: 0; width: 44px; }
 .entry .actions button { padding: 0; width: 44px; flex: none; }
 .entry .actions button.toggle { width: 36px; color: var(--quiet); }
@@ -290,7 +290,7 @@ html.typing .App { position: absolute; }
 .entry .field { flex: 1; min-width: 0; position: relative; display: flex; }
 /* The example request: the input's faint blue, as in the terminal. It
    leaves fast as typing starts and returns a little slower. */
-/* One line of text sits centred in the 44px row the buttons set. */
+/* One line of text sits centered in the 44px row the buttons set. */
 .entry .hint { position: absolute; inset: calc((44px - 1lh) / 2) 1ch auto; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; transition: opacity 150ms var(--ease-out); }
 .entry .hint.gone { opacity: 0; transition-duration: 80ms; }
 .entry textarea { field-sizing: content; overscroll-behavior: none; touch-action: pan-y pinch-zoom; max-height: calc(var(--app-height, 100dvh) * 0.4); flex: 1; min-width: 0; margin: 0; background: transparent; color: inherit; border: 0; padding: calc((44px - 1lh) / 2) 1ch; }
@@ -321,8 +321,8 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 @media (prefers-reduced-motion: reduce) { .Card .body, .entry .hint, .entry button, .Tabs .strip .marker { transition: none; } .cursor-line span, .Card .cursor, .status .dot, .Tabs .marker { animation: none; } }
 .Login { max-width: 20rem; margin: 20vh auto; display: flex; flex-direction: column; gap: 0.5lh; }
 .Question { position: relative; margin: 0 0 0.5lh; padding: 0.25lh 1ch; display: flex; flex-direction: column; gap: 0.25lh; }
-/* Options: a hairline in the card's colour; the chosen one solid in it,
-   its text the canvas colour (text-fill keeps currentColor the card's).
+/* Options: a hairline in the card's color; the chosen one solid in it,
+   its text the canvas color (text-fill keeps currentColor the card's).
    Focus follows the choice, so its ring is a hairline halo, not a
    second, thicker border. */
 .Question button:not(.dismiss) { padding: 0.125lh 1ch; background: transparent; color: inherit; box-shadow: inset 0 0 0 1px color-mix(in oklab, currentColor 55%, transparent); }
@@ -330,7 +330,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 @media (hover: hover) and (pointer: fine) { .Question button:hover:not([aria-pressed="true"]) { background: color-mix(in oklab, currentColor var(--mix-choice-hover), transparent); } }
 /* Options wrap with the same gap across and down. */
 .Question [role="group"] { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5lh 1ch; }
-/* Answer: the options' colours, a button's shape. */
+/* Answer: the options' colors, a button's shape. */
 .Question button.answer { align-self: flex-start; min-height: 36px; padding: 0 2ch; font-weight: 600; }
 .Question button:not(.dismiss):focus-visible { outline-width: 1px; outline-offset: 2px; }
 .Question .dismiss { position: absolute; top: 0; right: 0; background: none; color: inherit; padding: 0.25lh 1ch; }
@@ -381,7 +381,7 @@ button[aria-pressed="true"] { background: var(--accent); color: var(--canvas); }
 /* Tabs (tasks 3k, ce): one row with native momentum scrolling between
    narrow secondary chevrons; menu and new-tab stay fixed. Equal cell
    widths are set by Tabs.tsx. The shown tab's
-   cell is tinted with a lit bar under it; its content is centred, and a
+   cell is tinted with a lit bar under it; its content is centered, and a
    marker that appears widens it smoothly. Under 50px tall. */
 .Tabs { flex: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 .Tabs .strip { display: flex; align-items: stretch; white-space: nowrap; overflow: hidden; }

@@ -90,7 +90,7 @@ for (let stop of ['none', 'pause', 'close'] as const) {
 				await until(() => calls.length === 2)
 				let blocks = calls[1]!.input.messages.flatMap((m: any) => m.blocks)
 				expect(blocks).toContainEqual({ type: 'tool_result', id: 'first', output: 'settled partial output' })
-				expect(blocks).toContainEqual({ type: 'tool_result', id: 'pending', output: expect.stringContaining('did not run'), interrupted: 'cancelled' })
+				expect(blocks).toContainEqual({ type: 'tool_result', id: 'pending', output: expect.stringContaining('did not run'), interrupted: 'canceled' })
 				calls[1]!.push({ type: 'done', reason: 'end' })
 			}
 			await until(() => a.of('turn-end').length)
@@ -164,7 +164,7 @@ for (let escape of [false, true]) {
 				await until(() => calls.length === 2)
 				let messages = calls[1]!.input.messages
 				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual({ type: 'tool_result', id: 'flagged', output: 'migrated' })
-				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual({ type: 'tool_result', id: 'pending', output: expect.stringContaining('did not run'), interrupted: 'cancelled' })
+				expect(messages.flatMap((m: any) => m.blocks)).toContainEqual({ type: 'tool_result', id: 'pending', output: expect.stringContaining('did not run'), interrupted: 'canceled' })
 				expect(messages.at(-1).blocks.at(-1).text).toEqual(stamped('steer'))
 				calls[1]!.push({ type: 'done', reason: 'end' })
 			}

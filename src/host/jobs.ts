@@ -188,7 +188,7 @@ async function lost(): Promise<void> {
 // (turns.ts: not a failure, task ker).
 const steered = 'steered'
 const byMessage = 'by a new user message, which follows; read it, then carry on'
-function why(signal: AbortSignal, stopped = 'cancelled'): string {
+function why(signal: AbortSignal, stopped = 'canceled'): string {
 	return `${stopped} ${signal.reason === steered ? byMessage : 'by the user'}`
 }
 

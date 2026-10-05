@@ -134,7 +134,7 @@ function rows(item: object): Row[] {
 		let e = edit(o)
 		let note = [o.change!.what === 'changed' ? '' : o.change!.what, e ? plain(e) : first ? clean(first) : c.add + c.del ? 'blank lines' : ''].filter(Boolean).join(' · ')
 		let lead = `  ${titles.time(o.ts)}  ${o.change!.name.padEnd(pad)}  ${tally(c).padEnd(7)} `
-		// Only the changed text takes the diff colour; the lead stays dim.
+		// Only the changed text takes the diff color; the lead stays dim.
 		let parts: Part[] = e ? [{ text: lead, tone: 'dim' }, ...e] : first ? [{ text: lead, tone: 'dim' }, { text: note, tone: tone(first) }] : []
 		out.push({ text: `${lead} ${note}`.trimEnd(), tone: 'dim', parts: parts.length ? parts : undefined })
 	}

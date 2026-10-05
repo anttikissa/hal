@@ -25,7 +25,7 @@ export type Shown = { originSession?: string } & (
 	| { type: 'text'; text: string; naming?: true; ts?: string; model?: string; effort?: string }
 	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
 	| { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string; ts?: string }
-	| { type: 'tool-result'; id: string; output: string; isError?: boolean; ms?: number; interrupted?: 'cancelled' | 'stopped'; ts?: string }
+	| { type: 'tool-result'; id: string; output: string; isError?: boolean; ms?: number; interrupted?: 'canceled' | 'stopped'; ts?: string }
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string; ts?: string }
 	// A durable question; with `answers` once answered (secrets only named).
 	// `canceled`: dismissed (Escape, or a newer question replaced it).

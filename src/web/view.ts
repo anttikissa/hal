@@ -316,7 +316,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		}
 		case 'tool-result': {
 			// A glimpse, like the terminal; steering's note is the header's (ker).
-			if (item.interrupted === 'cancelled') return { kind: 'result log', text: '' }
+			if (item.interrupted === 'canceled') return { kind: 'result log', text: '' }
 			let rows = (item.interrupted ? bashResult.display(item.output, true, true) : bash ? bashResult.display(item.output) : item.output).replace(/\n$/, '').split('\n')
 			let shown = full ? rows : rows.slice(0, view.resultRows)
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)

@@ -34,8 +34,8 @@ function duration(ms: number | undefined, ticking = false): string | undefined {
 	return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
 }
 
-// Steering's status for a call (task ker): "cancelled", "stopped, 50.2s".
-function interrupted(r: { interrupted?: 'cancelled' | 'stopped'; ms?: number }): string | undefined {
+// Steering's status for a call (task ker): "canceled", "stopped, 50.2s".
+function interrupted(r: { interrupted?: 'canceled' | 'stopped'; ms?: number }): string | undefined {
 	if (r.interrupted !== 'stopped') return r.interrupted
 	let time = bashResult.duration(r.ms)
 	return time ? `stopped, ${time}` : 'stopped'
