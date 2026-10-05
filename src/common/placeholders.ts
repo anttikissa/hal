@@ -32,8 +32,8 @@ function pick(hal: boolean, turn: number): string {
 // shuffled (by a fixed seed), never showing one twice in a row.
 // `next`: ms until the text changes.
 const HOLD = 3000
-const ERASE = 15
-const TYPE = 35
+const ERASE = 7.5
+const TYPE = 17.5
 function rotate(list: string[], ms: number): { text: string; next: number } {
 	let graphemes = (s: string) => [...new Intl.Segmenter().segment(s)].map((g) => g.segment)
 	if (list.length < 2) return { text: list[0] ?? '', next: Infinity }
