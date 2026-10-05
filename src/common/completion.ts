@@ -13,7 +13,8 @@ function request(sessionId: string, text: string): unknown {
 
 // Explicit completion fills a declared default for a bare command.
 // Otherwise one replaces `text`; several extend their common prefix
-// and are listed by their last part (a name, a directory).
+// and are listed from where their shared part last breaks (a whole
+// name, a directory's last part).
 function apply(text: string, items: string[]): { text: string; choices?: string[] } {
 	let bare = /^\/([a-z][a-z0-9-]*)\s*$/.exec(text)
 	let args = bare && commandList.byName(bare[1]!)?.defaultArgs
@@ -25,10 +26,13 @@ function apply(text: string, items: string[]): { text: string; choices?: string[
 		while (n < a.length && a[n] === b[n]) n++
 		return a.slice(0, n)
 	})
+	// Cut where the shared part last breaks (a space or /), so a name
+	// with spaces stays whole and a path shows its last part.
+	let cut = Math.max(shared.lastIndexOf(' '), shared.lastIndexOf('/')) + 1
 	let choices = items.map((item) => {
 		let s = item.trimEnd()
 		if (!s.includes(' ')) return s
-		return s.slice(Math.max(s.lastIndexOf(' '), s.slice(0, -1).lastIndexOf('/')) + 1)
+		return s.slice(cut) || s.slice(Math.max(s.lastIndexOf(' '), s.slice(0, -1).lastIndexOf('/')) + 1)
 	})
 	return { text: shared.length > text.length ? shared : text, choices }
 }

@@ -7,6 +7,7 @@ test('one completion replaces the text; several extend it to what they share and
 	expect(completion.apply('/cd ~/project', ['/cd ~/projects/', '/cd ~/projection/'])).toEqual({ text: '/cd ~/project', choices: ['projects/', 'projection/'] })
 	expect(completion.apply('/', ['/cd ', '/help '])).toEqual({ text: '/', choices: ['/cd', '/help'] })
 	expect(completion.apply('/x', [])).toEqual({ text: '/x' })
+	expect(completion.apply('/go Li', ['/go Lighthouse short story', '/go Lippukiska demand (fork)']).choices).toEqual(['Lighthouse short story', 'Lippukiska demand (fork)'])
 })
 
 test('only a command is completed', () => {
