@@ -240,7 +240,9 @@ Each client only maps that to its medium (terminal rows, DOM elements).
 In the terminal a choice's options stand one per row, never side by
 side (a long list must not run off a wide screen), under the field's
 label if it has one; the chosen one reads `→ name`, lit like a
-picker's selected row (colors.popupCurrent, inverse on monochrome). Up and down move
+picker's selected row (colors.popupCurrent of the surrounding fg: a
+lighter tint of its hue, grey around neutral text; inverse on
+monochrome). Up and down move
 through them, left and right alike, without wrapping round; past the
 first or last option they move to the field above or below.
 On the web an open question is a card like the others (square, lit bar

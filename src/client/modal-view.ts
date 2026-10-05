@@ -50,7 +50,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 	}
 	let visible = Math.max(0, height - 2 - content.length)
 	let scroll = modalView.modalScroll(m, visible)
-	let current = colors.popupCurrent()
+	let current = colors.popupCurrent(colors.popup().neutralFg!)
 	let cursor = fields.cursor ?? { row: m.find && m.find.focus > 0 && m.find.focus < 5 ? content.length - 1 : content.length, col: 0 }
 	for (let i = scroll; i < Math.min(m.items.length, scroll + visible); i++) {
 		// Leading spaces are the picker's tree indentation: keep them.

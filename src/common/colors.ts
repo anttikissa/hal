@@ -26,7 +26,7 @@ export type Look = { [K in keyof Colors]?: Colors[K] extends (...args: any[]) =>
 // Fields that derive a colour from others, so take arguments; every
 // other field is a plain value (fgL, screen, mix) or a style, a function
 // read with no arguments.
-export const DERIVED = ['quiet', 'blinkDim', 'heat', 'toolOutput'] as const
+export const DERIVED = ['quiet', 'blinkDim', 'heat', 'toolOutput', 'popupCurrent'] as const
 
 // Plain names for colors.project() p0..p7, so a model can answer "which
 // is the cyan project" (task jm).
@@ -139,7 +139,13 @@ export const colors = {
 	// Help bar: keys stand out from descriptions.
 	help: (): Style => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0] }),
 	popup: (): Style => ({ neutralFg: [0.68, 0, 0], dangerFg: [0.86, 0.16, 85] }),
-	popupCurrent: (): Style => ({ fg: [0.98, 0.04, 55], bg: [0.42, 0.12, 55] }),
+	// The selected item (a picker row, a question's chosen answer): a
+	// lighter tint of the colour around it, so green in a question and
+	// grey in the neutral picker (the user's choice, option G).
+	popupCurrent: (around: Oklch): Style => {
+		let tint = around[1] >= 0.02
+		return { fg: [0.98, tint ? 0.04 : 0, around[2]], bg: [0.42, tint ? 0.11 : 0, around[2]] }
+	},
 	// Search matches in a modal's list: brighter than the items around.
 	popupMatch: (): Style => ({ fg: [0.95, 0.14, 95] }),
 	popupModelCurrent: (): Style => ({ fg: [0.88, 0, 0], bg: [0.28, 0, 0] }),
