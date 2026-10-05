@@ -67,7 +67,13 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 		document.addEventListener('pointerdown', outside, true)
 		document.addEventListener('focusin', outside)
 		document.addEventListener('focusout', leaving)
+		// A click inside a dialog moves the page selection into its text;
+		// closing it gives the box focus back without a caret, so keys
+		// vanish (task 6cm). Refocusing restores the caret.
+		let closed = () => { if (document.activeElement === input) { input.blur(); input.focus() } }
+		document.addEventListener('close', closed, true)
 		return () => {
+			document.removeEventListener('close', closed, true)
 			document.removeEventListener('pointerdown', outside, true)
 			document.removeEventListener('focusin', outside)
 			document.removeEventListener('focusout', leaving)
