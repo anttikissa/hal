@@ -229,7 +229,9 @@ function selection(st: ModalState, previous?: number): ModalState {
 	let chosen = picker.level(st, shownId)
 	let cap = t.capabilities?.[shownId]
 	let fallback = cap?.levels.length ? cap.policy ?? cap.default : undefined
-	let title = `Model: ${shownId}${chosen && chosen !== fallback ? `:${chosen}` : ''}${fallback ? ` (default effort: ${fallback})` : ''}`
+	// A pinned level shows as :level; otherwise the title names the default.
+	let pinned = chosen && chosen !== fallback
+	let title = `Model: ${shownId}${pinned ? `:${chosen}` : fallback ? ` (default effort: ${fallback})` : ''}`
 	return { ...st, title, ...(values && { values }), hint: `${hint}, esc: cancel` }
 }
 
