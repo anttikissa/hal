@@ -64,7 +64,7 @@ html.typing .App { position: absolute; }
    3px bar, just above the transcript's foot. */
 .Transcript > .to-bottom { position: sticky; bottom: 0; height: 0; margin: 0; z-index: 1; }
 .to-bottom button { position: absolute; bottom: calc(4px - 0.5lh); left: calc(-1 * var(--gut)); width: 52px; height: 52px; padding: 0 0 0 calc(var(--gut) + 1.5px - 4px); border: 0; background: none; display: flex; align-items: center; justify-content: flex-start; color: var(--text); animation: fade-in 150ms var(--ease-out); }
-.to-bottom .pill { display: flex; align-items: center; justify-content: center; width: 8px; height: 52px; background: rgb(0 0 0 / 75%); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+.to-bottom .pill { display: flex; align-items: center; justify-content: center; width: 8px; height: 52px; background: color-mix(in oklab, var(--overlay-bg) 75%, transparent); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
 .to-bottom svg { flex: none; width: 10px; height: 14px; fill: currentColor; }
 @keyframes fade-in { from { opacity: 0; } }
 /* Cards and the open question share one shape: square, a lit bar on
@@ -199,7 +199,7 @@ html.typing .App { position: absolute; }
 .Notices { --gl: max(2ch, env(safe-area-inset-left)); --gr: max(2ch, env(safe-area-inset-right)); }
 @media (max-width: 40rem) { .Notices { --gl: max(1ch, env(safe-area-inset-left)); --gr: max(1ch, env(safe-area-inset-right)); } }
 .Notices .stack { position: absolute; right: var(--gr); bottom: 0.5lh; width: min(24rem, calc(100% - var(--gl) - var(--gr))); display: flex; flex-direction: column; gap: 0.25lh; }
-.Notices .card { display: flex; flex-direction: column; padding: 0.25lh 1ch; border-left: 3px solid; box-shadow: 0 0 0 4px rgb(0 0 0 / 75%); text-decoration: none; animation: notice-in 200ms var(--ease-out); }
+.Notices .card { display: flex; flex-direction: column; padding: 0.25lh 1ch; border-left: 3px solid; box-shadow: 0 0 0 4px color-mix(in oklab, var(--overlay-bg) 75%, transparent); text-decoration: none; animation: notice-in 200ms var(--ease-out); }
 .Notices .card.done { border-color: var(--done-fg); } .Notices .card.done strong { color: var(--done-fg); }
 .Notices .card.failed { border-color: var(--failed-fg); } .Notices .card.failed strong { color: var(--failed-fg); }
 .Notices .card.attention { border-color: var(--attention-fg); } .Notices .card.attention strong { color: var(--attention-fg); }
