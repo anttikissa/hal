@@ -118,7 +118,8 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	if (hal) lines = halCursor.withCursor(lines, hal, inner)
 	// A block with a background has a row of it above and below its
 	// text, as the old Hal drew prompt cards; the id goes below the top.
-	let padded = !!style?.bg && lines.length > 0
+	// A closed block is its one row, unpadded (task ghs).
+	let padded = !!style?.bg && lines.length > 0 && look.fold !== 'closed'
 	if (padded) lines = ['', ...lines, '']
 	mark(lines, padded ? 1 : 0)
 	let rows = lines.flatMap((r) => ansi.paintRows(r, style, cols))

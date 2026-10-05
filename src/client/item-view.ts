@@ -333,7 +333,7 @@ function inlined(text: string, pastes: Look['pastes']): string {
 
 // A closed block's one row (task ghs): its title (or `head`), then the
 // start of its text, quiet.
-function closedRow(item: Item, text: string, width: number, head = (titles.title(item) ?? '') + '  '): string[] {
+function closedRow(item: Item, text: string, width: number, head = (titles.title(item) ?? '') + ' '): string[] {
 	head = ansi.clean(head)
 	let first = ansi.clean(text.split('\n').find((l) => l.trim()) ?? '').trim()
 	let row = strings.expandTabs(strings.clipVisual(head + first, width))
