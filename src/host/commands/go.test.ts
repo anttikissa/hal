@@ -41,6 +41,23 @@ test('/go resolves number, id, name and first open tab in a directory; only foll
 	expect(tabs.file().open).toEqual([first, second, third])
 })
 
+test('/go reopens a closed session by id, name or directory', async () => {
+	let a = client()
+	let first = make(a, '/tmp/a')
+	let gone = make(a, '/tmp/go-closed')
+	sessions.open(gone).name = 'Gone'
+	a.conn.send({ type: 'open', sessionId: first })
+	for (let value of [gone, 'Gone', '/tmp/go-closed']) {
+		a.conn.send({ type: 'tab-close', id: `close-${value}`, sessionId: gone })
+		await until(() => !tabs.file().open.includes(gone))
+		let count = a.of('go').length
+		a.conn.send({ type: 'submit', sessionId: first, text: `/go ${value}` })
+		await until(() => a.of('go').length > count)
+		expect(a.of('go').at(-1)).toMatchObject({ sessionId: first, tab: gone })
+		expect(tabs.file().open).toContain(gone)
+	}
+})
+
 test('/go completion uses open tabs and cwd, abbreviating home directories', () => {
 	let c = client()
 	let cwd = `${commands.home()}/hal-go-project`
