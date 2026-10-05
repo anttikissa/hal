@@ -1,0 +1,17 @@
+{
+	title: 'Rotation spends the quota that expires soonest',
+	spec: `The default account choice (pickAccount, task wf) spends the quota that expires soonest, so the plans stay available as long as possible: weekly quota is lost only when a window resets with quota left over.
+
+Eligible: a subscription whose shared windows (5h, 7d; model-specific windows such as 7d_opus are ignored, as now) are below 95% (5h) and 98% (7d) used. Expired windows count as unused (usage.windows).
+
+Order: eligible subscriptions first, by their 7d window's reset, soonest first (earliest deadline first); on a tie, or for accounts without a known reset (no data, or a window past its reset), the least used first, and those come after accounts with a known reset. Then the remaining subscriptions, least used first (they still work until a 429). Then API keys, as now. pick() still skips broken and limited accounts.
+
+A running session keeps its account (task wg) while it is eligible. It moves to the first account in the order when its account is no longer eligible, or when another eligible account's 7d window resets within 24 hours and sooner than its own.
+
+Example: 2/3 at 86% of 7d resetting at 00:00 and 3/3 at 81% resetting at 19:00 the next day: 2/3 is used until midnight, then 3/3.
+
+Tests: ranking by soonest 7d reset among eligible accounts; a near-full account comes after eligible ones but before an API key; a session switches to an account resetting within 24 hours sooner than its own, and stays otherwise.`,
+	status: 'planned',
+	needs: ['61', 'wg', 'wf'],
+	foldInto: ['61', 'wg']
+}
