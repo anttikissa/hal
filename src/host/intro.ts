@@ -230,16 +230,47 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts; /intro runs this guide again.\n- The web client is at ${settings.webUrl()}.\n\n${now}` })
 }
 
-// Example answers the language field rotates through; the first opens.
+// Example answers the language field rotates through; the first opens,
+// the rest shuffle: tones (like the Claude and ChatGPT style presets),
+// languages, and fun ones.
 const LANGUAGES = [
 	'Simplified Technical English, please',
 	'US English; spaces around em dash',
-	'¡Háblame en español, por favor!',
-	'Puhu minulle suomea',
-	'Parle-moi en français, s’il te plaît',
-	'Bitte auf Deutsch, kurz und knapp',
+	'British spelling, no fluff',
+	'Concise. Skip the pleasantries.',
+	'Friendly but brief',
+	'Explain like I’m new to this',
+	'Teach me as you go',
+	'Formal, like a lawyer wrote it',
+	'Be blunt; tell me when I’m wrong',
+	'Bullet points, not essays',
+	'No emoji, no exclamation marks',
+	'Nerdy is fine; show your sources',
+	'¡En español, porfa!',
+	'Suomeksi, kiitos',
+	'En français, stp',
+	'Auf Deutsch, bitte',
+	'In italiano, per favore',
+	'Em português, por favor',
+	'In het Nederlands graag',
+	'På svenska, tack',
+	'Po polsku, proszę',
 	'日本語でお願いします',
-	'British English, friendly but concise',
+	'한국어로 해 주세요',
+	'请用中文',
+	'Ey up, talk like a Yorkshireman',
+	'Arr, talk like a pirate',
+	'Full Aussie, mate',
+	'Broad Scots, if ye please',
+	'Shakespearean, forsooth',
+	'Speak like Yoda, you must',
+	'Like a 1940s noir detective',
+	'Narrate it like a nature documentary',
+	'Howdy, partner: cowboy talk',
+	'Like, totally Valley girl',
+	'Dry British sarcasm',
+	'Like a grumpy senior engineer',
+	'Haiku when possible',
 ]
 
 export const intro = { LANGUAGES, restart, run, answered, asked, accounts, choices, findZone, timezone }
