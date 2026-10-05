@@ -1,9 +1,10 @@
 {
-	title: '/go switches windows to a session',
-	spec: "`/go <target>` shows a session in every window that is showing the session running it (host terminal, peers, web pages), and in no others. Target: a tab number, a session id or name, or a directory (the first open session there). Tab completes targets, with directories from the open tabs' cwds (`/go ~/h<Tab>` lists them).",
+	title: '/go navigates to any session',
+	spec: "`/go <target>` is the one navigation command: it shows the target session in the clients following the session that runs it (host terminal, peers, web pages), and in no others. Target: a tab number, a session id or name, or a directory. Open tabs win; otherwise a closed session with that id or name, or the newest closed session in that directory, is reopened first. A directory with an open tab picks its first one. Help is one plain line with no internal terms: '/go <tab number|session id|name|directory>: go to a session, reopening it if closed. A directory picks its first open tab, else its newest session.' Tab completes targets from open tabs and closed sessions, with directories from their cwds (`/go ~/h<Tab>` lists them).",
 	status: 'done',
 	notes: [
-		'/go is a host slash command; target resolution reads only open tabs, in order (number, id, name, first tab with matching cwd). Completion includes tab numbers, ids, names, distinct tab cwds and ~/ paths. Host broadcasts a go event to followers of the source session only; terminal and web check their current shown id before switching, so /send from another session has the same effect without switching unrelated windows. Web uses normal router navigation so Back works.'
+		'/go is a host slash command; target resolution tries open tabs first, in order (number, id, name, first tab with matching cwd), then closed sessions (id, name, cwd). Completion includes tab numbers, ids, names, distinct tab cwds and ~/ paths. Host broadcasts a go event to followers of the source session only; terminal and web check their current shown id before switching, so /send from another session has the same effect without switching unrelated clients. Web uses normal router navigation so Back works.',
+		"Closed sessions come from sessions.list(), ordered newest closed first like /tabs all, and reopen through tab-resume before the go event. Earlier help said 'every window'; Hal has no window concept (see Terms in tasks/README.md), so the user could not read it."
 	],
 	needs: [],
 	foldInto: ['7w']
