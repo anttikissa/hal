@@ -12,7 +12,7 @@ import type { Key } from './forms.ts'
 import type { ModalAction, ModalState, TreeRow } from './modals.ts'
 import { fuzzy } from './fuzzy.ts'
 import { modals } from './modals.ts'
-import { effort, type EffortCapability } from './effort.ts'
+import { effort, type EffortCapability, type EffortLevel } from './effort.ts'
 
 // The ids matching `query`, best first; ties keep the given order,
 // shorter ids first. An empty query keeps every id in order. An id's
@@ -195,25 +195,24 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 	}
 	if (selected < 0) selected = Math.max(0, at(t.current))
 	let row = built.rows[selected]
-	let hint = row?.id ? 'leaf ←/→: lower/higher (clamped), enter: pick' : `${row?.default ? 'enter: pick default' : 'enter: open'}`
-	// The selected row shows its effort choice; others only an override.
-	built.items = built.items.map((text, i) => {
-		let id = built.rows[i]?.id
-		let level = id && picker.label(st, id)
-		return !level ? text : i === selected ? `${text}  ‹ ${level} ›` : level.startsWith('default') ? text : `${text} ${level}`
-	})
 	let shownId = row?.id ?? row?.default ?? t.current
-	let chosen = t.efforts?.[shownId]
+	let effortKeys = !!t.capabilities?.[shownId]?.levels.length
+	let hint = row?.id ? `${effortKeys ? '←/→: lower/higher effort, ' : ''}enter: pick` : `←/→: close/open, enter: ${row?.default ? 'pick default' : 'open'}`
+	// One effort draft for the whole picker, shown on the selected row
+	// as the level it gives that model (task r7r).
+	let level = picker.label(st, shownId)
+	if (row?.id && level) built.items[selected] = `${built.items[selected]}  ‹ ${level} ›`
+	let chosen = picker.level(st, shownId)
 	let cap = t.capabilities?.[shownId]
 	let title = `Model: ${shownId}${chosen && chosen !== (cap?.policy ?? cap?.default) ? `:${chosen}` : ''}`
-	return { ...st, title, items: built.items, query, tree: { ...t, rows: built.rows }, selected, hint: `${hint}, esc: cancel; category ←/→: close/open` }
+	return { ...st, title, items: built.items, query, tree: { ...t, rows: built.rows }, selected, hint: `${hint}, esc: cancel` }
 }
 
 // The picker over `ids`, on the current model, its categories open.
 function open(current: string, ids: string[], names: Record<string, string> = {}, capabilities?: Record<string, EffortCapability>, selectedEffort?: string): ModalState {
 	let st = modals.open({ title: `Model: ${current}`, form: { text: 'Switch model', fields: [{ type: 'text', name: 'search', label: 'Search' }] } })
 	let open = ancestors(tree(ids, current), current)
-	return picker.refilter({ ...st, tree: { rows: [], open, current, capabilities, efforts: { [current]: selectedEffort }, currentEffort: selectedEffort } }, ids, names)
+	return picker.refilter({ ...st, tree: { rows: [], open, current, capabilities, ...(selectedEffort && { effort: selectedEffort }) } }, ids, names)
 }
 
 // The open picker `st` over a newer list, keeping its search and
@@ -237,10 +236,10 @@ function step(st: ModalState, key: Key, ids: string[], names: Record<string, str
 		let id = row.id
 		let cap = t.capabilities?.[id]
 		if (!cap?.levels.length) return { state: st }
-		let selected = t.efforts?.[id] ?? cap.policy ?? cap.default
+		let selected = picker.level(st, id) ?? cap.policy ?? cap.default
 		let at = selected === undefined ? (key.key === 'right' ? -1 : cap.levels.length) : cap.levels.indexOf(selected as any)
 		let level = cap.levels[Math.max(0, Math.min(cap.levels.length - 1, at + (key.key === 'right' ? 1 : -1)))]!
-		return { state: picker.refilter({ ...st, tree: { ...t, efforts: { ...t.efforts, [id]: level } } }, ids, names, id) }
+		return { state: picker.refilter({ ...st, tree: { ...t, effort: level } }, ids, names, id) }
 	}
 	if (t && row && plain && (key.key === 'left' || key.key === 'right' || (key.key === 'enter' && row.path && !row.default))) {
 		let searching = !!(st.form?.values[0] ?? '').trim()
@@ -268,19 +267,25 @@ function step(st: ModalState, key: Key, ids: string[], names: Record<string, str
 function command(sessionId: string, st: ModalState, action: Extract<ModalAction, { type: 'submit' }>): { type: 'submit'; sessionId: string; text: string } | undefined {
 	let row = action.item === undefined ? undefined : st.tree?.rows[action.item]
 	let id = row?.id ?? row?.default
-	let selected = id === undefined ? undefined : row?.id ? st.tree?.efforts?.[id] : id === st.tree?.current ? st.tree.currentEffort : undefined
+	let selected = id === undefined ? undefined : picker.level(st, id)
 	return id === undefined ? undefined : { type: 'submit', sessionId, text: `/model ${id}${selected === undefined ? '' : `:${selected}`}` }
+}
+// The level the picker's effort draft gives `id`: its nearest one.
+function level(st: ModalState, id: string): string | undefined {
+	let cap = st.tree?.capabilities?.[id]
+	let draft = st.tree?.effort as EffortLevel | undefined
+	return draft && cap?.levels.length ? effort.closest(cap.levels, draft) : undefined
 }
 // The effort choice of `id`'s row; '' without effort control.
 function label(st: ModalState, id: string): string {
 	let cap = st.tree?.capabilities?.[id]
-	return cap?.levels.length ? effort.label(cap, st.tree?.efforts?.[id]) : ''
+	return cap?.levels.length ? effort.label(cap, picker.level(st, id)) : ''
 }
 function canAdjust(st: ModalState, direction: 'left' | 'right'): boolean {
 	let id = st.tree?.rows[st.selected]?.id
 	let cap = id ? st.tree?.capabilities?.[id] : undefined
 	if (!id || !cap?.levels.length) return false
-	let selected = st.tree?.efforts?.[id] ?? cap.policy ?? cap.default
+	let selected = picker.level(st, id) ?? cap.policy ?? cap.default
 	return selected === undefined || selected !== cap.levels[direction === 'left' ? 0 : cap.levels.length - 1]
 }
-export const picker = { defaults, rank, refilter, refresh, open, step, command, label, canAdjust }
+export const picker = { defaults, rank, refilter, refresh, open, step, command, level, label, canAdjust }

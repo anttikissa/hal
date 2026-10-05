@@ -187,6 +187,11 @@ test('effort drafts clamp on leaves, preserve tags and filtering, keep row ident
 	st = picker.step(st, key('left'), ids).state
 	st = picker.step(st, key('left'), ids).state
 	expect(picker.label(st, ids[0]!)).toBe('low')
+	// One draft for the whole picker: another model shows its nearest
+	// level, only the selected row shows effort, hints follow the row.
+	expect(picker.label(st, ids[1]!)).toBe('low')
+	expect(st.items.filter((t) => t.includes('‹'))).toEqual([st.items[st.selected]!])
+	expect(st.hint).toBe('←/→: lower/higher effort, enter: pick, esc: cancel')
 	let cancel = picker.step(st, key('escape'), ids)
 	expect(cancel.action).toEqual({ type: 'cancel' })
 	let submit = picker.step(st, key('enter'), ids)
