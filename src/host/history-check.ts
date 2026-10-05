@@ -20,6 +20,9 @@ function check(value: unknown): HistoryRecord {
 	if (r.type === 'output' && r.synthetic !== undefined && r.synthetic !== true) throw new Error('invalid synthetic output')
 	if (r.type === 'output') for (let k of ['transitionDone', 'transitionCancel'] as const) if (r[k] !== undefined && typeof r[k] !== 'string') throw new Error(`invalid ${k}`)
 	if ((r.type === 'reset' || r.type === 'compact') && r.transition !== undefined && typeof r.transition !== 'string') throw new Error('invalid boundary transition')
+	if (r.type === 'change' && r.previous !== undefined && (!r.previous || typeof r.previous !== 'object' || Object.values(r.previous).some((v) => typeof v !== 'string'))) throw new Error('invalid previous setting')
+	if (r.type === 'continue' && r.reason !== undefined && typeof r.reason !== 'string') throw new Error('invalid continuation reason')
+	if (r.type === 'user' && r.notices !== undefined && (!Array.isArray(r.notices) || r.notices.some((n) => !n || !Number.isSafeInteger(n.source) || n.source < 1 || typeof n.text !== 'string'))) throw new Error('invalid notices')
 	if (r.type === 'user' && r.naming !== undefined) {
 		let n = r.naming
 		if (!n || !Number.isSafeInteger(n.turn) || n.turn < 1 || !Number.isSafeInteger(n.version) || n.version < 0 || typeof n.name !== 'string' || typeof n.eligible !== 'boolean') throw new Error('invalid naming context')

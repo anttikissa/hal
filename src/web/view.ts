@@ -215,8 +215,8 @@ const commandDraft = (text: string) => /^\/(?:[a-z][a-z0-9-]*(?:\s|$)|$)/.test(t
 function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: string][] {
 	let busy = st.transcript && states.busy(st.transcript.state)
 	let command = view.commandDraft(text)
-	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'steer' : 'send'
-	let queue: [string, string][] = busy && !command ? [['alt+enter', 'queue']] : []
+	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'interrupt' : 'send'
+	let queue: [string, string][] = busy && !command ? [['alt+enter', 'after this turn']] : []
 	if (menu) return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift+enter', 'newline'], ...queue, ['esc', 'dismiss']]
 	if (busy) return [['enter', enter], ...queue, ['shift+enter', 'newline'], ['esc', 'pause']]
 	return [['enter', enter], ['shift+enter', 'newline'], ['↑', 'edit last'], ['tab', 'complete'], ['ctrl+m', 'model']]

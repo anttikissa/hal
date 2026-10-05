@@ -22,7 +22,7 @@ test('/queue lists in order, next steers a running turn, clear drops only queued
 	expect(b.views.get(id)?.inbox.map((m) => [m.text, m.queue])).toEqual([['first', undefined], ['second', true]])
 	send('/queue clear')
 	await until(() => b.views.get(id)?.inbox.length === 1)
-	expect(a.of('output').at(-1)?.text).toContain('1 queued prompt')
+	expect(a.of('output').at(-1)?.text).toContain('1 waiting message')
 	expect((await fresh(id)).inbox.map((m) => m.text)).toEqual(['first'])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)

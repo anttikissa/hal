@@ -44,7 +44,7 @@ test('spawn then wait in one round: the child is working, the parent sleeps unti
 	// Its first prompt comes from the parent and names it.
 	let first = calls[k]!.input.messages
 	expect(first).toHaveLength(1)
-	expect(first[0].blocks[0].text).toContain(`[Inbox · ${tabs.label(p)}]`)
+	expect(first[0].blocks[0].text).toContain(`[Message from ${tabs.label(p)}]`)
 	expect(first[0].blocks[0].text).toContain(p)
 	// The parent's turn ended at the wait, having seen the child.
 	await until(() => status.stateOf(p).type === 'idle')
@@ -59,7 +59,7 @@ test('spawn then wait in one round: the child is working, the parent sleeps unti
 	calls[after]!.push({ type: 'text', text: 'fixed it' }, { type: 'done', reason: 'end' })
 	let woke = await callWith('fixed it')
 	let got = calls[woke]!.input.messages.at(-1).blocks[0].text
-	expect(got).toContain(`[Inbox · tab 2 · ${child} · fixer]`)
+	expect(got).toContain(`[Message from tab 2 · ${child} · fixer]`)
 	expect(got).not.toContain('looking')
 	await until(() => !tabs.file().open.includes(child))
 	expect(tabs.file().open).toEqual([p])
@@ -169,7 +169,7 @@ async function reportOf(end: (c: C, child: string, k: number) => void): Promise<
 	let k = await callWith('doomed job')
 	let child = tabs.file().open[1]!
 	end(c, child, k)
-	let woke = await callWith(`[Inbox · ${tabs.label(child)}]`, k + 1)
+	let woke = await callWith(`[Message from ${tabs.label(child)}]`, k + 1)
 	return calls[woke]!.input.messages.at(-1).blocks[0].text
 }
 

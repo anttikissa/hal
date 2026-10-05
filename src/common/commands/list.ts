@@ -44,7 +44,7 @@ const list: CommandInfo[] = [
 	{ name: 'pause', description: 'pause the turn', category: 'session' },
 	{ name: 'perf', description: 'show startup timing marks', category: 'debug' },
 	{ name: 'plugins', description: 'list loaded plugins and their hooks', category: 'debug' },
-	{ name: 'queue', description: 'list, run or clear queued prompts', category: 'session' },
+	{ name: 'queue', description: 'list, run or clear messages waiting for after this turn', category: 'session' },
 	// Ctrl-C, Ctrl-Z and Ctrl-R are really caught by the emergency path:
 	// src/common/emergency.ts scans raw stdin and src/client/terminal.ts
 	// acts on them before any key decoding (tasks/README.md). Changing
@@ -58,7 +58,7 @@ const list: CommandInfo[] = [
 	// on the host (src/host/commands/restart.ts).
 	{ name: 'restart', description: 'restart everything (all), the host, both, or this client (local)', category: 'app', key: 'ctrl-r', keyArgs: 'local', defaultArgs: 'all' },
 	{ name: 'resume', description: 'reopen a closed session', category: 'tabs', key: 'shift-ctrl-t' },
-	{ name: 'send', description: 'send a prompt or command to another session', category: 'session' },
+	{ name: 'send', description: 'send a message or command to another session', category: 'session' },
 	{ name: 'suspend', description: 'suspend', category: 'app', key: 'ctrl-z', clientOnly: true },
 	{ name: 'status', description: 'show account usage windows', category: 'session' },
 	{ name: 'system', description: 'show the assembled system prompt', category: 'session' },

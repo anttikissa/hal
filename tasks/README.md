@@ -24,11 +24,28 @@ models. The tasks are the product as much as the code.
   peer, a browser.
 - **server**: only the listeners (Unix socket, HTTP), never a role.
 
-How sessions behave (states, who may pause, failures, steering,
+How sessions behave (states, who may pause, failures, interrupt delivery,
 drafts) is decided in tasks/j1/states.md; forms, commands, modals,
 approval and how terminal and web share code in tasks/w4/forms.md.
 Follow them. A design doc lives in the task that owns it; later tasks
 point to it.
+
+## Messages and notices (nzv)
+
+A turn spans provider requests until an answer; a round is one request and
+reply, followed by its tools before the next request. Messages carry their
+source. Hal notices report facts in meta framing. The inbox holds messages;
+delivery is at the next round, interrupt, or after this turn. Existing wire
+fields and tool flags remain compatible.
+
+Before a request, history.messages freezes pending notices on a user record,
+with original source numbers, timestamps and text. This is the same durable
+provider input used for prompts and delivered inbox messages, not a second
+queue. Notice-only records neither start a turn nor become a recalled prompt.
+Replay places notices after tool results, never inside an unfinished exchange;
+later facts do not move into earlier request prefixes. Model switches finish
+the current round and apply to the next round, not the next turn. Display order
+is block-start order in both clients; it is separate from delivery eligibility.
 
 ## Architecture
 

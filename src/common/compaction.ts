@@ -50,7 +50,7 @@ function entries(records: HistoryRecord[]): HistoryRecord[] {
 
 function promptText(r: HistoryRecord): string {
 	if (r.type !== 'user') return ''
-	return r.blocks.flatMap((b) => (b.type === 'text' ? [replay.framed(b)] : [])).join('\n\n')
+	return [...r.notices?.map((n) => n.text) ?? [], ...r.blocks.flatMap((b) => (b.type === 'text' ? [replay.framed(b)] : []))].join('\n\n')
 }
 
 const isText = (r: HistoryRecord) => r.type === 'assistant' && r.block.type === 'text'

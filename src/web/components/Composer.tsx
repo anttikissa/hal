@@ -102,11 +102,11 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 		let t = props.view.transcript
 		if (t) app.sendNow(paused() ? { type: 'continue', sessionId: t.meta.id } : view.pause(props.view))
 	}
-	// Steering keeps the phone keyboard up for the next steer; Send and
-	// Queue hide it so the reply is visible. A mouse keeps the focus.
-	// The main button's icon, name and tooltip: run a command, steer a
-	// running turn or send.
-	let action = (): [IconName, string, string] => view.commandDraft(props.text) ? ['run', 'Run', 'Run command'] : busy() ? ['steer', 'Steer', 'Steer: send now, into this turn'] : ['send', 'Send', 'Send']
+	// Interrupt delivery keeps the phone keyboard up for the next message;
+	// Send and after-this-turn delivery hide it so the reply is visible.
+	// A mouse keeps focus. The main button runs a command, interrupts a
+	// running turn or sends a message.
+	let action = (): [IconName, string, string] => view.commandDraft(props.text) ? ['run', 'Run', 'Run command'] : busy() ? ['steer', 'Interrupt', 'Interrupt: send into this turn'] : ['send', 'Send', 'Send']
 	let send = (queue = false) => {
 		let steer = busy() && !queue
 		app.send(queue)
@@ -186,7 +186,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 						</button>
 					</Show>
 					<Show when={busy() && !view.commandDraft(props.text)}>
-						<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} aria-label="Queue" title="Queue: send after this turn" onClick={() => send(true)}><Icon name="queue" /></button>
+						<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} aria-label="After this turn" title="Send after this turn" onClick={() => send(true)}><Icon name="queue" /></button>
 					</Show>
 					{/* The tap must not blur the draft before click: on iOS the blur
 					    starts hiding the keyboard and moving the composer, and the

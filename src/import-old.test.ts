@@ -29,7 +29,7 @@ function history(home: string, id: string): HistoryRecord[] {
 
 const t = (m: number) => `2026-01-01T00:${String(m).padStart(2, '0')}:00.000Z`
 const user = (text: string, m: number) => ({ type: 'user', parts: [{ type: 'text', text }], ts: t(m) })
-const texts = (recs: HistoryRecord[]) => replay.toMessages(recs).flatMap((m) => m.blocks.flatMap((b) => (b.type === 'text' ? [b.text.split('\n').at(-1)] : [])))
+const texts = (recs: HistoryRecord[]) => replay.toMessages(recs).flatMap((m) => m.blocks.flatMap((b) => (b.type === 'text' && !b.text.startsWith('<meta>') ? [b.text.split('\n').at(-1)] : [])))
 
 test('a fork of a fork holds each parent up to its fork time, then its own records', () => {
 	let dir = oldState(

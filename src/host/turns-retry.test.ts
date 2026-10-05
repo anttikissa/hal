@@ -6,7 +6,6 @@ import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
-import { replay } from '../common/replay.ts'
 import { auth } from './auth.ts'
 import { clock } from './clock.ts'
 import { history } from './history.ts'
@@ -124,12 +123,13 @@ test('a temporary failure retries at once, then backs off, and never gives up', 
 
 test('a stream cut off mid-answer continues, and the model is told', async () => {
 	let a = client()
-	script = [[{ type: 'text', text: 'half' }, dropped], done]
+	script = [[{ type: 'text', text: 'half' }, { type: 'usage', usage: { output: 3 } }, { ...dropped, body: 'full provider failure body' }], done]
 	let id = start(a)
 	await until(() => a.ends().length)
 	let messages = calls[1]!.input.messages
 	expect(messages.at(-2)).toEqual({ role: 'assistant', blocks: [{ type: 'text', text: 'half' }] })
-	expect(JSON.stringify(messages.at(-1))).toContain(replay.continueNote)
+	expect(JSON.stringify(messages.at(-1))).toContain('Hal is retrying after the response stopped: fetch failed')
+	expect(JSON.stringify(messages.at(-1))).toContain('full provider failure body')
 	expect(status.stateOf(id).type).toBe('idle')
 })
 

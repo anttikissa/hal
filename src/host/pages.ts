@@ -170,7 +170,7 @@ function apply(m: Marks, r: HistoryRecord, offset: number): void {
 	} else if (r.type === 'inbox' && r.withdrawn) delete m.inbox[r.id]
 	// Every record of a message: an edit keeps the place of the first.
 	else if (r.type === 'inbox') m.inbox[r.id] = [...[m.inbox[r.id] ?? []].flat(), offset]
-	else if (r.type === 'user' || r.type === 'assistant' || r.type === 'continue') {
+	else if ((r.type === 'user' && (r.notices === undefined || r.blocks.length)) || r.type === 'assistant' || r.type === 'continue') {
 		m.turn = offset
 		if (replay.isPrompt(r)) m.prompt = offset
 		if (r.type === 'user') for (let id of r.inbox ?? []) delete m.inbox[id]

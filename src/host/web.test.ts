@@ -787,7 +787,7 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 	}
 }, 20000)
 
-test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to where it ran: same card, no fade again', async () => {
+test.skipIf(!chrome)('in a browser a command stays below the block already streaming: same card, no fade again', async () => {
 	providerHome()
 	let id = tabs.create('/tmp')
 	let release = () => {}
@@ -826,7 +826,7 @@ test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to 
 			return {
 				wasAfter: before,
 				same: card.isConnected && !card.classList.contains('pending'),
-				nowBefore: !!(card.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING),
+				nowAfter: !!(reply.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING),
 				// A colour easing back from pending is not a fade.
 				fading: [card, reply].some((c) => c.getAnimations().some((a) => !(a instanceof CSSTransition))),
 				// The output is new: it fades in.
@@ -834,7 +834,7 @@ test.skipIf(!chrome)('in a browser a command sent mid-stream moves, pending, to 
 				copies: [...document.querySelectorAll('.Card.user')].filter((c) => c.textContent.endsWith('/help')).length,
 			}
 		})()`)
-		expect(moved).toEqual({ wasAfter: true, same: true, nowBefore: true, fading: false, fresh: true, copies: 1 })
+		expect(moved).toEqual({ wasAfter: true, same: true, nowAfter: true, fading: false, fresh: true, copies: 1 })
 		release()
 	} finally {
 		await b.close()
@@ -1122,10 +1122,10 @@ test.skipIf(!chrome)('manual reload notice preserves the draft and command actio
 		await b.evaluate("document.querySelector('.Composer .actions button').click()")
 		await b.waitFor("document.querySelector('main').textContent.includes('Still working')")
 		await input('later')
-		expect(await actions()).toEqual(['Pause (Esc)', 'Queue', 'Steer'])
+		expect(await actions()).toEqual(['Pause (Esc)', 'After this turn', 'Interrupt'])
 		await input('/model')
 		expect(await actions()).toEqual(['Pause (Esc)', 'Run'])
-		expect(await b.evaluate("document.querySelector('.Composer .help').textContent.includes('queue')")).toBe(false)
+		expect(await b.evaluate("document.querySelector('.Composer .help').textContent.includes('after this turn')")).toBe(false)
 		await input('draft stays put')
 		await b.evaluate("document.querySelector('textarea').focus(); window.__beforeUpdate = document.querySelector('.Chat'); window.__oldText = document.querySelector('textarea'); window.__transcriptRect = document.querySelector('.Transcript').getBoundingClientRect().toJSON()")
 		let page = await web.state.page!

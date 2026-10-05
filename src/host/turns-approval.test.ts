@@ -105,7 +105,7 @@ const bash = (id: string, command: string): StreamEvent => ({ type: 'tool_call',
 const read = (id: string): StreamEvent => ({ type: 'tool_call', id, name: 'read', input: { path: 'notes.txt' } })
 const round1 = (...events: StreamEvent[]) => calls[0]!.push(...events, { type: 'usage', usage: { input: 10, output: 5 } }, { type: 'done', reason: 'tool_use' })
 const finish = (call: Call) => call.push({ type: 'text', text: 'done' }, { type: 'usage', usage: { input: 20, output: 1 } }, { type: 'done', reason: 'end' })
-const results = (call: Call) => call.input.messages.at(-1).blocks
+const results = (call: Call) => call.input.messages.flatMap((m: any) => m.blocks).filter((b: any) => b.type === 'tool_result')
 
 test('each dangerous call is asked once, harmless ones not at all; answers survive a restart and results keep call order', async () => {
 	let a = client()

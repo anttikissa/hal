@@ -1,9 +1,9 @@
 // send: messages another session (task rj). The host, not the model,
 // says who sent it: the calling session, by tab, id and name.
 //
-// Advisory by default: the recipient reads it before its next request
-// but needn't drop its work; `steer` makes it steer as the user's
-// messages do, `queue` runs it after the recipient's current turn. An
+// Next round by default: the recipient reads it before its next request
+// without interrupting work; `steer` interrupts as a user message does,
+// `queue` delivers after the recipient's current turn. An
 // idle recipient gets it as a turn of its own (prompts.submit).
 
 import { existsSync } from 'fs'
@@ -24,8 +24,8 @@ function target(to: string): string | undefined {
 export const tool: Tool = {
 	name: 'send',
 	description:
-		'Send a message to another session, by tab number or session id. By default it is advisory: the recipient reads it soon ' +
-		'but need not drop its work. steer: true steers it as the user would; queue: true runs it after its current turn.',
+		'Send a message to another session, by tab number or session id. Default delivery is at the next round, without interrupting work. ' +
+		'steer: true interrupts as a user message would; queue: true delivers after this turn. An idle recipient can start a turn.',
 	parameters: {
 		type: 'object',
 		properties: {
@@ -35,8 +35,8 @@ export const tool: Tool = {
 				type: 'string',
 				description: 'One short plain-language sentence for the user: what the message says or asks, e.g. "Ask tab 2 to rerun the tests"',
 			},
-			steer: { type: 'boolean', description: 'Steer as the user would instead of advising' },
-			queue: { type: 'boolean', description: "Run after the recipient's current turn" },
+			steer: { type: 'boolean', description: 'Interrupt as a user message would instead of delivering at the next round' },
+			queue: { type: 'boolean', description: "Deliver after the recipient's current turn" },
 		},
 		required: ['to', 'text', 'description'],
 	},
