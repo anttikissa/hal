@@ -58,7 +58,7 @@ function itemStyle(item: Item, tool?: string): Style | undefined {
 		case 'question':
 			return colors.question()
 		case 'output':
-			return { fg: (item.error ? colors.error() : colors.log()).fg! }
+			return item.error ? { fg: colors.error().fg! } : item.synthetic ? colors.synthetic() : { fg: colors.log().fg! }
 		case 'divider':
 			return { fg: colors.log().fg! }
 	}

@@ -76,6 +76,11 @@ export const colors = {
 		linkFg: [0.88, 0.15, 55],
 		linkBg: [0.3, 0.05, 55],
 	}),
+	// Synthetic Hal: the assistant hue and brightness, slightly grayer.
+	synthetic: (): Style => {
+		let style = colors.assistant(), fg = style.fg!
+		return { ...style, fg: [fg[0], fg[1] * 0.75, fg[2]] }
+	},
 	// Thinking: muted blue-gray, recedes.
 	thinking: (): Style => ({
 		fg: [0.72, 0.03, 250],
