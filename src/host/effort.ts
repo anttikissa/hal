@@ -66,10 +66,7 @@ function nearest(id: string, asked: string): { level?: EffortLevel; note?: strin
 	if (rank < 0) throw new Error(`${id}: unknown effort '${asked}'; use default or ${effort.describe(id)?.levels.join(', ') || 'no verified effort control'}`)
 	let cap = effort.describe(id)
 	if (!cap?.levels.length) return { note: `${id} has no effort control; effort ${asked} dropped` }
-	let level = cap.levels.includes(want) ? want : [...cap.levels].sort((a, b) => {
-		let d = (l: EffortLevel) => Math.abs(vocabulary.levels.indexOf(l) - rank)
-		return d(a) - d(b) || vocabulary.levels.indexOf(b) - vocabulary.levels.indexOf(a)
-	})[0]
+	let level = vocabulary.closest(cap.levels, want)!
 	let notes = [
 		ultra && 'ultra → max (Hal has no Ultra mode; ask for subagents in the prompt)',
 		level !== want && `${want} → ${level} (closest supported by ${id})`,
