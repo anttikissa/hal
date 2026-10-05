@@ -92,9 +92,9 @@ test('overlapping aliases wait across sessions; disjoint and undeclared calls do
 	let undeclared = await fileChanges.begin(context(second), [])
 	undeclared.release()
 	let controller = new AbortController()
-	let cancelled = fileChanges.begin({ ...context(second), signal: controller.signal }, ['file'])
+	let canceled = fileChanges.begin({ ...context(second), signal: controller.signal }, ['file'])
 	controller.abort()
-	await expect(cancelled).rejects.toThrow('cancelled')
+	await expect(canceled).rejects.toThrow('canceled')
 	writeFileSync(`${cwd}/file`, 'first')
 	await fileChanges.finish(owner)
 	let acquired = await next

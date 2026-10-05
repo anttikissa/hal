@@ -126,11 +126,15 @@ is block-start order in both clients; it is separate from delivery eligibility.
   it (`<form class="Question">`). Decisions (keys, view state,
   reconnect, scroll maths) stay in plain .ts modules (app.ts, view.ts,
   link.ts), unit-tested without a browser or Solid; main.tsx renders
-  only when `document` exists. Colours come only from the CSS the host
+  only when `document` exists. Colors come only from the CSS the host
   generates from src/common/colors.ts (none written in src/web); layout
   CSS lives in the one stylesheet in index.html.
 - `src/main.ts` — the composition root and the only file that wires
   host and client together. Tests sit next to code as `*.test.ts`.
+- US English spelling (color, center, gray, canceled, summarize) in
+  code, names, comments, docs and tasks; quoted outside text keeps its
+  own. Persisted fields follow too: no compatibility shims for older
+  British-spelled records (task k45).
 - `src/conventions.test.ts` enforces the import rules and that
   importing every module (main.ts included) prints nothing, registers
   no signal handlers and leaves no timers or watchers running.
@@ -165,7 +169,7 @@ is block-start order in both clients; it is separate from delivery eligibility.
 ## Web client (Solid)
 
 Before implementing or reviewing UI, read `skills/ui-craft/SKILL.md`.
-Catalogue equivalent variants, fix shared layout owners, and inspect their
+Catalog equivalent variants, fix shared layout owners, and inspect their
 rendered short/long, open/closed and responsive states before claiming a
 visual fix. Passing tests alone does not establish visual quality.
 
@@ -199,7 +203,7 @@ it only when building the page with Bun, not on the host startup path.
 - Anything that navigates is an `<a href>` (Cmd-click, middle-click,
   copy link keep working). The browser never polls: the host pushes.
 - Phones: fields at least 16px, touch targets at least 44px, touch
-  behaviour keyed on `pointer: coarse` rather than width, the page
+  behavior keyed on `pointer: coarse` rather than width, the page
   sized from visualViewport (iOS keyboard), no horizontal page overflow,
   and text kept out of the safe area: viewport-fit=cover (else every
   env(safe-area-inset-*) is 0) and edge rows padded with them (4s).
@@ -212,14 +216,14 @@ it only when building the page with Bun, not on the host startup path.
 
 ## Look: retro sci-fi terminal (user's standing preference)
 
-Bold, colourful, contrasty: think 2001: A Space Odyssey, Alien, Blade
+Bold, colorful, contrasty: think 2001: A Space Odyssey, Alien, Blade
 Runner, Tron (the early-1980s film), CRT VT100 terminals glowing in the dark. Saturated phosphor
 hues on near-black, lit solid edges (a card's left bar is an LED,
 not a hairline; no glow or blur: the user doesn't want it), square corners everywhere (cards, buttons, tabs,
 fields, dialogs; no border-radius). Never meek, pastel, washed-out or
 corporate-neutral (the user's words: "be-afraid-say-nothing"). No
-slate: no blue-grey surfaces or buttons in any theme, the default
-included. Colour
+slate: no blue-gray surfaces or buttons in any theme, the default
+included. Color
 changes are proposed to the user with options before they land; he
 decides. Spacing follows the terminal grid (quarter lines vertically,
 whole ch across), and small text is fine where space is scarce; task gn
@@ -249,7 +253,7 @@ holds the rest of what the user chose (selection, focus, tabs). Readable text be
 
 ## Motion (web)
 
-After Emil Kowalski: animate only opacity, colour and transform (the
+After Emil Kowalski: animate only opacity, color and transform (the
 user's exceptions: a card opening or closing animates its height, as
 in tasks/4s/demo.tsx [F12], and a tab marker appearing its width); one
 strong ease-out (--ease-out); short (80–300 ms), exits faster than
@@ -271,7 +275,7 @@ exception, the user's choice: the example request in an empty prompt
 needed and stays visibly distinct from typed text.
 Hierarchy comes from hue, lightness steps above the minimum, bold or
 position, never from dropping below it. Don't overdo testing this;
-just be careful when introducing new colours.
+just be careful when introducing new colors.
 
 ## Artifacts
 

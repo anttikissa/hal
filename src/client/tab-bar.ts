@@ -21,7 +21,7 @@ type Part = { text: string; fg?: Oklch; link?: string; dim?: Oklch; under?: bool
 type Hint = { text: string; priority: number }
 
 // The mark after a tab's number (common/tab-mark.ts, shared with the
-// web), its colour and, if it blinks, `dim`: its colour in the dark
+// web), its color and, if it blinks, `dim`: its color in the dark
 // phase.
 const indicator = (tab: Tab): Part | undefined => {
 	let m = tabMark.mark(tab)
@@ -40,7 +40,7 @@ function markPart(m: Mark): Part {
 const blinks = (list: Tab[]): boolean => list.some((t) => !!tabBar.indicator(t)?.dim)
 
 // A blinking mark in its dark phase: dimmer, or gone where the dim
-// colour would look the same as the lit one (a monochrome terminal).
+// color would look the same as the lit one (a monochrome terminal).
 function dark(mark: Part): Part {
 	let dim = mark.dim!
 	if (ansi.sgr({ fg: dim }) === ansi.sgr({ fg: mark.fg! })) return { text: ' '.repeat(strings.visLen(mark.text)) }
@@ -123,7 +123,7 @@ function row(list: Tab[], focused: string | undefined, cols: number, lit = true)
 	// A tab's number links to its web page (task e3).
 	let out = fit(list, focused, width, lit).map((p) => {
 		let text = p.link ? `\x1b]8;;${ansi.webUrl(p.link)}\x07${p.text}${ansi.LINK_OFF}` : p.text
-		// Underline is no colour: it marks the focused tab in a monochrome
+		// Underline is no color: it marks the focused tab in a monochrome
 		// terminal too.
 		if (p.under) text = UNDER + text + UNUNDER
 		return (p.fg ? ansi.sgr({ fg: p.fg }) : '') + text

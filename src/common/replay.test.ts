@@ -97,15 +97,15 @@ test('notices appear once at their delivery point, not on later prompts', () => 
 	expect(texts.at(-1)).not.toContain('<meta>')
 })
 
-test('partial text of a cancelled turn is kept; unsigned thinking is not replayed', () => {
+test('partial text of a canceled turn is kept; unsigned thinking is not replayed', () => {
 	let msgs = replay.toMessages([
 		say('hi'),
 		block({ type: 'thinking', text: 'half a thou' }),
-		end('cancelled'),
+		end('canceled'),
 		say('go on'),
 		block({ type: 'thinking', text: 'x' }),
 		block({ type: 'text', text: 'partial ans' }),
-		end('cancelled'),
+		end('canceled'),
 	])
 	expect(msgs.flatMap((m) => m.role === 'assistant' ? m.blocks : [])).toEqual([{ type: 'text', text: 'partial ans' }])
 	expect(msgs[3]!.blocks).toEqual([{ type: 'text', text: 'partial ans' }])
@@ -119,7 +119,7 @@ test('tool calls get their results; unanswered ones get an error result before t
 		end('completed'),
 		user({ type: 'tool_result', id: 'a', output: 'ok' }),
 		block(call('c')),
-		end('cancelled'),
+		end('canceled'),
 		say('never mind'),
 	])
 	expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user', 'user', 'user'])

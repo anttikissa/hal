@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, mkdirSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { clock } from './clock.ts'
-import { neighbours } from './neighbours.ts'
+import { neighbors } from './neighbors.ts'
 import { sessions } from './sessions.ts'
 import { tools } from './tools.ts'
 
@@ -10,13 +10,13 @@ let home = '', cwd = ''
 const savedHome = process.env.HAL_HOME, savedNow = clock.now
 let t = 1_000_000
 beforeEach(() => {
-	home = mkdtempSync(`${tmpdir()}/hal-neighbours-`)
+	home = mkdtempSync(`${tmpdir()}/hal-neighbors-`)
 	process.env.HAL_HOME = home
 	cwd = `${home}/repo`
 	mkdirSync(cwd)
 	clock.now = () => t
-	neighbours.state.seen.clear()
-	neighbours.state.sent.clear()
+	neighbors.state.seen.clear()
+	neighbors.state.sent.clear()
 })
 afterEach(() => {
 	sessions.closeAll()
@@ -30,7 +30,7 @@ const bash = async (sessionId: string, command: string, modifies?: string[]) => 
 	return (await tools.run({ type: 'tool_call', id: 'c', name: 'bash', input: { command, description: 'x', modifies } }, ctx)).output
 }
 
-test('a neighbour editing the same directory is heard once, shared paths first, then not after 15 minutes', async () => {
+test('a neighbor editing the same directory is heard once, shared paths first, then not after 15 minutes', async () => {
 	let a = sessions.create({ cwd, model: 'fake/m' }).id
 	let b = sessions.create({ cwd, model: 'fake/m' }).id
 	await bash(a, 'true', ['x.ts', 'y.ts'])

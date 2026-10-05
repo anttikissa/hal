@@ -1,16 +1,16 @@
-# Card and panel catalogue
+# Card and panel catalog
 
 ## Transcript layout contract
 
-`Card` owns one article, colour/state classes, identity, block navigation and
+`Card` owns one article, color/state classes, identity, block navigation and
 expansion. `CardHeader` owns the first row: recorded time, readable label and
 block reference. Native controls and plain text occupy the same grid slots.
-All slots start on the first text line, not the centre of a multiline neighbour.
+All slots start on the first text line, not the center of a multiline neighbor.
 
 Card geometry is the same on every screen; nothing depends on pointer type.
 A header row and its controls are at least 44px high. The header has no
 additional outer vertical padding; each slot uses the same inset,
-(44px - 1lh) / 2, centring one line in the row. Thus single-line folded
+(44px - 1lh) / 2, centering one line in the row. Thus single-line folded
 cards share one row height.
 
 Every body uses `.content`: quarter-line top padding, one-character
@@ -24,7 +24,7 @@ does not reserve a reference-width gutter down its entire length.
 Long folded labels truncate while closed and wrap while open. Times and
 references stay on the first line. Native links remain outside the expansion
 button. References use generated text, excluded from copying. Records without
-time do not invent one. Colours remain the existing theme's responsibility.
+time do not invent one. Colors remain the existing theme's responsibility.
 
 | Transcript variant | Header | Body and deliberate differences |
 |---|---|---|
@@ -38,10 +38,10 @@ time do not invent one. Colours remain the existing theme's responsibility.
 | Tool call/result | Time + description or readable call | Folded call details and attached output; running output may auto-open. |
 | Summary-bearing prompt | Time + summary | Folded sender and original body; time is not repeated in the sender line. |
 | Queued prompt | Compact queue note until expanded | Three-line preview; expanded agent prose uses the shared header. Waiting items without time retain it in their queue note. |
-| Pending prompt | Same header/body as acknowledged prompt | Delayed pending colour and reconnect status, not a different shell. |
+| Pending prompt | Same header/body as acknowledged prompt | Delayed pending color and reconnect status, not a different shell. |
 | Image | No invented sender/time | Linked image constrained to the content width; headless reference. |
 | Detached tool result | No invented call timestamp | Result marker and output glimpse; headless reference. |
-| Answered/cancelled question | No invented timestamp | Question/answer text, not live form controls. |
+| Answered/canceled question | No invented timestamp | Question/answer text, not live form controls. |
 | Turn end | No header | Completed ends absent; pause/error text remains visible. |
 | Context boundary | No header | Label between rules, deliberately not a message header. |
 
@@ -49,7 +49,7 @@ time do not invent one. Colours remain the existing theme's responsibility.
 
 | Surface | Shared vocabulary | Intentional structural difference |
 |---|---|---|
-| Pending Question | Transcript bar, colour and spacing scale | Native form, URL text, choices/inputs and dismiss/answer controls. |
+| Pending Question | Transcript bar, color and spacing scale | Native form, URL text, choices/inputs and dismiss/answer controls. |
 | Notices | Lit bar and quarter-line/one-character inset | Floating linked tiles, compact labels and independent stacking. |
 | Composer/completions | Lit bar, native controls, same touch minimum | Editable field and selectable suggestions, not transcript articles. |
 | Tab sheet rows | Lit selection bar and touch controls | Navigable sessions with independent close buttons. |

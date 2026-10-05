@@ -1,8 +1,8 @@
-// The Hal cursor (task 5p): a block in the Hal cursor colour that
-// blinks right after the text Hal is streaming (in the thinking colour
+// The Hal cursor (task 5p): a block in the Hal cursor color that
+// blinks right after the text Hal is streaming (in the thinking color
 // while it thinks), and otherwise on its own row below the transcript.
 // That idle cursor is bright while the session works and, once it has
-// finished, fades to grey over fadeMs. Only the shown session's current
+// finished, fades to gray over fadeMs. Only the shown session's current
 // stream has one. Beats come from the shared pulse (pulse.ts).
 
 import { colors } from '../common/colors.ts'
@@ -39,7 +39,7 @@ function fade(id: string, working: boolean, now: number): number {
 	let since = st.stopped.get(id) ?? now
 	st.stopped.set(id, since)
 	let ms = halCursor.fadeMs
-	// In steps, so a fade paints (and caches) a few colours, not one per beat.
+	// In steps, so a fade paints (and caches) a few colors, not one per beat.
 	return ms > 0 ? Math.min(1, Math.round(((now - since) / ms) * 10) / 10) : 1
 }
 
@@ -88,7 +88,7 @@ export const halCursor = {
 	// `stopped`: per session seen working here, when it stopped (null
 	// while it works).
 	state: { stopped: new Map<string, number | null>() },
-	/** How long a finished session's idle cursor takes to turn grey. */
+	/** How long a finished session's idle cursor takes to turn gray. */
 	fadeMs: 5000,
 	streaming,
 	fade,

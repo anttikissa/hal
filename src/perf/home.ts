@@ -63,7 +63,7 @@ function reply(r: Rand): string {
 }
 
 // Tool output: mostly short, sometimes huge; a few with very long lines,
-// ANSI colour or wide characters, as real command output has.
+// ANSI color or wide characters, as real command output has.
 function output(r: Rand): string {
 	let x = r()
 	let count = x < 0.7 ? int(r, 1, 40) : x < 0.95 ? int(r, 40, 400) : int(r, 400, 6000)

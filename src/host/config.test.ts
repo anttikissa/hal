@@ -70,13 +70,13 @@ test('values in config.ason are what settings return; edits apply at once and ar
 })
 
 test('bad values and unknown keys warn, naming the file, and fall back', () => {
-	writeFileSync(paths.configFile(), "{ webPort: 'nope', colour: 'red', model: 'test/ok' }\n")
+	writeFileSync(paths.configFile(), "{ webPort: 'nope', color: 'red', model: 'test/ok' }\n")
 	start()
 	let w = config.warnings()
 	expect(w.length).toBe(2)
 	for (let line of w) expect(line).toContain('config.ason')
 	expect(w.some((l) => l.includes('webPort'))).toBe(true)
-	expect(w.some((l) => l.includes('colour'))).toBe(true)
+	expect(w.some((l) => l.includes('color'))).toBe(true)
 	expect(settings.webPort()).toBe(defaults().webPort as number)
 	expect(settings.model()).toBe('test/ok')
 })

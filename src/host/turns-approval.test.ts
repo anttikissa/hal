@@ -30,7 +30,7 @@ function fakeStream(_model: string, input: any, signal?: AbortSignal): AsyncIter
 	signal?.addEventListener('abort', () => wake())
 	return (async function* () {
 		while (true) {
-			if (signal?.aborted) return yield { type: 'error', message: 'Cancelled', cancelled: true }
+			if (signal?.aborted) return yield { type: 'error', message: 'Canceled', canceled: true }
 			let e = queue.shift()
 			if (!e) {
 				await new Promise<void>((r) => (wake = r))

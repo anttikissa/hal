@@ -41,7 +41,7 @@ function trim(text: string): string {
 // The conversation records a summary is made of: prompts, tool results
 // and assistant blocks, as the conversation now stands (edits applied),
 // from the latest reset on. Earlier summaries are not in it: a second
-// compact summarises from the start again.
+// compact summarizes from the start again.
 function entries(records: HistoryRecord[]): HistoryRecord[] {
 	records = replay.current(records)
 	let from = records.findLastIndex((r) => r.type === 'reset')
@@ -100,7 +100,7 @@ function omission(run: HistoryRecord[], label: (r: HistoryRecord, i: number) => 
 
 // The summary of `records` (a session's whole history), naming
 // `historyPath` for the rest, and how many prompts it covers; undefined
-// when there is no conversation to summarise (an active prompt may be protected).
+// when there is no conversation to summarize (an active prompt may be protected).
 function summary(records: HistoryRecord[], historyPath: string): { summary: string; prompts: number } | undefined {
 	let list = compaction.entries(records)
 	let keep = compaction.kept(list)

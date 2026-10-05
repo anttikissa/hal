@@ -1,4 +1,4 @@
-// /theme (task d3): the colour theme is plugins/color-theme.ts, a
+// /theme (task d3): the color theme is plugins/color-theme.ts, a
 // symlink to one of the tracked themes/<name>.ts; no link is the
 // built-in look, hal (src/common/colors.ts). The plugin loader sees the link
 // change and swaps the theme in every process that watches plugins/.
@@ -27,14 +27,14 @@ function active(): string | undefined {
 }
 
 export const command: SlashCommand = {
-	help: () => '/theme asks which colour theme to use, the active one chosen; /theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
+	help: () => '/theme asks which color theme to use, the active one chosen; /theme <name> switches to it (hal is the built-in look). Web pages show it on their next load.',
 	complete: (args) => names().filter((n) => n.startsWith(args)),
 	run(args, answers) {
 		let now = active()
 		let all = names()
 		// With no name, a question to pick from, the active one chosen.
 		if (!args && !answers) {
-			let text = now ? 'Pick the colour theme.' : `${link()} is your own file, not a theme link; /theme will not replace it.`
+			let text = now ? 'Pick the color theme.' : `${link()} is your own file, not a theme link; /theme will not replace it.`
 			return { ask: { text, fields: [{ type: 'choice', name: 'theme', options: all, initial: Math.max(0, all.indexOf(now ?? '')) }] } }
 		}
 		args ||= answers?.theme ?? ''

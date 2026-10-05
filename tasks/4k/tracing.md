@@ -35,7 +35,7 @@ throttling. `clear: true` means the renderer generated CSI 3J; `home: true`
 means cursor-home. `reason` distinguishes forced rebuilds, shrink, immutable
 row changes, ordinary diffs, and unchanged frames. Causes identify event
 categories, keyboard handling (not keys), heartbeat, resize, and redraw.
-Unclassified protocol events are labelled `event:other`, never copied raw.
+Unclassified protocol events are labeled `event:other`, never copied raw.
 
 The capture contains no transcript, input, output, session identity, paths,
 URLs, credentials, or terminal escape strings. It stays local and owner-only;

@@ -4,7 +4,7 @@
 // the last prompt, tab completion's choices, else the key hints for
 // the session's state (then 'ctrl-r: reload client' when a new commit
 // is checked out) with '/keys: shortcuts' at the right. Keys in
-// the help key colour, descriptions in its description colour, as in
+// the help key color, descriptions in its description color, as in
 // the old Hal. Pure.
 
 import { colors } from '../common/colors.ts'
@@ -49,7 +49,7 @@ function keys(state: SessionState | undefined, text: boolean): Hint[] {
 	return []
 }
 
-// Hints painted: each key in the key colour, its description dimmer.
+// Hints painted: each key in the key color, its description dimmer.
 function paint(hints: Hint[]): string {
 	let h = colors.help()
 	let key = ansi.sgr({ fg: h.key! })

@@ -58,7 +58,7 @@ export interface View {
 	tabs?: { list: Tab[]; focused?: string; lit?: boolean }
 	/** Tab completion's choices: listed in the help row. */
 	choices?: string[]
-	/** What the session is doing, centred in the prompt's top rule. */
+	/** What the session is doing, centered in the prompt's top rule. */
 	activity?: string
 	/** The hint while the last prompt is edited: the help row shows it. */
 	editing?: string

@@ -80,7 +80,7 @@ function cancel(id: string): string | undefined {
 	if (!changed) delete drafts.local(id).queueEdit
 	drafts.save(id)
 	connection.send({ type: 'queue-edit-cancel', sessionId: id, edit: e.edit })
-	return changed ? 'Queue edit cancelled; unsaved changes are kept. Edit this queued message again to recover them.' : undefined
+	return changed ? 'Queue edit canceled; unsaved changes are kept. Edit this queued message again to recover them.' : undefined
 }
 function save(id: string): string | undefined {
 	let e = queueEdit.current(id)

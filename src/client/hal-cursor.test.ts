@@ -42,7 +42,7 @@ const start = () => {
 	state({ type: 'running', phase: 'streaming' })
 }
 
-// The frame's rows as text; the cursor block kept, its colour named.
+// The frame's rows as text; the cursor block kept, its color named.
 function rows(cols = 40): string[] {
 	let hal = ansi.sgr({ fg: colors.assistant().cursor! })
 	let think = ansi.sgr({ fg: colors.thinking().fg! })
@@ -56,7 +56,7 @@ const below = (after: string) => {
 	return r.slice(r.lastIndexOf(after) + 1, r.lastIndexOf(after) + 4)
 }
 
-test('the cursor follows the streamed text, in the thinking colour while thinking', () => {
+test('the cursor follows the streamed text, in the thinking color while thinking', () => {
 	start()
 	stream({ type: 'thinking', text: 'hmm' })
 	expect(rows()).toContain(' hmm{think}')
@@ -90,7 +90,7 @@ test('the cursor goes when the block ends; blank, cursor, blank rows follow the 
 	expect(below(' Hello')).toEqual(['', ' {hal}', ''])
 	app.onEvent({ type: 'turn-end', sessionId: 's1', status: 'completed' })
 	state({ type: 'idle' })
-	// Finished: it fades from the Hal colour to grey.
+	// Finished: it fades from the Hal color to gray.
 	now = halCursor.fadeMs * 2
 	expect(below(' Hello')).toEqual(['', ' █', ''])
 	expect(rows().join('\n')).not.toContain('{hal}')
@@ -108,11 +108,11 @@ test('the idle cursor, the work now, sits above queued messages, the future', ()
 	expect(r.findIndex((l) => l.includes('{hal}'))).toBeLessThan(r.findIndex((l) => l.includes('later please')))
 })
 
-test('a finished session never seen working here shows the grey cursor at once', () => {
+test('a finished session never seen working here shows the gray cursor at once', () => {
 	app.onEvent(snapshot())
 	let lines = frame.build(appView.view(), 40).lines
-	let grey = ansi.sgr({ fg: colors.assistant().cursorIdle! }) + '█'
-	expect(lines.some((l) => l.includes(grey))).toBe(true)
+	let gray = ansi.sgr({ fg: colors.assistant().cursorIdle! }) + '█'
+	expect(lines.some((l) => l.includes(gray))).toBe(true)
 })
 
 test('no timer runs when nothing blinks', () => {

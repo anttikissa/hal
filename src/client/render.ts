@@ -251,7 +251,7 @@ function draw(force = false): void {
 		st.tab = tab
 	}
 	// A full redraw drops what kept blocks from shrinking (task fn), and
-	// every laid-out row, so all repaint in the current colours (a
+	// every laid-out row, so all repaint in the current colors (a
 	// plugin's theme, task an).
 	if (force) {
 		frame.state.rows = new WeakMap()

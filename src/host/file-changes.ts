@@ -6,7 +6,7 @@ import type { FileChange, FileSnapshot } from '../common/replay.ts'
 import { approval } from './approval.ts'
 import { paths } from './paths.ts'
 import { history } from './history.ts'
-import { neighbours } from './neighbours.ts'
+import { neighbors } from './neighbors.ts'
 import type { ToolContext } from './tools.ts'
 import { host } from './host.ts'
 import { stats } from './stats.ts'
@@ -28,7 +28,7 @@ function validate(input: unknown): string[] {
 	return input.map((p) => isAbsolute(p) ? resolve(p) : relative('/cwd', resolve('/cwd', p)) || '.')
 }
 
-// Canonicalise missing files through their nearest existing ancestor too.
+// Canonicalize missing files through their nearest existing ancestor too.
 async function canonical(path: string): Promise<string> {
 	try { return await realpath(path) } catch (e: any) {
 		if (e.code !== 'ENOENT') throw e
@@ -147,7 +147,7 @@ async function status(cwd: string): Promise<{ files: Map<string, string>; log?: 
 async function begin(ctx: ToolContext, patterns: string[]): Promise<Observation> {
 	let release = await fileChanges.acquire(ctx, patterns)
 	try {
-		neighbours.record(ctx.sessionId, ctx.cwd, patterns)
+		neighbors.record(ctx.sessionId, ctx.cwd, patterns)
 		let before = new Map<string, FileSnapshot>()
 		for (let path of await fileChanges.expand(ctx.cwd, patterns)) before.set(path, await fileChanges.snapshot(ctx, path))
 		let { files, log } = await fileChanges.status(ctx.cwd)
@@ -169,7 +169,7 @@ async function finish(observation: Observation): Promise<void> {
 		for (let path of new Set([...status.keys(), ...after.keys()])) {
 			if (!declaredPaths.has(resolve(ctx.cwd, path)) && status.get(path) !== after.get(path)) files.push({ path, undeclared: true, statusBefore: status.get(path) ?? null, statusAfter: after.get(path) ?? null })
 		}
-		neighbours.record(ctx.sessionId, ctx.cwd, files.map((f) => f.path))
+		neighbors.record(ctx.sessionId, ctx.cwd, files.map((f) => f.path))
 		if (patterns.length || files.length) {
 			history.append(ctx.sessionId, { type: 'file_changes', toolId: ctx.callId!, cwd: ctx.cwd, files })
 			host.broadcast(ctx.sessionId, { type: 'turn-stats', sessionId: ctx.sessionId, stats: stats.of(ctx.sessionId) })

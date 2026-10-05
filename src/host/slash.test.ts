@@ -164,7 +164,7 @@ test('a command question lives beside turns: a prompt runs at once, the turn end
 	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => !transcript.question(a.views.get(id)))
 	let view = a.views.get(id)!
-	expect(view.items.find((i) => i.type === 'question')).toMatchObject({ cancelled: true })
+	expect(view.items.find((i) => i.type === 'question')).toMatchObject({ canceled: true })
 	expect(existsSync(`${work}/nowhere`)).toBe(false)
 	expect((await opened(id)).views.get(id)).toEqual(view)
 })
@@ -190,7 +190,7 @@ test('a command question asked while a turn streams leaves the turn streaming; a
 	expect(a.views.get(id)!.state).toEqual({ type: 'running', phase: 'streaming' })
 	a.conn.send({ type: 'submit', sessionId: id, text: '/cd elsewhere' })
 	await until(() => transcript.question(a.views.get(id))?.id !== first)
-	expect(a.views.get(id)!.items.find((i) => i.type === 'question' && i.id === first)).toMatchObject({ cancelled: true })
+	expect(a.views.get(id)!.items.find((i) => i.type === 'question' && i.id === first)).toMatchObject({ canceled: true })
 	release()
 	await until(() => a.of('turn-end').length)
 	expect(a.views.get(id)!.items.filter((i) => i.type === 'text').map((i: any) => i.text)).toEqual(['working done'])
@@ -220,7 +220,7 @@ test('a command runs while a turn is busy instead of waiting in the inbox; /paus
 	expect(a.views.get(id)!.state).toEqual({ type: 'blocked', reason: 'question' })
 	let asked = transcript.question(a.views.get(id))!.id
 	a.conn.send({ type: 'submit', sessionId: id, text: '/pause' })
-	await until(() => history.readSync(id).some((r) => r.type === 'answer' && r.question === asked && r.cancelled))
+	await until(() => history.readSync(id).some((r) => r.type === 'answer' && r.question === asked && r.canceled))
 })
 
 test('history records who sent a command', async () => {

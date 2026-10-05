@@ -5,8 +5,8 @@
 	notes: [
 		"Intent lives on the accepting command's output record (transition); transitionCancel/transitionDone outputs settle it. Boundaries and continuation prompts carry the intent id, so recovery after any crash gap skips work already recorded and never injects twice. pages.marks and busy keep pending intents in closed tabs.",
 		'Clear must record results for every unanswered call before the old turn_end, including during crash recovery; recovery used to write turn_end first. Bare clear from paused, error or a parked approval ends idle: the turn_end closes the question and held calls never resume.',
-		"Compaction may summarise a first turn with no earlier prompt when it holds assistant or tool entries; the old 'nothing to summarise without a prompt' rule refused self-issued /compact in turn one. Scope unchanged otherwise.",
-		"Only /clear gets the literal raw tail (one separator consumed); other commands keep whitespace-normalised args so paths and flags parse as before. Completion outputs are durable but hidden live and in replay to avoid noise after 'Context cleared.'",
+		"Compaction may summarize a first turn with no earlier prompt when it holds assistant or tool entries; the old 'nothing to summarize without a prompt' rule refused self-issued /compact in turn one. Scope unchanged otherwise.",
+		"Only /clear gets the literal raw tail (one separator consumed); other commands keep whitespace-normalized args so paths and flags parse as before. Completion outputs are durable but hidden live and in replay to avoid noise after 'Context cleared.'",
 		'turns.ts hit the 400-line limit: policy helpers moved to turn-policy.ts and record validation to history-check.ts instead of deleting docs. Under full-suite load turns-retry and slash timing tests flake occasionally; they pass repeatedly in isolation and at base.'
 	],
 	needs: ['vh', 'bc', 'rj', 'hp'],

@@ -16,7 +16,7 @@ type Cursor = { row: number; col: number }
 
 /**
  * Where a modal goes on a terminal of `rows` × `cols`: a fixed height
- * (80% of the rows, at most 36) and width, centred across. Outside it
+ * (80% of the rows, at most 36) and width, centered across. Outside it
  * on each side: at least one blank column and one of transcript.
  */
 function modalBox(rows: number, cols: number): { height: number; width: number; left: number } {
@@ -92,7 +92,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		if (value?.cursor !== undefined) cursor = { row: content.length, col: Math.min(inner - 1, 2 + column + value.cursor) }
 		if (i === m.selected) {
 			if (!fields.cursor && !m.edit && (!m.find || m.find.focus === 5)) cursor = { row: content.length, col: 0 }
-			// Monochrome: reverse video instead of the highlight colour.
+			// Monochrome: reverse video instead of the highlight color.
 			row = (ansi.sgr(current) || ansi.INVERSE) + row + ' '.repeat(inner - strings.visLen(row)) + UNCOLOR + ansi.UNINVERSE
 		}
 		content.push(row)
@@ -146,7 +146,7 @@ function footer(m: ModalState, width: number): string[] {
 }
 
 // `row` (plain text) with the query's matches bold and bright, then back
-// to `after`'s colour (the selected row's) or the default. Monochrome:
+// to `after`'s color (the selected row's) or the default. Monochrome:
 // bold only.
 function highlight(row: string, query: string, after?: Style, literal = false): string {
 	let on = ansi.BOLD + (ansi.mono() ? '' : ansi.sgr({ fg: colors.popupMatch().fg! }))
@@ -176,7 +176,7 @@ function overlay(line: string, row: string, left: number, width: number, cols: n
 	return before + RESET + gap + row + RESET + (left + width < cols ? ' ' : '') + after
 }
 
-// Draws modal `m` over `lines`, centred on the screen (the last `rows`
+// Draws modal `m` over `lines`, centered on the screen (the last `rows`
 // of them), so that it never reaches into scrollback. A short frame
 // grows to hold it. Returns the cursor and the list's scroll.
 function withModal(lines: string[], m: ModalState, rows: number, cols: number): { cursor: Cursor; scroll: number } {

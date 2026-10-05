@@ -1,5 +1,5 @@
-// OKLCH to sRGB. A colour is [lightness 0..1, chroma, hue in degrees];
-// equal L and C across hues look equally bright and vivid. Colours
+// OKLCH to sRGB. A color is [lightness 0..1, chroma, hue in degrees];
+// equal L and C across hues look equally bright and vivid. Colors
 // outside sRGB keep their chroma and hue and darken until they fit, so
 // a bright orange stays orange (not peach); only one no lightness can
 // hold loses chroma instead. Terminal and web both get the fitted one.
@@ -27,8 +27,8 @@ function gamma(x: number): number {
 	return Math.round(255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055))
 }
 
-// Every frame paints the same few colours: each is converted once. The
-// cache is dropped when full, so animated colours cannot grow it.
+// Every frame paints the same few colors: each is converted once. The
+// cache is dropped when full, so animated colors cannot grow it.
 function toRgb(c: Oklch): [number, number, number] {
 	let st = oklch.state
 	let key = c.join()
@@ -40,8 +40,8 @@ function toRgb(c: Oklch): [number, number, number] {
 
 // `c` inside sRGB, keeping its hue: as dark as needed to keep its
 // chroma, or, if no lightness holds that much, at the lightness that
-// holds the most (the hue's most vivid colour). Never darker than that
-// point: below it darkening only loses chroma, so a colour already
+// holds the most (the hue's most vivid color). Never darker than that
+// point: below it darkening only loses chroma, so a color already
 // darker than it (a card background) loses chroma instead.
 function fit([L, C, h]: Oklch): Oklch {
 	L = Math.min(1, Math.max(0, L))
@@ -71,8 +71,8 @@ function convert(c: Oklch): [number, number, number] {
 	return linear(oklch.fit(c)).map(gamma) as [number, number, number]
 }
 
-// `c` as a CSS oklch() colour, fitted as the terminal draws it, so the
-// page and the terminal show the same colour.
+// `c` as a CSS oklch() color, fitted as the terminal draws it, so the
+// page and the terminal show the same color.
 function toCss(c: Oklch): string {
 	let [L, C, h] = oklch.fit(c)
 	return `oklch(${+L.toFixed(3)} ${+C.toFixed(3)} ${+h.toFixed(1)})`
@@ -82,7 +82,7 @@ function toHex(c: Oklch): string {
 	return '#' + oklch.toRgb(c).map((x) => x.toString(16).padStart(2, '0')).join('')
 }
 
-// WCAG 2.2 contrast ratio of two colours as shown (after gamut
+// WCAG 2.2 contrast ratio of two colors as shown (after gamut
 // mapping): 1 to 21, symmetric.
 function contrast(a: Oklch, b: Oklch): number {
 	let lum = (c: Oklch) => {
@@ -124,7 +124,7 @@ function search(fg: Oklch, bg: Oklch, target = 4.6, step = 0.12): Oklch {
 }
 
 // Example text in an empty prompt. Follow the box's lightness and
-// the prompt's hue; keep the stronger phosphor/green themes colourful
+// the prompt's hue; keep the stronger phosphor/green themes colorful
 // without letting the hint read like typed text.
 function faint(fg: Oklch, bg: Oklch): Oklch {
 	let chroma = fg[1] >= 0.2 ? 0.12 : fg[1] >= 0.16 ? 0.09 : 0.08

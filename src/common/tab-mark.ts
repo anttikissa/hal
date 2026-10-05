@@ -1,5 +1,5 @@
 // The one mark after a tab's number, the same in every client: the
-// terminal's tab bar colours it, the web's tab strip styles it by
+// terminal's tab bar colors it, the web's tab strip styles it by
 // kind. From the session state (tasks/j1/states.md) and whether the
 // tab wants attention (its turn ended, failed or asked since a client
 // showed it). Glyphs follow the old Hal's tabIndicator.

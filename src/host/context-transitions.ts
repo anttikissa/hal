@@ -41,7 +41,7 @@ function request(id: string, kind: 'clear' | 'compact', prompt: string, sender: 
 
 function cancel(id: string): void {
 	let intent = contextTransitions.pending(id)
-	if (intent && !intent.cancelled) contextTransitions.output(id, 'Automatic context continuation cancelled.', { transitionCancel: intent.id })
+	if (intent && !intent.canceled) contextTransitions.output(id, 'Automatic context continuation canceled.', { transitionCancel: intent.id })
 }
 
 function settle(id: string): void {
@@ -63,21 +63,21 @@ function settle(id: string): void {
 function apply(id: string): boolean {
 	let intent = contextTransitions.pending(id)
 	if (!intent) return false
-	if (intent.kind === 'compact' && !intent.cancelled) contextTransitions.settle(id)
+	if (intent.kind === 'compact' && !intent.canceled) contextTransitions.settle(id)
 	let records = history.readSync(id)
 	let boundary = records.some((r) => (r.type === 'reset' || r.type === 'compact') && r.transition === intent.id)
-	if (!boundary && !(intent.cancelled && intent.kind === 'compact')) {
+	if (!boundary && !(intent.canceled && intent.kind === 'compact')) {
 		if (intent.kind === 'compact') compact.run(id, turns.state.running.has(id) || history.unfinished(id), intent.id)
 		else compact.boundary(id, { type: 'reset', transition: intent.id })
 	}
 	let record = records.find((r) => r.type === 'user' && r.command === intent.id)
-	if (intent.kind === 'clear' && intent.prompt !== undefined && !intent.cancelled && !record) {
+	if (intent.kind === 'clear' && intent.prompt !== undefined && !intent.canceled && !record) {
 		let blocks = [{ type: 'text' as const, text: intent.prompt, ...intent.sender, generatingCommand: 'clear' as const }]
 		record = history.submit(id, blocks, intent.id)
 	}
-	if (record?.type === 'user' && !intent.cancelled) host.broadcast(id, prompts.promptEvent(id, record))
+	if (record?.type === 'user' && !intent.canceled) host.broadcast(id, prompts.promptEvent(id, record))
 	contextTransitions.output(id, `/${intent.kind} applied.`, { transitionDone: intent.id })
-	if (record?.type === 'user' && !intent.cancelled) {
+	if (record?.type === 'user' && !intent.canceled) {
 		status.transition(id, { type: 'submit' })
 		turns.start(id)
 	}

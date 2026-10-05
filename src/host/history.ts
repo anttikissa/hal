@@ -92,7 +92,7 @@ function onAppend(listener: (id: string, record: HistoryRecord) => void): () => 
 	return () => history.state.listeners.delete(listener)
 }
 
-// `command`: the client's id for the submit, so a resend is recognised.
+// `command`: the client's id for the submit, so a resend is recognized.
 function submit(id: string, prompt: string | UserBlock[], command?: string): HistoryRecord {
 	let content = typeof prompt === 'string' ? [{ type: 'text' as const, text: prompt }] : prompt
 	let record = { type: 'user' as const, blocks: content, ...(command !== undefined && { command }) }
@@ -278,7 +278,7 @@ function results(id: string, list: ToolResultBlock[]): HistoryRecord | undefined
 const errorText = (e: ErrorEvent): string => (e.body?.trim() && !e.message.includes(e.body.trim()) ? `${e.message}\n${e.body.trim()}` : e.message)
 
 // Ends the running turn, with the usage of all its rounds: `last` is
-// how its last round ended (none, or cancelled: the user paused it).
+// how its last round ended (none, or canceled: the user paused it).
 // Does nothing for a turn not running here, or already ended.
 // `pauseReason`: why Hal, not the user, paused a turn that ended paused.
 function end(id: string, last: DoneEvent | ErrorEvent | undefined, pauseReason?: string): void {
@@ -288,7 +288,7 @@ function end(id: string, last: DoneEvent | ErrorEvent | undefined, pauseReason?:
 	let usage = addUsage(running.prior, running.turn.usage)
 	let context = contextOf(running)
 	if (last?.type === 'done') history.append(id, { type: 'turn_end', status: 'completed', reason: last.reason, usage, ...context })
-	else if (last?.type === 'error' && !last.cancelled) history.append(id, { type: 'turn_end', status: 'error', error: errorText(last), usage, ...context })
+	else if (last?.type === 'error' && !last.canceled) history.append(id, { type: 'turn_end', status: 'error', error: errorText(last), usage, ...context })
 	else history.append(id, { type: 'turn_end', status: 'paused', usage, ...context, ...(pauseReason !== undefined && { pauseReason }) })
 }
 

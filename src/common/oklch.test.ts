@@ -7,7 +7,7 @@ test('the ends of the lightness scale are black and white', () => {
 	expect(oklch.toHex([1, 0, 0])).toBe('#ffffff')
 })
 
-test('zero chroma is grey whatever the hue', () => {
+test('zero chroma is gray whatever the hue', () => {
 	let [r, g, b] = oklch.toRgb([0.6, 0, 250])
 	expect(r).toBe(g)
 	expect(g).toBe(b)
@@ -26,8 +26,8 @@ test('hues land where expected: 25 red, 145 green, 250 blue', () => {
 	expect(b3).toBeGreaterThan(g3)
 })
 
-test('colours outside sRGB darken to keep their chroma and hue', () => {
-	// A bright orange no sRGB colour holds at its lightness: it stays
+test('colors outside sRGB darken to keep their chroma and hue', () => {
+	// A bright orange no sRGB color holds at its lightness: it stays
 	// vivid orange by darkening, never fading to peach.
 	let [L, C, h] = oklch.fit([0.84, 0.19, 55])
 	expect(h).toBe(55)

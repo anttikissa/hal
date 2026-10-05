@@ -103,8 +103,8 @@ function edit(o: Output): Part[] | undefined {
 // Plain rows for a terminal, which cannot open a card. One change:
 // '11:25 AGENTS.md changed  +2 −0', then up to three changed lines.
 // A run: '11:14–11:25 3 changes (one time if both match) to …', then one aligned row per change
-// with its first changed line. `tone` picks a row's colour.
-// `parts`, when set, colours the row word by word; `text` is it plain.
+// with its first changed line. `tone` picks a row's color.
+// `parts`, when set, colors the row word by word; `text` is it plain.
 type Row = { text: string; tone: 'head' | 'add' | 'del' | 'dim'; parts?: Part[] }
 const plain = (p: Part[]) => p.map((x) => x.text).join(' ')
 function rows(item: object): Row[] {

@@ -4,8 +4,8 @@
 	status: 'done',
 	notes: [
 		'Letters live in titles.letter/blockId (common/titles.ts); item keys stay bare numbers, so rows, backfill and dropped checks need no change. transcript.href accepts an optional letter and target.parse strips it before looking up a row. Generated hrefs carry the letter (/s#t19).',
-		"Background bash results are prompts with from = their own session and label 'bash #t19': lettered s, not m, and kept in the user colour. jobs.label makes the #t labels; the label regexes in item-view, Card and view accept #t?N so already stored 'bash #19' labels still link.",
-		"message colour: fg [0.8,0.19,350] (#ff71bb), bg [bgL,0.07,350]; 7.3:1, quiet 4.6:1 on its bg in hal/nostromo/tron/tyrell. wopr picks a yellower phosphor [0.9,0.17,115] on [0.17,0.05,115]. Commands from another session (command items with from) are m too; on the web they get kind 'message prompt'.",
+		"Background bash results are prompts with from = their own session and label 'bash #t19': lettered s, not m, and kept in the user color. jobs.label makes the #t labels; the label regexes in item-view, Card and view accept #t?N so already stored 'bash #19' labels still link.",
+		"message color: fg [0.8,0.19,350] (#ff71bb), bg [bgL,0.07,350]; 7.3:1, quiet 4.6:1 on its bg in hal/nostromo/tron/tyrell. wopr picks a yellower phosphor [0.9,0.17,115] on [0.17,0.05,115]. Commands from another session (command items with from) are m too; on the web they get kind 'message prompt'.",
 		"Not lettered: /find result ids (FindKind cannot tell u from m) and the rebase plan's #n lines and messages (the plan parser reads bare numbers)."
 	],
 	needs: []

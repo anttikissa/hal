@@ -1,0 +1,9 @@
+{
+	title: 'Code, names and docs use US English spelling',
+	spec: 'Identifiers, file names, comments, docs and tasks use US English spelling (color, center, gray, neighbor, behavior, canceled, labeled, summarize, catalog, license); tasks/README.md states the convention. Persisted record fields and protocol names follow it too (answer and transition canceled, TurnStatus canceled): there is no compatibility code for older histories, whose cancelled flags are now ignored (a canceled answer reads as an empty one). Quoted outside text (API values, third-party names) keeps its own spelling.',
+	status: 'done',
+	notes: [
+		"Converted by a one-off perl pass (camelCase-aware: textColour -> textColor; -our, -ise/-yse, doubled-l before ed/ing, centre, grey, catalogue, licence, whilst...). src/host/neighbours.ts became neighbors.ts. Files with others' uncommitted edits at the time were skipped and may still hold British forms."
+	],
+	needs: []
+}

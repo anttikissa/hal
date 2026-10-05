@@ -66,14 +66,14 @@ test('working and failing indicators blink; the others stay', () => {
 	}
 })
 
-test('without colours a blinking indicator comes and goes', () => {
+test('without colors a blinking indicator comes and goes', () => {
 	saved.mono = ansi.mono
 	ansi.mono = () => true
 	let list = [tab('a', { type: 'running', phase: 'streaming' }), tab('b', { type: 'paused' })]
 	expect(text(tabBar.row(list, 'b', 80, true))).toStartWith(' 1▪ 2! ')
 	// The same width dark, so nothing after it moves.
 	expect(text(tabBar.row(list, 'b', 80, false))).toStartWith(' 1  2! ')
-	// The focused number is underlined even without colours.
+	// The focused number is underlined even without colors.
 	expect(tabBar.row(list, 'b', 80)).toContain('\x1b[4m\x1b]8;;')
 })
 

@@ -33,7 +33,7 @@
 // [F14] Status line mirrors the terminal's (Running bash…, Thinking…, Reconnecting…).
 // [F15] Sending a message always glides to the very bottom, even when scrolled far up.
 // [F16] A dedicated line after the last block holds Hal's blinking terminal cursor.
-//      It stays visible when idle; orange normally, grey while thinking streams.
+//      It stays visible when idle; orange normally, gray while thinking streams.
 //      The user's textarea keeps its native browser caret.
 import { createSignal, flush, For, onSettled, Show } from 'solid-js'
 import { render } from '@solidjs/web'
@@ -73,7 +73,7 @@ function stopGlide(): void {
 // Only scroll keys count: any other key (like the demo's 's') would cancel the glide mid-way,
 // so the next measurement sees a half-finished scroll, lands outside the 50px zone, and stops following.
 // [F15] Except a send: macOS trackpad momentum keeps firing wheel events for a second or
-// two after the fingers lift, which cancelled the send glide right after it started.
+// two after the fingers lift, which canceled the send glide right after it started.
 function userScroll(): void {
 	if (!glide.forced) stopGlide()
 }
@@ -377,7 +377,7 @@ function Demo() {
 			.stream { padding: 0 13px 13px; white-space: pre-wrap; }
 			header .live { padding: 13px; color: var(--status-hi); }
 			/* [F16] Dedicated Hal cursor line, always after the final card. Orange like an
-			   assistant response; grey while thinking. No caret styling on the textarea. */
+			   assistant response; gray while thinking. No caret styling on the textarea. */
 			.hal-cursor { min-height: 40px; padding: 7px 0 12px; color: var(--assistant-fg); }
 			.hal-cursor.thinking { color: var(--thinking-fg); }
 			.hal-cursor span { display: block; width: 1ch; height: 1lh; background: currentColor; animation: hal-blink 1s steps(1, end) infinite; }

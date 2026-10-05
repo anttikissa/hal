@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-// One transcript row as a card in its theme colours (view.show). A
+// One transcript row as a card in its theme colors (view.show). A
 // thinking or tool card (the call with its result) folds, closed at
 // first: its header is a button naming what is inside, and a click
 // anywhere on the card toggles it, except on a link or a click that
@@ -235,7 +235,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		</>
 	)
 	// A prompt-file change (task ar): the terminal's rows in its diff
-	// colours, no header; open, each change's line and whole diff.
+	// colors, no header; open, each change's line and whole diff.
 	let tone = (r: string) => (r[0] === '+' ? 'add' : r[0] === '-' ? 'del' : 'dim')
 	// An item never turns into a change or out of one.
 	let isChange = () => props.row.item.type === 'output' && !!props.row.item.change

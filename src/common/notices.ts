@@ -10,8 +10,8 @@ export type NoticeKind = 'done' | 'failed' | 'attention' | 'update' | 'commit'
 // What the host sends when another tab's turn ends or asks (host/notify.ts)
 // or commits (host/commits.ts, its own key so it never replaces the others;
 // `what` overrides the kind's word, as 'amended' for an amend).
-// `color`: the sending tab's project colour (colors.project p0..p7), set
-// when tabs have colours; the card takes it instead of the kind's.
+// `color`: the sending tab's project color (colors.project p0..p7), set
+// when tabs have colors; the card takes it instead of the kind's.
 export type NoticeEvent = { type: 'notice'; session: string; tab?: number; color?: number; name: string; kind: NoticeKind; line: string; key?: string; what?: string }
 export type Notice = { key: string; kind: NoticeKind; title: string; line: string; session?: string; tab?: number; color?: number; stays?: true; at: number }
 export type Folded = { shown: Notice[]; more?: { count: number; tabs: number[] } }

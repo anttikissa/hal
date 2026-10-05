@@ -143,7 +143,7 @@ on what happened since that prompt:
 
 Down with the text unchanged (or Escape) continues the paused turn. The
 user relies on this every day and says it has never failed; the old
-implementation is the reference for behaviour, not for code.
+implementation is the reference for behavior, not for code.
 
 ## Drafts and sending (task for drafts)
 

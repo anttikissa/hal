@@ -82,7 +82,7 @@ test('a wrong code is asked again, a right one is remembered, and a revoked toke
 	expect(await remote.signIn(undefined, saved, () => null, () => {})).toEqual(first)
 
 	web.revoke()
-	await expect(remote.signIn(undefined, saved, () => null, () => {})).rejects.toThrow('login cancelled')
+	await expect(remote.signIn(undefined, saved, () => null, () => {})).rejects.toThrow('login canceled')
 	let again = await remote.signIn(undefined, saved, () => webAuth.issue(), () => {})
 	expect(again.token).not.toBe(first.token)
 	expect(saved.tokens[at]).toBe(again.token)

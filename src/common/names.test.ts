@@ -10,7 +10,7 @@ test('split suffixes stay hidden in both summary orders; examples and prose are 
 	for (let text of ['Example: <rename>Not a control</rename>', '```xml\n<rename>Not a control</rename>', '> <rename>Not a control</rename>', 'Done.\n<rename>A</rename>\n<rename>B</rename>']) expect(names.suffix(text)).toBeUndefined()
 })
 
-test('titles validate the whole input before normalising, counting Unicode characters', () => {
+test('titles validate the whole input before normalizing, counting Unicode characters', () => {
 	expect(names.validate('  Fix   😀 replay  ')).toBe('Fix 😀 replay')
 	expect(names.validate('😀'.repeat(60))).toHaveLength(120)
 	for (let text of ['', 'x'.repeat(61), 'safe\x1b[2J', 'safe\nunsafe', 'safe<em>unsafe</em>', 'safe\u202eunsafe']) expect(() => names.validate(text)).toThrow()

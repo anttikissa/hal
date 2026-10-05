@@ -67,7 +67,7 @@ function renderEntry(block: Block, cols: number, context: HistoryRenderContext, 
 
 function isPlainNotice(block: Block | undefined): boolean {
 	// Multi-line notices (opening summary, /status) read as their own section, so
-	// they keep blank lines around them instead of packing against neighbours.
+	// they keep blank lines around them instead of packing against neighbors.
 	return (block?.type === 'info' || (block?.type === 'log' && !block.text.startsWith('Prompt queued'))) && !block.text.includes('\n')
 }
 

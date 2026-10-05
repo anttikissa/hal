@@ -7,7 +7,7 @@ import { client, created, until, useHost } from '../host-fixture.test.ts'
 
 useHost()
 
-test('/theme links a theme as the colour plugin, and hal, the built-in, removes it', async () => {
+test('/theme links a theme as the color plugin, and hal, the built-in, removes it', async () => {
 	let a = client()
 	let id = created(a)
 	let say = async (text: string) => {

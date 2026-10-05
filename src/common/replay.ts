@@ -12,9 +12,9 @@ import type { PromptChange } from './prompt-changes.ts'
 export type { PromptChange }
 
 // `paused`: the user stopped the turn (tasks/j1/states.md); it can
-// continue. `cancelled` and `interrupted` are only in older histories
+// continue. `canceled` and `interrupted` are only in older histories
 // (the old Escape and restart) and read as paused.
-export type TurnStatus = 'completed' | 'paused' | 'error' | 'cancelled' | 'interrupted'
+export type TurnStatus = 'completed' | 'paused' | 'error' | 'canceled' | 'interrupted'
 
 // A hash names raw bytes in the session's file-blobs/. Metadata-only
 // snapshots cover large/sensitive files; null means absent (8w).
@@ -69,13 +69,13 @@ export type HistoryRecord = Numbered &
 	// without it, the turn asked.
 	| { type: 'question'; id: string; form: Form; call?: string; usage?: Usage; from?: { command: string; args: string }; ts: string }
 	// The first answer to question `question`. Secret fields are left
-	// out of `answers` and only named in `secrets`. `cancelled`: Escape
+	// out of `answers` and only named in `secrets`. `canceled`: Escape
 	// dismissed a command's question; nothing was answered.
-	| { type: 'answer'; question: string; answers: Answers; secrets?: string[]; cancelled?: true; ts: string }
+	| { type: 'answer'; question: string; answers: Answers; secrets?: string[]; canceled?: true; ts: string }
 	// A slash command (src/host/commands/), as typed. `from`: the session
 	// that sent it; `origin: model` identifies Hal's command tool. Without
 	// either, the human typed it (legacy provenance is unknown). `command`: the
-	// client's id for the submit, so a resend is recognised.
+	// client's id for the submit, so a resend is recognized.
 	| { type: 'command'; text: string; origin?: 'model'; from?: string; label?: string; command?: string; ts: string }
 	// What a command said; `error` if it failed.
 	// `change`: a system-prompt file changed (host/prompt-trail.ts); the
@@ -91,7 +91,7 @@ export type HistoryRecord = Numbered &
 	// assistant record. Not provider input, not shown in the transcript.
 	| { type: 'round'; usage: Usage; model?: string; block?: number; ts: string }
 	// A context boundary: `keep` names this turn's prompts, replayed
-	// verbatim (including images) after the summary, not summarised into it.
+	// verbatim (including images) after the summary, not summarized into it.
 	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string; ts: string }
 	// A fresh context (/clear, task vh): provider input is rebuilt from
 	// the records after it alone, with no summary.

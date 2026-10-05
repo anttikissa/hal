@@ -117,7 +117,7 @@ function answered(records: HistoryRecord[], field: string): string | undefined {
 		let record = records[i]!
 		if (record.type === 'answer' && Object.hasOwn(record.answers, field)) return record.answers[field]
 		// Escape skips an intro question: it reads as an empty answer.
-		if (record.type === 'answer' && record.cancelled && records.some((q) => q.type === 'question' && q.id === record.question && q.form.fields.some((f) => f.name === field))) return ''
+		if (record.type === 'answer' && record.canceled && records.some((q) => q.type === 'question' && q.id === record.question && q.form.fields.some((f) => f.name === field))) return ''
 	}
 	return undefined
 }

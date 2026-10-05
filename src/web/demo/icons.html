@@ -41,7 +41,7 @@ svg.g24 * { stroke-width: var(--sw); }
 .controls input[type="radio"] { width: 16px; height: 16px; }
 .controls input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* The catalogue */
+/* The catalog */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); gap: 8px; }
 .tile { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border); min-width: 0; }
 .tile .big svg { width: calc(var(--size) * 1.6); height: calc(var(--size) * 1.6); }
@@ -90,7 +90,7 @@ svg.g24 * { stroke-width: var(--sw); }
 <body>
 <main id="root">
 <h1>Icon candidates</h1>
-<p>Fifteen icons for the web client, drawn from seven free sets with no attribution in the UI. Switch the set, size and stroke to compare; the samples below use the real theme colours.</p>
+<p>Fifteen icons for the web client, drawn from seven free sets with no attribution in the UI. Switch the set, size and stroke to compare; the samples below use the real theme colors.</p>
 <div class="controls">
 	<fieldset><legend>Set</legend>
 		<label><input type="radio" name="set" value="l" checked> Lucide</label>
@@ -109,7 +109,7 @@ svg.g24 * { stroke-width: var(--sw); }
 <div class="grid" id="grid"></div>
 
 <h2>Alternatives</h2>
-<p>Pick one per row; the catalogue, composer and cards use it. While a turn runs, Interrupt sends into this turn and After this turn waits until it ends. Only Hugeicons, Fluent, Boxicons and MingCute have a real thought bubble. None of the seven has a snake, so the snakes come from IconPark, Pinhead and Material Design Icons and show in every set; only Tabler and Hugeicons have a Python logo.</p>
+<p>Pick one per row; the catalog, composer and cards use it. While a turn runs, Interrupt sends into this turn and After this turn waits until it ends. Only Hugeicons, Fluent, Boxicons and MingCute have a real thought bubble. None of the seven has a snake, so the snakes come from IconPark, Pinhead and Material Design Icons and show in every set; only Tabler and Hugeicons have a Python logo.</p>
 <h3>Thinking</h3><div class="picks" data-pick="think"></div>
 <h3>Interrupt</h3><div class="picks" data-pick="steer"></div>
 <h3>After this turn</h3><div class="picks" data-pick="queue"></div>
@@ -144,7 +144,7 @@ svg.g24 * { stroke-width: var(--sw); }
 <div class="Card assistant"><div class="CardHeader"><span class="label">The probe treated the gateway error as a foreign host.</span></div></div>
 <p class="said" id="said" aria-live="polite"></p>
 
-<h2>Licences</h2>
+<h2>Licenses</h2>
 <p class="legal">Lucide: ISC (its Feather-derived icons MIT). Phosphor: MIT. Tabler: MIT. Hugeicons (free Stroke Rounded): MIT. Fluent UI System Icons: MIT, Microsoft. Boxicons: MIT. MingCute: Apache 2.0. Bubbles: Hugeicons bubbles (MIT), Lucide bubbles (ISC). Flasks: Phosphor flask (MIT), Iconoir round-flask (MIT, Luca Burgio). Snakes: IconPark snake-zodiac (Apache 2.0, ByteDance), Pinhead rattlesnake (CC0), Material Design Icons snake (Apache 2.0, Pictogrammers). The Python logo is a trademark of the Python Software Foundation. All allow commercial use and changes with no attribution shown to users; the notices sit in this file's source. Hugeicons, Fluent, Boxicons and MingCute come from the Iconify JSON packages. Stroke changes only line-drawn sets (Lucide, Phosphor, Tabler, Hugeicons); Fluent, Boxicons and MingCute draw filled outlines.</p>
 </main>
 <script>

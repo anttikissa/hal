@@ -6,6 +6,6 @@
 	foldInto: ['b'],
 	notes: [
 		'The glob in conventions.test.ts is **/*.ts today; the Solid rewrite (1b) adds .tsx. Write the size check over the same file list sourceFiles() returns, so widening it once covers both.',
-		'Test for behaviour, not text: a fixture of a 401-line file under a temp dir (or the check function called with a line count) should fail, and a stale exception should fail. Do not assert the current list of exceptions.'
+		'Test for behavior, not text: a fixture of a 401-line file under a temp dir (or the check function called with a line count) should fail, and a stale exception should fail. Do not assert the current list of exceptions.'
 	]
 }

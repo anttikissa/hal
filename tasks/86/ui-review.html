@@ -153,15 +153,15 @@ a { color: inherit; }
 <main>
 <header class="chrome">
 <h1>UI review: choose fixes</h1>
-<p>Each item shows the current look (marked “current”) beside alternatives, in Hal’s real theme colours. Pick one per item and add a note if you like. Your choices collect in the <a href="#paste">text to paste</a> at the bottom, and they survive a reload.</p>
+<p>Each item shows the current look (marked “current”) beside alternatives, in Hal’s real theme colors. Pick one per item and add a note if you like. Your choices collect in the <a href="#paste">text to paste</a> at the bottom, and they survive a reload.</p>
 </header>
 
-<section class="item" data-title="Selection colour">
-<div class="chrome"><h2>1. Selection colour</h2>
-<p>Nothing sets <code>::selection</code>, so the browser's highlight sits behind coloured text. Drag across the samples, including inside the message box. The last row is a chosen completion: it's already a solid block, so a selection there has to stand out from it.</p></div>
+<section class="item" data-title="Selection color">
+<div class="chrome"><h2>1. Selection color</h2>
+<p>Nothing sets <code>::selection</code>, so the browser's highlight sits behind colored text. Drag across the samples, including inside the message box. The last row is a chosen completion: it's already a solid block, so a selection there has to stand out from it.</p></div>
 <template id="t-selection"><div class="sel-samples">
-<div class="Card user">refactor the tab strip so labels stay centred</div>
-<div class="Card assistant">The strip is laid out in <span class="b">Tabs.tsx</span>; widths come from <span class="md-code">tab-pages.ts</span>. I'll keep the cell width and centre the label.</div>
+<div class="Card user">refactor the tab strip so labels stay centered</div>
+<div class="Card assistant">The strip is laid out in <span class="b">Tabs.tsx</span>; widths come from <span class="md-code">tab-pages.ts</span>. I'll keep the cell width and center the label.</div>
 <div class="Card tool-bash">$ rg -n "Tabs .tab" src/web/index.html</div>
 <div class="row warning"><button type="button" class="opt" aria-pressed="true">Lit bar and tint</button><button type="button" class="opt" aria-pressed="false">Solid block</button></div>
 <div class="completion input"><strong>/rename</strong> Rename this session</div>
@@ -169,21 +169,21 @@ a { color: inherit; }
 </div></template>
 <div class="variants">
 <div class="variant"><label><input type="radio" name="selection" value="A · browser default (current)"><span><b>A</b> · Browser default (current)</span></label><div class="preview" data-sel="a" data-template="t-selection"></div></div>
-<div class="variant"><label><input type="radio" name="selection" value="B · reverse video in the text's own colour"><span><b>B</b> · Reverse video in the text's own colour</span></label><div class="preview" data-sel="b" data-template="t-selection"></div></div>
+<div class="variant"><label><input type="radio" name="selection" value="B · reverse video in the text's own color"><span><b>B</b> · Reverse video in the text's own color</span></label><div class="preview" data-sel="b" data-template="t-selection"></div></div>
 <div class="variant"><label><input type="radio" name="selection" value="C · one accent (cyan) everywhere, canvas text"><span><b>C</b> · One accent (cyan) everywhere</span></label><div class="preview" data-sel="c" data-template="t-selection"></div></div>
 <div class="variant"><label><input type="radio" name="selection" value="D · white block, canvas text (terminal reverse)"><span><b>D</b> · White block, like a terminal</span></label><div class="preview" data-sel="d" data-template="t-selection"></div></div>
 </div>
-<div class="note"><input type="text" aria-label="Note on selection colour" placeholder="Note (optional)"></div>
+<div class="note"><input type="text" aria-label="Note on selection color" placeholder="Note (optional)"></div>
 </section>
 
-<section class="item" data-title="Composer vertical centring">
-<div class="chrome"><h2>2. Message box: vertical centring</h2>
+<section class="item" data-title="Composer vertical centering">
+<div class="chrome"><h2>2. Message box: vertical centering</h2>
 <p>The buttons make the row 44px tall, but the text box underneath is about 39px tall and sits at the top of it, so the text and caret end up above the button labels. Try one line, then several (Shift+Enter).</p>
-<div class="toggles"><label><input type="checkbox" data-toggle="guides" checked> Show centre line</label><label><input type="checkbox" data-toggle="phone-font"> Phone font (16px)</label></div></div>
+<div class="toggles"><label><input type="checkbox" data-toggle="guides" checked> Show center line</label><label><input type="checkbox" data-toggle="phone-font"> Phone font (16px)</label></div></div>
 <template id="t-composer"><div class="entry input"><div class="field"><span class="hint">Ask Hal to change something…</span><textarea rows="1" aria-label="Sample message"></textarea></div><button type="button" aria-label="Attach file">+</button><button type="button">Send</button></div></template>
 <div class="variants composers guides">
 <div class="variant"><label><input type="radio" name="composer" value="A · as is (text sits high)"><span><b>A</b> · As is (current)</span></label><div class="preview comp-a" data-template="t-composer" data-grow="2"></div></div>
-<div class="variant"><label><input type="radio" name="composer" value="B · keep the 44px row; pad the text box to centre one line"><span><b>B</b> · 44px row, padding centres the text</span></label><div class="preview comp-b" data-template="t-composer" data-grow="0"></div></div>
+<div class="variant"><label><input type="radio" name="composer" value="B · keep the 44px row; pad the text box to center one line"><span><b>B</b> · 44px row, padding centers the text</span></label><div class="preview comp-b" data-template="t-composer" data-grow="0"></div></div>
 <div class="variant"><label><input type="radio" name="composer" value="C · compact 37px row on desktop (touch keeps B)"><span><b>C</b> · Compact row on desktop; touch keeps B</span></label><div class="preview comp-c" data-template="t-composer" data-grow="0"></div></div>
 </div>
 <div class="note"><input type="text" aria-label="Note on the message box" placeholder="Note (optional)"></div>
@@ -191,12 +191,12 @@ a { color: inherit; }
 
 <section class="item" data-title="Tab label alignment and current tab">
 <div class="chrome"><h2>3. Tabs: label alignment and the current tab</h2>
-<p>Tab labels sit at the left of their cell with extra space on the right, so the hover highlight looks off-centre. On touch the cell is 44px wide and the label is squeezed into its left part. Tab 3 is the current tab; hover over the others.</p></div>
+<p>Tab labels sit at the left of their cell with extra space on the right, so the hover highlight looks off-center. On touch the cell is 44px wide and the label is squeezed into its left part. Tab 3 is the current tab; hover over the others.</p></div>
 <div class="variants">
 <div class="variant"><label><input type="radio" name="tabs" value="A · left-aligned, underlined number (current)"><span><b>A</b> · Left, underlined number (current)</span></label><div class="preview tab-a" data-tabs></div></div>
-<div class="variant"><label><input type="radio" name="tabs" value="B · centred, underlined number"><span><b>B</b> · Centred, underlined number</span></label><div class="preview tab-b" data-tabs></div></div>
-<div class="variant"><label><input type="radio" name="tabs" value="C · centred, current tab tinted with a lit bar under it"><span><b>C</b> · Centred, tint and lit bar</span></label><div class="preview tab-c" data-tabs></div></div>
-<div class="variant"><label><input type="radio" name="tabs" value="D · centred, current tab a solid block"><span><b>D</b> · Centred, solid block</span></label><div class="preview tab-d" data-tabs></div></div>
+<div class="variant"><label><input type="radio" name="tabs" value="B · centered, underlined number"><span><b>B</b> · Centered, underlined number</span></label><div class="preview tab-b" data-tabs></div></div>
+<div class="variant"><label><input type="radio" name="tabs" value="C · centered, current tab tinted with a lit bar under it"><span><b>C</b> · Centered, tint and lit bar</span></label><div class="preview tab-c" data-tabs></div></div>
+<div class="variant"><label><input type="radio" name="tabs" value="D · centered, current tab a solid block"><span><b>D</b> · Centered, solid block</span></label><div class="preview tab-d" data-tabs></div></div>
 </div>
 <div class="note"><input type="text" aria-label="Note on tabs" placeholder="Note (optional)"></div>
 </section>
@@ -213,8 +213,8 @@ a { color: inherit; }
 </form></template>
 <div class="variants">
 <div class="variant"><label><input type="radio" name="question" value="A · as is"><span><b>A</b> · As is (current)</span></label><div class="preview q-a" data-template="t-question" data-inline></div></div>
-<div class="variant"><label><input type="radio" name="question" value="B · label and help above the options; Answer solid in the card colour"><span><b>B</b> · Label above; Answer solid in card colour</span></label><div class="preview q-b" data-template="t-question"></div></div>
-<div class="variant"><label><input type="radio" name="question" value="C · label and help above the options; Answer in the page button colour"><span><b>C</b> · Label above; Answer in page button colour</span></label><div class="preview q-c" data-template="t-question"></div></div>
+<div class="variant"><label><input type="radio" name="question" value="B · label and help above the options; Answer solid in the card color"><span><b>B</b> · Label above; Answer solid in card color</span></label><div class="preview q-b" data-template="t-question"></div></div>
+<div class="variant"><label><input type="radio" name="question" value="C · label and help above the options; Answer in the page button color"><span><b>C</b> · Label above; Answer in page button color</span></label><div class="preview q-c" data-template="t-question"></div></div>
 </div>
 <div class="note"><input type="text" aria-label="Note on questions" placeholder="Note (optional)"></div>
 </section>
@@ -226,7 +226,7 @@ a { color: inherit; }
 <div class="variants">
 <div class="variant"><label><input type="radio" name="focus" value="A · as is (mixed)"><span><b>A</b> · Mixed (current)</span></label><div class="preview fv-a" data-template="t-focus"></div></div>
 <div class="variant"><label><input type="radio" name="focus" value="B · 2px accent, inside the control"><span><b>B</b> · 2px accent, inside</span></label><div class="preview fv-b" data-template="t-focus"></div></div>
-<div class="variant"><label><input type="radio" name="focus" value="C · 2px in the control's own colour, outside"><span><b>C</b> · 2px own colour, outside</span></label><div class="preview fv-c" data-template="t-focus"></div></div>
+<div class="variant"><label><input type="radio" name="focus" value="C · 2px in the control's own color, outside"><span><b>C</b> · 2px own color, outside</span></label><div class="preview fv-c" data-template="t-focus"></div></div>
 <div class="variant"><label><input type="radio" name="focus" value="D · 2px accent, outside the control"><span><b>D</b> · 2px accent, outside</span></label><div class="preview fv-d" data-template="t-focus"></div></div>
 </div>
 <div class="note"><input type="text" aria-label="Note on focus" placeholder="Note (optional)"></div>
@@ -247,8 +247,8 @@ a { color: inherit; }
 <div class="chrome"><h2>7. Spacing scale</h2>
 <p>The CSS uses about a dozen different rem values. Choose one scale; each preview spaces the same screen with it.</p></div>
 <template id="t-mini"><div class="mini">
-<div class="Card user">make the tab labels centred</div>
-<div class="Card assistant">Done. Labels are centred in their cells; hover now covers them evenly.</div>
+<div class="Card user">make the tab labels centered</div>
+<div class="Card assistant">Done. Labels are centered in their cells; hover now covers them evenly.</div>
 <form class="Question warning" onsubmit="return false"><div class="text">? Push to main?</div><div class="group" role="group" aria-label="Push"><button type="button" class="opt" aria-pressed="true">Yes</button><button type="button" class="opt" aria-pressed="false">Not yet</button><button type="button" class="opt" aria-pressed="false">Show me the diff first</button></div></form>
 <div class="entry input"><div class="field"><textarea rows="1" aria-label="Sample message"></textarea></div><button type="button">Send</button></div>
 </div></template>
@@ -262,9 +262,9 @@ a { color: inherit; }
 
 <section class="item" data-title="Card fold motion">
 <div class="chrome"><h2>8. Opening and closing cards</h2>
-<p>Cards animate their height when they open, but tasks/README.md says animate only opacity, colour and transform. Click a card to try it.</p></div>
-<template id="t-fold"><div class="Card thinking fold"><button type="button" class="head" aria-expanded="false">▸ Thinking</button><div class="body" inert><div class="contents">The strip centres its pages; each cell is (digits + 2)ch wide.
-Centring the label inside the cell keeps the width, so nothing reflows.
+<p>Cards animate their height when they open, but tasks/README.md says animate only opacity, color and transform. Click a card to try it.</p></div>
+<template id="t-fold"><div class="Card thinking fold"><button type="button" class="head" aria-expanded="false">▸ Thinking</button><div class="body" inert><div class="contents">The strip centers its pages; each cell is (digits + 2)ch wide.
+Centering the label inside the cell keeps the width, so nothing reflows.
 The marker slot stays reserved so the number never jumps.</div></div></div><div class="Card tool-bash fold"><button type="button" class="head" aria-expanded="false">▸ $ ./test</button><div class="body" inert><div class="contents">1204 pass
 0 fail</div></div></div><div class="Card assistant">A card below, to see how it moves.</div></template>
 <div class="variants">
@@ -369,9 +369,9 @@ The marker slot stays reserved so the number never jumps.</div></div></div><div 
 		p.querySelector('.land').style.fontSize = `${land}px`
 	}
 
-	// 1. Selection colours, computed from the theme at runtime: B uses each
-	// element's own text colour, C the accent, D the page text colour; the
-	// selected text is the canvas colour.
+	// 1. Selection colors, computed from the theme at runtime: B uses each
+	// element's own text color, C the accent, D the page text color; the
+	// selected text is the canvas color.
 	let probe = (value) => {
 		let s = document.createElement('span')
 		s.style.color = value

@@ -66,7 +66,7 @@ function isWide(cp: number): boolean {
 
 const isRegional = (cp: number | undefined) => cp !== undefined && cp >= 0x1f1e6 && cp <= 0x1f1ff
 
-/** Display width of one code point, ignoring its neighbours. */
+/** Display width of one code point, ignoring its neighbors. */
 function charWidth(cp: number): number {
 	if (cp < 0x20) return 0
 	if (cp < 0x7f) return 1
@@ -178,7 +178,7 @@ function expandTabs(s: string): string {
 }
 
 // Keep OSC 8 links self-contained so a repaint of one row cannot leak a
-// link into its neighbours. The visible text is unchanged.
+// link into its neighbors. The visible text is unchanged.
 function containLinks(lines: string[]): string[] {
 	let active = ''
 	let close = '\x1b]8;;\x07'

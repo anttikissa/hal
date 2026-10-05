@@ -31,7 +31,7 @@ The planning agent writes tasks with the user; implementers carry them
 out.
 
 Tasks describe lasting state, not one-time actions: "package.json holds
-the current version", not "initialise package.json at 0.1.0". Avoid
+the current version", not "initialize package.json at 0.1.0". Avoid
 `once`; preserve files needed for a rebuild as task artifacts.
 
 Put implementation lessons (surprises, misleading artifacts, decisions)
@@ -142,7 +142,7 @@ Keep reports to one screen. Measure every number now (git log,
 `scripts/sloc ~/.hal <rev>` for the old Hal), never from memory:
 
 1. A feature map in a code block: what exists, a 12-cell bar
-   (█ done, ░ missing, labelled as estimates), and what's missing.
+   (█ done, ░ missing, labeled as estimates), and what's missing.
 2. A timeline in a code block: one line per run, with date, task count,
    changes and source lines; mark the latest "← now".
 3. A table against the previous report: source lines, tests, tasks
@@ -156,7 +156,7 @@ Keep reports to one screen. Measure every number now (git log,
 The web and the terminal obey the same UI rules unless a task records
 an exception. When changing behavior on one, consider whether the other
 should change too, and always ask the user; never assume either way.
-Colours are the exception: they match everywhere, so change both without
+Colors are the exception: they match everywhere, so change both without
 asking.
 
 # UI: visible plumbing

@@ -10,8 +10,8 @@ ESC and went through the idle timer).
   is dead, so no real model answer is possible until the user copies
   fresh credentials. No secret was printed.
 - Temp home, local.ts pointing anthropic at a local fake server and
-  stubbing auth.anthropic: answer streamed, Escape cancelled a held
-  turn ("[cancelled]"), Ctrl-R restarted into the same conversation,
+  stubbing auth.anthropic: answer streamed, Escape canceled a held
+  turn ("[canceled]"), Ctrl-R restarted into the same conversation,
   Ctrl-C quit leaving the last frame on screen.
 
 Limitations:

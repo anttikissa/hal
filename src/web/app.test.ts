@@ -348,7 +348,7 @@ test('with no valid id the page lands on the tab shown last, else the first, rep
 	expect(router.store.load()).toBe('1-aaa')
 })
 
-test('background neighbours fetch after paint and switching reuses their in-memory transcripts', async () => {
+test('background neighbors fetch after paint and switching reuses their in-memory transcripts', async () => {
 	address = 'http://h/2-bbb'
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc'), tab('4-ddd')))
 	app.onEvent(snapOf('2-bbb'))
@@ -408,7 +408,7 @@ test('/go changes this page only if it currently shows the source tab', () => {
 	expect(app.state.shown).toBe('2-bbb')
 })
 
-test('when the shown tab closes, the page lands on its neighbour, replacing the entry', () => {
+test('when the shown tab closes, the page lands on its neighbor, replacing the entry', () => {
 	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb'), tab('3-ccc')))
 	alt(2)
 	sent = []

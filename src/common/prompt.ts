@@ -135,7 +135,7 @@ function empty(): PromptState {
 function insert(st: PromptState, s: string): PromptState {
 	let text = st.text.slice(0, st.cursor) + s + st.text.slice(st.cursor)
 	let pos = st.cursor + s.length
-	// The insert may merge with its neighbours into one cluster (e.g. a
+	// The insert may merge with its neighbors into one cluster (e.g. a
 	// regional indicator pairing into a flag); move to the next boundary.
 	let cursor = pos === 0 || prompt.boundaries(text).includes(pos) ? pos : prompt.nextBoundary(text, pos)
 	return { ...st, text, cursor }

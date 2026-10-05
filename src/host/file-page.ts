@@ -36,7 +36,7 @@ function owns(pathname: string): boolean {
 
 // The page or the raw bytes at `pathname`; 404 for a name that is not
 // attachments.fileName, whose kind does not fit the address, or that
-// exists nowhere. `css` is the host's colour stylesheet.
+// exists nowhere. `css` is the host's color stylesheet.
 function serve(pathname: string, css: string): Response {
 	let raw = rawPath.exec(pathname)?.[1]
 	let m = pagePath.exec(pathname)

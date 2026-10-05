@@ -327,7 +327,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			if (item.status === 'completed') return null
 			return { kind: 'end log', text: titles.ended(item.ts, item.status) }
 		case 'question': {
-			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
+			let said = item.canceled ? ['(canceled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
 			let quote = item.form.quote ? [...item.form.quote.text.split('\n').map((l) => `    ${l}`), ''] : []
 			return { kind: 'question warning', text: [...quote, ...said.map((l) => `  ${l}`)].join('\n') }
 		}

@@ -16,7 +16,7 @@ async function serve(url: URL, css: string): Promise<Response> {
 	let files = changes.list(id)
 	let selected = url.searchParams.get('path')
 	if (selected !== null && !files.some((f) => f.path === selected)) return new Response('not found\n', { status: 404 })
-	let neighbours = all.filter((s) => s.id !== id).map((s) => {
+	let neighbors = all.filter((s) => s.id !== id).map((s) => {
 		if (s.error) throw new Error(s.error)
 		return { id: s.id, name: s.meta?.name, paths: new Set(changes.list(s.id).map((f) => f.path)) }
 	})
@@ -24,7 +24,7 @@ async function serve(url: URL, css: string): Promise<Response> {
 	for (let file of files.filter((f) => selected === null || f.path === selected)) {
 		let diff = await changes.diff(id, file.before, file.after)
 		let commit = await changes.committed(id, file)
-		let others = neighbours.filter((s) => s.paths.has(file.path)).map((s) => `<a href="${changes.href(s.id, file.path)}">${escape(s.id + (s.name ? `: ${s.name}` : ''))}</a>`)
+		let others = neighbors.filter((s) => s.paths.has(file.path)).map((s) => `<a href="${changes.href(s.id, file.path)}">${escape(s.id + (s.name ? `: ${s.name}` : ''))}</a>`)
 		let steps: string[] = []
 		for (let step of file.steps) {
 			let c = step.change

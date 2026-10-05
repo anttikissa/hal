@@ -50,8 +50,8 @@ export type ErrorEvent = {
 	message: string
 	status?: number
 	body?: string
-	// Set when the caller aborted; the turn was cancelled, not failed.
-	cancelled?: boolean
+	// Set when the caller aborted; the turn was canceled, not failed.
+	canceled?: boolean
 	// What fixes the failure (tasks/j1/states.md, Failures): time
 	// (temporary), time or another account (limited), a login (auth).
 	// Absent: nothing the host can do; the turn ends in error.

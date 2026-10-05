@@ -66,7 +66,7 @@ export default async (plugin: Plugin) => {
 // 		})
 // 	})
 //
-// 	// A theme: colours are OKLCH [lightness, chroma, hue]. set replaces a
+// 	// A theme: colors are OKLCH [lightness, chroma, hue]. set replaces a
 // 	// shared value, around a style; repaint whenever this file comes or goes.
 // 	plugin.set(colors, 'fgL', 0.85)
 // 	plugin.around(colors, 'user', (fn) => ({ ...fn(), bg: [0.3, 0.06, 150] }))

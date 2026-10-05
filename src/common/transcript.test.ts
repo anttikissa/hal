@@ -302,7 +302,7 @@ test('a model-run command shows only as its tool card, live and restored; a type
 	expect(restored.items).toMatchObject([{ type: 'command', text: '/cd /tmp', ts }, { type: 'output', text: 'cwd: /tmp', ts }])
 })
 
-test('waiting and delivered steering use the same header, without labelling a following fresh prompt', () => {
+test('waiting and delivered steering use the same header, without labeling a following fresh prompt', () => {
 	let waiting = transcript.waitingItem({ id: 's1', text: 'interrupt' })
 	expect(titles.title(waiting)).toBe('You (interrupt)')
 	let live = fold([

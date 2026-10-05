@@ -3,7 +3,7 @@
 //
 // Sending while a turn is busy puts the message in the session inbox
 // (src/common/inbox.ts), durable in history: steering messages go to
-// the model together after immediately cancelling its active round.
+// the model together after immediately canceling its active round.
 // Queued and advisory messages never cancel a round; queued ones run
 // as turns of their own once it has completed.
 //

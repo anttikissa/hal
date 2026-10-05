@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // The notice stack (task qm, common/notices.ts) at the bottom right,
 // over the transcript's foot: square cards behind a bar in the tab's
-// project colour on a dim tint of it (else the kind's colour), newest lowest; a card for a session is a link that shows its
+// project color on a dim tint of it (else the kind's color), newest lowest; a card for a session is a link that shows its
 // tab. Beyond three the oldest fold into one '+N more' line.
 
 import { For, Show } from 'solid-js'

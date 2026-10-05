@@ -273,7 +273,7 @@ interface ResponsesStreamState {
 
 function responsesDoneStatus(rawStatus: string): TurnEndStatus {
 	if (rawStatus === 'failed') return 'failed'
-	if (rawStatus === 'cancelled') return 'failed'
+	if (rawStatus === 'canceled') return 'failed'
 	if (rawStatus === 'incomplete') return 'failed'
 	return 'completed'
 }

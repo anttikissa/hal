@@ -752,7 +752,7 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 		await b.waitFor(`location.pathname === '${first}' && document.querySelector('.Tabs .strip [aria-current]')?.getAttribute('href') === '${first}'`)
 		await b.evaluate(`document.querySelector('.Tabs .strip a[href="${second}"]').click()`)
 		await b.waitFor(`location.pathname === '${second}'`)
-		// Closing the shown tab lands on its neighbour, replacing the entry.
+		// Closing the shown tab lands on its neighbor, replacing the entry.
 		let entries = await b.evaluate(`history.length`)
 		// A real click: focus moves, running focus handlers as the sheet opens.
 		let menu = JSON.parse(await b.evaluate(`JSON.stringify(document.querySelector('.Tabs .menu').getBoundingClientRect())`))
@@ -827,7 +827,7 @@ test.skipIf(!chrome)('in a browser a command stays below the block already strea
 				wasAfter: before,
 				same: card.isConnected && !card.classList.contains('pending'),
 				nowAfter: !!(reply.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING),
-				// A colour easing back from pending is not a fade.
+				// A color easing back from pending is not a fade.
 				fading: [card, reply].some((c) => c.getAnimations().some((a) => !(a instanceof CSSTransition))),
 				// The output is new: it fades in.
 				fresh: !!output && output.getAnimations().length > 0,
@@ -1190,7 +1190,7 @@ test.skipIf(!chrome)('completion dismissal follows pointer and focus without ste
 		await b.waitFor(`!document.querySelector('.completions')`)
 		expect(await b.evaluate(`document.querySelector('textarea').value`)).toBe('/cd ')
 		// Model Safari's button default: blur the editor without focusing
-		// the option. Cancelled gestures must retain both menu and draft.
+		// the option. Canceled gestures must retain both menu and draft.
 		for (let pointerType of ['mouse', 'touch']) {
 			await open()
 			let retained = await b.evaluate(`(() => {
@@ -1291,7 +1291,7 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 			return [...document.querySelectorAll('.CardHeader')].map(h => {
 				let c = h.closest('.Card'), stamp = h.querySelector('.stamp'), title = h.querySelector('.title'), ref = h.querySelector('.link');
 				let t = first(stamp ?? title), label = first(title), link = ref?.getBoundingClientRect(), box = h.getBoundingClientRect(), body = c.querySelector(':scope > .content'), end = body && last(body);
-				return { compact: c.classList.contains('thinking') || c.classList.contains('assistant'), folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, offCentre: t.y + t.height / 2 - (c.getBoundingClientRect().y + c.getBoundingClientRect().height / 2), rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && title.getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth, tail: end ? c.getBoundingClientRect().bottom - end.bottom : undefined };
+				return { compact: c.classList.contains('thinking') || c.classList.contains('assistant'), folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, offCenter: t.y + t.height / 2 - (c.getBoundingClientRect().y + c.getBoundingClientRect().height / 2), rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && title.getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth, tail: end ? c.getBoundingClientRect().bottom - end.bottom : undefined };
 			});
 		})()`
 		for (let [, width, height, touch] of [['portrait', 390, 800, true], ['narrow', 320, 760, true], ['landscape', 844, 390, true], ['desktop', 1200, 800, false]] as const) {
@@ -1314,10 +1314,10 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 				expect(row.textWidth).toBeLessThanOrEqual(row.boxWidth + 1)
 			}
 			for (let row of folded) expect(row.height).toBeCloseTo(folded[0].height, 1)
-			// Every screen shares one geometry: a 44px header row centring its
+			// Every screen shares one geometry: a 44px header row centering its
 			// line, and a body ending with the header's top inset.
 			expect(folded[0].height).toBeCloseTo(44, 1)
-			for (let row of folded.filter((r: any) => r.height < 50)) expect(Math.abs(row.offCentre)).toBeLessThanOrEqual(1.5)
+			for (let row of folded.filter((r: any) => r.height < 50)) expect(Math.abs(row.offCenter)).toBeLessThanOrEqual(1.5)
 			for (let row of closed.filter((r: any) => r.tail !== undefined)) expect(Math.abs(row.tail - row.inset)).toBeLessThanOrEqual(1.5)
 			await b.evaluate(`document.querySelectorAll('.Card.folds .mark').forEach(b => b.click()); document.querySelector('.Card.queued').click()`)
 			await b.waitFor(`document.querySelectorAll('.Card.folds.open').length === 4 && !!document.querySelector('.Card.queued .CardHeader')`)

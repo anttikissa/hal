@@ -6,7 +6,7 @@ Web: Up with the caret on the textarea's first line and no selection, and Down o
 	status: 'done',
 	needs: ['8m'],
 	notes: [
-		"Old behaviour to keep (old-prompt.ts in task 1x, browseHistory): when the just-sent prompt is still in the editor (edit mode), the first Up skips the entry equal to the current text. Old commits: 81c0440 'Unify up-arrow recall: one per-tab list, web prompts included', 8ac5f72 'Keep edited prompts on down'.",
+		"Old behavior to keep (old-prompt.ts in task 1x, browseHistory): when the just-sent prompt is still in the editor (edit mode), the first Up skips the entry equal to the current text. Old commits: 81c0440 'Unify up-arrow recall: one per-tab list, web prompts included', 8ac5f72 'Keep edited prompts on down'.",
 		'The web cannot know where the textarea wraps; "first line" there means no newline before the caret. That differs from the terminal\'s visual rows on purpose.',
 		"Sending a recalled entry keeps the draft: drafts.submit empties the local draft only when the sent text contains it, mirroring the host's drafts.sent, and both clients then put the draft back in the editor. The first-Up skip applies whenever the editor text equals the newest entry, not only in edit mode."
 	]

@@ -7,7 +7,7 @@ const prompt = (n: number): HistoryRecord => ({ type: 'user', n, blocks: [{ type
 const round = (n: number, input: number, cacheRead: number, cacheWrite = 0): HistoryRecord => ({ type: 'round', n, usage: { input, cacheRead, cacheWrite }, block: n - 1, ts })
 const done = (n: number): HistoryRecord => ({ type: 'turn_end', n, status: 'completed', usage: {}, ts })
 
-test('rounds become points with turns; drops are labelled only where history knows the cause', () => {
+test('rounds become points with turns; drops are labeled only where history knows the cause', () => {
 	let records: HistoryRecord[] = [prompt(1), round(3, 1000, 0, 9000), round(5, 500, 9500), done(6), prompt(7), round(9, 500, 10000)]
 	// A cache miss: the total stays but the cache read is gone.
 	records.push(round(10, 500, 0, 10000))
@@ -17,7 +17,7 @@ test('rounds become points with turns; drops are labelled only where history kno
 	expect(pts[0]!.block).toBe(2)
 })
 
-test('a pruning checkpoint labels the drop after every batch of completed turns; an unexplained drop stays unlabelled', () => {
+test('a pruning checkpoint labels the drop after every batch of completed turns; an unexplained drop stays unlabeled', () => {
 	let records: HistoryRecord[] = []
 	let n = 1
 	for (let t = 0; t < 9; t++) records.push(prompt(n++), round(n++, 0, t < 8 ? 1000 * (t + 1) : 3000), done(n++))

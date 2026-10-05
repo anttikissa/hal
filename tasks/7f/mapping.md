@@ -41,7 +41,7 @@ Consequences for the neutral shape:
   replay its text as plain text.
 - Anthropic `redacted_thinking` has no text, only `data`: the Anthropic
   provider stores it as a thinking block with empty text and a
-  signature it can recognise (e.g. JSON `{redacted: data}`).
+  signature it can recognize (e.g. JSON `{redacted: data}`).
 - Responses reasoning can arrive with no summary text: a signature with
   no preceding thinking delta still makes an (empty) thinking block.
 - Tool call input is a parsed object. Chat Completions and Responses
@@ -78,4 +78,4 @@ the provider subtracts them.
 Every stream ends with exactly one terminal event, `done` or `error`;
 shared code adds an error when a provider stops without one, drops
 anything after it, and turns an abort into `error` with
-`cancelled: true`.
+`canceled: true`.

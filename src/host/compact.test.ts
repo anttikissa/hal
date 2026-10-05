@@ -38,7 +38,7 @@ test('/compact: the next request holds the summary and only later records; the t
 	expect(input.slice(1).map(text).join()).not.toContain('re p5')
 	expect(input.slice(1).map(text).join()).toContain('after')
 	let view = shown(c.views.get(id)!.items)!
-	expect(view).toContainEqual({ type: 'divider', text: 'context compacted (5 prompts summarised)' })
+	expect(view).toContainEqual({ type: 'divider', text: 'context compacted (5 prompts summarized)' })
 	expect(view.filter((i) => i.type === 'prompt').length).toBe(6)
 	expect(shown((await fresh(id)).items)).toEqual(view)
 	// A new host rebuilds the very same input.
@@ -62,7 +62,7 @@ test('/compact during streaming waits for settlement and continues with its acti
 	await until(() => c.of('turn-end').length === 1)
 })
 
-test('/clear: the next request holds only later records; a compact after it summarises only what followed', async () => {
+test('/clear: the next request holds only later records; a compact after it summarizes only what followed', async () => {
 	let c = client()
 	let id = created(c)
 	await ask(c, id, 'before')
@@ -181,7 +181,7 @@ describe('a prompt too long (task mq)', () => {
 		expect(calls.length).toBe(3)
 	})
 
-	test('too long is recognised by provider wording and status', () => {
+	test('too long is recognized by provider wording and status', () => {
 		expect(compact.tooLong({ type: 'error', message: 'x', body: '{"error":{"code":"context_length_exceeded"}}', status: 400 })).toBe(true)
 		expect(compact.tooLong({ type: 'error', message: 'request too large', status: 413 })).toBe(true)
 		expect(compact.tooLong({ type: 'error', message: 'request too large', status: 500 })).toBe(false)

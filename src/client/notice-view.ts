@@ -1,8 +1,8 @@
 // The notice stack in the terminal (task qm, common/notices.ts): drawn
 // over the rows just above the tab bar, at the right, newest lowest;
 // full width on a narrow terminal. Each notice is two rows behind a bar
-// in its tab's project colour on a dim tint of it (else its kind's
-// colour on grey): bold "tab name · what happened", then its line.
+// in its tab's project color on a dim tint of it (else its kind's
+// color on gray): bold "tab name · what happened", then its line.
 
 import { colors } from '../common/colors.ts'
 import type { Folded } from '../common/notices.ts'
@@ -22,7 +22,7 @@ function rows(stack: Folded, w: number): string[] {
 	let out: string[] = []
 	if (stack.more) out.push(ansi.sgr({ fg: c.fg!, bg: c.bg! }) + fill(strings.clipVisual('  ' + notices.moreText(stack.more), w), 0))
 	for (let n of stack.shown) {
-		// A tab's project colour: bright bar and title on a dim tint of it.
+		// A tab's project color: bright bar and title on a dim tint of it.
 		let hue = n.color === undefined ? undefined : colors.project()[`p${n.color}`]
 		let on = ansi.sgr(hue ? { fg: hue, bg: colors.projectTint()[`p${n.color}Bg`]! } : { fg: c[`${n.kind}Fg`]!, bg: c.bg! })
 		let title = strings.clipVisual(ansi.clean(n.title), w - 2)

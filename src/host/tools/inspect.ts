@@ -81,7 +81,7 @@ function table(fields: string[], rows: string[][]): string {
 
 export const tool: Tool = {
 	name: 'inspect',
-	description: 'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. what "clients": connected clients; fields kind, pid, size (terminal columns x rows), term (TERM, terminal program, colour depth), follows (shows the caller\'s session). scope (sessions only): "self" (default, the caller), "project" (tabs sharing the caller\'s cwd) or "all". fields: comma-separated subset; default all.',
+	description: 'Inspect Hal read-only. what "sessions" (default): open tabs; fields tab, id, name, state, model, cwd, color (project color name), context (used/window as of the last provider response); the caller is marked "(you)". what "host": fields pid, version, started, uptime, clients (count). what "models": models by provider, the default, and which are rate limited until when. what "clients": connected clients; fields kind, pid, size (terminal columns x rows), term (TERM, terminal program, color depth), follows (shows the caller\'s session). scope (sessions only): "self" (default, the caller), "project" (tabs sharing the caller\'s cwd) or "all". fields: comma-separated subset; default all.',
 	parameters: {
 		type: 'object',
 		properties: {
