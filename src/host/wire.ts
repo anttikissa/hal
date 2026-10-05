@@ -7,6 +7,8 @@
 
 import { ason } from '../common/ason.ts'
 import type { Event } from '../common/protocol.ts'
+import type { ClientInfo } from './clients.ts'
+import { host } from './host.ts'
 
 function copy<T>(value: T): T {
 	return ason.parse(ason.stringify(value, 'short')) as T
@@ -20,4 +22,27 @@ function event(e: Event): Event {
 	return { ...e, snapshot }
 }
 
-export const wire = { copy, event }
+// One transport connection (a socket, a WebSocket) as a host
+// connection: each message received is one ASON command, and each event
+// goes to `write` as one short ASON message. Unreadable messages are
+// answered with `rejected`, never thrown.
+function adapt(write: (message: string) => void, info?: ClientInfo): { receive(message: string): void; unreadable(reason: string): void; close(): void } {
+	let send = (event: Event) => write(ason.stringify(event, 'short'))
+	let conn = host.connect(send, info)
+	let unreadable = (reason: string) => send({ type: 'rejected', command: '', reason: `unreadable message: ${reason}` })
+	return {
+		receive: (message) => {
+			let command: unknown
+			try {
+				command = ason.parse(message)
+			} catch (e: any) {
+				return unreadable(String(e?.message ?? e))
+			}
+			conn.send(command)
+		},
+		unreadable,
+		close: () => conn.close(),
+	}
+}
+
+export const wire = { adapt, copy, event }

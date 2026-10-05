@@ -2,6 +2,7 @@ import { titles } from '../common/titles.ts'
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import type { Event } from '../common/protocol.ts'
 import { view, type ViewState } from './view.ts'
+import { hrefs } from './hrefs.ts'
 
 let originalNames: Record<string, string>
 beforeEach(() => { originalNames = titles.names; titles.names = {} })
@@ -281,9 +282,9 @@ test('a sent prompt shows pending, then as the host’s item under the same key,
 })
 
 test('a prompt’s [image/<name>] markers become links; the rest stays text', () => {
-	expect(view.links('see [image/abc123.png] and [image/zz99yy.webp]!')).toEqual(['see ', { href: '/image/abc123.png', text: '[image/abc123.png]' }, ' and ', { href: '/image/zz99yy.webp', text: '[image/zz99yy.webp]' }, '!'])
-	expect(view.links('[paste/0005ab.txt] [paste/0005ab.png]')).toEqual([{ href: '/paste/0005ab.txt', text: '[paste/0005ab.txt]' }, ' [paste/0005ab.png]'])
-	expect(view.links('[image/ABC123.png] [image 0123456789ab]')).toEqual(['[image/ABC123.png] [image 0123456789ab]'])
+	expect(hrefs.links('see [image/abc123.png] and [image/zz99yy.webp]!')).toEqual(['see ', { href: '/image/abc123.png', text: '[image/abc123.png]' }, ' and ', { href: '/image/zz99yy.webp', text: '[image/zz99yy.webp]' }, '!'])
+	expect(hrefs.links('[paste/0005ab.txt] [paste/0005ab.png]')).toEqual([{ href: '/paste/0005ab.txt', text: '[paste/0005ab.txt]' }, ' [paste/0005ab.png]'])
+	expect(hrefs.links('[image/ABC123.png] [image 0123456789ab]')).toEqual(['[image/ABC123.png] [image 0123456789ab]'])
 })
 
 test('Bash display hides successful status but keeps errors and the original source data', () => {
@@ -299,10 +300,10 @@ test('Bash display hides successful status but keeps errors and the original sou
 test('question URLs preserve OAuth parameters and plain text, excluding prose punctuation', () => {
 	let url = 'https://example.com/oauth/authorize?client_id=abc-def&redirect_uri=https%3A%2F%2Fexample.org%2Fcallback&scope=user%3Aprofile&state=a_b#fragment'
 	let text = `Open (${url}).\nThen paste code#state; **literal** <script>bad()</script> javascript:bad() data:text/html,bad`
-	let parts = view.urlParts(text)
+	let parts = hrefs.urlParts(text)
 	expect(parts.filter((p) => typeof p !== 'string')).toEqual([{ href: url, text: url }])
 	expect(parts.map((p) => typeof p === 'string' ? p : p.text).join('')).toBe(text)
-	expect(view.urlParts('See http://example.org/a_(b), then https://example.net/!')).toEqual([
+	expect(hrefs.urlParts('See http://example.org/a_(b), then https://example.net/!')).toEqual([
 		'See ', { href: 'http://example.org/a_(b)', text: 'http://example.org/a_(b)' }, ', then ',
 		{ href: 'https://example.net/', text: 'https://example.net/' }, '!',
 	])

@@ -31,6 +31,7 @@ import { editPrompt } from '../edit-prompt.ts'
 import { scroll } from '../scroll.ts'
 import { target } from '../target.ts'
 import { view, type Row } from '../view.ts'
+import { hrefs } from '../hrefs.ts'
 import { folds } from '../folds.ts'
 
 const { opened, toggled } = folds
@@ -123,7 +124,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let who = () => {
 		let item = props.row.item
 		// A question is headed by its text, its addresses links.
-		if (item.type === 'question') return <For each={view.urlParts(item.form.text)}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>
+		if (item.type === 'question') return <For each={hrefs.urlParts(item.form.text)}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>
 		let ref = source(), t = titles.who(item)
 		return ref && t?.endsWith(`#${ref}`) ? <>{t.slice(0, -ref.length - 1)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">#{ref}</a></> : t
 	}
@@ -155,7 +156,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (item.name === 'bash' && typeof item.input.command === 'string' && runsPython.test(item.input.command)) return 'python'
 		return toolIcons[item.name]
 	}
-	let headerParts = createMemo(() => view.urlParts(head() ?? ''))
+	let headerParts = createMemo(() => hrefs.urlParts(head() ?? ''))
 	let body = () => {
 		let item = props.row.item
 		if (item.type !== 'tool') return lines().join('\n')
@@ -200,7 +201,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// A prompt's [image/<name>] markers are links (task qy), rebuilt only
 	// when its text changes, not when a snapshot brings a new row object.
 	let text = createMemo(() => shown()?.text ?? '')
-	let linked = createMemo(() => (props.row.item.type === 'prompt' && text().includes('[image/') ? view.links(text()) : text()))
+	let linked = createMemo(() => (props.row.item.type === 'prompt' && text().includes('[image/') ? hrefs.links(text()) : text()))
 	let parts = () => {
 		let l = linked()
 		return typeof l === 'string' ? l : l.map((p) => (typeof p === 'string' ? p : <a href={external(p.href)} target="_blank" rel="noopener">{p.text}</a>))
@@ -227,7 +228,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			<Show when={title()} fallback={link()}>{heading()}</Show>
 			<div class="content">
 				<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : props.row.item.type === 'prompt' && source() ? marked(s().text) : parts()}>
-					{(img) => <a href={view.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={view.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
+					{(img) => <a href={hrefs.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={hrefs.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
 				</Show>
 				<Show when={props.cursor && !md()}>{cursor()}</Show>
 				<Show when={undo()}><button type="button" class="undo" title="Restore the history before this rewrite (/rebase undo)" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: '/rebase undo' })}><Icon name="undo" />Undo</button></Show>
