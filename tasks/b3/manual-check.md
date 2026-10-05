@@ -17,7 +17,7 @@ ESC and went through the idle timer).
 Limitations:
 - One session per process: ./run opens the newest session on disk (or
   creates one). No picker, no tabs, no /commands.
-- Without a TTY, ./run prints "hal2 needs a terminal" and exits 1.
+- Without a TTY, ./run prints "hal needs a terminal" and exits 1.
 - A lone ESC waits terminal.escapeMs() (50 ms) for the rest of a
   sequence; a sequence split by a slower link would read as Escape.
 - Every frame holds the whole history (tasks/cc); long conversations

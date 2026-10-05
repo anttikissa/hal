@@ -266,7 +266,7 @@ async function auth(): Promise<number> {
 			})
 	})
 	if (answer.code === undefined) {
-		process.stderr.write(`hal2: ${answer.error}\n`)
+		process.stderr.write(`hal: ${answer.error}\n`)
 		return 1
 	}
 	process.stdout.write(`${webAuth.message(answer.code)}\n`)
@@ -285,7 +285,7 @@ async function remote(typed: string | undefined): Promise<void> {
 	try {
 		;({ origin, token } = await remoteClient.signIn(typed, saved, (q) => prompt(q), (text) => process.stderr.write(text)))
 	} catch (e: any) {
-		process.stderr.write(`hal2: ${e?.message ?? e}\n`)
+		process.stderr.write(`hal: ${e?.message ?? e}\n`)
 		process.exit(1)
 	}
 	liveFiles.save(saved)
@@ -302,7 +302,7 @@ async function remote(typed: string | undefined): Promise<void> {
 			saved.tokens = rest
 			liveFiles.save(saved)
 			terminal.leave()
-			process.stderr.write(`hal2: ${origin} logged this terminal out; run ./run -r again to log in\n`)
+			process.stderr.write(`hal: ${origin} logged this terminal out; run ./run -r again to log in\n`)
 			terminal.state.io!.exit(1)
 		},
 	})
@@ -339,7 +339,7 @@ async function start(): Promise<void> {
 	// A home too deep for a Unix socket can neither host nor join.
 	let problem = server.pathProblem()
 	if (problem) {
-		process.stderr.write(`hal2: ${problem}\n`)
+		process.stderr.write(`hal: ${problem}\n`)
 		process.exit(1)
 	}
 	if (parsed.kind === 'auth') process.exit(await main.auth())
@@ -353,7 +353,7 @@ async function start(): Promise<void> {
 	if (parsed.kind === 'print') return main.printMode(parsed)
 	if (parsed.kind === 'remote') {
 		if (!terminal.available()) {
-			process.stderr.write('hal2 needs a terminal\n')
+			process.stderr.write('hal needs a terminal\n')
 			process.exit(1)
 		}
 		return main.remote(parsed.host)
@@ -361,7 +361,7 @@ async function start(): Promise<void> {
 	main.init()
 	perf.mark('init')
 	if (!terminal.available()) {
-		process.stderr.write('hal2 needs a terminal\n')
+		process.stderr.write('hal needs a terminal\n')
 		process.exit(1)
 	}
 	await main.joinHost(

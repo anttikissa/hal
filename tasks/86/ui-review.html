@@ -278,7 +278,7 @@ The marker slot stays reserved so the number never jumps.</div></div></div><div 
 <section class="item" data-title="Small text">
 <div class="chrome"><h2>9. Small text</h2>
 <p>The status row uses 0.85em (about 11.9px), and landscape phones shrink it further, to 11px. The first row in each option is desktop; the second is a landscape phone.</p></div>
-<template id="t-status"><div class="srow status desk"><div class="primary"><span>hal2 · Editing the UI Craft Skill</span><span>writing</span><span class="ctx">ctx 61%</span></div><div class="secondary"><span>~/hal2</span><span>anthropic/claude-opus-5-5</span></div></div><div class="srow status land"><div class="primary"><span>hal2 · Editing the UI Craft Skill</span><span>writing</span><span class="ctx">ctx 61%</span></div><div class="secondary"><span>~/hal2</span><span>anthropic/claude-opus-5-5</span></div></div></template>
+<template id="t-status"><div class="srow status desk"><div class="primary"><span>hal · Editing the UI Craft Skill</span><span>writing</span><span class="ctx">ctx 61%</span></div><div class="secondary"><span>~/project</span><span>anthropic/claude-opus-5-5</span></div></div><div class="srow status land"><div class="primary"><span>hal · Editing the UI Craft Skill</span><span>writing</span><span class="ctx">ctx 61%</span></div><div class="secondary"><span>~/project</span><span>anthropic/claude-opus-5-5</span></div></div></template>
 <div class="variants">
 <div class="variant"><label><input type="radio" name="text" value="A · as is (11.9px; 11px on landscape phones)"><span><b>A</b> · 11.9px; 11px landscape (current)</span></label><div class="preview" data-template="t-status" data-sizes="11.9,11"></div></div>
 <div class="variant"><label><input type="radio" name="text" value="B · 14px everywhere"><span><b>B</b> · 14px everywhere</span></label><div class="preview" data-template="t-status" data-sizes="14,14"></div></div>
@@ -303,7 +303,7 @@ The marker slot stays reserved so the number never jumps.</div></div></div><div 
 
 	// 3. Tab strips: the desktop cell ((digits + 2)ch), a 44px touch cell, and cells with names.
 	const tabs = [['', ''], ['done', '✓'], ['', ''], ['working', '•'], ['asking', '?'], ['', ''], ['', ''], ['working', '•'], ['', '']]
-	const names = ['hal2', 'Tab strip', 'Editing the UI Craft Skill', 'Restart design', 'Question', 'Notes', 'Build', 'Release', 'Scratch']
+	const names = ['hal', 'Tab strip', 'Editing the UI Craft Skill', 'Restart design', 'Question', 'Notes', 'Build', 'Release', 'Scratch']
 	let strip = (label, cell, count, named) => {
 		let d = document.createElement('div')
 		d.innerHTML = `<div class="strip-label">${label}</div><nav class="strip tab" style="--cell: ${cell}"><button type="button" aria-label="All tabs">≡</button><div class="pages"></div><button type="button" aria-label="New tab">+</button></nav>`

@@ -4,7 +4,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 
 test('a home too deep for a Unix socket is one clear error, not a stack', () => {
-	let home = join(mkdtempSync(join(tmpdir(), 'hal2-main-')), 'x'.repeat(100))
+	let home = join(mkdtempSync(join(tmpdir(), 'hal-main-')), 'x'.repeat(100))
 	try {
 		let out = Bun.spawnSync(['./run'], { cwd: `${import.meta.dir}/..`, env: { ...process.env, HAL_HOME: home } })
 		let err = out.stderr.toString()
@@ -19,7 +19,7 @@ test('a home too deep for a Unix socket is one clear error, not a stack', () => 
 })
 
 test('./run starts again only after a restart exit, finding the tab it left; a fresh ./run starts without one', () => {
-	let home = mkdtempSync(join(tmpdir(), 'hal2-main-'))
+	let home = mkdtempSync(join(tmpdir(), 'hal-main-'))
 	try {
 		// Each start reports what it would come back to, then keeps a tab
 		// of its own and restarts; the third stops.

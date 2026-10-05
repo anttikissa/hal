@@ -60,7 +60,7 @@ test('no code is asked before a Hal is known to answer at the host', async () =>
 	let other = Bun.serve({ port: 0, fetch: () => new Response('<html>not hal</html>') })
 	let asked = 0
 	try {
-		await expect(remote.signIn(`127.0.0.1:${other.port}`, { last: '', tokens: {} }, () => (asked++, 'x'), () => {})).rejects.toThrow('not a hal2 host')
+		await expect(remote.signIn(`127.0.0.1:${other.port}`, { last: '', tokens: {} }, () => (asked++, 'x'), () => {})).rejects.toThrow('not a Hal host')
 		await expect(remote.signIn('127.0.0.1:1', { last: '', tokens: {} }, () => (asked++, 'x'), () => {})).rejects.toThrow('cannot reach')
 	} finally { other.stop(true) }
 	expect(asked).toBe(0)
@@ -139,7 +139,7 @@ test('saved-login startup retains the token through a gateway failure, but not o
 		// A first connection still fails before asking for a code.
 		remote.fetch = async () => new Response(body, { status: 502 })
 		await expect(remote.signIn(saved.last, { last: '', tokens: {} }, () => { throw new Error('must not ask') }, () => {}))
-			.rejects.toThrow('not a hal2 host')
+			.rejects.toThrow('not a Hal host')
 	} finally { remote.fetch = original }
 })
 

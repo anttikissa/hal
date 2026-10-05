@@ -16,7 +16,7 @@
 // instead of throwing; onChange hears every external edit, with the
 // error if it left the file malformed. Comments in the file ride along
 // on the parsed objects (ason COMMENTS) and are written back on save,
-// so a hand-written comment survives every change hal2 makes.
+// so a hand-written comment survives every change Hal makes.
 
 import { chmodSync, renameSync, unlinkSync, watch, writeFileSync, readFileSync, type FSWatcher } from 'fs'
 import { basename, dirname } from 'path'

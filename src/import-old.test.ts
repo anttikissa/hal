@@ -98,7 +98,7 @@ test('blob-backed thinking, calls and results are written inline and paired, a s
 	expect(texts(history(home, '1-a')).at(-1)).toBe('steer')
 })
 
-test('an image is copied as a hal2 blob, also into a fork that inherits it; an open question becomes output, not a live question', () => {
+test('an image is copied as a Hal blob, also into a fork that inherits it; an open question becomes output, not a live question', () => {
 	let dir = oldState(
 		{
 			'1-a': {

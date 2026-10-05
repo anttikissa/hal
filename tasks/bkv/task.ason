@@ -1,0 +1,6 @@
+{
+	title: 'The product is called Hal',
+	spec: "There is one Hal: this repository. User-facing text, code, tests and tasks call it Hal (hal in commands, prefixes and paths), never hal2. Error prefixes read 'hal: ...'. The previous implementation is 'the old Hal'; its repository (anttikissa/hal-old) is named only as a reference.",
+	status: 'done',
+	needs: []
+}

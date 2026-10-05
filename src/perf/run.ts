@@ -1,4 +1,4 @@
-// scripts/perf (task te): measures hal2 on a generated heavy home (task
+// scripts/perf (task te): measures Hal on a generated heavy home (task
 // y9) as host (cold, then warm), as a peer, switching tabs, over -r and
 // in the web client, and prints one table. Never run by ./test; no real
 // data. Exits 1 if a budget is missed.
@@ -61,7 +61,7 @@ async function until(test: () => boolean, ms: number): Promise<number | undefine
 type Stalls = { n: number; max: number; total: number; worst: string }
 type Probe = { first?: number; interactive?: number; p50?: number; p99?: number; max?: number; lost: number; allMarks?: number; rssMB: number; stalls: Stalls }
 
-// Event-loop blocks over 10 ms that any hal2 process under `root`
+// Event-loop blocks over 10 ms that any Hal process under `root`
 // reported (HAL_STALLS, task 7j) between wall-clock `from` and `to`;
 // `worst` lists the longest as length@seconds-since-from.
 function stalls(root: string, from: number, to: number): Stalls {

@@ -12,7 +12,7 @@ let t: any
 let g = globalThis as any
 
 beforeEach(async () => {
-	dir = mkdtempSync(join(tmpdir(), 'hal2-plugins-'))
+	dir = mkdtempSync(join(tmpdir(), 'hal-plugins-'))
 	reports = []
 	plugins.report = (text) => void reports.push(text)
 	writeFileSync(

@@ -5,7 +5,7 @@
 	needs: ['0z', 'e3'],
 	foldInto: ['0z'],
 	notes: [
-		"hal2's terminal draws no header rows, ref or time (items start with a marker: '> ', '▸ ', '? ', 'error:'), so the link sits on what stands in for the header: a tool call's whole row (the terminal shows a glimpse, the card all of it), else the leading marker token. No visible ref was added: it would steal columns from wrapped prompt text. itemView.linked does it after itemLines; frame.itemRows takes the session id (transcript.meta.id) and caches per session and key.",
+		"Hal's terminal draws no header rows, ref or time (items start with a marker: '> ', '▸ ', '? ', 'error:'), so the link sits on what stands in for the header: a tool call's whole row (the terminal shows a glimpse, the card all of it), else the leading marker token. No visible ref was added: it would steal columns from wrapped prompt text. itemView.linked does it after itemLines; frame.itemRows takes the session id (transcript.meta.id) and caches per session and key.",
 		'ansi.webUrl puts ?auth= before a #fragment: appended after it, the code would land in the hash and the page would get neither the code nor the block id.',
 		'The block-id rule (digits, optional .<i>; `~` keys are not linkable) lives in common transcript.href, shared by web target.ts and the terminal. The frame test resolves terminal links with web target.parse (tests may cross layers).',
 		'Tool results show an inline #<call block id> hyperlink to the call, which the web folds with its result in the same card. A background bash message also links the #<call block id> in its header; its own message id still links to itself. Text, thinking and command output retain their own links.'

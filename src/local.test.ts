@@ -26,7 +26,7 @@ console.log(JSON.stringify({ before, after: models.defaultModel() }))
 `
 
 function withHome(fn: (home: string) => void) {
-	let home = mkdtempSync(join(tmpdir(), 'hal2-local-'))
+	let home = mkdtempSync(join(tmpdir(), 'hal-local-'))
 	try {
 		fn(home)
 	} finally {
