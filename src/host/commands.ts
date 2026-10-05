@@ -21,7 +21,7 @@ import type { Answers, Form } from '../common/forms.ts'
 // (tasks/w4/forms.md, Provenance): 'models' is the model picker.
 // `show`: said like `say` but never recorded, so it is gone on the next
 // snapshot (a one-time code, /auth).
-export type Reply = { result?: string; say?: string; show?: string; error?: string; ask?: Form; askArgs?: string; open?: 'models'; rebase?: import('../common/rebase-rows.ts').RebaseRows }
+export type Reply = { result?: string; say?: string; show?: string; error?: string; ask?: Form; askArgs?: string; open?: 'models' | 'settings'; rebase?: import('../common/rebase-rows.ts').RebaseRows }
 
 // The session the command runs in.
 // setCwd and setModel also tell the model, on its next prompt; say

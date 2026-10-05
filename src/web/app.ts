@@ -285,7 +285,7 @@ function modalKey(k: Key): void {
 
 function modalPick(index: number): void {
 	let modal = app.state.view.modal
-	if (!modal) return
+	if (!modal || (modal.edit && modal.edit.index !== index)) return
 	app.state.view = { ...app.state.view, modal: { ...modal, selected: index } }
 	app.modalKey({ key: 'enter' })
 }
@@ -389,7 +389,7 @@ export const app = {
 	sendForm,
 	modalKey,
 	modalPick,
-	search: (text: string): void => { if (app.state.view.modal?.find) find.input(text); else app.setView(view.search(app.state.view, text)) },
+	search: (text: string, edit = false): void => { if (app.state.view.modal?.find) find.input(text); else app.setView(view.search(app.state.view, text, edit)) },
 	send,
 	store,
 	start,

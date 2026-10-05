@@ -14,6 +14,7 @@ import { forms, type FormState } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
 import { modals, type ModalAction, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
+import { settingsModal } from '../common/settings-modal.ts'
 import type { Event, Tab } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
@@ -131,6 +132,7 @@ function onEvent(event: Event): void {
 	else if (event.type === 'warning') st.notice = event.text
 	else if (event.type === 'completions') app.completed(event)
 	else if (event.type === 'models') app.pick(event)
+	else if (event.type === 'settings') app.configure(event)
 	else {
 		let t = transcript.fold(st.transcript, event)
 		st.transcript = t
@@ -241,6 +243,8 @@ function onKeys(events: KeyEvent[]): void {
 			let { state, action } = st.onModalKey ? st.onModalKey(st.modal, k) : modals.step(st.modal, k)
 			st.modal = state
 			if (!action) continue
+			// A /config change: sent, the modal stays open.
+			if (action.type === 'send') { app.send(action.command); continue }
 			let submit = st.onModal
 			app.close()
 			let command = action.type === 'submit' ? submit?.(action, state) : undefined
@@ -325,6 +329,13 @@ function pick(event: Event & { type: 'models' }): void {
 	)
 }
 
+// The /config modal for the session on screen, or an update of it.
+function configure(event: Event & { type: 'settings' }): void {
+	let modal = app.state.modal, id = app.state.transcript?.meta.id
+	if (event.refresh) return modal?.settings ? ((app.state.modal = settingsModal.refresh(modal, event)), app.show()) : undefined
+	if (id && event.sessionId === id) app.open(settingsModal.open(event), () => undefined, (m, key) => settingsModal.step(m, key, id))
+}
+
 // Takes keys from the terminal and paints the first frame. Idempotent.
 function init(): void {
 	terminal.onKeys = (events) => app.onKeys(events)
@@ -380,6 +391,7 @@ export const app = {
 	open,
 	close,
 	pick,
+	configure,
 	pasted,
 	init,
 	reset,

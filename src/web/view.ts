@@ -13,6 +13,7 @@ import { forms, type FormState, type Key } from '../common/forms.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
 import type { ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
+import { settingsModal } from '../common/settings-modal.ts'
 import type { Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Item, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
@@ -49,6 +50,10 @@ function onEvent(st: ViewState, event: Event): ViewState {
 		if (event.sessionId !== st.transcript?.meta.id || (event.refresh && !st.modal?.tree)) return st
 		let modal = event.refresh ? picker.refresh(st.modal!, event.items, event.names, event.capabilities) : picker.open(event.current, event.items, event.names, event.capabilities, event.effort)
 		return { ...st, modal, models: event.items, names: event.names ?? {} }
+	}
+	if (event.type === 'settings') {
+		if (event.refresh) return st.modal?.settings ? { ...st, modal: settingsModal.refresh(st.modal, event) } : st
+		return event.sessionId === st.transcript?.meta.id ? { ...st, modal: settingsModal.open(event) } : st
 	}
 	let t = transcript.fold(st.transcript, event)
 	if (t === st.transcript) return st
@@ -107,15 +112,18 @@ function closed(st: ViewState): ViewState {
 // A key on the open modal: the view after and the command Enter sends.
 function modalKey(st: ViewState, k: Key): { state: ViewState; command?: unknown } {
 	if (!st.modal || !st.transcript) return { state: st }
-	let { state, action } = picker.step(st.modal, k, st.models ?? [], st.names)
+	let { state, action } = st.modal.settings ? settingsModal.step(st.modal, k, st.transcript.meta.id) : picker.step(st.modal, k, st.models ?? [], st.names)
 	if (!action) return { state: { ...st, modal: state } }
+	if (action.type === 'send') return { state: { ...st, modal: state }, command: action.command }
 	let command = action.type === 'submit' ? picker.command(st.transcript.meta.id, state, action) : undefined
 	return command ? { state: closed(st), command } : { state: closed(st) }
 }
 
-// The search box now says `text` (typed natively in its input).
-function search(st: ViewState, text: string): ViewState {
+// The search box, or with `edit` the /config edit field, now says `text`
+// (typed natively in its input).
+function search(st: ViewState, text: string, edit = false): ViewState {
 	if (!st.modal?.form) return st
+	if (st.modal.settings) return { ...st, modal: edit ? settingsModal.edited(st.modal, text) : settingsModal.search(st.modal, text) }
 	let modal = { ...st.modal, form: forms.set(st.modal.form, 0, text), selected: 0, scroll: 0 }
 	return { ...st, modal: picker.refilter(modal, st.models ?? [], st.names) }
 }

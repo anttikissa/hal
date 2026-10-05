@@ -31,6 +31,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	completions: { sessionId: 's', text: 's', items: 'S', descriptions: 'S?' },
 	models: { sessionId: 's', current: 's', items: 'S', effort: 's?', capabilities: 'o?' },
 	attached: { sessionId: 's', command: 's', blob: 's', marker: 's' },
+	settings: { sessionId: 's?', values: 'o', stored: 'o' },
 	warning: { text: 's' },
 	'push-devices': { devices: 'a', result: 's?' },
 	'notice-history': { entries: 'a' },

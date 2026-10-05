@@ -1,11 +1,15 @@
 /// <reference lib="dom" />
-// Native modal shell and search box shared by the model picker and find.
+// Native modal shell and search box shared by the model picker, find and
+// /config, whose rows add a value column, a faint note shown on the
+// selected, hovered or focused row, an in-place edit field and the
+// selected row's details below (common/modals.ts).
 import { createEffect, For, Show, untrack } from 'solid-js'
 import { fuzzy } from '../../common/fuzzy.ts'
 import { findDialog } from '../../common/find-dialog.ts'
 import type { ModalState } from '../../common/modals.ts'
 import { app } from '../app.ts'
 import { picker } from '../../common/picker.ts'
+import { settings } from '../../common/settings.ts'
 import { find } from '../find.ts'
 import { Icon } from './Icon.tsx'
 
@@ -22,6 +26,13 @@ function Match(props: { text: string }) { return <b class="match">{props.text}</
 
 export function Picker(props: { modal: ModalState | undefined }) {
 	let box!: HTMLDialogElement, search!: HTMLInputElement, list!: HTMLUListElement
+	let edit: HTMLInputElement | undefined
+	// An edit starting takes the focus; one ending gives it back.
+	createEffect(
+		() => props.modal?.edit?.index,
+		(index) => untrack(() => { if (index === undefined) { if (box.open) search.focus() } else edit?.focus() }),
+	)
+	let width = () => `${Math.max(0, ...(props.modal?.items ?? []).map((s) => s.length)) + 2}ch`
 	// A new query reorders the list, so scroll from the top as the TUI
 	// does: the rows above the selection stay in view.
 	let query: string | undefined
@@ -63,9 +74,20 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				onFocus={() => find.focus(5)} aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}>
 				<For each={props.modal?.items ?? []}>{(item, i) => (
 					<li role="option" id={`modal-item-${i()}`} aria-selected={i() === props.modal?.selected ? 'true' : 'false'}
+						class={props.modal?.values ? 'row' : undefined} style={props.modal?.values ? { '--label': width() } : undefined}
 						onClick={() => { if (!props.modal?.find) app.modalPick(i()) }}>
+						<Show when={props.modal?.values} fallback={
 						<Show when={props.modal?.find} fallback={marked(item, props.modal?.query)}>
 							<a href={props.modal?.find?.results[i()]?.href} tabindex={-1}>{marked(item, props.modal?.query, true)}</a>
+						</Show>}>
+							<span class="label">{marked(item, props.modal?.query)}</span>
+							<Show when={props.modal?.edit?.index === i()} fallback={<span class="value">{props.modal?.values?.[i()] ?? ''}</span>}>
+								<input ref={(e) => (edit = e)} class="value input" autocomplete="off" aria-label={`${item}: value`}
+									type={props.modal?.edit?.form.form.fields[0]?.type === 'secret' ? 'password' : 'text'}
+									inputmode={settings.table.find((s) => s.name === props.modal?.settings?.names[i()])?.type.kind === 'integer' ? 'numeric' : undefined}
+									value={props.modal?.edit?.form.values[0] ?? ''} onInput={(e) => app.search(e.currentTarget.value, true)} onClick={(e) => e.stopPropagation()} />
+							</Show>
+							<span class="note popup-note">{props.modal?.notes?.[i()] ?? ''}</span>
 						</Show>
 					</li>
 				)}</For>
@@ -75,6 +97,12 @@ export function Picker(props: { modal: ModalState | undefined }) {
 					<button type="button" aria-label={`Lower effort (${props.modal ? picker.label(props.modal, props.modal.tree?.rows[props.modal.selected]?.id ?? '') : ''})`} disabled={!props.modal || !picker.canAdjust(props.modal, 'left')} onClick={() => app.modalKey({ key: 'left' })}>Lower</button>
 					<button type="button" aria-label={`Higher effort (${props.modal ? picker.label(props.modal, props.modal.tree?.rows[props.modal.selected]?.id ?? '') : ''})`} disabled={!props.modal || !picker.canAdjust(props.modal, 'right')} onClick={() => app.modalKey({ key: 'right' })}>Higher</button>
 				</div>
+			</Show>
+			<Show when={props.modal?.details}>
+				<div class="details">{props.modal?.details?.[props.modal.selected] ?? ''}</div>
+			</Show>
+			<Show when={props.modal?.error}>
+				<div class="refused" role="alert">{props.modal?.error}</div>
 			</Show>
 			<div class="log" role="status">{props.modal?.hint ?? ''}</div>
 		</dialog>

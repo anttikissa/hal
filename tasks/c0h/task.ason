@@ -1,7 +1,13 @@
 {
 	title: '/config: a settings modal, one row per setting',
 	spec: 'Bare /config opens a client-only modal (tasks/w4/forms.md, Modals), never in history, in the terminal and on the web alike. A search box filters with common/fuzzy.ts. Each setting is one row: a human label from the settings table (new `label` field: "Default model", "Push notifications"), then its value in a second column aligned across rows; booleans read on/off. The selected row also shows, faint grey, exactly what config.ason holds for it (`webDiagnostics: true`, or `(default)` when the key is absent); on the web this shows on hover and focus too. Below the list the selected setting\'s description wraps inside the box, indented under itself. Enter or Space cycles a boolean or choice; on text and integer it edits the value in place, Enter saving and Escape restoring it. Each change applies at once, as the ordinary command /config <name> <value>, which writes through config.ason\'s liveFile (keeping comments and unknown keys; a key set to its default is removed). The modal follows the liveFile: an external edit while it is open updates its rows. A refused value shows the reason in the modal and keeps the edit open. Secrets show as set/unset, never their value; editing one starts empty. Escape closes the modal. The settings view is a reusable modal module: shared state and keys in src/common (beside modals.ts and picker.ts), drawn by client/modal-view.ts and a web component reused by the model picker\'s modal frame, so later modals (/login, find) are a list of rows, not new rendering. /config <name> and /config <name> <value> keep working as today. The durable question form of zp is removed. config.ason starts with one comment line pointing to /config, the readable list of settings (settings.ts is the source but too dense to read), `// Every setting, its default and meaning: /config`. Hal adds it only when it writes a file that lacks it (on creation, or the first write to an older file) and never rewrites comments.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Own writes do not fire liveFile onChange, so config.update calls config.state.onChange itself; main wires it to host.warnAll, which now also sends the settings refresh to every client.',
+		'ASON keeps comments only on keys (COMMENTS), and a comment before the opening brace is dropped on save. The /config pointer therefore rides on the first key; deleting that key loses it and the next write adds it again; an empty {} holds none.',
+		'Refusals the client can check (settings.problem) stay in the modal. Host-only refusals, such as an unknown default model, land as command output in the transcript behind the modal.',
+		'Line limits: client/app.ts, web/app.ts, host/host.ts and web/view.ts sit at 398-400 lines, so the glue is compact; the web edit field reuses app.search(text, true).'
+	],
 	needs: ['zp', 'kv', 'pc'],
 	foldInto: ['zp']
 }

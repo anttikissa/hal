@@ -78,7 +78,11 @@ function key(e: KeyInput, target: Target): boolean {
 			return true
 		}
 		if ((target.kind === 'button' || target.kind === 'link') && (e.key === 'Enter' || e.key === ' ')) return false
-		if (!k || e.ctrlKey || e.metaKey || e.altKey || !['left', 'right', 'enter', 'escape', 'up', 'down'].includes(k.key)) return false
+		// /config: Space changes the selected setting, except in its edit field.
+		let space = !!st.view.modal.settings && !st.view.modal.edit && k?.text === ' '
+		if (!k || e.ctrlKey || e.metaKey || e.altKey || (!space && !['left', 'right', 'enter', 'escape', 'up', 'down'].includes(k.key))) return false
+		// The edit field and search box move their own cursors.
+		if (st.view.modal.settings && (k.key === 'left' || k.key === 'right')) return false
 		app.modalKey(k)
 		return true
 	}

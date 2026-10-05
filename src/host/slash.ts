@@ -9,6 +9,7 @@ import type { Event } from '../common/protocol.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { auth } from './auth.ts'
 import { commands, type Context, type Reply } from './commands.ts'
+import { config } from './config.ts'
 import { history } from './history.ts'
 import { naming } from './naming.ts'
 import { liveFiles } from './live-file.ts'
@@ -107,6 +108,7 @@ async function runCommand(id: string, name: string, args: string, answers?: Answ
 	if (reply.show !== undefined) host.broadcast(id, { type: 'output', sessionId: id, text: reply.show, ...slash.placed(id) })
 	if (reply.error !== undefined) slash.output(id, reply.error, true, sender?.origin)
 	if (reply.open === 'models') void slash.models(id).then((e) => host.broadcast(id, e))
+	if (reply.open === 'settings') host.broadcast(id, { ...config.event(), sessionId: id })
 	// The intro paused for this login (task vc): signed in, it goes on.
 	if (name === 'login' && !reply.ask && !reply.error && sessions.open(id).model === 'hal/intro' && status.stateOf(id).type === 'paused') prompts.resume(id)
 	if (!reply.ask) return reply
