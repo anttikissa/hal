@@ -16,6 +16,7 @@
 import { clock } from './clock.ts'
 import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
+import { settings } from '../common/settings.ts'
 
 export type WebLogin = { id: string; expires: string; firstSeen?: string; lastSeen?: string; device: string }
 type Store = Record<string, string | WebLogin>
@@ -142,7 +143,15 @@ function close(): void {
 	if (s) liveFiles.close(s)
 }
 
+// The /auth and `hal auth` text: the code, a link carrying it, and how
+// to connect a terminal. Shown, never saved, so the visible code is fine.
+function message(code: string): string {
+	let url = settings.webUrl().replace(/\/$/, '')
+	return `Login code (works once, for ${Math.round(webAuth.codeMs / 60_000)} minutes): ${code}\n\nOpen: ${url}/?auth=${code}\nOr connect a terminal: hal -r ${url.replace(/^https?:\/\//, '')}`
+}
+
 export const webAuth = {
+	message,
 	state: {
 		// Code → expiry (epoch ms).
 		codes: new Map<string, number>(),
