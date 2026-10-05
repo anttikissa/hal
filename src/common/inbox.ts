@@ -1,10 +1,10 @@
 // The session inbox (tasks/j1/states.md, Talking while it works):
 // messages the user sent while a turn was busy, durable in history as
 // `inbox` records until a prompt record delivers them (its `inbox` ids).
-// A steering message goes to the model before the turn's next request; a
-// queued one (`queue`) runs as a turn of its own after the turn ends.
+// Interrupt delivery reaches the model before the turn's next round;
+// after-this-turn delivery (`queue`) starts a turn after the current one ends.
 // Not a state: every client shows these as normal prompt cards, with
-// sender and kind in the header; why it waits belongs to the status.
+// sender and delivery in the header; why it waits belongs to the status.
 
 import type { Sender } from './blocks.ts'
 import type { HistoryRecord } from './replay.ts'
@@ -45,18 +45,19 @@ function sender(s: Sender): Sender {
 	return out
 }
 
-// Provenance a waiting message retains when delivered. Queue and
-// advisory messages are not steering; the kind belongs to each text.
+// Provenance a waiting message retains when delivered. Next-round and
+// after-this-turn messages do not interrupt; delivery belongs to each text.
 function provenance(item: InboxItem): Sender {
 	return { ...inbox.sender(item), ...(item.queue && item.ts !== undefined ? { queuedAt: item.ts } : {}), ...(!item.queue && !item.advisory ? { steering: true as const } : {}) }
 }
 
-// What leads a queued message's compact row (task 16): '15:29 (Queued
-// by 76-cpo, tab 5)'. `tab`: the sender's current tab number, if it
+// What leads a waiting message's compact row (task 16):
+// '15:29 (Message from 76-cpo, tab 5; after this turn)'.
+// `tab`: the sender's current tab number, if it
 // has one. Not the label: it already names the tab it had when sending. Never why the session stalls: that is the status line.
 function note(item: InboxItem, tab?: number): string {
-	let by = item.from === undefined ? '' : ` by ${item.from}${tab === undefined ? '' : `, tab ${tab}`}`
-	return titles.stamp(item.ts, `(Queued${by})`)
+	let who = item.from === undefined ? 'You' : `Message from ${item.from}${tab === undefined ? '' : `, tab ${tab}`}`
+	return titles.stamp(item.ts, `(${who}; after this turn)`)
 }
 
 export const inbox = { pending, sender, provenance, note }

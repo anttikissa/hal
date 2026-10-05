@@ -138,7 +138,7 @@ describe('a prompt too long (task mq)', () => {
 		expect(input[0].blocks[0].text).toStartWith('Context was compacted')
 		expect(input[0].blocks[0].text).toContain('earlier turn')
 		expect(input[0].blocks[0].text).not.toContain('original prompt of this turn')
-		expect(input.at(-1).blocks[0].text).toContain('original prompt of this turn')
+		expect(input.some((m: any) => m.blocks.some((b: any) => b.type === 'text' && b.text.endsWith('original prompt of this turn')))).toBe(true)
 		let onDisk = history.readSync(id)
 		let compacted = onDisk.findLast((r) => r.type === 'compact')
 		if (compacted?.type !== 'compact') throw new Error('expected a compact boundary')

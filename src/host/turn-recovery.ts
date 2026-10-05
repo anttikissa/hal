@@ -56,7 +56,7 @@ async function recover(): Promise<void> {
 			turns.stop(id, `continued ${n} times without progress; it may be what stops the host`)
 			continue
 		}
-		history.append(id, { type: 'continue' })
+		history.append(id, { type: 'continue', reason: 'The host restarted during the turn. Continue without repeating completed work.' })
 		turns.start(id)
 	}
 }

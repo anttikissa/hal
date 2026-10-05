@@ -21,7 +21,9 @@ function session(turnsCount: number): HistoryRecord[] {
 }
 
 test('keeps the first prompt and answer, the last three prompts and answers, and counts the rest', () => {
-	let made = compaction.summary(session(6), '/h/history.asonl')!
+	let records = session(6)
+	for (let i = 0; i < 3; i++) records.push({ type: 'user', blocks: [], notices: [{ source: ++n, text: '<meta>A setting changed.</meta>' }], ts, n: ++n })
+	let made = compaction.summary(records, '/h/history.asonl')!
 	expect(made.prompts).toBe(6)
 	let lines = made.summary.split('\n')
 	expect(lines[0]).toBe('Context was compacted to avoid exceeding the token limit. Verify before assuming.')

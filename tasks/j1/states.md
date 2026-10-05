@@ -34,7 +34,7 @@ Invariant, and the test for it: every state other than idle, paused and
 error names what ends it: a live stream or tool, a time T, or a
 human-facing reason. A session that waits on nothing is a bug.
 
-Queued and steering messages (the inbox) are not a state: they are
+Messages waiting in the inbox are not a state: they are
 visible data attached to a session in any state. Neither is a slash
 command's question (/login, /cd): the state belongs to the turn, and
 nothing outside the turn may overwrite what the host knows about it,
@@ -111,12 +111,17 @@ coalesce without loss or duplication. Escape or closing the tab clears
 restart intent and leaves the inbox waiting until continue or a new submit.
 Interrupted rounds are not user pauses. Host recovery and command-ID
 deduplication use durable history; no private client interruption path.
-Alt-Enter queues instead and never interrupts: it runs after the turn ends.
-Advisory sends wait until the next round without aborting; send steer:true
-uses ordinary submission semantics. Neither advisory nor queue undoes an
-explicit pause. Ordinary submission also cancels retry/login waits; the
-next request re-evaluates the failure or login rather than stranding text.
+Alt-Enter chooses after-this-turn delivery and never interrupts.
+Next-round messages wait without aborting; send steer:true chooses interrupt
+delivery and uses ordinary submission semantics. Neither next-round nor
+after-this-turn delivery undoes an explicit pause. Ordinary submission also
+cancels retry/login waits; the next request re-evaluates the failure or login rather than stranding text.
 Slash commands retain their own immediate command behavior.
+Model, cwd, instruction and turn-status notices reach the next request,
+including within a turn. They do not start or resume work by themselves.
+A model switch lets the active round finish and takes effect at the next round.
+Live blocks keep their start position; commands arriving during thinking appear
+below that block in both clients, live and restored.
 A restart (Ctrl-R) never changes what the user sees.
 The inbox is always visible; nothing hides behind a command. The old
 queue told the user "1 message in the queue, use /queue" and sometimes

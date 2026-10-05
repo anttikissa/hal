@@ -229,7 +229,7 @@ test('an edited prompt takes the place of the prompt it replaces and its turn, l
 	expect(late2).toEqual(t2)
 })
 
-test('a command during a running turn goes where history has it: after finished blocks, before the one streaming', () => {
+test('a command during a running turn stays after the block already streaming', () => {
 	let t = fold([
 		snap({ history: [] }),
 		{ type: 'turn-start', sessionId, prompt: 'go', provider: 'fake', n: 1, ts },
@@ -245,14 +245,13 @@ test('a command during a running turn goes where history has it: after finished 
 		{ type: 'tool-results', sessionId, results: [{ type: 'tool_result', id: 'c', output: 'ok' }], n: 8, ts },
 		{ type: 'turn-end', sessionId, status: 'completed', n: 9, ts },
 	])!
-	// The streaming block keeps the number it started with, written
-	// after the command numbered past it.
+	// A block keeps its start position even though it finishes after the command.
 	expect(t.items).toEqual([
 		{ type: 'prompt', text: 'go', ts, key: '1' },
 		{ type: 'thinking', text: 'hm', ts, key: '2' },
+		{ type: 'text', text: 'working', ts, key: '3' },
 		{ type: 'command', text: '/cd x', from: '2-xyz', ts, key: '4' },
 		{ type: 'output', text: 'no such directory', error: true, ts, key: '5' },
-		{ type: 'text', text: 'working', ts, key: '3' },
 		{ type: 'tool', id: 'c', name: 'ls', input: {}, key: '6', ts },
 		{ type: 'command', text: '/help', ts, key: '7' },
 		{ type: 'tool-result', id: 'c', output: 'ok', ts, key: '8' },
@@ -305,7 +304,7 @@ test('a model-run command shows only as its tool card, live and restored; a type
 
 test('waiting and delivered steering use the same header, without labelling a following fresh prompt', () => {
 	let waiting = transcript.waitingItem({ id: 's1', text: 'interrupt' })
-	expect(titles.title(waiting)).toBe('You (steering)')
+	expect(titles.title(waiting)).toBe('You (interrupt)')
 	let live = fold([
 		snap({ history: [] }),
 		{ type: 'prompt', sessionId, texts: ['interrupt', 'fresh'], senders: [{ steering: true }, {}], n: 3 },
@@ -315,6 +314,6 @@ test('waiting and delivered steering use the same header, without labelling a fo
 		{ type: 'user', blocks: [{ type: 'text', text: 'interrupt' }, { type: 'text', text: 'fresh' }], inbox: ['s1'], ts, n: 3 },
 	] })])!
 	for (let t of [live, loaded]) {
-		expect(t.items.map((i) => titles.who(i))).toEqual(['You (steering)', 'You'])
+		expect(t.items.map((i) => titles.who(i))).toEqual(['You (interrupt)', 'You'])
 	}
 })

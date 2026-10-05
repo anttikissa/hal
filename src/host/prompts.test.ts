@@ -43,7 +43,7 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('one\n\ntwo') }] },
 	])
 	expect(inboxOf(a, id)).toEqual([])
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)'])
+	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupt)', 'You (interrupt)'])
 	// Again, and again the prefix holds.
 	calls[1]!.push({ type: 'text', text: 'ok' })
 	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
@@ -65,7 +65,7 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ type: 'text', text: 'done' },
 		{ type: 'turn-end', status: 'completed' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)', 'You (steering)'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupt)', 'You (interrupt)', 'You (interrupt)'])
 	expect(a.views.get(id)).toEqual(view)
 	expect(b.views.get(id)).toEqual(view)
 	expect(a.of('turn-end')).toHaveLength(1)
@@ -109,11 +109,11 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	calls[1]!.push({ type: 'text', text: 'first done' }, { type: 'done', reason: 'end' })
 	await until(() => calls.length === 3)
 	expect(a.of('turn-end')).toHaveLength(1)
-	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Queued at ${queuedAt}.</meta>\nlater`)])
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nlater`)])
 	expect(inboxOf(a, id)).toEqual([])
 	let delivered = a.views.get(id)!.items.find((i) => i.type === 'prompt' && i.text === 'later')!
 	expect(delivered).toMatchObject({ queued: true, queuedAt })
-	expect(titles.title(delivered)).toBe(`${titles.time(delivered.ts)} You (queued at ${titles.time(queuedAt)})`)
+	expect(titles.title(delivered)).toBe(`${titles.time(delivered.ts)} You (after this turn, sent at ${titles.time(queuedAt)})`)
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 2)
 	let view = await fresh(id)
@@ -157,7 +157,7 @@ test('the inbox survives a pause and a restart, and runs when the user continues
 	expect(inboxOf(b, id)).toEqual(['queued'])
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 3)
-	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Queued at ${queuedAt}.</meta>\nqueued`)])
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nqueued`)])
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => b.of('turn-end').length === 2)
 	expect(await fresh(id)).toEqual(b.views.get(id)!)
@@ -182,7 +182,7 @@ test('a queued message left behind by a host dying after a turn end runs on the 
 	restartHost()
 	await turns.recover()
 	await until(() => calls.length === 2)
-	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Queued at ${queuedAt}.</meta>\nlater`)])
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nlater`)])
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
@@ -202,7 +202,8 @@ test('sending to a paused turn takes the waiting messages along, oldest first', 
 	await until(() => a.of('turn-end').length)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'second' })
 	await until(() => calls.length === 2)
-	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([expect.stringMatching(/paused[^]*\nfirst\n\nsecond$/)])
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([stamped('first\n\nsecond')])
+	expect(JSON.stringify(calls[1]!.input.messages.at(-2))).toContain('The user paused the turn.')
 	expect(inboxOf(a, id)).toEqual([])
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 2)
@@ -212,7 +213,7 @@ test('sending to a paused turn takes the waiting messages along, oldest first', 
 		{ type: 'prompt', text: 'first', steering: true },
 		{ type: 'prompt', text: 'second' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupt)', 'You'])
 	expect(a.views.get(id)).toEqual(view)
 })
 
@@ -291,8 +292,9 @@ test('an edit after a tool with side effects keeps history and is sent on top', 
 		await pauseAndEdit(a, id, 'clean up, but keep x')
 		await until(() => calls.length === 3)
 		let msgs = calls[2]!.input.messages
-		expect(msgs.slice(0, -1)).toEqual(calls[1]!.input.messages)
-		expect(msgs.at(-1).blocks[0].text).toMatch(/paused the previous turn[^]*\nclean up, but keep x$/)
+		expect(msgs.slice(0, calls[1]!.input.messages.length)).toEqual(calls[1]!.input.messages)
+		expect(JSON.stringify(msgs.at(-2))).toContain('The user paused the turn.')
+		expect(msgs.at(-1).blocks[0].text).toEqual(stamped('clean up, but keep x'))
 		calls[2]!.push({ type: 'done', reason: 'end' })
 		await until(() => a.of('turn-end').length === 2)
 		expect(await fresh(id)).toEqual(a.views.get(id)!)
@@ -356,7 +358,7 @@ test('an edited queued message runs as edited, in its place, and never as first 
 	await until(() => calls.length === 2)
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 3)
-	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Queued at ${queuedAt}.</meta>\ntest it`)])
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\ntest it`)])
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 4)
 	calls[3]!.push({ type: 'done', reason: 'end' })

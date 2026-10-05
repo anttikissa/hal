@@ -5,6 +5,7 @@
 
 import type { ErrorEvent } from '../common/blocks.ts'
 import { compaction } from '../common/compaction.ts'
+import { modelNotices } from '../common/model-notices.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
@@ -40,10 +41,12 @@ function run(id: string, protect = false, transition?: string): number | undefin
 		if (r.status === 'completed' || !records.slice(i + 1, edge).some((next) => next.type === 'continue')) { start = i + 1; break }
 		edge = i
 	}
-	let keep = protect ? records.slice(start).filter((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'text')).map((r) => r.n!) : []
+	let due = modelNotices.pending(records)
+	let keep = protect ? records.slice(start).filter((r) => r.type === 'user' && (r.notices?.length || r.blocks.some((b) => b.type === 'text'))).map((r) => r.n!) : []
 	let made = compaction.summary(records.filter((r) => !keep.includes(r.n!)), history.file(id))
 	if (!made) return undefined
 	compact.boundary(id, { type: 'compact', ...made, ...(transition && { transition }), ...(keep.length && { keep }) })
+	if (due.length) history.append(id, { type: 'user', blocks: [], notices: due })
 	return made.prompts
 }
 

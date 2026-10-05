@@ -57,25 +57,26 @@ test('the stamp names the date on the first prompt and whenever the date changed
 	expect(prompts(more).slice(0, 4)).toEqual(prompts(msgs))
 })
 
-test('a prompt after an errored turn stays separate and says the turn failed', () => {
-	let msgs = replay.toMessages([say('Say just the word pong'), end('error', { error: 'HTTP 400: prompt too long' }), say('k')])
-	let [one, two] = prompts(msgs)
-	expect(msgs).toHaveLength(2)
+test('a failure notice stays separate from both prompts and keeps the whole error', () => {
+	let error = `HTTP 400: ${'provider detail '.repeat(100)}last byte`
+	let msgs = replay.toMessages([say('Say just the word pong'), end('error', { error }), say('k')])
+	let [one, notice, next] = prompts(msgs)
+	expect(msgs).toHaveLength(3)
 	expect(one).toMatch(/\nSay just the word pong$/)
-	expect(two).toMatch(/^\[[\d -]+:\d\d\]\n<meta>[^<]*fail[^<]*HTTP 400: prompt too long[^<]*<\/meta>\nk$/)
+	expect(notice).toContain(error)
+	expect(next).toMatch(/^\[[\d -]+:\d\d\]\nk$/)
 })
 
-test('a prompt after a paused turn says it was paused, and by whom', () => {
+test('a pause notice identifies who paused, independently of the next prompt', () => {
 	let byUser = prompts(replay.toMessages([say('go'), block({ type: 'text', text: 'hal' }), end('paused'), say('stop that')]))
-	expect(byUser).toHaveLength(2)
-	expect(byUser[1]).toMatch(/^\[[\d -]+:\d\d\]\n<meta>[^<]*user paused[^<]*<\/meta>\nstop that$/)
+	expect(byUser[1]).toContain('user paused')
+	expect(byUser[2]).toMatch(/\nstop that$/)
 	let byHal = prompts(replay.toMessages([say('go'), end('paused', { pauseReason: 'kept crashing' }), say('why?')]))
-	expect(byHal).toHaveLength(2)
-	expect(byHal[1]).toMatch(/<meta>[^<]*paused[^<]*kept crashing[^<]*<\/meta>\nwhy\?$/)
-	expect(byHal[1]).not.toMatch(/user paused/)
+	expect(byHal[1]).toContain('Hal paused the turn: kept crashing')
+	expect(byHal[1]).not.toContain('user paused')
 })
 
-test('a note is for the next prompt only, and a continued turn needs none', () => {
+test('notices appear once at their delivery point, not on later prompts', () => {
 	let msgs = replay.toMessages([
 		say('one'),
 		end('error', { error: 'boom' }),
@@ -106,8 +107,8 @@ test('partial text of a cancelled turn is kept; unsigned thinking is not replaye
 		block({ type: 'text', text: 'partial ans' }),
 		end('cancelled'),
 	])
-	expect(msgs.map((m) => m.role)).toEqual(['user', 'user', 'assistant'])
-	expect(msgs[2]!.blocks).toEqual([{ type: 'text', text: 'partial ans' }])
+	expect(msgs.flatMap((m) => m.role === 'assistant' ? m.blocks : [])).toEqual([{ type: 'text', text: 'partial ans' }])
+	expect(msgs[3]!.blocks).toEqual([{ type: 'text', text: 'partial ans' }])
 })
 
 test('tool calls get their results; unanswered ones get an error result before the next prompt', () => {
@@ -121,8 +122,8 @@ test('tool calls get their results; unanswered ones get an error result before t
 		end('cancelled'),
 		say('never mind'),
 	])
-	expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user', 'user'])
-	let [, , results1, , results2, next] = msgs
+	expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user', 'user', 'user'])
+	let [, , results1, , results2, , next] = msgs
 	let ids1 = results1!.blocks.map((b) => b.type === 'tool_result' && b.id)
 	expect(ids1.sort()).toEqual(['a', 'b'])
 	expect(results1!.blocks.find((b) => b.type === 'tool_result' && b.id === 'a')).toMatchObject({ output: 'ok' })
@@ -135,28 +136,33 @@ test('tool calls get their results; unanswered ones get an error result before t
 test('tool results without a matching call are dropped', () => {
 	let msgs = replay.toMessages([say('x'), end('interrupted'), user({ type: 'tool_result', id: 'ghost', output: '' }), say('y')])
 	expect(msgs.flatMap((m): { type: string }[] => m.blocks).every((b) => b.type === 'text')).toBe(true)
-	expect(prompts(msgs)).toHaveLength(2)
+	expect(prompts(msgs)).toHaveLength(3)
 })
 
 test('a turn continued after a host went away tells the model, and cut-off calls may have run', () => {
 	let msgs = replay.toMessages([say('go'), block({ type: 'text', text: 'half' }), block(call('a')), cont, block({ type: 'text', text: 'rest' })])
-	expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant'])
-	let [result, note] = msgs[2]!.blocks
+	expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'user', 'assistant'])
+	let result = msgs[2]!.blocks[0]
 	expect(result).toMatchObject({ type: 'tool_result', id: 'a', isError: true })
 	expect((result as any).output).toMatch(/may or may not have run/)
-	expect(note).toEqual({ type: 'text', text: replay.continueNote })
+	expect(JSON.stringify(msgs[3])).toContain('unfinished turn is continuing')
 })
 
-test('continuing a paused turn after tool results asks nothing extra', () => {
-	let msgs = replay.toMessages([say('go'), block(call('a')), user({ type: 'tool_result', id: 'a', output: 'ok' }), end('paused'), cont])
-	expect(msgs.at(-1)).toEqual({ role: 'user', blocks: [{ type: 'tool_result', id: 'a', output: 'ok' }] })
+test('continuing after tool results keeps them intact and describes the pause and resume', () => {
+	let result = { type: 'tool_result' as const, id: 'a', output: 'ok' }
+	let msgs = replay.toMessages([say('go'), block(call('a')), user(result), end('paused'), cont])
+	expect(msgs[2]).toEqual({ role: 'user', blocks: [result] })
+	expect(JSON.stringify(msgs.at(-1))).toContain('user resumed the paused turn')
+	expect(JSON.stringify(msgs.at(-1))).not.toContain('response was interrupted')
 })
 
-test('a paused cut-off answer continues with the note; a failed request retries as it was', () => {
+test('continuation reports failure versus pause rather than inventing an interrupted answer', () => {
 	let paused = replay.toMessages([say('go'), block({ type: 'text', text: 'half' }), end('paused'), cont])
-	expect(paused.at(-1)!.blocks).toEqual([{ type: 'text', text: replay.continueNote }])
-	let failed = replay.toMessages([say('go'), end('error'), cont])
-	expect(failed).toEqual(replay.toMessages([say('go')]))
+	expect(JSON.stringify(paused.at(-1))).toContain('user resumed the paused turn')
+	let failed = replay.toMessages([say('go'), end('error', { error: 'bad request' }), cont])
+	expect(JSON.stringify(failed.at(-1))).toContain('another attempt after the failed turn')
+	expect(JSON.stringify(failed.at(-1))).toContain('bad request')
+	expect(JSON.stringify(failed)).not.toContain('response was interrupted')
 })
 
 test('waiting inbox messages are not sent; once delivered they are one prompt, oldest first', () => {
@@ -190,19 +196,18 @@ test('an edited prompt supersedes the prompt it replaces and that turn, as if wr
 	expect(replay.toMessages([...before, say('fix ti'), end('paused'), replaced, end('paused'), again])).toEqual(replay.toMessages([...before, say('fix it now')]))
 })
 
-test('a /cd or model switch reaches the model as notes on the next prompt, latest value only', () => {
+test('changes reach the next request without a prompt, preserving each transition and its time', () => {
 	let change = (c: { cwd?: string; model?: string }): HistoryRecord => ({ type: 'change', ...c, ts })
-	let before = [say('hi'), block({ type: 'text', text: 'hello' }), end('error', { error: 'boom' })]
-	let msgs = replay.toMessages([...before, change({ cwd: '/a' }), change({ model: 'openai/gpt-5' }), change({ cwd: '/b' }), say('where?'), block({ type: 'text', text: 'there' }), end('completed'), say('and now?')])
-	let [, second, third] = prompts(msgs)
-	expect(second).toMatch(/^\[[\d -]+:\d\d\]\n<meta>[^<]*boom[^<]*<\/meta>\n/)
-	expect(second).toMatch(/\n<meta>[^<]*\/b[^<]*<\/meta>\n/)
-	expect(second).toMatch(/\n<meta>[^<]*openai\/gpt-5[^<]*<\/meta>\n/)
-	expect(second).not.toMatch(/\/a\b/)
-	expect(second).toMatch(/\nwhere\?$/)
-	expect(third).toMatch(/^\[[\d -]+:\d\d\]\nand now\?$/)
-	// Nothing else changes: the same history without them, notes aside.
-	expect(msgs.map((m) => m.role)).toEqual(replay.toMessages([...before, say('where?'), block({ type: 'text', text: 'there' }), end('completed'), say('and now?')]).map((m) => m.role))
+	let before = [say('hi'), { ...block({ type: 'text', text: 'hello' }), model: 'hal/intro' }]
+	let msgs = replay.toMessages([...before, change({ cwd: '/a' }), change({ model: 'anthropic/opus' }), change({ cwd: '/b' })])
+	let notice = prompts(msgs).at(-1)!
+	expect(msgs.at(-1)?.role).toBe('user')
+	expect(notice).toContain('model changed from hal/intro to anthropic/opus')
+	expect(notice).toContain('working directory is now /a')
+	expect(notice).toContain('working directory changed from /a to /b')
+	expect(notice).toContain(ts)
+	expect(notice.indexOf('/a')).toBeLessThan(notice.indexOf('anthropic/opus'))
+	expect(notice).not.toContain('interrupted')
 })
 
 test('a change is not a turn: withoutCommands drops it', () => {
@@ -222,6 +227,6 @@ test('queued texts retain exact receipt timestamps independently of delivery and
 		],
 	}])
 	expect(prompts(msgs)).toEqual([
-		`[${day(deliveredAt)} ${hhmm(deliveredAt)}]\n<meta>Queued at ${queuedAt}.</meta>\nThat was the situation then.\n\nA fresh message.\n\n[Inbox · reviewer]\n<meta>Queued at ${queuedAt}.</meta>\nA queued agent message.`,
+		`[${day(deliveredAt)} ${hhmm(deliveredAt)}]\n<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nThat was the situation then.\n\nA fresh message.\n\n[Message from reviewer]\n<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nA queued agent message.`,
 	])
 })

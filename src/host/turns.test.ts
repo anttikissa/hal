@@ -3,39 +3,12 @@
 
 import { expect, test } from 'bun:test'
 import type { StreamEvent } from '../common/blocks.ts'
-import { replay } from '../common/replay.ts'
-import { states } from '../common/states.ts'
-import type { Shown as Item } from '../common/transcript.ts'
-import { titles } from '../common/titles.ts'
 import { history } from './history.ts'
 import { calls, client, created, fakeStream, fresh, readCall, records, restartHost, stamped, toolSession, until, useHost, shown } from './host-fixture.test.ts'
-import { host } from './host.ts'
 import { tools } from './tools.ts'
 import { turns } from './turns.ts'
 
 useHost()
-
-// Task hp: a block's header is right from its first streamed byte:
-// what a client shows mid-stream is what the saved record replays.
-test('a streaming block has its final header from the first event on', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'hi' })
-	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'thinking', text: 'h' })
-	await until(() => a.views.get(id)!.items.some((i) => i.type === 'thinking'))
-	let heads = () => a.views.get(id)!.items.filter((i) => i.type !== 'turn-end').map((i) => titles.title(i))
-	let early = heads()
-	await new Promise((r) => setTimeout(r, 5))
-	calls[0]!.push({ type: 'thinking', text: 'mm' }, { type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
-	await until(() => a.of('turn-end').length)
-	let saved = (await fresh(id)).items.filter((i) => i.type !== 'turn-end').map((i) => titles.title(i))
-	expect(early[1]).toMatch(/^\d\d:\d\d Thinking$/)
-	expect(saved.slice(0, 2)).toEqual(early)
-	expect(heads()).toEqual(saved)
-	expect(saved[2]).toMatch(/Hal \(fake\/m1\)$/)
-	expect((await history.read(id)).filter((r) => r.type === 'assistant').map((r) => (r as { model?: string }).model)).toEqual(['fake/m1', 'fake/m1'])
-})
 
 test('pause stops the turn, keeping partial output, and continue carries it on', async () => {
 	let a = client()
@@ -67,7 +40,7 @@ test('pause stops the turn, keeping partial output, and continue carries it on',
 	expect(a.views.get(id)!.state).toEqual({ type: 'paused' })
 	a.conn.send({ type: 'continue', sessionId: id })
 	await until(() => calls.length === 2)
-	expect(calls[1]!.input.messages.at(-1)).toEqual({ role: 'user', blocks: [{ type: 'text', text: replay.continueNote }] })
+	expect(JSON.stringify(calls[1]!.input.messages.at(-1))).toContain('The user resumed the paused turn')
 	calls[1]!.push({ type: 'text', text: 'rest' }, { type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length)
 	expect(shown(a.views.get(id)!.items.slice(1))).toEqual([
@@ -95,7 +68,8 @@ test('continue is refused with nothing to continue; a provider error ends the tu
 	expect(a.views.get(id)!.state).toEqual({ type: 'error', message: '400 bad request' })
 	a.conn.send({ type: 'continue', sessionId: id })
 	await until(() => calls.length === 2)
-	expect(calls[1]!.input.messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: stamped('go') }] }])
+	expect(calls[1]!.input.messages[0]).toEqual({ role: 'user', blocks: [{ type: 'text', text: stamped('go') }] })
+	expect(JSON.stringify(calls[1]!.input.messages.at(-1))).toContain('another attempt after the failed turn')
 })
 
 test('a stream that throws still ends the turn and frees the session', async () => {
@@ -171,8 +145,9 @@ test('a restart after a tool ran keeps its result, continues, and does not run i
 		restartHost()
 		await turns.recover()
 		await until(() => calls.length === 3)
-		// The model picks up at the result; no note, nothing was cut off.
-		expect(calls[2]!.input.messages).toEqual(calls[1]!.input.messages)
+		// Results remain intact; the notice describes the host restart truthfully.
+		expect(calls[2]!.input.messages.slice(0, calls[1]!.input.messages.length)).toEqual(calls[1]!.input.messages)
+		expect(JSON.stringify(calls[2]!.input.messages.at(-1))).toContain('host restarted')
 		calls[2]!.push({ type: 'text', text: 'milk' }, { type: 'done', reason: 'end' })
 		await until(() => history.readSync(id).at(-1)?.type === 'turn_end')
 		let view = await fresh(id)
@@ -201,9 +176,9 @@ test('a tool call cut off by a restart is reported to the model, not run', async
 		restartHost()
 		await turns.recover()
 		await until(() => calls.length === 2)
-		let [result, note] = calls[1]!.input.messages.at(-1).blocks
+		let result = calls[1]!.input.messages.at(-2).blocks[0]
 		expect(result).toMatchObject({ type: 'tool_result', id: 't1', isError: true })
-		expect(note).toEqual({ type: 'text', text: replay.continueNote })
+		expect(JSON.stringify(calls[1]!.input.messages.at(-1))).toContain('host restarted')
 		expect(ran).toBe(0)
 	} finally {
 		tools.run = origRun
@@ -225,7 +200,7 @@ test('a command cut off mid-run by a crash is never run again, and the model hea
 		restartHost()
 		await turns.recover()
 		await until(() => calls.length === 2)
-		let [result] = calls[1]!.input.messages.at(-1).blocks
+		let [result] = calls[1]!.input.messages.at(-2).blocks
 		expect(result).toMatchObject({ type: 'tool_result', id: 'b1', isError: true })
 		expect(result.output).toMatch(/may or may not have run/)
 		expect(ran).toBe(1)

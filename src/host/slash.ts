@@ -60,10 +60,11 @@ function context(id: string, sender?: Sender): Context {
 }
 
 // Changes the session's cwd or model: saved, told to followers, and
-// recorded for the model's next prompt (replay.changeNotes). The system
+// recorded as a notice for the model's next request. The system
 // prompt of the next request follows by itself.
 function change(id: string, patch: { cwd?: string; model?: string }): void {
 	let meta = sessions.open(id)
+	let previous = { cwd: meta.cwd, model: modelList.qualified(meta.model, meta.effort) }
 	let changed: typeof patch = {}
 	if (patch.cwd !== undefined && patch.cwd !== meta.cwd) changed.cwd = patch.cwd
 	let selection = patch.model === undefined ? undefined : modelList.selection(patch.model)
@@ -79,7 +80,7 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 		else meta.effort = selection.effort
 	}
 	liveFiles.save(meta)
-	history.append(id, { type: 'change', ...changed })
+	history.append(id, { type: 'change', ...changed, previous })
 	host.broadcast(id, changed.model === undefined ? { type: 'meta', sessionId: id, meta: { ...meta } } : { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
 	if (changed.model) {
 		// A turn waiting out a failure tries the new model now.

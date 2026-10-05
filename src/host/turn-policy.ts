@@ -46,8 +46,8 @@ async function waitOut(id: string, error: ErrorEvent, failures: number, outer: A
 }
 
 async function waitFor(id: string, error: ErrorEvent, failures: number, signal: AbortSignal): Promise<void> {
-	// Output cut off mid-answer: the model hears it was interrupted.
-	if (history.readSync(id).at(-1)?.type === 'assistant') history.append(id, { type: 'continue' })
+	// Partial output can be followed by usage/bookkeeping, not only an assistant record.
+	if (history.readSync(id).findLast((r) => r.type === 'assistant' || r.type === 'user' || r.type === 'continue')?.type === 'assistant') history.append(id, { type: 'continue', reason: `Hal is retrying after the response stopped: ${error.message}${error.body && !error.message.includes(error.body) ? `\n${error.body}` : ''}` })
 	if (error.failure === 'auth' && error.retryAt === undefined) {
 		status.transition(id, { type: 'block', reason: `log in: ${error.message}` })
 		await auth.changed(signal)

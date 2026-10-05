@@ -192,7 +192,7 @@ function ends(): string[] {
 		.map((r) => r.status)
 }
 
-const continued = 'ECHO(<meta>The previous response'
+const continued = 'completed work.'
 
 test('Escape pauses a turn; it stays paused over a restart and Enter continues it', async () => {
 	let p = run()

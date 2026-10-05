@@ -5,6 +5,7 @@
 import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
 import { rebase } from './rebase.ts'
 import { titles } from './titles.ts'
+import { modelNotices, type Notice } from './model-notices.ts'
 import type { ContextTransition } from './context-transition.ts'
 import type { Answers, Form } from './forms.ts'
 import type { PromptChange } from './prompt-changes.ts'
@@ -35,7 +36,7 @@ export type HistoryRecord = Numbered &
 	// messages it delivers, which are its first text blocks. `replaces`:
 	// an edit of the last prompt (tasks/j1/states.md, Editing the last
 	// prompt); it supersedes that prompt and everything after it.
-	| { type: 'user'; blocks: UserBlock[]; naming?: { turn: number; version: number; name: string; eligible: boolean }; command?: string; inbox?: string[]; queued?: true; replaces?: true; ts: string }
+	| { type: 'user'; blocks: UserBlock[]; notices?: Notice[]; naming?: { turn: number; version: number; name: string; eligible: boolean }; command?: string; inbox?: string[]; queued?: true; replaces?: true; ts: string }
 	// A message sent while the session was busy, waiting in the inbox
 	// (src/common/inbox.ts) until a prompt record delivers it. Not
 	// provider input by itself. `id`: the client's command id, if any.
@@ -56,7 +57,7 @@ export type HistoryRecord = Numbered &
 	// died or restarted mid-turn, and the next host continues it.
 	| { type: 'turn_end'; status: TurnStatus; reason?: StopReason; error?: string; pauseReason?: string; usage: Usage; context?: number; ts: string }
 	// The turn goes on after a pause, a failure or a host that went away.
-	| { type: 'continue'; ts: string }
+	| { type: 'continue'; reason?: string; ts: string }
 	// A provider answered with a limit; waiting is progress, not a crash.
 	| { type: 'rate_limit'; provider: string; model: string; until: string; text: string; ts: string }
 	// A durable question (tasks/w4/forms.md): the turn waits, blocked,
@@ -78,11 +79,11 @@ export type HistoryRecord = Numbered &
 	| { type: 'command'; text: string; origin?: 'model'; from?: string; label?: string; command?: string; ts: string }
 	// What a command said; `error` if it failed.
 	// `change`: a system-prompt file changed (host/prompt-trail.ts); the
-	// model reads `text` before its next prompt.
+	// model reads `text` as a notice on its next request.
 	| { type: 'output'; text: string; error?: true; origin?: 'model'; synthetic?: true; change?: PromptChange; transition?: ContextTransition; transitionDone?: string; transitionCancel?: string; ts: string }
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
-	// told in front of its next prompt.
-	| { type: 'change'; cwd?: string; model?: string; ts: string }
+	// told as a notice on its next request.
+	| { type: 'change'; cwd?: string; model?: string; previous?: { cwd?: string; model?: string }; ts: string }
 	// Observed changes during bash, not proof of authorship; not provider input.
 	| { type: 'file_changes'; toolId: string; cwd: string; files: FileChange[]; ts: string }
 	// One provider round's own usage (task c4), after its blocks: the
@@ -105,12 +106,9 @@ type Numbered = { n?: number; originSession?: string }
 // not replayable and is left out. Each tool call gets a result before the
 // next user message: a missing one becomes an error result, and results
 // with no call are dropped, so the input stays valid for every provider.
-// Each prompt is its own message, starting with its [HH:MM] line (with
-// the date on the first prompt and when it changed; replay.clock) and, if
-// the turn before it failed or was paused, a <meta> note saying so (and
-// notes for a cwd or model that changed since the last prompt):
-// providers join adjacent text blocks with no separator, so merged
-// prompts read as one ("pong" + "k" became "pongk").
+// Each prompt is its own stamped message: providers join adjacent text
+// blocks without a separator. Notices are separate user text at a safe
+// request boundary, after tool results, never inside a tool exchange.
 //
 // Only the records after the latest compact or reset count; a compact's
 // summary is the first user message.
@@ -124,54 +122,49 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	let out: Message[] = boundary?.type === 'compact' ? [{ role: 'user', blocks: [{ type: 'text', text: boundary.summary }] }] : []
 	let pending: string[] = []
 	let status: TurnStatus | undefined
-	let note: string | undefined
-	let changed: { cwd?: string; model?: string; prompt?: string[] } = {}
+	let facts: Notice[] = []
+	let known: Parameters<typeof modelNotices.text>[1] = {}
+	let delivered = new Set(records.flatMap((r) => r.type === 'user' ? r.notices?.map((n) => n.source) ?? [] : []))
 	let push = (msg: Message) => {
 		let last = out.at(-1)
 		if (last?.role === msg.role) (last.blocks as unknown[]).push(...msg.blocks)
 		else if (msg.blocks.length) out.push(msg)
+	}
+	let flush = () => {
+		if (facts.length) out.push({ role: 'user', blocks: [{ type: 'text', text: facts.map((n) => n.text).join('\n') }] })
+		facts = []
 	}
 	let prev: HistoryRecord | undefined
 	let stamped: string | undefined
 	// The approval question the pending calls wait on, while unanswered:
 	// none of them has run, and a continue runs them (host/approval.ts).
 	let waiting: string | undefined
-	for (let r of records) {
+	for (let [i, r] of records.entries()) {
 		if (r.type === 'question' && r.call !== undefined && pending.includes(r.call)) waiting = r.id
 		if (r.type === 'answer' && r.question === waiting) waiting = undefined
-		// For the human; whoever asked hears the answer another way.
-		if (r.type === 'change') {
-			if (r.cwd !== undefined) changed.cwd = r.cwd
-			if (r.model !== undefined) changed.model = r.model
-			continue
-		}
-		if (r.type === 'output' && r.change) (changed.prompt ??= []).push(r.text)
-		if (r.type === 'rate_limit' || r.type === 'rebase' || r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
+		let text = modelNotices.text(r, known)
+		if (text && !delivered.has(r.n ?? i + 1)) facts.push({ source: r.n ?? i + 1, text })
+		if (r.type === 'change' || r.type === 'rate_limit' || r.type === 'rebase' || r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
 		// Held calls go on waiting for their results.
-		if (r.type === 'continue' && waiting !== undefined) {
-			note = undefined
-			continue
-		}
+		if (r.type === 'continue' && waiting !== undefined) continue
 		let before = prev
 		prev = r
 		if (r.type === 'turn_end') {
 			status = r.status
-			note = replay.endNote(r)
 		} else if (r.type === 'continue') {
-			note = undefined
 			let why = before?.type === 'turn_end' ? before.status : 'interrupted'
-			let cut = out.at(-1)?.role === 'assistant'
 			let missing = pending.map((id): ToolResultBlock => ({ type: 'tool_result', id, output: replay.missingResult(why), isError: true }))
 			pending = []
 			waiting = undefined
 			push({ role: 'user', blocks: missing })
-			if (cut) push({ role: 'user', blocks: [{ type: 'text', text: replay.continueNote }] })
+			flush()
 		} else if (r.type === 'assistant') {
 			let b = r.block
 			if (b.type === 'thinking' && !b.signature) continue
 			if (b.type === 'tool_call') pending.push(b.id)
 			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : { ...b }] })
 		} else {
+			if (!r.blocks.length && r.notices) { facts.push(...r.notices); if (!pending.length) flush(); continue }
 			let results = r.blocks.filter((b): b is ToolResultBlock => b.type === 'tool_result' && pending.includes(b.id))
 			let answered = new Set(results.map((b) => b.id))
 			let missing: ToolResultBlock[] = pending
@@ -180,12 +173,12 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			pending = []
 			waiting = undefined
 			push({ role: 'user', blocks: [...results, ...missing] })
+			facts.push(...r.notices ?? [])
+			flush()
 			let texts = r.blocks.filter((b): b is UserText => b.type === 'text')
 			if (!texts.length) continue
-			let head = [`[${replay.clock(r.ts, stamped)}]`, ...(note ? [note] : []), ...replay.changeNotes(changed)].join('\n')
+			let head = `[${replay.clock(r.ts, stamped)}]`
 			stamped = r.ts
-			note = undefined
-			changed = {}
 			// Never merged: a prompt always starts a message of its own. Its
 			// texts (several when it delivers the inbox) are one block.
 			// Its images (task 2a) follow the text.
@@ -194,6 +187,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => replay.framed(b)).join('\n\n')}${nudge}` }, ...images.map((b) => ({ ...b }))] })
 		}
 	}
+	if (!pending.length) flush()
 	// Providers want a user message first; a turn started without a
 	// prompt (the intro, tabs.create) leaves assistant text before it.
 	while (out[0]?.role === 'assistant') out.shift()
@@ -201,15 +195,15 @@ function toMessages(records: HistoryRecord[]): Message[] {
 }
 
 // A prompt text as the model reads it: another session's message under
-// an [Inbox · sender] line (tab, id and name), an advisory one also
+// a sender line (tab, id and name), a next-round message also
 // saying it needn't drop its work for it.
 function framed(b: UserText): string {
-	let text = b.queuedAt === undefined ? b.text : `<meta>Queued at ${b.queuedAt}.</meta>\n${b.text}`
+	let text = b.queuedAt === undefined ? b.text : `<meta>Sent at ${b.queuedAt}; delivery after this turn.</meta>\n${b.text}`
 	if (b.generatingCommand) return `[${titles.author({ ...b, type: 'prompt' })}]\n${text}`
 	if (b.origin === 'model') return `[Hal]\n${text}`
 	if (b.from === undefined) return text
-	let head = `[Inbox · ${b.label ?? b.from}]`
-	return b.advisory ? `${head}\n${replay.advisoryNote}\n${text}` : `${head}\n${text}`
+	let head = `[Message from ${b.label ?? b.from}]`
+	return b.advisory ? `${head}\n${replay.nextRoundNotice}\n${text}` : `${head}\n${text}`
 }
 
 // Whether the record is a prompt: a user record with text.
@@ -235,7 +229,7 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 		if (r.type === 'rebase') { out = rebase.apply(out, r); continue }
 		if (r.type === 'user' && r.replaces) {
 			let at = replay.lastPrompt(out)
-			if (at >= 0) out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'change')]
+			if (at >= 0) out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'change' || (x.type === 'output' && x.change !== undefined))]
 			let { replaces: _replaces, ...projected } = r
 			r = projected
 		}
@@ -253,33 +247,10 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 function withoutCommands(records: HistoryRecord[]): HistoryRecord[] {
 	let questions = new Map(records.flatMap((r) => (r.type === 'question' ? [[r.id, r] as const] : [])))
 	return records.filter((r) => {
-		if (r.type === 'rebase' || r.type === 'command' || r.type === 'output' || r.type === 'change' || r.type === 'compact' || r.type === 'reset') return false
+		if ((r.type === 'user' && r.notices !== undefined && !r.blocks.length) || r.type === 'rebase' || r.type === 'command' || r.type === 'output' || r.type === 'change' || r.type === 'compact' || r.type === 'reset') return false
 		if (r.type === 'question') return !r.from
 		return r.type !== 'answer' || (questions.has(r.question) && !questions.get(r.question)!.from)
 	})
-}
-
-// How a turn ended, told in front of the next prompt; nothing when it
-// completed. A long provider error is clipped: the model needs the gist.
-function endNote(end: Extract<HistoryRecord, { type: 'turn_end' }>): string | undefined {
-	if (end.status === 'completed') return undefined
-	if (end.status === 'error') {
-		let error = end.error ?? 'unknown error'
-		if (error.length > 500) error = error.slice(0, 500) + '…'
-		return `<meta>The previous turn failed with an error: ${error}</meta>`
-	}
-	if (end.pauseReason !== undefined) return `<meta>Hal paused the previous turn: ${end.pauseReason}</meta>`
-	if (end.status === 'interrupted') return '<meta>The previous turn was interrupted.</meta>'
-	return '<meta>The user paused the previous turn.</meta>'
-}
-
-// What changed since the last prompt, as notes for the next one.
-function changeNotes(changed: { cwd?: string; model?: string; prompt?: string[] }): string[] {
-	let out: string[] = []
-	if (changed.cwd !== undefined) out.push(`<meta>The working directory is now ${changed.cwd}</meta>`)
-	if (changed.model !== undefined) out.push(`<meta>The model is now ${changed.model}</meta>`)
-	for (let text of changed.prompt ?? []) out.push(`<meta>The user edited your instructions. The system prompt you see is current; earlier replies followed the old text. ${text}</meta>`)
-	return out
 }
 
 // Local wall-clock HH:MM of an ISO timestamp, as YYYY-MM-DD HH:MM if
@@ -301,18 +272,14 @@ function missingResult(status: TurnStatus | undefined): string {
 }
 
 export const replay = {
-	// Told to the model when a cut-off answer continues.
-	continueNote: '<meta>The previous response was interrupted. Continue without repeating completed work.</meta>',
-	// Told with an advisory message delivered while the model works.
-	advisoryNote: '<meta>Another session sent this while you work: read it now, but you need not drop your current task for it.</meta>',
+	// Told with a next-round message delivered while the model works.
+	nextRoundNotice: '<meta>Another session sent this while you work: read it now, but you need not drop your current task for it.</meta>',
 	toMessages,
 	framed,
 	isPrompt,
 	lastPrompt,
 	current,
 	withoutCommands,
-	endNote,
-	changeNotes,
 	clock,
 	missingResult,
 }

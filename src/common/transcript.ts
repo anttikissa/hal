@@ -8,6 +8,7 @@ import { forms, type Answers, type Form } from './forms.ts'
 import { inbox, type InboxItem } from './inbox.ts'
 import type { Event, LiveTurn, Snapshot, Stats, TurnStatus } from './protocol.ts'
 import { rebaseDisplay } from './rebase-display.ts'
+import { transcriptOrder } from './transcript-order.ts'
 import { replay, type HistoryRecord, type PromptChange } from './replay.ts'
 import type { SessionMeta } from './session.ts'
 import type { SessionState } from './states.ts'
@@ -234,6 +235,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 		else items.push(...transcript.recordItems(r, items.length))
 	}
 	let promptKey = items[prompt ?? -1]?.key
+	items = transcriptOrder.order(items)
 	items = rebaseDisplay.insert(items, snapshot.rewrites)
 	let t: Transcript = { meta: { ...snapshot.meta }, state: snapshot.state, inbox: snapshot.inbox ?? [], items }
 	if (prompt !== undefined) t.prompt = items.findIndex((item) => item.key === promptKey)
@@ -244,7 +246,8 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 	if (snapshot.turn) {
 		let turn = transcript.copyTurn(snapshot.turn)
 		t.live = { start: items.length, turn }
-		t.items = [...items, ...transcript.turnItems(turn, items.length)]
+		t.items = transcriptOrder.order([...items, ...transcript.turnItems(turn, items.length)])
+		t.live.start = Math.min(items.length, ...turn.ns?.map((n) => t.items.findIndex((item) => item.key === String(n))).filter((at) => at >= 0) ?? [])
 	}
 	if (snapshot.toolOutput) t.items = t.items.map((item) => item.type === 'tool' && item.id === snapshot.toolOutput!.id ? { ...item, partial: snapshot.toolOutput!.output } : item)
 	return t
@@ -329,16 +332,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		return { ...rest, items: transcript.keyed([transcript.aside(event)], event.n, 0) }
 	}
 	if (event.type === 'command' || event.type === 'output' || event.type === 'divider' || (event.type === 'question' && event.command)) {
-		// Where history has it: after the running round's blocks already
-		// written, before the one still streaming (`streaming`), which
-		// stays live; as a snapshot taken now or later shows it.
-		if (!t.live) return { ...t, items: [...t.items, ...transcript.keyed([transcript.aside(event)], event.n, t.items.length)] }
-		let { blocks: list, ns, ts } = t.live.turn
-		let keep = event.streaming ? Math.max(0, list.length - 1) : list.length
-		let done = transcript.settle(t.items, { start: t.live.start, turn: { ...t.live.turn, blocks: list.slice(0, keep) } })
-		let items = [...done, ...transcript.keyed([transcript.aside(event)], event.n, done.length)]
-		let turn = transcript.copyTurn({ ...t.live.turn, blocks: list.slice(keep), ...(ns ? { ns: ns.slice(keep) } : {}), ...(ts ? { ts: ts.slice(keep) } : {}) })
-		return { ...t, items: [...items, ...transcript.turnItems(turn, items.length)], live: { start: items.length, turn } }
+		return { ...t, items: [...t.items, ...transcript.keyed([transcript.aside(event)], event.n, t.items.length)] }
 	}
 	if (event.type === 'turn-start') {
 		if (event.prompt === undefined) return { ...t, live: { start: t.items.length, turn: transcript.fresh(event) } }
@@ -371,7 +365,8 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 		if (!turn.ns && event.n !== undefined && turn.blocks.length) turn.ns = turn.blocks.map(() => event.n!)
 		// A block's start time comes with its first event.
 		while (event.ts !== undefined && (turn.ts ??= []).length < turn.blocks.length) turn.ts.push(event.ts)
-		return { ...t, items: [...settled, ...transcript.turnItems(turn, settled.length)], live: { start: live.start, turn } }
+		let items = transcriptOrder.replace(live === t.live ? t.items : settled, live.start, transcript.turnItems(live.turn, live.start), transcript.turnItems(turn, live.start))
+		return { ...t, items, live: { start: live.start, turn } }
 	}
 	if (event.type === 'tool-results') {
 		// The round's blocks are in history now; the next round starts empty.
@@ -389,7 +384,7 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 
 // The items with the live turn's blocks settled as history has them.
 function settle(items: Item[], live: NonNullable<Transcript['live']>): Item[] {
-	return [...items.slice(0, live.start), ...transcript.turnItems(live.turn, live.start)]
+	return transcriptOrder.replace(items, live.start, transcript.turnItems(live.turn, live.start), transcript.turnItems(live.turn, live.start))
 }
 
 // After `items`, a prompt event's texts; an edit (`replaces`) takes

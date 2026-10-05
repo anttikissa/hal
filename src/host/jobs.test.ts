@@ -3,7 +3,7 @@
 
 import { expect, test } from 'bun:test'
 import { existsSync } from 'fs'
-import { calls, client, restartHost, testHome, toolSession, until, useHost } from './host-fixture.test.ts'
+import { calls, client, testHome, toolSession, until, useHost } from './host-fixture.test.ts'
 import { jobs } from './jobs.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
@@ -55,7 +55,7 @@ test('the result reaches the running turn at its next request, as a message from
 	// The turn went on; the command still runs.
 	calls[1]!.push({ type: 'tool_call', id: 'b2', name: 'bash', input: { command: 'sleep 0.5', description: 'Wait' } }, { type: 'done', reason: 'tool_use' })
 	await slow(() => calls.length === 3)
-	expect(texts(2)).toContain(`[Inbox · bash ${job}]`)
+	expect(texts(2)).toContain(`[Message from bash ${job}]`)
 	expect(texts(2)).toContain('[exit 4]\nbuilt')
 	expect(jobs.running(id)).toEqual([])
 	expect(sessions.open(id).background).toBeUndefined()
@@ -67,7 +67,7 @@ test('an idle session gets the result as a turn of its own', async () => {
 	calls[1]!.push({ type: 'text', text: 'ok' }, { type: 'done', reason: 'end' })
 	await until(() => c.views.get(id)?.state.type === 'idle')
 	await slow(() => calls.length === 3)
-	expect(texts(2)).toContain(`[Inbox · bash ${job}]\n[exit 0]\nbuilt`)
+	expect(texts(2)).toContain(`[Message from bash ${job}]\n[exit 0]\nbuilt`)
 })
 
 test('Escape does not stop the command; the paused session keeps its result waiting', async () => {
@@ -86,7 +86,7 @@ test('/kill stops the job, which tells its session it was stopped by the user', 
 	await until(() => c.views.get(id)?.state.type === 'idle')
 	c.conn.send({ type: 'submit', sessionId: id, text: `/kill ${job}` })
 	await slow(() => calls.length === 3)
-	expect(texts(2)).toContain(`[Inbox · bash ${job}]\n[stopped by the user]`)
+	expect(texts(2)).toContain(`[Message from bash ${job}]\n[stopped by the user]`)
 	await Bun.sleep(700)
 	expect(existsSync(`${testHome()}/ran`)).toBe(false)
 	expect(jobs.stop(id, job).refused).toBe(`${job} is not running`)

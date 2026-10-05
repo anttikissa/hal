@@ -43,7 +43,7 @@ test('AGENTS.md changes reach only tabs they apply to; SYSTEM.md and its include
 	}
 })
 
-test('an AGENTS.md edit leaves one trail record the model reads with its next prompt', async () => {
+test('an AGENTS.md edit leaves one trail record the model reads on its next request', async () => {
 	let root = `${testHome()}/trail`
 	mkdirSync(`${root}/.git`, { recursive: true })
 	writeFileSync(`${root}/AGENTS.md`, 'Be terse.\n')
@@ -55,6 +55,6 @@ test('an AGENTS.md edit leaves one trail record the model reads with its next pr
 	let records = history.readSync(id).filter((r) => r.type === 'output')
 	expect(records.map((r) => r.type === 'output' && r.change)).toEqual([{ name: 'AGENTS.md', what: 'changed', diff: ' Be terse.\n+Say HOLA first.' }])
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'hello' }] })
-	let text = JSON.stringify(replay.toMessages(history.readSync(id)).at(-1))
+	let text = JSON.stringify(replay.toMessages(history.readSync(id)))
 	expect(text).toContain('+Say HOLA first.')
 })

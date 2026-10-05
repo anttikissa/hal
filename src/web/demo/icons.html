@@ -109,10 +109,10 @@ svg.g24 * { stroke-width: var(--sw); }
 <div class="grid" id="grid"></div>
 
 <h2>Alternatives</h2>
-<p>Pick one per row; the catalogue, composer and cards use it. While a turn runs, Steer sends now and Queue sends after the turn. Only Hugeicons, Fluent, Boxicons and MingCute have a real thought bubble. None of the seven has a snake, so the snakes come from IconPark, Pinhead and Material Design Icons and show in every set; only Tabler and Hugeicons have a Python logo.</p>
+<p>Pick one per row; the catalogue, composer and cards use it. While a turn runs, Interrupt sends into this turn and After this turn waits until it ends. Only Hugeicons, Fluent, Boxicons and MingCute have a real thought bubble. None of the seven has a snake, so the snakes come from IconPark, Pinhead and Material Design Icons and show in every set; only Tabler and Hugeicons have a Python logo.</p>
 <h3>Thinking</h3><div class="picks" data-pick="think"></div>
-<h3>Steer</h3><div class="picks" data-pick="steer"></div>
-<h3>Queue</h3><div class="picks" data-pick="queue"></div>
+<h3>Interrupt</h3><div class="picks" data-pick="steer"></div>
+<h3>After this turn</h3><div class="picks" data-pick="queue"></div>
 <h3>Attach</h3><div class="picks" data-pick="attach"></div>
 <h3>Python</h3><div class="picks" data-pick="python"></div>
 
@@ -124,8 +124,8 @@ svg.g24 * { stroke-width: var(--sw); }
 		<div class="entry"><button type="button" class="first" aria-label="Attach" data-say="Attach"><i data-icon="attach"></i></button><textarea rows="1" placeholder="Ask Hal anything"></textarea><button type="button" aria-label="Send" data-say="Send"><i data-icon="send"></i></button></div></div>
 	<div class="variant"><div class="cap">C. Icon with label</div>
 		<div class="entry"><button type="button" class="first" aria-label="Attach" data-say="Attach"><i data-icon="attach"></i></button><textarea rows="1" placeholder="Ask Hal anything"></textarea><button type="button" data-say="Send"><i data-icon="send"></i>Send</button></div></div>
-	<div class="variant"><div class="cap">D. While a turn runs: pause toggles to continue; queue and steer</div>
-		<div class="entry"><button type="button" class="first" aria-label="Attach" data-say="Attach"><i data-icon="attach"></i></button><textarea rows="1" placeholder="Steer or queue a message"></textarea><button type="button" id="toggle" aria-label="Pause"><i data-icon="pause"></i></button><button type="button" aria-label="Queue" data-say="Queue"><i data-icon="queue"></i></button><button type="button" aria-label="Steer" data-say="Steer"><i data-icon="steer"></i></button></div></div>
+	<div class="variant"><div class="cap">D. While a turn runs: pause toggles to continue; after this turn and interrupt</div>
+		<div class="entry"><button type="button" class="first" aria-label="Attach" data-say="Attach"><i data-icon="attach"></i></button><textarea rows="1" placeholder="Interrupt or send after this turn"></textarea><button type="button" id="toggle" aria-label="Pause"><i data-icon="pause"></i></button><button type="button" aria-label="After this turn" data-say="After this turn"><i data-icon="queue"></i></button><button type="button" aria-label="Interrupt" data-say="Interrupt"><i data-icon="steer"></i></button></div></div>
 </div>
 
 <h2>Transcript</h2>
@@ -165,8 +165,8 @@ const INFO = {
 	web: ['Web', 'read_url and google cards'],
 	python: ['Python', 'Python tool card'],
 	pause: ['Pause / continue', 'composer toggle while a turn runs'],
-	steer: ['Steer', 'composer while a turn runs: send now'],
-	queue: ['Queue', 'composer while a turn runs: send after'],
+	steer: ['Interrupt', 'composer while a turn runs: send into this turn'],
+	queue: ['After this turn', 'composer while a turn runs: wait until it ends'],
 }
 const PICKS = {
 	think: { hbubbles: 'Bubbles (Hugeicons)', lbubbles: 'Bubbles (Lucide)', flask: 'Flask (Phosphor)', rflask: 'Bubbling flask (Iconoir)', thought: 'Thought bubble', bulb: 'Light bulb', spark: 'Sparkle', bubble: 'Chat bubble', dots: 'Ellipsis', atom: 'Atom', think: 'Brain' },

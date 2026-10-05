@@ -12,6 +12,7 @@ import { historyCheck } from './history-check.ts'
 import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
 import { blocks, type DoneEvent, type ErrorEvent, type StreamEvent, type ThinkingBlock, type ToolResultBlock, type Turn, type Usage, type UserBlock } from '../common/blocks.ts'
+import { modelNotices } from '../common/model-notices.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { blobs } from './blobs.ts'
 import { busy } from './busy.ts'
@@ -212,6 +213,8 @@ async function messages(id: string, budget: { overhead?: number; window?: number
 	let signed = ({ signatureBlob, ...b }: ThinkingBlock): ThinkingBlock => ({ ...b, signature: blobs.text(id, signatureBlob!) })
 	let records = pruning.project(id, history.readSync(id), budget, (r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b) }
 		: r.type === 'assistant' && r.block.type === 'thinking' && r.block.signatureBlob !== undefined ? { ...r, block: signed(r.block) } : r)
+	let due = modelNotices.pending(replay.current(records))
+	if (due.length) records.push(history.append(id, { type: 'user', blocks: [], notices: due }))
 	return replay.toMessages(records)
 }
 
