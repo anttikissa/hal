@@ -212,11 +212,10 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 function selection(st: ModalState, previous?: number): ModalState {
 	let t = st.tree!
 	let items = [...st.items]
-	let old = previous === undefined ? undefined : t.rows[previous]?.id
-	if (old) {
-		let suffix = `  ‹ ${picker.label(st, old)} ›`
-		if (items[previous!]!.endsWith(suffix)) items[previous!] = items[previous!]!.slice(0, -suffix.length)
-	}
+	// Strip by shape, not by recomputed text: the draft may have changed.
+	let bare = (i: number) => { if (items[i] !== undefined) items[i] = items[i]!.replace(/ ‹ [^‹›]* ›$/, '') }
+	if (previous !== undefined) bare(previous)
+	bare(st.selected)
 	let row = t.rows[st.selected]
 	let shownId = row?.id ?? row?.default ?? t.current
 	let effortKeys = !!t.capabilities?.[shownId]?.levels.length
