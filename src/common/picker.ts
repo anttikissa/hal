@@ -138,7 +138,7 @@ function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean)
 	let category = (n: Node) => {
 		if (!n.all.some((id) => kept.has(id))) return
 		let shown = open(n.path, !bucket(n) || !node.all.some((id) => kept.has(id) && !n.all.includes(id)))
-		out.items.push(`${indent}${shown ? '▼' : '▶'} ${n.name}${n.default ? `  default: ${names[n.default] ?? n.default.slice(n.default.indexOf('/') + 1)}` : ''}`)
+		out.items.push(`${indent}${shown ? '▼' : '▶'} ${n.name}${n.default ? ` (default: ${n.default.slice(n.default.indexOf('/') + 1)})` : ''}`)
 		out.values.push('')
 		out.rows.push({ path: n.path, open: shown, ...(node.path ? { parent: node.path } : {}), ...(n.default ? { default: n.default } : {}) })
 		if (shown) rows(n, kept, open, current, names, depth + 1, out)
@@ -222,7 +222,7 @@ function selection(st: ModalState, previous?: number): ModalState {
 	let effortKeys = !!t.capabilities?.[shownId]?.levels.length
 	let hint = row?.id ? `${effortKeys ? '←/→: lower/higher effort, ' : ''}enter: pick` : `←/→: close/open, enter: ${row?.default ? 'pick default' : 'open'}`
 	let level = picker.label(st, shownId)
-	if (row?.id && level) items[st.selected] = `${items[st.selected]}  ‹ ${level} ›`
+	if (row?.id && level) items[st.selected] = `${items[st.selected]} ‹ ${level} ›`
 	let chosen = picker.level(st, shownId)
 	let cap = t.capabilities?.[shownId]
 	let title = `Model: ${shownId}${chosen && chosen !== (cap?.policy ?? cap?.default) ? `:${chosen}` : ''}`
