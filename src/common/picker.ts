@@ -11,6 +11,7 @@
 import type { Key } from './forms.ts'
 import type { ModalAction, ModalState, TreeRow } from './modals.ts'
 import { fuzzy } from './fuzzy.ts'
+import { titles } from './titles.ts'
 import { modals } from './modals.ts'
 import { effort, type EffortCapability, type EffortLevel } from './effort.ts'
 
@@ -132,20 +133,26 @@ function tree(ids: string[], keep = ''): Node {
 // whether the category shows by itself while searching: all do but a
 // bucket whose parent has matches outside it ("gpt" keeps gpt/older
 // closed, "gpt 5.5" opens it).
-function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean) => boolean, current: string, names: Record<string, string>, depth = 0, out = { items: [] as string[], rows: [] as TreeRow[] }) {
+function rows(node: Node, kept: Set<string>, open: (path: string, auto: boolean) => boolean, current: string, names: Record<string, string>, depth = 0, out = { items: [] as string[], values: [] as string[], rows: [] as TreeRow[] }) {
 	let indent = '  '.repeat(depth)
 	let category = (n: Node) => {
 		if (!n.all.some((id) => kept.has(id))) return
 		let shown = open(n.path, !bucket(n) || !node.all.some((id) => kept.has(id) && !n.all.includes(id)))
-		out.items.push(`${indent}${shown ? '▼' : '▶'} ${n.name}`)
+		out.items.push(`${indent}${shown ? '▼' : '▶'} ${n.name}${n.default ? `  default: ${names[n.default] ?? n.default.slice(n.default.indexOf('/') + 1)}` : ''}`)
+		out.values.push('')
 		out.rows.push({ path: n.path, open: shown, ...(node.path ? { parent: node.path } : {}), ...(n.default ? { default: n.default } : {}) })
 		if (shown) rows(n, kept, open, current, names, depth + 1, out)
 	}
 	node.nodes.filter((n) => !bucket(n)).forEach(category)
-	for (let { id, leaf } of node.ids) {
+	for (let { id, leaf, family } of node.ids) {
 		if (!kept.has(id)) continue
 		// ✓ the current model, • the group's default (task r7r).
-		out.items.push(`${indent}${id === current ? '✓ ' : id === node.default ? '• ' : '  '}${leaf.padEnd(12)} ${names[id] ?? id}`)
+		// A useful tree label at the left, catalog name at the right. A
+		// singleton (Haiku) or an unnamed model needs only one label.
+		let name = names[id]
+		let label = family && name ? leaf : name ? titles.shortName(id, name) : id
+		out.items.push(`${indent}${id === current ? '✓ ' : id === node.default ? '• ' : '  '}${label}`)
+		out.values.push(family && name ? name : '')
 		out.rows.push({ id, parent: node.path })
 	}
 	node.nodes.filter(bucket).forEach(category)
@@ -194,18 +201,29 @@ function refilter(st: ModalState, ids: string[], names: Record<string, string> =
 		if (selected < 0) selected = best((r) => (r.id ? (names[r.id] ? `${r.id} ${names[r.id]}` : r.id) : undefined))
 	}
 	if (selected < 0) selected = Math.max(0, at(t.current))
-	let row = built.rows[selected]
+	return picker.selection({ ...st, items: built.items, values: built.values, query, tree: { ...t, rows: built.rows }, selected })
+}
+
+// Refresh just the selected row's presentation: Up/Down must not rebuild
+// and sort the catalog. `previous` is the row losing its effort marker.
+function selection(st: ModalState, previous?: number): ModalState {
+	let t = st.tree!
+	let items = [...st.items]
+	let old = previous === undefined ? undefined : t.rows[previous]?.id
+	if (old) {
+		let suffix = `  ‹ ${picker.label(st, old)} ›`
+		if (items[previous!]!.endsWith(suffix)) items[previous!] = items[previous!]!.slice(0, -suffix.length)
+	}
+	let row = t.rows[st.selected]
 	let shownId = row?.id ?? row?.default ?? t.current
 	let effortKeys = !!t.capabilities?.[shownId]?.levels.length
 	let hint = row?.id ? `${effortKeys ? '←/→: lower/higher effort, ' : ''}enter: pick` : `←/→: close/open, enter: ${row?.default ? 'pick default' : 'open'}`
-	// One effort draft for the whole picker, shown on the selected row
-	// as the level it gives that model (task r7r).
 	let level = picker.label(st, shownId)
-	if (row?.id && level) built.items[selected] = `${built.items[selected]}  ‹ ${level} ›`
+	if (row?.id && level) items[st.selected] = `${items[st.selected]}  ‹ ${level} ›`
 	let chosen = picker.level(st, shownId)
 	let cap = t.capabilities?.[shownId]
 	let title = `Model: ${shownId}${chosen && chosen !== (cap?.policy ?? cap?.default) ? `:${chosen}` : ''}`
-	return { ...st, title, items: built.items, query, tree: { ...t, rows: built.rows }, selected, hint: `${hint}, esc: cancel` }
+	return { ...st, title, items, hint: `${hint}, esc: cancel` }
 }
 
 // The picker over `ids`, on the current model, its categories open.
@@ -258,7 +276,9 @@ function step(st: ModalState, key: Key, ids: string[], names: Record<string, str
 		return { state: st }
 	}
 	let r = modals.step(st, key)
-	if (r.action || r.state.form?.values[0] === st.form?.values[0]) return r
+	if (r.action) return r
+	let edited = r.state.form?.values[0] !== st.form?.values[0]
+	if (!edited) return t && r.state.selected !== st.selected ? { state: picker.selection(r.state, st.selected) } : r
 	return { state: picker.refilter({ ...r.state, ...(t ? { tree: { ...t, closed: [], opened: [] } } : {}) }, ids, names) }
 }
 
@@ -288,4 +308,4 @@ function canAdjust(st: ModalState, direction: 'left' | 'right'): boolean {
 	let selected = picker.level(st, id) ?? cap.policy ?? cap.default
 	return selected === undefined || selected !== cap.levels[direction === 'left' ? 0 : cap.levels.length - 1]
 }
-export const picker = { defaults, rank, refilter, refresh, open, step, command, level, label, canAdjust }
+export const picker = { defaults, rank, refilter, selection, refresh, open, step, command, level, label, canAdjust }

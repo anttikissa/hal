@@ -74,14 +74,14 @@ export function Picker(props: { modal: ModalState | undefined }) {
 				onFocus={() => find.focus(5)} aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}>
 				<For each={props.modal?.items ?? []}>{(item, i) => (
 					<li role="option" id={`modal-item-${i()}`} aria-selected={i() === props.modal?.selected ? 'true' : 'false'}
-						class={props.modal?.values ? 'row' : undefined} style={props.modal?.values ? { '--label': width() } : undefined}
+						class={props.modal?.tree ? 'row model-row' : props.modal?.values ? 'row' : undefined} style={props.modal?.values && !props.modal.tree ? { '--label': width() } : undefined}
 						onClick={() => { if (!props.modal?.find) app.modalPick(i()) }}>
 						<Show when={props.modal?.values} fallback={
 						<Show when={props.modal?.find} fallback={marked(item, props.modal?.query)}>
 							<a href={props.modal?.find?.results[i()]?.href} tabindex={-1}>{marked(item, props.modal?.query, true)}</a>
 						</Show>}>
 							<span class="label">{marked(item, props.modal?.query)}</span>
-							<Show when={props.modal?.edit?.index === i()} fallback={<span class="value">{props.modal?.values?.[i()] ?? ''}</span>}>
+							<Show when={props.modal?.edit?.index === i()} fallback={<span class="value">{marked(props.modal?.values?.[i()] ?? '', props.modal?.query)}</span>}>
 								<input ref={(e) => (edit = e)} class="value input" autocomplete="off" aria-label={`${item}: value`}
 									type={props.modal?.edit?.form.form.fields[0]?.type === 'secret' ? 'password' : 'text'}
 									inputmode={settings.table.find((s) => s.name === props.modal?.settings?.names[i()])?.type.kind === 'integer' ? 'numeric' : undefined}
