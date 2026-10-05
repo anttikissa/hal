@@ -21,7 +21,7 @@ export type SettingType =
 export type Setting = { name: string; label: string; type: SettingType; default: unknown; description: string; browser?: true }
 
 const table: Setting[] = [
-	{ name: 'model', label: 'Default model', type: { kind: 'text' }, default: 'anthropic/claude-opus-5-5', description: 'Default model (provider/id or alias, optional :effort or :default) for new sessions.' },
+	{ name: 'model', label: 'Default model', type: { kind: 'text' }, default: 'anthropic/claude-opus-5-5', description: 'Default model (provider/id or alias, optional :effort) for new sessions.' },
 	{
 		name: 'security',
 		label: 'Security',
