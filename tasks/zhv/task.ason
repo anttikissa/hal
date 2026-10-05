@@ -1,0 +1,10 @@
+{
+	title: './test passes on every run',
+	spec: './test is deterministic: run twice on an unchanged tree, it gives the same result. A test that sometimes fails without a bug is deleted, never retried, lengthened or skipped (AGENTS.md). Tests share one bun process, so a test leaves no live state behind: the host fixture (useHost) closes config.ason (config.reset) before deleting its home, or the next config.reset flushes a pending write into a vanished directory and throws.',
+	status: 'done',
+	notes: [
+		"Deleted as flaky (each failed in some full runs and passed in others, often by a 5 s timeout): render.test tabs 'after switching, scrollback and screen hold exactly the focused tab' and modals 'open, typed into and closed in place'; file-changes 'overlapping aliases wait across sessions'; forks 'fork snapshots completed blocks'; turns-retry 'a stream cut off mid-answer continues' and 'a temporary failure retries at once, then backs off'; notify 'a reply's <summary> is its notice line'; spawn 'a subagent waiting for its own reports' and 'a subagent that ends with no text still reports'; slash 'a command question lives beside turns'; turns-stop 'Escape during a command kills it'; and host-transcript.test.ts, whose only test was 'paused: partial output and the pause look the same everywhere'. Their behavior is now untested; a replacement must be deterministic.",
+		'Order-dependent, not flaky: the /config modal test timed out only after host.test.ts ran in the same process; bisecting the files that run before it found the leak.'
+	],
+	needs: ['0m']
+}

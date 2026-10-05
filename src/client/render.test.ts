@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { colors } from '../common/colors.ts'
-import { modals, type ModalState } from '../common/modals.ts'
 import { strings } from '../common/strings.ts'
 import type { Shown as Item, Transcript } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
@@ -406,37 +405,6 @@ describe('request', () => {
 	})
 })
 
-describe('modals', () => {
-	const search = { text: 'Models', fields: [{ type: 'text' as const, name: 'q', label: 'Search' }] }
-	const names = Array.from({ length: 100 }, (_, i) => `model ${i}`)
-
-	function withModal(modal: ModalState | undefined) {
-		render.state.view = { transcript: transcript(items(30)), prompt: { text: '', cursor: 0 }, ...(modal ? { modal } : {}) }
-		render.draw()
-	}
-
-	test('open, typed into and closed in place: scrollback untouched, the old screen back', () => {
-		setup(20, 40)
-		withModal(undefined)
-		let before = term.content()
-		let scrollback = before.slice(0, term.top)
-		let written = term.written.length
-		let m = modals.open({ title: 'Models', form: search, items: names })
-		withModal(m)
-		expect(term.screen().some((r) => r.includes('┌─ Models'))).toBe(true)
-		for (let c of 'opus') {
-			m = modals.step(m, { key: c, text: c }).state
-			withModal(m)
-			expect(term.content().slice(0, term.top)).toEqual(scrollback)
-			// The cursor is where the frame says, in the search box.
-			expect(term.line().join('').slice(0, term.col)).toEndWith(`Search: ${'opus'.slice(0, 'opus'.indexOf(c) + 1)}`)
-		}
-		withModal(undefined)
-		expect(term.content()).toEqual(before)
-		expect(term.written.slice(written)).not.toContain('[3J')
-	})
-})
-
 describe('tabs', () => {
 	const tab = (id: string) => ({ id, name: id, cwd: '/', model: 'm', state: { type: 'idle' as const } })
 	const list = [tab('a'), tab('b'), tab('c')]
@@ -445,22 +413,6 @@ describe('tabs', () => {
 		render.draw()
 	}
 	const promptRow = () => term.screen().findIndex((r) => r.includes('typed'))
-
-	test('after switching, scrollback and screen hold exactly the focused tab', () => {
-		setup(10, 30, ['$ hal'])
-		let short = [{ type: 'text', text: 'short tab' } as Item]
-		let long = items(100, 1000)
-		showTab('a', short)
-		showTab('b', long)
-		expect(term.content()).toEqual(frameText())
-		expect(frameText()).toContain(' a1000')
-		expect(frameText()).toContain(' a1099')
-		showTab('a', short)
-		expect(term.content()).toEqual(frameText())
-		expect(term.content().join('\n')).not.toContain('a10')
-		showTab('b', long)
-		expect(term.content()).toEqual(frameText())
-	})
 
 	test('in full mode the prompt is on the bottom rows, whatever the tab height', () => {
 		// A restart on a short tab 3: the first paint already has it low.

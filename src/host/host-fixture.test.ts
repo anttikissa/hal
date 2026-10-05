@@ -10,6 +10,7 @@ import { protocol, type Event } from '../common/protocol.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { history } from './history.ts'
 import { greetings } from './greetings.ts'
+import { config } from './config.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
 import { sessions } from './sessions.ts'
@@ -85,6 +86,8 @@ export function useHost(withNaming = false, withGreetings = false, withRecaps = 
 	afterEach(() => {
 		host.reset()
 		sessions.closeAll()
+		// config.ason lives in this home: close it before the home goes.
+		config.reset()
 		turns.stream = origStream
 		naming.prepare = origPrepare
 		greetings.open = origGreeting
