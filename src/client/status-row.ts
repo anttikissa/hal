@@ -106,7 +106,7 @@ function fit(info: StatusInfo, cols: number): Part[] {
 function row(info: StatusInfo, cols: number): string {
 	let base = ansi.sgr({ fg: colors.status().fg! })
 	let parts = statusRow.fit(info, Math.max(1, cols - 2 * ansi.PAD.length))
-	// Neighbouring parts with one href share a single link.
+	// Neighboring parts with one href share a single link.
 	let link: string | undefined
 	let out = parts.map((p) => {
 		let text = p.fg ? ansi.sgr({ fg: p.fg }) + p.text + base : p.text

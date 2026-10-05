@@ -137,13 +137,13 @@ test('bare clear ends paused and failed contexts idle, both live and after reloa
 	}
 })
 
-test('recovery settles orphaned calls before clear turn end and keeps cancelled continuation paused', async () => {
+test('recovery settles orphaned calls before clear turn end and keeps canceled continuation paused', async () => {
 	let c = client(), id = created(c)
 	history.submit(id, 'unfinished')
 	history.append(id, { type: 'assistant', block: commandCall('/clear followup') })
-	let intent = { id: 'cancelled-intent', kind: 'clear' as const, prompt: 'must not start', sender: { origin: 'model' as const } }
+	let intent = { id: 'canceled-intent', kind: 'clear' as const, prompt: 'must not start', sender: { origin: 'model' as const } }
 	history.append(id, { type: 'output', text: 'accepted', transition: intent })
-	history.append(id, { type: 'output', text: 'cancelled', transitionCancel: intent.id })
+	history.append(id, { type: 'output', text: 'canceled', transitionCancel: intent.id })
 	restartHost()
 	await turns.recover()
 	let all = await records(id), end = all.findIndex((r) => r.type === 'turn_end'), results = all.findIndex((r) => r.type === 'user' && r.blocks.some((b) => b.type === 'tool_result'))

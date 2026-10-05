@@ -99,7 +99,7 @@ function step(state: SessionState, event: StateEvent): SessionState | string {
 // The state durable history alone implies. A turn's open question
 // blocks; a command's is not the turn's and changes nothing (nor does
 // any command), and an unfinished turn (no end record) is running:
-// whoever is host must be carrying it on, and a new host continues it. Legacy ends (cancelled:
+// whoever is host must be carrying it on, and a new host continues it. Legacy ends (canceled:
 // the old Escape; interrupted: the old restart) read as paused, so they
 // can continue.
 function fromHistory(records: HistoryRecord[]): SessionState {

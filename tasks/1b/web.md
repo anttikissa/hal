@@ -94,7 +94,7 @@ runtime. Do not carry Solid 1 or React lifecycle patterns into this app.
 - Disable native text inflation at 100% text-size-adjust; do not disable
   pinch zoom. Cap app width by its container to avoid viewport feedback.
 - On reflow, preserve an exclusive top/bottom gap within 40 CSS pixels;
-  otherwise preserve the nearest text row at the viewport centre. This
+  otherwise preserve the nearest text row at the viewport center. This
   includes short scrollback close to both edges. Native Range geometry
   tracks text through wrapping; retained elements/pixels cover gaps or
   removed content. Clamp only when the requested position is impossible.

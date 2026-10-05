@@ -1,7 +1,7 @@
 // The web status block's facts (tasks a0, 5f): the details dialog's
 // groups, the overview's context, the model name's quota fill and the
 // wide layout's usage windows, all from pushed Stats. Percentages carry
-// `heat`, the whole percent used, which the page colours with the
+// `heat`, the whole percent used, which the page colors with the
 // shared curve (.heat-N, colors.heat).
 
 import type { Plan } from '../common/protocol.ts'

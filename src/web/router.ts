@@ -60,7 +60,7 @@ function format(id: string): string {
 
 // The tab to show when `wanted` (what the address or page asked for)
 // may not be open: itself if it is; for a tab that just closed (in
-// `before`), its neighbour; else the tab shown last, else the first.
+// `before`), its neighbor; else the tab shown last, else the first.
 function pick(tabs: Tab[], wanted: string | undefined, before: Tab[] = []): string | undefined {
 	let ids = tabs.map((t) => t.id)
 	if (wanted && ids.includes(wanted)) return wanted

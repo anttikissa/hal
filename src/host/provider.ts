@@ -66,18 +66,18 @@ export type Provider = {
 	capability?(model: string): Capability | undefined
 }
 
-class Cancelled extends Error {}
+class Canceled extends Error {}
 
 // Read one chunk, failing on abort or when no data arrives in time, so
 // a half-dead connection cannot hang a turn forever.
 async function read(reader: ReadableStreamDefaultReader<Uint8Array>, signal?: AbortSignal) {
-	if (signal?.aborted) throw new Cancelled()
+	if (signal?.aborted) throw new Canceled()
 	let timer: ReturnType<typeof setTimeout> | undefined
 	let onAbort: (() => void) | undefined
 	let ms = provider.streamTimeoutMs
 	let stop = new Promise<never>((_, reject) => {
 		timer = setTimeout(() => reject(new Error(`Stream read timed out (no data for ${ms}ms)`)), ms)
-		onAbort = () => reject(new Cancelled())
+		onAbort = () => reject(new Canceled())
 		signal?.addEventListener('abort', onAbort)
 	})
 	try {
@@ -116,7 +116,7 @@ async function* sse(body: ReadableStream<Uint8Array>, signal?: AbortSignal): Asy
 		while (true) {
 			let { done, value } = await read(reader, signal).catch((e) => {
 				// A dropped or stalled connection: trying again may work.
-				if (e instanceof Error && !(e instanceof Cancelled)) (e as { failure?: Failure }).failure ??= 'temporary'
+				if (e instanceof Error && !(e instanceof Canceled)) (e as { failure?: Failure }).failure ??= 'temporary'
 				throw e
 			})
 			buf += done ? decoder.decode() : decoder.decode(value, { stream: true })
@@ -262,7 +262,7 @@ async function* stream(
 	input: Omit<ProviderRequest, 'model'>,
 	signal?: AbortSignal,
 ): AsyncGenerator<StreamEvent> {
-	let cancelled: ErrorEvent = { type: 'error', message: 'Cancelled', cancelled: true }
+	let canceled: ErrorEvent = { type: 'error', message: 'Canceled', canceled: true }
 	let id = blocks.parseModelId(modelId)
 	if (!id) {
 		yield { type: 'error', message: `Model id must be provider/model, got '${modelId}'` }
@@ -286,7 +286,7 @@ async function* stream(
 	})
 	try {
 		let http = await p.request({ ...input, model: id.model })
-		if (signal?.aborted) throw new Cancelled()
+		if (signal?.aborted) throw new Canceled()
 		let limited = http.account ? limits.on(modelId, http.account) : limits.until(limits.key(modelId))
 		if (limited) {
 			yield { type: 'error', message: `${modelId} is rate limited`, failure: 'limited', retryAt: limited }
@@ -315,7 +315,7 @@ async function* stream(
 		}
 		let counted: { input?: number; cacheRead?: number; cacheWrite?: number } = {}
 		for await (let event of p.parse(provider.sse(res.body, conn.signal))) {
-			if (signal?.aborted) throw new Cancelled()
+			if (signal?.aborted) throw new Canceled()
 			if (event.type === 'error') {
 				yield failed(p, modelId, http.account, event)
 				return
@@ -328,12 +328,12 @@ async function* stream(
 			yield event
 			if (event.type === 'done') return
 		}
-		if (signal?.aborted) throw new Cancelled()
+		if (signal?.aborted) throw new Canceled()
 		yield { type: 'error', message: `Stream from ${id.provider} ended without finishing`, failure: 'temporary' }
 	} catch (err) {
-		if (signal?.aborted) yield cancelled
+		if (signal?.aborted) yield canceled
 		else if (slept) yield { type: 'error', message: 'connection lost (the computer slept)', failure: 'temporary' }
-		else if (err instanceof Cancelled) yield cancelled
+		else if (err instanceof Canceled) yield canceled
 		else {
 			let e: ErrorEvent = { type: 'error', message: errorText(err) }
 			let { failure, retryAt } = err as { failure?: Failure; retryAt?: number }

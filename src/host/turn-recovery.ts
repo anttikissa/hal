@@ -39,7 +39,7 @@ async function recover(): Promise<void> {
 		if (intent) {
 			if (intent.kind === 'clear') contextTransitions.settle(id)
 			if (intent.kind === 'clear' && history.unfinished(id)) {
-				history.append(id, { type: 'turn_end', status: intent.cancelled ? 'paused' : 'completed', usage: {} })
+				history.append(id, { type: 'turn_end', status: intent.canceled ? 'paused' : 'completed', usage: {} })
 				status.state.states.delete(id)
 			}
 			contextTransitions.apply(id)

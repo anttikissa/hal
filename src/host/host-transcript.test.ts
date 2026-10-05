@@ -19,7 +19,7 @@ const origOnError = liveFiles.onError
 let home = ''
 
 // Each provider call yields what the test pushes; an abort ends it as
-// cancelled, like provider.stream.
+// canceled, like provider.stream.
 let pushes: ((...e: StreamEvent[]) => void)[] = []
 
 function scripted(_model: string, _input: unknown, signal?: AbortSignal): AsyncIterable<StreamEvent> {
@@ -32,7 +32,7 @@ function scripted(_model: string, _input: unknown, signal?: AbortSignal): AsyncI
 	signal?.addEventListener('abort', () => wake())
 	return (async function* () {
 		while (true) {
-			if (signal?.aborted) return yield { type: 'error', message: 'Cancelled', cancelled: true }
+			if (signal?.aborted) return yield { type: 'error', message: 'Canceled', canceled: true }
 			let e = queue.shift()
 			if (!e) {
 				await new Promise<void>((r) => (wake = r))

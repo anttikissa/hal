@@ -36,7 +36,7 @@ function hiddenEvent(event: Event): void {
 	}
 }
 
-// After first paint, open the nearest neighbour, then the next upon its
+// After first paint, open the nearest neighbor, then the next upon its
 // snapshot. Never poll or cap the pace after startup.
 function backgroundStep(): void {
 	let st = app.state

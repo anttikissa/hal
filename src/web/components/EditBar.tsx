@@ -1,8 +1,8 @@
 /// <reference lib="dom" />
 // Over the message box while a prompt card's Edit is in progress (task
 // 26q, edit-prompt.ts): what sending will do, and Cancel, which brings
-// the draft back. Pages with a keyboard also name Escape. Coloured as
-// the notice stack: a bar in the attention colour on faint grey.
+// the draft back. Pages with a keyboard also name Escape. Colored as
+// the notice stack: a bar in the attention color on faint gray.
 
 import { flush, Show } from 'solid-js'
 import { queueEdit } from '../../common/queue-edit.ts'

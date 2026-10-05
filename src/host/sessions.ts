@@ -54,7 +54,7 @@ function load(id: string, watch: boolean): SessionMeta {
 // day 1 holds the home's epoch (state/epoch.ason, the first session's
 // UTC time). The word comes from session-words.txt cut into 24 slots,
 // slot 0 at 05:00, so a day's ids list roughly in creation order:
-// three tries in this hour's slot, two more with its neighbours, five
+// three tries in this hour's slot, two more with its neighbors, five
 // from the whole list, then random letters. The directory is claimed
 // with a non-recursive mkdir, so two creators never share one.
 function claimId(now = new Date()): string {

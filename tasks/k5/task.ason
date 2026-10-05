@@ -5,7 +5,7 @@
 	notes: [
 		'A new turn-stats protocol event follows each provider round with reported usage; clients fold it into status numbers without adding transcript items. Provisional per-turn token totals are committed only by turn_end, preventing double counting; context uses each round’s own input + cache-read + cache-write. Usage headers update each account at most once/minute, except 429 immediately updates to protect account rotation.',
 		'Limit status-row Sub display refresh to once a minute via stats.plan cache, NOT usage.observe: fresh response headers must always update account rotation immediately. The first attempt throttled usage.observe and broke the least-used account selection tests.',
-		'Bug fixed: a session retrying after 429s on every account still coloured the web model name with quota left, because turn-stats only followed successful rounds and stats.plan cached windows for a minute. Invariant: once a round fails, the pushed plan reflects the usage just observed (stats.failed clears the cache).'
+		'Bug fixed: a session retrying after 429s on every account still colored the web model name with quota left, because turn-stats only followed successful rounds and stats.plan cached windows for a minute. Invariant: once a round fails, the pushed plan reflects the usage just observed (stats.failed clears the cache).'
 	],
 	needs: [],
 	foldInto: ['1g']

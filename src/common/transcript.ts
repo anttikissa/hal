@@ -28,9 +28,9 @@ export type Shown = { originSession?: string } & (
 	| { type: 'tool-result'; id: string; output: string; isError?: boolean; ms?: number; interrupted?: 'cancelled' | 'stopped'; ts?: string }
 	| { type: 'turn-end'; status: TurnStatus; usage?: Usage; error?: string; ts?: string }
 	// A durable question; with `answers` once answered (secrets only named).
-	// `cancelled`: dismissed (Escape, or a newer question replaced it).
+	// `canceled`: dismissed (Escape, or a newer question replaced it).
 	// `command`: a slash command asked; open in any session state.
-	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; cancelled?: true; command?: true; ts?: string }
+	| { type: 'question'; id: string; form: Form; answers?: Answers; secrets?: string[]; canceled?: true; command?: true; ts?: string }
 	// A slash command: origin identifies Hal; from identifies another session.
 	| { type: 'command'; text: string; from?: string; label?: string; ts?: string }
 	// What a command said.
@@ -167,18 +167,18 @@ function endItem(end: { status: TurnStatus; usage?: Usage; error?: string; ts?: 
 	return item
 }
 
-function answered(items: Item[], answer: { question: string; answers: Answers; secrets?: string[]; cancelled?: true }): Item[] {
+function answered(items: Item[], answer: { question: string; answers: Answers; secrets?: string[]; canceled?: true }): Item[] {
 	return items.map((item) => {
 		if (item.type !== 'question' || item.id !== answer.question) return item
 		let done: Item = { ...item, answers: answer.answers }
 		if (answer.secrets) done.secrets = answer.secrets
-		if (answer.cancelled) done.cancelled = true
+		if (answer.canceled) done.canceled = true
 		return done
 	})
 }
 
 function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): string {
-	return r.type === 'reset' ? 'Context cleared.' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarised)`
+	return r.type === 'reset' ? 'Context cleared.' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarized)`
 }
 
 function aside(r: { type: 'command'; text: string; from?: string; label?: string; ts?: string } | { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string } | { type: 'divider'; text: string; ts?: string; clear?: true } | { type: 'question'; id: string; form: Form; ts?: string }): Shown {
@@ -192,7 +192,7 @@ function aside(r: { type: 'command'; text: string; from?: string; label?: string
 // command's while unanswered, a turn's while the turn waits on it.
 function question(t: Transcript | undefined): (Item & { type: 'question' }) | undefined {
 	let last = t?.items.findLast((item) => item.type === 'question')
-	if (last?.type !== 'question' || last.answers || last.cancelled) return undefined
+	if (last?.type !== 'question' || last.answers || last.canceled) return undefined
 	return last.command || (t?.state.type === 'blocked' && t.state.reason === 'question') ? last : undefined
 }
 
@@ -268,7 +268,7 @@ function prepend(t: Transcript, loaded: HistoryRecord[], page: HistoryRecord[], 
 	let drop = t.earlier ?? 0
 	// A stand-in question answered meanwhile is answered in its place.
 	for (let item of t.items.slice(0, drop)) {
-		if (item.type === 'question' && item.answers) prefix = transcript.answered(prefix, { question: item.id, answers: item.answers, ...(item.secrets ? { secrets: item.secrets } : {}), ...(item.cancelled ? { cancelled: true as const } : {}) })
+		if (item.type === 'question' && item.answers) prefix = transcript.answered(prefix, { question: item.id, answers: item.answers, ...(item.secrets ? { secrets: item.secrets } : {}), ...(item.canceled ? { canceled: true as const } : {}) })
 	}
 	let shift = prefix.length - drop
 	let { earlier: _earlier, ...out }: Transcript = { ...t, items: [...prefix, ...t.items.slice(drop)] }

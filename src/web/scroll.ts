@@ -16,7 +16,7 @@
 // there would sweep the session past the reader.
 //
 // Wheel, touch or a scroll key cancel a glide: the reader takes over.
-// Only scroll keys, since cancelling on any key leaves a half-finished
+// Only scroll keys, since canceling on any key leaves a half-finished
 // scroll whose gap then falls outside `near` and stops the follow. A
 // send's glide ignores leftover wheel momentum, but a new finger
 // gesture always takes over and pauses following until release.

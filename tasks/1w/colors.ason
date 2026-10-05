@@ -28,7 +28,7 @@
 		linkBg: [0.30, 0.05, 55],
 	},
 
-	// Thinking — muted blue-grey, recedes visually
+	// Thinking — muted blue-gray, recedes visually
 	thinking: {
 		fg: [0.72, 0.03, 250],
 		bg: [0, 0, 250],

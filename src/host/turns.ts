@@ -98,14 +98,14 @@ function stop(id: string, reason?: string, closing = false): string | undefined 
 	if (!transition && !closing && open && !open.from && open.form.skip) {
 		let refused = status.transition(id, { type: 'answer' })
 		if (refused) return refused
-		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
-		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, cancelled: true })
+		history.append(id, { type: 'answer', question: open.id, answers: {}, canceled: true })
+		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, canceled: true })
 		turns.start(id)
 		return
 	}
 	if (closing && open && !open.from) {
-		history.append(id, { type: 'answer', question: open.id, answers: {}, cancelled: true })
-		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, cancelled: true })
+		history.append(id, { type: 'answer', question: open.id, answers: {}, canceled: true })
+		host.broadcast(id, { type: 'answer', sessionId: id, question: open.id, answers: {}, canceled: true })
 	}
 	if (open?.from) return void slash.dismiss(id, open.id)
 	let event: StateEvent = { type: 'pause' }
@@ -203,7 +203,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		while (true) {
 			let transition = contextTransitions.pending(id)
 			if (transition?.kind === 'clear') {
-				last = transition.cancelled ? undefined : { type: 'done', reason: 'end' }
+				last = transition.canceled ? undefined : { type: 'done', reason: 'end' }
 				break
 			}
 			if (transition?.kind === 'compact') contextTransitions.apply(id)
@@ -250,7 +250,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					shrunk = true
 					continue
 				}
-				if (last?.type === 'error' && last.failure && !last.cancelled && !signal.aborted) {
+				if (last?.type === 'error' && last.failure && !last.canceled && !signal.aborted) {
 					host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.failed(id) })
 					await turns.waitOut(id, last, failures++, signal)
 					if (turns.state.running.get(id) !== running) return

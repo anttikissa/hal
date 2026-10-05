@@ -1,9 +1,9 @@
 // The built-in look, hal, written out as a theme (task d3): copy it to
 // themes/<name>.ts, change what you like, then /theme <name>. Every
-// colour is OKLCH [lightness, chroma, hue]; a style can read another
+// color is OKLCH [lightness, chroma, hue]; a style can read another
 // through colors (colors.fgL), which sees this theme's values.
-// Derived colours (quiet, blinkDim) are functions given the field they
-// replace first; every colour Hal draws comes from a field here.
+// Derived colors (quiet, blinkDim) are functions given the field they
+// replace first; every color Hal draws comes from a field here.
 // It starts equal to src/common/colors.ts; nothing keeps them in step.
 
 import { terminal } from '../src/client/terminal.ts'
@@ -23,13 +23,13 @@ export const look: Look = {
 	bgL: 0.2,
 	bgC: 0.05,
 
-	// Derived colours: code calls these, so a theme may override them
+	// Derived colors: code calls these, so a theme may override them
 	// like any field. quiet: a style's secondary text (hints, ids,
 	// command lines, table rules), darker than fg but never below 4.6:1
 	// on bg. blinkDim: a blinking tab mark in its dark phase.
 	quiet: (_base, fg, bg) => oklch.quiet(fg, bg),
 	blinkDim: (_base, fg) => [fg[0] * 0.65, fg[1], fg[2]],
-	// Web only, percentages: how much of the current colour tints a
+	// Web only, percentages: how much of the current color tints a
 	// hovered control (hover; a choice, choiceHover) or the current tab
 	// (tab), draws the prompt box bar (entry), quote bar (quote) and
 	// table lines (table) and the line before the prompt box's buttons
@@ -47,7 +47,7 @@ export const look: Look = {
 		linkFg: [0.88, 0.15, 55],
 		linkBg: [0.3, 0.05, 55],
 	}),
-	// Thinking: muted blue-grey, recedes.
+	// Thinking: muted blue-gray, recedes.
 	thinking: () => ({
 		fg: [0.72, 0.03, 250],
 		bold: [0.85, 0.02, 250],
@@ -85,8 +85,8 @@ export const look: Look = {
 		errorFg: colors.error().fg!,
 		pausedFg: [0.86, 0.16, 95],
 	}),
-	// The notice stack (task qm): a bar in the event's colour on a faint
-	// neutral grey, lighter than the screen so its shape shows; never slate.
+	// The notice stack (task qm): a bar in the event's color on a faint
+	// neutral gray, lighter than the screen so its shape shows; never slate.
 	notice: () => ({
 		fg: [0.9, 0, 0],
 		bg: [0.22, 0, 0],
@@ -123,7 +123,7 @@ export const look: Look = {
 		match: [0.92, 0.14, 95],
 	}),
 	// Tools: each kind its own hue. Red is kept for real failures. A
-	// tool without its own entry (tool + capitalised name) uses `tool`.
+	// tool without its own entry (tool + capitalized name) uses `tool`.
 	tool: () => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),
 	toolBash: () => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
 	toolEval: () => ({ fg: [colors.fgL, colors.fgC, 295], bg: [colors.bgL, 0.06, 295] }),

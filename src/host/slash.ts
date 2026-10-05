@@ -162,8 +162,8 @@ async function listing(id: string): Promise<Event & { type: 'models' }> {
 // Closes question `question` unanswered: Escape, or a newer one
 // replaces it. Whoever asked is not run again.
 function dismiss(id: string, question: string): void {
-	history.append(id, { type: 'answer', question, answers: {}, cancelled: true })
-	host.broadcast(id, { type: 'answer', sessionId: id, question, answers: {}, cancelled: true })
+	history.append(id, { type: 'answer', question, answers: {}, canceled: true })
+	host.broadcast(id, { type: 'answer', sessionId: id, question, answers: {}, canceled: true })
 }
 
 // What a command said. `origin: model` marks a model-run command's

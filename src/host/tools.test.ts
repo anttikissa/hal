@@ -127,7 +127,7 @@ test('bash without a description is an error and does not run the command', asyn
 	expect((await bash({ description: 'Nothing' })).isError).toBe(true)
 })
 
-test('cancel stops a running command, pipelines included, and a cancelled turn runs nothing more', async () => {
+test('cancel stops a running command, pipelines included, and a canceled turn runs nothing more', async () => {
 	let ac = new AbortController()
 	let started = Date.now()
 	let pending = bash({ command: 'sleep 30 | cat; touch late', description: 'Wait' }, ac.signal)

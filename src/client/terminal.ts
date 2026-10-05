@@ -273,7 +273,7 @@ export const terminal = {
 	/** Runs as the user quits, before the exit; set by main. Must be
 	 * synchronous, quick and never throw or wait on the host. */
 	onQuit: (): void => {},
-	/** Repaints everything in the current colours (resume, Ctrl-L, a
+	/** Repaints everything in the current colors (resume, Ctrl-L, a
 	 * plugin's theme); replaced by the renderer, a no-op until then. */
 	redraw: (): void => {},
 	/** Repaints after a terminal resize; replaced by the renderer. */

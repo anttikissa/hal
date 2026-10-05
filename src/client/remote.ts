@@ -93,7 +93,7 @@ async function signIn(typed: string | undefined, saved: Saved, ask: (question: s
 	if (!token) await remote.probe(at)
 	while (!token) {
 		let code = ask(`One-time code for ${at} (/auth or hal auth there):`)?.trim()
-		if (!code) throw new Error('login cancelled')
+		if (!code) throw new Error('login canceled')
 		token = await remote.login(at, code)
 		if (!token) say('Wrong or expired code.\n')
 	}

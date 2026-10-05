@@ -134,7 +134,7 @@ test('the open question is the last one in the unfinished turn, until answered',
 	let cmd: HistoryRecord = { type: 'question', id: 'c1', form: name, from: { command: 'cd', args: 'x' }, ts }
 	let end = { type: 'turn_end' as const, status: 'completed' as const, usage: {}, ts }
 	expect(forms.open([cmd, prompt, end])?.id).toBe('c1')
-	expect(forms.open([cmd, { type: 'answer', question: 'c1', answers: {}, cancelled: true, ts }, prompt, end])).toBeUndefined()
+	expect(forms.open([cmd, { type: 'answer', question: 'c1', answers: {}, canceled: true, ts }, prompt, end])).toBeUndefined()
 })
 
 test('a client keeps what was typed while the same question is open, and starts afresh for the next', () => {

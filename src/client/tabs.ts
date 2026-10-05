@@ -18,7 +18,7 @@ function focus(old: string[], next: string[], current: Focus, asked?: string): F
 	}
 	if (tab === undefined || next.includes(tab)) return current
 	if (opener?.tab === tab && next.includes(opener.from)) return { tab: opener.from }
-	// Closed: its right neighbour, else the new last tab.
+	// Closed: its right neighbor, else the new last tab.
 	let right = old.slice(old.indexOf(tab) + 1).find((id) => next.includes(id))
 	let to = right ?? next.at(-1)
 	return to === undefined ? {} : { tab: to }

@@ -37,14 +37,14 @@ icon, like You and Hal cards. An active terminal question always shows its field
 focused choice, even if the question block was cached before it became
 answerable. An open question's fields stand between blank rows, apart
 from the question text above and the key hint below. A text field's
-placeholder is drawn in oklch.faint of the block's colours, like the
+placeholder is drawn in oklch.faint of the block's colors, like the
 prompt's example request: deliberately below the readable-text minimum
 so it never reads as typed text (the user's decision). A placeholder may
 be a list: it rotates (placeholders.rotate) in list order, each held
 3 s (4.5 s if over 50 graphemes), erased a grapheme every 5 ms and the
 next typed in at 35/3 ms each. Whoever asks orders the list. Both clients repaint only when the text next changes; the web
 keeps the first under prefers-reduced-motion. A form marked
-`skip` changes Escape from pause to skip: the host records a cancelled
+`skip` changes Escape from pause to skip: the host records a canceled
 answer and runs the asker again, which moves on; its hint says
 "Escape: skip". While a turn's question is open the session is
 `blocked (question)` (tasks/j1/states.md). A command's question is not
@@ -201,7 +201,7 @@ lists its two newest versions' flagships; the rest wait in a closed
 `older` inside it, and a provider's non-chat and family-less models in
 a closed `other`, both last. ▶/▼ mark closed/open categories; it opens
 with the current model's categories open and selected (a `✓` marks it;
-the selected row is lit in the picker colour behind a `→`).
+the selected row is lit in the picker color behind a `→`).
 Right opens the selected category and left closes it or the one the
 selection is in, also while searching;
 Enter on a category picks its default (the alias's model: gpt →
@@ -266,7 +266,7 @@ They should look and behave alike, but they don't share rendering:
 lines and escape codes are not DOM. Shared, in `src/common`:
 - what to show: transcript items, session state, forms and their
   current values and focus;
-- behaviour: key handling for the prompt and forms, as pure functions of
+- behavior: key handling for the prompt and forms, as pure functions of
   (state, key) → state, so Enter, Escape, arrows and Tab mean the same
   in both.
 
@@ -283,9 +283,9 @@ On the web an open question is a card like the others (square, lit bar
 on the left, its style's tint behind) with a ✕ at its top right that
 dismisses it exactly as Escape does; tapping outside does not. Choice
 options wrap with the same gap across and down; each is outlined in
-the card's colour and the chosen one is solid in it, dark text on top
+the card's color and the chosen one is solid in it, dark text on top
 (no slate buttons, no pale accent). The web's current tab is lit the
-same way: a bar in its colour on the left, its tint behind. No glow
+same way: a bar in its color on the left, its tint behind. No glow
 anywhere: a card's bar is a plain solid edge.
 A feature is done when both clients have it, unless its task says
 otherwise.

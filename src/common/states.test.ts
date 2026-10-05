@@ -134,7 +134,7 @@ test('history alone: an unfinished turn is running, ends say the rest', () => {
 	expect(states.fromHistory([say('a'), end('paused')])).toEqual(paused)
 	expect(states.fromHistory([say('a'), end('paused', { pauseReason: 'loop' })])).toEqual({ type: 'paused', reason: 'loop' })
 	// The old Escape and the old restart could both continue.
-	expect(states.fromHistory([say('a'), end('cancelled')])).toEqual(paused)
+	expect(states.fromHistory([say('a'), end('canceled')])).toEqual(paused)
 	expect(states.fromHistory([say('a'), end('interrupted')])).toEqual(paused)
 })
 

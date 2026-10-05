@@ -31,7 +31,7 @@ export function testHome(): string {
 }
 
 // A scripted provider: each call waits for events pushed by the test,
-// and ends as cancelled when its signal aborts, like provider.stream.
+// and ends as canceled when its signal aborts, like provider.stream.
 type Call = { model: string; input: any; push: (...e: StreamEvent[]) => void }
 export const calls: Call[] = []
 
@@ -51,7 +51,7 @@ export function fakeStream(model: string, input: any, signal?: AbortSignal): Asy
 	return (async function* () {
 		while (true) {
 			if (signal?.aborted) {
-				yield { type: 'error', message: 'Cancelled', cancelled: true }
+				yield { type: 'error', message: 'Canceled', canceled: true }
 				return
 			}
 			let e = queue.shift()

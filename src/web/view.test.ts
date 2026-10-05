@@ -120,7 +120,7 @@ test('Up on an empty input while the model works edits the last prompt; Enter se
 	expect(view.editKey(editing, 'escape', 'fix it')).toEqual({ view: { ...editing, editing: undefined }, command: { type: 'continue', sessionId }, text: 'fix it' })
 })
 
-test('commands show who sent them, and their output; a cancelled question says so', () => {
+test('commands show who sent them, and their output; a canceled question says so', () => {
 	let form = { text: 'Create?', fields: [{ type: 'choice' as const, name: 'create', options: ['yes', 'no'] }] }
 	let st = fold([
 		{ type: 'snapshot', sessionId, snapshot: { meta, history: [], state: { type: 'idle' } } },
@@ -128,7 +128,7 @@ test('commands show who sent them, and their output; a cancelled question says s
 		{ type: 'output', sessionId, text: 'Commands' },
 		{ type: 'command', sessionId, text: '/cd x', from: '7-abc' },
 		{ type: 'question', sessionId, id: 'q', form },
-		{ type: 'answer', sessionId, question: 'q', answers: {}, cancelled: true },
+		{ type: 'answer', sessionId, question: 'q', answers: {}, canceled: true },
 		{ type: 'output', sessionId, text: 'nope', error: true },
 	])
 	let texts = shown(st).map((s) => s!.text)
@@ -136,11 +136,11 @@ test('commands show who sent them, and their output; a cancelled question says s
 	expect(texts[1]).toBe('Commands')
 	expect(texts[2]).toBe('/cd x')
 	// A command is drawn as the prompt it was typed as, its sender in the
-	// head; another session's in the message colour (task 9p).
+	// head; another session's in the message color (task 9p).
 	expect(shown(st)[0]!.kind).toBe('user prompt')
 	expect(shown(st)[2]!.kind).toBe('message prompt')
 	expect(titles.who(st.transcript!.items[2]!)).toBe('Command from 7-abc')
-	expect(texts[3]).toContain('(cancelled)')
+	expect(texts[3]).toContain('(canceled)')
 	expect(shown(st)[4]!.kind).toContain('error')
 })
 

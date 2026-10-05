@@ -16,7 +16,7 @@ The startup budget remains a product requirement, measured on an otherwise idle 
 		'main.later() holds web.start() and turns.recover() until render.painted reports the first tab (or laterMs). The startup test runs ./run detached and kills the process group, or the bun child outlives it.',
 		'On 2026-09-28 the user chose a 150 ms first-UI budget (host and joining) rather than 100 ms: sub-200 ms feels responsive enough. Keep typed-input at 200 ms. Joining had repeatedly measured 104 ms on this machine; the earlier 100 ms target had very little margin.',
 		'Startup path audit: tabs.list reads metadata for each of the 50 open tabs and status.stateOf uses pages.essentials (marks and only a few history lines); the focused snapshot reads a bounded tail. history.open checks the last byte only. If marks.ason is absent/stale, pages.marks does scan the history once to rebuild the marks; that cold case is intentional, and subsequent starts use the saved marks. No unconditional readFileSync of all 50 full histories on a warm start.',
-		'The user authorised removing flaky tests. Removed startup.test.ts after a full-suite run measured joining UI at 192 ms against 150 ms while other runs passed. The product budget is unchanged; a load-sensitive benchmark no longer gates unrelated functional changes.'
+		'The user authorized removing flaky tests. Removed startup.test.ts after a full-suite run measured joining UI at 192 ms against 150 ms while other runs passed. The product budget is unchanged; a load-sensitive benchmark no longer gates unrelated functional changes.'
 	],
 	needs: ['bq', 'vq']
 }

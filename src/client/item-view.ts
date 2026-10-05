@@ -181,7 +181,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let shown = rows.slice(0, max)
 			let more = rows.length - shown.length + lines.length - used
 			// Rows start at the margin: no marker, no indent (an error's
-			// first row says so, not only its colour). Attached, the card
+			// first row says so, not only its color). Attached, the card
 			// tells input from output; apart, the text is quieter.
 			let status = tool ? '' : itemView.resultStatus(item, !!call, style)
 			let res = shown.map((l, i) => {
@@ -212,7 +212,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// Headed by its time and text, wrapped (never clipped), then
 			// the quote and the answer, as the open form draws them.
 			let quote = itemView.quoteLines(item.form.quote, width)
-			let said = item.cancelled ? ['(cancelled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
+			let said = item.canceled ? ['(canceled)'] : item.answers ? forms.summary(item.form, item.answers, item.secrets) : ['(not answered)']
 			return [...ansi.wrap(titles.title(item)!, width), '', ...quote, ...(quote.length ? [''] : []), ...said.flatMap((l) => ansi.wrap(l, width - 2).map((r) => `  ${r}`))]
 		}
 		// Drawn as the prompt it was typed as: header, then its text.
@@ -240,7 +240,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			}
 			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		}
-		// One row: the text centred in a rule across the width.
+		// One row: the text centered in a rule across the width.
 		case 'divider': {
 			let text = strings.clipVisual(` ${titles.stamp(item.ts, item.text)} `, width)
 			let rest = Math.max(0, width - strings.visLen(text))

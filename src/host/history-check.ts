@@ -15,7 +15,7 @@ function check(value: unknown): HistoryRecord {
 	for (let s of senders) { let problem = sender.invalid(s); if (problem) throw new Error(problem) }
 	if (r.type === 'output' && r.transition !== undefined) {
 		let t = r.transition
-		if (!t || typeof t.id !== 'string' || !['clear', 'compact'].includes(t.kind) || (t.prompt !== undefined && typeof t.prompt !== 'string') || (t.cancelled !== undefined && t.cancelled !== true) || sender.invalid(t.sender)) throw new Error('invalid context transition')
+		if (!t || typeof t.id !== 'string' || !['clear', 'compact'].includes(t.kind) || (t.prompt !== undefined && typeof t.prompt !== 'string') || (t.canceled !== undefined && t.canceled !== true) || sender.invalid(t.sender)) throw new Error('invalid context transition')
 	}
 	if (r.type === 'output' && r.synthetic !== undefined && r.synthetic !== true) throw new Error('invalid synthetic output')
 	if (r.type === 'output') for (let k of ['transitionDone', 'transitionCancel'] as const) if (r[k] !== undefined && typeof r[k] !== 'string') throw new Error(`invalid ${k}`)

@@ -3,10 +3,10 @@ import { readdirSync } from 'fs'
 import { colors, DERIVED, type Style } from './colors.ts'
 import { oklch, type Oklch } from './oklch.ts'
 
-// Shared values (fgL, screen) are a number or one colour; the rest are styles.
+// Shared values (fgL, screen) are a number or one color; the rest are styles.
 const styles = () => Object.entries(colors).filter(([key, value]) => typeof value === 'function' && !(DERIVED as readonly string[]).includes(key)).map(([key, value]) => [key, (value as () => Style)()] as const)
 
-test('every style is a set of OKLCH colours', () => {
+test('every style is a set of OKLCH colors', () => {
 	for (let [key, style] of styles()) {
 		expect(Object.keys(style).length, key).toBeGreaterThan(0)
 		for (let c of Object.values(style)) {
@@ -43,7 +43,7 @@ test('overriding one style is seen by styles built on it', () => {
 })
 
 // tasks/README.md, readable text: WCAG AA against the background each
-// colour sits on, its style's own bg or else the screen we design for.
+// color sits on, its style's own bg or else the screen we design for.
 function readable(): string[] {
 	// placeholder: the example request, faint on purpose (frame.test.ts
 	// checks it stands apart from both the box and typed text).
@@ -70,7 +70,7 @@ function readable(): string[] {
 	return low
 }
 
-test('every colour is readable where it is drawn, and so is its quieter form', () => {
+test('every color is readable where it is drawn, and so is its quieter form', () => {
 	expect(readable()).toEqual([])
 })
 

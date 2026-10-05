@@ -36,7 +36,7 @@ test('keeps the first prompt and answer, the last three prompts and answers, and
 	expect(lines.at(-1)).toContain('/h/history.asonl')
 })
 
-test('empty history has no summary; protected-prompt context still summarises remaining blocks', () => {
+test('empty history has no summary; protected-prompt context still summarizes remaining blocks', () => {
 	n = 0
 	expect(compaction.summary([], '/h')).toBeUndefined()
 	expect(compaction.summary([say('hi')], '/h')).toMatchObject({ prompts: 0, summary: expect.stringContaining('1 assistant block omitted') })
@@ -50,7 +50,7 @@ test('long assistant text keeps its head and tail with a size marker', () => {
 	expect(compaction.trim('short')).toBe('short')
 })
 
-test('a second compact summarises from the start, earlier prompts included', () => {
+test('a second compact summarizes from the start, earlier prompts included', () => {
 	let first = session(4)
 	let made = compaction.summary(first, '/h')!
 	let records = [...first, { type: 'compact', ...made, ts, n: ++n } as HistoryRecord, ...turn(5)]
@@ -61,7 +61,7 @@ test('a second compact summarises from the start, earlier prompts included', () 
 	expect(again.summary.split('Context was compacted').length).toBe(2)
 })
 
-test('a compact after a reset summarises only what follows the reset', () => {
+test('a compact after a reset summarizes only what follows the reset', () => {
 	let records = [...session(2), { type: 'reset', ts, n: ++n } as HistoryRecord, ...turn(3)]
 	let made = compaction.summary(records, '/h')!
 	expect(made.prompts).toBe(1)

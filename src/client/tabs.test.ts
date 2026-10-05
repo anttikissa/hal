@@ -17,7 +17,7 @@ test('a tab this client asked for gets focus, remembering where it came from', (
 test('closing a tab opened here goes back to its opener', () => {
 	let f: Focus = { tab: 'n', opener: { tab: 'n', from: 'a' } }
 	expect(tabs.focus(['a', 'n', 'b'], ['a', 'b'], f)).toEqual({ tab: 'a' })
-	// Opener gone too: the right neighbour.
+	// Opener gone too: the right neighbor.
 	expect(tabs.focus(['a', 'n', 'b'], ['b'], f)).toEqual({ tab: 'b' })
 })
 
@@ -32,7 +32,7 @@ test('an opener expires once focus has left the new tab', () => {
 test('closing the focused tab goes right, or to the new last tab', () => {
 	expect(at(tabs.focus(['a', 'b', 'c'], ['a', 'c'], { tab: 'b' }))).toBe('c')
 	expect(at(tabs.focus(['a', 'b', 'c'], ['a', 'b'], { tab: 'c' }))).toBe('b')
-	// Its right neighbour closed at the same time: the next one still open.
+	// Its right neighbor closed at the same time: the next one still open.
 	expect(at(tabs.focus(['a', 'b', 'c', 'd'], ['a', 'd'], { tab: 'b' }))).toBe('d')
 })
 

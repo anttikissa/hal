@@ -3,8 +3,8 @@
 // values; every other top-level field is a function, read at call time:
 // styles computed from them, so overriding a value (colors.fgL = 0.9 from
 // local.ts, or plugin.set(colors, 'fgL', 0.9), which can undo it) moves
-// everything derived from it. A style names its colours: fg and bg, plus extras
-// such as bold, code or cursor for later renderers. Every colour is
+// everything derived from it. A style names its colors: fg and bg, plus extras
+// such as bold, code or cursor for later renderers. Every color is
 // OKLCH [lightness, chroma, hue]: equal L and C across hues look equally
 // bright and vivid.
 //
@@ -23,7 +23,7 @@ type Colors = typeof colors
 // A plain value (fgL, screen, mix) is replaced by a plain value (plugin.set).
 export type Look = { [K in keyof Colors]?: Colors[K] extends (...args: any[]) => unknown ? (base: Colors[K], ...args: Parameters<Colors[K]>) => ReturnType<Colors[K]> : Colors[K] }
 
-// Fields that derive a colour from others, so take arguments; every
+// Fields that derive a color from others, so take arguments; every
 // other field is a plain value (fgL, screen, mix) or a style, a function
 // read with no arguments.
 export const DERIVED = ['quiet', 'blinkDim', 'heat', 'toolOutput', 'popupCurrent'] as const
@@ -44,7 +44,7 @@ export const colors = {
 	bgL: 0.2,
 	bgC: 0.05,
 
-	// Derived colours: code calls these, so a theme may override them
+	// Derived colors: code calls these, so a theme may override them
 	// like any field. quiet: a style's secondary text (hints, ids,
 	// command lines, table rules), darker than fg but never below 4.6:1
 	// on bg. blinkDim: a blinking tab mark in its dark phase.
@@ -52,13 +52,13 @@ export const colors = {
 	blinkDim: (fg: Oklch): Oklch => [fg[0] * 0.65, fg[1], fg[2]],
 	// toolOutput: a tool's output text under its call, from the call's
 	// fg: darker at full chroma, so it reads below the command without
-	// turning grey (task hr).
+	// turning gray (task hr).
 	toolOutput: (fg: Oklch): Oklch => [fg[0] - 0.23, fg[1], fg[2]],
-	// A percentage used (context, quota) as one continuous colour: green
+	// A percentage used (context, quota) as one continuous color: green
 	// when little is used, through yellow and orange, to red when all is.
 	// The web gets it as classes .heat-0 to .heat-100 (host/web.ts).
 	heat: (used: number): Oklch => [0.78, 0.14, 145 - 1.2 * Math.max(0, Math.min(100, used))],
-	// Web only, percentages: how much of the current colour tints a
+	// Web only, percentages: how much of the current color tints a
 	// hovered control (hover; a choice, choiceHover) or the current tab
 	// (tab), draws the prompt box bar (entry), quote bar (quote) and
 	// table lines (table) and the line before the prompt box's buttons
@@ -76,7 +76,7 @@ export const colors = {
 		linkFg: [0.88, 0.15, 55],
 		linkBg: [0.3, 0.05, 55],
 	}),
-	// Thinking: muted blue-grey, recedes.
+	// Thinking: muted blue-gray, recedes.
 	thinking: (): Style => ({
 		fg: [0.72, 0.03, 250],
 		bold: [0.85, 0.02, 250],
@@ -120,11 +120,11 @@ export const colors = {
 	// Project colors (task 22), CSS --p0..--p7: one L and C, hues spread
 	// with a single cyan; the display clips what is out of its gamut.
 	project: (): Style => Object.fromEntries([327.5, 7.5, 47.5, 87.5, 127.5, 195, 247.5, 287.5].map((h, i) => [`p${i}`, [0.778, 0.225, h] as Oklch])),
-	// Dim tints of the project colours for a notice's background (task
+	// Dim tints of the project colors for a notice's background (task
 	// qm): p0Bg..p7Bg, each the hue of its p0..p7.
 	projectTint: (): Style => Object.fromEntries(Object.entries(colors.project()).map(([k, c]) => [`${k}Bg`, [0.2, 0.05, c![2]] as Oklch])),
-	// The notice stack (task qm): a bar in the event's colour on a faint
-	// neutral grey, lighter than the screen so its shape shows; never slate.
+	// The notice stack (task qm): a bar in the event's color on a faint
+	// neutral gray, lighter than the screen so its shape shows; never slate.
 	notice: (): Style => ({
 		fg: [0.9, 0, 0],
 		bg: [0.22, 0, 0],
@@ -172,7 +172,7 @@ export const colors = {
 		match: [0.92, 0.14, 95],
 	}),
 	// Tools: each kind its own hue. Red is kept for real failures. A
-	// tool without its own entry (tool + capitalised name) uses `tool`.
+	// tool without its own entry (tool + capitalized name) uses `tool`.
 	tool: (): Style => ({ fg: [colors.fgL, colors.fgC, 250], bg: [colors.bgL, colors.bgC, 250] }),
 	toolBash: (): Style => ({ fg: [colors.fgL, colors.fgC, 320], bg: [colors.bgL, colors.bgC, 320] }),
 	toolEval: (): Style => ({ fg: [colors.fgL, colors.fgC, 295], bg: [colors.bgL, 0.06, 295] }),

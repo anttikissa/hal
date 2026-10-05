@@ -42,13 +42,13 @@ function svg(id: string, pts: Point[]): string {
 	}
 	let path = pts.map((p, i) => p.window ? `${L + i * SLOT},${y(p.window)} ${L + (i + 1) * SLOT},${y(p.window)}` : '').filter(Boolean).join(' ')
 	if (path) out.push(`<polyline class="win" points="${path}"/>`)
-	let labelled = -99
+	let labeled = -99
 	pts.forEach((p, i) => {
 		let x = L + i * SLOT
 		if (i === 0 || p.turn !== pts[i - 1]!.turn) {
 			out.push(`<line class="turn" x1="${x}" x2="${x}" y1="${T}" y2="${H - B}"/>`)
-			if (x - labelled >= 36) out.push(`<text class="lbl" x="${x + 3}" y="${H - B + 14}">t${p.turn}</text>`)
-			if (x - labelled >= 36) labelled = x
+			if (x - labeled >= 36) out.push(`<text class="lbl" x="${x + 3}" y="${H - B + 14}">t${p.turn}</text>`)
+			if (x - labeled >= 36) labeled = x
 		}
 		if (p.cause) out.push(`<line class="cause ${TONE[p.cause]}" x1="${x + 7}" x2="${x + 7}" y1="${T}" y2="${H - B}"/><text class="mark ${TONE[p.cause]}" x="${x + 7}" y="${T - 6}" text-anchor="middle">${LETTER[p.cause]}</text>`)
 		let stack = 0, bar = (v: number, tone: string) => {

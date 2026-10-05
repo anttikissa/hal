@@ -42,7 +42,7 @@ test('narrowing drops the plan, then the tokens, then the role, then clips the l
 	expect(text(info, 20)).toBe(`${SHORT.slice(0, 19)}…`)
 })
 
-test('the context is a heat-coloured percentage of the window', () => {
+test('the context is a heat-colored percentage of the window', () => {
 	let at = (context: number) => statusRow.left({ ...info, stats: { context, window: 200_000, sent: 0, received: 0 } }).at(-1)!
 	let low = at(20_000)
 	let high = at(190_000)
@@ -58,7 +58,7 @@ test('token counts are compact', () => {
 	expect([252, 999, 1000, 4100, 9_960, 41_000, 999_499, 999_600, 1_200_000, 12_000_000].map(statusRow.count)).toEqual(['252', '999', '1.0k', '4.1k', '10k', '41k', '999k', '1.0M', '1.2M', '12M'])
 })
 
-test('the painted row fits the terminal and ends its colour', () => {
+test('the painted row fits the terminal and ends its color', () => {
 	let row = statusRow.row(info, 60)
 	expect(strings.visLen(row)).toBeLessThanOrEqual(60)
 	expect(row.endsWith('\x1b[39;49m')).toBe(true)

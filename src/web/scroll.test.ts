@@ -69,13 +69,13 @@ test('earlier history put above keeps what the reader was reading in place', () 
 test('a finger takes over a send glide and streamed updates do not fight its drag', () => {
 	let original = { ...scroll.state }
 	let cancel = globalThis.cancelAnimationFrame
-	let cancelled = 0
-	globalThis.cancelAnimationFrame = (id) => { cancelled = id }
+	let canceled = 0
+	globalThis.cancelAnimationFrame = (id) => { canceled = id }
 	let el = box(1000, 600, 400)
 	Object.assign(scroll.state, { el, frame: 7, gap: 0, forcedUntil: Infinity })
 	try {
 		scroll.touchStart()
-		expect(cancelled).toBe(7)
+		expect(canceled).toBe(7)
 		expect(scroll.state.frame).toBe(0)
 		// The reader has only moved 10px: still inside near-bottom range.
 		el.scrollTop = 590

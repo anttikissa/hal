@@ -5,7 +5,7 @@
 	notes: [
 		'Functional state: Works for real: `./run` talks to Opus over the copied OAuth credentials (after the user refreshed them), streams thinking and text, and the model uses the `read` tool on its own ("Can you read tsconfig.json" → tool call → answer). A second `./run` follows the same stream; killing the host hands over to it.',
 		'Functional state: Escape cancels; Ctrl-R restarts into the same conversation; Ctrl-C quits leaving the last frame on screen.',
-		'Functional state: One session per process (newest on disk). No commands, tabs, colours, markdown, system prompt, or cwd in the model context.',
+		'Functional state: One session per process (newest on disk). No commands, tabs, colors, markdown, system prompt, or cwd in the model context.',
 		'Known bugs and surprises: `[interrupted]` only appears when the *host* process exits while a turn is still streaming. Quitting a client leaves the turn running on the host. An answer can look finished on screen while the stream has not ended yet (message_stop pending), so Ctrl-C then marks it interrupted; a moment later it would not. Users see this as random.',
 		'Known bugs and surprises: A turn interrupted before any output leaves two user records in a row. Replay merges them into one message whose text blocks the model reads joined without a separator ("hello wolrd" + "yo" was answered as "hello wolrdyo"), and nothing tells the model the earlier turn was interrupted. Replay should keep them apart or mark the interruption.',
 		'Known bugs and surprises: cacheRead is always 0 in real sessions so far; the prompts were small (1–3k tokens), possibly under the cacheable minimum. Check once a system prompt exists.',
@@ -13,7 +13,7 @@
 		'Tests: 338 tests, ~5,300 test lines for ~4,300 source lines. `./test` is green (tsc clean, 4 old oxlint warnings).',
 		'Tests: Strong: fake Anthropic and OpenAI-compatible servers, a fake terminal emulator with scrollback, real multi-process host takeover with kill -9 (5 processes), restart mid-turn and mid-tool-round e2e tests, ASON exact-output contracts, credential refresh against a fake endpoint.',
 		'Tests: Weak or near-tautological, candidates to delete or sharpen: "parseModelId splits on the first slash only" (restates a one-liner), "restart and quit use different exit codes", "init is idempotent" (terminal), "display abbreviates the user home", and the conventions test that checks its own rule function.',
-		'Tests: Not covered: real TTY behaviour beyond one manual expect run (tasks/b3/manual-check.md), suspend in a real terminal, real provider contracts (only fakes).',
+		'Tests: Not covered: real TTY behavior beyond one manual expect run (tasks/b3/manual-check.md), suspend in a real terminal, real provider contracts (only fakes).',
 		'Process: 21 tasks, one fresh subagent each, up to four in parallel; 42 minutes wall clock (00:17–00:59).',
 		'Process: Tokens (coordinator + 22 subagents, Opus 5.5): 454k output, 24.3M cache read, 1.5M cache write. At list price ($4 in / $20 out, $0.20 cache read, $5 cache write per MTok) about $21.50.',
 		"Process: Parallel agents collided in git twice (one committed another's main.ts edit; one committed another's e2e edits and had to amend). AGENTS.md now says to stage only your own changes.",
@@ -23,7 +23,7 @@
 		'Clients learn a round ended from the `tool-results` event: the fold settles the live round there and starts an empty one. Any new mid-turn event must keep "streamed view == late-joiner snapshot".',
 		'A missing result after `interrupted` is worded "may or may not have run": with the call recorded before running and the result after, the host can die in between. Read-only tools make that harmless; a first mutating tool (bash, write) needs to face it explicitly.',
 		'Tools run whenever a round ends `done` with tool calls, whatever the stop reason; there is no round limit (only Escape stops a loop).',
-		'Cancel landing between rounds: results already computed are still recorded, then the turn ends cancelled (not completed).',
+		'Cancel landing between rounds: results already computed are still recorded, then the turn ends canceled (not completed).',
 		"Gotcha: rewriting a whole function via scripted string replace on a shared file silently dropped a parallel agent's just-committed code (ah's `interrupt()`). Re-read shared files right before editing and diff against HEAD before committing.",
 		'4 Oct: ./test was red from five oxlint warnings that landed unchecked (prompt-changes, web.test imports, frame comma expression, intro). Invariant: main stays lint-clean; run ./test, not only tsc, before pushing.'
 	],

@@ -149,7 +149,7 @@ for (let disconnect of [false, true]) test(`${disconnect ? 'disconnect' : 'pause
 	expect(status.stateOf(id).type).toBe('paused')
 })
 
-test('the acquisition pause survives takeover before the cancelled turn settles', async () => {
+test('the acquisition pause survives takeover before the canceled turn settles', async () => {
 	let { a, id } = await queued()
 	calls[0]!.push({ type: 'text', text: 'unfinished block' })
 	await until(() => a.of('stream').length)

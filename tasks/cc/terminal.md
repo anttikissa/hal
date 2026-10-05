@@ -191,7 +191,7 @@ the escapes active at the cut, so card backgrounds carry on.
 
 The box height is fixed while it is open: 80% of the rows, at most 50,
 whatever it holds or whatever is typed in it; its list scrolls instead.
-It is centred on the writable screen (the frame's last `rows` rows), so
+It is centered on the writable screen (the frame's last `rows` rows), so
 opening, typing into and closing a modal are ordinary in-place diffs and
 never reach scrollback. A frame shorter than the box grows to hold it.
 

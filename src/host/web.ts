@@ -135,10 +135,10 @@ async function version(): Promise<string | undefined> {
 const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
 
 // The theme as CSS, computed now so overrides show on the next load,
-// as oklch() (wide-gamut screens show the full colour; the terminal
+// as oklch() (wide-gamut screens show the full color; the terminal
 // gets it fitted to sRGB):
 // one class per style (toolBash is .tool-bash) with fg as color, bg as
-// background and any other colour as a custom property (--link-bg),
+// background and any other color as a custom property (--link-bg),
 // plus --quiet: the fg's quieter, still readable form (colors.quiet), for
 // secondary text, which never fades by opacity (tasks/README.md). The
 // page's is measured on its lightest surface, the button. --fg and
@@ -152,7 +152,7 @@ function css(): string {
 			rules.push(`:root { ${Object.entries(colors.mix).map(([k, v]) => `--mix-${kebab(k)}: ${v}%`).join('; ')} }`)
 			continue
 		}
-		// Shared values (fgL, screen) are numbers or one colour, not styles.
+		// Shared values (fgL, screen) are numbers or one color, not styles.
 		if (typeof value !== 'function') continue
 		let style = (value as () => Style)()
 		let decls = Object.entries(style).map(([part, c]) => {
@@ -161,7 +161,7 @@ function css(): string {
 		})
 		let fg = style.fg ?? style.text
 		if (fg) decls.push(`--quiet: ${oklch.toCss(colors.quiet(fg, style.bg ?? style.button ?? colors.screen))}`)
-		// Selection is reverse video in the style's own colour (task gn).
+		// Selection is reverse video in the style's own color (task gn).
 		if (fg) decls.push(`--fg: ${oklch.toCss(fg)}`, `--sel-back: ${oklch.toCss(fg)}`)
 		if (fg && key.startsWith('tool')) decls.push(`--output: ${oklch.toCss(colors.toolOutput(fg))}`)
 		if (key === 'input' && style.placeholder) decls.push(`--faint: ${oklch.toCss(style.placeholder)}`)

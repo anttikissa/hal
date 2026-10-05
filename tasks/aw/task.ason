@@ -4,7 +4,7 @@
 	status: 'done',
 	notes: [
 		'Summary handling previously ignored only tags immediately preceded by a backtick; fenced examples and tags later in code spans were consumed. A browser-safe Markdown code mask preserves offsets, so summary extraction reads original content while locating only prose controls. The renderer remains unchanged. Unclosed inline spans are protected through the current line and unclosed fences through the remaining text for streaming.',
-		'Focused summary regressions pass. Full ./test on the shared checkout reported 1336 passing, one skipped, and four failures: web colour literals, lazy-history frame equality, browser streaming delta count, and tab paging. Concurrent tab UI edits were present; tsc and oxlint passed. These failures are not claimed fixed by this task.'
+		'Focused summary regressions pass. Full ./test on the shared checkout reported 1336 passing, one skipped, and four failures: web color literals, lazy-history frame equality, browser streaming delta count, and tab paging. Concurrent tab UI edits were present; tsc and oxlint passed. These failures are not claimed fixed by this task.'
 	],
 	needs: ['x8'],
 	foldInto: ['x8']

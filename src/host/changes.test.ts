@@ -73,7 +73,7 @@ test('changes retain first/latest and steps through commits, exact content match
 test('diff routes require login, validate selection, escape content and show overlapping sessions and unavailable snapshots', async () => {
 	let before = blob('old\n'), after = blob('<script>alert(1)</script>\n')
 	history.append(id, { type: 'file_changes', cwd: home, toolId: 'call', files: [{ path: 'a.txt', before, after }, { path: '.env', before: null, after: { size: 8, mtime: 1 } }] })
-	let other = sessions.create({ cwd: home, name: 'Neighbour' }).id
+	let other = sessions.create({ cwd: home, name: 'Neighbor' }).id
 	history.append(other, { type: 'file_changes', cwd: home, toolId: 'other', files: [{ path: 'a.txt', undeclared: true, statusBefore: null, statusAfter: '??' }] })
 	let server = {} as any
 	let route = `http://localhost${changes.href(id)}`

@@ -85,17 +85,17 @@ test('only src/web imports Solid or the JSX compiler', () => {
 	expect(sourceFiles().flatMap(webOnlyImports)).toEqual([])
 })
 
-// The browser's colours come only from the CSS the host generates from
-// src/common/colors.ts, so no colour literal may sit in src/web.
-function colourLiterals(text: string): string[] {
+// The browser's colors come only from the CSS the host generates from
+// src/common/colors.ts, so no color literal may sit in src/web.
+function colorLiterals(text: string): string[] {
 	return text.match(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\(/gi) ?? []
 }
 
-test('src/web has no colour literals', () => {
+test('src/web has no color literals', () => {
 	let found: string[] = []
 	for (let rel of new Glob('web/**/*.{ts,tsx,html,css}').scanSync(srcDir)) {
 		if (/\.test\.tsx?$/.test(rel)) continue
-		for (let c of colourLiterals(readFileSync(`${srcDir}/${rel}`, 'utf8'))) found.push(`${rel}: ${c}`)
+		for (let c of colorLiterals(readFileSync(`${srcDir}/${rel}`, 'utf8'))) found.push(`${rel}: ${c}`)
 	}
 	expect(found).toEqual([])
 })

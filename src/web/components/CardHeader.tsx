@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // The first row of every headed transcript card. Slots share one grid:
 // time, readable label, block link. Controls grow their hit area, not
-// an independently centred glyph; every slot starts on the first line.
+// an independently centered glyph; every slot starts on the first line.
 import { Show } from 'solid-js'
 import type { JSX } from '@solidjs/web'
 import { Icon } from './Icon.tsx'

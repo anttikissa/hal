@@ -9,7 +9,7 @@ import type { Style } from '../common/colors.ts'
 import { ansi } from './ansi.ts'
 
 
-// Code in the style's code colour, then back to its fg; plain in a
+// Code in the style's code color, then back to its fg; plain in a
 // monochrome terminal or a style without one.
 function code(text: string, style: Style | undefined): string {
 	if (!style?.code || ansi.mono() || !text) return text

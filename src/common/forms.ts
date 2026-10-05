@@ -23,7 +23,7 @@ export type Field = { help?: string } & (
 // approve), with `marks`, [start, end) offsets, highlighted.
 export type Quote = { text: string; marks?: [number, number][] }
 
-// `skip`: Escape skips the question (a cancelled answer; whoever asked
+// `skip`: Escape skips the question (a canceled answer; whoever asked
 // runs again and moves on) instead of pausing the turn.
 export type Form = { text: string; quote?: Quote; fields: Field[]; skip?: true }
 

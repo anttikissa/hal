@@ -144,7 +144,7 @@ test('closing a tab blocked on a question cancels it instead of restarting the t
 	await until(() => a.of('question').length)
 	send(a, { type: 'tab-close', sessionId: id })
 	expect(status.stateOf(id).type).toBe('paused')
-	expect(history.readSync(id).some((r) => r.type === 'answer' && r.cancelled)).toBe(true)
+	expect(history.readSync(id).some((r) => r.type === 'answer' && r.canceled)).toBe(true)
 	expect(history.readSync(id).at(-1)).toMatchObject({ type: 'turn_end', status: 'paused' })
 	expect(calls.length).toBe(1)
 })

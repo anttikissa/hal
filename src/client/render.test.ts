@@ -554,14 +554,14 @@ describe('terminal.redraw', () => {
 		expect(term.written).toBe('')
 	})
 
-	test('repaints every row in the current colours, cached rows too', () => {
+	test('repaints every row in the current colors, cached rows too', () => {
 		let warning = colors.warning, mono = ansi.mono
-		// Colour escapes exist only outside GNU screen (ansi.mono): a run
-		// inside screen without ./test must still paint in colour.
+		// Color escapes exist only outside GNU screen (ansi.mono): a run
+		// inside screen without ./test must still paint in color.
 		ansi.mono = () => false
 		try {
 			setup(10, 40)
-			// The exit status colour is painted inside the row, not part
+			// The exit status color is painted inside the row, not part
 			// of the item's own style.
 			show([{ type: 'prompt', label: 'bash #1', text: '[exit 1] failed' }])
 			let amber = ansi.sgr({ fg: colors.warning().fg! })

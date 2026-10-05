@@ -48,7 +48,7 @@ test('an open wanted tab wins; otherwise the tab shown last, else the first', ()
 	expect(router.pick([], undefined)).toBeUndefined()
 })
 
-test('when the shown tab closes, its neighbour shows', () => {
+test('when the shown tab closes, its neighbor shows', () => {
 	let before = tabs('1-aaa', '2-bbb', '3-ccc')
 	last = '1-aaa'
 	expect(router.pick(tabs('1-aaa', '3-ccc'), '2-bbb', before)).toBe('3-ccc')

@@ -3,7 +3,7 @@
 // viewport while the layout viewport, and therefore 100dvh, stays full height.
 // The app box then hangs off the top of the screen and the tab strip is invisible.
 // So we mirror the visual viewport into custom properties and size #app from those.
-// Chrome and Firefox honour the meta tag, but the same numbers are correct there.
+// Chrome and Firefox honor the meta tag, but the same numbers are correct there.
 
 type VisualViewportBox = {
 	height: number

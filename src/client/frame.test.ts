@@ -17,7 +17,7 @@ let originalNames: Record<string, string>
 beforeEach(() => { originalNames = titles.names; titles.names = { 'anthropic/claude-opus-5-5': 'Opus 5.5' } })
 afterEach(() => { titles.names = originalNames })
 
-// Where text in `style`'s quieter colour starts (ansi.quiet).
+// Where text in `style`'s quieter color starts (ansi.quiet).
 const quietOn = (style: { fg?: Oklch; bg?: Oklch }) => ansi.sgr({ fg: oklch.quiet(style.fg!, style.bg ?? colors.screen) })
 
 // Visible text only: escape sequences removed.
@@ -68,7 +68,7 @@ test('exactly one blank row before Paused., however many newlines the model stre
 	expect(lines.slice(at - 2, at + 1)).toEqual(['rain', '', 'Paused.'])
 })
 
-test('the same items drawn again follow a new width and colour', () => {
+test('the same items drawn again follow a new width and color', () => {
 	let v = view([{ type: 'text', text: 'one two three four five six' }])
 	let wide = frame.build(v, 40).lines
 	expect(frame.build(v, 40).lines).toEqual(wide)
@@ -145,7 +145,7 @@ test('a frame reusing the last one equals a frame built from nothing, as items s
 test('text cannot send escape sequences to the terminal', () => {
 	let f = frame.build(view([{ type: 'text', text: 'hi\x1b[2J\x1b]0;title\x07\r\nthere' }], 'a\x1bb'), 40)
 	for (let line of f.lines) for (let c of ['\x07', '\r']) expect(line).not.toContain(c)
-	// Only colour (SGR) sequences are left, which move nothing.
+	// Only color (SGR) sequences are left, which move nothing.
 	for (let line of f.lines) for (let esc of line.split('\x1b').slice(1)) expect(esc).toMatch(/^\[[\d;]*m/)
 	expect(plain(f.lines)).toContain('there')
 })
@@ -198,10 +198,10 @@ test('a notice sits between the transcript and the prompt, wrapped and cleaned',
 	expect(f.cursor.row).toBe(boxOf(f).top + 1)
 })
 
-// Truecolor SGR parameters for a colour, as the terminal gets them.
+// Truecolor SGR parameters for a color, as the terminal gets them.
 const rowWith = (lines: string[], text: string) => lines.find((l) => strip(l).includes(text))!
 
-test('a card background fills the whole row and colour ends with the row', () => {
+test('a card background fills the whole row and color ends with the row', () => {
 	let f = frame.build(view([{ type: 'prompt', text: 'short\nlines' }], 'typed'), 30)
 	for (let text of ['short', 'lines', 'typed']) {
 		let row = rowWith(f.lines, text)
@@ -310,7 +310,7 @@ describe('prompt box', () => {
 	})
 })
 
-test('inside GNU screen the frame has no colour, only reverse video for the selection', () => {
+test('inside GNU screen the frame has no color, only reverse video for the selection', () => {
 	let env = process.env.STY
 	process.env.STY = '1.pts-0.host'
 	try {
@@ -353,7 +353,7 @@ test('every block shows its id at the right of its first row, linked to the bloc
 			{ type: 'text', text: 'Looking.' },
 			{ type: 'tool', id: 't1', name: 'bash', input: { command: 'ls' } },
 			{ type: 'tool-result', id: 't1', output: 'a\nb' },
-			{ type: 'question', id: 'q', form: { text: 'Delete?', fields: [] }, cancelled: true },
+			{ type: 'question', id: 'q', form: { text: 'Delete?', fields: [] }, canceled: true },
 			{ type: 'turn-end', status: 'error', error: 'boom' },
 		]
 		let v = view(items)
@@ -444,7 +444,7 @@ test('finished thinking with no readable text draws nothing, not a bare header',
 })
 
 
-test('Bash results link to the call; a failed status and the time go in the title, in the warning colour (task wm0)', () => {
+test('Bash results link to the call; a failed status and the time go in the title, in the warning color (task wm0)', () => {
 	let v = view([
 		{ type: 'tool', id: 'run', name: 'bash', input: { description: 'Check files', command: 'git status --short' } },
 		{ type: 'tool-result', id: 'run', output: '[exit 0]\n M notes.md\n' },

@@ -3,7 +3,7 @@
 	spec: "/status formats reset times and Started in the asking session's client time zone (clients.timezone), falling back to the host zone, so its text equals the status line's for the same window on a UTC server. Day boundaries ('on 6 Oct') follow that zone. The status line prefixes usage windows with the subscription slot (e.g. 3/3) whenever a provider has several, so its percentages are attributable to a /status row. Invariant: one stored window renders identically in /status and the status line.",
 	status: 'done',
 	notes: [
-		"2 Oct 2026: remote (UTC) /status said lex resets 16:00 on 6 Oct, status line 19:00; and status line 0% looked contradictory to lippukiska's 12% because it showed slot 3/3 unlabelled. Host already knew the client zone (tab-start timezone) but only intro used it."
+		"2 Oct 2026: remote (UTC) /status said lex resets 16:00 on 6 Oct, status line 19:00; and status line 0% looked contradictory to lippukiska's 12% because it showed slot 3/3 unlabeled. Host already knew the client zone (tab-start timezone) but only intro used it."
 	],
 	needs: ['5y']
 }

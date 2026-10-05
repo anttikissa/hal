@@ -19,7 +19,7 @@ function sgr(style: Style): string {
 }
 
 // A padded row in a style. With a background it is a card filling all
-// `cols` columns; colour always ends with the row.
+// `cols` columns; color always ends with the row.
 function paint(row: string, style: Style | undefined, cols: number): string {
 	let on = style ? ansi.sgr(style) : ''
 	if (!on) return ansi.PAD + row
@@ -39,7 +39,7 @@ function wrap(text: string, width: number, keepLong = true): string[] {
 // pad, the rest at column 0, and every row but the last ends with FLOW
 // (nothing else pads them), so the renderer writes them in one go and
 // the terminal soft-wraps them into one line: a URL there opens and
-// copies whole. Colour ends only after the last one.
+// copies whole. Color ends only after the last one.
 function paintRows(row: string, style: Style | undefined, cols: number): string[] {
 	let full = ansi.PAD + row
 	if (strings.visLen(full) <= cols) return [ansi.paint(row, style, cols)]
@@ -81,7 +81,7 @@ function webUrl(path: string): string {
 	return `${url || settings.webUrl()}${page}${code ? `?auth=${code}` : ''}${hash ?? ''}`
 }
 
-// `text` in the quieter colour of `style` (oklch.quiet), then back to
+// `text` in the quieter color of `style` (oklch.quiet), then back to
 // the style's own fg; plain in a monochrome terminal. Never SGR 2.
 function quiet(text: string, style: Style | undefined): string {
 	if (ansi.mono() || !text) return text
@@ -107,7 +107,7 @@ export const ansi = {
 	// APC the renderer strips, zero columns wide.
 	FLOW: '\x1b_flow\x1b\\',
 	// GNU screen (STY set, or a TERM of screen*) mangles truecolor, so
-	// there the terminal is monochrome: no colour escapes at all, only
+	// there the terminal is monochrome: no color escapes at all, only
 	// bold and reverse video. Read on every call.
 	mono: (): boolean => !!process.env.STY || (process.env.TERM ?? '').startsWith('screen'),
 	sgr,

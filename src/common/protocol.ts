@@ -186,7 +186,7 @@ export type Command = (
 	| { type: 'visibility'; sessionId: string; visible: boolean }
 	// A peer on the host socket names its process, for /clients (task z8).
 	| { type: 'hello'; pid: number }
-	// A terminal client's size and terminal (TERM, program, colour depth),
+	// A terminal client's size and terminal (TERM, program, color depth),
 	// on connecting and on every resize, for the inspect tool; untrusted.
 	| { type: 'screen'; cols: number; rows: number; term?: string }
 ) & { id?: string }
@@ -249,8 +249,8 @@ export type Event =
 	// (`streaming`).
 	| { type: 'question'; sessionId: string; id: string; form: Form; n?: number; ts?: string; command?: true; streaming?: true }
 	// The first answer to it, as history keeps it (secrets only named).
-	// `cancelled`: Escape dismissed a command's question.
-	| { type: 'answer'; sessionId: string; question: string; answers: Answers; secrets?: string[]; cancelled?: true }
+	// `canceled`: Escape dismissed a command's question.
+	| { type: 'answer'; sessionId: string; question: string; answers: Answers; secrets?: string[]; canceled?: true }
 	// A slash command is in history (`from`: as in submit) and runs.
 	// `command`: the client's id for the submit, as in turn-start.
 	// `streaming`: the running round's last block was still streaming

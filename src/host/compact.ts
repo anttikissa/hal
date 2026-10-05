@@ -73,7 +73,7 @@ function tooLong(e: ErrorEvent): boolean {
 // first time in a turn (`tried` false) the context is compacted and
 // true says to retry the round; after that the turn fails with it.
 function retry(id: string, e: ErrorEvent, tried: boolean): boolean {
-	if (e.cancelled || !compact.tooLong(e)) return false
+	if (e.canceled || !compact.tooLong(e)) return false
 	delete e.failure
 	if (tried || compact.run(id, true) === undefined) return false
 	slash.output(id, 'the provider said the prompt is too long: compacted, trying again')

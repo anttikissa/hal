@@ -134,17 +134,17 @@ test('nothing follows a terminal event', async () => {
 	expect(await all(provider.stream('fake/m1', req))).toEqual([{ type: 'done', reason: 'end' }])
 })
 
-test('abort mid-stream ends with one cancelled error and stops reading', async () => {
+test('abort mid-stream ends with one canceled error and stops reading', async () => {
 	provider.register('fake', echo)
 	let enc = new TextEncoder()
-	let cancelled = false
+	let canceled = false
 	// Never closes on its own: only abort can end it.
 	let stream = new ReadableStream<Uint8Array>({
 		start(c) {
 			c.enqueue(enc.encode(sse({ type: 'text', text: 'first' })))
 		},
 		cancel() {
-			cancelled = true
+			canceled = true
 		},
 	})
 	fakeFetch(() => new Response(stream))
@@ -155,18 +155,18 @@ test('abort mid-stream ends with one cancelled error and stops reading', async (
 		// Abort while the next read is waiting for data.
 		if (e.type === 'text') setTimeout(() => ac.abort(), 5)
 	}
-	expect(events).toEqual([{ type: 'text', text: 'first' }, expect.objectContaining({ type: 'error', cancelled: true })])
-	expect(cancelled).toBe(true)
+	expect(events).toEqual([{ type: 'text', text: 'first' }, expect.objectContaining({ type: 'error', canceled: true })])
+	expect(canceled).toBe(true)
 	expect(calls[0]!.init.signal?.aborted).toBe(true)
 })
 
-test('abort before the request is sent yields cancelled without fetching', async () => {
+test('abort before the request is sent yields canceled without fetching', async () => {
 	provider.register('fake', echo)
 	fakeFetch(() => new Response(''))
 	let ac = new AbortController()
 	ac.abort()
 	let events = await all(provider.stream('fake/m1', req, ac.signal))
-	expect(events).toEqual([expect.objectContaining({ type: 'error', cancelled: true })])
+	expect(events).toEqual([expect.objectContaining({ type: 'error', canceled: true })])
 	expect(calls).toHaveLength(0)
 })
 
@@ -348,6 +348,6 @@ test('a wake drops the open stream as a temporary failure, not a cancel', async 
 		if (e.type === 'text') setTimeout(() => clock.wake(), 5)
 	}
 	expect(events.at(-1)).toMatchObject({ type: 'error', failure: 'temporary' })
-	expect((events.at(-1) as any).cancelled).toBeUndefined()
+	expect((events.at(-1) as any).canceled).toBeUndefined()
 	expect(clock.state.listeners.size).toBe(0)
 })

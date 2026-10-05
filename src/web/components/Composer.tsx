@@ -143,7 +143,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 					<div class="completions" role="listbox" aria-label="Completions">
 						{/* Keep the editor focused: iOS may blur without focusing the button,
 						    dismissing the menu before its click. Choose only on click, not
-						    pointerdown, so scrolling and cancelled touches remain harmless. */}
+						    pointerdown, so scrolling and canceled touches remain harmless. */}
 						<For each={props.menu.choices}>{(choice, index) => (
 							<button type="button" role="option" aria-selected={props.menu?.selected === index() ? 'true' : 'false'} onPointerDown={(e) => e.preventDefault()} onClick={() => { app.choose(index()); input.focus() }}>
 								<strong>{choice.label}</strong><span>{choice.description}</span>
