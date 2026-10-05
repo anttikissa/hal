@@ -40,7 +40,7 @@ function fieldLines(st: FormState, width: number, style: Style = colors.question
 			if (field.label) rows.push(strings.clipVisual(head.trimEnd(), width))
 			// The chosen one is marked and lit like a picker's selection.
 			let indent = field.label ? '  ' : ''
-			let lit = colors.popupCurrent()
+			let lit = colors.popupCurrent(style.fg ?? colors.popup().neutralFg!)
 			for (let o of field.options) {
 				let label = `${o === value ? formView.ARROW : ' '} ${ansi.clean(o)} `
 				if (o === value && focused) cursor = { row: rows.length, col: indent.length + 2 }
