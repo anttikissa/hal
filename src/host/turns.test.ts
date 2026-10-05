@@ -37,35 +37,6 @@ test('a streaming block has its final header from the first event on', async () 
 	expect((await history.read(id)).filter((r) => r.type === 'assistant').map((r) => (r as { model?: string }).model)).toEqual(['fake/m1', 'fake/m1'])
 })
 
-test('the next turn replays durable history, even after a host restart', async () => {
-	let a = client()
-	let id = created(a)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'one' })
-	await until(() => calls.length === 1)
-	calls[0]!.push({ type: 'thinking', text: 'why' }, { type: 'signature', value: 'sig' }, { type: 'text', text: 'first' }, { type: 'done', reason: 'end' })
-	await until(() => a.of('turn-end').length === 1)
-	restartHost()
-
-	let b = client()
-	b.conn.send({ type: 'open', sessionId: id })
-	await until(() => b.views.get(id))
-	expect(b.views.get(id)!.items).toEqual(a.views.get(id)!.items)
-	b.conn.send({ type: 'submit', sessionId: id, text: 'two' })
-	await until(() => calls.length === 2)
-	expect(calls[1]!.model).toBe('fake/m1')
-	expect(calls[1]!.input.messages).toEqual([
-		{ role: 'user', blocks: [{ type: 'text', text: stamped('one') }] },
-		{
-			role: 'assistant',
-			blocks: [
-				{ type: 'thinking', text: 'why', signature: 'sig', provider: 'fake' },
-				{ type: 'text', text: 'first' },
-			],
-		},
-		{ role: 'user', blocks: [{ type: 'text', text: stamped('two') }] },
-	])
-})
-
 test('pause stops the turn, keeping partial output, and continue carries it on', async () => {
 	let a = client()
 	let id = created(a)

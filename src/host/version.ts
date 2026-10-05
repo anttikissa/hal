@@ -26,6 +26,14 @@ function head(): Promise<string | undefined> {
 	return version.git('rev-parse', '--short', 'HEAD')
 }
 
+// The checkout's version now: HEAD, plus a short hash of the uncommitted
+// diff when there is one ('unknown' outside a git checkout).
+async function current(): Promise<{ hash: string | undefined; loaded: string }> {
+	let [hash, diff] = await Promise.all([version.head(), version.git('diff', 'HEAD')])
+	let changes = diff ? Bun.hash(diff).toString(16).padStart(7, '0').slice(0, 7) : ''
+	return { hash, loaded: hash === undefined ? 'unknown' : changes ? `${hash}+${changes}` : hash }
+}
+
 // Finds the loaded version, logs it and starts watching HEAD. Idempotent.
 async function init(): Promise<void> {
 	let st = version.state
@@ -33,10 +41,9 @@ async function init(): Promise<void> {
 	st.started = true
 	// Read-only on purpose: `git stash create` writes .git/index.lock, and
 	// hosts killed mid-call (tests start dozens) left it behind for others.
-	let [hash, diff] = await Promise.all([version.head(), version.git('diff', 'HEAD')])
+	let { hash, loaded } = await version.current()
 	st.head = hash
-	let changes = diff ? Bun.hash(diff).toString(16).padStart(7, '0').slice(0, 7) : ''
-	st.loaded = hash === undefined ? 'unknown' : changes ? `${hash}+${changes}` : hash
+	st.loaded = loaded
 	diag.log(`version ${st.loaded} (${version.dir()})`)
 	version.found(st.loaded)
 	if (hash === undefined) return
@@ -77,6 +84,7 @@ export const version = {
 	changed: (): void => {},
 	git,
 	head,
+	current,
 	init,
 	check,
 	stop,

@@ -9,6 +9,7 @@ test('unknown arguments are errors, never the terminal', () => {
 test('known forms parse, print options in any order', () => {
 	expect(args.parse([])).toEqual({ kind: 'terminal' })
 	for (let h of ['-h', '--help', 'help']) expect(args.parse([h])).toEqual({ kind: 'help' })
+	for (let v of ['-v', '--version']) expect(args.parse([v])).toEqual({ kind: 'version' })
 	expect(args.parse(['auth'])).toEqual({ kind: 'auth' })
 	expect(args.parse(['-r'])).toEqual({ kind: 'remote' })
 	expect(args.parse(['-r', 'example.com'])).toEqual({ kind: 'remote', host: 'example.com' })

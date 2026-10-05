@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "hal2",
+      "name": "hal",
       "dependencies": {
         "@solidjs/compiler": "2.0.0-rc.11",
         "@solidjs/web": "2.0.0-rc.11",
