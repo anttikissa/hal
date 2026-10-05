@@ -32,7 +32,6 @@ import { modelsDev } from './host/models-dev.ts'
 import { sessions } from './host/sessions.ts'
 import { turns } from './host/turns.ts'
 import { version } from './host/version.ts'
-import pkg from '../package.json'
 import { openai } from './host/openai.ts'
 import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
@@ -328,8 +327,8 @@ async function start(): Promise<void> {
 	// Checked before anything else, so a mistyped option starts nothing.
 	let parsed = args.parse(process.argv.slice(2))
 	if (parsed.kind === 'help') process.exit((process.stdout.write(args.usage()), 0))
-	// package.json is the official version; the checkout is this file's (task jjr).
-	if (parsed.kind === 'version') process.exit((process.stdout.write(`hal ${pkg.version}\ngit ${(await version.current()).loaded}\ndir ${version.dir()}\n`), 0))
+	// The release check loads only here; the checkout is this file's (task jjr).
+	if (parsed.kind === 'version') process.exit((process.stdout.write(await (await import('./host/release.ts')).release.cli()), 0))
 	if (parsed.kind === 'error') process.exit((process.stderr.write(`hal: ${parsed.message}\n\n${args.usage()}`), 2))
 	perf.state.epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || perf.state.epoch
 	perf.mark('imported')
