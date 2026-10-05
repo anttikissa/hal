@@ -6,9 +6,9 @@ Steering (ordinary submission, send steer:true) changes as follows; task 8p hold
 
 Cancelled and stopped-by-steering calls are not failures: their status uses the muted colour and the card has no red error text. The model still receives a tool result saying the call was cancelled or stopped by a new user message. Red stays for real failures. The status sits where task wm0 puts exit status and duration: "(4s)" while running, "(exit 1, 3.2s)" when done, "(cancelled)", "(stopped, 50.2s)". Terminal and web match.
 
-Restart warning. When a flagged call runs in any session on the host, a restart that ends the host asks first: /restart host|both|all from any client (terminal, web, remote), and Ctrl-R in a terminal client that would restart that host. The dialog is a common/modals.ts modal listing each flagged call (block link, title, elapsed time), with "Wait" selected by default and "Restart anyway". Wait or Escape dismisses it and nothing restarts. A client-only restart never asks.
+Restart warning. When a flagged call runs in any session on the host, a restart that ends the host asks first: /restart host|both|all from any client (terminal, web, remote), and Ctrl-R in the terminal that runs the host. Ctrl-R in a client-only terminal restarts only that client, stops no tool call and never asks. The dialog is a common/modals.ts modal listing each flagged call (block link, title, elapsed time), with "Wait" selected by default and "Restart anyway". Wait or Escape dismisses it and nothing restarts.
 
-Emergency-key exception: tasks/README.md (Emergency keys) records this as the only case where a modal may stand before Ctrl-R. The client decides from the session state it already holds, synchronously, never waiting on the host. Pressing Ctrl-R again while the dialog is open restarts at once, so Ctrl-R Ctrl-R always restarts, even when the host hangs. Ctrl-C and Ctrl-Z are unchanged.`,
+Emergency-key exception: tasks/README.md (Emergency keys) records this as the only case where a modal may stand before Ctrl-R. The check is synchronous, within the host process. Ctrl-C and Ctrl-Z are unchanged; Ctrl-C still quits at once, dialog or not.`,
 	status: 'planned',
 	needs: ['wm0'],
 	foldInto: ['8p']
