@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-// The gate: a one-time code (from /auth or ./run auth) sets the cookie
+// The gate: a one-time code (from /auth or hal auth) sets the cookie
 // and calls onDone.
 
 import { createSignal, onSettled } from 'solid-js'
@@ -18,7 +18,7 @@ export function Login(props: { onDone: () => void }) {
 	}
 	return (
 		<form class="Login" onSubmit={submit}>
-			<label for="code">Enter a one-time code: type /auth in Hal, or ./run auth in a shell.</label>
+			<label for="code">Enter a one-time code: type /auth in Hal, or hal auth in a shell.</label>
 			<input ref={(e) => (input = e)} id="code" name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck={false} />
 			<button>Log in</button>
 			<div id="notice" class="log">
