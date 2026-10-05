@@ -1,4 +1,4 @@
-// A generated hal2 home for performance runs (task y9): a heavy user's
+// A generated Hal home for performance runs (task y9): a heavy user's
 // shape, filler text, no real data. The same seed and scale give
 // byte-identical files. CLI: bun src/perf/home.ts <home> [scale] [seed].
 import { appendFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs'

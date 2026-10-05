@@ -5,8 +5,8 @@ Test with the terminal emulator in render.test.ts: after switching between a 3-l
 	status: 'done',
 	needs: ['7w'],
 	notes: [
-		"hal2's tasks/cc/terminal.md is newer than the old Hal's docs/terminal.md (it adds Modals); nothing is missing from it, so no newer copy is attached.",
-		"old-render.ts is the old renderer: its peak and peakCols (around line 220) are NOT to be copied, since padding from a high-water mark left the prompt mid-screen after a restart; fullscreen recovery after shrink, and why draw(true) must not run from a resize handler that fires repeatedly (CSI 3J each time). Reference only; hal2's render.ts already has one-way full mode (task cc notes).",
+		"Hal's tasks/cc/terminal.md is newer than the old Hal's docs/terminal.md (it adds Modals); nothing is missing from it, so no newer copy is attached.",
+		"old-render.ts is the old renderer: its peak and peakCols (around line 220) are NOT to be copied, since padding from a high-water mark left the prompt mid-screen after a restart; fullscreen recovery after shrink, and why draw(true) must not run from a resize handler that fires repeatedly (CSI 3J each time). Reference only; Hal's render.ts already has one-way full mode (task cc notes).",
 		'The renderer, not app.ts, spots a switch: render.draw compares view.tabs.focused with the tab painted last (undefined -> X at startup is not a switch). frame.build takes `full` and returns `history` (transcript + pending rows); inbox, notice, tab bar and prompt count as chrome. Peak only knows histories that were painted.',
 		"'A single-tab session never writes CSI 3J' holds while its frame fits: a single tab that outgrows the screen still enters full mode by task cc's rules. Ctrl-L is handled in app.onKeys (terminal.redraw) before modals and forms."
 	]

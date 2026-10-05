@@ -1,6 +1,6 @@
-// Imports the old Hal's sessions into a hal2 home (task 3q). Run by hand
+// Imports the old Hal's sessions into a Hal home (task 3q). Run by hand
 // (scripts/import-old); nothing on the host path calls it. Each old
-// session becomes one hal2 session with the same id whose history holds
+// session becomes one Hal session with the same id whose history holds
 // what the old Hal showed and sent: its current log, after the fork
 // parent's records from before the fork (the old loadAllHistory), with
 // blob contents written inline. Old formats: ~/.hal/src/common/history.ts.

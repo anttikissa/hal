@@ -11,8 +11,8 @@ Web: the textarea keeps native typing, IME, selection, clipboard and undo. A key
 Test step() with a table of (text with a cursor mark, key) -> expected text and cursor, at both ends and in the middle, with multi-code-point graphemes, and each kill followed by a yank.`,
 	status: 'done',
 	notes: [
-		'old-prompt.ts is module-global state with snapshot/restore wrappers around it; hal2 wants the reverse: pure functions over a state value, owned by the client (one per session). Lift behaviour and test cases, not structure.',
-		"The old editor used string indexes (text[i]) for word moves; keep hal2's grapheme boundaries (Intl.Segmenter) and test with emoji and combining marks.",
+		'old-prompt.ts is module-global state with snapshot/restore wrappers around it; Hal wants the reverse: pure functions over a state value, owned by the client (one per session). Lift behaviour and test cases, not structure.',
+		"The old editor used string indexes (text[i]) for word moves; keep Hal's grapheme boundaries (Intl.Segmenter) and test with emoji and combining marks.",
 		"Ctrl-W is taken by tabs (7w): it closes a tab, it is not readline's kill-word. Ctrl-C/Z/R are emergency keys and never reach the editor (tasks/README.md).",
 		"Web write-back: setting textarea.value wipes the browser's undo stack. setRangeText() or document.execCommand('insertText') keep native Cmd-Z working; pick one and note which.",
 		'On macOS, Option-Left/Right in a browser already moves by word natively; leave native what already matches, and route through step() only where Hal differs.',

@@ -6,8 +6,8 @@ Each task lives in a directory named by its ID, with a task.ason record and opti
 
 ## Goal
 
-hal2 rebuilds Hal (the old one lives in ~/.hal, repo anttikissa/hal-old)
-from scratch with tsk.
+Hal is built from scratch with tsk. The previous implementation (repo
+anttikissa/hal-old) is for reference only.
 Not an identical clone, but: smaller, better architected, more capable
 where possible, and it leaves behind a set of tasks with implementation
 notes from which Hal can be rewritten again and again by more capable

@@ -10,7 +10,7 @@ afterEach(() => { titles.names = originalNames })
 const info: StatusInfo = {
 	id: '156-way',
 	name: 'Orchestrate v3',
-	cwd: '/Users/me/hal2',
+	cwd: '/Users/me/project',
 	home: '/Users/me',
 	model: 'anthropic/claude-opus-5-5',
 	role: 'host',
@@ -18,7 +18,7 @@ const info: StatusInfo = {
 }
 
 const text = (i: StatusInfo, cols: number) => statusRow.fit(i, cols).map((p) => p.text).join('')
-const LEFT = '156-way: Orchestrate v3 · ~/hal2 · Claude Opus 5.5 high · 87k/1000k (9%)'
+const LEFT = '156-way: Orchestrate v3 · ~/project · Claude Opus 5.5 high · 87k/1000k (9%)'
 // Where the whole row does not fit, the short model name (task r7r).
 const SHORT = LEFT.replace('Claude ', '')
 

@@ -96,7 +96,7 @@ function layout() {
 	edge(document.getElementById('next'), hi + 1, n - 1, '›', false)
 	document.getElementById('prev').onclick = () => go(lo - 1)
 	document.getElementById('next').onclick = () => go(hi + 1)
-	document.getElementById('status').innerHTML = `<b>${cur + 1} ${name(cur)}</b> &nbsp; /Users/antti/hal2 &nbsp; Claude Opus 5.5 &nbsp; ${header.getBoundingClientRect().height.toFixed(0)}px strip, ${paged ? `${per} per page` : withNames ? 'names' : 'numbers'}`
+	document.getElementById('status').innerHTML = `<b>${cur + 1} ${name(cur)}</b> &nbsp; /Users/me/project &nbsp; Claude Opus 5.5 &nbsp; ${header.getBoundingClientRect().height.toFixed(0)}px strip, ${paged ? `${per} per page` : withNames ? 'names' : 'numbers'}`
 }
 
 function go(i) { cur = (i + n) % n; layout() }

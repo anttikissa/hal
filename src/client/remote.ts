@@ -50,7 +50,7 @@ async function login(at: string, code: string): Promise<string | undefined> {
 		let c = Bun.Cookie.parse(header)
 		if (c.name === 'hal' && c.value) return c.value
 	}
-	throw new Error(`${at} answered the login without a session cookie; is it a hal2 host?`)
+	throw new Error(`${at} answered the login without a session cookie; is it a Hal host?`)
 }
 
 // Whether a Hal answers at `at`, checked before the user is asked for
@@ -58,7 +58,7 @@ async function login(at: string, code: string): Promise<string | undefined> {
 async function probe(at: string): Promise<void> {
 	let res = await request(at, '/manifest.webmanifest', {})
 	let name = res.ok ? (await res.json().catch(() => null))?.name : undefined
-	if (name !== 'Hal') throw new Error(`${at} answers (HTTP ${res.status}) but is not a hal2 host`)
+	if (name !== 'Hal') throw new Error(`${at} answers (HTTP ${res.status}) but is not a Hal host`)
 }
 
 // Whether the host still takes this token; throws if it can't be asked.
