@@ -28,15 +28,26 @@ button:has(> .icon) { display: inline-flex; align-items: center; justify-content
    control that already draws a border, so it reads as a thicker one. */
 :where(:focus-visible) { outline: 2px solid currentColor; outline-offset: 2px; }
 html { background: var(--canvas); color: var(--text); overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-html, body { margin: 0; height: 100%; overflow: hidden; }
+html, body { margin: 0; }
+/* The document is 1px taller than the screen and rests scrolled 1px
+   down: iOS answers a status-bar tap by scrolling it to 0, which
+   viewport.statusTap turns into scrolling the transcript to the top.
+   The app is fixed, so this 1px never moves it. */
+html { overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
+html::-webkit-scrollbar { display: none; }
 /* Keep the document geometry still while Safari pans its visual viewport
    for the focused field. Move the app, not a fixed body whose layout top
    changes underneath Safari's focus scrolling. */
-body { height: 100dvh; }
+body { height: calc(100dvh + 1px); overflow: hidden; }
 body, textarea, input, button { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 body, textarea { tab-size: 4; }
 .App, .Chat { height: 100%; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
-.App { position: absolute; top: 0; left: 0; width: var(--app-width, 100%); max-width: 100%; height: var(--app-height, 100dvh); transform: translate(var(--app-left, 0px), var(--app-top, 0px)); }
+.App { position: fixed; top: 0; left: 0; width: var(--app-width, 100%); max-width: 100%; height: var(--app-height, 100dvh); transform: translate(var(--app-left, 0px), var(--app-top, 0px)); }
+/* While typing, the keyboard's panning is handled by viewport.page, so
+   the old locked layout returns: no document scroll, app absolute. */
+html.typing { overflow: hidden; }
+html.typing body { height: 100dvh; }
+html.typing .App { position: absolute; }
 /* Zero-height anchor: reload floats over text without moving it. */
 .source-update { position: relative; flex: none; height: 0; z-index: 2; pointer-events: none; }
 .source-update button { position: absolute; top: 4px; right: max(1ch, env(safe-area-inset-right)); pointer-events: auto; font-size: 16px; line-height: 1; min-height: 24px; min-width: 44px; padding: 4px 8px; border: 0; color: var(--text); background: color-mix(in oklab, var(--overlay-bg) 75%, transparent); }

@@ -3,7 +3,7 @@
 	spec: 'When the web transcript is more than 200px above its bottom (scroll.awayPx), a pill appears at the bottom of the transcript, centered exactly on the cards\' 3px left bar: a translucent canvas-colored vertical pill (20x44px, inside a 44x52px target) holding two stacked downward triangles. Tapping it glides to the very bottom (the same forced glide as sending) and the pill fades away. It is a zero-height sticky row ending the transcript, so it shares the cards\' left edge at every width and safe-area inset. It is labeled "Scroll to the bottom" for screen readers and does not take focus from the draft. The terminal has no equivalent.',
 	status: 'done',
 	notes: [
-		"Status-bar tap to scroll up (user request) is not implemented. iOS only scrolls the document's root scroller on a status-bar tap and sends the page no event. Hal keeps the document fixed (html/body overflow hidden; .Transcript is the one scroller) because Safari pans the document when the keyboard opens. The known workaround keeps the document scrolled 1px and treats a jump to 0 as a tap, but keyboard panning would trigger it falsely and it cannot be tested headless; revisit only with on-device testing.",
+		"Status-bar tap to scroll up is task ddh.",
 		'An onCleanup inside onSettled halts Solid 2 reactivity (CLEANUP_IN_FORBIDDEN_SCOPE); return the cleanup from the onSettled callback instead. A pill placed outside the scroller cannot match the bar: the transcript padding differs by width (1ch on phones, 2ch wider) and font size, so it sits inside as a sticky row.'
 	],
 	needs: ['4s']
