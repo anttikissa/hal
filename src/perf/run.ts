@@ -139,7 +139,7 @@ async function freePort(): Promise<number> {
 
 function code(home: string): string {
 	let out = Bun.spawnSync([run, 'auth'], { env: { ...process.env, HAL_HOME: home, TMPDIR: home } }).stdout.toString()
-	let m = out.match(/code: (\S+)/)
+	let m = out.match(/\?auth=(\S+)/)
 	if (!m) throw new Error(`./run auth said: ${out}`)
 	return m[1]!
 }
