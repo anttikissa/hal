@@ -96,14 +96,14 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'prompt':
 			let bash = (/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
 			// A job's message has no title to carry its status: a nonzero
-			// one stays its first row, in the warning color (task wm0).
+			// one stays its first row, in the exit color (task wm0).
 			let source = bash ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text
 			if (fold === 'inline') source = itemView.inlined(source, look.pastes)
 			if (fold === 'closed' && !item.summary) return itemView.closedRow(item, source, width)
 			let body = ansi.wrap(source, width).map(ansi.links)
 			if (bash && /^\[exit [1-9]\d*\]/.test(body[0] ?? '')) {
 				let status = /^\[exit [1-9]\d*\]/.exec(body[0]!)![0]
-				body[0] = itemView.warn(status, itemView.itemStyle(item)) + body[0]!.slice(status.length)
+				body[0] = itemView.exitColor(status, itemView.itemStyle(item)) + body[0]!.slice(status.length)
 			}
 			// Another session's message: its summary, then a glimpse;
 			// opened, its whole text.
@@ -294,18 +294,18 @@ function unsafe(row: string, item: Item & { type: 'tool' }, width: number): stri
 	return `${strings.clipVisual(row, width - label.length - 2)}  \x1b[3m${label}\x1b[23m`
 }
 
-// `text` in the warning color, then back to `style`'s.
-function warn(text: string, style: Style | undefined): string {
+// `text` in the exit color, then back to `style`'s.
+function exitColor(text: string, style: Style | undefined): string {
 	if (ansi.mono()) return text
-	return ansi.sgr({ fg: colors.warning().fg! }) + text + (style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
+	return ansi.sgr({ fg: colors.exit().fg! }) + text + (style?.fg ? ansi.sgr({ fg: style.fg }) : '\x1b[39m')
 }
 
 // The status after a tool card's title (task wm0), quiet: a nonzero
-// exit in the warning color, then the time; '' with neither.
+// exit in the exit color, then the time; '' with neither.
 function status(exit: string | undefined, time: string | undefined, style: Style | undefined): string {
 	if (!exit && !time) return ''
 	if (!exit) return ansi.quiet(`(${time})`, style)
-	return ansi.quiet('(', style) + itemView.warn(exit, style) + ansi.quiet(time ? `, ${time})` : ')', style)
+	return ansi.quiet('(', style) + itemView.exitColor(exit, style) + ansi.quiet(time ? `, ${time})` : ')', style)
 }
 
 // A finished call's status from its result; `bash`: a bash call's.
@@ -369,7 +369,7 @@ export const itemView = {
 	ref,
 	quoteLines,
 	unsafe,
-	warn,
+	exitColor,
 	status,
 	resultStatus,
 	right,

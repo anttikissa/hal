@@ -461,11 +461,11 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	expect(printed).not.toContain('#1813>')
 	let title = lines.find((line) => line.includes('Read missing'))!
 	expect(plain([title])[0]).toMatch(/Read missing +\(exit 123, 3\.2s\) #t1815$/)
-	expect(title).toContain(ansi.sgr({ fg: colors.warning().fg! }) + 'exit 123')
+	expect(title).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
 	expect(printed).not.toContain('[exit 123]\nerror')
 	expect(printed).toContain('error: cannot access file')
 	// A job's message has no title for it: the status stays its first row.
-	expect(lines.find((line) => plain([line])[0]!.includes('[exit 123]'))).toContain(ansi.sgr({ fg: colors.warning().fg! }) + '[exit 123]')
+	expect(lines.find((line) => plain([line])[0]!.includes('[exit 123]'))).toContain(ansi.sgr({ fg: colors.exit().fg! }) + '[exit 123]')
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
 	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1818', '1814'][i]! }))
 	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('#t1813>  M notes.md')
