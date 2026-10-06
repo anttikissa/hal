@@ -17,7 +17,8 @@ Ctrl-O opens a small transient dialog (not a question in history, like Ctrl-F fi
 	notes: [
 		'Line limits: frame.ts gave the Hal cursor helpers (glyph, withCursor) to hal-cursor.ts; app.ts routes redraw, toggle and paste-text events to client/commands.ts; host.ts merged its two auth lines and paste-text lives in blobs.ts. host.ts was already 403 lines at HEAD from another change when this landed.',
 		"A fold change relayouts the whole transcript (View.folds.sig is in the layout look); each item's rows stay cached by their own key, so a toggle costs one pass over the items, and toggles are rare.",
-		'Bug: a closed card took three rows (its padding rows above and below), and its title and first line were separated by two spaces. Invariant restored: a closed block is exactly one row, title and text separated by one space.'
+		'Bug: a closed card took three rows (its padding rows above and below), and its title and first line were separated by two spaces. Invariant restored: a closed block is exactly one row, title and text separated by one space.',
+		"Invariant: /toggle on an existing block that does not fold (a notice, command output, a tool result line) reports 'block N does not open or close', never 'no block N to toggle', which only means no block has that number."
 	],
 	needs: ['wm0']
 }
