@@ -199,9 +199,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		let call = item.type === 'tool-result' ? batch.find((c) => c.type === 'tool' && c.id === item.id) : undefined
 		return n + (call?.type === 'tool' ? frame.itemRows(item, cols, session, undefined, undefined, call.name).length - 1 : frame.itemRows(item, cols, session).length + 1)
 	}, 0)
-	// Ordered once per transcript (updates replace its items), in
-	// slices too: a sliced layout is called again and again (task 7j).
-	// An unsaved layout (render.tail's) leaves the memo alone.
+	// Ordered once per transcript (updates replace its items), in slices
+	// (task 7j); an unsaved layout (render.tail's) leaves the memo alone.
 	let src = view.transcript?.items ?? [], memo = frame.state.ordered, how = `${cols} ${screen} ${session} ${src.length}`
 	let fits = (batch: Item[]) => height(batch) <= screen
 	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(promptChanges.group(src), fits) } }
