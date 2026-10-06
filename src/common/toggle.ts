@@ -28,7 +28,7 @@ function parse(args: string): Target | string {
 // Whether `item` opens and closes; `range`: as part of a range, which
 // leaves assistant text and the user's prompts alone.
 function toggles(item: Item, range = false): boolean {
-	if (item.type === 'tool' || item.type === 'thinking') return true
+	if (item.type === 'tool' || item.type === 'thinking' || (item.type === 'output' && !!item.change)) return true
 	if (item.type === 'text') return !range
 	return item.type === 'prompt' && (!range || item.from !== undefined)
 }
@@ -50,9 +50,10 @@ function keys(items: Item[], target: Target): string[] | string {
 }
 
 // A block's state until toggled: tools closed (a glimpse), another
-// session's message closed (its summary and glimpse), the rest open.
+// session's message closed (its summary and glimpse), prompt-file
+// changes closed (their summary rows), the rest open.
 function initial(item: Item): Fold {
-	return item.type === 'tool' || (item.type === 'prompt' && !!item.summary) ? 'closed' : 'open'
+	return item.type === 'tool' || (item.type === 'output' && !!item.change) || (item.type === 'prompt' && !!item.summary) ? 'closed' : 'open'
 }
 
 // Whether a prompt has pastes, so it has three states.
