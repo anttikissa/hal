@@ -4,7 +4,6 @@
 // Tasks: fwk, nvm.
 import { readFileSync, statfsSync } from 'fs'
 import { freemem, totalmem } from 'os'
-import { diag } from './diag.ts'
 import { host } from './host.ts'
 import { history } from './history.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
@@ -71,7 +70,6 @@ function check(sample = resources.measure()): void {
 	st.sample = sample
 	st.level = resources.grade(sample)
 	if (st.level === before) return
-	diag.log(`resources: ${before} -> ${st.level} (disk ${gb(sample.disk)}, memory ${gb(sample.memory)})`)
 	st.told = new WeakSet()
 	let text = resources.warning() ?? resources.text()!
 	if (rank[st.level] > rank[before] || st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text })
@@ -122,7 +120,7 @@ function notice(id: string): void {
 // warning. Idempotent; the host calls it once it serves.
 function report(error: unknown): void {
 	let text = `Resource check failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}`
-	diag.log(text)
+	process.stderr.write(text + '\n')
 	for (let client of host.state.clients) client.deliver({ type: 'warning', text })
 }
 
