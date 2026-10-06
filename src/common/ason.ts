@@ -16,7 +16,8 @@
 //
 // Philosophy: (nearly) every JavaScript literal is valid ASON, and ASON
 // pastes into a JS REPL. Strings in single, double or backtick quotes
-// (multiline, no ${} interpolation); unquoted keys; trailing commas;
+// (multiline, no ${} interpolation); unquoted keys that are JS identifiers
+// or integers ({ café: 1, $x: 2, 0: 3 }, but { a-b: 1 } is an error); trailing commas;
 // // and /* */ comments; \x41, \u0041 and \u{1F600} escapes; numbers as JS
 // writes them: .5, 1., +1, 0xFF, 0b101, 0o17, 1_000, 42n, NaN, -Infinity, -0;
 // undefined; and any JS whitespace. Commas between items are
@@ -78,8 +79,6 @@
 //
 // TODO, where ASON still differs from JSON or JS (all checked against this
 // file):
-// - Unquoted keys take any run of characters up to : , } ] or whitespace
-//   ({a-b.c@: 1} parses), looser than JS identifiers.
 // - toJSON is ignored (a Date or Map becomes {}); functions and symbols throw
 //   instead of being skipped as in JSON.stringify.
 
@@ -399,19 +398,21 @@ function parseNumber(ctx: Ctx): number | bigint {
 	return Number(m[0].replace(/_/g, ''))
 }
 
+// Unquoted keys are what JS accepts: identifiers (Unicode, \uXXXX escapes) or
+// integers. The escaped form must still decode to an identifier.
+const KEY_RE = /(?:[\p{ID_Start}$_]|\\u[0-9a-fA-F]{4})(?:[\p{ID_Continue}$\u200C\u200D]|\\u[0-9a-fA-F]{4})*|0|[1-9][0-9]*/uy
+const IDENT_FULL_RE = /^(?:[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*|0|[1-9][0-9]*)$/u
+
 function parseKey(ctx: Ctx): string {
 	skipWhite(ctx)
 	const c = peek(ctx)
 	if (c === "'" || c === '"') return parseString(ctx, c)
-	const start = ctx.pos
-	while (ctx.pos < ctx.buf.length) {
-		const c = peek(ctx)
-		if (c === ':' || c === ',' || c === '}' || c === ']' || isSpace(c)) break
-		if (c === '/' && (peek2(ctx) === '/' || peek2(ctx) === '*')) break
-		ctx.pos++
-	}
-	if (ctx.pos === start) fail(ctx, 'Expected object key')
-	return ctx.buf.slice(start, ctx.pos).replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+	KEY_RE.lastIndex = ctx.pos
+	const m = KEY_RE.exec(ctx.buf)
+	const key = m?.[0].replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+	if (!key || !IDENT_FULL_RE.test(key)) fail(ctx, 'Expected object key (an identifier, an integer or a quoted string)')
+	ctx.pos = KEY_RE.lastIndex
+	return key
 }
 
 // obj['__proto__'] = v would replace the prototype; define an own key, as JSON.parse does.
