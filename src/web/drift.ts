@@ -7,8 +7,8 @@
 // scroll.ts keeps a pinned reader at the bottom. This reports both:
 // - 'pulled': scroll.ts found a pinned view above the bottom and
 //   pulled it back, so something other than the reader moved it.
-// - 'drift': pinning failed: still pinned, above the bottom, no glide
-//   on its way, for two checks in a row (a bug in scroll.ts).
+// - 'drift': pinning failed: still pinned, above the bottom
+//   for two checks in a row (a bug in scroll.ts).
 // Each logs a breadcrumb (detail: page visibility; line: gap px) and
 // shows a notice.
 import { notices } from '../common/notices.ts'
@@ -24,7 +24,7 @@ function init(): void {
 	let stuck = 0
 	setInterval(() => {
 		let st = scroll.state, el = st.el
-		let short = !!el && st.pinned && !st.frame && !st.pressing && !st.touching && scroll.gap(el) > 1
+		let short = !!el && st.pinned && !st.pressing && !st.touching && scroll.gap(el) > 1
 		stuck = short ? stuck + 1 : 0
 		if (stuck !== 2) return
 		let gap = Math.round(scroll.gap(el!))

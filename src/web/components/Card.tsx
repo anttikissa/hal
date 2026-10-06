@@ -173,7 +173,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		scroll.follow(() => {
 			setOpen(!expanded())
 			flush()
-		}, 'track')
+		})
 	}
 	// Show all of a tool's result, or its glimpse again, keeping the
 	// button (the card's end) in view as the card shrinks.
@@ -182,7 +182,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		scroll.follow(() => {
 			setFull(!full())
 			flush()
-		}, 'track')
+		})
 		if (!full()) button.scrollIntoView({ block: 'nearest' })
 	}
 	let cursor = () => <span class="cursor" aria-hidden="true" />

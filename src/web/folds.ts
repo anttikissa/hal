@@ -70,7 +70,7 @@ function run(args: string, mode: Mode = 'toggle'): string | undefined {
 			folds.set(`${t.meta.id}#${item.key}`, item, p.open ?? at(item) === 'closed', result ? [item.key, result] : [item.key])
 		}
 		flush()
-	}, 'track')
+	})
 	return undefined
 }
 
