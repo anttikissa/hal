@@ -1,7 +1,7 @@
-// Plugins (task an). Every test hooks objects from its own temp module,
+// Plugins (tasks an, 90v). Every test hooks objects from its own temp module,
 // so nothing leaks into the real module singletons or other test files.
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { plugins } from './plugins.ts'
@@ -39,7 +39,7 @@ afterEach(() => {
 // `plugin` in scope) and loads it.
 async function plugin(name: string, body: string, head = ''): Promise<string> {
 	let path = join(dir, name)
-	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\n${head}\nexport default async (plugin: any) => {\n${body}\n}\n`)
+	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\n${head}\nexport default (plugin: any) => {\n${body}\n}\n`)
 	await plugins.load(path)
 	return path
 }
@@ -109,26 +109,61 @@ test('a rejected async before is reported, not awaited and not thrown', async ()
 	expect(reports.join()).toContain('late')
 })
 
-test('each reload re-runs the file; a failed reload keeps the old hooks and names the path', async () => {
-	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 'v1')`, 'globalThis.pluginRuns++')
-	writeFileSync(path, `globalThis.pluginRuns++\nexport default (plugin: any) => { throw new Error('bad v2') }\n`)
-	await plugins.load(path)
+test('hooks act as soon as registered; replacing a version removes its hooks and data before its cleanup, then runs the new body', async () => {
+	let path = await plugin(
+		'a.ts',
+		`plugin.around(t, 'f', () => 'v1')
+plugin.set(t, 'value', 4)
+t.log.push('setup sees ' + t.f(1) + ' ' + t.value)
+return () => t.log.push('cleanup sees ' + t.f(1) + ' ' + t.value)`,
+		'globalThis.pluginRuns++',
+	)
+	expect(t.log).toEqual(['setup sees v1 4'])
+	await plugin('a.ts', `t.log.push('v2 body sees ' + t.f(1) + ' ' + t.value)\nplugin.set(t, 'value', 5)`, 'globalThis.pluginRuns++')
 	expect(g.pluginRuns).toBe(2)
-	expect(t.f(1)).toBe('v1')
+	expect(t.log.filter((l: string) => l !== 'f')).toEqual(['setup sees v1 4', 'cleanup sees 2 3', 'v2 body sees 2 3'])
+	expect(t.value).toBe(5)
+	plugins.remove(path)
+	expect(t.value).toBe(3)
+})
+
+test('a file that throws in its body runs without its hooks and is renamed to .ts.broken', async () => {
+	let original = t.f
+	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 'v1')\nreturn () => t.log.push('v1 cleanup')`)
+	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default (plugin: any) => { plugin.around(t, 'f', () => 'v2'); throw new Error('bad v2') }\n`)
+	await plugins.load(path)
+	expect(t.f).toBe(original)
+	expect(t.log).toEqual(['v1 cleanup'])
+	expect(existsSync(path)).toBe(false)
+	expect(existsSync(`${path}.broken`)).toBe(true)
 	expect(reports).toHaveLength(1)
-	expect(reports[0]).toContain(path)
-	expect(reports[0]).toContain('bad v2')
+	for (let part of [path, `${path}.broken`, 'bad v2']) expect(reports[0]).toContain(part)
+	expect(plugins.describe()).toContain('bad v2')
+	// Removing the vanished file keeps the error for /plugins.
+	await plugins.sync(dir, 'a.ts')
 	expect(plugins.describe()).toContain('bad v2')
 })
 
-test('deleting a file removes its hooks and runs its unload', async () => {
+test('an async registration function is refused, and hooks registered after the body returned are refused', async () => {
+	let original = t.f
+	let path = await plugin('a.ts', `globalThis.late = plugin`)
+	expect(() => g.late.around(t, 'f', () => 0)).toThrow('after the registration function returned')
+	expect(t.f).toBe(original)
+	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default async (plugin: any) => { plugin.around(t, 'f', () => 0) }\n`)
+	await plugins.load(path)
+	expect(t.f).toBe(original)
+	expect(reports[0]).toContain('a Promise')
+	expect(existsSync(`${path}.broken`)).toBe(true)
+})
+
+test('deleting a file removes its hooks and runs its cleanup', async () => {
 	let original = t.f
 	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 0)
-plugin.unload(() => t.log.push('unloaded'))`)
+return () => t.log.push('cleaned')`)
 	unlinkSync(path)
 	await plugins.sync(dir, 'a.ts')
 	expect(t.f).toBe(original)
-	expect(t.log).toEqual(['unloaded'])
+	expect(t.log).toEqual(['cleaned'])
 })
 
 test('an expired file never registers; a live one is unloaded when its expiry passes', async () => {
@@ -137,7 +172,7 @@ test('an expired file never registers; a live one is unloaded when its expiry pa
 	expect(g.pluginRuns).toBe(0)
 	expect(t.f).toBe(original)
 	let soon = new Date(Date.now() + 150).toISOString()
-	await plugin('soon.ts', `plugin.around(t, 'f', () => 0)\nplugin.unload(() => t.log.push('expired'))`, `export const expires = '${soon}'`)
+	await plugin('soon.ts', `plugin.around(t, 'f', () => 0)\nreturn () => t.log.push('expired')`, `export const expires = '${soon}'`)
 	expect(t.f(1)).toBe(0)
 	await Bun.sleep(300)
 	expect(t.f).toBe(original)
@@ -145,7 +180,7 @@ test('an expired file never registers; a live one is unloaded when its expiry pa
 	expect(plugins.describe()).toContain(`expired ${soon}`)
 })
 
-test('a missing or non-function target, or a bad expires, is a load error naming file and target, and registers nothing', async () => {
+test('a missing or non-function target, or a bad expires, breaks the file with an error naming file and target', async () => {
 	let original = t.f
 	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 0)\nplugin.before(t, 'nope', () => {})`)
 	expect(t.f).toBe(original)
@@ -159,32 +194,10 @@ test('a missing or non-function target, or a bad expires, is a load error naming
 	expect(reports[2]).toContain('expires')
 })
 
-test('async registration stays staged; a load overtaken by an edit or deletion is discarded', async () => {
-	let original = t.f
-	let slow = `plugin.around(t, 'f', () => 'slow')\nawait new Promise((r) => (globalThis.release = r))`
-	let path = join(dir, 'a.ts')
-	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default async (plugin: any) => {\n${slow}\n}\n`)
-	let pending = plugins.load(path)
-	await Bun.sleep(20)
-	expect(t.f).toBe(original)
-	await plugin('a.ts', `plugin.around(t, 'f', () => 'fast')`)
-	g.release()
-	await pending
-	expect(t.f(1)).toBe('fast')
-
-	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default async (plugin: any) => {\n${slow}\n}\n`)
-	pending = plugins.load(path)
-	await Bun.sleep(20)
-	unlinkSync(path)
-	await plugins.sync(dir, 'a.ts')
-	g.release()
-	await pending
-	expect(t.f).toBe(original)
-})
-
 test('the directory is watched: a new file hooks, an edit reloads, /plugins names the targets', async () => {
-	await plugins.init(dir)
-	let path = join(dir, 'w.ts')
+	// Its own directory: target.ts is no plugin.
+	await plugins.init(join(dir, 'p'))
+	let path = join(dir, 'p', 'w.ts')
 	let head = `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\n`
 	writeFileSync(path, `${head}export default (plugin: any) => plugin.around(t, 'f', () => 'one')\n`)
 	for (let i = 0; i < 100 && t.f(1) !== 'one'; i++) await Bun.sleep(20)
@@ -193,84 +206,4 @@ test('the directory is watched: a new file hooks, an edit reloads, /plugins name
 	writeFileSync(path, `${head}export default (plugin: any) => plugin.around(t, 'f', () => 'two')\n`)
 	for (let i = 0; i < 100 && t.f(1) !== 'two'; i++) await Bun.sleep(20)
 	expect(t.f(1)).toBe('two')
-})
-
-// A plugin body that logs its onChange calls as `tag reason phase`, and
-// what t.f returns at that moment (which hooks are active).
-let changes = (tag: string) => `plugin.onChange(({ reason, phase }: any) => t.log.push(\`${tag} \${reason} \${phase} \${t.f(1)}\`))`
-
-test('onChange: load, then reload runs outgoing then incoming, both seeing the new hooks', async () => {
-	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 'v1')\n${changes('v1')}`)
-	expect(t.log).toEqual(['v1 load activate v1'])
-	t.log.length = 0
-	await plugin('a.ts', `plugin.around(t, 'f', () => 'v2')\n${changes('v2')}`)
-	expect(t.log).toEqual(['v1 reload deactivate v2', 'v2 reload activate v2'])
-	t.log.length = 0
-	// A failed or superseded load runs none and keeps the hooks.
-	writeFileSync(path, `export default (plugin: any) => { plugin.onChange(() => (globalThis as any).pluginRuns++); throw new Error('bad') }\n`)
-	await plugins.load(path)
-	expect(g.pluginRuns).toBe(0)
-	expect(t.log).toEqual([])
-	expect(t.f(1)).toBe('v2')
-})
-
-test('onChange: delete and expiry run deactivate with the hooks already gone', async () => {
-	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 0)\n${changes('a')}`)
-	unlinkSync(path)
-	await plugins.sync(dir, 'a.ts')
-	let soon = new Date(Date.now() + 100).toISOString()
-	await plugin('b.ts', `plugin.around(t, 'f', () => 0)\n${changes('b')}`, `export const expires = '${soon}'`)
-	await Bun.sleep(250)
-	expect(t.log.filter((l: string) => l !== 'f')).toEqual(['a load activate 0', 'a delete deactivate 2', 'b load activate 0', 'b expire deactivate 2'])
-})
-
-test('a throwing or rejecting callback is reported and the others still run', async () => {
-	await plugin(
-		'a.ts',
-		`plugin.onChange(() => { throw new Error('sync boom') })
-plugin.onChange(async () => { throw new Error('async boom') })
-plugin.onChange(() => t.log.push('third'))
-plugin.unload(() => { throw new Error('unload boom') })
-plugin.unload(() => t.log.push('unloaded'))`,
-	)
-	await plugin('a.ts', ``)
-	await Bun.sleep(1)
-	expect(t.log).toEqual(['third', 'unloaded', 'third'])
-	expect(reports.join('\n')).toContain('sync boom')
-	expect(reports.join('\n')).toContain('async boom')
-	expect(reports.join('\n')).toContain('unload boom')
-})
-
-test('a failed or superseded load runs its staged cleanups at once and keeps the active version', async () => {
-	let path = await plugin('a.ts', `plugin.around(t, 'f', () => 'v1')\nplugin.unload(() => t.log.push('v1 unload'))`)
-	writeFileSync(path, `export default (plugin: any) => { plugin.unload(() => (globalThis as any).pluginRuns++); throw new Error('bad') }\n`)
-	await plugins.load(path)
-	expect(g.pluginRuns).toBe(1)
-	expect(t.f(1)).toBe('v1')
-	expect(t.log).toEqual([])
-
-	let slow = `plugin.unload(() => t.log.push('slow unload'))\nawait new Promise((r) => (globalThis.release = r))`
-	writeFileSync(path, `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default async (plugin: any) => {\n${slow}\n}\n`)
-	let pending = plugins.load(path)
-	await Bun.sleep(20)
-	await plugin('a.ts', `plugin.around(t, 'f', () => 'v3')`)
-	expect(t.log).toEqual(['v1 unload'])
-	g.release()
-	await pending
-	expect(t.log).toEqual(['v1 unload', 'slow unload'])
-	expect(t.f(1)).toBe('v3')
-})
-
-test('an unload registered after its version was dropped or removed runs at once', async () => {
-	let path = await plugin('a.ts', `globalThis.late = plugin.unload\nplugin.around(t, 'f', () => 'v1')`)
-	let late = g.late
-	await plugin('a.ts', `plugin.around(t, 'f', () => 'v2')`)
-	late(() => t.log.push('late v1'))
-	expect(t.log).toEqual(['late v1'])
-
-	writeFileSync(path, `export default (plugin: any) => { globalThis.late = plugin.unload; throw new Error('bad') }\n`)
-	await plugins.load(path)
-	g.late(() => t.log.push('late failed'))
-	expect(t.log).toEqual(['late v1', 'late failed'])
-	expect(t.f(1)).toBe('v2')
 })
