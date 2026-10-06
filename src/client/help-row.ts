@@ -2,7 +2,7 @@
 // row, so the prompt never jumps when what it says changes. In
 // priority order: the keys of an open question, the hint while editing
 // the last prompt, tab completion's choices, else the key hints for
-// the session's state (then 'ctrl-r: reload client' when a new commit
+// the session's state (then 'ctrl-r: reload' when a new commit
 // is checked out) with '/keys: shortcuts' at the right. Keys in
 // the help key color, descriptions in its description color, as in
 // the old Hal. Pure.
@@ -40,10 +40,10 @@ function question(st: FormState): Hint[] {
 // The key hints for the session's state and whether the prompt has text.
 function keys(state: SessionState | undefined, text: boolean): Hint[] {
 	let working = state?.type === 'running' || state?.type === 'retrying' || state?.type === 'blocked'
-	if (working && text) return [['enter', 'interrupt'], ['alt-enter', 'after this turn'], ['shift-enter', 'newline'], ['esc', 'pause']]
+	if (working && text) return [['enter', 'interrupt'], ['alt-enter', 'queue'], ['shift-enter', 'newline'], ['esc', 'pause']]
 	if (state?.type === 'retrying' && !text) return [['enter', 'retry now'], ['esc', 'pause']]
 	if (working) return [['esc', 'pause']]
-	if (text) return [['enter', 'send'], ['shift-enter', 'newline'], ['alt-enter', 'after this turn']]
+	if (text) return [['enter', 'send'], ['shift-enter', 'newline'], ['alt-enter', 'queue']]
 	if (state?.type === 'paused') return [['enter', 'continue']]
 	if (state?.type === 'error') return [['enter', 'retry']]
 	return []
@@ -68,7 +68,7 @@ function row(v: HelpInput, cols: number, resize = false): string {
 	if (v.choices?.length) return line(ansi.clean(v.choices.join('  ')))
 	let hints = helpRow.keys(v.transcript?.state, v.prompt.text.trim() !== '')
 	if (resize) hints = [['ctrl-=/-', 'resize prompt'], ...hints]
-	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'reload client']] : hints)
+	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'reload']] : hints)
 	let right = helpRow.paint([['/keys', 'shortcuts']])
 	let rw = strings.visLen(right)
 	if (rw + 1 > width) return line(left)
