@@ -56,7 +56,25 @@ function page(): () => void {
 		return e instanceof HTMLTextAreaElement || (e instanceof HTMLInputElement && !['button', 'checkbox', 'radio', 'file', 'submit', 'reset', 'range', 'color'].includes(e.type)) || (e instanceof HTMLElement && e.isContentEditable)
 	}
 	let full = () => (!vv || vv.scale > 1.01 || typing() ? undefined : { width: innerWidth, height: innerHeight, offsetLeft: 0, offsetTop: 0 })
-	return sync(vv, document.documentElement.style, full, [[window, ['resize', 'pageshow']], [document, ['focusin', 'focusout', 'visibilitychange']]])
+	let root = document.documentElement
+	// The app follows an opening keyboard at once, so the composer is
+	// never hidden; when it closes, html.easing lets the composer glide
+	// down on an S curve (index.html) rather than drop with the
+	// keyboard, so the Send button's flash stays in sight.
+	let last = 0, timer: ReturnType<typeof setTimeout> | undefined
+	let style = { setProperty(k: string, v: string) {
+		if (k === '--app-height') {
+			let h = parseFloat(v)
+			if (last && h > last + 100 && matchMedia('(pointer: coarse)').matches) {
+				root.classList.add('easing')
+				clearTimeout(timer)
+				timer = setTimeout(() => root.classList.remove('easing'), 400)
+			}
+			last = h
+		}
+		root.style.setProperty(k, v)
+	} }
+	return sync(vv, style, full, [[window, ['resize', 'pageshow']], [document, ['focusin', 'focusout', 'visibilitychange']]])
 }
 
 // iOS scrolls the document to its top when the status bar is tapped,
