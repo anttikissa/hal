@@ -10,6 +10,7 @@ import { titles } from '../common/titles.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { transcript, type Item as Keyed, type Shown as Item } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
+import { markdown } from '../common/markdown.ts'
 import { markdownView } from './markdown-view.ts'
 import { summary } from '../common/summary.ts'
 import { names } from '../common/names.ts'
@@ -91,6 +92,7 @@ function headed(item: Item, body: string[], width: number, session?: string): st
 // pastes a prompt shown inline needs.
 function itemLines(item: Item, width: number, streaming = false, session?: string, calls?: Map<string, string>, tool?: string, images: Item[] = [], look: Look = {}): string[] {
 	let fold = look.fold
+	let key = (item as { key?: string }).key ?? ''
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
@@ -138,12 +140,12 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			if (fold === 'closed' && !streaming) return itemView.closedRow(item, item.text, width, prefix)
 			// Leave at least one text column even on a very narrow terminal.
 			prefix = strings.clipVisual(prefix, Math.max(0, width - 1))
-			let body = markdownView.lines(item.text.trimEnd(), width - strings.visLen(prefix), streaming, itemView.itemStyle(item))
+			let body = markdownView.lines(item.text.trimEnd(), width - strings.visLen(prefix), streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
 			return [prefix + (body[0] ?? ''), ...body.slice(1).map(line => ' '.repeat(strings.visLen(prefix)) + line)]
 		}
 		case 'text':
 			if (fold === 'closed' && !streaming) return itemView.closedRow(item, names.strip(summary.strip(item.text)), width)
-			return itemView.headed(item, markdownView.lines(names.strip(summary.strip(item.text)).trimEnd(), width, streaming, itemView.itemStyle(item)), width)
+			return itemView.headed(item, markdownView.lines(names.strip(summary.strip(item.text)).trimEnd(), width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined), width)
 		case 'tool': {
 			let { command, description } = item.input
 			let prefix = titles.stamp(item.ts, '')

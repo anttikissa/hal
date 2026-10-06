@@ -10,7 +10,7 @@
 
 import { createEffect, createMemo, For, Match, onSettled, Show, Switch } from 'solid-js'
 import type { JSX } from '@solidjs/web'
-import { markdown, type Code, type Line, type Run, type Table } from '../../common/markdown.ts'
+import { markdown, type Code, type Line, type Links, type Run, type Table } from '../../common/markdown.ts'
 
 // Solid's string binding assigns Text.data, which resets native Range
 // offsets even when text only grows. Edit only changed characters instead;
@@ -37,7 +37,7 @@ function Runs(props: { runs: Run[] }) {
 		<For each={props.runs} keyed={false}>
 			{(r) => (
 				<Switch>
-					<Match when={!!r().href}><a class={cls(r())} href={external(r().href!)} target="_blank" rel="noopener noreferrer"><Text value={r().text} /></a></Match>
+					<Match when={!!r().href}><a class={cls(r())} href={external(r().href!)} target={r().href!.startsWith('/') ? undefined : '_blank'} rel="noopener noreferrer"><Text value={r().text} /></a></Match>
 					<Match when={!r().href}><span class={cls(r())}><Text value={r().text} /></span></Match>
 				</Switch>
 			)}
@@ -45,8 +45,10 @@ function Runs(props: { runs: Run[] }) {
 	)
 }
 
-export function Markdown(props: { text: string; streaming?: boolean; children?: JSX.Element }) {
-	let blocks = createMemo(() => markdown.parse(props.text.trimEnd(), !!props.streaming))
+// `links`: block ids in the text that are links (task d92); in-app links
+// open in this tab.
+export function Markdown(props: { text: string; streaming?: boolean; links?: Links; children?: JSX.Element }) {
+	let blocks = createMemo(() => markdown.parse(props.text.trimEnd(), !!props.streaming, props.links))
 	let root: HTMLDivElement | undefined
 	let peak = 0
 	onSettled(() => {
