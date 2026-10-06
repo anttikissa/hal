@@ -1,9 +1,10 @@
 import { expect, test } from 'bun:test'
+import { inbox } from './inbox.ts'
 import { rebaseRows } from './rebase-rows.ts'
 import { replay, type HistoryRecord } from './replay.ts'
 
 const ts = new Date(2026, 9, 4, 9, 0).toISOString()
-const prompt = (n: number, text: string): HistoryRecord => ({ type: 'user', n, ts, blocks: [{ type: 'text', text }] })
+const prompt = (n: number, text: string): HistoryRecord & { type: 'user' } => ({ type: 'user', n, ts, blocks: [{ type: 'text', text }] })
 const say = (n: number, text: string): HistoryRecord => ({ type: 'assistant', n, ts, block: { type: 'text', text } })
 const call: HistoryRecord = { type: 'assistant', n: 3, ts, block: { type: 'tool_call', id: 'a', name: 'bash', input: { command: './test' } } }
 const result: HistoryRecord = { type: 'user', n: 5, ts, blocks: [{ type: 'tool_result', id: 'a', output: 'output cut; whole output in blob abcdef123456', image: { type: 'image', blob: '123456abcdef', mediaType: 'image/png', bytes: 500 } }] }
@@ -80,4 +81,27 @@ test('multi-result rows edit one output through its call number and expose paire
 test('deleting one row of a signed drop group refuses another edited row with its todo line', () => {
 	let snapshot = rebaseRows.build([prompt(1, 'go'), { type: 'assistant', n: 2, ts, block: { type: 'thinking', text: 'reason', signature: 'sig' } }, say(3, 'answer')])
 	expect(() => rebaseRows.parse('keep #1\nedit #3', snapshot)).toThrow('line 2: edited record #3 belongs to a dropped group')
+})
+
+test('waiting messages are editable rows; dropping removes all revisions and undo restores the inbox', () => {
+	let raw: HistoryRecord[] = [prompt(1, 'go'), { type: 'inbox', n: 2, ts, id: 'message', text: 'original', from: 'other-session', label: 'Other session', interject: true }, { type: 'inbox', n: 3, ts, id: 'message', text: 'current', from: 'other-session', label: 'Other session', interject: true }]
+	let snapshot = rebaseRows.build(raw)
+	expect(snapshot.rows[1]).toMatchObject({ n: 2, ns: [2, 3], kind: 'interjecting', summary: 'Other session: current', editN: 3, text: 'current' })
+	let edited = rebaseRows.parse('keep #1\nedit #2', snapshot, { 2: 'replacement' })
+	let current = replay.current([...raw, { type: 'rebase', n: 4, ts, ...edited.plan }])
+	expect(inbox.pending(current)).toMatchObject([{ n: 2, text: 'replacement', from: 'other-session', interject: true }])
+	let dropped = rebaseRows.parse('keep #1', snapshot)
+	let rewrite: HistoryRecord = { type: 'rebase', n: 4, ts, ...dropped.plan }
+	expect(inbox.pending(replay.current([...raw, rewrite]))).toEqual([])
+	expect(inbox.pending(replay.current([...raw, rewrite, { type: 'rebase', n: 5, ts, base: 3, drop: [], edit: [] }]))).toMatchObject([{ text: 'current' }])
+})
+
+test('dropping a delivered prompt never resurrects its inbox messages', () => {
+	let raw: HistoryRecord[] = [prompt(1, 'go'), { type: 'inbox', n: 2, ts, id: 'message', text: 'from another session', from: 'other-session' }, { ...prompt(3, 'from another session'), inbox: ['message'] }]
+	let snapshot = rebaseRows.build(raw)
+	expect(snapshot.rows.map((row) => row.n)).toEqual([1, 3])
+	let dropped = rebaseRows.parse('keep #1', snapshot)
+	let current = replay.current([...raw, { type: 'rebase', n: 4, ts, ...dropped.plan }])
+	expect(inbox.pending(current)).toEqual([])
+	expect(current.map((r) => r.n)).toEqual([1])
 })

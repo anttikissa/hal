@@ -13,8 +13,16 @@ function apply(id: string, plan: RebasePlan, expectedBase = plan.base): HistoryR
 	let problem = rebase.invalid(plan)
 	if (problem) throw new Error(problem)
 	if (plan.base !== expectedBase && !raw.some((r) => r.type === 'rebase' && r.base === plan.base)) throw new Error('Undo base has no earlier rebase.')
-	replay.current([...raw, { type: 'rebase', ...plan, ts: new Date().toISOString() }])
-	return history.append(id, { type: 'rebase', ...plan })
+	let current = replay.current([...raw, { type: 'rebase', ...plan, ts: new Date().toISOString() }])
+	let state = states.fromHistory(current)
+	let last = current.findLast((r) => r.type === 'assistant' || (r.type === 'user' && r.blocks.length > 0))
+	let unanswered = last?.type === 'user' && last.blocks.some((b) => b.type === 'text')
+	let record = history.append(id, { type: 'rebase', ...plan })
+	// Rewritten context is never permission to start a request, even on takeover.
+	if (state.type === 'running' || (state.type === 'idle' && unanswered)) history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
+	status.state.states.delete(id)
+	status.state.derived.delete(id)
+	return record
 }
 
 export const rebases = { apply }

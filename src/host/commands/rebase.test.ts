@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { client, created, fresh, restartHost, until, useHost, calls } from '../host-fixture.test.ts'
 import { history } from '../history.ts'
 import { tools } from '../tools.ts'
+import { states } from '../../common/states.ts'
 
 useHost()
 
@@ -80,4 +81,56 @@ test('todo replacement text is applied; queue prompts start in order; empty and 
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
 	expect(a.of('turn-start').at(-1).prompt).toBe('second')
+})
+
+test('waiting cross-session messages can be dropped from the todo and stay gone after host restart', async () => {
+	let a = client(), id = created(a)
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'go' }] })
+	history.append(id, { type: 'turn_end', status: 'paused', usage: {} })
+	let message = history.append(id, { type: 'inbox', id: 'cross-session-message', text: 'waiting message', from: 'other-session', label: 'Other session', interject: true })
+	a.conn.send({ type: 'open', sessionId: id })
+	expect(a.views.get(id)?.inbox).toHaveLength(1)
+	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
+	await until(() => a.of('rebase-plan').length)
+	let start = a.of('rebase-plan')[0]
+	expect(start.snapshot.rows.find((row: any) => row.n === message.n)).toMatchObject({ text: 'waiting message' })
+	let todo = start.todo.replace(new RegExp(`^keep\\s+#${message.n}.*\\n`, 'm'), '')
+	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo })
+	expect(a.of('rebase-result').at(-1)?.ok).toBe(true)
+	expect(a.views.get(id)?.inbox).toEqual([])
+	restartHost()
+	expect((await fresh(id)).inbox).toEqual([])
+	let b = client(); b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.views.has(id))
+	b.conn.send({ type: 'submit', sessionId: id, text: '/rebase undo' })
+	await until(() => b.of('history-rewritten').length)
+	expect(b.views.get(id)?.inbox).toMatchObject([{ text: 'waiting message', from: 'other-session' }])
+})
+
+test('rebase leaving an unanswered prompt clears cached idle state and Enter can resume after restart', async () => {
+	let a = client(), id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'Answer this.' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: 'Old answer.' }, { type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length)
+	expect(a.views.get(id)?.state.type).toBe('idle')
+	let answer = history.readSync(id).find((r) => r.type === 'assistant' && r.block.type === 'text')!
+	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
+	await until(() => a.of('rebase-plan').length)
+	let start = a.of('rebase-plan')[0]
+	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, plan: { base: start.snapshot.base, drop: [answer.n], edit: [] } })
+	expect(a.views.get(id)?.state.type).toBe('paused')
+	expect(calls).toHaveLength(1)
+	restartHost()
+	let snap = await fresh(id)
+	expect(snap.state.type).toBe('paused')
+	expect(calls).toHaveLength(1)
+	let b = client(); b.conn.send({ type: 'open', sessionId: id })
+	await until(() => b.views.has(id))
+	let enter = states.enter(id, snap.state, '')
+	expect(enter.command).toMatchObject({ type: 'continue', sessionId: id })
+	b.conn.send(enter.command as any)
+	await until(() => calls.length === 2)
+	expect(JSON.stringify(calls[1]!.input.messages)).toContain('Answer this.')
+	expect(JSON.stringify(calls[1]!.input.messages)).not.toContain('Old answer.')
 })

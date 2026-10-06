@@ -2,11 +2,13 @@
 	title: 'Rebase rows: what each record costs and holds',
 	spec: `One shared, browser-safe module (src/common/) turns a session's current records into rebase rows, used by the terminal todo file and the web view alike. One row per prompt, assistant text, thinking block, tool call with its result (one row), command and output, compact or reset boundary. Each row: #n, time (HH:MM, date when it changes), kind, a one-line summary (prompt's first line, tool name and command or path, thinking's first words), its size in estimated tokens and characters, and what it carries: images, blobs (with their size), a cut or pruned output. Sums at the top: rows, tokens now, tokens after the planned changes, and from which record the prompt cache would be rebuilt.
 Token estimates use the calibrated chars-per-token ratio when there is one (task 1dk), otherwise the pruning estimate.
-Rendering a plan to todo text and parsing it back live here too (format in tasks/3zz/rebase.md), with errors naming the line.`,
+Rendering a plan to todo text and parsing it back live here too (format in tasks/3zz/rebase.md), with errors naming the line.
+Waiting inbox messages, including messages from other sessions, have visible rebase rows with their stable inbox number, sender, delivery kind and current text. They can be kept, dropped or edited in the same shared plan as prompts; delivered and withdrawn inbox audit records do not create duplicate rows.`,
 	status: 'done',
 	notes: [
 		'Browser-safe API: rebaseRows.build(raw, { model, ratios, blobSizes, pruned }) returns { base, records, rows, options }; totals(snapshot, plan), render(sessionId, snapshot, plan) and parse(todo, snapshot, replacementsByRowNumber). parse returns { plan, queue, edits, aborted }; edits are row numbers awaiting full-text editing. Rows expose n, ns, group, editable, editN and text. A tool row names its call, but its editN normally names the single result record; batched results use the call number to select one output. Groups may connect multiple rows; deletion/drop propagates and conflicting edits are rejected with the source line. Row costs use tokenEstimates and caller-supplied calibration ratios; blob sizes and pruning marks are supplied by the host. Sums use rows’ estimated payload costs, and cacheFrom follows history order rather than numeric sorting (streamed numbers may be out of append order).',
-		'Terminal todos align Action, N, Tok and Chars columns; shared instructions allow repeated user rows as ordered queue entries and recommend abort when there are no editable rows.'
+		'Terminal todos align Action, N, Tok and Chars columns; shared instructions allow repeated user rows as ordered queue entries and recommend abort when there are no editable rows.',
+		'Waiting inbox cards were absent from the todo because rows handled only delivered user records. Rows now use inbox.pending, keep the first stable number, edit the latest revision, and drop every revision. Sender and delivery metadata survive edits.'
 	],
 	needs: ['3zz']
 }

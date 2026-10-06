@@ -1,4 +1,5 @@
 // Shared terminal/web rows and the interactive todo-file format (task 01d).
+import { inbox } from './inbox.ts'
 import { attachments } from './attachments.ts'
 import type { UserBlock } from './blocks.ts'
 import { rebase, type RebasePlan } from './rebase.ts'
@@ -23,6 +24,12 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 	let records = replay.current(raw), rows: RebaseRow[] = [], groups = rebase.groups(records)
 	let calls = new Map<string, RebaseRow>(), command: RebaseRow | undefined
 	let byNumber = new Map(records.map((r) => [r.n, r]))
+	let waiting = new Map(inbox.pending(records).map((item) => [item.n, item]))
+	let revisions = new Map<string, number[]>()
+	for (let r of records) if (r.type === 'inbox' && r.n !== undefined) {
+		let ns = revisions.get(r.id) ?? []
+		ns.push(r.n); revisions.set(r.id, ns)
+	}
 	let add = (r: HistoryRecord, kind: string, summary: string, characters: number): RebaseRow => {
 		if (r.n === undefined) throw new Error('Rebase rows require stable record numbers.')
 		let row: RebaseRow = { n: r.n, ns: [r.n], ts: r.ts, time: '', kind, summary: oneLine(summary), characters, tokens: 0, carries: [], group: [...(groups.get(r.n) ?? [r.n])], editable: false }
@@ -76,6 +83,13 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 				carry(row, b.text)
 				row.editable = b.type === 'text'; row.editN = row.editable ? r.n : undefined; row.text = row.editable ? b.text : undefined
 			}
+		} else if (r.type === 'inbox' && waiting.has(r.n)) {
+			let item = waiting.get(r.n)!
+			let kind = item.queue ? 'queued' : item.advisory ? 'advisory' : item.interject ? 'interjecting' : 'steering'
+			let row = add(r, kind, `${item.from === undefined ? 'You' : item.label ?? item.from}: ${item.text}`, item.text.length)
+			row.ns = revisions.get(r.id)!
+			row.editable = true; row.editN = row.ns.at(-1); row.text = item.text
+			carry(row, item.text)
 		} else if (r.type === 'command') command = add(r, 'command', r.text, r.text.length)
 		else if (r.type === 'output') {
 			if (!command) { let row = add(r, 'output', r.text, r.text.length); carry(row, r.text) }

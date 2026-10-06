@@ -21,6 +21,15 @@ function groups(records: HistoryRecord[]): Map<number, Set<number>> {
 		let all = new Set(ns.flatMap((n) => [...(out.get(n) ?? [])]))
 		for (let n of all) out.set(n, all)
 	}
+	let inboxRecords = new Map<string, number[]>()
+	for (let r of records) if (r.type === 'inbox' && r.n !== undefined) {
+		let ns = inboxRecords.get(r.id) ?? []
+		ns.push(r.n); inboxRecords.set(r.id, ns)
+	}
+	for (let ns of inboxRecords.values()) join(ns)
+	for (let r of records) if (r.type === 'user' && r.n !== undefined) {
+		for (let id of r.inbox ?? []) join([r.n, ...(inboxRecords.get(id) ?? [])])
+	}
 	let calls = new Map<string, number>(), round: number[] = [], signed = false, command: number | undefined
 	let flush = () => { if (signed) join(round); round = []; signed = false }
 	for (let r of records) {
@@ -45,6 +54,7 @@ function groups(records: HistoryRecord[]): Map<number, Set<number>> {
 }
 
 function text(r: HistoryRecord): string | undefined {
+	if (r.type === 'inbox') return r.text
 	if (r.type === 'assistant' && r.block.type === 'text') return r.block.text
 	if (r.type !== 'user') return undefined
 	let texts = r.blocks.filter((b) => b.type === 'text')
@@ -53,6 +63,7 @@ function text(r: HistoryRecord): string | undefined {
 }
 
 function edited(r: HistoryRecord, text: string): HistoryRecord {
+	if (r.type === 'inbox') return { ...r, text }
 	if (r.type === 'assistant' && r.block.type === 'text') return { ...r, block: { ...r.block, text } }
 	if (r.type === 'user') {
 		if (r.blocks.some((b) => b.type === 'text')) {
