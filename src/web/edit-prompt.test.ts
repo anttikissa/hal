@@ -99,6 +99,7 @@ test('queued card Edit preserves the draft and waits for protection; save and ca
 	expect(save.queue).toBeUndefined()
 	expect(app.pending()).toEqual([])
 	app.onEvent({ type: 'ack', id: save.id })
+	app.onEvent({ type: 'queue-hold', sessionId })
 	expect(app.state.text).toBe('my draft')
 	expect(app.state.view.editing).toBeUndefined()
 	editPrompt.edit('queued')

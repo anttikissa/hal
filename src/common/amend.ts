@@ -96,7 +96,7 @@ function resume(editing: Editing, t: Transcript | undefined): unknown {
 // prompt is replaced only if nothing with side effects ran since
 // (prompts.amend on the host).
 function bar(editing: Editing): string {
-	if (editing.queueEdit) return 'Editing queued message · saving replaces it in the queue; the session stays paused until you finish'
+	if (editing.queueEdit) return 'Editing queued message · Saving keeps its place in the queue'
 	if (editing.rewind === undefined) return editing.changed ? 'Editing the last prompt · files changed since, so sending adds it as a new prompt' : 'Editing the last prompt · sending replaces it'
 	let k = editing.later ?? 0
 	let text = `Editing prompt #${editing.rewind} · sending rewinds here: ${k} later message${k === 1 ? '' : 's'} leave${k === 1 ? 's' : ''} the context`

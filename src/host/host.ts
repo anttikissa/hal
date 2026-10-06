@@ -209,7 +209,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 			return {}
 		})()
 	}
-	if (tabs.is(c)) { if (c.type === 'tab-close') queueEdits.suppress(c.sessionId); return tabs.act(c) }
+	if (tabs.is(c)) return tabs.act(c)
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
 	if (c.type === 'notice-history') return { reply: { type: 'notice-history', entries: noticeHistory.list() } }
 	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid) : clients.screen(client.record, c)
@@ -231,7 +231,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		return undefined
 	}
 	let refused: string | undefined
-	if (c.type === 'close') { queueEdits.suppress(c.sessionId); queueEdits.disconnect(client, c.sessionId); client.open.delete(c.sessionId); if (client.visible === c.sessionId) client.visible = undefined; if (client.shown === c.sessionId) client.shown = undefined }
+	if (c.type === 'close') { queueEdits.disconnect(client, c.sessionId); client.open.delete(c.sessionId); if (client.visible === c.sessionId) client.visible = undefined; if (client.shown === c.sessionId) client.shown = undefined }
 	else if (c.type === 'attach') {
 		let stored = c.name !== undefined ? blobs.stage(c.name, c.mediaType, c.data) : blobs.store(c.sessionId, c.mediaType, c.data)
 		return { reply: { type: 'attached', sessionId: c.sessionId, command: c.id ?? '', blob: stored.blob, marker: stored.marker } }
@@ -251,7 +251,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 		if (changed) prompts.draft(c.sessionId, changed, c.id)
 		else return { reply: { type: 'draft', sessionId: c.sessionId, draft: drafts.get(c.sessionId), ...(c.id !== undefined ? { command: c.id } : {}) } }
 	} else if (c.type === 'continue') refused = prompts.resume(c.sessionId)
-	else if (c.type === 'pause') { queueEdits.suppress(c.sessionId); refused = status.stateOf(c.sessionId).type === 'paused' ? undefined : turns.stop(c.sessionId) }
+	else if (c.type === 'pause') refused = status.stateOf(c.sessionId).type === 'paused' ? undefined : turns.stop(c.sessionId)
 	else if (c.type === 'answer') refused = prompts.reply(c.sessionId, c.question, c.answers)
 	else if (c.type === 'models') void slash.models(c.sessionId).then((e) => host.state.clients.has(client) && client.deliver(e))
 	else if (c.type === 'paste-text') return { reply: blobs.pasteText(c.sessionId, c.name) }
@@ -272,10 +272,10 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 function ready(id: string): Promise<void> | undefined {
 	let pending = host.state.opening.get(id)
 	if (pending) return pending
-	if (sessions.state.open.has(id)) { queueEdits.recover(id); return undefined }
+	if (sessions.state.open.has(id)) return undefined
 	pending = history
 		.open(id)
-		.then(() => queueEdits.recover(id))
+		.then(() => {})
 		.finally(() => host.state.opening.delete(id))
 	host.state.opening.set(id, pending)
 	return pending
@@ -322,7 +322,7 @@ function quitting(last: boolean): void {
 // Forgets every client and turn (tests).
 function reset(): void {
 	history.stop(false)
-	queueEdits.state.clear(); queueEdits.pending.clear()
+	queueEdits.state.clear()
 	find.reset()
 	recap.reset()
 	for (let r of turns.state.running.values()) r.controller.abort()

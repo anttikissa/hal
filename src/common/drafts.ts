@@ -38,7 +38,8 @@ export type Local = {
 	queueEdit?: QueueEditing
 }
 
-export type Store = { load(sessionId: string): Local | undefined; save(sessionId: string, local: Local): void }
+// `window`: names this window (queue-edit.ts), if the store is shared with others.
+export type Store = { load(sessionId: string): Local | undefined; save(sessionId: string, local: Local): void; window?(): string }
 
 type DraftsState = {
 	sessions: Map<string, Local>
@@ -71,7 +72,7 @@ function valid(l: Local | undefined): Local | undefined {
 	if (!l || typeof l.text !== 'string' || typeof l.base !== 'number' || !Array.isArray(l.sending)) return undefined
 	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.ts === undefined || typeof s.ts === 'string') && (s.queue === undefined || typeof s.queue === 'boolean') && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.rewind === undefined || Number.isSafeInteger(s.rewind)) && (s.queueEdit === undefined || typeof s.queueEdit === 'string'))
 	let e = l.queueEdit
-	let queueEdit = e && typeof e.edit === 'string' && typeof e.message === 'string' && typeof e.text === 'string' && typeof e.active === 'boolean' && (e.original === undefined || typeof e.original === 'string') && (e.request === undefined || typeof e.request === 'string') && (e.saving === undefined || typeof e.saving === 'string') ? e : undefined
+	let queueEdit = e && typeof e.edit === 'string' && typeof e.message === 'string' && typeof e.text === 'string' && typeof e.active === 'boolean' && (e.original === undefined || typeof e.original === 'string') && (e.request === undefined || typeof e.request === 'string') && (e.saving === undefined || typeof e.saving === 'string') && (e.window === undefined || typeof e.window === 'string') ? e : undefined
 	return { text: l.text, base: l.base, dirty: l.dirty === true, sending, ...(queueEdit ? { queueEdit } : {}) }
 }
 

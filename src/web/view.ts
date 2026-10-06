@@ -164,7 +164,7 @@ function editKey(st: ViewState, key: 'up' | 'down' | 'escape', text: string): { 
 
 // The passing notice, else the hint while editing the last prompt.
 function notice(st: ViewState): string | undefined {
-	return st.notice ?? (st.transcript && queueEdit.notice(st.transcript.meta.id)) ?? (st.editing && !st.editing.aside ? amend.hint(st.editing) : undefined)
+	return st.notice ?? (st.transcript && queueEdit.notice(st.transcript)) ?? (st.editing && !st.editing.aside ? amend.hint(st.editing) : undefined)
 }
 
 // Tab in the message box with `text` (the caret at its end): the
@@ -206,7 +206,7 @@ function line(st: ViewState, connected: boolean): Line {
 	if (!connected) return { text: 'reconnecting', tone: 'error' }
 	if (!t) return { text: 'connecting', tone: 'busy' }
 	let s = t.state
-	if (t.queueHold) return { text: 'editing queue', tone: 'warn' }
+	if (queueEdit.waiting(t)) return { text: 'waiting for queue edit', tone: 'warn' }
 	if (s.type === 'idle') return { text: 'idle', tone: 'idle' }
 	let text = states.describe(s, undefined, t.items) ?? ''
 	return { text, tone: s.type === 'error' ? 'error' : s.type === 'running' || s.type === 'retrying' ? 'busy' : 'warn' }
@@ -217,7 +217,6 @@ const commandDraft = (text: string) => /^\/(?:[a-z][a-z0-9-]*(?:\s|$)|$)/.test(t
 
 function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: string][] {
 	if (st.editing?.queueEdit) return [['enter', 'save queue edit'], ['shift+enter', 'newline'], ['esc', 'cancel']]
-	if (st.transcript?.queueHold) return [['shift+enter', 'newline'], ['↑', 'edit queued']]
 
 	let busy = st.transcript && states.busy(st.transcript.state)
 	let command = view.commandDraft(text)
@@ -262,12 +261,12 @@ function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 // command id), but for one the host already put in the transcript: it
 // is a row already, under the same key, so its card stays. `tabs`: the
 // host's tab ids in order, numbering a queued message's sender.
-function withPending(rows: Row[], pending: { id: string; text: string; ts?: string }[], waiting: InboxItem[] = [], tabs: string[] = []): Row[] {
+function withPending(rows: Row[], pending: { id: string; text: string; ts?: string }[], waiting: InboxItem[] = [], tabs: string[] = [], held?: string): Row[] {
 	let keys = new Set(rows.map((r) => r.key))
 	let at = (rows.at(-1)?.at ?? -1) + 1
 	let row = (m: InboxItem): Row => {
 		let r: Row = { item: transcript.waitingItem(m), at, key: m.id, waiting: true }
-		if (m.queue) r.note = inbox.note(m, m.from === undefined ? undefined : tabs.indexOf(m.from) + 1 || undefined)
+		if (m.queue) r.note = inbox.note(m, m.from === undefined ? undefined : tabs.indexOf(m.from) + 1 || undefined, m.id === held)
 		return r
 	}
 	let queued = waiting.filter((m) => !keys.has(m.id)).map(row)
