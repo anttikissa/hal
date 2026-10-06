@@ -126,9 +126,9 @@ function init(): void {
 	version.found = (loaded) => {
 		versions.state.own = loaded
 		host.announce(loaded)
-		app.show()
+		versions.report(app.send), app.show()
 	}
-	version.changed = () => ((versions.state.newCode = true), app.show())
+	version.changed = () => ((versions.state.newCode = true), versions.report(app.send), app.show())
 	main.later(() => void version.init())
 }
 
@@ -159,7 +159,7 @@ function initTerminal(remote?: string): void {
 function onEvent(event: Event): void {
 	if (event.type !== 'version') return app.onEvent(event)
 	versions.state.host = event.version
-	app.show()
+	versions.report(app.send), app.show()
 }
 
 // Joins this home's host, or becomes it; resolves once connected. Either

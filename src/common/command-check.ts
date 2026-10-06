@@ -23,7 +23,8 @@ function invalid(value: unknown): string | undefined {
 		if (replacements !== undefined && (!replacements || typeof replacements !== 'object' || Array.isArray(replacements) || Object.entries(replacements).some(([n, text]) => !/^[1-9]\d*$/.test(n) || typeof text !== 'string'))) return 'rebase-apply: replacements must map record numbers to text'
 		return str('sessionId') ?? str('recoveryPath', true) ?? (c.plan === undefined ? undefined : rebase.invalid(c.plan))
 	}
-	if (c.type === 'hello') return Number.isInteger(c.pid) ? undefined : 'hello: pid must be an integer'
+	// The version reaches git as a revision: only a short hash, never an option.
+	if (c.type === 'hello') return !Number.isInteger(c.pid) ? 'hello: pid must be an integer' : c.version !== undefined && !/^[0-9a-f]{4,40}(\+[0-9a-f]{7})?$/.test(String(c.version)) ? 'hello: version must be a short hash, optionally +7 hex digits' : c.newCode !== undefined && c.newCode !== true ? 'hello: newCode must be true when present' : undefined
 	if (c.type === 'screen') {
 		let size = (n: unknown) => Number.isInteger(n) && (n as number) > 0 && (n as number) <= 10000
 		if (!size(c.cols) || !size(c.rows)) return 'screen: cols and rows must be integers from 1 to 10000'

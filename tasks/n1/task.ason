@@ -9,7 +9,8 @@
 		'client/app.ts is at the 400-line limit: this task merged two comments to stay under it. startup.test.ts measured 124-159 ms both with and without this change under load (4.6); not a regression.',
 		"Every host git call goes through version.git, which always passes --no-optional-locks and only reads. Tests SIGKILL hosts; a killed git that held .git/index.lock (as git stash create did) left it behind and broke agents' commits. ./test fails if a lock appears (task r).",
 		"Hint reads 'reload client', not 'load new code': it names what Ctrl-R does without promising the reload brings anything new.",
-		"User asked for the shortest hint: 'ctrl-r: reload' replaces 'reload client'. Help-row hints are terse key labels; the help text names the full action."
+		"User asked for the shortest hint: 'ctrl-r: reload' replaces 'reload client'. Help-row hints are terse key labels; the help text names the full action.",
+		"Superseded: /version now also shows the asking peer's version (task jjr); peers send it in hello via versions.report."
 	],
 	needs: []
 }

@@ -12,7 +12,7 @@ export type ClientInfo = { kind: Kind; address?: string; userAgent?: string }
 // it followed when it left.
 // `timezone`: the IANA zone the client reported on connecting (task wq),
 // for this connection only: never persisted or logged.
-export type ClientRecord = ClientInfo & { connectedAt: number; lastAt: number; open: Set<string>; pid?: number; goneAt?: number; followed?: string[]; timezone?: string; screen?: { cols: number; rows: number; term?: string } }
+export type ClientRecord = ClientInfo & { connectedAt: number; lastAt: number; open: Set<string>; pid?: number; version?: string; newCode?: true; goneAt?: number; followed?: string[]; timezone?: string; screen?: { cols: number; rows: number; term?: string } }
 
 const goneMs = 24 * 60 * 60 * 1000
 
@@ -27,9 +27,11 @@ function join(open: Set<string>, info: ClientInfo = { kind: 'own' }): ClientReco
 
 // A peer says which process it is (the `hello` command). Only sockets
 // carry peers: a browser cannot name a pid.
-function hello(rec: ClientRecord, pid: number): Record<string, never> {
+function hello(rec: ClientRecord, pid: number, version?: string, newCode?: true): Record<string, never> {
 	if (rec.kind !== 'peer') return {}
 	rec.pid = pid
+	if (version) rec.version = version
+	if (newCode) rec.newCode = newCode
 	for (let old of clients.state.records) if (old.goneAt !== undefined && old.kind === 'peer' && old.pid === pid) clients.state.records.delete(old)
 	return {}
 }
