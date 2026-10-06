@@ -1,0 +1,7 @@
+{
+	title: 'A broken plugin is reported to the session that last edited it',
+	spec: "When the plugin loader disables a failing plugin (task 90v renames it to <name>.ts.broken), it tells the session whose bash call most recently declared that plugin file in modifies and changed it (task c4x declared-only file records). The message is model-visible, so the session can fix its own work, and it names the original path, the .ts.broken path, the complete error and stack, and how to enable the file again (rename it back to .ts). It reports activity, not ownership: it says that session's last edit preceded the failure. Gitignored plugins qualify because declared snapshots compare file contents, not Git status. When no session declared and changed the file (edited outside Hal, or that session no longer exists), Hal names no session and shows the failure as a notice to every client; it never guesses a writer from timing. Test: a session that declares and writes a plugin that throws gets the message; an undeclared edit produces a notice naming no session.",
+	status: 'planned',
+	needs: ['90v', 'c4x'],
+	foldInto: ['90v']
+}
