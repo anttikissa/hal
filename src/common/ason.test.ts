@@ -12,6 +12,12 @@ describe('stringify', () => {
 			}
 		})
 
+		test('values without a literal become parseable: toJSON, then strings for functions and symbols', () => {
+			const out = stringify({ d: new Date(0), f() {}, c: class K {}, s: Symbol('x'), a: [() => 1] }, 'short')
+			expect(out).toBe("{ d: '1970-01-01T00:00:00.000Z', f: '[Function: f]', c: '[class K]', s: 'Symbol(x)', a: ['[Function: (anonymous)]'] }")
+			expect(() => parse(out)).not.toThrow()
+		})
+
 		test('-0 keeps its sign', () => expect(Object.is(parse(stringify(-0)), -0)).toBe(true))
 
 		test('string with newline (smart)', () => expect(stringify('a\nb')).toBe('`a\nb`'))

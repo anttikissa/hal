@@ -1,4 +1,5 @@
-// ASON — A Saner Object Notation. MIT, one TypeScript file, no dependencies.
+// ASON 0.1.0 — A Saner Object Notation. MIT, one TypeScript file, no
+// dependencies.
 //
 // A drop-in replacement for JSON and JSONL that is readable and convenient
 // out of the box. Use it wherever people read or edit the data: config files
@@ -77,10 +78,31 @@
 // counts characters, so a tab is one column. The original lives unchanged
 // in tasks/8.
 //
-// TODO, where ASON still differs from JSON or JS (all checked against this
-// file):
-// - toJSON is ignored (a Date or Map becomes {}); functions and symbols throw
-//   instead of being skipped as in JSON.stringify.
+// Values with no ASON literal are written as JSON.stringify writes them:
+// toJSON(key) runs first, so a Date becomes its ISO string; a Map, Set,
+// Error or class instance is written as its own enumerable keys (often {}).
+// Unlike JSON, which drops them, functions and symbols become strings:
+// '[Function: name]', '[class Name]', 'Symbol(x)'. Lenient by design: output
+// always parses and stringify never throws on such input, so it suits loggers.
+//
+// Future experiments, not decided:
+// - { strict: true }: throw, naming the path (.meta.time), on any value
+//   parse cannot give back.
+// - Write Date, Map and Set as new Date('2026-10-06T…'), new Map([[k, v]])
+//   and new Set([…]), and parse exactly those three forms (no code runs), so
+//   they round-trip and still paste into JS.
+//
+// Changelog
+// 0.1.0 (2026-10-06) First versioned release; changes from the original
+//   Hal ASON in tasks/8:
+//   - stringify takes { mode, indent }; config.indent sets the default;
+//     width counts a tab as one column; -0 stays -0; control characters,
+//     U+2028/U+2029, lone surrogates and \r in backticks are escaped;
+//     toJSON runs as in JSON; functions and symbols become strings.
+//   - parse keeps __proto__ as an own key; reports unterminated comments;
+//     takes unquoted keys only as JS identifiers or integers; reads 0b/0o,
+//     \u{…} and all JS whitespace; reads CRLF in templates as LF.
+//   - This header documents usage and which comments survive.
 
 /** Symbol key for attaching comments to AsonObject/AsonArray. */
 export const COMMENTS = Symbol('comments')
@@ -144,6 +166,19 @@ function renderCollection(open: string, close: string, inline: string, col: numb
 	return `${open}\n${buildLines(unit.repeat(childDepth), childDepth).join('\n')}\n${unit.repeat(depth)}${close}`
 }
 
+// Values ASON has no literal for: toJSON(key) runs first, as in JSON (a Date
+// becomes its ISO string); functions and symbols become descriptive strings,
+// as Node's inspect names them, so output always parses; other objects (Map,
+// Set, Error, class instances) are written as their own enumerable keys.
+function toJsonValue(value: unknown, key: string): unknown {
+	const toJSON = (value as { toJSON?: unknown } | null | undefined)?.toJSON
+	const v = typeof toJSON === 'function' ? toJSON.call(value, key) : value
+	if (typeof v === 'symbol') return v.toString()
+	if (typeof v !== 'function') return v
+	if (/^class\b/.test(Function.prototype.toString.call(v))) return `[class ${v.name || '(anonymous)'}]`
+	return `[Function: ${v.name || '(anonymous)'}]`
+}
+
 function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: number, unit: string): string {
 	if (obj === null) return 'null'
 	if (obj === undefined) return 'undefined'
@@ -161,20 +196,21 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 	if (Array.isArray(obj)) {
 		if (obj.length === 0) return '[]'
 		const comments = maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
-		const inline = maxWidth === 0 ? '' : `[${obj.map((v) => stringifyValue(v, 0, depth, maxWidth, unit)).join(', ')}]`
+		const items = obj.map((v, i) => toJsonValue(v, String(i)))
+		const inline = maxWidth === 0 ? '' : `[${items.map((v) => stringifyValue(v, 0, depth, maxWidth, unit)).join(', ')}]`
 		return renderCollection('[', ']', inline, col, depth, maxWidth, unit, !!comments, (pad, childDepth) =>
-			obj.map((v, i) => `${commentPrefix(comments?.[i], pad)}${pad}${stringifyValue(v, childDepth * unit.length, childDepth, maxWidth, unit)}${i < obj.length - 1 ? ',' : ''}`),
+			items.map((v, i) => `${commentPrefix(comments?.[i], pad)}${pad}${stringifyValue(v, childDepth * unit.length, childDepth, maxWidth, unit)}${i < items.length - 1 ? ',' : ''}`),
 		)
 	}
 
 	if (typeof obj === 'object') {
 		const rec = obj as AsonObject
-		const keys = Object.keys(rec)
-		if (keys.length === 0) return '{}'
+		const entries = Object.keys(rec).map((k): [string, unknown] => [k, toJsonValue(rec[k], k)])
+		if (entries.length === 0) return '{}'
 		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
-		const inline = maxWidth === 0 ? '' : `{ ${keys.map((k) => `${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth, unit)}`).join(', ')} }`
+		const inline = maxWidth === 0 ? '' : `{ ${entries.map(([k, v]) => `${quoteKey(k)}: ${stringifyValue(v, 0, depth, maxWidth, unit)}`).join(', ')} }`
 		return renderCollection('{', '}', inline, col, depth, maxWidth, unit, !!comments, (pad, childDepth) =>
-			keys.map((k, i) => `${commentPrefix(comments?.[k], pad)}${pad}${quoteKey(k)}: ${stringifyValue(rec[k], childDepth * unit.length + `${quoteKey(k)}: `.length, childDepth, maxWidth, unit)}${i < keys.length - 1 ? ',' : ''}`),
+			entries.map(([k, v], i) => `${commentPrefix(comments?.[k], pad)}${pad}${quoteKey(k)}: ${stringifyValue(v, childDepth * unit.length + `${quoteKey(k)}: `.length, childDepth, maxWidth, unit)}${i < entries.length - 1 ? ',' : ''}`),
 		)
 	}
 
@@ -192,7 +228,7 @@ export const config = { indent: '\t' as string | number }
 export function stringify(obj: unknown, opts: StringifyMode | StringifyOptions = 'smart'): string {
 	const { mode = 'smart', indent = config.indent } = typeof opts === 'string' ? { mode: opts } : opts
 	const maxWidth = mode === 'short' ? Infinity : mode === 'long' ? 0 : 80
-	return stringifyValue(obj, 0, 0, maxWidth, typeof indent === 'number' ? ' '.repeat(indent) : indent)
+	return stringifyValue(toJsonValue(obj, ''), 0, 0, maxWidth, typeof indent === 'number' ? ' '.repeat(indent) : indent)
 }
 
 // --- Parse ---
