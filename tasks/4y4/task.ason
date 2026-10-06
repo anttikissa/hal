@@ -1,0 +1,10 @@
+{
+	title: 'Terminal: a tool call card never shrinks',
+	spec: "In the terminal, a tool call's card, with the results attached under it, is never drawn shorter than the tallest height it reached at this width and fold state. A running bash call shows its last 5 output lines; its finished result shows a shorter glimpse, and in full mode a frame one row shorter clears screen and scrollback, snapping a scrolled-up terminal to the bottom. Blank rows in the card's style at its end keep the height until the next full redraw (a width change, a tab switch, Ctrl-L). Folding or unfolding the call (/collapse) is a new fold state and starts afresh, so a deliberate fold still shrinks it. The mark lives in memory with the streaming block's (frame.state.peaks), never persisted. A call is always laid out together with its results, so its card is measured whole. The web is not changed: whether it should follow is the user's decision.",
+	status: 'done',
+	notes: [
+		"Invariant restored: in full mode, a bash call finishing never clears scrollback. snaps.jsonl showed '#tN (tool) 10 -> 5 rows, #tM (tool-result) 0 -> 4 rows' on nearly every call: 5 running output lines gave way to a 3-row glimpse. The layout cache (frame.state.history) keeps padded rows too, so a test of a forgotten mark must clear it as render.draw(true) does."
+	],
+	needs: ['fn'],
+	foldInto: ['fn']
+}
