@@ -55,7 +55,12 @@ function all(): Map<string, SlashCommand> {
 	let found = new Map<string, SlashCommand>()
 	for (let file of readdirSync(commands.dir()).sort()) {
 		if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue
-		found.set(file.slice(0, -3), require(`${commands.dir()}/${file}`).command)
+		let name = file.slice(0, -3), path = `${commands.dir()}/${file}`
+		// One module that fails to load (e.g. it needs code newer than the
+		// running host's module cache) breaks only its own command, which
+		// reports the full error, never every other command.
+		try { found.set(name, require(path).command) }
+		catch (e) { found.set(name, { run: () => ({ error: `/${name} failed to load from ${path}: ${e instanceof Error ? e.stack ?? e.message : String(e)}` }) } as SlashCommand) }
 	}
 	return found
 }
