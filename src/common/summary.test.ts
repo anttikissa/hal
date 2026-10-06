@@ -64,3 +64,16 @@ test('a question tag is hidden and extracted like a summary, and marks the reply
 	expect(summary.asks('Done.\n<summary>Done.</summary>')).toBe(false)
 	expect(summary.asks('Asking `<question>x</question>` in code.')).toBe(false)
 })
+
+test('notification-only answers stay visible without duplicating normal answers', () => {
+	for (let tag of ['summary', 'question']) {
+		let text = `<${tag}>Stopped.</${tag}>`
+		expect(summary.answer(text)).toBe('Stopped.')
+		expect(summary.answer(` \n${text}\n`)).toBe('Stopped.')
+		expect(summary.answer(`Visible answer.\n${text}`)).toBe('Visible answer.')
+		expect(summary.answer(`${text}\n<rename>New name</rename>`)).toBe('Stopped.')
+		for (let n = 1; n < text.length; n++) expect(summary.answer(text.slice(0, n))).toBe('')
+	}
+	expect(summary.answer('`<summary>Example.</summary>`')).toBe('`<summary>Example.</summary>`')
+	expect(summary.answer('<rename>New name</rename>')).toBe('')
+})

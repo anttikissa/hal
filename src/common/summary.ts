@@ -1,11 +1,12 @@
 // A final answer ends with <summary>one line</summary> (SYSTEM.md, task
 // x8): the line a notice or push shows. A reply that asks the user ends
 // with <question>one line</question> instead (task nd6): its turn waits
-// for the user. Clients hide both, including a tag still streaming in
-// and a trailing prefix of an opening tag. A tag quoted in code
-// (`<summary>`) is text, not a tag.
+// for the user. Clients hide redundant tags, including incomplete streaming
+// tags, but show the notification line when it is the whole answer (a1k).
+// A tag quoted in code (`<summary>`) is text, not a tag.
 
 import { markdownCode } from './markdown-code.ts'
+import { names } from './names.ts'
 
 const NAMES = ['summary', 'question'] as const
 export type TagKind = (typeof NAMES)[number]
@@ -52,4 +53,10 @@ function strip(text: string): string {
 	return out.trimEnd()
 }
 
-export const summary = { extract, asks, strip }
+// Hide redundant notification text, never an answer's only visible content.
+function answer(text: string): string {
+	let body = names.strip(summary.strip(text))
+	return body.trim() ? body : summary.extract(text) ?? body
+}
+
+export const summary = { extract, asks, strip, answer }

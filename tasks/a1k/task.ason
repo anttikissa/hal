@@ -1,0 +1,10 @@
+{
+	title: 'Show notification-only answers as message text',
+	spec: 'Terminal and web render the extracted summary or question line as the assistant message body when stripping notification tags and naming controls leaves no visible answer text. Normal answers keep notification tags hidden to avoid duplication. Literal tags in code remain content; incomplete streaming tags remain hidden until complete. Whitespace-only or naming-only answers remain empty. SYSTEM.md describes the summary-only visibility exception. This changes display only, not session history, provider input construction, notification extraction or question waiting semantics. Extend the terminal empty-card fix: notification-only answers are readable instead of suppressed.',
+	status: 'done',
+	notes: [
+		'Plumbing visible is the rationale: hiding redundant notification text is acceptable; hiding the only answer text is not. The shared answer formatter strips naming controls before deciding whether the notification line is the only readable content. strip remains tag removal for other callers, including prompt summaries.'
+	],
+	needs: ['hse', 'x8'],
+	foldInto: ['hse', 'x8']
+}
