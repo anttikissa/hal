@@ -108,6 +108,9 @@ async function request(req: ProviderRequest) {
 		let accountId = c.accountId ?? cred.accountId
 		if (codex && !accountId) throw Object.assign(new Error(`the OpenAI token of ${cred.account} names no ChatGPT account; ${auth.logIn('openai')}`), { failure: 'auth' })
 		if (codex) Object.assign(headers, { originator: 'hal', 'chatgpt-account-id': accountId })
+		// The Codex backend routes its prompt cache by this header, as the
+		// Codex CLI sends it; prompt_cache_key alone gets no cache hits.
+		if (codex && req.sessionId) headers.session_id = req.sessionId
 	}
 	return { url: codex ? openai.codexUrl : openai.apiUrl, headers, body: openai.body(req, codex), account: cred.account }
 }
