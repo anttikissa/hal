@@ -95,6 +95,8 @@ function indexed(): Promise<void> | undefined {
 			let n = 0
 			for (let id of open) {
 				try {
+					// Its meta too, which the tabs event reads.
+					sessions.open(id)
 					status.derive(id, (yield* pages.markedSteps(id)).map((l) => l.record))
 				} catch {}
 				// Every 8th tab counts as a big read, so 60 small ones yield
