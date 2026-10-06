@@ -1,0 +1,10 @@
+{
+	title: 'Hide empty terminal answer cards',
+	spec: 'Restore the terminal rendering invariant: an assistant text block with no visible content after summary/question and naming controls are stripped draws no header, reference, body or inter-item gap, whether expanded or collapsed. While streaming, an empty visible body may retain the active cursor but not an empty Hal header. Whitespace-only answers also draw nothing when settled. Nonempty answers retain their content and normal headers. This is a terminal-only rendering fix: stored session history, provider input, notifications and web behavior are unchanged.',
+	status: 'done',
+	notes: [
+		'The screenshot cards came from answers containing only hidden notification tags. itemLines stripped the controls but headed an empty body. Suppression must occur after stripping, before expanded or collapsed headers. A streaming empty body returns one empty row for frame.itemRows to attach the live cursor.'
+	],
+	needs: ['cc'],
+	foldInto: ['cc']
+}

@@ -1,5 +1,6 @@
 // Transcript items as the frame shows them: the rows of each item and
 // the style it wears. Pure.
+// Tasks: fn, hp, hr, hse.
 
 import { attachments } from '../common/attachments.ts'
 import { bashResult } from '../common/bash-result.ts'
@@ -149,9 +150,14 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let body = markdownView.lines(flows ? prefix + text : text, width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
 			return flows ? body : [...ansi.wrap(prefix.trimEnd(), width), ...body]
 		}
-		case 'text':
-			if (fold === 'closed' && !streaming) return itemView.closedRow(item, names.strip(summary.strip(item.text)), width)
-			return itemView.headed(item, markdownView.lines(names.strip(summary.strip(item.text)).trimEnd(), width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined), width)
+		case 'text': {
+			let text = names.strip(summary.strip(item.text)).trimEnd()
+			// Controls can be the whole answer; no visible body means no card.
+			// frame.itemRows adds the live cursor independently while streaming.
+			if (!text.trim()) return streaming ? [''] : []
+			if (fold === 'closed' && !streaming) return itemView.closedRow(item, text, width)
+			return itemView.headed(item, markdownView.lines(text, width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined), width)
+		}
 		case 'tool': {
 			let { command, description } = item.input
 			let prefix = titles.stamp(item.ts, '')
