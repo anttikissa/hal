@@ -1,6 +1,10 @@
 {
 	title: 'Measure the share of provider input that Hal adds',
 	spec: 'scripts/framing <session-id>... prints, for each session, the size of the provider input that replay.toMessages builds from its history, and the share of it that Hal adds rather than the user, the model or a tool wrote: headers, <meta> lines, notices and message framing. Sizes are in characters; the script calls no provider and needs no network. Any change that adds framing to provider input runs the script on at least one real session and records the share before and after in its task notes, so the total cost of many small additions stays visible.',
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Baseline 2026-10-06 (commit before c2t), scripts/framing 06-hdd 04-car 04-eur 06-him: 06-hdd 1.5% (1573/102475 chars, 59 msgs); 04-car 2.3% (17244/744083, 657 msgs); 04-eur 10.6% (11024/104041, 81 msgs); 06-him 0.1% (67/58538, 17 msgs). 04-eur is high because two system-prompt-edit notices quote whole diffs (6147 and 2851 chars) and each rename nudge is about 400 chars.',
+		'Method: replay the history twice, as is and with every authored text emptied (prompt and assistant text, thinking, tool results, tool call names and inputs, compact summaries); what the second replay still holds is framing. Paste markers are expanded as history.messages does; pruning is not applied, and images and thinking signatures are not counted.'
+	],
 	needs: ['7']
 }

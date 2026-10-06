@@ -1,0 +1,36 @@
+#!/usr/bin/env bun
+// The share of provider input Hal adds (task qtg): headers, <meta>
+// lines, notices, missing tool results. Replays each history twice:
+// as is, and with every text the user, model or a tool wrote emptied;
+// what the second replay still holds is framing. Sizes in characters;
+// images and thinking signatures are not counted. No provider calls.
+import type { HistoryRecord } from '../src/common/replay.ts'
+import type { Message } from '../src/common/blocks.ts'
+import { replay } from '../src/common/replay.ts'
+import { blobs } from '../src/host/blobs.ts'
+import { history } from '../src/host/history.ts'
+
+let size = (msgs: Message[]) => msgs.flatMap((m) => m.blocks as any[]).reduce((n, b) =>
+	n + (b.type === 'text' || b.type === 'thinking' ? b.text.length
+		: b.type === 'tool_result' ? b.output.length
+		: b.type === 'tool_call' ? b.name.length + (Object.keys(b.input).length ? JSON.stringify(b.input).length : 0) : 0), 0)
+
+// Every authored text emptied; framing stays.
+let strip = (r: HistoryRecord): HistoryRecord =>
+	r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' ? { ...b, text: '' } : b.type === 'tool_result' ? { ...b, output: '' } : b) }
+	: r.type === 'assistant' ? { ...r, block: r.block.type === 'tool_call' ? { ...r.block, name: '', input: {} } : { ...r.block, text: '' } }
+	: r.type === 'compact' ? { ...r, summary: '' } : r
+
+let ids = Bun.argv.slice(2)
+if (!ids.length) {
+	console.error('usage: scripts/framing <session-id>...')
+	process.exit(1)
+}
+console.log('SESSION  MESSAGES  INPUT CHARS  FRAMING CHARS  SHARE')
+for (let id of ids) {
+	// Paste markers expanded, as history.messages does before a request.
+	let records = history.readSync(id).map((r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' ? { ...b, text: blobs.expand(id, b.text) } : b) } : r)
+	let msgs = replay.toMessages(records)
+	let total = size(msgs), framing = size(replay.toMessages(records.map(strip)))
+	console.log(`${id}  ${msgs.length}  ${total}  ${framing}  ${total ? (100 * framing / total).toFixed(1) : '0.0'}%`)
+}
