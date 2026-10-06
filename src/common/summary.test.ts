@@ -53,3 +53,14 @@ test('a stray unclosed tag in prose hides nothing after it', () => {
 	expect(summary.strip(full)).toBe(prose)
 	expect(summary.extract(full)).toBe('Done.')
 })
+
+// Task nd6: a <question> line works like a summary and marks a turn that waits.
+test('a question tag is hidden and extracted like a summary, and marks the reply as asking', () => {
+	let full = 'Two options.\n\n<question>Use the new API or keep the old one?</question>'
+	expect(summary.strip(full)).toBe('Two options.')
+	expect(summary.extract(full)).toBe('Use the new API or keep the old one?')
+	expect(summary.asks(full)).toBe(true)
+	for (let n = 'Two options.'.length; n <= full.length; n++) expect(summary.strip(full.slice(0, n))).toBe('Two options.')
+	expect(summary.asks('Done.\n<summary>Done.</summary>')).toBe(false)
+	expect(summary.asks('Asking `<question>x</question>` in code.')).toBe(false)
+})

@@ -122,6 +122,28 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	expect(view.items.find((i) => i.type === 'prompt' && i.text === 'later')).toMatchObject({ queued: true, queuedAt })
 })
 
+// Task nd6: a turn that ends with <question> waits for the user; queued
+// messages run only after a later final answer.
+test('queued messages wait through an asking turn until the reply turn ends', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'later', queue: true })
+	calls[0]!.push({ type: 'text', text: 'Which one?\n<question>A or B?</question>' }, { type: 'done', reason: 'end' })
+	await until(() => a.of('turn-end').length === 1)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'also', queue: true })
+	await Bun.sleep(50)
+	expect(calls).toHaveLength(1)
+	expect(inboxOf(a, id)).toEqual(['later', 'also'])
+	a.conn.send({ type: 'submit', sessionId: id, text: 'A' })
+	await until(() => calls.length === 2)
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([stamped('A')])
+	calls[1]!.push({ type: 'text', text: 'Done.\n<summary>Did A.</summary>' }, { type: 'done', reason: 'end' })
+	await until(() => calls.length === 3)
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining('later')])
+})
+
 test('a queued message sent to an idle session just runs', async () => {
 	let a = client()
 	let id = created(a)

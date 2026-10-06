@@ -16,6 +16,7 @@ import { greetings } from './greetings.ts'
 import { jobs } from './jobs.ts'
 import { liveFiles } from './live-file.ts'
 import { models } from './models.ts'
+import { notify } from './notify.ts'
 import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { projects } from './projects.ts'
@@ -212,7 +213,8 @@ function act(c: TabCommand): Outcome {
 	else if (c.type === 'tab-close') outcome = { refused: tabs.close(c.sessionId) }
 	else if (c.type === 'tab-resume') outcome = tabs.resume(c.sessionId)
 	else if (c.type === 'tab-start') outcome = tabs.start(c.cwd, c.last)
-	else if (c.type === 'tab-seen') f.attention = f.attention.filter((id) => id !== c.sessionId)
+	// A turn that asked keeps its mark until the user sends something (task nd6).
+	else if (c.type === 'tab-seen' && !notify.asked(c.sessionId)) f.attention = f.attention.filter((id) => id !== c.sessionId)
 	else if (c.type === 'tab-move') {
 		let from = f.open.indexOf(c.sessionId)
 		if (from < 0) return { refused: 'not a tab' }
@@ -238,6 +240,8 @@ function observe(id: string, event: Event): void {
 	if (!f.open.includes(id)) return
 	let wants = event.type === 'question' || (event.type === 'turn-end' && (event.status === 'completed' || event.status === 'error'))
 	if (wants && !f.attention.includes(id)) f.attention.push(id)
+	// The user answered an asking turn: a new turn runs.
+	if (event.type === 'state' && states.busy(event.state) && f.attention.includes(id)) f.attention = f.attention.filter((x) => x !== id)
 	tabs.publish()
 }
 

@@ -1,22 +1,37 @@
 // A final answer ends with <summary>one line</summary> (SYSTEM.md, task
-// x8): the line a notice or push shows. Clients hide it, including a
-// tag still streaming in and a trailing prefix of its opening tag. A
-// tag quoted in code (`<summary>`) is text, not a tag.
+// x8): the line a notice or push shows. A reply that asks the user ends
+// with <question>one line</question> instead (task nd6): its turn waits
+// for the user. Clients hide both, including a tag still streaming in
+// and a trailing prefix of an opening tag. A tag quoted in code
+// (`<summary>`) is text, not a tag.
 
 import { markdownCode } from './markdown-code.ts'
 
-const TAG = '<summary>'
-const OPEN = /<summary>/g
-const TAGS = /<summary>((?:(?!<summary>)[\s\S])*?)<\/summary>/g
+const NAMES = ['summary', 'question'] as const
+export type TagKind = (typeof NAMES)[number]
+const OPEN = /<(summary|question)>/g
+const TAGS = /<(summary|question)>((?:(?!<(?:summary|question)>)[\s\S])*?)<\/\1>/g
 
-// The summary of `text`: the last complete tag's content, one line.
-function extract(text: string): string | undefined {
+// The last complete tag of `text`: its kind and content, one line.
+function last(text: string): { kind: TagKind; line: string } | undefined {
 	let match = [...markdownCode.mask(text).matchAll(TAGS)].at(-1)
-	let s = match && text.slice(match.index + TAG.length, match.index + match[0].length - '</summary>'.length).replace(/\s+/g, ' ').trim()
-	return s || undefined
+	if (!match) return undefined
+	let kind = match[1] as TagKind
+	let line = text.slice(match.index + kind.length + 2, match.index + match[0].length - kind.length - 3).replace(/\s+/g, ' ').trim()
+	return line ? { kind, line } : undefined
 }
 
-// `text` without its summary tags, for display.
+// The summary or question line of `text`.
+function extract(text: string): string | undefined {
+	return last(text)?.line
+}
+
+// Whether `text` ends its reply by asking the user (a <question> tag last).
+function asks(text: string): boolean {
+	return last(text)?.kind === 'question'
+}
+
+// `text` without its tags, for display.
 function strip(text: string): string {
 	let masked = markdownCode.mask(text)
 	let out = '', at = 0
@@ -26,12 +41,15 @@ function strip(text: string): string {
 	}
 	out += text.slice(at)
 	masked = markdownCode.mask(out)
-	// An unclosed tag is a summary still streaming in only on the last
+	// An unclosed tag is a line still streaming in only on the last
 	// line: a summary is one line, so a stray tag in prose stays text.
 	let open = [...masked.matchAll(OPEN)].at(-1)?.index
 	if (open !== undefined && !out.includes('\n', open)) return out.slice(0, open).trimEnd()
-	for (let n = TAG.length - 1; n > 0; n--) if (masked.endsWith(TAG.slice(0, n))) return out.slice(0, -n).trimEnd()
+	for (let name of NAMES) {
+		let tag = `<${name}>`
+		for (let n = tag.length - 1; n > 0; n--) if (masked.endsWith(tag.slice(0, n))) return out.slice(0, -n).trimEnd()
+	}
 	return out.trimEnd()
 }
 
-export const summary = { extract, strip }
+export const summary = { extract, asks, strip }
