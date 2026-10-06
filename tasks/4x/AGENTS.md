@@ -9,7 +9,7 @@ trailers (Task only when applicable):
 
 Pull and push frequently: two hosts share work through GitHub. Set
 pull.rebase=true and rebase.autoStash=true. When multiple agents share a
-checkout, use --no-autostash and never stash others’ changes. Rebase
+checkout, use --no-autostash and never stash others' changes. Rebase
 only when that checkout is clean and no other agent is editing it.
 
 Use worktrees only read-only: to test your work when others' uncommitted
@@ -46,10 +46,13 @@ any hand edit, run `tsk show <id>`.
 Before changing code, read tasks/README.md for architecture, module
 conventions and invariants, including emergency keys.
 
-## Writing specs
+## Writing specs and system prompts / AGENTS.md
 
 Apply Strunk & White: omit needless words. Use plain technical English;
 remove repetition and empty phrases without weakening requirements.
+
+State a rule once, positively. Add a negative example only when the rule
+alone would be misread.
 
 # Privacy
 
@@ -126,10 +129,10 @@ Do not delegate routine searches, small edits or tightly coupled work.
 Task count alone is no reason. State the benefit before spawning; use
 the fewest agents needed. Do not duplicate their work while they run.
 
-Inspect a tab's current state before messaging it. Before citing tab
-numbers, look up a session's current tab number; they change. Assume
-idle tabs no longer own files. Message an idle tab only when a
-specific question needs its context or expertise.
+Inspect a tab's current state before messaging it. Tab numbers change:
+look up a session's current tab number before citing it. Assume idle
+tabs no longer own files. Message an idle tab only when a specific
+question needs its context or expertise.
 
 Give each delegate a bounded task, relevant context, an explicit
 deliverable and file ownership. Use a fresh subagent for each delegated
