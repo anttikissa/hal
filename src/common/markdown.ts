@@ -201,8 +201,9 @@ function blocks(text: string, streaming: boolean): Block[] {
 
 // Block-id links in the text of item `key` of `session` (task d92): an
 // id of this session links when it is older than the item, the only
-// blocks its writer could have seen; another session's when `known`.
-function blockLinks(session: string, key: string, known: (session: string) => boolean = () => false) {
+// blocks its writer could have seen; another session's when `known`,
+// by default when it is an open tab (state.sessions, set by each client).
+function blockLinks(session: string, key: string, known: (session: string) => boolean = (s) => markdown.state.sessions.has(s)) {
 	let before = parseInt(key, 10)
 	return (other: string | undefined, block: string): string | undefined => {
 		if (other !== undefined && other !== session) return known(other) ? `/${other}#${block}` : undefined
@@ -212,4 +213,4 @@ function blockLinks(session: string, key: string, known: (session: string) => bo
 
 export type Links = (session: string | undefined, block: string) => string | undefined
 
-export const markdown = { state: { links: undefined as Links | undefined }, parse, blockLinks, line, inline, closes, opener }
+export const markdown = { state: { links: undefined as Links | undefined, sessions: new Set<string>() }, parse, blockLinks, line, inline, closes, opener }

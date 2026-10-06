@@ -7,6 +7,7 @@
 
 import { backfill } from '../common/backfill.ts'
 import { commandList } from '../common/commands/list.ts'
+import { markdown } from '../common/markdown.ts'
 import { connection } from '../common/connection.ts'
 import { queueEdit } from '../common/queue-edit.ts'
 import { queuedPrompt } from './queue-edit.ts'
@@ -117,6 +118,7 @@ function onTabs(list: Tab[]): void {
 	let st = app.state
 	let before = st.tabs
 	st.tabs = list
+	markdown.state.sessions = new Set(list.map((t) => t.id))
 	if (st.landing && !list.some((t) => t.id === st.landing)) return
 	delete st.landing
 	for (let id of st.cached.keys()) if (!list.some((tab) => tab.id === id)) {
