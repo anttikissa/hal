@@ -17,8 +17,9 @@
 // Philosophy: (nearly) every JavaScript literal is valid ASON, and ASON
 // pastes into a JS REPL. Strings in single, double or backtick quotes
 // (multiline, no ${} interpolation); unquoted keys; trailing commas;
-// // and /* */ comments; numbers as JS writes them: .5, 1., +1, 0xFF,
-// 1_000, 42n, NaN, -Infinity; and undefined. Commas between items are
+// // and /* */ comments; \x41, \u0041 and \u{1F600} escapes; numbers as JS
+// writes them: .5, 1., +1, 0xFF, 0b101, 0o17, 1_000, 42n, NaN, -Infinity, -0;
+// undefined; and any JS whitespace. Commas between items are
 // required, as in JS: [1 2] is an error.
 //
 // It is not yet another JSON5 or JSONC, though it reads both: it is a
@@ -36,9 +37,23 @@
 //   config.name = 'hal 2'
 //   stringify(config)  // the comment is still above name
 //
-// Best effort: comments after the last item, and those of a collection
-// replaced in code, are lost; a comment after a value becomes the next
-// key's leading comment; 'short' omits comments.
+// The promise: a comment on the lines before an object key or an array item
+// (blank lines between comments included) is written back above that key or
+// item by smart and long stringify. That is all; every other comment is
+// discarded on parse, as expected:
+// - comments outside the root value (above or below it in the file);
+// - comments after the last key or item, before its } or ];
+// - comments inside an entry: between key and ':', or after a value before
+//   its ','.
+// Consequences to expect:
+// - A comment after a value's ',' on the same line (a: 1, // note) is a
+//   leading comment of the next key: it moves above that key.
+// - Object comments follow keys: deleting a key drops its comment; a new key
+//   has none.
+// - Array comments follow positions, not items: after unshift, item 0's
+//   comment sits above the new first item.
+// - A collection replaced in code (config.list = [...]) has no comments.
+// - 'short' writes no comments; parse without { comments: true } keeps none.
 //
 // Streaming ASONL: write each record as stringify(record, 'short') + '\n';
 // parseAll(text) reads a whole file (a torn last record throws), and
@@ -63,20 +78,9 @@
 //
 // TODO, where ASON still differs from JSON or JS (all checked against this
 // file):
-// - A __proto__ key sets the prototype instead of an own key, unlike
-//   JSON.parse (prototype pollution on untrusted input); define it instead.
-// - An unclosed /* is accepted at top level (1 /* open parses as 1) and gives
-//   a misleading "Expected ',' or '}'" inside objects; say "Unterminated
-//   comment".
-// - A comment just before } or ] is dropped, even with { comments: true }.
-// - stringify writes NUL, other control characters and U+2028/U+2029 raw
-//   instead of escaping them.
-// - Backtick output keeps \r raw; JS reads \r\n in a template as \n.
-// - Unquoted keys are looser than JS identifiers ({a-b.c@: 1} parses) and
-//   than what stringify writes unquoted.
-// - 0b/0o numbers and \u{...} escapes are rejected; so is Unicode whitespace
-//   such as U+2000, which JSON5 allows.
-// - toJSON is ignored (a Date becomes {}); functions and symbols throw
+// - Unquoted keys take any run of characters up to : , } ] or whitespace
+//   ({a-b.c@: 1} parses), looser than JS identifiers.
+// - toJSON is ignored (a Date or Map becomes {}); functions and symbols throw
 //   instead of being skipped as in JSON.stringify.
 
 /** Symbol key for attaching comments to AsonObject/AsonArray. */
@@ -95,12 +99,22 @@ export type AsonObject = {
 
 // --- Stringify ---
 
+// Characters a reader can't see or a UTF-8 file can't hold: control characters,
+// U+2028/U+2029 and lone surrogates. \r is escaped even in backticks: JS reads a
+// raw \r\n in a template as \n.
+const UNSAFE_RE = /[\0-\x08\x0b-\x1f\x7f\u2028\u2029]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g
+const SHORT_ESCAPES: Record<string, string> = { '\n': '\\n', '\r': '\\r', '\t': '\\t' }
+function escapeUnsafe(c: string): string {
+	const code = c.charCodeAt(0)
+	return SHORT_ESCAPES[c] ?? (code < 0x100 ? `\\x${code.toString(16).padStart(2, '0')}` : `\\u${code.toString(16)}`)
+}
+
 function quoteString(s: string, multiline = false): string {
 	if (multiline && s.includes('\n')) {
-		const escaped = s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${')
+		const escaped = s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${').replace(UNSAFE_RE, escapeUnsafe)
 		return `\`${escaped}\``
 	}
-	const escaped = s.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
+	const escaped = s.replace(/\\/g, '\\\\').replace(/[\n\r\t]/g, escapeUnsafe).replace(UNSAFE_RE, escapeUnsafe)
 	const hasSingle = s.includes("'")
 	const hasDouble = s.includes('"')
 	if (hasSingle && !hasDouble) return `"${escaped}"`
@@ -205,6 +219,11 @@ function isIdent(c: string): boolean {
 	return /[a-zA-Z0-9_$]/.test(c)
 }
 
+// JS whitespace and line terminators: \s matches exactly those.
+function isSpace(c: string): boolean {
+	return c === ' ' || c === '\t' || c === '\n' || c === '\r' || (c > '~' && /\s/.test(c)) || c === '\f' || c === '\v'
+}
+
 function skipWhite(ctx: Ctx): string {
 	let collected = ''
 	let newlines = 0
@@ -215,7 +234,7 @@ function skipWhite(ctx: Ctx): string {
 			newlines++
 			continue
 		}
-		if (c === ' ' || c === '\t' || c === '\r' || c === '\f' || c === '\v' || c === '\u00A0' || c === '\uFEFF' || c === '\u2028' || c === '\u2029') {
+		if (isSpace(c)) {
 			ctx.pos++
 			continue
 		}
@@ -233,14 +252,9 @@ function skipWhite(ctx: Ctx): string {
 		}
 		if (c === '/' && peek2(ctx) === '*') {
 			const start = ctx.pos
-			ctx.pos += 2
-			while (ctx.pos < ctx.buf.length) {
-				if (peek(ctx) === '*' && peek2(ctx) === '/') {
-					ctx.pos += 2
-					break
-				}
-				ctx.pos++
-			}
+			const end = ctx.buf.indexOf('*/', start + 2)
+			if (end < 0) fail(ctx, 'Unterminated comment')
+			ctx.pos = end + 2
 			if (ctx.comments) {
 				if (newlines >= 2) collected += '\n'
 				collected += ctx.buf.slice(start, ctx.pos)
@@ -304,13 +318,14 @@ function parseString(ctx: Ctx, quote: string): string {
 		const next = ctx.pos + part.length
 		ctx.pos = next
 		if (next === buf.length) break
+		const text = template && part.includes('\r') ? part.replace(/\r\n?/g, '\n') : part
 		if (next === end) {
 			ctx.pos++
-			if (!segments.length) return part
-			segments.push(part)
+			if (!segments.length) return text
+			segments.push(text)
 			return segments.join('')
 		}
-		segments.push(part)
+		segments.push(text)
 		ctx.pos++
 		const esc = buf.charCodeAt(ctx.pos)
 		switch (esc) {
@@ -321,8 +336,17 @@ function parseString(ctx: Ctx, quote: string): string {
 			case 0x2028:
 			case 0x2029:
 				break
-			case 0x78:
-			case 0x75: {
+			case 0x75:
+				if (buf[ctx.pos + 1] === '{') {
+					const close = buf.indexOf('}', ctx.pos)
+					const hex = close < 0 ? '' : buf.slice(ctx.pos + 2, close)
+					if (!/^[0-9a-fA-F]{1,6}$/.test(hex) || parseInt(hex, 16) > 0x10ffff) fail(ctx, 'Invalid unicode escape')
+					segments.push(String.fromCodePoint(parseInt(hex, 16)))
+					ctx.pos = close
+					break
+				}
+			// falls through
+			case 0x78: {
 				const size = esc === 0x78 ? 2 : 4
 				const hex = buf.slice(ctx.pos + 1, ctx.pos + 1 + size)
 				if (!(size === 2 ? HEX2_RE : HEX4_RE).test(hex)) fail(ctx, size === 2 ? 'Invalid hex escape' : 'Invalid unicode escape')
@@ -340,9 +364,10 @@ function parseString(ctx: Ctx, quote: string): string {
 
 // Numeric separators: underscores between digits are allowed (like JS 1_000_000).
 // The regex accepts them, then we strip before Number()/BigInt()/parseInt().
-const HEX_BIGINT_RE = /[+-]?0[xX][0-9a-fA-F]+(?:_[0-9a-fA-F]+)*n/y
+const RADIX = '0(?:[xX][0-9a-fA-F]+(?:_[0-9a-fA-F]+)*|[oO][0-7]+(?:_[0-7]+)*|[bB][01]+(?:_[01]+)*)'
+const HEX_BIGINT_RE = new RegExp(`[+-]?${RADIX}n`, 'y')
 const INT_BIGINT_RE = /[+-]?[0-9]+(?:_[0-9]+)*n/y
-const HEX_RE = /[+-]?0[xX][0-9a-fA-F]+(?:_[0-9a-fA-F]+)*/y
+const HEX_RE = new RegExp(`[+-]?${RADIX}`, 'y')
 const NUM_RE = /[+-]?(?:[0-9]+(?:_[0-9]+)*(?:\.(?:[0-9]+(?:_[0-9]+)*)?)?|\.[0-9]+(?:_[0-9]+)*)(?:[eE][+-]?[0-9]+(?:_[0-9]+)*)?/y
 
 function parseNumber(ctx: Ctx): number | bigint {
@@ -365,7 +390,7 @@ function parseNumber(ctx: Ctx): number | bigint {
 	if (hex) {
 		ctx.pos = HEX_RE.lastIndex
 		const sign = hex[0][0] === '-' ? -1 : 1
-		return sign * parseInt(hex[0].replace(/^[+-]/, '').replace(/_/g, ''), 16)
+		return sign * Number(hex[0].replace(/^[+-]/, '').replace(/_/g, ''))
 	}
 	NUM_RE.lastIndex = ctx.pos
 	const m = NUM_RE.exec(ctx.buf)
@@ -381,12 +406,18 @@ function parseKey(ctx: Ctx): string {
 	const start = ctx.pos
 	while (ctx.pos < ctx.buf.length) {
 		const c = peek(ctx)
-		if (c === ':' || c === ',' || c === '}' || c === ']' || c === ' ' || c === '\t' || c === '\r' || c === '\n') break
+		if (c === ':' || c === ',' || c === '}' || c === ']' || isSpace(c)) break
 		if (c === '/' && (peek2(ctx) === '/' || peek2(ctx) === '*')) break
 		ctx.pos++
 	}
 	if (ctx.pos === start) fail(ctx, 'Expected object key')
 	return ctx.buf.slice(start, ctx.pos).replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+}
+
+// obj['__proto__'] = v would replace the prototype; define an own key, as JSON.parse does.
+function setOwn(obj: Record<string, unknown>, key: string, value: unknown): void {
+	if (key === '__proto__') Object.defineProperty(obj, key, { value, enumerable: true, writable: true, configurable: true })
+	else obj[key] = value
 }
 
 function parseObject(ctx: Ctx): AsonObject {
@@ -399,11 +430,11 @@ function parseObject(ctx: Ctx): AsonObject {
 		const key = parseKey(ctx)
 		if (comment) {
 			commentMap ??= {}
-			commentMap[key] = comment
+			setOwn(commentMap, key, comment)
 		}
 		skipWhite(ctx)
 		eat(ctx, ':', true)
-		obj[key] = parseAny(ctx)
+		setOwn(obj, key, parseAny(ctx))
 		skipWhite(ctx)
 		if (eat(ctx, '}')) break
 		if (!eat(ctx, ',')) fail(ctx, "Expected ',' or '}'")
