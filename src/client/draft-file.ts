@@ -40,6 +40,8 @@ function save(id: string, local: Local): void {
 }
 
 export const draftFile = {
+	// One window per ./run, kept across Ctrl-R restarts.
+	window: (): string => process.env.HAL_TAB_FILE ?? `pid ${process.pid}`,
 	// Set by main.ts: state/drafts in the home.
 	dir: (): string => {
 		throw new Error('draftFile.dir is not set')

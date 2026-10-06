@@ -70,7 +70,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// status) keep every row object, so no card binding runs again.
 	let items = createMemo(() => props.view.transcript?.items ?? none)
 	let rows = createMemo(() => view.rows(items(), props.view.sent))
-	let all = createMemo(() => view.withPending(rows(), props.pending, props.view.transcript?.inbox, props.tabs?.map((t) => t.id)))
+	let all = createMemo(() => view.withPending(rows(), props.pending, props.view.transcript?.inbox, props.tabs?.map((t) => t.id), props.view.transcript?.queueHold))
 	// The row Hal's cursor sits in: the last, while it streams.
 	let streaming = createMemo(() => view.streaming(props.view))
 	let cursorKey = () => (streaming() ? rows().at(-1)?.key : undefined)
@@ -84,7 +84,8 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 	// Background jobs still running, by call key: their cards offer Kill.
 	let jobs = createMemo(() => view.jobs(all()))
 	// Prompts the user may edit and resend (task 26q): their cards offer Edit.
-	let editableWaiting = (r: Row) => r.note !== undefined && r.item.type === 'prompt' && r.item.from === undefined && r.item.origin !== 'model'
+	// One queued message is edited at a time, in one window.
+	let editableWaiting = (r: Row) => !props.view.transcript?.queueHold && r.note !== undefined && r.item.type === 'prompt' && r.item.from === undefined && r.item.origin !== 'model'
 	let editable = createMemo(() => amend.editable(items()))
 	let hit = createMemo(() => props.target && target.row(all(), props.target)?.key)
 	// The linked card is always among the rows shown.

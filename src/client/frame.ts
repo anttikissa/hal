@@ -330,7 +330,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	for (let { item, m } of tail) {
 		let tab = m?.from === undefined ? 0 : (view.tabs?.list.findIndex((t) => t.id === m.from) ?? -1) + 1
 		let queued = !!m?.queue && item.type === 'prompt'
-		let rows = queued ? frame.queuedRows(item as Item & { type: 'prompt' }, inbox.note(m!, tab || undefined), cols, session) : frame.itemRows(item, cols, session)
+		let rows = queued ? frame.queuedRows(item as Item & { type: 'prompt' }, inbox.note(m!, tab || undefined, m!.id === view.transcript?.queueHold), cols, session) : frame.itemRows(item, cols, session)
 		if (stacked && !queued) lines.push(edge)
 		if (rows.length && (lines.length || above) && !(stacked && queued)) lines.push('')
 		if (queued && !stacked) lines.push(edge)

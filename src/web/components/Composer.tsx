@@ -100,7 +100,6 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	let busy = () => !!props.view.transcript && states.busy(props.view.transcript.state)
 	let queueEditing = () => !!props.view.editing?.queueEdit
 	let saving = () => !!props.view.transcript && !!queueEdit.current(props.view.transcript.meta.id)?.saving
-	let blocked = () => !!props.view.transcript?.queueHold
 	let canSave = () => !!props.view.transcript && queueEdit.ready(props.view.transcript.meta.id)
 	let paused = () => props.view.transcript?.state.type === 'paused'
 	let toggle = () => {
@@ -186,17 +185,17 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				<div class="actions">
 					{/* Pause and continue without Escape (task v0g); the tap keeps the keyboard. */}
 					<Show when={busy() || paused()}>
-						<button type="button" class="toggle" disabled={blocked()} aria-label={paused() ? 'Continue' : 'Pause (Esc)'} title={blocked() ? 'Save or cancel the queue edit before continuing' : paused() ? 'Continue' : 'Pause (Esc)'} onPointerDown={(e) => e.preventDefault()} onClick={toggle}>
+						<button type="button" class="toggle" aria-label={paused() ? 'Continue' : 'Pause (Esc)'} title={paused() ? 'Continue' : 'Pause (Esc)'} onPointerDown={(e) => e.preventDefault()} onClick={toggle}>
 							<Icon name={paused() ? 'play' : 'pause'} />
 						</button>
 					</Show>
-					<Show when={busy() && !queueEditing() && !blocked() && !view.commandDraft(props.text)}>
+					<Show when={busy() && !queueEditing() && !view.commandDraft(props.text)}>
 						<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} aria-label="Queue" title="Queue — Sent after this turn ends." onClick={() => send(true)}><Icon name="queue" /></button>
 					</Show>
 					{/* The tap must not blur the draft before click: on iOS the blur
 					    starts hiding the keyboard and moving the composer, and the
 					    click was lost. send() blurs afterwards. */}
-					<button type="button" class="go" aria-label={action()[1]} title={action()[2]} disabled={!props.text.trim() || !!props.view.form || (queueEditing() ? !canSave() : blocked())} onPointerDown={(e) => e.preventDefault()} onClick={() => send()}>
+					<button type="button" class="go" aria-label={action()[1]} title={action()[2]} disabled={!props.text.trim() || !!props.view.form || (queueEditing() && !canSave())} onPointerDown={(e) => e.preventDefault()} onClick={() => send()}>
 						<Icon name={action()[0]} />
 					</button>
 				</div>

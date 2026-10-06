@@ -3,6 +3,18 @@ import type { Local } from '../common/drafts.ts'
 // The browser's local copy of drafts, for typing while disconnected
 // and prompts not yet acknowledged when the tab closes.
 export const store = {
+	state: { window: undefined as string | undefined },
+	// One window per browser tab, kept across reloads.
+	window: (): string => {
+		let st = store.state
+		try {
+			st.window ??= sessionStorage.getItem('hal-window') ?? crypto.randomUUID()
+			sessionStorage.setItem('hal-window', st.window)
+		} catch {
+			st.window ??= crypto.randomUUID()
+		}
+		return st.window
+	},
 	load: (id: string): Local | undefined => {
 		try {
 			return JSON.parse(localStorage.getItem(`hal-draft:${id}`) ?? 'null') ?? undefined

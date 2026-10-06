@@ -38,7 +38,7 @@ function view(): View {
 	if (t && !st.prompt.text && t.meta.model !== 'hal/intro') v.placeholder = placeholders.pick(!!app.focusedTab()?.hal, t.items.filter((i) => i.type === 'prompt').length)
 	if (st.tabs.length) v.tabs = st.focus.tab === undefined ? { list: st.tabs } : { list: st.tabs, focused: st.focus.tab }
 	if (v.tabs && tabBar.blinks(st.tabs)) v.tabs.lit = pulse.slow(pulse.beat())
-	let stopped = t && appView.why(t), notice = st.notice ?? (t && queueEdit.notice(t.meta.id)) ?? versions.notice()
+	let stopped = t && appView.why(t), notice = st.notice ?? (t && queueEdit.notice(t)) ?? versions.notice()
 	if (stopped) v.why = stopped
 	if (notice) v.notice = notice
 	if (st.editing) v.editing = amend.hint(st.editing)
@@ -75,7 +75,7 @@ function status(t: Transcript): StatusInfo {
 // The activity in the prompt's top rule: a word or two, never a message
 // clipped to the row; the whole sentence is the notice (why).
 function activity(t: Transcript): string | undefined {
-	if (t.queueHold) return 'editing queue'
+	if (queueEdit.waiting(t)) return 'waiting for queue edit'
 	let s = t.state
 	if (s.type === 'blocked') return s.reason === 'question' ? 'waiting for answer' : `blocked: ${s.reason.split(':')[0]}`
 	if (s.type === 'paused') return 'paused'
@@ -86,7 +86,7 @@ function activity(t: Transcript): string | undefined {
 
 // Why a stopped session waits and what the user can do, in full.
 function why(t: Transcript): string | undefined {
-	if (t.queueHold) return 'A queued message is being edited; save or cancel the edit before continuing.'
+	if (queueEdit.waiting(t)) return 'The next queued message is being edited. It is sent when the edit is saved or canceled.'
 	let s = t.state
 	if (s.type === 'running' || s.type === 'idle' || (s.type === 'blocked' && s.reason === 'question')) return undefined
 	// Paused. and the help row's enter: continue say the rest.
