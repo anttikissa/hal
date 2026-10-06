@@ -287,8 +287,9 @@ function modalPick(index: number): void {
 	app.modalKey({ key: 'enter' })
 }
 // Sends what the box holds (Enter, or the Send button); `queue`
-// (Alt+Enter) waits for the running turn.
-function send(queue = false): void {
+// (Alt+Enter) waits for the running turn; `nextRound` (plain Enter)
+// steers without interrupting (task csn).
+function send(queue = false, nextRound = false): void {
 	let st = app.state
 	let id = app.sessionId()
 	if (st.view.editing?.queueEdit || (id && queueEdit.current(id)?.active)) { queuedPrompt.save(); return }
@@ -298,8 +299,8 @@ function send(queue = false): void {
 		return app.setNotice('sending once the upload is done')
 	}
 	if (restart.typed(st.text) || folds.typed(st.text)) return app.input('')
-	let { command, notice, keep } = view.submit(st.view, st.text, queue)
-	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number } | undefined
+	let { command, notice, keep } = view.submit(st.view, st.text, queue, nextRound)
+	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; nextRound?: boolean; amend?: boolean; edits?: string; rewind?: number } | undefined
 	// A prompt shows at once and waits, pending, for the host.
 	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c)
 	else if (c) connection.send(c)

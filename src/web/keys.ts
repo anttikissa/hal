@@ -175,7 +175,8 @@ function key(e: KeyInput, target: Target): boolean {
 	let indents = lead && (!e.shiftKey || /^[ \t]/.test(st.text.slice(start)))
 	if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && (sel.includes('\n') || indents)) return keys.edit({ key: 'tab', shift: e.shiftKey }, target)
 	if (e.key !== 'Enter' || e.shiftKey || (target.coarse && plain)) return false
-	app.send(e.altKey)
+	// Enter steers between rounds; Ctrl-Enter interrupts (task csn).
+	app.send(e.altKey, !e.ctrlKey)
 	return true
 }
 

@@ -135,13 +135,13 @@ function search(st: ViewState, text: string, edit = false): ViewState {
 // failed turn), or show why not (the typed text stays).
 // While editing a prompt, Enter sends the edit; emptied, an edit from
 // an Edit button cancels (task 26q).
-function submit(st: ViewState, text: string, queue = false): { command?: unknown; notice?: string; keep: boolean } {
+function submit(st: ViewState, text: string, queue = false, nextRound = false): { command?: unknown; notice?: string; keep: boolean } {
 	if (st.editing) {
 		let command = st.editing.aside && !text.trim() ? amend.resume(st.editing, st.transcript) : amend.enter(st.editing, st.transcript, text, queue)
 		return command ? { command, keep: false } : { keep: false }
 	}
 	if (!st.transcript) return text.trim() ? { notice: 'no session yet', keep: true } : { keep: false }
-	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, queue)
+	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, queue, nextRound)
 	if (refused) return { notice: refused, keep: true }
 	return command ? { command, keep: false } : { keep: false }
 }
@@ -223,7 +223,7 @@ function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: strin
 	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'steer' : 'send'
 	let queue: [string, string][] = busy && !command ? [['alt+enter', 'queue']] : []
 	if (menu) return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift+enter', 'newline'], ...queue, ['esc', 'dismiss']]
-	if (busy) return [['enter', enter], ...queue, ['shift+enter', 'newline'], ['esc', 'pause']]
+	if (busy) return [['enter', enter], ...(command ? [] : [['ctrl+enter', 'interrupt'] as [string, string]]), ...queue, ['shift+enter', 'newline'], ['esc', 'pause']]
 	return [['enter', enter], ['shift+enter', 'newline'], ['↑', 'edit last'], ['tab', 'complete'], ['ctrl+m', 'model']]
 }
 
