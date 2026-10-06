@@ -68,7 +68,7 @@ function of(id: string, records?: HistoryRecord[]): Stats {
 	let live = stats.state.live.get(id)
 	let tokens = { sent: committed.sent + (live?.sent ?? 0), received: committed.received + (live?.received ?? 0) }
 	let out: Stats = { ...tokens }
-	let files = Object.keys(pages.marks(id).changedPaths ?? {}).length
+	let files = pages.marks(id).files
 	if (files) out.files = files
 	// Only an effort off the model's default is said (task r7r).
 	let level = models.effort(model, sessions.open(id).effort)
