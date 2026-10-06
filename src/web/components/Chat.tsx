@@ -14,6 +14,7 @@ import { app } from '../app.ts'
 import { editor } from '../editor.ts'
 import { keys, type Target } from '../keys.ts'
 import { scroll } from '../scroll.ts'
+import { flash } from '../flash.ts'
 import { push } from '../push.ts'
 import { viewport } from '../viewport.ts'
 import { Composer } from './Composer.tsx'
@@ -86,6 +87,28 @@ function reveal(): void {
 	scroll.leave()
 	card.scrollIntoView({ block: 'start' })
 	scroll.moved()
+	flash.card(card)
+	away(card)
+}
+
+let watching: IntersectionObserver | undefined
+
+// Once the linked card has shown and scrolls fully out of view, the
+// address drops its #block (no new history entry): it names what the
+// reader looks at, not where they arrived. The card's # link gives a
+// permalink again.
+function away(card: Element): void {
+	watching?.disconnect()
+	let seen = false
+	watching = new IntersectionObserver(([e]) => {
+		if (e!.isIntersecting) return void (seen = true)
+		if (!seen || !card.isConnected) return
+		watching?.disconnect()
+		if (!location.hash || !card.classList.contains('target')) return
+		history.replaceState(history.state, '', location.pathname + location.search)
+		app.aim()
+	})
+	watching.observe(card)
 }
 
 function target(e: Event): Target {
@@ -153,6 +176,7 @@ export function Chat() {
 		document.addEventListener('keydown', onKey)
 		document.addEventListener('paste', onPaste)
 		let stop = viewport.page()
+		let stopFlash = flash.buttons()
 		let stopTap = viewport.statusTap(() => document.querySelector('.Transcript')?.scrollTo({ top: 0, behavior: 'smooth' }))
 		app.start()
 		return () => {
@@ -161,6 +185,7 @@ export function Chat() {
 			for (let [k, f] of drags) document.removeEventListener(k, f)
 			stop()
 			stopTap()
+			stopFlash()
 		}
 	})
 	return (

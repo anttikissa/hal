@@ -779,7 +779,10 @@ browserTest('in a browser a block address loads its page, marks its card and ope
 		expect(inspection).toContain('$ seq 40\n  printf done\nEdits /tmp/example.log')
 		expect(inspection).toContain('Keep this visible')
 		expect(inspection).not.toMatch(/\bc0\b|120000|Call ID/)
-
+		// It flashes; scrolled out of view, the address drops its #block.
+		expect(await b.evaluate(`document.querySelector('.Card.target').getAnimations().length`)).toBe(1)
+		await b.evaluate(`document.querySelector('.Transcript').scrollTop = 1e6`)
+		await b.waitFor(`!location.hash && !document.querySelector('.Card.target')`)
 	} finally {
 		await b.close()
 	}

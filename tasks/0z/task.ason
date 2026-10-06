@@ -10,7 +10,8 @@
 		'`items.map(view.show)` passes the index as the second argument: with show(item, full) that silently showed every result in full; call it through a lambda.',
 		'--cursor is defined only on the .input element (host CSS puts non-fg colors on their style class), so a card outline uses currentColor.',
 		'Checked in headless Chrome at 1200x800 and 390x800 (coarse pointer): linked card scrolled to the top with its outline, all 40 lines and show less; show less keeps the button in view. Not checked on a real phone.',
-		"Invariant: a scroll Hal makes itself (scroll.put, a linked card's scrollIntoView) retakes reflow's reading anchor at once (scroll.moved). Otherwise a resize seen before that scroll's event restored the anchor from before the move: a link to a queued message, near the bottom, opened at the top. Browser test: a queued message address shows its card."
+		"Invariant: a scroll Hal makes itself (scroll.put, a linked card's scrollIntoView) retakes reflow's reading anchor at once (scroll.moved). Otherwise a resize seen before that scroll's event restored the anchor from before the move: a link to a queued message, near the bottom, opened at the top. Browser test: a queued message address shows its card.",
+		'The linked card is no longer outlined: it flashes, and the address drops its #block once the card scrolls out of view (task fbr).'
 	],
 	needs: [],
 	foldInto: ['4s']

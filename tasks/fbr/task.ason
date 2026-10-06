@@ -1,0 +1,10 @@
+{
+	title: 'Web: buttons and linked cards flash white',
+	spec: "On the web, every enabled button flashes when pressed: its background turns the page color flash (white, src/common/colors.ts) at once and decays exponentially (ease-out-expo) to its own background over about 450ms. A mouse flashes on pointerdown; touch, pen and keyboard (Enter, Space) on click, so a scroll that starts on a button does not flash; a mouse press flashes once, also where click is a MouseEvent (Safari). A card reached by its address (opening /<session>#<block>, its # link, or /go with a block) flashes the same way over about 1.6s instead of an outline, so the reader sees where they landed. Once that card has been in view and scrolls fully out of view, the address drops its #block without a new history entry and the card is no longer the target: the address names what the reader looks at, and the card's # link gives a permalink again. Browser test: a linked card flashes, and scrolling it away drops the hash. The terminal is unchanged: it has no pressed buttons and no address.",
+	status: 'done',
+	notes: [
+		'Built as: src/web/flash.ts (flash.on animates backgroundColor from --flash to the computed background with Web Animations; flash.buttons is installed by Chat). Chat.reveal flashes the card and watches it with an IntersectionObserver: dropping needs one intersecting report first (the reveal scroll), a connected card still marked .target, and a hash; then replaceState and app.aim(), as folds.set does when the linked card closes. The color comes from colors.page().flash because src/web may hold no color literals.'
+	],
+	needs: ['0z'],
+	foldInto: ['0z']
+}

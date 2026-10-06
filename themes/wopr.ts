@@ -33,7 +33,7 @@ export const look: Look = {
 	popupCurrent: () => ({ fg: green(0.98, 0.06), bg: green(0.4, 0.12) }),
 	popupMatch: () => ({ fg: green(0.97, 0.12) }),
 	popupModelCurrent: () => ({ fg: green(0.9, 0.1), bg: green(0.24, 0.05) }),
-	page: () => ({ canvas: green(0.09, 0.01), text: green(0.88, 0.17), accent: green(0.9, 0.2), field: green(0.13, 0.03), border: green(0.5, 0.12), button: green(0.28, 0.08), match: green(0.97, 0.12) }),
+	page: () => ({ canvas: green(0.09, 0.01), text: green(0.88, 0.17), accent: green(0.9, 0.2), field: green(0.13, 0.03), border: green(0.5, 0.12), button: green(0.28, 0.08), match: green(0.97, 0.12), flash: green(1, 0) }),
 	tool,
 	toolBash: tool,
 	toolEval: tool,

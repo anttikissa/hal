@@ -47,6 +47,9 @@ Record new design decisions in the project's canonical spec.
 - Define foreground and background together for each applicable state: default,
   hover, focus-visible, pressed, selected, disabled, busy, error, and success.
   Check combinations such as selected plus focused, not just isolated states.
+- Acknowledge every press in the next frame, visibly enough to notice, for
+  mouse, touch, and keyboard activation. A quick tap may never paint `:active`;
+  feedback that outlives the press (a brief flash that decays) does.
 - Define theme-aware `::selection` foreground and background. Check selected text
   in inputs, prose, code, links, and contrasting surfaces: inherited or syntax
   colors can become unreadable. Check scoped overrides and browser behavior;

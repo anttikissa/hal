@@ -150,14 +150,14 @@ html.typing .App { position: absolute; }
 .Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
 .Card.folds { cursor: pointer; }
 /* Each card links to itself (task 0z): a # in its top right corner,
-   shown on hover or focus; the linked card is outlined. */
+   shown on hover or focus; the linked card flashes (flash.ts). */
 .Card .link { color: var(--quiet); text-decoration: none; user-select: none; white-space: nowrap; }
 .Card > .link { position: absolute; top: 0; right: 1ch; padding-block: var(--card-inset); min-width: 44px; text-align: right; }
 .Card:has(> .link) > .content { padding-right: 7ch; }
 .Card .link::before { content: attr(data-ref); }
 .Card .link:focus-visible { color: inherit; text-decoration: underline; }
 @media (hover: hover) and (pointer: fine) { .Card .link:hover { color: inherit; text-decoration: underline; } }
-.Card.target { outline: 1px solid currentColor; outline-offset: 2px; scroll-margin-top: 0.5lh; }
+.Card.target { scroll-margin-top: 0.5lh; }
 .Card .more { display: block; margin-top: 0.25lh; background: none; color: inherit; text-decoration: underline; padding: 0; }
 .Card .more { min-height: 44px; }
 .Card .more .icon { margin-right: 0.75ch; }
