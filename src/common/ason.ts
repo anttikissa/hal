@@ -18,7 +18,8 @@
 // Philosophy: (nearly) every JavaScript literal is valid ASON, and ASON
 // pastes into a JS REPL. Strings in single, double or backtick quotes
 // (multiline, no ${} interpolation); unquoted keys that are JS identifiers
-// or integers ({ café: 1, $x: 2, 0: 3 }, but { a-b: 1 } is an error); trailing commas;
+// or integers ({ café: 1, $x: 2, 0: 3 }, but { a-b: 1 } is an error;
+// stringify quotes every key but an ASCII identifier: { '0': 3 }); trailing commas;
 // // and /* */ comments; \x41, \u0041 and \u{1F600} escapes; numbers as JS
 // writes them: .5, 1., +1, 0xFF, 0b101, 0o17, 1_000, 42n, NaN, -Infinity, -0;
 // undefined; and any JS whitespace. Commas between items are
