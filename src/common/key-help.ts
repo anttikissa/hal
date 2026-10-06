@@ -40,6 +40,7 @@ function sections(): KeySection[] {
 			title: 'Prompt',
 			rows: [
 				row('enter', 'send the prompt; on an empty prompt, continue'),
+				row('ctrl-enter', 'terminal: steer now, stopping the reply and running tools; enter steers between steps'),
 				row('shift-enter', 'new line'),
 				row('alt-enter', 'queue the prompt to run after the turn'),
 				row('escape', 'pause the turn; leave editing the last prompt'),
