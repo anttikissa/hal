@@ -88,7 +88,7 @@ export type HistoryRecord = Numbered &
 	// told as a notice on its next request.
 	| { type: 'change'; cwd?: string; model?: string; previous?: { cwd?: string; model?: string }; ts: string }
 	// Observed changes during bash, not proof of authorship; not provider input.
-	| { type: 'file_changes'; toolId: string; cwd: string; files: FileChange[]; ts: string }
+	| { type: 'file_changes'; toolId: string; call?: number; cwd: string; files: FileChange[]; ts: string }
 	// One provider round's own usage (task c4), after its blocks: the
 	// context graph's points. `block`: the number of the round's first
 	// assistant record. Not provider input, not shown in the transcript.

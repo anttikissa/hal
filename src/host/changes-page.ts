@@ -1,5 +1,6 @@
 // Authenticated read-only pages; request paths never name host files.
 import { changes } from './changes.ts'
+import { clients } from './clients.ts'
 import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
 
@@ -21,6 +22,7 @@ async function serve(url: URL, css: string): Promise<Response> {
 		return { id: s.id, name: s.meta?.name, paths: new Set(changes.list(s.id).map((f) => f.path)) }
 	})
 	let sections: string[] = []
+	let cwd = sessions.open(id).cwd, timeZone = clients.timezone(id)
 	for (let file of files.filter((f) => selected === null || f.path === selected)) {
 		let diff = await changes.diff(id, file.before, file.after)
 		let commit = await changes.committed(id, file)
@@ -29,9 +31,11 @@ async function serve(url: URL, css: string): Promise<Response> {
 		for (let step of file.steps) {
 			let c = step.change
 			let text = await changes.diff(id, c.before, c.after)
-			steps.push(`<details><summary>Call ${escape(step.toolId)} · ${escape(step.ts)}</summary><pre>${escape(text)}</pre></details>`)
+			let block = step.call === undefined ? 'Call' : `<a href="/${id}#t${step.call}">#t${step.call}</a>`
+			steps.push(`<details><summary>${block} · ${escape(changes.time(step.ts, timeZone))}</summary><pre>${escape(text)}</pre></details>`)
 		}
-		sections.push(`<section><h2><a href="${changes.href(id, file.path)}">${escape(file.path)}</a></h2><p>${changes.counts(diff)}${commit ? ` · committed in ${commit}` : ''}</p>${others.length ? `<p>Also observed by ${others.join(', ')}</p>` : ''}<pre>${escape(diff)}</pre><h3>Steps per call</h3>${steps.join('')}</section>`)
+		let ids = changes.calls(id, file).map((c) => `<a href="${c.href}">${c.block}</a>`).join(' ')
+		sections.push(`<section><h2><a href="${changes.href(id, file.path)}">${escape(changes.shown(file, cwd))}</a></h2><p>${escape(changes.counts(diff))}  ${escape(changes.time(file.ts, timeZone))}${ids ? `  ${ids}` : ''}${commit ? ` · committed in ${commit}` : ''}</p>${others.length ? `<p>Also observed by ${others.join(', ')}</p>` : ''}<pre>${escape(diff)}</pre><h3>Steps per call</h3>${steps.join('')}</section>`)
 	}
 	let html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>${id} changes</title><style>${css}
 body { margin: 0; background: var(--canvas); color: var(--text); font: 16px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -43,7 +47,7 @@ summary { cursor: pointer; overflow-wrap: anywhere; }
 section { margin-top: 24px; border-top: 3px solid currentColor; }
 h1, h2 { font-size: 20px; overflow-wrap: anywhere; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-</style></head><body class="page"><main><nav><a href="/${id}">Session ${id}</a><a href="${changes.href(id)}">All changes (${files.length} files)</a></nav><h1>${id} · observed file changes</h1><p>Observed during calls, not proof of authorship. Commits do not clear this list. Undeclared, sensitive, large and binary files may have no textual diff.</p>${sections.join('') || '<p>No file changes since the last /changes clear.</p>'}</main></body></html>`
+</style></head><body class="page"><main><nav><a href="/${id}">Session ${id}</a><a href="${changes.href(id)}">All changes (${files.length} files)</a></nav><h1>${id} · file changes</h1><p>Files this session declared and changed. Commits do not clear this list.</p>${sections.join('') || '<p>No file changes since the last /changes clear.</p>'}</main></body></html>`
 	return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'" } })
 }
 

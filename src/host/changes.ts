@@ -5,7 +5,7 @@ import { fileChanges } from './file-changes.ts'
 import { history } from './history.ts'
 import { pages } from './pages.ts'
 
-export type Step = { toolId: string; n?: number; ts: string; change: FileChange }
+export type Step = { toolId: string; n?: number; call?: number; ts: string; change: Exclude<FileChange, { undeclared: true }> }
 export type ChangedFile = { path: string; cwd: string; name: string; steps: Step[]; before: FileSnapshot; after: FileSnapshot; ts: string }
 
 // Older histories hold undeclared Git status observations; they are
@@ -23,7 +23,7 @@ function collect(records: HistoryRecord[]): ChangedFile[] {
 				file = { path, cwd: r.cwd, name: change.path, steps: [], before: change.before, after: change.after, ts: r.ts }
 				files.set(path, file)
 			}
-			file.steps.push({ toolId: r.toolId, n: r.n, ts: r.ts, change })
+			file.steps.push({ toolId: r.toolId, n: r.n, call: r.call, ts: r.ts, change })
 			file.ts = r.ts
 			file.after = change.after
 		}
@@ -65,7 +65,8 @@ async function diff(id: string, before: FileSnapshot, after: FileSnapshot): Prom
 function counts(diff: string): string {
 	let lines = diff.split('\n')
 	if (diff === 'No net content change.\n') return '+0 -0'
-	if (!lines.some((l) => l.startsWith('@@'))) return '+? -?'
+	if (diff.startsWith('Content unavailable')) return 'metadata only (sensitive, large or non-regular file)'
+	if (!lines.some((l) => l.startsWith('@@'))) return 'no textual diff'
 	let added = 0, removed = 0, hunk = false
 	for (let line of lines) {
 		if (line.startsWith('@@')) hunk = true
@@ -101,8 +102,30 @@ async function committed(_id: string, file: ChangedFile): Promise<string | undef
 	}
 }
 
+// A time as the user reads it: HH:MM in their timezone, with the date
+// when not today.
+function time(ts: string, timeZone?: string, now = new Date()): string {
+	let day = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone })
+	let hm = new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone })
+	return day(new Date(ts)) === day(now) ? hm : `${day(new Date(ts))} ${hm}`
+}
+
+// A file's path as the session sees it: relative to its cwd, absolute
+// outside it.
+function shown(file: ChangedFile, cwd: string): string {
+	let rel = relative(cwd, file.path)
+	return rel && !rel.startsWith('..') && !rel.startsWith('/') ? rel : file.path
+}
+
+// The calls that changed a file as block ids with their card addresses
+// (task 0z). Records from before task jts have no call number: no id.
+function calls(id: string, file: ChangedFile): { block: string; href: string }[] {
+	let blocks = [...new Set(file.steps.flatMap((s) => (s.call === undefined ? [] : [`t${s.call}`])))]
+	return blocks.map((b) => ({ block: `#${b}`, href: `/${id}#${b}` }))
+}
+
 function href(id: string, path?: string): string {
 	return `/changes/${id}${path === undefined ? '' : `?path=${encodeURIComponent(path)}`}`
 }
 
-export const changes = { state: { cache: new Map<string, { size: number; files: ChangedFile[] }>() }, collect, list, run, diff, counts, committed, href }
+export const changes = { state: { cache: new Map<string, { size: number; files: ChangedFile[] }>() }, collect, list, run, diff, counts, committed, time, shown, calls, href }

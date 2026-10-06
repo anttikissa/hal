@@ -90,3 +90,15 @@ test('diff routes require login, validate selection, escape content and show ove
 	expect(html).toContain('metadata only')
 	expect((await changesPage.serve(new URL(route + '?path=/etc/passwd'), web.css())).status).toBe(404)
 })
+
+test('/changes lists a file once with the cards of the calls that changed it, never provider ids', async () => {
+	let { command } = await import('./commands/changes.ts')
+	let a = blob('one\n'), b = blob('two\n'), c = blob('three\n')
+	history.append(id, { type: 'file_changes', cwd: home, toolId: 'toolu_a', call: 5, files: [{ path: 'src/x.ts', before: a, after: b }] })
+	history.append(id, { type: 'file_changes', cwd: home, toolId: 'toolu_b', call: 9, files: [{ path: 'src/x.ts', before: b, after: c }] })
+	let say = ((await command.run('', {}, { sessionId: id } as any)) as { say: string }).say
+	let rows = say.split('\n').filter((l) => l.startsWith('- '))
+	expect(rows).toHaveLength(1)
+	expect(rows[0]).toMatch(new RegExp(`^- \\[src/x\\.ts\\]\\([^)]+\\)  \\+1 -1  \\d\\d:\\d\\d  \\[#t5\\]\\([^)]*/${id}#t5\\) \\[#t9\\]\\([^)]*/${id}#t9\\)$`))
+	expect(say).not.toContain('toolu_')
+})

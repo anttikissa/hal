@@ -153,7 +153,11 @@ async function finish(observation: Observation): Promise<void> {
 			if (JSON.stringify(a) !== JSON.stringify(b)) files.push({ path, before: a, after: b })
 		}
 		if (patterns.length || files.length) {
-			history.append(ctx.sessionId, { type: 'file_changes', toolId: ctx.callId!, cwd: ctx.cwd, files })
+			// The call's card number, so /changes can name it #t<n> (task jts).
+			let running = history.state.running.get(ctx.sessionId)
+			let i = running?.turn.blocks.findIndex((b) => b.type === 'tool_call' && b.id === ctx.callId) ?? -1
+			let call = i >= 0 ? running!.ns[i] : undefined
+			history.append(ctx.sessionId, { type: 'file_changes', toolId: ctx.callId!, ...(call !== undefined && { call }), cwd: ctx.cwd, files })
 			host.broadcast(ctx.sessionId, { type: 'turn-stats', sessionId: ctx.sessionId, stats: stats.of(ctx.sessionId) })
 		}
 	} finally {

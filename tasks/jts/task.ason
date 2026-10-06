@@ -3,7 +3,10 @@
 	spec: `The /changes list shows, per file: the path (relative to the session cwd; absolute outside it) linking to its diff page, +added -removed lines, the local time of its latest change (HH:MM, with the date when not today) and the calls that changed it as block ids (#t123, task 9p). Each block id links to that tool call's card at the task 0z address <webUrl>/<session id>#<block id>: an OSC 8 link in the terminal when webUrl is known (plain text otherwise), an anchor on the web, the same address task d92 uses. Provider tool call ids (toolu_…, call_…) never appear. No "observed during calls, not proof of authorship" header and no undeclared markers. A file without a textual diff names the reason instead of +? -?, e.g. "metadata only (large file)". Example:
   src/client/render.ts  +120 -17  15:17  #t161 #t183 #t206
 The web changes page uses the same row and labels each step with its linked block id and local time instead of the tool call id and ISO time. Both clients render the same /changes text. Test: a session with two declared edits lists one row with both block ids linked to their cards, and no tool call id.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"file_changes records carry call: the record number of the tool_call block, read from the running turn (history.state.running ns), so /changes names #t<call>. Records written before jts have no call and list no ids; provider toolIds are never shown. Times use the client's timezone (clients.timezone). Snapshots with no content read 'metadata only (sensitive, large or non-regular file)'."
+	],
 	needs: ['fz', '9p', '0z', 'c4x'],
 	foldInto: ['fz']
 }
