@@ -17,21 +17,27 @@ import { profile } from './profile.ts'
 import { slash } from './slash.ts'
 import type { Reply } from './synthetic.ts'
 
-// Example answers the language field rotates through: tones (some
-// like the Claude and ChatGPT style presets), languages as a native
-// speaker would ask, and fun ones. intro.languages() mixes them.
-const LANGUAGES = [
+// Example answers the language field rotates through, most useful
+// first: tones (some like the Claude and ChatGPT style presets),
+// languages as a native speaker would ask, and fun ones.
+// intro.languages() mixes them, favoring the useful ones early.
+const PLACEHOLDERS = [
+	'Simplified Technical English, please',
 	'US English; spaces around em dash',
-	'British spelling, no fluff',
+	'Avoid em dashes and the word "load-bearing"',
+	'Use plain ASCII punctuation: -, \', "',
+	'No yapping',
 	'Concise. Skip the pleasantries.',
-	'Friendly but brief',
+	'British spelling, no fluff',
+	'Bullet points, not essays',
+	'Be blunt; tell me when I’m wrong',
+	'No emoji, no exclamation marks',
+	'Terse as a Unix man page',
 	'Explain like I’m new to this',
 	'Teach me as you go',
-	'Formal, like a lawyer wrote it',
-	'Be blunt; tell me when I’m wrong',
-	'Bullet points, not essays',
-	'No emoji, no exclamation marks',
+	'Friendly but brief',
 	'Nerdy is fine; show your sources',
+	'Formal, like a lawyer wrote it',
 	'¡En español, porfa!',
 	'Suomeksi, kiitos',
 	'En français, stp',
@@ -70,7 +76,6 @@ const LANGUAGES = [
 	'Dry British sarcasm',
 	'Like a grumpy senior engineer',
 	'Haiku when possible',
-	'Werner Herzog narrating my bugs',
 	'Deadpan, like a Kaurismäki film',
 	'Punk zine energy, zero corporate speak',
 	'Like a 90s BBS sysop',
@@ -79,7 +84,6 @@ const LANGUAGES = [
 	'Talk to me like a fellow hacker',
 	'Logic only, like Spock',
 	'Stoic: what can I control here?',
-	'Terse as a Unix man page',
 	'Cryptic, like the Log Lady',
 	'RTFM energy, but kind',
 	'Like a Bond villain explaining the plan',
@@ -95,11 +99,14 @@ const LANGUAGES = [
 	'Dungeon master: narrate my quest',
 ]
 
-// A fresh order for each run: the plain first, a wink about where the
-// examples live fourth, the rest shuffled.
+// A fresh order for each run: the first example always first, a wink
+// about where the examples live fourth, the rest shuffled. Sorting by
+// random × (rank + 5) keeps useful examples early while any one can
+// still come up.
 function languages(): string[] {
-	let mixed = LANGUAGES.map((s) => ({ s, k: Math.random() })).sort((a, b) => a.k - b.k).map((x) => x.s)
-	return ['Simplified Technical English, please', mixed[0]!, mixed[1]!, 'Psst — check out these examples in src/host/intro.ts', ...mixed.slice(2)]
+	let [first, ...rest] = PLACEHOLDERS
+	let mixed = rest.map((s, i) => ({ s, k: Math.random() * (i + 5) })).sort((a, b) => a.k - b.k).map((x) => x.s)
+	return [first!, mixed[0]!, mixed[1]!, 'Psst — check out these examples in src/host/intro.ts', ...mixed.slice(2)]
 }
 
 type Entry = Record<string, any>
