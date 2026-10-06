@@ -158,6 +158,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let row: string
 			if (typeof command === 'string' && typeof description === 'string') {
 				let head = itemView.unsafe(strings.clipVisual(`${prefix}${ansi.clean(toolDetails.headline(item.name, item.input).text)}`, width), item, width)
+				if (fold === 'closed') return [head]
 				let mark = item.input.background === true ? '&' : '$'
 				let commandLine = strings.clipVisual(`${mark} ${ansi.clean(command).replace(/\s+/g, ' ')}`, width)
 				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-5).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-5) : [])]
@@ -177,8 +178,9 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			let out = item.interrupted === 'canceled' ? '' : call ? bashResult.display(item.output, true, !!item.interrupted) : bashResult.trim(item.output)
 			let style = itemView.itemStyle(item, tool)
 			// Attached, nothing to show draws nothing; apart, the header
-			// row stays, for its time, link and status.
-			if (!out && tool && !item.isError) return []
+			// row stays, for its time, link and status. A closed call is
+			// its header row (task ghs): attached results draw nothing.
+			if (tool && (fold === 'closed' || (!out && !item.isError))) return []
 			// Only the lines shown are laid out (outputs run to megabytes);
 			// the rest are counted as source lines, as on the web.
 			let wide = width, max = fold === 'open' ? itemView.openRows : itemView.resultRows
