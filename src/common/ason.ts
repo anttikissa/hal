@@ -44,8 +44,6 @@
 //   //     	port: 8080,
 //   //     	^
 //
-// The error also carries .pos, the offset into the text.
-//
 // Comments can be kept if you need them: parse(text, { comments: true }).
 // Not all of them: for simplicity, ASON keeps the common case, a comment
 // above the root value, a key or an array item, and stringify writes it
