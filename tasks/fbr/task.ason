@@ -5,7 +5,8 @@
 	notes: [
 		'Built as: src/web/flash.ts (flash.on animates backgroundColor from --flash to the computed background with Web Animations; flash.buttons is installed by Chat). Chat.reveal flashes the card and watches it with an IntersectionObserver: dropping needs one intersecting report first (the reveal scroll), a connected card still marked .target, and a hash; then replaceState and app.aim(), as folds.set does when the linked card closes. The color comes from colors.page().flash because src/web may hold no color literals.',
 		"A background-color flash with an ease-out-expo curve over 450ms read as barely anything (the user saw a faint icon tint): white fell to half within ~50ms. Now an inset box-shadow (100vmax spread, color-mix of --flash) with ten linear keyframes of e^-5t; the element's own box-shadow is kept after it. Checked in headless Chrome: the pressed Pause button is white, then becomes Continue still flashing.",
-		"The page CSS comes from the running host's colors module, so a host started before page().flash existed serves no --flash and the flash was invisible; flash.ts falls back to --text (nearly white) until a host restart."
+		"The page CSS comes from the running host's colors module, so a host started before page().flash existed serves no --flash and the flash was invisible; flash.ts falls back to --text (nearly white) until a host restart.",
+		'The --text fallback looked beige under an amber theme; the fallback is plain white.'
 	],
 	needs: ['0z'],
 	foldInto: ['0z']
