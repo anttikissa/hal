@@ -170,11 +170,9 @@ function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) 
 // Becomes host if nobody is. Then, once the first frame is up, serves
 // the web and continues every turn the previous host left unfinished.
 async function becomeHost(): Promise<boolean> {
-	if (!(await server.serve(async () => {
-		await version.init()
-		restartNote.started(version.state.loaded ?? (await version.current()).loaded)
-	}))) return false
+	if (!(await server.serve())) return false
 	perf.mark('host')
+	restartNote.announce()
 	main.later(() => {
 		find.init()
 		resources.init()

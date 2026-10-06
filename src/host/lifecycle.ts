@@ -1,4 +1,4 @@
-// Host initialization, role policy and supervised lifetime (tasks fd1, nvm).
+// Host initialization, role policy and supervised lifetime (task fd1).
 import { settings } from '../common/settings.ts'
 import { anthropic } from './anthropic.ts'
 import { config } from './config.ts'
@@ -50,11 +50,11 @@ async function serve(becomeHost: () => Promise<boolean>): Promise<void> {
 	process.on('SIGTERM', stop)
 	process.on('SIGINT', stop)
 	process.on('SIGUSR1', () => restartProcess.run())
-	version.found = (loaded) => host.announce(loaded)
 	if (!(await becomeHost())) {
 		process.stderr.write('hal: another host owns this HAL_HOME; stop it before starting hal serve\n')
 		process.exit(1)
 	}
+	version.found = (loaded) => host.announce(loaded)
 	void version.init()
 }
 
