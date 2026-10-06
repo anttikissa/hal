@@ -1,9 +1,11 @@
 import { describe, test, expect } from 'bun:test'
-import { stringify, parse, parseAll, parseStream, COMMENTS } from './ason'
+import { stringify, parse, parseAll, parseStream, COMMENTS, config } from './ason'
 
 describe('stringify', () => {
 	describe('primitives', () => {
 		test('bigint', () => expect(stringify(42n)).toBe('42n'))
+
+		test('-0 keeps its sign', () => expect(Object.is(parse(stringify(-0)), -0)).toBe(true))
 
 		test('string with newline (smart)', () => expect(stringify('a\nb')).toBe('`a\nb`'))
 	})
@@ -42,6 +44,20 @@ describe('stringify modes', () => {
 		}
 		stringify(value, 'long')
 		expect(reads).toBe(12)
+	})
+
+	test('indent comes from options, then config; width counts it as characters', () => {
+		const value = { a: { b: 'x'.repeat(66) }, c: 1 }
+		// Inner object fits 80 columns after one tab, not after four spaces.
+		expect(stringify(value)).toBe(`{\n\ta: { b: '${'x'.repeat(66)}' },\n\tc: 1\n}`)
+		expect(stringify(value, { indent: 4 })).toBe(`{\n    a: {\n        b: '${'x'.repeat(66)}'\n    },\n    c: 1\n}`)
+		config.indent = '  '
+		try {
+			expect(stringify({ a: 1 }, 'long')).toBe('{\n  a: 1\n}')
+			expect(stringify({ a: 1 }, { mode: 'long', indent: '\t' })).toBe('{\n\ta: 1\n}')
+		} finally {
+			config.indent = '\t'
+		}
 	})
 })
 
