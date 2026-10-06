@@ -412,13 +412,9 @@ function later(): void {
 }
 
 /**
- * Paint soon: at the end of this task if nothing was painted in the
- * last frameMs, else once when that time is up, however many requests
- * came in between. A stream of events can then never starve keyboard
- * input. The paint waits for the task's end because the host delivers
- * one change as several events in a row (a waiting message leaves the
- * inbox, then arrives as a prompt): painting between them would draw a
- * frame shorter than both, which clears scrollback in full mode.
+ * Paint soon: at the end of this task (one host step's events paint
+ * once, task a27) if nothing was painted in the last frameMs, else once
+ * when that time is up. A stream of events never starves keyboard input.
  */
 function request(): void {
 	let st = render.state
@@ -426,10 +422,7 @@ function request(): void {
 		st.dirty = true
 		return
 	}
-	queueMicrotask(() => {
-		st.dirty = false
-		render.draw()
-	})
+	queueMicrotask(() => ((st.dirty = false), render.draw()))
 	st.timer = setTimeout(() => {
 		st.timer = null
 		if (!st.dirty) return
