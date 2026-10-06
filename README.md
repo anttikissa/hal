@@ -8,7 +8,7 @@ This is HAL 9001, an agent harness.
 
 1. **Respect the terminal.** Ctrl-C quits and Ctrl-Z suspends, always.
    Scrolling, search and links stay native.
-2. **Concise by default, everything on request.** Blocks start closed;
+2. **Concise by default, verbose when you need it.** Blocks start closed;
    Ctrl-O opens them.
 3. **The best editing experience possible.** Shift to select works,
    cmd-z undoes, cut, copy and paste just work.
