@@ -1,10 +1,11 @@
 // /mem: host process memory and what Hal knows it holds (task 7a).
 
 import { heapStats } from 'bun:jsc'
-import { freemem, totalmem } from 'os'
+import { totalmem } from 'os'
 import type { SlashCommand } from '../commands.ts'
 import { history } from '../history.ts'
 import { pages } from '../pages.ts'
+import { resources } from '../resources.ts'
 import { sessions } from '../sessions.ts'
 import { web } from '../web.ts'
 
@@ -23,7 +24,7 @@ async function report(): Promise<string> {
 	let rows = [
 		`rss        ${size(process.memoryUsage.rss())}`,
 		`heap       ${size(heap.heapSize)} used of ${size(heap.heapCapacity)}, ${heap.objectCount} objects`,
-		`machine    ${size(freemem())} free of ${size(totalmem())}`,
+		`machine    ${size(resources.availableMemory())} available of ${size(totalmem())}`,
 		'',
 		'holders',
 	]

@@ -8,7 +8,7 @@
 // their commands. The user decides when to resume. In memory only.
 // Tasks: fwk.
 import { readFileSync, statfsSync } from 'fs'
-import { freemem } from 'os'
+import { freemem, totalmem } from 'os'
 import { diag } from './diag.ts'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
@@ -20,16 +20,27 @@ type Sample = { disk: number; memory: number }
 const rank: Record<Level, number> = { ok: 0, low: 1, critical: 2 }
 const gb = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`
 
-// Free bytes for unprivileged writers in the home, and memory the kernel
-// can hand out without swapping (MemAvailable; freemem() off Linux).
-function measure(): Sample {
-	let fs = statfsSync(paths.home())
-	let memory = freemem()
+// Memory the kernel can hand out without swapping. Linux: MemAvailable.
+// macOS: freemem() counts only idle pages and ignores reclaimable cache,
+// so it reads near zero on a healthy Mac; kern.memorystatus_level is the
+// available percentage that memory_pressure reports. freemem() elsewhere.
+function availableMemory(): number {
 	try {
 		let m = /^MemAvailable:\s+(\d+) kB/m.exec(readFileSync('/proc/meminfo', 'utf8'))
-		if (m) memory = Number(m[1]) * 1024
+		if (m) return Number(m[1]) * 1024
 	} catch {}
-	return { disk: fs.bavail * fs.bsize, memory }
+	if (process.platform === 'darwin') {
+		let out = Bun.spawnSync(['sysctl', '-n', 'kern.memorystatus_level']).stdout.toString()
+		let percent = Number.parseInt(out, 10)
+		if (percent >= 0 && percent <= 100) return (totalmem() * percent) / 100
+	}
+	return freemem()
+}
+
+// Free bytes for unprivileged writers in the home, and available memory.
+function measure(): Sample {
+	let fs = statfsSync(paths.home())
+	return { disk: fs.bavail * fs.bsize, memory: availableMemory() }
 }
 
 function grade(s: Sample): Level {
@@ -117,5 +128,5 @@ export const resources = {
 	criticalDiskBytes: 1e9,
 	lowMemoryBytes: 1.5e9,
 	criticalMemoryBytes: 0.5e9,
-	measure, grade, describe, warning, check, append, init, stop,
+	availableMemory, measure, grade, describe, warning, check, append, init, stop,
 }
