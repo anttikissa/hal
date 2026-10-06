@@ -77,12 +77,20 @@ function append(id: string, record: NewRecord & { ts?: string }): HistoryRecord 
 	let full = { ...rest, n: n ?? history.number(id), ts: ts ?? new Date().toISOString() } as HistoryRecord
 	let line = lines.encode(full)
 	if (busy.starts(full)) busy.add(id)
-	appendFileSync(history.file(id), line)
+	history.write(history.file(id), line)
 	pages.note(id, line, full)
 	naming.committed(id, full)
 	if (full.type === 'turn_end' && !Object.keys(pages.marks(id).inbox).length && !pages.marks(id).transitions?.length) busy.drop(id)
 	for (let listener of history.state.listeners) listener(id, full)
 	return full
+}
+
+// Appends one whole line or nothing: a failed write (ENOSPC) is cut
+// back to the old size before it rethrows, so a later append never
+// joins a torn record mid-file (task ncy). Shrinking needs no space.
+function write(path: string, line: string): void {
+	let size = existsSync(path) ? statSync(path).size : 0
+	try { appendFileSync(path, line) } catch (e) { try { truncateSync(path, size) } catch {} throw e }
 }
 
 // Calls `listener` after every durable append (find.ts indexes them);
@@ -374,27 +382,6 @@ export const history = {
 	// record number not given out yet. `listeners`: see onAppend.
 	state: { running: new Map<string, Running>(), cache: new Map<string, { size: number; records: HistoryRecord[] }>(), next: new Map<string, number>(), listeners: new Set<(id: string, record: HistoryRecord) => void>() },
 	check: (value: unknown) => historyCheck.check(value),
-	blockRecord,
-	started,
-	number,
-	file,
-	append,
-	onAppend,
-	submit,
-	load,
-	lastByte,
-	read,
-	readSync,
-	unfinished,
-	open,
-	messages,
-	record,
-	results,
-	end,
-	park,
-	carry,
-	stop,
-	live,
-	streaming,
-	turn,
+	blockRecord, started, number, file, append, write, onAppend, submit, load, lastByte, read, readSync,
+	unfinished, open, messages, record, results, end, park, carry, stop, live, streaming, turn,
 }

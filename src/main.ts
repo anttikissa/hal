@@ -19,6 +19,7 @@ import { drafts } from './common/drafts.ts'
 import { perf } from './common/perf.ts'
 import { protocol, type Event, type Tab } from './common/protocol.ts'
 import { settings } from './common/settings.ts'
+import { resources } from './host/resources.ts'
 import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
 import { diag } from './host/diag.ts'
@@ -195,6 +196,7 @@ async function becomeHost(): Promise<boolean> {
 	}
 	main.later(() => {
 		find.init()
+		resources.init()
 		web.start()
 		if (web.state.server && web.state.server.port !== settings.webPort() && terminal.available()) {
 			app.state.notice = `Web is on port ${web.state.server.port} (preferred ${settings.webPort()} is busy)`
