@@ -1,7 +1,10 @@
 {
-	title: 'Web question header wraps to the left edge',
-	spec: "A question card's header on the web flows its time and text as one paragraph: a wrapped question continues at the card's left edge, under the time, as the terminal wraps a question's header (ansi.wrap of the stamped title). The block link stays in its own right column on the first line. Other card headers keep the hanging grid of task 4v. Test: at phone and desktop widths, a wrapped pending question's last label line starts at the time's left edge.",
+	title: 'Card headers wrap to the left edge',
+	spec: "Every card header, web and terminal, flows its time and text as one paragraph: a wrapped header continues at the left edge, under the time, never in a hanging indent. Web: CardHeader is the one header layout (a .flow paragraph of stamp, icon, label and inline extras, then actions such as edit and discard, then the block link, each in its own right column on the first line); a folded header stays one row with an ellipsis. Terminal: itemView.headed wraps the title with ansi.wrap instead of clipping it; thinking puts its time before the first paragraph, or on its own row before a heading, list or code. Tests: at phone width a wrapped card header and a wrapped question end their label at the time's left edge.",
 	status: 'done',
+	notes: [
+		'First done for questions only (a flow variant beside the hanging grid); the user rejected the scope: one layout for every header, in one place per client.'
+	],
 	needs: ['4v'],
 	foldInto: ['4v']
 }

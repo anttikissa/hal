@@ -1383,7 +1383,7 @@ browserTest('transcript card variants share first-line geometry in open and clos
 			return [...document.querySelectorAll('.CardHeader')].map(h => {
 				let c = h.closest('.Card'), stamp = h.querySelector('.stamp'), title = h.querySelector('.title'), ref = h.querySelector('.link');
 				let t = first(stamp ?? title), label = first(title), link = ref?.getBoundingClientRect(), box = h.getBoundingClientRect(), body = c.querySelector(':scope > .content'), end = body && last(body);
-				return { compact: c.classList.contains('thinking') || c.classList.contains('assistant'), folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, offCenter: t.y + t.height / 2 - (c.getBoundingClientRect().y + c.getBoundingClientRect().height / 2), rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && title.getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth, tail: end ? c.getBoundingClientRect().bottom - end.bottom : undefined };
+				return { compact: c.classList.contains('thinking') || c.classList.contains('assistant'), folds: c.classList.contains('folds'), height: c.getBoundingClientRect().height, offCenter: t.y + t.height / 2 - (c.getBoundingClientRect().y + c.getBoundingClientRect().height / 2), rowHeight: box.height, inset: t.y - c.getBoundingClientRect().y, baseline: label ? label.y - t.y : 0, refTop: link ? link.y - box.y : 0, overlap: !!link && h.querySelector('.flow').getBoundingClientRect().right > link.left + 1, textWidth: c.scrollWidth, boxWidth: c.clientWidth, tail: end ? c.getBoundingClientRect().bottom - end.bottom : undefined };
 			});
 		})()`
 		for (let [, width, height, touch] of [['portrait', 390, 800, true], ['narrow', 320, 760, true], ['landscape', 844, 390, true], ['desktop', 1200, 800, false]] as const) {
@@ -1423,9 +1423,11 @@ browserTest('transcript card variants share first-line geometry in open and clos
 			}
 			expect(await b.evaluate(`document.querySelector('.Card.thinking .title').textContent`)).toBe('Thinking')
 			expect(await b.evaluate(`document.querySelector('.Card.thinking .content').textContent`)).toContain('Further thought')
-			let insets = await b.evaluate(`(() => { let c = document.querySelectorAll('.Card.tool')[1], header = c.querySelector('.stamp'), body = c.querySelector('.content'); return { body: body.getBoundingClientRect().x + parseFloat(getComputedStyle(body).paddingLeft), header: header.getBoundingClientRect().x, wrapped: c.querySelector('.title').getBoundingClientRect().height > parseFloat(getComputedStyle(c).lineHeight) * 2, } })()`)
+			let insets = await b.evaluate(`(() => { let c = document.querySelectorAll('.Card.tool')[1], header = c.querySelector('.stamp'), body = c.querySelector('.content'); return { body: body.getBoundingClientRect().x + parseFloat(getComputedStyle(body).paddingLeft), header: header.getBoundingClientRect().x, wrapped: c.querySelector('.title').getBoundingClientRect().height > parseFloat(getComputedStyle(c).lineHeight) * 2, under: [...c.querySelector('.title .label').getClientRects()].at(-1).left - header.getBoundingClientRect().x } })()`)
 			expect(insets.body).toBeCloseTo(insets.header, 1)
 			if (width <= 390) expect(insets.wrapped).toBe(true)
+			// A wrapped header continues at the left edge, under its time (task 77f).
+			if (width <= 390) expect(Math.abs(insets.under)).toBeLessThanOrEqual(1)
 
 			await b.evaluate(`document.querySelectorAll('.Card.folds .mark').forEach(b => b.click()); document.querySelector('.Card.queued').click()`)
 			await Bun.sleep(300)

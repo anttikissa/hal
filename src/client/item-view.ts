@@ -74,13 +74,15 @@ function imageLabel(item: Item & { type: 'image' }, session?: string): string {
 function headed(item: Item, body: string[], width: number, session?: string): string[] {
 	let title = titles.title(item)
 	if (title === undefined) return body
-	title = strings.clipVisual(ansi.clean(title), width)
+	// Wrapped, a header continues at the left edge, under its time (task 77f).
+	let rows = ansi.wrap(ansi.clean(title), width)
+	let last = rows.at(-1)!
 	let call = item.type === 'prompt' && item.label?.match(/^bash #(t?\d+)$/)?.[1]
-	if (call && session && title.endsWith(`#${call}`)) {
+	if (call && session && last.endsWith(`#${call}`)) {
 		let href = transcript.href(session, call)
-		if (href) title = `${title.slice(0, -call.length - 1)}${ansi.quiet(`\x1b]8;;${ansi.webUrl(href)}\x07#${call}${ansi.LINK_OFF}`, itemView.itemStyle(item))}`
+		if (href) rows[rows.length - 1] = `${last.slice(0, -call.length - 1)}${ansi.quiet(`\x1b]8;;${ansi.webUrl(href)}\x07#${call}${ansi.LINK_OFF}`, itemView.itemStyle(item))}`
 	}
-	return [title, '', ...body]
+	return [...rows, '', ...body]
 }
 
 // Rows for one item at `width` columns, without the side padding;
@@ -138,10 +140,14 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			if (!item.text.trim() && !streaming) return []
 			let prefix = titles.stamp(item.ts, item.originSession ? `(in ${item.originSession}) ` : '')
 			if (fold === 'closed' && !streaming) return itemView.closedRow(item, item.text, width, prefix)
-			// Leave at least one text column even on a very narrow terminal.
-			prefix = strings.clipVisual(prefix, Math.max(0, width - 1))
-			let body = markdownView.lines(item.text.trimEnd(), width - strings.visLen(prefix), streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
-			return [prefix + (body[0] ?? ''), ...body.slice(1).map(line => ' '.repeat(strings.visLen(prefix)) + line)]
+			// The time leads the first paragraph, so wrapped rows continue at
+			// the left edge (task 77f); before a heading, list or code it
+			// stands on its own row.
+			let text = item.text.trim()
+			let first = markdown.parse(text.split('\n', 1)[0]!, false)[0]
+			let flows = first?.type === 'line' && first.kind === 'p' && !first.marker
+			let body = markdownView.lines(flows ? prefix + text : text, width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
+			return flows ? body : [...ansi.wrap(prefix.trimEnd(), width), ...body]
 		}
 		case 'text':
 			if (fold === 'closed' && !streaming) return itemView.closedRow(item, names.strip(summary.strip(item.text)), width)

@@ -106,19 +106,15 @@ html.typing .App { position: absolute; }
    stays the same when a label wraps. The 44px height belongs to this row:
    every slot shares one top inset that centers a single line in 44px,
    so a wrapped label grows down from the timestamp's line. */
-.CardHeader { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; column-gap: 1ch; padding-inline: 1ch; min-height: 44px; }
-.CardHeader:not(:has(.stamp)) { grid-template-columns: minmax(0, 1fr) auto; }
-.CardHeader .stamp, .CardHeader .title, .CardHeader .link { padding-block: var(--card-inset); }
-.CardHeader .stamp { padding-inline: 0; background: none; color: inherit; font: inherit; text-align: left; white-space: nowrap; }
-.CardHeader .mark { display: flex; align-items: flex-start; justify-content: flex-start; }
-.CardHeader .title { display: flex; align-items: flex-start; gap: 0.2ch; min-width: 0; }
-.CardHeader .label { min-width: 0; }
+.CardHeader { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: start; column-gap: 1ch; padding-inline: 1ch; min-height: 44px; }
+.CardHeader .flow, .CardHeader .link { padding-block: var(--card-inset); }
+.CardHeader .flow { min-width: 0; }
+.CardHeader .stamp { padding: 0; background: none; color: inherit; font: inherit; white-space: nowrap; }
+.CardHeader .mark { position: relative; }
+@media (pointer: coarse) { .CardHeader .mark::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); } }
 /* A flowing header (a question): time and label are one text, wrapping to the left edge. */
-.CardHeader.flow { grid-template-columns: minmax(0, 1fr) auto; }
-.CardHeader.flow .title { display: block; }
-.CardHeader.flow .stamp { padding-block: 0; }
-.CardHeader .title > .icon { height: 1lh; margin-right: 0.8ch; opacity: 0.8; }
-.Card.folds:not(.open) .CardHeader .label { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
+.CardHeader .title > .icon { height: 1lh; margin-right: 0.8ch; vertical-align: top; opacity: 0.8; }
+.Card.folds:not(.open) .CardHeader .flow { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
 .CardHeader .error { background: none; margin-left: 1ch; }
 /* Steering's "(canceled)" or "(stopped, 50.2s)" is no failure; a flagged call's label keeps the title color (task ker). */
 .CardHeader .status { margin-left: 1ch; color: var(--quiet); white-space: nowrap; }
@@ -127,8 +123,8 @@ html.typing .App { position: absolute; }
 @media (pointer: coarse) { .CardHeader .kill { min-height: 44px; min-width: 44px; } }
 /* One text line tall, inside the title line; on touch an invisible
    ::after makes the 44px target without growing the row. */
-.CardHeader :is(.edit, .discard) { position: relative; margin-left: auto; height: 1lh; padding: 0 1ch; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 0.2em; align-self: flex-start; }
-.CardHeader .edit + .discard { margin-left: 0; }
+.CardHeader :is(.edit, .discard) { position: relative; margin-top: var(--card-inset); height: 1lh; padding: 0 1ch; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 0.2em; align-self: flex-start; }
+.CardHeader .edit + .discard { margin-left: -1ch; }
 @media (hover: hover) and (pointer: fine) { .Card:not(:hover, :focus-within) .CardHeader :is(.edit, .discard) { opacity: 0; } }
 @media (pointer: coarse) { .CardHeader :is(.edit, .discard)::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); } }
 .EditBar { flex: none; display: flex; align-items: center; gap: 1ch; margin: 0 max(2ch, env(safe-area-inset-right)) 0 max(2ch, env(safe-area-inset-left)); padding: 0.25lh 1ch; border-left: 3px solid var(--attention-fg); }
@@ -136,7 +132,7 @@ html.typing .App { position: absolute; }
 .EditBar button { flex: none; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; }
 @media (pointer: coarse) { .EditBar .keys { display: none; } .EditBar button { min-height: 44px; min-width: 44px; } }
 @media (max-width: 40rem) { .EditBar { margin-inline: max(1ch, env(safe-area-inset-left)) max(1ch, env(safe-area-inset-right)); } }
-.CardHeader .stamp, .CardHeader .link { min-width: 44px; }
+.CardHeader .link { min-width: 44px; }
 .CardHeader .title a { padding-block: var(--card-inset); }
 /* A context boundary (tasks bc, vh): its text centered in a rule. */
 .Card.divider { display: flex; align-items: center; gap: 1ch; border-left: none; }
@@ -182,7 +178,7 @@ html.typing .App { position: absolute; }
 .cursor-line span, .Card .cursor { display: block; width: 1ch; height: 1lh; background: currentColor; animation: blink 1s steps(1, end) infinite; }
 .Card .cursor { display: inline-block; vertical-align: text-bottom; margin-left: 0.2ch; background: var(--cursor); }
 .Card.thinking .cursor { background: var(--quiet); }
-.CardHeader .cursor { vertical-align: text-bottom; }
+.CardHeader .cursor { vertical-align: top; }
 /* Model text as markdown (task fn). Each source line is a row, a blank
    one as tall as text; the last is inline so Hal's cursor follows it. A
    table too wide scrolls sideways in its own box, and while more of it
