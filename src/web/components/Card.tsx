@@ -220,10 +220,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// Drops this queued message by its inbox id (task gr4); the host refuses with a visible reason.
 	let discardButton = () => <Show when={props.discard}><button type="button" class="discard" aria-label="Discard queued message" title="Remove from the queue" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop ${props.row.key}` })}><Icon name="close" /></button></Show>
 	let heading = () => (
-		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} label={who()} reference={link()}>
-			{editButton()}
-			{discardButton()}
-		</CardHeader>
+		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} label={who()} reference={link()} actions={<>{editButton()}{discardButton()}</>} />
 	)
 	// Content branches share the shell, header and normal body inset.
 	let plain = (s: () => { kind: string; text: string }) => (

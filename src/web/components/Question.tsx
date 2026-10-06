@@ -57,7 +57,7 @@ export function Question(props: { item: Item & { type: 'question' } & { key: str
 	}
 	return (
 		<form class="Question question" onSubmit={submit}>
-			<CardHeader flow time={titles.time(props.item.ts)} label={<For each={parts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>} reference={<Show when={target.href(props.session, titles.blockId(props.item))}>{(h) => <a class="link" href={h()} data-ref={`#${titles.blockId(props.item)}`} title="Link to this block" aria-label={`Link to block ${titles.blockId(props.item)}`} />}</Show>} />
+			<CardHeader time={titles.time(props.item.ts)} label={<For each={parts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>} reference={<Show when={target.href(props.session, titles.blockId(props.item))}>{(h) => <a class="link" href={h()} data-ref={`#${titles.blockId(props.item)}`} title="Link to this block" aria-label={`Link to block ${titles.blockId(props.item)}`} />}</Show>} />
 			<button type="button" class="dismiss" aria-label="Dismiss" title="Dismiss (Esc)" onClick={() => app.sendForm({ type: 'cancel' })}>
 				<Icon name="close" />
 			</button>
