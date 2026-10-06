@@ -26,8 +26,10 @@ function strip(text: string): string {
 	}
 	out += text.slice(at)
 	masked = markdownCode.mask(out)
+	// An unclosed tag is a summary still streaming in only on the last
+	// line: a summary is one line, so a stray tag in prose stays text.
 	let open = [...masked.matchAll(OPEN)].at(-1)?.index
-	if (open !== undefined) return out.slice(0, open).trimEnd()
+	if (open !== undefined && !out.includes('\n', open)) return out.slice(0, open).trimEnd()
 	for (let n = TAG.length - 1; n > 0; n--) if (masked.endsWith(TAG.slice(0, n))) return out.slice(0, -n).trimEnd()
 	return out.trimEnd()
 }

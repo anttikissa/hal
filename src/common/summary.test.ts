@@ -46,3 +46,10 @@ test('streaming literal tags stay visible and escaped backticks do not open code
 	}
 	expect(summary.strip('Escaped \\` marker.\n<summary>Done.</summary>')).toBe('Escaped \\` marker.')
 })
+
+test('a stray unclosed tag in prose hides nothing after it', () => {
+	let prose = "A push reads 'done: <summary>'.\n\nMore text."
+	let full = prose + '\n\n<summary>Done.</summary>'
+	expect(summary.strip(full)).toBe(prose)
+	expect(summary.extract(full)).toBe('Done.')
+})
