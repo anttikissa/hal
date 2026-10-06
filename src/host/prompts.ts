@@ -16,7 +16,7 @@
 import type { ImageBlock, Sender, UserBlock, UserText } from '../common/blocks.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
 import { forms, type Answers } from '../common/forms.ts'
-import type { Event } from '../common/protocol.ts'
+import type { Delivery, Event } from '../common/protocol.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { states } from '../common/states.ts'
 import { blobs } from './blobs.ts'
@@ -50,15 +50,16 @@ import { turns } from './turns.ts'
 // unless the session is idle, where it runs as a turn of its own and
 // so gets full attention (no longer advisory).
 //
-// `nextRound` (the terminal's plain Enter, task csn): a steer that
-// leaves the stream and running tools alone; the turn delivers it before
-// its next request.
-function submit(id: string, text: string, command?: string, queue = false, sender?: Sender, nextRound = false): string | undefined {
+// `delivery` (task csn): 'interject' (Enter) leaves the stream and
+// running tools alone, the turn delivering it before its next request;
+// 'interrupt' (Ctrl-Enter) stops them; 'queue' runs after the turn.
+function submit(id: string, text: string, command?: string, delivery: Delivery = 'interrupt', sender?: Sender): string | undefined {
 	let call = commands.parse(text)
 	// A command (/model, /pause) is not a prompt: the tab stays the parent's.
 	if (!call && sender?.from === undefined && sender?.origin !== 'model') subagents.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
 	let state = status.stateOf(id)
+	let queue = delivery === 'queue'
 	let interrupt = !queue && sender?.advisory !== true
 	// Queued messages still waiting (one is being edited) go first.
 	let behind = queue && status.inboxOf(id).some((m) => m.queue)
@@ -66,6 +67,7 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 	if (behind || (queue && notify.asked(id)) || turns.state.running.has(id) || states.busy(state) || ((queue || sender?.from !== undefined || sender?.origin === 'model') && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
 		if (queue) record.queue = true
+		else if (delivery === 'interject') record.interject = true
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
 		history.append(id, record)
 		// A steer swaps in a fresh controller and aborts the old one: the
@@ -76,11 +78,8 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 		if (interrupt && running) {
 			// Even just after Escape, while the turn still settles: it goes on.
 			status.transition(id, { type: 'submit' })
-			if (nextRound) {
-				// Stopped by Escape: nothing runs on, so it steers as usual.
-				if (running.controller.signal.aborted) prompts.interrupt(running)
-			} else if (running.unsafe && !running.controller.signal.aborted) running.steered = true
-			else prompts.interrupt(running)
+			// Stopped by Escape: nothing runs on, so an interjection goes at once too.
+			if (delivery !== 'interject' || running.controller.signal.aborted) prompts.force(running)
 		}
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 		return
@@ -234,24 +233,50 @@ function next(id: string): void {
 	turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), { ...record, sender: prompts.senders(record.blocks)[0] })
 }
 
+// Steers turn `running` at once. A running call flagged unsafeToStop
+// defers it until the call ends (task ker).
+function force(running: NonNullable<ReturnType<typeof turns.state.running.get>>): void {
+	if (running.unsafe && !running.controller.signal.aborted) running.steered = true
+	else prompts.interrupt(running)
+}
+
 // /queue next: the oldest queued message goes now. In a busy turn it
-// becomes a steering message for the next round; otherwise it runs as
-// a fresh turn, even if paused. One being edited goes when the edit ends.
-function queueNext(id: string): { say?: string; error?: string } {
+// interjects at the next round (`now`: interrupts, task csn); otherwise
+// it runs as a fresh turn, even if paused. One being edited goes when
+// the edit ends.
+function queueNext(id: string, now = false): { say?: string; error?: string } {
 	let item = status.inboxOf(id).find((m) => m.queue)
 	if (!item) return { say: 'queue is empty' }
 	if (queueEdits.deferNext(id)) return { say: 'The next queued message is being edited. It is sent when the edit is saved or canceled.' }
 	if (states.busy(status.stateOf(id))) {
 		// Editing this inbox id preserves its place, sender and provenance.
-		history.append(id, { type: 'inbox', id: item.id, text: item.text, ...(item.from ? { from: item.from, label: item.label } : {}) })
+		history.append(id, { type: 'inbox', id: item.id, text: item.text, ...(item.from ? { from: item.from, label: item.label } : {}), ...(now ? {} : { interject: true as const }) })
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
-		return { say: 'sending the next queued message now' }
+		let running = turns.state.running.get(id)
+		if (!now) prompts.promoted.set(id, item.id)
+		else if (running) {
+			prompts.promoted.delete(id)
+			status.transition(id, { type: 'submit' })
+			prompts.force(running)
+		}
+		return { say: now ? 'interrupting with the next queued message' : 'sending the next queued message at the next round' }
 	}
 	let refused = status.transition(id, { type: 'submit' })
 	if (refused) return { error: refused }
 	let record = prompts.deliver(id, [item], undefined, undefined, true)
 	turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), { ...record, sender: prompts.senders(record.blocks)[0] })
 	return { say: 'running the next queued message' }
+}
+
+// /queue undo: the message /queue next last moved goes back to the
+// front of the queue, if the turn has not read it yet (task csn).
+function unqueueUndo(id: string): { say?: string; error?: string } {
+	let item = status.inboxOf(id).find((m) => m.id === prompts.promoted.get(id) && !m.queue)
+	prompts.promoted.delete(id)
+	if (!item) return { error: 'Nothing to undo: no message was sent early, or the turn already read it.' }
+	history.append(id, { type: 'inbox', id: item.id, text: item.text, queue: true, ...(item.from ? { from: item.from, label: item.label } : {}) })
+	host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
+	return { say: 'queued again' }
 }
 
 // After a submit: the draft it was typed in is sent, so it clears
@@ -332,6 +357,10 @@ export const prompts = {
 	steer,
 	next,
 	queueNext,
+	unqueueUndo,
+	force,
+	// By session: the inbox id /queue next last moved, for /queue undo.
+	promoted: new Map<string, string>(),
 	sent,
 	draft,
 	resume,

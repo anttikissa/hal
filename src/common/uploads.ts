@@ -8,17 +8,17 @@
 // waits and goes when the last one lands.
 
 import { attachments } from './attachments.ts'
-import type { Event } from './protocol.ts'
+import type { Delivery, Event } from './protocol.ts'
 import { settings } from './settings.ts'
 
 type Upload = { sessionId: string; placeholder: string; name: string }
-export type Settled = Omit<Upload, 'name'> & { text: string; error?: string; resume?: { queue: boolean } }
+export type Settled = Omit<Upload, 'name'> & { text: string; error?: string; resume?: { delivery: Delivery } }
 type Spot = { text: string; cursor: number; anchor?: number }
 
 function createState() {
 	// `pending`: by attach command id; `waiting`: sessions whose submit
-	// waits for their uploads, and whether it queues.
-	return { pending: new Map<string, Upload>(), waiting: new Map<string, boolean>() }
+	// waits for their uploads, and how it delivers.
+	return { pending: new Map<string, Upload>(), waiting: new Map<string, Delivery>() }
 }
 
 // Registers upload `id` (the attach command's id) of session
@@ -63,8 +63,8 @@ function pending(sessionId: string): boolean {
 }
 
 // Enter while `sessionId` uploads: remembered, sent by the last settle.
-function wait(sessionId: string, queue = false): void {
-	uploads.state.waiting.set(sessionId, queue)
+function wait(sessionId: string, delivery: Delivery = 'interrupt'): void {
+	uploads.state.waiting.set(sessionId, delivery)
 }
 
 // The upload `event` answers, if any: what its placeholder becomes, and
@@ -80,10 +80,10 @@ function settle(event: Event): Settled | undefined {
 		return { sessionId: up.sessionId, placeholder: up.placeholder, text: `[upload failed: ${event.reason}]`, error: event.reason }
 	}
 	let done: Settled = { sessionId: up.sessionId, placeholder: up.placeholder, text: (event as Event & { type: 'attached' }).marker }
-	let queue = st.waiting.get(up.sessionId)
-	if (queue !== undefined && !uploads.pending(up.sessionId)) {
+	let delivery = st.waiting.get(up.sessionId)
+	if (delivery !== undefined && !uploads.pending(up.sessionId)) {
 		st.waiting.delete(up.sessionId)
-		done.resume = { queue }
+		done.resume = { delivery }
 	}
 	return done
 }

@@ -15,7 +15,7 @@
 //   Refused, it goes back into the editor.
 
 import { connection } from './connection.ts'
-import type { Event } from './protocol.ts'
+import type { Delivery, Event } from './protocol.ts'
 import type { QueueEditing } from './queue-edit.ts'
 
 // `queue`: run after the current turn instead of steering it. `amend`:
@@ -23,7 +23,7 @@ import type { QueueEditing } from './queue-edit.ts'
 // the waiting inbox message it edits; `rewind`: the earlier prompt
 // record it replaces, rewinding there (task 26q). `ts`: when it was
 // sent, its time until the host's record replaces it (task ta).
-export type Sending = { id: string; text: string; ts?: string; queue?: boolean; nextRound?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
+export type Sending = { id: string; text: string; ts?: string; delivery?: Delivery; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
 
 export type Local = {
 	// What the editor holds.
@@ -70,7 +70,7 @@ function local(id: string): Local {
 // as no draft rather than breaking the client.
 function valid(l: Local | undefined): Local | undefined {
 	if (!l || typeof l.text !== 'string' || typeof l.base !== 'number' || !Array.isArray(l.sending)) return undefined
-	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.ts === undefined || typeof s.ts === 'string') && (s.queue === undefined || typeof s.queue === 'boolean') && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.rewind === undefined || Number.isSafeInteger(s.rewind)) && (s.queueEdit === undefined || typeof s.queueEdit === 'string'))
+	let sending = l.sending.filter((s) => s && typeof s.id === 'string' && typeof s.text === 'string' && (s.ts === undefined || typeof s.ts === 'string') && (s.delivery === undefined || ['queue', 'interject', 'interrupt'].includes(s.delivery)) && (s.amend === undefined || typeof s.amend === 'boolean') && (s.edits === undefined || typeof s.edits === 'string') && (s.rewind === undefined || Number.isSafeInteger(s.rewind)) && (s.queueEdit === undefined || typeof s.queueEdit === 'string'))
 	let e = l.queueEdit
 	let queueEdit = e && typeof e.edit === 'string' && typeof e.message === 'string' && typeof e.text === 'string' && typeof e.active === 'boolean' && (e.original === undefined || typeof e.original === 'string') && (e.request === undefined || typeof e.request === 'string') && (e.saving === undefined || typeof e.saving === 'string') && (e.window === undefined || typeof e.window === 'string') ? e : undefined
 	return { text: l.text, base: l.base, dirty: l.dirty === true, sending, ...(queueEdit ? { queueEdit } : {}) }
@@ -119,8 +119,7 @@ function flush(id: string): void {
 function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> & { id?: string } = {}): void {
 	let l = drafts.local(id)
 	let sending: Sending = { id: how.id ?? drafts.nextId(), text, ts: new Date().toISOString() }
-	if (how.queue) sending.queue = true
-	if (how.nextRound) sending.nextRound = true
+	if (how.delivery && how.delivery !== 'interrupt') sending.delivery = how.delivery
 	if (how.amend) sending.amend = true
 	if (how.edits !== undefined) sending.edits = how.edits
 	if (how.rewind !== undefined) sending.rewind = how.rewind
@@ -136,7 +135,7 @@ function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> & { 
 }
 
 function command(sessionId: string, s: Sending): object {
-	return { type: 'submit', sessionId, text: s.text, ...(s.queueEdit === undefined ? {} : { queueEdit: s.queueEdit }), ...(s.queue ? { queue: true } : {}), ...(s.nextRound ? { nextRound: true } : {}), ...(s.amend ? { amend: true } : {}), ...(s.edits === undefined ? {} : { edits: s.edits }), ...(s.rewind === undefined ? {} : { rewind: s.rewind }), id: s.id }
+	return { type: 'submit', sessionId, text: s.text, ...(s.queueEdit === undefined ? {} : { queueEdit: s.queueEdit }), ...(s.delivery ? { delivery: s.delivery } : {}), ...(s.amend ? { amend: true } : {}), ...(s.edits === undefined ? {} : { edits: s.edits }), ...(s.rewind === undefined ? {} : { rewind: s.rewind }), id: s.id }
 }
 
 // Folds a host event in. True if the session's editor text changed.

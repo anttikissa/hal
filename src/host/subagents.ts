@@ -50,7 +50,7 @@ function spawn(parent: string, s: Spawn): string {
 	tabs.publish()
 	let text = s.kind === 'interactive' ? s.task : subagents.prompt(parent, s.task, s.kind, s.limit)
 	if (text.trim()) {
-		let refused = prompts.submit(child.id, text, undefined, false, { from: parent, label: tabs.label(parent) })
+		let refused = prompts.submit(child.id, text, undefined, 'interrupt', { from: parent, label: tabs.label(parent) })
 		if (refused) throw new Error(`${child.id} did not start: ${refused}`)
 	}
 	return child.id
@@ -150,7 +150,7 @@ function report(id: string): void {
 	let deliver = () => {
 		// A child stopped by tab close must not wake an idle, now unseen parent.
 		if (tabs.file().closed.some((tab) => tab.id === parent) && !tabs.file().open.includes(parent)) return
-		let refused = prompts.submit(parent, text, undefined, false, { from: id, label, advisory: true, summary: summary.extract(text) })
+		let refused = prompts.submit(parent, text, undefined, 'interrupt', { from: id, label, advisory: true, summary: summary.extract(text) })
 		if (refused) diag.log(`report ${id} to ${parent}: ${refused}`)
 	}
 	let ready = host.ready(parent)

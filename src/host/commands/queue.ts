@@ -18,7 +18,7 @@ function target(id: string, key: string): { n: number; item?: { id: string; text
 }
 
 export const command: SlashCommand = {
-	help: () => '/queue <message>: queue a message, like Alt-Enter. /queue lists queued messages; /queue next sends the oldest now, steering a running turn; /queue drop <n> drops the nth message in the list; /queue clear drops them all.',
+	help: () => '/queue <message>: queue a message, like Alt-Enter. /queue lists queued messages; /queue next sends the oldest at the next round of a running turn (Enter on an empty prompt), /queue now interrupts with it (Ctrl-Enter), /queue undo queues it again if still waiting (Cmd-Z on an empty prompt); /queue drop <n> drops the nth message in the list; /queue clear drops them all.',
 	record(args, id) {
 		let key = args.match(/^drop\s+(\S+)$/)?.[1]
 		let n = key === undefined ? 0 : target(id, key).n
@@ -44,8 +44,9 @@ export const command: SlashCommand = {
 			host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })
 			return { say: `dropped queued message ${n}: ${item.text}` }
 		}
-		if (args === 'next') return prompts.queueNext(id)
-		let refused = prompts.submit(id, args, undefined, true)
+		if (args === 'next' || args === 'now') return prompts.queueNext(id, args === 'now')
+		if (args === 'undo') return prompts.unqueueUndo(id)
+		let refused = prompts.submit(id, args, undefined, 'queue')
 		return refused ? { error: refused } : { say: 'queued' }
 	},
 }

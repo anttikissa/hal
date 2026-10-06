@@ -95,6 +95,10 @@ export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'e
 
 // ── Commands (client → host) ──
 
+// How a prompt sent while a turn works reaches it (task csn): Alt-Enter,
+// Enter and Ctrl-Enter.
+export type Delivery = 'queue' | 'interject' | 'interrupt'
+
 export type Command = (
 	| { type: 'create'; cwd: string; model?: string; name?: string }
 	| { type: 'find'; request: string; query: string; kinds?: FindFilter[] }
@@ -113,7 +117,9 @@ export type Command = (
 	// Stop following it. The session and any running turn carry on.
 	| { type: 'close'; sessionId: string }
 	// A prompt. While a turn is busy it waits in the inbox: steering, sent
-	// before the turn's next request; with `queue`, run after it ends.
+	// before the turn's next request. `delivery` (task csn): 'interrupt'
+	// (the default) stops the stream and running tools; 'interject' waits
+	// for the next round; 'queue' runs after the turn. `queue`: legacy 'queue'.
 	// With `amend`, an edit of the last prompt: the host decides from
 	// history whether it replaces that prompt or is sent on top; with
 	// `edits` too, an edit of that inbox message while it still waits.
@@ -124,7 +130,7 @@ export type Command = (
 	// (the send tool), never from what a client claims (task rj).
 	| { type: 'queue-edit'; sessionId: string; message: string; edit: string }
 	| { type: 'queue-edit-cancel'; sessionId: string; edit: string }
-	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; nextRound?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
+	| { type: 'submit'; sessionId: string; text: string; delivery?: Delivery; queue?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }

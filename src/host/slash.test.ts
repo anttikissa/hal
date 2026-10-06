@@ -206,7 +206,7 @@ test('a command runs while a turn is busy instead of waiting in the inbox; /paus
 test('history records who sent a command', async () => {
 	let a = client()
 	let id = created(a)
-	prompts.submit(id, '/help', undefined, false, { from: '7-abc' })
+	prompts.submit(id, '/help', undefined, 'interrupt', { from: '7-abc' })
 	a.conn.send({ type: 'submit', sessionId: id, text: '/help cd' })
 	let cmds = history.readSync(id).filter((r) => r.type === 'command')
 	expect(cmds.map((r: any) => r.from)).toEqual(['7-abc', undefined])

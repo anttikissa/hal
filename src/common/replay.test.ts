@@ -252,7 +252,7 @@ test('replay headers carry block ids, steering, durations and what the model wro
 	// Assistant blocks reach the provider exactly as produced.
 	expect(msgs[1]!.blocks).toEqual([{ type: 'thinking', text: 'hmm', signature: 's', provider: 'anthropic' }, { type: 'text', text: 'Running it.' }, { type: 'tool_call', id: 'toolu_1', name: 'bash', input: { command: './test' } }])
 	expect(msgs[2]!.blocks).toEqual([{ type: 'tool_result', id: 'toolu_1', output: '[12:34 #t4; 8.1s; you wrote #r2 #a3]\nok', ms: 8100 }])
-	expect(msgs[3]!.blocks).toEqual([{ type: 'text', text: '[12:40 #m6; message from tab 3 (160-xyz), Builder; steering]\nhurry' }])
+	expect(msgs[3]!.blocks).toEqual([{ type: 'text', text: '[12:40 #m6; message from tab 3 (160-xyz), Builder; interrupting]\nhurry' }])
 	expect(msgs[5]!.blocks).toEqual([{ type: 'text', text: '[12:42 #u9; you wrote #a7]\nthanks' }])
 	// Appending never changes earlier provider input.
 	let more = replay.toMessages([...history, { type: 'assistant', block: { type: 'text', text: 'Welcome.' }, ts: at(12, 43), n: 10 }, { type: 'user', blocks: [{ type: 'text', text: 'bye' }], ts: at(12, 44), n: 11 }])

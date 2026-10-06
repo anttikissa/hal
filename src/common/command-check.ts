@@ -53,7 +53,8 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'tab-resume') return str('sessionId', true)
 	if (c.type === 'history' && !(Number.isInteger(c.before) && (c.before as number) >= 0)) return 'history: before must be an offset'
 	if (c.type === 'tab-move' && !Number.isInteger(c.index)) return 'tab-move: index must be an integer'
-	for (let flag of ['queue', 'nextRound', 'amend']) if (c.type === 'submit' && c[flag] !== undefined && typeof c[flag] !== 'boolean') return `submit: ${flag} must be a boolean`
+	if (c.type === 'submit' && c.delivery !== undefined && !['queue', 'interject', 'interrupt'].includes(c.delivery as string)) return 'submit: delivery must be queue, interject or interrupt'
+	for (let flag of ['queue', 'amend']) if (c.type === 'submit' && c[flag] !== undefined && typeof c[flag] !== 'boolean') return `submit: ${flag} must be a boolean`
 	if (c.type === 'draft' && c.base !== undefined && !Number.isInteger(c.base)) return 'draft: base must be an integer'
 	if (c.type === 'answer') {
 		let a = c.answers
@@ -65,7 +66,7 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'submit' && c.rewind !== undefined && !(Number.isSafeInteger(c.rewind) && (c.rewind as number) > 0)) return 'submit: rewind must be a record number'
 	if (c.type === 'queue-edit' || c.type === 'queue-edit-cancel') return str('sessionId') ?? str('edit') ?? (c.type === 'queue-edit' ? str('message') : undefined)
 	if (c.type === 'submit') {
-		if (c.queueEdit !== undefined && (c.amend !== true || c.edits === undefined || c.queue === true || c.rewind !== undefined)) return 'submit: queueEdit requires amend and edits, without queue or rewind'
+		if (c.queueEdit !== undefined && (c.amend !== true || c.edits === undefined || c.queue === true || c.delivery === 'queue' || c.rewind !== undefined)) return 'submit: queueEdit requires amend and edits, without queue, delivery queue or rewind'
 		return str('sessionId') ?? str('text') ?? str('edits', true) ?? str('queueEdit', true)
 	}
 	return str('sessionId') ?? (c.type === 'draft' || c.type === 'complete' ? str('text') : undefined)

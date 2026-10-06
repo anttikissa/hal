@@ -5,7 +5,7 @@ function invalid(value: unknown): string | undefined {
 	for (let k of ['from', 'label', 'summary']) if (s[k] !== undefined && typeof s[k] !== 'string') return `invalid sender ${k}`
 	if (s.origin !== undefined && s.origin !== 'model') return 'invalid sender origin'
 	if (s.generatingCommand !== undefined && s.generatingCommand !== 'clear') return 'invalid generating command'
-	for (let k of ['advisory', 'steering']) if (s[k] !== undefined && s[k] !== true) return `invalid sender ${k}`
+	for (let k of ['advisory', 'steering', 'interject']) if (s[k] !== undefined && s[k] !== true) return `invalid sender ${k}`
 }
 
 export const sender = { invalid }

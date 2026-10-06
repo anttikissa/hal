@@ -72,7 +72,7 @@ test('Enter and Escape follow the session state', () => {
 	expect(view.pause(idle)).toBeUndefined()
 	let busy = view.onEvent(idle, { type: 'state', sessionId, state: { type: 'running', phase: 'streaming' } })
 	expect(view.submit(busy, 'more')).toEqual({ command: { type: 'submit', sessionId, text: 'more' }, keep: false })
-	expect(view.submit(busy, 'later', true)).toEqual({ command: { type: 'submit', sessionId, text: 'later', queue: true }, keep: false })
+	expect(view.submit(busy, 'later', 'queue')).toEqual({ command: { type: 'submit', sessionId, text: 'later', delivery: 'queue' }, keep: false })
 	expect(view.pause(busy)).toEqual({ type: 'pause', sessionId })
 	let paused = view.onEvent(idle, { type: 'state', sessionId, state: { type: 'paused' } })
 	expect(view.submit(paused, '')).toEqual({ command: { type: 'continue', sessionId }, keep: false })

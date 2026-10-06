@@ -11,7 +11,7 @@ import { connection, type LinkState } from '../common/connection.ts'
 import { drafts, type Sending } from '../common/drafts.ts'
 import { forms, type FormAction, type Key } from '../common/forms.ts'
 import { placeholders } from '../common/placeholders.ts'
-import type { Event, Tab } from '../common/protocol.ts'
+import type { Delivery, Event, Tab } from '../common/protocol.ts'
 import { recall } from '../common/recall.ts'
 import { uploads, type Settled } from '../common/uploads.ts'
 import { completions, type Known, type Menu } from './completions.ts'
@@ -171,7 +171,7 @@ function settled(done: Settled): void {
 	if (shown) app.rewrite((p) => uploads.swap(p, done.placeholder, done.text))
 	let draft = drafts.text(done.sessionId)
 	if (draft.includes(done.placeholder)) drafts.edit(done.sessionId, draft.replace(done.placeholder, () => done.text))
-	if (shown && done.resume) app.send(done.resume.queue)
+	if (shown && done.resume) app.send(done.resume.delivery)
 }
 
 // The reader is near the top: ask for the page before it, if any.
@@ -286,21 +286,20 @@ function modalPick(index: number): void {
 	app.state.view = { ...app.state.view, modal: { ...modal, selected: index } }
 	app.modalKey({ key: 'enter' })
 }
-// Sends what the box holds (Enter, or the Send button); `queue`
-// (Alt+Enter) waits for the running turn; `nextRound` (plain Enter)
-// steers without interrupting (task csn).
-function send(queue = false, nextRound = false): void {
+// Sends what the box holds (Enter, or the Send button) as `delivery`
+// says (task csn); a command runs at once.
+function send(delivery: Delivery = 'interrupt'): void {
 	let st = app.state
 	let id = app.sessionId()
 	if (st.view.editing?.queueEdit || (id && queueEdit.current(id)?.active)) { queuedPrompt.save(); return }
-	if (view.commandDraft(st.text)) queue = false
+	if (view.commandDraft(st.text) && delivery === 'queue') delivery = 'interrupt'
 	if (id && uploads.pending(id)) {
-		uploads.wait(id, queue)
+		uploads.wait(id, delivery)
 		return app.setNotice('sending once the upload is done')
 	}
 	if (restart.typed(st.text) || folds.typed(st.text)) return app.input('')
-	let { command, notice, keep } = view.submit(st.view, st.text, queue, nextRound)
-	let c = command as { type: string; sessionId: string; text?: string; queue?: boolean; nextRound?: boolean; amend?: boolean; edits?: string; rewind?: number } | undefined
+	let { command, notice, keep } = view.submit(st.view, st.text, delivery)
+	let c = command as { type: string; sessionId: string; text?: string; delivery?: Delivery; amend?: boolean; edits?: string; rewind?: number } | undefined
 	// A prompt shows at once and waits, pending, for the host.
 	if (c?.type === 'submit') drafts.submit(c.sessionId, c.text!, c)
 	else if (c) connection.send(c)

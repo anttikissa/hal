@@ -222,7 +222,7 @@ function fromSnapshot(snapshot: Snapshot): Transcript {
 			r = { ...r, blocks: r.blocks.map((b) => {
 				if (b.type !== 'text') return b
 				let origin = origins.get(ids[i++] ?? '')
-				return origin && inbox.provenance(origin).steering ? { ...b, steering: true } : b
+				return origin && inbox.provenance(origin).steering ? { ...b, steering: true } : origin?.interject ? { ...b, interject: true } : b
 			}) }
 		}
 		if (replay.isPrompt(r)) prompt = items.length

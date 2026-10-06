@@ -239,11 +239,12 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	else if (c.type === 'submit') {
 		let unknown = commands.parse(c.text) ? [] : blobs.unknown(c.sessionId, c.text)
 		if (unknown.length) client.deliver({ type: 'warning', text: `${unknown.join(', ')} names no attachment of this session; sent as text` })
-		let amending = c.amend && !c.queue && !commands.parse(c.text)
+		let delivery = c.delivery ?? (c.queue ? 'queue' : 'interrupt')
+		let amending = c.amend && delivery !== 'queue' && !commands.parse(c.text)
 		if (c.rewind !== undefined && !commands.parse(c.text)) refused = rebasePlans.rewind(c.sessionId, c.rewind, c.text, c.id)
-		else if (c.amend && !c.queue && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
+		else if (c.amend && delivery !== 'queue' && c.edits !== undefined) refused = prompts.edit(c.sessionId, c.edits, c.text, c.id)
 		else if (commands.parse(c.text)?.name === 'rebase') refused = slash.command(c.sessionId, c.text, commands.parse(c.text)!, c.id, undefined, (reply) => { if (reply.rebase) client.deliver({ type: 'rebase-plan', sessionId: c.sessionId, snapshot: reply.rebase, todo: rebaseRows.render(c.sessionId, reply.rebase) }) })
-		else refused = amending ? prompts.amend(c.sessionId, c.text, c.id) : prompts.submit(c.sessionId, c.text, c.id, c.queue, undefined, c.nextRound)
+		else refused = amending ? prompts.amend(c.sessionId, c.text, c.id) : prompts.submit(c.sessionId, c.text, c.id, delivery)
 		if (refused === undefined) prompts.sent(c.sessionId, c.text, c.id)
 	} else if (c.type === 'draft') {
 		let changed = drafts.set(c.sessionId, c.text, c.base)

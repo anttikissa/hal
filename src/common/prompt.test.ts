@@ -140,8 +140,8 @@ describe('actions', () => {
 		expect(prompt.step(at('a|'), key('C-d')).action).toBeUndefined()
 	})
 	test('Enter, Shift-Enter, Alt-Enter and Escape', () => {
-		expect(prompt.step(at('h|i'), key('enter')).action).toEqual({ type: 'submit', text: 'hi' })
-		expect(prompt.step(at('h|i'), { key: 'enter', alt: true }).action).toEqual({ type: 'submit', text: 'hi', queue: true })
+		expect(prompt.step(at('h|i'), key('enter')).action).toEqual({ type: 'submit', text: 'hi', delivery: 'interject' })
+		expect(prompt.step(at('h|i'), { key: 'enter', alt: true }).action).toEqual({ type: 'submit', text: 'hi', delivery: 'queue' })
 		expect(show(prompt.step(at('h|i'), { key: 'enter', shift: true }).state)).toBe('h\n|i')
 		expect(prompt.step(at('h|i'), key('escape'))).toEqual({ state: at('h|i'), action: { type: 'cancel' } })
 	})

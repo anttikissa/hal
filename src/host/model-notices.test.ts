@@ -42,7 +42,7 @@ test('changes during streaming follow real tool results without changing earlier
 	slash.change(id, { model: 'fake/m3' })
 	history.append(id, { type: 'output', text: 'Rules changed.', change: { name: 'AGENTS.md', what: 'changed', diff: '+new rule' } })
 	// The pending next-round message uses the same safe boundary as notices.
-	prompts.submit(id, 'Another session update.', undefined, false, { from: id, advisory: true })
+	prompts.submit(id, 'Another session update.', undefined, 'interrupt', { from: id, advisory: true })
 	calls[0]!.push({ type: 'tool_call', id: 'read', name: 'read', input: { path: '/tmp/this-hal-test-file-does-not-exist' } }, { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	let messages = calls[1]!.input.messages
