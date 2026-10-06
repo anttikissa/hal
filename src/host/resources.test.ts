@@ -1,14 +1,13 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
-import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { resources } from './resources.ts'
 import { sessions } from './sessions.ts'
 import { turns } from './turns.ts'
 
-const saved = { log: diag.log, append: history.append, stop: turns.stop, home: process.env.HAL_HOME }
+const saved = { append: history.append, stop: turns.stop, home: process.env.HAL_HOME }
 const plenty = { disk: 50e9, memory: 8e9 }
 let home = '', notices: { id: string; text: string }[] = [], warnings: string[] = []
 let client = { deliver: (event: any) => warnings.push(event.text) } as any
@@ -16,7 +15,6 @@ beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-resources-`)
 	process.env.HAL_HOME = home
 	notices = []; warnings = []
-	diag.log = () => {}
 	history.append = ((id: string, record: any) => { notices.push({ id, text: record.text }); return record }) as typeof history.append
 	host.state.clients.add(client)
 })
@@ -24,7 +22,7 @@ afterEach(() => {
 	resources.stop()
 	sessions.closeAll()
 	host.state.clients.delete(client)
-	diag.log = saved.log; history.append = saved.append; turns.stop = saved.stop
+	history.append = saved.append; turns.stop = saved.stop
 	if (saved.home === undefined) delete process.env.HAL_HOME
 	else process.env.HAL_HOME = saved.home
 	rmSync(home, { recursive: true, force: true })
