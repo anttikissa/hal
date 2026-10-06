@@ -112,7 +112,7 @@
 //
 // Changelog
 // 0.1.0  Initial release: reasonable JS literals, comment round trip.
-//        55 tests, 423 lines of code.
+//        55 tests, 425 lines of code.
 
 /** Symbol key for attaching comments to AsonObject/AsonArray. */
 export const COMMENTS = Symbol('comments')
