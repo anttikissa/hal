@@ -286,3 +286,12 @@ test('a draft the host already holds settles instead of being resent forever', a
 	expect(p.draft?.text).toBe('/status')
 	expect(events.filter((e) => e.type === 'ack').length).toBe(sent + 1)
 })
+
+test('a stale empty draft from another client cannot erase restored host text', async () => {
+	await client()
+	let p = phone()
+	p.send({ type: 'draft', sessionId: id, text: 'restored text', base: 0 })
+	p.send({ type: 'draft', sessionId: id, text: '', base: 0 })
+	expect(p.draft?.text).toBe('restored text')
+	expect(drafts.text(id)).toBe('restored text')
+})

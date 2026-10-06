@@ -887,3 +887,32 @@ test('Up opens a queued editor only after host protection, Alt-Enter saves in pl
 		expect(app.state.prompt.text).toBe('a separate draft')
 	} finally { connection.send = send }
 })
+
+test('navigating to a cached tab uses the draft updated while it was hidden', () => {
+	startOn(['a', 'b'])
+	app.focusOn({ tab: 'b' })
+	app.onEvent(snapshot('b'))
+	app.focusOn({ tab: 'a' })
+	app.onEvent({ type: 'draft', sessionId: 'b', draft: { text: 'written on another client', rev: 3 } })
+	app.onEvent({ type: 'go', sessionId: 'a', tab: 'b' })
+	expect(app.state.prompt.text).toBe('written on another client')
+	type('!')
+	expect(drafted.at(-1)).toMatchObject({ sessionId: 'b', text: 'written on another client!', base: 3 })
+})
+
+test('a synchronous navigation submit does not clear the destination editor', () => {
+	startOn(['a', 'b'])
+	app.focusOn({ tab: 'b' })
+	app.onEvent(snapshot('b', { type: 'idle' }, { text: 'destination draft', rev: 7 }))
+	app.focusOn({ tab: 'a' })
+	type('/go b')
+	drafts.send = (command: any) => {
+		record(command)
+		if (command.type === 'submit') app.onEvent({ type: 'go', sessionId: 'a', tab: 'b' })
+	}
+	enter()
+	expect(shown()).toBe('b')
+	expect(app.state.prompt.text).toBe('destination draft')
+	app.focusOn({ tab: 'a' })
+	expect(app.state.prompt.text).toBe('')
+})

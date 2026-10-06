@@ -105,7 +105,8 @@ function focusOn(focus: Focus): void {
 		if (focus.tab !== undefined) {
 			st.hidden.delete(focus.tab)
 			if (!back) drafts.join(focus.tab, early)
-			if (!back) app.setPrompt(queueEdit.editing(focus.tab) ? queueEdit.text(focus.tab) : recall.shown(focus.tab) ?? drafts.text(focus.tab))
+			// Cached editor text can lag draft events received while hidden (qhz).
+			app.setPrompt(queueEdit.editing(focus.tab) ? queueEdit.text(focus.tab) : recall.shown(focus.tab) ?? drafts.text(focus.tab))
 			if (!st.background.has(focus.tab)) {
 				st.background.add(focus.tab)
 				app.send({ type: 'open', sessionId: focus.tab })
