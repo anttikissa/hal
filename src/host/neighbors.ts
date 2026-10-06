@@ -1,41 +1,47 @@
-// Sessions in one directory hear who edits what (task 0f). Bash calls
-// record the paths they declare and change (file-changes.ts, task 8w);
-// a bash result in a cwd where another open session did so lately gets
-// one line per neighbor after the output. Observations, not proof of
-// authorship. In memory only: after a restart the first notes repeat.
+// Sessions in one directory hear about recent activity (tasks 0f, c4x).
+// Bash calls report the paths they declare in modifies when they start
+// (file-changes.ts, task 8w); a bash result in a cwd where another open
+// session declared paths lately gets one line per neighbor after the
+// output. Activity, never ownership. In memory only: after a restart the
+// first notes repeat.
 import { clock } from './clock.ts'
+import { clients } from './clients.ts'
 import { sessions } from './sessions.ts'
 
-type Entry = { cwd: string; paths: Map<string, number> }
+type Entry = { cwd: string; paths: Map<string, number>; running: number }
 
 const maxPaths = 5
 
-function record(sessionId: string, cwd: string, paths: string[]): void {
+function start(sessionId: string, cwd: string, paths: string[]): void {
 	let entry = neighbors.state.seen.get(sessionId)
-	if (!entry || entry.cwd !== cwd) neighbors.state.seen.set(sessionId, entry = { cwd, paths: new Map() })
+	if (!entry || entry.cwd !== cwd) neighbors.state.seen.set(sessionId, entry = { cwd, paths: new Map(), running: 0 })
+	entry.running++
 	for (let p of paths) entry.paths.set(p, clock.now())
 }
 
-// Lines for `ctx`'s session about others; only those whose content
-// (not the age) changed since the last note to this session.
+function end(sessionId: string): void {
+	let entry = neighbors.state.seen.get(sessionId)
+	if (entry) entry.running = Math.max(0, entry.running - 1)
+}
+
+// Lines for `sessionId` about others; only those whose content changed
+// since the last note to this session. Times show in its client's zone.
 function notes(sessionId: string, cwd: string): string[] {
-	let now = clock.now(), mine = neighbors.state.seen.get(sessionId)
-	let own = new Set(mine?.cwd === cwd ? [...mine.paths.keys()] : [])
+	let now = clock.now(), timeZone = clients.timezone(sessionId)
 	let lines: string[] = []
 	for (let [id, entry] of neighbors.state.seen) {
 		let key = `${sessionId}|${id}`
 		let fresh = [...entry.paths].filter(([, at]) => now - at <= neighbors.windowMs)
 		if (id === sessionId || entry.cwd !== cwd || !sessions.state.open.has(id) || !fresh.length) { neighbors.state.sent.delete(key); continue }
-		// Shared paths first, then newest.
-		fresh.sort((a, b) => Number(own.has(b[0])) - Number(own.has(a[0])) || b[1] - a[1])
-		let shown = fresh.slice(0, maxPaths).map(([p]) => own.has(p) ? `${p} (also yours)` : p)
+		fresh.sort((a, b) => b[1] - a[1])
+		let shown = fresh.slice(0, maxPaths).map(([p]) => p)
 		if (fresh.length > maxPaths) shown.push(`${fresh.length - maxPaths} more`)
 		let name = sessions.state.open.get(id)?.name
-		let who = `${id}${name ? ` (${name})` : ''} is editing ${shown.join(', ')}`
-		if (neighbors.state.sent.get(key) === who) continue
-		neighbors.state.sent.set(key, who)
-		let min = Math.floor((now - Math.max(...fresh.map(([, at]) => at))) / 60_000)
-		lines.push(`[${who}; ${min < 1 ? 'just now' : `${min} min ago`}]`)
+		let time = new Date(fresh[0]![1]).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone })
+		let line = `[${id}${name ? ` (${name})` : ''} declared edits to ${shown.join(', ')} at ${time}; call ${entry.running ? 'running' : 'finished'}]`
+		if (neighbors.state.sent.get(key) === line) continue
+		neighbors.state.sent.set(key, line)
+		lines.push(line)
 	}
 	return lines
 }
@@ -49,5 +55,5 @@ function append(output: string, sessionId: string, cwd: string): string {
 export const neighbors = {
 	state: { seen: new Map<string, Entry>(), sent: new Map<string, string>() },
 	windowMs: 15 * 60_000,
-	record, notes, append,
+	start, end, notes, append,
 }

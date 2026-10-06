@@ -154,7 +154,7 @@ function apply(m: Marks, r: HistoryRecord, offset: number): void {
 	if (r.type === 'command' && r.text.trim() === '/changes clear') { m.changes = []; m.changedPaths = {} }
 	if (r.type === 'file_changes') {
 		(m.changes ??= []).push(offset)
-		for (let file of r.files) (m.changedPaths ??= {})[resolve(r.cwd, file.path)] = true
+		for (let file of r.files) if (!file.undeclared) (m.changedPaths ??= {})[resolve(r.cwd, file.path)] = true
 	}
 	if (r.type === 'question') {
 		m.question = offset

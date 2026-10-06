@@ -31,9 +31,8 @@ const bash = (command: string, modifies?: unknown, ctx = context()) => tools.run
 const changes = () => history.readSync(id).filter((r) => r.type === 'file_changes')
 const bytes = (hash: unknown) => readFileSync(fileChanges.blobPath(id, hash as string))
 
-// One integration test covers all snapshot transitions and the Git observation
-// boundary, including a dirty file whose status stays unchanged.
-test('snapshots creations, edits, deletes and new glob matches; observes undeclared status only', async () => {
+// One integration test covers all snapshot transitions; undeclared files are never recorded.
+test('snapshots creations, edits, deletes and new glob matches; records declared paths only', async () => {
 	writeFileSync(`${cwd}/edit`, 'old')
 	writeFileSync(`${cwd}/gone`, 'delete me')
 	writeFileSync(`${cwd}/same`, 'untouched')
@@ -42,7 +41,7 @@ test('snapshots creations, edits, deletes and new glob matches; observes undecla
 	expect(result.isError).toBeUndefined()
 	let r = changes()[0]!
 	expect(r).toMatchObject({ toolId: 'c1', cwd })
-	expect(r.files.map((f) => f.path).sort()).toEqual(['edit', 'gone', 'new.txt', 'other'])
+	expect(r.files.map((f) => f.path).sort()).toEqual(['edit', 'gone', 'new.txt'])
 	let edit = r.files.find((f) => f.path === 'edit')!
 	expect(bytes(edit.before).toString()).toBe('old')
 	expect(bytes(edit.after).toString()).toBe('new')
@@ -52,11 +51,28 @@ test('snapshots creations, edits, deletes and new glob matches; observes undecla
 	let fresh = r.files.find((f) => f.path === 'new.txt')!
 	expect(fresh.before).toBeNull()
 	expect(bytes(fresh.after).toString()).toBe('created')
-	expect(r.files.find((f) => f.path === 'other')).toEqual({ path: 'other', undeclared: true, statusBefore: null, statusAfter: '??' })
 	expect(replay.toMessages([r])).toEqual([])
 	expect(transcript.recordItems(r, 0)).toEqual([])
 	await bash('printf different > edit; printf new > surprise')
-	expect(changes()[1]!.files.map((f) => f.path)).toEqual(['surprise'])
+	expect(changes()).toHaveLength(1)
+})
+
+// Bug 2026-10-06: a commit by another session during a call was recorded
+// as this session's change and announced as its edit (task c4x).
+test('another session changing and committing an undeclared file during a call is in no changes and no edit note', async () => {
+	let other = sessions.create({ cwd, model: 'fake/m' }).id
+	writeFileSync(`${cwd}/scroll.ts`, 'old')
+	await fileChanges.git(cwd, ['add', '.'])
+	await fileChanges.git(cwd, ['-c', 'user.name=Example', '-c', 'user.email=example@example.org', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Initial'])
+	// Dirty before the call, clean after: what Git status saw in the bug.
+	writeFileSync(`${cwd}/scroll.ts`, 'dirty')
+	let running = bash('sleep 0.3; printf mine > mine', ['mine'])
+	await Bun.sleep(100)
+	let theirs = await bash('printf new > scroll.ts && git add scroll.ts && git -c user.name=Example -c user.email=example@example.org -c commit.gpgsign=false commit -qm Scroll', undefined, { ...context(other), callId: 'c2' })
+	let mine = await running
+	let all = [id, other].flatMap((s) => history.readSync(s).filter((r) => r.type === 'file_changes').flatMap((r) => r.files.map((f) => f.path)))
+	expect(all).toEqual(['mine'])
+	for (let output of [theirs.output, mine.output, (await bash('true', undefined, { ...context(other), callId: 'c3' })).output]) expect(output).not.toContain('scroll.ts')
 })
 
 test('sensitive paths and symlink aliases, and large files retain metadata not bytes', async () => {

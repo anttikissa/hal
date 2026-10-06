@@ -28,10 +28,10 @@ async function serve(url: URL, css: string): Promise<Response> {
 		let steps: string[] = []
 		for (let step of file.steps) {
 			let c = step.change
-			let text = c.undeclared ? `Undeclared observation: ${c.statusBefore ?? 'clean'} → ${c.statusAfter ?? 'clean'}; no content captured.` : await changes.diff(id, c.before, c.after)
-			steps.push(`<details><summary>Call ${escape(step.toolId)} · ${escape(step.ts)}${c.undeclared ? ' · undeclared' : ''}</summary><pre>${escape(text)}</pre></details>`)
+			let text = await changes.diff(id, c.before, c.after)
+			steps.push(`<details><summary>Call ${escape(step.toolId)} · ${escape(step.ts)}</summary><pre>${escape(text)}</pre></details>`)
 		}
-		sections.push(`<section><h2><a href="${changes.href(id, file.path)}">${escape(file.path)}</a></h2><p>${changes.counts(diff)}${file.undeclared ? ' · includes undeclared observations' : ''}${commit ? ` · committed in ${commit}` : ''}</p>${others.length ? `<p>Also observed by ${others.join(', ')}</p>` : ''}<pre>${escape(diff)}</pre><h3>Steps per call</h3>${steps.join('')}</section>`)
+		sections.push(`<section><h2><a href="${changes.href(id, file.path)}">${escape(file.path)}</a></h2><p>${changes.counts(diff)}${commit ? ` · committed in ${commit}` : ''}</p>${others.length ? `<p>Also observed by ${others.join(', ')}</p>` : ''}<pre>${escape(diff)}</pre><h3>Steps per call</h3>${steps.join('')}</section>`)
 	}
 	let html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>${id} changes</title><style>${css}
 body { margin: 0; background: var(--canvas); color: var(--text); font: 16px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
