@@ -11,10 +11,8 @@
 //   survives.
 // - Full mode, entered one-way when a frame first outgrows the screen
 //   or there are two or more tabs (canonically: scrollback is the
-//   shown tab only):
-//   when a changed row is already in scrollback, or the frame shrinks,
-//   there is no correct in-place update, so the canonical repaint
-//   clears screen and scrollback and writes the whole frame again.
+//   shown tab only): only a full redraw clears scrollback. A changed
+//   row in scrollback stays stale, and a shorter frame gets blank rows.
 // - state.cursorRow always says which frame row the cursor is on.
 // - Every frame line is at most one terminal row (frame.ts wraps), so
 //   frame rows and terminal rows are the same thing. Rows ending in
@@ -49,13 +47,10 @@ export interface Output {
  */
 export interface ClearReason {
 	kind: 'all' | 'down' | 'below' | 'row'
-	cause: 'forced' | 'first paint' | 'shrink' | 'scrollback edit' | 'park'
+	cause: 'forced' | 'first paint' | 'shrink' | 'park'
 	trigger?: string
 	rows: { before: number; after: number; screen: number }
 	firstChanged?: number
-	writableTop?: number
-	/** The block holding the first changed row, in the last frame. */
-	changedBlock?: string
 	blocks?: { block: string; before: number; after: number }[]
 	text: string
 }
@@ -83,6 +78,8 @@ interface RenderState {
 	past: { session: string | undefined; past: Past } | undefined
 	/** The next slice of that layout. */
 	slicing: ReturnType<typeof setTimeout> | null
+	/** The last paint showed those rows: the whole history repaints once laid out. */
+	standIn: boolean
 	/** A blank row goes above the first paint if that frame fits the
 	 * screen (task hd); main.ts sets it on a terminal. */
 	gap: boolean
@@ -109,6 +106,7 @@ function createState(): RenderState {
 		dirty: false,
 		past: undefined,
 		slicing: null,
+		standIn: false,
 		gap: false,
 	}
 }
@@ -216,6 +214,12 @@ function paint(next: Frame, rows: number, force = false, trigger?: string): stri
 function paintParts(next: Frame, rows: number, force = false, trigger = 'a redraw'): Part[] {
 	let st = render.state
 	let prev = st.prev
+	// In full mode a frame never gets shorter: scrollback cannot come back
+	// onto the screen, and clearing it snaps a scrolled-up terminal to the
+	// bottom. Blank rows above the prompt keep its height until a full
+	// redraw; new rows fill them first.
+	let pad = !force && st.fullscreen && prev.length > rows ? prev.length - next.lines.length : 0
+	if (pad > 0) next = { ...next, lines: next.lines.toSpliced(next.history, 0, ...Array<string>(pad).fill('')), history: next.history + pad, cursor: { ...next.cursor, row: next.cursor.row + pad } }
 	let lines = next.lines
 	let shape: Shape = { length: lines.length, history: next.history, items: next.items, ends: next.ends }
 	let size = { before: prev.length, after: lines.length, screen: rows }
@@ -262,16 +266,10 @@ function paintParts(next: Frame, rows: number, force = false, trigger = 'a redra
 			let blocks = changes(st.shape, shape)
 			return { kind: 'below', cause: 'shrink', rows: size, firstChanged: first, blocks, text: `Erased ${prev.length - lines.length} rows below the frame's new end${said(blocks)}.` }
 		}
-		if (wasFull && (first < writableTop || lines.length < prev.length)) {
-			let blocks = changes(st.shape, shape)
-			let changedBlock = st.shape ? blockAt(st.shape, first) : undefined
-			let reason: ClearReason =
-				first < writableTop
-					? { kind: 'all', cause: 'scrollback edit', rows: size, firstChanged: first, writableTop, changedBlock, blocks, text: `Row ${first}, in ${changedBlock ?? 'an unknown block'}, changed in scrollback (rows above ${writableTop} cannot be rewritten in place)${lines.length < prev.length ? ` and the frame shrank from ${prev.length} to ${lines.length} rows` : ''}, so Hal cleared screen and scrollback and repainted${said(blocks)}.` }
-					: { kind: 'all', cause: 'shrink', rows: size, firstChanged: first, writableTop, changedBlock, blocks, text: `The frame shrank from ${prev.length} to ${lines.length} rows; a terminal cannot pull scrollback back onto the screen, so Hal cleared screen and scrollback and repainted${said(blocks)}.` }
-			body = canonical(lines, reason)
-			row = lines.length - 1
-		} else if (first >= lines.length) {
+		// Rows in scrollback cannot be rewritten: they stay as they were
+		// until a full redraw, rather than snapping the terminal.
+		first = Math.max(first, writableTop)
+		if (first >= lines.length) {
 			// Only rows at the end went away.
 			body = [move(st.cursorRow, first) + '\r' + render.clear(shrank())]
 			row = first
@@ -364,6 +362,8 @@ function draw(force = false, trigger?: string): void {
 	// last full redraw shows its last screenful of items meanwhile.
 	let session = st.view.transcript?.meta.id
 	let past = frame.layout(st.view, cols, performance.now() + render.sliceMs, true, rows)
+	let laidOut = st.standIn && !!past
+	st.standIn = !past
 	if (!past) {
 		render.later()
 		past = st.past && st.past.session === session ? st.past.past : frame.layout(render.tail(st.view, cols, rows), cols, Infinity, false, rows)!
@@ -376,7 +376,7 @@ function draw(force = false, trigger?: string): void {
 	st.view.prompt.scroll = next.promptScroll
 	let out = st.out
 	let pending = ''
-	for (let p of render.paintParts(next, rows, force, trigger)) {
+	for (let p of render.paintParts(next, rows, force || laidOut, laidOut && !force ? 'the history laid out in full' : trigger)) {
 		if (typeof p === 'string') pending += p
 		else if (out.defer) {
 			if (pending) out.write(pending)

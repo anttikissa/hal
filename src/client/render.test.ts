@@ -264,30 +264,37 @@ describe('full mode', () => {
 		expect(render.state.fullscreen).toBe(true)
 	})
 
-	test('a change in scrollback repaints canonically, with every history row', () => {
+	test('a change in scrollback never clears it: the screen is right, scrollback waits for a full redraw', () => {
 		setup(8, 30, ['$ hal'])
 		show(items(10))
+		term.written = ''
 		let list = items(10)
 		list[0] = { type: 'output', text: 'q0 edited' }
 		show(list)
+		expect(term.written).not.toContain('\x1b[3J')
+		expect(term.screen()).toEqual(frameText().slice(-8))
+		expect(term.content().join('\n')).not.toContain('q0 edited')
+		show(list, '', 0, true)
 		expect(term.content()).toEqual(frameText())
-		expect(frameText()).toContain(' q0 edited')
-		expect(frameText()).toContain(' a9')
 	})
 
-	test('a shrink repaints canonically, and any later change still lands on the right row', () => {
-		// A shrink cannot pull scrollback back onto the screen; a renderer
-		// that shrank in place would misplace later edits near the top.
+	test('a shorter frame keeps its height with blank rows above the prompt; later changes land right', () => {
+		// Scrollback cannot come back onto the screen: shrinking in place
+		// would misplace later edits, and clearing snaps to the bottom.
 		for (let k = 0; k < 20; k++) {
 			render.reset()
 			setup(8, 30)
 			show(items(10), 'three\nprompt\nrows')
+			let height = frameText().length
+			term.written = ''
 			show(items(10), 'one')
+			expect(frameText().length).toBe(height)
 			if (k === 0) expect(term.content()).toEqual(frameText())
 			let list = items(10)
 			list[k] = { type: 'text', text: 'edited' }
 			show(list, 'one')
-			expect(term.content()).toEqual(frameText())
+			expect(term.written).not.toContain('\x1b[3J')
+			expect(term.screen()).toEqual(frameText().slice(-8))
 		}
 	})
 
@@ -600,23 +607,20 @@ describe('clear reasons (task e4c)', () => {
 		show(list.slice(0, -2), '', 0, true)
 		let erases = term.written.match(/\x1b\[\d*J/g)?.length ?? 0
 		expect(erases).toBe(reasons.reduce((n, r) => n + (r.kind === 'all' ? 2 : 1), 0))
-		expect(reasons.map((r) => `${r.kind} ${r.cause}`)).toEqual(['down first paint', 'below shrink', 'all scrollback edit', 'all shrink', 'all forced'])
+		expect(reasons.map((r) => `${r.kind} ${r.cause}`)).toEqual(['down first paint', 'below shrink', 'all forced'])
 		expect(reasons.every((r) => r.text.length > 0)).toBe(true)
 	})
 
 	test('a shrink names the block that shrank; a forced repaint its trigger', () => {
 		setup(20, 30)
-		let list = items(10)
-		list.push({ type: 'output', text: 'one\ntwo\nthree\nfour' })
+		let list: Item[] = [...items(1), { type: 'output', text: 'one\ntwo\nthree\nfour' }]
 		show(list)
 		record()
-		list = [...list.slice(0, -1), { type: 'output', text: 'one' }]
-		show(list)
-		expect(reasons[0]).toMatchObject({ kind: 'all', cause: 'shrink' })
+		show([...items(1), { type: 'output', text: 'one' }])
+		expect(reasons[0]).toMatchObject({ kind: 'below', cause: 'shrink' })
 		expect(reasons[0]!.blocks![0]).toMatchObject({ before: 5, after: 2 })
-		expect(reasons[0]!.blocks![0]!.block).toMatch(/~20 \(output\)$/)
-		expect(reasons[0]!.text).toContain('~20 (output) 5 → 2 rows')
+		expect(reasons[0]!.text).toMatch(/\(output\) 5 → 2 rows/)
 		terminal.redraw('Ctrl-L or /redraw')
-		expect(reasons[1]).toMatchObject({ kind: 'all', cause: 'forced', trigger: 'Ctrl-L or /redraw' })
+		expect(reasons[1]).toMatchObject({ cause: 'forced', trigger: 'Ctrl-L or /redraw' })
 	})
 })
