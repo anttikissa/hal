@@ -178,6 +178,8 @@ export const colors = {
 		button: [0.3, 0.08, 215],
 		// Search matches in the picker's list.
 		match: [0.92, 0.14, 95],
+		// Where a press or a linked card's flash starts (web/flash.ts).
+		flash: [1, 0, 0],
 	}),
 	// Tools: each kind its own hue. Red is kept for real failures. A
 	// tool without its own entry (tool + capitalized name) uses `tool`.
