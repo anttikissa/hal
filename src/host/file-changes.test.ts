@@ -113,9 +113,10 @@ test('absolute scratch literals and globs snapshot files outside cwd', async () 
 	expect(bad.output).toContain('command did not run')
 })
 
-// Task hy: a commit a bash call makes is announced once, to the committing
-// session, except to clients watching it; moving HEAD back is no commit;
-// an amend says 'amended'.
+// Task hy: a commit a bash call makes is announced once, except to
+// clients watching the session its Session trailer names (task pdw:
+// without one, no session); moving HEAD back is no commit; an amend
+// says 'amended'.
 test('a commit in a bash call notifies other tabs once; a reset does not; an amend says amended', async () => {
 	let other = sessions.create({ cwd, model: 'fake/m' }).id
 	let elsewhere: any[] = [], watching: any[] = []
@@ -123,14 +124,17 @@ test('a commit in a bash call notifies other tabs once; a reset does not; an ame
 	for (let c of fakes) host.state.clients.add(c)
 	try {
 		let git = 'git -c user.name=t -c user.email=t@example.com'
-		await bash(`printf a > a && ${git} add a && ${git} commit -qm 'first line' -m 'body'`)
+		await bash(`printf z > z && ${git} add z && ${git} commit -qm untrailed`)
+		expect(elsewhere.splice(0)).toMatchObject([{ session: '', name: 'repo', line: expect.stringMatching(/ untrailed$/) }])
+		expect(watching.splice(0)).toHaveLength(1)
+		await bash(`printf a > a && ${git} add a && ${git} commit -qm 'first line' -m 'body' -m 'Session: ${id}'`)
 		let hash = (await fileChanges.git(cwd, ['rev-parse', 'HEAD'])).text.trim()
 		expect(elsewhere).toMatchObject([{ type: 'notice', session: id, kind: 'commit', key: `commit:${hash}`, line: `${hash.slice(0, 7)} first line` }])
-		await bash(`printf b > b && ${git} add b && ${git} commit -qm second && ${git} reset -q --hard HEAD~1`)
+		await bash(`printf b > b && ${git} add b && ${git} commit -qm second -m 'Session: ${id}' && ${git} reset -q --hard HEAD~1`)
 		expect(elsewhere.map((e) => e.line.split(' ')[1])).toEqual(['first', 'second'])
 		await bash(`${git} reset -q --hard HEAD`)
 		expect(elsewhere).toHaveLength(2)
-		await bash(`${git} commit -q --amend -m reworded`)
+		await bash(`${git} commit -q --amend -m reworded -m 'Session: ${id}'`)
 		expect(elsewhere[2]).toMatchObject({ what: 'amended', line: expect.stringMatching(/ reworded$/) })
 		expect(elsewhere[0].what).toBeUndefined()
 		expect(watching).toEqual([])
