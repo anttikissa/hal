@@ -1,24 +1,25 @@
 {
-	title: 'Open or close blocks: kinds, majority rule, live hint, Tab',
-	spec: `The /toggle dialog and syntax, on the terminal and the web alike. The user-facing term is "block"; the dialog title is "Open or close blocks".
+	title: 'Expand or collapse blocks: /expand, /collapse, lists, live hint, Tab',
+	spec: `/toggle, /expand and /collapse, and their dialog, on the terminal and the web alike. The user-facing term is "block"; its states are expanded and collapsed. The dialog title is "Expand or collapse blocks".
 
-Syntax: an optional '#', optional kind letters, then a number, a range N-M (inclusive) or '*'. Kinds: t tool, r reasoning (thinking), a assistant, u user, m message from another session, s system, q question. Letters combine: au10-40 means the user and assistant blocks in 10-40; t* means every tool block. A single number names one block of any kind; a letter before it is ignored (#t24, t24, 24 are the same). A range or '*' without letters never touches user or assistant blocks; naming a or u includes them. An empty target is the latest tool block.
+Syntax (shared by all three commands): a list of items separated by commas, spaces or both (t14,t16,t30-45 and #t14 16 30-45 are the same). An item is an optional '#', optional kind letters, then a number, a range N-M (inclusive) or '*'. Kinds: t tool, r reasoning (thinking), a assistant, u user, m message from another session, s system, q question. Letters combine: au10-40 means the user and assistant blocks in 10-40; t* means every tool block. A single number names one block of any kind; a letter before it is ignored (#t24, t24, 24 are the same). A range or '*' without letters never touches user or assistant blocks; naming a or u includes them. An empty target is the latest tool block.
 
-Majority rule: a range or '*' opens every matched block when more than half are closed, otherwise closes them all; a tie opens them, since opening loses nothing. One named block flips. Fold state stays per client, so each client applies the rule to its own state.
+/expand expands every matched block and /collapse collapses them; neither name may be confused with /close, which closes the tab. /toggle flips one named block; for anything more (a range, '*' or a list) it applies the majority rule to the whole match: expand all when more than half are collapsed, otherwise collapse all; a tie expands, since expanding hides nothing. Fold state stays per client, so each client applies /toggle's rule to its own state.
 
-Dialog: the field; below it a live hint that updates on every keystroke and says what Enter does ("Opens 12 tool blocks: t4-t88") or why the input is invalid; then a help area:
+Dialog (Ctrl-O, runs /toggle): the field; below it a live hint that updates on every keystroke and says what Enter does ("Expands 12 tool blocks: t4-t88") or why the input is invalid; then a help area:
   24, #t24   one block          t*   all tool blocks
   10-24      a range            r*   all thinking (reasoning) blocks
-  empty      latest tool block  Tab  complete a block id
+  t14, r2-9  a list             Tab  complete a block id
+  empty      latest tool block
   User and assistant blocks change only when you name them (a, u).
   Kinds: tool, reasoning, assistant, user, message, system, question
 The kinds row separates words with commas, like the terminal's key help row; each word's first letter (the kind letter) is bright and bold. The placeholder is static ("24, 10-24 or t*").
 
-Tab completes like /command completion: it fills the common prefix of the matching block ids; when several match it lists them in the help area, packed several per row, newest first, at least 10; more than fit end with "+N more". It never cycles.
+Tab completes like /command completion: it fills the common prefix of the matching block ids for the item under the cursor; when several match it lists them in the help area, packed several per row, newest first, at least 10; more than fit end with "+N more". It never cycles.
 
 Size: the terminal dialog is as tall as its content (field, hint, help or completions); the web dialog is as tall as its content too, not the full picker height.
 
-The model runs /toggle through the command tool with the same syntax. The host resolves the target against history and returns the matched block ids ("12 tool blocks: t4, t7, ..."), not opened or closed, since fold state is per client; it then tells the following clients to apply the target.`,
+Typed by the user (or Ctrl-O), the client runs the command itself, unrecorded. Run by the model through the command tool, the host resolves the target against history, tells the following clients to apply it, and returns the matched blocks, each with its model and effort where history records them ("Expanded 3 thinking blocks: r12 (opus-5-5, xhigh), r40 (opus-5-5, xhigh), r77 (opus-5-5, high)"), so the model can narrow a request such as "expand the xhigh thinking blocks" into a list. /toggle's result says "Toggled" with the same list, since the outcome depends on each client's state.`,
 	status: 'planned',
 	needs: ['ghs', 'r4d'],
 	foldInto: ['ghs']
