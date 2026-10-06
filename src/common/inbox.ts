@@ -56,12 +56,12 @@ function provenance(item: InboxItem): Sender {
 }
 
 // What leads a waiting message's compact row (task 16):
-// '15:29 (Message from 76-cpo, tab 5; after this turn)'.
+// '15:29 Message from 76-cpo, tab 5 (queued)'.
 // `tab`: the sender's current tab number, if it
 // has one. Not the label: it already names the tab it had when sending. Never why the session stalls: that is the status line.
 function note(item: InboxItem, tab?: number): string {
 	let who = item.from === undefined ? 'You' : `Message from ${item.from}${tab === undefined ? '' : `, tab ${tab}`}`
-	return titles.stamp(item.ts, `(${who}; after this turn)`)
+	return titles.stamp(item.ts, `${who} (queued)`)
 }
 
 export const inbox = { pending, sender, provenance, note }

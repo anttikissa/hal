@@ -24,7 +24,7 @@ function text(r: HistoryRecord, known: Known): string | undefined {
 		known.waiting = undefined
 		if (r.status !== 'completed') lines.push(r.status === 'error' ? `The turn failed with an error: ${r.error ?? 'unknown error'}` : r.pauseReason !== undefined ? `Hal paused the turn: ${r.pauseReason}` : r.status === 'interrupted' ? 'The turn was interrupted.' : 'The user paused the turn.')
 	}
-	if (r.type === 'continue' && known.waiting === undefined) lines.push(r.reason ?? (known.end === 'error' ? 'The user requested another attempt after the failed turn.' : known.end === undefined ? 'The unfinished turn is continuing. Do not repeat completed work.' : 'The user resumed the paused turn. Do not repeat completed work.'))
+	if (r.type === 'continue' && known.waiting === undefined) lines.push(r.reason ?? (known.end === 'error' ? 'The user asked to retry the failed turn.' : known.end === undefined ? 'The unfinished turn is continuing. Do not repeat completed work.' : 'The user resumed the paused turn. Do not repeat completed work.'))
 	if (r.type === 'assistant' || r.type === 'continue') known.end = undefined
 	return lines.length ? `<meta>${r.ts}\n${lines.join('\n')}</meta>` : undefined
 }

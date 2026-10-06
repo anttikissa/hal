@@ -1122,10 +1122,10 @@ test.skipIf(!chrome)('manual reload notice preserves the draft and command actio
 		await b.evaluate("document.querySelector('.Composer .actions button').click()")
 		await b.waitFor("document.querySelector('main').textContent.includes('Still working')")
 		await input('later')
-		expect(await actions()).toEqual(['Pause (Esc)', 'After this turn', 'Interrupt'])
+		expect(await actions()).toEqual(['Pause (Esc)', 'Queue', 'Steer'])
 		await input('/model')
 		expect(await actions()).toEqual(['Pause (Esc)', 'Run'])
-		expect(await b.evaluate("document.querySelector('.Composer .help').textContent.includes('after this turn')")).toBe(false)
+		expect(await b.evaluate("document.querySelector('.Composer .help').textContent.includes('alt+enter')")).toBe(false)
 		await input('draft stays put')
 		await b.evaluate("document.querySelector('textarea').focus(); window.__beforeUpdate = document.querySelector('.Chat'); window.__oldText = document.querySelector('textarea'); window.__transcriptRect = document.querySelector('.Transcript').getBoundingClientRect().toJSON()")
 		let page = await web.state.page!

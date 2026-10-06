@@ -273,7 +273,7 @@ function missingResult(status: TurnStatus | undefined): string {
 
 export const replay = {
 	// Told with a next-round message delivered while the model works.
-	nextRoundNotice: '<meta>Another session sent this while you work: read it now, but you need not drop your current task for it.</meta>',
+	nextRoundNotice: '<meta>Another session sent this while you were working. No need to stop your task for it.</meta>',
 	toMessages,
 	framed,
 	isPrompt,

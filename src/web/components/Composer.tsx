@@ -109,9 +109,9 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	}
 	// Interrupt delivery keeps the phone keyboard up for the next message;
 	// Send and after-this-turn delivery hide it so the reply is visible.
-	// A mouse keeps focus. The main button runs a command, interrupts a
+	// A mouse keeps focus. The main button runs a command, steers a
 	// running turn or sends a message.
-	let action = (): [IconName, string, string] => queueEditing() ? ['send', 'Save queued message', 'Save in the same queue position'] : view.commandDraft(props.text) ? ['run', 'Run', 'Run command'] : busy() ? ['steer', 'Interrupt', 'Interrupt: send into this turn'] : ['send', 'Send', 'Send']
+	let action = (): [IconName, string, string] => queueEditing() ? ['send', 'Save queued message', 'Save in the same queue position'] : view.commandDraft(props.text) ? ['run', 'Run', 'Run command'] : busy() ? ['steer', 'Steer', 'Steer — Send message immediately. Interrupts ongoing work.'] : ['send', 'Send', 'Send']
 	let send = (queue = false) => {
 		let steer = busy() && !queue
 		app.send(queue)
@@ -191,7 +191,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 						</button>
 					</Show>
 					<Show when={busy() && !queueEditing() && !blocked() && !view.commandDraft(props.text)}>
-						<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} aria-label="After this turn" title="Send after this turn" onClick={() => send(true)}><Icon name="queue" /></button>
+						<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} aria-label="Queue" title="Queue — Sent after this turn ends." onClick={() => send(true)}><Icon name="queue" /></button>
 					</Show>
 					{/* The tap must not blur the draft before click: on iOS the blur
 					    starts hiding the keyboard and moving the composer, and the

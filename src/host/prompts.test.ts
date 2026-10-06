@@ -43,7 +43,7 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('one\n\ntwo') }] },
 	])
 	expect(inboxOf(a, id)).toEqual([])
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupt)', 'You (interrupt)'])
+	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupted)', 'You (interrupted)'])
 	// Again, and again the prefix holds.
 	calls[1]!.push({ type: 'text', text: 'ok' })
 	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
@@ -65,7 +65,7 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ type: 'text', text: 'done' },
 		{ type: 'turn-end', status: 'completed' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupt)', 'You (interrupt)', 'You (interrupt)'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupted)', 'You (interrupted)', 'You (interrupted)'])
 	expect(a.views.get(id)).toEqual(view)
 	expect(b.views.get(id)).toEqual(view)
 	expect(a.of('turn-end')).toHaveLength(1)
@@ -113,7 +113,7 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	expect(inboxOf(a, id)).toEqual([])
 	let delivered = a.views.get(id)!.items.find((i) => i.type === 'prompt' && i.text === 'later')!
 	expect(delivered).toMatchObject({ queued: true, queuedAt })
-	expect(titles.title(delivered)).toBe(`${titles.time(delivered.ts)} You (after this turn, sent at ${titles.time(queuedAt)})`)
+	expect(titles.title(delivered)).toBe(`${titles.time(delivered.ts)} You (queued at ${titles.time(queuedAt)})`)
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 2)
 	let view = await fresh(id)
@@ -213,7 +213,7 @@ test('sending to a paused turn takes the waiting messages along, oldest first', 
 		{ type: 'prompt', text: 'first', steering: true },
 		{ type: 'prompt', text: 'second' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupt)', 'You'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupted)', 'You'])
 	expect(a.views.get(id)).toEqual(view)
 })
 

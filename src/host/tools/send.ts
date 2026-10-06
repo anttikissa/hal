@@ -24,8 +24,8 @@ function target(to: string): string | undefined {
 export const tool: Tool = {
 	name: 'send',
 	description:
-		'Send a message to another session, by tab number or session id. Default delivery is at the next round, without interrupting work. ' +
-		'steer: true interrupts as a user message would; queue: true delivers after this turn. An idle recipient can start a turn.',
+		'Send a message to another session, by tab number or session id. By default the recipient reads it at its next round, without interrupting its work. ' +
+		'steer: true interrupts. queue: true waits until its current turn ends. An idle recipient can start a turn.',
 	parameters: {
 		type: 'object',
 		properties: {
@@ -35,8 +35,8 @@ export const tool: Tool = {
 				type: 'string',
 				description: 'One short plain-language sentence for the user: what the message says or asks, e.g. "Ask tab 2 to rerun the tests"',
 			},
-			steer: { type: 'boolean', description: 'Interrupt as a user message would instead of delivering at the next round' },
-			queue: { type: 'boolean', description: "Deliver after the recipient's current turn" },
+			steer: { type: 'boolean', description: "Interrupt the recipient's current round" },
+			queue: { type: 'boolean', description: "Wait until the recipient's current turn ends" },
 		},
 		required: ['to', 'text', 'description'],
 	},
