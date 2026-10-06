@@ -1,13 +1,18 @@
-// Measures host disk and memory; level transitions reach clients and each
-// open session's durable notices. Critical levels pause running turns.
-// New sessions learn the current shortage before their first request.
-// Tasks: fwk, nvm.
+// Watches free disk space in the home and available memory, so a full
+// disk or an out-of-memory kill never takes Hal and its sessions down
+// unannounced. Every intervalMs the host measures
+// both and grades them ok, low or critical. Entering a worse level warns
+// every client (and each one joining while it lasts) and appends a notice
+// to each open session; entering critical pauses every running turn with
+// the reason, which also kills their commands. The user decides when to
+// resume. Tasks: fwk, nvm.
 import { readFileSync, statfsSync } from 'fs'
 import { freemem, totalmem } from 'os'
-import { host } from './host.ts'
+import { diag } from './diag.ts'
 import { history } from './history.ts'
-import { sessions, type SessionMeta } from './sessions.ts'
+import { host } from './host.ts'
 import { paths } from './paths.ts'
+import { sessions } from './sessions.ts'
 import { turns } from './turns.ts'
 
 export type Level = 'ok' | 'low' | 'critical'
@@ -70,60 +75,16 @@ function check(sample = resources.measure()): void {
 	st.sample = sample
 	st.level = resources.grade(sample)
 	if (st.level === before) return
-	st.told = new WeakSet()
-	let text = resources.warning() ?? resources.text()!
+	let text = resources.warning() ?? `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available`
 	if (rank[st.level] > rank[before] || st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text })
-	try {
-		for (let id of sessions.state.open.keys()) {
-			history.append(id, { type: 'notice', text: resources.text()! })
-			st.told.add(sessions.open(id))
-		}
-	} finally {
-		// A full disk can reject the notice itself; still stop resource users.
-		if (st.level === 'critical') {
-			let reason = `${resources.describe(sample, 'critical')}. Free space, then resume.`
-			for (let [id, running] of turns.state.running) {
-				try {
-					turns.stop(id, reason, true)
-				} catch (error) {
-					resources.report(error)
-				} finally {
-					delete running.steered
-					running.controller.abort()
-				}
-			}
-		}
-	}
-}
-
-// Facts only: recovery is a transition too, not advice hidden in tool output.
-function text(): string | undefined {
-	let { level, sample } = resources.state
-	if (!sample) return undefined
-	return level === 'ok'
-		? `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available`
-		: `${level} resources: ${resources.describe(sample, level)}`
-}
-
-// Called before history.messages reads records. Weak identities do not retain
-// closed sessions, and reopening during a shortage gets the current fact.
-function notice(id: string): void {
-	let st = resources.state
-	if (st.level === 'ok' || !st.sample) return
-	let meta = sessions.open(id)
-	if (st.told.has(meta)) return
-	history.append(id, { type: 'notice', text: resources.text()! })
-	st.told.add(meta)
+	// Stop first: on a full disk, the writes below may fail.
+	if (st.level === 'critical') for (let id of turns.state.running.keys()) turns.stop(id, `${resources.describe(sample, 'critical')}. Free space, then resume.`)
+	for (let id of sessions.state.open.keys()) history.append(id, { type: 'notice', text })
+	diag.log(`resources: ${before} -> ${st.level} (disk ${gb(sample.disk)}, memory ${gb(sample.memory)})`)
 }
 
 // Checks now and every intervalMs; clients joining while short get the
 // warning. Idempotent; the host calls it once it serves.
-function report(error: unknown): void {
-	let text = `Resource check failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}`
-	process.stderr.write(text + '\n')
-	for (let client of host.state.clients) client.deliver({ type: 'warning', text })
-}
-
 function init(): void {
 	let st = resources.state
 	if (st.timer) return
@@ -136,8 +97,8 @@ function init(): void {
 	let run = () => {
 		try {
 			resources.check()
-		} catch (error) {
-			resources.report(error)
+		} catch (e: any) {
+			diag.log(`resources: ${e?.message ?? e}`)
 		}
 	}
 	st.timer = setInterval(run, resources.intervalMs)
@@ -147,15 +108,15 @@ function init(): void {
 
 function stop(): void {
 	clearInterval(resources.state.timer)
-	resources.state = { level: 'ok', told: new WeakSet(), timer: undefined, sample: undefined }
+	resources.state = { level: 'ok', timer: undefined, sample: undefined }
 }
 
 export const resources = {
-	state: { level: 'ok' as Level, told: new WeakSet<SessionMeta>(), timer: undefined as ReturnType<typeof setInterval> | undefined, sample: undefined as Sample | undefined },
+	state: { level: 'ok' as Level, timer: undefined as ReturnType<typeof setInterval> | undefined, sample: undefined as Sample | undefined },
 	intervalMs: 30_000,
 	lowDiskBytes: 5e9,
 	criticalDiskBytes: 1e9,
 	lowMemoryBytes: 1.5e9,
 	criticalMemoryBytes: 0.5e9,
-	availableMemory, measure, grade, describe, warning, check, text, notice, report, init, stop,
+	availableMemory, measure, grade, describe, warning, check, init, stop,
 }

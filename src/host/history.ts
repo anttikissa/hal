@@ -26,7 +26,6 @@ import { models } from './models.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 import { naming } from './naming.ts'
 import { neighbors } from './neighbors.ts'
-import { resources } from './resources.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
 
@@ -220,7 +219,6 @@ async function open(id: string): Promise<SessionMeta> {
 // The session as provider messages, each prompt's paste markers
 // expanded to the pasted text (blobs.expand): history keeps markers.
 async function messages(id: string, budget: { overhead?: number; window?: number; model?: string } = {}) {
-	resources.notice(id)
 	for (let text of neighbors.notes(id, sessions.open(id).cwd)) history.append(id, { type: 'notice', text })
 	// A thinking block as the provider sent it: its signature back from its blob.
 	let signed = ({ signatureBlob, ...b }: ThinkingBlock): ThinkingBlock => ({ ...b, signature: blobs.text(id, signatureBlob!) })

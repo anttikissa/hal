@@ -12,7 +12,6 @@
 // line-delimited ASON (src/common/lines.ts). The host also serves the
 // web endpoint (web.ts), started by main.ts after the first frame and
 // stopped here with the host.
-// Tasks: ja, nvm.
 
 import { dlopen, FFIType } from 'bun:ffi'
 import { closeSync, openSync, rmSync } from 'fs'
@@ -59,7 +58,7 @@ function tryLock(): boolean {
 // Becomes host if nobody is: takes the lock, then replaces whatever
 // socket a previous host left and listens on it. False if another
 // process is host. Idempotent.
-async function serve(beforeListen: () => Promise<void> = async () => {}): Promise<boolean> {
+async function serve(): Promise<boolean> {
 	if (server.state.listener) return true
 	if (!server.tryLock()) return false
 	// Only the lock holder moves credentials into secrets/ (task de): a
@@ -68,8 +67,6 @@ async function serve(beforeListen: () => Promise<void> = async () => {}): Promis
 	secrets.migrate(['auth.ason', 'state/push-vapid.ason', 'state/push-subscriptions.ason'])
 	try {
 		await historyMigration.run()
-		// Host facts must be durable before any client can request model input.
-		await beforeListen()
 		server.state.listener = await server.listen(server.socketPath())
 	} catch (e) {
 		closeSync(server.state.lockFd!)
