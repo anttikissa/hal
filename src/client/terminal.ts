@@ -193,7 +193,7 @@ function resumed(): void {
 	if (!terminal.state.suspended) return
 	terminal.state.suspended = false
 	terminal.enter()
-	terminal.redraw()
+	terminal.redraw('a resume after suspend')
 }
 
 // Only while we own the terminal; a resize during a suspend is answered
@@ -275,7 +275,8 @@ export const terminal = {
 	onQuit: (): void => {},
 	/** Repaints everything in the current colors (resume, Ctrl-L, a
 	 * plugin's theme); replaced by the renderer, a no-op until then. */
-	redraw: (): void => {},
+	/** Repaint everything; `trigger` says why (task e4c). */
+	redraw: (_trigger?: string): void => {},
 	/** Repaints after a terminal resize; replaced by the renderer. */
 	onResize: (): void => {},
 	/** Tells the host the new size; replaced by the app. */

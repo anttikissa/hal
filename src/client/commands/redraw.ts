@@ -2,4 +2,4 @@
 
 import { terminal } from '../terminal.ts'
 
-export const command = { run: (): void => terminal.redraw() }
+export const command = { run: (): void => terminal.redraw('Ctrl-L or /redraw') }
