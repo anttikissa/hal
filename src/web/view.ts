@@ -221,7 +221,7 @@ function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: strin
 
 	let busy = st.transcript && states.busy(st.transcript.state)
 	let command = view.commandDraft(text)
-	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'interrupt' : 'send'
+	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'steer' : 'send'
 	let queue: [string, string][] = busy && !command ? [['alt+enter', 'queue']] : []
 	if (menu) return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift+enter', 'newline'], ...queue, ['esc', 'dismiss']]
 	if (busy) return [['enter', enter], ...queue, ['shift+enter', 'newline'], ['esc', 'pause']]

@@ -69,7 +69,7 @@ test('continue is refused with nothing to continue; a provider error ends the tu
 	a.conn.send({ type: 'continue', sessionId: id })
 	await until(() => calls.length === 2)
 	expect(calls[1]!.input.messages[0]).toEqual({ role: 'user', blocks: [{ type: 'text', text: stamped('go') }] })
-	expect(JSON.stringify(calls[1]!.input.messages.at(-1))).toContain('another attempt after the failed turn')
+	expect(JSON.stringify(calls[1]!.input.messages.at(-1))).toContain('asked to retry the failed turn')
 })
 
 test('a stream that throws still ends the turn and frees the session', async () => {

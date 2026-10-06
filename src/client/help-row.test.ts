@@ -31,7 +31,7 @@ test('each state shows its key hints, with /keys at the right', () => {
 	// Blank text is no text.
 	expect(help(view(idle, '  \n'))).toBe('/keys: shortcuts')
 	expect(help(view(running))).toMatch(/^esc: pause +\/keys/)
-	expect(help(view(running, 'more'))).toMatch(/^enter: interrupt, alt-enter: queue, shift-enter: newline, esc: pause +\/keys/)
+	expect(help(view(running, 'more'))).toMatch(/^enter: steer, alt-enter: queue, shift-enter: newline, esc: pause +\/keys/)
 	expect(help(view({ type: 'retrying', at: '', reason: 'overloaded' }))).toMatch(/^enter: retry now, esc: pause /)
 	expect(help(view({ type: 'paused' }))).toMatch(/^enter: continue +\/keys/)
 	expect(help(view({ type: 'error', message: 'boom' }))).toMatch(/^enter: retry +\/keys/)

@@ -160,7 +160,7 @@ test('continuation reports failure versus pause rather than inventing an interru
 	let paused = replay.toMessages([say('go'), block({ type: 'text', text: 'half' }), end('paused'), cont])
 	expect(JSON.stringify(paused.at(-1))).toContain('user resumed the paused turn')
 	let failed = replay.toMessages([say('go'), end('error', { error: 'bad request' }), cont])
-	expect(JSON.stringify(failed.at(-1))).toContain('another attempt after the failed turn')
+	expect(JSON.stringify(failed.at(-1))).toContain('asked to retry the failed turn')
 	expect(JSON.stringify(failed.at(-1))).toContain('bad request')
 	expect(JSON.stringify(failed)).not.toContain('response was interrupted')
 })
