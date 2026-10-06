@@ -6,7 +6,7 @@
 // onChange is the client's repaint.
 import { titles } from './titles.ts'
 
-export type NoticeKind = 'done' | 'failed' | 'attention' | 'update' | 'commit'
+export type NoticeKind = 'done' | 'failed' | 'attention' | 'update' | 'commit' | 'warning'
 // What the host sends when another tab's turn ends or asks (host/notify.ts)
 // or commits (host/commits.ts, its own key so it never replaces the others;
 // `what` overrides the kind's word, as 'amended' for an amend).
@@ -21,7 +21,7 @@ export type Folded = { shown: Notice[]; more?: { count: number; tabs: number[] }
 export type NoticeEntry = { id: string; at: string; session: string; name: string; kind: NoticeKind; line: string; what?: string; block?: string; awaiting?: boolean }
 
 // 'update': a mid-turn notify-tool line, which neither ends the turn nor asks.
-const WORDS: Record<NoticeKind, string> = { done: 'done', failed: 'failed', attention: 'needs your attention', update: 'update', commit: 'committed' }
+const WORDS: Record<NoticeKind, string> = { done: 'done', failed: 'failed', attention: 'needs your attention', update: 'update', commit: 'committed', warning: 'warning' }
 
 // Why a history entry was sent, in words that claim no more than
 // happened (both clients' notification history).

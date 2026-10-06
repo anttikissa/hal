@@ -5,7 +5,10 @@
 Hal cross-checks the trailer. It is confirmed when the claimed session had a bash call running at the commit time whose command contains "commit", or when the commit's short hash appears in one of that session's tool results from the commit time on. The hash check waits until the claimed session's calls that were running at the commit time have their results. When both fail, Hal writes a persistent warning: a notice-history entry of kind warning and a visible output record in the claimed session (when it exists), naming the commit hash and subject, the claimed session and why the check failed, e.g. "Commit e827d6a says Session: 166-his, but no call in 166-his made it." Hal never attributes the commit to another session. The check is advisory: trailers and command text are not proof, and agents are trusted.
 
 Measured 2026-10-06 over 25 commits from Opus 5.5, Astra, Luna and Sol sessions: 23 confirmed by both checks; the two failures (e517e4f, e827d6a) were real wrong trailers that the models amended seconds later. Tests: a wrong trailer warns; a quiet commit (git commit -q, no hash printed) with a correct trailer does not; no trailer gives a notice without a session.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"commits.check is pure over the claimed session's history: bash tool_call records (ts = block start, before execution) and tool_result records (ts = when the round's results land). Running at commit time = started before the commit second ends, no result before it. verify re-runs the check on each of that session's appends via history.onAppend while it says 'wait'. Not covered: a background bash call whose early result came before the commit and whose output prints the hash only later. A notice without a session uses the repository directory's basename as its name. The hy integration test now puts Session trailers in its commits; commits.test.ts checks the verdicts."
+	],
 	needs: ['hy'],
 	foldInto: ['hy']
 }
