@@ -3,9 +3,10 @@
 // /config, whose rows add a value column, a faint note shown on the
 // selected, hovered or focused row, an in-place edit field and the
 // selected row's details below (common/modals.ts).
-import { createEffect, createSignal, For, Show, untrack } from 'solid-js'
+import { createEffect, For, Show, untrack } from 'solid-js'
 import { fuzzy } from '../../common/fuzzy.ts'
 import { findDialog } from '../../common/find-dialog.ts'
+import { blocksDialog } from '../../common/blocks-dialog.ts'
 import { modals, type ModalState } from '../../common/modals.ts'
 import { app } from '../app.ts'
 import { picker } from '../../common/picker.ts'
@@ -34,21 +35,6 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		() => props.modal?.edit?.index,
 		(index) => untrack(() => { if (index === undefined) { if (box.open) search?.focus() } else edit?.focus() }),
 	)
-	// The Ctrl-O dialog's example types itself as in a question form
-	// (task ghs); under reduced motion the first stays.
-	let [now, setNow] = createSignal(Date.now())
-	createEffect(() => props.modal?.compact && props.modal.form, (form) => {
-		if (!form || matchMedia('(prefers-reduced-motion: reduce)').matches) return
-		let timer: ReturnType<typeof setTimeout> | undefined
-		let tick = () => {
-			let t = Date.now()
-			setNow(t)
-			let next = forms.example(form, 0, t).next
-			if (next < Infinity) timer = setTimeout(tick, next)
-		}
-		tick()
-		return () => clearTimeout(timer)
-	})
 	let width = () => `${Math.max(0, ...(props.modal?.items ?? []).map((s) => s.length)) + 2}ch`
 	// Model picker table: postfix, effort, name and ID columns, each as
 	// wide as its longest model row (effort: its widest choice).
@@ -79,7 +65,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		if (e.target === box && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) cancel(e)
 	}
 	return (
-		<dialog ref={(e) => (box = e)} class="Picker" aria-label={props.modal?.title ?? 'Picker'} onCancel={cancel} onClick={outside}>
+		<dialog ref={(e) => (box = e)} class={props.modal?.compact ? 'Picker compact' : 'Picker'} aria-label={props.modal?.title ?? 'Picker'} onCancel={cancel} onClick={outside}>
 			<div class="top">
 				<div class="title">{props.modal?.title ?? ''}</div>
 				<button type="button" class="close" aria-label="Close" onClick={cancel}><Icon name="close" /></button>
@@ -87,9 +73,22 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			<Show when={props.modal?.form}>
 				<input ref={(e) => (search = e)} class="input" type="text" aria-label="Search" autocomplete="off"
 					aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
-					placeholder={props.modal?.compact && props.modal.form ? forms.example(props.modal.form, 0, now()).text : undefined}
+					placeholder={props.modal?.compact && props.modal.form ? forms.example(props.modal.form, 0, 0).text : undefined}
 					value={props.modal?.form?.values[0] ?? ''} onInput={(e) => (props.modal?.compact ? folds.input(e.currentTarget.value) : app.search(e.currentTarget.value))} onFocus={() => find.focus(0)} />
 			</Show>
+			<Show when={props.modal?.blocks}>{(b) => (
+				<>
+					<div class={b().invalid ? 'blocks-hint refused' : 'blocks-hint'} role="status">{b().hint}</div>
+					<Show when={b().choices} fallback={
+						<div class="blocks-help">
+							<dl><For each={blocksDialog.help}>{([k, d]) => <div><dt>{k}</dt><dd>{d}</dd></div>}</For></dl>
+							<p>{blocksDialog.note}</p>
+							<p>Kinds: <For each={blocksDialog.kinds}>{(w, i) => <>{i() ? ', ' : ''}<b>{w[0]}</b>{w.slice(1)}</>}</For></p>
+						</div>}>
+						{(ids) => <ul class="blocks-ids" aria-label="Matching blocks"><For each={ids().length > 40 ? [...ids().slice(0, 39), `+${ids().length - 39} more`] : ids()}>{(id) => <li>{id}</li>}</For></ul>}
+					</Show>
+				</>
+			)}</Show>
 			<Show when={props.modal?.restart}>{(r) => {
 				let lines = () => modals.restartLines(r().calls)
 				return <div class="details">{lines().head}<For each={lines().calls}>{(c) => <>{'\n'}<Show when={c.href} fallback={c.block}><a href={c.href}>{c.block}</a></Show>{c.rest}</>}</For></div>

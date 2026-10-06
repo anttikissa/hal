@@ -1767,3 +1767,39 @@ browserTest('queued message edits retain the draft and require host protection t
 		await b.close()
 	}
 }, 20000)
+
+browserTest('the Ctrl-O dialog is as tall as its content, hints live, completes with Tab and expands', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'prompt' }] })
+	let calls = [0, 1, 2].map((k) => history.append(id, { type: 'assistant', block: { type: 'tool_call', id: `c${k}`, name: 'bash', input: { command: `echo ${k}`, description: `Say ${k}` } } }).n)
+	history.append(id, { type: 'user', blocks: [0, 1, 2].map((k) => ({ type: 'tool_result' as const, id: `c${k}`, output: `out ${k}` })) })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		for (let width of [390, 1280]) {
+			await b.call('Emulation.setTouchEmulationEnabled', { enabled: width === 390 })
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+			await b.waitFor(`document.querySelectorAll('.Card.folds').length >= 3`)
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'o', code: 'KeyO', windowsVirtualKeyCode: 79, modifiers: 2 })
+			await b.waitFor(`document.querySelector('.Picker.compact[open] .blocks-hint')?.textContent === 'Expands tool block t${calls[2]}'`)
+			let box = await b.evaluate(`(() => { let d = document.querySelector('.Picker.compact'), r = d.getBoundingClientRect(); return { left: r.left, right: r.right, height: r.height, fits: d.scrollHeight <= d.clientHeight && d.scrollWidth <= d.clientWidth, width: innerWidth } })()`)
+			expect(box.left).toBeGreaterThanOrEqual(0)
+			expect(box.right).toBeLessThanOrEqual(box.width)
+			expect(box.fits).toBe(true)
+			expect(box.height).toBeLessThan(width === 390 ? 600 : 400)
+			await b.call('Input.insertText', { text: 't' })
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+			await b.waitFor(`document.querySelectorAll('.Picker .blocks-ids li').length === 3`)
+			expect(await b.evaluate(`[...document.querySelectorAll('.Picker .blocks-ids li')].map((l) => l.textContent)`)).toEqual([...calls].reverse().map((n) => `t${n}`))
+			await b.call('Input.insertText', { text: '*' })
+			await b.waitFor(`document.querySelector('.Picker .blocks-hint')?.textContent === 'Expands 3 tool blocks: ${calls.map((n) => `t${n}`).join(', ')}'`)
+			await b.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+			await b.waitFor(`document.querySelectorAll('.Card.folds.open').length === 3 && !document.querySelector('.Picker[open]')`)
+		}
+	} finally {
+		await b.call('Emulation.setTouchEmulationEnabled', { enabled: false })
+		await b.close()
+	}
+}, 20000)

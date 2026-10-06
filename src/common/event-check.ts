@@ -14,7 +14,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	snapshot: { sessionId: 's', snapshot: 'o', 'snapshot.meta': 'o', 'snapshot.history': 'a', 'snapshot.state': 'o', 'snapshot.stats': 'o?', 'snapshot.queueHold': 's?' },
 	'turn-start': { sessionId: 's', provider: 's', model: 's?', effort: 's?', prompt: 's?', images: 'a?', command: 's?', ts: 's?' },
 	history: { sessionId: 's', before: 'i', records: 'a', older: 'i?' },
-	toggle: { sessionId: 's', target: 's' },
+	toggle: { sessionId: 's', target: 's', mode: 's?' },
 	'paste-text': { sessionId: 's', name: 's', text: 's?', error: 's?' },
 	state: { sessionId: 's', state: 'o', 'state.type': 's' },
 	inbox: { sessionId: 's', inbox: 'a' },

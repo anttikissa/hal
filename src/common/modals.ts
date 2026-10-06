@@ -63,6 +63,9 @@ export type ModalState = {
 	restart?: { scope: string; calls: FlaggedCall[] }
 	/** Only fields, no list: the box is as tall as they are (Ctrl-O). */
 	compact?: true
+	/** The Ctrl-O dialog's live hint (`invalid`: why Enter fails) and
+	 * Tab's block ids (common/blocks-dialog.ts). */
+	blocks?: { hint: string; invalid?: true; choices?: string[] }
 	selected: number
 	/** The first list row in view; clients keep it with modals.scroll. */
 	scroll: number

@@ -22,13 +22,8 @@ function apply(text: string, items: string[]): { text: string; choices?: string[
 	if (preferred && items.includes(preferred)) return { text: preferred }
 	if (items.length <= 1) return { text: items[0] ?? text }
 	let prefix = items.filter((item) => item.startsWith(text))
-	let common = (values: string[]) => values.reduce((a, b) => {
-		let n = 0
-		while (n < a.length && a[n] === b[n]) n++
-		return a.slice(0, n)
-	})
-	let shared = common(items)
-	let filled = common(prefix.length ? prefix : items)
+	let shared = completion.common(items)
+	let filled = completion.common(prefix.length ? prefix : items)
 	// Cut where the shared part last breaks (a space or /), so a name
 	// with spaces stays whole and a path shows its last part.
 	let cut = Math.max(shared.lastIndexOf(' '), shared.lastIndexOf('/')) + 1
@@ -40,4 +35,13 @@ function apply(text: string, items: string[]): { text: string; choices?: string[
 	return { text: filled.length > text.length ? filled : text, choices }
 }
 
-export const completion = { request, apply }
+// The longest prefix all of `values` share.
+function common(values: string[]): string {
+	return values.reduce((a, b) => {
+		let n = 0
+		while (n < a.length && a[n] === b[n]) n++
+		return a.slice(0, n)
+	})
+}
+
+export const completion = { request, apply, common }

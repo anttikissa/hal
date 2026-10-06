@@ -1,17 +1,18 @@
-// Which web cards are open or closed (tasks w5, r4d): kept by session
+// Which web cards are open or closed (tasks w5, r4d, v8y): kept by session
 // and block key, not by the DOM, in memory only. Folding cards
 // (thinking, tools, another session's message) start closed and are
 // `opened`; assistant text and the user's prompts start open and are
-// `closed` (/toggle names them one at a time). /toggle typed here and
-// Ctrl-O flip cards locally and unrecorded, as in the terminal (task
-// ghs); the model's /toggle arrives as an event.
+// `closed` (/toggle names them). /toggle, /expand and
+// /collapse typed here and Ctrl-O change cards locally and unrecorded,
+// as in the terminal (task ghs); the model's command arrives as an event.
 
 import { createSignal, flush, untrack } from 'solid-js'
-import { modals, type ModalState } from '../common/modals.ts'
+import type { ModalState } from '../common/modals.ts'
 import type { Key } from '../common/forms.ts'
 import { forms } from '../common/forms.ts'
 import type { Event } from '../common/protocol.ts'
-import { toggle } from '../common/toggle.ts'
+import { toggle, type Fold, type Mode } from '../common/toggle.ts'
+import { blocksDialog } from '../common/blocks-dialog.ts'
 import type { Item } from '../common/transcript.ts'
 import { app } from './app.ts'
 import { scroll } from './scroll.ts'
@@ -41,7 +42,8 @@ function isOpen(id: string, item: Item): boolean {
 // the address's #block without a new history entry.
 // `closes`: the card starts open (a queued row's note never does).
 function set(id: string, item: Item, on: boolean, keys: string[] = [item.key], closes = folds.closable(item)): void {
-	untrack(() => (closes ? setClosed(toggled(closed(), id, !on)) : setOpened(toggled(opened(), id, on))))
+	// The updater sees earlier sets of the same batch (/expand t*).
+	untrack(() => (closes ? setClosed((s) => toggled(s, id, !on)) : setOpened((s) => toggled(s, id, on))))
 	let hash = decodeURIComponent(location.hash.slice(1)).replace(/^[a-z](?=\d)/, '')
 	if (!on && hash && keys.includes(hash)) {
 		history.replaceState(history.state, '', location.pathname + location.search)
@@ -49,63 +51,81 @@ function set(id: string, item: Item, on: boolean, keys: string[] = [item.key], c
 	}
 }
 
-// Flips the cards `args` names in the session shown, as a click does.
-// Returns why nothing was flipped, or undefined.
-function run(args: string): string | undefined {
+// Card `item`'s state in session `sid`, as the shared rules see it.
+function fold(sid: string, item: Item): Fold {
+	return folds.isOpen(`${sid}#${item.key}`, item) ? 'open' : 'closed'
+}
+
+// Applies `mode` with `args` to the cards of the session shown, as
+// clicks do. Returns why nothing changed, or undefined.
+function run(args: string, mode: Mode = 'toggle'): string | undefined {
 	let t = app.state.view.transcript
-	let target = toggle.parse(args)
-	if (typeof target === 'string' || !t) return typeof target === 'string' ? target : undefined
-	let found = toggle.keys(t.items, target)
-	if (typeof found === 'string') return found
+	if (!t) return undefined
+	let at = (i: Item) => folds.fold(t.meta.id, i)
+	let p = toggle.plan(mode, t.items, args, at)
+	if (typeof p === 'string') return p
 	scroll.follow(() => {
-		for (let key of found) {
-			let item = t.items.find((i) => i.key === key)!
+		for (let item of p.items) {
 			let result = item.type === 'tool' ? t.items.find((i) => i.type === 'tool-result' && i.id === item.id)?.key : undefined
-			folds.set(`${t.meta.id}#${key}`, item, !folds.isOpen(`${t.meta.id}#${key}`, item), result ? [key, result] : [key])
+			folds.set(`${t.meta.id}#${item.key}`, item, p.open ?? at(item) === 'closed', result ? [item.key, result] : [item.key])
 		}
 		flush()
 	}, 'track')
 	return undefined
 }
 
-// Typed /toggle: true if `text` was one (and it ran).
+// Typed /toggle, /expand or /collapse: true if `text` was one (and it ran).
 function typed(text: string): boolean {
-	let m = /^\/toggle(?:\s+(.*))?$/s.exec(text.trim())
+	let m = /^\/(toggle|expand|collapse)(?:\s+(.*))?$/s.exec(text.trim())
 	if (!m) return false
-	let error = folds.run(m[1] ?? '')
+	let error = folds.run(m[2] ?? '', m[1] as Mode)
 	if (error) app.setNotice(error)
 	return true
 }
 
-// The model's /toggle for the session shown: true if it was one.
+// The model's command for the session shown: true if it was one.
 function onEvent(event: Event): boolean {
 	if (event.type !== 'toggle') return event.type === 'paste-text'
-	if (event.sessionId === app.state.view.transcript?.meta.id) folds.run(event.target)
+	if (event.sessionId === app.state.view.transcript?.meta.id) folds.run(event.target, event.mode)
 	return true
 }
 
-const examples = ['10-24   (toggle blocks 10-24)', '25   (you can also close an assistant message)', '#t24   (one tool call)', '(empty: the latest tool block)']
+// The dialog `m` with the hint for the session shown.
+function hinted(m: ModalState): ModalState {
+	let t = app.state.view.transcript
+	return t ? blocksDialog.update(m, t.items, (i) => folds.fold(t.meta.id, i)) : m
+}
 
-// Ctrl-O: the dialog asking which blocks to toggle.
+// Ctrl-O: the "Expand or collapse blocks" dialog (task v8y).
 function open(): void {
 	if (!app.state.view.transcript) return
-	let modal: ModalState = { compact: true, ...modals.open({ title: 'Toggle', hint: 'enter: toggle · esc: close', form: { text: 'Toggle', fields: [{ type: 'text', name: 'target', placeholder: examples }] } }) }
-	app.setView({ ...app.state.view, modal })
+	app.setView({ ...app.state.view, modal: folds.hinted(blocksDialog.open()) })
 }
 
-// The dialog's field typed into.
+// The dialog's field typed into: a new hint, Tab's list gone.
 function input(text: string): void {
 	let m = app.state.view.modal
-	if (m?.compact && m.form) app.setView({ ...app.state.view, modal: { ...m, form: forms.set(m.form, 0, text) } })
+	if (m?.compact && m.form) app.setView({ ...app.state.view, modal: folds.hinted({ ...m, form: forms.set(m.form, 0, text) }) })
 }
 
-// A key on the dialog: Enter toggles, Escape closes.
-function key(k: Key): void {
-	let m = app.state.view.modal
-	if (!m?.compact || (k.key !== 'enter' && k.key !== 'escape')) return
+// A key on the dialog: Enter runs /toggle, Escape closes, Tab
+// completes the block id before `cursor`.
+function key(k: Key, cursor?: number): void {
+	let m = app.state.view.modal, t = app.state.view.transcript
+	if (!m?.compact) return
+	if (k.key === 'tab') {
+		if (!t) return
+		let next = blocksDialog.complete(m, t.items, (i) => folds.fold(t.meta.id, i), cursor)
+		app.setView({ ...app.state.view, modal: next })
+		// The caret stays after the completed id, not at the end.
+		let field = document.activeElement
+		if (field instanceof HTMLInputElement) { flush(); field.setSelectionRange(next.form!.cursor, next.form!.cursor) }
+		return
+	}
+	if (k.key !== 'enter' && k.key !== 'escape') return
 	app.setView({ ...app.state.view, modal: undefined })
 	let error = k.key === 'enter' ? folds.run(m.form?.values[0] ?? '') : undefined
 	if (error) app.setNotice(error)
 }
 
-export const folds = { opened, setOpened, closed, toggled, closable, isOpen, set, run, typed, onEvent, open, input, key, examples }
+export const folds = { opened, setOpened, closed, toggled, closable, isOpen, set, fold, run, typed, onEvent, hinted, open, input, key }
