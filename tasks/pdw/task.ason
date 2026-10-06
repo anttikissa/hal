@@ -1,0 +1,11 @@
+{
+	title: 'Commit notices verify the Session trailer; no timing guess',
+	spec: `A detected commit (task hy) names a session only through its Session trailer. Without a trailer naming a session of this home, the notice names no session and no tab; the latest-started-call guess is gone.
+
+Hal cross-checks the trailer. It is confirmed when the claimed session had a bash call running at the commit time whose command contains "commit", or when the commit's short hash appears in one of that session's tool results from the commit time on. The hash check waits until the claimed session's calls that were running at the commit time have their results. When both fail, Hal writes a persistent warning: a notice-history entry of kind warning and a visible output record in the claimed session (when it exists), naming the commit hash and subject, the claimed session and why the check failed, e.g. "Commit e827d6a says Session: 166-his, but no call in 166-his made it." Hal never attributes the commit to another session. The check is advisory: trailers and command text are not proof, and agents are trusted.
+
+Measured 2026-10-06 over 25 commits from Opus 5.5, Astra, Luna and Sol sessions: 23 confirmed by both checks; the two failures (e517e4f, e827d6a) were real wrong trailers that the models amended seconds later. Tests: a wrong trailer warns; a quiet commit (git commit -q, no hash printed) with a correct trailer does not; no trailer gives a notice without a session.`,
+	status: 'planned',
+	needs: ['hy'],
+	foldInto: ['hy']
+}
