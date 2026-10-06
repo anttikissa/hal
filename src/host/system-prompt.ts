@@ -41,22 +41,25 @@ function candidates(cwd: string): string[] {
 }
 
 // Skills (task 074): names only, so many skills cost few tokens; the
-// model reads <dir>/<name>/SKILL.md when one fits. Hal's own skills/
+// model reads <dir>/SKILL.md when one fits. One line, a brace group per
+// folder: /a/skills/{x,y} /b/skills/z.
+// TODO: maybe an option to also list each skill's front matter
+// description, so models pick skills better; names suffice for now. Hal's own skills/
 // apply everywhere, like SYSTEM.md; a project's .agents/skills (or
 // .claude/skills) only where its AGENTS.md would. Only folders holding a
 // SKILL.md count; names are sorted so the text stays cache-stable.
 function skills(cwd: string): string {
 	let dirs = [`${paths.repoRoot()}/skills`]
 	for (let dir of candidates(cwd)) for (let sub of ['.agents/skills', '.claude/skills']) dirs.push(`${dir === '/' ? '' : dir}/${sub}`)
-	let lines: string[] = []
+	let groups: string[] = []
 	for (let dir of new Set(dirs)) {
 		let names: string[] = []
 		try {
 			names = readdirSync(dir).filter((name) => existsSync(`${dir}/${name}/SKILL.md`)).sort()
 		} catch {}
-		if (names.length) lines.push(`- ${dir}: ${names.join(', ')}`)
+		if (names.length) groups.push(names.length === 1 ? `${dir}/${names[0]}` : `${dir}/{${names.join(',')}}`)
 	}
-	return lines.length ? `Skills (read <dir>/<name>/SKILL.md when one fits the task):\n${lines.join('\n')}` : ''
+	return groups.length ? `Skills - read <dir>/SKILL.md when appropriate: ${groups.join(' ')}` : ''
 }
 
 function read(path: string): string | undefined {
