@@ -40,13 +40,12 @@ test('inert until opted in; traces geometry and clears without altering output o
 	expect([render.paint(first, 10), render.paint(shrink, 10)]).toEqual(expected)
 	let rows = capture()
 	expect(rows[0].clear).toBe(false)
-	// Full mode pads a shorter frame rather than clearing (task 4y4).
-	expect(rows[1]).toMatchObject({ clear: false, oldRows: 20 })
+	expect(rows[1]).toMatchObject({ reason: 'shrink', clear: true, home: true, oldRows: 20, newRows: 19, writableTop: 10 })
 	expect(readFileSync(file, 'utf8')).not.toContain(content)
 	expect(lstatSync(file).mode & 0o777).toBe(0o600)
 })
 
-test('records diffs, including scrollback changes, apart from unchanged paints', () => {
+test('records immutable-row changes separately from writable diffs and unchanged paints', () => {
 	redrawTrace.start(file)
 	let lines = Array.from({ length: 20 }, (_, i) => `line ${i}`)
 	render.paint(frame(lines), 10)
@@ -56,7 +55,7 @@ test('records diffs, including scrollback changes, apart from unchanged paints',
 	lines = ['new old row', ...lines.slice(1)]
 	render.paint(frame(lines), 10)
 	expect(capture().map((r) => [r.reason, r.clear])).toEqual([
-		['diff', false], ['diff', false], ['unchanged', false], ['diff', false],
+		['diff', false], ['diff', false], ['unchanged', false], ['immutable-row-changed', true],
 	])
 })
 

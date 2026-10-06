@@ -86,9 +86,7 @@ them.
 “Safe to modify” means cursor-addressable without forcing a snap or scroll.
 Before a writable-screen row is pushed across the boundary into scrollback, it
 must be canonical and final. Scrollback rows cannot be selectively rewritten and
-must remain immutable between canonical rebuilds. A row that changes after
-entering scrollback stays stale until the next one: only a full redraw rebuilds,
-and a shorter frame gets blank rows above the prompt (task 4y4). Before fullscreen begins, Hal
+must remain immutable between canonical rebuilds. Before fullscreen begins, Hal
 must preserve the terminal contents that predate Hal. Once fullscreen begins, a
 canonical rebuild may clear the entire scrollback buffer, including those pre-Hal
 contents, when snapping the viewport is known to be acceptable.
