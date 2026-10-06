@@ -1,0 +1,9 @@
+{
+	title: 'hal/queue-test: a scripted model for testing steering and the queue',
+	spec: "hal/queue-test is a synthetic model (synthetic.ts, queue-test.ts), listed and selectable like hal/scroll-test, for testing steering, queued messages, editing and discarding by hand without provider tokens. After a prompt it works for 30 rounds of about 8-10 s each: about 4 s of thinking streamed in short steps (so a steer interrupts it promptly), then one real bash call, sleep 3; echo round N. Each round starts by saying which user messages reached it since the previous round: the closed thinking card's first line gives the count or 'no new messages', and a text block lists each one with its send and arrival times (HH:MM:SS), its sender and how it came (prompt, steering, queued, advisory or steering from another session, from Hal) and its text. It derives this from history alone (user records after the last assistant record; their text blocks' sender fields and inbox ids, matched to inbox records for the send time), so a host restart changes nothing. Rounds count bash calls since the turn began (the last turn end not followed by a continue), so steering does not restart the count. After 30 rounds it reports the last messages, answers briefly and ends with a summary line. It writes no files and needs no approvals.",
+	status: 'done',
+	notes: [
+		"The round report goes in a text block because thinking cards are closed by default; the thinking's first line repeats the count so the closed card shows it. Thinking streams word by word over about 4 s: a steer aborts the round only when the stream yields its next event."
+	],
+	needs: ['mvd', '2r']
+}

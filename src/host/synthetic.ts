@@ -9,6 +9,7 @@ import type { StreamEvent } from '../common/blocks.ts'
 import type { Answers, Form } from '../common/forms.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { intro } from './intro.ts'
+import { queueTest } from './queue-test.ts'
 import { scrollTest } from './scroll-test.ts'
 
 export type Reply = { say?: string; stream?: AsyncGenerator<StreamEvent>; ask?: Form; pause?: string; after?: () => void }
@@ -36,7 +37,7 @@ async function* paced(say: string | undefined, signal: AbortSignal): AsyncGenera
 }
 
 export const synthetic = {
-	models: { intro: (records, answers, id) => intro.run(records, answers, id), 'scroll-test': (records) => scrollTest.run(records) } as Record<string, Synthetic>,
+	models: { intro: (records, answers, id) => intro.run(records, answers, id), 'scroll-test': (records) => scrollTest.run(records), 'queue-test': (records) => queueTest.run(records) } as Record<string, Synthetic>,
 	find,
 	paced,
 	pauseMs: 400,
