@@ -1,0 +1,9 @@
+{
+	title: 'Hal warns and pauses when disk or memory runs low',
+	spec: 'The host checks free disk space in the home (statfs bavail × bsize) and available memory (/proc/meminfo MemAvailable, os.freemem elsewhere) at start and every 30 s, and grades them: critical under 1 GB of disk or 0.5 GB of memory, low under 5 GB or 1.5 GB, else ok. Thresholds and interval are plain values on the resources object, overridable from local.ts or plugins. Entering a worse level sends every client a warning event naming what is short, how much is left and the limit; clients joining while it lasts get it too; returning to ok sends one recovery warning. Each session\'s next bash result carries one note, after the neighbor notes, per level it has not heard ("[Hal: low resources: disk 3.2 GB free in <home> (low under 5.0 GB). Avoid large copies, builds and downloads; delete temp files you made.]"); after recovery a new low episode is told again. Entering critical pauses every running turn with that reason (turns.stop), which kills their commands; the user resumes. State is in memory; checks never send a message or start a turn. Module: src/host/resources.ts, started by main.becomeHost.',
+	status: 'done',
+	notes: [
+		'Warnings reuse the existing warning event (st.notice in both clients) and host.warn for joining clients, so the web and the terminal show them the same way with no new UI. Notes go into bash results only: bash is what fills disks, and the note then sits in history like neighbor notes, so replay and the cache see the same bytes. A test injects samples into resources.check; the pause path is turns.stop, tested with turns.'
+	],
+	needs: ['0f', 'j1']
+}

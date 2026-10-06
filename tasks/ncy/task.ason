@@ -1,0 +1,10 @@
+{
+	title: 'A failed history append leaves no torn record',
+	spec: 'history.append writes each record through history.write, which appends one whole line or nothing: when the write fails (ENOSPC, EIO) it truncates the file back to its size before the write, then rethrows. Invariant restored: a torn record exists only as the last line after the host died mid-write, which history.open repairs; a later append never joins a torn fragment mid-file. The disk filling on 2026-10-06 left half-written turn_end and tool_result records that the next continue record glued onto, so two sessions failed as malformed history.',
+	status: 'done',
+	notes: [
+		'Checked once on a 64 KB tmpfs: appendFileSync on ENOSPC leaves the bytes that fit (state/diag.log shows the same), and history.write leaves the file at its old size. Busy joins before the write as before, so a crash right after the append still finds the session busy. Shrinking a file needs no free blocks, so the truncate works on a full disk.'
+	],
+	needs: ['7'],
+	foldInto: ['7']
+}
