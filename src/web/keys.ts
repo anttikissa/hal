@@ -36,14 +36,14 @@ import { emergency } from '../common/emergency.ts'
 
 // Where a key was pressed: the message box (its text, the caret, and
 // `write`, which edits the box natively and leaves the selection from
-// `anchor` to `cursor`; `anchor`: the selection's other end), a text field of the open
-// question, a button or link (`submits`: a form's submit button), or
+// `anchor` to `cursor`; `anchor`: the selection's other end), a text field (its caret) of the open
+// question or a dialog, a button or link (`submits`: a form's submit button), or
 // anywhere else. `coarse`: the box is typed on a touch keyboard
 // (pointer: coarse), which has no Shift: Enter is a newline there and
 // the Send button sends.
 export type Target =
 	| { kind: 'message'; text: string; cursor: number; anchor?: number; write?: (edit: Splice, cursor: number, anchor: number) => void; coarse?: boolean }
-	| { kind: 'field' }
+	| { kind: 'field'; cursor?: number }
 	| { kind: 'link' }
 	| { kind: 'button'; submits: boolean }
 	| { kind: 'other' }
@@ -79,8 +79,8 @@ function key(e: KeyInput, target: Target): boolean {
 	// Find has native text editing; model arrows remain tree/effort keys.
 	if (st.view.modal) {
 		if (st.view.modal.compact) {
-			if (!k || e.ctrlKey || e.metaKey || e.altKey || !['enter', 'escape'].includes(k.key)) return false
-			folds.key(k)
+			if (!k || e.ctrlKey || e.metaKey || e.altKey || (k.key === 'tab' && e.shiftKey) || !['enter', 'escape', 'tab'].includes(k.key)) return false
+			folds.key(k, target.kind === 'field' ? target.cursor : undefined)
 			return true
 		}
 		if (st.view.modal.find) {

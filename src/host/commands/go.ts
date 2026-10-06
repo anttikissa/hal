@@ -1,14 +1,13 @@
 // /go switches only clients following the session that runs it, to a
 // session and optionally a block in it (task 4qh).
 import { relative, resolve } from 'path'
-import { replay } from '../../common/replay.ts'
 import { titles } from '../../common/titles.ts'
 import { toolDetails } from '../../common/tool-details.ts'
-import { transcript, type Item } from '../../common/transcript.ts'
+import type { Item } from '../../common/transcript.ts'
 import { clients } from '../clients.ts'
 import { commands, type Candidate, type Context, type SlashCommand } from '../commands.ts'
-import { history } from '../history.ts'
 import { host } from '../host.ts'
+import { sessionBlocks } from '../session-blocks.ts'
 import { tabs } from '../tabs.ts'
 import { closedSessions } from './tabs.ts'
 
@@ -38,11 +37,6 @@ function headline(item: Item): string {
 	return text.trim().split('\n')[0]!.trim()
 }
 
-// Session `id`'s blocks with ids, in history order.
-function blocks(id: string): Item[] {
-	return replay.current(history.readSync(id)).flatMap((r, i) => transcript.recordItems(r, i)).filter((i) => /^\d+(\.\d+)?$/.test(i.key))
-}
-
 // '16:29' today, else '2 Oct 16:29', in the zone of the session's client.
 function when(ts: string | undefined, ctx: Context, time = true): string {
 	if (!ts || Number.isNaN(Date.parse(ts))) return ''
@@ -57,7 +51,7 @@ function when(ts: string | undefined, ctx: Context, time = true): string {
 function blockRows(id: string, rest: string, prefix: string, ctx: Context): Candidate[] {
 	let m = /^([a-z]?)(\d*(?:\.\d*)?)$/.exec(rest)
 	if (!m) return []
-	let rows = blocks(id).filter((i) => i.type !== 'tool-result' && i.type !== 'turn-end' && (!m[1] || titles.letter(i) === m[1]) && i.key.startsWith(m[2]!))
+	let rows = sessionBlocks.of(id).filter((i) => i.type !== 'tool-result' && i.type !== 'turn-end' && (!m[1] || titles.letter(i) === m[1]) && i.key.startsWith(m[2]!))
 	return rows.slice(-maxBlocks).reverse().map((i) => ({ value: `${prefix}${titles.blockId(i)}`, description: [when((i as { ts?: string }).ts, ctx), headline(i)].filter(Boolean).join('  ') }))
 }
 
@@ -106,7 +100,7 @@ export const command: SlashCommand = {
 			if (!m || (m[1] === undefined && !m[2] && !m[3])) return { error: `no session ${args}` }
 			target = m[1] === undefined ? { id: ctx.sessionId } : session(m[1], ctx)
 			if (!target) return { error: `no session ${m[1]}` }
-			let hit = blocks(target.id).find((i) => i.key === m[4])
+			let hit = sessionBlocks.of(target.id).find((i) => i.key === m[4])
 			if (!hit) return { error: `no block #${m[3]}${m[4]} in ${target.id}` }
 			block = titles.blockId(hit)
 		}

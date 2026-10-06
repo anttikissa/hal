@@ -320,9 +320,10 @@ export type Event =
 	| { type: 'web-update' } // Opted-in pages wait for the user to reload.
 	// Repaint terminals following this session; no reload on the web.
 	| { type: 'redraw'; sessionId: string }
-	// Open or close the blocks `target` names (/toggle, task ghs); each
-	// client flips its own fold state.
-	| { type: 'toggle'; sessionId: string; target: string }
+	// Expand or collapse the blocks `target` names (/toggle, /expand,
+	// /collapse; tasks ghs, v8y); each client changes its own fold state.
+	// No `mode`: toggle.
+	| { type: 'toggle'; sessionId: string; target: string; mode?: 'expand' | 'collapse' }
 	// A paste's text for a prompt shown inline (task ghs), to the client
 	// that asked; `error` if there is none to show.
 	| { type: 'paste-text'; sessionId: string; name: string; text?: string; error?: string }

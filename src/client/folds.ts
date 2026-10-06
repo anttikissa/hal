@@ -1,13 +1,15 @@
-// Which transcript blocks this terminal shows open or closed (task
-// ghs): /toggle typed here and Ctrl-O flip them locally, unrecorded; a
-// toggle event (the model's /toggle) flips them too. In memory only,
-// per session: not stored, not synced to other clients. Pastes shown
-// inline are fetched from the host once and kept.
+// Which transcript blocks this terminal shows expanded or collapsed
+// (tasks ghs, v8y): /toggle, /expand and /collapse typed here and
+// Ctrl-O change them locally, unrecorded; a toggle event (the model's
+// command) changes them too. In memory only, per session: not stored,
+// not synced to other clients. Pastes shown inline are fetched from
+// the host once and kept.
 
-import { modals, type ModalState } from '../common/modals.ts'
+import { blocksDialog } from '../common/blocks-dialog.ts'
+import { modals } from '../common/modals.ts'
 import type { Event } from '../common/protocol.ts'
-import { toggle, type Fold } from '../common/toggle.ts'
-import type { Transcript } from '../common/transcript.ts'
+import { toggle, type Fold, type Mode } from '../common/toggle.ts'
+import type { Item, Transcript } from '../common/transcript.ts'
 import { app } from './app.ts'
 
 // Session → block key → state; paste name → its text, or why none.
@@ -20,21 +22,24 @@ function of(id: string): Map<string, Fold> {
 	return m
 }
 
+// Block `item`'s state in session `id`.
+function fold(id: string, item: Item): Fold {
+	return folds.of(id).get(item.key) ?? toggle.initial(item)
+}
+
 // The transcript of session `id`, shown or kept for a hidden tab.
 function transcriptOf(id: string): Transcript | undefined {
 	let st = app.state
 	return st.transcript?.meta.id === id ? st.transcript : st.hidden.get(id)?.transcript
 }
 
-// Flips the blocks `args` names in session `id`. Returns why nothing
-// was flipped, or undefined.
-function run(id: string, args: string): string | undefined {
-	let target = toggle.parse(args)
-	if (typeof target === 'string') return target
-	let t = transcriptOf(id)
+// Applies `mode` with `args` in session `id`. Returns why nothing
+// changed, or undefined.
+function run(id: string, args: string, mode: Mode = 'toggle'): string | undefined {
+	let t = folds.transcriptOf(id)
 	if (!t) return undefined
 	let states = folds.of(id)
-	let done = toggle.flip(states, t.items, target)
+	let done = toggle.apply(mode, states, t.items, args)
 	if (typeof done === 'string') return done
 	// Pastes opened inline: their text comes from the host.
 	for (let key of done) {
@@ -49,37 +54,41 @@ function run(id: string, args: string): string | undefined {
 	return undefined
 }
 
-// Typed /toggle: true if `text` was one (and it ran).
+// Typed /toggle, /expand or /collapse: true if `text` was one (and it ran).
 function typed(text: string): boolean {
-	let m = /^\/toggle(?:\s+(.*))?$/s.exec(text.trim())
+	let m = /^\/(toggle|expand|collapse)(?:\s+(.*))?$/s.exec(text.trim())
 	let id = app.state.transcript?.meta.id
 	if (!m || id === undefined) return false
-	let error = folds.run(id, m[1] ?? '')
+	let error = folds.run(id, m[2] ?? '', m[1] as Mode)
 	if (error) app.state.notice = error
 	app.show()
 	return true
 }
 
-const examples = ['10-24   (toggle blocks 10-24)', '25   (you can also close an assistant message)', '#t24   (one tool call)', '(empty: the latest tool block)']
-
-// Ctrl-O: asks which blocks to toggle.
+// Ctrl-O: asks which blocks to expand or collapse.
 function open(): void {
-	let id = app.state.transcript?.meta.id
-	if (id === undefined) return
+	let t = app.state.transcript
+	if (!t) return
+	let id = t.meta.id
+	let at = (i: Item) => folds.fold(id, i)
 	app.close()
-	let modal: ModalState = { compact: true, ...modals.open({ title: 'Toggle', hint: 'enter: toggle · esc: close', form: { text: 'Toggle', fields: [{ type: 'text', name: 'target', placeholder: examples }] } }) }
-	app.open(modal, (action) => {
+	app.open(blocksDialog.update(blocksDialog.open(), t.items, at), (action) => {
 		let error = folds.run(id, action.answers.target ?? '')
 		if (error) app.state.notice = error
 		return undefined
+	}, (m, k) => {
+		let items = folds.transcriptOf(id)?.items ?? []
+		if (k.key === 'tab' && !k.shift && !k.ctrl && !k.alt) return { state: blocksDialog.complete(m, items, at) }
+		let r = modals.step(m, k)
+		return r.state.form!.values[0] !== m.form!.values[0] ? { ...r, state: blocksDialog.update(r.state, items, at) } : r
 	})
 }
 
-// The model's /toggle, or a paste's text arriving.
+// The model's command, or a paste's text arriving.
 function event(e: Event & { type: 'toggle' | 'paste-text' }): void {
-	if (e.type === 'toggle') return void folds.run(e.sessionId, e.target)
+	if (e.type === 'toggle') return void folds.run(e.sessionId, e.target, e.mode)
 	folds.state.pastes.set(e.name, e.text === undefined ? { error: e.error ?? 'no text' } : { text: e.text })
 	app.show()
 }
 
-export const folds = { state, of, run, typed, open, event }
+export const folds = { state, of, fold, transcriptOf, run, typed, open, event }

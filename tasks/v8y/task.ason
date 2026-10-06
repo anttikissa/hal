@@ -20,7 +20,12 @@ Tab completes like /command completion: it fills the common prefix of the matchi
 Size: the terminal dialog is as tall as its content (field, hint, help or completions); the web dialog is as tall as its content too, not the full picker height.
 
 Typed by the user (or Ctrl-O), the client runs the command itself, unrecorded. Run by the model through the command tool, the host resolves the target against history, tells the following clients to apply it, and returns the matched blocks, each with its model and effort where history records them ("Expanded 3 thinking blocks: r12 (opus-5-5, xhigh), r40 (opus-5-5, xhigh), r77 (opus-5-5, high)"), so the model can narrow a request such as "expand the xhigh thinking blocks" into a list. /toggle's result says "Toggled" with the same list, since the outcome depends on each client's state.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"The parser and dialog logic live in src/common (toggle.ts: parse, resolve, majority rule; blocks-dialog.ts: live hint, Tab completion, packed id rows) so both clients share them; the host's src/host/session-blocks.ts gives /go and /toggle the same block list. Tab reuses completion.common from the /command completer rather than a copy.",
+		'Web folds.set must use updater setters: /expand t* sets several blocks in one batch, and reading the signal inside untrack saw the pre-batch state, so only the last block expanded.',
+		"The web compact Picker needs height: fit-content; height: auto still filled the dialog's fixed picker height."
+	],
 	needs: ['ghs', 'r4d'],
 	foldInto: ['ghs']
 }

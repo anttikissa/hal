@@ -9,6 +9,7 @@ import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 import { formView } from './form-view.ts'
 import { findDialog } from '../common/find-dialog.ts'
+import { blocksDialog } from '../common/blocks-dialog.ts'
 
 const { UNCOLOR, RESET, LINK_OFF } = ansi
 
@@ -59,6 +60,7 @@ function modalLines(m: ModalState, width: number, height: number): { rows: strin
 		if (m.find.focus !== 0) fields.cursor = undefined
 		content.push(strings.clipVisual(findDialog.labels.map((label, i) => `${m.find!.focus === i + 1 ? '›' : ''}[${m.find!.filters.includes(findDialog.filters[i]!) ? 'x' : ' '}] ${label}`).join('  '), inner))
 	}
+	if (m.blocks) content.push(...modalView.blocksLines(m, inner))
 	// The restart dialog: its flagged calls above the list, each block id
 	// a link to its block on the web (task ker).
 	if (m.restart) {
@@ -135,6 +137,33 @@ function cell(m: ModalState, i: number, current: Style): { text: string; cursor?
 	return { text: `${value}   ${faint}${note}${back}` }
 }
 
+// The Ctrl-O dialog's rows below its field (task v8y): the live hint,
+// then the help area, or Tab's block ids packed in as many rows.
+function blocksLines(m: ModalState, width: number): string[] {
+	let h = colors.help()
+	let key = ansi.sgr({ fg: h.key! }), desc = ansi.sgr({ fg: h.description! })
+	let hint = m.blocks!.invalid ? ansi.sgr({ fg: colors.error().fg! }) + m.blocks!.hint + UNCOLOR : m.blocks!.hint
+	let pairs = blocksDialog.help
+	let kw = (from: number) => Math.max(...pairs.filter((_, i) => i % 2 === from).map(([k]) => k.length)) + 2
+	let left = kw(0) + Math.max(...pairs.filter((_, i) => i % 2 === 0).map(([, d]) => d.length)) + 2
+	let two = left + kw(1) + Math.max(...pairs.filter((_, i) => i % 2 === 1).map(([, d]) => d.length)) <= width
+	let cell = ([k, d]: [string, string], w: number) => key + k.padEnd(w) + desc + d
+	let rows: string[] = []
+	if (two) for (let i = 0; i < pairs.length; i += 2) rows.push(cell(pairs[i]!, kw(0)).padEnd(left + key.length + desc.length) + (pairs[i + 1] ? cell(pairs[i + 1]!, kw(1)) : '') + UNCOLOR)
+	else {
+		// Narrow: one pair per row, a long description wrapped under itself.
+		let w = Math.max(kw(0), kw(1))
+		for (let [k, d] of pairs) strings.wordWrap(d, Math.max(1, width - w)).forEach((line, i) => rows.push(cell([i ? '' : k, line], w) + UNCOLOR))
+	}
+	rows.push(...strings.wordWrap(blocksDialog.note, width).map((r) => desc + r + UNCOLOR))
+	// Each kind's first letter is its kind letter: bright and bold.
+	let lit = new RegExp(`\\b(${blocksDialog.kinds.join('|')})\\b`, 'g')
+	rows.push(...strings.wordWrap(`Kinds: ${blocksDialog.kinds.join(', ')}`, width).map((r) => desc + r.replace(lit, (w) => ansi.BOLD + key + w[0] + ansi.UNBOLD + desc + w.slice(1)) + UNCOLOR))
+	let ids = m.blocks!.choices
+	if (ids) rows = blocksDialog.pack(ids, width, rows.length).map((r) => key + r + UNCOLOR)
+	return [strings.clipVisual(hint, width), '', ...rows.map((r) => strings.clipVisual(r, width))]
+}
+
 // The rows below the list: the selected item's details, wrapped, and why
 // a change was refused.
 function footer(m: ModalState, width: number): string[] {
@@ -182,7 +211,7 @@ function overlay(line: string, row: string, left: number, width: number, cols: n
 function withModal(lines: string[], m: ModalState, rows: number, cols: number): { cursor: Cursor; scroll: number } {
 	let box = modalView.modalBox(rows, cols)
 	// A dialog that is only a field (Ctrl-O, task ghs) is as tall as it.
-	if (m.compact && m.form) box.height = Math.min(box.height, m.form.form.fields.length + 2)
+	if (m.compact && m.form) box.height = Math.min(box.height, m.form.form.fields.length + 2 + (m.blocks ? modalView.blocksLines(m, box.width - 4).length : 0))
 	while (lines.length < box.height) lines.push('')
 	let screen = Math.min(lines.length, rows)
 	let top = lines.length - screen + Math.floor((screen - box.height) / 2)
@@ -191,4 +220,4 @@ function withModal(lines: string[], m: ModalState, rows: number, cols: number): 
 	return { cursor: { row: top + drawn.cursor.row, col: box.left + drawn.cursor.col }, scroll: drawn.scroll }
 }
 
-export const modalView = { table, modalBox, border, modalLines, cell, footer, highlight, modalScroll, overlay, withModal }
+export const modalView = { table, modalBox, border, modalLines, cell, blocksLines, footer, highlight, modalScroll, overlay, withModal }

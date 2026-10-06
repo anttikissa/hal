@@ -96,8 +96,9 @@ function target(e: Event): Target {
 		let coarse = matchMedia('(pointer: coarse)').matches
 		return { kind: 'message', text: t.value, cursor, anchor, coarse, write: (edit, at, from) => editor.write(t, edit, at, from) }
 	}
+	if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return { kind: 'field', cursor: t.selectionStart ?? undefined }
 	// An open sheet keeps its keys (the box behind it is inert).
-	if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || (t instanceof Element && t.closest('dialog[open], [contenteditable]'))) return { kind: 'field' }
+	if (t instanceof Element && t.closest('dialog[open], [contenteditable]')) return { kind: 'field' }
 	if (t instanceof HTMLAnchorElement) return { kind: 'link' }
 	if (t instanceof HTMLButtonElement) return { kind: 'button', submits: t.type === 'submit' }
 	return { kind: 'other' }
