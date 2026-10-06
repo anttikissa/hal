@@ -16,6 +16,8 @@ import { turns } from './turns.ts'
 
 async function recover(): Promise<void> {
 	for (let id of new Set([...tabs.file().open, ...busy.list()])) {
+		// A hundred tabs' checks are sync reads: yield between slices (task 7j).
+		if (performance.now() >= pages.deadline()) await new Promise((resolve) => setImmediate(resolve))
 		if (turns.state.running.has(id)) continue
 		if (!existsSync(history.file(id))) {
 			busy.drop(id)
