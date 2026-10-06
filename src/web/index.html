@@ -48,10 +48,10 @@ body, textarea { tab-size: 4; }
 html.typing { overflow: hidden; }
 html.typing body { height: 100dvh; }
 html.typing .App { position: absolute; }
-/* The keyboard closing: the app grows on an S curve in 300 ms (viewport.ts). */
+/* The keyboard closing: the app grows on an S curve in 360 ms (viewport.ts). */
 @media (prefers-reduced-motion: no-preference) {
-  html.easing .App { transition: height 300ms cubic-bezier(0.65, 0, 0.35, 1), transform 300ms cubic-bezier(0.65, 0, 0.35, 1); }
-  html.easing .Composer { transition: padding-bottom 300ms cubic-bezier(0.65, 0, 0.35, 1); }
+  html.easing .App { transition: height 360ms cubic-bezier(0.65, 0, 0.35, 1), transform 360ms cubic-bezier(0.65, 0, 0.35, 1); }
+  html.easing .Composer { transition: padding-bottom 360ms cubic-bezier(0.65, 0, 0.35, 1); }
 }
 /* Zero-height anchor: reload floats over text without moving it. */
 .source-update { position: relative; flex: none; height: 0; z-index: 2; pointer-events: none; }

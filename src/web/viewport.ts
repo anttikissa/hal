@@ -68,7 +68,7 @@ function page(): () => void {
 			if (last && h > last + 100 && matchMedia('(pointer: coarse)').matches) {
 				root.classList.add('easing')
 				clearTimeout(timer)
-				timer = setTimeout(() => root.classList.remove('easing'), 400)
+				timer = setTimeout(() => root.classList.remove('easing'), 460)
 			}
 			last = h
 		}
