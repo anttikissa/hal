@@ -1,3 +1,4 @@
+import { statSync } from 'fs'
 // The protocol end of the host: connections, snapshots, commands and
 // their ids (host.ts).
 
@@ -8,6 +9,7 @@ import { calls, client, created, fresh, records, restartHost, until, useHost } f
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { pages } from './pages.ts'
+import { models } from './models.ts'
 import { sessions } from './sessions.ts'
 
 useHost()
@@ -20,6 +22,23 @@ test('create makes a session and sends its snapshot', () => {
 	expect(snap.snapshot.history).toEqual([])
 	expect(snap.snapshot.turn).toBeUndefined()
 	expect(sessions.list().map((s) => s.id)).toEqual([id])
+})
+
+test('history sends distinct assistant model names before the page', async () => {
+	let a = client()
+	let id = created(a)
+	history.append(id, { type: 'assistant', block: { type: 'text', text: 'old' }, model: 'openai/gpt-6-luna' })
+	history.append(id, { type: 'assistant', block: { type: 'text', text: 'again' }, model: 'openai/gpt-6-luna' })
+	let original = models.nameEvent
+	models.nameEvent = (ids) => ids.length ? { type: 'model-names', names: { 'openai/gpt-6-luna': 'GPT-6 Luna' } } : undefined
+	try {
+		a.events.length = 0
+		a.conn.send({ type: 'history', sessionId: id, before: statSync(history.file(id)).size })
+		expect(a.events.map((e) => e.type)).toEqual(['model-names', 'history'])
+		expect(a.of('model-names')[0].names).toEqual({ 'openai/gpt-6-luna': 'GPT-6 Luna' })
+	} finally {
+		models.nameEvent = original
+	}
 })
 
 test('a snapshot read in slices misses no record appended meanwhile, and commands sent after the open wait for it', async () => {

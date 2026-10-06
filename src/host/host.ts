@@ -34,6 +34,7 @@ import { rebaseRows } from '../common/rebase-rows.ts'
 import { rebasePlans } from './rebase-plans.ts'
 import { queueEdits } from './queue-edits.ts'
 import { recap } from './recap.ts'
+import { models } from './models.ts'
 
 export type Connection = {
 	// Takes unvalidated data: the peer may be another process.
@@ -257,6 +258,9 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	else if (c.type === 'paste-text') return { reply: blobs.pasteText(c.sessionId, c.name) }
 	else if (c.type === 'history') {
 		let answer = (page: Page): Outcome => {
+			let ids = [...new Set(page.records.flatMap((r) => r.type === 'assistant' && r.model ? [r.model] : []))]
+			let names = models.nameEvent(ids)
+			if (names) client.deliver(names)
 			let reply: Event = { type: 'history', sessionId: c.sessionId, before: c.before, records: page.records }
 			if (page.start > 0 && !page.records.some((r) => r.type === 'reset')) reply.older = page.start // nothing before a /clear (vh)
 			return { reply }
