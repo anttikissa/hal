@@ -14,7 +14,7 @@
 // work; text in a textarea can never be a link) with an × that deletes
 // the marker as an undoable edit. The text stays the only state.
 
-import { createEffect, createMemo, For, Show, onSettled } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show, onSettled } from 'solid-js'
 import { queueEdit } from '../../common/queue-edit.ts'
 import { attachments } from '../../common/attachments.ts'
 import { states } from '../../common/states.ts'
@@ -106,11 +106,25 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 		let t = props.view.transcript
 		if (t) app.sendNow(paused() ? { type: 'continue', sessionId: t.meta.id } : view.pause(props.view))
 	}
+	// One source per action button (task 02s): the icon, the small-caps
+	// name under it, the aria-label and the caption that hover or
+	// keyboard focus shows under the row on fine pointers.
+	let [caption, setCaption] = createSignal('')
+	let explains = matchMedia('(hover: hover) and (pointer: fine)')
+	let Action = (p: { kind: keyof typeof BUTTONS; class?: string; disabled?: boolean; onClick: () => void }) => {
+		let b = () => BUTTONS[p.kind]
+		let show = () => explains.matches && setCaption(b().caption)
+		return (
+			<button type="button" class={p.class} aria-label={b().label} title={`${b().label} — ${b().caption}`} disabled={p.disabled} onPointerDown={(e) => e.preventDefault()} onPointerEnter={show} onFocus={show} onPointerLeave={() => setCaption('')} onBlur={() => setCaption('')} onClick={p.onClick}>
+				<Icon name={b().icon} /><small>{b().name}</small>
+			</button>
+		)
+	}
 	// Interrupt delivery keeps the phone keyboard up for the next message;
 	// Send and after-this-turn delivery hide it so the reply is visible.
 	// A mouse keeps focus. The main button runs a command, steers a
 	// running turn or sends a message.
-	let action = (): [IconName, string, string] => queueEditing() ? ['send', 'Save queued message', 'Save in the same queue position'] : view.commandDraft(props.text) ? ['run', 'Run', 'Run command'] : busy() ? ['steer', 'Steer', 'Steer — Send message immediately. Interrupts ongoing work.'] : ['send', 'Send', 'Send']
+	let action = (): keyof typeof BUTTONS => queueEditing() ? 'save' : view.commandDraft(props.text) ? 'run' : busy() ? 'steer' : 'send'
 	let send = (queue = false) => {
 		let steer = busy() && !queue
 		app.send(queue)
@@ -185,21 +199,18 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				<div class="actions">
 					{/* Pause and continue without Escape (task v0g); the tap keeps the keyboard. */}
 					<Show when={busy() || paused()}>
-						<button type="button" class="toggle" aria-label={paused() ? 'Continue' : 'Pause (Esc)'} title={paused() ? 'Continue' : 'Pause (Esc)'} onPointerDown={(e) => e.preventDefault()} onClick={toggle}>
-							<Icon name={paused() ? 'play' : 'pause'} />
-						</button>
+						<Action kind={paused() ? 'continue' : 'pause'} class="toggle" onClick={toggle} />
 					</Show>
 					<Show when={busy() && !queueEditing() && !view.commandDraft(props.text)}>
-						<button type="button" disabled={!props.text.trim() || !!props.view.form} onPointerDown={(e) => e.preventDefault()} aria-label="Queue" title="Queue — Sent after this turn ends." onClick={() => send(true)}><Icon name="queue" /></button>
+						<Action kind="queue" disabled={!props.text.trim() || !!props.view.form} onClick={() => send(true)} />
 					</Show>
 					{/* The tap must not blur the draft before click: on iOS the blur
 					    starts hiding the keyboard and moving the composer, and the
 					    click was lost. send() blurs afterwards. */}
-					<button type="button" class="go" aria-label={action()[1]} title={action()[2]} disabled={!props.text.trim() || !!props.view.form || (queueEditing() && !canSave())} onPointerDown={(e) => e.preventDefault()} onClick={() => send()}>
-						<Icon name={action()[0]} />
-					</button>
+					<Action kind={action()} class="go" disabled={!props.text.trim() || !!props.view.form || (queueEditing() && !canSave())} onClick={() => send()} />
 				</div>
 			</div>
+			<Show when={caption()}><div class="caption" role="status">{caption()}</div></Show>
 			<div class="help">
 				<For each={view.hints(props.view, props.text, props.menu)}>
 					{(h) => (
@@ -212,3 +223,13 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 		</footer>
 	)
 }
+
+const BUTTONS = {
+	pause: { icon: 'pause', name: 'Pause', label: 'Pause (Esc)', caption: 'Stop the turn for now. Continue resumes it.' },
+	continue: { icon: 'play', name: 'Continue', label: 'Continue', caption: 'Resume the paused turn.' },
+	queue: { icon: 'queue', name: 'Queue', label: 'Queue', caption: 'Sent after this turn ends.' },
+	steer: { icon: 'steer', name: 'Steer', label: 'Steer', caption: 'Send message immediately. Interrupts ongoing work.' },
+	send: { icon: 'send', name: 'Send', label: 'Send', caption: 'Send message to start a turn.' },
+	run: { icon: 'run', name: 'Run', label: 'Run', caption: 'Run the command.' },
+	save: { icon: 'send', name: 'Save', label: 'Save queued message', caption: 'Keep its place in the queue.' },
+} satisfies Record<string, { icon: IconName; name: string; label: string; caption: string }>

@@ -590,7 +590,8 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 			expect(layout.left).toBeGreaterThanOrEqual(0)
 			expect(layout.right).toBeLessThanOrEqual(layout.viewport)
 			expect(layout.bottom).toBeLessThanOrEqual(layout.boxTop)
-			expect(layout.target).toBeGreaterThanOrEqual(44)
+			// Touch targets are 44px; a mouse gets compact 32px rows (task kx).
+			expect(layout.target).toBeGreaterThanOrEqual(width === 390 ? 44 : 32)
 			expect(await b.evaluate(frame)).toEqual(before)
 			let covered = await b.evaluate(`(() => {
 				let menu = document.querySelector('.completions'), m = menu.getBoundingClientRect();
@@ -1147,6 +1148,11 @@ test.skipIf(!chrome)('manual reload notice preserves the draft and command actio
 		await b.waitFor("document.querySelector('main').textContent.includes('Still working')")
 		await input('later')
 		expect(await actions()).toEqual(['Pause (Esc)', 'Queue', 'Steer'])
+		// Named buttons (task 02s) keep 44px targets and fit the 390px row.
+		let fit = await b.evaluate("(() => { let rs = [...document.querySelectorAll('.Composer .actions button')].map(b => b.getBoundingClientRect()); return { small: Math.min(...rs.map(r => Math.min(r.width, r.height))), right: Math.max(...rs.map(r => r.right)), width: document.documentElement.clientWidth, names: [...document.querySelectorAll('.Composer .actions small')].map(s => s.textContent) } })()")
+		expect(fit.names).toEqual(['Pause', 'Queue', 'Steer'])
+		expect(fit.small).toBeGreaterThanOrEqual(44)
+		expect(fit.right).toBeLessThanOrEqual(fit.width)
 		await input('/model')
 		expect(await actions()).toEqual(['Pause (Esc)', 'Run'])
 		expect(await b.evaluate("document.querySelector('.Composer .help').textContent.includes('alt+enter')")).toBe(false)
