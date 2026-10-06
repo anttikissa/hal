@@ -213,7 +213,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	if (tabs.is(c)) return tabs.act(c)
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
 	if (c.type === 'notice-history') return { reply: { type: 'notice-history', entries: noticeHistory.list() } }
-	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid) : clients.screen(client.record, c)
+	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid, c.version, c.newCode) : clients.screen(client.record, c)
 	if (c.type === 'visibility') {
 		// A known tab may still be waiting for its open snapshot.
 		if (!client.open.has(c.sessionId) && !tabs.file().open.includes(c.sessionId)) return { refused: 'visibility: session is not an open tab or followed session' }

@@ -185,8 +185,10 @@ export type Command = (
 	// Answered, to this client only, with `notice-history` (task py).
 	| { type: 'notice-history' }
 	| { type: 'visibility'; sessionId: string; visible: boolean }
-	// A peer on the host socket names its process, for /clients (task z8).
-	| { type: 'hello'; pid: number }
+	// A peer on the host socket names its process, for /clients (task z8),
+	// and once known its version and whether a newer commit is checked
+	// out, for /version (task jjr); sent again when either changes.
+	| { type: 'hello'; pid: number; version?: string; newCode?: true }
 	// A terminal client's size and terminal (TERM, program, color depth),
 	// on connecting and on every resize, for the inspect tool; untrusted.
 	| { type: 'screen'; cols: number; rows: number; term?: string }
