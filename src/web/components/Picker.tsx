@@ -3,7 +3,7 @@
 // /config, whose rows add a value column, a faint note shown on the
 // selected, hovered or focused row, an in-place edit field and the
 // selected row's details below (common/modals.ts).
-import { createEffect, For, Show, untrack } from 'solid-js'
+import { createEffect, createSignal, For, Show, untrack } from 'solid-js'
 import { fuzzy } from '../../common/fuzzy.ts'
 import { findDialog } from '../../common/find-dialog.ts'
 import { modals, type ModalState } from '../../common/modals.ts'
@@ -34,6 +34,21 @@ export function Picker(props: { modal: ModalState | undefined }) {
 		() => props.modal?.edit?.index,
 		(index) => untrack(() => { if (index === undefined) { if (box.open) search?.focus() } else edit?.focus() }),
 	)
+	// The Ctrl-O dialog's example types itself as in a question form
+	// (task ghs); under reduced motion the first stays.
+	let [now, setNow] = createSignal(Date.now())
+	createEffect(() => props.modal?.compact && props.modal.form, (form) => {
+		if (!form || matchMedia('(prefers-reduced-motion: reduce)').matches) return
+		let timer: ReturnType<typeof setTimeout> | undefined
+		let tick = () => {
+			let t = Date.now()
+			setNow(t)
+			let next = forms.example(form, 0, t).next
+			if (next < Infinity) timer = setTimeout(tick, next)
+		}
+		tick()
+		return () => clearTimeout(timer)
+	})
 	let width = () => `${Math.max(0, ...(props.modal?.items ?? []).map((s) => s.length)) + 2}ch`
 	// Model picker table: postfix, effort, name and ID columns, each as
 	// wide as its longest model row (effort: its widest choice).
@@ -72,7 +87,7 @@ export function Picker(props: { modal: ModalState | undefined }) {
 			<Show when={props.modal?.form}>
 				<input ref={(e) => (search = e)} class="input" type="text" aria-label="Search" autocomplete="off"
 					aria-activedescendant={props.modal?.items.length ? `modal-item-${props.modal.selected}` : ''}
-					placeholder={props.modal?.compact && props.modal.form ? forms.example(props.modal.form, 0, Date.now()).text : undefined}
+					placeholder={props.modal?.compact && props.modal.form ? forms.example(props.modal.form, 0, now()).text : undefined}
 					value={props.modal?.form?.values[0] ?? ''} onInput={(e) => (props.modal?.compact ? folds.input(e.currentTarget.value) : app.search(e.currentTarget.value))} onFocus={() => find.focus(0)} />
 			</Show>
 			<Show when={props.modal?.restart}>{(r) => {

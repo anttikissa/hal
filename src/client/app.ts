@@ -85,7 +85,7 @@ function show(): void {
 	render.show(v)
 	let st = app.state
 	clearTimeout(st.typing)
-	let f = st.form
+	let f = st.form ?? st.modal?.form
 	let now = Date.now()
 	let next = Math.min(...(f?.values.map((v, i) => (v ? Infinity : forms.example(f, i, now).next)) ?? []))
 	if (next === Infinity) return
