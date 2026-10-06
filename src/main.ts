@@ -1,5 +1,6 @@
 // Composition root: the one explicit startup path. Other modules do no
 // work on import; start() calls their init() functions in order.
+// Tasks: b, ah, nvm.
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { ason } from './common/ason.ts'
@@ -169,19 +170,11 @@ function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) 
 // Becomes host if nobody is. Then, once the first frame is up, serves
 // the web and continues every turn the previous host left unfinished.
 async function becomeHost(): Promise<boolean> {
-	if (!(await server.serve())) return false
+	if (!(await server.serve(async () => {
+		await version.init()
+		restartNote.started(version.state.loaded ?? (await version.current()).loaded)
+	}))) return false
 	perf.mark('host')
-	// Who restarted Hal (task 2e): every client now, and those joining within a minute.
-	let restarted = restartNote.take()
-	if (restarted) {
-		for (let client of host.state.clients) client.deliver({ type: 'warning', text: restarted })
-		let warn = host.warn
-		host.warn = (client) => {
-			warn(client)
-			let text = restartNote.pending()
-			if (text) client.deliver({ type: 'warning', text })
-		}
-	}
 	main.later(() => {
 		find.init()
 		resources.init()

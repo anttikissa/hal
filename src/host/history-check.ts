@@ -1,10 +1,11 @@
 // Validate durable conversation records; corruption fails loudly.
+// Tasks: jf, nvm.
 import { ason } from '../common/ason.ts'
 import { rebase } from '../common/rebase.ts'
 import { sender } from '../common/sender.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 
-const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'change', 'compact', 'reset', 'file_changes', 'round', 'rebase', 'rate_limit'])
+const recordTypes = new Set(['user', 'assistant', 'turn_end', 'continue', 'inbox', 'question', 'answer', 'command', 'output', 'notice', 'change', 'compact', 'reset', 'file_changes', 'round', 'rebase', 'rate_limit'])
 
 function check(value: unknown): HistoryRecord {
 	let r = value as HistoryRecord
@@ -21,6 +22,7 @@ function check(value: unknown): HistoryRecord {
 	if (r.type === 'output') for (let k of ['transitionDone', 'transitionCancel'] as const) if (r[k] !== undefined && typeof r[k] !== 'string') throw new Error(`invalid ${k}`)
 	if ((r.type === 'reset' || r.type === 'compact') && r.transition !== undefined && typeof r.transition !== 'string') throw new Error('invalid boundary transition')
 	if (r.type === 'change' && r.previous !== undefined && (!r.previous || typeof r.previous !== 'object' || Object.values(r.previous).some((v) => typeof v !== 'string'))) throw new Error('invalid previous setting')
+	if (r.type === 'notice' && (typeof r.text !== 'string' || !r.text.trim() || typeof r.ts !== 'string' || !Number.isFinite(Date.parse(r.ts)))) throw new Error('invalid host notice')
 	if (r.type === 'continue' && r.reason !== undefined && typeof r.reason !== 'string') throw new Error('invalid continuation reason')
 	if (r.type === 'user' && r.notices !== undefined && (!Array.isArray(r.notices) || r.notices.some((n) => !n || !Number.isSafeInteger(n.source) || n.source < 1 || typeof n.text !== 'string'))) throw new Error('invalid notices')
 	if (r.type === 'user' && r.naming !== undefined) {

@@ -6,6 +6,7 @@
 // (the host died mid-write) is cut off. Any other malformed record is
 // reported and the file is left untouched. A turn with no end record is
 // unfinished, not broken: the host continues it (turns.recover).
+// Tasks: 7, nvm.
 
 import { appendFileSync, existsSync, openSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
 import { historyCheck } from './history-check.ts'
@@ -24,6 +25,8 @@ import { pruning } from './pruning.ts'
 import { models } from './models.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 import { naming } from './naming.ts'
+import { neighbors } from './neighbors.ts'
+import { resources } from './resources.ts'
 
 type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit<R, 'ts'> : never) : never
 
@@ -217,6 +220,8 @@ async function open(id: string): Promise<SessionMeta> {
 // The session as provider messages, each prompt's paste markers
 // expanded to the pasted text (blobs.expand): history keeps markers.
 async function messages(id: string, budget: { overhead?: number; window?: number; model?: string } = {}) {
+	resources.notice(id)
+	for (let text of neighbors.notes(id, sessions.open(id).cwd)) history.append(id, { type: 'notice', text })
 	// A thinking block as the provider sent it: its signature back from its blob.
 	let signed = ({ signatureBlob, ...b }: ThinkingBlock): ThinkingBlock => ({ ...b, signature: blobs.text(id, signatureBlob!) })
 	let records = pruning.project(id, history.readSync(id), budget, (r) => r.type === 'user' ? { ...r, blocks: r.blocks.map((b) => b.type === 'text' && /\[(?:paste|file)[/ ]/.test(b.text) ? { ...b, text: blobs.expand(id, b.text) } : b) }
