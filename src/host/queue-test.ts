@@ -75,14 +75,15 @@ function planned(records: HistoryRecord[]): { total: number; stopped: boolean } 
 
 const usage = "How to use: send a number (e.g. 3) to run that many more rounds, or 'stop' to end at the next round. Queue messages with Alt-Enter; they arrive after this turn ends."
 
-function report(n: number, lines: string[], total = rounds): { head: string; body: string } {
+function report(n: number, lines: string[], total = rounds, note = ''): { head: string; body: string } {
 	let count = lines.length ? `${lines.length} new message${lines.length > 1 ? 's' : ''}` : 'no new messages'
 	let body = lines.length ? `Round ${n}. New messages since the last round:\n${lines.join('\n')}` : `Round ${n}: no new messages.`
+	if (note) body += `\n\n${note}`
 	return { head: `Round ${n} of ${total}: ${count}.`, body: n === 1 ? `${body}\n\n${usage}` : body }
 }
 
-async function* round(n: number, lines: string[], total: number): AsyncGenerator<StreamEvent> {
-	let { head, body } = report(n, lines, total)
+async function* round(n: number, lines: string[], total: number, note: string): AsyncGenerator<StreamEvent> {
+	let { head, body } = report(n, lines, total, note)
 	let thought = `${head}\n\nReading the history for messages that arrived since the last round, then pretending to work for a while so there is time to steer, queue, edit or discard a message.`
 	// Short steps: a steer interrupts at the next one.
 	let words = thought.split(/(?<=\s)/)
@@ -101,7 +102,11 @@ function run(records: HistoryRecord[]): Reply {
 	let n = records.slice(start(records)).filter((r) => r.type === 'assistant' && r.block.type === 'tool_call').length
 	let lines = arrived(records)
 	let { total, stopped } = planned(records)
-	if (n < total && !stopped) return { stream: round(n + 1, lines, total) }
+	// Confirm a number that just arrived: compare with the plan before it.
+	let spoke = records.findLastIndex((r) => r.type === 'assistant')
+	let left = total - n
+	let note = planned(records.slice(0, spoke + 1)).total !== total && !stopped ? `OK: ${left} round${left === 1 ? '' : 's'} left, ending after round ${total}.` : ''
+	if (n < total && !stopped) return { stream: round(n + 1, lines, total, note) }
 	let say = lines.length ? `New messages since the last round:\n${lines.join('\n')}\n\n` : ''
 	let done = stopped ? `Stopped after ${n} rounds, as asked.` : `Finished ${n} rounds.`
 	return { say: `${say}${done}\n\n<summary>${done}</summary>` }
