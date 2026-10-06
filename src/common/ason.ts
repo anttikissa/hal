@@ -73,11 +73,12 @@
 //   new Date(0)         '1970-01-01T00:00:00.000Z'   "1970-01-01T00:00:00.000Z"
 //   function f() {}     '[Function: f]'              (dropped)
 //   Symbol('x')         'Symbol(x)'                  (dropped)
-//   new Map([[1, 2]])   {}                           {}
-//   new Error('no')     {}                           {}
+//   new Map([[1, 2]])   '[Map with 1 item]'          {}
+//   new Set([1, 2])     '[Set with 2 items]'         {}
+//   new Error('no')     '[Error: no]'                {}
 //
-// Like JSON, it calls toJSON(key) first and writes other objects as their
-// own enumerable keys.
+// Like JSON, it calls toJSON(key) first and writes other objects, such as
+// class instances, as their own enumerable keys.
 //
 // ASONL is ASON lines, as JSONL is JSON lines: one stringify(value, 'short')
 // per line, each ending in \n (\r\n is read too). Blank lines and lines
@@ -178,12 +179,15 @@ function renderCollection(open: string, close: string, inline: string, col: numb
 
 // Values ASON has no literal for: toJSON(key) runs first, as in JSON (a Date
 // becomes its ISO string); functions and symbols become descriptive strings,
-// as Node's inspect names them, so output always parses; other objects (Map,
-// Set, Error, class instances) are written as their own enumerable keys.
+// as Node's inspect names them, so output always parses; Error, Map and Set
+// become one-line summaries; other objects are written as their own keys.
 function toJsonValue(value: unknown, key: string): unknown {
 	const toJSON = (value as { toJSON?: unknown } | null | undefined)?.toJSON
 	const v = typeof toJSON === 'function' ? toJSON.call(value, key) : value
 	if (typeof v === 'symbol') return v.toString()
+	// Better than JSON's {}: say what it was. No stack traces; that's the logger's job.
+	if (v instanceof Error) return `[${v.name}: ${v.message}]`
+	if (v instanceof Map || v instanceof Set) return `[${v instanceof Map ? 'Map' : 'Set'} with ${v.size} ${v.size === 1 ? 'item' : 'items'}]`
 	if (typeof v !== 'function') return v
 	if (/^class\b/.test(Function.prototype.toString.call(v))) return `[class ${v.name || '(anonymous)'}]`
 	return `[Function: ${v.name || '(anonymous)'}]`
