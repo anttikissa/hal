@@ -1,6 +1,6 @@
 {
 	title: 'Composer eases down when the phone keyboard closes',
-	spec: 'On a touch screen, when the on-screen keyboard closes and the app grows by more than 100px, the app height, offset and composer bottom padding ease to their new values over 300 ms on an S curve (cubic-bezier(0.65, 0, 0.35, 1)), so the composer glides down instead of dropping with the keyboard and the Send button flash stays visible. An opening keyboard is followed at once, so the composer is never hidden. With prefers-reduced-motion: reduce, nothing animates. viewport.page toggles html.easing for 400 ms; index.html owns the transitions.',
+	spec: 'On a touch screen, when the on-screen keyboard closes and the app grows by more than 100px, the app height, offset and composer bottom padding ease to their new values over 600 ms on an S curve (cubic-bezier(0.65, 0, 0.35, 1)), so the composer glides down instead of dropping with the keyboard and the Send button flash stays visible. An opening keyboard is followed at once, so the composer is never hidden. With prefers-reduced-motion: reduce, nothing animates. viewport.page toggles html.easing for 700 ms; index.html owns the transitions.',
 	status: 'done',
 	needs: ['qn'],
 	foldInto: ['qn']
