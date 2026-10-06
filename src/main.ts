@@ -2,6 +2,7 @@
 // work on import; start() calls their init() functions in order.
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
+import { ason } from './common/ason.ts'
 import { args, type Args } from './client/args.ts'
 import { app } from './client/app.ts'
 import { command as restart } from './client/commands/restart.ts'
@@ -136,6 +137,8 @@ function initTerminal(remote?: string): void {
 	terminal.init()
 	render.init()
 	render.state.gap = true
+	// Full mode or not is decided by the first paint (task 7j).
+	if (!remote) try { render.startTabs = (ason.parse(readFileSync(join(paths.stateDir(), 'tabs.ason'), 'utf8')) as { open: unknown[] }).open.length } catch {}
 	render.painted = (view) => {
 		if (main.state.shown) return
 		perf.mark('frame', view.transcript ? view.transcript.meta.id : 'no tab yet')
