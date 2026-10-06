@@ -20,7 +20,8 @@ Ctrl-O opens a small transient dialog (not a question in history, like Ctrl-F fi
 		'Bug: a closed card took three rows (its padding rows above and below), and its title and first line were separated by two spaces. Invariant restored: a closed block is exactly one row, title and text separated by one space.',
 		"Invariant: /toggle on an existing block that does not fold (a notice, command output, a tool result line) reports 'block N does not open or close', never 'no block N to toggle', which only means no block has that number.",
 		'Prompt-file change cards (task ar) toggle too: the web folded them on click, while /toggle said they did not.',
-		"Invariant: the Ctrl-O example types itself frame by frame. The terminal schedules the next typing repaint for a modal's field as for a question form (app.show reads st.form ?? st.modal.form); the web Picker keeps a ticking now signal while the compact dialog is open. Before, both repainted only when something else did, so the text jumped about once a second."
+		"Invariant: the Ctrl-O example types itself frame by frame. The terminal schedules the next typing repaint for a modal's field as for a question form (app.show reads st.form ?? st.modal.form); the web Picker keeps a ticking now signal while the compact dialog is open. Before, both repainted only when something else did, so the text jumped about once a second.",
+		"Bug fix 2026-10-07: closed cards were drawn unpadded. A closed bash call then lost its $ command row, since its attached result replaces the call's last row, meant to be the bottom padding, and the card looked broken. Invariant restored: every block with a background is padded above and below, closed or open (frame.itemRows)."
 	],
 	needs: ['wm0']
 }
