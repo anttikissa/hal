@@ -161,3 +161,27 @@ test('the home USER.md appears in the real SYSTEM prompt when present, with no r
 		else process.env.HAL_HOME = old
 	}
 })
+
+test('skills are listed by name: Hal skills always, project skills only along the cwd chain', () => {
+	let skill = (dir: string) => (mkdirSync(dir, { recursive: true }), writeFileSync(`${dir}/SKILL.md`, '---\nname: x\n---\nBODY TEXT'))
+	mkdirSync(`${root}/repo/.git`, { recursive: true })
+	skill(`${root}/repo/.agents/skills/zeta`)
+	skill(`${root}/repo/.agents/skills/alpha`)
+	mkdirSync(`${root}/repo/.agents/skills/no-skill-file`)
+	skill(`${root}/repo/sub/.claude/skills/inner`)
+	skill(`${root}/repo/other/.agents/skills/elsewhere`)
+	mkdirSync(`${root}/repo/sub/deep`, { recursive: true })
+	let text = systemPrompt.build({ cwd: `${root}/repo/sub/deep`, model: 'm/x', now: at })
+	expect(text).toContain('Skills (read <dir>/<name>/SKILL.md when one fits the task):')
+	expect(text).toMatch(/\/skills: .*hal-server-install/)
+	expect(text).toContain(`- ${root}/repo/.agents/skills: alpha, zeta\n`)
+	expect(text).toContain(`- ${root}/repo/sub/.claude/skills: inner`)
+	// Folders without SKILL.md, projects off the chain and skill bodies stay out.
+	expect(text).not.toContain('no-skill-file')
+	expect(text).not.toContain('elsewhere')
+	expect(text).not.toContain('BODY TEXT')
+	// Outside that project only the Hal skills remain.
+	let away = systemPrompt.build({ cwd: root, model: 'm/x', now: at })
+	expect(away).toMatch(/\/skills: .*hal-server-install/)
+	expect(away).not.toContain('alpha')
+})

@@ -9,7 +9,7 @@
 // working; changes during a session also reach the model as <meta>
 // notes on the next prompt (replay.ts).
 
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readdirSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { paths } from './paths.ts'
@@ -38,6 +38,25 @@ function candidates(cwd: string): string[] {
 		if (existsSync(`${dir}/.git`)) return dirs
 		if (dirname(dir) === dir) return [resolve(cwd)]
 	}
+}
+
+// Skills (task 074): names only, so many skills cost few tokens; the
+// model reads <dir>/<name>/SKILL.md when one fits. Hal's own skills/
+// apply everywhere, like SYSTEM.md; a project's .agents/skills (or
+// .claude/skills) only where its AGENTS.md would. Only folders holding a
+// SKILL.md count; names are sorted so the text stays cache-stable.
+function skills(cwd: string): string {
+	let dirs = [`${paths.repoRoot()}/skills`]
+	for (let dir of candidates(cwd)) for (let sub of ['.agents/skills', '.claude/skills']) dirs.push(`${dir === '/' ? '' : dir}/${sub}`)
+	let lines: string[] = []
+	for (let dir of new Set(dirs)) {
+		let names: string[] = []
+		try {
+			names = readdirSync(dir).filter((name) => existsSync(`${dir}/${name}/SKILL.md`)).sort()
+		} catch {}
+		if (names.length) lines.push(`- ${dir}: ${names.join(', ')}`)
+	}
+	return lines.length ? `Skills (read <dir>/<name>/SKILL.md when one fits the task):\n${lines.join('\n')}` : ''
 }
 
 function read(path: string): string | undefined {
@@ -108,6 +127,8 @@ function assemble(input: { cwd: string; model: string; now: number; sessionId?: 
 	}
 	// Missing SYSTEM.md is a broken checkout: throw with the path.
 	let parts = [systemPrompt.preprocess(systemPrompt.file(), vars, sources).trim(), `<date>${date(input.now)}</date>\n<cwd>${input.cwd}</cwd>\n<model>${input.model}</model>`]
+	let skillList = skills(input.cwd)
+	if (skillList) parts.push(skillList)
 	for (let dir of systemPrompt.candidates(input.cwd)) {
 		// One file per directory: AGENTS.md, else CLAUDE.md.
 		for (let name of ['AGENTS.md', 'CLAUDE.md']) {
