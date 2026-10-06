@@ -73,7 +73,7 @@ function planned(records: HistoryRecord[]): { total: number; stopped: boolean } 
 	return plan
 }
 
-const usage = "How to use: send a number (e.g. 3) to run that many more rounds, or 'stop' to end at the next round. Queue messages with Alt-Enter; they arrive after this turn ends."
+const usage = "How to use: send a number (e.g. 3) to run that many more rounds, or 'stop' to end at the next round. Queue messages with Alt-Enter; they arrive after this turn ends. Ask another session to send messages to this session."
 
 function report(n: number, lines: string[], total = rounds, note = ''): { head: string; body: string } {
 	let count = lines.length ? `${lines.length} new message${lines.length > 1 ? 's' : ''}` : 'no new messages'
@@ -88,7 +88,7 @@ async function* round(n: number, lines: string[], total: number, note: string): 
 	// Short steps: a steer interrupts at the next one.
 	let words = thought.split(/(?<=\s)/)
 	for (let [i, word] of words.entries()) {
-		if (i) await sleep(4000 / words.length)
+		if (i) await sleep(queueTest.thinkMs / words.length)
 		yield { type: 'thinking', text: word }
 	}
 	yield { type: 'signature', value: '' }
@@ -108,8 +108,10 @@ function run(records: HistoryRecord[]): Reply {
 	let note = planned(records.slice(0, spoke + 1)).total !== total && !stopped ? `OK: ${left} round${left === 1 ? '' : 's'} left, ending after round ${total}.` : ''
 	if (n < total && !stopped) return { stream: round(n + 1, lines, total, note) }
 	let say = lines.length ? `New messages since the last round:\n${lines.join('\n')}\n\n` : ''
-	let done = stopped ? `Stopped after ${n} rounds, as asked.` : `Finished ${n} rounds.`
+	let count = `${n} round${n === 1 ? '' : 's'}`
+	let done = stopped ? `Stopped after ${count}, as asked.` : `Finished ${count}.`
 	return { say: `${say}${done}\n\n<summary>${done}</summary>` }
 }
 
-export const queueTest = { run, start, arrived }
+// thinkMs: how long each round thinks; tests set it to 0.
+export const queueTest = { run, start, arrived, thinkMs: 4000 }
