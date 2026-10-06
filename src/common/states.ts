@@ -8,6 +8,8 @@
 // or a human-facing reason (blocked). A session that waits on nothing is
 // a bug.
 
+import type { InboxItem } from './inbox.ts'
+import type { Delivery } from './protocol.ts'
 import { forms } from './forms.ts'
 import { replay, type HistoryRecord } from './replay.ts'
 import type { Shown } from './transcript.ts'
@@ -133,12 +135,24 @@ function recoveries(records: HistoryRecord[]): number {
 }
 
 // What a client sends for Enter with `text` in a session in `state`:
-// a prompt (which steers a busy turn; with `queue`, Alt-Enter, it waits
-// for the turn to end), a continue (bare Enter on a paused, failed or
-// waiting turn: the host rechecks limits and retries now), nothing (bare Enter otherwise), or why not (the text stays).
-function enter(sessionId: string, state: SessionState, text: string, queue = false, nextRound = false): { command?: unknown; refused?: string } {
-	if (!text.trim()) return state.type === 'paused' || state.type === 'error' || state.type === 'retrying' ? { command: { type: 'continue', sessionId } } : {}
-	return { command: queue ? { type: 'submit', sessionId, text, queue: true } : nextRound && states.busy(state) ? { type: 'submit', sessionId, text, nextRound: true } : { type: 'submit', sessionId, text } }
+// a prompt (which steers a busy turn as `delivery` says, task csn), a
+// continue (bare Enter on a paused, failed or waiting turn: the host
+// rechecks limits and retries now), the oldest queued message sent early
+// (bare Enter or Ctrl-Enter on a busy turn with `queued` ones), nothing
+// (bare Enter otherwise), or why not (the text stays).
+function enter(sessionId: string, state: SessionState, text: string, delivery: Delivery = 'interrupt', queued = false): { command?: unknown; refused?: string } {
+	let busy = states.busy(state)
+	if (!text.trim()) {
+		if (busy && queued && delivery !== 'queue') return { command: { type: 'submit', sessionId, text: delivery === 'interrupt' ? '/queue now' : '/queue next' } }
+		return state.type === 'paused' || state.type === 'error' || state.type === 'retrying' ? { command: { type: 'continue', sessionId } } : {}
+	}
+	return { command: delivery === 'queue' || (delivery === 'interject' && busy) ? { type: 'submit', sessionId, text, delivery } : { type: 'submit', sessionId, text } }
+}
+
+// Whether undo on an empty prompt may take back a message sent early
+// from the queue (task csn): one of the user's waits to interject.
+function promoted(items: InboxItem[]): boolean {
+	return items.some((m) => m.interject && m.from === undefined && m.origin !== 'model')
 }
 
 // What a client sends for Escape: a pause, if anything is running.
@@ -192,4 +206,4 @@ function doing(phase: Phase, items: readonly Shown[]): string {
 	return names.length ? `running ${names.join(', ')}` : 'running tools'
 }
 
-export const states = { maxRecoveries: () => MAX_RECOVERIES, busy, step, fromHistory, recoveries, enter, escape, describe, doing }
+export const states = { maxRecoveries: () => MAX_RECOVERIES, busy, step, fromHistory, recoveries, enter, promoted, escape, describe, doing }

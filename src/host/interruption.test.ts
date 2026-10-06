@@ -111,9 +111,9 @@ test('queue and advisory do not abort, while explicit steer does', async () => {
 	await until(() => calls.length === 1)
 	let signal = turns.state.running.get(id)!.controller.signal
 	a.conn.send({ type: 'submit', sessionId: id, text: 'later', queue: true })
-	prompts.submit(id, 'advice', undefined, false, { from: 'peer', advisory: true })
+	prompts.submit(id, 'advice', undefined, 'interrupt', { from: 'peer', advisory: true })
 	expect(signal.aborted).toBe(false)
-	prompts.submit(id, 'steer', undefined, false, { from: 'peer' })
+	prompts.submit(id, 'steer', undefined, 'interrupt', { from: 'peer' })
 	expect(signal.aborted).toBe(true)
 	await until(() => calls.length === 2)
 	calls[1]!.push({ type: 'done', reason: 'end' })

@@ -26,6 +26,7 @@
 // tab, or indents the selected lines; Shift-Tab outdents. Ctrl-/, Cmd-Z
 // and Cmd-U undo, with Shift redo (prompt-undo.ts).
 
+import type { Delivery } from './protocol.ts'
 import type { Key } from './forms.ts'
 import { promptLayout } from './prompt-layout.ts'
 import { promptUndo } from './prompt-undo.ts'
@@ -55,7 +56,7 @@ export interface PromptState {
 export type PromptSnapshot = { text: string; cursor: number; anchor?: number }
 
 // `queue`: Alt-Enter, run after the turn instead of steering it.
-export type PromptAction = { type: 'submit'; text: string; queue?: true; force?: true } | { type: 'cancel' } | { type: 'quit' }
+export type PromptAction = { type: 'submit'; text: string; delivery: Delivery } | { type: 'cancel' } | { type: 'quit' }
 
 export interface PromptResult {
 	state: PromptState
@@ -280,14 +281,14 @@ function apply(st: PromptState, k: Key, width: number): PromptResult {
 			return to(text.length)
 		case 'M-enter':
 			if (k.shift) break
-			return { state: prompt.cleared(st), action: { type: 'submit', text, queue: true } }
+			return { state: prompt.cleared(st), action: { type: 'submit', text, delivery: 'queue' } }
 		case '-enter':
 			if (k.shift) return { state: prompt.insert(cut, '\n') }
-			return { state: prompt.cleared(st), action: { type: 'submit', text } }
+			return { state: prompt.cleared(st), action: { type: 'submit', text, delivery: 'interject' } }
 		// Ctrl-Enter: steer at once, stopping the stream and running tools (task csn).
 		case 'C-enter':
 			if (k.shift) break
-			return { state: prompt.cleared(st), action: { type: 'submit', text, force: true } }
+			return { state: prompt.cleared(st), action: { type: 'submit', text, delivery: 'interrupt' } }
 		case '-escape':
 			return { state: st, action: { type: 'cancel' } }
 		case 'C-d':

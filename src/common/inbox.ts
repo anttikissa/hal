@@ -47,6 +47,7 @@ function sender(s: Sender): Sender {
 	if (s.label !== undefined) out.label = s.label
 	if (s.advisory) out.advisory = true
 	if (s.steering) out.steering = true
+	if (s.interject) out.interject = true
 	if (s.summary) out.summary = s.summary
 	return out
 }
@@ -54,7 +55,7 @@ function sender(s: Sender): Sender {
 // Provenance a waiting message retains when delivered. Next-round and
 // after-this-turn messages do not interrupt; delivery belongs to each text.
 function provenance(item: InboxItem): Sender {
-	return { ...inbox.sender(item), ...(item.queue && item.ts !== undefined ? { queuedAt: item.ts } : {}), ...(!item.queue && !item.advisory ? { steering: true as const } : {}) }
+	return { ...inbox.sender(item), ...(item.queue && item.ts !== undefined ? { queuedAt: item.ts } : {}), ...(!item.queue && !item.advisory && !item.interject ? { steering: true as const } : {}) }
 }
 
 // What leads a waiting message's compact row (task 16):

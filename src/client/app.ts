@@ -15,7 +15,7 @@ import { connection, type LinkState } from '../common/connection.ts'
 import { forms, type FormState } from '../common/forms.ts'
 import { drafts } from '../common/drafts.ts'
 import { modals, type ModalAction, type ModalState } from '../common/modals.ts'
-import type { Event, Tab } from '../common/protocol.ts'
+import type { Delivery, Event, Tab } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Transcript } from '../common/transcript.ts'
 import { uploads } from '../common/uploads.ts'
@@ -111,7 +111,7 @@ function onEvent(event: Event): void {
 	if (drafts.onEvent(event) && mine && !recall.shown(mine) && !st.editing?.queueEdit) app.setPrompt(drafts.text(mine))
 	// An upload landed; a submit waiting for it goes now.
 	let resume = paste.settled(st, event)?.resume
-	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: resume.queue, ctrl: false, cmd: false }])
+	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: resume.delivery === 'queue', ctrl: resume.delivery === 'interrupt', cmd: false }])
 	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
 	if (event.type === 'model-names') titles.learn(event)
 	if (event.type === 'tabs') return app.onTabs(event.tabs)
@@ -182,10 +182,9 @@ function onState(state: LinkState): void {
 	app.show()
 }
 
-// Enter: a prompt (steering a busy turn; `queue`: after it; `nextRound`:
-// between rounds, not interrupting, task csn), an edit of the last prompt,
-// or a continue on an empty prompt. Refuses (keeping the typed text) what the host would refuse anyway.
-function submit(text: string, queue = false, nextRound = false): boolean {
+// Enter: a prompt (steering a busy turn as `delivery` says, task csn),
+// an edit of the last prompt, or a continue on an empty prompt. Refuses (keeping the typed text) what the host would refuse anyway.
+function submit(text: string, delivery: Delivery = 'interrupt'): boolean {
 	let st = app.state
 	let id = st.transcript?.meta.id
 	if (id && queueEdit.current(id)?.active) {
@@ -201,14 +200,14 @@ function submit(text: string, queue = false, nextRound = false): boolean {
 		return false
 	}
 	if (uploads.pending(st.transcript.meta.id)) {
-		uploads.wait(st.transcript.meta.id, queue)
+		uploads.wait(st.transcript.meta.id, delivery)
 		st.notice = 'sending once the upload is done'
 		return false
 	}
 	// While editing the last prompt, Enter sends the edit.
 	let { command, refused } = st.editing
-		? { command: amend.enter(st.editing, st.transcript, text, queue), refused: undefined }
-		: states.enter(st.transcript.meta.id, st.transcript.state, text, queue, nextRound)
+		? { command: amend.enter(st.editing, st.transcript, text, delivery === 'queue'), refused: undefined }
+		: states.enter(st.transcript.meta.id, st.transcript.state, text, delivery, st.transcript.inbox.some((m) => m.queue))
 	if (refused) {
 		st.notice = refused
 		return false
@@ -216,7 +215,7 @@ function submit(text: string, queue = false, nextRound = false): boolean {
 	st.editing = undefined
 	if (command) {
 		st.notice = undefined
-		let c = command as { type: string; text?: string; queue?: boolean; nextRound?: boolean; amend?: boolean; edits?: string }
+		let c = command as { type: string; text?: string; delivery?: Delivery; amend?: boolean; edits?: string }
 		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, c)
 		else app.send(command)
 	}
@@ -286,13 +285,19 @@ function onKeys(events: KeyEvent[]): void {
 		}
 		if (promptKeys.history(st, k, frame.promptWidth(app.cols()))) continue
 		// A pasted image path or long text: its upload's placeholder.
+		// Undo on an empty prompt with nothing to undo takes back a message sent early (task csn).
+		let undo = !k.shift && !k.alt && ((k.ctrl && k.key === '/') || (k.cmd && (k.key === 'z' || k.key === 'u')))
+		if (undo && st.transcript && !st.prompt.text && !st.prompt.undo?.length && states.promoted(st.transcript.inbox)) {
+			drafts.submit(st.transcript.meta.id, '/queue undo')
+			continue
+		}
 		let key = st.transcript ? paste.key(st.transcript.meta.id, k, app.send) : k
 		if (key.key === 'paste' && key.text) {
 			let start = prompt.selection(st.prompt)?.start ?? st.prompt.cursor
 			key = { ...key, text: uploads.pad(key.text, st.prompt.text.slice(0, start)) }
 		}
 		let { state, action } = prompt.step(st.prompt, key, frame.promptWidth(app.cols()))
-		if (action?.type === 'submit' && !app.submit(action.text, action.queue, !action.force)) continue
+		if (action?.type === 'submit' && !app.submit(action.text, action.delivery)) continue
 		// An in-process /go can focus another session during submit (qhz).
 		if (st.transcript?.meta.id !== shown) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'

@@ -15,7 +15,7 @@ import { inbox, type InboxItem } from '../common/inbox.ts'
 import { modals, type ModalState } from '../common/modals.ts'
 import { picker } from '../common/picker.ts'
 import { settingsModal } from '../common/settings-modal.ts'
-import type { Event } from '../common/protocol.ts'
+import type { Delivery, Event } from '../common/protocol.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Item, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
 import { titles } from '../common/titles.ts'
@@ -135,13 +135,13 @@ function search(st: ViewState, text: string, edit = false): ViewState {
 // failed turn), or show why not (the typed text stays).
 // While editing a prompt, Enter sends the edit; emptied, an edit from
 // an Edit button cancels (task 26q).
-function submit(st: ViewState, text: string, queue = false, nextRound = false): { command?: unknown; notice?: string; keep: boolean } {
+function submit(st: ViewState, text: string, delivery: Delivery = 'interrupt'): { command?: unknown; notice?: string; keep: boolean } {
 	if (st.editing) {
-		let command = st.editing.aside && !text.trim() ? amend.resume(st.editing, st.transcript) : amend.enter(st.editing, st.transcript, text, queue)
+		let command = st.editing.aside && !text.trim() ? amend.resume(st.editing, st.transcript) : amend.enter(st.editing, st.transcript, text, delivery === 'queue')
 		return command ? { command, keep: false } : { keep: false }
 	}
 	if (!st.transcript) return text.trim() ? { notice: 'no session yet', keep: true } : { keep: false }
-	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, queue, nextRound)
+	let { command, refused } = states.enter(st.transcript.meta.id, st.transcript.state, text, delivery, st.transcript.inbox.some((m) => m.queue))
 	if (refused) return { notice: refused, keep: true }
 	return command ? { command, keep: false } : { keep: false }
 }

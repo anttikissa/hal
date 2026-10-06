@@ -9,7 +9,7 @@ test('/queue next runs a queued foreign message even when paused, retaining its 
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'working' })
 	await until(() => calls.length === 1)
-	prompts.submit(id, 'foreign message', undefined, true, { from: '9-abc', label: 'helper' })
+	prompts.submit(id, 'foreign message', undefined, 'queue', { from: '9-abc', label: 'helper' })
 	a.conn.send({ type: 'pause', sessionId: id })
 	await until(() => a.views.get(id)?.state.type === 'paused')
 	a.conn.send({ type: 'submit', sessionId: id, text: '/queue next' })

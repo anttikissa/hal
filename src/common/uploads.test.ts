@@ -69,9 +69,9 @@ test('a refused upload leaves an error text, and answers not about uploads are i
 test('a submit waits for every upload of its session, and not after a failure', () => {
 	uploads.begin('s', 'c.1', 'image/png')
 	uploads.begin('s', 'c.2', 'image/png')
-	uploads.wait('s', true)
+	uploads.wait('s', 'queue')
 	expect(uploads.settle(attached('c.1', '[image aaaaaaaaaaaa]'))!.resume).toBeUndefined()
-	expect(uploads.settle(attached('c.2', '[image bbbbbbbbbbbb]'))!.resume).toEqual({ queue: true })
+	expect(uploads.settle(attached('c.2', '[image bbbbbbbbbbbb]'))!.resume).toEqual({ delivery: 'queue' })
 
 	uploads.begin('s', 'c.3', 'image/png')
 	uploads.wait('s')

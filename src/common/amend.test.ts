@@ -35,7 +35,7 @@ test('Enter sends the edit for the host to place; an emptied edit just continues
 	expect(amend.enter(editing, paused, 'fix it')).toEqual({ type: 'submit', sessionId: 's1', text: 'fix it', amend: true })
 	expect(amend.enter(editing, paused, '  ')).toEqual({ type: 'continue', sessionId: 's1' })
 	// Alt-Enter queues it as a new message instead.
-	expect(amend.enter(editing, paused, 'later', true)).toEqual({ type: 'submit', sessionId: 's1', text: 'later', queue: true })
+	expect(amend.enter(editing, paused, 'later', true)).toEqual({ type: 'submit', sessionId: 's1', text: 'later', delivery: 'queue' })
 })
 
 test('leaving the edit continues the paused turn, or the one whose pause is on its way', () => {

@@ -47,7 +47,7 @@ function apply(c: Command & { type: 'rebase-apply' }): string {
 		rebasePlans.broadcast(c.sessionId, sums.cacheFrom ?? c.base)
 	}
 	for (let [i, text] of queue.entries()) {
-		let refused = prompts.submit(c.sessionId, text, undefined, i > 0)
+		let refused = prompts.submit(c.sessionId, text, undefined, i > 0 ? 'queue' : 'interrupt')
 		if (refused) throw new Error(refused)
 	}
 	return plan.drop.length || plan.edit.length ? `History rewritten.${queue.length ? ` Queued ${queue.length} prompts.` : ''}` : queue.length ? `Queued ${queue.length} prompts.` : 'Rebase unchanged.'

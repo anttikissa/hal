@@ -17,7 +17,7 @@ export const command: SlashCommand = {
 		if (!id) return { error: `no session ${target}` }
 		if (id === ctx.sessionId) return { error: 'cannot send to this session itself' }
 		await (host.ready(id) ?? Promise.resolve())
-		let refused = prompts.submit(id, text!, undefined, false, { from: ctx.sessionId, label: tabs.label(ctx.sessionId) })
+		let refused = prompts.submit(id, text!, undefined, 'interrupt', { from: ctx.sessionId, label: tabs.label(ctx.sessionId) })
 		return refused ? { error: refused } : { say: `sent to ${tabs.label(id)}` }
 	},
 }

@@ -93,7 +93,7 @@ test('queued card Edit preserves the draft and waits for protection; save and ca
 	expect(app.state.text).toBe('queued text')
 	expect(app.state.view.editing).toMatchObject({ queueEdit: acquire.edit, aside: true })
 	app.input('corrected queue')
-	app.send(true)
+	app.send('queue')
 	let save = sent.at(-1)
 	expect(save).toMatchObject({ type: 'submit', text: 'corrected queue', edits: 'queued', queueEdit: acquire.edit })
 	expect(save.queue).toBeUndefined()

@@ -117,7 +117,7 @@ function finish(id: string, out: string): void {
 // Sends `text` to the session as an advisory message from 'bash <id>'.
 function tell(sessionId: string, id: string, text: string): void {
 	let deliver = () => {
-		let refused = prompts.submit(sessionId, text, undefined, false, { from: sessionId, label: `bash ${jobs.label(sessionId, id)}`, advisory: true })
+		let refused = prompts.submit(sessionId, text, undefined, 'interrupt', { from: sessionId, label: `bash ${jobs.label(sessionId, id)}`, advisory: true })
 		if (refused) diag.log(`bash ${id} to ${sessionId}: ${refused}`)
 	}
 	let ready = host.ready(sessionId)

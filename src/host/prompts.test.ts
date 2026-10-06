@@ -43,7 +43,7 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('one\n\ntwo') }] },
 	])
 	expect(inboxOf(a, id)).toEqual([])
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)'])
+	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupting)', 'You (interrupting)'])
 	// Again, and again the prefix holds.
 	calls[1]!.push({ type: 'text', text: 'ok' })
 	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
@@ -65,7 +65,7 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ type: 'text', text: 'done' },
 		{ type: 'turn-end', status: 'completed' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)', 'You (steering)'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupting)', 'You (interrupting)', 'You (interrupting)'])
 	expect(a.views.get(id)).toEqual(view)
 	expect(b.views.get(id)).toEqual(view)
 	expect(a.of('turn-end')).toHaveLength(1)
@@ -159,7 +159,7 @@ test('a next-round message leaves the stream running and arrives after the answe
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'work' })
 	await until(() => a.of('stream').length)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'later', nextRound: true })
+	a.conn.send({ type: 'submit', sessionId: id, text: 'later', delivery: 'interject' })
 	await until(() => inboxOf(a, id).length === 1)
 	calls[0]!.push({ type: 'text', text: ' done' })
 	calls[0]!.push({ type: 'done', reason: 'end' })
@@ -168,6 +168,27 @@ test('a next-round message leaves the stream running and arrives after the answe
 		{ role: 'assistant', blocks: [{ type: 'text', text: 'work done' }] },
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('later') }] },
 	])
+})
+
+test('an empty Enter sends the next queued message early, undo queues it again, Ctrl-Enter interrupts with it', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: 'work' })
+	await until(() => a.of('stream').length)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'later', delivery: 'queue' })
+	let queued = () => a.views.get(id)!.inbox.filter((m) => m.queue).length
+	await until(() => queued() === 1)
+	a.conn.send({ type: 'submit', sessionId: id, text: '/queue next' })
+	await until(() => queued() === 0)
+	expect(a.views.get(id)!.inbox).toMatchObject([{ text: 'later', interject: true }])
+	a.conn.send({ type: 'submit', sessionId: id, text: '/queue undo' })
+	await until(() => queued() === 1)
+	expect(calls.length).toBe(1)
+	a.conn.send({ type: 'submit', sessionId: id, text: '/queue now' })
+	await until(() => calls.length === 2)
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([stamped('later')])
 })
 
 test('the inbox survives a pause and a restart, and runs when the user continues', async () => {
@@ -253,7 +274,7 @@ test('sending to a paused turn takes the waiting messages along, oldest first', 
 		{ type: 'prompt', text: 'first', steering: true },
 		{ type: 'prompt', text: 'second' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupting)', 'You'])
 	expect(a.views.get(id)).toEqual(view)
 })
 
@@ -428,7 +449,7 @@ test('a message another session sent waits unedited', async () => {
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	prompts.submit(id, 'from a peer', 'p1', false, { from: 'other' })
+	prompts.submit(id, 'from a peer', 'p1', 'interrupt', { from: 'other' })
 	a.conn.send({ type: 'submit', sessionId: id, text: 'mine now', amend: true, edits: 'p1' })
 	expect(a.of('rejected')).toHaveLength(1)
 	expect(a.views.get(id)!.inbox).toEqual([{ id: 'p1', text: 'from a peer', from: 'other', ts: expect.any(String), n: expect.any(Number) }])

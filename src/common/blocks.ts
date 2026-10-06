@@ -25,10 +25,11 @@ export type ImageBlock = { type: 'image'; blob: string; mediaType: string; bytes
 // it, `label` names it for people and the model (tab, id and name as
 // they were then); none, the human. `advisory`: the model may read it
 // without dropping its work (the send tool's default). `steering`:
-// this text was submitted to steer an active turn; retained for display.
+// this text was submitted to steer an active turn, interrupting it;
+// `interject`: to steer it at its next round (task csn). Both retained for display.
 // `summary`: one line for the user, heading the message folded.
 // queuedAt: original inbox receipt time, retained after queue delivery.
-export type Sender = { queuedAt?: string; from?: string; label?: string; advisory?: true; steering?: true; summary?: string; origin?: 'model'; generatingCommand?: 'clear' }
+export type Sender = { queuedAt?: string; from?: string; label?: string; advisory?: true; steering?: true; interject?: true; summary?: string; origin?: 'model'; generatingCommand?: 'clear' }
 
 // A prompt's text, saying who sent it.
 export type UserText = TextBlock & Sender

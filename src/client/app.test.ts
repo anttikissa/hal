@@ -108,9 +108,9 @@ test('while a turn runs, Enter steers between rounds, Ctrl-Enter interrupts, Alt
 	app.onKeys([{ ...key('enter'), alt: true }])
 	escape()
 	expect(sent).toEqual([
-		{ type: 'submit', sessionId: 's1', text: 'now', nextRound: true },
+		{ type: 'submit', sessionId: 's1', text: 'now', delivery: 'interject' },
 		{ type: 'submit', sessionId: 's1', text: 'stop' },
-		{ type: 'submit', sessionId: 's1', text: 'later', queue: true },
+		{ type: 'submit', sessionId: 's1', text: 'later', delivery: 'queue' },
 		{ type: 'pause', sessionId: 's1' },
 	])
 })

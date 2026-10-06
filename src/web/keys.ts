@@ -14,6 +14,7 @@
 // the readline keys in editor.table edit the box. A printable key
 // pressed outside any field types into the box.
 
+import { states } from '../common/states.ts'
 import { queueEdit } from '../common/queue-edit.ts'
 import { queuedPrompt } from './queue-edit.ts'
 import { connection } from '../common/connection.ts'
@@ -151,6 +152,12 @@ function key(e: KeyInput, target: Target): boolean {
 	}
 	let sel = target.anchor === undefined ? '' : st.text.slice(Math.min(target.anchor, target.cursor), Math.max(target.anchor, target.cursor))
 	if (plain && !sel && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && keys.recall(e.key === 'ArrowUp' ? -1 : 1, target)) return true
+	// Undo on an empty box takes back a message sent early (task csn).
+	let id = app.sessionId()
+	if (!st.text && id && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === 'z' && st.view.transcript && states.promoted(st.view.transcript.inbox)) {
+		drafts.submit(id, '/queue undo')
+		return true
+	}
 	if (k && editor.routed(k)) return keys.edit(k, target)
 	if (e.key === 'Tab' && !e.shiftKey && target.cursor === st.text.length && st.menu && (st.menu.explicit || st.known?.input === st.text)) {
 		if (st.menu.explicit) app.choose(st.menu.selected)
@@ -176,7 +183,7 @@ function key(e: KeyInput, target: Target): boolean {
 	if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && (sel.includes('\n') || indents)) return keys.edit({ key: 'tab', shift: e.shiftKey }, target)
 	if (e.key !== 'Enter' || e.shiftKey || (target.coarse && plain)) return false
 	// Enter steers between rounds; Ctrl-Enter interrupts (task csn).
-	app.send(e.altKey, !e.ctrlKey)
+	app.send(e.altKey ? 'queue' : e.ctrlKey ? 'interrupt' : 'interject')
 	return true
 }
 
