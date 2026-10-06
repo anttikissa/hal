@@ -84,6 +84,7 @@ test('a ChatGPT token goes to the Codex backend with its account id; an API key 
 	expect(seen[0]!.path).toBe('/codex/responses')
 	expect(seen[0]!.headers.get('authorization')).toBe(`Bearer ${subscriptionToken}`)
 	expect(seen[0]!.headers.get('chatgpt-account-id')).toBe('acct-1')
+	expect(seen[0]!.headers.get('session_id')).toBe('sess-1')
 	expect(seen[0]!.body).toMatchObject({ model: 'gpt-5.5', store: false, stream: true, instructions: 'be brief', prompt_cache_key: 'sess-1' })
 	expect(seen[0]!.body.max_output_tokens).toBeUndefined()
 
@@ -94,6 +95,7 @@ test('a ChatGPT token goes to the Codex backend with its account id; an API key 
 	expect(seen[1]!.path).toBe('/v1/responses')
 	expect(seen[1]!.headers.get('authorization')).toBe('Bearer sk-test')
 	expect(seen[1]!.headers.get('chatgpt-account-id')).toBeNull()
+	expect(seen[1]!.headers.get('session_id')).toBeNull()
 	expect(seen[1]!.body.max_output_tokens).toBe(1000)
 })
 
