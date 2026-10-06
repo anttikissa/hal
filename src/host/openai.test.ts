@@ -80,6 +80,7 @@ afterEach(() => {
 	provider.state.providers = {}
 	for (let id of openaiWs.state.sockets.keys()) openaiWs.close(id)
 	openaiWs.state.httpUntil = 0
+	openaiWs.state.httpSessions.clear()
 	for (let [k, v] of Object.entries(saved)) {
 		if (v === undefined) delete process.env[k]
 		else process.env[k] = v

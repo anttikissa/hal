@@ -29,6 +29,9 @@ const RESTART = new Set(['previous_response_not_found', 'websocket_connection_li
 const state = {
 	sockets: new Map<string, Socket>(),
 	httpUntil: 0,
+	// Sessions whose socket died mid-response (e.g. 1009, message too
+	// big): they stay on HTTP, as pi does, so the retry cannot loop.
+	httpSessions: new Set<string>(),
 	connectMs: 10_000,
 	idleMs: 10 * 60_000,
 	fallbackMs: 10 * 60_000,
@@ -74,7 +77,7 @@ function continuation(s: Socket, fields: string, full: unknown[], req: ProviderR
 // undefined to use HTTP.
 async function open(http: HttpRequest, req: ProviderRequest, items: (req: ProviderRequest) => unknown[]): Promise<ReadableStream<Uint8Array> | undefined> {
 	let id = req.sessionId
-	if (!state.enabled || !id || Date.now() < state.httpUntil) return undefined
+	if (!state.enabled || !id || Date.now() < state.httpUntil || state.httpSessions.has(id)) return undefined
 	let { input: full, ...rest } = http.body as { input: unknown[] } & Record<string, unknown>
 	let key = JSON.stringify([http.url, http.account, http.headers['chatgpt-account-id']])
 	let s = state.sockets.get(id)
@@ -150,7 +153,11 @@ async function open(http: HttpRequest, req: ProviderRequest, items: (req: Provid
 			ctrl.close()
 		}
 	}
-	let onClose = (e: CloseEvent) => fail(`OpenAI WebSocket closed before the response finished (code ${e.code}${e.reason ? `: ${e.reason}` : ''})`)
+	let onClose = (e: CloseEvent) => {
+		state.httpSessions.add(id)
+		diag.log(`OpenAI WebSocket of ${id} closed mid-response (code ${e.code}); the session uses HTTP`)
+		fail(`OpenAI WebSocket closed before the response finished (code ${e.code}${e.reason ? `: ${e.reason}` : ''})`)
+	}
 	return new ReadableStream<Uint8Array>({
 		start(c) {
 			ctrl = c
