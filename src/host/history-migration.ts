@@ -1,5 +1,6 @@
 // Retire ask calls before the host accepts clients (task cs). Histories
 // are rewritten atomically; no legacy reader or dead tool remains.
+import { open } from 'fs/promises'
 import { existsSync, linkSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
@@ -73,7 +74,25 @@ function migrate(path: string): boolean {
 	return true
 }
 
-function run(): void {
+// Whether `path` mentions 'ask', read 1 MB at a time: scanning every
+// history in one go held the host's event loop ~650 ms at a cold start
+// (task 7j).
+async function mentionsAsk(path: string): Promise<boolean> {
+	let file = await open(path)
+	try {
+		let buf = Buffer.alloc(1 << 20), carry = ''
+		for (let pos = 0; ; ) {
+			let { bytesRead } = await file.read(buf, 0, buf.length, pos)
+			if (!bytesRead) return false
+			let text = carry + buf.toString('latin1', 0, bytesRead)
+			if (text.includes("'ask'")) return true
+			carry = text.slice(-4)
+			pos += bytesRead
+		}
+	} finally { await file.close() }
+}
+
+async function run(): Promise<void> {
 	let marker = liveFiles.liveFile<{ askRemoved: boolean }>(`${paths.stateDir()}/migrations.ason`, { askRemoved: false }, { watch: false, mode: 0o600 })
 	try {
 		if (typeof marker.askRemoved !== 'boolean') throw new Error(`${paths.stateDir()}/migrations.ason: invalid askRemoved`)
@@ -84,7 +103,7 @@ function run(): void {
 		for (let entry of readdirSync(paths.sessionsDir(), { withFileTypes: true })) {
 			if (!entry.isDirectory()) continue
 			let path = `${paths.sessionDir(entry.name)}/history.asonl`
-			if (existsSync(path)) historyMigration.migrate(path)
+			if (existsSync(path) && (await mentionsAsk(path))) historyMigration.migrate(path)
 		}
 		marker.askRemoved = true
 		liveFiles.save(marker)

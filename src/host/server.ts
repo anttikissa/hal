@@ -66,7 +66,7 @@ async function serve(): Promise<boolean> {
 	// auth.ason would leave a stale copy that wins.
 	secrets.migrate(['auth.ason', 'state/push-vapid.ason', 'state/push-subscriptions.ason'])
 	try {
-		historyMigration.run()
+		await historyMigration.run()
 		server.state.listener = await server.listen(server.socketPath())
 	} catch (e) {
 		closeSync(server.state.lockFd!)
