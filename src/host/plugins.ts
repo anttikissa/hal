@@ -1,14 +1,14 @@
-// Plugins (task an): every plugins/*.ts in the home hooks functions on
-// module objects, or sets their plain values (task d41). A file exports `default (plugin) => {...}` and maybe
-// `expires` (a UTC ISO time). Hooks are owned by their file: reloading,
-// deleting or expiring it removes exactly its hooks, and an emptied
-// chain puts the original function back. A reload is staged: the old
-// hooks stay until the new file imported and registered cleanly. Once
-// a swap is complete, the files' onChange callbacks reconcile whatever
-// depends on the hooks (a theme repaints).
+// Plugins (task an, 90v): every plugins/*.ts in the home hooks
+// functions on module objects, or sets their plain values (task d41). A
+// file exports `default (plugin) => { ...; return cleanup }` and maybe
+// `expires` (a UTC ISO time). The body registers hooks, which take
+// effect at once, and returns its cleanup. Hooks are owned by their
+// file: replacing, deleting or expiring it removes exactly its hooks,
+// then runs its cleanup; an emptied chain puts the original back. A file
+// that fails to import or throws in its body is renamed to .ts.broken.
 
 import { createHash } from 'crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, watch, type FSWatcher } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, watch, type FSWatcher } from 'fs'
 import { basename, join, relative } from 'path'
 import { paths } from './paths.ts'
 
@@ -23,13 +23,7 @@ export type Plugin = {
 	after<T extends object, K extends Keys<T>>(obj: T, key: K, fn: (result: ReturnType<F<T, K>>, args: Parameters<F<T, K>>) => void): void
 	around<T extends object, K extends Keys<T>>(obj: T, key: K, fn: NoInfer<(next: F<T, K>, ...args: Parameters<F<T, K>>) => ReturnType<F<T, K>>>): void
 	set<T extends object, K extends Exclude<keyof T & string, Keys<T>>>(obj: T, key: K, value: NoInfer<T[K]>): void
-	unload(fn: () => void): void
-	onChange(fn: (change: Change) => unknown): void
 }
-
-// 'load' is a file's first load; phase says whether this callback's
-// version is coming in ('activate') or going out ('deactivate').
-export type Change = { reason: 'load' | 'reload' | 'delete' | 'expire'; phase: 'activate' | 'deactivate' }
 
 type Kind = 'before' | 'after' | 'around' | 'set'
 type Hook = { file: string; seq: number; kind: Kind; obj: any; key: string; fn: Fn; value?: unknown; target: string }
@@ -38,7 +32,8 @@ type Hook = { file: string; seq: number; kind: Kind; obj: any; key: string; fn: 
 type Run = { befores: Fn[]; arounds: Fn[]; afters: Fn[] }
 // A value patch (set) holds the value it applied instead of a wrapper.
 type Patch = { original: any; wrapper: Fn; hooks: Hook[]; run: Run; value?: true; applied?: unknown }
-export type Loaded = { path: string; hash: string; expires?: string; expired?: true; error?: string; hooks: Hook[]; unloads: (() => void)[]; changes: Fn[]; active?: true; closed?: true; timer?: Timer }
+// open: the registration body is running, so hooks may register.
+export type Loaded = { path: string; hash: string; expires?: string; expired?: true; error?: string; hooks: Hook[]; cleanup?: () => unknown; open?: true; timer?: Timer }
 
 const srcDir = join(import.meta.dir, '..')
 
@@ -111,56 +106,72 @@ function settle(obj: any, key: string, patch: Patch): void {
 	}
 }
 
-// Runs every callback in `fns`; one that throws or rejects is
-// reported and the rest still run. Results are not awaited.
-function runAll(path: string, what: string, fns: Fn[], ...args: unknown[]): void {
+// Runs `fn` (a cleanup); a throw or rejection is reported.
+function run(path: string, what: string, fn: Fn | undefined): void {
 	let fail = (e: any) => plugins.report(`plugin ${path}: ${what} failed: ${e?.stack ?? e}`)
-	for (let fn of fns) {
-		try {
-			let out = fn(...args)
-			if (out && typeof out.then === 'function') out.then(undefined, fail)
-		} catch (e) {
-			fail(e)
-		}
+	try {
+		let out = fn?.()
+		if (out && typeof out.then === 'function') out.then(undefined, fail)
+	} catch (e) {
+		fail(e)
 	}
 }
 
-// Takes `entry`'s hooks out and runs its unload callbacks. Returns its
-// onChange callbacks, for the caller to run once its swap is complete.
-function deactivate(entry: Loaded): Fn[] {
+// Takes `entry`'s hooks out, then runs its cleanup.
+function deactivate(entry: Loaded): void {
 	clearTimeout(entry.timer)
+	delete entry.open
 	for (let h of entry.hooks) {
 		let patch = plugins.state.patches.get(h.obj)?.get(h.key)
 		if (!patch) continue
 		patch.hooks = patch.hooks.filter((x) => x !== h)
 		plugins.settle(h.obj, h.key, patch)
 	}
-	let { unloads, changes } = entry
-	entry.closed = true
+	let cleanup = entry.cleanup
 	entry.hooks = []
-	entry.unloads = []
-	entry.changes = []
-	runAll(entry.path, 'unload', unloads)
-	return changes
+	entry.cleanup = undefined
+	run(entry.path, 'cleanup', cleanup)
 }
 
-// A load that never activates: its staged cleanups run at once, so a
-// timer or connection it started does not leak.
-function discard(staged: Loaded): void {
-	let unloads = staged.unloads
-	staged.closed = true
-	staged.unloads = []
-	runAll(staged.path, 'unload', unloads)
+// Adds hook `h` to `entry` and puts it into effect at once.
+// Registration is final once the body returns.
+function register(entry: Loaded, h: Omit<Hook, 'file' | 'seq' | 'target'>): void {
+	let target = `${targetName(h.obj, h.key)} ${h.kind}`
+	if (!entry.open) throw new Error(`${entry.path}: ${target} registered after the registration function returned; register in its body`)
+	let hook: Hook = { ...h, file: basename(entry.path), seq: entry.hooks.length, target }
+	entry.hooks.push(hook)
+	let patch = plugins.patchOf(h.obj, h.key)
+	patch.hooks.push(hook)
+	plugins.settle(h.obj, h.key, patch)
 }
 
-function activate(entry: Loaded): void {
-	entry.active = true
-	for (let h of entry.hooks) {
-		let patch = plugins.patchOf(h.obj, h.key)
-		patch.hooks.push(h)
-		plugins.settle(h.obj, h.key, patch)
+function hook(entry: Loaded, kind: Kind, obj: any, key: string, fn: Fn): void {
+	if (!obj || typeof obj[key] !== 'function') throw new Error(`${entry.path}: ${kind} target ${obj ? targetName(obj, key) : key} is not a function`)
+	plugins.register(entry, { kind, obj, key, fn })
+}
+
+function override(entry: Loaded, obj: any, key: string, value: unknown): void {
+	if (!obj || !(key in obj) || typeof obj[key] === 'function') throw new Error(`${entry.path}: set target ${obj ? targetName(obj, key) : key} is not a plain value; use around`)
+	plugins.register(entry, { kind: 'set', obj, key, fn: () => value, value })
+}
+
+// The API one file version registers through.
+function api(entry: Loaded): Plugin {
+	const plugin: Plugin = {
+		before(obj, key, fn) {
+			hook(entry, 'before', obj, key, fn)
+		},
+		after(obj, key, fn) {
+			hook(entry, 'after', obj, key, fn)
+		},
+		around(obj, key, fn) {
+			hook(entry, 'around', obj, key, fn)
+		},
+		set(obj, key, value) {
+			override(entry, obj, key, value)
+		},
 	}
-	if (entry.expires) plugins.arm(entry)
+	return plugin
 }
 
 // Removes `entry`'s hooks once its expiry passes. Timers cap at ~24
@@ -175,80 +186,93 @@ function expire(path: string): void {
 	let entry = plugins.state.files.get(path)
 	if (!entry) return
 	plugins.state.latest.set(path, ++plugins.state.gen)
-	let changes = plugins.deactivate(entry)
+	plugins.deactivate(entry)
 	entry.expired = true
-	runAll(path, 'onChange', changes, { reason: 'expire', phase: 'deactivate' })
 }
 
-// A registration recorder: hooks and unloads are only collected here,
-// checked, and activated by load() once registration succeeded. An
-// unload registered late (from a timer) after its version was removed
-// or dropped runs at once, so its resource does not leak.
-function recorder(path: string, entry: Loaded): Plugin {
-	let add = (kind: Kind) => (obj: any, key: string, fn: Fn) => {
-		if (!obj || typeof obj[key] !== 'function') throw new Error(`${path}: ${kind} target ${obj ? targetName(obj, key) : key} is not a function`)
-		entry.hooks.push({ file: basename(path), seq: entry.hooks.length, kind, obj, key, fn, target: `${targetName(obj, key)} ${kind}` })
-	}
-	let set = (obj: any, key: string, value: unknown) => {
-		if (!obj || !(key in obj) || typeof obj[key] === 'function') throw new Error(`${path}: set target ${obj ? targetName(obj, key) : key} is not a plain value; use around`)
-		entry.hooks.push({ file: basename(path), seq: entry.hooks.length, kind: 'set', obj, key, fn: () => value, value, target: `${targetName(obj, key)} set` })
-	}
-	return { before: add('before'), after: add('after'), around: add('around'), set, unload: (fn) => void (entry.closed ? runAll(path, 'unload', [fn]) : entry.unloads.push(fn)), onChange: (fn) => void entry.changes.push(fn) } as Plugin
+function hashOf(path: string): string {
+	return createHash('sha256').update(readFileSync(path)).digest('hex').slice(0, 8)
 }
 
-// (Re)loads plugin file `path`. The file's old hooks stay unless the new
-// version imported and registered cleanly and nothing newer (an edit,
-// deletion or expiry) came meanwhile.
+// A file that failed to import or register, like a config file that
+// does not parse: Hal runs without it and renames it to .ts.broken, so
+// the next start skips it too. No rollback to an earlier version. A file
+// that changed since it was read is still being written: a newer load
+// follows, so it stays.
+function broken(path: string, hash: string, e: any): void {
+	let st = plugins.state
+	let old = st.files.get(path)
+	if (old) plugins.deactivate(old)
+	let error = String(e?.stack ?? e)
+	if (!error.includes(path)) error = `${path}: ${error}`
+	let to = `${path}.broken`
+	let text: string
+	try {
+		if (hashOf(path) !== hash) return
+		renameSync(path, to)
+		text = `plugin ${path} failed and was renamed to ${to}, so it does not load again; Hal runs without it. Fix it and rename it back to ${basename(path)} to enable it.\n${error}`
+	} catch (r: any) {
+		text = `plugin ${path} failed; Hal runs without it, but renaming it to ${to} failed too (${r?.message ?? r}).\n${error}`
+	}
+	st.files.set(path, { path, hash, hooks: [], error: text })
+	plugins.report(text)
+}
+
+// (Re)loads plugin file `path`: the old version's hooks go and its
+// cleanup runs, then the new body runs, its hooks active as it
+// registers them. A load overtaken by a newer edit, deletion or expiry
+// while importing is dropped.
 async function load(path: string): Promise<void> {
 	let st = plugins.state
 	let gen = ++st.gen
 	st.latest.set(path, gen)
 	let current = () => st.latest.get(path) === gen
-	let text = readFileSync(path)
-	let staged: Loaded = { path, hash: createHash('sha256').update(text).digest('hex').slice(0, 8), hooks: [], unloads: [], changes: [] }
-	let old = st.files.get(path)
+	let hash = hashOf(path)
+	let entry: Loaded = { path, hash, hooks: [] }
+	let mod: any
 	try {
 		// A query string makes Bun import (and run) the file afresh. The
 		// real path: through a symlinked directory (/tmp on macOS) Bun
 		// cannot find a file created after it first resolved there.
-		let mod = await import(`${realpathSync(path)}?v=${gen}`)
+		mod = await import(`${realpathSync(path)}?v=${gen}`)
 		if (mod.expires !== undefined) {
 			if (typeof mod.expires !== 'string' || !mod.expires.endsWith('Z') || Number.isNaN(Date.parse(mod.expires))) throw new Error(`${path}: expires must be a UTC ISO time like '2026-09-29T16:00:00Z'`)
-			staged.expires = mod.expires
+			entry.expires = mod.expires
 		}
-		if (!current()) return
-		let expired = () => staged.expires !== undefined && Date.parse(staged.expires) <= Date.now()
-		if (!expired()) {
-			if (typeof mod.default !== 'function') throw new Error(`${path}: export default (plugin) => { ... } is missing`)
-			await mod.default(plugins.recorder(path, staged))
-		}
-		if (!current()) return plugins.discard(staged)
-		let reload = !!old?.active
-		let outgoing = old ? plugins.deactivate(old) : []
-		st.files.set(path, staged)
-		if (expired()) staged.expired = true
-		else plugins.activate(staged)
-		// Both versions' callbacks see the new hooks already active.
-		let reason = reload ? 'reload' : 'load'
-		runAll(path, 'onChange', outgoing, { reason, phase: 'deactivate' })
-		runAll(path, 'onChange', staged.changes, { reason, phase: 'activate' })
-	} catch (e: any) {
-		plugins.discard(staged)
-		if (!current()) return
-		let error = String(e?.message ?? e)
-		if (!error.includes(path)) error = `${path}: ${error}`
-		if (old) Object.assign(old, { error, hash: staged.hash })
-		else st.files.set(path, { ...staged, hooks: [], unloads: [], changes: [], error })
-		plugins.report(`plugin failed to load, keeping its last working hooks: ${error}`)
+		if (typeof mod.default !== 'function') throw new Error(`${path}: export default (plugin) => { ... } is missing`)
+	} catch (e) {
+		if (current()) plugins.broken(path, hash, e)
+		return
 	}
+	if (!current()) return
+	let old = st.files.get(path)
+	if (old) plugins.deactivate(old)
+	st.files.set(path, entry)
+	if (entry.expires && Date.parse(entry.expires) <= Date.now()) return void (entry.expired = true)
+	entry.open = true
+	try {
+		let out = mod.default(plugins.api(entry))
+		if (out !== undefined && typeof out !== 'function') {
+			if (typeof out?.then === 'function') out.then(undefined, (e: any) => plugins.report(`plugin ${path}: its async registration failed: ${e?.stack ?? e}`))
+			throw new Error(`${path}: the registration function returned ${typeof out?.then === 'function' ? 'a Promise' : typeof out}; return a cleanup function or nothing, and start async work from the body`)
+		}
+		entry.cleanup = out
+	} catch (e) {
+		return plugins.broken(path, hash, e)
+	} finally {
+		delete entry.open
+	}
+	if (entry.expires) plugins.arm(entry)
 }
 
 function remove(path: string): void {
 	let st = plugins.state
 	st.latest.set(path, ++st.gen)
 	let entry = st.files.get(path)
+	// A broken file's entry stays, so /plugins shows why it went.
+	if (entry?.error) return
 	st.files.delete(path)
-	if (entry) runAll(path, 'onChange', plugins.deactivate(entry), { reason: 'delete', phase: 'deactivate' })
+	if (entry) plugins.deactivate(entry)
 }
 
 // Brings file `name` in dir `d` up to date: loads it if its content
@@ -257,9 +281,8 @@ async function sync(d: string, name: string): Promise<void> {
 	if (!name.endsWith('.ts') || name.endsWith('.d.ts')) return
 	let path = join(d, name)
 	if (!existsSync(path)) return plugins.remove(path)
-	let hash = createHash('sha256').update(readFileSync(path)).digest('hex').slice(0, 8)
 	let entry = plugins.state.files.get(path)
-	if (entry?.hash === hash && plugins.state.latest.has(path)) return
+	if (entry?.hash === hashOf(path) && !entry.error && plugins.state.latest.has(path)) return
 	await plugins.load(path)
 }
 
@@ -278,6 +301,7 @@ function close(): void {
 	plugins.state.watcher?.close()
 	plugins.state.watcher = undefined
 	for (let path of plugins.state.files.keys()) plugins.remove(path)
+	plugins.state.files.clear()
 }
 
 // One line per file for /plugins.
@@ -309,11 +333,11 @@ export const plugins = {
 	patchOf,
 	settle,
 	deactivate,
-	discard,
-	activate,
+	register,
+	api,
 	arm,
 	expire,
-	recorder,
+	broken,
 	load,
 	remove,
 	sync,

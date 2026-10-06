@@ -146,5 +146,7 @@ export default (plugin: Plugin) => {
 		if (typeof v === 'function') plugin.around(colors, key as never, v as never)
 		else plugin.set(colors, key as never, v as never)
 	}
-	plugin.onChange(() => terminal.redraw())
+	// Repaint in these colors now, and in the remaining ones once removed.
+	terminal.redraw()
+	return () => terminal.redraw()
 }
