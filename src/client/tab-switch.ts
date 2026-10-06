@@ -4,6 +4,7 @@
 // lives in app.state (tabs, focus, asked, hidden).
 
 import { backfill } from '../common/backfill.ts'
+import { markdown } from '../common/markdown.ts'
 import { connection } from '../common/connection.ts'
 import { queueEdit } from '../common/queue-edit.ts'
 import { queuedPrompt } from './queue-edit.ts'
@@ -65,6 +66,7 @@ function onTabs(list: Tab[]): void {
 	let old = st.tabs.map((t) => t.id)
 	let ids = list.map((t) => t.id)
 	st.tabs = list
+	markdown.state.sessions = new Set(ids)
 	let asked = st.asked
 	if (asked !== undefined && ids.includes(asked)) delete st.asked
 	for (let id of st.hidden.keys()) if (!ids.includes(id)) {
