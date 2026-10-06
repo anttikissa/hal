@@ -11,14 +11,15 @@ import { changedFiles } from './changed-files.ts'
 import { pages } from './pages.ts'
 
 export type Job = { upgrade: string } | { history: string; offsets: number[] }
-export type Reply = { paths?: string[]; error?: string }
+// `paths`: separated by NUL, one string being far cheaper to pass.
+export type Reply = { paths?: string; error?: string }
 
 function handle(job: Job): Reply {
 	try {
 		if ('history' in job) {
 			let seen = new Set<string>()
 			for (let o of job.offsets) changedFiles.add(seen, pages.lineAt(job.history, o).record)
-			return { paths: [...seen] }
+			return { paths: [...seen].join('\0') }
 		}
 		let m = ason.parse(readFileSync(job.upgrade, 'utf8')) as Record<string, unknown>
 		if (!m || typeof m !== 'object' || !('changedPaths' in m)) return {}

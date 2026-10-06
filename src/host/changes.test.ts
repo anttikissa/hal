@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
+import { changedFiles } from './changed-files.ts'
 import { changes } from './changes.ts'
 import { changesPage } from './changes-page.ts'
 import { fileChanges } from './file-changes.ts'
@@ -107,4 +108,25 @@ test('/changes lists a file once with the cards of the calls that changed it, ne
 	expect(rows).toHaveLength(1)
 	expect(rows[0]).toMatch(new RegExp(`^- \\[src/x\\.ts\\]\\([^)]+\\)  \\+1 -1  \\d\\d:\\d\\d  \\[#t5\\]\\([^)]*/${id}#t5\\) \\[#t9\\]\\([^)]*/${id}#t9\\)$`))
 	expect(say).not.toContain('toolu_')
+})
+
+test('a big history rebuilds its changed paths in a worker and counts the records that came meanwhile', async () => {
+	let after = blob('x\n')
+	let change = (path: string) => history.append(id, { type: 'file_changes', cwd: home, toolId: path, files: [{ path, before: null, after }] })
+	change('a.txt')
+	change('b.txt')
+	pages.reset()
+	let syncBytes = changedFiles.syncBytes
+	changedFiles.syncBytes = 0
+	try {
+		change('a.txt')
+		change('c.txt')
+		expect(stats.of(id).files).toBe(2)
+		for (let i = 0; i < 500 && stats.of(id).files === 2; i++) await Bun.sleep(10)
+		expect(stats.of(id).files).toBe(3)
+		change('d.txt')
+		expect(stats.of(id).files).toBe(4)
+	} finally {
+		changedFiles.syncBytes = syncBytes
+	}
 })
