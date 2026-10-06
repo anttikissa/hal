@@ -254,7 +254,8 @@ async function main(): Promise<number> {
 			if (p.lost) failed.push(`${name}: ${p.lost} keys never showed`)
 			if (p.rssMB > 1024) failed.push(`${name}: memory ${p.rssMB} MB > 1024 MB`)
 		}
-		for (let [name, st] of stallRows) if (st.max > 10) failed.push(`${name}: event loop blocked ${st.max} ms > 10 ms`)
+		// Blocks of 10-40 ms are listed above but allowed (task 7j).
+		for (let [name, st] of stallRows) if (st.max > 40) failed.push(`${name}: event loop blocked ${st.max} ms > 40 ms`)
 		check('host, cold every tab indexed', rows[0]![1].allMarks, 10000)
 		check('tab switch max', sorted.at(-1), 200)
 		if (chrome) check('web page ready', web, 1000)
