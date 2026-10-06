@@ -4,16 +4,38 @@ This is HAL 9001, an agent harness.
 
 ![Hal in a terminal (left) and a web browser (right)](hal.png)
 
+# Ten holy commandments of HAL
+
+1. **Respect the terminal.** Ctrl-C quits and Ctrl-Z suspends, always.
+   Scrolling, search and links stay native.
+2. **Concise by default, everything on request.** Blocks start closed;
+   Ctrl-O opens them.
+3. **The best editing experience possible.** Shift to select works,
+   cmd-z undoes, cut, copy and paste just work.
+4. **Excellent in the terminal, good on the web.** The web covers what
+   the terminal can't: clickable links, images, pastes, phones.
+5. **No dependencies we can avoid.** Each one is a supply-chain attack
+   waiting to happen.
+6. **A minimal system prompt.** It makes agents do the right thing 90%
+   of the time; the rest is yours to tweak (SYSTEM.md, AGENTS.md).
+7. **Bash for all the things.** Agents are very good at editing with
+   bash and python nowadays, so Hal embraces that: there is no edit
+   tool. You can implement one if you like.
+8. **Never lose work.** Tabs, sessions and half-typed prompts survive
+   restarts, crashes and reconnects. Ctrl-R restarts Hal and continues
+   where you left off.
+9. **Mac first, Linux second, Windows maybe some day.** I have a
+   MacBook, so keyboard shortcuts are designed to work in macOS. Linux
+   users may want to rebind e.g. Ctrl-commands to something else. (Edit
+   the source code, that's not a configurable feature yet.)
+10. **Yours to hack.** Hal is small enough to read and can edit itself.
+    Every function is a hook point, and plugins reload when you save
+    them.
+
 Goals:
 
-- Lightweight and as few dependencies as possible.
-- Minimal system prompt, minimal set of tools out of the box.
 - Support for multiple Claude & ChatGPT subscriptions with account rotation, plus a few others
-- Use native terminal features - stuff like cmd-click on links, scrolling, ctrl-c, ctrl-z, should *just work*.
-- You can use shift to select text! Yes!
-- Hackable: Hal can inspect and edit itself. Ctrl-R to restart and continue from where you left off.
 - Run multiple sessions in tabs, which are persistent by default - pretty much like a web browser.
-- Mac and Linux support (for now).
 - Try to keep under 20k lines of code and startup time under 200ms even if you have 50 tabs open.
 
 # Install
