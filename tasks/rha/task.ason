@@ -1,0 +1,11 @@
+{
+	title: 'Queued messages stay still while items land above',
+	spec: 'In the web transcript, a bottom reader sees the last card stay put when content grows only above it: queued messages waiting at the tail do not move while new items arrive or text streams above them. scroll.follow snaps instead of gliding when the last card is the same node and its distance from the content bottom is unchanged; growth inside or after the last card still glides. Invariant restored: a glide never pushes the tail down and slides it back (the bounce). A Chrome test samples the queued card position each frame while replies stream above it.',
+	status: 'done',
+	notes: [
+		'Reproduced with the new Chrome test before the fix: the queued card top jumped between 449 and 523 px every frame while text streamed above. After: one value until the turn ends. At turn end the queued message is delivered and may shift 1 px, so the test samples before the done event. Terminal has no glide, so it needs no change.',
+		'Snap only when the content grew. check() pulls a pinned view back with follow and an empty change, which also leaves the last card still; snapping there yanked a reader at the top straight back and made the earlier-history test fail 3 in 10 runs.'
+	],
+	needs: ['4s', '16'],
+	foldInto: ['4s']
+}
