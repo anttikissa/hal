@@ -1,6 +1,6 @@
 // Composition root: the one explicit startup path. Other modules do no
 // work on import; start() calls their init() functions in order.
-import { appendFileSync, existsSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { args, type Args } from './client/args.ts'
 import { app } from './client/app.ts'
@@ -35,6 +35,7 @@ import { turns } from './host/turns.ts'
 import { version } from './host/version.ts'
 import { openai } from './host/openai.ts'
 import { openaiCompat } from './host/openai-compat.ts'
+import { marksWorker } from './host/marks-worker.ts'
 import { paths } from './host/paths.ts'
 import { secrets } from './host/secrets.ts'
 import { plugins } from './host/plugins.ts'
@@ -198,6 +199,8 @@ async function becomeHost(): Promise<boolean> {
 		}
 		turns.recover().catch((e) => diag.log(`recover: ${e?.message ?? e}`))
 		jobs.lost().catch((e) => diag.log(`lost jobs: ${e?.message ?? e}`))
+		// Old marks of sessions not open yet convert off this thread too.
+		if (existsSync(paths.sessionsDir())) void marksWorker.upgrade(readdirSync(paths.sessionsDir()))
 		void main.refreshModels()
 	})
 	return true

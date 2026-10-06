@@ -7,6 +7,7 @@ import { busy } from './busy.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { marksWorker } from './marks-worker.ts'
 import { pages } from './pages.ts'
 import { prompts } from './prompts.ts'
 import { status } from './status.ts'
@@ -22,6 +23,7 @@ async function recover(): Promise<void> {
 		}
 		// Startup's first-frame timeout can fire before tab indexing finishes.
 		// Recovery must not finish that work synchronously through marks().
+		await marksWorker.upgrade([id])
 		await pages.slices(pages.catchUp(id))
 		if (!turnRecovery.leftWork(id)) {
 			busy.drop(id)
