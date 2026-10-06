@@ -1405,6 +1405,44 @@ test.skipIf(!chrome)('streaming preserves native selection and Markdown text nod
 // A reader scrolled up with everything selected (Cmd+A) while Hal
 // streams 80 rows: no update may remove a shown node, move the focus,
 // collapse the selection or scroll the view.
+// Task 4s, pinned bottom: a card can grow with no DOM change (its open
+// animation, an image); a reader at the bottom must still end there.
+test.skipIf(!chrome)('a pinned reader stays at the bottom when a card grows by itself', async () => {
+	providerHome()
+	let b = await browser()
+	try {
+		await server.serve()
+		web.start()
+		let id = tabs.create('/tmp')
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
+		// Reduced motion snaps: no glide is still running when we check.
+		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
+		turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
+			for (let i = 0; i < 40; i++) yield { type: 'text', text: `Line ${i} text.\n\n` }
+			yield { type: 'done', reason: 'end' }
+		})()
+		let atBottom = `(() => { let t = document.querySelector('.Transcript'); return t.scrollHeight - t.clientHeight - t.scrollTop <= 1 })()`
+		await b.waitFor(`(() => { let t = document.querySelector('textarea'); t.value = 'go'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return !document.querySelector('#notice').textContent })()`)
+		await b.waitFor(`document.querySelector('.activity')?.textContent.includes('idle') && ${atBottom}`)
+		// Let the turn's last redraw land, so nothing else pulls the view.
+		await b.evaluate(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+		// A style change is not a DOM mutation and fires no scroll event.
+		// Two frames later the view must be back, not left short until
+		// some later change happens to pull it.
+		let grown = await b.evaluate(`new Promise((r) => {
+			[...document.querySelectorAll('.Transcript > *')].at(-2).style.minHeight = '3000px'
+			requestAnimationFrame(() => requestAnimationFrame(() => r(${atBottom})))
+		})`)
+		expect(grown).toBe(true)
+	} finally {
+		await b.call('Emulation.setEmulatedMedia', { features: [] })
+		await b.close()
+	}
+})
+
 test.skipIf(!chrome)('a select-all survives seconds of streaming untouched', async () => {
 	providerHome()
 	let b = await browser(), release = () => {}
