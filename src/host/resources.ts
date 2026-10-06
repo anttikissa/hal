@@ -78,7 +78,10 @@ function check(sample = resources.measure()): void {
 	let text = resources.warning() ?? `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available`
 	if (rank[st.level] > rank[before] || st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text })
 	// Stop first: on a full disk, the writes below may fail.
-	if (st.level === 'critical') for (let id of turns.state.running.keys()) turns.stop(id, `${resources.describe(sample, 'critical')}. Free space, then resume.`)
+	if (st.level === 'critical') for (let id of turns.state.running.keys()) {
+		try { turns.stop(id, `${resources.describe(sample, 'critical')}. Free space, then resume.`) }
+		catch (e) { process.stderr.write(`resource pause for ${id}: ${e instanceof Error ? e.stack : e}\n`) }
+	}
 	for (let id of sessions.state.open.keys()) history.append(id, { type: 'notice', text })
 	diag.log(`resources: ${before} -> ${st.level} (disk ${gb(sample.disk)}, memory ${gb(sample.memory)})`)
 }

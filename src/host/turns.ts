@@ -87,6 +87,14 @@ function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlo
 // it paused; one not running here (unfinished on disk) is paused on disk.
 // A command's open question is dismissed instead: nothing ran.
 function stop(id: string, reason?: string, closing = false): string | undefined {
+	try { return pause(id, reason, closing) }
+	finally {
+		let running = turns.state.running.get(id)
+		if (reason !== undefined && !closing && running) { delete running.steered; running.controller.abort() }
+	}
+}
+
+function pause(id: string, reason?: string, closing = false): string | undefined {
 	let transition = contextTransitions.pending(id)
 	contextTransitions.cancel(id)
 	let records = history.readSync(id)

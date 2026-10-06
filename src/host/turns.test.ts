@@ -208,3 +208,14 @@ test('a command cut off mid-run by a crash is never run again, and the model hea
 		tools.run = origRun
 	}
 })
+
+test('a forced stop aborts even when history cannot be read', () => {
+	let read = history.readSync, controller = new AbortController()
+	let id = 'forced-stop'
+	turns.state.running.set(id, { provider: 'fake', controller })
+	try {
+		history.readSync = () => { throw new Error('disk failure') }
+		expect(() => turns.stop(id, 'critical resources')).toThrow('disk failure')
+		expect(controller.signal.aborted).toBe(true)
+	} finally { history.readSync = read; turns.state.running.delete(id) }
+})

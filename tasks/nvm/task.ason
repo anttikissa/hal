@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'Restored invariant: tool results hold only tool output; Hal facts reach the next model request even when the model never runs bash.',
-		'The first implementation added a version store, per-tab startup error state, weak-identity bootstrap of sessions opened during a shortage, hand-copied turn aborts, neighbor pruning and about 200 test lines. It grew source by 85 lines against an explicit request to simplify. It was cut back to the pre-task modules plus the notice record: sessions opened during a shortage learn of it only at the next level change.'
+		'The first implementation added a version store, per-tab startup error state, weak-identity bootstrap of sessions opened during a shortage, hand-copied turn aborts, neighbor pruning and about 200 test lines. It grew source by 85 lines against an explicit request to simplify. It was cut back to the pre-task modules plus the notice record: sessions opened during a shortage learn of it only at the next level change.',
+		'Lean follow-up replaces the sleep-based neighbor test with deterministic delivery checks. Reasoned non-closing stops guarantee abort in turns.stop, even if form persistence fails; resource checks isolate each stop failure so remaining turns still stop. Count production and test reductions separately.'
 	],
 	needs: ['nzv', '0f', 'fwk', '2e'],
 	foldInto: ['nzv', '0f', 'fwk', '2e']
