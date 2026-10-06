@@ -1,0 +1,6 @@
+{
+	title: 'Skills: Hal-wide and per-project, listed by name',
+	spec: "The system prompt lists available agent skills by name only, so many skills cost few tokens: one line per directory that holds any, 'Skills (read <dir>/<name>/SKILL.md when one fits the task):' then '- <dir>: name, name'. Hal skills live in the checkout's skills/ and are listed in every session, like SYSTEM.md. Project skills live in .agents/skills/ (the shared convention of Codex, Amp and Cursor) or .claude/skills/, in the same directories AGENTS.md is read from (nearest Git root down to the cwd, else the cwd only), and are listed only there, like AGENTS.md. Only subfolders holding a SKILL.md count, so unrelated folders add nothing; names are sorted and directories appear once, so the text is stable for prompt caching. Same names in different scopes are both listed with their directories; no override rules. No skills, no line. Hal ships hal-server-install (Hal-wide) and keeps ui-craft as a project skill of the Hal repo. Tests: Hal and project skills listed in their scopes, folders without SKILL.md and projects outside the cwd's chain ignored, no line when empty.",
+	status: 'done',
+	needs: []
+}

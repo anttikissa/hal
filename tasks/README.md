@@ -170,7 +170,7 @@ is block-start order in both clients; it is separate from delivery eligibility.
 
 ## Web client (Solid)
 
-Before implementing or reviewing UI, read `skills/ui-craft/SKILL.md`.
+Before implementing or reviewing UI, read `.agents/skills/ui-craft/SKILL.md`.
 Catalog equivalent variants, fix shared layout owners, and inspect their
 rendered short/long, open/closed and responsive states before claiming a
 visual fix. Passing tests alone does not establish visual quality.
