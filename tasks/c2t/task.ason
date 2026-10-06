@@ -15,7 +15,12 @@ Determinism: each header depends only on history records at or before it, so app
 The system prompt says in one line what the headers mean and that the model may cite ids it received, never invented ones.
 
 Tests: the exact replay of a short history with a prompt, a steering message, thinking, text and a tool call of 5 s or more (a format contract); appending a record leaves the earlier messages byte-identical. Run scripts/framing (task qtg) on a real session before and after, and record both shares in the notes.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Measured with scripts/framing: 04-car framing share 2.3% before (17244/744083 chars), 3.5% after (26496/753335); 06-hdd 2.1% and 06-hum 1.6% after.',
+		"Decision: replay omits the ' in <origin>' suffix on forked blocks. A fork must replay byte-identical to its parent (forks.test.ts) so the prompt cache hits; the suffix would change every copied header. Block numbers stay unique within a session, so the bare id is still citeable.",
+		'Records without n (built by hand in tests) get no id and no tool header. host-fixture strips tool result headers before tests see provider input; heard() maps a tab label to its header form.'
+	],
 	needs: ['7', '9p', 'nn', 'nzv', 'wm0', 'qtg'],
 	foldInto: ['nn']
 }

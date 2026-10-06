@@ -39,6 +39,10 @@ export const calls: Call[] = []
 export function fakeStream(model: string, input: any, signal?: AbortSignal): AsyncIterable<StreamEvent> {
 	let queue: StreamEvent[] = []
 	let wake = () => {}
+	// Tool result headers (task c2t) have their own contract test in
+	// replay.test.ts; tests here check what the tools said.
+	let bare = (b: any) => b?.type === 'tool_result' && typeof b.output === 'string' ? { ...b, output: b.output.replace(/^\[[^\]\n]*#[a-z]\d+[^\]\n]*\]\n/, '') } : b
+	input = input?.messages ? { ...input, messages: input.messages.map((m: any) => Array.isArray(m.blocks) ? { ...m, blocks: m.blocks.map(bare) } : m) } : input
 	let call: Call = {
 		model,
 		input,
@@ -149,7 +153,12 @@ export function restartHost() {
 }
 
 // A prompt as replay sends it: its [HH:MM] line, then the text.
-export const stamped = (text: string) => expect.stringMatching(new RegExp(`^\\[[\\d -]+:\\d\\d\\]\\n${text}$`))
+// A prompt as replayed: each text under its header (task c2t), which
+// tests of what was said need not repeat.
+const HEAD = '\\[[\\d -]+:\\d\\d[^\\]\\n]*\\]\\n'
+// A tab label as a replay header names it (task c2t).
+export const heard = (label: string) => label.replace(/^(tab \d+) · ([^ ]+)(?: · (.*))?$/, (_, t, id, name) => `${t} (${id})${name ? `, ${name}` : ''}`)
+export const stamped = (text: string) => expect.stringMatching(new RegExp(`^${HEAD}${text.replaceAll('\n\n', `\n\n(?:${HEAD})?`)}$`))
 
 // Items as shown, without their keys (task w5), for comparing with
 // literals; a live transcript and a fresh one compare keys too.

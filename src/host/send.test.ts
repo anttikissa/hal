@@ -4,7 +4,7 @@
 import { expect, test } from 'bun:test'
 import { amend } from '../common/amend.ts'
 import { history } from './history.ts'
-import { calls, client, created, fresh, readCall, shown as unkeyed, toolSession, until, useHost } from './host-fixture.test.ts'
+import { calls, client, created, fresh, heard, readCall, shown as unkeyed, toolSession, until, useHost } from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
 import { tabs } from './tabs.ts'
 
@@ -53,7 +53,7 @@ test('an advisory message reaches a working session with its next request, frame
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === next + 2)
 	let text = lastText(next + 1)
-	expect(text).toMatch(new RegExp(`\\n\\[Message from ${by}\\]\\n<meta>[^\\n]+</meta>\\ncheck the tests$`))
+	expect(text).toMatch(new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\n<meta>[^\\n]+</meta>\\ncheck the tests$`))
 	let shown = unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt'))
 	expect(shown).toEqual([
 		{ type: 'prompt', text: 'go' },
@@ -74,7 +74,7 @@ test('an idle session gets the message as a turn of its own, with full attention
 	// The sender's next round and the recipient's own turn, in some order.
 	let theirs = calls.findIndex((call) => call.input.messages.length === 1 && !lastText(calls.indexOf(call)).endsWith('tell them'))
 	expect(resultOf(3 - theirs).isError).toBeUndefined()
-	expect(lastText(theirs)).toMatch(new RegExp(`\\n\\[Message from ${by}\\]\\nplease review$`))
+	expect(lastText(theirs)).toMatch(new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\nplease review$`))
 	expect(unkeyed(c.views.get(a)!.items)).toEqual([{ type: 'prompt', text: 'please review', from: b, label: by, summary: 'Ask for checks' }])
 	expect((await fresh(a)).items).toEqual(c.views.get(a)!.items)
 })
@@ -93,12 +93,13 @@ test('steer is read like the user steering; queue waits for the turn to end', as
 	])
 	let queuedAt = c.views.get(a)!.inbox[0]!.ts!
 	let steered = recipient()
-	expect(lastText(steered)).toMatch(new RegExp(`\\n\\[Message from ${by}\\]\\nnow$`))
+	expect(lastText(steered)).toMatch(new RegExp(`^\\[[^\\]\\n]*message from ${heard(by).replace(/[()]/g, '\\$&')}[^\\]\\n]*\\]\\nnow$`))
 	calls[steered]!.push({ type: 'done', reason: 'end' })
 	// Only after the interrupted turn completes: the queued own turn.
 	let queued = () => calls.findIndex((call, i) => i > steered && call.input.sessionId === a)
 	await until(() => queued() >= 0)
-	expect(lastText(queued())).toContain(`[Message from ${by}]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nlater`)
+	expect(lastText(queued())).toMatch(`message from ${heard(by)}`)
+	expect(lastText(queued())).toContain(`]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nlater`)
 })
 
 test('sending to itself or to no session is an error result and delivers nothing', async () => {
@@ -134,13 +135,15 @@ test("an edit of the human's delivered message leaves another session's message 
 	calls[0]!.push({ type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === next + 2)
 	let delivered = lastText(next + 1)
-	expect(delivered).toMatch(/\[Message from [^\n]+\]\n<meta>[^\n]+<\/meta>\nfyi\n\nand hury$/)
+	expect(delivered).toMatch(/\[[^\]\n]*message from [^\n]+\]\n<meta>[^\n]+<\/meta>\nfyi\n\n\[[^\]\n]*\]\nand hury$/)
 	// Up edits the human's text, not the later one from the other session.
 	expect(amend.begin(c.views.get(a)!, '')?.editing.original).toBe('and hury')
 	c.conn.send({ type: 'pause', sessionId: a })
 	c.conn.send({ type: 'submit', sessionId: a, text: 'and hurry', amend: true })
 	await until(() => calls.length === next + 3)
-	expect(lastText(next + 2)).toBe(delivered.replace('hury', 'hurry'))
+	// The edit is a new record, so its block ids differ (task c2t).
+	let body = (t: string) => t.replace(/^\[[^\]\n]*\]$/gm, '[]')
+	expect(body(lastText(next + 2))).toBe(body(delivered.replace('hury', 'hurry')))
 	expect(unkeyed(c.views.get(a)!.items.filter((i) => i.type === 'prompt').slice(-2))).toEqual([
 		{ type: 'prompt', text: 'fyi', from: b, label: by, advisory: true, summary: 'Ask for checks' },
 		{ type: 'prompt', text: 'and hurry' },
