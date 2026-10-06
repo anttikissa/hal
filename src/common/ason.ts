@@ -3,7 +3,7 @@
 //
 // A drop-in replacement for JSON and JSONL that people can read and write.
 // Use it wherever readability and convenience matter: config files (comments
-// survive a round trip), wire messages, and logs (ASONL, one record a line).
+// survive a round trip), wire messages, and logs (ASONL, one record per line).
 //
 //   import { parse, stringify } from './ason'
 //
