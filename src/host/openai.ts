@@ -15,6 +15,7 @@ import { modelsDev } from './models-dev.ts'
 import { diag } from './diag.ts'
 import { provider, type ProviderRequest, type SseMessage } from './provider.ts'
 import { effort } from './effort.ts'
+import { openaiWs } from './openai-ws.ts'
 
 const SCOPE = 'api.responses.write'
 // A ChatGPT subscription's input limit: 400k window = 272k input + 128k
@@ -256,6 +257,7 @@ function init(): void {
 	provider.register('openai', {
 		request: openai.request,
 		parse: openai.parse,
+		open: (http, req) => openaiWs.open(http, req, openai.input),
 		rejected: (account) => auth.rejected(account, 'openai'),
 		spent: (account) => auth.spent(account, 'openai'),
 		models: (signal) => openai.listModels(signal),

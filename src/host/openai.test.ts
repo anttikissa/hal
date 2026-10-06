@@ -11,6 +11,7 @@ import { auth } from './auth.ts'
 import { limits } from './limits.ts'
 import { models } from './models.ts'
 import { openai } from './openai.ts'
+import { openaiWs } from './openai-ws.ts'
 import { provider } from './provider.ts'
 
 const saved = { HAL_HOME: process.env.HAL_HOME, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
@@ -20,6 +21,8 @@ let server: ReturnType<typeof Bun.serve>
 let seen: { path: string; headers: Headers; body: any }[] = []
 let reply: () => Response
 let catalogReply: ((req: Request) => Response) | undefined
+// WebSocket requests the fake server got; null refuses the upgrade.
+let wsSeen: any[] | null = null
 
 const jwt = (claims: object) => `h.${btoa(JSON.stringify(claims)).replace(/=+$/, '')}.s`
 const subscriptionToken = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-1' } })
@@ -36,10 +39,22 @@ beforeEach(() => {
 	seen = []
 	catalogReply = undefined
 	reply = () => sse(completed())
+	wsSeen = null
+	openaiWs.state.enabled = false
 	server = Bun.serve({
 		port: 0,
-		async fetch(req) {
+		websocket: {
+			message(ws, data) {
+				let body = JSON.parse(String(data))
+				wsSeen!.push(body)
+				let id = `resp-${wsSeen!.length}`
+				let response = { id, previous_response_id: body.previous_response_id }
+				for (let e of [{ type: 'response.created', response }, { type: 'response.output_text.delta', delta: 'ok' }, { type: 'response.completed', response: { ...response, status: 'completed' } }]) ws.send(JSON.stringify(e))
+			},
+		},
+		async fetch(req, srv) {
 			let path = new URL(req.url).pathname
+			if (req.headers.get('upgrade') === 'websocket') return wsSeen && srv.upgrade(req, { data: null }) ? (undefined as unknown as Response) : new Response('no', { status: 426 })
 			if (path === '/token') return Response.json({ access_token: subscriptionToken, refresh_token: 'r2', expires_in: 3600 })
 			if (path === '/codex/models') {
 				seen.push({ path, headers: req.headers, body: null })
@@ -63,6 +78,8 @@ afterEach(() => {
 	Object.assign(openai, { apiUrl: orig.apiUrl, codexUrl: orig.codexUrl, codexModelsUrl: orig.codexModelsUrl })
 	auth.tokenUrl = orig.tokenUrl
 	provider.state.providers = {}
+	for (let id of openaiWs.state.sockets.keys()) openaiWs.close(id)
+	openaiWs.state.httpUntil = 0
 	for (let [k, v] of Object.entries(saved)) {
 		if (v === undefined) delete process.env[k]
 		else process.env[k] = v
@@ -238,4 +255,28 @@ test('model discovery unions account catalogs rather than the request account an
 	expect(openai.modelsKey()).not.toBe(key)
 	catalogReply = () => new Response(null, { status: 401 })
 	await expect(openai.listModels(new AbortController().signal)).rejects.toThrow('No OpenAI model catalog available')
+})
+
+test('over a WebSocket, a request that extends the last one sends only the new items; a refused socket falls back to HTTP', async () => {
+	writeAuth({ openai: { accessToken: subscriptionToken, refreshToken: 'r', expires: Date.now() + 3_600_000 } })
+	openaiWs.state.enabled = true
+	wsSeen = []
+	let messages: Message[] = [{ role: 'user', blocks: [{ type: 'text', text: 'one' }] }]
+	let text = async () => (await run(messages, { system: 's', sessionId: 'ws-1' })).filter((e) => e.type === 'text').map((e: any) => e.text).join('')
+	expect(await text()).toBe('ok')
+	messages.push({ role: 'assistant', blocks: [{ type: 'text', text: 'ok' }] }, { role: 'user', blocks: [{ type: 'text', text: 'two' }] })
+	expect(await text()).toBe('ok')
+	expect(wsSeen.map((b) => [b.type, b.previous_response_id, b.input.length])).toEqual([['response.create', undefined, 1], ['response.create', 'resp-1', 1]])
+	expect(wsSeen[1].input[0].content[0].text).toBe('two')
+	// An edited earlier message breaks the chain: everything goes again.
+	messages[0] = { role: 'user', blocks: [{ type: 'text', text: 'one, edited' }] }
+	await text()
+	expect([wsSeen[2].previous_response_id, wsSeen[2].input.length]).toEqual([undefined, 3])
+	expect(seen.filter((r) => r.path === '/codex/responses')).toEqual([])
+
+	wsSeen = null
+	openaiWs.close('ws-1')
+	expect(await text()).toBe('')
+	expect(seen.filter((r) => r.path === '/codex/responses')).toHaveLength(1)
+	expect(openaiWs.state.httpUntil).toBeGreaterThan(Date.now())
 })

@@ -48,6 +48,9 @@ export type Provider = {
 	rejected?(account: string): void
 	// The account (a paid key) has no credits left.
 	spent?(account: string): void
+	// The request's stream over another transport (a WebSocket), as SSE
+	// bytes; undefined sends it over HTTP.
+	open?(http: HttpRequest, req: ProviderRequest): Promise<ReadableStream<Uint8Array> | undefined>
 	// Should end with done or error; shared code adds an error if not.
 	parse(messages: AsyncIterable<SseMessage>): AsyncIterable<StreamEvent>
 	// The model names it offers (without "provider/"), for the picker.
@@ -292,9 +295,10 @@ async function* stream(
 			yield { type: 'error', message: `${modelId} is rate limited`, failure: 'limited', retryAt: limited }
 			return
 		}
+		let socket = await p.open?.(http, { ...input, model: id.model })
 		let res: Response
 		try {
-			res = await provider.fetch(http.url, {
+			res = socket ? new Response(socket) : await provider.fetch(http.url, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json', ...http.headers },
 				body: JSON.stringify(http.body),
