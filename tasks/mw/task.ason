@@ -10,7 +10,8 @@
 		'Unquoted keys are JS identifiers (Unicode ID_Start/ID_Continue, $, _, \\uXXXX escapes that decode to an identifier) or canonical integers; anything else, e.g. {a-b.c@: 1}, fails. The original accepted any run of characters up to a delimiter; that was a spec bug. All 1527 .ason/.asonl files in the checkout still parsed when this changed.',
 		"ASON 0.1.0 (header holds the version and changelog). Values without a literal: toJSON(key) runs as in JSON (Date -> ISO string); functions and symbols become strings ('[Function: name]', '[class Name]', 'Symbol(x)') rather than JSON's dropping, so lenient output always parses and stringify never throws on them (user decision, for loggers). Future experiments in the header: a strict option, and new Date/Map/Set literals.",
 		'Legacy octal (017, 08, "\\101", "\\01") is a parse error, as in strict JS; before, 017 silently read as 17 and "\\101" as "101" where sloppy JS reads 15 and "A". Remaining literal gaps, documented in the header: regex literals, array holes, non-integer numeric keys.',
-		"parse({ comments: true }) keeps the comment above the root value and stringify writes it back; block-comment continuation lines drop the comment's own indentation so re-indenting doesn't double it. parseStream skips lines starting with //. The user asked for tab = 4 columns after first saying a tab is one; tabWidth makes it configurable."
+		"parse({ comments: true }) keeps the comment above the root value and stringify writes it back; block-comment continuation lines drop the comment's own indentation so re-indenting doesn't double it. parseStream skips lines starting with //. The user asked for tab = 4 columns after first saying a tab is one; tabWidth makes it configurable.",
+		"Lenient stringify writes Error as '[Name: message]' (never a stack: that is the logger's job), Map and Set as '[Map with N items]' / '[Set with 1 item]', instead of JSON's {}."
 	],
 	needs: [],
 	foldInto: ['8']
