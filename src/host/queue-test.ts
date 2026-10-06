@@ -38,7 +38,7 @@ function arrived(records: HistoryRecord[]): string[] {
 		let texts = r.blocks.filter((b) => b.type === 'text')
 		for (let [i, b] of texts.entries()) {
 			let id = r.inbox?.[i]
-			let how = b.from !== undefined ? `from ${b.label ?? b.from}, ${b.advisory ? 'advisory' : b.steering ? 'steering' : b.queuedAt ? 'queued' : 'prompt'}`
+			let how = b.from !== undefined ? `from ${b.label ?? b.from}, ${b.advisory ? 'default delivery' : b.steering ? 'steering' : b.queuedAt ? 'queued' : 'prompt'}`
 				: b.origin === 'model' ? 'from Hal'
 				: b.steering ? 'You, steering'
 				: b.queuedAt !== undefined || r.queued ? 'You, queued'
