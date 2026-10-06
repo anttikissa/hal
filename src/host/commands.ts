@@ -31,8 +31,9 @@ export type Context = { sessionId: string; sender?: Sender; cwd: string; previou
 export type SlashCommand = {
 	// Refuse a bad answer before recording it or closing the question.
 	checkAnswers?(args: string, answers: Answers): string | undefined
-	// Safe command text for history and other clients (secret arguments).
-	record?(args: string): string
+	// Safe or readable command text for history and other clients
+	// (secret arguments; ids shown as positions). `id`: the session.
+	record?(args: string, id: string): string | undefined
 	// The detail /help <name> shows; `args` follow the name.
 	help?(args: string): string
 	// Full argument texts `args` may complete to.

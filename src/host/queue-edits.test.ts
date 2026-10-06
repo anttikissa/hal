@@ -1,7 +1,7 @@
 // Queue-edit locks (task zez): the race between acquiring the lock and
 // each way a queued message leaves the inbox, in both orders.
 import { expect, test } from 'bun:test'
-import { calls, client, created, until, useHost } from './host-fixture.test.ts'
+import { calls, client, created, fresh, records, restartHost, until, useHost } from './host-fixture.test.ts'
 import { status } from './status.ts'
 import { turns } from './turns.ts'
 
@@ -128,4 +128,25 @@ test('one window edits at a time; its disconnect releases the lock and delivery 
 	expect(lastPrompt(1)).toContain('old')
 	expect(b.of('warning').at(-1).text).toContain('unchanged')
 	expect(b.of('queue-hold').at(-1).message).toBeUndefined()
+})
+
+test('/queue drop: refused for the locked message; a dropped one never runs, even after a restart', async () => {
+	let { a, id } = await queued()
+	acquire(a, id)
+	a.conn.send({ type: 'submit', sessionId: id, text: '/queue drop 1' })
+	expect(waiting(id)).toEqual(['queued', 'later'])
+	// The web's × names the message by id; history shows its position.
+	a.conn.send({ type: 'submit', sessionId: id, text: '/queue drop later' })
+	expect(waiting(id)).toEqual(['queued'])
+	await until(() => a.of('output').length === 2)
+	expect(a.of('output').map((e) => e.text)).toEqual(['That message is being edited; save or cancel the edit first.', 'dropped queued message 2: later'])
+	expect((await records(id)).filter((r) => r.type === 'command').map((r: any) => r.text)).toEqual(['/queue drop 1', '/queue drop 2'])
+	cancel(a, id)
+	end(0)
+	await until(() => calls.length === 2)
+	end(1)
+	await until(() => !turns.state.running.has(id))
+	restartHost()
+	expect((await fresh(id)).inbox).toEqual([])
+	expect(calls.map((_, i) => lastPrompt(i)).join()).not.toContain('later')
 })

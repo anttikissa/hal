@@ -65,7 +65,7 @@ const runsPython = /(?:^|[;&|(]|\$\()\s*(?:\w+=\S*\s+|(?:env|exec|time|nice|uv r
 // Tool cards' header icons, by tool name.
 const toolIcons: Record<string, IconName> = { bash: 'bash', read: 'read', read_url: 'web', google: 'google', send: 'message', spawn: 'spawn', wait: 'wait', command: 'command', inspect: 'inspect', notify: 'notify', ask: 'ask', read_blob: 'blob' }
 
-export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean }) {
+export function Card(props: { row: Row; session: string; cursor?: boolean; target?: boolean; job?: string; edit?: boolean; discard?: boolean }) {
 	let id = () => `${props.session}#${props.row.key}`
 	let root: HTMLElement | undefined
 	onSettled(() => root && enter(root))
@@ -169,7 +169,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let failed = () => !!props.row.result?.isError
 	let toggle = (e: MouseEvent) => {
-		if ((!folding() && props.row.note === undefined) || (e.target as Element).closest('a, .more, .kill, .edit') || !getSelection()?.isCollapsed) return
+		if ((!folding() && props.row.note === undefined) || (e.target as Element).closest('a, .more, .kill, .edit, .discard') || !getSelection()?.isCollapsed) return
 		scroll.follow(() => {
 			setOpen(!expanded())
 			flush()
@@ -217,9 +217,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		box?.setSelectionRange(box.value.length, box.value.length)
 	}
 	let editButton = () => <Show when={props.edit}><button type="button" class="edit" aria-label={props.row.waiting ? 'Edit queued message' : 'Edit prompt'} title={props.row.waiting ? 'Edit in the queue without changing its position' : 'Edit this prompt and send it again from here'} onClick={edit}><Icon name="edit" /></button></Show>
+	// Drops this queued message by its inbox id (task gr4); the host refuses with a visible reason.
+	let discardButton = () => <Show when={props.discard}><button type="button" class="discard" aria-label="Discard queued message" title="Remove from the queue" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop ${props.row.key}` })}><Icon name="close" /></button></Show>
 	let heading = () => (
 		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} label={who()} reference={link()}>
 			{editButton()}
+			{discardButton()}
 		</CardHeader>
 	)
 	// Content branches share the shell, header and normal body inset.
@@ -261,7 +264,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let compact = () => (
 		<>
-			<Show when={expanded() && md()} fallback={<>{link()}{editButton()}<div class="content">{queued()}</div></>}>
+			<Show when={expanded() && md()} fallback={<>{link()}{editButton()}{discardButton()}<div class="content">{queued()}</div></>}>
 				{heading()}
 				<div class="content"><div class="sender">{props.row.note}</div>{markdown()}</div>
 			</Show>
