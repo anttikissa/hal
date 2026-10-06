@@ -23,7 +23,7 @@ import { liveFiles } from './live-file.ts'
 import { paths } from './paths.ts'
 
 // `next`: past the highest record number (HistoryRecord `n`).
-type Marks = { rebaseVersion?: 1; rebase?: number; transitions?: number[]; size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]>; changes?: number[]; changedPaths?: Record<string, true> }
+type Marks = { rebaseVersion?: 1; rebase?: number; transitions?: number[]; size: number; next?: number; question?: number; turnQuestion?: string; answer?: number; turn?: number; prompt?: number; inbox: Record<string, number | number[]>; changes?: number[]; files?: number; changedPaths?: Record<string, true> }
 type Raw = { offset: number; bytes: number; text: string }
 type Line = { offset: number; bytes: number; record: HistoryRecord }
 // `end`: the byte the page (or tail) ends at.
@@ -143,18 +143,39 @@ function lineAt(path: string, offset: number): Line {
 	}
 }
 
-function apply(m: Marks, r: HistoryRecord, offset: number): void {
+// The distinct paths the file_changes records at m.changes observed.
+// Marks keep only their count (a single call can declare a whole tree:
+// 130k paths made marks.ason 15 MB, ~800 ms to load); the paths are
+// rebuilt in memory from those records when a new one needs them.
+function changedPaths(m: Marks, path: string): Set<string> {
+	let seen = pages.state.paths.get(m)
+	if (seen) return seen
+	seen = new Set()
+	for (let o of m.changes ?? []) {
+		let r = pages.lineAt(path, o).record
+		if (r.type === 'file_changes') for (let file of r.files) if (!file.undeclared) seen.add(resolve(r.cwd, file.path))
+	}
+	pages.state.paths.set(m, seen)
+	return seen
+}
+
+function apply(m: Marks, r: HistoryRecord, offset: number, path: string): void {
 	if (r.type === 'rebase') m.rebase = offset
 	if (r.type === 'output' && r.transition) m.transitions = [offset]
 	if (r.type === 'output' && r.transitionCancel) (m.transitions ??= []).push(offset)
 	if (r.type === 'output' && r.transitionDone) m.transitions = []
 	m.next = Math.max(m.next ?? 1, (r.n ?? offset + 1) + 1)
 	m.changes ??= []
-	m.changedPaths ??= {}
-	if (r.type === 'command' && r.text.trim() === '/changes clear') { m.changes = []; m.changedPaths = {} }
+	if (r.type === 'command' && r.text.trim() === '/changes clear') {
+		m.changes = []
+		m.files = 0
+		pages.state.paths.set(m, new Set())
+	}
 	if (r.type === 'file_changes') {
-		(m.changes ??= []).push(offset)
-		for (let file of r.files) if (!file.undeclared) (m.changedPaths ??= {})[resolve(r.cwd, file.path)] = true
+		let seen = pages.changedPaths(m, path)
+		m.changes.push(offset)
+		for (let file of r.files) if (!file.undeclared) seen.add(resolve(r.cwd, file.path))
+		m.files = seen.size
 	}
 	if (r.type === 'question') {
 		m.question = offset
@@ -212,9 +233,15 @@ function* catchUp(id: string): Steps<Marks> {
 		let size = existsSync(path) ? statSync(path).size : 0
 		// Marks from before `next`, or with `close` (an answer or a turn
 		// end, before answers were kept apart), are rebuilt.
+		// Marks from before `files` kept their paths: only the count stays.
+		if ('changedPaths' in m) {
+			m.files = Object.keys(m.changedPaths ?? {}).length
+			delete m.changedPaths
+		}
 		if (m.size < 0 || m.size > size || (m.size > 0 && (m.next === undefined || m.changes === undefined || !('rebaseVersion' in m))) || 'close' in m) {
 			for (let key of Object.keys(m)) delete (m as Record<string, unknown>)[key]
-			Object.assign(m, { size: 0, inbox: {}, changes: [], changedPaths: {}, rebaseVersion: 1 })
+			Object.assign(m, { size: 0, inbox: {}, changes: [], files: 0, rebaseVersion: 1 })
+			pages.state.paths.set(m, new Set())
 		}
 		if (m.size >= size) return m
 		let base = m.size
@@ -227,7 +254,7 @@ function* catchUp(id: string): Steps<Marks> {
 			yield r.bytes
 			if (m.size !== at) break
 			let line = decode(path, r)
-			pages.apply(m, line.record, line.offset)
+			pages.apply(m, line.record, line.offset, path)
 			m.size = at = line.offset + line.bytes
 		}
 		// Blank lines after the last record: the marks cover them too.
@@ -243,7 +270,7 @@ function note(id: string, line: string, record: HistoryRecord): void {
 	let m = pages.load(id)
 	if (m.size < 0 && size === bytes) m.size = 0
 	if (m.size !== size - bytes) return
-	pages.apply(m, record, m.size)
+	pages.apply(m, record, m.size, history.file(id))
 	m.size = size
 }
 
@@ -363,7 +390,7 @@ function reset(): void {
 export const pages = {
 	// `bytesRead`: history bytes read lazily so far. `marks`: by path.
 	// `until`: when this turn's slice of sliced work ends.
-	state: { bytesRead: 0, marks: new Map<string, Marks>(), until: undefined as number | undefined },
+	state: { bytesRead: 0, marks: new Map<string, Marks>(), paths: new WeakMap<Marks, Set<string>>(), until: undefined as number | undefined },
 	// About how many bytes of history a snapshot or a page reads.
 	budget: 256 * 1024,
 	// The longest stretch sliced reading runs without yielding.
@@ -382,6 +409,7 @@ export const pages = {
 	raw,
 	lines,
 	lineAt,
+	changedPaths,
 	apply,
 	marksPath,
 	load,

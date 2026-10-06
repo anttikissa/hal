@@ -61,7 +61,7 @@ function migrate(path: string): boolean {
 		let next = marks.next
 		if (next !== undefined && (!Number.isSafeInteger(next) || (next as number) < 1)) throw new Error(`${path}: invalid marks next`)
 		for (let key of Object.keys(marks)) delete marks[key]
-		Object.assign(marks, { size: 0, next: records.reduce((max, r) => Math.max(max, r.n! + 1), (next as number | undefined) ?? 1), inbox: {}, changes: [], changedPaths: {}, rebaseVersion: 1 })
+		Object.assign(marks, { size: 0, next: records.reduce((max, r) => Math.max(max, r.n! + 1), (next as number | undefined) ?? 1), inbox: {}, changes: [], files: 0, rebaseVersion: 1 })
 		liveFiles.save(marks)
 	} finally { liveFiles.close(marks) }
 	let temp = `${path}.migrate`

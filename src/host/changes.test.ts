@@ -6,6 +6,7 @@ import { changesPage } from './changes-page.ts'
 import { fileChanges } from './file-changes.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
+import { pages } from './pages.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 import { stats } from './stats.ts'
@@ -64,10 +65,15 @@ test('changes retain first/latest and steps through commits, exact content match
 	// Calls may observe temporary files outside their Git cwd.
 	expect(await changes.committed(id, { ...file, path: `${home}-backup.txt` })).toBeUndefined()
 	expect(changes.list(id)).toHaveLength(1)
+	// Marks keep only the count: a restarted host rebuilds the paths from
+	// the records to count distinct ones.
+	pages.state.marks.clear()
+	history.append(id, { type: 'file_changes', cwd: home, toolId: 'four', files: [{ path: 'b.txt', before: null, after }] })
+	expect(stats.of(id).files).toBe(2)
 	history.append(id, { type: 'command', text: '/changes clear' })
 	expect(changes.list(id)).toHaveLength(0)
 	expect(stats.of(id).files).toBeUndefined()
-	expect(history.readSync(id).filter((r) => r.type === 'file_changes')).toHaveLength(2)
+	expect(history.readSync(id).filter((r) => r.type === 'file_changes')).toHaveLength(3)
 	history.append(id, { type: 'file_changes', cwd: home, toolId: 'three', files: [{ path: 'a.txt', before: after, after: null }] })
 	expect(changes.list(id)[0]!.before).toBe(after)
 })
