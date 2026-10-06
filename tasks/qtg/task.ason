@@ -1,0 +1,6 @@
+{
+	title: 'Measure the share of provider input that Hal adds',
+	spec: 'scripts/framing <session-id>... prints, for each session, the size of the provider input that replay.toMessages builds from its history, and the share of it that Hal adds rather than the user, the model or a tool wrote: headers, <meta> lines, notices and message framing. Sizes are in characters; the script calls no provider and needs no network. Any change that adds framing to provider input runs the script on at least one real session and records the share before and after in its task notes, so the total cost of many small additions stays visible.',
+	status: 'planned',
+	needs: ['7']
+}

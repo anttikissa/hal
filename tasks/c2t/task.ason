@@ -1,0 +1,21 @@
+{
+	title: 'Replay tells the model block ids and delivery facts',
+	spec: `Provider input tells the model the block ids, times and delivery facts that the user sees in the transcript, so both can refer to blocks by id (read_blob already accepts block ids). The facts go only into user-side content: assistant text, thinking and tool_use blocks reach the provider exactly as it produced them. Thinking signatures need this, and the model cannot imitate a prefix that it never sees in its own output.
+
+Header: each prompt, message and tool result starts with one line in square brackets. Its fields are separated by "; ": the time and block id first, then the tags.
+- Time: replay.clock, HH:MM, with YYYY-MM-DD first on the first stamp and whenever the date differs from the previous stamp's. Never titles.time: it depends on today's date.
+- Prompts and messages: the time, the id and the transcript header's tags (sender, steering, queued at HH:MM, next round, /x continuation, Hal), e.g. "[12:33 #u123]" or "[12:40 #m130; message from Builder (160-xyz); steering]". A plain prompt has no tag. This header replaces the separate "[Message from ...]", "[Hal]" and "Sent at" lines. The next-round notice stays.
+- Tool results: the id of the call's card (#t, the id the user sees; the provider's toolu_ id stays internal), the call's start time, and its duration when the stored ms is 5000 or more, in the wm0 format, e.g. "[12:34 #t125; 8.1s]".
+- The ids of the model's text and thinking blocks go into the header of the next user-side content (the first tool result or the prompt that follows), e.g. "[12:35 #u126; you wrote #r124 #a125]". Tool calls are not listed: their results carry their ids.
+- A block from a forked session shows its id as the transcript does: "#u12 in 160-xyz".
+- No model names: catalog display names can change. Model switches already arrive as notices.
+
+Determinism: each header depends only on history records at or before it, so appending to history never changes earlier provider input and the prompt cache stays valid. The only cache miss is the one when this change is deployed.
+
+The system prompt says in one line what the headers mean and that the model may cite ids it received, never invented ones.
+
+Tests: the exact replay of a short history with a prompt, a steering message, thinking, text and a tool call of 5 s or more (a format contract); appending a record leaves the earlier messages byte-identical. Run scripts/framing (task qtg) on a real session before and after, and record both shares in the notes.`,
+	status: 'planned',
+	needs: ['7', '9p', 'nn', 'nzv', 'wm0', 'qtg'],
+	foldInto: ['nn']
+}
