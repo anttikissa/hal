@@ -26,10 +26,24 @@ function present(c: Watcher): boolean {
 	return c.visible !== undefined && (c.record?.lastAt === undefined || Date.now() - c.record.lastAt < presentMs)
 }
 
-function kind(event: Event): NoticeKind | undefined {
+// A turn whose reply ends with <question> waits for the user (task nd6).
+function kind(event: Event, id?: string): NoticeKind | undefined {
 	if (event.type === 'question') return 'attention'
 	if (event.type !== 'turn-end') return undefined
-	return event.status === 'completed' ? 'done' : event.status === 'error' ? 'failed' : undefined
+	if (event.status === 'completed') return id !== undefined && notify.asked(id) ? 'attention' : 'done'
+	return event.status === 'error' ? 'failed' : undefined
+}
+
+// Whether the latest turn's reply ends with a <question> tag: derived
+// from history, so a restart, a reload and every client agree.
+function asked(id: string): boolean {
+	let records = pages.page(id).records
+	for (let i = records.length - 1; i >= 0; i--) {
+		let r = records[i]!
+		if (r.type === 'user') return false
+		if (r.type === 'assistant' && r.block.type === 'text') return summary.asks(r.block.text)
+	}
+	return false
 }
 
 // What the latest turn replied: its <summary> (common/summary.ts), else
@@ -62,12 +76,12 @@ function line(id: string, event: Event): string {
 }
 
 function route(clients: Iterable<Watcher>, id: string, event: Event): void {
-	let k = notify.kind(event)
+	let k = notify.kind(event, id)
 	if (!k) return
 	let all = [...clients]
 	if (all.some((c) => present(c) && c.visible === id)) return diag.log(`push: ${id} not pushed, its tab is on screen`)
 	let word = k === 'attention' ? 'needs an answer' : k === 'failed' ? 'failed' : 'done'
-	let told = k === 'done' ? notify.reply(id) : undefined
+	let told = event.type === 'turn-end' && k !== 'failed' ? notify.reply(id) : undefined
 	let block = event.type === 'question' ? (event.n === undefined ? undefined : `${event.n}`) : told?.block
 	let source = { ...(block ? { block } : {}), ...(event.type === 'question' ? { question: event.id } : {}) }
 	notify.deliver(all, id, k, notify.line(id, event), told?.line ? `${word}: ${told.line}` : word, source)
@@ -97,4 +111,4 @@ function deliver(clients: Iterable<Watcher>, id: string, k: NoticeKind, line: st
 	diag.log(`push: ${id} not pushed, watched: ${who.join('; ')}`)
 }
 
-export const notify = { kind, replyLine, reply, line, route, deliver }
+export const notify = { kind, asked, replyLine, reply, line, route, deliver }

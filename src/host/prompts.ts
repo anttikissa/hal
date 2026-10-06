@@ -32,6 +32,7 @@ import { slash } from './slash.ts'
 import { status } from './status.ts'
 import { statusUsage } from './status-usage.ts'
 import { subagents } from './subagents.ts'
+import { notify } from './notify.ts'
 import { queueEdits } from './queue-edits.ts'
 import { turns } from './turns.ts'
 
@@ -57,7 +58,8 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 	let interrupt = !queue && sender?.advisory !== true
 	// Queued messages still waiting (one is being edited) go first.
 	let behind = queue && status.inboxOf(id).some((m) => m.queue)
-	if (behind || turns.state.running.has(id) || states.busy(state) || ((queue || sender?.from !== undefined || sender?.origin === 'model') && state.type !== 'idle')) {
+	// After an asking turn (task nd6), a queued message waits for the reply's turn.
+	if (behind || (queue && notify.asked(id)) || turns.state.running.has(id) || states.busy(state) || ((queue || sender?.from !== undefined || sender?.origin === 'model') && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
 		if (queue) record.queue = true
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
@@ -216,9 +218,11 @@ function steer(id: string): void {
 
 // After a completed turn: runs the oldest queued message, if any. One
 // being edited waits, and the ones behind it too (queueEdits.release).
+// A turn that ended with <question> waits for the user's reply first
+// (task nd6); queued messages run after a final answer.
 function next(id: string): void {
 	let queued = status.inboxOf(id).find((m) => m.queue)
-	if (!queued || queued.id === queueEdits.held(id) || status.transition(id, { type: 'submit' })) return
+	if (!queued || queued.id === queueEdits.held(id) || notify.asked(id) || status.transition(id, { type: 'submit' })) return
 	let record = prompts.deliver(id, [queued], undefined, undefined, true)
 	turns.start(id, prompts.texts(record.blocks)[0], undefined, prompts.images(record.blocks), { ...record, sender: prompts.senders(record.blocks)[0] })
 }

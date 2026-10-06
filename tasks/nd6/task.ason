@@ -1,7 +1,10 @@
 {
 	title: 'A <question> tag marks a turn that waits for the user',
 	spec: "SYSTEM.md tells the model: a reply that ends by asking the user something ends with <question>one line</question> instead of <summary>. common/summary.ts extracts and hides both tags alike, with the same streaming, code-span and stray-tag rules (x8, aw). A turn that ends with <question> waits for the user: its notice and push use the attention kind (qm), and the tab keeps its attention mark until the user sends something. Queued messages (Alt-Enter, /queue, send with queue: true) run only after a final turn end: a turn that ends with <summary> or with no tag. After a <question> turn they stay queued and visible; the user's reply starts a turn, and they run after that turn ends with a final answer. /queue next still sends the oldest at once. Steering, default delivery, pauses, failures and question forms keep their current behavior. Whether the last turn ended with a question derives from history, so restart, reload and both clients agree. Raised by the user in sessions 166-gig and 165-gab (2026-10-06); a separate tag was chosen over a summary attribute, which models get wrong more often.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"summary.ts handles both tags with one regex; summary.asks(text) is true when the last complete tag is <question>. notify.asked(id) reads the latest turn's last text block from pages (history), and gates three places: notify.kind (attention instead of done), prompts.next and prompts.submit (a queued submit to an idle session after an asking turn stays queued), and tabs (tab-seen does not clear the mark; a busy state event does)."
+	],
 	needs: ['qm', '2r', 'nzv'],
 	foldInto: ['x8']
 }
