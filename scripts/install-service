@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Install a user service for this live checkout, without changing a host.
+# Task: 1es.
+set -euo pipefail
+
+case "${1:-}" in
+	--help|-h)
+		printf 'Usage: scripts/install-service [--print]\nInstall hal.service for this user; never enable or start it.\n--print prints the unit without writing files.\n'
+		exit 0 ;;
+	''|--print) ;;
+	*) echo "Unknown option: $1" >&2; exit 1 ;;
+esac
+[ "$#" -le 1 ] || { echo 'Expected at most one option.' >&2; exit 1; }
+[ "$(uname -s)" = Linux ] || { echo 'This installer requires Linux and systemd.' >&2; exit 1; }
+checkout="$(cd "$(dirname "$0")/.." && pwd -P)"
+bun="$(command -v bun)" || { echo 'Bun is missing; run ./install first.' >&2; exit 1; }
+bun="$(readlink -f "$bun")"
+[ -x "$bun" ] || { echo "Bun is not executable: $bun" >&2; exit 1; }
+[ -d "$checkout/node_modules" ] || { echo 'Dependencies are missing; run ./install first.' >&2; exit 1; }
+
+# Reject line injection before command substitutions (their failures do not
+# propagate through a successful heredoc cat).
+for value in "$checkout" "$bun" "$PATH"; do
+	case "$value" in *$'\n'*|*$'\r'*) echo 'Newlines in service paths or PATH are unsupported.' >&2; exit 1 ;; esac
+done
+
+# WorkingDirectory takes a raw path; trailing whitespace is stripped and a
+# final backslash continues the line. Refuse paths it cannot represent.
+case "$checkout" in *[[:space:]]|*\\) echo 'Checkout paths ending in whitespace or backslash are unsupported.' >&2; exit 1 ;; esac
+
+# systemd has its own quoting and % specifiers, not shell quoting.
+quote() {
+	local value="$1"
+	value="${value//\\/\\\\}"
+	value="${value//\"/\\\"}"
+	value="${value//%/%%}"
+	printf '"%s"' "$value"
+}
+unit="$(cat <<UNIT
+[Unit]
+Description=Hal live-checkout host
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=${checkout//%/%%}
+Environment=$(quote "HAL_HOME=$checkout")
+Environment=$(quote "PATH=$PATH")
+ExecStart=$(quote "${bun//\$/\$\$}") $(quote "${checkout//\$/\$\$}/src/main.ts") serve
+Restart=on-failure
+RestartForceExitStatus=100
+RestartSec=2
+KillMode=control-group
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=default.target
+UNIT
+)"
+if [ "${1:-}" = --print ]; then
+	printf '%s\n' "$unit"
+	exit 0
+fi
+command -v systemctl >/dev/null || { echo 'systemctl is missing.' >&2; exit 1; }
+target="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/hal.service"
+mkdir -p "$(dirname "$target")"
+if [ -e "$target" ] || [ -L "$target" ]; then
+	if [ -f "$target" ] && [ "$(cat "$target")" = "$unit" ]; then
+		printf 'Already installed: %s\n' "$target"
+	else
+		printf 'Refusing to replace existing unit: %s\nInspect it and remove it explicitly before reinstalling.\n' "$target" >&2
+		exit 1
+	fi
+else
+	(set -o noclobber; printf '%s\n' "$unit" > "$target")
+	printf 'Installed: %s\n' "$target"
+fi
+printf '\nNo host or config changed. No service enabled or started.\n'
+printf 'Read SERVER.md before enabling: set hostMode to server, then stop any existing host deliberately.\n'
+printf 'When ready:\n  systemctl --user daemon-reload\n  systemctl --user enable --now hal.service\n'
+printf 'Boot without login requires linger (authorization may be needed):\n  loginctl enable-linger "$USER"\n'

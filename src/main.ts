@@ -20,12 +20,11 @@ import { perf } from './common/perf.ts'
 import { protocol, type Event, type Tab } from './common/protocol.ts'
 import { settings } from './common/settings.ts'
 import { resources } from './host/resources.ts'
-import { anthropic } from './host/anthropic.ts'
 import { config } from './host/config.ts'
+import { lifecycle } from './host/lifecycle.ts'
 import { diag } from './host/diag.ts'
 import { find } from './host/find.ts'
 import { host } from './host/host.ts'
-import { promptFiles } from './host/prompt-files.ts'
 import { restartGuard, restartProcess } from './host/commands/restart.ts'
 import { restartNote } from './host/restart-note.ts'
 import { jobs } from './host/jobs.ts'
@@ -35,8 +34,6 @@ import { modelsDev } from './host/models-dev.ts'
 import { sessions } from './host/sessions.ts'
 import { turns } from './host/turns.ts'
 import { version } from './host/version.ts'
-import { openai } from './host/openai.ts'
-import { openaiCompat } from './host/openai-compat.ts'
 import { marksWorker } from './host/marks-worker.ts'
 import { paths } from './host/paths.ts'
 import { secrets } from './host/secrets.ts'
@@ -89,17 +86,6 @@ function keepTab(tab: Tab): void {
 	} catch {}
 }
 
-// What any process that may host needs, terminal or not.
-function initHost(): void {
-	paths.init()
-	host.init()
-	anthropic.init()
-	openai.init()
-	openaiCompat.init()
-	// Checks only while this process hosts: a peer has no clients.
-	promptFiles.start(host.state.clients)
-}
-
 // Module init() calls go here, in order, once modules have them.
 function init(): void {
 	main.initHost()
@@ -125,7 +111,8 @@ function init(): void {
 	version.found = (loaded) => {
 		versions.state.own = loaded
 		host.announce(loaded)
-		versions.report(app.send), app.show()
+		versions.report(app.send)
+		app.show()
 	}
 	version.changed = () => ((versions.state.newCode = true), versions.report(app.send), app.show())
 	main.later(() => void version.init())
@@ -160,7 +147,8 @@ function initTerminal(remote?: string): void {
 function onEvent(event: Event): void {
 	if (event.type !== 'version') return app.onEvent(event)
 	versions.state.host = event.version
-	versions.report(app.send), app.show()
+	versions.report(app.send)
+	app.show()
 }
 
 // Joins this home's host, or becomes it; resolves once connected. Either
@@ -170,7 +158,7 @@ function onEvent(event: Event): void {
 function joinHost(onEvent: (event: Event) => void, onState?: (state: LinkState) => void): Promise<void> {
 	let opts: Parameters<typeof link.start>[0] = {
 		socketPath: server.socketPath(),
-		tryHost: () => main.becomeHost(),
+		tryHost: async () => main.mayHost() && main.becomeHost(),
 		local: (deliver) => host.connect(deliver),
 		onEvent,
 	}
@@ -198,7 +186,7 @@ async function becomeHost(): Promise<boolean> {
 		find.init()
 		resources.init()
 		web.start()
-		if (web.state.server && web.state.server.port !== settings.webPort() && terminal.available()) {
+		if (web.state.server && web.state.server.port !== settings.webPort() && !main.state.headless && terminal.available()) {
 			app.state.notice = `Web is on port ${web.state.server.port} (preferred ${settings.webPort()} is busy)`
 			app.show()
 		}
@@ -323,7 +311,7 @@ async function printMode(job: Extract<Args, { kind: 'print' }>): Promise<void> {
 	}
 	main.initHost()
 	let run = print.run({ prompt: job.prompt, cwd, ...(job.model && { model: job.model }) }, { out: (t) => process.stdout.write(t), err: (t) => process.stderr.write(t) })
-	await link.start({ socketPath: server.socketPath(), tryHost: () => server.serve(), local: (deliver) => host.connect(deliver), onEvent: run.onEvent })
+	await link.start({ socketPath: server.socketPath(), tryHost: async () => main.mayHost() && server.serve(), local: (deliver) => host.connect(deliver), onEvent: run.onEvent })
 	run.begin()
 	process.exit(await run.done)
 }
@@ -355,6 +343,7 @@ async function start(): Promise<void> {
 	perf.mark('local.ts')
 	await main.loadPlugins()
 	perf.mark('plugins')
+	if (parsed.kind === 'serve') return main.serve()
 	if (parsed.kind === 'print') return main.printMode(parsed)
 	if (parsed.kind === 'remote') {
 		if (!terminal.available()) {
@@ -377,7 +366,7 @@ async function start(): Promise<void> {
 }
 
 export const main = {
-	state: { kept: '', shown: false, later: [] as (() => void)[], fallback: undefined as Timer | undefined },
+	state: { kept: '', shown: false, headless: false, later: [] as (() => void)[], fallback: undefined as Timer | undefined },
 	laterMs: 1000,
 	authWaitMs: 5000,
 	lastTab,
@@ -385,11 +374,18 @@ export const main = {
 	localPath,
 	loadLocal,
 	loadPlugins,
-	initHost,
+	initHost: lifecycle.initHost,
 	init,
 	initTerminal,
 	onEvent,
 	becomeHost,
+	mayHost: lifecycle.mayHost,
+	serve: async () => {
+		main.state.headless = true
+		main.initHost()
+		await lifecycle.serve(main.becomeHost)
+		main.shown()
+	},
 	refreshModels,
 	later,
 	shown,
