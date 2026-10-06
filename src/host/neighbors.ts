@@ -1,9 +1,6 @@
-// Sessions in one directory hear about recent activity (tasks 0f, c4x).
-// Bash calls report the paths they declare in modifies when they start
-// (file-changes.ts, task 8w); a bash result in a cwd where another open
-// session declared paths lately gets one line per neighbor after the
-// output. Activity, never ownership. In memory only: after a restart the
-// first notes repeat.
+// Recent declared activity among open same-cwd sessions, sampled before
+// model requests. State is bounded by the recent window and open sessions;
+// after a host restart the first facts repeat. Tasks: 0f, c4x, nvm.
 import { clock } from './clock.ts'
 import { clients } from './clients.ts'
 import { sessions } from './sessions.ts'
@@ -13,6 +10,7 @@ type Entry = { cwd: string; paths: Map<string, number>; running: number }
 const maxPaths = 5
 
 function start(sessionId: string, cwd: string, paths: string[]): void {
+	neighbors.prune()
 	let entry = neighbors.state.seen.get(sessionId)
 	if (!entry || entry.cwd !== cwd) neighbors.state.seen.set(sessionId, entry = { cwd, paths: new Map(), running: 0 })
 	entry.running++
@@ -24,15 +22,31 @@ function end(sessionId: string): void {
 	if (entry) entry.running = Math.max(0, entry.running - 1)
 }
 
+// Discard expired paths, closed/moved activity and its delivery fingerprints.
+// Keep active counters until exit so an old background call cannot finish a newer one.
+function prune(): void {
+	let now = clock.now()
+	for (let [id, entry] of neighbors.state.seen) {
+		for (let [path, at] of entry.paths) if (now - at > neighbors.windowMs) entry.paths.delete(path)
+		if ((!entry.paths.size && !entry.running) || sessions.state.open.get(id)?.cwd !== entry.cwd) neighbors.state.seen.delete(id)
+	}
+	for (let key of neighbors.state.sent.keys()) {
+		let [viewer, id] = key.split('|')
+		let entry = neighbors.state.seen.get(id!)
+		if (!entry?.paths.size || sessions.state.open.get(viewer!)?.cwd !== entry.cwd) neighbors.state.sent.delete(key)
+	}
+}
+
 // Lines for `sessionId` about others; only those whose content changed
 // since the last note to this session. Times show in its client's zone.
 function notes(sessionId: string, cwd: string): string[] {
-	let now = clock.now(), timeZone = clients.timezone(sessionId)
+	neighbors.prune()
+	let timeZone = clients.timezone(sessionId)
 	let lines: string[] = []
 	for (let [id, entry] of neighbors.state.seen) {
 		let key = `${sessionId}|${id}`
-		let fresh = [...entry.paths].filter(([, at]) => now - at <= neighbors.windowMs)
-		if (id === sessionId || entry.cwd !== cwd || !sessions.state.open.has(id) || !fresh.length) { neighbors.state.sent.delete(key); continue }
+		let fresh = [...entry.paths]
+		if (id === sessionId || entry.cwd !== cwd || !fresh.length) { neighbors.state.sent.delete(key); continue }
 		fresh.sort((a, b) => b[1] - a[1])
 		let shown = fresh.slice(0, maxPaths).map(([p]) => p)
 		if (fresh.length > maxPaths) shown.push(`${fresh.length - maxPaths} more`)
@@ -46,14 +60,8 @@ function notes(sessionId: string, cwd: string): string[] {
 	return lines
 }
 
-// The tool result with the notes (if any) after its output.
-function append(output: string, sessionId: string, cwd: string): string {
-	let lines = neighbors.notes(sessionId, cwd)
-	return lines.length ? `${output}${output.endsWith('\n') || !output ? '' : '\n'}${lines.join('\n')}` : output
-}
-
 export const neighbors = {
 	state: { seen: new Map<string, Entry>(), sent: new Map<string, string>() },
 	windowMs: 15 * 60_000,
-	start, end, notes, append,
+	start, end, prune, notes,
 }

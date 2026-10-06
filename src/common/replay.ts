@@ -1,6 +1,7 @@
 // Session history records (one per line in sessions/<id>/history.asonl)
 // and the rebuild of provider input from them. Provider input comes from
 // these records alone, never from display state.
+// Tasks: 7, nvm.
 
 import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
 import { bashResult } from './bash-result.ts'
@@ -87,6 +88,8 @@ export type HistoryRecord = Numbered &
 	// The session's cwd (/cd) or model changed. Not a turn; the model is
 	// told as a notice on its next request.
 	| { type: 'change'; cwd?: string; model?: string; previous?: { cwd?: string; model?: string }; ts: string }
+	// Host facts, delivered only at a frozen request boundary (nvm).
+	| { type: 'notice'; text: string; ts: string }
 	// Observed changes during bash, not proof of authorship; not provider input.
 	| { type: 'file_changes'; toolId: string; call?: number; cwd: string; files: FileChange[]; ts: string }
 	// One provider round's own usage (task c4), after its blocks: the
@@ -168,7 +171,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		if (r.type === 'answer' && r.question === waiting) waiting = undefined
 		let text = modelNotices.text(r, known)
 		if (text && !delivered.has(r.n ?? i + 1)) facts.push({ source: r.n ?? i + 1, text })
-		if (r.type === 'change' || r.type === 'rate_limit' || r.type === 'rebase' || r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
+		if (r.type === 'notice' || r.type === 'change' || r.type === 'rate_limit' || r.type === 'rebase' || r.type === 'file_changes' || r.type === 'round' || r.type === 'inbox' || r.type === 'question' || r.type === 'answer' || r.type === 'command' || r.type === 'output' || r.type === 'compact' || r.type === 'reset') continue
 		// Held calls go on waiting for their results.
 		if (r.type === 'continue' && waiting !== undefined) continue
 		let before = prev
@@ -265,7 +268,7 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 		if (r.type === 'rebase') { out = rebase.apply(out, r); continue }
 		if (r.type === 'user' && r.replaces) {
 			let at = replay.lastPrompt(out)
-			if (at >= 0) out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'change' || (x.type === 'output' && x.change !== undefined))]
+			if (at >= 0) out = [...out.slice(0, at), ...out.slice(at).filter((x) => x.type === 'inbox' || x.type === 'answer' || x.type === 'notice' || x.type === 'change' || (x.type === 'output' && x.change !== undefined))]
 			let { replaces: _replaces, ...projected } = r
 			r = projected
 		}
@@ -283,7 +286,7 @@ function current(records: HistoryRecord[]): HistoryRecord[] {
 function withoutCommands(records: HistoryRecord[]): HistoryRecord[] {
 	let questions = new Map(records.flatMap((r) => (r.type === 'question' ? [[r.id, r] as const] : [])))
 	return records.filter((r) => {
-		if ((r.type === 'user' && r.notices !== undefined && !r.blocks.length) || r.type === 'rebase' || r.type === 'command' || r.type === 'output' || r.type === 'change' || r.type === 'compact' || r.type === 'reset') return false
+		if ((r.type === 'user' && r.notices !== undefined && !r.blocks.length) || r.type === 'rebase' || r.type === 'command' || r.type === 'output' || r.type === 'notice' || r.type === 'change' || r.type === 'compact' || r.type === 'reset') return false
 		if (r.type === 'question') return !r.from
 		return r.type !== 'answer' || (questions.has(r.question) && !questions.get(r.question)!.from)
 	})

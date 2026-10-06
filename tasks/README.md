@@ -43,6 +43,8 @@ Before a request, history.messages freezes pending notices on a user record,
 with original source numbers, timestamps and text. This is the same durable
 provider input used for prompts and delivered inbox messages, not a second
 queue. Notice-only records neither start a turn nor become a recalled prompt.
+Host facts (resource levels, neighbor activity and restarts, task nvm) use
+notice records through this path, never suffixes inside bash output.
 Replay places notices after tool results, never inside an unfinished exchange;
 later facts do not move into earlier request prefixes. Model switches finish
 the current round and apply to the next round, not the next turn. Display order

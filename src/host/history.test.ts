@@ -11,6 +11,9 @@ import { liveFiles } from './live-file.ts'
 import { provider } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { naming } from './naming.ts'
+import { busy } from './busy.ts'
+import { replay } from '../common/replay.ts'
+import { modelNotices } from '../common/model-notices.ts'
 
 const savedHome = process.env.HAL_HOME
 const origOnError = liveFiles.onError
@@ -413,4 +416,37 @@ test('a failed turn stores the provider body with the message, never just a head
 	history.submit(id, 'go')
 	await drain(history.turn(id))
 	expect((await history.read(id)).at(-1)).toMatchObject({ type: 'turn_end', status: 'error', error: 'Invalid JSON input\n{"command": "ls' })
+})
+
+test('host facts freeze at the next request without waking a turn or changing earlier input', async () => {
+	let id = newSession()
+	let fact = history.append(id, { type: 'notice', text: 'Disk resources recovered.', ts: '2026-10-06T21:00:00Z' })
+	expect(busy.list()).not.toContain(id)
+	expect(replay.lastPrompt(history.readSync(id))).toBe(-1)
+	let first = await history.messages(id)
+	expect(JSON.stringify(first)).toContain('Disk resources recovered.')
+	expect(JSON.stringify(first)).toContain('2026-10-06T21:00:00Z')
+	let records = history.readSync(id)
+	expect(records.at(-1)).toMatchObject({ type: 'user', blocks: [], notices: [{ source: fact.n }] })
+	expect(busy.list()).not.toContain(id)
+	expect(modelNotices.pending(records)).toEqual([])
+	forget()
+	expect(await history.messages(id)).toEqual(first)
+	expect(history.readSync(id)).toHaveLength(records.length)
+	// Later facts must not alter an already frozen request prefix.
+	history.append(id, { type: 'notice', text: 'Another host started.' })
+	let next = await history.messages(id)
+	expect(JSON.stringify(next)).toContain('Another host started.')
+	expect(next.slice(0, first.length)).toEqual(first)
+})
+
+test('editing a prompt keeps host facts and corrupt host notices are rejected', async () => {
+	let id = newSession()
+	history.submit(id, 'old')
+	history.append(id, { type: 'notice', text: 'Another host started.' })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'new' }], replaces: true })
+	expect(JSON.stringify(await history.messages(id))).toContain('Another host started.')
+	writeFileSync(history.file(id), lines.encode({ type: 'notice', text: 12, ts: '2026-10-06T21:00:00Z' }))
+	forget()
+	expect(() => history.readSync(id)).toThrow('invalid host notice')
 })

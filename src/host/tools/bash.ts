@@ -1,11 +1,10 @@
 // bash: runs a command in the session's working directory. It mutates,
 // which is safe to offer because a call is recorded before it runs
 // (tools.ts).
+// Tasks: gr, a5, 8w, nvm.
 
 import { jobs } from '../jobs.ts'
 import { fileChanges } from '../file-changes.ts'
-import { neighbors } from '../neighbors.ts'
-import { resources } from '../resources.ts'
 import type { Tool } from '../tools.ts'
 
 export const tool: Tool = {
@@ -49,12 +48,11 @@ export const tool: Tool = {
 		try {
 			// Escape does not stop a background job. Its snapshot and lock
 			// last until actual exit, not until the early tool result.
-			let note = (out: string) => resources.append(neighbors.append(out, ctx.sessionId, ctx.cwd), ctx.sessionId)
-			if (input.background) return note(await jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId, launch))
+			if (input.background) return await jobs.start(ctx.sessionId, input.command, ctx.cwd, given, ctx.callId, launch)
 			let run = launch()
 			let stop = () => run.stop(jobs.why(ctx.signal, 'stopped'))
 			ctx.signal.addEventListener('abort', stop, { once: true })
-			try { return note(await run.done) } finally { ctx.signal.removeEventListener('abort', stop) }
+			try { return await run.done } finally { ctx.signal.removeEventListener('abort', stop) }
 		} finally {
 			if (!launched) observation.release()
 		}

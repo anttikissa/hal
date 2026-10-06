@@ -1,5 +1,6 @@
 // Hal facts, not human prompts. Delivery is frozen on an existing user
 // record before a request; sources remain in history for the UI.
+// Tasks: nzv, nvm.
 import type { HistoryRecord, TurnStatus } from './replay.ts'
 
 export type Notice = { source: number; text: string }
@@ -7,6 +8,7 @@ type Known = { cwd?: string; model?: string; end?: TurnStatus; waiting?: string 
 
 function text(r: HistoryRecord, known: Known): string | undefined {
 	let lines: string[] = []
+	if (r.type === 'notice') lines.push(r.text)
 	if (r.type === 'change') for (let key of ['cwd', 'model'] as const) {
 		let value = r[key]
 		if (value === undefined) continue
