@@ -10,16 +10,16 @@ test('an image block’s label links to the image', () => {
 })
 
 test('answers with only hidden controls or whitespace have no terminal card', () => {
-	for (let text of ['', ' \n\t', '<summary>Stopped.</summary>', '<question>Continue?</question>', '<rename>New name</rename>']) {
+	for (let text of ['', ' \n\t', '<summary></summary>', '<rename>New name</rename>']) {
 		let item = { type: 'text', text, key: '12', ts: '2026-10-06T22:09:00Z', model: 'fake/model' } as const
 		for (let fold of ['open', 'closed'] as const) {
 			expect(itemView.itemLines(item, 60, false, 's-1', undefined, undefined, [], { fold })).toEqual([])
 			expect(itemView.itemLines(item, 60, true, 's-1', undefined, undefined, [], { fold })).toEqual([''])
 		}
 	}
-	let item = { type: 'text', text: 'Visible answer.\n<summary>Done.</summary>' } as const
+	let item = { type: 'text', text: '<summary>Stopped.</summary>' } as const
 	let rows = itemView.itemLines(item, 60)
-	expect(rows.join('\n')).toContain('Visible answer.')
+	expect(rows.join('\n')).toContain('Stopped.')
 	expect(rows.join('\n')).not.toContain('<summary>')
 	// Literal markup in code is content, not a hidden control.
 	expect(itemView.itemLines({ type: 'text', text: '`<summary>Stopped.</summary>`' }, 60).length).toBeGreaterThan(0)

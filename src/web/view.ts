@@ -2,6 +2,7 @@
 // from host events (the same transcript.fold the terminal uses), a
 // passing notice, and what each item looks like as text. app.ts feeds
 // it the events from link.ts; the components draw it.
+// Tasks: dz, a1k.
 
 import { queueEdit } from '../common/queue-edit.ts'
 import { completions, type Menu } from './completions.ts'
@@ -20,7 +21,6 @@ import { states } from '../common/states.ts'
 import { transcript, type Item, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
 import { titles } from '../common/titles.ts'
 import { summary } from '../common/summary.ts'
-import { names } from '../common/names.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
 
@@ -303,7 +303,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }
 		case 'text':
-			return { kind: 'assistant', text: names.strip(summary.strip(item.text)) }
+			return { kind: 'assistant', text: summary.answer(item.text) }
 		case 'thinking':
 			return { kind: 'thinking', text: item.text }
 		case 'tool': {

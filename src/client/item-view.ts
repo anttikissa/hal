@@ -1,6 +1,6 @@
 // Transcript items as the frame shows them: the rows of each item and
 // the style it wears. Pure.
-// Tasks: fn, hp, hr, hse.
+// Tasks: fn, hp, hr, hse, a1k.
 
 import { attachments } from '../common/attachments.ts'
 import { bashResult } from '../common/bash-result.ts'
@@ -14,7 +14,6 @@ import { ansi } from './ansi.ts'
 import { markdown } from '../common/markdown.ts'
 import { markdownView } from './markdown-view.ts'
 import { summary } from '../common/summary.ts'
-import { names } from '../common/names.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
 import type { Fold } from '../common/toggle.ts'
 import { resolve } from 'path'
@@ -151,7 +150,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			return flows ? body : [...ansi.wrap(prefix.trimEnd(), width), ...body]
 		}
 		case 'text': {
-			let text = names.strip(summary.strip(item.text)).trimEnd()
+			let text = summary.answer(item.text).trimEnd()
 			// Controls can be the whole answer; no visible body means no card.
 			// frame.itemRows adds the live cursor independently while streaming.
 			if (!text.trim()) return streaming ? [''] : []
