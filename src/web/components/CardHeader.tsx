@@ -7,16 +7,19 @@ import type { JSX } from '@solidjs/web'
 import { Icon } from './Icon.tsx'
 import type { IconName } from '../icons.ts'
 
-export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.Element; reference?: JSX.Element; name?: string; open?: boolean; children?: JSX.Element }) {
+// flow: the time leads the label's text, so a wrapped label continues
+// at the left edge, as the terminal wraps a question (task 4v).
+export function CardHeader(props: { icon?: IconName; time?: string; label?: JSX.Element; reference?: JSX.Element; name?: string; open?: boolean; flow?: boolean; children?: JSX.Element }) {
 	return (
-		<header class={['CardHeader', props.name === undefined ? 'who' : 'head']}>
-			<Show when={props.time || props.name}>
+		<header class={['CardHeader', props.name === undefined ? 'who' : 'head', props.flow && 'flow']}>
+			<Show when={props.flow}><span class="title"><span class="stamp">{props.time}</span>{' '}<span class="label">{props.label}</span></span></Show>
+			<Show when={!props.flow && (props.time || props.name)}>
 				<Show when={props.name !== undefined} fallback={<span class="stamp">{props.time}</span>}>
 					<button type="button" class="stamp mark" aria-label={props.name} aria-expanded={props.open ? 'true' : 'false'}>{props.time}</button>
 				</Show>
 				<Show when={props.label}>{' '}</Show>
 			</Show>
-			<span class="title"><Show when={props.icon}>{(name) => <Icon name={name()} />}</Show><span class="label">{props.label}</span>{props.children}</span>
+			<Show when={!props.flow}><span class="title"><Show when={props.icon}>{(name) => <Icon name={name()} />}</Show><span class="label">{props.label}</span>{props.children}</span></Show>
 			{props.reference}
 		</header>
 	)

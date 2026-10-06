@@ -108,6 +108,10 @@ html.typing .App { position: absolute; }
 .CardHeader .mark { display: flex; align-items: flex-start; justify-content: flex-start; }
 .CardHeader .title { display: flex; align-items: flex-start; gap: 0.2ch; min-width: 0; }
 .CardHeader .label { min-width: 0; }
+/* A flowing header (a question): time and label are one text, wrapping to the left edge. */
+.CardHeader.flow { grid-template-columns: minmax(0, 1fr) auto; }
+.CardHeader.flow .title { display: block; }
+.CardHeader.flow .stamp { padding-block: 0; }
 .CardHeader .title > .icon { height: 1lh; margin-right: 0.8ch; opacity: 0.8; }
 .Card.folds:not(.open) .CardHeader .label { overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
 .CardHeader .error { background: none; margin-left: 1ch; }
