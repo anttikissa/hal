@@ -1,9 +1,14 @@
-import { expect, test } from 'bun:test'
-import { mkdtempSync, readdirSync, readFileSync, statSync } from 'fs'
+import { afterEach, expect, test } from 'bun:test'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { ason } from '../common/ason.ts'
 import { replay, type HistoryRecord } from '../common/replay.ts'
 import { perfHome } from './home.ts'
+
+// Each generated home is megabytes: removed after every test.
+let homes: string[] = []
+const temp = (prefix: string): string => (homes.push(mkdtempSync(`${tmpdir()}/${prefix}`)), homes.at(-1)!)
+afterEach(() => homes.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })))
 
 const small = { scale: 0.01, seed: 7 }
 
@@ -20,7 +25,7 @@ function files(home: string): Map<string, string> {
 }
 
 test('the same seed and scale give byte-identical homes; another seed differs', () => {
-	let a = mkdtempSync(`${tmpdir()}/perf-a-`), b = mkdtempSync(`${tmpdir()}/perf-b-`), c = mkdtempSync(`${tmpdir()}/perf-c-`)
+	let a = temp('perf-a-'), b = temp('perf-b-'), c = temp('perf-c-')
 	perfHome.generate(a, { ...small, cwd: '/w' })
 	perfHome.generate(b, { ...small, cwd: '/w' })
 	perfHome.generate(c, { ...small, seed: 8, cwd: '/w' })
@@ -29,7 +34,7 @@ test('the same seed and scale give byte-identical homes; another seed differs', 
 })
 
 test('generated histories are valid, idle and sized as the shape says', () => {
-	let home = mkdtempSync(`${tmpdir()}/perf-`)
+	let home = temp('perf-')
 	let { open, sessions } = perfHome.generate(home, small)
 	let tabs = ason.parse(readFileSync(`${home}/state/tabs.ason`, 'utf8')) as { open: string[] }
 	expect(tabs.open.toSorted()).toEqual(open.toSorted())
