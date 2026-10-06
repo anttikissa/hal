@@ -59,7 +59,10 @@ function onEvent(event: Event): boolean {
 	if (event.type === 'tabs') tabs.onTabs(event.tabs)
 	else if (event.type === 'rejected' && event.id && st.asked.delete(event.id)) { delete st.landing; tabs.onTabs(st.tabs); return false }
 	else if (event.type === 'go') {
-		if (st.shown === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) tabs.show(event.tab, false)
+		if (st.shown === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) {
+			tabs.show(event.tab, false, event.block)
+			if (event.block) app.aim()
+		}
 	}
 	else if (event.type === 'ack' && st.asked.delete(event.id) && event.tab) tabs.show(event.tab, false)
 	else if (event.type === 'notice') { notices.add(notices.fromEvent(event)); push.noticed() }
@@ -129,9 +132,9 @@ function onTabs(list: Tab[]): void {
 
 // Show tab `id`, the address naming it: a new history entry, or with
 // `replace` (a tab the page landed on) the current one rewritten.
-function show(id: string, replace: boolean): void {
+function show(id: string, replace: boolean, block?: string): void {
 	let st = app.state
-	router.go(id, replace)
+	router.go(id, replace, block)
 	if (id === st.shown) return
 	if (st.shown) {
 		scroll.save(st.shown)

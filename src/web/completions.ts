@@ -20,7 +20,8 @@ function receive(input: string, items: string[], previous?: Menu, descriptions?:
 	let choices = items.map((value, i) => {
 		let name = value.trimEnd().split(' ')[0]!
 		let label = short?.[i] ?? (name === value.trimEnd() ? name : value.slice(value.lastIndexOf(' ') + 1))
-		let description = descriptions?.[i] ?? (name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) ?? (value.endsWith('/') ? 'directory' : 'path')
+		// Only the host or the command list describes a candidate (task 4qh).
+		let description = descriptions?.[i] || (name === value.trimEnd() ? commandList.byName(name.slice(1))?.description : undefined) || ''
 		return previous?.choices.find((choice) => choice.value === value && choice.label === label && choice.description === description) ?? { value, label, description }
 	})
 	if (previous && choices.length === previous.choices.length && choices.every((choice, i) => choice === previous.choices[i])) return previous

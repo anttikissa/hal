@@ -155,7 +155,7 @@ function seek(): void {
 	let t = st.target
 	if (!t || t.found) return
 	let rows = view.withPending(view.rows(st.view.transcript?.items ?? []), [], st.view.transcript?.inbox)
-	let s = target.seek(t, app.sessionId(), rows, !backfill.complete(st.older, t.session), st.view.transcript?.dropped)
+	let s = target.seek(t, st.view.transcript?.meta.id, rows, !backfill.complete(st.older, t.session), st.view.transcript?.dropped)
 	if (s === 'older') app.older()
 	else if (s === 'missing' || s === 'dropped') {
 		st.target = undefined

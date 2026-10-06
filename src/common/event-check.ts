@@ -44,7 +44,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	'model-names': { names: 'o', defaults: 'o?' },
 	notice: { session: 's', tab: 'i?', name: 's', kind: 's', line: 's', key: 's?', what: 's?' },
 	tabs: { tabs: 'a' },
-	go: { sessionId: 's', tab: 's' },
+	go: { sessionId: 's', tab: 's', block: 's?' },
 	draft: { sessionId: 's', draft: 'o', 'draft.text': 's', 'draft.rev': 'i', command: 's?' },
 	rejected: { sessionId: 's?', command: 's', reason: 's', id: 's?' },
 	ack: { id: 's', tab: 's?' },

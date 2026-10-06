@@ -28,6 +28,8 @@ export type Reply = { result?: string; say?: string; show?: string; error?: stri
 // records output while the command still runs (a login that waits).
 export type Context = { sessionId: string; sender?: Sender; cwd: string; previousCwd?: string; model: string; effort?: string; setCwd(cwd: string): void; setModel(model: string): void; setName?(name?: string): void; say(text: string): void }
 
+export type Candidate = { value: string; description: string }
+
 export type SlashCommand = {
 	// Refuse a bad answer before recording it or closing the question.
 	checkAnswers?(args: string, answers: Answers): string | undefined
@@ -36,8 +38,9 @@ export type SlashCommand = {
 	record?(args: string, id: string): string | undefined
 	// The detail /help <name> shows; `args` follow the name.
 	help?(args: string): string
-	// Full argument texts `args` may complete to.
-	complete?(args: string, ctx: Context): string[]
+	// Full argument texts `args` may complete to, each with an optional
+	// description the clients show beside it.
+	complete?(args: string, ctx: Context): (string | Candidate)[]
 	// Optional detail for each candidate, resolved on the host.
 	describeCompletion?(args: string, ctx: Context): string
 	run(args: string, answers: Answers | undefined, ctx: Context): Reply | Promise<Reply>
@@ -65,8 +68,8 @@ function parse(text: string): { name: string; args: string } | undefined {
 }
 
 // Every full text `text` may complete to: a command name, or what the
-// command completes its arguments to.
-function complete(text: string, ctx: Context): string[] {
+// command completes its arguments to, with the command's descriptions.
+function candidates(text: string, ctx: Context): (string | Candidate)[] {
 	let bare = /^\/([a-z0-9-]*)$/.exec(text)
 	if (bare && commandList.byName(bare[1]!)?.defaultArgs !== undefined) text += ' '
 	else if (bare) return commandList.all().filter((c) => !c.hidden).map((c) => c.name).filter((n) => n.startsWith(bare[1]!)).map((n) => `/${n} `)
@@ -74,16 +77,22 @@ function complete(text: string, ctx: Context): string[] {
 	let cmd = m && commands.all().get(m[1]!)
 	if (!m || commandList.byName(m[1]!)?.hidden || !cmd?.complete) return []
 	try {
-		return cmd.complete(m[2]!, ctx).map((a) => `/${m[1]} ${a}`)
+		return cmd.complete(m[2]!, ctx).map((a) => typeof a === 'string' ? `/${m[1]} ${a}` : { value: `/${m[1]} ${a.value}`, description: a.description })
 	} catch {
 		return []
 	}
 }
 
+function complete(text: string, ctx: Context): string[] {
+	return commands.candidates(text, ctx).map((c) => typeof c === 'string' ? c : c.value)
+}
+
 // Keep replacement strings compatible with terminal completion; optional
 // aligned descriptions let richer clients show the actual host-side choice.
 function suggestions(text: string, ctx: Context): { items: string[]; descriptions?: string[] } {
-	let items = commands.complete(text, ctx)
+	let found = commands.candidates(text, ctx)
+	let items = found.map((c) => typeof c === 'string' ? c : c.value)
+	if (found.some((c) => typeof c !== 'string')) return { items, descriptions: found.map((c) => typeof c === 'string' ? '' : c.description) }
 	let parsed = commands.parse(text)
 	let cmd = parsed && commands.all().get(parsed.name)
 	return cmd?.describeCompletion ? { items, descriptions: items.map((item) => cmd.describeCompletion!(commands.parse(item)!.args, ctx)) } : { items }
@@ -101,6 +110,7 @@ export const commands = {
 	home: (): string => homedir(),
 	all,
 	parse,
+	candidates,
 	complete,
 	suggestions,
 	expand,

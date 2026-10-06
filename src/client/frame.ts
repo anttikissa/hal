@@ -31,7 +31,7 @@ import type { Tab } from '../common/protocol.ts'
 import { promptView } from './prompt-view.ts'
 import { halCursor, type HalCursor } from './hal-cursor.ts'
 import { tabBar } from './tab-bar.ts'
-import { helpRow } from './help-row.ts'
+import { helpRow, type Hint } from './help-row.ts'
 import { statusRow, type StatusInfo } from './status-row.ts'
 import { strings } from '../common/strings.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
@@ -56,8 +56,9 @@ export interface View {
 	/** The host's tabs and the one shown: a tab bar row above the prompt;
 	 * `lit` is the blink phase while an indicator blinks. */
 	tabs?: { list: Tab[]; focused?: string; lit?: boolean }
-	/** Tab completion's choices: listed in the help row. */
-	choices?: string[]
+	/** Tab completion's choices: listed in the help row, or described
+	 * one per row in the help area (task 4qh). */
+	choices?: string[] | Hint[]
 	/** What the session is doing, centered in the prompt's top rule. */
 	activity?: string
 	/** The hint while the last prompt is edited: the help row shows it. */
@@ -367,7 +368,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	lines.push(rule(p.below ? `↓${p.below}` : ''))
 	lines.push(view.status ? statusRow.row(view.status, cols) : '')
 	// Text near the box's height earns the resize hint (task 0nj).
-	lines.push(helpRow.row(view, cols, !!view.prompt.text.trim() && p.total >= Math.max(1, p.limit - 2)))
+	lines.push(...helpRow.rows(view, cols, !!view.prompt.text.trim() && p.total >= Math.max(1, p.limit - 2)))
 	// Keep the matched block's first row in the visible transcript area.
 	if (past.target !== undefined) history = history.slice(0, past.target + Math.max(1, rows - lines.length))
 	let pad = full ? Math.max(0, rows - lines.length - history.length) : 0

@@ -267,13 +267,12 @@ html.typing .App { position: absolute; }
    selected row is a soft tint with a lit left bar, its text unchanged. */
 .Composer .completions { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; max-height: min(35dvh, 20rem); overflow-y: auto; padding: 4px 0; background: color-mix(in oklab, currentColor 6%, var(--canvas)); box-shadow: 0 0 0 1px color-mix(in oklab, currentColor 18%, transparent), 0 -12px 32px -8px color-mix(in oklab, var(--overlay-bg) 70%, transparent); scrollbar-width: thin; scrollbar-color: color-mix(in oklab, currentColor 25%, transparent) transparent; animation: completions-in 140ms var(--ease-out); }
 @keyframes completions-in { from { opacity: 0; transform: translateY(4px); } }
-.Composer .completions button { display: flex; align-items: baseline; gap: 2ch; width: 100%; min-height: 32px; padding: 0.2lh 1.5ch; text-align: left; background: transparent; color: inherit; transition: background 80ms; }
+.Composer .completions button { display: flex; flex-direction: column; align-items: stretch; width: 100%; min-height: 32px; padding: 0.2lh 1.5ch; text-align: left; background: transparent; color: inherit; transition: background 80ms; }
 @media (pointer: coarse) { .Composer .completions button { min-height: 44px; } }
 @media (hover: hover) and (pointer: fine) { .Composer .completions button:hover { background: color-mix(in oklab, currentColor 7%, transparent); } }
 .Composer .completions button[aria-selected="true"] { background: color-mix(in oklab, currentColor 14%, transparent); box-shadow: inset 2px 0 0 currentColor; }
-.Composer .completions strong { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.Composer .completions span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--quiet); font-size: 0.85em; }
-@media (max-width: 40rem) { .Composer .completions button { flex-direction: column; align-items: stretch; gap: 0; } .Composer .completions strong { max-width: none; } }
+.Composer .completions strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.Composer .completions span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--quiet); font-size: 0.85em; }
 @media (prefers-reduced-motion: reduce) { .Composer .completions { animation: none; } }
 .status .busy { color: var(--highlight); }
 .status .warning, .status .error { background: none; }

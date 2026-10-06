@@ -70,12 +70,13 @@ function pick(tabs: Tab[], wanted: string | undefined, before: Tab[] = []): stri
 	return last && ids.includes(last) ? last : ids[0]
 }
 
-// The address now names `id`: a new history entry, or with `replace`
-// the current one rewritten. Nothing if it already does.
-function go(id: string, replace: boolean): void {
-	if (router.parse(router.href()) === id) return
+// The address now names `id` (and `block`, task 4qh): a new history
+// entry, or with `replace` the current one rewritten. Nothing if it
+// already does.
+function go(id: string, replace: boolean, block?: string): void {
 	let url = new URL(router.href())
-	router.write(`${router.format(id)}${url.search}`, replace)
+	if (router.parse(url.href) === id && (!block || url.hash === `#${block}`)) return
+	router.write(`${router.format(id)}${url.search}${block ? `#${block}` : ''}`, replace)
 }
 
 export const router = { href, write, store, parse, isApp, format, pick, go }
