@@ -45,6 +45,7 @@ function keys(items: Item[], target: Target): string[] | string {
 		return n >= target.from && n <= target.to && toggle.toggles(i, target.range)
 	})
 	if (found.length) return found.map((i) => i.key)
+	if (!target.range && items.some((i) => i.key === String(target.from))) return `block ${target.from} does not open or close`
 	return target.range ? `nothing to toggle in ${target.from}-${target.to}` : `no block ${target.from} to toggle`
 }
 
