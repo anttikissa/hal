@@ -57,13 +57,12 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 	host.warn(client)
 	if (version.state.loaded) client.deliver({ type: 'version', version: version.state.loaded })
 	// The tabs come with the first events, so no client has to ask; their
-	// states need the open tabs' marks, caught up in slices first.
+	// states need the open tabs' marks, caught up in slices first. Held
+	// commands run a turn of the event loop after the tabs (task 7j).
 	let indexed = tabs.indexed()
-	if (!indexed) tabs.greet(client, () => host.state.clients.has(client))
-	else {
-		client.held.set('*', [])
-		void indexed.then(() => host.state.clients.has(client) && host.release(client, '*'))
-	}
+	let live = () => host.state.clients.has(client)
+	if (!indexed) tabs.greet(client, live)
+	else void (client.held.set('*', []), indexed.then(() => live() && (tabs.greet(client, live), setImmediate(() => live() && host.release(client, '*')))))
 	return {
 		send: (command) => {
 			if (host.state.clients.has(client)) host.handle(client, wire.copy(command))
@@ -84,7 +83,6 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 function release(client: Client, key: string): void {
 	let held = client.held.get(key) ?? []
 	client.held.delete(key)
-	if (key === '*') tabs.greet(client, () => host.state.clients.has(client))
 	for (let c of held) host.handle(client, c)
 }
 
