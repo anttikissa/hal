@@ -2,8 +2,10 @@
 // messages, editing and discarding by hand (task 0za). Each round says
 // which user messages reached it since the previous round, read from
 // history alone so a restarted host agrees; then it thinks for a few
-// seconds and runs a harmless bash call. After `rounds` rounds it
-// answers and stops. Nothing it does writes files.
+// seconds and runs a harmless bash call. After `rounds` rounds (or the
+// number in the turn's prompt, e.g. '3') it answers and stops; a
+// message that is just 'stop' ends it at the next round. Nothing it
+// does writes files.
 import type { StreamEvent } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import type { Reply } from './synthetic.ts'
@@ -50,13 +52,24 @@ function arrived(records: HistoryRecord[]): string[] {
 	return lines
 }
 
-function report(n: number, lines: string[]): { head: string; body: string } {
-	let count = lines.length ? `${lines.length} new message${lines.length > 1 ? 's' : ''}` : 'no new messages'
-	return { head: `Round ${n} of ${rounds}: ${count}.`, body: lines.length ? `Round ${n}. New messages since the last round:\n${lines.join('\n')}` : `Round ${n}: no new messages.` }
+// The turn's texts, oldest first: its prompt and everything since.
+function texts(records: HistoryRecord[]): string[] {
+	return records.slice(start(records)).flatMap((r) => (r.type === 'user' ? r.blocks.flatMap((b) => (b.type === 'text' ? [b.text.trim()] : [])) : []))
 }
 
-async function* round(n: number, lines: string[]): AsyncGenerator<StreamEvent> {
-	let { head, body } = report(n, lines)
+// Rounds this turn runs: the first number in its prompt, else `rounds`.
+function planned(records: HistoryRecord[]): number {
+	let n = Number(texts(records)[0]?.match(/\b\d+\b/)?.[0])
+	return n > 0 ? n : rounds
+}
+
+function report(n: number, lines: string[], total = rounds): { head: string; body: string } {
+	let count = lines.length ? `${lines.length} new message${lines.length > 1 ? 's' : ''}` : 'no new messages'
+	return { head: `Round ${n} of ${total}: ${count}.`, body: lines.length ? `Round ${n}. New messages since the last round:\n${lines.join('\n')}` : `Round ${n}: no new messages.` }
+}
+
+async function* round(n: number, lines: string[], total: number): AsyncGenerator<StreamEvent> {
+	let { head, body } = report(n, lines, total)
 	let thought = `${head}\n\nReading the history for messages that arrived since the last round, then pretending to work for a while so there is time to steer, queue, edit or discard a message.`
 	// Short steps: a steer interrupts at the next one.
 	let words = thought.split(/(?<=\s)/)
@@ -74,10 +87,13 @@ async function* round(n: number, lines: string[]): AsyncGenerator<StreamEvent> {
 function run(records: HistoryRecord[]): Reply {
 	let n = records.slice(start(records)).filter((r) => r.type === 'assistant' && r.block.type === 'tool_call').length
 	let lines = arrived(records)
-	if (n < rounds) return { stream: round(n + 1, lines) }
-	let { body } = report(n + 1, lines)
+	let total = planned(records)
+	let stopped = texts(records).slice(1).some((t) => t.toLowerCase() === 'stop')
+	if (n < total && !stopped) return { stream: round(n + 1, lines, total) }
+	let { body } = report(n + 1, lines, total)
 	let say = lines.length ? `${body}\n\n` : ''
-	return { say: `${say}Finished ${rounds} rounds.\n\n<summary>Ran ${rounds} scripted queue-test rounds.</summary>` }
+	let done = stopped ? `Stopped after ${n} rounds, as asked.` : `Finished ${n} rounds.`
+	return { say: `${say}${done}\n\n<summary>${done}</summary>` }
 }
 
 export const queueTest = { run, start, arrived }
