@@ -1,116 +1,122 @@
-// ASON 0.1.0 — A Saner Object Notation. MIT, one TypeScript file, no
-// dependencies.
+// ASON 0.1.0 — A Saner Object Notation
+// MIT license. One TypeScript file, no dependencies.
 //
-// A drop-in replacement for JSON and JSONL that is readable and convenient
-// out of the box. Use it wherever people read or edit the data: config files
-// (comments survive a parse/stringify round trip), wire serialization, and
-// log files (ASONL: one record per line, like JSONL).
+// A drop-in replacement for JSON and JSONL that people can read and write.
+// Use it wherever readability and convenience matter: config files (comments
+// survive a round trip), wire messages, and logs (ASONL, one record a line).
 //
 //   import { parse, stringify } from './ason'
-//   parse("{ name: 'hal', tags: ['a', 'b',], big: 42n }")
-//   stringify({ name: 'hal', tags: ['a', 'b'] })   // { name: 'hal', tags: ['a', 'b'] }
-//   stringify(value)           // smart: inline if it fits 80 columns, else one item per line
-//   stringify(value, 'short')  // always one line: an ASONL record or wire message
-//   stringify(value, 'long')   // every object and array expanded
-//   stringify(value, { mode: 'long', indent: 2 })  // indent: '\t' (default), '  ' or 2
-//   config.indent = '  '       // process-wide default; per-call options win
 //
-// Philosophy: (nearly) every JavaScript literal is valid ASON, and ASON
-// pastes into a JS REPL. Strings in single, double or backtick quotes
-// (multiline, no ${} interpolation); unquoted keys that are JS identifiers
-// or integers ({ café: 1, $x: 2, 0: 3 }, but { a-b: 1 } is an error;
-// stringify quotes every key but an ASCII identifier: { '0': 3 }); trailing commas;
-// // and /* */ comments; \x41, \u0041 and \u{1F600} escapes; numbers as JS
-// writes them: .5, 1., +1, 0xFF, 0b101, 0o17, 1_000, 42n, NaN, -Infinity, -0;
-// undefined; and any JS whitespace. Not supported: regex literals, array
-// holes ([1,,2]), and keys like 1.5, 0x10 or 1n. Legacy octal (017, "\101")
-// is an error, as in strict JS. Expressions (${…}, { a }, [k]: v, ...xs,
-// new Date()) are not literals and are errors. Commas between items are
-// required, as in JS: [1 2] is an error.
+//   const settings = parse(`{
+//   	name: 'demo',        // comments
+//   	port: 8_080,         // JS numbers
+//   	tags: ['a', 'b',],   // trailing commas
+//   }`)
+//   stringify(settings)    // { name: 'demo', port: 8080, tags: ['a', 'b'] }
 //
-// It is not yet another JSON5 or JSONC, though it reads both: it is a
-// superset of JSON, JSONC and JSON5 syntax, aiming at JS rather than at
-// another JSON dialect.
+//   stringify(value)                 // smart: one line if it fits 80 columns, else expanded
+//   stringify(value, 'short')        // always one line: an ASONL record or a wire message
+//   stringify(value, 'long')         // every object and array expanded
+//   stringify(value, { indent: 2 })  // indent: '\t' (default), '  ' or a number of spaces
+//   config.indent = '  '             // process-wide defaults; per-call options win
+//   config.tabWidth = 4              // columns a tab takes when fitting 80 columns
 //
-// Comments round-trip. parse(text, { comments: true }) keeps each key's and
-// array item's leading comments on obj[COMMENTS]; edit the data and
-// stringify writes them back:
+// Nearly (*) every JS literal is valid ASON, and ASON pastes into a JS
+// console: strings in '', "" or `` (backticks span lines), unquoted keys,
+// trailing commas, // and /* */ comments, and your regular JS numbers like
+// 1_000, 0xFF, 42n (BigInt), NaN and Infinity. And undefined.
 //
-//   const config = parse(`{
-//   	// Shown in the tab bar
-//   	name: 'hal',
-//   }`, { comments: true })
-//   config.name = 'hal 2'
-//   stringify(config)  // the comment is still above name
+// Already know JSON5 or JSONC? Then you know ASON. It reads JSON, JSONC,
+// JWCC (HuJSON) and JSON5 files as they are, so point it at any of them.
+// Formats that drop quotes or commas (Hjson, RJSON, CSON, YAML) are another
+// idea; ASON stays JavaScript.
 //
-// The promise: a comment on the lines before an object key or an array item
-// (blank lines between comments included) is written back above that key or
-// item by smart and long stringify. That is all; every other comment is
-// discarded on parse, as expected:
-// - comments outside the root value (above or below it in the file);
-// - comments after the last key or item, before its } or ];
-// - comments inside an entry: between key and ':', or after a value before
-//   its ','.
-// Consequences to expect:
-// - A comment after a value's ',' on the same line (a: 1, // note) is a
-//   leading comment of the next key: it moves above that key.
-// - Object comments follow keys: deleting a key drops its comment; a new key
-//   has none.
-// - Array comments follow positions, not items: after unshift, item 0's
-//   comment sits above the new first item.
-// - A collection replaced in code (config.list = [...]) has no comments.
-// - 'short' writes no comments; parse without { comments: true } keeps none.
+// Errors tell you where, and show you. JSON.parse says "Expected '}'" or
+// "at position 4231"; ASON says:
 //
-// Streaming ASONL: write each record as stringify(record, 'short') + '\n';
-// parseAll(text) reads a whole file (a torn last record throws), and
-// parseStream yields records as bytes arrive:
+//   parse(`{
+//   	name: 'demo'
+//   	port: 8080,
+//   }`)
+//   // Expected ',' or '}' at 3:2:
+//   //     	port: 8080,
+//   //     	^
 //
-//   for await (const event of parseStream(Bun.file('log.asonl').stream())) ...
+// The error also carries .pos, the offset into the text.
 //
-// A stream may start mid-record, e.g. tailing a log from a byte offset:
-// parseStream drops a malformed first line up to its '\n', then is strict.
+// Comments can be kept if you need them: parse(text, { comments: true }).
+// Not all of them: for simplicity, ASON keeps the common case, a comment
+// above the root value, a key or an array item, and stringify writes it
+// back. Trailing comments are dropped.
 //
-// Errors throw with .pos (offset) and a message giving line:column, the
-// source line and a caret:
+//   // this is kept
+//   {
+//   	/* this
+//   	   too */
+//   	abc: 123,
+//   	// and this
+//   	xyz: 234 /* but this is gone */,
+//   }
+//   // and so is this
 //
-//   Expected ',' or '}' at 1:8:
-//       { a: 1 b: 2 }
-//              ^
+// Kept comments stay with their key when you change the value; a key you
+// delete takes its comment along. Array comments stay with positions, not
+// items. 'short' writes no comments.
 //
-// Exact output (quotes, escapes, spacing, indentation, wrapping) is a
-// compatibility contract asserted by tests (tasks 8, mw). Smart width
-// counts characters, so a tab is one column. The original lives unchanged
-// in tasks/8.
+// Stringify is lenient: it never throws, so it is safe to log anything.
 //
-// Values with no ASON literal are written as JSON.stringify writes them:
-// toJSON(key) runs first, so a Date becomes its ISO string; a Map, Set,
-// Error or class instance is written as its own enumerable keys (often {}).
-// Unlike JSON, which drops them, functions and symbols become strings:
-// '[Function: name]', '[class Name]', 'Symbol(x)'. Lenient by design: output
-// always parses and stringify never throws on such input, so it suits loggers.
+//   JS value            ASON                         JSON
+//   undefined           undefined                    (dropped)
+//   NaN, -Infinity      NaN, -Infinity               null
+//   42n                 42n                          throws
+//   -0                  -0                           0
+//   new Date(0)         '1970-01-01T00:00:00.000Z'   "1970-01-01T00:00:00.000Z"
+//   function f() {}     '[Function: f]'              (dropped)
+//   Symbol('x')         'Symbol(x)'                  (dropped)
+//   new Map([[1, 2]])   {}                           {}
+//   new Error('no')     {}                           {}
+//
+// Like JSON, it calls toJSON(key) first and writes other objects as their
+// own enumerable keys.
+//
+// ASONL is ASON lines, as JSONL is JSON lines: one stringify(value, 'short')
+// per line, each ending in \n (\r\n is read too). Blank lines and lines
+// starting with // are skipped; comments are never kept.
+//
+//   parseAll(text)       // a whole file; a torn last line throws
+//   for await (const record of parseStream(file.stream())) { … }
+//
+// parseStream yields records as bytes arrive. It may start mid-record, e.g.
+// when tailing a log from a byte offset: it drops a malformed first line up
+// to its \n, then is strict.
 //
 // Future experiments, not decided:
-// - { strict: true }: throw, naming the path (.meta.time), on any value
-//   parse cannot give back.
+// - stringify(value, { strict: true }): throw, naming the path (.meta.time),
+//   on a value parse cannot give back. (parse is strict already.)
 // - Write Date, Map and Set as new Date('2026-10-06T…'), new Map([[k, v]])
-//   and new Set([…]), and parse exactly those three forms (no code runs), so
-//   they round-trip and still paste into JS.
+//   and new Set([…]), and parse exactly those forms (no code runs), so they
+//   round-trip and still paste into JS.
+//
+// (*) Exceptions and fine print:
+// - Not supported: regex literals and array holes ([1,,2]).
+// - Keys: unquoted keys are JS identifiers (café, $x) or integers (0: 'x');
+//   keys like 1.5 or 0x10 must be quoted. stringify quotes every key that
+//   is not an ASCII identifier.
+// - What strict-mode JS rejects is an error: 017, "\101".
+// - Escapes: \x41, \u0041, \u{1F600}. stringify escapes invisible
+//   characters, so output is plain printable text.
+// - Backtick strings read \r\n as \n, as JS does.
+// - Whitespace is whatever JS counts as whitespace.
+// - A __proto__ key is an ordinary key, as with JSON.parse.
 //
 // Changelog
-// 0.1.0 (2026-10-06) First versioned release; changes from the original
-//   Hal ASON in tasks/8:
-//   - stringify takes { mode, indent }; config.indent sets the default;
-//     width counts a tab as one column; -0 stays -0; control characters,
-//     U+2028/U+2029, lone surrogates and \r in backticks are escaped;
-//     toJSON runs as in JSON; functions and symbols become strings.
-//   - parse keeps __proto__ as an own key; reports unterminated comments;
-//     takes unquoted keys only as JS identifiers or integers; reads 0b/0o,
-//     \u{…} and all JS whitespace; reads CRLF in templates as LF; rejects
-//     legacy octal numbers and escapes.
-//   - This header documents usage and which comments survive.
+// 0.1.0  Initial release: reasonable JS literals, comment round trip.
+//        55 tests, 423 lines of code.
 
 /** Symbol key for attaching comments to AsonObject/AsonArray. */
 export const COMMENTS = Symbol('comments')
+// The comment above the root value, kept by parse({ comments: true }) and written by stringify.
+const LEAD = Symbol('lead comment')
 
 /** Any value representable in ASON. */
 export type AsonValue = string | number | bigint | boolean | null | undefined | AsonArray | AsonObject
@@ -162,7 +168,6 @@ function commentPrefix(comment: string | undefined, pad: string): string {
 	return comment ? `${indentComment(comment, pad)}\n` : ''
 }
 
-// Width counts characters: a tab is one column, whatever an editor's tab width.
 // In long mode, skip the unused inline candidate: computing both forms at every level is exponential.
 function renderCollection(open: string, close: string, inline: string, col: number, depth: number, maxWidth: number, unit: string, hasComments: boolean, buildLines: (pad: string, childDepth: number) => string[]): string {
 	if (maxWidth === Infinity) return inline // short strings already escape newlines
@@ -184,7 +189,8 @@ function toJsonValue(value: unknown, key: string): unknown {
 	return `[Function: ${v.name || '(anonymous)'}]`
 }
 
-function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: number, unit: string): string {
+// cols: the indent unit's width in columns, a tab counting as config.tabWidth.
+function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: number, unit: string, cols: number): string {
 	if (obj === null) return 'null'
 	if (obj === undefined) return 'undefined'
 	if (typeof obj === 'boolean') return obj ? 'true' : 'false'
@@ -202,9 +208,9 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		if (obj.length === 0) return '[]'
 		const comments = maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
 		const items = obj.map((v, i) => toJsonValue(v, String(i)))
-		const inline = maxWidth === 0 ? '' : `[${items.map((v) => stringifyValue(v, 0, depth, maxWidth, unit)).join(', ')}]`
+		const inline = maxWidth === 0 ? '' : `[${items.map((v) => stringifyValue(v, 0, depth, maxWidth, unit, cols)).join(', ')}]`
 		return renderCollection('[', ']', inline, col, depth, maxWidth, unit, !!comments, (pad, childDepth) =>
-			items.map((v, i) => `${commentPrefix(comments?.[i], pad)}${pad}${stringifyValue(v, childDepth * unit.length, childDepth, maxWidth, unit)}${i < items.length - 1 ? ',' : ''}`),
+			items.map((v, i) => `${commentPrefix(comments?.[i], pad)}${pad}${stringifyValue(v, childDepth * cols, childDepth, maxWidth, unit, cols)}${i < items.length - 1 ? ',' : ''}`),
 		)
 	}
 
@@ -213,9 +219,9 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		const entries = Object.keys(rec).map((k): [string, unknown] => [k, toJsonValue(rec[k], k)])
 		if (entries.length === 0) return '{}'
 		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
-		const inline = maxWidth === 0 ? '' : `{ ${entries.map(([k, v]) => `${quoteKey(k)}: ${stringifyValue(v, 0, depth, maxWidth, unit)}`).join(', ')} }`
+		const inline = maxWidth === 0 ? '' : `{ ${entries.map(([k, v]) => `${quoteKey(k)}: ${stringifyValue(v, 0, depth, maxWidth, unit, cols)}`).join(', ')} }`
 		return renderCollection('{', '}', inline, col, depth, maxWidth, unit, !!comments, (pad, childDepth) =>
-			entries.map(([k, v], i) => `${commentPrefix(comments?.[k], pad)}${pad}${quoteKey(k)}: ${stringifyValue(v, childDepth * unit.length + `${quoteKey(k)}: `.length, childDepth, maxWidth, unit)}${i < entries.length - 1 ? ',' : ''}`),
+			entries.map(([k, v], i) => `${commentPrefix(comments?.[k], pad)}${pad}${quoteKey(k)}: ${stringifyValue(v, childDepth * cols + `${quoteKey(k)}: `.length, childDepth, maxWidth, unit, cols)}${i < entries.length - 1 ? ',' : ''}`),
 		)
 	}
 
@@ -224,16 +230,18 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 
 export type StringifyMode = 'short' | 'smart' | 'long'
 /** indent: a string such as '\t' or '  ', or a number of spaces. */
-export type StringifyOptions = { mode?: StringifyMode; indent?: string | number }
+export type StringifyOptions = { mode?: StringifyMode; indent?: string | number; tabWidth?: number }
 
 /** Process-wide defaults for stringify; per-call options override them. */
-export const config = { indent: '\t' as string | number }
+export const config = { indent: '\t' as string | number, tabWidth: 4 }
 
 /** Convert a value to an ASON string. Mode: 'smart' (default, 80-col wrap), 'short' (single line), 'long' (always expanded). */
 export function stringify(obj: unknown, opts: StringifyMode | StringifyOptions = 'smart'): string {
-	const { mode = 'smart', indent = config.indent } = typeof opts === 'string' ? { mode: opts } : opts
+	const { mode = 'smart', indent = config.indent, tabWidth = config.tabWidth } = typeof opts === 'string' ? { mode: opts } : opts
 	const maxWidth = mode === 'short' ? Infinity : mode === 'long' ? 0 : 80
-	return stringifyValue(toJsonValue(obj, ''), 0, 0, maxWidth, typeof indent === 'number' ? ' '.repeat(indent) : indent)
+	const unit = typeof indent === 'number' ? ' '.repeat(indent) : indent
+	const lead = mode === 'short' ? undefined : (obj as { [LEAD]?: string } | null | undefined)?.[LEAD]
+	return commentPrefix(lead, '') + stringifyValue(toJsonValue(obj, ''), 0, 0, maxWidth, unit, unit.length + (tabWidth - 1) * (unit.split('\t').length - 1))
 }
 
 // --- Parse ---
@@ -297,7 +305,10 @@ function skipWhite(ctx: Ctx): string {
 			ctx.pos = end + 2
 			if (ctx.comments) {
 				if (newlines >= 2) collected += '\n'
-				collected += ctx.buf.slice(start, ctx.pos)
+				// Continuation lines lose the comment's own indentation; stringify re-indents them.
+				const indent = ctx.buf.slice(ctx.buf.lastIndexOf('\n', start) + 1, start)
+				const text = ctx.buf.slice(start, ctx.pos)
+				collected += /^[ \t]+$/.test(indent) ? text.replaceAll(`\n${indent}`, '\n') : text
 			}
 			newlines = 0
 			continue
@@ -555,9 +566,11 @@ function parseAny(ctx: Ctx): AsonValue {
 /** Parse a single ASON value. Pass `{ comments: true }` to preserve comments as `[COMMENTS]` metadata. */
 export function parse(str: string, opts?: { comments?: boolean }): AsonValue {
 	const ctx: Ctx = { buf: str, pos: 0, comments: opts?.comments }
+	const lead = skipWhite(ctx)
 	const value = parseAny(ctx)
 	skipWhite(ctx)
 	if (ctx.pos < ctx.buf.length) fail(ctx, 'Unexpected content after value')
+	if (lead && value && typeof value === 'object') (value as { [LEAD]?: string })[LEAD] = lead
 	return value
 }
 
@@ -594,7 +607,7 @@ async function* streamLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<
 export async function* parseStream(stream: ReadableStream<Uint8Array>): AsyncGenerator<AsonValue> {
 	let first = true
 	for await (const line of streamLines(stream)) {
-		if (!line.trim()) continue
+		if (!line.trim() || line.trimStart().startsWith('//')) continue
 		if (first) {
 			first = false
 			try {

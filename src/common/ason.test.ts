@@ -59,11 +59,12 @@ describe('stringify modes', () => {
 		expect(reads).toBe(12)
 	})
 
-	test('indent comes from options, then config; width counts it as characters', () => {
+	test('indent comes from options, then config; a tab counts as tabWidth columns', () => {
 		const value = { a: { b: 'x'.repeat(66) }, c: 1 }
-		// Inner object fits 80 columns after one tab, not after four spaces.
-		expect(stringify(value)).toBe(`{\n\ta: { b: '${'x'.repeat(66)}' },\n\tc: 1\n}`)
-		expect(stringify(value, { indent: 4 })).toBe(`{\n    a: {\n        b: '${'x'.repeat(66)}'\n    },\n    c: 1\n}`)
+		// Inner object fits 80 columns after two spaces, not after a 4-column tab.
+		expect(stringify(value, { indent: 2 })).toBe(`{\n  a: { b: '${'x'.repeat(66)}' },\n  c: 1\n}`)
+		expect(stringify(value)).toBe(`{\n\ta: {\n\t\tb: '${'x'.repeat(66)}'\n\t},\n\tc: 1\n}`)
+		expect(stringify(value, { tabWidth: 2 })).toBe(`{\n\ta: { b: '${'x'.repeat(66)}' },\n\tc: 1\n}`)
 		config.indent = '  '
 		try {
 			expect(stringify({ a: 1 }, 'long')).toBe('{\n  a: 1\n}')
@@ -309,6 +310,11 @@ describe('comments', () => {
 			const src = '{\n\t/* greeting */\n\ta: 1,\n\tb: 2\n}'
 			const parsed = parse(src, { comments: true })
 			expect(stringify(parsed)).toBe(src)
+		})
+
+		test('the documented promise: leading comments kept, trailing ones dropped', () => {
+			const kept = '// root\n{\n\t/* multi\n\t   line */\n\tabc: 123,\n\t// item\n\txyz: [1]\n}'
+			expect(stringify(parse(kept.replace('[1]', '[1] /* gone */') + '\n// gone', { comments: true }))).toBe(kept)
 		})
 	})
 })
