@@ -6,7 +6,8 @@
 		"Queued waiting rows keep the submit id as their web Row key (optimistic → waiting continuity) while the item key is q<n>; transcript.waitingItem(m, list) numbers queued items by position among queued ones only. Terminal: frame.queuedRows; web: Card's compact branch when Row.note is set.",
 		"inbox.pending keeps a message's first ts across edits, so its Queued-at time does not jump when edited. web app.seek and Transcript's target hit look through withPending rows, so a #q link finds the waiting card.",
 		'On 1 Oct three host tests failed on origin/main independent of this change (scratch literals snapshot, effort persists, timezone saved unasked).',
-		"Waiting rows' item keys are the inbox record's n (inbox.pending keeps the first record's n across edits; InboxItem.n), so #q is free for questions (task 9p). The web Row key stays the submit id."
+		"Waiting rows' item keys are the inbox record's n (inbox.pending keeps the first record's n across edits; InboxItem.n), so #q is free for questions (task 9p). The web Row key stays the submit id.",
+		'Invariant: no code derives an id from queue position; #q means a question only. Web edit-prompt.edit finds a waiting queued message by its submit id (Card passes the waiting Row key), the dead q<position> match removed.'
 	],
 	needs: [],
 	foldInto: ['2r']

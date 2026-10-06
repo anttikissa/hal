@@ -46,7 +46,7 @@ function draft(id: string | undefined): string {
 
 function edit(key: string): boolean {
 	let t = app.state.view.transcript
-	let waiting = t?.inbox.find((m) => m.queue && (m.id === key || `q${t.inbox.filter((x) => x.queue).indexOf(m) + 1}` === key))
+	let waiting = t?.inbox.find((m) => m.queue && m.id === key)
 	if (waiting) return queuedPrompt.begin(waiting.id)
 	if (app.state.view.editing?.queueEdit || (t && queueEdit.current(t.meta.id)?.active)) return false
 	let out = editPrompt.begin(app.state.view, key)
