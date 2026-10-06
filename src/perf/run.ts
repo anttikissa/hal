@@ -2,7 +2,7 @@
 // y9) as host (cold, then warm), as a peer, switching tabs, over -r and
 // in the web client, and prints one table. Never run by ./test; no real
 // data. Exits 1 if a budget is missed.
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { perfHome } from './home.ts'
 
@@ -10,6 +10,34 @@ const repo = `${import.meta.dir}/../..`
 const run = `${repo}/run`
 const strip = (s: string) => s.replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-Za-z]/g, '')
 const keys = '§¶ØÆ¤µ'
+
+// Temp dirs are named after this process (hp-<pid>-, hal-perf-chrome-<pid>-)
+// and removed on exit, Ctrl-C or kill; a later run removes those whose
+// process is gone (a heavy home is gigabytes, so leaks fill the disk).
+const temps = new Set<string>()
+function temp(prefix: string): string {
+	let dir = mkdtempSync(`${prefix}${process.pid}-`)
+	temps.add(dir)
+	return dir
+}
+function drop(dir: string): void {
+	rmSync(dir, { recursive: true, force: true })
+	temps.delete(dir)
+}
+function sweep(): void {
+	let alive = (pid: number) => {
+		try { return process.kill(pid, 0) } catch (e) { return (e as { code?: string }).code === 'EPERM' }
+	}
+	for (let [dir, prefix] of [['/tmp', 'hp-'], [tmpdir(), 'hal-perf-chrome-']] as const) {
+		for (let name of existsSync(dir) ? readdirSync(dir) : []) {
+			if (!name.startsWith(prefix)) continue
+			let pid = Number(name.slice(prefix.length).split('-')[0])
+			// Older runs named dirs without a pid: gone after an hour.
+			let stale = Number.isInteger(pid) && pid > 0 ? !alive(pid) : Date.now() - statSync(`${dir}/${name}`).mtimeMs > 3600_000
+			if (stale) rmSync(`${dir}/${name}`, { recursive: true, force: true })
+		}
+	}
+}
 
 type Term = { exited(): boolean; write(s: string): void; screen(): string; clear(): void; rss(): number; stop(): Promise<void> }
 
@@ -150,7 +178,7 @@ const chrome = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', 
 // prompt show, in headless Chrome.
 async function webLoad(url: string): Promise<number | undefined> {
 	if (!chrome) return undefined
-	let dir = mkdtempSync(`${tmpdir()}/hal-perf-chrome-`)
+	let dir = temp(`${tmpdir()}/hal-perf-chrome-`)
 	let proc = Bun.spawn([chrome, '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], { stdout: 'ignore', stderr: 'ignore' })
 	try {
 		let port = ''
@@ -181,7 +209,7 @@ async function webLoad(url: string): Promise<number | undefined> {
 	} finally {
 		proc.kill()
 		await proc.exited
-		rmSync(dir, { recursive: true, force: true })
+		drop(dir)
 	}
 }
 
@@ -190,7 +218,10 @@ const ms = (x: number | undefined) => (x === undefined ? '—' : x === Infinity 
 async function main(): Promise<number> {
 	let scale = Number(process.argv[2] ?? 1)
 	// Under /tmp: the host's socket path must stay under 104 bytes.
-	let root = mkdtempSync('/tmp/hp-')
+	for (let [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]] as const) process.on(signal, () => process.exit(code))
+	process.on('exit', () => [...temps].forEach(drop))
+	sweep()
+	let root = temp('/tmp/hp-')
 	let home = `${root}/h`
 	let failed: string[] = []
 	let check = (what: string, value: number | undefined, budget: number) => {
@@ -260,7 +291,7 @@ async function main(): Promise<number> {
 		check('tab switch max', sorted.at(-1), 200)
 		if (chrome) check('web page ready', web, 1000)
 	} finally {
-		rmSync(root, { recursive: true, force: true })
+		drop(root)
 	}
 	console.log(failed.length ? `\nover budget:\n  ${failed.join('\n  ')}` : '\nall within budget')
 	return failed.length ? 1 : 0
