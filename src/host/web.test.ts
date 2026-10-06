@@ -1,6 +1,6 @@
-import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
-import { tmpdir } from 'os'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { tmpdir, totalmem } from 'os'
 import { ason } from '../common/ason.ts'
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Event } from '../common/protocol.ts'
@@ -482,15 +482,64 @@ const chrome = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', 
 	existsSync(p),
 )
 
+// Test Chromes allowed at once on this machine, across all test runs:
+// one per 4 GiB of RAM. A headless Chrome takes ~0.5 GB, and parallel
+// agents' runs once filled a 7.6 GB server until the kernel OOM-killed.
+const chromeSlots = Math.max(1, Math.floor(totalmem() / 2 ** 32))
+
+// Takes a free slot directory, waiting while every slot is busy. A slot
+// whose watchdog is gone (killed with SIGKILL, or a reboot) is stale.
+async function slot(): Promise<string> {
+	let deadline = Date.now() + 5 * 60_000
+	for (;;) {
+		let held: string[] = []
+		for (let n = 0; n < chromeSlots; n++) {
+			let dir = `${tmpdir()}/hal-chrome-${n}`
+			try {
+				mkdirSync(dir)
+				return dir
+			} catch {}
+			let pid = Number(existsSync(`${dir}/watchdog.pid`) ? readFileSync(`${dir}/watchdog.pid`, 'utf8') : 0)
+			let alive = pid > 0 && (() => {
+				try {
+					return process.kill(pid, 0)
+				} catch {
+					return false
+				}
+			})()
+			// A slot without a pid file is being taken right now, unless old.
+			if (alive || (!pid && Date.now() - (statSync(dir, { throwIfNoEntry: false })?.mtimeMs ?? 0) < 30_000)) held.push(`${dir} (watchdog ${pid || 'starting'})`)
+			else rmSync(dir, { recursive: true, force: true })
+		}
+		if (held.length === chromeSlots && Date.now() > deadline) throw new Error(`every test Chrome slot stayed busy for 5 minutes: ${held.join(', ')}`)
+		await Bun.sleep(250)
+	}
+}
+
+// Chrome runs under a detached sh watchdog, in its own process group.
+// The watchdog kills that group and frees the slot when this test
+// process dies in any way (SIGKILL, a signal to its pid alone, exit
+// without afterAll: each left a whole Chrome behind before), when
+// Chrome exits, or when close() sends it SIGTERM.
+const watchdog = `owner=$1 dir=$2; shift 2
+set -m
+"$@" </dev/null >/dev/null 2>&1 & c=$!
+stop() { kill -9 -- -$c 2>/dev/null; wait $c; rm -rf "$dir"; exit 0; }
+trap stop TERM INT HUP
+while kill -0 "$owner" 2>/dev/null && kill -0 $c 2>/dev/null; do sleep 1; done
+stop`
+
 // A headless Chrome page driven over the DevTools protocol.
 async function launch() {
-	let dir = mkdtempSync(`${tmpdir()}/hal-chrome-`)
-	let proc = Bun.spawn([chrome!, '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], {
-		stdout: 'ignore',
-		stderr: 'ignore',
+	let dir = await slot()
+	let profile = `${dir}/profile`
+	let proc = Bun.spawn(['sh', '-c', watchdog, 'sh', String(process.pid), dir, chrome!, '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], {
+		stdio: ['ignore', 'ignore', 'ignore'],
+		detached: true,
 	})
+	writeFileSync(`${dir}/watchdog.pid`, String(proc.pid))
 	let port = ''
-	await until(() => existsSync(`${dir}/DevToolsActivePort`) && (port = readFileSync(`${dir}/DevToolsActivePort`, 'utf8').split('\n')[0]!))
+	await until(() => existsSync(`${profile}/DevToolsActivePort`) && (port = readFileSync(`${profile}/DevToolsActivePort`, 'utf8').split('\n')[0]!))
 	let targets: any[] = []
 	for (let i = 0; i < 100 && !targets.some((t) => t.type === 'page'); i++) {
 		targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
@@ -531,7 +580,6 @@ async function launch() {
 		ws.close()
 		proc.kill()
 		await proc.exited
-		rmSync(dir, { recursive: true, force: true })
 	}
 	return { call, evaluate, waitFor, close, diagnostics }
 }
@@ -551,6 +599,15 @@ async function browser() {
 	}
 	return { ...b, close }
 }
+// A test that needs Chrome. Its own describe gives it a beforeAll that
+// runs only when the test does (not under a -t filter that skips it), so
+// waiting for a free slot never counts against the test's own timeout.
+function browserTest(name: string, fn: () => Promise<void>, timeout?: number): void {
+	describe.skipIf(!chrome)('browser', () => {
+		beforeAll(async () => void (await (shared ??= launch())), 6 * 60_000)
+		test(name, fn, timeout)
+	})
+}
 afterAll(async () => {
 	if (shared) await (await shared).close()
 })
@@ -562,7 +619,7 @@ function providerHome(): void {
 	writeFileSync(`${paths.sessionDir(id)}/session.ason`, ason.stringify({ id, cwd: '/tmp', model: 'anthropic/claude-opus-5-5', createdAt: new Date().toISOString() }) + '\n')
 }
 
-test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tapped', async () => {
+browserTest('completion choices fit phone and desktop, and can be tapped', async () => {
 	providerHome()
 	let b = await browser()
 	let known = models.known
@@ -641,7 +698,7 @@ test.skipIf(!chrome)('completion choices fit phone and desktop, and can be tappe
 }, 15000)
 
 
-test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay, open ones stay open', async () => {
+browserTest('in a browser earlier history loads above: shown cards stay, open ones stay open', async () => {
 	// Turns taller than the window, one per page.
 	let id = tabs.create('/tmp')
 	for (let t = 0; t < 4; t++) {
@@ -689,7 +746,7 @@ test.skipIf(!chrome)('in a browser earlier history loads above: shown cards stay
 	}
 }, 20000)
 
-test.skipIf(!chrome)('in a browser a block address loads its page, marks its card and opens the whole output', async () => {
+browserTest('in a browser a block address loads its page, marks its card and opens the whole output', async () => {
 	// The linked tool result sits in the first turn, pages away from the tail.
 	let id = tabs.create('/tmp')
 	let output = Array.from({ length: 40 }, (_, i) => `row ${i + 1}`).join('\n')
@@ -728,7 +785,7 @@ test.skipIf(!chrome)('in a browser a block address loads its page, marks its car
 	}
 }, 20000)
 
-test.skipIf(!chrome)('in a browser a queued message address shows its card at the bottom', async () => {
+browserTest('in a browser a queued message address shows its card at the bottom', async () => {
 	// The reveal's scroll event may come after a resize; the view must not
 	// go back to the pre-reveal reading anchor (the top).
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
@@ -752,7 +809,7 @@ test.skipIf(!chrome)('in a browser a queued message address shows its card at th
 	}
 }, 20000)
 
-test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the address; the strip stays one short row', async () => {
+browserTest('in a browser tabs are links; new, Back and close move the address; the strip stays one short row', async () => {
 	let origCwd = host.cwd
 	host.cwd = () => '/tmp'
 	let b = await browser()
@@ -812,7 +869,7 @@ test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the 
 	}
 }, 20000)
 
-test.skipIf(!chrome)('in a browser a command stays below the block already streaming: same card, no fade again', async () => {
+browserTest('in a browser a command stays below the block already streaming: same card, no fade again', async () => {
 	providerHome()
 	let id = tabs.create('/tmp')
 	let release = () => {}
@@ -867,7 +924,7 @@ test.skipIf(!chrome)('in a browser a command stays below the block already strea
 }, 20000)
 
 
-test.skipIf(!chrome)('web tab paging scrolls with overlap without selecting, and selection recenters', async () => {
+browserTest('web tab paging scrolls with overlap without selecting, and selection recenters', async () => {
 	providerHome()
 	let ids = Array.from({ length: 21 }, () => sessions.create({ cwd: home }).id)
 	tabs.file().open = ids
@@ -945,7 +1002,7 @@ test.skipIf(!chrome)('web tab paging scrolls with overlap without selecting, and
 	}
 }, 20000)
 
-test.skipIf(!chrome)('compact status keeps two lines and opens full live details without losing the draft', async () => {
+browserTest('compact status keeps two lines and opens full live details without losing the draft', async () => {
 	providerHome()
 	let b = await browser()
 	try {
@@ -1001,7 +1058,7 @@ test.skipIf(!chrome)('compact status keeps two lines and opens full live details
 	}
 }, 20_000)
 
-test.skipIf(!chrome)('phone landscape shrinks chrome and bounds long drafts as the visible viewport changes', async () => {
+browserTest('phone landscape shrinks chrome and bounds long drafts as the visible viewport changes', async () => {
 	providerHome()
 	let b = await browser()
 	try {
@@ -1054,7 +1111,7 @@ test.skipIf(!chrome)('phone landscape shrinks chrome and bounds long drafts as t
 	}
 }, 20000)
 
-test.skipIf(!chrome)('touch tab navigation does not focus the composer', async () => {
+browserTest('touch tab navigation does not focus the composer', async () => {
 	providerHome()
 	let b = await browser()
 	try {
@@ -1089,7 +1146,7 @@ test.skipIf(!chrome)('touch tab navigation does not focus the composer', async (
 	}
 })
 
-test.skipIf(!chrome)('pending question URLs are safe native links and wrap at phone and desktop widths', async () => {
+browserTest('pending question URLs are safe native links and wrap at phone and desktop widths', async () => {
 	let id = sessions.create({ cwd: home, model: 'anthropic/claude-opus-5-5' }).id
 	let url = `https://example.com/oauth?state=a_b&redirect_uri=https%3A%2F%2Fexample.org%2Fcallback&scope=${'user%3Aprofile+'.repeat(30)}#fragment`
 	let text = `Open (${url}).\nThen paste code#state. <script>window.pwned=1</script> javascript:bad()`
@@ -1123,7 +1180,7 @@ test.skipIf(!chrome)('pending question URLs are safe native links and wrap at ph
 	}
 })
 
-test.skipIf(!chrome)('manual reload notice preserves the draft and command actions stay distinct from steering', async () => {
+browserTest('manual reload notice preserves the draft and command actions stay distinct from steering', async () => {
 	providerHome()
 	let id = tabs.create('/tmp')
 	let finish = () => {}
@@ -1190,7 +1247,7 @@ test.skipIf(!chrome)('manual reload notice preserves the draft and command actio
 	}
 }, 20000)
 
-test.skipIf(!chrome)('completion dismissal follows pointer and focus without stealing choice clicks or Enter', async () => {
+browserTest('completion dismissal follows pointer and focus without stealing choice clicks or Enter', async () => {
 	providerHome()
 	let b = await browser()
 	try {
@@ -1284,7 +1341,7 @@ test.skipIf(!chrome)('completion dismissal follows pointer and focus without ste
 }, 15000)
 
 
-test.skipIf(!chrome)('transcript card variants share first-line geometry in open and closed states', async () => {
+browserTest('transcript card variants share first-line geometry in open and closed states', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	let ts = '2026-10-02T06:20:00Z'
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Human prompt body' }], ts })
@@ -1376,7 +1433,7 @@ test.skipIf(!chrome)('transcript card variants share first-line geometry in open
 }, 15000)
 
 // Selection belongs to the browser: tests may inspect it; rendering must not.
-test.skipIf(!chrome)('streaming preserves native selection and Markdown text nodes without holding updates', async () => {
+browserTest('streaming preserves native selection and Markdown text nodes without holding updates', async () => {
 	providerHome()
 	let b = await browser(), release = () => {}
 	try {
@@ -1437,7 +1494,7 @@ test.skipIf(!chrome)('streaming preserves native selection and Markdown text nod
 // collapse the selection or scroll the view.
 // Task 4s, pinned bottom: a card can grow with no DOM change (its open
 // animation, an image); a reader at the bottom must still end there.
-test.skipIf(!chrome)('a pinned reader stays at the bottom when a card grows by itself', async () => {
+browserTest('a pinned reader stays at the bottom when a card grows by itself', async () => {
 	providerHome()
 	let b = await browser()
 	try {
@@ -1475,7 +1532,7 @@ test.skipIf(!chrome)('a pinned reader stays at the bottom when a card grows by i
 
 // Task rha: items landing above a queued message must not push it down
 // and glide it back; a bottom reader sees it stay put.
-test.skipIf(!chrome)('a queued message at the bottom stays still while replies stream above it', async () => {
+browserTest('a queued message at the bottom stays still while replies stream above it', async () => {
 	providerHome()
 	let b = await browser(), release = () => {}, finish = () => {}
 	try {
@@ -1524,7 +1581,7 @@ test.skipIf(!chrome)('a queued message at the bottom stays still while replies s
 	}
 }, 20000)
 
-test.skipIf(!chrome)('a select-all survives seconds of streaming untouched', async () => {
+browserTest('a select-all survives seconds of streaming untouched', async () => {
 	providerHome()
 	let b = await browser(), release = () => {}
 	try {
@@ -1615,7 +1672,7 @@ test('self logout is same-origin POST only and cannot revoke another login', asy
 	expect((await fetch(`${base()}/login`, { headers: { cookie: first } })).status).toBe(401)
 })
 
-test.skipIf(!chrome)('browser status logout fits phone and desktop and returns to the login gate', async () => {
+browserTest('browser status logout fits phone and desktop and returns to the login gate', async () => {
 	providerHome()
 	let b = await browser()
 	try {
@@ -1655,7 +1712,7 @@ test('revocation while an upgrade awaits the page build refuses the socket', asy
 	} finally { web.version = original }
 })
 
-test.skipIf(!chrome)('queued message edits retain the draft and require host protection through save, cancel and reload', async () => {
+browserTest('queued message edits retain the draft and require host protection through save, cancel and reload', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
 	let ts = '2026-10-04T20:13:07.456Z'
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Earlier prompt' }], ts })

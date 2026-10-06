@@ -1,0 +1,13 @@
+{
+	title: 'Test Chromes never outlive their run and share a per-machine cap',
+	spec: `Browser tests in src/host/web.test.ts start headless Chrome so that it never outlives the test process and never fills the machine. Invariant restored: no test Chrome runs once the bun process that launched it is gone, however it ended (SIGKILL, a signal to its pid alone, exit without afterAll); before, each of those left a whole Chrome (about 10 processes, ~0.5 GB) behind, and parallel agent runs piled up 13 of them on a 7.6 GB server until the kernel OOM killer froze the web client and ssh.
+- Chrome runs under a detached sh watchdog in its own process group. The watchdog polls the owner pid each second and, when the owner is gone, Chrome exits, or close() sends it SIGTERM, kills the Chrome group and removes its directory.
+- At most one test Chrome per 4 GiB of RAM (at least one) runs on the machine, across all test runs. Slots are directories hal-chrome-N in the temp dir, taken with an atomic mkdir; each holds watchdog.pid and the Chrome profile. A slot whose watchdog is dead, or which has had no pid file for 30 s, is stale and is removed. A run waits for a free slot, failing after 5 minutes with the holders named.
+- Each browser test is registered with browserTest(): its own describe holds a beforeAll that launches the shared Chrome, so a run filtered to other tests starts no Chrome, and waiting for a slot does not count against the test timeout.`,
+	status: 'done',
+	notes: [
+		'Experiments (2026-10-06, Linux): a signal to the whole process group (Hal kills a tool group with SIGTERM then SIGKILL; Ctrl-C in a terminal) already killed every Chrome process; SIGTERM, SIGINT or SIGKILL to the bun pid alone, or process.exit, left all of them. So a SIGINT trap in ./test would not help: SIGKILL cannot be trapped and agents run bun test directly. /usr/bin/chromium-browser on RHEL is a bash wrapper that execs the binary, so killing the spawned pid does reach Chrome. set -m in sh -c puts the background Chrome in its own group, which the watchdog kills without killing itself. When probing with pkill -f, keep the pattern out of your own command line: it matched and SIGKILLed the probing shell twice.',
+		'src/perf/run.ts still launches its own unguarded Chrome (perf may import only perf and common); it is run by hand, rarely.'
+	],
+	needs: ['4s']
+}
