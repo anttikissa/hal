@@ -16,6 +16,18 @@ implement parts of it; they may refine names, not rules.
   peer, a browser, later a host on another machine.
 - **server**: only the listeners (Unix socket, HTTP). Not a role.
 
+## Supervised server mode (fd1)
+
+With `hostMode: 'server'`, local peers never become host. They wait for
+`hal serve`, including across crashes and intentional restarts. The
+headless host runs in the foreground under a supervisor. SIGHUP is
+ignored; SIGTERM/SIGINT stop it without pausing unfinished turns, so an
+explicit service stop stays stopped and a later start recovers them.
+SIGUSR1 and `/restart` exit with the intentional restart code. Terminal
+quit only closes the client. The automatic-mode rules below remain the
+default; in server mode recovery belongs to the supervised host, not a
+peer.
+
 ## States
 
 One state per session at any time, derived by the host from history

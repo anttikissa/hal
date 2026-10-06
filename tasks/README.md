@@ -19,7 +19,8 @@ models. The tasks are the product as much as the code.
   calls, every state write). It also serves remote terminal and web
   clients.
 - **peer**: another Hal process on the same machine, in the client
-  role; it can become host.
+  role; it can become host in automatic mode. In server mode (`hostMode:
+  'server'`, task fd1), it waits for the supervised `hal serve` process.
 - **client**: anything following sessions: the host's own terminal, a
   peer, a browser.
 - **server**: only the listeners (Unix socket, HTTP), never a role.
@@ -53,7 +54,8 @@ is block-start order in both clients; it is separate from delivery eligibility.
   and clients talk over Unix sockets. Windows is left to its first user.
 - One host per home (sessions/ + state/) owns sessions, provider calls and all state
   writes. Every other process is a client over a Unix socket; if the
-  host goes away, a client takes over. Reconnect = connect + snapshot.
+  host goes away, a client takes over in automatic mode. Server-mode
+  clients wait for the supervised host. Reconnect = connect + snapshot.
 - Every client (terminal, peer, browser) uses one connection core,
   `src/common/connection.ts`, over a small transport: in-process or
   Unix socket (`src/client/link.ts`), WebSocket (`src/common/ws-link.ts`,

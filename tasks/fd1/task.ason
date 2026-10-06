@@ -1,0 +1,11 @@
+{
+	title: 'Supervised server mode',
+	spec: 'Hal supports hostMode auto (default peer promotion) or server in config.ason. In server mode ordinary terminals and print clients never acquire the host lock, even after loss or restart; they wait and reconnect. Invalid hostMode values refuse local client startup rather than silently permitting promotion. hal serve explicitly starts the foreground headless host without a terminal, using the existing exclusive lock, web service, recovery, plugins and version reporting. A competing host causes a clear startup failure. SIGHUP does not stop the headless host; SIGTERM/SIGINT stop it without recording user pauses; SIGUSR1 and /restart preserve intentional restart exit 100. Supervision, not custom daemonization, manages lifetime. Tests cover a real headless host, hangup survival, single ownership and client reconnection without promotion. Session-state documentation distinguishes server mode from automatic peer mode.',
+	status: 'done',
+	notes: [
+		'Host lifetime and role policy live in host/lifecycle.ts; main.ts remains the composition root below the 400-line limit. A malformed config refuses promotion too: its default auto policy would otherwise let a broken server-mode file turn an SSH peer into host. The headless host ignores HUP, exits 0 on TERM/INT without pausing unfinished turns, and exits 100 on USR1 or /restart host; systemd invokes Bun directly rather than nesting ./run.',
+		'Validation: 25 affected tests pass, TypeScript passes, changed-file lint passes. Full suite: 1490 pass, 1 skip, 4 failures; unchanged HEAD reproduces module-size, legacy-import output, and both browser failures. Extraction fixes main.ts size; client/render.ts remains over the existing limit. Full lint also reports a pre-existing unused pages import in host.test.ts. No live host, config or service was changed.'
+	],
+	needs: ['ja', 'pc', 'cb'],
+	foldInto: ['ja']
+}

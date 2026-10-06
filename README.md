@@ -49,6 +49,12 @@ cd ~/.hal
 hal 
 ```
 
+# Server
+
+For a supervised, headless host running from an editable checkout, see
+[Linux server setup](SERVER.md), including the systemd user-service
+installer and a declarative NixOS example.
+
 # Plugins
 
 Hal has no plugin API in the usual sense. Each module exports one

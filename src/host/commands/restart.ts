@@ -13,6 +13,7 @@
 import { toolDetails } from '../../common/tool-details.ts'
 import type { FlaggedCall } from '../../common/modals.ts'
 import { transcript } from '../../common/transcript.ts'
+import { settings } from '../../common/settings.ts'
 import type { SlashCommand } from '../commands.ts'
 import { history } from '../history.ts'
 import { host } from '../host.ts'
@@ -52,7 +53,9 @@ export const command: SlashCommand = {
 	help: () =>
 		[
 			'/restart or /restart all restarts the host and every client connected to it.',
-			'/restart host restarts the host; clients reconnect, and a peer may take over.',
+			settings.value('hostMode') === 'server'
+				? '/restart host restarts the host; clients wait for the supervised server to return.'
+				: '/restart host restarts the host; clients reconnect, and a peer may take over.',
 			'/restart both restarts the host and this client.',
 			'/restart local (ctrl-r) restarts this client; the web page reloads.',
 			'When this client is the host, local and host restart the same process.',

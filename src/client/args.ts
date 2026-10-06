@@ -6,6 +6,7 @@ export type Args =
 	| { kind: 'help' }
 	| { kind: 'version' }
 	| { kind: 'auth' }
+	| { kind: 'serve' }
 	| { kind: 'remote'; host?: string }
 	| { kind: 'print'; prompt: string; dir?: string; model?: string }
 	| { kind: 'error'; message: string }
@@ -14,6 +15,7 @@ const usage = `Usage:
   hal                                    start the terminal client
   hal -p <prompt> [-d <dir>] [-m <model>] run one prompt in a new tab, print the reply
   hal -r [host]                          follow a remote Hal
+  hal serve                              run the foreground headless host
   hal auth                               print a one-time web login code
   hal -v, --version                      show the version, commit and checkout
   hal -h, --help                         show this help
@@ -24,6 +26,7 @@ function parse(argv: string[]): Args {
 	if (first === undefined) return { kind: 'terminal' }
 	if (argv.length === 1 && ['-h', '--help', 'help'].includes(first)) return { kind: 'help' }
 	if (argv.length === 1 && ['-v', '--version'].includes(first)) return { kind: 'version' }
+	if (first === 'serve' && !rest.length) return { kind: 'serve' }
 	if (first === 'auth' && !rest.length) return { kind: 'auth' }
 	if (first === '-r' && rest.length <= 1) return rest[0] === undefined ? { kind: 'remote' } : rest[0].startsWith('-') ? { kind: 'error', message: `-r: unexpected ${rest[0]}` } : { kind: 'remote', host: rest[0] }
 	if (!argv.includes('-p') && !argv.includes('--print')) return { kind: 'error', message: `unknown arguments: ${argv.join(' ')}` }
