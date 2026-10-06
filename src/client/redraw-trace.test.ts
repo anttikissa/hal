@@ -59,13 +59,14 @@ test('records immutable-row changes separately from writable diffs and unchanged
 	])
 })
 
-test('attributes throttle-coalesced paints to event and keyboard sources, not their payloads', () => {
+test('attributes throttle-coalesced paints to event and keyboard sources, not their payloads', async () => {
 	let writes: string[] = []
 	render.init({ size: () => ({ rows: 10, cols: 40 }), write: (s) => writes.push(s) })
 	app.onEvent = () => render.request()
 	app.onKeys = () => render.request()
 	redrawTrace.start(file)
 	app.onEvent({ type: 'warning', text: 'PRIVATE message' })
+	await Promise.resolve()
 	app.onEvent({ type: 'tool-output', sessionId: 'PRIVATE session', id: 'PRIVATE id', at: 0, chunk: 'PRIVATE output' })
 	app.onKeys([{ key: 'PRIVATE typed key', alt: false, ctrl: false, shift: false, cmd: false }])
 	render.draw()

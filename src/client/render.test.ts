@@ -382,7 +382,7 @@ describe('leaving and coming back', () => {
 })
 
 describe('request', () => {
-	test('paints at once, then at most once per frame time', async () => {
+	test('paints at the end of the task, then at most once per frame time', async () => {
 		setup()
 		let writes = 0
 		let write = term.write.bind(term)
@@ -396,11 +396,18 @@ describe('request', () => {
 			render.state.view = { transcript: transcript([{ type: 'text', text: `t${i}` }]), prompt: { text: '', cursor: 0 } }
 			render.request()
 		}
+		// Events delivered in one task paint once, showing the latest view.
+		expect(writes).toBe(0)
+		await Promise.resolve()
+		expect(writes).toBe(1)
+		expect(term.content()).toContain(' t49')
+		render.state.view = { transcript: transcript([{ type: 'text', text: 't50' }]), prompt: { text: '', cursor: 0 } }
+		render.request()
+		await Promise.resolve()
 		expect(writes).toBe(1)
 		await Bun.sleep(20)
 		expect(writes).toBe(2)
-		// The trailing paint shows the latest view.
-		expect(term.content()).toContain(' t49')
+		expect(term.content()).toContain(' t50')
 		render.frameMs = 16
 	})
 })

@@ -1,0 +1,7 @@
+{
+	title: 'Terminal: one host step paints once',
+	spec: 'The terminal client paints at the end of the current task (a microtask in render.request, src/client/render.ts), never in the middle of applying events. The local host delivers one change as several synchronous events: a waiting message leaves the inbox, then arrives as a prompt. A paint between them would show a frame shorter than both, and in full mode a shorter frame clears screen and scrollback, snapping a scrolled-up terminal to the bottom. After a paint, further requests wait for frameMs as before.',
+	status: 'done',
+	needs: ['4y4'],
+	foldInto: ['fn']
+}
