@@ -41,8 +41,9 @@ function dir(): string {
 	return join(paths.home(), 'plugins')
 }
 
-// Where failures go; main.ts adds open sessions and clients on the host.
-function report(text: string): void {
+// Where failures go; on the host, main.ts sends them on (task njq).
+// `path`: the plugin file a failure disabled.
+function report(text: string, _path?: string): void {
 	process.stderr.write(`${text}\n`)
 }
 
@@ -215,7 +216,7 @@ function broken(path: string, hash: string, e: any): void {
 		text = `plugin ${path} failed; Hal runs without it, but renaming it to ${to} failed too (${r?.message ?? r}).\n${error}`
 	}
 	st.files.set(path, { path, hash, hooks: [], error: text })
-	plugins.report(text)
+	plugins.report(text, path)
 }
 
 // (Re)loads plugin file `path`: the old version's hooks go and its

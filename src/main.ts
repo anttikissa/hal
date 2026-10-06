@@ -38,8 +38,8 @@ import { openaiCompat } from './host/openai-compat.ts'
 import { paths } from './host/paths.ts'
 import { secrets } from './host/secrets.ts'
 import { plugins } from './host/plugins.ts'
+import { pluginReports } from './host/plugin-reports.ts'
 import { server } from './host/server.ts'
-import { slash } from './host/slash.ts'
 import { tabs } from './host/tabs.ts'
 import { web } from './host/web.ts'
 import { webAuth } from './host/web-auth.ts'
@@ -60,11 +60,7 @@ async function loadLocal(): Promise<void> {
 // Loads and follows plugins/*.ts (task an), after local.ts. A failure
 // goes to stderr and, on the host, to every open session and client.
 async function loadPlugins(): Promise<void> {
-	plugins.report = (text) => {
-		process.stderr.write(`${text}\n`)
-		for (let id of sessions.openIds()) slash.output(id, text, true)
-		for (let client of host.state.clients) client.deliver({ type: 'warning', text })
-	}
+	plugins.report = (text, path) => void pluginReports.report(text, path)
 	await plugins.init()
 }
 
