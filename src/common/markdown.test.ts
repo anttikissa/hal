@@ -85,3 +85,13 @@ describe('parse', () => {
 		expect(kinds('a\n| h |', false)).toEqual(['p', 'p'])
 	})
 })
+
+test('block ids link to cards the writer could have seen; code, invented ids and punctuation stay text (task d92)', () => {
+	let links = markdown.blockLinks('06-abc', '20', (s) => s === '05-xyz')
+	let hrefs = (s: string) => markdown.parse(s, false, links).flatMap((b) => (b.type === 'line' ? b.runs : [])).filter((r) => r.href).map((r) => [r.text, r.href])
+	expect(hrefs('see #t5.')).toEqual([['#t5', '/06-abc#t5']])
+	expect(hrefs('see `#t5` and #t99 and #1 and #fff')).toEqual([])
+	expect(hrefs('in 05-xyz#u3, not 07-qqq#u3')).toEqual([['05-xyz#u3', '/05-xyz#u3']])
+	expect(hrefs('#u6.1 then a#t5')).toEqual([['#u6.1', '/06-abc#u6.1']])
+	expect(markdown.parse('#t5', false).flatMap((b) => (b.type === 'line' ? b.runs : [])).some((r) => r.href)).toBe(false)
+})

@@ -194,7 +194,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 			(item.type === 'prompt' && !!item.from && !/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
 	})
 	let markdown = () => (
-		<Markdown text={shown()?.text ?? ''} streaming={props.cursor}>
+		<Markdown text={shown()?.text ?? ''} streaming={props.cursor} links={props.row.item.type === 'text' || props.row.item.type === 'thinking' ? parser.blockLinks(props.session, props.row.key) : undefined}>
 			<Show when={props.cursor}>{cursor()}</Show>
 		</Markdown>
 	)

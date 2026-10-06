@@ -112,6 +112,15 @@ function scan(s: string, i: number, st: Style, until: string, open: boolean): Sc
 			i += bare.length
 			continue
 		}
+		// A block id (task d92), #t5 or <session>#t5, where the resolver
+		// knows the block: a link to its card. Else it stays text.
+		let id = markdown.state.links && (c === '#' || /\d/.test(c)) && !WORD.test(s[i - 1] ?? '') ? /^(?:(\d+-[a-z]{3})#|#)([umartsq]\d+(?:\.\d+)?)(?![\w#])/.exec(s.slice(i)) : null
+		let to = id ? markdown.state.links!(id[1], id[2]!) : undefined
+		if (id && to) {
+			add(id[0], { ...st, href: to })
+			i += id[0].length
+			continue
+		}
 		let entity = c === '&' ? /^&(nbsp|amp|lt|gt|quot);/.exec(s.slice(i)) : null
 		add(entity ? ENTITIES[entity[1]!]! : c, st)
 		i += entity ? entity[0].length : 1
@@ -142,7 +151,14 @@ function cells(row: string, open: boolean): Run[][] {
 		.map((c) => c.trim().split(/<br\s*\/?>/i).flatMap((line, i) => [...(i ? [{ text: '\n' }] : []), ...inline(line, open)]))
 }
 
-function parse(text: string, streaming = false): Block[] {
+// `links`: where a block id in the text links (task d92), given the
+// session it names (undefined: this one) and the id; undefined: text.
+function parse(text: string, streaming = false, links?: Links): Block[] {
+	markdown.state.links = links
+	try { return blocks(text, streaming) } finally { markdown.state.links = undefined }
+}
+
+function blocks(text: string, streaming: boolean): Block[] {
 	let lines = text.split('\n')
 	let out: Block[] = []
 	for (let i = 0; i < lines.length; i++) {
@@ -183,4 +199,17 @@ function parse(text: string, streaming = false): Block[] {
 	return out
 }
 
-export const markdown = { parse, line, inline, closes, opener }
+// Block-id links in the text of item `key` of `session` (task d92): an
+// id of this session links when it is older than the item, the only
+// blocks its writer could have seen; another session's when `known`.
+function blockLinks(session: string, key: string, known: (session: string) => boolean = () => false) {
+	let before = parseInt(key, 10)
+	return (other: string | undefined, block: string): string | undefined => {
+		if (other !== undefined && other !== session) return known(other) ? `/${other}#${block}` : undefined
+		return parseInt(block.slice(1), 10) < before ? `/${session}#${block}` : undefined
+	}
+}
+
+export type Links = (session: string | undefined, block: string) => string | undefined
+
+export const markdown = { state: { links: undefined as Links | undefined }, parse, blockLinks, line, inline, closes, opener }

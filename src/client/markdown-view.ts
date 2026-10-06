@@ -3,7 +3,7 @@
 // with their cells wrapped inside their columns. Every row closes the
 // styles it opens, so repainting one row never leaks into another.
 
-import { markdown, type Block, type Run } from '../common/markdown.ts'
+import { markdown, type Block, type Links, type Run } from '../common/markdown.ts'
 import { strings } from '../common/strings.ts'
 import type { Style } from '../common/colors.ts'
 import { ansi } from './ansi.ts'
@@ -111,12 +111,12 @@ function block(b: Block, width: number, style?: Style): string[] {
 }
 
 // Rows of model text at `width` columns; `streaming`: it may still grow.
-function lines(text: string, width: number, streaming = false, style?: Style): string[] {
+function lines(text: string, width: number, streaming = false, style?: Style, links?: Links): string[] {
 	let source = strings.expandTabs(ansi.clean(text.replace(/\r\n?/g, '\n')))
 	// While streaming, hold back an unfinished last line that is empty or may
 	// still become a fence, so its row never appears and then vanishes.
 	if (streaming) source = source.replace(/(^|\n)( {0,3}(`{1,2}|~{1,2}))?$/, '')
-	let blocks = markdown.parse(source, streaming)
+	let blocks = markdown.parse(source, streaming, links)
 	let gap = (b: Block | undefined) => b?.type === 'line' && b.kind === 'p' && !b.marker && !b.runs.length
 	let closed = (b: Block | undefined) => b?.type === 'code' && b.close !== undefined
 	return blocks.flatMap((b, i) => (gap(b) && closed(blocks[i - 1]) ? [] : markdownView.block(b, width, style)))
