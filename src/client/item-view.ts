@@ -220,11 +220,11 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			return itemView.headed(item, ansi.wrap(item.text, width), width, session)
 		case 'output': {
 			// A prompt-file change (task ar): a head row and short colored
-			// rows, no header; the web card opens to the diffs.
+			// rows, no header; open, each change's line and whole diff.
 			if (item.change) {
 				let d = colors.diff(), style = itemView.itemStyle(item as unknown as Item)
 				let paint = (t: string, tone: string) => (tone === 'head' ? t : tone === 'dim' ? ansi.quiet(t, style) : ansi.sgr({ fg: tone === 'add' ? d.addFg! : d.removeFg! }) + (tone === 'del' ? `\x1b[9m${t}\x1b[29m` : t) + ansi.sgr({ fg: (style ?? colors.log()).fg! }))
-				return promptChanges.rows(item).map((r) => {
+				let summary = promptChanges.rows(item).map((r) => {
 					if (!r.parts) return paint(strings.clipVisual(r.text, width), r.tone)
 					// Word by word, clipped to the width like a plain row.
 					let room = width, out = ''
@@ -237,6 +237,9 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 					}
 					return out
 				})
+				if (fold !== 'open') return summary
+				let tone = (r: string) => (r[0] === '+' ? 'add' : r[0] === '-' ? 'del' : 'dim')
+				return [...summary, ...promptChanges.run(item as Keyed).flatMap((o) => ['', ansi.quiet(promptChanges.line(o), style), ...o.change!.diff.split('\n').flatMap((r) => ansi.wrap(r, width).map((w) => paint(w, tone(r))))])]
 			}
 			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width)
 		}
