@@ -108,7 +108,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	}
 	// One source per action button (task 02s): the icon, the small-caps
 	// name under it, the aria-label and the caption that hover or
-	// keyboard focus shows under the row on fine pointers.
+	// keyboard focus shows under the buttons on fine pointers.
 	let [caption, setCaption] = createSignal('')
 	let explains = matchMedia('(hover: hover) and (pointer: fine)')
 	let Action = (p: { kind: keyof typeof BUTTONS; class?: string; disabled?: boolean; onClick: () => void }) => {
@@ -181,7 +181,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				{/* Keep the keyboard: the tap leaves the draft focused, and the
 				    draft takes the focus back when the picker closes. */}
 				<button type="button" class="attach" aria-label="Attach file" title="Attach file" disabled={!!props.view.form} onPointerDown={(e) => { typing = document.activeElement === input; e.preventDefault() }} onClick={() => picker.click()}>
-					<Icon name="attach" />
+					<Icon name="plus" />
 				</button>
 				{/* Our own placeholder, so it can fade as typing starts. */}
 				<div class="field">
@@ -209,8 +209,8 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 					    click was lost. send() blurs afterwards. */}
 					<Action kind={action()} class="go" disabled={!props.text.trim() || !!props.view.form || (queueEditing() && !canSave())} onClick={() => send()} />
 				</div>
+				<Show when={caption()}><div class="caption" role="status">{caption()}</div></Show>
 			</div>
-			<Show when={caption()}><div class="caption" role="status">{caption()}</div></Show>
 			<div class="help">
 				<For each={view.hints(props.view, props.text, props.menu)}>
 					{(h) => (
