@@ -21,7 +21,11 @@
 //   ansi.FLOW continue on the next (a long URL): they are written with
 //   no CRLF between, so the terminal soft-wraps them into one line, and
 //   such a chain is always rewritten whole, from its first row.
+// - Every erase of rows the paint does not rewrite in place goes
+//   through render.clear(reason), and nothing else erases (task e4c):
+//   a plugin observes each one, with why, by hooking it.
 
+import { titles } from '../common/titles.ts'
 import { ansi } from './ansi.ts'
 import { frame, type Frame, type Past, type View } from './frame.ts'
 import { terminal } from './terminal.ts'
@@ -34,6 +38,28 @@ export interface Output {
 	size(): { rows: number; cols: number }
 }
 
+/**
+ * Why rows are erased (task e4c). `kind`: 'all' clears screen and
+ * scrollback, which snaps a scrolled-up terminal to the bottom; 'down'
+ * clears from the frame's top row down (scrollback untouched); 'below'
+ * erases rows past the frame's new end; 'row' erases the help row for
+ * the shell. `blocks`: the parts whose row counts changed, as
+ * '#t239 (tool-result)', 'waiting messages' or 'the prompt area'.
+ * Holds no transcript text.
+ */
+export interface ClearReason {
+	kind: 'all' | 'down' | 'below' | 'row'
+	cause: 'forced' | 'first paint' | 'shrink' | 'scrollback edit' | 'park'
+	trigger?: string
+	rows: { before: number; after: number; screen: number }
+	firstChanged?: number
+	writableTop?: number
+	/** The block holding the first changed row, in the last frame. */
+	changedBlock?: string
+	blocks?: { block: string; before: number; after: number }[]
+	text: string
+}
+
 // Bytes to write: a string, or a piece of a big one made when written.
 type Part = string | (() => string)
 
@@ -42,6 +68,8 @@ interface RenderState {
 	view: View
 	/** The frame lines painted last; [] before the first paint or after park. */
 	prev: string[]
+	/** Where the last frame's blocks were, for clear reasons. */
+	shape: Shape | undefined
 	cursorRow: number
 	fullscreen: boolean
 	/** The tab painted last. */
@@ -72,6 +100,7 @@ function createState(): RenderState {
 		out: null,
 		view: { prompt: { text: '', cursor: 0 } },
 		prev: [],
+		shape: undefined,
 		cursorRow: 0,
 		fullscreen: false,
 		tab: undefined,
@@ -120,8 +149,55 @@ function rowParts(lines: string[]): Part[] {
 
 // Clear screen and scrollback, write the whole frame. The cursor ends
 // on its last row.
-function canonical(lines: string[]): Part[] {
-	return [CLEAR_ALL, ...rowParts(lines)]
+function canonical(lines: string[], reason: ClearReason): Part[] {
+	return [render.clear(reason), ...rowParts(lines)]
+}
+
+/** The erase sequence for `reason`; the one place that erases rows. */
+function clear(reason: ClearReason): string {
+	return reason.kind === 'all' ? CLEAR_ALL : reason.kind === 'row' ? `${CSI}2K` : `${CSI}J`
+}
+
+type Shape = { length: number; history: number; items?: Frame['items']; ends?: number[] }
+
+// The part of frame `f` that row `row` belongs to.
+function blockAt(f: Shape, row: number): string {
+	let ends = f.ends ?? []
+	if (row < (ends.at(-1) ?? 0)) {
+		let lo = 0
+		for (let hi = ends.length - 1; lo < hi; ) {
+			let mid = (lo + hi) >> 1
+			if (ends[mid]! > row) hi = mid
+			else lo = mid + 1
+		}
+		let item = f.items![lo]!
+		return `#${titles.blockId(item)} (${item.type})`
+	}
+	return row < f.history ? 'waiting messages' : 'the prompt area'
+}
+
+// Rows per part of frame `f`.
+function sizes(f: Shape): Map<string, number> {
+	let m = new Map<string, number>()
+	let add = (k: string, n: number) => n && m.set(k, (m.get(k) ?? 0) + n)
+	let ends = f.ends ?? []
+	ends.forEach((end, i) => add(blockAt(f, end - 1), end - (i ? ends[i - 1]! : 0)))
+	add('waiting messages', f.history - (ends.at(-1) ?? 0))
+	add('the prompt area', f.length - f.history)
+	return m
+}
+
+// The parts whose row counts differ between two frames, biggest
+// shrink first, at most 5.
+function changes(a: Shape | undefined, b: Shape): NonNullable<ClearReason['blocks']> {
+	if (!a) return []
+	let x = sizes(a), y = sizes(b)
+	let out = [...new Set([...x.keys(), ...y.keys()])].map((block) => ({ block, before: x.get(block) ?? 0, after: y.get(block) ?? 0 })).filter((c) => c.before !== c.after)
+	return out.sort((p, q) => p.after - p.before - (q.after - q.before)).slice(0, 5)
+}
+
+function said(blocks: NonNullable<ClearReason['blocks']>): string {
+	return blocks.length ? `: ${blocks.map((c) => `${c.block} ${c.before} → ${c.after} rows`).join(', ')}` : ''
 }
 
 // Parts made into one string (tests, small frames).
@@ -133,14 +209,16 @@ function text(parts: Part[]): string {
  * The bytes that turn the terminal from the last painted frame into
  * `next`, with `rows` terminal rows. Updates the state as if written.
  */
-function paint(next: Frame, rows: number, force = false): string {
-	return text(render.paintParts(next, rows, force))
+function paint(next: Frame, rows: number, force = false, trigger?: string): string {
+	return text(render.paintParts(next, rows, force, trigger))
 }
 
-function paintParts(next: Frame, rows: number, force = false): Part[] {
+function paintParts(next: Frame, rows: number, force = false, trigger = 'a redraw'): Part[] {
 	let st = render.state
 	let prev = st.prev
 	let lines = next.lines
+	let shape: Shape = { length: lines.length, history: next.history, items: next.items, ends: next.ends }
+	let size = { before: prev.length, after: lines.length, screen: rows }
 	let wasFull = st.fullscreen
 	// Off the shell's output above, unless the frame fills the screen.
 	let gap = st.gap && !prev.length && lines.length < rows ? '\r\n' : ''
@@ -152,14 +230,18 @@ function paintParts(next: Frame, rows: number, force = false): Part[] {
 		// Our top is out of reach (the terminal shrank): no clean
 		// repaint in place is possible any more.
 		st.fullscreen = wasFull = true
+		trigger += ', with the frame top out of reach'
 	}
 	if (force && wasFull) {
-		body = canonical(lines)
+		body = canonical(lines, { kind: 'all', cause: 'forced', trigger, rows: size, text: `Cleared screen and scrollback and repainted everything because of ${trigger}.` })
 		row = lines.length - 1
 	} else if (force || !prev.length) {
 		// Grow mode, or the first paint: from the top of our frame (the
 		// cursor, on a first paint) clear down and write everything.
-		body = [gap + '\r' + move(st.cursorRow, 0) + `${CSI}J`, ...rowParts(lines)]
+		let reason: ClearReason = force
+			? { kind: 'down', cause: 'forced', trigger, rows: size, text: `Repainted the frame from its top (scrollback untouched) because of ${trigger}.` }
+			: { kind: 'down', cause: 'first paint', rows: size, text: 'Cleared below the cursor for the first paint.' }
+		body = [gap + '\r' + move(st.cursorRow, 0) + render.clear(reason), ...rowParts(lines)]
 		row = lines.length - 1
 	} else {
 		let first = 0
@@ -172,15 +254,26 @@ function paintParts(next: Frame, rows: number, force = false): Part[] {
 			let out = move(st.cursorRow, next.cursor.row) + render.column(next.cursor.col)
 			st.cursorRow = next.cursor.row
 			if (lines.length > rows) st.fullscreen = true
+			st.shape = shape
 			return [out]
 		}
 		let writableTop = Math.max(0, prev.length - rows)
+		let shrank = (): ClearReason => {
+			let blocks = changes(st.shape, shape)
+			return { kind: 'below', cause: 'shrink', rows: size, firstChanged: first, blocks, text: `Erased ${prev.length - lines.length} rows below the frame's new end${said(blocks)}.` }
+		}
 		if (wasFull && (first < writableTop || lines.length < prev.length)) {
-			body = canonical(lines)
+			let blocks = changes(st.shape, shape)
+			let changedBlock = st.shape ? blockAt(st.shape, first) : undefined
+			let reason: ClearReason =
+				first < writableTop
+					? { kind: 'all', cause: 'scrollback edit', rows: size, firstChanged: first, writableTop, changedBlock, blocks, text: `Row ${first}, in ${changedBlock ?? 'an unknown block'}, changed in scrollback (rows above ${writableTop} cannot be rewritten in place)${lines.length < prev.length ? ` and the frame shrank from ${prev.length} to ${lines.length} rows` : ''}, so Hal cleared screen and scrollback and repainted${said(blocks)}.` }
+					: { kind: 'all', cause: 'shrink', rows: size, firstChanged: first, writableTop, changedBlock, blocks, text: `The frame shrank from ${prev.length} to ${lines.length} rows; a terminal cannot pull scrollback back onto the screen, so Hal cleared screen and scrollback and repainted${said(blocks)}.` }
+			body = canonical(lines, reason)
 			row = lines.length - 1
 		} else if (first >= lines.length) {
 			// Only rows at the end went away.
-			body = [move(st.cursorRow, first) + `\r${CSI}J`]
+			body = [move(st.cursorRow, first) + '\r' + render.clear(shrank())]
 			row = first
 		} else {
 			// Rewrite the rows that changed from the first change on (a
@@ -214,7 +307,7 @@ function paintParts(next: Frame, rows: number, force = false): Part[] {
 			if (lines.length < prev.length) {
 				// Erase the leftover rows below. CSI B, not CRLF: at the
 				// bottom of the screen CRLF would scroll in a blank row.
-				parts.push(move(at, lines.length - 1), `\r${CSI}1B${CSI}J`)
+				parts.push(move(at, lines.length - 1), `\r${CSI}1B` + render.clear(shrank()))
 				row = lines.length
 			}
 			body = [parts.join('')]
@@ -222,6 +315,7 @@ function paintParts(next: Frame, rows: number, force = false): Part[] {
 	}
 	if (lines.length > rows) st.fullscreen = true
 	st.prev = lines
+	st.shape = shape
 	st.cursorRow = next.cursor.row
 	return [SYNC_ON + HIDE_CURSOR, ...body, move(row, next.cursor.row) + render.column(next.cursor.col) + SHOW_CURSOR + SYNC_OFF]
 }
@@ -236,7 +330,7 @@ function column(col: number): string {
  * showing another tab than last time repaints canonically: scrollback
  * holds only the tab shown.
  */
-function draw(force = false): void {
+function draw(force = false, trigger?: string): void {
 	let st = render.state
 	if (terminal.state.external || !st.out || (st.parked && !force)) return
 	st.parked = false
@@ -244,10 +338,16 @@ function draw(force = false): void {
 	// Two or more tabs means full mode for good, from the first paint
 	// that sees them: a restart on tab 2 then clears what the last run
 	// left on screen instead of painting under it.
-	if (!st.fullscreen && (st.view.tabs?.list.length ?? 0) > 1) st.fullscreen = force = true
+	if (!st.fullscreen && (st.view.tabs?.list.length ?? 0) > 1) {
+		st.fullscreen = force = true
+		trigger = 'the first paint with two or more tabs'
+	}
 	let tab = st.view.tabs?.focused
 	if (tab !== undefined) {
-		if (st.tab !== undefined && st.tab !== tab) st.fullscreen = force = true
+		if (st.tab !== undefined && st.tab !== tab) {
+			st.fullscreen = force = true
+			trigger = 'a tab switch'
+		}
 		st.tab = tab
 	}
 	// A full redraw drops what kept blocks from shrinking (task fn), and
@@ -276,7 +376,7 @@ function draw(force = false): void {
 	st.view.prompt.scroll = next.promptScroll
 	let out = st.out
 	let pending = ''
-	for (let p of render.paintParts(next, rows, force)) {
+	for (let p of render.paintParts(next, rows, force, trigger)) {
 		if (typeof p === 'string') pending += p
 		else if (out.defer) {
 			if (pending) out.write(pending)
@@ -347,8 +447,10 @@ function park(): void {
 	let st = render.state
 	if (!st.out || st.parked) return
 	st.parked = true
-	if (st.prev.length) st.out.write(move(st.cursorRow, st.prev.length - 1) + `\r${CSI}2K` + SHOW_CURSOR)
+	let size = { before: st.prev.length, after: 0, screen: st.out.size().rows }
+	if (st.prev.length) st.out.write(move(st.cursorRow, st.prev.length - 1) + '\r' + render.clear({ kind: 'row', cause: 'park', rows: size, text: 'Erased the help row so the shell prompt takes it (suspend or quit).' }) + SHOW_CURSOR)
 	st.prev = []
+	st.shape = undefined
 	st.cursorRow = 0
 }
 
@@ -358,8 +460,8 @@ function init(out: Output | null = terminal.state.io): void {
 	render.state.out = out
 	// Never while suspended: the shell has the terminal (a plugin's
 	// onChange may call it any time).
-	terminal.redraw = () => void (terminal.state.suspended || render.draw(true))
-	terminal.onResize = () => render.draw(true)
+	terminal.redraw = (trigger = 'a redraw request') => void (terminal.state.suspended || render.draw(true, trigger))
+	terminal.onResize = () => render.draw(true, 'a terminal resize')
 	terminal.park = () => render.park()
 }
 
@@ -384,6 +486,7 @@ export const render = {
 	painted: (_view: View): void => {},
 	paint,
 	paintParts,
+	clear,
 	column,
 	draw,
 	tail,

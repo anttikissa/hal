@@ -23,7 +23,7 @@ async function edit(path: string): Promise<void> {
 		terminal.state.external = false
 		if (terminal.state.io) terminal.enter()
 		process.stdin.resume()
-		terminal.redraw()
+		terminal.redraw('the rebase editor closing')
 	}
 }
 

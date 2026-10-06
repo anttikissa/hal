@@ -3,7 +3,7 @@ import { colors } from '../common/colors.ts'
 import { strings } from '../common/strings.ts'
 import type { Shown as Item, Transcript } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
-import { render } from './render.ts'
+import { render, type ClearReason } from './render.ts'
 import { terminal } from './terminal.ts'
 
 // A small terminal emulator: a buffer of rows whose last `rows` rows are
@@ -556,5 +556,48 @@ describe('a long history (task 7j)', () => {
 		} finally {
 			render.sliceMs = slice
 		}
+	})
+})
+
+describe('clear reasons (task e4c)', () => {
+	let reasons: ClearReason[] = []
+	let original = render.clear
+	function record() {
+		reasons = []
+		render.clear = (r) => (reasons.push(r), original(r))
+	}
+	afterEach(() => void (render.clear = original))
+
+	test('every erase the renderer writes goes through render.clear', () => {
+		record()
+		setup(20, 30)
+		show(items(2))
+		show(items(1))
+		show(items(10))
+		let list = items(10)
+		list[0] = { type: 'output', text: 'q0 edited' }
+		show(list)
+		show(list.slice(0, -2))
+		show(list.slice(0, -2), '', 0, true)
+		let erases = term.written.match(/\x1b\[\d*J/g)?.length ?? 0
+		expect(erases).toBe(reasons.reduce((n, r) => n + (r.kind === 'all' ? 2 : 1), 0))
+		expect(reasons.map((r) => `${r.kind} ${r.cause}`)).toEqual(['down first paint', 'below shrink', 'all scrollback edit', 'all shrink', 'all forced'])
+		expect(reasons.every((r) => r.text.length > 0)).toBe(true)
+	})
+
+	test('a shrink names the block that shrank; a forced repaint its trigger', () => {
+		setup(20, 30)
+		let list = items(10)
+		list.push({ type: 'output', text: 'one\ntwo\nthree\nfour' })
+		show(list)
+		record()
+		list = [...list.slice(0, -1), { type: 'output', text: 'one' }]
+		show(list)
+		expect(reasons[0]).toMatchObject({ kind: 'all', cause: 'shrink' })
+		expect(reasons[0]!.blocks![0]).toMatchObject({ before: 5, after: 2 })
+		expect(reasons[0]!.blocks![0]!.block).toMatch(/~20 \(output\)$/)
+		expect(reasons[0]!.text).toContain('~20 (output) 5 → 2 rows')
+		terminal.redraw('Ctrl-L or /redraw')
+		expect(reasons[1]).toMatchObject({ kind: 'all', cause: 'forced', trigger: 'Ctrl-L or /redraw' })
 	})
 })

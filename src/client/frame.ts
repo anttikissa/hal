@@ -87,6 +87,9 @@ export interface Frame {
 	promptScroll: number
 	/** Rows of history (transcript and pending prompts) at the top. */
 	history: number
+	/** The transcript items in it and the row each ends at (Past). */
+	items?: Item[]
+	ends?: number[]
 }
 
 // The prompt's content width on a terminal `cols` wide: what Up/Down
@@ -173,7 +176,9 @@ function highWater(rows: string[], item: Item, cols: number, session: string | u
 	return [...rows, ...Array<string>(peak! - rows.length).fill(ansi.paint('', itemView.itemStyle(item), cols))]
 }
 
-export type Past = { lines: string[]; formCursor?: Frame['cursor']; target?: number; tick?: { row: number; labeled: string; plain: string } }
+// `items`/`ends`: the items laid out and the row each ends at, so a
+// row can be traced to its block (render.clear's reasons, task e4c).
+export type Past = { lines: string[]; items?: Item[]; ends?: number[]; formCursor?: Frame['cursor']; target?: number; tick?: { row: number; labeled: string; plain: string } }
 
 // Lays out the transcript's items. The rows of items drawn last time
 // and unchanged since are reused as they are: a frame costs what
@@ -289,7 +294,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	let at = view.target ? items.findIndex((i) => i.key === view.target) : -1
 	// An image drawn in its prompt's card is found at that card.
 	while (at > 0 && items[at]!.type === 'image' && ['prompt', 'image'].includes(items[at - 1]!.type)) at--
-	return { lines, ...(formCursor ? { formCursor } : {}), ...(at >= 0 ? { target: at ? ends[at - 1]! : 0 } : {}), ...(tick ? { tick } : {}) }
+	return { lines, items, ends, ...(formCursor ? { formCursor } : {}), ...(at >= 0 ? { target: at ? ends[at - 1]! : 0 } : {}), ...(tick ? { tick } : {}) }
 }
 
 // The frame for `view` on a terminal of `rows` × `cols`. `full`: full
@@ -376,7 +381,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	if (tick && lines.length - tick.row > rows && lines[tick.row] === tick.labeled) lines[tick.row] = tick.plain
 	top += history.length + pad + grown
 	let cursor = formCursor ?? { row: top + p.row, col: ansi.PAD.length + p.col }
-	let out = { lines, cursor, promptScroll: p.scroll, history: history.length + grown }
+	let out = { lines, cursor, promptScroll: p.scroll, history: history.length + grown, items: past.items, ends: past.ends }
 	if (!view.modal) return out
 	let m = modalView.withModal(lines, view.modal, rows, cols)
 	return { ...out, cursor: m.cursor, modalScroll: m.scroll }
