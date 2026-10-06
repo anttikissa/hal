@@ -31,8 +31,10 @@
 // Formats that drop quotes or commas (Hjson, RJSON, CSON, YAML) are another
 // idea; ASON stays JavaScript.
 //
-// Errors tell you where, and show you. JSON.parse says "Expected '}'" or
-// "at position 4231"; ASON says:
+// Errors tell you where, and show you. For the missing comma below,
+// JSON.parse in Bun says only "JSON Parse error: Expected '}'"; Node says
+// "Expected ',' or '}' after property value in JSON at position 19 (line 3
+// column 2)". ASON says:
 //
 //   parse(`{
 //   	name: 'demo'
