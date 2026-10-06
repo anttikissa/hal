@@ -1467,6 +1467,57 @@ test.skipIf(!chrome)('a pinned reader stays at the bottom when a card grows by i
 	}
 })
 
+// Task rha: items landing above a queued message must not push it down
+// and glide it back; a bottom reader sees it stay put.
+test.skipIf(!chrome)('a queued message at the bottom stays still while replies stream above it', async () => {
+	providerHome()
+	let b = await browser(), release = () => {}, finish = () => {}
+	try {
+		await server.serve()
+		web.start()
+		let id = tabs.create('/tmp')
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 1000, height: 600, deviceScaleFactor: 1, mobile: false })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
+		let go = new Promise<void>((r) => { release = r })
+		let end = new Promise<void>((r) => { finish = r })
+		turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
+			// Enough to scroll: the queued card sits at the bottom.
+			for (let i = 0; i < 30; i++) yield { type: 'text', text: `Start ${i}.\n\n` }
+			yield { type: 'text', text: 'Starting.\n\n' }
+			await go
+			for (let i = 0; i < 30; i++) {
+				yield { type: i % 2 ? 'text' : 'thinking', text: `Line ${i} text.\n\n` }
+				await Bun.sleep(40)
+			}
+			await end
+			yield { type: 'done', reason: 'end' }
+		})()
+		let send = (text: string, alt: boolean) => `(() => { let t = document.querySelector('textarea'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', altKey: ${alt}, bubbles: true })); return !document.querySelector('#notice').textContent })()`
+		await b.waitFor(send('go', false))
+		await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Starting.')`)
+		await b.evaluate(send('later', true))
+		await b.waitFor(`!!document.querySelector('.Card.queued') && !document.querySelector('.Card.pending')`)
+		await Bun.sleep(400)
+		await b.evaluate(`(() => {
+			window.tops = []
+			let frame = () => { let c = document.querySelector('.Card.queued'); if (c) { tops.push(Math.round(c.getBoundingClientRect().top)); requestAnimationFrame(frame) } }
+			requestAnimationFrame(frame)
+		})()`)
+		release()
+		await b.waitFor(`document.querySelector('.Transcript').innerText.includes('Line 29 ')`)
+		await Bun.sleep(200)
+		// Before the turn ends: then the queued message is delivered.
+		let tops = await b.evaluate(`[...new Set(tops)]`)
+		expect(tops).toHaveLength(1)
+	} finally {
+		release()
+		finish()
+		await b.close()
+	}
+}, 20000)
+
 test.skipIf(!chrome)('a select-all survives seconds of streaming untouched', async () => {
 	providerHome()
 	let b = await browser(), release = () => {}

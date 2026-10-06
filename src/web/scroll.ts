@@ -36,6 +36,11 @@
 // pins again whenever it is found at the very bottom; pulling back a
 // reader who left on purpose is not, so when unsure, unpin. A send
 // pins at once. Unpinned, the 50 px rule above applies as before.
+//
+// Growth above a still tail snaps (task rha): when the last card is
+// the same and nothing below its top changed (queued messages waiting
+// at the end while new items land above them), a glide would push that
+// tail down and slide it back, so it bounces. Snapping keeps it still.
 
 import { reflow } from './reflow.ts'
 
@@ -193,6 +198,24 @@ function quiet(change: () => void): void {
 	}
 }
 
+// The last card, how far its top is above the content's bottom, and
+// the content's height; in a browser only.
+function tail(el: Box): { node: Element; below: number; height: number } | undefined {
+	if (typeof Element === 'undefined' || !(el instanceof Element)) return
+	let node = el.lastElementChild
+	while (node && !node.classList.contains('Card')) node = node.previousElementSibling
+	if (!node) return
+	return { node, height: el.scrollHeight, below: el.scrollHeight - el.scrollTop - (node.getBoundingClientRect().top - el.getBoundingClientRect().top) }
+}
+
+// Whether the change grew the content above the last card only. A
+// change that grew nothing (a pull back to the bottom) keeps its glide:
+// a snap there would yank a reader the instant they leave the bottom.
+function still(el: Box, before: ReturnType<typeof tail>): boolean {
+	let after = before && tail(el)
+	return !!after && after.node === before!.node && after.height > before!.height && Math.abs(after.below - before!.below) < 1
+}
+
 // Follow `el`; returns the cleanup. `onTop`: the reader scrolled near
 // the top.
 function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
@@ -276,8 +299,10 @@ function follow(change: () => void, mode: Mode = 'glide', force = false): void {
 	// A send pins; pinned, the gap to keep is 0 whatever was measured.
 	if (force) st.pinned = true
 	let g = st.touching && !force ? undefined : scroll.keep(scroll.gap(el), st.frame ? st.gap : undefined, force || st.pinned)
+	let last = g !== undefined && mode === 'glide' ? tail(el) : undefined
 	change()
 	if (g === undefined) return
+	if (last && still(el, last)) mode = 'snap'
 	st.gap = g
 	// A send ignores wheel momentum until its glide lands, at most
 	// forcedMs: while a reply streams the glide may never land, and
@@ -292,15 +317,15 @@ function follow(change: () => void, mode: Mode = 'glide', force = false): void {
 	// A running glide re-aims at the new gap from where it is.
 	if (st.frame) return
 	st.pos = st.set = el.scrollTop
-	let last = performance.now()
+	let prev = performance.now()
 	let step = (now: number) => {
 		// Unpinned, anything else moving the view (a wheel this missed)
 		// is the reader taking over. Pinned, the reader's input would
 		// have unpinned first, so the move is not theirs: carry on.
 		if (Math.abs(el.scrollTop - st.set) > 2 && !scroll.forced() && !st.pinned) return void (st.frame = 0)
 		// rAF time is the frame's start, which may precede `last`.
-		let ms = Math.min(50, Math.max(0, now - last))
-		last = Math.max(last, now)
+		let ms = Math.min(50, Math.max(0, now - prev))
+		prev = Math.max(prev, now)
 		let to = scroll.target(el, st.gap)
 		st.pos = now < st.exactUntil ? to : scroll.at(st.pos, to, ms)
 		el.scrollTop = st.pos
