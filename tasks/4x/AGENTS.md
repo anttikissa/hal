@@ -53,6 +53,10 @@ remove repetition and empty phrases without weakening requirements.
 
 # Privacy
 
+Diagnostics and telemetry are opt-in, always: off by default, on only
+through an explicit setting. Never collect or send anything until the
+user turns it on.
+
 Gitignored files (plugins/, local.ts, auth, state) are private and
 exempt from task tracking. Nothing about them belongs in tracked files,
 including tasks, notes and commits. If unsure, ask. Personal hostnames,
@@ -66,6 +70,9 @@ to operate a host is not permission to publish its configuration.
 Tests are maintenance debt. Add one only if it catches a plausible
 regression worth its cost. Omit cosmetic tests and those a one-off check
 can replace. When unsure, omit.
+
+Delete a flaky test: one that sometimes fails without a bug teaches
+everyone to ignore red. Never retry, lengthen its timeout or skip it.
 
 Test behavior and invariants, not implementation. Avoid source-text
 assertions, repeated constants or templates, and tests that restate
@@ -119,10 +126,10 @@ Do not delegate routine searches, small edits or tightly coupled work.
 Task count alone is no reason. State the benefit before spawning; use
 the fewest agents needed. Do not duplicate their work while they run.
 
-Inspect a tab's current state before messaging it. Assume idle tabs no
-longer own files; do not ask them to release ownership or send routine
-coordination replies to old inbox messages. Message an idle tab only
-when a specific question needs its context or expertise.
+Inspect a tab's current state before messaging it. Before citing tab
+numbers, look up a session's current tab number; they change. Assume
+idle tabs no longer own files. Message an idle tab only when a
+specific question needs its context or expertise.
 
 Give each delegate a bounded task, relevant context, an explicit
 deliverable and file ownership. Use a fresh subagent for each delegated
@@ -160,6 +167,12 @@ Colors are the exception: they match everywhere, so change both without
 asking.
 
 # UI: visible plumbing
+
+Never hide an error. Every failure reaches the user complete: message,
+provider body, raw input, path. Store it with the session and show it
+where it happened. A failure is never reduced to a headline or dropped
+between layers. A failure the model can act on also goes to the model
+as a tool error, so the turn continues.
 
 Show everything relevant once: identifiers users act on, file paths,
 failures and complete output. Omit what nobody reads, such as tool call
