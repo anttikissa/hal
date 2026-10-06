@@ -1166,6 +1166,8 @@ browserTest('pending question URLs are safe native links and wrap at phone and d
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
 			await b.evaluate(`new Promise(resolve => requestAnimationFrame(resolve))`)
 			expect(await b.evaluate(`(() => { let q = document.querySelector('.Question'); return q.scrollWidth <= q.clientWidth && document.documentElement.scrollWidth <= innerWidth })()`)).toBe(true)
+			// A wrapped question continues at the left edge, under its time, as in the terminal.
+			expect(await b.evaluate(`(() => { let h = document.querySelector('.Question .CardHeader'), rects = [...h.querySelector('.title .label').getClientRects()]; return Math.abs(rects.at(-1).left - h.querySelector('.stamp').getBoundingClientRect().left) })()`)).toBeLessThanOrEqual(1)
 		}
 		await b.call('Emulation.setTouchEmulationEnabled', { enabled: true })
 		await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
