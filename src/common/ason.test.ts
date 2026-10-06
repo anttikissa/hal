@@ -5,6 +5,13 @@ describe('stringify', () => {
 	describe('primitives', () => {
 		test('bigint', () => expect(stringify(42n)).toBe('42n'))
 
+		test('invisible and unencodable characters are escaped and round-trip', () => {
+			for (const s of ['a\0b\x01\x7f\u2028c\ud800', 'x\ny\r\nz']) {
+				expect(stringify(s)).not.toMatch(/[\0-\x08\r\x7f\u2028\ud800]/)
+				expect(parse(stringify(s))).toBe(s)
+			}
+		})
+
 		test('-0 keeps its sign', () => expect(Object.is(parse(stringify(-0)), -0)).toBe(true))
 
 		test('string with newline (smart)', () => expect(stringify('a\nb')).toBe('`a\nb`'))
@@ -131,6 +138,20 @@ describe('parse', () => {
 
 	describe('JSON compat', () => {
 		test('double-quoted keys', () => expect(parse('{ "name": "hal" }')).toEqual({ name: 'hal' }))
+
+		test('__proto__ is an own key, not the prototype', () => {
+			const o = parse('{ "__proto__": { polluted: 1 } }') as any
+			expect(Object.getPrototypeOf(o)).toBe(Object.prototype)
+			expect(o.polluted).toBeUndefined()
+			expect(Object.keys(o)).toEqual(['__proto__'])
+		})
+	})
+
+	describe('JS literals', () => {
+		test('0b, 0o, \\u{...} and Unicode whitespace', () =>
+			expect(parse('\u3000[0b101, 0o17, 0b1n, "\\u{1F600}",\u2000]')).toEqual([5, 15, 1n, '😀']))
+
+		test('templates read CRLF as LF, like JS', () => expect(parse('`a\r\nb`')).toBe('a\nb'))
 	})
 
 	describe('errors', () => {
@@ -138,6 +159,11 @@ describe('parse', () => {
 			expect(() => parse('tru')).toThrow(/Expected 'e', got 'EOF'/)
 			expect(() => parse('tru')).toThrow(/tru/)
 			expect(() => parse('tru')).toThrow(/\^/)
+		})
+
+		test('unterminated comment', () => {
+			expect(() => parse('1 /* open')).toThrow(/Unterminated comment at 1:3/)
+			expect(() => parse('{ a: 1 /* open')).toThrow(/Unterminated comment at 1:8/)
 		})
 
 		test('error caret aligns with tabs', () => {
