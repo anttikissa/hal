@@ -66,7 +66,7 @@ test('host migration removes parked ask history atomically, preserves addresses 
 	let originalLast = Buffer.byteLength(records.slice(0, 2).map((r) => lines.encode(r)).join('')) + 1
 	expect(history.append(id, { type: 'continue' }).n).toBe(Math.max(originalLast + 1, 9999))
 	let once = readFileSync(path, 'utf8')
-	historyMigration.run()
+	await historyMigration.run()
 	expect(readFileSync(path, 'utf8')).toBe(once)
 })
 
@@ -77,13 +77,13 @@ test('migration adjusts context surgery targets without changing surviving recor
 	expect(replay.current(stripped).at(-1)).toMatchObject({ n: 4, blocks: [{ type: 'tool_result', id: 'b', output: 'edited' }] })
 })
 
-test('a malformed complete record fails with its path and input, without replacing history', () => {
+test('a malformed complete record fails with its path and input, without replacing history', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'fake/m1' }).id
 	let path = history.file(id)
 	let raw = lines.encode(call('a', 'ask')) + '{ broken record\n'
 	writeFileSync(path, raw)
-	expect(() => historyMigration.run()).toThrow(path)
-	expect(() => historyMigration.run()).toThrow('{ broken record')
+	await expect(historyMigration.run()).rejects.toThrow(path)
+	await expect(historyMigration.run()).rejects.toThrow('{ broken record')
 	expect(readFileSync(path, 'utf8')).toBe(raw)
 	expect(existsSync(`${paths.stateDir()}/migrations.ason`)).toBe(false)
 })
@@ -93,7 +93,7 @@ test('migration leaves a torn last write for normal history repair', async () =>
 	let path = history.file(id)
 	let prompt: HistoryRecord = { type: 'user', blocks: [{ type: 'text', text: 'go' }], ts }
 	writeFileSync(path, lines.encode(prompt) + lines.encode(call('a', 'ask')) + '{ torn')
-	historyMigration.run()
+	await historyMigration.run()
 	expect(readFileSync(path, 'utf8').endsWith('{ torn')).toBe(true)
 	await history.open(id)
 	expect(history.readSync(id)).toEqual([{ ...prompt, n: 1 }])
