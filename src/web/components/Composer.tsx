@@ -2,7 +2,9 @@
 // The bottom panel under the transcript: the messages waiting for the
 // turn (the inbox), the passing notice, the message box with its Send
 // button, and the key hints. Session activity lives in StatusRow. The box grows with its text up to 40% of
-// the window. An open question or the model picker owns the keys
+// the window. Its height is set by script from a hidden copy with the
+// same width and text, so the visible box never collapses to measure
+// and changes height only when its row count does (task 4s). An open question or the model picker owns the keys
 // meanwhile; the box keeps its text and takes the focus back when they
 // close. Enter is handled by keys.key (none during IME composition).
 // Images pasted, image and text files dropped on the page (Chat.tsx)
@@ -30,6 +32,15 @@ import type { IconName } from '../icons.ts'
 
 export function Composer(props: { view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; dropping: boolean }) {
 	let input!: HTMLTextAreaElement
+	let measure!: HTMLTextAreaElement
+	// The copy has height 0, so its scrollHeight is the text's height plus padding.
+	let fit = () => {
+		if (!input || !measure) return
+		measure.value = input.value
+		let h = `${measure.scrollHeight}px`
+		if (input.style.height !== h) input.style.height = h
+	}
+	createEffect(() => props.text, () => fit())
 	// Text at the caret, replacing the selection, as if typed.
 	let insert = (text: string) => {
 		text = uploads.pad(text, input.value.slice(0, input.selectionStart))
@@ -73,7 +84,13 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 		// vanish (task 6cm). Refocusing restores the caret.
 		let closed = () => { if (document.activeElement === input) { input.blur(); input.focus() } }
 		document.addEventListener('close', closed, true)
+		// A new width can change how the text wraps.
+		let width = 0
+		let resized = new ResizeObserver(() => { if (input.clientWidth !== width) { width = input.clientWidth; fit() } })
+		resized.observe(input.parentElement!)
+		fit()
 		return () => {
+			resized.disconnect()
 			document.removeEventListener('close', closed, true)
 			document.removeEventListener('pointerdown', outside, true)
 			document.removeEventListener('focusin', outside)
@@ -192,9 +209,10 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 					aria-label="Message"
 					value={props.text}
 					disabled={!!props.view.form || saving()}
-					onInput={(e) => app.input(e.currentTarget.value)}
+					onInput={(e) => { app.input(e.currentTarget.value); fit() }}
 					onPaste={(e) => e.clipboardData && attach.paste(e.clipboardData, insert) && e.preventDefault()}
 				/>
+				<textarea ref={(e) => (measure = e)} class="measure" rows={1} tabindex={-1} aria-hidden="true" readonly />
 				</div>
 				<div class="actions">
 					{/* Pause and continue without Escape (task v0g); the tap keeps the keyboard. */}
