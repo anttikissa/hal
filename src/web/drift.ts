@@ -1,8 +1,8 @@
 /// <reference lib="dom" />
 // Temporary probe (task s0) for the transcript leaving the bottom
-// without the reader scrolling. Removable: delete this file, its line
-// in main.tsx and the 'drift' and 'pulled' kinds. On while
-// webDiagnostics is on.
+// without the reader scrolling. On while webDiagnostics is on. Task
+// 5cz deletes it after 7 days with no 'drift' entry: this file, its
+// line in main.tsx, the 'drift' and 'pulled' kinds, scroll.onPull.
 //
 // scroll.ts keeps a pinned reader at the bottom. This reports both:
 // - 'pulled': scroll.ts found a pinned view above the bottom and

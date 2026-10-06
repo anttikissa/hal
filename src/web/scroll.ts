@@ -206,8 +206,15 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	el.addEventListener('scroll', scrolled, { passive: true })
 	// Streamed text and new cards change the DOM; a change that no
 	// follow() covered would otherwise leave a pinned view short.
-	let content = new MutationObserver(() => scroll.check('content'))
+	let content = new MutationObserver(() => { watchCards(); scroll.check('content') })
 	content.observe(el, { childList: true, characterData: true, subtree: true })
+	// A card can also grow with no DOM change and no scroll event: its
+	// open animation, an image or font arriving. Watch each card's size,
+	// so that growth too pulls a pinned view back. observe() ignores a
+	// card already watched; a removed card drops out by itself.
+	let cards = new ResizeObserver(() => scroll.check('resize'))
+	let watchCards = () => { for (let c of el.children) cards.observe(c, { box: 'border-box' }) }
+	watchCards()
 	// A background tab gets no animation frames: catch up when shown.
 	let shown = () => { if (!document.hidden) scroll.check('shown') }
 	document.addEventListener('visibilitychange', shown)
@@ -232,6 +239,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		stopReflow()
 		el.removeEventListener('scroll', scrolled)
 		content.disconnect()
+		cards.disconnect()
 		document.removeEventListener('visibilitychange', shown)
 		el.removeEventListener('pointerdown', press)
 		removeEventListener('pointerup', release)

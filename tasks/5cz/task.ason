@@ -1,0 +1,6 @@
+{
+	title: 'Remove the scroll drift probe',
+	spec: "src/web/drift.ts does not exist: no line in src/web/main.tsx loads it, src/common/web-diagnostics.ts has no 'drift' or 'pulled' kind, scroll.ts has no onPull hook, and the task s0 spec no longer describes the probe. Done when the diagnostics log (state/web-diag.log, webDiagnostics on) shows no 'drift' entry for 7 days of normal use. Until then, a 'drift' entry means the pinned bottom (task 4s) failed: fix that first. The probe was temporary from the start (the user asked for it to be easily removable).",
+	status: 'planned',
+	needs: ['s0', '4s']
+}
