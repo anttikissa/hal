@@ -21,7 +21,10 @@ Invariant restored (bug, screenshot 2026-10-06): a web completion shows only a d
 Model text that cites blocks (166-eta#u232) becomes links in task d92.
 
 Tests: target parsing (n is a tab; #n, r12, #r12 are blocks; 4#t12 and 166-eta/12 are blocks of another session; a matching path wins over x/n); one completion row per session; a block target in a closed session reopens it and reveals the block.`,
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Built as: SlashCommand.complete may return {value, description} candidates (host/commands.ts candidates/suggestions); /go sends one per session, directory or block, so the web no longer guesses labels (its 'path'/'directory' fallback is gone; an empty description shows nothing). Block rows come from replay.current + transcript.recordItems (tool results and turn ends skipped), capped at the newest 100 so a long history does not send thousands of rows per keystroke; times use the session client's timezone (clients.timezone). The go event carries block (letter + key, e.g. u12). Terminal: find.target accepts any {sessionId, blockId}, so go reuses Ctrl-F's reveal and paging. Web: router.go(id, replace, block) keeps the hash, then app.aim(); app.seek now waits until the shown transcript is the target's session, since a tab switched to before its snapshot looked complete and gave up as 'missing'. Terminal described completions (go, model, effort, restart) list as Hint rows via helpRow.rows, which grows the help area beyond one row only while they show."
+	],
 	needs: ['2t', '6m', '0z', '9p'],
 	foldInto: ['2t']
 }

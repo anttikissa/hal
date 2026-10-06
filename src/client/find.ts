@@ -36,7 +36,7 @@ function seek(): void {
 	if (c) setTimeout(app.send, 0, c)
 }
 export const find = {
-	state: findController.create(), target: undefined as FindResult | undefined,
+	state: findController.create(), target: undefined as (Pick<FindResult, 'sessionId' | 'blockId'> & Partial<FindResult>) | undefined,
 	open, go, seek,
 	close: (): void => findController.close(find.state, hooks),
 	event: (b: FindBatch): void => findController.event(hooks, b),

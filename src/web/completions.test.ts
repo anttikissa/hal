@@ -1,14 +1,16 @@
 import { expect, test } from 'bun:test'
 import { completions } from './completions.ts'
 
-test('slash and path candidates use host values with useful labels and descriptions', () => {
+test('candidates show only descriptions the host or the command list supplies (task 4qh)', () => {
 	let commands = completions.receive('/c', ['/cd ', '/clear '])!
 	expect(commands.choices.map((c) => c.label)).toEqual(['/cd', '/clear'])
 	expect(commands.choices[0]!.description).toContain('directory')
 	let paths = completions.receive('/cd ~/pro', ['/cd ~/projects/', '/cd ~/profile.pdf'])!
 	expect(paths.choices.map((c) => c.label)).toEqual(['projects/', 'profile.pdf'])
-	expect(paths.choices[0]!.description).toBe('directory')
+	expect(paths.choices.map((c) => c.description)).toEqual(['', ''])
 	expect(paths.choices[1]!.value).toBe('/cd ~/profile.pdf')
+	let go = completions.receive('/go ~/h', ['/go ~/hal', '/go ~/hal-old'], undefined, ['directory', 'directory'])!
+	expect(go.choices.map((c) => c.description)).toEqual(['directory', 'directory'])
 })
 
 test('model descriptions stay aligned and preserve menu identity while filtering', () => {

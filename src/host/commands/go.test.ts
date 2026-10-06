@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { client, until, useHost } from '../host-fixture.test.ts'
 import { commands } from '../commands.ts'
+import { history } from '../history.ts'
 import { sessions } from '../sessions.ts'
 import { tabs } from '../tabs.ts'
 
@@ -58,12 +59,71 @@ test('/go reopens a closed session by id, name or directory', async () => {
 	}
 })
 
-test('/go completion uses open tabs and cwd, abbreviating home directories', () => {
+test('/go completion: one described row per session, directories, blocks newest first', () => {
 	let c = client()
 	let cwd = `${commands.home()}/hal-go-project`
 	let id = make(c, cwd)
+	let other = make(c, '/tmp/go-rows')
+	sessions.open(other).name = 'Rows'
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'first line\nsecond' }] })
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'c1', name: 'bash', input: { command: 'ls', description: 'List files' } } })
 	let context = { sessionId: id, cwd: '/tmp', model: 'fake/m', setCwd() {}, setModel() {}, say() {} }
-	expect(commands.complete('/go ~/hal-go', context)).toContain('/go ~/hal-go-project')
-	expect(commands.complete('/go 1', context)).toContain('/go 1')
-	expect(commands.complete(`/go ${id.slice(0, 2)}`, context)).toContain(`/go ${id}`)
+	let rows = (text: string) => commands.suggestions(text, context)
+	expect(rows('/go ~/hal-go')).toEqual({ items: ['/go ~/hal-go-project'], descriptions: ['directory'] })
+	let tabsRows = rows('/go ')
+	expect(tabsRows.items).toEqual(tabs.list().map((_, i) => `/go ${i + 1}`))
+	expect(tabsRows.descriptions![tabs.list().findIndex((t) => t.id === other)]).toBe(`Rows  ${other}`)
+	expect(rows(`/go ${other.slice(0, 3)}`).items.filter((v) => v === `/go ${other}`)).toHaveLength(1)
+	expect(rows('/go Ro')).toEqual({ items: [`/go ${other}`], descriptions: [expect.stringContaining('Rows')] })
+	let blocks = rows('/go #')
+	expect(blocks.items).toEqual(['/go #t2', '/go #u1'])
+	expect(blocks.descriptions![0]).toEndWith('List files')
+	expect(blocks.descriptions![1]).toEndWith('first line')
+	expect(rows('/go t').items).toContain('/go #t2')
+	expect(rows(`/go ${other}#`).items).toEqual([])
+})
+
+test('/go targets: n is a tab; #n, r12, #r12 and <session>#n, <session>/n are blocks; paths and names win', async () => {
+	let a = client()
+	let first = make(a, '/tmp/go-t')
+	let second = make(a, '/tmp/go-t/4')
+	sessions.open(second).name = 'Second'
+	history.append(second, { type: 'user', blocks: [{ type: 'text', text: 'hi' }] })
+	a.conn.send({ type: 'open', sessionId: first })
+	await until(() => a.views.has(first))
+	let go = async (value: string) => {
+		let count = a.of('go').length
+		a.conn.send({ type: 'submit', sessionId: first, text: `/go ${value}` })
+		await until(() => a.of('go').length > count || a.of('output').at(-1)?.error)
+		expect(a.of('go')).toHaveLength(count + 1)
+		return a.of('go').at(-1)!
+	}
+	let n = history.readSync(second).at(-1)!.n
+	expect(await go('2')).toMatchObject({ tab: second })
+	expect((await go('2')).block).toBeUndefined()
+	for (let value of [`2#${n}`, `2#t${n}`, `Second/${n}`, `${second}#u${n}`]) expect(await go(value)).toMatchObject({ tab: second, block: `u${n}` })
+	// The path /tmp/go-t/4 is a session directory: it wins over tab 1's block 4.
+	expect(await go('/tmp/go-t/4')).toMatchObject({ tab: second })
+	expect((await go('/tmp/go-t/4')).block).toBeUndefined()
+	sessions.open(second).name = 'r12'
+	expect((await go('r12')).block).toBeUndefined()
+	let before = a.of('go').length
+	a.conn.send({ type: 'submit', sessionId: first, text: '/go #r999' })
+	await until(() => a.of('output').some((o) => o.error && String(o.text).includes('#r999')))
+	expect(a.of('go')).toHaveLength(before)
+})
+
+test('/go to a block of a closed session reopens it and carries the block', async () => {
+	let a = client()
+	let first = make(a, '/tmp/a')
+	let gone = make(a, '/tmp/go-closed-block')
+	history.append(gone, { type: 'user', blocks: [{ type: 'text', text: 'hi' }] })
+	let n = history.readSync(gone).at(-1)!.n
+	a.conn.send({ type: 'open', sessionId: first })
+	a.conn.send({ type: 'tab-close', id: 'close-block', sessionId: gone })
+	await until(() => !tabs.file().open.includes(gone))
+	a.conn.send({ type: 'submit', sessionId: first, text: `/go ${gone}#${n}` })
+	await until(() => a.of('go').at(-1)?.tab === gone)
+	expect(a.of('go').at(-1)).toMatchObject({ block: `u${n}` })
+	expect(tabs.file().open).toContain(gone)
 })

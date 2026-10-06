@@ -39,6 +39,7 @@ import { appModals } from './app-modals.ts'
 import { titles } from '../common/titles.ts'
 import { notices } from '../common/notices.ts'
 import { find } from './find.ts'
+import type { Hint } from './help-row.ts'
 import { command as restart } from './commands/restart.ts'
 
 // `form`: the session's open question as filled in here; while there is
@@ -69,7 +70,7 @@ export type AppState = {
 	modal?: ModalState
 	onModal?: (action: Extract<ModalAction, { type: 'submit' }>, modal: ModalState) => unknown
 	onModalKey?: (modal: ModalState, key: KeyEvent) => ReturnType<typeof modals.step>
-	older: Map<string, Backfill>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout>; typing?: ReturnType<typeof setTimeout>; choices?: string[]
+	older: Map<string, Backfill>; background: Set<string>; painted: boolean; loading?: string; timer?: ReturnType<typeof setTimeout>; typing?: ReturnType<typeof setTimeout>; choices?: string[] | Hint[]
 }
 
 function createState(): AppState {
@@ -119,8 +120,11 @@ function onEvent(event: Event): void {
 	if (event.type === 'restart-ask') return restart.ask(event, app.open)
 	if (event.type === 'redraw' || event.type === 'toggle' || event.type === 'paste-text') return clientCommands.event(event)
 	if (event.type === 'go') {
-		if (st.focus.tab === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) app.focusOn({ tab: event.tab })
-		return
+		if (st.focus.tab !== event.sessionId || !st.tabs.some((tab) => tab.id === event.tab)) return
+		if (event.block) find.target = { sessionId: event.tab, blockId: event.block.replace(/^[a-z]/, '') }
+		app.focusOn({ tab: event.tab })
+		find.seek()
+		return app.show()
 	}
 	if (event.type === 'ack' && event.tab !== undefined) {
 		st.asked = event.tab
@@ -226,7 +230,8 @@ function completed(event: Event & { type: 'completions' }): void {
 	app.setPrompt(text)
 	if (text !== event.text) drafts.edit(event.sessionId, text)
 	if (!event.items.length || st.notice === 'no completions') st.notice = event.items.length ? undefined : 'no completions'
-	st.choices = choices
+	// Described candidates (task 4qh) list one per row.
+	st.choices = choices && event.descriptions ? choices.map((c, i): Hint => [c, event.descriptions![i]!]) : choices
 }
 
 // Puts `text` in the prompt, unless it is there already (the cursor

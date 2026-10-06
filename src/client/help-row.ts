@@ -21,7 +21,7 @@ export type HelpInput = {
 	form?: FormState
 	/** The hint while the last prompt is being edited. */
 	editing?: string
-	choices?: string[]
+	choices?: string[] | Hint[]
 	transcript?: { state: SessionState }
 	/** A new commit is checked out (task n1). */
 	newCode?: boolean
@@ -65,7 +65,7 @@ function row(v: HelpInput, cols: number, resize = false): string {
 	let line = (text: string, fg = h.description!) => ansi.PAD + ansi.sgr({ fg }) + strings.clipVisual(text, width) + ansi.UNCOLOR
 	if (v.form) return line(helpRow.paint(helpRow.question(v.form)))
 	if (v.editing) return line(v.editing, colors.warning().fg!)
-	if (v.choices?.length) return line(ansi.clean(v.choices.join('  ')))
+	if (v.choices?.length) return line(ansi.clean(v.choices.map((c) => typeof c === 'string' ? c : c[0]).join('  ')))
 	let hints = helpRow.keys(v.transcript?.state, v.prompt.text.trim() !== '')
 	if (resize) hints = [['ctrl-=/-', 'resize prompt'], ...hints]
 	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'reload']] : hints)
@@ -76,4 +76,18 @@ function row(v: HelpInput, cols: number, resize = false): string {
 	return ansi.PAD + left + ' '.repeat(width - strings.visLen(left) - rw) + right + ansi.UNCOLOR
 }
 
-export const helpRow = { question, keys, paint, row }
+// The help area: described completion candidates one per row, at most
+// `max`, then '+N more' (task 4qh); else the help row alone.
+function rows(v: HelpInput, cols: number, resize = false, max = 10): string[] {
+	let list = v.form || v.editing ? undefined : v.choices
+	if (!list?.length || typeof list[0] === 'string') return [helpRow.row(v, cols, resize)]
+	let hints = list as Hint[]
+	let width = Math.max(1, cols - 2 * ansi.PAD.length)
+	let h = colors.help()
+	let pad = Math.max(...hints.slice(0, max).map(([c]) => strings.visLen(ansi.clean(c))))
+	let out = hints.slice(0, max).map(([c, d]) => ansi.PAD + strings.clipVisual(`${ansi.sgr({ fg: h.key! })}${ansi.clean(c).padEnd(pad)}  ${ansi.sgr({ fg: h.description! })}${ansi.clean(d)}`, width) + ansi.UNCOLOR)
+	if (hints.length > max) out.push(ansi.PAD + ansi.sgr({ fg: h.description! }) + `+${hints.length - max} more` + ansi.UNCOLOR)
+	return out
+}
+
+export const helpRow = { question, keys, paint, row, rows }
