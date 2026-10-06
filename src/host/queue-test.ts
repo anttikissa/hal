@@ -2,10 +2,10 @@
 // messages, editing and discarding by hand (task 0za). Each round says
 // which user messages reached it since the previous round, read from
 // history alone so a restarted host agrees; then it thinks for a few
-// seconds and runs a harmless bash call. After `rounds` rounds (or the
-// number in the turn's prompt, e.g. '3') it answers and stops; a
-// message that is just 'stop' ends it at the next round. Nothing it
-// does writes files.
+// seconds and runs a harmless bash call. A number in the prompt, or a
+// later message that is just a number, means 'run that many more
+// rounds' (default `rounds`); a message that is just 'stop' ends the
+// turn at the next round. Round 1 says so. Nothing it does writes files.
 import type { StreamEvent } from '../common/blocks.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import type { Reply } from './synthetic.ts'
@@ -52,20 +52,33 @@ function arrived(records: HistoryRecord[]): string[] {
 	return lines
 }
 
-// The turn's texts, oldest first: its prompt and everything since.
-function texts(records: HistoryRecord[]): string[] {
-	return records.slice(start(records)).flatMap((r) => (r.type === 'user' ? r.blocks.flatMap((b) => (b.type === 'text' ? [b.text.trim()] : [])) : []))
+// Where this turn should end, counted in rounds: each number means 'that
+// many more rounds' from the round it arrived in; 'stop' means 'now'.
+function planned(records: HistoryRecord[]): { total: number; stopped: boolean } {
+	let plan = { total: rounds, stopped: false }
+	let done = 0
+	let first = true
+	for (let r of records.slice(start(records))) {
+		if (r.type === 'assistant' && r.block.type === 'tool_call') done++
+		if (r.type !== 'user') continue
+		for (let b of r.blocks) {
+			if (b.type !== 'text') continue
+			let t = b.text.trim()
+			let n = Number((first ? t.match(/\b\d+\b/)?.[0] : /^\d+$/.test(t) && t) || NaN)
+			if (n > 0) plan = { total: done + n, stopped: false }
+			else if (t.toLowerCase() === 'stop') plan = { total: done, stopped: true }
+			first = false
+		}
+	}
+	return plan
 }
 
-// Rounds this turn runs: the first number in its prompt, else `rounds`.
-function planned(records: HistoryRecord[]): number {
-	let n = Number(texts(records)[0]?.match(/\b\d+\b/)?.[0])
-	return n > 0 ? n : rounds
-}
+const usage = "How to use: send a number (e.g. 3) to run that many more rounds, or 'stop' to end at the next round. Queue messages with Alt-Enter; they arrive after this turn ends."
 
 function report(n: number, lines: string[], total = rounds): { head: string; body: string } {
 	let count = lines.length ? `${lines.length} new message${lines.length > 1 ? 's' : ''}` : 'no new messages'
-	return { head: `Round ${n} of ${total}: ${count}.`, body: lines.length ? `Round ${n}. New messages since the last round:\n${lines.join('\n')}` : `Round ${n}: no new messages.` }
+	let body = lines.length ? `Round ${n}. New messages since the last round:\n${lines.join('\n')}` : `Round ${n}: no new messages.`
+	return { head: `Round ${n} of ${total}: ${count}.`, body: n === 1 ? `${body}\n\n${usage}` : body }
 }
 
 async function* round(n: number, lines: string[], total: number): AsyncGenerator<StreamEvent> {
@@ -87,8 +100,7 @@ async function* round(n: number, lines: string[], total: number): AsyncGenerator
 function run(records: HistoryRecord[]): Reply {
 	let n = records.slice(start(records)).filter((r) => r.type === 'assistant' && r.block.type === 'tool_call').length
 	let lines = arrived(records)
-	let total = planned(records)
-	let stopped = texts(records).slice(1).some((t) => t.toLowerCase() === 'stop')
+	let { total, stopped } = planned(records)
 	if (n < total && !stopped) return { stream: round(n + 1, lines, total) }
 	let say = lines.length ? `New messages since the last round:\n${lines.join('\n')}\n\n` : ''
 	let done = stopped ? `Stopped after ${n} rounds, as asked.` : `Finished ${n} rounds.`

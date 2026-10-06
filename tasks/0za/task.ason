@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		"The round report goes in a text block because thinking cards are closed by default; the thinking's first line repeats the count so the closed card shows it. Thinking streams word by word over about 4 s: a steer aborts the round only when the stream yields its next event.",
-		"User needed a way to end the turn early to test queued messages (Esc only pauses, so queued messages keep waiting). The first number in the turn's prompt sets the round count (default 30); a later message that is just 'stop' (steering or default delivery) ends the turn at the next round with a final answer."
+		"User needed a way to end the turn early to test queued messages (Esc only pauses, so queued messages keep waiting). The first number in the turn's prompt sets the round count (default 30); a later message that is just 'stop' (steering or default delivery) ends the turn at the next round with a final answer.",
+		"A number counted only in the turn's first prompt, so '3' sent mid-turn did nothing (user report). Now any message that is just a number means 'that many more rounds' from the round it arrived in (the first prompt's first number too); 'stop' ends at the next round. Round 1 states this usage."
 	],
 	needs: ['mvd', '2r']
 }
