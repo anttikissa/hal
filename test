@@ -36,4 +36,10 @@ fi
 for f in plugins/*.ts; do
 	bun -e "await import('./$f')" || status=1
 done
+# Task 5cz: the scroll drift probe is temporary. From its due date,
+# remind every run to delete it; this warns and never fails the run.
+# Deleting src/web/drift.ts silences it; 5cz deletes these lines too.
+if [ -f src/web/drift.ts ] && [[ $(date +%F) > 2026-10-12 ]]; then
+	echo "./test: warning: task 5cz is due: remove the scroll drift probe" >&2
+fi
 exit $status
