@@ -227,6 +227,6 @@ test('queued texts retain exact receipt timestamps independently of delivery and
 		],
 	}])
 	expect(prompts(msgs)).toEqual([
-		`[${day(deliveredAt)} ${hhmm(deliveredAt)}]\n<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nThat was the situation then.\n\nA fresh message.\n\n[Message from reviewer]\n<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nA queued agent message.`,
+		`[${day(deliveredAt)} ${hhmm(deliveredAt)}]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nThat was the situation then.\n\nA fresh message.\n\n[Message from reviewer]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nA queued agent message.`,
 	])
 })

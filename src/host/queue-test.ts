@@ -90,8 +90,7 @@ function run(records: HistoryRecord[]): Reply {
 	let total = planned(records)
 	let stopped = texts(records).slice(1).some((t) => t.toLowerCase() === 'stop')
 	if (n < total && !stopped) return { stream: round(n + 1, lines, total) }
-	let { body } = report(n + 1, lines, total)
-	let say = lines.length ? `${body}\n\n` : ''
+	let say = lines.length ? `New messages since the last round:\n${lines.join('\n')}\n\n` : ''
 	let done = stopped ? `Stopped after ${n} rounds, as asked.` : `Finished ${n} rounds.`
 	return { say: `${say}${done}\n\n<summary>${done}</summary>` }
 }

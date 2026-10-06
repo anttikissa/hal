@@ -198,7 +198,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 // a sender line (tab, id and name), a next-round message also
 // saying it needn't drop its work for it.
 function framed(b: UserText): string {
-	let text = b.queuedAt === undefined ? b.text : `<meta>Sent at ${b.queuedAt}; delivery after this turn.</meta>\n${b.text}`
+	let text = b.queuedAt === undefined ? b.text : `<meta>Message was queued at ${b.queuedAt}, take that into account when reading it.</meta>\n${b.text}`
 	if (b.generatingCommand) return `[${titles.author({ ...b, type: 'prompt' })}]\n${text}`
 	if (b.origin === 'model') return `[Hal]\n${text}`
 	if (b.from === undefined) return text
