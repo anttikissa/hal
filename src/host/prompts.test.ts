@@ -43,7 +43,7 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('one\n\ntwo') }] },
 	])
 	expect(inboxOf(a, id)).toEqual([])
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupted)', 'You (interrupted)'])
+	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)'])
 	// Again, and again the prefix holds.
 	calls[1]!.push({ type: 'text', text: 'ok' })
 	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
@@ -65,7 +65,7 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ type: 'text', text: 'done' },
 		{ type: 'turn-end', status: 'completed' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupted)', 'You (interrupted)', 'You (interrupted)'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)', 'You (steering)'])
 	expect(a.views.get(id)).toEqual(view)
 	expect(b.views.get(id)).toEqual(view)
 	expect(a.of('turn-end')).toHaveLength(1)
@@ -213,7 +213,7 @@ test('sending to a paused turn takes the waiting messages along, oldest first', 
 		{ type: 'prompt', text: 'first', steering: true },
 		{ type: 'prompt', text: 'second' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupted)', 'You'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You'])
 	expect(a.views.get(id)).toEqual(view)
 })
 

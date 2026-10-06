@@ -60,9 +60,17 @@ async function waitOut(id: string, error: ErrorEvent, failures: number, outer: A
 	finally { if (running?.rewait === rewait) delete running.rewait }
 }
 
+// What the model reads when a provider error cut its response off and
+// the host retries: status, kind and the complete error.
+function retryNotice(error: ErrorEvent): string {
+	let kind = [error.status && !error.message.includes(`${error.status}`) && `HTTP ${error.status}`, error.failure && { temporary: 'temporary', limited: 'rate limited', auth: 'login problem' }[error.failure]].filter(Boolean).join(', ')
+	let body = error.body && !error.message.includes(error.body) ? `\n${error.body}` : ''
+	return `Your response was cut off by an error${kind ? ` (${kind})` : ''}: ${error.message}${body}\nRetrying. Continue without repeating what you already wrote.`
+}
+
 async function waitFor(id: string, error: ErrorEvent, failures: number, signal: AbortSignal): Promise<void> {
 	// Partial output can be followed by usage/bookkeeping, not only an assistant record.
-	if (history.readSync(id).findLast((r) => r.type === 'assistant' || r.type === 'user' || r.type === 'continue')?.type === 'assistant') history.append(id, { type: 'continue', reason: `Hal is retrying after the response stopped: ${error.message}${error.body && !error.message.includes(error.body) ? `\n${error.body}` : ''}` })
+	if (history.readSync(id).findLast((r) => r.type === 'assistant' || r.type === 'user' || r.type === 'continue')?.type === 'assistant') history.append(id, { type: 'continue', reason: turnPolicy.retryNotice(error) })
 	if (error.failure === 'auth' && error.retryAt === undefined) {
 		status.transition(id, { type: 'block', reason: `log in: ${error.message}` })
 		await auth.changed(signal)
@@ -93,4 +101,4 @@ function backoffMs(failures: number): number {
 	return failures === 0 ? 0 : Math.min(1000 * 2 ** (failures - 1), 30_000)
 }
 
-export const turnPolicy = { stopped, canceled, stoppedBy, parkedUsage, waitOut, waitFor, backoffMs }
+export const turnPolicy = { stopped, canceled, stoppedBy, parkedUsage, waitOut, waitFor, retryNotice, backoffMs }
