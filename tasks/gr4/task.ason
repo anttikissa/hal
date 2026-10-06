@@ -1,6 +1,10 @@
 {
 	title: 'Discard one queued message',
 	spec: "The user can drop a single queued message without touching the others. Web: each queued card has an × button (aria-label 'Discard queued message', 44px target). Terminal: /queue drop <n> drops the nth message in /queue's list. Both use the existing durable inbox withdrawal, so history keeps the message, every client removes its card, and reload and restart agree. A message already delivered, or held by a queue edit in progress (jsg), is refused with a visible reason. The terminal and web parity was agreed with the user (2026-10-06).",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		"Implemented: src/host/commands/queue.ts takes /queue drop <n> (position in /queue's list) or /queue drop <inbox id>; the web × sends the id so a queue that changed meanwhile cannot shift the target. SlashCommand.record gets the session id, so history and other clients show '/queue drop <n>', never the id. 'drop' followed by one word is now reserved like 'next' and 'clear'.",
+		"Order: drop refuses the locked message (queueEdits.held), so a session in 'waiting for queue edit' still waits for that edit and its release delivers as before; drop never starts delivery and never reorders the rest. The × shows on every queued card except the locked one, including messages from other sessions, which /queue clear drops too."
+	],
 	needs: ['jq', '16', 'jsg']
 }

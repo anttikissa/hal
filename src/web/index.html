@@ -118,9 +118,10 @@ html.typing .App { position: absolute; }
 @media (pointer: coarse) { .CardHeader .kill { min-height: 44px; min-width: 44px; } }
 /* One text line tall, inside the title line; on touch an invisible
    ::after makes the 44px target without growing the row. */
-.CardHeader .edit { position: relative; margin-left: auto; height: 1lh; padding: 0 1ch; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 0.2em; align-self: flex-start; }
-@media (hover: hover) and (pointer: fine) { .Card:not(:hover, :focus-within) .CardHeader .edit { opacity: 0; } }
-@media (pointer: coarse) { .CardHeader .edit::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); } }
+.CardHeader :is(.edit, .discard) { position: relative; margin-left: auto; height: 1lh; padding: 0 1ch; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 0.2em; align-self: flex-start; }
+.CardHeader .edit + .discard { margin-left: 0; }
+@media (hover: hover) and (pointer: fine) { .Card:not(:hover, :focus-within) .CardHeader :is(.edit, .discard) { opacity: 0; } }
+@media (pointer: coarse) { .CardHeader :is(.edit, .discard)::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); } }
 .EditBar { flex: none; display: flex; align-items: center; gap: 1ch; margin: 0 max(2ch, env(safe-area-inset-right)) 0 max(2ch, env(safe-area-inset-left)); padding: 0.25lh 1ch; border-left: 3px solid var(--attention-fg); }
 .EditBar .text { flex: 1; min-width: 0; }
 .EditBar button { flex: none; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; }
@@ -138,10 +139,13 @@ html.typing .App { position: absolute; }
 .Card.user { transition: color 300ms var(--ease-out); }
 .Transcript > .Card.queued:has(+ .Card.queued) { margin-bottom: 0; }
 .Card.queued { cursor: pointer; }
-/* Queue edits share the existing pencil, with a real 44px target beside
-   the reference; reserve both controls so long previews never overlap. */
-.Card.queued > .edit { position: absolute; top: 0; right: calc(1ch + 44px); width: 44px; height: 44px; padding: 0; background: transparent; color: inherit; }
-.Card.queued:has(> .edit) > .content { padding-right: calc(7ch + 44px); }
+/* Queue edits share the existing pencil and discard is an ×, each a real
+   44px target beside the reference; reserve all controls so long
+   previews never overlap. A card with the pencil always has the ×. */
+.Card.queued > :is(.edit, .discard) { position: absolute; top: 0; right: calc(1ch + 44px); width: 44px; height: 44px; padding: 0; background: transparent; color: inherit; }
+.Card.queued:has(> .discard) > .edit { right: calc(1ch + 88px); }
+.Card.queued:has(> .discard) > .content { padding-right: calc(7ch + 44px); }
+.Card.queued:has(> .edit) > .content { padding-right: calc(7ch + 88px); }
 .Card.pending { color: var(--quiet); transition-delay: 300ms; }
 .Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
 .Card.folds { cursor: pointer; }
