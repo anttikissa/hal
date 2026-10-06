@@ -6,26 +6,26 @@ import { history } from './history.ts'
 import { pages } from './pages.ts'
 
 export type Step = { toolId: string; n?: number; ts: string; change: FileChange }
-export type ChangedFile = { path: string; cwd: string; name: string; steps: Step[]; before?: FileSnapshot; after?: FileSnapshot; undeclared: boolean; ts: string }
+export type ChangedFile = { path: string; cwd: string; name: string; steps: Step[]; before: FileSnapshot; after: FileSnapshot; ts: string }
 
+// Older histories hold undeclared Git status observations; they are
+// not this session's changes and are skipped (task c4x).
 function collect(records: HistoryRecord[]): ChangedFile[] {
 	let files = new Map<string, ChangedFile>()
 	for (let r of records) {
 		if (r.type === 'command' && r.text.trim() === '/changes clear') files.clear()
 		if (r.type !== 'file_changes') continue
 		for (let change of r.files) {
+			if (change.undeclared) continue
 			let path = resolve(r.cwd, change.path)
 			let file = files.get(path)
 			if (!file) {
-				file = { path, cwd: r.cwd, name: change.path, steps: [], before: change.undeclared ? undefined : change.before, undeclared: false, ts: r.ts }
+				file = { path, cwd: r.cwd, name: change.path, steps: [], before: change.before, after: change.after, ts: r.ts }
 				files.set(path, file)
 			}
 			file.steps.push({ toolId: r.toolId, n: r.n, ts: r.ts, change })
 			file.ts = r.ts
-			if (change.undeclared) {
-				file.undeclared = true
-				file.after = undefined
-			} else file.after = change.after
+			file.after = change.after
 		}
 	}
 	return [...files.values()]
@@ -47,8 +47,7 @@ async function run(args: string[], cwd?: string): Promise<{ code: number; bytes:
 	return { code, bytes: Buffer.from(bytes) }
 }
 
-async function diff(id: string, before: FileSnapshot | undefined, after: FileSnapshot | undefined): Promise<string> {
-	if (before === undefined || after === undefined) return 'Undeclared observation: content was not captured.\n'
+async function diff(id: string, before: FileSnapshot, after: FileSnapshot): Promise<string> {
 	if ((before !== null && typeof before !== 'string') || (after !== null && typeof after !== 'string')) return 'Content unavailable: sensitive, large or non-regular file (metadata only).\n'
 	let a = before === null ? '/dev/null' : fileChanges.blobPath(id, before)
 	let b = after === null ? '/dev/null' : fileChanges.blobPath(id, after)
@@ -77,7 +76,7 @@ function counts(diff: string): string {
 }
 
 async function committed(_id: string, file: ChangedFile): Promise<string | undefined> {
-	if (!Object.hasOwn(file, 'after') || (file.after !== null && typeof file.after !== 'string')) return
+	if ((file.after !== null && typeof file.after !== 'string')) return
 	let root = await changes.run(['git', '-C', file.cwd, 'rev-parse', '--show-toplevel'])
 	if (root.code) return
 	let cwd = root.bytes.toString().trim()

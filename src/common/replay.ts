@@ -18,6 +18,8 @@ export type TurnStatus = 'completed' | 'paused' | 'error' | 'canceled' | 'interr
 
 // A hash names raw bytes in the session's file-blobs/. Metadata-only
 // snapshots cover large/sensitive files; null means absent (8w).
+// `undeclared` entries (Git status observations) exist only in older
+// histories; readers ignore them (c4x).
 export type FileSnapshot = string | { size: number; mtime: number } | null
 export type FileChange =
 	| { path: string; before: FileSnapshot; after: FileSnapshot; undeclared?: never }

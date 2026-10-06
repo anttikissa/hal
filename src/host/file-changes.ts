@@ -1,4 +1,7 @@
-// Observations during bash calls, not proof of authorship (task 8w).
+// Advisory record of the declared files each bash call changed (tasks
+// 8w, c4x). Only declared paths whose snapshots differ are recorded; Git
+// status is never read, so another session's edits or commits during a
+// call never count as this session's. Not enforcement or a sandbox.
 import { realpath, stat, mkdir, writeFile } from 'fs/promises'
 import { dirname, basename, resolve, relative, isAbsolute } from 'path'
 import { createHash } from 'crypto'
@@ -15,7 +18,7 @@ import { tabs } from './tabs.ts'
 import { jobs } from './jobs.ts'
 
 type Lock = { sessionId: string; callId?: string; paths: Set<string>; done: Promise<void>; release: () => void }
-type Observation = { ctx: ToolContext; patterns: string[]; before: Map<string, FileSnapshot>; status: Map<string, string>; commits?: Awaited<ReturnType<typeof commits.begin>>; release: () => void }
+type Observation = { ctx: ToolContext; patterns: string[]; before: Map<string, FileSnapshot>; commits?: Awaited<ReturnType<typeof commits.begin>>; release: () => void }
 
 function validate(input: unknown): string[] {
 	if (input === undefined) return []
@@ -111,52 +114,37 @@ async function snapshot(ctx: ToolContext, path: string): Promise<FileSnapshot> {
 	return hash
 }
 
-// Git's -z rename format is destination NUL source NUL; retain both.
-function parseStatus(text: string, root: string, cwd: string): Map<string, string> {
-	let parts = text.split('\0'), out = new Map<string, string>()
-	for (let i = 0; i < parts.length; i++) {
-		let item = parts[i]!
-		if (!item) continue
-		let status = item.slice(0, 2)
-		out.set(relative(cwd, resolve(root, item.slice(3))), status)
-		if (/[RC]/.test(status)) out.set(relative(cwd, resolve(root, parts[++i]!)), status)
-	}
-	return out
-}
-
 async function git(cwd: string, args: string[]): Promise<{ code: number; text: string; error: string }> {
 	let child = Bun.spawn(['git', '-C', cwd, ...args], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } })
 	let [code, text, error] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
 	return { code, text, error }
 }
 
-// Also the HEAD reflog's path for commit notices (commits.ts); worktrees have their own.
-async function status(cwd: string): Promise<{ files: Map<string, string>; log?: string }> {
-	let root = await fileChanges.git(cwd, ['rev-parse', '--show-toplevel', '--git-path', 'logs/HEAD'])
+// The HEAD reflog's path for commit notices (commits.ts); worktrees have their own.
+async function headLog(cwd: string): Promise<string | undefined> {
+	let root = await fileChanges.git(cwd, ['rev-parse', '--git-path', 'logs/HEAD'])
 	if (root.code) {
-		if (root.error.includes('not a git repository')) return { files: new Map() }
+		if (root.error.includes('not a git repository')) return undefined
 		throw new Error(root.error)
 	}
-	let [top, log] = root.text.trimEnd().split('\n')
-	let result = await fileChanges.git(cwd, ['status', '--porcelain=v1', '-z', '--untracked-files=all'])
-	if (result.code) throw new Error(result.error)
 	// git-path is relative to cwd in a main checkout, absolute in a worktree.
-	return { files: fileChanges.parseStatus(result.text, top!, await fileChanges.canonical(cwd)), log: await fileChanges.canonical(resolve(cwd, log!)) }
+	return fileChanges.canonical(resolve(cwd, root.text.trimEnd()))
 }
 
 async function begin(ctx: ToolContext, patterns: string[]): Promise<Observation> {
 	let release = await fileChanges.acquire(ctx, patterns)
 	try {
-		neighbors.record(ctx.sessionId, ctx.cwd, patterns)
 		let before = new Map<string, FileSnapshot>()
 		for (let path of await fileChanges.expand(ctx.cwd, patterns)) before.set(path, await fileChanges.snapshot(ctx, path))
-		let { files, log } = await fileChanges.status(ctx.cwd)
-		return { ctx, patterns, before, status: files, commits: log ? await commits.begin(ctx.sessionId, ctx.cwd, log) : undefined, release }
+		let log = await fileChanges.headLog(ctx.cwd)
+		let observation = { ctx, patterns, before, commits: log ? await commits.begin(ctx.sessionId, ctx.cwd, log) : undefined, release }
+		if (patterns.length) neighbors.start(ctx.sessionId, ctx.cwd, patterns)
+		return observation
 	} catch (e) { release(); throw e }
 }
 
 async function finish(observation: Observation): Promise<void> {
-	let { ctx, patterns, before, status, release } = observation
+	let { ctx, patterns, before, release } = observation
 	try {
 		let files: FileChange[] = []
 		let declared = new Set([...before.keys(), ...await fileChanges.expand(ctx.cwd, patterns)])
@@ -164,17 +152,12 @@ async function finish(observation: Observation): Promise<void> {
 			let a = before.get(path) ?? null, b = await fileChanges.snapshot(ctx, path)
 			if (JSON.stringify(a) !== JSON.stringify(b)) files.push({ path, before: a, after: b })
 		}
-		let after = (await fileChanges.status(ctx.cwd)).files
-		let declaredPaths = new Set([...declared].map((p) => resolve(ctx.cwd, p)))
-		for (let path of new Set([...status.keys(), ...after.keys()])) {
-			if (!declaredPaths.has(resolve(ctx.cwd, path)) && status.get(path) !== after.get(path)) files.push({ path, undeclared: true, statusBefore: status.get(path) ?? null, statusAfter: after.get(path) ?? null })
-		}
-		neighbors.record(ctx.sessionId, ctx.cwd, files.map((f) => f.path))
 		if (patterns.length || files.length) {
 			history.append(ctx.sessionId, { type: 'file_changes', toolId: ctx.callId!, cwd: ctx.cwd, files })
 			host.broadcast(ctx.sessionId, { type: 'turn-stats', sessionId: ctx.sessionId, stats: stats.of(ctx.sessionId) })
 		}
 	} finally {
+		if (patterns.length) neighbors.end(ctx.sessionId)
 		if (observation.commits) await commits.finish(observation.commits)
 		release()
 	}
@@ -183,5 +166,5 @@ async function finish(observation: Observation): Promise<void> {
 export const fileChanges = {
 	state: { locks: [] as Lock[] },
 	maxBytes: 1_000_000,
-	validate, canonical, expand, acquire, blobPath, snapshot, parseStatus, git, status, begin, finish,
+	validate, canonical, expand, acquire, blobPath, snapshot, git, headLog, begin, finish,
 }

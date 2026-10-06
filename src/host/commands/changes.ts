@@ -20,7 +20,7 @@ export const command: SlashCommand = {
 			let diff = await changes.diff(ctx.sessionId, file.before, file.after)
 			let commit = await changes.committed(ctx.sessionId, file)
 			let label = file.path.replace(/[[\]\\\n\r]/g, ' ')
-			lines.push(`- [${label}](${base}${changes.href(ctx.sessionId, file.path)}) ${changes.counts(diff)} · calls: ${file.steps.map((s) => s.toolId + (s.change.undeclared ? ' (undeclared)' : '')).join(', ')}${commit ? ` · committed in ${commit}` : ''}`)
+			lines.push(`- [${label}](${base}${changes.href(ctx.sessionId, file.path)}) ${changes.counts(diff)} · calls: ${file.steps.map((s) => s.toolId).join(', ')}${commit ? ` · committed in ${commit}` : ''}`)
 		}
 		if (!files.length) lines.push('No file changes since the last /changes clear.')
 		return { say: lines.join('\n') }
