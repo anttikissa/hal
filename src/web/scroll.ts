@@ -123,7 +123,18 @@ function onKey(e: KeyboardEvent): void {
 // event it causes is not mistaken for the reader dragging.
 function put(el: Box, top: number): void {
 	el.scrollTop = top
-	scroll.state.set = el.scrollTop
+	scroll.moved()
+}
+
+// The view moved by our hand (put, a linked card scrolled into view):
+// remember the position as ours and read from here. A resize seen
+// before the scroll event would otherwise restore the reading anchor
+// from before the move (task 0z).
+function moved(): void {
+	let st = scroll.state
+	if (!st.el) return
+	st.set = st.el.scrollTop
+	st.reanchor()
 }
 
 // Runs after anything that may have moved the view or grown the
@@ -189,7 +200,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	// A resize mid-glide (the message box grows, an image loads) must not
 	// cancel it: the glide re-aims at the moving bottom every frame, while
 	// the reading anchor was taken mid-way and would strand the view.
-	let stopReflow = reflow.watch(el, () => {
+	let { stop: stopReflow, capture } = reflow.watch(el, () => {
 		if (scroll.state.frame) return true
 		// Pinned: the bottom is the anchor, whatever the reading anchor says.
 		if (scroll.state.pinned) {
@@ -199,6 +210,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		scroll.state.forcedUntil = 0
 		return false
 	})
+	scroll.state.reanchor = capture
 	let scrolled = () => {
 		scroll.check('scroll', true)
 		if (scroll.atTop()) onTop()
@@ -236,6 +248,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	return () => {
 		scroll.stop()
 		scroll.state.el = null
+		scroll.state.reanchor = () => {}
 		stopReflow()
 		el.removeEventListener('scroll', scrolled)
 		content.disconnect()
@@ -333,7 +346,8 @@ export const scroll = {
 	forcedMs: 300,
 	// `pinned`: see the header. `pressing`: a mouse button or pen is down
 	// in the transcript. `set`: the last position this module set.
-	state: { el: null as Box | null, quiet: false, frame: 0, gap: 0, pos: 0, set: 0, exactUntil: 0, forcedUntil: 0, touching: false, pinned: true, pressing: false, places: new Map<string, { top: number } | { gap: number }>() },
+	// `reanchor`: takes reflow's reading anchor at the current view.
+	state: { el: null as Box | null, reanchor: (): void => {}, quiet: false, frame: 0, gap: 0, pos: 0, set: 0, exactUntil: 0, forcedUntil: 0, touching: false, pinned: true, pressing: false, places: new Map<string, { top: number } | { gap: number }>() },
 	// Called when a pinned view is pulled back to the bottom, with the
 	// gap found and the trigger. A diagnostics hook (drift.ts); no-op.
 	onPull: (_gap: number, _why: string): void => {},
@@ -341,6 +355,7 @@ export const scroll = {
 	keep,
 	leave,
 	put,
+	moved,
 	check,
 	target,
 	at,
