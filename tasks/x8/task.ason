@@ -4,7 +4,8 @@
 	status: 'done',
 	notes: [
 		'SYSTEM.md is read per request from the checkout, code only at start: after a pull, a host started earlier already asks for <summary> but shows the raw tag (in notices and answers) until Ctrl-R.',
-		'Invariant: a tag quoted in code (`<summary>`) is text. A non-greedy match from such a mention to the real closing tag hid everything between, cutting a final answer short; tags after a backtick no longer count.'
+		'Invariant: a tag quoted in code (`<summary>`) is text. A non-greedy match from such a mention to the real closing tag hid everything between, cutting a final answer short; tags after a backtick no longer count.',
+		'Invariant: an unclosed <summary> hides the rest of the text only when no newline follows it (a summary still streaming in). A stray tag in prose, written without backticks, once hid every paragraph after it.'
 	],
 	needs: ['qm']
 }
