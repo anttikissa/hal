@@ -335,10 +335,10 @@ function draw(force = false, trigger?: string): void {
 	if (terminal.state.external || !st.out || (st.parked && !force)) return
 	st.parked = false
 	let { rows, cols } = st.out.size()
-	// Two or more tabs means full mode for good, from the first paint
-	// that sees them: a restart on tab 2 then clears what the last run
-	// left on screen instead of painting under it.
-	if (!st.fullscreen && (st.view.tabs?.list.length ?? 0) > 1) {
+	// Two or more tabs (startTabs until the host lists them) means full
+	// mode for good, from the first paint: no inline frame first that a
+	// clear then replaces, and a restart clears what the last run left.
+	if (!st.fullscreen && (st.view.tabs?.list.length ?? render.startTabs) > 1) {
 		st.fullscreen = force = true
 		trigger = 'the first paint with two or more tabs'
 	}
@@ -476,6 +476,8 @@ function reset(): void {
 
 export const render = {
 	state: createState(),
+	/** Open tabs before the host says (the home's tabs file). */
+	startTabs: 0,
 	/** Minimum time between two paints. */
 	frameMs: 16,
 	/** How long a slice of history layout may run before yielding. */

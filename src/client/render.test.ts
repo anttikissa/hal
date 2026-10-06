@@ -457,6 +457,18 @@ describe('tabs', () => {
 		expect(term.content()).toEqual(frameText())
 	})
 
+	test('the tabs file listing two tabs makes the first paint, before any tab, full mode', () => {
+		setup(10, 30, ['$ hal', 'old prompt'])
+		render.startTabs = 2
+		render.state.view = { prompt: { text: 'Ω', cursor: 1 } } as typeof render.state.view
+		try { render.draw() } finally { render.startTabs = 0 }
+		expect(term.written).toContain('\x1b[3J')
+		showTab('b', items(1))
+		term.written = ''
+		showTab('b', items(2))
+		expect(term.written).not.toContain('\x1b[3J')
+	})
+
 	test('a tab switch, Ctrl-L redraw and resize are canonical repaints once in full mode', () => {
 		setup(10, 30, ['$ hal'])
 		showTab('a', items(1))
