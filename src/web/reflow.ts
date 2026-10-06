@@ -64,8 +64,9 @@ function restore(el: HTMLElement, anchor: Anchor): void {
 }
 
 // `onResize` returns true when it keeps the view itself (a glide to the
-// bottom is running), so the anchor is left alone.
-function watch(el: HTMLElement, onResize: () => boolean): () => void {
+// bottom is running), so the anchor is left alone. `capture` takes the
+// anchor now, after a move whose scroll event has not come yet.
+function watch(el: HTMLElement, onResize: () => boolean): { stop: () => void; capture: () => void } {
 	let anchor = capture(el)
 	let update = () => {
 		if (el.clientWidth !== anchor.width || el.clientHeight !== anchor.height) {
@@ -87,11 +88,12 @@ function watch(el: HTMLElement, onResize: () => boolean): () => void {
 	resize.observe(el)
 	let content = new MutationObserver(update)
 	content.observe(el, { childList: true, characterData: true, subtree: true })
-	return () => {
+	let stop = () => {
 		el.removeEventListener('load', loaded, true)
 		el.removeEventListener('scroll', update)
 		resize.disconnect(); content.disconnect()
 	}
+	return { stop, capture: () => void (anchor = capture(el)) }
 }
 
 export const reflow = { watch }

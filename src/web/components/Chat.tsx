@@ -85,6 +85,7 @@ function reveal(): void {
 	// The reader asked for this card: leaving the bottom is theirs.
 	scroll.leave()
 	card.scrollIntoView({ block: 'start' })
+	scroll.moved()
 }
 
 function target(e: Event): Target {

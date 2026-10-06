@@ -727,6 +727,30 @@ test.skipIf(!chrome)('in a browser a block address loads its page, marks its car
 	}
 }, 20000)
 
+test.skipIf(!chrome)('in a browser a queued message address shows its card at the bottom', async () => {
+	// The reveal's scroll event may come after a resize; the view must not
+	// go back to the pre-reveal reading anchor (the top).
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	for (let t = 0; t < 12; t++) {
+		history.append(id, { type: 'user', blocks: [{ type: 'text', text: `prompt ${t}` }] })
+		history.append(id, { type: 'assistant', block: { type: 'text', text: `reply ${t}\n\nmore` } })
+	}
+	let queued = history.append(id, { type: 'inbox', id: 'q1', text: 'Queued one', queue: true })
+	history.append(id, { type: 'assistant', block: { type: 'text', text: 'still working' } })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Emulation.setDeviceMetricsOverride', { width: 1000, height: 600, deviceScaleFactor: 1, mobile: false })
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}#u${queued.n}` })
+		await b.waitFor(`document.querySelector('.Card.target.queued')`)
+		await Bun.sleep(300)
+		let box = await b.evaluate(`(() => { let c = document.querySelector('.Card.target').getBoundingClientRect(), m = document.querySelector('.Transcript').getBoundingClientRect(); return c.top >= m.top && c.bottom <= m.bottom })()`)
+		expect(box).toBe(true)
+	} finally {
+		await b.close()
+	}
+}, 20000)
+
 test.skipIf(!chrome)('in a browser tabs are links; new, Back and close move the address; the strip stays one short row', async () => {
 	let origCwd = host.cwd
 	host.cwd = () => '/tmp'
