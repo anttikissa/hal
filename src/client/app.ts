@@ -287,6 +287,8 @@ function onKeys(events: KeyEvent[]): void {
 		}
 		let { state, action } = prompt.step(st.prompt, key, frame.promptWidth(app.cols()))
 		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
+		// An in-process /go can focus another session during submit (qhz).
+		if (st.transcript?.meta.id !== shown) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'
 		st.prompt = state
 		let id = st.transcript?.meta.id

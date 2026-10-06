@@ -630,3 +630,20 @@ test('an open menu preserves touch and modified Enter and Tab contracts', () => 
 	press('Enter', message('/cd'), { altKey: true })
 	expect(sent.some((c) => c.type === 'submit' && c.text === '/cd')).toBe(true)
 })
+
+test('/go shows a cached destination draft updated by another client without writing it', () => {
+	app.onEvent(tabsEvent(tab('1-aaa'), tab('2-bbb')))
+	app.onEvent(snapOf('1-aaa'))
+	tabs.show('2-bbb', false)
+	app.onEvent(snapOf('2-bbb'))
+	tabs.show('1-aaa', false)
+	app.onEvent({ type: 'draft', sessionId: '2-bbb', draft: { text: 'from terminal', rev: 5 } })
+	app.input('/go 2-bbb')
+	app.send()
+	sent = []
+	app.onEvent({ type: 'go', sessionId: '1-aaa', tab: '2-bbb' })
+	expect(app.state.text).toBe('from terminal')
+	expect(sent.filter((c) => c.type === 'draft')).toEqual([])
+	app.input('from terminal!')
+	expect(sent.find((c) => c.type === 'draft')).toMatchObject({ sessionId: '2-bbb', text: 'from terminal!', base: 5 })
+})
