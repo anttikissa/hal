@@ -161,6 +161,11 @@ describe('parse', () => {
 			expect(() => parse('tru')).toThrow(/\^/)
 		})
 
+		test('unquoted keys must be JS identifiers or integers', () => {
+			expect(parse('{ café: 1, $x: 2, 0: 3, \\u0061b: 4 }')).toEqual({ café: 1, $x: 2, 0: 3, ab: 4 })
+			for (const bad of ['{a-b.c@: 1}', '{01: 1}', '{ \\u002d: 1 }']) expect(() => parse(bad)).toThrow()
+		})
+
 		test('unterminated comment', () => {
 			expect(() => parse('1 /* open')).toThrow(/Unterminated comment at 1:3/)
 			expect(() => parse('{ a: 1 /* open')).toThrow(/Unterminated comment at 1:8/)
