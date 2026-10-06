@@ -1,16 +1,83 @@
-// ASON — A Saner Object Notation (MIT). Import ason (default/named object)
-// or its named functions: stringify(value, mode = 'smart') wraps at 80 columns;
-// 'short' is one line without comments, 'long' always expands collections.
-// parse(text, { comments: true }) keeps leading key/item comments on COMMENTS;
-// smart/long stringify reuse them best-effort, not a full comment round-trip.
-// parseAll(text) reads concatenated values; parseStream(byteStream) yields ASONL
-// records, ignoring a malformed first nonblank line (for mid-record starts).
-// Parse errors carry .pos and a line/column caret. No dependencies or eval.
-// A superset of JSON and JSONC, with JSON5 syntax: comments, trailing commas,
-// unquoted keys, single quotes, hex, signed/leading-dot numbers, NaN/Infinity,
-// escapes and line continuations. Not ALL JSON5: Unicode whitespace outside the
-// explicit whitespace set is unsupported. Also: undefined, BigInt, numeric
-// separators and multiline backticks (no ${interpolation}). Commas required.
+// ASON — A Saner Object Notation. MIT, one TypeScript file, no dependencies.
+//
+// A drop-in replacement for JSON and JSONL that is readable and convenient
+// out of the box. Use it wherever people read or edit the data: config files
+// (comments survive a parse/stringify round trip), wire serialization, and
+// log files (ASONL: one record per line, like JSONL).
+//
+//   import { parse, stringify } from './ason'
+//   parse("{ name: 'hal', tags: ['a', 'b',], big: 42n }")
+//   stringify({ name: 'hal', tags: ['a', 'b'] })   // { name: 'hal', tags: ['a', 'b'] }
+//   stringify(value)           // smart: inline if it fits 80 columns, else one item per line
+//   stringify(value, 'short')  // always one line: an ASONL record or wire message
+//   stringify(value, 'long')   // every object and array expanded
+//   stringify(value, { mode: 'long', indent: 2 })  // indent: '\t' (default), '  ' or 2
+//   config.indent = '  '       // process-wide default; per-call options win
+//
+// Philosophy: (nearly) every JavaScript literal is valid ASON, and ASON
+// pastes into a JS REPL. Strings in single, double or backtick quotes
+// (multiline, no ${} interpolation); unquoted keys; trailing commas;
+// // and /* */ comments; numbers as JS writes them: .5, 1., +1, 0xFF,
+// 1_000, 42n, NaN, -Infinity; and undefined. Commas between items are
+// required, as in JS: [1 2] is an error.
+//
+// It is not yet another JSON5 or JSONC, though it reads both: it is a
+// superset of JSON, JSONC and JSON5 syntax, aiming at JS rather than at
+// another JSON dialect.
+//
+// Comments round-trip. parse(text, { comments: true }) keeps each key's and
+// array item's leading comments on obj[COMMENTS]; edit the data and
+// stringify writes them back:
+//
+//   const config = parse(`{
+//   	// Shown in the tab bar
+//   	name: 'hal',
+//   }`, { comments: true })
+//   config.name = 'hal 2'
+//   stringify(config)  // the comment is still above name
+//
+// Best effort: comments after the last item, and those of a collection
+// replaced in code, are lost; a comment after a value becomes the next
+// key's leading comment; 'short' omits comments.
+//
+// Streaming ASONL: write each record as stringify(record, 'short') + '\n';
+// parseAll(text) reads a whole file (a torn last record throws), and
+// parseStream yields records as bytes arrive:
+//
+//   for await (const event of parseStream(Bun.file('log.asonl').stream())) ...
+//
+// A stream may start mid-record, e.g. tailing a log from a byte offset:
+// parseStream drops a malformed first line up to its '\n', then is strict.
+//
+// Errors throw with .pos (offset) and a message giving line:column, the
+// source line and a caret:
+//
+//   Expected ',' or '}' at 1:8:
+//       { a: 1 b: 2 }
+//              ^
+//
+// Exact output (quotes, escapes, spacing, indentation, wrapping) is a
+// compatibility contract asserted by tests (tasks 8, mw). Smart width
+// counts characters, so a tab is one column. The original lives unchanged
+// in tasks/8.
+//
+// TODO, where ASON still differs from JSON or JS (all checked against this
+// file):
+// - A __proto__ key sets the prototype instead of an own key, unlike
+//   JSON.parse (prototype pollution on untrusted input); define it instead.
+// - An unclosed /* is accepted at top level (1 /* open parses as 1) and gives
+//   a misleading "Expected ',' or '}'" inside objects; say "Unterminated
+//   comment".
+// - A comment just before } or ] is dropped, even with { comments: true }.
+// - stringify writes NUL, other control characters and U+2028/U+2029 raw
+//   instead of escaping them.
+// - Backtick output keeps \r raw; JS reads \r\n in a template as \n.
+// - Unquoted keys are looser than JS identifiers ({a-b.c@: 1} parses) and
+//   than what stringify writes unquoted.
+// - 0b/0o numbers and \u{...} escapes are rejected; so is Unicode whitespace
+//   such as U+2000, which JSON5 allows.
+// - toJSON is ignored (a Date becomes {}); functions and symbols throw
+//   instead of being skipped as in JSON.stringify.
 
 /** Symbol key for attaching comments to AsonObject/AsonArray. */
 export const COMMENTS = Symbol('comments')
@@ -55,16 +122,16 @@ function commentPrefix(comment: string | undefined, pad: string): string {
 	return comment ? `${indentComment(comment, pad)}\n` : ''
 }
 
-// Tabs encode one ASON indentation level; keep wrapping compatible with the former two-column indentation.
+// Width counts characters: a tab is one column, whatever an editor's tab width.
 // In long mode, skip the unused inline candidate: computing both forms at every level is exponential.
-function renderCollection(open: string, close: string, inline: string, col: number, depth: number, maxWidth: number, hasComments: boolean, buildLines: (pad: string, childDepth: number) => string[]): string {
+function renderCollection(open: string, close: string, inline: string, col: number, depth: number, maxWidth: number, unit: string, hasComments: boolean, buildLines: (pad: string, childDepth: number) => string[]): string {
 	if (maxWidth === Infinity) return inline // short strings already escape newlines
 	if (maxWidth > 0 && !hasComments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 	const childDepth = depth + 1
-	return `${open}\n${buildLines('\t'.repeat(childDepth), childDepth).join('\n')}\n${'\t'.repeat(depth)}${close}`
+	return `${open}\n${buildLines(unit.repeat(childDepth), childDepth).join('\n')}\n${unit.repeat(depth)}${close}`
 }
 
-function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: number): string {
+function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: number, unit: string): string {
 	if (obj === null) return 'null'
 	if (obj === undefined) return 'undefined'
 	if (typeof obj === 'boolean') return obj ? 'true' : 'false'
@@ -72,6 +139,7 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		if (Number.isNaN(obj)) return 'NaN'
 		if (obj === Infinity) return 'Infinity'
 		if (obj === -Infinity) return '-Infinity'
+		if (Object.is(obj, -0)) return '-0'
 		return String(obj)
 	}
 	if (typeof obj === 'bigint') return `${obj}n`
@@ -80,9 +148,9 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 	if (Array.isArray(obj)) {
 		if (obj.length === 0) return '[]'
 		const comments = maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
-		const inline = maxWidth === 0 ? '' : `[${obj.map((v) => stringifyValue(v, 0, depth, maxWidth)).join(', ')}]`
-		return renderCollection('[', ']', inline, col, depth, maxWidth, !!comments, (pad, childDepth) =>
-			obj.map((v, i) => `${commentPrefix(comments?.[i], pad)}${pad}${stringifyValue(v, childDepth * 2, childDepth, maxWidth)}${i < obj.length - 1 ? ',' : ''}`),
+		const inline = maxWidth === 0 ? '' : `[${obj.map((v) => stringifyValue(v, 0, depth, maxWidth, unit)).join(', ')}]`
+		return renderCollection('[', ']', inline, col, depth, maxWidth, unit, !!comments, (pad, childDepth) =>
+			obj.map((v, i) => `${commentPrefix(comments?.[i], pad)}${pad}${stringifyValue(v, childDepth * unit.length, childDepth, maxWidth, unit)}${i < obj.length - 1 ? ',' : ''}`),
 		)
 	}
 
@@ -91,9 +159,9 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		const keys = Object.keys(rec)
 		if (keys.length === 0) return '{}'
 		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
-		const inline = maxWidth === 0 ? '' : `{ ${keys.map((k) => `${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth)}`).join(', ')} }`
-		return renderCollection('{', '}', inline, col, depth, maxWidth, !!comments, (pad, childDepth) =>
-			keys.map((k, i) => `${commentPrefix(comments?.[k], pad)}${pad}${quoteKey(k)}: ${stringifyValue(rec[k], childDepth * 2 + `${quoteKey(k)}: `.length, childDepth, maxWidth)}${i < keys.length - 1 ? ',' : ''}`),
+		const inline = maxWidth === 0 ? '' : `{ ${keys.map((k) => `${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth, unit)}`).join(', ')} }`
+		return renderCollection('{', '}', inline, col, depth, maxWidth, unit, !!comments, (pad, childDepth) =>
+			keys.map((k, i) => `${commentPrefix(comments?.[k], pad)}${pad}${quoteKey(k)}: ${stringifyValue(rec[k], childDepth * unit.length + `${quoteKey(k)}: `.length, childDepth, maxWidth, unit)}${i < keys.length - 1 ? ',' : ''}`),
 		)
 	}
 
@@ -101,11 +169,17 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 }
 
 export type StringifyMode = 'short' | 'smart' | 'long'
+/** indent: a string such as '\t' or '  ', or a number of spaces. */
+export type StringifyOptions = { mode?: StringifyMode; indent?: string | number }
+
+/** Process-wide defaults for stringify; per-call options override them. */
+export const config = { indent: '\t' as string | number }
 
 /** Convert a value to an ASON string. Mode: 'smart' (default, 80-col wrap), 'short' (single line), 'long' (always expanded). */
-export function stringify(obj: unknown, mode: StringifyMode = 'smart'): string {
+export function stringify(obj: unknown, opts: StringifyMode | StringifyOptions = 'smart'): string {
+	const { mode = 'smart', indent = config.indent } = typeof opts === 'string' ? { mode: opts } : opts
 	const maxWidth = mode === 'short' ? Infinity : mode === 'long' ? 0 : 80
-	return stringifyValue(obj, 0, 0, maxWidth)
+	return stringifyValue(obj, 0, 0, maxWidth, typeof indent === 'number' ? ' '.repeat(indent) : indent)
 }
 
 // --- Parse ---
@@ -455,5 +529,5 @@ export async function* parseStream(stream: ReadableStream<Uint8Array>): AsyncGen
 	}
 }
 
-export const ason = { stringify, parse, parseAll, parseStream, COMMENTS }
+export const ason = { stringify, parse, parseAll, parseStream, COMMENTS, config }
 export default ason
