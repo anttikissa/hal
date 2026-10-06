@@ -15,8 +15,8 @@ const steps = Array.from({ length: 11 }, (_, i) => (i < 10 ? Math.round(100 * Ma
 function on(el: Element, ms: number): void {
 	let style = getComputedStyle(el)
 	// A host started before colors.page().flash existed serves no
-	// --flash until it restarts; the page text is nearly white.
-	let white = style.getPropertyValue('--flash') || style.getPropertyValue('--text')
+	// --flash until it restarts (theme text can be amber, not white).
+	let white = style.getPropertyValue('--flash') || 'white'
 	let own = style.boxShadow === 'none' ? '' : `, ${style.boxShadow}`
 	let frames = steps.map((p) => ({ boxShadow: `inset 0 0 0 100vmax color-mix(in oklab, ${white} ${p}%, transparent)${own}` }))
 	el.animate(frames, { duration: ms })
