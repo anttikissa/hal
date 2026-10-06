@@ -30,11 +30,8 @@ import { Icon } from './Icon.tsx'
 const snap = () => ({ target: app.state.target?.found && app.state.target.key, pages: app.state.pages, tabs: app.state.tabs, shown: app.state.shown, view: app.state.view, text: app.state.text, menu: app.state.menu, pending: app.pending(), notice: app.notice(), placeholder: app.placeholder(), connected: connection.connected(), pushReady: !!push.state.registration, notices: notices.state.entries, updateAvailable: app.state.updateAvailable })
 type Snap = ReturnType<typeof snap>
 
-// More new items than this at once are a catch-up, not news.
-const catchUp = 8
-
 // A change to the transcript follows the bottom: a new prompt pending
-// (sent) glides to the very bottom, new items and streamed text glide.
+// (sent) goes to the bottom; other output follows only while pinned.
 // Anything else (typing, the status) just redraws.
 function redraw(before: Snap, set: (s: Snap) => void): void {
 	let next = snap()
@@ -63,13 +60,11 @@ function redraw(before: Snap, set: (s: Snap) => void): void {
 	}
 	if (items(next) === items(before) && next.view.transcript?.inbox === before.view.transcript?.inbox && next.pending.length === before.pending.length) return set(next)
 	let sent = next.pending.length > before.pending.length
-	let added = (items(next)?.length ?? 0) + (next.view.transcript?.inbox.length ?? 0) - (items(before)?.length ?? 0) - (before.view.transcript?.inbox.length ?? 0)
 	scroll.follow(
 		() => {
 			set(next)
 			flush()
 		},
-		added > catchUp ? 'snap' : 'glide',
 		sent,
 	)
 }

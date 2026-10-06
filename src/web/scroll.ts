@@ -1,76 +1,19 @@
 /// <reference lib="dom" />
-// Following the bottom of the transcript. A reader within `near` px of
-// the bottom stays at the same distance from it as content grows (new
-// items, streamed text, a card opening); one scrolled further up is
-// left alone. The gap is measured before a change, since afterwards
-// the page is taller. The view never jumps: one glide chases the
-// moving bottom, closing a fixed share of the distance each frame
-// (exponential, about the CSS --ease-out), so new items, streamed
-// lines and a send landing mid-glide re-aim it without restarting it
-// or changing the position at once. A card opening or closing is
-// tracked exactly while its height animates; sending glides to the
-// very bottom from anywhere.
-//
-// A catch-up (a reconnect bringing many items) snaps to the bottom at
-// once: the rows are replaced and scrollTop resets, and a glide from
-// there would sweep the session past the reader.
-//
-// Wheel, touch or a scroll key cancel a glide: the reader takes over.
-// Only scroll keys, since canceling on any key leaves a half-finished
-// scroll whose gap then falls outside `near` and stops the follow. A
-// send's glide ignores leftover wheel momentum, but a new finger
-// gesture always takes over and pauses following until release.
-//
-// Pinned (the user's rule): a reader at the very bottom stays there
-// until they leave it by hand. The 50 px rule alone kept whatever gap
-// it found, so anything else that moved the view a few pixels (a tab
-// in the background, tool output landing, the browser clamping
-// scrollTop) became the new gap, and the view stayed that far short
-// for good. While pinned, the gap kept is always 0 and any move or
-// growth the reader did not make is pulled back to the bottom.
-//
-// Only reader input unpins: wheel, touch, scroll keys or Tab, find
-// (Cmd/Ctrl+F or G, F3), a press on the scrollbar, a drag that moves
-// the view (a selection or middle-button autoscroll, a thumb drag),
-// or a link to a block. Unpinning too eagerly is safe, since the view
-// pins again whenever it is found at the very bottom; pulling back a
-// reader who left on purpose is not, so when unsure, unpin. A send
-// pins at once. Unpinned, the 50 px rule above applies as before.
-//
-// Growth above a still tail snaps (task rha): when the last card is
-// the same and nothing below its top changed (queued messages waiting
-// at the end while new items land above them), a glide would push that
-// tail down and slide it back, so it bounces. Snapping keeps it still.
-
+// One pinned bottom: changes keep it at the bottom without animation.
+// Reader input leaves following; history and viewport changes preserve
+// reading anchors, and each tab keeps its position. Tasks: 4s, e5h.
 import { reflow } from './reflow.ts'
 
 type Box = { scrollHeight: number; scrollTop: number; clientHeight: number }
-export type Mode = 'glide' | 'snap' | 'track'
 
 // How far the view is above the bottom.
 function gap(el: Box): number {
 	return Math.max(0, el.scrollHeight - el.scrollTop - el.clientHeight)
 }
 
-// The gap to keep after a change, or undefined to leave the view
-// alone. Mid-glide the gap it heads for counts (a fast stream would
-// otherwise outrun `near`); `force` (a send) means the very bottom.
-function keep(measured: number, gliding?: number, force = false): number | undefined {
-	if (force) return 0
-	let g = gliding ?? measured
-	return g < scroll.near ? g : undefined
-}
-
 // Where the view goes to be `gap` above the bottom.
 function target(el: Box, gap: number): number {
 	return Math.max(0, el.scrollHeight - el.clientHeight - gap)
-}
-
-// Position `ms` after `from` while chasing `to`: the distance shrinks
-// by e every `tauMs`, from any start and however `to` moves.
-function at(from: number, to: number, ms: number): number {
-	let x = from + (to - from) * (1 - Math.exp(-ms / scroll.tauMs))
-	return Math.abs(to - x) < 0.5 ? to : x
 }
 
 const scrollKeys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '])
@@ -79,27 +22,8 @@ const scrollKeys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home'
 // scroll positions can be fractional.
 const atBottom = 1
 
-function stop(): void {
-	if (scroll.state.frame) cancelAnimationFrame(scroll.state.frame)
-	scroll.state.frame = 0
-}
-
-// Whether a send's glide still ignores wheel momentum.
-function forced(): boolean {
-	return performance.now() < scroll.state.forcedUntil
-}
-
-// The reader moved, or may be about to move, the view: stop any glide
-// and stop pulling the view back to the bottom.
 function leave(): void {
-	scroll.stop()
 	scroll.state.pinned = false
-}
-
-// Wheel and scroll keys. Leftover wheel momentum during a send's glide
-// is not a new decision, so it neither stops the glide nor unpins.
-function userScroll(): void {
-	if (!scroll.forced()) scroll.leave()
 }
 
 // A new finger gesture is deliberate, unlike leftover wheel momentum.
@@ -108,11 +32,11 @@ function userScroll(): void {
 function touchStart(): void {
 	scroll.state.touching = true
 	scroll.leave()
-	scroll.state.forcedUntil = 0
 }
 
 function touchEnd(): void {
 	scroll.state.touching = false
+	scroll.check('touchend')
 }
 
 function onKey(e: KeyboardEvent): void {
@@ -121,7 +45,7 @@ function onKey(e: KeyboardEvent): void {
 	let find = e.key === 'F3' || ((e.metaKey || e.ctrlKey) && /^[fg]$/i.test(e.key))
 	if (find) return scroll.leave()
 	// Tab may focus a card off screen, and the browser scrolls it into view.
-	if ((scrollKeys.has(e.key) || e.key === 'Tab') && !t?.closest?.('textarea, input')) scroll.userScroll()
+	if ((scrollKeys.has(e.key) || e.key === 'Tab') && !t?.closest?.('textarea, input')) scroll.leave()
 }
 
 // Sets the view's position and remembers it as ours, so the scroll
@@ -159,13 +83,13 @@ function check(why: string, scrolled = false): void {
 		if (!st.touching) st.pinned = true
 		return
 	}
-	// Pinned but above the bottom, and no glide is already on its way:
+	// Pinned but above the bottom:
 	// something other than the reader moved the view or grew the
 	// content. Pull back, unless a press is under way (a click or the
 	// start of a selection must not have the text slide under it).
-	if (!st.pinned || st.frame || st.pressing || st.touching) return
+	if (!st.pinned || st.pressing || st.touching) return
 	scroll.onPull(g, why)
-	scroll.follow(() => {})
+	scroll.put(el, scroll.target(el, 0))
 }
 
 // Whether the reader is within `nearTop` px of the top, where earlier
@@ -182,7 +106,6 @@ function anchor(change: () => void): void {
 	let el = scroll.state.el
 	if (!el) return change()
 	let below = el.scrollHeight - el.scrollTop
-	scroll.stop()
 	scroll.quiet(change)
 	scroll.put(el, Math.max(0, el.scrollHeight - below))
 }
@@ -198,39 +121,17 @@ function quiet(change: () => void): void {
 	}
 }
 
-// The last card, how far its top is above the content's bottom, and
-// the content's height; in a browser only.
-function tail(el: Box): { node: Element; below: number; height: number } | undefined {
-	if (typeof Element === 'undefined' || !(el instanceof Element)) return
-	let node = el.lastElementChild
-	while (node && !node.classList.contains('Card')) node = node.previousElementSibling
-	if (!node) return
-	return { node, height: el.scrollHeight, below: el.scrollHeight - el.scrollTop - (node.getBoundingClientRect().top - el.getBoundingClientRect().top) }
-}
-
-// Whether the change grew the content above the last card only. A
-// change that grew nothing (a pull back to the bottom) keeps its glide:
-// a snap there would yank a reader the instant they leave the bottom.
-function still(el: Box, before: ReturnType<typeof tail>): boolean {
-	let after = before && tail(el)
-	return !!after && after.node === before!.node && after.height > before!.height && Math.abs(after.below - before!.below) < 1
-}
-
 // Follow `el`; returns the cleanup. `onTop`: the reader scrolled near
 // the top.
 function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	scroll.state.el = el
-	// A resize mid-glide (the message box grows, an image loads) must not
-	// cancel it: the glide re-aims at the moving bottom every frame, while
-	// the reading anchor was taken mid-way and would strand the view.
 	let { stop: stopReflow, capture } = reflow.watch(el, () => {
-		if (scroll.state.frame) return true
+		if (scroll.state.touching || scroll.state.pressing) return true
 		// Pinned: the bottom is the anchor, whatever the reading anchor says.
 		if (scroll.state.pinned) {
 			scroll.put(el, scroll.target(el, 0))
 			return true
 		}
-		scroll.state.forcedUntil = 0
 		return false
 	})
 	scroll.state.reanchor = capture
@@ -241,16 +142,20 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 	el.addEventListener('scroll', scrolled, { passive: true })
 	// Streamed text and new cards change the DOM; a change that no
 	// follow() covered would otherwise leave a pinned view short.
-	let content = new MutationObserver(() => { watchCards(); scroll.check('content') })
+	let content = new MutationObserver((changes) => { if (changes.some((c) => c.target === el && c.type === 'childList')) watchCards(); scroll.check('content') })
 	content.observe(el, { childList: true, characterData: true, subtree: true })
 	// A card can also grow with no DOM change and no scroll event: its
 	// open animation, an image or font arriving. Watch each card's size,
-	// so that growth too pulls a pinned view back. observe() ignores a
-	// card already watched; a removed card drops out by itself.
+	// so that growth too keeps the bottom. Unobserve removed cards so
+	// switching sessions does not retain their DOM.
 	let cards = new ResizeObserver(() => scroll.check('resize'))
-	let watchCards = () => { for (let c of el.children) cards.observe(c, { box: 'border-box' }) }
+	let watched = new Set<Element>()
+	let watchCards = () => {
+		for (let c of watched) if (c.parentElement !== el) { cards.unobserve(c); watched.delete(c) }
+		for (let c of el.children) if (!watched.has(c)) { cards.observe(c, { box: 'border-box' }); watched.add(c) }
+	}
 	watchCards()
-	// A background tab gets no animation frames: catch up when shown.
+	// Catch up after the browser suspends a background tab.
 	let shown = () => { if (!document.hidden) scroll.check('shown') }
 	document.addEventListener('visibilitychange', shown)
 	// A press inside the transcript; on the scrollbar (right of the
@@ -259,17 +164,16 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		scroll.state.pressing = true
 		if (e.target === el && e.offsetX >= el.clientWidth) scroll.leave()
 	}
-	let release = () => { scroll.state.pressing = false }
+	let release = () => { scroll.state.pressing = false; scroll.check('release') }
 	el.addEventListener('pointerdown', press, { passive: true })
 	addEventListener('pointerup', release, { passive: true })
 	addEventListener('pointercancel', release, { passive: true })
-	addEventListener('wheel', scroll.userScroll, { passive: true })
+	addEventListener('wheel', scroll.leave, { passive: true })
 	el.addEventListener('touchstart', scroll.touchStart, { passive: true })
 	el.addEventListener('touchend', scroll.touchEnd, { passive: true })
 	el.addEventListener('touchcancel', scroll.touchEnd, { passive: true })
 	addEventListener('keydown', scroll.onKey)
 	return () => {
-		scroll.stop()
 		scroll.state.el = null
 		scroll.state.reanchor = () => {}
 		stopReflow()
@@ -281,7 +185,7 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 		removeEventListener('pointerup', release)
 		removeEventListener('pointercancel', release)
 		scroll.state.pressing = false
-		removeEventListener('wheel', scroll.userScroll)
+		removeEventListener('wheel', scroll.leave)
 		el.removeEventListener('touchstart', scroll.touchStart)
 		el.removeEventListener('touchend', scroll.touchEnd)
 		el.removeEventListener('touchcancel', scroll.touchEnd)
@@ -292,62 +196,22 @@ function init(el: HTMLElement, onTop: () => void = () => {}): () => void {
 
 // Runs `change`, which must leave the DOM updated (flush() in Solid),
 // and keeps a bottom reader at the bottom.
-function follow(change: () => void, mode: Mode = 'glide', force = false): void {
+function follow(change: () => void, force = false): void {
 	let st = scroll.state
-	let el = st.el
-	if (!el) return change()
-	// A send pins; pinned, the gap to keep is 0 whatever was measured.
 	if (force) st.pinned = true
-	let g = st.touching && !force ? undefined : scroll.keep(scroll.gap(el), st.frame ? st.gap : undefined, force || st.pinned)
-	let last = g !== undefined && mode === 'glide' ? tail(el) : undefined
 	change()
-	if (g === undefined) return
-	if (last && still(el, last)) mode = 'snap'
-	st.gap = g
-	// A send ignores wheel momentum until its glide lands, at most
-	// forcedMs: while a reply streams the glide may never land, and
-	// would hold a reader who scrolls up.
-	if (force) st.forcedUntil = performance.now() + scroll.forcedMs
-	if (mode === 'snap' || matchMedia('(prefers-reduced-motion: reduce)').matches) {
-		scroll.stop()
-		scroll.put(el, scroll.target(el, g))
-		return
-	}
-	if (mode === 'track') st.exactUntil = performance.now() + scroll.toggleMs
-	// A running glide re-aims at the new gap from where it is.
-	if (st.frame) return
-	st.pos = st.set = el.scrollTop
-	let prev = performance.now()
-	let step = (now: number) => {
-		// Unpinned, anything else moving the view (a wheel this missed)
-		// is the reader taking over. Pinned, the reader's input would
-		// have unpinned first, so the move is not theirs: carry on.
-		if (Math.abs(el.scrollTop - st.set) > 2 && !scroll.forced() && !st.pinned) return void (st.frame = 0)
-		// rAF time is the frame's start, which may precede `last`.
-		let ms = Math.min(50, Math.max(0, now - prev))
-		prev = Math.max(prev, now)
-		let to = scroll.target(el, st.gap)
-		st.pos = now < st.exactUntil ? to : scroll.at(st.pos, to, ms)
-		el.scrollTop = st.pos
-		st.set = el.scrollTop
-		// Landing ends a send's hold on wheel momentum.
-		if (st.pos === to) st.forcedUntil = 0
-		st.frame = st.pos !== to || now < st.exactUntil ? requestAnimationFrame(step) : 0
-	}
-	st.frame = requestAnimationFrame(step)
+	if (st.el && st.pinned && (force || (!st.touching && !st.pressing))) scroll.put(st.el, scroll.target(st.el, 0))
 }
 
-// Each tab keeps its place while another is shown: a reader near the
-// bottom comes back to the bottom (it may have grown), one further up
+// Each tab keeps its place: a pinned reader returns to the bottom
+// (it may have grown), an unpinned reader returns
 // to the same spot; a tab never shown here opens at the bottom.
 function save(id: string): void {
 	let el = scroll.state.el
 	if (!el) return
-	scroll.stop()
 	// A pinned reader comes back pinned, even if a drift was not yet
 	// pulled back.
-	let near = scroll.keep(scroll.gap(el)) !== undefined
-	scroll.state.places.set(id, scroll.state.pinned ? { gap: 0 } : near ? { gap: scroll.gap(el) } : { top: el.scrollTop })
+	scroll.state.places.set(id, scroll.state.pinned ? { gap: 0 } : { top: el.scrollTop })
 }
 
 function restore(id: string): void {
@@ -360,33 +224,22 @@ function restore(id: string): void {
 }
 
 export const scroll = {
-	near: 50,
 	// Further above the bottom than this shows the scroll-to-bottom pill.
 	awayPx: 200,
 	nearTop: 800,
-	// A glide closes 99% of its distance in about 4.6 tauMs.
-	tauMs: 45,
-	// A card's open and close animation (CSS --toggle-ms matches).
-	toggleMs: 250,
-	forcedMs: 300,
 	// `pinned`: see the header. `pressing`: a mouse button or pen is down
 	// in the transcript. `set`: the last position this module set.
 	// `reanchor`: takes reflow's reading anchor at the current view.
-	state: { el: null as Box | null, reanchor: (): void => {}, quiet: false, frame: 0, gap: 0, pos: 0, set: 0, exactUntil: 0, forcedUntil: 0, touching: false, pinned: true, pressing: false, places: new Map<string, { top: number } | { gap: number }>() },
+	state: { el: null as Box | null, reanchor: (): void => {}, quiet: false, set: 0, touching: false, pinned: true, pressing: false, places: new Map<string, { top: number } | { gap: number }>() },
 	// Called when a pinned view is pulled back to the bottom, with the
 	// gap found and the trigger. A diagnostics hook (drift.ts); no-op.
 	onPull: (_gap: number, _why: string): void => {},
 	gap,
-	keep,
 	leave,
 	put,
 	moved,
 	check,
 	target,
-	at,
-	stop,
-	forced,
-	userScroll,
 	touchStart,
 	touchEnd,
 	onKey,

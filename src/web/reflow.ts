@@ -63,8 +63,8 @@ function restore(el: HTMLElement, anchor: Anchor): void {
 	el.scrollTop = Math.max(0, Math.min(target, el.scrollHeight - el.clientHeight))
 }
 
-// `onResize` returns true when it keeps the view itself (a glide to the
-// bottom is running), so the anchor is left alone. `capture` takes the
+// `onResize` returns true when the caller owns the position (pinned
+// bottom or a reader gesture), so the anchor is left alone. `capture` takes the
 // anchor now, after a move whose scroll event has not come yet.
 function watch(el: HTMLElement, onResize: () => boolean): { stop: () => void; capture: () => void } {
 	let anchor = capture(el)

@@ -726,6 +726,7 @@ browserTest('in a browser earlier history loads above: shown cards stay, open on
 			let seen = new MutationObserver((ms) => { for (let m of ms) for (let n of m.addedNodes) if (n.nodeType === 1 && (n.matches('.Card') || n.querySelector('.Card'))) added++ })
 			seen.observe(main, { childList: true, subtree: true })
 			for (let i = 0; i < 200 && !main.innerText.includes('prompt 0'); i++) {
+				main.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true }))
 				main.scrollTop = 0
 				main.dispatchEvent(new Event('scroll'))
 				await new Promise((r) => setTimeout(r, 20))
@@ -1510,8 +1511,6 @@ browserTest('a pinned reader stays at the bottom when a card grows by itself', a
 		let id = tabs.create('/tmp')
 		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
 		await b.call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false })
-		// Reduced motion snaps: no glide is still running when we check.
-		await b.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
 		await b.call('Page.navigate', { url: `${base()}/${id}` })
 		await b.waitFor(`!!document.querySelector('textarea') && !!document.querySelector('.StatusRow')`)
 		turns.stream = () => (async function* (): AsyncGenerator<StreamEvent> {
@@ -1531,8 +1530,21 @@ browserTest('a pinned reader stays at the bottom when a card grows by itself', a
 			requestAnimationFrame(() => requestAnimationFrame(() => r(${atBottom})))
 		})`)
 		expect(grown).toBe(true)
+		// Composer grows and shrinks while output is pinned: no glide or
+		// transient gap in any rendered frame, including an empty last row.
+		let gaps = await b.evaluate(`(async () => {
+			let t = document.querySelector('.Transcript'), box = document.querySelector('textarea'), gaps = []
+			for (let value of ['hello', 'hello\\n', 'hello\\na', 'hello\\n', 'hello', '']) {
+				box.value = value; box.dispatchEvent(new InputEvent('input', { bubbles: true }))
+				for (let i = 0; i < 3; i++) {
+					await new Promise(r => requestAnimationFrame(r))
+					gaps.push(t.scrollHeight - t.clientHeight - t.scrollTop)
+				}
+			}
+			return gaps
+		})()`)
+		expect(gaps.every((gap: number) => gap <= 1)).toBe(true)
 	} finally {
-		await b.call('Emulation.setEmulatedMedia', { features: [] })
 		await b.close()
 	}
 })

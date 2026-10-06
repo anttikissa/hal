@@ -113,7 +113,7 @@ export function Transcript(props: { view: ViewState; pending: Sending[]; target?
 			<Show when={!streaming() && !rows().length}>{line()}</Show>
 			<div class="to-bottom">
 				<Show when={away()}>
-					<button type="button" aria-label="Scroll to the bottom" title="Scroll to the bottom" onPointerDown={(e) => e.preventDefault()} onClick={() => scroll.follow(() => {}, 'glide', true)}>
+					<button type="button" aria-label="Scroll to the bottom" title="Scroll to the bottom" onPointerDown={(e) => e.preventDefault()} onClick={() => scroll.follow(() => {}, true)}>
 						<span class="pill"><svg viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10L6 7zM1 8h10l-5 6z" /></svg></span>
 					</button>
 				</Show>
