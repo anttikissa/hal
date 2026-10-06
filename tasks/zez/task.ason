@@ -1,0 +1,18 @@
+{
+	title: 'Queue edits lock one message, not the session',
+	spec: `Editing a queued message locks that message only, not the session. The turn keeps working while the user edits: tools run, steering and messages from other sessions still reach the model. Starting an edit never pauses, aborts or ends a turn.
+
+Order invariant: Hal never changes the order of queued messages without explicit user intent. When the turn ends, the first queued message is delivered as usual if it is not being edited, even if a later one is. If the first queued message is the one being edited, the session waits; messages behind it wait too. The status reads 'waiting for queue edit'. Save or cancel delivers it at once, in its place. The same rule applies wherever a waiting human message would leave the queue: /queue next, a prompt that takes waiting messages along, and any future delivery mode that releases waiting messages at the next round instead of at turn end.
+
+Race invariant: lock and dequeue are atomic with respect to each other. Exactly one wins. If delivery wins, acquisition refuses with the full reason ('already delivered') and the editor returns the changed text to the draft. If the lock wins, delivery skips or waits as above; the message is never delivered with text that differs from what the user saved. Host tests cover both orders: turn end, /queue next and prompt take-along each racing acquisition, plus save and cancel while the turn ends.
+
+Lock lifetime: the lock belongs to the user's edit, not one connection. Any window of the same session may continue it: the editor state mirrors to every client, and Enter or Save in any of them saves (the host checks the text the edit started from, and refuses with a visible reason if the message changed meanwhile). A save or cancel from any window ends the edit everywhere. A window that only mirrors the edit never shows a plain composer whose Enter is refused. When the last connection holding the edit disconnects (window closed, crash, network loss), the host releases the lock after the disconnect is detected; the message stays unchanged and queued, and delivery continues in order. No durable session pause results from editing; a host restart during an edit releases the lock the same way. Unsaved text survives in the client draft as today.
+
+Visible plumbing: waiting cards show which queued message is being edited; refusals and released locks show their reason where they happened.`,
+	status: 'planned',
+	notes: [
+		"Current state (src/host/queue-edits.ts): acquisition pauses the session (aborting a running round) and writes sessions/<id>/queue-edit.ason so a new host stays paused; holds are owned by one connection object. Disconnect releases the hold but leaves the session paused. Bun websockets detect dead peers via ping/idle timeout (about 2 minutes), a closed window at once. Web drafts mirror across browser tabs through localStorage, including queueEdit, but host ownership is per connection: a mirroring tab showed the edited text in a plain composer and Enter was refused ('a queued message is being edited'). Host is single-threaded, so acquire and dequeue are atomic if each checks and acts synchronously."
+	],
+	needs: ['jsg'],
+	foldInto: ['jsg']
+}
