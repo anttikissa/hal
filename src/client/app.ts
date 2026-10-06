@@ -182,9 +182,10 @@ function onState(state: LinkState): void {
 	app.show()
 }
 
-// Enter: a prompt (steering a busy turn; `queue`: after it), an edit of the last prompt,
+// Enter: a prompt (steering a busy turn; `queue`: after it; `nextRound`:
+// between rounds, not interrupting, task csn), an edit of the last prompt,
 // or a continue on an empty prompt. Refuses (keeping the typed text) what the host would refuse anyway.
-function submit(text: string, queue = false): boolean {
+function submit(text: string, queue = false, nextRound = false): boolean {
 	let st = app.state
 	let id = st.transcript?.meta.id
 	if (id && queueEdit.current(id)?.active) {
@@ -207,7 +208,7 @@ function submit(text: string, queue = false): boolean {
 	// While editing the last prompt, Enter sends the edit.
 	let { command, refused } = st.editing
 		? { command: amend.enter(st.editing, st.transcript, text, queue), refused: undefined }
-		: states.enter(st.transcript.meta.id, st.transcript.state, text, queue)
+		: states.enter(st.transcript.meta.id, st.transcript.state, text, queue, nextRound)
 	if (refused) {
 		st.notice = refused
 		return false
@@ -215,7 +216,7 @@ function submit(text: string, queue = false): boolean {
 	st.editing = undefined
 	if (command) {
 		st.notice = undefined
-		let c = command as { type: string; text?: string; queue?: boolean; amend?: boolean; edits?: string }
+		let c = command as { type: string; text?: string; queue?: boolean; nextRound?: boolean; amend?: boolean; edits?: string }
 		if (c.type === 'submit') drafts.submit(st.transcript.meta.id, c.text!, c)
 		else app.send(command)
 	}
@@ -291,7 +292,7 @@ function onKeys(events: KeyEvent[]): void {
 			key = { ...key, text: uploads.pad(key.text, st.prompt.text.slice(0, start)) }
 		}
 		let { state, action } = prompt.step(st.prompt, key, frame.promptWidth(app.cols()))
-		if (action?.type === 'submit' && !app.submit(action.text, action.queue)) continue
+		if (action?.type === 'submit' && !app.submit(action.text, action.queue, !action.force)) continue
 		// An in-process /go can focus another session during submit (qhz).
 		if (st.transcript?.meta.id !== shown) continue
 		let edited = state.text !== st.prompt.text && action?.type !== 'submit'

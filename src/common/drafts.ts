@@ -23,7 +23,7 @@ import type { QueueEditing } from './queue-edit.ts'
 // the waiting inbox message it edits; `rewind`: the earlier prompt
 // record it replaces, rewinding there (task 26q). `ts`: when it was
 // sent, its time until the host's record replaces it (task ta).
-export type Sending = { id: string; text: string; ts?: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
+export type Sending = { id: string; text: string; ts?: string; queue?: boolean; nextRound?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
 
 export type Local = {
 	// What the editor holds.
@@ -120,6 +120,7 @@ function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> & { 
 	let l = drafts.local(id)
 	let sending: Sending = { id: how.id ?? drafts.nextId(), text, ts: new Date().toISOString() }
 	if (how.queue) sending.queue = true
+	if (how.nextRound) sending.nextRound = true
 	if (how.amend) sending.amend = true
 	if (how.edits !== undefined) sending.edits = how.edits
 	if (how.rewind !== undefined) sending.rewind = how.rewind
@@ -135,7 +136,7 @@ function submit(id: string, text: string, how: Omit<Sending, 'id' | 'text'> & { 
 }
 
 function command(sessionId: string, s: Sending): object {
-	return { type: 'submit', sessionId, text: s.text, ...(s.queueEdit === undefined ? {} : { queueEdit: s.queueEdit }), ...(s.queue ? { queue: true } : {}), ...(s.amend ? { amend: true } : {}), ...(s.edits === undefined ? {} : { edits: s.edits }), ...(s.rewind === undefined ? {} : { rewind: s.rewind }), id: s.id }
+	return { type: 'submit', sessionId, text: s.text, ...(s.queueEdit === undefined ? {} : { queueEdit: s.queueEdit }), ...(s.queue ? { queue: true } : {}), ...(s.nextRound ? { nextRound: true } : {}), ...(s.amend ? { amend: true } : {}), ...(s.edits === undefined ? {} : { edits: s.edits }), ...(s.rewind === undefined ? {} : { rewind: s.rewind }), id: s.id }
 }
 
 // Folds a host event in. True if the session's editor text changed.

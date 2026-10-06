@@ -124,7 +124,7 @@ export type Command = (
 	// (the send tool), never from what a client claims (task rj).
 	| { type: 'queue-edit'; sessionId: string; message: string; edit: string }
 	| { type: 'queue-edit-cancel'; sessionId: string; edit: string }
-	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
+	| { type: 'submit'; sessionId: string; text: string; queue?: boolean; nextRound?: boolean; amend?: boolean; edits?: string; rewind?: number; queueEdit?: string }
 	// Tab: complete the slash command `text` on the host; answered, to
 	// this client only, with `completions`.
 	| { type: 'complete'; sessionId: string; text: string }

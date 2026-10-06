@@ -55,7 +55,7 @@ export interface PromptState {
 export type PromptSnapshot = { text: string; cursor: number; anchor?: number }
 
 // `queue`: Alt-Enter, run after the turn instead of steering it.
-export type PromptAction = { type: 'submit'; text: string; queue?: true } | { type: 'cancel' } | { type: 'quit' }
+export type PromptAction = { type: 'submit'; text: string; queue?: true; force?: true } | { type: 'cancel' } | { type: 'quit' }
 
 export interface PromptResult {
 	state: PromptState
@@ -284,6 +284,10 @@ function apply(st: PromptState, k: Key, width: number): PromptResult {
 		case '-enter':
 			if (k.shift) return { state: prompt.insert(cut, '\n') }
 			return { state: prompt.cleared(st), action: { type: 'submit', text } }
+		// Ctrl-Enter: steer at once, stopping the stream and running tools (task csn).
+		case 'C-enter':
+			if (k.shift) break
+			return { state: prompt.cleared(st), action: { type: 'submit', text, force: true } }
 		case '-escape':
 			return { state: st, action: { type: 'cancel' } }
 		case 'C-d':

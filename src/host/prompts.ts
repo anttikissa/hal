@@ -49,7 +49,11 @@ import { turns } from './turns.ts'
 // pause or a failure the user has to see to: it waits in the inbox
 // unless the session is idle, where it runs as a turn of its own and
 // so gets full attention (no longer advisory).
-function submit(id: string, text: string, command?: string, queue = false, sender?: Sender): string | undefined {
+//
+// `nextRound` (the terminal's plain Enter, task csn): a steer that
+// leaves the stream and running tools alone; the turn delivers it before
+// its next request.
+function submit(id: string, text: string, command?: string, queue = false, sender?: Sender, nextRound = false): string | undefined {
 	let call = commands.parse(text)
 	// A command (/model, /pause) is not a prompt: the tab stays the parent's.
 	if (!call && sender?.from === undefined && sender?.origin !== 'model') subagents.promote(id)
@@ -72,7 +76,10 @@ function submit(id: string, text: string, command?: string, queue = false, sende
 		if (interrupt && running) {
 			// Even just after Escape, while the turn still settles: it goes on.
 			status.transition(id, { type: 'submit' })
-			if (running.unsafe && !running.controller.signal.aborted) running.steered = true
+			if (nextRound) {
+				// Stopped by Escape: nothing runs on, so it steers as usual.
+				if (running.controller.signal.aborted) prompts.interrupt(running)
+			} else if (running.unsafe && !running.controller.signal.aborted) running.steered = true
 			else prompts.interrupt(running)
 		}
 		host.broadcast(id, { type: 'inbox', sessionId: id, inbox: status.inboxOf(id) })

@@ -152,6 +152,24 @@ test('a queued message sent to an idle session just runs', async () => {
 	expect(inboxOf(a, id)).toEqual([])
 })
 
+test('a next-round message leaves the stream running and arrives after the answer', async () => {
+	let a = client()
+	let id = created(a)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
+	await until(() => calls.length === 1)
+	calls[0]!.push({ type: 'text', text: 'work' })
+	await until(() => a.of('stream').length)
+	a.conn.send({ type: 'submit', sessionId: id, text: 'later', nextRound: true })
+	await until(() => inboxOf(a, id).length === 1)
+	calls[0]!.push({ type: 'text', text: ' done' })
+	calls[0]!.push({ type: 'done', reason: 'end' })
+	await until(() => calls.length === 2)
+	expect(calls[1]!.input.messages.slice(-2)).toEqual([
+		{ role: 'assistant', blocks: [{ type: 'text', text: 'work done' }] },
+		{ role: 'user', blocks: [{ type: 'text', text: stamped('later') }] },
+	])
+})
+
 test('the inbox survives a pause and a restart, and runs when the user continues', async () => {
 	let a = client()
 	let id = created(a)

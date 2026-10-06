@@ -40,7 +40,7 @@ function question(st: FormState): Hint[] {
 // The key hints for the session's state and whether the prompt has text.
 function keys(state: SessionState | undefined, text: boolean): Hint[] {
 	let working = state?.type === 'running' || state?.type === 'retrying' || state?.type === 'blocked'
-	if (working && text) return [['enter', 'steer'], ['alt-enter', 'queue'], ['shift-enter', 'newline'], ['esc', 'pause']]
+	if (working && text) return [['enter', 'steer'], ['ctrl-enter', 'interrupt'], ['alt-enter', 'queue'], ['esc', 'pause']]
 	if (state?.type === 'retrying' && !text) return [['enter', 'retry now'], ['esc', 'pause']]
 	if (working) return [['esc', 'pause']]
 	if (text) return [['enter', 'send'], ['shift-enter', 'newline'], ['alt-enter', 'queue']]

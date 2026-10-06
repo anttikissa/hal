@@ -136,9 +136,9 @@ function recoveries(records: HistoryRecord[]): number {
 // a prompt (which steers a busy turn; with `queue`, Alt-Enter, it waits
 // for the turn to end), a continue (bare Enter on a paused, failed or
 // waiting turn: the host rechecks limits and retries now), nothing (bare Enter otherwise), or why not (the text stays).
-function enter(sessionId: string, state: SessionState, text: string, queue = false): { command?: unknown; refused?: string } {
+function enter(sessionId: string, state: SessionState, text: string, queue = false, nextRound = false): { command?: unknown; refused?: string } {
 	if (!text.trim()) return state.type === 'paused' || state.type === 'error' || state.type === 'retrying' ? { command: { type: 'continue', sessionId } } : {}
-	return { command: queue ? { type: 'submit', sessionId, text, queue: true } : { type: 'submit', sessionId, text } }
+	return { command: queue ? { type: 'submit', sessionId, text, queue: true } : nextRound && states.busy(state) ? { type: 'submit', sessionId, text, nextRound: true } : { type: 'submit', sessionId, text } }
 }
 
 // What a client sends for Escape: a pause, if anything is running.
