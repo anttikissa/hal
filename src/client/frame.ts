@@ -19,7 +19,7 @@ import type { ModalState } from '../common/modals.ts'
 import { inbox } from '../common/inbox.ts'
 import { transcript, type Item, type Transcript } from '../common/transcript.ts'
 import { ansi } from './ansi.ts'
-import { batchOrder } from './batch-order.ts'
+import { batchOrder, type Ordering } from './batch-order.ts'
 import { formView } from './form-view.ts'
 import { itemView, type Look } from './item-view.ts'
 import { toggle, type Fold } from '../common/toggle.ts'
@@ -199,11 +199,17 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		let call = item.type === 'tool-result' ? batch.find((c) => c.type === 'tool' && c.id === item.id) : undefined
 		return n + (call?.type === 'tool' ? frame.itemRows(item, cols, session, undefined, undefined, call.name).length - 1 : frame.itemRows(item, cols, session).length + 1)
 	}, 0)
-	// Ordered once per transcript (updates replace its items): a sliced
-	// layout is called again and again (task 7j).
+	// Ordered once per transcript (updates replace its items), in
+	// slices too: a sliced layout is called again and again (task 7j).
+	// An unsaved layout (render.tail's) leaves the memo alone.
 	let src = view.transcript?.items ?? [], memo = frame.state.ordered, how = `${cols} ${screen} ${session} ${src.length}`
-	let items = memo?.src === src && memo.how === how ? memo.items : frame.order(promptChanges.group(src), (batch) => height(batch) <= screen)
-	frame.state.ordered = { src, how, items }
+	let fits = (batch: Item[]) => height(batch) <= screen
+	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(promptChanges.group(src), fits) } }
+	else if (memo?.src !== src || memo.how !== how) memo = { src, how, grouped: promptChanges.group(src), at: { i: 0, out: [] } }
+	if (memo.at.i < memo.grouped.length) memo.at = frame.order(memo.grouped, fits, deadline, memo.at)
+	if (save) frame.state.ordered = memo
+	if (memo.at.i < memo.grouped.length) return undefined
+	let items = memo.at.out
 	let calls = new Map<string, string>()
 	// A result opens and closes with its call (task ghs).
 	let callKeys = new Map<string, string>()
@@ -392,4 +398,4 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; items: Item[] } | undefined }, layout, build, itemRows, ref, queuedRows, highWater, order: batchOrder.order, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, ref, queuedRows, highWater, order: batchOrder.order, promptWidth }

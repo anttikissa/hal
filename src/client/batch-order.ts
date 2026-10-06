@@ -10,9 +10,16 @@ import type { Item } from '../common/transcript.ts'
 // never rewrite scrollback. A batch that once overflowed stays split,
 // so its layout never flips back. Later items keep their place
 // (background output arrives as its own block).
-function order(items: Item[], fits: (batch: Item[]) => boolean): Item[] {
-	let out: Item[] = []
-	for (let i = 0; i < items.length; ) {
+// With a `deadline`, stops after the first batch once it is past;
+// passing the returned `at` back goes on from there (task 7j): `fits`
+// lays out every multi-call batch, so a long history is ordered in
+// slices.
+function order(items: Item[], fits: (batch: Item[]) => boolean): Item[]
+function order(items: Item[], fits: (batch: Item[]) => boolean, deadline: number, at?: Ordering): Ordering
+function order(items: Item[], fits: (batch: Item[]) => boolean, deadline?: number, at: Ordering = { i: 0, out: [] }): Item[] | Ordering {
+	let { out } = at, i = at.i
+	for (let first = true; i < items.length; first = false) {
+		if (!first && deadline !== undefined && performance.now() > deadline) break
 		let j = i
 		while (j < items.length && items[j]!.type === 'tool') j++
 		let k = j
@@ -31,7 +38,9 @@ function order(items: Item[], fits: (batch: Item[]) => boolean): Item[] {
 		}
 		i = Math.max(k, i + 1)
 	}
-	return out
+	return deadline === undefined ? out : { i, out }
 }
+
+export type Ordering = { i: number; out: Item[] }
 
 export const batchOrder = { state: { split: new Set<string>() }, order }
