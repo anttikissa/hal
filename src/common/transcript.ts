@@ -1,5 +1,5 @@
 // The transcript every client shows: one pure fold of a session snapshot
-// and the live events after it (src/common/protocol.ts). A client that
+// and the live events after it (src/common/protocol.ts). A client
 // following live events and one reconnecting show the same transcript.
 // Provider input comes from host history; items omit provider-only fields.
 

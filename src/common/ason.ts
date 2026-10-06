@@ -22,7 +22,10 @@
 // stringify quotes every key but an ASCII identifier: { '0': 3 }); trailing commas;
 // // and /* */ comments; \x41, \u0041 and \u{1F600} escapes; numbers as JS
 // writes them: .5, 1., +1, 0xFF, 0b101, 0o17, 1_000, 42n, NaN, -Infinity, -0;
-// undefined; and any JS whitespace. Commas between items are
+// undefined; and any JS whitespace. Not supported: regex literals, array
+// holes ([1,,2]), and keys like 1.5, 0x10 or 1n. Legacy octal (017, "\101")
+// is an error, as in strict JS. Expressions (${…}, { a }, [k]: v, ...xs,
+// new Date()) are not literals and are errors. Commas between items are
 // required, as in JS: [1 2] is an error.
 //
 // It is not yet another JSON5 or JSONC, though it reads both: it is a
@@ -102,7 +105,8 @@
 //     toJSON runs as in JSON; functions and symbols become strings.
 //   - parse keeps __proto__ as an own key; reports unterminated comments;
 //     takes unquoted keys only as JS identifiers or integers; reads 0b/0o,
-//     \u{…} and all JS whitespace; reads CRLF in templates as LF.
+//     \u{…} and all JS whitespace; reads CRLF in templates as LF; rejects
+//     legacy octal numbers and escapes.
 //   - This header documents usage and which comments survive.
 
 /** Symbol key for attaching comments to AsonObject/AsonArray. */
@@ -391,6 +395,8 @@ function parseString(ctx: Ctx, quote: string): string {
 				break
 			}
 			default:
+				// Strict JS rejects legacy octal escapes (\1, \01): sloppy JS reads "\101" as "A".
+				if ((esc >= 0x31 && esc <= 0x39) || (esc === 0x30 && /[0-9]/.test(buf[ctx.pos + 1] ?? ''))) fail(ctx, 'Octal escapes are not allowed')
 				segments.push(SIMPLE_ESCAPES[esc] ?? buf[ctx.pos]!)
 		}
 		ctx.pos++
@@ -417,6 +423,8 @@ function parseNumber(ctx: Ctx): number | bigint {
 	}
 	INT_BIGINT_RE.lastIndex = ctx.pos
 	const intBig = INT_BIGINT_RE.exec(ctx.buf)
+	// Strict JS rejects 017 and 08; sloppy JS reads 017 as octal 15.
+	if (/^[+-]?0[0-9_]/.test(ctx.buf.slice(ctx.pos, ctx.pos + 3))) fail(ctx, 'Leading zeros are not allowed')
 	if (intBig) {
 		ctx.pos = INT_BIGINT_RE.lastIndex
 		return BigInt(intBig[0].slice(0, -1).replace(/_/g, ''))

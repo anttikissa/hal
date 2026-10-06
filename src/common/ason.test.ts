@@ -157,6 +157,11 @@ describe('parse', () => {
 		test('0b, 0o, \\u{...} and Unicode whitespace', () =>
 			expect(parse('\u3000[0b101, 0o17, 0b1n, "\\u{1F600}",\u2000]')).toEqual([5, 15, 1n, '😀']))
 
+		test('legacy octal is an error, as in strict JS', () => {
+			for (const bad of ['017', '08', '"\\101"', '"\\01"']) expect(() => parse(bad)).toThrow()
+			expect(parse('"a\\0b"')).toBe('a\0b')
+		})
+
 		test('templates read CRLF as LF, like JS', () => expect(parse('`a\r\nb`')).toBe('a\nb'))
 	})
 
