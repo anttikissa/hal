@@ -1,0 +1,6 @@
+{
+	title: 'Discard one queued message',
+	spec: "The user can drop a single queued message without touching the others. Web: each queued card has an × button (aria-label 'Discard queued message', 44px target). Terminal: /queue drop <n> drops the nth message in /queue's list. Both use the existing durable inbox withdrawal, so history keeps the message, every client removes its card, and reload and restart agree. A message already delivered, or held by a queue edit in progress (jsg), is refused with a visible reason. The terminal and web parity was agreed with the user (2026-10-06).",
+	status: 'planned',
+	needs: ['jq', '16', 'jsg']
+}
