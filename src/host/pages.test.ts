@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { appendFileSync, existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
+import { ason } from '../common/ason.ts'
 import { lines } from '../common/lines.ts'
 import { forms } from '../common/forms.ts'
 import { inbox } from '../common/inbox.ts'
@@ -9,6 +10,7 @@ import { states } from '../common/states.ts'
 import { history } from './history.ts'
 import { host } from './host.ts'
 import { liveFiles } from './live-file.ts'
+import { marksWorker } from './marks-worker.ts'
 import { paths } from './paths.ts'
 import { pages } from './pages.ts'
 import { sessions } from './sessions.ts'
@@ -150,4 +152,21 @@ test('a history cut short (a partial last record repaired away) rebuilds the mar
 	writeFileSync(history.file(id), records.map((r) => lines.encode(r)).join(''))
 	expect(statSync(history.file(id)).size).toBe(size)
 	expect(states.fromHistory(pages.essentials(id))).toEqual({ type: 'idle' })
+})
+
+test('big marks from before the changed-file count convert off the thread, keeping their place', async () => {
+	let id = newSession()
+	turn(id, 0)
+	let size = pages.marks(id).size
+	pages.reset()
+	let file = `${paths.sessionDir(id)}/marks.ason`
+	let old = ason.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+	old.changedPaths = Object.fromEntries(Array.from({ length: 5000 }, (_, i) => [`/some/long/path/to/file-${i}.ts`, true]))
+	writeFileSync(file, ason.stringify(old) + '\n')
+	expect(statSync(file).size).toBeGreaterThan(marksWorker.bigMarks)
+	await marksWorker.upgrade([id])
+	let now = ason.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+	expect(now.changedPaths).toBeUndefined()
+	expect(now.files).toBe(5000)
+	expect(pages.marks(id)).toMatchObject({ size, files: 5000 })
 })

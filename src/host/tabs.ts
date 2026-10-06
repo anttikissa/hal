@@ -15,6 +15,7 @@ import { history } from './history.ts'
 import { greetings } from './greetings.ts'
 import { jobs } from './jobs.ts'
 import { liveFiles } from './live-file.ts'
+import { marksWorker } from './marks-worker.ts'
 import { models } from './models.ts'
 import { notify } from './notify.ts'
 import { pages } from './pages.ts'
@@ -89,7 +90,7 @@ function indexed(): Promise<void> | undefined {
 	try {
 		open = tabs.file().open
 	} catch {}
-	let done = pages.slices(
+	let steps = (): void | Promise<void> => pages.slices(
 		(function* () {
 			let n = 0
 			for (let id of open) {
@@ -102,6 +103,9 @@ function indexed(): Promise<void> | undefined {
 			}
 		})(),
 	)
+	// Old marks convert in a worker first (task 7j).
+	let upgraded = marksWorker.upgrade(open)
+	let done = upgraded ? upgraded.then(steps) : steps()
 	return done instanceof Promise ? done : undefined
 }
 
