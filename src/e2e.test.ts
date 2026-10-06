@@ -55,7 +55,7 @@ const toolAnswer = (result: any) => [
 
 // A prompt's own text, without the [HH:MM] line and <meta> notes that
 // replay puts in front of it.
-const bare = (text: string) => text.replace(/^\[[\d -]+:\d\d\]\n(<meta>[^]*?<\/meta>\n)*/, '').replace(/\n<meta>Current session name: [^]*?<\/meta>$/, '')
+const bare = (text: string) => text.replace(/^\[[\d -]+:\d\d[^\]\n]*\]\n(<meta>[^]*?<\/meta>\n)*/, '').replace(/\n<meta>Current session name: [^]*?<\/meta>$/, '')
 
 // Answers "<prompt>" with "ECHO(<prompt>)". A prompt starting with
 // "hold" streams PART1, then waits for release() to send PART2 and

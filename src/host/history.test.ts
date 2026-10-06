@@ -138,9 +138,9 @@ test('a prompt after a failed turn is its own message, told of the failure', asy
 	history.submit(id, 'k')
 	await drain(history.turn(id))
 	expect(sent[1]).toEqual([
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d\]\nSay just the word pong$/) }] },
+		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d[^\]\n]*\]\nSay just the word pong$/) }] },
 		{ role: 'user', blocks: [{ type: 'text', text: expect.stringContaining('The turn failed with an error: HTTP 400 from fake') }] },
-		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d\]\nk$/) }] },
+		{ role: 'user', blocks: [{ type: 'text', text: expect.stringMatching(/^\[[\d -]+:\d\d[^\]\n]*\]\nk$/) }] },
 	])
 })
 

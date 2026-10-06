@@ -29,7 +29,7 @@ test('self-issued clear records results for later undispatched calls, ends old t
 	expect(prompt).toMatchObject({ text: tail, origin: 'model', generatingCommand: 'clear' })
 	expect(titles.author(prompt)).toBe('Hal (/clear continuation)')
 	expect(amend.begin(c.views.get(id), '')).toBeUndefined()
-	expect(JSON.stringify(calls[1]!.input.messages)).toContain('Hal (/clear continuation)')
+	expect(JSON.stringify(calls[1]!.input.messages)).toContain('; Hal; /clear continuation]')
 	expect(JSON.stringify(calls[1]!.input.messages)).not.toContain('old prompt')
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length === 2)
@@ -114,7 +114,7 @@ test('cross-session clear inherits host sender through execution and fresh promp
 	await until(() => calls.length === 1)
 	let prompt = c.views.get(id)!.items.find((i) => i.type === 'prompt')!
 	expect(titles.author(prompt)).toBe('Message from tab 2 · Other session (/clear continuation)')
-	expect(JSON.stringify(calls[0]!.input.messages)).toContain('Message from tab 2 · Other session (/clear continuation)')
+	expect(JSON.stringify(calls[0]!.input.messages)).toContain('; message from tab 2 (Other session); /clear continuation]')
 	expect(titles.author({ type: 'command', text: '/clear', from: '02-abc' })).toBe('Command from 02-abc')
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length === 1)

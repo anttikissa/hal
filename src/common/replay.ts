@@ -3,6 +3,7 @@
 // these records alone, never from display state.
 
 import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
+import { bashResult } from './bash-result.ts'
 import { rebase } from './rebase.ts'
 import { titles } from './titles.ts'
 import { modelNotices, type Notice } from './model-notices.ts'
@@ -138,6 +139,27 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	}
 	let prev: HistoryRecord | undefined
 	let stamped: string | undefined
+	// Headers (task c2t): '[12:34 #t125; 8.1s]'. Each depends only on
+	// records at or before it, so earlier provider input never changes.
+	let calls = new Map<string, HistoryRecord>()
+	let wrote: string[] = []
+	let header = (ts: string, id: string, tags: (string | undefined)[] = []) => {
+		let list = [...tags.filter((t): t is string => !!t), ...(wrote.length ? [`you wrote ${wrote.join(' ')}`] : [])]
+		wrote = []
+		let head = `[${replay.clock(ts, stamped)}${id ? ` ${id}` : ''}${list.map((t) => `; ${t}`).join('')}]`
+		stamped = ts
+		return head
+	}
+	// Records built by hand (tests) have no number, so no id. No " in
+	// <origin>" suffix: a fork replays byte-identical to its parent, so
+	// the prompt cache still hits.
+	let ref = (r: HistoryRecord, letter: string, i = 0) => r.n === undefined ? '' : `#${letter}${r.n}${i ? `.${i}` : ''}`
+	let result = (b: ToolResultBlock): ToolResultBlock => {
+		let call = calls.get(b.id)
+		if (call?.n === undefined) return b
+		let time = b.ms !== undefined && b.ms >= 5000 ? bashResult.duration(b.ms) : undefined
+		return { ...b, output: `${header(call.ts, ref(call, 't'), [time])}\n${b.output}` }
+	}
 	// The approval question the pending calls wait on, while unanswered:
 	// none of them has run, and a continue runs them (host/approval.ts).
 	let waiting: string | undefined
@@ -155,7 +177,7 @@ function toMessages(records: HistoryRecord[]): Message[] {
 			status = r.status
 		} else if (r.type === 'continue') {
 			let why = before?.type === 'turn_end' ? before.status : 'interrupted'
-			let missing = pending.map((id): ToolResultBlock => ({ type: 'tool_result', id, output: replay.missingResult(why), isError: true }))
+			let missing = pending.map((id): ToolResultBlock => result({ type: 'tool_result', id, output: replay.missingResult(why), isError: true }))
 			pending = []
 			waiting = undefined
 			push({ role: 'user', blocks: missing })
@@ -163,7 +185,8 @@ function toMessages(records: HistoryRecord[]): Message[] {
 		} else if (r.type === 'assistant') {
 			let b = r.block
 			if (b.type === 'thinking' && !b.signature) continue
-			if (b.type === 'tool_call') pending.push(b.id)
+			if (b.type === 'tool_call') { pending.push(b.id); calls.set(b.id, r) }
+			else if (r.n !== undefined) wrote.push(ref(r, b.type === 'thinking' ? 'r' : 'a'))
 			push({ role: 'assistant', blocks: [b.type === 'text' ? { type: 'text', text: b.text } : { ...b }] })
 		} else {
 			if (!r.blocks.length && r.notices) { facts.push(...r.notices); if (!pending.length) flush(); continue }
@@ -174,19 +197,18 @@ function toMessages(records: HistoryRecord[]): Message[] {
 				.map((id): ToolResultBlock => ({ type: 'tool_result', id, output: replay.missingResult(status), isError: true }))
 			pending = []
 			waiting = undefined
-			push({ role: 'user', blocks: [...results, ...missing] })
+			push({ role: 'user', blocks: [...results, ...missing].map(result) })
 			facts.push(...r.notices ?? [])
 			flush()
 			let texts = r.blocks.filter((b): b is UserText => b.type === 'text')
 			if (!texts.length) continue
-			let head = `[${replay.clock(r.ts, stamped)}]`
-			stamped = r.ts
 			// Never merged: a prompt always starts a message of its own. Its
-			// texts (several when it delivers the inbox) are one block.
-			// Its images (task 2a) follow the text.
+			// texts (several when it delivers the inbox) are one block, each
+			// under its own header. Its images (task 2a) follow the text.
 			let images = r.blocks.filter((b) => b.type === 'image')
 			let nudge = r.naming ? `\n<meta>Current session name: ${JSON.stringify(r.naming.name)}.${r.naming.eligible ? ' If this is a placeholder or no longer describes the main task, use the command tool to run /rename with a specific 3–7-word human-readable description, at most 60 Unicode characters, in the user language. Do not copy the user request or rename merely to polish wording. Never emit XML rename tags. Do not answer this metadata.' : ''}</meta>` : ''
-			out.push({ role: 'user', blocks: [{ type: 'text', text: `${head}\n${texts.map((b) => replay.framed(b)).join('\n\n')}${nudge}` }, ...images.map((b) => ({ ...b }))] })
+			let text = texts.map((b) => `${header(r.ts, ref(r, replay.letter(b), r.blocks.indexOf(b)), replay.tags(b))}\n${replay.framed(b)}`).join('\n\n')
+			out.push({ role: 'user', blocks: [{ type: 'text', text: `${text}${nudge}` }, ...images.map((b) => ({ ...b }))] })
 		}
 	}
 	if (!pending.length) flush()
@@ -196,16 +218,27 @@ function toMessages(records: HistoryRecord[]): Message[] {
 	return out
 }
 
-// A prompt text as the model reads it: another session's message under
-// a sender line (tab, id and name), a next-round message also
-// saying it needn't drop its work for it.
+// A prompt text as the model reads it, below its header: a next-round
+// message also says it needn't drop its work for it.
 function framed(b: UserText): string {
 	let text = b.queuedAt === undefined ? b.text : `<meta>Message was queued at ${b.queuedAt}, take that into account when reading it.</meta>\n${b.text}`
-	if (b.generatingCommand) return `[${titles.author({ ...b, type: 'prompt' })}]\n${text}`
-	if (b.origin === 'model') return `[Hal]\n${text}`
-	if (b.from === undefined) return text
-	let head = `[Message from ${b.label ?? b.from}]`
-	return b.advisory ? `${head}\n${replay.nextRoundNotice}\n${text}` : `${head}\n${text}`
+	return b.advisory ? `${replay.nextRoundNotice}\n${text}` : text
+}
+
+// A prompt text's kind letter, as the transcript shows it (task 9p).
+function letter(b: UserText): string {
+	return b.from === undefined ? (b.origin === 'model' ? 's' : 'u') : b.label?.startsWith('bash ') ? 's' : 'm'
+}
+
+// The transcript header's tags for a prompt text (task c2t); none for a plain prompt.
+function tags(b: UserText): string[] {
+	return [
+		b.from !== undefined ? `message from ${titles.address(b.label ?? b.from)}` : b.origin === 'model' ? 'Hal' : undefined,
+		b.generatingCommand && `/${b.generatingCommand} continuation`,
+		b.steering && 'steering',
+		b.queuedAt !== undefined && `queued at ${replay.clock(b.queuedAt).slice(-5)}`,
+		b.advisory && 'next round',
+	].filter((t): t is string => !!t)
 }
 
 // Whether the record is a prompt: a user record with text.
@@ -278,6 +311,8 @@ export const replay = {
 	nextRoundNotice: '<meta>Another session sent this while you were working. No need to stop your task for it.</meta>',
 	toMessages,
 	framed,
+	letter,
+	tags,
 	isPrompt,
 	lastPrompt,
 	current,

@@ -172,7 +172,7 @@ test('waiting inbox messages are not sent; once delivered they are one prompt, o
 	let after = replay.toMessages([...waiting, { type: 'user', blocks: [{ type: 'text', text: 'one' }, { type: 'text', text: 'three' }], inbox: ['a'], ts }])
 	expect(after.slice(0, before.length)).toEqual(before)
 	// One text block: providers join blocks with no separator.
-	expect(after.at(-1)!.blocks).toEqual([{ type: 'text', text: `[${hhmm(ts)}]\none\n\nthree` }])
+	expect(after.at(-1)!.blocks).toEqual([{ type: 'text', text: `[${hhmm(ts)}]\none\n\n[${hhmm(ts)}]\nthree` }])
 })
 
 test('an edited prompt supersedes the prompt it replaces and that turn, as if written that way', () => {
@@ -227,6 +227,34 @@ test('queued texts retain exact receipt timestamps independently of delivery and
 		],
 	}])
 	expect(prompts(msgs)).toEqual([
-		`[${day(deliveredAt)} ${hhmm(deliveredAt)}]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nThat was the situation then.\n\nA fresh message.\n\n[Message from reviewer]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nA queued agent message.`,
+		`[${day(deliveredAt)} ${hhmm(deliveredAt)}; queued at ${hhmm(queuedAt)}]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nThat was the situation then.\n\n[${hhmm(deliveredAt)}]\nA fresh message.\n\n[${hhmm(deliveredAt)}; message from reviewer; queued at ${hhmm(queuedAt)}]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nA queued agent message.`,
 	])
+})
+
+// Task c2t: headers give the model the block ids, times and delivery
+// facts the transcript shows. A format contract: exact text.
+test('replay headers carry block ids, steering, durations and what the model wrote', () => {
+	let at = (h: number, m: number, s = 0) => new Date(2026, 0, 1, h, m, s).toISOString()
+	let history: HistoryRecord[] = [
+		{ type: 'user', blocks: [{ type: 'text', text: 'go' }], ts: at(12, 33), n: 1 },
+		{ type: 'assistant', block: { type: 'thinking', text: 'hmm', signature: 's', provider: 'anthropic' }, ts: at(12, 33), n: 2 },
+		{ type: 'assistant', block: { type: 'text', text: 'Running it.' }, ts: at(12, 34), n: 3 },
+		{ type: 'assistant', block: { type: 'tool_call', id: 'toolu_1', name: 'bash', input: { command: './test' } }, ts: at(12, 34), n: 4 },
+		{ type: 'user', blocks: [{ type: 'tool_result', id: 'toolu_1', output: 'ok', ms: 8100 }], ts: at(12, 34, 9), n: 5 },
+		{ type: 'user', blocks: [{ type: 'text', text: 'hurry', from: '160-xyz', label: 'tab 3 · 160-xyz · Builder', steering: true }], ts: at(12, 40), n: 6 },
+		{ type: 'assistant', block: { type: 'text', text: 'Done.' }, ts: at(12, 41), n: 7, originSession: '160-abc' },
+		{ type: 'turn_end', status: 'completed', usage: {}, ts: at(12, 41), n: 8 },
+		{ type: 'user', blocks: [{ type: 'text', text: 'thanks' }], ts: at(12, 42), n: 9 },
+	]
+	let msgs = replay.toMessages(history)
+	expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'user', 'assistant', 'user'])
+	expect(msgs[0]!.blocks).toEqual([{ type: 'text', text: '[2026-01-01 12:33 #u1]\ngo' }])
+	// Assistant blocks reach the provider exactly as produced.
+	expect(msgs[1]!.blocks).toEqual([{ type: 'thinking', text: 'hmm', signature: 's', provider: 'anthropic' }, { type: 'text', text: 'Running it.' }, { type: 'tool_call', id: 'toolu_1', name: 'bash', input: { command: './test' } }])
+	expect(msgs[2]!.blocks).toEqual([{ type: 'tool_result', id: 'toolu_1', output: '[12:34 #t4; 8.1s; you wrote #r2 #a3]\nok', ms: 8100 }])
+	expect(msgs[3]!.blocks).toEqual([{ type: 'text', text: '[12:40 #m6; message from tab 3 (160-xyz), Builder; steering]\nhurry' }])
+	expect(msgs[5]!.blocks).toEqual([{ type: 'text', text: '[12:42 #u9; you wrote #a7]\nthanks' }])
+	// Appending never changes earlier provider input.
+	let more = replay.toMessages([...history, { type: 'assistant', block: { type: 'text', text: 'Welcome.' }, ts: at(12, 43), n: 10 }, { type: 'user', blocks: [{ type: 'text', text: 'bye' }], ts: at(12, 44), n: 11 }])
+	expect(JSON.stringify(more.slice(0, msgs.length))).toBe(JSON.stringify(msgs))
 })
