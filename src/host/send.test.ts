@@ -98,7 +98,7 @@ test('steer is read like the user steering; queue waits for the turn to end', as
 	// Only after the interrupted turn completes: the queued own turn.
 	let queued = () => calls.findIndex((call, i) => i > steered && call.input.sessionId === a)
 	await until(() => queued() >= 0)
-	expect(lastText(queued())).toContain(`[Message from ${by}]\n<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nlater`)
+	expect(lastText(queued())).toContain(`[Message from ${by}]\n<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nlater`)
 })
 
 test('sending to itself or to no session is an error result and delivers nothing', async () => {

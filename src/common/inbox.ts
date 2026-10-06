@@ -15,7 +15,8 @@ import { titles } from './titles.ts'
 // n: the history line of the inbox record that first sent it.
 export type InboxItem = { id: string; text: string; queue?: true; ts?: string; n?: number } & Sender
 
-// Messages sent and not yet delivered, oldest first, as last edited.
+// Messages sent and not yet delivered, as last edited, in delivery
+// order: those read at the next round, then queued ones; each oldest first.
 function pending(records: HistoryRecord[]): InboxItem[] {
 	let waiting = new Map<string, InboxItem>()
 	for (let r of records) {
@@ -32,7 +33,8 @@ function pending(records: HistoryRecord[]): InboxItem[] {
 		}
 		else if (r.type === 'user') for (let id of r.inbox ?? []) waiting.delete(id)
 	}
-	return [...waiting.values()]
+	let all = [...waiting.values()]
+	return [...all.filter((m) => !m.queue), ...all.filter((m) => m.queue)]
 }
 
 // The sender fields of a record or item, and nothing else.

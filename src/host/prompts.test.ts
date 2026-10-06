@@ -99,8 +99,8 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	let queuedAt = a.views.get(id)!.inbox.find((m) => m.queue)!.ts!
 	a.conn.send({ type: 'submit', sessionId: id, text: 'now' })
 	expect(a.views.get(id)!.inbox).toEqual([
-		{ id: expect.any(String), text: 'later', queue: true, ts: expect.any(String), n: expect.any(Number) },
 		{ id: expect.any(String), text: 'now', ts: expect.any(String), n: expect.any(Number) },
+		{ id: expect.any(String), text: 'later', queue: true, ts: expect.any(String), n: expect.any(Number) },
 	])
 	calls[0]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
@@ -109,7 +109,7 @@ test('a queued message waits for the turn to end, then runs as the next turn', a
 	calls[1]!.push({ type: 'text', text: 'first done' }, { type: 'done', reason: 'end' })
 	await until(() => calls.length === 3)
 	expect(a.of('turn-end')).toHaveLength(1)
-	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nlater`)])
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nlater`)])
 	expect(inboxOf(a, id)).toEqual([])
 	let delivered = a.views.get(id)!.items.find((i) => i.type === 'prompt' && i.text === 'later')!
 	expect(delivered).toMatchObject({ queued: true, queuedAt })
@@ -157,7 +157,7 @@ test('the inbox survives a pause and a restart, and runs when the user continues
 	expect(inboxOf(b, id)).toEqual(['queued'])
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 3)
-	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nqueued`)])
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nqueued`)])
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => b.of('turn-end').length === 2)
 	expect(await fresh(id)).toEqual(b.views.get(id)!)
@@ -182,7 +182,7 @@ test('a queued message left behind by a host dying after a turn end runs on the 
 	restartHost()
 	await turns.recover()
 	await until(() => calls.length === 2)
-	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\nlater`)])
+	expect(texts(calls[1]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\nlater`)])
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	let b = client()
 	b.conn.send({ type: 'open', sessionId: id })
@@ -358,7 +358,7 @@ test('an edited queued message runs as edited, in its place, and never as first 
 	await until(() => calls.length === 2)
 	calls[1]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 3)
-	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Sent at ${queuedAt}; delivery after this turn.</meta>\ntest it`)])
+	expect(texts(calls[2]!.input.messages.at(-1))).toEqual([expect.stringContaining(`<meta>Message was queued at ${queuedAt}, take that into account when reading it.</meta>\ntest it`)])
 	calls[2]!.push({ type: 'done', reason: 'end' })
 	await until(() => calls.length === 4)
 	calls[3]!.push({ type: 'done', reason: 'end' })
