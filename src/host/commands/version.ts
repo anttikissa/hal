@@ -9,6 +9,6 @@ export const command: SlashCommand = {
 	run: async () => {
 		let st = version.state
 		if (!st.loaded) return { say: 'version: still looking it up' }
-		return { say: `${await release.line(st.head, st.loaded.includes('+'))} (${st.loaded})${st.newCode ? '; a newer commit is checked out (ctrl-r loads it)' : ''}` }
+		return { say: `${await release.line(st.head, st.loaded.includes('+'))} (${st.loaded})${st.newCode ? '; a newer commit is checked out (/restart loads it)' : ''}` }
 	},
 }
