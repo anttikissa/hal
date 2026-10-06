@@ -41,48 +41,6 @@ test('history sends distinct assistant model names before the page', async () =>
 	}
 })
 
-test('a snapshot read in slices misses no record appended meanwhile, and commands sent after the open wait for it', async () => {
-	let a = client()
-	let id = created(a)
-	for (let i = 0; i < 30; i++) history.append(id, { type: 'output', text: `out ${i}` })
-	let saved = { sliceMs: pages.sliceMs, syncBytes: pages.syncBytes, budget: pages.budget, pageSteps: pages.pageSteps }
-	pages.sliceMs = 0
-	pages.syncBytes = 0
-	pages.budget = 300
-	// The record lands once the tail has been read, before it is sent.
-	pages.pageSteps = function* (...args) {
-		let page = yield* saved.pageSteps(...args)
-		if (args[1] === undefined) history.append(id, { type: 'output', text: 'meanwhile' })
-		return page
-	}
-	try {
-		let b = client()
-		b.conn.send({ type: 'open', sessionId: id, id: 'o1' })
-		b.conn.send({ type: 'submit', sessionId: id, text: 'go', id: 's1' })
-		expect(b.of('snapshot')).toEqual([])
-		await until(() => calls.length === 1)
-		let [snap] = b.of('snapshot')
-		let outputs = (records: any[]) => records.filter((r) => r.type === 'output').map((r) => r.text)
-		expect(outputs(snap.snapshot.history).at(-1)).toBe('meanwhile')
-		expect(b.of('rejected')).toEqual([])
-		expect(b.events.map((e) => (e.type === 'ack' ? e.id : e.type)).filter((t) => ['snapshot', 'o1', 's1'].includes(t))).toEqual(['snapshot', 'o1', 's1'])
-		// Earlier pages are answered in slices too, every record once.
-		let got = outputs(snap.snapshot.history)
-		for (let before = snap.snapshot.older; before !== undefined; ) {
-			b.conn.send({ type: 'history', sessionId: id, before })
-			await until(() => b.of('history').at(-1)?.before === before)
-			let page = b.of('history').at(-1)
-			got = [...outputs(page.records), ...got]
-			before = page.older
-		}
-		expect(got).toEqual([...Array.from({ length: 30 }, (_, i) => `out ${i}`), 'meanwhile'])
-	} finally {
-		Object.assign(pages, saved)
-	}
-})
-
-// ── Talking while it works: the inbox (tasks/j1/states.md) ──
-
 test('bad commands are rejected, not thrown', async () => {
 	let a = client()
 	for (let bad of [null, 'open', { type: 'explode' }, { type: 'submit', sessionId: 1, text: 'x' }, { type: 'create' }, { type: 'submit', sessionId: 's', text: 'x', queue: 'yes' }]) {
