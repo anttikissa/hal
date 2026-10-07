@@ -82,8 +82,12 @@ async function waitFor(id: string, error: ErrorEvent, failures: number, signal: 
 		let provider = turns.state.running.get(id)?.provider ?? model.split('/')[0]!
 		let until = new Date(at).toISOString()
 		let text = `Rate limit: ${provider}, ${model}, until ${until}\n${error.message}`
-		let r = history.append(id, { type: 'rate_limit', provider, model, until, text })
-		host.broadcast(id, { type: 'output', sessionId: id, text, ts: r.ts, n: r.n })
+		// One record per run of waits: the status line shows each new deadline.
+		let last = history.readSync(id).at(-1)
+		if (last?.type !== 'rate_limit' || last.provider !== provider || last.model !== model) {
+			let r = history.append(id, { type: 'rate_limit', provider, model, until, text })
+			host.broadcast(id, { type: 'output', sessionId: id, text, ts: r.ts, n: r.n })
+		}
 	}
 	status.transition(id, { type: 'retry', at: new Date(at).toISOString(), reason: error.message })
 	if (error.failure !== 'limited' || at <= clock.now()) return clock.until(at, signal)
