@@ -221,18 +221,22 @@ it only when building the page with Bun, not on the host startup path.
 
 ## Look: retro sci-fi terminal (user's standing preference)
 
-Bold, colorful, contrasty: think 2001: A Space Odyssey, Alien, Blade
-Runner, Tron (the early-1980s film), CRT VT100 terminals glowing in the dark. Saturated phosphor
-hues on near-black, lit solid edges (a card's left bar is an LED,
-not a hairline; no glow or blur: the user doesn't want it), square corners everywhere (cards, buttons, tabs,
-fields, dialogs; no border-radius). Never meek, pastel, washed-out or
-corporate-neutral (the user's words: "be-afraid-say-nothing"). No
-slate: no blue-gray surfaces or buttons in any theme, the default
-included. Color
-changes are proposed to the user with options before they land; he
-decides. Spacing follows the terminal grid (quarter lines vertically,
-whole ch across), and small text is fine where space is scarce; task gn
-holds the rest of what the user chose (selection, focus, tabs). Readable text below still holds.
+Bold, colorful and contrasty, in the spirit of 2001: A Space Odyssey,
+Alien, Blade Runner, Tron and CRT VT100 terminals glowing in the dark:
+
+- Saturated phosphor hues on near-black. Never meek, pastel,
+  washed-out or corporate-neutral; no slate (blue-gray) surfaces or
+  buttons in any theme.
+- Lit solid edges: a card's left bar is an LED, not a hairline. The
+  light comes from color alone, with no glow or blur effects.
+- Square corners on cards, buttons, tabs, fields and dialogs.
+- Spacing follows the terminal grid: quarter lines vertically, whole
+  ch across. Small text is fine where space is scarce.
+- Propose color changes to the user with options before they land;
+  he decides.
+
+Task gn holds the rest of the user's choices (selection, focus, tabs).
+Readable text (below) still applies.
 
 ## Emergency keys (invariants)
 
