@@ -21,7 +21,6 @@ import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, un
 import { bashResult } from '../../common/bash-result.ts'
 import { markdown as parser } from '../../common/markdown.ts'
 import { titles } from '../../common/titles.ts'
-import { rebaseCards } from '../../common/rebase-cards.ts'
 import { toolDetails } from '../../common/tool-details.ts'
 import { transcript } from '../../common/transcript.ts'
 import { external, Markdown } from './Markdown.tsx'
@@ -74,7 +73,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	onSettled(() => root && enter(root))
 	let open = () => opened().has(id())
 	// The setters may run in an effect: they read the state as of the call.
-	let setOpen = (on: boolean) => untrack(() => folds.set(id(), props.row.item, on, [props.row.key, ...rebaseCards.members(props.row.item).map((m) => m.key), ...(props.row.result ? [props.row.result.key] : [])], closable()))
+	let setOpen = (on: boolean) => untrack(() => folds.set(id(), props.row.item, on, [props.row.key, ...(props.row.result ? [props.row.result.key] : [])], closable()))
 	// Assistant text and the user's prompts start open; /toggle closes
 	// them (task r4d), and a closed one folds like thinking.
 	let closable = () => props.row.note === undefined && folds.closable(props.row.item)
@@ -90,7 +89,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return () => clearTimeout(t)
 	})
 	let fullCommand = () => { let item = props.row.item; return item.type === 'tool' && toolDetails.fullCommand(item.name, item.input) }
-	let reports = () => rebaseCards.members(props.row.item)
 	let full = () => fullCommand() || whole().has(id())
 	let setFull = (on: boolean) => untrack(() => setWhole(toggled(whole(), id(), on)))
 	createEffect(
@@ -119,7 +117,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	)
 	// Another session's message with a summary folds under it.
 	// Prompt-file changes fold under their summary (task ar).
-	let folding = () => shut() || props.row.item.type === 'thinking' || props.row.item.type === 'tool' || (props.row.item.type === 'prompt' && !!props.row.item.summary) || (props.row.item.type === 'output' && (!!props.row.item.change || !!props.row.item.rebaseReports))
+	let folding = () => shut() || props.row.item.type === 'thinking' || props.row.item.type === 'tool' || (props.row.item.type === 'prompt' && !!props.row.item.summary) || (props.row.item.type === 'output' && !!props.row.item.change)
 	// A tool's first line (its description or call) heads the card;
 	// thinking is headed by the terminal's header words and its first
 	// line. Prompts and model text show those words above their text
@@ -214,7 +212,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	}
 	let time = () => titles.time((props.row.item as { ts?: string }).ts)
 	// A history rewrite's divider (task z71) offers its undo.
-	let undo = () => rebaseCards.undo(props.row.item) || (props.row.item.type === 'divider' && props.row.item.text.startsWith('History rewritten · /rebase undo ·'))
+	let undo = () => (props.row.item.type === 'divider' && props.row.item.text.startsWith('History rewritten · /rebase undo ·'))
 	let undoButton = () => <Show when={undo()}><button type="button" class="undo" title="Restore the history before this rewrite (/rebase undo)" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: '/rebase undo' })}><Icon name="undo" />Undo</button></Show>
 	let edit = () => {
 		if (!editPrompt.edit(props.row.waiting ? props.row.key : props.row.item.key)) return
@@ -277,7 +275,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	return (
 		<Show when={shown()}>
 			{(s) => (
-				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), reports().length ? 'rebase' : '', props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
+				<article ref={(e) => (root = e)} class={['Card', ...s().kind.split(' '), props.row.pending ? 'pending' : '', props.row.note !== undefined ? 'queued' : '', folding() ? 'folds' : '', expanded() && !closable() ? 'open' : '', props.target ? 'target' : '']} onClick={toggle}>
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange() ? change() : (
 						<Show when={folding()} fallback={plain(s)}>
@@ -293,7 +291,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 								<div class="contents">
 									<div class="content">
 										<Show when={props.row.item.type === 'prompt'}><div class="sender">{who()}</div></Show>
-										{reports().length ? <For each={expanded() ? reports() : []}>{(report) => <div class="report">{rebaseCards.detail(report)}</div>}</For> : md() ? markdown() : body()}
+										{md() ? markdown() : body()}
 										<Show when={props.cursor && !md()}>{cursor()}</Show>
 										<Show when={long()}><button type="button" class="more" onClick={more}><Icon name={full() ? 'less' : 'more'} />{full() ? 'show less' : 'show all'}</button></Show>
 									</div>

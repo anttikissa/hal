@@ -8,7 +8,6 @@ import { forms } from './forms.ts'
 import { modals, type ModalState } from './modals.ts'
 import { titles } from './titles.ts'
 import { toggle, type Fold } from './toggle.ts'
-import { rebaseCards } from './rebase-cards.ts'
 import type { Item } from './transcript.ts'
 
 // The help area: key and description pairs, row by row in two columns,
@@ -37,7 +36,6 @@ function update(m: ModalState, items: Item[], fold: (item: Item) => Fold): Modal
 // Tab: the item under the cursor gets the common prefix of the block
 // ids it matches; several are listed, newest first. Never cycles.
 function complete(m: ModalState, items: Item[], fold: (item: Item) => Fold, cursor = m.form!.cursor): ModalState {
-	items = rebaseCards.group(items)
 	let text = m.form!.values[0]!
 	let before = text.slice(0, cursor)
 	let token = /#?[a-z]*\d*$/i.exec(before)![0]

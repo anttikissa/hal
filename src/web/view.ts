@@ -24,7 +24,6 @@ import { titles } from '../common/titles.ts'
 import { summary } from '../common/summary.ts'
 import { toolDetails } from '../common/tool-details.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
-import { rebaseCards } from '../common/rebase-cards.ts'
 
 // `form`: the open question as filled in on this page.
 // `editing`: the last prompt is in the input (src/common/amend.ts).
@@ -244,7 +243,7 @@ export type Row = { item: Item; at: number; key: string; result?: Item & { type:
 function rows(items: Item[], sent: Record<string, string> = {}): Row[] {
 	let out: Row[] = []
 	let calls = new Map<string, Row>()
-	items = rebaseCards.group(promptChanges.group(items))
+	items = promptChanges.group(items)
 	for (let [at, item] of items.entries()) {
 		if (item.type === 'turn-end' && item.status === 'completed') continue
 		// Thinking with no readable text (redacted or empty) is no card,
