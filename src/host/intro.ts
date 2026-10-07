@@ -115,7 +115,7 @@ function languages(): string[] {
 // Name examples: people who talked to a fictional AI, most iconic
 // first. Dave (2001) always comes first and Chell (Portal) last for
 // those who know; the rest get a fresh weighted shuffle each run.
-const NAMES = ['Dave', 'Will Robinson', 'Tony', 'Professor Falken', 'Michael', 'Theodore', 'Ripley', 'Cooper', 'Caleb', 'Lister', 'Chell']
+const NAMES = ['Dave', 'Professor Falken', 'Will Robinson', 'Tony', 'Michael', 'Theodore', 'Ripley', 'Cooper', 'Caleb', 'Lister', 'Chell']
 const names = (): string[] => [NAMES[0]!, ...ranked(NAMES.slice(1, -1)), NAMES.at(-1)!]
 
 type Entry = Record<string, any>
