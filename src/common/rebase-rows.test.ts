@@ -36,7 +36,7 @@ test('calibrated row estimates and plan totals account for edits, paired drops a
 test('todo round-trips keep, deletion drops paired records, and edits target the result rather than the call', () => {
 	let snapshot = rebaseRows.build([prompt(1, 'original'), say(2, 'answer'), call, result])
 	let text = rebaseRows.render('157-gut', snapshot)
-	expect(rebaseRows.parse(text, snapshot)).toEqual({ plan: { base: 5, drop: [], edit: [] }, queue: [], edits: [], aborted: false })
+	expect(rebaseRows.parse(text, snapshot)).toEqual({ plan: { base: 5, drop: [], edit: [] }, queue: [], edits: [], aborted: false, inline: {} })
 	let changed = text.replace(/^keep\s+#1.*\n/m, '').replace(/^keep\s+#3/m, 'edit  #3') + 'queue Next prompt\nqueue Then this\n'
 	let pending = rebaseRows.parse(changed, snapshot)
 	expect(pending.plan.drop).toEqual([1])
@@ -47,6 +47,17 @@ test('todo round-trips keep, deletion drops paired records, and edits target the
 	expect(JSON.stringify(replay.toMessages([prompt(1, 'start'), ...snapshot.records.slice(1), { type: 'rebase', ...parsed.plan, drop: [], n: 6, ts }]))).not.toContain('abcdef123456')
 	let deleted = rebaseRows.parse(text.replace(/^keep\s+#3.*\n/m, ''), snapshot)
 	expect(deleted.plan.drop).toEqual([3, 5])
+})
+
+test('a changed summary edits the first line in place; changed columns or tool rows fail', () => {
+	let snapshot = rebaseRows.build([prompt(1, 'First line\nsecond $&'), say(2, 'answer'), call, result])
+	let text = rebaseRows.render('167-dam', snapshot)
+	let tail = text.replace('First line', () => 'Fixed $& line').replace(/^keep\s+#2[\s\S]*/m, '')
+	expect(rebaseRows.parse(tail, snapshot).plan).toEqual({ base: 5, drop: [2, 3, 5], edit: [{ n: 1, text: 'Fixed $& line\nsecond $&' }] })
+	let opened = rebaseRows.parse(tail.replace(/^keep/m, 'edit'), snapshot)
+	expect([opened.edits, opened.inline]).toEqual([[1], { 1: 'Fixed $& line\nsecond $&' }])
+	expect(() => rebaseRows.parse(text.replace('$ ./test', '$ ./test -v'), snapshot)).toThrow('Rebase line 6: #3 changed')
+	expect(() => rebaseRows.parse(text.replace(/prompt(\s+)/, 'answer$1'), snapshot)).toThrow('Rebase line 4: #1 changed')
 })
 
 test('todo format header reports planned savings and preserves deterministic row layout', () => {

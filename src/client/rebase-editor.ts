@@ -45,7 +45,7 @@ async function open(event: Event & { type: 'rebase-plan' }, send: (command: Comm
 		if (!parsed.aborted) for (let n of parsed.edits) {
 			let row = event.snapshot.rows.find((row) => row.n === n)!
 			let full = join(dir, `record-${n}.txt`)
-			writeFileSync(full, row.text!, { mode: 0o600 })
+			writeFileSync(full, parsed.inline[n] ?? row.text!, { mode: 0o600 })
 			await rebaseEditor.edit(full)
 			replacements[n] = readFileSync(full, 'utf8')
 		}
