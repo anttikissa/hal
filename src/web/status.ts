@@ -56,7 +56,6 @@ function groups(st: ViewState): StatusGroup[] {
 	let t = st.transcript
 	if (!t) return []
 	let { meta, stats } = t
-	let count = (n: number) => n < 1000 ? `${n}` : n < 9950 ? `${(n / 1000).toFixed(1)}k` : n < 999500 ? `${Math.round(n / 1000)}k` : n < 9950000 ? `${(n / 1e6).toFixed(1)}M` : `${Math.round(n / 1e6)}M`
 	let kilo = (n: number) => n < 1000 ? String(n) : `${Math.round(n / 1000)}k`
 	let out: StatusGroup[] = [
 		{ parts: [{ text: meta.id }, ...(meta.name ? [{ text: `: ${meta.name}` }] : [])] },
@@ -67,7 +66,6 @@ function groups(st: ViewState): StatusGroup[] {
 	let pct = status.context(st)
 	if (stats?.window) out.push({ parts: [{ text: `${kilo(stats.context ?? 0)}/${kilo(stats.window)} (` }, pct!, { text: ')' }], href: `/context/${meta.id}` })
 	else if (stats?.context) out.push({ parts: [{ text: kilo(stats.context) }], href: `/context/${meta.id}` })
-	if (stats) out.push({ parts: [{ text: `↑${count(stats.sent)} ↓${count(stats.received)}` }] })
 	if (stats?.plan) {
 		let plan = stats.plan
 		let parts: StatusPart[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}/${plan.accounts}` : ''}` }]
