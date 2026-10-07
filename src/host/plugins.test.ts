@@ -1,7 +1,7 @@
 // Plugins (tasks an, 90v). Every test hooks objects from its own temp module,
 // so nothing leaks into the real module singletons or other test files.
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { plugins } from './plugins.ts'
@@ -206,6 +206,27 @@ test('the directory is watched: a new file hooks, an edit reloads, /plugins name
 	writeFileSync(path, `${head}export default (plugin: any) => plugin.around(t, 'f', () => 'two')\n`)
 	for (let i = 0; i < 100 && t.f(1) !== 'two'; i++) await Bun.sleep(20)
 	expect(t.f(1)).toBe('two')
+})
+
+test('/plugins disable and enable toggle a watched plugin and restore its file exactly', async () => {
+	let d = join(dir, 'p')
+	let realDir = plugins.dir
+	plugins.dir = () => d
+	try {
+		await plugins.init(d)
+		let { command } = await import('./commands/plugins.ts')
+		let path = join(d, 'w.ts')
+		let text = `import { t } from ${JSON.stringify(join(dir, 'target.ts'))}\nexport default function (p: any) {\n\tp.around(t, 'f', () => 'on')\n}\n`
+		writeFileSync(path, text)
+		for (let i = 0; i < 100 && t.f(1) !== 'on'; i++) await Bun.sleep(20)
+		expect(await command.run('disable w', undefined, {} as any)).toEqual({ say: 'w.ts: disabled' })
+		expect(t.f(1)).toBe(2)
+		expect(await command.run('enable w.ts', undefined, {} as any)).toEqual({ say: 'w.ts: loaded' })
+		expect(t.f(1)).toBe('on')
+		expect(readFileSync(path, 'utf8')).toBe(text)
+	} finally {
+		plugins.dir = realDir
+	}
 })
 
 test('disable stops the body, removes what it registered, and is not a failure', async () => {
