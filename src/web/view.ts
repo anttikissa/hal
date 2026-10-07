@@ -190,7 +190,7 @@ function pause(st: ViewState): unknown {
 
 // Prompts Play sends when an idle turn ended with the assistant's text
 // (task yhn): a few words, each asking for action, not another plan.
-const NUDGES = ['Continue.', 'Proceed.', 'Go on.', 'Keep going.', 'Carry on.', 'Go ahead.', 'Finish it.']
+const NUDGES = ['Continue.', 'Proceed.', 'Go on.', 'Keep going.', 'Carry on.', 'Go ahead.', 'Finish it.', 'You can do it.', 'Onward!']
 
 // A nudge if the session is idle and its last output is the assistant's text.
 function nudge(st: ViewState, pick = Math.random()): string | undefined {
