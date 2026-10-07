@@ -1,0 +1,10 @@
+{
+	title: 'Send keys are plain values a keys.ts plugin overrides',
+	spec: "Which delivery (task csn) each Enter chord gives a prompt is a plain value on sendKeys (src/common/send-keys.ts): enter 'interject', ctrl-enter 'interrupt', alt-enter 'queue', cmd-enter 'interject' by default; null leaves a chord unbound. A plugin changes one chord per line with plugin.set(sendKeys, 'enter', 'interrupt') (task d41); plugins/keys.ts in the Hal home is where users put them, and plugins/example-plugin.ts shows how. Shift-Enter stays a newline. The terminal reads its own process's values (a remote terminal uses its own home's plugins); the web page gets the host's values in the page, like settings, and picks up a change on its next load. Every consumer reads sendKeys at call time: the terminal and web prompt keys, the upload resume, the help rows and the key help name the chord bound to each delivery, so the help never names a key that does something else.",
+	status: 'done',
+	notes: [
+		"Cmd-Enter defaults to 'interject' because the web already sent it as plain Enter (keys.ts ignored metaKey); the terminal gains it. The upload resume replays the chord bound to its delivery rather than fixed Alt/Ctrl, so a remap holds. src/host/queue-test.ts keeps its fixed Alt-Enter wording: a scripted test model, not help. Web hints write chords with '+' (ctrl+enter) as before; the terminal and key help with '-'."
+	],
+	needs: ['csn', 'd41'],
+	foldInto: ['csn']
+}

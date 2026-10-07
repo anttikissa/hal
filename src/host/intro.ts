@@ -5,6 +5,7 @@ import { existsSync } from 'fs'
 import { resolve } from 'path'
 import { forms, type Answers, type Form } from '../common/forms.ts'
 import type { HistoryRecord } from '../common/replay.ts'
+import { sendKeys } from '../common/send-keys.ts'
 import { settings } from '../common/settings.ts'
 import { apiKeys } from './api-keys.ts'
 import { auth } from './auth.ts'
@@ -285,7 +286,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 		: 'This tab still runs the intro: /model or Ctrl-M picks any model.'
 	// Not signed in (environment keys aside): the close always says how.
 	if (!loggedIn.stored) now += "\n\nYou're not signed in: /login signs in with your Claude, ChatGPT or OpenCode Go subscription, or adds an API key."
-	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; Alt-Enter queues a message for later.\n- /help lists commands and /keys lists shortcuts; /intro runs this guide again.\n- The web client is at ${settings.webUrl()} — /auth gives the one-time login code.\n\n${now}` })
+	return reply({ say: `${closing} A few tips:\n- Escape pauses a turn; ${sendKeys.name('queue')} queues a message for later.\n- /help lists commands and /keys lists shortcuts; /intro runs this guide again.\n- The web client is at ${settings.webUrl()} — /auth gives the one-time login code.\n\n${now}` })
 }
 
 export const intro = { languages, restart, run, answered, accounts, choices }

@@ -16,6 +16,7 @@
 
 import { states } from '../common/states.ts'
 import { queueEdit } from '../common/queue-edit.ts'
+import { sendKeys } from '../common/send-keys.ts'
 import { queuedPrompt } from './queue-edit.ts'
 import { connection } from '../common/connection.ts'
 import { drafts } from '../common/drafts.ts'
@@ -182,8 +183,10 @@ function key(e: KeyInput, target: Target): boolean {
 	let indents = lead && (!e.shiftKey || /^[ \t]/.test(st.text.slice(start)))
 	if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && (sel.includes('\n') || indents)) return keys.edit({ key: 'tab', shift: e.shiftKey }, target)
 	if (e.key !== 'Enter' || e.shiftKey || (target.coarse && plain)) return false
-	// Enter steers between rounds; Ctrl-Enter interrupts (task csn).
-	app.send(e.altKey ? 'queue' : e.ctrlKey ? 'interrupt' : 'interject')
+	// Each Enter chord sends as sendKeys binds it (tasks csn, 8kx).
+	let delivery = sendKeys.delivery({ ctrl: e.ctrlKey, alt: e.altKey, cmd: e.metaKey })
+	if (!delivery) return false
+	app.send(delivery)
 	return true
 }
 

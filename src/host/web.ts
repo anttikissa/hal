@@ -40,6 +40,7 @@ import type { BunPlugin, Server, ServerWebSocket } from 'bun'
 import { watch, type FSWatcher } from 'fs'
 import { ason } from '../common/ason.ts'
 import { colors, DERIVED, type Style } from '../common/colors.ts'
+import { sendKeys } from '../common/send-keys.ts'
 import { oklch } from '../common/oklch.ts'
 import { session } from '../common/session.ts'
 import { settings } from '../common/settings.ts'
@@ -182,7 +183,7 @@ async function page(): Promise<Response> {
 		diag.log(`${e?.message ?? e}: ${e?.errors?.join('\n') ?? ''}`)
 		return new Response('the web client failed to build; see diag.log\n', { status: 500 })
 	}
-	html = html.replace('/*COLORS*/', () => web.css()).replace('/*SETTINGS*/', () => settings.forPage())
+	html = html.replace('/*COLORS*/', () => web.css()).replace('/*SETTINGS*/', () => settings.forPage()).replace('/*SEND_KEYS*/', () => sendKeys.forPage())
 	// Public signing key only, encoded into JSON safely (never the private key).
 	try { let key = (await push.keys()).publicKey; html = html.replace('/*PUSH_KEY*/', () => JSON.stringify(key)) }
 	catch (e: any) { diag.log(`push: ${e?.message ?? e}`); html = html.replace('/*PUSH_KEY*/', 'null') }
