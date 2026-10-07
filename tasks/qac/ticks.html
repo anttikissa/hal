@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en" class="page">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Read receipts for steering and queued messages</title>
+<!-- Tick icons: Phosphor Icons (MIT), Copyright (c) 2023 Phosphor Icons. -->
+<style>
+/*COLORS*/
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+html { background: var(--canvas); color: var(--text); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+main { max-width: 72rem; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+h1 { font-size: 20px; margin: 0 0 8px; }
+h2 { font-size: 16px; margin: 32px 0 8px; padding-top: 16px; border-top: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); }
+h3 { font-size: 14px; margin: 0 0 8px; color: var(--text); font-weight: 600; }
+p { margin: 0 0 8px; max-width: 58ch; }
+.q { color: color-mix(in oklab, currentColor 65%, transparent); }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; margin: 16px 0; }
+.controls fieldset { display: flex; flex-wrap: wrap; gap: 4px 16px; border: 0; margin: 0; padding: 0; align-items: center; }
+.controls legend { float: left; margin-right: 8px; opacity: 0.7; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.controls input { margin: 0; width: 16px; height: 16px; }
+.controls input:focus-visible, .play:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.play { font: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; min-height: 44px; padding: 0 2ch; background: transparent; color: inherit; border: 1px solid currentColor; cursor: pointer; }
+
+.side { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr)); gap: 24px; align-items: start; }
+
+/* Web cards, after src/web/index.html */
+.Transcript > * { margin: 0 0 0.5lh; }
+.Card { position: relative; border-left: 3px solid currentColor; white-space: pre-wrap; overflow-wrap: anywhere; --card-inset: calc((44px - 1lh) / 2); }
+.Card .content { padding: 0.25lh 1ch var(--card-inset); padding-right: 7ch; }
+.Card.assistant { --card-inset: calc((44px - 1lh) / 4); }
+.Card.assistant .CardHeader { min-height: 0; }
+.CardHeader { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: start; column-gap: 1ch; padding-inline: 1ch; min-height: 44px; }
+.CardHeader .flow { padding-block: var(--card-inset); min-width: 0; }
+.Card > .link { position: absolute; top: 0; right: 1ch; padding-block: var(--card-inset); color: var(--quiet); text-decoration: none; white-space: nowrap; display: inline-flex; gap: 1ch; align-items: center; }
+.Card .who { color: var(--quiet); }
+.Card.user { transition: color 300ms ease-out; }
+.Card.pending { color: var(--quiet); }
+
+/* The ticks: Phosphor check / checks, one text line tall. */
+.ticks { display: inline-flex; align-items: center; height: 1lh; vertical-align: top; }
+.ticks svg { width: 1.3em; height: 1.3em; display: block; }
+.ticks svg * { fill: none; stroke: currentColor; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; }
+.ticks.none { width: 1.3em; }
+.after-label .ticks { margin-left: 1ch; }
+/* Read color variants */
+.read-quiet .ticks.read { color: var(--quiet); }
+.read-full .ticks.read { color: var(--fg); }
+.ticks.sent { color: var(--quiet); }
+/* Unread cards: dimmed text variant */
+.dim-unread .Card.unread .content { opacity: 0.6; }
+@media (prefers-reduced-motion: no-preference) { .ticks svg { transition: opacity 200ms ease-out; } }
+
+/* Terminal mockup: 58 columns, the card's tint on every row. */
+.term { background: var(--canvas); border: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); padding: 8px 0; overflow-x: auto; }
+.term pre { margin: 0; font: inherit; white-space: pre; }
+.term .row { display: block; width: 58ch; padding-left: 1ch; }
+</style>
+</head>
+<body>
+<main>
+<h1>Read receipts</h1>
+<p>Steering and queued messages show whether Hal has read them yet: <b>no tick</b> while this client waits for the host to accept the message, <b>one tick</b> once the host has it in the inbox, <b>two ticks</b> once the model has read it. Normal prompts and interrupting messages are taken at once and show no ticks.</p>
+
+<div class="controls">
+	<button type="button" class="play" id="play">Play the lifecycle</button>
+	<fieldset><legend>Step</legend>
+		<label><input type="radio" name="step" value="0"> Sending</label>
+		<label><input type="radio" name="step" value="1" checked> Delivered ✓</label>
+		<label><input type="radio" name="step" value="2"> Read ✓✓</label>
+	</fieldset>
+</div>
+<div class="controls">
+	<fieldset><legend>Ticks on web</legend>
+		<label><input type="radio" name="place" value="right" checked> Right, before #id</label>
+		<label><input type="radio" name="place" value="label"> After the title</label>
+	</fieldset>
+	<fieldset><legend>Read color</legend>
+		<label><input type="radio" name="color" value="quiet" checked> Quiet (Signal)</label>
+		<label><input type="radio" name="color" value="full"> Card color</label>
+		<label><input type="radio" name="color" value="accent"> Green (like WhatsApp blue)</label>
+	</fieldset>
+	<fieldset><legend>Unread text</legend>
+		<label><input type="radio" name="dim" value="no" checked> Normal</label>
+		<label><input type="radio" name="dim" value="yes"> Dimmed</label>
+	</fieldset>
+</div>
+
+<h2>Steering: sent while Hal works</h2>
+<div class="side">
+	<div><h3>Web</h3><div class="Transcript" id="web-steer"></div></div>
+	<div><h3>Terminal</h3><div class="term"><pre id="term-steer"></pre></div></div>
+</div>
+
+<h2>Queued: waits for the turn to end</h2>
+<div class="side">
+	<div><h3>Web</h3><div class="Transcript" id="web-queue"></div></div>
+	<div><h3>Terminal</h3><div class="term"><pre id="term-queue"></pre></div></div>
+</div>
+
+<h2>A message from another tab, queued</h2>
+<p>The receiving tab shows the same ticks; it never sees the first stage.</p>
+<div class="side">
+	<div><h3>Web</h3><div class="Transcript" id="web-msg"></div></div>
+	<div><h3>Terminal</h3><div class="term"><pre id="term-msg"></pre></div></div>
+</div>
+
+<h2>No ticks: a normal prompt and an interrupting one</h2>
+<div class="side">
+	<div><h3>Web</h3><div class="Transcript" id="web-plain"></div></div>
+	<div><h3>Terminal</h3><div class="term"><pre id="term-plain"></pre></div></div>
+</div>
+</main>
+
+<script>
+const check = '<svg viewBox="0 0 256 256" aria-hidden="true"><polyline points="40 144 96 200 224 72"/></svg>'
+const checks = '<svg viewBox="0 0 256 256" aria-hidden="true"><polyline points="16 130.29 54.4 168 144 80"/><polyline points="125.96 144 150.4 168 240 80"/></svg>'
+const opt = { step: 1, place: 'right', color: 'quiet', dim: 'no' }
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c])
+
+function tickHtml(step) {
+	if (step === 0) return '<span class="ticks none"></span>'
+	let label = step === 1 ? 'Delivered, not read yet' : 'Read by Hal at 06:05'
+	return `<span class="ticks ${step === 1 ? 'sent' : `read${opt.color === 'accent' ? ' status-cool' : ''}`}" role="img" aria-label="${label}" title="${label}">${step === 1 ? check : checks}</span>`
+}
+function tickText(step) { return step === 0 ? '  ' : step === 1 ? '✓ ' : '✓✓' }
+
+function tag(kind, step) {
+	// Present tense while waiting, past once read.
+	if (kind === 'steer') return step < 2 ? 'interjecting' : 'interjected'
+	return step < 2 ? 'queued' : 'queued at 06:04'
+}
+
+function webCard(cls, who, text, ref, step) {
+	let ticks = step === undefined ? '' : tickHtml(step)
+	let unread = step !== undefined && step < 2 ? ' unread' : ''
+	let pending = step === 0 ? ' pending' : ''
+	let label = `<span class="who">${esc(who)}</span>${opt.place === 'label' ? ticks : ''}`
+	return `<div class="Card ${cls}${unread}${pending}"><header class="CardHeader"><span class="flow"><span class="stamp">06:04</span> ${label}</span></header><div class="content">${esc(text)}</div><a class="link" href="#">${opt.place === 'right' ? ticks : ''}${ref}</a></div>`
+}
+function hal(text) { return `<div class="Card assistant"><header class="CardHeader"><span class="flow"><span class="stamp">06:04</span> <span class="who">Hal (opus 5.5)</span></span></header><div class="content">${esc(text)}</div></div>` }
+
+// Terminal rows: the user card is tinted with a blank row above and below,
+// the #id (and ticks before it) right-aligned on the header row.
+function pad(s, n) { return s + ' '.repeat(Math.max(0, n - [...s].length)) }
+function termCard(cls, head, lines, ref, step) {
+	let right = (step === undefined ? '' : tickText(step) + ' ') + ref
+	let header = pad(head, 56 - [...right].length) + right
+	let rows = ['', header, ...lines, ''].map((l) => `<span class="row ${cls}">${esc(pad(l, 57))}</span>`)
+	return rows.join('')
+}
+function termHal(lines) { return ['06:04 Hal (opus 5.5)', ...lines].map((l) => `<span class="row assistant">${esc(l)}</span>`).join('') + '<span class="row"> </span>' }
+
+const steerText = 'Also keep the old flag working for now.'
+const queueText = 'After this, run the tests and push.'
+
+function render() {
+	let s = opt.step
+	let ref = s === 0 ? '' : '#u24'
+	let reply = s === 2 ? ['Noted — keeping --legacy as an alias.'] : []
+	// Unread steering waits below the running turn; once read it sits where
+	// the model read it, before the next reply.
+	let steerWeb = s < 2
+		? hal('Renaming the flag in src/cli.ts…') + webCard('user', `You (${tag('steer', s)})`, steerText, ref, s)
+		: hal('Renaming the flag in src/cli.ts…') + webCard('user', `You (${tag('steer', s)})`, steerText, ref, s) + hal(reply[0])
+	document.getElementById('web-steer').innerHTML = steerWeb
+	let steerTerm = termHal(['Renaming the flag in src/cli.ts…']) + termCard('user', `06:04 You (${tag('steer', s)})`, [steerText], ref, s) + (s === 2 ? '<span class="row"> </span>' + termHal(reply) : '')
+	document.getElementById('term-steer').innerHTML = steerTerm
+
+	let queueWeb = hal(s < 2 ? 'Done: the flag is renamed.' : 'Done: the flag is renamed.') + webCard('user', `You (${tag('queue', s)})`, queueText, ref, s) + (s === 2 ? hal('Running ./test…') : '')
+	document.getElementById('web-queue').innerHTML = queueWeb
+	document.getElementById('term-queue').innerHTML = termHal(['Done: the flag is renamed.']) + termCard('user', `06:04 You (${tag('queue', s)})`, [queueText], ref, s) + (s === 2 ? '<span class="row"> </span>' + termHal(['Running ./test…']) : '')
+
+	let ms = Math.max(1, s), mref = '#u25', mtext = 'Tests on main fail in src/host/web.ts; please look.'
+	document.getElementById('web-msg').innerHTML = hal('Done: the flag is renamed.') + webCard('message', `Message from tab 3 (07-abc) (${tag('queue', ms)})`, mtext, mref, ms)
+	document.getElementById('term-msg').innerHTML = termHal(['Done: the flag is renamed.']) + termCard('message', `06:04 Message from tab 3 (${tag('queue', ms)})`, [mtext], mref, ms)
+	document.getElementById('web-plain').innerHTML = webCard('user', 'You', 'Rename --old to --legacy.', '#u20') + webCard('user', 'You (interrupting)', 'Stop, use --compat instead.', '#u22')
+	document.getElementById('term-plain').innerHTML = termCard('user', '06:03 You', ['Rename --old to --legacy.'], '#u20') + '<span class="row"> </span>' + termCard('user', '06:04 You (interrupting)', ['Stop, use --compat instead.'], '#u22')
+
+	document.body.className = `read-${opt.color} ${opt.dim === 'yes' ? 'dim-unread' : ''}`
+	document.querySelector(`input[name=step][value="${s}"]`).checked = true
+}
+
+for (let input of document.querySelectorAll('.controls input')) input.addEventListener('change', () => {
+	opt[input.name] = input.name === 'step' ? Number(input.value) : input.value
+	stop()
+	render()
+})
+
+let timers = []
+function stop() { timers.forEach(clearTimeout); timers = [] }
+document.getElementById('play').addEventListener('click', () => {
+	stop()
+	opt.step = 0; render()
+	timers.push(setTimeout(() => { opt.step = 1; render() }, 700))
+	timers.push(setTimeout(() => { opt.step = 2; render() }, 3200))
+})
+render()
+</script>
+</body>
+</html>
