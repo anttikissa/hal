@@ -23,6 +23,7 @@ import { ansi } from './ansi.ts'
 import { batchOrder, type Ordering } from './batch-order.ts'
 import { formView } from './form-view.ts'
 import { itemView, type Look } from './item-view.ts'
+import { water } from './water.ts'
 import { toggle, type Fold } from '../common/toggle.ts'
 import { modalView } from './modal-view.ts'
 import { noticeView } from './notice-view.ts'
@@ -164,34 +165,6 @@ function queuedRows(item: Item & { type: 'prompt' }, note: string, cols: number,
 	return lines.flatMap((r) => ansi.paintRows(r, style, cols))
 }
 
-// A streaming block never shrinks (task fn): the tallest it was drawn
-// at, from its first render here, pads it with blank rows at its end,
-// also after it stops streaming, until the next full redraw (render.draw
-// forgets them all). In memory only, per block and width.
-function highWater(rows: string[], item: Item, cols: number, session: string | undefined, streams: boolean): string[] {
-	let id = `${cols} ${session} ${item.key}`
-	let peaks = frame.state.peaks
-	let peak = peaks.get(id)
-	if (peak === undefined && !streams) return rows
-	if (rows.length >= (peak ?? 0)) {
-		peaks.set(id, rows.length)
-		return rows
-	}
-	return [...rows, ...Array<string>(peak! - rows.length).fill(ansi.paint('', itemView.itemStyle(item), cols))]
-}
-
-// A call's card, with its results, never shrinks either: a running
-// call's last output lines give way to a shorter result glimpse, and in
-// full mode one row less clears scrollback, snapping the terminal to the
-// bottom. Blank card rows at its end keep the tallest height drawn at
-// this width and fold state until the next full redraw; folding with
-// /collapse starts afresh.
-function cardWater(lines: string[], start: number, id: string, style: Style | undefined, cols: number): void {
-	let peaks = frame.state.peaks, height = lines.length - start, peak = peaks.get(id) ?? 0
-	if (height >= peak) peaks.set(id, height)
-	else for (let n = height; n < peak; n++) lines.push(ansi.paint('', style, cols))
-}
-
 // `items`/`ends`: the items laid out and the row each ends at, so a
 // row can be traced to its block (render.clear's reasons, task e4c).
 export type Past = { lines: string[]; items?: Item[]; ends?: number[]; formCursor?: Frame['cursor']; target?: number; tick?: { row: number; labeled: string; plain: string } }
@@ -301,14 +274,14 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 				else if (next?.type === 'tool-result' && next.id === item.id) status = itemView.resultStatus(next, item.name === 'bash', style)
 			}
 			let rows = merged ? [] : frame.itemRows(item, cols, session, streams ? view.hal : undefined, calls, tool, images, status, look)
-			rows = frame.highWater(rows, item, cols, session, streams)
+			rows = water.high(frame.state.peaks, rows, item, cols, session, streams)
 			if (tool && rows.length && lines.length) lines.pop()
 			else if (rows.length && lines.length) lines.push('')
 			for (let r of rows) lines.push(r)
 			if (item.type === 'tool') card = { id: item.id, key: item.key, start: lines.length - rows.length }
 			let next = items[i + 1]
 			if (card && (item.type === 'tool' || item.type === 'tool-result') && item.id === card.id && !(next?.type === 'tool-result' && next.id === card.id)) {
-				frame.cardWater(lines, card.start, `${cols} ${session} call ${card.key} ${look.fold ?? ''}${look.full ? 'full' : ''}`, itemView.itemStyle(item, tool), cols)
+				water.card(frame.state.peaks, lines, card.start, `${cols} ${session} call ${card.key} ${look.fold ?? ''}${look.full ? 'full' : ''}`, itemView.itemStyle(item, tool), cols)
 				card = undefined
 			}
 			if (ticks) {
@@ -423,4 +396,4 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 // first items ends in them and its bash calls (the job ids results show); forgotten with the peaks on a full redraw.
 type History = { look: string; items: Item[]; ends: number[]; bash: { at: number; id: string; key: string }[]; lines: string[] }
 
-export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, ref, queuedRows, highWater, cardWater, order: batchOrder.order, promptWidth }
+export const frame = { state: { rows: new WeakMap<Item, { key: string; rows: string[] }>(), peaks: new Map<string, number>(), history: undefined as History | undefined, ordered: undefined as { src: Item[]; how: string; grouped: Item[]; at: Ordering } | undefined }, layout, build, itemRows, ref, queuedRows, order: batchOrder.order, promptWidth }
