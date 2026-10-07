@@ -84,6 +84,10 @@ as ASON). Don't test nondeterministic model wording.
 
 # Code
 
+Hal is efficient: small, quick to start, light on CPU, memory, network
+and tokens. Treat it so, keep it so, and measure before calling
+anything costly.
+
 Climb the lazy ladder: skip unnecessary code; prefer the standard
 library, native platform features (Bun, Web APIs), installed
 dependencies, one line, then the minimum code that works. Avoid new
