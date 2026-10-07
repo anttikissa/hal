@@ -93,6 +93,7 @@ test('block ids link to cards the writer could have seen; code, invented ids and
 	expect(hrefs('see `#t5` and #t99 and #1 and #fff')).toEqual([])
 	expect(hrefs('in 05-xyz#u3, not 07-qqq#u3')).toEqual([['05-xyz#u3', '/05-xyz#u3']])
 	expect(hrefs('#u6.1 then a#t5')).toEqual([['#u6.1', '/06-abc#u6.1']])
+	expect(hrefs('05-xyz, 64-bit and 05-xyzw')).toEqual([['05-xyz', '/05-xyz']])
 	markdown.state.sessions = new Set(['05-xyz'])
 	expect(markdown.parse('05-xyz#t2 07-qqq#t2', false, markdown.blockLinks('06-abc', '20')).flatMap((b) => (b.type === 'line' ? b.runs : [])).filter((r) => r.href).map((r) => r.href)).toEqual(['/05-xyz#t2'])
 	markdown.state.sessions = new Set()

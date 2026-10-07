@@ -137,6 +137,12 @@ function openIds(): string[] {
 	return [...sessions.state.open.keys()]
 }
 
+// Every session id on disk, names only (task b4b).
+function ids(): string[] {
+	if (!existsSync(paths.sessionsDir())) return []
+	return readdirSync(paths.sessionsDir(), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
+}
+
 // Every session directory on disk, open or not. Read-only: a broken one
 // is listed with its error rather than skipped or repaired.
 function list(): SessionListing[] {
@@ -187,6 +193,7 @@ function newest(): string | undefined {
 }
 
 export const sessions = {
+	ids,
 	state: { open: new Map<string, SessionMeta>() },
 	validate,
 	load,

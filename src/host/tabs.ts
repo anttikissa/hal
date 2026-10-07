@@ -67,7 +67,7 @@ function list(): Tab[] {
 function greet(client: { deliver: (event: Event) => void }, live: () => boolean): void {
 	try {
 		let openTabs = tabs.list()
-		client.deliver({ type: 'tabs', tabs: openTabs })
+		client.deliver({ type: 'tabs', tabs: openTabs, sessions: sessions.ids() })
 		queueMicrotask(() => {
 			if (!live()) return
 			try {

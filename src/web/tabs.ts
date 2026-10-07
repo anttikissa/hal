@@ -57,7 +57,10 @@ function backgroundStep(): void {
 // (true), or left to app.onEvent.
 function onEvent(event: Event): boolean {
 	let st = app.state
-	if (event.type === 'tabs') tabs.onTabs(event.tabs)
+	if (event.type === 'tabs') {
+		if (event.sessions) markdown.state.sessions = new Set(event.sessions)
+		tabs.onTabs(event.tabs)
+	}
 	else if (event.type === 'rejected' && event.id && st.asked.delete(event.id)) { delete st.landing; tabs.onTabs(st.tabs); return false }
 	else if (event.type === 'go') {
 		if (st.shown === event.sessionId && st.tabs.some((tab) => tab.id === event.tab)) {
@@ -118,7 +121,7 @@ function onTabs(list: Tab[]): void {
 	let st = app.state
 	let before = st.tabs
 	st.tabs = list
-	markdown.state.sessions = new Set(list.map((t) => t.id))
+	for (let t of list) markdown.state.sessions.add(t.id)
 	if (st.landing && !list.some((t) => t.id === st.landing)) return
 	delete st.landing
 	for (let id of st.cached.keys()) if (!list.some((tab) => tab.id === id)) {
