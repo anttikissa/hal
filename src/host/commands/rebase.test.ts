@@ -16,7 +16,7 @@ test('rebase plans are requester-local; changes, dividers and undo reach every f
 	await until(() => a.of('rebase-plan').length)
 	expect(b.of('rebase-plan')).toHaveLength(0)
 	let start = a.of('rebase-plan')[0]
-	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, plan: { base: start.snapshot.base, drop: [answer.n], edit: [{ n: prompt.n, text: 'fixed prompt' }] } })
+	a.conn.send({ type: 'rebase-apply', paused: true, sessionId: id, base: start.snapshot.base, plan: { base: start.snapshot.base, drop: [answer.n], edit: [{ n: prompt.n, text: 'fixed prompt' }] } })
 	expect(a.of('history-rewritten')).toHaveLength(1)
 	expect(b.of('history-rewritten')).toHaveLength(1)
 	for (let c of [a, b]) {
@@ -36,13 +36,13 @@ test('rebase plans are requester-local; changes, dividers and undo reach every f
 	c.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
 	await until(() => c.of('rebase-plan').length)
 	let next = c.of('rebase-plan').at(-1)
-	let apply = { type: 'rebase-apply', id: 'rebase-dedup', sessionId: id, base: next.snapshot.base, plan: { base: next.snapshot.base, drop: [answer.n], edit: [] } }
+	let apply = { type: 'rebase-apply', paused: true, id: 'rebase-dedup', sessionId: id, base: next.snapshot.base, plan: { base: next.snapshot.base, drop: [answer.n], edit: [] } }
 	c.conn.send(apply); c.conn.send(apply)
 	expect(history.readSync(id).filter((r) => r.type === 'rebase')).toHaveLength(3)
 	expect(c.of('rebase-result').slice(-2).map((r) => r.ok)).toEqual([true, true])
 })
 
-test('stale and malformed plans never append a rebase; busy sessions refuse; model cannot invoke rebase', async () => {
+test('append activity is allowed, context rewrites and malformed plans refuse; busy editors refuse and model uses sparse commands', async () => {
 	let a = client(), id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
 	await until(() => a.of('rebase-plan').length)
@@ -50,12 +50,15 @@ test('stale and malformed plans never append a rebase; busy sessions refuse; mod
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rename Changed' })
 	await until(() => a.of('meta').length)
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo: start.todo })
+	expect(a.of('rebase-result').at(-1)?.ok).toBe(true)
+	history.append(id, { type: 'reset' })
+	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo: start.todo })
 	expect(a.of('output').at(-1).text).toContain('stale')
 	expect(a.of('rebase-result').at(-1)).toMatchObject({ ok: false, text: expect.stringContaining('stale') })
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: 'wrong', todo: start.todo })
 	expect(a.of('rejected').at(-1).reason).toContain('base')
 	expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
-	await expect(tools.all().get('command')!.run({ command: '/rebase' }, { sessionId: id, signal: new AbortController().signal } as any)).rejects.toThrow('not available to the model')
+	await expect(tools.all().get('command')!.run({ command: '/rebase' }, { sessionId: id, signal: new AbortController().signal } as any)).rejects.toThrow('Use /rebase show')
 	a.conn.send({ type: 'submit', sessionId: id, text: 'running' })
 	await until(() => calls.length)
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
@@ -74,6 +77,9 @@ test('todo replacement text is applied; queue prompts start in order; empty and 
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo: '' })
 	expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
 	let todo = start.todo.replace(`keep  #${user.n}`, `edit  #${user.n}`) + 'queue first\nqueue second\n'
+	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo, replacements: { [user.n!]: 'edited' }, paused: true })
+	expect(a.of('rebase-result').at(-1)).toMatchObject({ ok: false, text: expect.stringContaining('remove the queue lines or --paused') })
+	expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
 	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo, replacements: { [user.n!]: 'edited' } })
 	await until(() => calls.length === 1)
 	expect(a.of('turn-start').at(-1).prompt).toBe('first')
@@ -95,7 +101,7 @@ test('waiting cross-session messages can be dropped from the todo and stay gone 
 	let start = a.of('rebase-plan')[0]
 	expect(start.snapshot.rows.find((row: any) => row.n === message.n)).toMatchObject({ text: 'waiting message' })
 	let todo = start.todo.replace(new RegExp(`^keep\\s+#${message.n}.*\\n`, 'm'), '')
-	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo })
+	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, todo, paused: true })
 	expect(a.of('rebase-result').at(-1)?.ok).toBe(true)
 	expect(a.views.get(id)?.inbox).toEqual([])
 	restartHost()
@@ -107,7 +113,7 @@ test('waiting cross-session messages can be dropped from the todo and stay gone 
 	expect(b.views.get(id)?.inbox).toMatchObject([{ text: 'waiting message', from: 'other-session' }])
 })
 
-test('rebase leaving an unanswered prompt clears cached idle state and Enter can resume after restart', async () => {
+test('paused rebase leaving an unanswered prompt clears cached idle state and Enter can resume after restart', async () => {
 	let a = client(), id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'Answer this.' })
 	await until(() => calls.length === 1)
@@ -118,7 +124,7 @@ test('rebase leaving an unanswered prompt clears cached idle state and Enter can
 	a.conn.send({ type: 'submit', sessionId: id, text: '/rebase' })
 	await until(() => a.of('rebase-plan').length)
 	let start = a.of('rebase-plan')[0]
-	a.conn.send({ type: 'rebase-apply', sessionId: id, base: start.snapshot.base, plan: { base: start.snapshot.base, drop: [answer.n], edit: [] } })
+	a.conn.send({ type: 'rebase-apply', paused: true, sessionId: id, base: start.snapshot.base, plan: { base: start.snapshot.base, drop: [answer.n], edit: [] } })
 	expect(a.views.get(id)?.state.type).toBe('paused')
 	expect(calls).toHaveLength(1)
 	restartHost()

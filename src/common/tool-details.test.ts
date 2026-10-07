@@ -31,3 +31,10 @@ test('send headers distinguish requested destinations from host-resolved ones', 
 	expect(toolDetails.headline('send', input, 'Sent to 157-cms · Review').text).toBe('To 157-cms: Report completion')
 	expect(toolDetails.lines('send', input)).toEqual(['text: Done', 'queue: true'])
 })
+
+test('command labels remain literal for discovery, sparse plans and other commands', () => {
+	for (let command of ['/help', '/help rebase', '/rebase run --paused drop t4-; edit #u2 "new; edit is text"', '/rebase preview edit #2 `full\\nreplacement`', '/rename Keep slash labels']) {
+		expect(toolDetails.headline('command', { command }).text).toBe(command)
+		expect(toolDetails.lines('command', { command })).toEqual([])
+	}
+})

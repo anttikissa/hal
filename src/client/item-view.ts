@@ -17,13 +17,14 @@ import { ansi } from './ansi.ts'
 import { markdown } from '../common/markdown.ts'
 import { markdownView } from './markdown-view.ts'
 import { summary } from '../common/summary.ts'
+import { rebaseCards } from '../common/rebase-cards.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
 import type { Fold } from '../common/toggle.ts'
 import { resolve } from 'path'
 
 // A block's fold state when toggled (task ghs), and the paste texts a
 // prompt shown inline needs (client/folds.ts).
-export type Look = { fold?: Fold; pastes?: Map<string, { text?: string; error?: string }> }
+export type Look = { full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }> }
 
 const { INVERSE, UNINVERSE } = ansi
 
@@ -164,6 +165,10 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'tool': {
 			let { command, description } = item.input
 			let prefix = titles.stamp(item.ts, '')
+			if (toolDetails.fullCommand(item.name, item.input)) {
+				if (fold !== 'open') return [strings.clipVisual(prefix + ansi.clean(String(command)), width)]
+				return [String(command), ...toolDetails.lines(item.name, item.input)].flatMap((line) => ansi.wrap(line, width))
+			}
 			let row: string
 			if (typeof command === 'string' && typeof description === 'string') {
 				let head = itemView.unsafe(strings.clipVisual(`${prefix}${ansi.clean(toolDetails.headline(item.name, item.input).text)}`, width), item, width)
@@ -186,8 +191,6 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'tool-result': {
 			// A glimpse: tool output can be long, the model sees all of it.
 			let call = calls?.get(item.id)
-			// No blank lines at either end, no bash status line: the
-			// status is in the title (task wm0).
 			// A canceled call's note to the model: the title says "(canceled)".
 			let out = item.interrupted === 'canceled' ? '' : call ? bashResult.display(item.output, true, !!item.interrupted) : bashResult.trim(item.output)
 			let style = itemView.itemStyle(item, tool)
@@ -195,18 +198,13 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// row stays, for its time, link and status. A closed call is
 			// its header row (task ghs): attached results draw nothing.
 			if (tool && (fold === 'closed' || (!out && !item.isError))) return []
-			// Only the lines shown are laid out (outputs run to megabytes);
-			// the rest are counted as source lines, as on the web.
-			let wide = width, max = fold === 'open' ? itemView.openRows : itemView.resultRows
+			let wide = width, max = fold === 'open' ? look.full ? Infinity : itemView.openRows : itemView.resultRows
 			let lines = out.split('\n')
 			let rows: string[] = []
 			let used = 0
 			while (used < lines.length && rows.length <= max) rows.push(...ansi.wrap(lines[used++]!.slice(0, (max + 1) * wide * 4), wide, false))
 			let shown = rows.slice(0, max)
 			let more = rows.length - shown.length + lines.length - used
-			// Rows start at the margin: no marker, no indent (an error's
-			// first row says so, not only its color). Attached, the card
-			// tells input from output; apart, the text is quieter.
 			let status = tool ? '' : itemView.resultStatus(item, !!call, style)
 			let res = shown.map((l, i) => {
 				let prefix = !i && item.isError ? '✗ ' : ''
@@ -218,8 +216,6 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let line = tool ? text : ansi.quiet(text, style)
 				return !i && status ? itemView.right(line, status, width) : line
 			})
-			// Hidden lines are counted at the end of the last row, or on
-			// a row of their own when that one is too full.
 			if (more) {
 				let marker = ansi.quiet(`… ${more} more lines${fold === 'open' ? ` in ${itemView.fullAt(item.output, session, (item as Partial<Keyed>).key)}` : ''}`, style)
 				let last = res.at(-1)!
@@ -243,6 +239,10 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		case 'command':
 			return itemView.headed(item, ansi.wrap(item.text, width), width, session)
 		case 'output': {
+			if (item.rebaseReports) {
+				let head = ansi.wrap(`${fold === 'open' ? '▾' : '▸'} ${titles.stamp(item.ts, item.text)}`, width)
+				return fold === 'open' ? [...head, ...item.rebaseReports.flatMap((r) => ['', ...ansi.wrap(rebaseCards.detail(r), width)])] : head
+			}
 			// A prompt-file change (task ar): a head row and short colored
 			// rows, no header; open, each change's line and whole diff.
 			if (item.change) {

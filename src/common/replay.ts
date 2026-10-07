@@ -1,7 +1,7 @@
 // Session history records (one per line in sessions/<id>/history.asonl)
 // and the rebuild of provider input from them. Provider input comes from
 // these records alone, never from display state.
-// Tasks: 7, nvm, 6eq.
+// Tasks: 7, nvm, svt, 6eq.
 
 import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
 import { bashResult } from './bash-result.ts'
@@ -101,7 +101,7 @@ export type HistoryRecord = Numbered &
 	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string; ts: string }
 	// A fresh context (/clear, task vh): provider input is rebuilt from
 	// the records after it alone, with no summary.
-	| ({ type: 'rebase'; ts: string } & import('./rebase.ts').RebasePlan)
+	| ({ type: 'rebase'; transition?: string; ts: string } & import('./rebase.ts').RebasePlan)
 	| { type: 'reset'; transition?: string; ts: string }
 	)
 

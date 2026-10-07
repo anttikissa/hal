@@ -1,4 +1,4 @@
-// Client-local plans; only the host validates and writes history (task z71).
+// Client-local plans; only the host validates and writes history (tasks z71, svt).
 import { rebase, type RebasePlan } from '../common/rebase.ts'
 import { rebaseRows, type RebaseRows } from '../common/rebase-rows.ts'
 import type { Command, Event } from '../common/protocol.ts'
@@ -31,21 +31,25 @@ function broadcast(id: string, from: number): void {
 }
 
 function apply(c: Command & { type: 'rebase-apply' }): string {
-	let snapshot = rebasePlans.build(c.sessionId)
-	if (snapshot.base !== c.base) throw new Error(`Rebase is stale: base #${c.base}, latest record #${snapshot.base}. Rebuild the plan.`)
+	let current = rebasePlans.build(c.sessionId)
+	let agent = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent
+	agent.fresh(history.readSync(c.sessionId), c.base)
+	let snapshot = rebaseRows.build(history.readSync(c.sessionId).filter((r) => r.n! <= c.base), current.options)
 	let parsed = c.todo === undefined ? undefined : rebaseRows.parse(c.todo, snapshot, c.replacements)
 	if (parsed?.aborted) return 'Rebase aborted.'
 	if (parsed?.edits.length) throw new Error(`Rebase edits missing full text: ${parsed.edits.map((n) => `#${n}`).join(', ')}`)
 	let plan = parsed?.plan ?? c.plan!, queue = parsed?.queue ?? []
+	if (c.paused && queue.length) throw new Error('--paused cannot be combined with queue lines; remove the queue lines or --paused before applying.')
 	if (plan.base !== c.base) throw new Error('Rebase plan base does not match the requested base.')
 	// Queue entries must be prompts, not a second channel for slash commands.
 	if (queue.some((text) => /^\s*\/[a-z][a-z0-9-]*(?:\s|$)/.test(text))) throw new Error('Rebase queue lines must be prompts, not slash commands.')
 	plan = { ...plan, edit: plan.edit.filter((e) => snapshot.rows.find((row) => row.editN === e.n)?.text !== e.text) }
 	let sums = rebaseRows.totals(snapshot, plan)
+	let continuation = agent.continuation(history.readSync(c.sessionId), plan, c.paused)
 	if (plan.drop.length || plan.edit.length) {
 		// Generate before writing: a diff failure must not partially apply the rebase.
-		let report = (require('./rebase-report.ts') as typeof import('./rebase-report.ts')).rebaseReport.text(snapshot, plan)
-		rebases.apply(c.sessionId, plan, c.base)
+		let report = (require('./rebase-report.ts') as typeof import('./rebase-report.ts')).rebaseReport.text(snapshot, plan, c.paused, continuation)
+		rebases.apply(c.sessionId, { ...plan, base: current.base }, current.base)
 		rebasePlans.broadcast(c.sessionId, sums.cacheFrom ?? c.base)
 		slash.output(c.sessionId, report)
 	}
@@ -53,6 +57,7 @@ function apply(c: Command & { type: 'rebase-apply' }): string {
 		let refused = prompts.submit(c.sessionId, text, undefined, i > 0 ? 'queue' : 'interrupt')
 		if (refused) throw new Error(refused)
 	}
+	if (!queue.length && (plan.drop.length || plan.edit.length)) agent.continuePrompt(c.sessionId, c.paused, continuation)
 	return plan.drop.length || plan.edit.length ? `History rewritten.${queue.length ? ` Queued ${queue.length} prompts.` : ''}` : queue.length ? `Queued ${queue.length} prompts.` : 'Rebase unchanged.'
 }
 

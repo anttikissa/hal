@@ -1,5 +1,6 @@
 // /help: every command by category with its key, or one command in
 // detail. Client-only commands are listed too (common/commands/list.ts).
+// Tasks: et, x0, 18n.
 
 import { commandList } from '../../common/commands/list.ts'
 import { commands, type SlashCommand } from '../commands.ts'
@@ -13,7 +14,10 @@ export const command: SlashCommand = {
 			let [name = '', ...rest] = args.replace(/^\//, '').split(/\s+/)
 			let info = commandList.byName(name)
 			if (!info) return { error: `no command /${name}` }
-			return { say: commands.all().get(name)?.help?.(rest.join(' ')) ?? info.description }
+			let text = commands.all().get(name)?.help?.(rest.join(' ')) ?? info.description
+			if (['login', 'quit', 'suspend', 'budget'].includes(name)) text += '\nAgents: unavailable through the command tool.'
+			if (name === 'send' || name === 'queue') text += '\nAgents: use the send tool instead.'
+			return { say: text }
 		}
 		let width = Math.max(...all.map((c) => c.name.length)) + 1
 		let keys = Math.max(...all.map((c) => c.key?.length ?? 0))

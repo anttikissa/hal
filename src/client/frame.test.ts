@@ -509,3 +509,34 @@ test('interruption markers remain whole and colored at a full terminal row', () 
 		expect(plain(rows).join('')).toContain('x'.repeat(n) + '--')
 	}
 })
+
+test('help and rebase command cards open directly to full input and output without changing other commands', () => {
+	for (let command of ['/help rebase', '/rebase show', '/rename Example']) {
+		let v = view([{ type: 'tool', id: 'c', name: 'command', input: { command } }, { type: 'tool-result', id: 'c', output: Array.from({ length: 240 }, (_, i) => `output ${i}`).join('\n') }])
+		let closed = plain(frame.build(v, 70).lines).join('\n')
+		if (command !== '/rename Example') expect(closed).not.toContain('output 0')
+		v.folds = { states: new Map([['~0', 'open']]), sig: 'open' }
+		let opened = plain(frame.build(v, 70).lines).join('\n')
+		expect(opened).toContain(command)
+		if (command !== '/rename Example') {
+			expect(opened).toContain('output 239')
+			expect(opened).not.toContain('more lines')
+		} else expect(opened).toContain('more lines')
+	}
+})
+
+test('a self-removed rebase report toggles its complete details with counts collapsed and IDs and pause in full detail', () => {
+	let report = 'Rebase applied (dropped 11 entries, edited 1)\nDropped 11 entries: #170-180 (11 entries)\n--paused\nEdited #169 user:\n```diff\n-old\n+replacement\n```'
+	let v = view([{ type: 'output', text: report }])
+	let closed = plain(frame.build(v, 45).lines).join('\n')
+	expect(closed.replace(/\s+/g, ' ')).toContain('dropped 11 entries, edited 1')
+	expect(closed).not.toContain('--paused')
+	expect(closed).not.toContain('+replacement')
+	v.folds = { states: new Map([['~0', 'open']]), sig: 'open' }
+	let opened = plain(frame.build(v, 45).lines).join('\n')
+	expect(opened).toContain('+replacement')
+	expect(opened).toContain('--paused')
+	expect(opened).toContain('Edited #169')
+	v.folds = { states: new Map([['~0', 'closed']]), sig: 'closed' }
+	expect(plain(frame.build(v, 45).lines).join('\n')).toBe(closed)
+})

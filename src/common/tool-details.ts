@@ -1,5 +1,5 @@
 // A tool call in readable text, relevant parts once (AGENTS.md "UI:
-// visible plumbing", task 8t): a headline for the card's head, and the
+// visible plumbing", tasks 8t, 18n): a headline for the card's head, and the
 // lines an open card adds without repeating it. Bash reads like the
 // terminal; call IDs, argument types and defaults stay in session files.
 //
@@ -142,4 +142,7 @@ const unsafe = (name: string, input: Record<string, unknown>): boolean => name =
 // a prompt before them leaves the world as it was.
 const readOnly: ReadonlySet<string> = new Set(['read', 'inspect', 'google', 'wait', 'read_url'])
 
-export const toolDetails = { value, headline, lines, unsafe, readOnly }
+// Discovery and history commands open directly to their complete output (18n).
+const fullCommand = (name: string, input: Record<string, unknown>): boolean => name === 'command' && typeof input.command === 'string' && /^\s*\/(?:help|rebase)(?:\s|$)/.test(input.command)
+
+export const toolDetails = { fullCommand, value, headline, lines, unsafe, readOnly }

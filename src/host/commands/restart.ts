@@ -9,6 +9,7 @@
 // ker), a restart asks first: the session's followers get the restart
 // dialog, and its Restart anyway sends /restart <scope> anyway. Only a
 // human may skip the question; a model's `anyway` asks too.
+// Tasks: cf, 18n.
 
 import { toolDetails } from '../../common/tool-details.ts'
 import type { FlaggedCall } from '../../common/modals.ts'
@@ -60,6 +61,7 @@ export const command: SlashCommand = {
 			'/restart local (ctrl-r) restarts this client; the web page reloads.',
 			'When this client is the host, local and host restart the same process.',
 			'While a call flagged unsafe to stop runs, a restart of the host asks first.',
+			'Agents: use only with user consent.',
 		].join('\n'),
 	complete: (args) => scopes.filter((s) => s.startsWith(args.trim())),
 	describeCompletion: (args) => ({ all: 'restart the host and every connected client (default)', host: 'restart the host', both: 'restart the host and this client', local: 'restart this client (ctrl-r)' } as Record<string, string>)[args]!,

@@ -39,7 +39,7 @@ test('apply is append-only; provider input, pages, index and links project edits
 	let prefix = readFileSync(history.file(id))
 	findIndex.init(); await findIndex.catchup(id)
 	let applied = rebases.apply(id, { base: 4, drop: [2], edit: [{ n: 1, text: 'newneedle' }] })
-	expect(applied.n).toBe(5)
+	expect(applied.n).toBe(6)
 	expect(snapshots.build(id).dropped).toEqual([2])
 	expect(readFileSync(history.file(id)).subarray(0, prefix.length)).toEqual(prefix)
 	expect(JSON.stringify(await history.messages(id))).toContain('newneedle')
@@ -98,4 +98,19 @@ test('edited tool output survives an omission saved before the rebase', async ()
  rebases.apply(id, {base:4, drop:[], edit:[{n:3,text:'retained edit'}]})
  expect(JSON.stringify(await history.messages(id))).toContain('retained edit')
  expect(JSON.stringify(await history.messages(id))).not.toContain('[pruned tool output')
+})
+
+test('failed rewrite commit keeps original content even when it must pause before committing', async () => {
+	seed()
+	let append = history.append
+	history.append = (id, record) => {
+		if (record.type === 'rebase') throw new Error('disk full at history path')
+		return append(id, record)
+	}
+	try {
+		expect(() => rebases.apply(id, { base: 4, drop: [2], edit: [] })).toThrow('Rebase was not applied; the session is paused.\ndisk full at history path')
+		expect(history.readSync(id).some((r) => r.type === 'rebase')).toBe(false)
+		expect(snapshots.build(id).state.type).toBe('paused')
+		expect(JSON.stringify(await history.messages(id))).toContain('oldanswer')
+	} finally { history.append = append }
 })

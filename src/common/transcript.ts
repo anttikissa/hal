@@ -35,7 +35,7 @@ export type Shown = { originSession?: string } & (
 	// A slash command: origin identifies Hal; from identifies another session.
 	| { type: 'command'; text: string; from?: string; label?: string; ts?: string }
 	// What a command said.
-	| { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; ts?: string }
+	| { type: 'output'; text: string; error?: true; synthetic?: true; change?: PromptChange; rebaseReports?: Item[]; ts?: string }
 	// A compact (task bc), drawn as a one-row rule. A /clear (task vh)
 	// shows as an output: 'HH:MM Context cleared.'.
 	| { type: 'divider'; text: string; ts?: string }

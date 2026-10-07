@@ -1,4 +1,4 @@
-// Shared terminal/web rows and the interactive todo-file format (task 01d).
+// Shared terminal/web rows and the interactive todo-file format (tasks 01d, svt).
 import { inbox } from './inbox.ts'
 import { attachments } from './attachments.ts'
 import type { UserBlock } from './blocks.ts'
@@ -9,10 +9,10 @@ import { tokenEstimates } from './token-estimates.ts'
 export type RebaseRow = {
 	n: number; ns: number[]; ts: string; time: string; kind: string; summary: string
 	characters: number; tokens: number; carries: string[]; group: number[]
-	editable: boolean; editN?: number; text?: string
+	editable: boolean; tool?: true; editN?: number; text?: string
 }
 export type RowOptions = { model?: string; ratios?: Record<string, number>; blobSizes?: Record<string, number>; pruned?: number[] }
-export type RebaseRows = { base: number; records: HistoryRecord[]; rows: RebaseRow[]; options: RowOptions }
+export type RebaseRows = { paused?: true; base: number; records: HistoryRecord[]; rows: RebaseRow[]; options: RowOptions }
 export type RebaseTotals = { rows: number; tokens: number; after: number; cacheFrom?: number }
 export type ParsedTodo = { plan: RebasePlan; queue: string[]; edits: number[]; aborted: boolean; inline: Record<number, string> }
 
@@ -82,6 +82,7 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 			if (b.type === 'tool_call') {
 				let detail = b.input.command ?? b.input.path ?? b.input.description ?? ''
 				let row = add(r, b.name, `${b.name === 'bash' ? '$ ' : ''}${typeof detail === 'string' ? detail : JSON.stringify(detail)}`, JSON.stringify(b.input).length)
+				row.tool = true
 				calls.set(b.id, row)
 			} else {
 				let row = add(r, b.type === 'text' ? 'assistant' : 'thinking', b.text, b.text.length)

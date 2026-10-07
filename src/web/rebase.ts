@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-// The web /rebase view's decisions (task bzf), without Solid: which
+// The web /rebase view's decisions (tasks bzf, svt), without Solid: which
 // action each row has, what the plan is, ranges, quick actions, and
 // the host's answer. Rebase.tsx draws `rebaseView.state`; nothing is
 // sent before Apply.
@@ -130,7 +130,7 @@ function apply(): void {
 	if (!st || st.sending || !rebaseView.dirty(st)) return
 	let id = connection.nextId()
 	set({ ...st, sending: id, error: undefined })
-	connection.send({ type: 'rebase-apply', id, sessionId: st.sessionId, base: st.snapshot.base, plan: rebaseView.plan(st) })
+	connection.send({ type: 'rebase-apply', id, sessionId: st.sessionId, base: st.snapshot.base, ...(st.snapshot.paused && { paused: true }), plan: rebaseView.plan(st) })
 }
 
 // Asks the host for fresh rows (after a stale base); choices carry over.

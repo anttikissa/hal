@@ -1841,3 +1841,40 @@ browserTest('interrupted answers keep accessible decoration outside prose at pho
 		}
 	} finally { await b.close() }
 })
+
+browserTest('rebase summaries toggle complete reports and help opens all output at phone and desktop widths', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id, b = await browser()
+	let report = 'Rebase applied (dropped 11 entries, edited 1)\nDropped 11 entries: #170-180 (11 entries)\n--paused\nEdited #169 prompt:\n```diff\n-old\n+replacement\n```'
+	history.append(id, { type: 'output', text: report })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'A conversation message separates these cards.' }] })
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'help', name: 'command', input: { command: '/help rebase' } } })
+	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'help', output: Array.from({ length: 240 }, (_, n) => `help line ${n}`).join('\n') }] })
+	history.append(id, { type: 'turn_end', status: 'completed', usage: {} })
+	try {
+		await server.serve()
+		web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`!!document.querySelector('.Card.rebase .mark') && !!document.querySelector('.tool-command .mark')`)
+		for (let width of [390, 1280]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			let header = await b.evaluate(`document.querySelector('.Card.rebase .CardHeader').innerText`)
+			expect(header).toContain('dropped 11 entries, edited 1')
+			expect(header).not.toContain('--paused')
+			expect(await b.evaluate(`document.querySelector('.Card.rebase .mark').getAttribute('aria-expanded')`)).toBe('false')
+			expect(await b.evaluate(`document.querySelector('.Card.rebase .report') === null`)).toBe(true)
+			await b.evaluate(`document.querySelector('.Card.rebase .mark').click()`)
+			await b.waitFor(`document.querySelector('.Card.rebase .report')?.textContent.includes('+replacement')`)
+			expect(await b.evaluate(`document.querySelector('.Card.rebase .report').textContent`)).toContain(report)
+			expect(await b.evaluate(`document.querySelector('.Card.rebase .more') === null`)).toBe(true)
+			await b.evaluate(`document.querySelector('.Card.rebase .mark').click()`)
+			await b.waitFor(`document.querySelector('.Card.rebase .mark').getAttribute('aria-expanded') === 'false'`)
+			expect(await b.evaluate(`document.querySelector('.tool-command .label').textContent`)).toBe('/help rebase')
+			await b.evaluate(`document.querySelector('.tool-command .mark').click()`)
+			await b.waitFor(`document.querySelector('.tool-command .mark').getAttribute('aria-expanded') === 'true'`)
+			expect(await b.evaluate(`document.querySelector('.tool-command .result-text').textContent`)).toContain('help line 239')
+			expect(await b.evaluate(`document.querySelector('.tool-command .more') === null`)).toBe(true)
+			await b.evaluate(`document.querySelector('.tool-command .mark').click()`)
+			expect(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`)).toBe(true)
+		}
+	} finally { await b.close() }
+})
