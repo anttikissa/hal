@@ -243,7 +243,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 						</span>
 					)}
 				</For>
-				{/* A newer Hal is served (task 7t): Ctrl-R reloads too. Phones
+				{/* A newer Hal is served (task 7t): the last hint; Ctrl-R reloads too. Phones
 				    have no help row and keep the badge over the transcript. */}
 				<Show when={props.update}>
 					<button type="button" class="update" aria-label="Reload to update Hal" onClick={() => location.reload()}>
