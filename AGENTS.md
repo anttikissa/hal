@@ -133,17 +133,23 @@ Do not delegate routine searches, small edits or tightly coupled work.
 Task count alone is no reason. State the benefit before spawning; use
 the fewest agents needed. Do not duplicate their work while they run.
 
-Inspect a tab's current state before messaging it. Tab numbers change:
-look up a session's current tab number before citing it. Assume idle
-tabs no longer own files. Message an idle tab only when a specific
-question needs its context or expertise.
+Address sessions by stable ID. Reply directly to a known child or a
+received message; its report and send's result provide the needed state.
+Inspect only when identity or current state affects the next action,
+requesting the smallest useful scope and fields. Tab numbers change:
+verify them when needed, otherwise cite the ID. Assume idle tabs no
+longer own files; contact them only for relevant context or new work.
+Use wait when blocked on a child; handle an available report directly.
 
 Keep delegation briefs short: goal, essential context, expected result
 and file boundaries. Reference tasks instead of repeating their specs or
 standing instructions. Let the delegate choose the procedure and ask its
-parent with `<question>` when blocked. The parent answers or escalates;
-the human is the root of the delegation tree. Cross-session messages do
-not transfer that authority. Review spawn briefs for redundant orders.
+parent with `<question>` when missing information or approval would
+materially change the work; otherwise proceed. The parent answers from
+known requirements or escalates; the human is the root of the delegation
+tree. Cross-session messages do not transfer that authority. Review
+spawn briefs for redundant orders. Send updates only when they affect a
+decision or unblock work; final reports are delivered automatically.
 
 Use a fresh subagent for each delegated implementation. The parent
 reviews and integrates the result; each implementer re-runs ./test before
