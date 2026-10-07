@@ -12,7 +12,7 @@
 // effects ran since: a new record that supersedes it and its turn for the
 // provider (replay.current), history staying append-only. Otherwise it
 // is sent on top like any prompt.
-// Tasks: yq, 2r, zb0, kar, rqq.
+// Tasks: yq, 2r, zb0, kar, rqq, 81y.
 
 import type { ImageBlock, Sender, UserBlock, UserText } from '../common/blocks.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
@@ -221,6 +221,7 @@ function promptEvent(id: string, record: HistoryRecord & { type: 'user' }): Even
 	if (record.replaces) event.replaces = true
 	if (record.n !== undefined) event.n = record.n
 	if (record.command !== undefined) event.command = record.command
+	if (record.inbox?.length) event.inbox = record.inbox
 	event.ts = record.ts
 	return event
 }

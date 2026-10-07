@@ -2,7 +2,7 @@
 // answer, their tools and questions, pausing, and recovering turns left
 // unfinished on disk. A turn with no end record is unfinished; whichever
 // process becomes host continues it (recover).
-// Tasks: yq, xz, svt, 6eq, rqq.
+// Tasks: yq, xz, svt, 6eq, rqq, 81y.
 
 import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type Sender, type StreamEvent, type ToolCallBlock, type ToolResultBlock } from '../common/blocks.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
@@ -69,7 +69,7 @@ function ask(id: string, form: Form, call?: string): void {
 // `images`: the prompt's image blocks, for followers to show; `record`:
 // the prompt's, whose number, command id and sender (of its first text)
 // they are told.
-function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { n?: number; command?: string; sender?: Sender; ts?: string }): void {
+function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlock[], record?: { inbox?: string[]; n?: number; command?: string; sender?: Sender; ts?: string }): void {
 	let model = sessions.open(id).model
 	let running: Running = { provider: '', controller: new AbortController() }
 	let effort = target(running, model, sessions.open(id).effort)
@@ -82,6 +82,7 @@ function start(id: string, prompt?: string, answers?: Answers, images?: ImageBlo
 	if (prompt !== undefined && record?.sender && Object.keys(record.sender).length) event.sender = record.sender
 	if (prompt !== undefined && record?.n !== undefined) event.n = record.n
 	if (prompt !== undefined && record?.command !== undefined) event.command = record.command
+	if (record?.inbox?.length) event.inbox = record.inbox
 	host.broadcast(id, event)
 	running.done = turns.runTurn(id, model, running, answers).catch((e) => diag.log(`turn ${id}: ${e?.message ?? e}`))
 }

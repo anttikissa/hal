@@ -17,3 +17,11 @@ test('known forms parse, print options in any order', () => {
 	expect(args.parse(['-p', 'Tee raportti', '-d', '~/x', '-m', 'opus-5.5'])).toEqual({ kind: 'print', prompt: 'Tee raportti', dir: '~/x', model: 'opus-5.5' })
 	expect(args.parse(['-m', 'gpt', 'hi', '--print'])).toEqual({ kind: 'print', prompt: 'hi', model: 'gpt' })
 })
+
+test('print target and delivery flags validate combinations', () => {
+	expect(args.parse(['-p', 'answer', '--session', '07-bah', '--soft-steer'])).toEqual({ kind: 'print', prompt: 'answer', session: '07-bah', delivery: 'soft-steer' })
+	expect(args.parse(['-p', 'answer', '-s', '12', '--queue'])).toEqual({ kind: 'print', prompt: 'answer', session: '12', delivery: 'queue' })
+	expect(args.parse(['-p', 'answer', '--keep'])).toEqual({ kind: 'print', prompt: 'answer', keep: true })
+	for (let flags of [['--session'], ['--session', '12', '--keep'], ['--steer', '--queue'], ['--session', '12', '-d', '/tmp']])
+		expect(args.parse(['-p', 'answer', ...flags]).kind).toBe('error')
+})

@@ -1,6 +1,6 @@
 // Composition root: the one explicit startup path. Other modules do no
 // work on import; start() calls their init() functions in order.
-// Tasks: b, ah, nvm.
+// Tasks: b, ah, nvm, 81y.
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { ason } from './common/ason.ts'
@@ -312,7 +312,7 @@ async function printMode(job: Extract<Args, { kind: 'print' }>): Promise<void> {
 		process.exit(2)
 	}
 	main.initHost()
-	let run = print.run({ prompt: job.prompt, cwd, ...(job.model && { model: job.model }) }, { out: (t) => process.stdout.write(t), err: (t) => process.stderr.write(t) })
+	let run = print.run({ ...job, cwd }, { out: (t) => process.stdout.write(t), err: (t) => process.stderr.write(t) })
 	await link.start({ socketPath: server.socketPath(), tryHost: async () => main.mayHost() && server.serve(), local: (deliver) => host.connect(deliver), onEvent: run.onEvent })
 	run.begin()
 	process.exit(await run.done)
