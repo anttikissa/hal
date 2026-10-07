@@ -78,6 +78,11 @@ function messageHead(item: Shown & { type: 'prompt' }): string {
 	return item.report ? `${who} · ${item.report === 'question' ? 'Needs info' : 'Finished'}: ${item.summary}` : `${who}: ${item.summary}`
 }
 
+// Receipts describe model delivery, not transport acknowledgement of normal prompts.
+function receipt(item: Shown): 0 | 1 | 2 {
+	return item.type === 'prompt' && (item.interject || item.advisory || item.queued || item.queuedAt) ? item.waiting ? 1 : 2 : 0
+}
+
 // Who wrote `item`, or undefined for an item without a header.
 function who(item: Shown): string | undefined {
 	let label = titles.author(item)
@@ -88,7 +93,7 @@ function who(item: Shown): string | undefined {
 function author(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt':
-			return tagged(item.from !== undefined && /^bash #t?\d+$/.test(item.label ?? '') ? `Background command finished ${item.label!.slice(5)}` : item.from !== undefined ? item.report ? `Message from ${titles.address(item.label ?? item.from)}` : item.summary ? `From ${titles.address(item.label ?? item.from)}` : `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.generatingCommand && `/${item.generatingCommand} continuation`, item.steering && 'steering', item.interject && 'soft-steering', item.queued && (item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : 'queued')])
+			return tagged(item.from !== undefined && /^bash #t?\d+$/.test(item.label ?? '') ? `Background command finished ${item.label!.slice(5)}` : item.from !== undefined ? item.report ? `Message from ${titles.address(item.label ?? item.from)}` : item.summary ? `From ${titles.address(item.label ?? item.from)}` : `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.generatingCommand && `/${item.generatingCommand} continuation`, item.steering && 'steering', item.interject && (item.waiting ? 'soft-steering' : 'soft-steered'), item.queued && (item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : 'queued')])
 		// A command is headed as the prompt it was typed as.
 		case 'command':
 			return item.from === undefined ? 'You' : `Command from ${item.label ?? item.from}`
@@ -147,4 +152,4 @@ function blockId(item: Shown & { key: string }): string {
 	return titles.letter(item) + item.key
 }
 
-export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, learn, time, stamp, ended, address, messageHead, author, who, title, letter, blockId }
+export const titles = { names: {} as Record<string, string>, defaults: {} as Record<string, string>, modelName, shortName, modelLabel, learn, time, stamp, ended, address, receipt, messageHead, author, who, title, letter, blockId }

@@ -367,9 +367,15 @@ function fullAt(output: string, session: string | undefined, key = ''): string {
 	return `${path} line ${/^\d+/.exec(key)?.[0] ?? '?'}`
 }
 
+function receipt(item: Item, style?: Style): string {
+	let state = titles.receipt(item)
+	return state ? ansi.quiet(state === 1 ? '✓' : '✓✓', style) : ''
+}
+
 export const itemView = {
 	// Rows of a tool result shown in the transcript: closed, and opened.
 	resultRows: 3,
+	receipt,
 	openRows: 200,
 	inlined,
 	closedRow,
