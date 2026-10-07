@@ -133,7 +133,9 @@ cancels retry/login waits; the next request re-evaluates the failure or login ra
 Slash commands retain their own immediate command behavior.
 Model, cwd, instruction and turn-status notices reach the next request,
 including within a turn. They do not start or resume work by themselves.
-A model switch lets the active round finish and takes effect at the next round.
+Effective model and cwd changes interrupt active work and continue with the
+new context, independent of the submit key (task 6eq). They reuse hard
+steering, including safe tool settlement, and leave idle or paused work alone.
 Live blocks keep their start position; commands arriving during thinking appear
 below that block in both clients, live and restored.
 A restart (Ctrl-R) never changes what the user sees.

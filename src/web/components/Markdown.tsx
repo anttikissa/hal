@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-// Model text as elements (task fn), from the blocks of common/markdown.ts:
+// Model text as elements (tasks fn, 6eq), from the blocks of common/markdown.ts:
 // runs are text nodes in styled spans and links only http(s) <a>s, so
 // model text never reaches the page as HTML. Lists are non-keyed, so a
 // streamed delta updates the blocks it touched in place.
@@ -48,8 +48,9 @@ function Runs(props: { runs: Run[] }) {
 
 // `links`: block ids in the text that are links (task d92); in-app links
 // open in this tab.
-export function Markdown(props: { text: string; streaming?: boolean; links?: Links; children?: JSX.Element }) {
+export function Markdown(props: { text: string; streaming?: boolean; links?: Links; children?: JSX.Element; interruption?: string }) {
 	let blocks = createMemo(() => markdown.parse(props.text.trimEnd(), !!props.streaming, props.links))
+	let marker = () => <Show when={props.interruption}>{(tail) => <span class="interrupted warning" role="img" aria-label="Interrupted" data-tail={tail()} />}</Show>
 	let root: HTMLDivElement | undefined
 	let peak = 0
 	onSettled(() => {
@@ -89,7 +90,7 @@ export function Markdown(props: { text: string; streaming?: boolean; links?: Lin
 							<pre class={c().lang === 'diff' ? 'diff' : undefined} data-lang={c().lang || undefined}><code><Show when={c().lang === 'diff'} fallback={<Text value={c().lines.join('\n')} />}>
 								{/* A diff fence takes the diff colors, in both clients. */}
 								<For each={c().lines} keyed={false}>{(l, i) => <span class={diff.tone(l())}><Text value={(i ? '\n' : '') + l()} /></span>}</For>
-							</Show></code></pre>
+							</Show><Show when={b() === blocks().at(-1)}>{marker()}</Show></code></pre>
 						</Match>
 						<Match when={b().type === 'table'}>
 							<div class="table">
@@ -110,6 +111,7 @@ export function Markdown(props: { text: string; streaming?: boolean; links?: Lin
 					</Switch>
 				}}
 			</For>
+			<Show when={blocks().at(-1)?.type !== 'code'}>{marker()}</Show>
 			{props.children}
 		</div>
 	)

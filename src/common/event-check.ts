@@ -1,4 +1,5 @@
 // Validation of host events on the client side; protocol.ts holds the types.
+// Tasks: qt, 6eq.
 import { sender } from './sender.ts'
 import type { EventType } from './protocol.ts'
 
@@ -22,6 +23,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	'queue-hold': { sessionId: 's', message: 's?' },
 	prompt: { sessionId: 's', texts: 'S', senders: 'a?', images: 'a?', command: 's?', ts: 's?' },
 	stream: { sessionId: 's', event: 'o', 'event.type': 's', ts: 's?', model: 's?', effort: 's?' },
+	'assistant-interrupted': { sessionId: 's', record: 'o', 'record.type': 's', 'record.block': 'o', 'record.block.type': 's', 'record.block.text': 's', 'record.interrupted': 'b', 'record.n': 'i', 'record.ts': 's', 'record.model': 's?', 'record.effort': 's?' },
 	'tool-output': { sessionId: 's', id: 's', at: 'i', chunk: 's' },
 	'tool-results': { sessionId: 's', results: 'a' },
 	'turn-stats': { sessionId: 's', stats: 'o' },
@@ -73,6 +75,10 @@ function invalidEvent(value: unknown): string | undefined {
 		let v = path.split('.').reduce<unknown>((o, key) => (isObject(o) ? o[key] : undefined), value)
 		if (v === undefined && kind.endsWith('?')) continue
 		if (!kinds[kind[0]!]!(v)) return `${value.type}: ${path} must be ${kindNames[kind[0]!]}`
+	}
+	if (value.type === 'assistant-interrupted') {
+		let r = value.record as Record<string, unknown>
+		if (r.type !== 'assistant' || (r.block as Record<string, unknown>).type !== 'text' || r.interrupted !== true || !Number.isSafeInteger(r.n) || (r.n as number) < 1 || !Number.isFinite(Date.parse(r.ts as string))) return 'assistant-interrupted: invalid interrupted text record'
 	}
 	let senders = value.type === 'prompt' ? value.senders ?? [] : value.type === 'turn-start' && value.sender !== undefined ? [value.sender] : value.type === 'inbox' ? value.inbox : []
 	if (!Array.isArray(senders) || senders.some((s) => sender.invalid(s))) return `${value.type}: invalid sender metadata`

@@ -1,5 +1,6 @@
 // /cd: changes the session's working directory, offering to create one
 // that does not exist.
+// Tasks: et, 6eq.
 
 import { mkdirSync, readdirSync, statSync } from 'fs'
 import { commands, type Context, type SlashCommand } from '../commands.ts'
@@ -10,7 +11,7 @@ function isDir(path: string): boolean {
 }
 
 export const command: SlashCommand = {
-	help: () => '/cd <dir>: change the working directory of this session (~ is home; relative to the current one). Offers to create a missing directory. /cd alone goes to the Hal home; /cd - goes back.',
+	help: () => '/cd <dir>: change this session\'s working directory and safely interrupt and continue active work (~ is home; relative to the current one). Offers to create a missing directory. /cd alone goes to the Hal home; /cd - goes back.',
 	complete(args: string, ctx: Context): string[] {
 		if (args === '~') return ['~/']
 		let head = args.slice(0, args.lastIndexOf('/') + 1)

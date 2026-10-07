@@ -32,19 +32,23 @@ test('switching from the intro and skipping its question sends the change on the
 	expect((await fresh(id)).items).toEqual(c.views.get(id)!.items)
 })
 
-test('changes during streaming follow real tool results without changing earlier request prefixes', async () => {
+test('changes interrupt streaming, settle pending calls and preserve earlier request prefixes', async () => {
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'Inspect.' })
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'Working.' })
 	await until(() => c.of('stream').length)
+	calls[0]!.push({ type: 'tool_call', id: 'read', name: 'read', input: { path: '/tmp/this-hal-test-file-does-not-exist' } })
+	await until(() => c.of('stream').some((e) => e.event.type === 'tool_call'))
 	slash.change(id, { model: 'fake/m2' })
 	slash.change(id, { model: 'fake/m3' })
 	history.append(id, { type: 'output', text: 'Rules changed.', change: { name: 'AGENTS.md', what: 'changed', diff: '+new rule' } })
 	// The pending next-round message uses the same safe boundary as notices.
 	prompts.submit(id, 'Another session update.', undefined, 'interrupt', { from: id, advisory: true })
-	calls[0]!.push({ type: 'tool_call', id: 'read', name: 'read', input: { path: '/tmp/this-hal-test-file-does-not-exist' } }, { type: 'done', reason: 'tool_use' })
+	// Late old-model output must not enter the continuation.
+	calls[0]!.push({ type: 'text', text: 'LATE OUTPUT' }, { type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
+	expect(calls[1]!.model).toBe('fake/m3')
 	let messages = calls[1]!.input.messages
 	expect(messages.slice(0, calls[0]!.input.messages.length)).toEqual(calls[0]!.input.messages)
 	let blocks = messages.flatMap((m: any) => m.blocks)
@@ -56,6 +60,8 @@ test('changes during streaming follow real tool results without changing earlier
 	expect(texts(messages)).toContain('changed from fake/m1 to fake/m2')
 	expect(texts(messages)).toContain('changed from fake/m2 to fake/m3')
 	expect(texts(messages)).toContain('Rules changed.')
+	expect(texts(messages)).toContain('Continue your unfinished response')
+	expect(texts(messages)).not.toContain('LATE OUTPUT')
 	expect(texts(messages)).toContain('Another session update.')
 	calls[1]!.push({ type: 'text', text: 'Done.' }, { type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length)

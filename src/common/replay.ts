@@ -1,7 +1,7 @@
 // Session history records (one per line in sessions/<id>/history.asonl)
 // and the rebuild of provider input from them. Provider input comes from
 // these records alone, never from display state.
-// Tasks: 7, nvm.
+// Tasks: 7, nvm, 6eq.
 
 import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
 import { bashResult } from './bash-result.ts'
@@ -53,7 +53,7 @@ export type HistoryRecord = Numbered &
 	// One assistant block, appended as soon as it is complete.
 	// `ts`: when the block started streaming; `model`, `effort`: what
 	// wrote it (task hp; older records have neither).
-	| { type: 'assistant'; block: AssistantBlock; model?: string; effort?: string; ts: string }
+	| { type: 'assistant'; block: AssistantBlock; model?: string; effort?: string; interrupted?: true; ts: string }
 	// Ends one model turn, or pauses it (then `pauseReason` if Hal, not
 	// the user, paused it). `usage`: all its rounds'; `context`: the
 	// tokens its last round with usage took in (status row, task 1g).

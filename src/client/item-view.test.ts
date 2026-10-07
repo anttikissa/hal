@@ -24,3 +24,13 @@ test('answers with only hidden controls or whitespace have no terminal card', ()
 	// Literal markup in code is content, not a hidden control.
 	expect(itemView.itemLines({ type: 'text', text: '`<summary>Stopped.</summary>`' }, 60).length).toBeGreaterThan(0)
 })
+
+test('interrupted text decorates its end, preserving trailing spaces and line breaks', () => {
+	for (let [text, end] of [['partial', 'partial --'], ['partial ', 'partial --'], ['partial\n', 'partial\n--'], ['', '--']] as const) {
+		let item = { type: 'text' as const, text: text!, interrupted: true as const }
+		let rows = itemView.itemLines(item, 60)
+		let plain = rows.join('\n').replace(/\x1b\[[0-9;]*m/g, '')
+		expect(plain.endsWith(end!)).toBe(true)
+		expect(item.text).toBe(text)
+	}
+})

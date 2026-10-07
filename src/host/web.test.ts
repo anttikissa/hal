@@ -1822,3 +1822,22 @@ browserTest('the Ctrl-O dialog is as tall as its content, hints live, completes 
 		await b.close()
 	}
 }, 20000)
+
+browserTest('interrupted answers keep accessible decoration outside prose at phone and desktop widths', async () => {
+	providerHome()
+	let id = tabs.create('/tmp')
+	for (let text of ['short', 'trailing ', 'line\n', '**long** '.repeat(50) + 'ending', '```ts\nconst partial =']) history.append(id, { type: 'assistant', block: { type: 'text', text }, interrupted: true })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Network.setCookie', { name: 'hal', value: (await cookie()).slice(4), url: base() })
+		await b.call('Page.navigate', { url: `${base()}/${id}` })
+		await b.waitFor(`document.querySelectorAll('.interrupted').length === 5`)
+		for (let width of [390, 1280]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 390 })
+			let marks = await b.evaluate(`Array.from(document.querySelectorAll('.interrupted'), el => ({ tail: el.dataset.tail, label: el.getAttribute('aria-label'), prose: el.textContent, contrasting: getComputedStyle(el).color !== getComputedStyle(el.parentElement).color, visible: el.getBoundingClientRect().width > 0, fits: el.getBoundingClientRect().right <= innerWidth }))`)
+			expect(await b.evaluate(`!!document.querySelector('pre code .interrupted')`)).toBe(true)
+			expect(marks).toEqual([' --', ' --', '\n--', ' --', ' --'].map((tail) => ({ tail, label: 'Interrupted', prose: '', contrasting: true, visible: true, fits: true })))
+		}
+	} finally { await b.close() }
+})

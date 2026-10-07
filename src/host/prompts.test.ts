@@ -57,10 +57,10 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 	let view = await fresh(id)
 	expect(shown(view.items)).toEqual([
 		{ type: 'prompt', text: 'go' },
-		{ type: 'text', text: 'work' },
+		{ type: 'text', text: 'work', interrupted: true },
 		{ type: 'prompt', text: 'one', steering: true },
 		{ type: 'prompt', text: 'two', steering: true },
-		{ type: 'text', text: 'ok' },
+		{ type: 'text', text: 'ok', interrupted: true },
 		{ type: 'prompt', text: 'three', steering: true },
 		{ type: 'text', text: 'done' },
 		{ type: 'turn-end', status: 'completed' },

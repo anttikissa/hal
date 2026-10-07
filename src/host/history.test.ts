@@ -425,3 +425,25 @@ test('a host notice reaches the next request once and never starts a turn', asyn
 	expect(busy.list()).not.toContain(id)
 	expect(JSON.stringify(await history.messages(id))).toBe(first)
 })
+
+test('only canceled unfinished text gets display metadata, never provider prose', async () => {
+	for (let completed of [false, true]) {
+		let id = sessions.create({ cwd: home, model: 'fake/m' }).id
+		history.submit(id, 'go')
+		let controller = new AbortController()
+		async function* partial(): AsyncGenerator<StreamEvent> {
+			yield { type: 'text', text: 'partial\n' }
+			if (completed) yield { type: 'done', reason: 'end' }
+			controller.abort()
+		}
+		await drain(history.record(id, 'fake', partial(), { model: 'fake/m' }, controller.signal))
+		let record = history.readSync(id).find((r) => r.type === 'assistant')!
+		expect(record).toMatchObject({ block: { type: 'text', text: 'partial\n' }, model: 'fake/m' })
+		expect(record.interrupted).toBe(completed ? undefined : true)
+		expect(history.interrupted(id)?.interrupted).toBe(completed ? undefined : true)
+		let messages = await history.messages(id)
+		expect(messages.at(-1)?.blocks).toEqual([{ type: 'text', text: 'partial\n' }])
+		await drain(history.record(id, 'fake', events({ type: 'text', text: 'next' }, { type: 'done', reason: 'end' })))
+		expect(history.interrupted(id)).toBeUndefined()
+	}
+})

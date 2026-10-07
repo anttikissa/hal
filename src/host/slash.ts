@@ -1,6 +1,7 @@
 // Running slash commands (commands.ts) in a session: recorded as typed,
 // run on the host, their output recorded and broadcast, and a question
 // they ask kept in history until answered (prompts.reply).
+// Tasks: et, yq, 6eq.
 
 import type { Sender } from '../common/blocks.ts'
 import { commandList } from '../common/commands/list.ts'
@@ -63,8 +64,8 @@ function context(id: string, sender?: Sender): Context {
 }
 
 // Changes the session's cwd or model: saved, told to followers, and
-// recorded as a notice for the model's next request. The system
-// prompt of the next request follows by itself.
+// recorded before hard steering active work. The next request rebuilds
+// its system prompt from the new context; pause and tool safety stay intact.
 function change(id: string, patch: { cwd?: string; model?: string }): void {
 	let meta = sessions.open(id)
 	let previous = { cwd: meta.cwd, model: modelList.qualified(meta.model, meta.effort) }
@@ -85,6 +86,11 @@ function change(id: string, patch: { cwd?: string; model?: string }): void {
 	liveFiles.save(meta)
 	history.append(id, { type: 'change', ...changed, previous })
 	host.broadcast(id, changed.model === undefined ? { type: 'meta', sessionId: id, meta: { ...meta } } : { type: 'meta', sessionId: id, meta: { ...meta }, stats: stats.of(id) })
+	let running = turns.state.running.get(id)
+	if (running && !running.controller.signal.aborted) {
+		history.append(id, { type: 'notice', text: 'The model or working directory changed during your work. Continue your unfinished response using the current context, without repeating what you already wrote or completed.' })
+		prompts.force(running)
+	}
 	if (changed.model) {
 		// A turn waiting out a failure tries the new model now.
 		turns.state.running.get(id)?.rewait?.abort()

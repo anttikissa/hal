@@ -1,5 +1,5 @@
 // Validate durable conversation records; corruption fails loudly.
-// Tasks: jf, nvm.
+// Tasks: jf, nvm, 6eq.
 import { ason } from '../common/ason.ts'
 import { rebase } from '../common/rebase.ts'
 import { sender } from '../common/sender.ts'
@@ -12,6 +12,7 @@ function check(value: unknown): HistoryRecord {
 	if (!r || typeof r !== 'object' || !recordTypes.has(r.type) || (r.n !== undefined && !Number.isSafeInteger(r.n))) throw new Error(`unknown record ${ason.stringify(value, 'short').slice(0, 80)}`)
 	if (r.originSession !== undefined && (typeof r.originSession !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(r.originSession))) throw new Error('invalid origin session')
 	if ((r.type === 'command' || r.type === 'output') && r.origin !== undefined && r.origin !== 'model') throw new Error(`invalid ${r.type} origin`)
+	if (r.type === 'assistant' && r.interrupted !== undefined && (r.interrupted !== true || r.block?.type !== 'text')) throw new Error('invalid assistant interruption')
 	let senders = r.type === 'user' ? r.blocks.filter((b) => b.type === 'text') : r.type === 'inbox' || r.type === 'command' ? [r] : []
 	for (let s of senders) { let problem = sender.invalid(s); if (problem) throw new Error(problem) }
 	if (r.type === 'output' && r.transition !== undefined) {

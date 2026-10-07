@@ -2,7 +2,7 @@
 // and the live events after it (src/common/protocol.ts). A client
 // following live events and one reconnecting show the same transcript.
 // Provider input comes from host history; items omit provider-only fields.
-// Tasks: ca, nvm.
+// Tasks: ca, nvm, 6eq.
 
 import { blocks, type AssistantBlock, type ImageBlock, type Sender, type ToolResultBlock, type Usage } from './blocks.ts'
 import { forms, type Answers, type Form } from './forms.ts'
@@ -23,7 +23,7 @@ export type Shown = { originSession?: string } & (
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number; ts?: string }
 	// `ts`: when the block started; `model`, `effort`: what wrote it
 	// (task hp). Records from before hp have none of them.
-	| { type: 'text'; text: string; naming?: true; ts?: string; model?: string; effort?: string }
+	| { type: 'text'; text: string; naming?: true; interrupted?: true; ts?: string; model?: string; effort?: string }
 	| { type: 'thinking'; text: string; ts?: string; model?: string; effort?: string }
 	| { type: 'tool'; id: string; name: string; input: Record<string, unknown>; partial?: string; ts?: string }
 	| { type: 'tool-result'; id: string; output: string; isError?: boolean; ms?: number; interrupted?: 'canceled' | 'stopped'; ts?: string }
@@ -75,9 +75,10 @@ function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number
 	for (let [i, b] of list.entries()) {
 		let key = transcript.key(ns?.[i], 0, at + out.length)
 		if (b.type === 'tool_call') out.push({ type: 'tool', id: b.id, name: b.name, input: b.input, key, ...(by.ts?.[i] !== undefined && { ts: by.ts[i] }) })
-		else if (b.text) {
+		else if (b.text || (b.type === 'text' && by.interrupted)) {
 			let item: Item & { type: 'text' | 'thinking' } = { type: b.type, text: b.text, key }
 			if (b.type === 'text' && b.naming) (item as Item & { type: 'text' }).naming = true
+			if (b.type === 'text' && by.interrupted) (item as Item & { type: 'text' }).interrupted = true
 			if (by.ts?.[i] !== undefined) item.ts = by.ts[i]
 			if (by.model !== undefined) item.model = by.model
 			if (by.effort !== undefined) item.effort = by.effort
@@ -87,7 +88,7 @@ function blockItems(list: AssistantBlock[], ns: number[] | undefined, at: number
 	return out
 }
 
-type By = { model?: string; effort?: string; ts?: string[] }
+type By = { interrupted?: true; model?: string; effort?: string; ts?: string[] }
 
 // A live turn's blocks as items going at `at`.
 function turnItems(turn: LiveTurn, at: number): Item[] {
@@ -108,7 +109,6 @@ function waitingItem(item: InboxItem): Item {
 	let key = item.n === undefined ? item.id : `${item.n}`
 	return { ...transcript.promptItem(item.text, inbox.provenance(item), item.ts, !!item.queue), key }
 }
-
 function key(n: number | undefined, i: number, at: number): string {
 	return n === undefined ? `~${at}` : i ? `${n}.${i}` : `${n}`
 }
@@ -124,14 +124,12 @@ function href(session: string, key: string): string | undefined {
 function keyed(shown: Shown[], n: number | undefined, at: number): Item[] {
 	return shown.map((s, i) => ({ ...s, key: transcript.key(n, i, at + i) }) as Item)
 }
-
 function imageItem(b: ImageBlock, ts?: string): Shown {
 	let item: Shown = { type: 'image', blob: b.blob, mediaType: b.mediaType }
 	if (b.bytes !== undefined) item.bytes = b.bytes
 	if (ts !== undefined) item.ts = ts
 	return item
 }
-
 function resultItem(b: ToolResultBlock, ts?: string): Shown {
 	let item: Shown = { type: 'tool-result', id: b.id, output: b.output }
 	if (b.isError) item.isError = true
@@ -144,7 +142,7 @@ function resultItem(b: ToolResultBlock, ts?: string): Shown {
 // Display items for one history record, going at `at`.
 function recordItems(r: HistoryRecord, at: number): Item[] {
 	let items = r.type === 'assistant'
-		? transcript.blockItems([r.block], r.n === undefined ? undefined : [r.n], at, { model: r.model, effort: r.effort, ts: [r.ts] })
+		? transcript.blockItems([r.block], r.n === undefined ? undefined : [r.n], at, { model: r.model, effort: r.effort, ts: [r.ts], interrupted: r.interrupted })
 		: transcript.keyed(transcript.recordShown(r), r.n, at)
 	return r.originSession === undefined ? items : items.map((item) => ({ ...item, originSession: r.originSession }))
 }
@@ -159,7 +157,6 @@ function recordShown(r: HistoryRecord): Shown[] {
 	if (r.type === 'user') return r.blocks.map((b): Shown => (b.type === 'text' ? transcript.promptItem(b.text, b, r.ts, r.queued) : b.type === 'image' ? transcript.imageItem(b, r.ts) : transcript.resultItem(b, r.ts)))
 	return [transcript.endItem(r)]
 }
-
 function endItem(end: { status: TurnStatus; usage?: Usage; error?: string; ts?: string }): Shown {
 	let item: Shown = { type: 'turn-end', status: end.status }
 	if (end.ts !== undefined) item.ts = end.ts
@@ -167,7 +164,6 @@ function endItem(end: { status: TurnStatus; usage?: Usage; error?: string; ts?: 
 	if (end.error !== undefined) item.error = end.error
 	return item
 }
-
 function answered(items: Item[], answer: { question: string; answers: Answers; secrets?: string[]; canceled?: true }): Item[] {
 	return items.map((item) => {
 		if (item.type !== 'question' || item.id !== answer.question) return item
@@ -177,7 +173,6 @@ function answered(items: Item[], answer: { question: string; answers: Answers; s
 		return done
 	})
 }
-
 function boundary(r: { type: 'compact'; prompts: number } | { type: 'reset' }): string {
 	return r.type === 'reset' ? 'Context cleared.' : `context compacted (${r.prompts} prompt${r.prompts === 1 ? '' : 's'} summarized)`
 }
@@ -312,6 +307,11 @@ function fold(t: Transcript | undefined, event: Event): Transcript | undefined {
 	if (event.type === 'meta') return { ...t, meta: { ...event.meta }, ...(event.stats && { stats: event.stats }) }
 	if (event.type === 'turn-stats') return { ...t, stats: event.stats }
 	if (event.type === 'turn-end' && event.stats) t = { ...t, stats: event.stats }
+	if (event.type === 'assistant-interrupted') {
+		let items = t.live ? transcript.settle(t.items, t.live) : t.items
+		items = transcriptOrder.order([...items.filter((item) => item.key !== String(event.record.n)), ...transcript.recordItems(event.record, items.length)])
+		return { ...t, items, ...(t.live && { live: { start: items.length, turn: transcript.fresh(t.live.turn) } }) }
+	}
 	if (event.type === 'tool-output') {
 		let changed = false
 		let items = t.items.map((item): Item => {
