@@ -18,7 +18,6 @@ import { picker } from '../common/picker.ts'
 import { settingsModal } from '../common/settings-modal.ts'
 import type { Delivery, Event } from '../common/protocol.ts'
 import { sendKeys } from '../common/send-keys.ts'
-import { hints as stateHints, type Hint } from '../common/hints.ts'
 import { states } from '../common/states.ts'
 import { transcript, type Item, type Shown as ItemShown, type Transcript } from '../common/transcript.ts'
 import { titles } from '../common/titles.ts'
@@ -234,15 +233,15 @@ function line(st: ViewState, connected: boolean): Line {
 	return { text, tone: s.type === 'error' ? 'error' : s.type === 'running' || s.type === 'retrying' ? 'busy' : 'warn' }
 }
 
-// The web help row: the shared state hints (common/hints.ts), or the
+// The web help row: the shared state hints (sendKeys.hints), or the
 // keys of the completion menu or a queue edit, which only the web has.
-function hints(st: ViewState, text = '', menu?: Menu): Hint[] {
+function hints(st: ViewState, text = '', menu?: Menu): [string, string][] {
 	if (st.editing?.queueEdit) return [['enter', 'save queue edit'], ['shift-enter', 'newline'], ['esc', 'cancel']]
-	if (!menu) return stateHints.keys(st.transcript?.state, text)
+	if (!menu) return sendKeys.hints(st.transcript?.state, text)
 	let busy = !!st.transcript && states.busy(st.transcript.state)
-	let command = stateHints.commandDraft(text)
+	let command = sendKeys.commandDraft(text)
 	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'steer' : 'send'
-	let queue = busy && !command ? sendKeys.hints(true).filter((h) => h[1] === 'queue') : []
+	let queue: [string, string][] = busy && !command && sendKeys.key('queue') ? [[sendKeys.key('queue')!, 'queue']] : []
 	return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift-enter', 'newline'], ...queue, ['esc', 'dismiss']]
 }
 
@@ -380,7 +379,7 @@ export const view = {
 	streaming,
 	line,
 	hints,
-	commandDraft: stateHints.commandDraft,
+	commandDraft: sendKeys.commandDraft,
 	rows,
 	withPending,
 	jobs,
