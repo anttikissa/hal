@@ -39,6 +39,7 @@ import { marksWorker } from './host/marks-worker.ts'
 import { paths } from './host/paths.ts'
 import { secrets } from './host/secrets.ts'
 import { plugins } from './host/plugins.ts'
+import { theme } from './host/commands/theme.ts'
 import { pluginReports } from './host/plugin-reports.ts'
 import { server } from './host/server.ts'
 import { tabs } from './host/tabs.ts'
@@ -63,6 +64,8 @@ async function loadLocal(): Promise<void> {
 async function loadPlugins(): Promise<void> {
 	plugins.report = (text, path) => void pluginReports.report(text, path)
 	plugins.changed = pluginReports.changed
+	// An old color-theme.ts link becomes the portable theme.ts (task 4c1).
+	try { theme.migrate() } catch (e) { plugins.report(`theme migration: ${e instanceof Error ? e.message : e}`) }
 	await plugins.init()
 }
 
