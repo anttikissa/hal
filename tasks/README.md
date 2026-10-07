@@ -225,7 +225,7 @@ Bold, colorful and contrasty, in the spirit of 2001: A Space Odyssey,
 Alien, Blade Runner, Tron and CRT VT100 terminals:
 
 - Saturated phosphor hues on near-black. Never meek, pastel,
-  washed-out or corporate-neutral; avoid slate (blue-gray) surfaces.
+  washed-out, corporate-neutral or slate (blue-gray).
 - Lit solid edges: a card's left bar is an LED, not a hairline. The
   light comes from color alone, with no glow or blur effects.
 - Square corners on cards, buttons, tabs, fields and dialogs.
