@@ -1,10 +1,6 @@
 {
 	title: 'File tracking records declared files only; edit notes are not ownership',
-	spec: `File tracking is advisory: a quick view of what a session changed, built from what its bash calls declare in modifies. The host snapshots declared paths before and after each call, as task 8w does, and records only declared paths whose snapshots changed. It never runs git status around calls and never records undeclared observations: a file another session changes or commits during a call is not this session's change. Readers of older histories ignore undeclared entries (no migration). It is not enforcement: Hal neither checks commands against declarations nor sandboxes them.
-
-Edit notes (task 0f) come from declarations only and report activity, never ownership. A note names the session, the declared paths and the local time of the call, and says whether the call is still running: "[166-abc (Fix render) declared edits to src/a.ts at 15:12; call finished]". No "(also yours)" marker and no "is editing" for a finished call. The 15-minute window and repeat rule stay. SYSTEM.md says once: edit notes show recent activity; no session owns a file or is responsible for its failing tests, and any session that finds a failure may fix it. The modifies line in SYSTEM.md drops the Git status sentence.
-
-Invariant restored (bug 2026-10-06): 166-int committed src/web/scroll.ts while a 166-jay call ran; Git status saw the file go clean, so 166-jay was recorded as changing it and 166-int was told 166-jay was editing it. Test: a second session changes and commits an undeclared file during a call; it is absent from the first session's changes and from every edit note.`,
+	spec: 'File tracking records declared files only (task 8w). Edit notes (task 0f) come from declarations only and report activity; files have no owners. SYSTEM.md says once: edit notes show recent activity; no session owns a file or is responsible for its failing tests, and any session that finds a failure may fix it. The modifies line in SYSTEM.md drops the Git status sentence.',
 	status: 'done',
 	notes: [
 		"Edit notes start at call start (neighbors.start in fileChanges.begin) so a running call shows as running; end decrements a per-session running count. Times use the asking session's client zone (clients.timezone), falling back to the host zone.",

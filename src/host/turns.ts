@@ -20,6 +20,8 @@ import { turnPolicy } from './turn-policy.ts'
 import { diag } from './diag.ts'
 import { history } from './history.ts'
 import { models } from './models.ts'
+import { neighbors } from './neighbors.ts'
+import { notify } from './notify.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
 import { synthetic, type Reply } from './synthetic.ts'
@@ -355,6 +357,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 		end.stats = stats.ended(id, recorded)
 	}
 	host.broadcast(id, end)
+	if (end.status === 'completed' && !notify.asked(id)) neighbors.finished(id)
 	// Paused already, unless something other than the user aborted it.
 	if (end.status === 'paused') status.transition(id, capped === undefined ? { type: 'pause' } : { type: 'pause', reason: capped })
 	else status.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
