@@ -4,7 +4,13 @@
 // field crosses a trust boundary, so the host checks commands here and
 // the client checks replies before using them; plugin-history.receive
 // also verifies every version id and content hash.
-// Tasks: zh7.
+// A review step (task b81): the remote terminal scripts the host's
+// hal/plugin-sync session. The host asks it with a plugin-sync event
+// naming the session (`review`) and the answers, if any; the terminal
+// answers with a step command: what to say and what to ask next.
+// Tasks: zh7, b81.
+
+import { forms, type Answers, type Form } from './forms.ts'
 
 // One recorded plugin version, as task gev keeps it.
 export type SyncVersion = { id: string; file: string; hash?: string; parent?: string; ts: string; deleted?: true; offline?: true }
@@ -24,6 +30,7 @@ export type PluginSyncCommand = { type: 'plugin-sync' } & (
 	| { op: 'content'; hashes: string[] }
 	| { op: 'fetch'; file: string; known: string[]; expect?: string }
 	| { op: 'apply'; file: string; versions: SyncVersion[]; contents: Record<string, string>; target?: string; expect?: string }
+	| { op: 'step'; session: string; say: string; ask?: Form }
 )
 
 // The answer to command `request`, or with `changed` (no request) a
@@ -41,11 +48,13 @@ export type PluginSyncEvent = {
 	stale?: true
 	head?: SyncHead
 	applied?: true
+	review?: string
+	answers?: Answers
 }
 
 const ID = /^[0-9a-f]{16}$/
 const HASH = /^[0-9a-f]{64}$/
-const OPS = ['inventory', 'history', 'content', 'fetch', 'apply']
+const OPS = ['inventory', 'history', 'content', 'fetch', 'apply', 'step']
 
 // A top-level plugin filename: no path, so a file operation stays in
 // the plugins directory.
@@ -71,6 +80,11 @@ function invalidCommand(c: Record<string, unknown>): string | undefined {
 	if (c.op === 'inventory') return typeof c.home !== 'string' ? bad('home must be a string') : list(c.names, isName) ? undefined : bad('names must be plugin filenames')
 	if (c.op === 'history') return list(c.files, isName) ? undefined : bad('files must be plugin filenames')
 	if (c.op === 'content') return list(c.hashes, (h) => HASH.test(h as string)) ? undefined : bad('hashes must be sha256 hex')
+	if (c.op === 'step') {
+		if (typeof c.session !== 'string' || typeof c.say !== 'string' || c.say.length > 4_000_000) return bad('session and say must be strings, say at most 4 MB')
+		let form = c.ask === undefined ? undefined : forms.invalid(c.ask)
+		return form && bad(`ask: ${form}`)
+	}
 	if (!isName(c.file)) return bad('file must be a top-level plugin filename')
 	if (c.expect !== undefined && !ID.test(c.expect as string)) return bad('expect must be a version id')
 	if (c.op === 'fetch') return list(c.known, (id) => ID.test(id as string)) ? undefined : bad('known must be version ids')
@@ -86,6 +100,7 @@ function invalidEvent(e: Record<string, unknown>): string | undefined {
 	if (e.ignored !== undefined && !list(e.ignored, isName)) return 'plugin-sync: invalid ignored names'
 	if (e.contents !== undefined && !contentsOk(e.contents)) return 'plugin-sync: invalid contents'
 	if (e.head !== undefined && !isHead(e.head)) return 'plugin-sync: invalid head'
+	if (e.answers !== undefined && !(e.answers && typeof e.answers === 'object' && Object.values(e.answers).every((v) => typeof v === 'string'))) return 'plugin-sync: invalid answers'
 	return undefined
 }
 

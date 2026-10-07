@@ -1,14 +1,16 @@
 // Scripted models run inside the host, no provider needed: hal/intro
-// (intro.ts). Each answered form is durable in history; a model derives
+// (intro.ts), and hal/plugin-sync (plugin-sync-session.ts). Each answered form is durable in history; a model derives
 // its next step from those records. A reply's paragraphs arrive with
 // a typing pace (pauseMs); `pause` ends the turn paused with that reason,
 // and `after` runs once the turn has ended (a command the reply starts).
 // `stream` replaces the paced text with raw events, tool calls included;
 // the turn runs those and asks the model again, as with a provider.
+// Tasks: vc, b81.
 import type { StreamEvent } from '../common/blocks.ts'
 import type { Answers, Form } from '../common/forms.ts'
 import type { HistoryRecord } from '../common/replay.ts'
 import { intro } from './intro.ts'
+import { pluginSyncSession } from './plugin-sync-session.ts'
 import { queueTest } from './queue-test.ts'
 import { scrollTest } from './scroll-test.ts'
 
@@ -37,7 +39,7 @@ async function* paced(say: string | undefined, signal: AbortSignal): AsyncGenera
 }
 
 export const synthetic = {
-	models: { intro: (records, answers, id) => intro.run(records, answers, id), 'scroll-test': (records) => scrollTest.run(records), 'queue-test': (records) => queueTest.run(records) } as Record<string, Synthetic>,
+	models: { intro: (records, answers, id) => intro.run(records, answers, id), 'scroll-test': (records) => scrollTest.run(records), 'queue-test': (records) => queueTest.run(records), 'plugin-sync': (_records, answers, id) => pluginSyncSession.run(answers, id!) } as Record<string, Synthetic>,
 	find,
 	paced,
 	pauseMs: 400,

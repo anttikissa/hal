@@ -13,7 +13,8 @@
 // pluginHistory.receive, so both versions stay in history, and the
 // write goes through checkout's atomic write; the watcher then
 // hot-reloads it, and pluginReports names the source in its notice.
-// Tasks: zh7.
+// A review step (task b81) goes to plugin-sync-session.ts.
+// Tasks: zh7, b81.
 
 import { existsSync, readFileSync, realpathSync, unlinkSync } from 'fs'
 import { hostname } from 'os'
@@ -24,6 +25,7 @@ import { host } from './host.ts'
 import { paths } from './paths.ts'
 import { pluginHistory } from './plugin-history.ts'
 import { pluginReports } from './plugin-reports.ts'
+import { pluginSyncSession } from './plugin-sync-session.ts'
 import { plugins } from './plugins.ts'
 
 type Client = { deliver(event: Event): void }
@@ -113,10 +115,11 @@ function command(client: Client, c: Extract<Command, { type: 'plugin-sync' }>): 
 	}
 	let cmd = c as PluginSyncCommand
 	if (cmd.op === 'inventory') {
-		pluginSync.state.followers.add(client)
+		pluginSync.state.followers.set(client, cmd.home)
 		let names = [...new Set([...pluginSync.portable(), ...cmd.names])].filter((n) => !ignore.has(n)).sort()
 		return reply({ home: pluginSync.home(), heads: names.map(pluginSync.headOf), ignored: [...ignore] })
 	}
+	if (cmd.op === 'step') return pluginSyncSession.step(cmd), reply({})
 	if (cmd.op === 'history') return reply({ versions: cmd.files.filter((f) => !ignore.has(f)).flatMap(pluginSync.versionsOf) })
 	if (cmd.op === 'content') {
 		let allowed = new Set([...pluginHistory.state.versions.values()].filter((v) => v.hash && !ignore.has(v.file)).map((v) => v.hash!))
@@ -142,7 +145,7 @@ function command(client: Client, c: Extract<Command, { type: 'plugin-sync' }>): 
 // let this home's own comparison (if it is one) run again.
 function changed(path: string): void {
 	let followers = pluginSync.state.followers
-	for (let client of followers) {
+	for (let client of followers.keys()) {
 		if (!host.state.clients.has(client as any)) followers.delete(client)
 		else client.deliver({ type: 'plugin-sync', changed: true })
 	}
@@ -150,8 +153,9 @@ function changed(path: string): void {
 }
 
 export const pluginSync = {
-	// `followers`: clients that asked for an inventory on this host.
-	state: { followers: new Set<Client>() },
+	// `followers`: clients that asked for an inventory on this host, with
+	// the home they said they are.
+	state: { followers: new Map<Client, string>() },
 	sha,
 	home,
 	dir,

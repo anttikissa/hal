@@ -6,13 +6,14 @@
 // file is client-ahead, server-ahead, divergent or unrelated. Nothing
 // is written until apply() gets a confirmed choice; timestamps only
 // suggest one. /plugin-sync (task b81) reads state and calls compare,
-// diff, apply and ignore; onChange tells it the comparison changed.
+// diff, apply and ignore; onChange tells it the comparison changed,
+// and onReview hands it the host's review turns.
 //
 // Comparisons never overlap: one asked for while another runs follows
 // it. Requests go through the connection, so one sent while
 // disconnected waits for the next connection; a fresh apply refuses
 // while disconnected instead.
-// Tasks: zh7.
+// Tasks: zh7, b81.
 
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -82,6 +83,7 @@ function event(e: Event): boolean {
 	if (e.type === 'plugin-sync') {
 		if (e.changed) pluginSyncClient.schedule()
 		else if (e.request) reqs.get(e.request)?.resolve(e)
+		else if (e.review) pluginSyncClient.onReview(e)
 		return true
 	}
 	if ((e.type === 'ack' || e.type === 'rejected') && e.id !== undefined && reqs.has(e.id)) {
@@ -257,6 +259,8 @@ export const pluginSyncClient = {
 	send: (c: object): void => connection.send(c),
 	// Called whenever state changes (b81 repaints its review).
 	onChange: (): void => {},
+	// A host's hal/plugin-sync session asks for its next step (b81).
+	onReview: (_e: PluginSyncEvent): void => {},
 	start,
 	link,
 	event,
