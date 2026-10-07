@@ -329,7 +329,10 @@ html.typing .App { position: absolute; }
 .entry > button, .entry .actions button { background: transparent; color: inherit; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 2ch; border-left: 1px solid color-mix(in oklab, currentColor var(--mix-divider), transparent); transition: background-color 120ms var(--ease-out), color 150ms var(--ease-out); }
 @media (hover: hover) and (pointer: fine) { .entry > button:hover:not(:disabled), .entry .actions button:hover:not(:disabled) { background: color-mix(in oklab, currentColor var(--mix-hover), transparent); } }
 .entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; }
-.help { display: flex; flex-wrap: wrap; gap: 0 2ch; padding-top: 0.25lh; color: var(--description); }
+.help { display: flex; flex-wrap: wrap; gap: 0 1ch; padding-top: 0.25lh; color: var(--description); }
+/* 'key: description, …' as in the terminal's help row; /keys sits right. */
+.help > :not(:nth-last-child(-n + 2))::after { content: ','; color: var(--description); }
+.help .keys { margin-left: auto; }
 .help b { color: var(--key); font-weight: 600; }
 /* Reads as a hint, acts as a button: the update reload (task 7t). */
 .help .update { padding: 0; border: 0; background: none; font: inherit; color: var(--update); cursor: pointer; }
