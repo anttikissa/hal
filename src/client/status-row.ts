@@ -17,7 +17,7 @@ import { ansi } from './ansi.ts'
 // `hal`: the cwd is the Hal repo; `home` is shortened to ~ in the cwd.
 // `color`: the tab's project color (task 22).
 // `plugins`: the plugin sync indicator of a remote terminal (task b81).
-export type StatusInfo = { id: string; name?: string; cwd: string; hal?: boolean; color?: Oklch; model: string; role?: string; stats?: Stats; home?: string; plugins?: string }
+export type StatusInfo = { id: string; name?: string; autoclose?: boolean; cwd: string; hal?: boolean; color?: Oklch; model: string; role?: string; stats?: Stats; home?: string; plugins?: string }
 
 type Part = { text: string; fg?: Oklch; href?: string }
 
@@ -34,7 +34,7 @@ function percent(s: Stats | undefined): number | undefined {
 // The left side's groups: session, cwd, model, context.
 function left(info: StatusInfo, full = true): Part[][] {
 	let hi = colors.status().highlight!
-	let out: Part[][] = [info.name ? [{ text: `${info.id}: ` }, { text: ansi.clean(info.name), fg: hi }] : [{ text: info.id }]]
+	let out: Part[][] = [info.name ? [{ text: `${info.id}: ` }, { text: ansi.clean(info.name) + (info.autoclose ? ' ↧' : ''), fg: hi }] : [{ text: info.id + (info.autoclose ? ' ↧' : '') }]]
 	let home = info.home
 	let cwd = home && (info.cwd === home || info.cwd.startsWith(`${home}/`)) ? `~${info.cwd.slice(home.length)}` : info.cwd
 	out.push([{ text: ansi.clean(cwd), fg: info.color ?? (info.hal ? colors.assistant().fg! : hi) }])

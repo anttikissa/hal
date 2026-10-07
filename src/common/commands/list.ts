@@ -15,6 +15,7 @@ export type CommandInfo = { name: string; description: string; category: string;
 
 // Sorted by name.
 const list: CommandInfo[] = [
+	{ name: 'autoclose', description: 'show or set automatic tab closure', category: 'session' },
 	{ name: 'auth', description: 'one-time code for the web client', category: 'session' },
 	{ name: 'branch', description: 'alias for /fork', category: 'tabs', hidden: true },
 	{ name: 'budget', description: 'show or set spawn slots', category: 'session' },

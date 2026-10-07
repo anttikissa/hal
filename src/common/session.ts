@@ -1,5 +1,6 @@
 // Session metadata as stored in sessions/<id>/session.ason. Browser-safe
 // shape only; the host owns reading and writing it.
+// Tasks: gj, p87.
 export interface SessionMeta {
 	id: string
 	// Working directory and provider/model id for the next turn.
@@ -17,9 +18,9 @@ export interface SessionMeta {
 	nameOwner?: 'auto' | 'manual'
 	nameVersion?: number
 	nameTurns?: number
-	// Spawned by session `parent` (task t0) as `spawn`: a `subagent`
-	// closes its tab after a clean finish, `subagent-leave-open` stays,
-	// `interactive` is the user's.
+	// Close after a successful final turn once no work remains (task p87).
+	autoclose?: boolean
+	// Spawn kinds differ in their initial autoclose value; interactive is the user's.
 	parent?: string
 	spawn?: SpawnKind
 	// Spawn slots left; none yet means the first session's allowance.

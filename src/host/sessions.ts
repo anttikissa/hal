@@ -3,6 +3,7 @@
 // to the returned object persist. The host may keep several open at once.
 // A session needs no history to be valid. Malformed metadata is reported
 // and left on disk untouched; it is never replaced with defaults.
+// Tasks: gj, p87.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'fs'
 import type { SessionMeta } from '../common/session.ts'
@@ -30,6 +31,7 @@ function validate(id: string, data: Record<string, any>): void {
 	if (data.name !== undefined && typeof data.name !== 'string') throw new Error(`${path}: invalid name`)
 	if (data.nameOwner !== undefined && data.nameOwner !== 'auto' && data.nameOwner !== 'manual') throw new Error(`${path}: invalid nameOwner`)
 	for (let key of ['nameVersion', 'nameTurns']) if (data[key] !== undefined && (!Number.isSafeInteger(data[key]) || data[key] < 0)) throw new Error(`${path}: invalid ${key}`)
+	if (data.autoclose !== undefined && typeof data.autoclose !== 'boolean') throw new Error(`${path}: invalid autoclose`)
 	if (data.previousCwd !== undefined && typeof data.previousCwd !== 'string') throw new Error(`${path}: invalid previousCwd`)
 	if (data.effort !== undefined && typeof data.effort !== 'string') throw new Error(`${path}: invalid effort`)
 	let bg = data.background
@@ -46,6 +48,11 @@ function load(id: string, watch: boolean): SessionMeta {
 	} catch (e) {
 		liveFiles.close(data)
 		throw e
+	}
+	// Materialize the former spawn policy when opening pre-property metadata.
+	if (data.autoclose === undefined) {
+		data.autoclose = data.spawn === 'subagent'
+		liveFiles.save(data)
 	}
 	return data as SessionMeta
 }
@@ -88,7 +95,7 @@ function claimId(now = new Date()): string {
 	}
 }
 
-function create(init: { cwd: string; model?: string; name?: string }): SessionMeta {
+function create(init: { cwd: string; model?: string; name?: string; autoclose?: boolean }): SessionMeta {
 	let selection = models.selection(init.model ?? models.defaultModel())
 	let id = sessions.claimId()
 	let meta: SessionMeta = {
@@ -97,6 +104,7 @@ function create(init: { cwd: string; model?: string; name?: string }): SessionMe
 		model: selection.id,
 		...(selection.effort !== undefined && { effort: selection.effort }),
 		createdAt: new Date().toISOString(),
+		autoclose: init.autoclose ?? false,
 	}
 	meta.name = init.name ? names.validate(init.name) : names.fallback(id)
 	meta.nameVersion = 0
