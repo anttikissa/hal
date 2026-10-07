@@ -82,7 +82,7 @@ export const command: SlashCommand = {
 		// With no name, a question to pick from, the active one chosen.
 		if (!args && !answers) {
 			let text = now.own ? `${now.own}; /theme will not replace it.`
-				: all.includes(now.name) ? 'Pick the color theme.'
+				: all.includes(now.name ?? '') ? 'Pick the color theme.'
 				: `${file()} selects ${now.name}, which is not in ${themesDir()}. Pick the color theme.`
 			return { ask: { text, fields: [{ type: 'choice', name: 'theme', options: all, initial: Math.max(0, all.indexOf(now.name ?? '')) }] } }
 		}
