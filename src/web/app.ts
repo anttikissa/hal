@@ -369,6 +369,8 @@ export const app = {
 	setView,
 	setNotice,
 	sendNow,
+	// Play's nudge (task yhn): a prompt sent as if typed, pending until the host takes it.
+	nudge: (id: string, text: string): void => { drafts.submit(id, text); app.changed() },
 	backgroundStep: () => tabs.backgroundStep(),
 	onEvent,
 	settled,

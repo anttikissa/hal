@@ -30,7 +30,7 @@ import { view, type ViewState } from '../view.ts'
 import { Icon } from './Icon.tsx'
 import type { IconName } from '../icons.ts'
 
-export function Composer(props: { view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; dropping: boolean }) {
+export function Composer(props: { update?: boolean; view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; dropping: boolean }) {
 	let input!: HTMLTextAreaElement
 	let measure!: HTMLTextAreaElement
 	// The copy has height 0, so its scrollHeight is the text's height plus padding.
@@ -119,9 +119,16 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 	let saving = () => !!props.view.transcript && !!queueEdit.current(props.view.transcript.meta.id)?.saving
 	let canSave = () => !!props.view.transcript && queueEdit.ready(props.view.transcript.meta.id)
 	let paused = () => props.view.transcript?.state.type === 'paused'
+	// A typed draft goes with Send: the host clears a draft its prompt
+	// contains, so a nudge could swallow a draft such as 'Go'.
+	let nudgeable = () => !props.text.trim() && !!view.nudge(props.view, 0)
 	let toggle = () => {
 		let t = props.view.transcript
-		if (t) app.sendNow(paused() ? { type: 'continue', sessionId: t.meta.id } : view.pause(props.view))
+		if (!t) return
+		if (busy()) return void app.sendNow(view.pause(props.view))
+		if (paused()) return void app.sendNow({ type: 'continue', sessionId: t.meta.id })
+		let text = nudgeable() && view.nudge(props.view)
+		if (text) app.nudge(t.meta.id, text)
 	}
 	// One source per action button (task 02s): the icon, the small-caps
 	// name under it, the aria-label and the caption that hover or
@@ -215,10 +222,9 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				<textarea ref={(e) => (measure = e)} class="measure" rows={1} tabindex={-1} aria-hidden="true" readonly />
 				</div>
 				<div class="actions">
-					{/* Pause and continue without Escape (task v0g); the tap keeps the keyboard. */}
-					<Show when={busy() || paused()}>
-						<Action kind={paused() ? 'continue' : 'pause'} class="toggle" onClick={toggle} />
-					</Show>
+					{/* Pause and continue without Escape (task v0g); the tap keeps the
+					    keyboard. Idle, Play nudges the model on (task yhn). */}
+					<Action kind={paused() ? 'continue' : busy() ? 'pause' : 'nudge'} class="toggle" disabled={!busy() && !paused() && !nudgeable()} onClick={toggle} />
 					<Show when={busy() && !queueEditing() && !view.commandDraft(props.text)}>
 						<Action kind="queue" disabled={!props.text.trim() || !!props.view.form} onClick={() => send(true)} />
 					</Show>
@@ -233,10 +239,20 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 				<For each={view.hints(props.view, props.text, props.menu)}>
 					{(h) => (
 						<span>
-							<b>{h[0]}</b> {h[1]}
+							<b>{h[0]}</b>: {h[1]}
 						</span>
 					)}
 				</For>
+				{/* A newer Hal is served (task 7t): the last hint; Ctrl-R reloads too. Phones
+				    have no help row and keep the badge over the transcript. */}
+				<Show when={props.update}>
+					<button type="button" class="update" aria-label="Reload to update Hal" onClick={() => location.reload()}>
+						<b>ctrl-r</b>: reload
+					</button>
+				</Show>
+				<span class="keys">
+					<b>/keys</b>: shortcuts
+				</span>
 			</div>
 		</footer>
 	)
@@ -245,6 +261,7 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 const BUTTONS = {
 	pause: { icon: 'pause', name: 'Pause', label: 'Pause (Esc)', caption: 'Stop the turn for now. Continue resumes it.' },
 	continue: { icon: 'play', name: 'Continue', label: 'Continue', caption: 'Resume the paused turn.' },
+	nudge: { icon: 'play', name: 'Continue', label: 'Continue', caption: 'Ask the model to keep going.' },
 	queue: { icon: 'queue', name: 'Queue', label: 'Queue', caption: 'Sent after this turn ends.' },
 	steer: { icon: 'steer', name: 'Steer', label: 'Steer', caption: 'Send message immediately. Interrupts ongoing work.' },
 	send: { icon: 'send', name: 'Send', label: 'Send', caption: 'Send message to start a turn.' },

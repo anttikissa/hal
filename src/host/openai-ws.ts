@@ -5,10 +5,12 @@
 // conversation. Messages are fed back as SSE bytes, so provider.ts keeps
 // its timeouts, abort and parse unchanged. Anything unexpected closes
 // the socket; the next request starts over with the full input, and a
-// failed connect falls back to HTTP for a while.
+// failed connect falls back to HTTP for a while. Quota arrives as a
+// codex.rate_limits message, not as response headers (usage.ts).
 
 import type { HttpRequest, ProviderRequest } from './provider.ts'
 import { diag } from './diag.ts'
+import { usage } from './usage.ts'
 
 type Socket = {
 	key: string
@@ -46,6 +48,23 @@ function close(id: string): void {
 	try {
 		s.ws.close()
 	} catch {}
+}
+
+// A codex.rate_limits message as the response headers HTTP would carry,
+// so usage.observe reads both alike (codex-rs codex-api/src/rate_limits.rs).
+// Only the shared limit: a metered one (one model's own) would overwrite it.
+function rateHeaders(ev: any): Headers {
+	let h = new Headers()
+	let limit = String(ev.metered_limit_name ?? ev.limit_name ?? 'codex').toLowerCase()
+	if (limit !== 'codex') return h
+	for (let which of ['primary', 'secondary']) {
+		let w = ev.rate_limits?.[which]
+		if (typeof w?.used_percent !== 'number') continue
+		h.set(`x-codex-${which}-used-percent`, String(w.used_percent))
+		if (typeof w.window_minutes === 'number') h.set(`x-codex-${which}-window-minutes`, String(w.window_minutes))
+		if (typeof w.reset_at === 'number') h.set(`x-codex-${which}-reset-at`, String(w.reset_at))
+	}
+	return h
 }
 
 function connect(url: string, headers: Record<string, string>): Pick<Socket, 'ws' | 'opened'> {
@@ -130,6 +149,8 @@ async function open(http: HttpRequest, req: ProviderRequest, items: (req: Provid
 		} catch {
 			return fail(`OpenAI WebSocket sent invalid JSON: ${data.slice(0, 500)}`)
 		}
+		// Carries no response id, so it is read before the filter below.
+		if (ev.type === 'codex.rate_limits') return usage.observe('openai', http.account, rateHeaders(ev))
 		if (ev.type === 'error') {
 			let code = ev.error?.code ?? ev.code
 			// A stale continuation or the 60-minute socket limit: the retry

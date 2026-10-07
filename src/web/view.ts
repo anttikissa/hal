@@ -188,6 +188,26 @@ function pause(st: ViewState): unknown {
 	return st.transcript && states.escape(st.transcript.meta.id, st.transcript.state)
 }
 
+// Prompts Play sends when an idle turn ended with the assistant's text
+// (task yhn): short, and each asks for action, not another plan.
+const NUDGES = [
+	'Continue.',
+	'Proceed.',
+	'Go on.',
+	'Keep going until the task is done.',
+	'Proceed with the next step; no need to ask.',
+	'Yes, go ahead and do it.',
+	'Carry on and finish what you started.',
+]
+
+// A nudge if the session is idle and its last output is the assistant's text.
+function nudge(st: ViewState, pick = Math.random()): string | undefined {
+	let t = st.transcript
+	if (t?.state.type !== 'idle') return undefined
+	let last = t.items.findLast((i) => i.type !== 'turn-end' && i.type !== 'thinking')
+	return last?.type === 'text' ? NUDGES[Math.floor(pick * NUDGES.length)] : undefined
+}
+
 // What the model is streaming into the last item, thinking or text:
 // Hal's cursor sits in that item's card (dimmed while thinking).
 function streaming(st: ViewState): 'thinking' | 'text' | undefined {
@@ -213,22 +233,16 @@ function line(st: ViewState, connected: boolean): Line {
 	return { text, tone: s.type === 'error' ? 'error' : s.type === 'running' || s.type === 'retrying' ? 'busy' : 'warn' }
 }
 
-// Include an incomplete / command, but not an absolute file path.
-const commandDraft = (text: string) => /^\/(?:[a-z][a-z0-9-]*(?:\s|$)|$)/.test(text.trim())
-
-function hints(st: ViewState, text = '', menu?: Menu): [key: string, does: string][] {
-	if (st.editing?.queueEdit) return [['enter', 'save queue edit'], ['shift+enter', 'newline'], ['esc', 'cancel']]
-
-	let busy = st.transcript && states.busy(st.transcript.state)
-	let command = view.commandDraft(text)
+// The web help row: the shared state hints (sendKeys.hints), or the
+// keys of the completion menu or a queue edit, which only the web has.
+function hints(st: ViewState, text = '', menu?: Menu): [string, string][] {
+	if (st.editing?.queueEdit) return [['enter', 'save queue edit'], ['shift-enter', 'newline'], ['esc', 'cancel']]
+	if (!menu) return sendKeys.hints(st.transcript?.state, text)
+	let busy = !!st.transcript && states.busy(st.transcript.state)
+	let command = sendKeys.commandDraft(text)
 	let enter = completions.chooses(text, menu) ? 'choose' : command ? 'run' : busy ? 'steer' : 'send'
-	// Send chords as sendKeys binds them (task 8kx), named with '+' here.
-	let web = (h: [string, string][]): [string, string][] => h.map(([k, does]) => [k.replace('-', '+'), does])
-	let queue = busy && !command ? web(sendKeys.hints(true).filter((h) => h[1] === 'queue')) : []
-	if (menu) return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift+enter', 'newline'], ...queue, ['esc', 'dismiss']]
-	if (busy && command) return [['enter', enter], ['shift+enter', 'newline'], ['esc', 'pause']]
-	if (busy) return [...web(sendKeys.hints(true)), ['shift+enter', 'newline'], ['esc', 'pause']]
-	return [['enter', enter], ['shift+enter', 'newline'], ['↑', 'edit last'], ['tab', 'complete'], ['ctrl+m', 'model']]
+	let queue: [string, string][] = busy && !command && sendKeys.key('queue') ? [[sendKeys.key('queue')!, 'queue']] : []
+	return [['enter', enter], ['↑/↓', 'select'], ['tab', 'complete'], ['shift-enter', 'newline'], ...queue, ['esc', 'dismiss']]
 }
 
 // A transcript row: an item, and for a tool call its result once it
@@ -361,10 +375,11 @@ export const view = {
 	complete,
 	completed,
 	pause,
+	nudge,
 	streaming,
 	line,
 	hints,
-	commandDraft,
+	commandDraft: sendKeys.commandDraft,
 	rows,
 	withPending,
 	jobs,

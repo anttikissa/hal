@@ -540,7 +540,6 @@ test('slash commands never queue, including modified Enter; ordinary messages st
 	app.onEvent(snapshot({ type: 'running', phase: 'streaming' }))
 	for (let text of ['/model other', '  /cd /tmp', '/']) {
 		app.input(text)
-		expect(view.hints(app.state.view, text).some((h) => h[1] === 'queue')).toBe(false)
 		expect(press('Enter', message(text), { altKey: true })).toBe(true)
 		let submit = sent.findLast((c) => c.type === 'submit')
 		expect(submit.text).toBe(text)
@@ -551,7 +550,6 @@ test('slash commands never queue, including modified Enter; ordinary messages st
 	expect(view.hints(app.state.view, app.state.text, app.state.menu).some((h) => h[1] === 'queue')).toBe(false)
 	for (let text of ['later', '/tmp/file is broken']) {
 		app.input(text)
-		expect(view.hints(app.state.view, text)).toContainEqual(['alt+enter', 'queue'])
 		press('Enter', message(text), { altKey: true })
 		expect(sent.findLast((c) => c.type === 'submit')).toMatchObject({ text, delivery: 'queue' })
 	}
