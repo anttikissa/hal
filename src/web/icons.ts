@@ -54,6 +54,7 @@ const phosphor = {
 	ask: '<circle cx="128" cy="180" r="12"/><path d="M128,144v-8c17.67,0,32-12.54,32-28s-14.33-28-32-28S96,92.54,96,108v4" class="s"/><circle cx="128" cy="128" r="96" class="s"/>',
 	blob: '<polygon points="152 224 104 152 76.36 193.46 60 168 24 224 152 224" class="s"/><polyline points="152 32 152 88 208 88" class="s"/><path d="M192,224h8a8,8,0,0,0,8-8V88L152,32H56a8,8,0,0,0-8,8v88" class="s"/>',
 	check: '<polyline points="40 144 96 200 224 72" class="s"/>',
+	checks: '<polyline points="16 130.29 54.4 168 144 80" class="s"/><polyline points="125.96 144 150.4 168 240 80" class="s"/>',
 	copy: '<polyline points="168 168 216 168 216 40 88 40 88 88" class="s"/><rect x="40" y="88" width="128" height="128" class="s"/>',
 	download: '<line x1="128" y1="144" x2="128" y2="32" class="s"/><polyline points="216 144 216 208 40 208 40 144" class="s"/><polyline points="168 104 128 144 88 104" class="s"/>',
 	image: '<rect x="32" y="48" width="192" height="160" rx="8" class="s"/><circle cx="156" cy="100" r="12"/><path d="M147.31,164,173,138.34a8,8,0,0,1,11.31,0L224,178.06" class="s"/><path d="M32,168.69l54.34-54.35a8,8,0,0,1,11.32,0L191.31,208" class="s"/>',

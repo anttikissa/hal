@@ -118,6 +118,12 @@ html.typing .App { position: absolute; }
 /* Rebase summaries retain drop ranges, edited IDs and --paused at every width (18n). */
 .CardHeader .error { background: none; margin-left: 1ch; }
 /* Steering's "(canceled)" or "(stopped, 50.2s)" is no failure; a flagged call's label keeps the title color (task ker). */
+.Card .receipt { opacity: .5; display: inline-flex; align-items: center; flex-shrink: 0; }
+.Card > .receipt { position: absolute; top: var(--card-inset); right: calc(1ch + 44px); }
+.Card:has(> .link > .receipt) { --receipt-space: 2ch; }
+.CardHeader > .receipt { padding-block: var(--card-inset); }
+.Card .link:has(.receipt) { display: inline-flex; align-items: center; justify-content: flex-end; gap: .5ch; }
+.Card .link:has(.receipt)::before { order: 1; }
 .CardHeader .status { padding-block: var(--card-inset); color: var(--quiet); white-space: nowrap; }
 .CardHeader .unsafe { margin-left: 1ch; font-style: italic; white-space: nowrap; }
 .CardHeader .kill { margin-left: 1ch; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; align-self: flex-start; }
@@ -127,6 +133,7 @@ html.typing .App { position: absolute; }
 .CardHeader :is(.edit, .discard) { position: relative; margin-top: var(--card-inset); height: 1lh; padding: 0 1ch; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 0.2em; align-self: flex-start; }
 .CardHeader .edit + .discard { margin-left: -1ch; }
 @media (hover: hover) and (pointer: fine) { .Card:not(:hover, :focus-within) .CardHeader :is(.edit, .discard) { opacity: 0; } }
+.CardHeader:has(.receipt) .discard { padding-inline: 0; }
 @media (pointer: coarse) { .CardHeader :is(.edit, .discard)::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); } }
 .EditBar { flex: none; display: flex; align-items: center; gap: 1ch; margin: 0 max(2ch, env(safe-area-inset-right)) 0 max(2ch, env(safe-area-inset-left)); padding: 0.25lh 1ch; border-left: 3px solid var(--attention-fg); }
 .EditBar .text { flex: 1; min-width: 0; }
@@ -148,10 +155,10 @@ html.typing .App { position: absolute; }
 /* Queue edits share the existing pencil and discard is an ×, each a real
    44px target beside the reference; reserve all controls so long
    previews never overlap. A card with the pencil always has the ×. */
-.Card.queued > :is(.edit, .discard) { position: absolute; top: 0; right: calc(1ch + 44px); width: 44px; height: 44px; padding: 0; background: transparent; color: inherit; }
-.Card.queued:has(> .discard) > .edit { right: calc(1ch + 88px); }
-.Card.queued:has(> .discard) > .content { padding-right: calc(7ch + 44px); }
-.Card.queued:has(> .edit) > .content { padding-right: calc(7ch + 88px); }
+.Card.queued > :is(.edit, .discard) { position: absolute; top: 0; right: calc(1ch + 44px + var(--receipt-space, 0ch)); width: 44px; height: 44px; padding: 0; background: transparent; color: inherit; }
+.Card.queued:has(> .discard) > .edit { right: calc(1ch + 88px + var(--receipt-space, 0ch)); }
+.Card.queued:has(> .discard) > .content { padding-right: calc(7ch + 44px + var(--receipt-space, 0ch)); }
+.Card.queued:has(> .edit) > .content { padding-right: calc(7ch + 88px + var(--receipt-space, 0ch)); }
 .Card.pending { color: var(--quiet); transition-delay: 300ms; }
 .Chat.offline .Card.pending .who::after { content: " (waiting to reconnect)"; }
 .Card.folds { cursor: pointer; }
@@ -159,7 +166,7 @@ html.typing .App { position: absolute; }
    shown on hover or focus; the linked card flashes (flash.ts). */
 .Card .link { color: var(--quiet); text-decoration: none; user-select: none; white-space: nowrap; }
 .Card > .link { position: absolute; top: 0; right: 1ch; padding-block: var(--card-inset); min-width: 44px; text-align: right; }
-.Card:has(> .link) > .content { padding-right: 7ch; }
+.Card:has(> .link) > .content { padding-right: calc(7ch + var(--receipt-space, 0ch)); }
 .Card .link::before { content: attr(data-ref); }
 .Card .link:focus-visible { color: inherit; text-decoration: underline; }
 @media (hover: hover) and (pointer: fine) { .Card .link:hover { color: inherit; text-decoration: underline; } }

@@ -108,13 +108,17 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	// leaves it out.
 	let blockId = () => titles.blockId(props.row.item)
 	let href = () => (props.row.pending || (props.row.waiting && props.row.note === undefined) ? undefined : target.href(props.session, blockId()))
+	let receipt = () => props.row.pending ? 0 : titles.receipt(props.row.item)
+	let receiptLabel = () => receipt() === 1 ? 'Delivered, not read yet' : `Read by Hal${time() ? ` at ${time()}` : ''}`
+	let ticks = () => <Show when={receipt()}><span class="receipt" role="img" aria-label={receiptLabel()} title={receiptLabel()}><Icon name={receipt() === 1 ? 'check' : 'checks'} /></span></Show>
 	let link = () => (
-		<Show when={href()}>
+		<Show when={href()} fallback={ticks()}>
 			{(h) => (
-				<a class="link" href={h()} data-ref={`#${blockId()}`} title="Link to this block" aria-label={`Link to block ${blockId()}`} />
+				<a class="link" href={h()} data-ref={`#${blockId()}`} title="Link to this block" aria-label={`Link to block ${blockId()}`}>{ticks()}</a>
 			)}
 		</Show>
 	)
+
 	// Another session's message with a summary folds under it.
 	// Prompt-file changes fold under their summary (task ar).
 	let folding = () => shut() || props.row.item.type === 'thinking' || props.row.item.type === 'tool' || (props.row.item.type === 'prompt' && !!props.row.item.summary) || (props.row.item.type === 'output' && !!props.row.item.change)

@@ -46,3 +46,15 @@ test('subagent reports show their outcome after sender identity; ordinary chatte
 	expect(titles.messageHead({ ...item, report: 'summary', summary: 'Import added' })).toBe('Message from tab 124 (07-kim) · Finished: Import added')
 	expect(titles.messageHead({ ...item, report: undefined })).toBe('From tab 124 (07-kim): Which format?')
 })
+
+test('receipts distinguish inbox delivery from model history without marking immediate messages', () => {
+	let prompt = { type: 'prompt' as const, text: 'change direction' }
+	for (let flags of [{ interject: true as const }, { advisory: true as const, from: 'other' }, { queued: true as const }, { queuedAt: at(19, 12) }]) {
+		expect(titles.receipt({ ...prompt, ...flags, waiting: true })).toBe(1)
+		expect(titles.receipt({ ...prompt, ...flags })).toBe(2)
+	}
+	expect(titles.receipt(prompt)).toBe(0)
+	expect(titles.receipt({ ...prompt, steering: true })).toBe(0)
+	expect(titles.title({ ...prompt, interject: true, waiting: true })).toBe('You (soft-steering)')
+	expect(titles.title({ ...prompt, interject: true })).toBe('You (soft-steered)')
+})

@@ -18,7 +18,7 @@ import type { SessionState } from './states.ts'
 export type Shown = { originSession?: string } & (
 	// `from`: the session that sent it, `label` naming it; without it,
 	// the human. `ts`: when it was sent (task hp).
-	| ({ type: 'prompt'; text: string; queued?: true; ts?: string } & Sender)
+	| ({ type: 'prompt'; text: string; queued?: true; waiting?: true; ts?: string } & Sender)
 	// An image attached to the prompt before it (task 2a).
 	| { type: 'image'; blob: string; mediaType: string; bytes?: number; ts?: string }
 	// `ts`: when the block started; `model`, `effort`: what wrote it
@@ -96,8 +96,8 @@ function turnItems(turn: LiveTurn, at: number): Item[] {
 }
 
 // A prompt text as shown, saying who sent it if not the human.
-function promptItem(text: string, s?: Sender, ts?: string, queued = false): Shown {
-	let item: Shown = { type: 'prompt', text, ...inbox.sender(s ?? {}) }
+function promptItem(text: string, s?: Sender, ts?: string, queued = false): Shown & { type: 'prompt' } {
+	let item: Shown & { type: 'prompt' } = { type: 'prompt', text, ...inbox.sender(s ?? {}) }
 	if (ts !== undefined) item.ts = ts
 	if (queued) item.queued = true
 	return item
@@ -107,7 +107,7 @@ function promptItem(text: string, s?: Sender, ts?: string, queued = false): Show
 // record's history line (task 9p); queued ones draw compact (task 16).
 function waitingItem(item: InboxItem): Item {
 	let key = item.n === undefined ? item.id : `${item.n}`
-	return { ...transcript.promptItem(item.text, inbox.provenance(item), item.ts, !!item.queue), key }
+	return { ...transcript.promptItem(item.text, inbox.provenance(item), item.ts, !!item.queue), waiting: true, key }
 }
 function key(n: number | undefined, i: number, at: number): string {
 	return n === undefined ? `~${at}` : i ? `${n}.${i}` : `${n}`

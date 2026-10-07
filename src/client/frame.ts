@@ -139,6 +139,7 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 // `at`, after `status` if there is one; the row is clipped to make room.
 function ref(item: Item, cols: number, session: string | undefined, style: Style | undefined, status = ''): { inner: number; mark: (lines: string[], at: number) => void } {
 	let width = Math.max(1, cols - 2 * ansi.PAD.length)
+	status = [status, itemView.receipt(item, style)].filter(Boolean).join(' ')
 	let ref = itemView.ref(item, session)
 	// On a very narrow terminal the text needs every column.
 	if (ref && width < 4 * strings.visLen(ref.text)) ref = undefined
