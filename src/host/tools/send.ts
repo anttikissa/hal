@@ -61,6 +61,7 @@ export const tool: Tool = {
 		if (typeof to !== 'string' || !to.trim()) throw new Error('to must be a tab number or session id')
 		if (typeof text !== 'string' || !text.trim()) throw new Error('text must be a non-empty string')
 		if (typeof description !== 'string' || !description.trim()) throw new Error('description must be a non-empty string')
+		// LEGACY-SEND (task zb0): delete with its test by 2026-10-10.
 		if ('steer' in input || 'queue' in input) throw new Error("steer and queue are no longer parameters: use delivery 'emergency' or 'queue'")
 		if (delivery !== 'soft-steer' && delivery !== 'queue' && delivery !== 'emergency') throw new Error('delivery must be soft-steer, queue or emergency')
 		let id = target(to.trim())
