@@ -1,0 +1,6 @@
+{
+	title: 'Read receipts on interjecting and queued messages',
+	spec: 'Interjecting and queued messages, from the user or another tab, show whether Hal has read them, with Signal-style ticks: none while this client waits for the host to acknowledge the send (optimistic, task rw), one check once the host holds it in the inbox, two checks once the model has read it (the host froze it into the history before a request). Normal prompts on an idle session and interrupting messages are taken at once and show no ticks. The two checks stay on the delivered message in the history. The web draws Phosphor check and checks icons (src/web/icons.ts); the terminal draws ✓ and ✓✓ in the status slot before the block id. The title reads present tense while waiting and past once read: You (interjecting) becomes You (interjected); queued becomes queued at HH:MM. On the web the ticks have hover text: Delivered, not read yet / Read by Hal at HH:MM; the terminal has no hover (a recorded web-only exception). src/web/demo/ticks.html (artifact ticks.html, served at /demo/ticks, task 86) compares tick placement, read color and dimming of unread text, with web and terminal side by side and a lifecycle player.',
+	status: 'planned',
+	needs: ['csn', 'rw']
+}
