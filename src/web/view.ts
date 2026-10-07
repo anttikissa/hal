@@ -2,7 +2,7 @@
 // from host events (the same transcript.fold the terminal uses), a
 // passing notice, and what each item looks like as text. app.ts feeds
 // it the events from link.ts; the components draw it.
-// Tasks: dz, a1k.
+// Tasks: dz, a1k, kx0.
 
 import { queueEdit } from '../common/queue-edit.ts'
 import { completions, type Menu } from './completions.ts'
@@ -316,7 +316,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'prompt':
 			// Who sent it is in the card's head (task hp); a report's
 			// summary heads its card, so the body omits the tag (task rj).
-			return { kind: titles.letter(item) === 'm' ? 'message prompt' : 'user prompt', text: (/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? '')) ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text }
+			return { kind: titles.letter(item) === 'm' ? 'message prompt' : 'user prompt', text: bashResult.background(item) ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text }
 		case 'image':
 			// The text is the image's alt text; Card shows the image.
 			return { kind: 'user image', text: attachments.label(item) }
@@ -334,7 +334,7 @@ function show(item: ItemShown, full = false, bash = false): Shown {
 		case 'tool-result': {
 			// A glimpse, like the terminal; steering's note is the header's (ker).
 			if (item.interrupted === 'canceled') return { kind: 'result log', text: '' }
-			let rows = (item.interrupted ? bashResult.display(item.output, true, true) : bash ? bashResult.display(item.output) : item.output).replace(/\n$/, '').split('\n')
+			let rows = (item.interrupted ? bashResult.display(item.output, true) : bash ? bashResult.display(item.output) : item.output).replace(/\n$/, '').split('\n')
 			let shown = full ? rows : rows.slice(0, view.resultRows)
 			if (rows.length > shown.length) shown.push(`… ${rows.length - shown.length} more lines`)
 			return { kind: item.isError ? 'result error' : 'result log', text: (item.isError ? '✗ ' : '◂ ') + shown.join('\n  ') }

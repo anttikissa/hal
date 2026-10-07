@@ -1,17 +1,14 @@
 // Presentation of a Bash result. Keep the original output in history
 // and provider input; the UI shows a nonzero status in the card's
-// title instead of an output row (task wm0).
+// title instead of an output row (tasks wm0, kx0).
+
+import type { Shown } from './transcript.ts'
 
 const STATUS = /^\[exit (\d+)\]\n?/
 
-// The output to show: no blank lines at either end and no `[exit 0]`;
-// `titled`: no status line at all, the card's title shows it (the
-// terminal; job messages and the web keep a nonzero one). `interrupted`:
-// steering stopped it, so its first line is the stop note (task ker).
-function display(output: string, titled = false, interrupted = false): string {
-	if (titled && interrupted) return bashResult.trim(output.replace(/^\[[^\n]*\]\n?/, ''))
-	let status = titled || !bashResult.status(output) ? STATUS : ''
-	return bashResult.trim(output.replace(status, ''))
+// Status belongs to the header; interrupted calls replace it with a stop note.
+function display(output: string, interrupted = false): string {
+	return bashResult.trim(output.replace(interrupted ? /^\[[^\n]*\]\n?/ : STATUS, ''))
 }
 
 // Text without blank lines at either end: they are never shown.
@@ -41,4 +38,5 @@ function interrupted(r: { interrupted?: 'canceled' | 'stopped'; ms?: number }): 
 	return time ? `stopped, ${time}` : 'stopped'
 }
 
-export const bashResult = { display, trim, status, duration, interrupted }
+// Stored job labels identify literal Bash output and its original call.
+export const bashResult = { background: (item: Shown) => item.type === 'prompt' ? /^bash (#t?\d+|b[0-9a-f]{6})$/.exec(item.label ?? '')?.[1] : undefined, display, trim, status, duration, interrupted }

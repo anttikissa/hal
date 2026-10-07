@@ -464,13 +464,21 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	expect(title).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
 	expect(printed).not.toContain('[exit 123]\nerror')
 	expect(printed).toContain('error: cannot access file')
-	// A job's message has no title for it: the status stays its first row.
-	expect(lines.find((line) => plain([line])[0]!.includes('[exit 123]'))).toContain(ansi.sgr({ fg: colors.exit().fg! }) + '[exit 123]')
+	let jobTitle = lines.find((line) => line.includes('Background command finished'))!
+	expect(plain([jobTitle])[0]).toMatch(/Background command finished #1813 +\(exit 123\) #s1817$/)
+	expect(jobTitle).toContain(ansi.sgr({ fg: colors.exit().fg! }) + 'exit 123')
+	expect(printed).not.toContain('[exit 123]')
 	let apart = view([v.transcript!.items[0]!, { type: 'text', text: 'meanwhile' }, v.transcript!.items[1]!])
 	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1818', '1814'][i]! }))
 	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('#t1813>  M notes.md')
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#t1813`)
 	expect(printed).toContain('Background command finished #1813')
+	for (let width of [40, 50, 70]) for (let label of ['bash #1813', 'bash #t1813']) {
+		let job = view([{ type: 'prompt', text: '[exit 123]\nmissing file', from: 's', label }])
+		let rendered = frame.build(job, width).lines
+		expect(targets(rendered)).toContain(`${settings.webUrl()}/s${label.slice(5)}`)
+		expect(plain(rendered).join('\n')).toContain(label.slice(5))
+	}
 })
 
 test('legacy rename controls never appear in terminal answers without a naming flag', () => {

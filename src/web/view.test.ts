@@ -287,11 +287,11 @@ test('a prompt’s [image/<name>] markers become links; the rest stays text', ()
 	expect(hrefs.links('[image/ABC123.png] [image 0123456789ab]')).toEqual(['[image/ABC123.png] [image 0123456789ab]'])
 })
 
-test('Bash display hides successful status but keeps errors and the original source data', () => {
+test('Bash headers own status; output and original source data remain complete', () => {
 	let good = { type: 'tool-result' as const, id: 'call', output: '[exit 0]\n M notes.md\n' }
 	let bad = { ...good, output: '[exit 123]\nerror: cannot access file\n' }
 	expect(view.show(good, false, true)?.text).toBe('◂  M notes.md')
-	expect(view.show(bad, false, true)?.text).toContain('[exit 123]\n  error: cannot access file')
+	expect(view.show(bad, false, true)?.text).toBe('◂ error: cannot access file')
 	expect(view.show(good, false, false)?.text).toContain('[exit 0]')
 	expect(view.show({ type: 'prompt', text: good.output, from: 's', label: 'bash #1813' })?.text).toBe(' M notes.md')
 	expect(good.output).toStartWith('[exit 0]')

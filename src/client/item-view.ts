@@ -1,6 +1,6 @@
 // Transcript items as the frame shows them: the rows of each item and
 // the style it wears. Pure.
-// Tasks: fn, hp, hr, hse, a1k, 6eq.
+// Tasks: fn, hp, hr, hse, a1k, 6eq, kx0.
 
 import { interruption } from '../common/interruption.ts'
 import { diff } from '../common/diff.ts'
@@ -23,7 +23,7 @@ import { resolve } from 'path'
 
 // A block's fold state when toggled (task ghs), and the paste texts a
 // prompt shown inline needs (client/folds.ts).
-export type Look = { full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }> }
+export type Look = { headerWidth?: number; full?: boolean; fold?: Fold; pastes?: Map<string, { text?: string; error?: string }> }
 
 const { INVERSE, UNINVERSE } = ansi
 
@@ -100,17 +100,10 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
-			let bash = (/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
-			// A job's message has no title to carry its status: a nonzero
-			// one stays its first row, in the exit color (task wm0).
-			let source = bash ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text
+			let source = bashResult.background(item) ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text
 			if (fold === 'inline') source = itemView.inlined(source, look.pastes)
 			if (fold === 'closed' && !item.summary) return itemView.closedRow(item, source, width)
 			let body = ansi.wrap(source, width).map(ansi.links)
-			if (bash && /^\[exit [1-9]\d*\]/.test(body[0] ?? '')) {
-				let status = /^\[exit [1-9]\d*\]/.exec(body[0]!)![0]
-				body[0] = itemView.exitColor(status, itemView.itemStyle(item)) + body[0]!.slice(status.length)
-			}
 			// Another session's message: its summary, then a glimpse;
 			// opened, its whole text.
 			if (item.summary && (fold ?? 'closed') !== 'closed') body = [...ansi.wrap(item.summary, width), ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
@@ -130,7 +123,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (fits) rows[rows.length - 1] += ' ' + linked
 				else rows.push(linked)
 			}
-			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, width, session)
+			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, look.headerWidth ?? width, session)
 		case 'image':
 			return [itemView.imageLabel(item, session)]
 		// Markdown hides trailing blanks except before interruption marks.
@@ -191,7 +184,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// A glimpse: tool output can be long, the model sees all of it.
 			let call = calls?.get(item.id)
 			// A canceled call's note to the model: the title says "(canceled)".
-			let out = item.interrupted === 'canceled' ? '' : call ? bashResult.display(item.output, true, !!item.interrupted) : bashResult.trim(item.output)
+			let out = item.interrupted === 'canceled' ? '' : call ? bashResult.display(item.output, !!item.interrupted) : bashResult.trim(item.output)
 			let style = itemView.itemStyle(item, tool)
 			// Attached, nothing to show draws nothing; apart, the header
 			// row stays, for its time, link and status. A closed call is
@@ -329,7 +322,7 @@ function status(exit: string | undefined, time: string | undefined, style: Style
 
 // A finished call's status from its result; `bash`: a bash call's.
 // Steering's "(canceled)" or "(stopped, 50.2s)" is quiet: no failure.
-function resultStatus(item: Item & { type: 'tool-result' }, bash: boolean, style: Style | undefined): string {
+function resultStatus(item: { output: string; ms?: number; interrupted?: 'canceled' | 'stopped' }, bash: boolean, style: Style | undefined): string {
 	let text = bashResult.interrupted(item)
 	if (text) return ansi.quiet(`(${text})`, style)
 	return itemView.status(bash ? bashResult.status(item.output) : undefined, bashResult.duration(item.ms), style)
