@@ -142,8 +142,8 @@ export const colors = {
 		commitFg: [0.8, 0.16, 300],
 	}),
 	// Help bar: keys stand out from descriptions; the web's update reload
-	// hint (task 7t) takes the attention yellow of tab markers.
-	help: (): Style => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0], update: colors.tab().warningFg! }),
+	// hint (task 7t) is amber, a special case only when new code waits.
+	help: (): Style => ({ key: [0.76, 0.008, 250], description: [0.68, 0, 0], update: [0.82, 0.17, 70] }),
 	popup: (): Style => ({ neutralFg: [0.68, 0, 0], dangerFg: [0.86, 0.16, 85] }),
 	// The selected item (a picker row, a question's chosen answer): a
 	// lighter tint of the color around it, so green in a question and
