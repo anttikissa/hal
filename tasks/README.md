@@ -222,18 +222,16 @@ it only when building the page with Bun, not on the host startup path.
 ## Look: retro sci-fi terminal (user's standing preference)
 
 Bold, colorful and contrasty, in the spirit of 2001: A Space Odyssey,
-Alien, Blade Runner, Tron and CRT VT100 terminals glowing in the dark:
+Alien, Blade Runner, Tron and CRT VT100 terminals:
 
 - Saturated phosphor hues on near-black. Never meek, pastel,
-  washed-out or corporate-neutral; no slate (blue-gray) surfaces or
-  buttons in any theme.
+  washed-out or corporate-neutral; avoid slate (blue-gray) surfaces.
 - Lit solid edges: a card's left bar is an LED, not a hairline. The
   light comes from color alone, with no glow or blur effects.
 - Square corners on cards, buttons, tabs, fields and dialogs.
 - Spacing follows the terminal grid: quarter lines vertically, whole
   ch across. Small text is fine where space is scarce.
-- Propose color changes to the user with options before they land;
-  he decides.
+- Propose color changes to the user with options before they land.
 
 Task gn holds the rest of the user's choices (selection, focus, tabs).
 Readable text (below) still applies.
