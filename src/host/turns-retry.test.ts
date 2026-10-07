@@ -112,6 +112,16 @@ test('a rate limit waits for the time the provider gave, visible in snapshots; E
 	expect(calls).toHaveLength(1)
 })
 
+test('repeated rate limits on one model record one wait', async () => {
+	let a = client()
+	let limited = (s: number): StreamEvent[] => [{ type: 'error', message: 'all accounts limited', failure: 'limited', retryAt: now + s * 1000 }]
+	script = [limited(60), limited(120), limited(180), done]
+	let id = start(a)
+	await until(() => a.ends().length)
+	expect(calls).toHaveLength(4)
+	expect(history.readSync(id).filter((r) => r.type === 'rate_limit')).toHaveLength(1)
+})
+
 test('a login in another tab resumes all quota waits without resuming paused or idle tabs', async () => {
 	let a = client()
 	let at = now + 3 * 3600_000
