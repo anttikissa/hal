@@ -10,10 +10,11 @@ import { effort } from './effort.ts'
 // OAuth tokens are rejected unless the first system block is exactly this.
 const IDENTITY = "You are Claude Code, Anthropic's official CLI for Claude."
 const OAUTH_BETAS = 'claude-code-20250219,oauth-2025-04-20'
-const TOOL_STREAMING_BETA = 'fine-grained-tool-streaming-2025-05-14'
 // The Claude Code version reported in the OAuth user-agent, as the
 // Agent SDK does; the entrypoint slot honestly says "hal".
 const CLAUDE_CODE_VERSION = '2.1.280'
+// Tool inputs use standard buffered streaming: Hal only executes complete
+// parsed calls, so eager fragments add risk without earlier execution.
 // Smallest thinking budget the API accepts.
 const MIN_THINKING = 1024
 
@@ -80,7 +81,7 @@ function body(req: ProviderRequest, oauth: boolean): Record<string, unknown> {
 	if (req.system) system.push({ type: 'text', text: oauth ? `\n\n${req.system}` : req.system, cache_control: ephemeral })
 	let b: Record<string, unknown> = { model: req.model, max_tokens: maxTokens, stream: true, messages: anthropic.toMessages(req) }
 	if (system.length) b.system = system
-	if (req.tools?.length) b.tools = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }))
+	if (req.tools?.length) b.tools = req.tools.map((t) => ({ name: t.name, description: t.description, ...(t.name === 'bash' ? { strict: true, input_schema: { ...t.inputSchema, additionalProperties: false } } : { input_schema: t.inputSchema }) }))
 	if (adaptive(req.model)) b.thinking = { type: 'adaptive', display: 'summarized' }
 	else if (/^claude-(opus|sonnet)/.test(req.model) && maxTokens > MIN_THINKING) {
 		b.thinking = { type: 'enabled', budget_tokens: Math.max(MIN_THINKING, Math.min(anthropic.thinkingBudget, maxTokens - 1024)) }
@@ -97,11 +98,11 @@ async function headers(model?: string, req?: ProviderRequest): Promise<{ headers
 	let headers: Record<string, string> = oauth
 		? {
 				authorization: `Bearer ${cred.value}`,
-				'anthropic-beta': `${OAUTH_BETAS},${TOOL_STREAMING_BETA}`,
+				'anthropic-beta': OAUTH_BETAS,
 				'user-agent': `claude-cli/${CLAUDE_CODE_VERSION} (external, hal)`,
 				'x-app': 'cli',
 			}
-		: { 'x-api-key': cred.value, 'anthropic-beta': TOOL_STREAMING_BETA }
+		: { 'x-api-key': cred.value }
 	headers['anthropic-version'] = '2023-06-01'
 	return { headers, oauth, account: cred.account }
 }
