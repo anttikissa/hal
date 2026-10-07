@@ -1,0 +1,7 @@
+{
+	title: 'Rebase rows estimate image tokens from pixels, not bytes',
+	spec: 'A rebase row counts each image at its provider token cost (Anthropic: about width x height / 750, capped by the provider image limit), not its encoded byte size as characters. Bars, sums and "Drop outputs over N tokens" use that estimate. Decide whether image blocks record width and height at attach time (older images read from the PNG/JPEG header) or a fixed per-image cost suffices. Example: a 479x585 PNG screenshot of about 60 kB showed 17.9k tokens; its real cost is about 370.',
+	status: 'planned',
+	needs: ['01d'],
+	foldInto: ['01d']
+}
