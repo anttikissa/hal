@@ -27,6 +27,7 @@ import { render } from './render.ts'
 import { rebaseEditor } from './rebase-editor.ts'
 import { terminal } from './terminal.ts'
 import { clientCommands } from './commands.ts'
+import { markdown } from '../common/markdown.ts'
 import { frame } from './frame.ts'
 import { paste } from './paste.ts'
 import { pulse } from './pulse.ts'
@@ -117,7 +118,10 @@ function onEvent(event: Event): void {
 	if (resume && mine) app.onKeys([{ key: 'enter', shift: false, alt: chord === 'alt-enter', ctrl: chord === 'ctrl-enter', cmd: chord === 'cmd-enter' }])
 	if (event.type === 'auth' && event.link !== undefined) ansi.state.web = { url: event.link, code: event.code }
 	if (event.type === 'model-names') titles.learn(event)
-	if (event.type === 'tabs') return app.onTabs(event.tabs)
+	if (event.type === 'tabs') {
+		if (event.sessions) markdown.state.sessions = new Set(event.sessions)
+		return app.onTabs(event.tabs)
+	}
 	if (event.type === 'notice') return notices.add(notices.fromEvent(event))
 	if (event.type === 'restart') return restart.withHost()
 	if (event.type === 'restart-ask') return restart.ask(event, app.open)

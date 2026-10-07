@@ -305,7 +305,7 @@ export type Event =
 	| { type: 'notice-history'; entries: NoticeEntry[] }
 	// The tabs changed, or the client just connected: every tab, in
 	// order. Sent to every client; which one a client shows is its own business.
-	| { type: 'tabs'; tabs: Tab[] }
+	| { type: 'tabs'; tabs: Tab[]; sessions?: string[] }
 	// /go in this session changes only windows currently showing/following it.
 	| { type: 'go'; sessionId: string; tab: string; block?: string }
 	// The session's draft changed; `command` is the id of the command

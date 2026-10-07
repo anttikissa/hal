@@ -66,7 +66,7 @@ function onTabs(list: Tab[]): void {
 	let old = st.tabs.map((t) => t.id)
 	let ids = list.map((t) => t.id)
 	st.tabs = list
-	markdown.state.sessions = new Set(ids)
+	for (let id of ids) markdown.state.sessions.add(id)
 	let asked = st.asked
 	if (asked !== undefined && ids.includes(asked)) delete st.asked
 	for (let id of st.hidden.keys()) if (!ids.includes(id)) {
