@@ -184,7 +184,9 @@ html.typing .App { position: absolute; }
    table too wide scrolls sideways in its own box, and while more of it
    is off to the right, that edge fades (a scroll-driven --fade). */
 .Markdown .line { min-height: 1lh; }
-.Markdown .line:has(+ .cursor) { display: inline; }
+.Markdown .line:has(+ .cursor), .Markdown .line:has(+ .interrupted) { display: inline; }
+.Markdown .interrupted { background: transparent; white-space: pre-wrap; }
+.Markdown .interrupted::after { content: attr(data-tail); }
 .Markdown .h { margin-top: 0.25lh; }
 /* Inline flow keeps native selection from separating marker and body. */
 .Markdown .li { padding-left: 2ch; text-indent: -2ch; }

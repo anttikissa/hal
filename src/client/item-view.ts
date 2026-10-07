@@ -1,7 +1,8 @@
 // Transcript items as the frame shows them: the rows of each item and
 // the style it wears. Pure.
-// Tasks: fn, hp, hr, hse, a1k.
+// Tasks: fn, hp, hr, hse, a1k, 6eq.
 
+import { interruption } from '../common/interruption.ts'
 import { diff } from '../common/diff.ts'
 import { diffView } from './diff-view.ts'
 import { attachments } from '../common/attachments.ts'
@@ -72,7 +73,6 @@ function imageLabel(item: Item & { type: 'image' }, session?: string): string {
 	let label = attachments.label(item)
 	return session ? `\x1b]8;;${ansi.webUrl(`/blob/${encodeURIComponent(session)}/${encodeURIComponent(item.blob)}`)}\x07${label}${ansi.LINK_OFF}` : label
 }
-
 function headed(item: Item, body: string[], width: number, session?: string): string[] {
 	let title = titles.title(item)
 	if (title === undefined) return body
@@ -133,11 +133,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			return itemView.headed(item, rows.length ? [...body, '', ...rows] : body, width, session)
 		case 'image':
 			return [itemView.imageLabel(item, session)]
-		// Trailing blank lines the model streamed are not drawn: the one
-		// blank row between items (frame.build) is the only gap. Model
-		// text is markdown (task fn).
-		// Finished thinking with no readable text (redacted or empty)
-		// draws nothing, not a bare header (task hp).
+		// Markdown hides trailing blanks except before interruption marks.
+		// Empty thinking draws nothing, not a bare header (tasks fn, hp, 6eq).
 		case 'thinking': {
 			if (!item.text.trim() && !streaming) return []
 			let prefix = titles.stamp(item.ts, item.originSession ? `(in ${item.originSession}) ` : '')
@@ -153,11 +150,16 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 		}
 		case 'text': {
 			let text = summary.answer(item.text).trimEnd()
-			// Controls can be the whole answer; no visible body means no card.
-			// frame.itemRows adds the live cursor independently while streaming.
-			if (!text.trim()) return streaming ? [''] : []
+			if (!text.trim() && !item.interrupted) return streaming ? [''] : []
 			if (fold === 'closed' && !streaming) return itemView.closedRow(item, text, width)
-			return itemView.headed(item, markdownView.lines(text, width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined), width)
+			let body = markdownView.lines(text, width, streaming, itemView.itemStyle(item), session ? markdown.blockLinks(session, key) : undefined)
+			if (item.interrupted) {
+				let tail = interruption.tail(item.text).replace(/\r\n?/g, '\n').split('\n')
+				let last = body.pop() ?? ''
+				if (tail.length === 1 && strings.visLen(last) + strings.visLen(tail[0]!) > width) { body.push(last); last = ''; tail[0] = tail[0]!.trimStart() }
+				body.push(...tail.map((part, i) => (i ? '' : last) + ansi.sgr({ fg: colors.warning().fg! }) + part + ansi.sgr(itemView.itemStyle(item)!)))
+			}
+			return itemView.headed(item, body, width)
 		}
 		case 'tool': {
 			let { command, description } = item.input

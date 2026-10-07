@@ -1,12 +1,13 @@
 // /model: switches the session's model; alone, opens the model picker
 // on every client following the session.
+// Tasks: 0x, 03, 6eq.
 
 import type { SlashCommand } from '../commands.ts'
 import { models } from '../models.ts'
 import { effort } from '../effort.ts'
 
 export const command: SlashCommand & { levels(id: string): string[] } = {
-	help: () => '/model <provider/model or family>[:level]: switch this session from its next request, keeping its effort (snapped to the nearest supported level); /model :level changes only the effort; :default clears it. /model alone opens the picker (Ctrl-M too).',
+	help: () => '/model <provider/model or family>[:level]: switch this session immediately, interrupting active work and continuing safely, keeping its effort (snapped to the nearest supported level); /model :level changes only the effort; :default clears it. /model alone opens the picker (Ctrl-M too).',
 	// Prefix matches first (aliases, full ids), then ids where a word of
 	// the name starts with it: "fab" finds anthropic/claude-fable-5-1.
 	complete: (args, ctx) => {

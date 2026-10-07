@@ -10,6 +10,7 @@
 // always adds one). The host answers it with `ack`, or `rejected`
 // carrying the id, and ignores a repeat of an id it has acted on, so a
 // command resent after a reconnect never acts twice.
+// Tasks: 6, qt, 6eq.
 
 import type { AssistantBlock, ImageBlock, Sender, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
@@ -245,6 +246,8 @@ export type Event =
 	| { type: 'prompt'; sessionId: string; texts: string[]; senders?: Sender[]; images?: ImageBlock[]; queued?: true; replaces?: true; n?: number; command?: string; ts?: string }
 	// `ts`: when the block it streams into started (task hp).
 	| { type: 'stream'; sessionId: string; event: LiveStreamEvent; n?: number; ts?: string; model?: string; effort?: string }
+	// A canceled partial text block, durable before broadcast (task 6eq).
+	| { type: 'assistant-interrupted'; sessionId: string; record: Extract<HistoryRecord, { type: 'assistant' }> }
 	// New bytes only; a late joiner gets the same partial output in its snapshot.
 	| { type: 'tool-output'; sessionId: string; id: string; at: number; chunk: string }
 	// The host ran the round's tool calls and recorded these results; the

@@ -27,7 +27,7 @@ test('pause stops the turn, keeping partial output, and continue carries it on',
 	let view = await fresh(id)
 	expect(view).toEqual(a.views.get(id)!)
 	expect(shown(view.items.slice(1))).toEqual([
-		{ type: 'text', text: 'part' },
+		{ type: 'text', text: 'part', interrupted: true },
 		{ type: 'turn-end', status: 'paused' },
 	])
 	// A new host does not continue a paused turn.
@@ -44,7 +44,7 @@ test('pause stops the turn, keeping partial output, and continue carries it on',
 	calls[1]!.push({ type: 'text', text: 'rest' }, { type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length)
 	expect(shown(a.views.get(id)!.items.slice(1))).toEqual([
-		{ type: 'text', text: 'part' },
+		{ type: 'text', text: 'part', interrupted: true },
 		{ type: 'turn-end', status: 'paused' },
 		{ type: 'text', text: 'rest' },
 		{ type: 'turn-end', status: 'completed' },

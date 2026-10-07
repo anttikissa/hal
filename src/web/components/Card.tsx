@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-// One transcript row as a card in its theme colors (view.show). A
+// Tasks: w5, 6eq. One transcript row as a card in its theme colors (view.show). A
 // thinking or tool card (the call with its result) folds, closed at
 // first: its header is a button naming what is inside, and a click
 // anywhere on the card toggles it, except on a link or a click that
@@ -15,6 +15,7 @@
 // result and can show all of it; the transcript holds all of it
 // (host tools cap what they keep), so nothing is fetched.
 
+import { interruption } from '../../common/interruption.ts'
 import { diff } from '../../common/diff.ts'
 import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
 import { bashResult } from '../../common/bash-result.ts'
@@ -194,8 +195,9 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		return item.type === 'text' || item.type === 'thinking' || item.type === 'output' ||
 			(item.type === 'prompt' && !!item.from && !/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
 	})
+	let interrupted = () => { let item = props.row.item; return item.type === 'text' && item.interrupted ? interruption.tail(item.text) : '' }
 	let markdown = () => (
-		<Markdown text={shown()?.text ?? ''} streaming={props.cursor} links={props.row.item.type === 'text' || props.row.item.type === 'thinking' ? parser.blockLinks(props.session, props.row.key) : undefined}>
+		<Markdown text={shown()?.text ?? ''} interruption={interrupted()} streaming={props.cursor} links={props.row.item.type === 'text' || props.row.item.type === 'thinking' ? parser.blockLinks(props.session, props.row.key) : undefined}>
 			<Show when={props.cursor}>{cursor()}</Show>
 		</Markdown>
 	)

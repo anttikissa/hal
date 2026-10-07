@@ -46,9 +46,10 @@ queue. Notice-only records neither start a turn nor become a recalled prompt.
 Host facts (resource levels, neighbor activity and restarts, task nvm) use
 notice records through this path, never suffixes inside bash output.
 Replay places notices after tool results, never inside an unfinished exchange;
-later facts do not move into earlier request prefixes. Model switches finish
-the current round and apply to the next round, not the next turn. Display order
-is block-start order in both clients; it is separate from delivery eligibility.
+later facts do not move into earlier request prefixes. Model and cwd changes
+interrupt active work through hard steering and continue with the new context
+(task 6eq); unsafe-to-stop calls finish first. Display order is block-start
+order in both clients; it is separate from delivery eligibility.
 
 ## Architecture
 

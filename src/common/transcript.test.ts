@@ -317,3 +317,19 @@ test('waiting and delivered steering use the same header, without labeling a fol
 		expect(t.items.map((i) => titles.who(i))).toEqual(['You (interrupting)', 'You'])
 	}
 })
+
+test('interruption reconciles an unbroadcast delta and separates same-model continuation', () => {
+	let partial = { ...said({ type: 'text', text: 'partial final' }, 2), model: 'fake/m', interrupted: true as const }
+	let live = fold([
+		snap({ history: [prompt('go', 1)] }),
+		{ type: 'turn-start', sessionId, provider: 'fake', model: 'fake/m' },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'partial' }, model: 'fake/m', n: 2, ts },
+		{ type: 'assistant-interrupted', sessionId, record: partial },
+		{ type: 'stream', sessionId, event: { type: 'text', text: 'continued' }, model: 'fake/m', n: 3, ts },
+	])!
+	let reload = fold([snap({ history: [prompt('go', 1), partial], turn: { provider: 'fake', model: 'fake/m', blocks: [{ type: 'text', text: 'continued' }], ns: [3], ts: [ts], usage: {} } })])!
+	expect(live.items).toEqual(reload.items)
+	expect(live.items.filter((i) => i.type === 'text')).toMatchObject([
+		{ text: 'partial final', interrupted: true, key: '2' }, { text: 'continued', key: '3' },
+	])
+})

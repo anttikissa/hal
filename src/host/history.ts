@@ -6,7 +6,7 @@
 // (the host died mid-write) is cut off. Any other malformed record is
 // reported and the file is left untouched. A turn with no end record is
 // unfinished, not broken: the host continues it (turns.recover).
-// Tasks: 7, nvm.
+// Tasks: 7, nvm, 6eq.
 
 import { appendFileSync, existsSync, openSync, readSync as readFd, closeSync, statSync, truncateSync } from 'fs'
 import { historyCheck } from './history-check.ts'
@@ -36,7 +36,7 @@ type NewRecord = HistoryRecord extends infer R ? (R extends HistoryRecord ? Omit
 // `context`: what the latest earlier round with usage took in.
 // `by`: the model and effort writing the turn; `starts`: when each
 // block (by `ns` index) started, its record's ts (task hp).
-type Running = { turn: Turn; written: number; prior: Usage; ended?: boolean; ns: number[]; starts: string[]; by: By; context?: number }
+type Running = { turn: Turn; written: number; prior: Usage; ended?: boolean; ns: number[]; starts: string[]; by: By; context?: number; interrupted?: true }
 export type By = { model?: string; effort?: string }
 
 // The tokens a round took in: input, cache read and cache write.
@@ -234,7 +234,7 @@ async function messages(id: string, budget: { overhead?: number; window?: number
 // rest when the consumer stops early). A stream that throws ends as an
 // error, yielded like any other error event. The turn stays running,
 // through tool calls and later rounds, until end().
-async function* record(id: string, providerName: string, events: AsyncIterable<StreamEvent>, by: By = {}): AsyncGenerator<StreamEvent> {
+async function* record(id: string, providerName: string, events: AsyncIterable<StreamEvent>, by: By = {}, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
 	let before = history.state.running.get(id)
 	let inputRecords = history.readSync(id)
 	let prior = before ? addUsage(before.prior, before.turn.usage) : {}
@@ -247,6 +247,7 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 	history.state.running.set(id, running)
 	try {
 		for await (let event of events) {
+			if (signal?.aborted) break
 			blocks.apply(turn, event)
 			while (running.ns.length < turn.blocks.length) {
 				running.ns.push(history.number(id))
@@ -259,6 +260,7 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 	} catch (e: any) {
 		turn.end = { type: 'error', message: String(e?.message ?? e) }
 	} finally {
+		if (signal?.aborted && turn.end?.type !== 'done' && turn.blocks.at(-1)?.type === 'text') running.interrupted = true
 		flush(turn.blocks.length)
 		if (!running.ended && Object.keys(turn.usage).length) history.append(id, { type: 'round', usage: { ...turn.usage }, ...(by.model !== undefined && { model: by.model }), ...(running.ns[0] !== undefined && { block: running.ns[0] }) })
 		if (turn.end?.type === 'done') pruning.consumed(id, inputRecords)
@@ -272,10 +274,19 @@ function blockRecord(id: string, running: Running, i: number): NewRecord & { ts?
 	let block = running.turn.blocks[i]!
 	if (block.type === 'thinking' && block.signature) { let { signature, ...rest } = block; block = { ...rest, signatureBlob: blobs.storeOutput(id, signature).blob } }
 	let r: NewRecord & { type: 'assistant'; ts?: string } = { type: 'assistant', block, n: running.ns[i]! }
+	if (running.interrupted && i === running.turn.blocks.length - 1) r.interrupted = true
 	if (running.by.model !== undefined) r.model = running.by.model
 	if (running.by.effort !== undefined) r.effort = running.by.effort
 	if (running.starts[i] !== undefined) r.ts = running.starts[i]
 	return r
+}
+
+// Only the current round can report interruption (task 6eq). The full
+// record also reconciles a final delta the host did not broadcast.
+function interrupted(id: string): Extract<HistoryRecord, { type: 'assistant' }> | undefined {
+	let r = history.state.running.get(id)
+	if (!r?.interrupted) return
+	return history.blockRecord(id, r, r.turn.blocks.length - 1) as Extract<HistoryRecord, { type: 'assistant' }>
 }
 
 // Records the results of a round's tool calls, unless the turn has
@@ -369,7 +380,7 @@ async function* turn(id: string, opts: Omit<ProviderRequest, 'model' | 'messages
 	let providerName = blocks.parseModelId(modelId)?.provider ?? modelId
 	let last: DoneEvent | ErrorEvent | undefined
 	try {
-		for await (let event of history.record(id, providerName, provider.stream(modelId, input, signal), { model: modelId })) {
+		for await (let event of history.record(id, providerName, provider.stream(modelId, input, signal), { model: modelId }, signal)) {
 			if (event.type === 'done' || event.type === 'error') last = event
 			yield event
 		}
@@ -386,5 +397,5 @@ export const history = {
 	state: { running: new Map<string, Running>(), cache: new Map<string, { size: number; records: HistoryRecord[] }>(), next: new Map<string, number>(), listeners: new Set<(id: string, record: HistoryRecord) => void>() },
 	check: (value: unknown) => historyCheck.check(value),
 	blockRecord, started, number, file, append, write, onAppend, submit, load, lastByte, read, readSync,
-	unfinished, open, messages, record, results, end, park, carry, stop, live, streaming, turn,
+	unfinished, open, messages, record, interrupted, results, end, park, carry, stop, live, streaming, turn,
 }

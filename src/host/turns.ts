@@ -2,6 +2,7 @@
 // answer, their tools and questions, pausing, and recovering turns left
 // unfinished on disk. A turn with no end record is unfinished; whichever
 // process becomes host continues it (recover).
+// Tasks: yq, xz, 6eq.
 
 import { blocks, type DoneEvent, type ErrorEvent, type ImageBlock, type Sender, type StreamEvent, type ToolCallBlock, type ToolResultBlock } from '../common/blocks.ts'
 import { forms, type Answers, type Form } from '../common/forms.ts'
@@ -237,7 +238,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 				last = undefined
 				prompts.steer(id)
 				status.transition(id, { type: 'request' })
-				for await (let event of history.record(id, running.provider, stream(), running)) {
+				for await (let event of history.record(id, running.provider, stream(), running, signal)) {
 					blocks.apply(round, event)
 					if (event.type === 'done' || event.type === 'error') {
 						last = event
@@ -249,6 +250,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					let ts = history.started(id)
 					host.broadcast(id, { type: 'stream', sessionId: id, event, model: running.model, effort: running.effort, ...(n !== undefined && { n }), ...(ts !== undefined && { ts }) })
 				}
+				let interrupted = history.interrupted(id)
+				if (interrupted) host.broadcast(id, { type: 'assistant-interrupted', sessionId: id, record: interrupted })
 				if (Object.keys(round.usage).length) host.broadcast(id, { type: 'turn-stats', sessionId: id, stats: stats.round(id, round.usage) })
 				if (last?.type === 'error' && !signal.aborted && compact.retry(id, last, shrunk)) {
 					shrunk = true
