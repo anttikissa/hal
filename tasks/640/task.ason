@@ -1,0 +1,7 @@
+{
+	title: 'Subagent report cards preserve identity and preview the outcome',
+	spec: 'In the parent transcript, subagent questions and completion reports use the existing expandable message card on both web and terminal, not a separate card style or duplicate notification. Preserve the existing timestamp, sender session ID, tab number and session-name conventions. Append Needs info and the text of the final question tag for clarification reports; append Finished and the summary text for completed reports. Render tag contents, not literal XML tags. Expanding shows the complete original message with normal formatting. At narrow widths preserve the sender identity and tab number ahead of the outcome preview; the full content remains available expanded. Untagged reports retain existing full-message behavior; paused or failed reports must not be described as Finished. Use existing report and message rendering machinery; no new answer-tracking state. Ordinary cross-session chatter remains an ordinary message. User request in 07-ban: harmonious with the current timestamp / Message from session / tab header, whose tab number is essential for humans navigating either client.',
+	status: 'planned',
+	needs: ['mt', 'kar'],
+	foldInto: ['mt']
+}
