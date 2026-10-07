@@ -207,3 +207,15 @@ test('the directory is watched: a new file hooks, an edit reloads, /plugins name
 	for (let i = 0; i < 100 && t.f(1) !== 'two'; i++) await Bun.sleep(20)
 	expect(t.f(1)).toBe('two')
 })
+
+test('disable stops the body, removes what it registered, and is not a failure', async () => {
+	let original = t.f
+	let path = await plugin('a.ts', `plugin.around(t, 'f', (fn: any, x: number) => fn(x) + 1)\nplugin.disable()\nglobalThis.pluginRuns++\nreturn () => globalThis.pluginRuns++`)
+	expect(t.f).toBe(original)
+	expect(g.pluginRuns).toBe(0)
+	expect(reports).toEqual([])
+	expect(existsSync(path)).toBe(true)
+	expect(plugins.describe()).toContain('disabled')
+	plugins.remove(path)
+	expect(g.pluginRuns).toBe(0)
+})
