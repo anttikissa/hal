@@ -7,7 +7,7 @@ import { ason } from '../common/ason.ts'
 import { config } from './config.ts'
 import { calls, client, created, fresh, records, restartHost, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
-import { host } from './host.ts'
+import { warnings } from './warnings.ts'
 import { pages } from './pages.ts'
 import { models } from './models.ts'
 import { sessions } from './sessions.ts'
@@ -102,11 +102,11 @@ test('config warnings reach every client: on connect and when announced', () => 
 		current = ['config.ason: webPort: bad']
 		let late = client()
 		expect(late.of('warning').map((e) => e.text)).toEqual(['config.ason: webPort: bad'])
-		host.warnAll()
+		warnings.all()
 		expect(quiet.of('warning').map((e) => e.text)).toEqual(['config.ason: webPort: bad'])
 		expect(late.of('warning').length).toBe(2)
 		current = []
-		host.warnAll()
+		warnings.all()
 		expect(quiet.of('warning').length).toBe(1)
 	} finally {
 		config.warnings = origWarnings
