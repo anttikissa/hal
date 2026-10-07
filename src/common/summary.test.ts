@@ -69,11 +69,17 @@ test('notification-only answers stay visible without duplicating normal answers'
 	for (let tag of ['summary', 'question']) {
 		let text = `<${tag}>Stopped.</${tag}>`
 		expect(summary.answer(text)).toBe('Stopped.')
-		expect(summary.answer(` \n${text}\n`)).toBe('Stopped.')
-		expect(summary.answer(`Visible answer.\n${text}`)).toBe('Visible answer.')
+		expect(summary.answer(` \n${text}\n`).trim()).toBe('Stopped.')
+		expect(summary.answer(`Visible answer.\n${text}`)).toBe(tag === 'question' ? 'Visible answer.\nStopped.' : 'Visible answer.')
 		expect(summary.answer(`${text}\n<rename>New name</rename>`)).toBe('Stopped.')
 		for (let n = 1; n < text.length; n++) expect(summary.answer(text.slice(0, n))).toBe('')
 	}
 	expect(summary.answer('`<summary>Example.</summary>`')).toBe('`<summary>Example.</summary>`')
 	expect(summary.answer('<rename>New name</rename>')).toBe('')
+})
+
+test('questions remain inline beside prose and literal code in replayed answers', () => {
+	let text = 'My recommendation.\n\n<question>Use `/help` in both clients?</question>'
+	expect(summary.answer(text)).toBe('My recommendation.\n\nUse `/help` in both clients?')
+	expect(summary.answer('Example: `<question>Literal?</question>`')).toBe('Example: `<question>Literal?</question>`')
 })

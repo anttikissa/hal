@@ -25,7 +25,7 @@ export const tool: Tool = {
 	name: 'send',
 	description:
 		'Send a message to another session, by tab number or session id. By default the recipient reads it at its next round, without interrupting its work. ' +
-		'steer: true interrupts. queue: true waits until its current turn ends. An idle recipient can start a turn.',
+		'steer: true interrupts. queue: true waits until its current turn ends. An idle recipient can start a turn; a recipient waiting for a human answer queues agent messages, including steer:true.',
 	parameters: {
 		type: 'object',
 		properties: {
