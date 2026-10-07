@@ -1885,3 +1885,30 @@ browserTest('rebase diffs are visible and colored after an earlier error and hel
 		}
 	} finally { await b.close() }
 })
+
+browserTest('foreground and background Bash share header status without losing output or command links', async () => {
+	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
+	history.append(id, { type: 'assistant', block: { type: 'tool_call', id: 'run', name: 'bash', input: { description: 'Check output', command: 'printf example' } } })
+	history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: 'run', output: '[exit 1]\nForeground output', ms: 2700 }] })
+	history.append(id, { type: 'user', blocks: [{ type: 'text', from: id, label: 'bash #t1', text: '[exit 1]\nBackground output' }] })
+	let b = await browser()
+	try {
+		await server.serve(); web.start()
+		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
+		await b.waitFor(`document.querySelectorAll('.CardHeader > .status').length === 2`)
+		for (let width of [320, 1200]) {
+			await b.call('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width === 320 })
+			let headers = await b.evaluate(`Array.from(document.querySelectorAll('.CardHeader'), h => ({ status: h.querySelector(':scope > .status').textContent, beforeLink: h.querySelector(':scope > .status').nextElementSibling.matches('.link'), fits: h.closest('.Card').scrollWidth <= h.closest('.Card').clientWidth, exit: h.querySelector('.exit').textContent }))`)
+			expect(headers.map((h: any) => h.status)).toEqual(['(exit 1, 2.7s)', '(exit 1)'])
+			expect(headers.every((h: any) => h.beforeLink && h.fits && h.exit === 'exit 1')).toBe(true)
+		}
+		await b.evaluate(`document.querySelector('.Card.tool .mark').click()`)
+		expect(await b.evaluate(`document.querySelector('main').textContent`)).not.toContain('[exit 1]')
+		expect(await b.evaluate(`document.querySelector('.result-text').textContent`)).toContain('Foreground output')
+		expect(await b.evaluate(`document.querySelector('.Card.prompt .content').textContent`)).toBe('Background output')
+		expect(await b.evaluate(`document.querySelector('.Card.prompt .call').getAttribute('href')`)).toEndWith('#t1')
+		await b.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getTiming().iterations !== Infinity).map(a => a.finished))`)
+		let screenshot = await b.call('Page.captureScreenshot', { format: 'png' })
+		writeFileSync('/tmp/hal-shared-bash-header.png', Buffer.from(screenshot.result.data, 'base64'))
+	} finally { await b.close() }
+})

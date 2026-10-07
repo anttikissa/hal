@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-// Tasks: w5, 6eq, 18n. One transcript row as a card in its theme colors (view.show). A
+// Tasks: w5, 6eq, 18n, kx0. One transcript row as a card in its theme colors (view.show). A
 // thinking or tool card (the call with its result) folds, closed at
 // first: its header is a button naming what is inside, and a click
 // anywhere on the card toggles it, except on a link or a click that
@@ -100,7 +100,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		},
 	)
 	let shown = () => view.show(props.row.item)
-	let result = () => props.row.result && view.show(props.row.result, full())
+	let result = () => props.row.result && view.show(props.row.result, full(), bash())
 	// Whether the result is longer than its glimpse.
 	let long = () => !fullCommand() && (props.row.result ? props.row.result.output.replace(/\n$/, '').split('\n').length : 0) > view.resultRows
 	// The link shows the block's id, #t35, as the terminal does. Its
@@ -130,10 +130,6 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		if (item.type === 'question') return <For each={hrefs.urlParts(item.form.text)}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>
 		let ref = source(), t = titles.who(item)
 		return ref && t?.endsWith(`#${ref}`) ? <>{t.slice(0, -ref.length - 1)}<a class="call" href={transcript.href(props.session, ref)} title="Go to Bash call">#{ref}</a></> : t
-	}
-	let marked = (s: string) => {
-		let match = /\[exit [1-9]\d*\]/.exec(s)
-		return match ? <>{s.slice(0, match.index)}<span class="exit">{match[0]}</span>{s.slice(match.index + match[0].length)}</> : s
 	}
 	let lines = () => (shown()?.text ?? '').replace(/^▸ /, '').split('\n')
 	let head = () => {
@@ -167,8 +163,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 		// has streamed so far.
 		let call = toolDetails.lines(item.name, item.input)
 		let out = result()?.text ?? item.partial?.replace(/\n$/, '')
-		let mark = item.name === 'bash' ? marked : (s: string) => s
-		return <>{[...call, ...(out && call.length ? [''] : [])].map((l) => l + '\n').join('')}{out ? <span class={failed() ? 'result-text error' : 'result-text'}>{mark(out)}</span> : ''}</>
+		return <>{[...call, ...(out && call.length ? [''] : [])].map((l) => l + '\n').join('')}{out ? <span class={failed() ? 'result-text error' : 'result-text'}>{out}</span> : ''}</>
 	}
 	let failed = () => !!props.row.result?.isError || (props.row.item.type === 'output' && !!props.row.item.error)
 	let toggle = (e: MouseEvent) => {
@@ -194,7 +189,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let md = createMemo(() => {
 		let item = props.row.item
 		return item.type === 'text' || item.type === 'thinking' || item.type === 'output' ||
-			(item.type === 'prompt' && !!item.from && !/^bash (?:#t?\d+|b[0-9a-f]{6})$/.test(item.label ?? ''))
+			(item.type === 'prompt' && !!item.from && !bashResult.background(item))
 	})
 	let interrupted = () => { let item = props.row.item; return item.type === 'text' && item.interrupted ? interruption.tail(item.text) : '' }
 	let markdown = () => (
@@ -224,15 +219,17 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	let editButton = () => <Show when={props.edit}><button type="button" class="edit" aria-label={props.row.waiting ? 'Edit queued message' : 'Edit prompt'} title={props.row.waiting ? 'Edit in the queue without changing its position' : 'Edit this prompt and send it again from here'} onClick={edit}><Icon name="edit" /></button></Show>
 	// Drops this queued message by its inbox id (task gr4); the host refuses with a visible reason.
 	let discardButton = () => <Show when={props.discard}><button type="button" class="discard" aria-label="Discard queued message" title="Remove from the queue" onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/queue drop ${props.row.key}` })}><Icon name="close" /></button></Show>
+	let statusResult = () => { let item = props.row.item; return item.type === 'prompt' && bashResult.background(item) ? { output: item.text } : props.row.result }
+	let bash = () => !!bashResult.background(props.row.item) || (props.row.item.type === 'tool' && props.row.item.name === 'bash')
 	let heading = () => (
-		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} label={who()} reference={link()} actions={<>{editButton()}{discardButton()}</>} />
+		<CardHeader icon={titles.letter(props.row.item) === 'm' ? 'message' : undefined} time={time()} label={who()} result={statusResult()} bash={bash()} reference={link()} actions={<>{editButton()}{discardButton()}</>} />
 	)
 	// Content branches share the shell, header and normal body inset.
 	let plain = (s: () => { kind: string; text: string }) => (
 		<>
 			<Show when={title()} fallback={link()}>{heading()}</Show>
 			<div class="content">
-				<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : props.row.item.type === 'prompt' && source() ? marked(s().text) : parts()}>
+				<Show when={props.row.item.type === 'image' && props.row.item} fallback={md() ? markdown() : parts()}>
 					{(img) => <a href={hrefs.blobUrl(props.session, img().blob)} target="_blank" rel="noopener" title="Open image in a separate tab to zoom"><img src={hrefs.blobUrl(props.session, img().blob)} alt={s().text} /></a>}
 				</Show>
 				<Show when={props.cursor && !md()}>{cursor()}</Show>
@@ -279,11 +276,10 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange() ? change() : (
 						<Show when={folding()} fallback={plain(s)}>
-							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} reference={link()} actions={undoButton()}
+							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} reference={link()} actions={undoButton()}
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>
-								<Show when={props.row.result && bashResult.interrupted(props.row.result)}>{(s) => <span class="status">({s()})</span>}</Show>
 								<Show when={failed()}><span class="error">✗</span></Show>
 								<Show when={props.job}>{(n) => <button type="button" class="kill" title={`Stop background job #t${n()} (/kill #t${n()})`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #t${n()}` })}><Icon name="stop" />kill</button>}</Show>
 							</CardHeader>

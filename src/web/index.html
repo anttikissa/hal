@@ -118,7 +118,7 @@ html.typing .App { position: absolute; }
 /* Rebase summaries retain drop ranges, edited IDs and --paused at every width (18n). */
 .CardHeader .error { background: none; margin-left: 1ch; }
 /* Steering's "(canceled)" or "(stopped, 50.2s)" is no failure; a flagged call's label keeps the title color (task ker). */
-.CardHeader .status { margin-left: 1ch; color: var(--quiet); white-space: nowrap; }
+.CardHeader .status { padding-block: var(--card-inset); color: var(--quiet); white-space: nowrap; }
 .CardHeader .unsafe { margin-left: 1ch; font-style: italic; white-space: nowrap; }
 .CardHeader .kill { margin-left: 1ch; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; align-self: flex-start; }
 @media (pointer: coarse) { .CardHeader .kill { min-height: 44px; min-width: 44px; } }

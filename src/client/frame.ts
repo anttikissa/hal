@@ -11,8 +11,9 @@
 // Its parts are drawn by ansi.ts (escapes, painted rows), item-view.ts
 // (transcript items), form-view.ts (open questions), prompt-view.ts
 // (the prompt), tab-bar.ts (the tabs), help-row.ts (the last row) and
-// modal-view.ts (modals over it all).
+// modal-view.ts (modals over it all). Task kx0 shares result status for background jobs.
 
+import { bashResult } from '../common/bash-result.ts'
 import { colors, type Style } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
 import type { ModalState } from '../common/modals.ts'
@@ -113,13 +114,14 @@ function promptWidth(cols: number): number {
 // `look`: its fold state and inline pastes (task ghs).
 function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, calls?: Map<string, string>, tool?: string, images: Item[] = [], status = '', look: Look = {}): string[] {
 	let style = itemView.itemStyle(item, tool)
+	if (item.type === 'prompt' && bashResult.background(item)) status = itemView.resultStatus({ output: item.text }, true, style)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
 	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, mark } = frame.ref(item, cols, session, style, status)
-	let lines = itemView.itemLines(item, inner, !!hal, session, calls, tool, images, look)
+	let lines = itemView.itemLines(item, inner, !!hal, session, calls, tool, images, { ...look, headerWidth: status ? Math.max(1, inner - strings.visLen(status) - 2) : inner })
 	if (hal) lines = halCursor.withCursor(lines, hal, inner)
 	// A block with a background has a row of it above and below its
 	// text, as the old Hal drew prompt cards; the id goes below the top.

@@ -1,0 +1,10 @@
+{
+	title: 'Share background result header status rendering',
+	spec: 'Foreground and background Bash results use the same result-status parsing and per-client header renderers. In terminal and web, nonzero exit status appears in the exit color at the right end of the title bar immediately before the block link; omit the status output row. Ordinary web Bash results follow this rule too. Keep original-command links, complete output, interruption handling, history and provider input. Remove background-only status coloring and duplicate recognition/rendering where shared helpers replace them; reduce source lines rather than adding parallel renderers. Duration appears only when recorded; do not infer a background duration. Restored invariant: every Bash result uses the same title-bar status presentation.',
+	status: 'done',
+	notes: [
+		'Background output now calls the same bashResult.display and itemView.resultStatus as ordinary results; frame.ref positions the terminal status beside the block link. CardHeader owns the one web status renderer for both result sources, including duration and interruption labels. Removed terminal background output-status coloring, the web inline status-marker renderer and the obsolete untitled Bash display mode. Measured changed non-test source: 1169 to 1165 nonblank/noncomment lines (4 fewer). Header wrapping reserves the status and two-space gap without narrowing the output body. Focused suite: 60 pass; Chrome verifies both result sources, output preservation, original command links and fit at 320 and 1200px. Desktop screenshot inspected. Browser screenshot waits only for finite animations: including the perpetual cursor animation caused a deterministic timeout, corrected without a retry or timeout increase. Full ./test: 1548 pass, 12 failures outside result-status checks (replay/process lifecycle, module limits, continuation and existing browser layout/streaming), plus an unused pages import lint warning. Typecheck and lint of changed files pass.'
+	],
+	needs: ['778', 'wm0'],
+	foldInto: ['wm0', 'v0']
+}
