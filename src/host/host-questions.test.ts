@@ -171,7 +171,7 @@ test('intro resumes through profile, save, model and secret search setup', async
 	c.conn.send({ type: 'submit', sessionId: id, text: 'hello' })
 	process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
 	await reply(c, id, 'name', 'Rowan', 'login')
-	expect(texts(c.views.get(id)!)[0]).toBe('Hello — I am HAL 9001, your personal agent harness. You can call me Hal.\n\nI have four questions for you.')
+	expect(texts(c.views.get(id)!)[0]).toBe('Hello — I am HAL 9001, your personal agent harness. You can call me Hal.\n\nI have five questions for you.')
 	// A restart between steps keeps answers in history.
 	host.reset()
 	sessions.closeAll()
@@ -188,7 +188,10 @@ test('intro resumes through profile, save, model and secret search setup', async
 	expect(options.join()).not.toContain('/')
 	await reply(c, id, 'model', options[0]!, 'search')
 	await reply(c, id, 'search', 'Yes', 'key')
-	await reply(c, id, 'key', 'secret-SERPER-123', 'language')
+	await reply(c, id, 'key', 'secret-SERPER-123', 'theme')
+	// The theme answer writes the portable selector at once.
+	await reply(c, id, 'theme', 'wopr', 'language')
+	expect(readFileSync(`${home}/plugins/theme.ts`, 'utf8')).toContain("themes/wopr.ts'")
 	// Language comes last; it joins the saved profile.
 	await reply(c, id, 'language', 'US English')
 	await until(() => c.of('turn-end').length > 0)
@@ -205,7 +208,7 @@ test('with no credential the intro offers /login, pauses for it and goes on once
 	apiKeys.save('serper', 'existing-key')
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'start' })
-	expect(texts(await (async () => { await until(() => field(c, id)); return c.views.get(id)! })())[0]).toContain('three questions')
+	expect(texts(await (async () => { await until(() => field(c, id)); return c.views.get(id)! })())[0]).toContain('four questions')
 	await reply(c, id, 'name', '', 'login')
 	// Nothing answered, nothing saved.
 	expect(profile.text()).toBe('')
@@ -215,7 +218,8 @@ test('with no credential the intro offers /login, pauses for it and goes on once
 	// The intro's paused turn end comes first, then the login it started.
 	let records = history.readSync(id)
 	expect(records.findLastIndex((r) => r.type === 'turn_end')).toBeLessThan(records.findLastIndex((r) => r.type === 'command'))
-	await reply(c, id, 'key', 'test-key', 'language')
+	await reply(c, id, 'key', 'test-key', 'theme')
+	await reply(c, id, 'theme', 'hal', 'language')
 	await reply(c, id, 'language', '')
 	await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
 	expect(apiKeys.get('opencode-go')).toBe('test-key')
@@ -233,6 +237,7 @@ test('the Serper key step never traps: an empty key or Escape moves on', async (
 		await reply(c, id, 'search', 'Yes', 'key')
 		if (escape) c.conn.send({ type: 'pause', sessionId: id })
 		else await reply(c, id, 'key', '  ')
+		await reply(c, id, 'theme', 'hal')
 		await reply(c, id, 'language', '')
 		await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
 		expect(texts(c.views.get(id)!).join('\n')).toContain('Skipped web search')
@@ -250,7 +255,8 @@ test('/intro switches a tab back to hal/intro and greets again at once', async (
 	await until(() => field(c, id)?.name === 'name')
 	expect(sessions.open(id).model).toBe('hal/intro')
 	await reply(c, id, 'name', '', 'login')
-	await reply(c, id, 'login', 'Skip', 'language')
+	await reply(c, id, 'login', 'Skip', 'theme')
+	await reply(c, id, 'theme', 'hal', 'language')
 	await reply(c, id, 'language', '')
 	await until(() => c.of('turn-end').some((e) => e.status === 'completed'))
 	expect(texts(c.views.get(id)!).at(-1)).toContain('/intro')
@@ -262,7 +268,8 @@ test('/intro switches a tab back to hal/intro and greets again at once', async (
 	// An emptied field removes the saved value; Escape keeps it.
 	profile.save({ 'Language preference': 'Terse' })
 	await reply(c, id, 'name', '', 'login')
-	await reply(c, id, 'login', 'Skip', 'language')
+	await reply(c, id, 'login', 'Skip', 'theme')
+	await reply(c, id, 'theme', 'hal', 'language')
 	expect(field(c, id)).toMatchObject({ initial: 'Terse' })
 	c.conn.send({ type: 'pause', sessionId: id })
 	await until(() => c.of('turn-end').filter((e) => e.status === 'completed').length === 2)

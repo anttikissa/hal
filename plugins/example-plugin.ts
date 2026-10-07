@@ -36,9 +36,11 @@
 //
 // Portable plugins (task gev): `export const portable = true` lets a
 // terminal client and its host share the file; without it a plugin stays
-// on its own machine. Sync keeps `expires` as written and never extends
-// it. Every version Hal sees of each plugins/*.ts is kept, privately, in
-// plugins/history.asonl and plugins/history/ (contents by hash).
+// on its own machine. plugins/keys.ts is a good one to share, as is
+// plugins/theme.ts, which /theme writes portable (task 4c1). Sync keeps
+// `expires` as written and never extends it. Every version Hal sees of
+// each plugins/*.ts is kept, privately, in plugins/history.asonl and
+// plugins/history/ (contents by hash).
 
 import type { Plugin } from '../src/host/plugins.ts'
 // import { auth } from '../src/host/auth.ts'

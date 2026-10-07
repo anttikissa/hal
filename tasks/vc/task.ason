@@ -20,7 +20,8 @@ It is resumable: after a restart or a steered message it continues from the firs
 		'E2E provider tests must wait for the preexisting session’s first host socket and then the peer UI before sending commands; session count is nonzero before either process starts, so using it as readiness races and drops keystrokes.',
 		'Keep model choices tied to the available credential provider IDs, not the configured default; an unconfigured default must not sneak into the options. If the login step is skipped with no credentials, go straight to search.',
 		'Model step also offers up to four local Ollama models, labeled "<tag> (Ollama, local)" from the cached ollama list; the greeting starts models.warm so the list is ready by then. With only Ollama, the step is asked instead of skipped.',
-		'The timezone step was removed: intro runs on the user’s own machine, where the zone adds nothing. USER.md may still hold a hand-written Timezone line; greetings read it. How a server host gets USER.md is open.'
+		'The timezone step was removed: intro runs on the user’s own machine, where the zone adds nothing. USER.md may still hold a hand-written Timezone line; greetings read it. How a server host gets USER.md is open.',
+		'Task 4c1 adds a theme question before the language one; the count names it (four, five with Serper). Only the theme answer itself selects, so a /theme during the intro is not undone by later steps.'
 	],
 	needs: ['n2', 'wq']
 }

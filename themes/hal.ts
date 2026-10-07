@@ -142,7 +142,7 @@ export const look: Look = {
 	toolEdit: () => ({ fg: [0.76, 0.11, 190], bg: [colors.bgL, 0.04, 190] }),
 }
 
-// A theme is a plugin (task d3): /theme links it to plugins/color-theme.ts.
+// A theme is a plugin (tasks d3, 4c1): /theme selects it in plugins/theme.ts.
 export default (plugin: Plugin) => {
 	for (let [key, v] of Object.entries(look)) {
 		if (typeof v === 'function') plugin.around(colors, key as never, v as never)
