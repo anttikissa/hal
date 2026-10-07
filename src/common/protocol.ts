@@ -89,7 +89,7 @@ export type Snapshot = {
 // goes to: its place among the provider's subscription accounts
 // (1-based), each usage window's percent used ("5h": 18) and, when
 // known, when it resets (ISO).
-export type Stats = { context?: number; window?: number; sent: number; received: number; files?: number; plan?: Plan; effort?: string }
+export type Stats = { context?: number; window?: number; files?: number; plan?: Plan; effort?: string }
 export type Plan = { account: number; accounts: number; windows: Record<string, number>; resets?: Record<string, string> }
 
 // Stream events forwarded live; terminal done/error become `turn-end`.

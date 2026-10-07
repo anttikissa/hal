@@ -1,7 +1,6 @@
 // What a session's status row shows that clients cannot work out
 // (task 1g; common/protocol.ts Stats): the context the last round took
-// in, the model's context window, the tokens the session's turns sent
-// and received since this host started, and the usage windows of the
+// in, the model's context window and the usage windows of the
 // subscription account its next request goes to. Sent with snapshots,
 // turn ends and model changes; nothing polls.
 
@@ -64,10 +63,7 @@ function plan(id: string, model: string): Plan | undefined {
 // context in when this host has not seen a turn end yet.
 function of(id: string, records?: HistoryRecord[]): Stats {
 	let model = sessions.open(id).model
-	let committed = stats.state.tokens.get(id) ?? { sent: 0, received: 0 }
-	let live = stats.state.live.get(id)
-	let tokens = { sent: committed.sent + (live?.sent ?? 0), received: committed.received + (live?.received ?? 0) }
-	let out: Stats = { ...tokens }
+	let out: Stats = {}
 	let files = pages.marks(id).files
 	if (files) out.files = files
 	// Only an effort off the model's default is said (task r7r).
@@ -82,22 +78,17 @@ function of(id: string, records?: HistoryRecord[]): Stats {
 	return out
 }
 
-// A finished provider round, before the turn ends. The running totals are
-// provisional until turn_end records the whole turn; no double counting.
+// A finished provider round, before the turn ends: its intake is the
+// context now.
 function round(id: string, usage: { input?: number; cacheRead?: number; cacheWrite?: number; output?: number }): Stats {
-	let t = stats.state.live.get(id) ?? { sent: 0, received: 0 }
-	stats.state.live.set(id, { sent: t.sent + (usage.input ?? 0), received: t.received + (usage.output ?? 0) })
 	let context = (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
 	if (context) stats.state.context.set(id, context)
 	contextPage.notify(id)
 	return stats.of(id)
 }
 
-// Counts a recorded turn end in; returns the stats to send with it.
+// A recorded turn end; returns the stats to send with it.
 function ended(id: string, end: HistoryRecord & { type: 'turn_end' }): Stats {
-	let t = stats.state.tokens.get(id) ?? { sent: 0, received: 0 }
-	stats.state.tokens.set(id, { sent: t.sent + (end.usage.input ?? 0), received: t.received + (end.usage.output ?? 0) })
-	stats.state.live.delete(id)
 	if (end.context) stats.state.context.set(id, end.context)
 	contextPage.notify(id)
 	return stats.of(id, [end])
@@ -112,9 +103,9 @@ function failed(id: string): Stats {
 }
 
 export const stats = {
-	// Per session, since this host started: tokens of its turns, and the
-	// context of its last turn end.
-	state: { tokens: new Map<string, { sent: number; received: number }>(), context: new Map<string, number>(), live: new Map<string, { sent: number; received: number }>(), windows: new Map<string, { at: number; windows: Record<string, number>; resets: Record<string, string> }>() },
+	// Per session, since this host started: the context of its last
+	// round; per account, its cached usage windows.
+	state: { context: new Map<string, number>(), windows: new Map<string, { at: number; windows: Record<string, number>; resets: Record<string, string> }>() },
 	lastContext,
 	failed,
 	plan,

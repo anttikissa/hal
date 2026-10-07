@@ -1,0 +1,7 @@
+{
+	title: 'No token totals on the status rows',
+	spec: "The terminal status row (task 1g) and the web status row (task 68) show no session token totals (no '↑sent ↓received' group). User decision 2026-10-07: the counts went unused and the context group already shows what a session takes in. Stats (common/protocol.ts) carries no sent/received fields and host/stats.ts keeps no per-session token tallies; it tracks only the last round's context and the usage windows. The terminal's right side drops, from the end: plan, then role. Anyone who wants the counts can add them with a plugin that observes stats.round and appends a group to statusRow.right.",
+	status: 'done',
+	needs: [],
+	foldInto: ['1g', '68']
+}

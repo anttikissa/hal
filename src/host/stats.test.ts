@@ -26,30 +26,30 @@ async function turn(c: ReturnType<typeof client>, id: string, ...rounds: { input
 	return c.of('turn-end').at(-1).stats
 }
 
-test('turn ends carry this run’s token totals and the last round’s context; a new host keeps only the context', async () => {
+test('turn ends carry the last round’s context, which a new host keeps', async () => {
 	let c = client()
 	let id = created(c)
-	expect(c.of('snapshot').at(-1).snapshot.stats).toEqual({ sent: 0, received: 0 })
+	expect(c.of('snapshot').at(-1).snapshot.stats).toEqual({})
 	// Two rounds: the context is the last round's intake, cache included.
-	expect(await turn(c, id, { input: 900, output: 10 }, { input: 50, cacheRead: 1000, output: 20 })).toEqual({ sent: 950, received: 30, context: 1050 })
-	expect(await turn(c, id, { input: 7, cacheRead: 2000, output: 5 })).toEqual({ sent: 957, received: 35, context: 2007 })
-	expect((await fresh(id)).stats).toEqual({ sent: 957, received: 35, context: 2007 })
+	expect(await turn(c, id, { input: 900, output: 10 }, { input: 50, cacheRead: 1000, output: 20 })).toEqual({ context: 1050 })
+	expect(await turn(c, id, { input: 7, cacheRead: 2000, output: 5 })).toEqual({ context: 2007 })
+	expect((await fresh(id)).stats).toEqual({ context: 2007 })
 	restartHost()
-	expect((await fresh(id)).stats).toEqual({ sent: 0, received: 0, context: 2007 })
+	expect((await fresh(id)).stats).toEqual({ context: 2007 })
 })
 
-test('stats rise after a provider round while tools run, then change on the next round without double counting', async () => {
+test('the context follows each provider round while tools run', async () => {
 	let c = client(), id = created(c)
 	c.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'tool_call', id: 't1', name: 'nope', input: {} }, { type: 'usage', usage: { input: 900, output: 5 } }, { type: 'done', reason: 'tool_use' })
 	await until(() => calls.length === 2)
 	expect(c.of('turn-end')).toHaveLength(0)
-	expect(c.views.get(id)!.stats).toMatchObject({ sent: 900, received: 5, context: 900 })
+	expect(c.views.get(id)!.stats).toMatchObject({ context: 900 })
 	calls[1]!.push({ type: 'usage', usage: { input: 50, cacheRead: 1000, output: 20 } }, { type: 'done', reason: 'end' })
 	await until(() => c.of('turn-end').length)
 	expect(c.of('turn-stats').map((event) => event.stats.context)).toEqual([900, 1050])
-	expect(c.views.get(id)!.stats).toMatchObject({ sent: 950, received: 25, context: 1050 })
+	expect(c.views.get(id)!.stats).toMatchObject({ context: 1050 })
 	expect((await fresh(id)).stats).toEqual(c.views.get(id)!.stats)
 })
 

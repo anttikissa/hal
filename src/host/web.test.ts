@@ -1017,7 +1017,7 @@ browserTest('compact status keeps two lines and opens full live details without 
 		await b.waitFor("document.querySelector('.StatusRow .name')?.textContent.includes(': Session ')")
 		let id = await b.evaluate("location.pathname.slice(1)")
 		let meta = { id, cwd: '/tmp/very-long-parent-directory/project', model: 'fake/a-very-long-model-name', name: 'A long conversation name that must not wrap on a narrow phone', createdAt: new Date().toISOString() }
-		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta, stats: { context: 85000, window: 100000, sent: 9000, received: 2000, files: 4, effort: 'medium', plan: { account: 1, accounts: 1, windows: { '5h': 17 } } } })
+		host.broadcast(meta.id, { type: 'meta', sessionId: meta.id, meta, stats: { context: 85000, window: 100000, files: 4, effort: 'medium', plan: { account: 1, accounts: 1, windows: { '5h': 17 } } } })
 		host.broadcast(meta.id, { type: 'state', sessionId: meta.id, state: { type: 'running', phase: 'requesting' } })
 		await b.waitFor("document.querySelector('.StatusRow .heat-85')?.textContent === '85%' && document.querySelector('.activity')?.textContent.includes('processing')")
 		await b.evaluate("let draft = document.querySelector('textarea'); draft.value = 'draft survives details'; draft.dispatchEvent(new Event('input', { bubbles: true }))")

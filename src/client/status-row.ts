@@ -1,8 +1,8 @@
 // The status row between the prompt box and the help row (task 1g),
 // after the old Hal's renderStatusLine. Left, joined with ' · ': the
 // session id (and its name), the cwd, the model and the context used;
-// right-aligned: this process's role (or the remote host), the session's tokens this run and
-// the subscription account's usage windows, after any differing
+// right-aligned: this process's role (or the remote host) and the
+// subscription account's usage windows, after any differing
 // portable plugins (task b81). When the row is too narrow
 // the right parts go from the end, then the left is clipped. Pure.
 
@@ -22,15 +22,6 @@ export type StatusInfo = { id: string; name?: string; cwd: string; hal?: boolean
 type Part = { text: string; fg?: Oklch; href?: string }
 
 const SEP = ' · '
-
-// A token count as the row shows totals: 252, 4.1k, 41k, 1.2M, 12M.
-function count(n: number): string {
-	if (n < 1000) return String(n)
-	if (n < 9_950) return `${(n / 1000).toFixed(1)}k`
-	if (n < 999_500) return `${Math.round(n / 1000)}k`
-	if (n < 9_950_000) return `${(n / 1_000_000).toFixed(1)}M`
-	return `${Math.round(n / 1_000_000)}M`
-}
 
 // A context size in whole thousands: 87k, 1000k.
 const kilo = (n: number): string => (n < 1000 ? String(n) : `${Math.round(n / 1000)}k`)
@@ -59,14 +50,12 @@ function left(info: StatusInfo, full = true): Part[][] {
 }
 
 // The right side's groups, in the order they are dropped from the end:
-// plugins, role, tokens, plan. Empty ones are left out.
+// plugins, role, plan. Empty ones are left out.
 function right(info: StatusInfo): Part[][] {
 	let out: Part[][] = []
 	if (info.plugins) out.push([{ text: ansi.clean(info.plugins), fg: colors.warning().fg! }])
 	if (info.role) out.push([{ text: info.role }])
 	let s = info.stats
-	let tokens = [s?.sent ? `↑${count(s.sent)}` : '', s?.received ? `↓${count(s.received)}` : ''].filter(Boolean).join(' ')
-	if (tokens) out.push([{ text: tokens }])
 	let plan = s?.plan
 	if (plan) {
 		let parts: Part[] = [{ text: `Sub${plan.accounts > 1 ? ` ${plan.account}/${plan.accounts}` : ''}` }]
@@ -120,4 +109,4 @@ function row(info: StatusInfo, cols: number): string {
 	return ansi.PAD + base + out + (link ? ansi.LINK_OFF : '') + ansi.UNCOLOR
 }
 
-export const statusRow = { count, percent, left, right, fit, row }
+export const statusRow = { percent, left, right, fit, row }
