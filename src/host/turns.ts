@@ -22,7 +22,7 @@ import { history } from './history.ts'
 import { models } from './models.ts'
 import { provider, type ProviderRequest } from './provider.ts'
 import { sessions } from './sessions.ts'
-import { synthetic } from './synthetic.ts'
+import { synthetic, type Reply } from './synthetic.ts'
 import { systemPrompt } from './system-prompt.ts'
 import { tools } from './tools.ts'
 import { host } from './host.ts'
@@ -172,9 +172,9 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	let records = history.readSync(id)
 	history.carry(id, running.provider, turns.parkedUsage(records))
 	let held = approval.held(records)
-	let asking: Form | undefined
-	let stopping: string | undefined
-	let after: (() => void) | undefined
+	// The scripted reply of the round, read once its stream ended: a
+	// stream may settle what to ask while it runs (task b81).
+	let replied: Reply | undefined
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
 		if (!scripted) {
@@ -188,11 +188,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 			}
 			return
 		}
-		let reply = scripted(await history.read(id), answers, id)
+		let reply = (replied = scripted(await history.read(id), answers, id))
 		answers = undefined
-		asking = reply.ask
-		stopping = reply.pause
-		after = reply.after
 		yield* reply.stream ?? synthetic.paced(reply.say, signal)
 	}
 	let last: DoneEvent | ErrorEvent | undefined
@@ -280,8 +277,8 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 					rounds++
 					last = turns.stopped(last)
 				}
-				if (asking && last?.type === 'done' && !signal.aborted) return turns.ask(id, asking)
-				if (stopping && last?.type === 'done' && !signal.aborted) [capped, last] = [stopping, undefined]
+				if (replied?.ask && last?.type === 'done' && !signal.aborted) return turns.ask(id, replied.ask)
+				if (replied?.pause && last?.type === 'done' && !signal.aborted) [capped, last] = [replied.pause, undefined]
 				if (capped) break
 				calls = round.blocks.filter((b) => b.type === 'tool_call')
 				if (last?.type !== 'done') break
@@ -362,7 +359,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	if (end.status === 'paused') status.transition(id, capped === undefined ? { type: 'pause' } : { type: 'pause', reason: capped })
 	else status.transition(id, end.status === 'error' ? { type: 'end', error: end.error ?? 'turn failed' } : { type: 'end' })
 	// After the turn's own records, so what it starts lands below them.
-	if (end.status === 'paused' && capped !== undefined) after?.()
+	if (end.status === 'paused' && capped !== undefined) replied?.after?.()
 	if (contextTransitions.apply(id)) return
 	subagents.report(id)
 	if (end.status === 'completed') {

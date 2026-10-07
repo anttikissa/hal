@@ -2,7 +2,8 @@
 // after the old Hal's renderStatusLine. Left, joined with ' · ': the
 // session id (and its name), the cwd, the model and the context used;
 // right-aligned: this process's role (or the remote host), the session's tokens this run and
-// the subscription account's usage windows. When the row is too narrow
+// the subscription account's usage windows, after any differing
+// portable plugins (task b81). When the row is too narrow
 // the right parts go from the end, then the left is clipped. Pure.
 
 import { titles } from '../common/titles.ts'
@@ -15,7 +16,8 @@ import { ansi } from './ansi.ts'
 
 // `hal`: the cwd is the Hal repo; `home` is shortened to ~ in the cwd.
 // `color`: the tab's project color (task 22).
-export type StatusInfo = { id: string; name?: string; cwd: string; hal?: boolean; color?: Oklch; model: string; role?: string; stats?: Stats; home?: string }
+// `plugins`: the plugin sync indicator of a remote terminal (task b81).
+export type StatusInfo = { id: string; name?: string; cwd: string; hal?: boolean; color?: Oklch; model: string; role?: string; stats?: Stats; home?: string; plugins?: string }
 
 type Part = { text: string; fg?: Oklch; href?: string }
 
@@ -57,9 +59,10 @@ function left(info: StatusInfo, full = true): Part[][] {
 }
 
 // The right side's groups, in the order they are dropped from the end:
-// role, tokens, plan. Empty ones are left out.
+// plugins, role, tokens, plan. Empty ones are left out.
 function right(info: StatusInfo): Part[][] {
 	let out: Part[][] = []
+	if (info.plugins) out.push([{ text: ansi.clean(info.plugins), fg: colors.warning().fg! }])
 	if (info.role) out.push([{ text: info.role }])
 	let s = info.stats
 	let tokens = [s?.sent ? `↑${count(s.sent)}` : '', s?.received ? `↓${count(s.received)}` : ''].filter(Boolean).join(' ')

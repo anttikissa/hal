@@ -69,6 +69,7 @@ function status(t: Transcript): StatusInfo {
 	if (t.stats) s.stats = t.stats
 	let link = connection.state.link
 	if (link.type === 'connected') s.role = appView.state.remote ?? (link.role === 'host' ? 'host' : 'peer')
+	if (appView.state.plugins) s.plugins = appView.state.plugins
 	return s
 }
 
@@ -112,7 +113,8 @@ function blinks(view: View): string {
 export const appView = {
 	// `remote`: the host's name when following a remote one (task tr),
 	// shown where the role would be.
-	state: { remote: undefined as string | undefined },
+	// `plugins`: the plugin sync indicator of a remote terminal (b81).
+	state: { remote: undefined as string | undefined, plugins: undefined as string | undefined },
 	view,
 	status,
 	activity,

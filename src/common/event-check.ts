@@ -55,7 +55,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	'web-update': {},
 	redraw: { sessionId: 's' },
 	auth: { code: 's', link: 's?' },
-	'plugin-sync': { request: 's?', changed: 'b?', stale: 'b?', applied: 'b?', home: 's?', ignored: 'S?', heads: 'a?', versions: 'a?', contents: 'o?', head: 'o?' },
+	'plugin-sync': { request: 's?', changed: 'b?', stale: 'b?', applied: 'b?', home: 's?', ignored: 'S?', heads: 'a?', versions: 'a?', contents: 'o?', head: 'o?', review: 's?', answers: 'o?' },
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)

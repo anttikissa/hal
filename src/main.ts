@@ -42,6 +42,7 @@ import { plugins } from './host/plugins.ts'
 import { theme } from './host/commands/theme.ts'
 import { pluginReports } from './host/plugin-reports.ts'
 import { pluginSyncClient } from './host/plugin-sync-client.ts'
+import { pluginSyncReview } from './host/plugin-sync-review.ts'
 import { server } from './host/server.ts'
 import { tabs } from './host/tabs.ts'
 import { web } from './host/web.ts'
@@ -281,9 +282,9 @@ async function remote(typed: string | undefined): Promise<void> {
 	process.stderr.write(`Connecting to ${origin}…\n`)
 	main.initTerminal(origin)
 	// This process runs this home's plugins: their notices show here, and
-	// portable ones are compared with the host's (task zh7).
+	// portable ones are compared with the host's (tasks zh7, b81).
 	pluginReports.deliver = (event) => main.onEvent(event)
-	pluginSyncClient.start(new URL(origin).host)
+	pluginSyncReview.start(new URL(origin).host, (text) => ((appView.state.plugins = text), app.show()))
 	remoteClient.start({
 		origin,
 		token,
