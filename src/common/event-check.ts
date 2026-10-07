@@ -2,6 +2,7 @@
 // Tasks: qt, 6eq.
 import { sender } from './sender.ts'
 import type { EventType } from './protocol.ts'
+import { pluginSyncWire } from './plugin-sync.ts'
 
 // What each event carries, checked by clients (connection.ts) before
 // use: a page or terminal can outlive a host restart onto newer code.
@@ -54,6 +55,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	'web-update': {},
 	redraw: { sessionId: 's' },
 	auth: { code: 's', link: 's?' },
+	'plugin-sync': { request: 's?', changed: 'b?', stale: 'b?', applied: 'b?', home: 's?', ignored: 'S?', heads: 'a?', versions: 'a?', contents: 'o?', head: 'o?' },
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -85,6 +87,7 @@ function invalidEvent(value: unknown): string | undefined {
 	if ((value.type === 'command' || value.type === 'output') && value.origin !== undefined && value.origin !== 'model') return `${value.type}: origin must be model`
 	if (value.type === 'completions' && value.descriptions !== undefined && (value.descriptions as string[]).length !== (value.items as string[]).length) return 'completions: descriptions must align with items'
 	if (value.type === 'tabs' && !(value.tabs as unknown[]).every((t) => isObject(t) && ['id', 'name', 'cwd'].every((k) => typeof t[k] === 'string'))) return 'tabs: every tab needs an id, name and cwd'
+	if (value.type === 'plugin-sync') return pluginSyncWire.invalidEvent(value)
 	if (value.type === 'find-results') {
 		let tiers = ['metadata', 'user', 'assistant', 'thinking', 'tool-call', 'tool-output', 'other']
 		if (!tiers.includes(value.tier as string)) return 'find-results: invalid tier'

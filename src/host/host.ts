@@ -17,6 +17,7 @@ import { jobs } from './jobs.ts'
 import { pages, type Page, type Tail } from './pages.ts'
 import { notify } from './notify.ts'
 import { noticeHistory } from './notice-history.ts'
+import { pluginSync } from './plugin-sync.ts'
 import { push } from './push.ts'
 import { sessions } from './sessions.ts'
 import { snapshots } from './snapshots.ts'
@@ -210,7 +211,7 @@ function act(client: Client, c: Command): Outcome | Promise<Outcome> | undefined
 	}
 	if (tabs.is(c)) return tabs.act(c)
 	if (c.type === 'push-subscribe' || c.type === 'push') return push.command(c).then((reply) => ({ reply }))
-	if (c.type === 'notice-history') return { reply: { type: 'notice-history', entries: noticeHistory.list() } }
+	if (c.type === 'notice-history' || c.type === 'plugin-sync') return c.type === 'plugin-sync' ? pluginSync.command(client, c) : { reply: { type: 'notice-history', entries: noticeHistory.list() } }
 	if (c.type === 'hello' || c.type === 'screen') return c.type === 'hello' ? clients.hello(client.record, c.pid, c.version, c.newCode) : clients.screen(client.record, c)
 	if (c.type === 'visibility') {
 		// A known tab may still be waiting for its open snapshot.
