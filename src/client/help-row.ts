@@ -2,19 +2,19 @@
 // row, so the prompt never jumps when what it says changes. In
 // priority order: the keys of an open question, the hint while editing
 // the last prompt, tab completion's choices, else the key hints for
-// the session's state (common/hints.ts, shared with the web; then 'ctrl-r: reload' when a new commit
+// the session's state (sendKeys.hints, shared with the web; then 'ctrl-r: reload' when a new commit
 // is checked out) with '/keys: shortcuts' at the right. Keys in
 // the help key color, descriptions in its description color, as in
 // the old Hal. Pure.
 
 import { colors } from '../common/colors.ts'
 import type { FormState } from '../common/forms.ts'
-import { hints as stateHints, type Hint } from '../common/hints.ts'
+import { sendKeys } from '../common/send-keys.ts'
 import type { SessionState } from '../common/states.ts'
 import { strings } from '../common/strings.ts'
 import { ansi } from './ansi.ts'
 
-export type { Hint }
+export type Hint = [key: string, description: string]
 
 // What the help row needs to know; the frame's View fits.
 export type HelpInput = {
@@ -55,7 +55,7 @@ function row(v: HelpInput, cols: number, resize = false): string {
 	if (v.form) return line(helpRow.paint(helpRow.question(v.form)))
 	if (v.editing) return line(v.editing, colors.warning().fg!)
 	if (v.choices?.length) return line(ansi.clean(v.choices.map((c) => typeof c === 'string' ? c : c[0]).join('  ')))
-	let hints = stateHints.keys(v.transcript?.state, v.prompt.text)
+	let hints = sendKeys.hints(v.transcript?.state, v.prompt.text)
 	if (resize) hints = [['ctrl-=/-', 'resize prompt'], ...hints]
 	let left = helpRow.paint(v.newCode ? [...hints, ['ctrl-r', 'reload']] : hints)
 	let right = helpRow.paint([['/keys', 'shortcuts']])
