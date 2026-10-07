@@ -7,6 +7,7 @@ import { settings } from '../common/settings.ts'
 import { anthropic } from './anthropic.ts'
 import { auth } from './auth.ts'
 import { provider } from './provider.ts'
+import { tool as bash } from './tools/bash.ts'
 
 // A local fake Messages server and fake credentials in a temp home:
 // neither the real ./auth.ason nor the real API is ever touched.
@@ -94,7 +95,7 @@ test('OAuth request: endpoint, headers and the required Claude Code system ident
 	expect(s.headers.get('x-api-key')).toBeNull()
 	expect(s.headers.get('anthropic-version')).toBe('2023-06-01')
 	expect(s.headers.get('content-encoding')).toBe('gzip')
-	expect(s.headers.get('anthropic-beta')!.split(',')).toEqual(expect.arrayContaining(['oauth-2025-04-20', 'claude-code-20250219']))
+	expect(s.headers.get('anthropic-beta')!.split(',')).toEqual(['claude-code-20250219', 'oauth-2025-04-20'])
 	expect(s.headers.get('user-agent')).toMatch(/^claude-cli\/\S+ \(external, hal/)
 	expect(s.headers.get('x-app')).toBe('cli')
 	// The identity must be the first system block, on its own.
@@ -114,7 +115,7 @@ test('an API key credential uses x-api-key and no OAuth betas', async () => {
 	let s = seen[0]!
 	expect(s.headers.get('x-api-key')).toBe('fake-key')
 	expect(s.headers.get('authorization')).toBeNull()
-	expect(s.headers.get('anthropic-beta') ?? '').not.toContain('oauth')
+	expect(s.headers.get('anthropic-beta')).toBeNull()
 })
 
 test('missing credentials: an error naming the file, no request', async () => {
@@ -148,11 +149,11 @@ test('conversation maps to Messages; own thinking replays with its signature, fo
 			],
 		},
 	]
-	let tools = [{ name: 'ls', description: 'List', inputSchema: { type: 'object' } }]
+	let tools = [{ name: 'ls', description: 'List', inputSchema: { type: 'object' } }, { name: bash.name, description: bash.description, inputSchema: bash.parameters }]
 	await run(messages, { tools, maxTokens: 20_000 })
 	let body = seen[0]!.body
 	expect(body.max_tokens).toBe(20_000)
-	expect(body.tools).toEqual([{ name: 'ls', description: 'List', input_schema: { type: 'object' } }])
+	expect(body.tools).toEqual([{ name: 'ls', description: 'List', input_schema: { type: 'object' } }, { name: 'bash', description: bash.description, strict: true, input_schema: { ...bash.parameters, additionalProperties: false } }])
 	let strip = (m: any) => ({ role: m.role, content: m.content.map((b: any) => { let c = { ...b }; delete c.cache_control; return c }) })
 	expect(body.messages.map(strip)).toEqual([
 		{ role: 'user', content: [{ type: 'text', text: 'list files' }] },

@@ -1,0 +1,10 @@
+{
+	title: 'Buffer Anthropic tool inputs before execution',
+	spec: 'Anthropic requests use ordinary buffered tool-input streaming, not the legacy global fine-grained streaming beta. Hal executes tool calls only after complete input is parsed, so buffering preserves the invariant that unvalidated fragments never run and avoids foregoing provider JSON validation without using early fragments. OAuth identity and required beta headers remain intact; API-key requests omit unnecessary beta headers. Local argument validation, full malformed-input errors, truncated-input handling, cancellation, and file-change snapshots remain unchanged. Provider tests exercise both authentication routes and existing malformed/truncated streams.',
+	status: 'done',
+	notes: [
+		'Six focused Sonnet 5.5 medium runs (csv-quotes and cli-value, three reps each) passed with zero malformed JSON calls. Six omitted descriptions and three modifies strings still failed runtime validation: buffering addresses JSON syntax, not schema adherence. No partial tool-input execution is implemented, so eager fragment streaming provides no earlier tool execution.'
+	],
+	needs: ['ya'],
+	foldInto: ['ya']
+}

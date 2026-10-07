@@ -1,0 +1,10 @@
+{
+	title: 'Constrain Anthropic bash arguments to their schema',
+	spec: 'Anthropic bash tool definitions use native strict schema-constrained generation with additionalProperties false. Required command and user-visible description and optional modifies string-array retain their existing shape. Other tools remain unchanged. Host-side validation, error visibility, snapshots and cancellation remain authoritative. A provider mapping test verifies the real bash schema is sent in strict mode without changing other definitions. Live evaluation must distinguish syntax buffering from schema adherence.',
+	status: 'done',
+	notes: [
+		'Six focused live OAuth Sonnet 5.5 medium runs passed with zero tool-input rejections. CSV median 9.422 s, mean cost $0.0249; CLI-value median 20.225 s, mean cost $0.0497. These sequential three-rep results are encouraging, not statistical proof. Strict-batch quota sampling failed because phase labels were rejected; real usage logs survived. Runtime validation and malformed/truncated-input tests remain. Strict generation currently applies only to bash; other tools keep their existing schema mapping.'
+	],
+	needs: ['a09'],
+	foldInto: ['ya']
+}
