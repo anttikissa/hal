@@ -121,7 +121,10 @@ function lines(text: string, width: number, streaming = false, style?: Style, li
 	let blocks = markdown.parse(source, streaming, links)
 	let gap = (b: Block | undefined) => b?.type === 'line' && b.kind === 'p' && !b.marker && !b.runs.length
 	let closed = (b: Block | undefined) => b?.type === 'code' && b.close !== undefined
-	return blocks.flatMap((b, i) => (gap(b) && closed(blocks[i - 1]) ? [] : markdownView.block(b, width, style)))
+	let rows = blocks.flatMap((b, i) => (gap(b) && closed(blocks[i - 1]) ? [] : markdownView.block(b, width, style)))
+	// Completed text has no trailing empty rows; layout supplies the gap (task fcn).
+	if (!streaming) while (rows.length && !Bun.stripANSI(rows.at(-1)!).trim()) rows.pop()
+	return rows
 }
 
 export const markdownView = { lines, block, table, fit, styled, code }
