@@ -45,7 +45,7 @@ test('an advisory message reaches a working session with its next request, frame
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'working' })
 	let next = await send(c, b, { to: '1', text: 'check the tests' })
-	expect(resultOf(next)).toMatchObject({ output: `Sent to ${tabs.label(a)}` })
+	expect(resultOf(next)).toMatchObject({ output: `Sent to ${tabs.label(a)}: it reads this before its next request` })
 	expect(resultOf(next).isError).toBeUndefined()
 	// Waiting, visibly from the other session.
 	let waiting = c.views.get(a)!.inbox
@@ -79,13 +79,13 @@ test('an idle session gets the message as a turn of its own, with full attention
 	expect((await fresh(a)).items).toEqual(c.views.get(a)!.items)
 })
 
-test('steer is read like the user steering; queue waits for the turn to end', async () => {
+test('emergency is read like the user steering; queue waits for the turn to end', async () => {
 	let c = client()
 	let { a, b, by } = pair(c)
 	c.conn.send({ type: 'submit', sessionId: a, text: 'go' })
 	await until(() => calls.length === 1)
-	let next = await send(c, b, { to: '1', text: 'later', queue: true })
-	calls[next]!.push(sendCall({ to: '1', text: 'now', steer: true }, 's2'), { type: 'done', reason: 'tool_use' })
+	let next = await send(c, b, { to: '1', text: 'later', delivery: 'queue' })
+	calls[next]!.push(sendCall({ to: '1', text: 'now', delivery: 'emergency' }, 's2'), { type: 'done', reason: 'tool_use' })
 	let recipient = () => calls.findIndex((call, i) => i > 0 && call.input.sessionId === a && lastText(i).endsWith('now'))
 	await until(() => recipient() >= 0)
 	expect(c.views.get(a)!.inbox.map((m) => [m.text, m.queue, m.advisory])).toEqual([
@@ -158,7 +158,7 @@ test('a paused session stays paused: the message waits for the user to continue'
 	c.conn.send({ type: 'pause', sessionId: a })
 	await until(() => c.of('turn-end').length === 1)
 	let next = await send(c, b, { to: '1', text: 'fyi' })
-	expect(resultOf(next).isError).toBeUndefined()
+	expect(resultOf(next)).toMatchObject({ output: `Waiting in ${tabs.label(a)}: it is paused; it reads this when the user continues it` })
 	expect(c.views.get(a)!.state.type).toBe('paused')
 	expect(c.views.get(a)!.inbox.map((m) => m.text)).toEqual(['fyi'])
 	c.conn.send({ type: 'continue', sessionId: a })
