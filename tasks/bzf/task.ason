@@ -5,7 +5,8 @@
 	notes: [
 		'Files: src/web/rebase.ts (decisions, no Solid; unit-tested), src/web/components/Rebase.tsx (native <dialog> modal), CSS in src/web/index.html, Undo on the divider in Card.tsx. rebase-plan and rebase-result are handled before the shown-tab filter in app.onEvent.',
 		"Keys: while the view is open page keys return early (the dialog keeps its own; Escape is the dialog's native cancel), and Chat.target treats a textarea inside an open dialog as a field, not the message box, so edits never reach the composer.",
-		"Visual check (headless Chrome, CDP): Hal has no light theme, so only the built-in dark theme was checked (linking a theme plugin into a fresh HAL_HOME did not take effect there); the overlay uses only theme CSS variables. Pitfalls: at phone width touch emulation makes Enter insert a newline (coarse pointer), and a 1x1 PNG fixture looks like a missing image. Solid STRICT_READ_UNTRACKED console warnings (<Xf> in a Show) predate this task; origin/main logs them too."
+		'Visual check (headless Chrome, CDP): Hal has no light theme, so only the built-in dark theme was checked (linking a theme plugin into a fresh HAL_HOME did not take effect there); the overlay uses only theme CSS variables. Pitfalls: at phone width touch emulation makes Enter insert a newline (coarse pointer), and a 1x1 PNG fixture looks like a missing image. Solid STRICT_READ_UNTRACKED console warnings (<Xf> in a Show) predate this task; origin/main logs them too.',
+		'The token number and bar have hover titles (estimated tokens, percent of the largest row, green small to red largest), and the quick-actions hint says what numbers and bars mean, since users read the numbers as bytes and the heat colors as good/bad.'
 	],
 	needs: ['z71']
 }
