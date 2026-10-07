@@ -124,7 +124,7 @@ test('what the state needs from earlier stays right as history grows and without
 	history.submit(id, 'go')
 	history.append(id, { type: 'inbox', id: 'a', text: 'steer' })
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'steer' }], inbox: ['a'] })
-	history.append(id, { type: 'inbox', id: 'b', text: 'later', queue: true })
+	history.append(id, { type: 'inbox', id: 'b', text: 'later', delivery: 'after-turn' })
 	check()
 	history.append(id, { type: 'command', text: '/model' })
 	history.append(id, { type: 'question', id: 'm', form: { text: 'Model?', fields: [{ type: 'text', name: 'm' }] }, from: { command: 'model', args: '' } })

@@ -7,6 +7,7 @@
 // on cancel (Escape, the bar's Cancel, or Enter on an emptied box) and
 // after sending. A working session is paused when the edit begins and
 // continued on cancel.
+// Tasks: rqq.
 
 import { queueEdit } from '../common/queue-edit.ts'
 import { queuedPrompt } from './queue-edit.ts'
@@ -46,7 +47,7 @@ function draft(id: string | undefined): string {
 
 function edit(key: string): boolean {
 	let t = app.state.view.transcript
-	let waiting = t?.inbox.find((m) => m.queue && m.id === key)
+	let waiting = t?.inbox.find((m) => m.delivery === 'after-turn' && m.id === key)
 	if (waiting) return queuedPrompt.begin(waiting.id)
 	if (app.state.view.editing?.queueEdit || (t && queueEdit.current(t.meta.id)?.active)) return false
 	let out = editPrompt.begin(app.state.view, key)

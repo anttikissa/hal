@@ -12,6 +12,7 @@
 // (transcript items), form-view.ts (open questions), prompt-view.ts
 // (the prompt), tab-bar.ts (the tabs), help-row.ts (the last row) and
 // modal-view.ts (modals over it all). Task kx0 shares result status for background jobs.
+// Tasks: rqq.
 
 import { bashResult } from '../common/bash-result.ts'
 import { colors, type Style } from '../common/colors.ts'
@@ -340,7 +341,7 @@ function build(view: View, cols: number, rows = 24, full = false, past: Past = f
 	let edge = ansi.paint('', colors.user(), cols)
 	for (let { item, m } of tail) {
 		let tab = m?.from === undefined ? 0 : (view.tabs?.list.findIndex((t) => t.id === m.from) ?? -1) + 1
-		let queued = !!m?.queue && item.type === 'prompt'
+		let queued = !!(m?.delivery === 'after-turn') && item.type === 'prompt'
 		let rows = queued ? frame.queuedRows(item as Item & { type: 'prompt' }, inbox.note(m!, tab || undefined, m!.id === view.transcript?.queueHold), cols, session) : frame.itemRows(item, cols, session)
 		if (stacked && !queued) lines.push(edge)
 		if (rows.length && (lines.length || above) && !(stacked && queued)) lines.push('')

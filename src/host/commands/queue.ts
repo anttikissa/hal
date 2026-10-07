@@ -1,4 +1,5 @@
 // /queue manages durable queued messages.
+// Tasks: jq, gr4, rqq.
 import { sendKeys } from '../../common/send-keys.ts'
 import type { SlashCommand } from '../commands.ts'
 import { history } from '../history.ts'
@@ -7,7 +8,7 @@ import { prompts } from '../prompts.ts'
 import { queueEdits } from '../queue-edits.ts'
 import { status } from '../status.ts'
 
-const queuedOf = (id: string) => status.inboxOf(id).filter((m) => m.queue)
+const queuedOf = (id: string) => status.inboxOf(id).filter((m) => m.delivery === 'after-turn')
 
 // The message `/queue drop <key>` names: its position in /queue's list,
 // or its inbox id (the web's × sends it, so a queue that changed in

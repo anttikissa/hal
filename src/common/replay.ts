@@ -1,7 +1,7 @@
 // Session history records (one per line in sessions/<id>/history.asonl)
 // and the rebuild of provider input from them. Provider input comes from
 // these records alone, never from display state.
-// Tasks: 7, nvm, svt, 6eq.
+// Tasks: 7, nvm, svt, 6eq, rqq.
 
 import type { AssistantBlock, Message, StopReason, ToolResultBlock, Usage, UserBlock, UserText } from './blocks.ts'
 import { bashResult } from './bash-result.ts'
@@ -40,7 +40,7 @@ export type HistoryRecord = Numbered &
 	// messages it delivers, which are its first text blocks. `replaces`:
 	// an edit of the last prompt (tasks/j1/states.md, Editing the last
 	// prompt); it supersedes that prompt and everything after it.
-	| { type: 'user'; blocks: UserBlock[]; notices?: Notice[]; naming?: { turn: number; version: number; name: string; eligible: boolean }; command?: string; inbox?: string[]; queued?: true; replaces?: true; ts: string }
+	| { type: 'user'; blocks: UserBlock[]; notices?: Notice[]; naming?: { turn: number; version: number; name: string; eligible: boolean }; command?: string; inbox?: string[]; replaces?: true; ts: string }
 	// A message sent while the session was busy, waiting in the inbox
 	// (src/common/inbox.ts) until a prompt record delivers it. Not
 	// provider input by itself. `id`: the client's command id, if any.
@@ -49,7 +49,7 @@ export type HistoryRecord = Numbered &
 	// record with the same id is an edit of the waiting message (task
 	// dg): its new text, in the same place; `withdrawn` takes it out
 	// (edited into a slash command). `command`: the edit's command id.
-	| { type: 'inbox'; id: string; text: string; queue?: true; interject?: true; from?: string; label?: string; advisory?: true; summary?: string; report?: 'question' | 'summary'; withdrawn?: true; command?: string; origin?: 'model'; generatingCommand?: 'clear'; ts: string }
+	| { type: 'inbox'; id: string; text: string; delivery?: 'now' | 'next-round' | 'after-turn'; from?: string; label?: string; advisory?: true; summary?: string; report?: 'question' | 'summary'; withdrawn?: true; command?: string; origin?: 'model'; generatingCommand?: 'clear'; ts: string }
 	// One assistant block, appended as soon as it is complete.
 	// `ts`: when the block started streaming; `model`, `effort`: what
 	// wrote it (task hp; older records have neither).
@@ -238,8 +238,8 @@ function tags(b: UserText): string[] {
 	return [
 		b.from !== undefined ? `message from ${titles.address(b.label ?? b.from)}` : b.origin === 'model' ? 'Hal' : undefined,
 		b.generatingCommand && `/${b.generatingCommand} continuation`,
-		b.steering && 'steering',
-		b.interject && 'soft-steering',
+		(b.delivery === 'now') && 'steering',
+		(b.delivery === 'next-round') && !b.advisory && 'soft-steering',
 		b.queuedAt !== undefined && `queued at ${replay.clock(b.queuedAt).slice(-5)}`,
 		b.advisory && 'next round',
 	].filter((t): t is string => !!t)

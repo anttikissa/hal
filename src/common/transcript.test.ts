@@ -307,11 +307,11 @@ test('waiting and delivered steering use the same header, without labeling a fol
 	expect(titles.title(waiting)).toBe('You (steering)')
 	let live = fold([
 		snap({ history: [] }),
-		{ type: 'prompt', sessionId, texts: ['steer', 'fresh'], senders: [{ steering: true }, {}], n: 3 },
+		{ type: 'prompt', sessionId, texts: ['steer', 'fresh'], senders: [{ delivery: 'now' }, {}], n: 3 },
 	])!
 	let loaded = fold([snap({ history: [
 		{ type: 'inbox', id: 's1', text: 'steer', ts, n: 1 },
-		{ type: 'user', blocks: [{ type: 'text', text: 'steer' }, { type: 'text', text: 'fresh' }], inbox: ['s1'], ts, n: 3 },
+		{ type: 'user', blocks: [{ type: 'text', text: 'steer', delivery: 'now' }, { type: 'text', text: 'fresh' }], inbox: ['s1'], ts, n: 3 },
 	] })])!
 	for (let t of [live, loaded]) {
 		expect(t.items.map((i) => titles.who(i))).toEqual(['You (steering)', 'You'])

@@ -95,12 +95,12 @@ test('deleting one row of a signed drop group refuses another edited row with it
 })
 
 test('waiting messages are editable rows; dropping removes all revisions and undo restores the inbox', () => {
-	let raw: HistoryRecord[] = [prompt(1, 'go'), { type: 'inbox', n: 2, ts, id: 'message', text: 'original', from: 'other-session', label: 'Other session', interject: true }, { type: 'inbox', n: 3, ts, id: 'message', text: 'current', from: 'other-session', label: 'Other session', interject: true }]
+	let raw: HistoryRecord[] = [prompt(1, 'go'), { type: 'inbox', n: 2, ts, id: 'message', text: 'original', from: 'other-session', label: 'Other session', delivery: 'next-round' }, { type: 'inbox', n: 3, ts, id: 'message', text: 'current', from: 'other-session', label: 'Other session', delivery: 'next-round' }]
 	let snapshot = rebaseRows.build(raw)
 	expect(snapshot.rows[1]).toMatchObject({ n: 2, ns: [2, 3], kind: 'interjecting', summary: 'Other session: current', editN: 3, text: 'current' })
 	let edited = rebaseRows.parse('keep #1\nedit #2', snapshot, { 2: 'replacement' })
 	let current = replay.current([...raw, { type: 'rebase', n: 4, ts, ...edited.plan }])
-	expect(inbox.pending(current)).toMatchObject([{ n: 2, text: 'replacement', from: 'other-session', interject: true }])
+	expect(inbox.pending(current)).toMatchObject([{ n: 2, text: 'replacement', from: 'other-session', delivery: 'next-round' }])
 	let dropped = rebaseRows.parse('keep #1', snapshot)
 	let rewrite: HistoryRecord = { type: 'rebase', n: 4, ts, ...dropped.plan }
 	expect(inbox.pending(replay.current([...raw, rewrite]))).toEqual([])

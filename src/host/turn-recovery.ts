@@ -1,6 +1,6 @@
 // Find unfinished turns and queued work from session marks, then continue
 // it after a host restart without scanning closed, idle histories.
-// Tasks: bx, svt.
+// Tasks: bx, svt, rqq.
 import { existsSync } from 'fs'
 import { states } from '../common/states.ts'
 import { contextTransitions } from './context-transitions.ts'
@@ -75,7 +75,7 @@ function leftWork(id: string): boolean {
 	if (last && last.status !== 'completed') return false
 	return Object.values(m.inbox).flat().some((at) => {
 		let r = pages.lineAt(path, at).record
-		return r.type === 'inbox' && r.queue === true
+		return r.type === 'inbox' && r.delivery === 'after-turn'
 	})
 }
 

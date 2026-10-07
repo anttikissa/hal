@@ -8,6 +8,7 @@
 // changed). Down with the text unchanged, or Escape, continues the
 // paused turn. Messages another session sent (`from`) are never
 // recalled.
+// Tasks: rqq.
 
 import { states } from './states.ts'
 import { toolDetails } from './tool-details.ts'
@@ -64,7 +65,7 @@ function begin(t: Transcript | undefined, text: string): { editing: Editing; com
 	if (!t || text !== '') return undefined
 	let sessionId = t.meta.id
 	// Queued messages require queueEdit.begin and its host handshake.
-	if (t.inbox.some((m) => m.queue && m.from === undefined && m.origin !== 'model')) return undefined
+	if (t.inbox.some((m) => m.delivery === 'after-turn' && m.from === undefined && m.origin !== 'model')) return undefined
 	let waiting = t.inbox.findLast((m) => m.from === undefined && m.origin !== 'model')
 	if (waiting) return { editing: { sessionId, original: waiting.text, inbox: waiting.id } }
 	if (!states.busy(t.state)) return undefined

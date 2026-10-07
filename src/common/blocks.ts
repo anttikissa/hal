@@ -1,6 +1,9 @@
 // Provider-neutral conversation blocks and stream events. How they map
 // onto Anthropic Messages, OpenAI Responses and Chat Completions is
-// recorded in tasks/7f/mapping.md.
+// recorded in tasks/7f/mapping.md. These types are both the wire format
+// (protocol events) and the persisted one (history records), so a field
+// change requires converting older histories before readers open them.
+// Tasks: 7f, rqq.
 
 export type TextBlock = { type: 'text'; text: string; naming?: true }
 
@@ -23,13 +26,12 @@ export type ImageBlock = { type: 'image'; blob: string; mediaType: string; bytes
 
 // Who sent a prompt's text (task rj): `from` is the session that sent
 // it, `label` names it for people and the model (tab, id and name as
-// they were then); none, the human. `advisory`: the model may read it
-// without dropping its work (the send tool's default). `steering`:
-// this text was submitted to steer an active turn, interrupting it;
-// `interject`: to steer it at its next round (task csn). Both retained for display.
+// they were then); none, the human. Advisory is independent of timing:
+// automatic reports and deliberate sends retain their existing provenance.
+// Delivery records a busy message's scheduling tier, not an idle prompt.
 // `summary`: one line for the user, heading the message folded.
 // queuedAt: original inbox receipt time, retained after queue delivery.
-export type Sender = { queuedAt?: string; from?: string; label?: string; advisory?: true; steering?: true; interject?: true; summary?: string; report?: 'question' | 'summary'; origin?: 'model'; generatingCommand?: 'clear' }
+export type Sender = { queuedAt?: string; from?: string; label?: string; advisory?: true; delivery?: 'now' | 'next-round' | 'after-turn'; summary?: string; report?: 'question' | 'summary'; origin?: 'model'; generatingCommand?: 'clear' }
 
 // A prompt's text, saying who sent it.
 export type UserText = TextBlock & Sender

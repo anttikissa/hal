@@ -10,9 +10,9 @@ let connected = true
 const original = { send: connection.send, connected: connection.connected, store: drafts.store }
 const ts = '2026-10-04T20:13:07.456Z'
 const t = () => transcript.fromSnapshot({ meta: { id: 's1', cwd: '/tmp', model: 'fake/m', createdAt: ts }, history: [], state: { type: 'paused' }, inbox: [
-	{ id: 'q1', text: 'older', queue: true, ts },
-	{ id: 'peer', text: 'not mine', queue: true, from: 'other', ts },
-	{ id: 'q2', text: 'newer', queue: true, ts },
+	{ id: 'q1', text: 'older', delivery: 'after-turn', ts },
+	{ id: 'peer', text: 'not mine', delivery: 'after-turn', from: 'other', ts },
+	{ id: 'q2', text: 'newer', delivery: 'after-turn', ts },
 	{ id: 'steer', text: 'steering', ts },
 ] })
 const reply = (text = 'newer') => { let e = queueEdit.current('s1')!; queueEdit.onEvent({ type: 'queue-edit', sessionId: 's1', edit: e.edit, message: e.message, text }) }

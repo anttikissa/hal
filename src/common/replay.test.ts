@@ -166,7 +166,7 @@ test('continuation reports failure versus pause rather than inventing an interru
 })
 
 test('waiting inbox messages are not sent; once delivered they are one prompt, oldest first', () => {
-	let waiting: HistoryRecord[] = [say('go'), block({ type: 'text', text: 'working' }), { type: 'inbox', id: 'a', text: 'one', ts }, { type: 'inbox', id: 'b', text: 'two', queue: true, ts }]
+	let waiting: HistoryRecord[] = [say('go'), block({ type: 'text', text: 'working' }), { type: 'inbox', id: 'a', text: 'one', ts }, { type: 'inbox', id: 'b', text: 'two', delivery: 'after-turn', ts }]
 	let before = replay.toMessages(waiting)
 	expect(prompts(before)).toHaveLength(1)
 	let after = replay.toMessages([...waiting, { type: 'user', blocks: [{ type: 'text', text: 'one' }, { type: 'text', text: 'three' }], inbox: ['a'], ts }])
@@ -219,7 +219,7 @@ test('queued texts retain exact receipt timestamps independently of delivery and
 	let queuedAt = '2026-10-04T20:13:07.456Z'
 	let deliveredAt = '2026-10-04T20:17:42.123Z'
 	let msgs = replay.toMessages([{
-		type: 'user', ts: deliveredAt, queued: true,
+		type: 'user', ts: deliveredAt,
 		blocks: [
 			{ type: 'text', text: 'That was the situation then.', queuedAt },
 			{ type: 'text', text: 'A fresh message.' },
@@ -241,7 +241,7 @@ test('replay headers carry block ids, steering, durations and what the model wro
 		{ type: 'assistant', block: { type: 'text', text: 'Running it.' }, ts: at(12, 34), n: 3 },
 		{ type: 'assistant', block: { type: 'tool_call', id: 'toolu_1', name: 'bash', input: { command: './test' } }, ts: at(12, 34), n: 4 },
 		{ type: 'user', blocks: [{ type: 'tool_result', id: 'toolu_1', output: 'ok', ms: 8100 }], ts: at(12, 34, 9), n: 5 },
-		{ type: 'user', blocks: [{ type: 'text', text: 'hurry', from: '160-xyz', label: 'tab 3 · 160-xyz · Builder', steering: true }], ts: at(12, 40), n: 6 },
+		{ type: 'user', blocks: [{ type: 'text', text: 'hurry', from: '160-xyz', label: 'tab 3 · 160-xyz · Builder', delivery: 'now' }], ts: at(12, 40), n: 6 },
 		{ type: 'assistant', block: { type: 'text', text: 'Done.' }, ts: at(12, 41), n: 7, originSession: '160-abc' },
 		{ type: 'turn_end', status: 'completed', usage: {}, ts: at(12, 41), n: 8 },
 		{ type: 'user', blocks: [{ type: 'text', text: 'thanks' }], ts: at(12, 42), n: 9 },

@@ -1,6 +1,7 @@
 // What a block's header says (task hp): its local time and who wrote
 // it, the same words in the terminal and on the web. Background
 // command completion wording belongs here (task 778); stored labels stay intact.
+// Tasks: rqq.
 
 import type { Shown } from './transcript.ts'
 
@@ -80,7 +81,7 @@ function messageHead(item: Shown & { type: 'prompt' }): string {
 
 // Receipts describe model delivery, not transport acknowledgement of normal prompts.
 function receipt(item: Shown): 0 | 1 | 2 {
-	return item.type === 'prompt' && (item.interject || item.advisory || item.queued || item.queuedAt) ? item.waiting ? 1 : 2 : 0
+	return item.type === 'prompt' && ((item.delivery === 'next-round') || (item.delivery === 'after-turn') || item.queuedAt) ? item.waiting ? 1 : 2 : 0
 }
 
 // Who wrote `item`, or undefined for an item without a header.
@@ -93,7 +94,7 @@ function who(item: Shown): string | undefined {
 function author(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt':
-			return tagged(item.from !== undefined && /^bash #t?\d+$/.test(item.label ?? '') ? `Background command finished ${item.label!.slice(5)}` : item.from !== undefined ? item.report ? `Message from ${titles.address(item.label ?? item.from)}` : item.summary ? `From ${titles.address(item.label ?? item.from)}` : `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.generatingCommand && `/${item.generatingCommand} continuation`, item.steering && 'steering', item.interject && (item.waiting ? 'soft-steering' : 'soft-steered'), item.queued && (item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : 'queued')])
+			return tagged(item.from !== undefined && /^bash #t?\d+$/.test(item.label ?? '') ? `Background command finished ${item.label!.slice(5)}` : item.from !== undefined ? item.report ? `Message from ${titles.address(item.label ?? item.from)}` : item.summary ? `From ${titles.address(item.label ?? item.from)}` : `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.generatingCommand && `/${item.generatingCommand} continuation`, (item.delivery === 'now') && 'steering', (item.delivery === 'next-round') && !item.advisory && (item.waiting ? 'soft-steering' : 'soft-steered'), (item.delivery === 'after-turn') && (item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : 'queued')])
 		// A command is headed as the prompt it was typed as.
 		case 'command':
 			return item.from === undefined ? 'You' : `Command from ${item.label ?? item.from}`

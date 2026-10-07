@@ -5,6 +5,7 @@
 // that owns an edit (the store's, else this page load's or process's), so a store
 // shared with other windows (localStorage, draft files) never makes them
 // act on it; an edit left by a window that is gone is adopted.
+// Tasks: rqq.
 import { connection } from './connection.ts'
 import { drafts } from './drafts.ts'
 import type { Editing } from './amend.ts'
@@ -15,7 +16,7 @@ import type { Transcript } from './transcript.ts'
 export type QueueEditing = { edit: string; message: string; text: string; original?: string; active: boolean; request?: string; saving?: string; window?: string }
 
 function candidate(t: Transcript | undefined): InboxItem | undefined {
-	return t?.inbox.findLast((m) => m.queue && m.from === undefined && m.origin !== 'model')
+	return t?.inbox.findLast((m) => m.delivery === 'after-turn' && m.from === undefined && m.origin !== 'model')
 }
 
 function mine(e?: QueueEditing): QueueEditing | undefined { return e && (e.window === undefined || e.window === queueEdit.windowId()) ? e : undefined }
@@ -27,7 +28,7 @@ function elsewhere(t: Transcript): boolean {
 }
 // Delivery waits: the next queued message is the one being edited.
 function waiting(t: Transcript): boolean {
-	return !!t.queueHold && t.state.type === 'idle' && t.inbox.find((m) => m.queue)?.id === t.queueHold
+	return !!t.queueHold && t.state.type === 'idle' && t.inbox.find((m) => m.delivery === 'after-turn')?.id === t.queueHold
 }
 function ready(id: string): boolean {
 	let e = queueEdit.current(id)
@@ -68,7 +69,7 @@ function recover(id: string): void {
 }
 function begin(t: Transcript, message: string): boolean {
 	let id = t.meta.id
-	let waiting = t.inbox.find((m) => m.id === message && m.queue && m.from === undefined && m.origin !== 'model')
+	let waiting = t.inbox.find((m) => m.id === message && (m.delivery === 'after-turn') && m.from === undefined && m.origin !== 'model')
 	if (!waiting) return false
 	// Another window edits: the notice says so; nothing to begin here.
 	if (queueEdit.elsewhere(t)) return true

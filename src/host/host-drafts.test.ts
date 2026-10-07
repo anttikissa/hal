@@ -237,7 +237,7 @@ test('a prompt sent while a turn runs steers it, and is pending until the host h
 	drafts.submit(id, 'first')
 	drafts.submit(id, 'later', { delivery: 'queue' })
 	await until(() => drafts.pending(id).length === 0)
-	expect(history.readSync(id).filter((r) => r.type === 'inbox')).toMatchObject([{ text: 'later', queue: true }])
+	expect(history.readSync(id).filter((r) => r.type === 'inbox')).toMatchObject([{ text: 'later', delivery: 'after-turn' }])
 	host.reset()
 })
 

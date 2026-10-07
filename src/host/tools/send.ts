@@ -7,6 +7,7 @@
 // idle recipient gets it as a turn of its own (prompts.submit). The
 // result says which happened, including a message left waiting for the
 // user because the recipient is paused, failed or blocked.
+// Tasks: rqq.
 
 import { existsSync } from 'fs'
 import type { Sender } from '../../common/blocks.ts'
@@ -31,11 +32,11 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 	let item = status.inboxOf(id).findLast((m) => m.from === from && m.text === text)
 	if (!item) return `Sent to ${to}: it started a turn`
 	let state = status.stateOf(id)
-	if (item.queue && notify.asked(id)) return `Queued in ${to}: it waits for the user's answer, then reads this`
+	if ((item.delivery === 'after-turn') && notify.asked(id)) return `Queued in ${to}: it waits for the user's answer, then reads this`
 	let held = { paused: 'paused', error: 'failed' }[state.type as string]
 	if (held) return `Waiting in ${to}: it is ${held}; it reads this when the user continues it`
 	if (state.type === 'blocked') return `Waiting in ${to}: it waits for the user (${state.reason}); it reads this after`
-	if (item.queue) return `Queued in ${to}: it reads this after its current turn`
+	if ((item.delivery === 'after-turn')) return `Queued in ${to}: it reads this after its current turn`
 	return delivery === 'emergency' ? `Interrupted ${to}: it reads this now` : `Sent to ${to}: it reads this before its next request`
 }
 

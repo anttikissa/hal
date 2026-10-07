@@ -5,6 +5,7 @@
 // shared through common/drafts.ts; a sent prompt shows at once, pending
 // until the host has it. It shows the host's tabs and one focused tab
 // (src/client/tabs.ts); each tab keeps its own client state meanwhile.
+// Tasks: b3, tr, p0, rqq.
 
 import { queueEdit } from '../common/queue-edit.ts'
 import { queuedPrompt } from './queue-edit.ts'
@@ -214,7 +215,7 @@ function submit(text: string, delivery: Delivery = 'steer'): boolean {
 	// While editing the last prompt, Enter sends the edit.
 	let { command, refused } = st.editing
 		? { command: amend.enter(st.editing, st.transcript, text, delivery === 'queue'), refused: undefined }
-		: states.enter(st.transcript.meta.id, st.transcript.state, text, delivery, st.transcript.inbox.some((m) => m.queue))
+		: states.enter(st.transcript.meta.id, st.transcript.state, text, delivery, st.transcript.inbox.some((m) => m.delivery === 'after-turn'))
 	if (refused) {
 		st.notice = refused
 		return false

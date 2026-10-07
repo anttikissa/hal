@@ -22,7 +22,7 @@ const save = (a: ReturnType<typeof client>, id: string, text: string) => a.conn.
 const cancel = (a: ReturnType<typeof client>, id: string) => a.conn.send({ type: 'queue-edit-cancel', sessionId: id, edit: 'token' })
 const end = (i: number) => calls[i]!.push({ type: 'done', reason: 'end' })
 const lastPrompt = (i: number) => JSON.stringify(calls[i]!.input.messages.at(-1))
-const waiting = (id: string) => status.inboxOf(id).map((m) => `${m.id}${m.queue ? '' : ' (steering)'}`)
+const waiting = (id: string) => status.inboxOf(id).map((m) => `${m.id}${(m.delivery === 'after-turn') ? '' : ' (steering)'}`)
 
 test('turn end: a locked first message waits with the ones behind it; save sends it as saved', async () => {
 	let { a, id } = await queued()
