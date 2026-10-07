@@ -1,0 +1,7 @@
+{
+	title: 'hal -p: --session, delivery tier, --keep, question exit code',
+	spec: "hal -p takes -s/--session <session id or tab number>: it opens no tab and sends the prompt to that session, delivered by --steer, --soft-steer or --queue (task 760 terms; default as the prompt box's Enter). Its provenance is the user's: it counts as a human prompt, answers a <question> (nd6) and promotes as a typed prompt does (p87). It waits for the end of the first turn that carries its message, whatever ends it. Without --session, the new tab starts with autoclose on (p87); --keep starts it off; --keep with --session is an error (exit 2). Exit codes: 0 a final answer (its text on stdout), 3 a reply ending with <question> (the question on stdout; the tab stays open), 1 failed, paused or canceled, 2 bad arguments or an unknown session. Raised in session 07-bah on 2026-10-07.",
+	status: 'planned',
+	needs: ['gw', 'p87', '760'],
+	foldInto: ['gw']
+}
