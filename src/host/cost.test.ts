@@ -74,3 +74,14 @@ test('catalog retains prices, including cache prices; missing used-token prices 
 	expect(() => cost.run(['--since', 'nonsense'])).toThrow('--since')
 	expect(() => cost.run(['--wrong'])).toThrow('unknown option')
 })
+
+test('rounds split by account and sum into account subtotals across sessions', () => {
+	session('02-abc', [
+		{ type: 'round', model: 'unknown/model', account: 'a@example.com', usage: { input: 10 }, ts },
+		{ type: 'round', model: 'unknown/model', account: 'b@example.com', usage: { input: 20 }, ts },
+	])
+	session('02-def', [{ type: 'round', model: 'unknown/model', account: 'a@example.com', usage: { input: 5, output: 1 }, ts }])
+	let report = cost.run([])
+	expect(report).toContain('ACCOUNT a@example.com  $0.0000  2  15  1  0  0')
+	expect(report).toContain('ACCOUNT b@example.com  $0.0000  1  20  0  0  0')
+})

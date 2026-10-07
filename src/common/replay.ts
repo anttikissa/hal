@@ -95,7 +95,7 @@ export type HistoryRecord = Numbered &
 	// One provider round's own usage (task c4), after its blocks: the
 	// context graph's points. `block`: the number of the round's first
 	// assistant record. Not provider input, not shown in the transcript.
-	| { type: 'round'; usage: Usage; model?: string; block?: number; ts: string }
+	| { type: 'round'; usage: Usage; model?: string; account?: string; block?: number; ts: string }
 	// A context boundary: `keep` names this turn's prompts, replayed
 	// verbatim (including images) after the summary, not summarized into it.
 	| { type: 'compact'; summary: string; prompts: number; keep?: number[]; transition?: string; ts: string }

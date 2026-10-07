@@ -262,7 +262,7 @@ async function* record(id: string, providerName: string, events: AsyncIterable<S
 	} finally {
 		if (signal?.aborted && turn.end?.type !== 'done' && turn.blocks.at(-1)?.type === 'text') running.interrupted = true
 		flush(turn.blocks.length)
-		if (!running.ended && Object.keys(turn.usage).length) history.append(id, { type: 'round', usage: { ...turn.usage }, ...(by.model !== undefined && { model: by.model }), ...(running.ns[0] !== undefined && { block: running.ns[0] }) })
+		if (!running.ended && Object.keys(turn.usage).length) history.append(id, { type: 'round', usage: { ...turn.usage }, ...(by.model !== undefined && { model: by.model }), ...(turn.account && { account: turn.account }), ...(running.ns[0] !== undefined && { block: running.ns[0] }) })
 		if (turn.end?.type === 'done') pruning.consumed(id, inputRecords)
 	}
 	if (turn.end && !running.ended) yield turn.end

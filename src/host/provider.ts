@@ -340,7 +340,10 @@ async function* stream(
 				yield failed(p, modelId, http.account, event)
 				return
 			}
-			if (event.type === 'usage') Object.assign(counted, event.usage)
+			if (event.type === 'usage') {
+				Object.assign(counted, event.usage)
+				if (http.account) event = { ...event, account: http.account }
+			}
 			if (event.type === 'done' && !input.messages.some((m) => m.blocks.some((b) => b.type === 'image' || (b.type === 'tool_result' && b.image)))) {
 				let chars = tokenEstimates.characters(input.messages, (input.system?.length ?? 0) + JSON.stringify(input.tools ?? []).length)
 				tokenCalibration.observe(modelId, chars, (counted.input ?? 0) + (counted.cacheRead ?? 0) + (counted.cacheWrite ?? 0))

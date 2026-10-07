@@ -1,0 +1,7 @@
+{
+	title: 'Round records name the account; scripts/cost totals by account',
+	spec: "Each history round record carries the account label (auth account name: the subscription email or 'account N', or the API key's name; never credentials) that served the request, when the provider has accounts. Providers attach http.account to usage events; blocks.apply keeps it on the turn. scripts/cost rows split per session, model and account, and add ACCOUNT subtotals, so quota consumption can be attributed per subscription. Older rounds without an account count under no account. Raised in 167-fox on 2026-10-07 after three Plus accounts ran out and usage could not be attributed.",
+	status: 'done',
+	needs: ['asa'],
+	foldInto: ['asa']
+}

@@ -68,7 +68,8 @@ export type StreamEvent =
 	// Closes the current thinking block (or makes an empty one).
 	| { type: 'signature'; value: string }
 	| ({ type: 'tool_call' } & Omit<ToolCallBlock, 'type'>)
-	| { type: 'usage'; usage: Usage }
+	// `account`: the credentials' label that served the request.
+	| { type: 'usage'; usage: Usage; account?: string }
 	| DoneEvent
 	| ErrorEvent
 
@@ -77,6 +78,7 @@ export type Turn = {
 	provider: string
 	blocks: AssistantBlock[]
 	usage: Usage
+	account?: string
 	end?: DoneEvent | ErrorEvent
 }
 
@@ -106,6 +108,7 @@ function apply(turn: Turn, event: StreamEvent): void {
 			break
 		case 'usage':
 			for (let [k, v] of Object.entries(event.usage)) if (v !== undefined) turn.usage[k as keyof Usage] = v
+			if (event.account) turn.account = event.account
 			break
 		default:
 			turn.end = event
