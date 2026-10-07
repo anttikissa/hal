@@ -1,0 +1,10 @@
+{
+	title: 'Prefer file editing tools without shell recipes',
+	spec: 'SYSTEM.md favors available file-editing tools for file changes without prescribing heredocs or Python/perl editing recipes. When shell editing is necessary, require failure if expected old content is absent. Preserve edit verification and declared-file snapshot requirements.',
+	status: 'planned',
+	notes: [
+		'The user removed the heredoc prescription during isolated editing-tool experiments. Supersedes tm shell recipes without installing an editor or removing snapshots and verification.'
+	],
+	needs: ['tm'],
+	foldInto: ['tm']
+}
