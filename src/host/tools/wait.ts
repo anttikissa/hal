@@ -7,7 +7,7 @@ import type { Tool } from '../tools.ts'
 
 export const tool: Tool = {
 	name: 'wait',
-	description: 'Wait for the next subagent session to report back. Ends this turn; its message starts the next one.',
+	description: 'Wait for the next subagent session to report back. Ends this turn; its question or completion starts the next one. Answer a question through ordinary send.',
 	parameters: { type: 'object', properties: {} },
 	async run(_input, ctx) {
 		let active = subagents.running(ctx.sessionId)

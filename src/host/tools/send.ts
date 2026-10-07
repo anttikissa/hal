@@ -42,8 +42,8 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 export const tool: Tool = {
 	name: 'send',
 	description:
-		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) is read at its next round without interrupting its work; queue waits until its current turn ends; emergency interrupts its round at once (calls marked unsafe to stop finish first) — only for stopping harmful or wasted work. ' +
-		'An idle recipient starts a turn. A paused or failed recipient keeps the message until the user continues it; one waiting for a login or a human answer keeps it until then. The result says which happened.',
+		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) is read at its next round without interrupting its work; queue waits until its current turn ends; emergency interrupts its round at once (calls marked unsafe to stop finish first), and also ends a pause or failure and skips the wait for a human answer — only for stopping harmful or wasted work. ' +
+		'An idle recipient starts a turn. Otherwise a paused or failed recipient keeps the message until the user continues it; one waiting for a login or a human answer keeps it until then. A parent’s default send answers its child’s clarification question; automatic reports do not. The result says which happened.',
 	parameters: {
 		type: 'object',
 		properties: {
@@ -71,7 +71,7 @@ export const tool: Tool = {
 		await (host.ready(id) ?? Promise.resolve())
 		let sender: Sender = { from: ctx.sessionId, label: tabs.label(ctx.sessionId), summary: description.replace(/\s+/g, ' ').trim() }
 		if (delivery === 'soft-steer') sender.advisory = true
-		let refused = prompts.submit(id, text, undefined, delivery === 'queue' ? 'queue' : 'steer', sender)
+		let refused = prompts.submit(id, text, undefined, delivery === 'emergency' ? 'steer' : delivery, sender)
 		if (refused) throw new Error(refused)
 		return outcome(id, text, ctx.sessionId, delivery)
 	},

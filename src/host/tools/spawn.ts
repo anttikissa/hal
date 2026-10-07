@@ -24,8 +24,8 @@ export const tool: Tool = {
 	description:
 		'Open a session in the tab after this one. A subagent session’s last message comes back here when it finishes, then ' +
 		'its tab closes; subagent-leave-open reports back and stays open; interactive is a session for the user, blank ' +
-		'without a task. A fresh session knows only its task: give it clear, task-specific guidance (standing instructions ' +
-		'it has already).',
+		'without a task. Give the goal and necessary context, not a procedure. A child can ask with <question> and stay open; ' +
+		'answer through ordinary send, or ask your user/parent if the decision is not yours.',
 	parameters: {
 		type: 'object',
 		properties: {

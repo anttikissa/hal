@@ -12,6 +12,7 @@
 // effects ran since: a new record that supersedes it and its turn for the
 // provider (replay.current), history staying append-only. Otherwise it
 // is sent on top like any prompt.
+// Tasks: yq, 2r, zb0, kar.
 
 import type { ImageBlock, Sender, UserBlock, UserText } from '../common/blocks.ts'
 import { inbox, type InboxItem } from '../common/inbox.ts'
@@ -30,6 +31,7 @@ import { host } from './host.ts'
 import { jobs } from './jobs.ts'
 import { slash } from './slash.ts'
 import { status } from './status.ts'
+import { sessions } from './sessions.ts'
 import { statusUsage } from './status-usage.ts'
 import { subagents } from './subagents.ts'
 import { notify } from './notify.ts'
@@ -48,7 +50,9 @@ import { turns } from './turns.ts'
 // sending session, never by a client. Such a message never ends a
 // pause or a failure the user has to see to: it waits in the inbox
 // unless the session is idle, where it runs as a turn of its own and
-// so gets full attention (no longer advisory).
+// so gets full attention (no longer advisory). An emergency (a sender's
+// 'steer', task zb0) is the exception: it ends a pause or failure and
+// does not wait behind the user's answer.
 //
 // `delivery` (task csn): 'soft-steer' leaves the stream and
 // running tools alone, the turn delivering it before its next request;
@@ -59,16 +63,22 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	if (!call && sender?.from === undefined && sender?.origin !== 'model') subagents.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
 	let state = status.stateOf(id)
-	// An agent report is not the human's answer, even with steer:true (nd6).
-	let queue = delivery === 'queue' || ((sender?.from !== undefined || sender?.origin === 'model') && notify.asked(id))
+	// Automatic reports never answer a question. A deliberate soft-steer
+	// from the owner of delegated work does (kar); emergencies bypass it (zb0).
+	let agent = sender?.from !== undefined || sender?.origin === 'model'
+	let emergency = agent && delivery === 'steer' && sender?.advisory !== true
+	let asked = notify.asked(id)
+	let parentAnswer = asked && delivery === 'soft-steer' && sender?.from !== undefined && sender.from === sessions.open(id).parent
+		&& sessions.open(id).spawn !== 'interactive' && subagents.owed(id, history.readSync(id))
+	let queue = delivery === 'queue' || (agent && !emergency && !parentAnswer && asked)
 	let interrupt = !queue && sender?.advisory !== true
 	// Queued messages still waiting (one is being edited) go first.
 	let behind = queue && status.inboxOf(id).some((m) => m.queue)
 	// After an asking turn (task nd6), a queued message waits for the reply's turn.
-	if (behind || (queue && notify.asked(id)) || turns.state.running.has(id) || states.busy(state) || ((queue || sender?.from !== undefined || sender?.origin === 'model') && state.type !== 'idle')) {
+	if (behind || (queue && notify.asked(id)) || turns.state.running.has(id) || states.busy(state) || ((queue || (agent && !emergency)) && state.type !== 'idle')) {
 		let record: Omit<HistoryRecord & { type: 'inbox' }, 'ts'> = { type: 'inbox', id: command ?? crypto.randomUUID(), text }
 		if (queue) record.queue = true
-		else if (delivery === 'soft-steer') record.interject = true
+		else if (delivery === 'soft-steer' && sender?.advisory !== true) record.interject = true
 		if (sender) Object.assign(record, inbox.sender(queue ? { ...sender, advisory: undefined } : sender))
 		history.append(id, record)
 		// A steer swaps in a fresh controller and aborts the old one: the

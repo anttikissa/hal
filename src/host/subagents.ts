@@ -4,7 +4,8 @@
 // parent, as a message the parent sent (task rj). When a turn the parent
 // asked for ends, the host sends the parent its last text (report, task
 // mt); a `subagent`'s tab then closes after a clean finish unless a
-// human prompted it (promote). Spawn slots only go down: a
+// human prompted it (promote), or it asks a question (task kar).
+// Spawn slots only go down: a
 // parent spends limit + 1 for a child given `limit`.
 
 import { cpSync, existsSync, writeFileSync } from 'fs'
@@ -24,6 +25,7 @@ import { jobs } from './jobs.ts'
 import { prompts } from './prompts.ts'
 import { sessions } from './sessions.ts'
 import { status } from './status.ts'
+import { notify } from './notify.ts'
 import { tabs } from './tabs.ts'
 import { models } from './models.ts'
 import { auth } from './auth.ts'
@@ -66,6 +68,7 @@ function prompt(parent: string, task: string, kind: SpawnKind, slots: number): s
 		'Task:',
 		task,
 		'',
+		'If necessary context is missing, end with <question>your question</question>; your parent answers through send and this tab stays open. Otherwise proceed.',
 		`Your last message when you finish is returned to session ${parent}: make it a concise handoff (summary, files changed, open questions).`,
 		kind === 'subagent' ? 'Hal then closes this tab.' : 'This tab stays open for the user.',
 	].join('\n')
@@ -163,7 +166,7 @@ function report(id: string): void {
 // is not done.
 function finished(id: string): void {
 	if (sessions.open(id).spawn !== 'subagent' || status.stateOf(id).type !== 'idle') return
-	if (status.inboxOf(id).length || subagents.running(id).length || jobs.running(id).length) return
+	if (notify.asked(id) || status.inboxOf(id).length || subagents.running(id).length || jobs.running(id).length) return
 	if (tabs.close(id) === undefined) tabs.publish()
 }
 
