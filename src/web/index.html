@@ -126,8 +126,8 @@ html.typing .App { position: absolute; }
 .Card .link:has(.receipt)::before { order: 1; }
 .CardHeader .status { padding-block: var(--card-inset); color: var(--quiet); white-space: nowrap; }
 .CardHeader .unsafe { margin-left: 1ch; font-style: italic; white-space: nowrap; }
-.CardHeader .kill { margin-left: 1ch; padding: 0 1ch; background: transparent; color: inherit; font: inherit; box-shadow: inset 0 0 0 1px currentColor; align-self: flex-start; }
-@media (pointer: coarse) { .CardHeader .kill { min-height: 44px; min-width: 44px; } }
+.CardHeader .kill { min-height: 44px; min-width: 44px; margin: 0; padding: 0; background: transparent; font: inherit; }
+.CardHeader .kill:focus-visible { outline-offset: 0; }
 /* One text line tall, inside the title line; on touch an invisible
    ::after makes the 44px target without growing the row. */
 .CardHeader :is(.edit, .discard) { position: relative; margin-top: var(--card-inset); height: 1lh; padding: 0 1ch; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 0.2em; align-self: flex-start; }

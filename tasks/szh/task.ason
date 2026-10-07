@@ -1,0 +1,12 @@
+{
+	title: 'Keep background kill actions out of header text flow',
+	spec: 'Web background Bash cards keep timestamp, tool icon, description and block reference aligned on the first line. Closed cards remain one 44px row; open descriptions wrap to the left edge without displacement by their job action. The kill action occupies its own header action column before the reference, with the word kill and an upstream Phosphor Regular skull icon, no enclosing box, a named native button and at least a 44px touch target. Preserve /kill behavior, focus visibility, pointer feedback, native reference links, card expansion and text selection. Restore the invariant that a background-job action cannot increase the inline text line box or be clipped with a closed headline. Keep the terminal unchanged under the existing web-icon exception (19m). Check rendered short/long, open/closed cards at phone portrait, landscape and desktop widths, including neighboring non-job headers.',
+	status: 'done',
+	notes: [
+		'User requested restrained red for danger: only the skull-and-kill action uses the existing theme error foreground; the card and tool icon retain their normal colors. No new palette color or terminal presentation change.',
+		'Root cause: the inline-flex kill button lived inside the inline title; its 44px touch height enlarged the line box and its inline baseline dropped the timestamp. Moving it to CardHeader actions fixes both open and closed headers. The upstream Phosphor skull uses the existing icon license. The error-fg variable belongs to tab styles, not the transcript; the action uses the existing error class with transparent background instead.',
+		'Extended the existing browser geometry fixture with short and long background Python cards and current-day timestamps (the reported state). Real Chrome checks pass at 320x760, 390x800, 844x390 and 1200x800; action targets remain 44px high, headlines and references do not overlap, and closed tinted cards remain 44px high. Inspected portrait and desktop open/closed screenshots and keyboard focus; screenshot capture was temporary and is not retained in the test. Two focused browser tests and 18 web view tests pass; typecheck and focused lint pass. Physical iOS Safari remains unverified.'
+	],
+	needs: ['77f', '19m'],
+	foldInto: ['4v', '19m']
+}
