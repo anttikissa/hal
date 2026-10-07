@@ -74,20 +74,21 @@ function address(label: string, short = false): string {
 }
 
 function messageHead(item: Shown & { type: 'prompt' }): string {
-	let who = titles.who(item.from === undefined ? item : { ...item, label: titles.address(item.label ?? item.from, true) })
-	return `${who}: ${item.summary}`
+	let who = titles.who(item.from === undefined ? item : { ...item, report: undefined, ...(item.report ? { summary: undefined } : {}), label: titles.address(item.label ?? item.from, true) })
+	return item.report ? `${who} · ${item.report === 'question' ? 'Needs info' : 'Finished'}: ${item.summary}` : `${who}: ${item.summary}`
 }
 
 // Who wrote `item`, or undefined for an item without a header.
 function who(item: Shown): string | undefined {
 	let label = titles.author(item)
+	if (item.type === 'prompt' && item.report && item.summary) label = `${label} · ${item.report === 'question' ? 'Needs info' : 'Finished'}: ${item.summary}`
 	return label !== undefined && item.originSession !== undefined ? `${label} (in ${item.originSession})` : label
 }
 
 function author(item: Shown): string | undefined {
 	switch (item.type) {
 		case 'prompt':
-			return tagged(item.from !== undefined && /^bash #t?\d+$/.test(item.label ?? '') ? `Background command finished ${item.label!.slice(5)}` : item.from !== undefined ? item.summary ? `From ${titles.address(item.label ?? item.from)}` : `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.generatingCommand && `/${item.generatingCommand} continuation`, item.steering && 'steering', item.interject && 'soft-steering', item.queued && (item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : 'queued')])
+			return tagged(item.from !== undefined && /^bash #t?\d+$/.test(item.label ?? '') ? `Background command finished ${item.label!.slice(5)}` : item.from !== undefined ? item.report ? `Message from ${titles.address(item.label ?? item.from)}` : item.summary ? `From ${titles.address(item.label ?? item.from)}` : `Message from ${item.label ?? item.from}` : item.origin === 'model' ? 'Hal' : 'You', [item.generatingCommand && `/${item.generatingCommand} continuation`, item.steering && 'steering', item.interject && 'soft-steering', item.queued && (item.queuedAt ? `queued at ${titles.time(item.queuedAt)}` : 'queued')])
 		// A command is headed as the prompt it was typed as.
 		case 'command':
 			return item.from === undefined ? 'You' : `Command from ${item.label ?? item.from}`

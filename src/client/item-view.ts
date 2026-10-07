@@ -100,14 +100,15 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 	switch (item.type) {
 		// A prompt card gets its padding rows from frame.itemRows.
 		case 'prompt':
-			let source = bashResult.background(item) ? bashResult.display(item.text) : item.summary ? summary.strip(item.text) : item.text
+			let source = bashResult.background(item) ? bashResult.display(item.text) : item.report ? summary.answer(item.text) : item.summary ? summary.strip(item.text) : item.text
 			if (fold === 'inline') source = itemView.inlined(source, look.pastes)
+			if (item.report && (fold ?? 'closed') === 'closed') return itemView.closedRow(item, '', width)
 			if (fold === 'closed' && !item.summary) return itemView.closedRow(item, source, width)
 			let body = ansi.wrap(source, width).map(ansi.links)
 			// Another session's message: its summary, then a glimpse;
 			// opened, its whole text.
-			if (item.summary && (fold ?? 'closed') !== 'closed') body = [...ansi.wrap(item.summary, width), ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
-			else if (item.summary) {
+			if (item.summary && !item.report && (fold ?? 'closed') !== 'closed') body = [...ansi.wrap(item.summary, width), ...body.map((l) => ansi.quiet(l, itemView.itemStyle(item)))]
+			else if (item.summary && !item.report) {
 				let more = body.length - 3
 				body = [...ansi.wrap(item.summary, width), ...body.slice(0, 3).map((l) => ansi.quiet(l, itemView.itemStyle(item))), ...(more > 0 ? [`… ${more} more lines`] : [])]
 			}

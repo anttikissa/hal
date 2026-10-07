@@ -153,7 +153,7 @@ function report(id: string): void {
 	let deliver = () => {
 		// A child stopped by tab close must not wake an idle, now unseen parent.
 		if (tabs.file().closed.some((tab) => tab.id === parent) && !tabs.file().open.includes(parent)) return
-		let refused = prompts.submit(parent, text, undefined, 'steer', { from: id, label, advisory: true, summary: summary.extract(text) })
+		let refused = prompts.submit(parent, text, undefined, 'steer', { from: id, label, advisory: true, summary: summary.extract(text), ...(summary.extract(text) && end.status === 'completed' ? { report: summary.asks(text) ? 'question' as const : 'summary' as const } : {}) })
 		if (refused) diag.log(`report ${id} to ${parent}: ${refused}`)
 	}
 	let ready = host.ready(parent)
