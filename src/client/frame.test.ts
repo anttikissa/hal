@@ -505,7 +505,7 @@ test('interruption markers remain whole and colored at a full terminal row', () 
 	for (let n of [47, 48]) {
 		let rows = frame.itemRows({ type: 'text', text: 'x'.repeat(n), interrupted: true, key: '~cut' }, 50)
 		expect(plain(rows).at(-1)).toBe('--')
-		expect(rows.at(-1)).toContain(ansi.sgr({ fg: colors.warning().fg! }) + '--')
+		expect(rows.at(-1)).toContain(ansi.sgr({ fg: colors.log().fg! }) + '--')
 		expect(plain(rows).join('')).toContain('x'.repeat(n) + '--')
 	}
 })
