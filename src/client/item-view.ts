@@ -166,7 +166,12 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				if (fold === 'closed') return [head]
 				let mark = item.input.background === true ? '&' : '$'
 				let commandLine = strings.clipVisual(`${mark} ${ansi.clean(command).replace(/\s+/g, ' ')}`, width)
-				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-5).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-5) : [])]
+				// Running output is laid out as its result glimpse will be
+				// (a blank row, then resultRows rows), so the card does not
+				// shrink when the call finishes (task 4y4).
+				let n = itemView.resultRows
+				let live = item.partial ? item.partial.replace(/\n$/, '').split('\n').slice(-n).flatMap((line) => ansi.wrap(ansi.clean(line), width, false)).slice(-n) : []
+				return [head, ansi.quiet(commandLine, itemView.itemStyle(item)), ...(live.length ? ['', ...live] : [])]
 			} else {
 				row = strings.clipVisual(`${prefix}${ansi.clean(toolDetails.headline(item.name, item.input).text)}`, width)
 			}

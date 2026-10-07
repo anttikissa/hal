@@ -95,7 +95,16 @@ describe('tool card high-water mark', () => {
 		let running = height(view([{ type: 'tool', id: 'x', name: 'bash', input, partial: output, key: '3' }]))
 		let done = view([{ type: 'tool', id: 'x', name: 'bash', input, key: '3' }, { type: 'tool-result', id: 'x', output: `[exit 0]\n${output}`, key: '4' }])
 		expect(height(done)).toBe(running)
-		// A full redraw forgets the mark, as render.draw(true) does.
+		// Not only through the mark: running output is laid out as the glimpse.
+		frame.state.peaks.clear()
+		frame.state.history = undefined
+		expect(height(done)).toBe(running)
+	})
+
+	test('a result shorter than its running output keeps the height until a full redraw', () => {
+		let running = height(view([{ type: 'tool', id: 'x', name: 'bash', input, partial: 'a\n\n\n', key: '3' }]))
+		let done = view([{ type: 'tool', id: 'x', name: 'bash', input, key: '3' }, { type: 'tool-result', id: 'x', output: '[exit 0]\na\n\n\n', key: '4' }])
+		expect(height(done)).toBe(running)
 		frame.state.peaks.clear()
 		frame.state.history = undefined
 		expect(height(done)).toBeLessThan(running)
