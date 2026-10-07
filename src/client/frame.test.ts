@@ -470,7 +470,7 @@ test('Bash results link to the call; a failed status and the time go in the titl
 	apart.transcript!.items = apart.transcript!.items.map((item, i) => ({ ...item, key: ['1813', '1818', '1814'][i]! }))
 	expect(plain(frame.build(apart, 70).lines).join('\n')).toContain('#t1813>  M notes.md')
 	expect(targets(frame.build(apart, 70).lines)).toContain(`${settings.webUrl()}/s#t1813`)
-	expect(printed).toContain('Message from bash #1813')
+	expect(printed).toContain('Background command finished #1813')
 })
 
 test('legacy rename controls never appear in terminal answers without a naming flag', () => {
@@ -537,5 +537,17 @@ test('rebase reports show colored edits immediately, separately from an earlier 
 	expect(text).not.toContain('```')
 	for (let [line, fg] of [['-old', colors.diff().removeFg], ['+replacement', colors.diff().addFg]] as const) {
 		expect(rows.find((r) => plain([r])[0]!.includes(line))).toContain(ansi.sgr({ fg: fg! }))
+	}
+})
+
+test('idle cursor has one blank row after text, fences and whitespace tails', () => {
+	for (let text of ['last line', 'last line\n\n  \n', '```diff\n-last line\n+last line\n```']) {
+		let v = view([{ type: 'output', text }])
+		v.hal = { at: 'idle', lit: true, color: [0.7, 0, 0] }
+		let lines = plain(frame.build(v, 80).lines)
+		let at = lines.findIndex((line) => line === '█')
+		expect(at).toBeGreaterThan(1)
+		expect(lines[at - 1]).toBe('')
+		expect(lines[at - 2]).toContain('last line')
 	}
 })

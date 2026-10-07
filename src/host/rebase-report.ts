@@ -21,7 +21,8 @@ function text(snapshot: RebaseRows, plan: RebasePlan, paused = false, continuati
 	let lines = [summary, ...(count ? [`Dropped ${count} ${count === 1 ? 'entry' : 'entries'}: ${ranges.join(', ')}`] : []), ...(paused ? ['--paused'] : [])]
 	for (let e of plan.edit) {
 		let row = snapshot.rows.find((r) => r.editN === e.n) ?? snapshot.rows.find((r) => r.n === e.n)
-		lines.push(`Edited #${row?.n ?? e.n} ${row?.kind ?? 'record'}:`, diff.fence(textDiff.text(row?.text ?? '', e.text)))
+		let changes = textDiff.text(row?.text ?? '', e.text).split('\n').filter((line) => line !== '\\ No newline at end of file').join('\n')
+		lines.push(`Edited #${row?.n ?? e.n} ${row?.kind ?? 'record'}:`, diff.fence(changes))
 	}
 	return lines.join('\n')
 }
