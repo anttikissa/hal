@@ -2,8 +2,9 @@
 // Tasks: 6, qt, svt.
 import type { CommandType } from './protocol.ts'
 import { rebase } from './rebase.ts'
+import { pluginSyncWire } from './plugin-sync.ts'
 
-const commandTypes: CommandType[] = ['queue-edit', 'queue-edit-cancel', 'rebase-error', 'rebase-apply', 'find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'paste-text', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello', 'screen']
+const commandTypes: CommandType[] = ['queue-edit', 'queue-edit-cancel', 'rebase-error', 'rebase-apply', 'find', 'find-cancel', 'create', 'open-newest', 'open', 'history', 'close', 'submit', 'draft', 'pause', 'continue', 'answer', 'complete', 'models', 'paste-text', 'attach', 'tab-new', 'tab-close', 'tab-resume', 'tab-move', 'tab-start', 'tab-seen', 'auth', 'push-subscribe', 'push', 'notice-history', 'visibility', 'hello', 'screen', 'plugin-sync']
 
 // Why `value` is not a well-formed command, or undefined if it is.
 // Commands cross a process boundary, so the host checks before acting.
@@ -33,6 +34,7 @@ function invalid(value: unknown): string | undefined {
 		return str('term', true) ?? (((c.term as string | undefined)?.length ?? 0) > 200 ? 'screen: term exceeds 200 characters' : undefined)
 	}
 	if (c.type === 'find-cancel') return undefined
+	if (c.type === 'plugin-sync') return pluginSyncWire.invalidCommand(c)
 	if (c.type === 'find') {
 		let kinds = c.kinds
 		let valid = kinds === undefined || (Array.isArray(kinds) && kinds.every((k) => ['text', 'thinking', 'tools', 'other'].includes(k)))

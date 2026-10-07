@@ -16,6 +16,7 @@ import { modelsDev } from './models-dev.ts'
 import { paths } from './paths.ts'
 import { profile } from './profile.ts'
 import { slash } from './slash.ts'
+import { theme } from './commands/theme.ts'
 import type { Reply } from './synthetic.ts'
 
 // Example answers the language field rotates through, most useful
@@ -206,7 +207,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 	}
 	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: names(), ...known('Name') }] }
 	// Local servers answer before the model question (task vc).
-	let hello = (): Reply => (void models.warm(), { say: `${greeting}\n\nI have ${words[3 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
+	let hello = (): Reply => (void models.warm(), { say: `${greeting}\n\nI have ${words[4 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
 	let run = records.slice(start + 1)
 	// Text typed while nothing was asked: the intro can't take it. Text
@@ -277,6 +278,15 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 		if (key === undefined) return reply({ ask: { text: 'Paste your Serper API key (it will not be shown or saved in conversation history). Empty skips.', fields: [{ type: 'secret', name: 'key', label: 'Serper API key' }] } })
 		if (key.trim()) apiKeys.save('serper', key.trim())
 		else if (answers?.key !== undefined || !replied(run, 'language')) say.push('Skipped web search for now.')
+	}
+	// The theme (task 4c1): the answer writes plugins/theme.ts, which the
+	// plugin loader applies at once; a rerun starts from the active one.
+	// Only the answer itself selects, so a later /theme is not undone.
+	let current = theme.active()
+	if (answered(run, 'theme') === undefined) return reply({ ask: { text: 'Which color theme? (/theme changes it later)', fields: [{ type: 'choice', name: 'theme', options: theme.names(), initial: Math.max(0, theme.names().indexOf(current.name ?? '')) }] } })
+	if (answers?.theme && answers.theme !== current.name) {
+		let refused = theme.select(answers.theme)
+		if (refused) say.push(refused)
 	}
 	// Language comes last: the scripted intro can't switch language
 	// mid-way, so asking earlier would promise what it can't do.

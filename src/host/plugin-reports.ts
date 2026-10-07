@@ -10,6 +10,7 @@ import { diag } from './diag.ts'
 import { host } from './host.ts'
 import { noticeHistory } from './notice-history.ts'
 import { pages } from './pages.ts'
+import { pluginSync } from './plugin-sync.ts'
 import { paths } from './paths.ts'
 import { plugins } from './plugins.ts'
 import { prompts } from './prompts.ts'
@@ -37,9 +38,15 @@ async function lastEditor(path: string): Promise<{ id: string; call?: number; ts
 	return best
 }
 
+// To every client of this host; a remote terminal (task zh7), whose
+// process loads its own home's plugins, shows them itself instead.
+function deliver(event: NoticeEvent | { type: 'warning'; text: string }): void {
+	for (let client of host.state.clients) client.deliver(event)
+}
+
 function everyone(text: string): void {
 	for (let id of sessions.openIds()) slash.output(id, text, true)
-	for (let client of host.state.clients) client.deliver({ type: 'warning', text })
+	pluginReports.deliver({ type: 'warning', text })
 }
 
 // `path`: the plugin file, when the failure disabled it.
@@ -59,9 +66,10 @@ async function report(text: string, path?: string): Promise<void> {
 }
 
 // Names where the next change to plugin `path` came from, such as a
-// sync replacement, so its one notice says so.
-function via(path: string, source: string): void {
-	pluginReports.state.sources.set(path, source)
+// sync replacement, so its one notice says so; `side`: which end of a
+// remote terminal's link the file is on (task zh7).
+function via(path: string, source: string, side?: 'client' | 'server'): void {
+	pluginReports.state.sources.set(path, side ? { source, side } : { source })
 }
 
 // A plugin lifecycle change after the initial scan (task b66): one
@@ -69,13 +77,14 @@ function via(path: string, source: string): void {
 // and shutdown (no watcher) stay quiet; failures go through report().
 function changed(path: string, what: string): void {
 	if (!plugins.state.watcher) return
-	let source = pluginReports.state.sources.get(path)
+	pluginSync.changed(path)
+	let from = pluginReports.state.sources.get(path)
 	pluginReports.state.sources.delete(path)
-	if (source && what === 'reloaded') what = 'replaced'
-	let name = basename(path), line = `${paths.display(path)}${source ? ` from ${source}` : ''}`
+	if (from && what === 'reloaded') what = 'replaced'
+	let name = basename(path), line = `${paths.display(path)}${from?.side ? ` on ${from.side}` : ''}${from ? ` from ${from.source}` : ''}`
 	noticeHistory.record({ session: '', name, kind: 'update', line, what })
 	let notice: NoticeEvent = { type: 'notice', session: '', name, kind: 'update', what, line, key: `plugin:${path}` }
-	for (let client of host.state.clients) client.deliver(notice)
+	pluginReports.deliver(notice)
 }
 
-export const pluginReports = { state: { sources: new Map<string, string>() }, canonical, lastEditor, everyone, report, via, changed }
+export const pluginReports = { state: { sources: new Map<string, { source: string; side?: 'client' | 'server' }>() }, canonical, lastEditor, deliver, everyone, report, via, changed }
