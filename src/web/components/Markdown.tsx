@@ -8,6 +8,7 @@
 // shrinks it, but width/font reflow clears that obsolete height floor. On the root, not the card, so a folded thinking card still
 // folds. `children` (Hal's cursor) follows the last line.
 
+import { diff } from '../../common/diff.ts'
 import { createEffect, createMemo, For, Match, onSettled, Show, Switch } from 'solid-js'
 import type { JSX } from '@solidjs/web'
 import { markdown, type Code, type Line, type Links, type Run, type Table } from '../../common/markdown.ts'
@@ -85,7 +86,10 @@ export function Markdown(props: { text: string; streaming?: boolean; links?: Lin
 							</div>
 						</Match>
 						<Match when={b().type === 'code'}>
-							<pre data-lang={c().lang || undefined}><code><Text value={c().lines.join('\n')} /></code></pre>
+							<pre class={c().lang === 'diff' ? 'diff' : undefined} data-lang={c().lang || undefined}><code><Show when={c().lang === 'diff'} fallback={<Text value={c().lines.join('\n')} />}>
+								{/* A diff fence takes the diff colors, in both clients. */}
+								<For each={c().lines} keyed={false}>{(l, i) => <span class={diff.tone(l())}><Text value={(i ? '\n' : '') + l()} /></span>}</For>
+							</Show></code></pre>
 						</Match>
 						<Match when={b().type === 'table'}>
 							<div class="table">

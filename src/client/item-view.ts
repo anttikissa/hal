@@ -2,6 +2,8 @@
 // the style it wears. Pure.
 // Tasks: fn, hp, hr, hse, a1k.
 
+import { diff } from '../common/diff.ts'
+import { diffView } from './diff-view.ts'
 import { attachments } from '../common/attachments.ts'
 import { bashResult } from '../common/bash-result.ts'
 import { colors, type Style } from '../common/colors.ts'
@@ -242,8 +244,8 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 			// A prompt-file change (task ar): a head row and short colored
 			// rows, no header; open, each change's line and whole diff.
 			if (item.change) {
-				let d = colors.diff(), style = itemView.itemStyle(item as unknown as Item)
-				let paint = (t: string, tone: string) => (tone === 'head' ? t : tone === 'dim' ? ansi.quiet(t, style) : ansi.sgr({ fg: tone === 'add' ? d.addFg! : d.removeFg! }) + (tone === 'del' ? `\x1b[9m${t}\x1b[29m` : t) + ansi.sgr({ fg: (style ?? colors.log()).fg! }))
+				let style = itemView.itemStyle(item as unknown as Item)
+				let paint = (text: string, tone: Parameters<typeof diffView.paint>[1]) => diffView.paint(text, tone, style ?? colors.log(), true)
 				let summary = promptChanges.rows(item).map((r) => {
 					if (!r.parts) return paint(strings.clipVisual(r.text, width), r.tone)
 					// Word by word, clipped to the width like a plain row.
@@ -258,7 +260,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 					return out
 				})
 				if (fold !== 'open') return summary
-				let tone = (r: string) => (r[0] === '+' ? 'add' : r[0] === '-' ? 'del' : 'dim')
+				let tone = diff.tone
 				return [...summary, ...promptChanges.run(item as Keyed).flatMap((o) => ['', ansi.quiet(promptChanges.line(o), style), ...o.change!.diff.split('\n').flatMap((r) => ansi.wrap(r, width).map((w) => paint(w, tone(r))))])]
 			}
 			return itemView.headed(item, markdownView.lines(item.text.trimEnd(), width, streaming, itemView.itemStyle(item)), width)

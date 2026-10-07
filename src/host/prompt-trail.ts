@@ -4,7 +4,7 @@
 // own earlier replies that ignored them, and blames itself.
 // The last seen texts live in the session's prompt-files.json.
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { relative } from 'path'
 import type { PromptChange } from '../common/prompt-changes.ts'
 import { diag } from './diag.ts'
@@ -22,21 +22,9 @@ function read(path: string): string | undefined {
 	try { return readFileSync(path, 'utf8') } catch { return undefined }
 }
 
-// Changed lines of `before` → `after` (git diff, headers dropped),
-// at most `limit` lines.
+// Keep the generator off the startup import graph.
 function diff(before: string, after: string, limit = maxLines): string {
-	let dir = `${paths.tmpDir()}/prompt-trail-${process.pid}`
-	mkdirSync(dir, { recursive: true })
-	try {
-		writeFileSync(`${dir}/a`, before)
-		writeFileSync(`${dir}/b`, after)
-		let out = Bun.spawnSync(['git', 'diff', '--no-index', '--no-ext-diff', '--no-color', '-U1', '--', `${dir}/a`, `${dir}/b`]).stdout.toString()
-		let lines = out.split('\n').filter((l) => /^[-+ ]/.test(l) && !/^(---|\+\+\+) /.test(l) || l.startsWith('@@'))
-			.map((l) => (l.startsWith('@@') ? '…' : l))
-		if (lines[0] === '…') lines.shift()
-		let more = lines.length - limit
-		return [...lines.slice(0, limit), ...(more > 0 ? [`… ${more} more lines`] : [])].join('\n')
-	} finally { rmSync(dir, { recursive: true, force: true }) }
+	return (require('./text-diff.ts') as typeof import('./text-diff.ts')).textDiff.text(before, after, limit)
 }
 
 // Compares the session's prompt files with what it last saw; records

@@ -43,10 +43,11 @@ function apply(c: Command & { type: 'rebase-apply' }): string {
 	plan = { ...plan, edit: plan.edit.filter((e) => snapshot.rows.find((row) => row.editN === e.n)?.text !== e.text) }
 	let sums = rebaseRows.totals(snapshot, plan)
 	if (plan.drop.length || plan.edit.length) {
+		// Generate before writing: a diff failure must not partially apply the rebase.
+		let report = (require('./rebase-report.ts') as typeof import('./rebase-report.ts')).rebaseReport.text(snapshot, plan)
 		rebases.apply(c.sessionId, plan, c.base)
 		rebasePlans.broadcast(c.sessionId, sums.cacheFrom ?? c.base)
-		// Loaded on first use only, never at host startup.
-		slash.output(c.sessionId, (require('./rebase-report.ts') as typeof import('./rebase-report.ts')).rebaseReport.text(snapshot, plan))
+		slash.output(c.sessionId, report)
 	}
 	for (let [i, text] of queue.entries()) {
 		let refused = prompts.submit(c.sessionId, text, undefined, i > 0 ? 'queue' : 'interrupt')

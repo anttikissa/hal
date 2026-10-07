@@ -15,6 +15,7 @@
 // result and can show all of it; the transcript holds all of it
 // (host tools cap what they keep), so nothing is fetched.
 
+import { diff } from '../../common/diff.ts'
 import { createEffect, createMemo, createSignal, flush, For, onSettled, Show, untrack } from 'solid-js'
 import { bashResult } from '../../common/bash-result.ts'
 import { markdown as parser } from '../../common/markdown.ts'
@@ -237,7 +238,7 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 	)
 	// A prompt-file change (task ar): the terminal's rows in its diff
 	// colors, no header; open, each change's line and whole diff.
-	let tone = (r: string) => (r[0] === '+' ? 'add' : r[0] === '-' ? 'del' : 'dim')
+	let tone = diff.tone
 	// An item never turns into a change or out of one.
 	let isChange = () => props.row.item.type === 'output' && !!props.row.item.change
 	let change = () => (

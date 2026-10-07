@@ -96,9 +96,9 @@ html.typing .App { position: absolute; }
    right edge fading while more is off screen, like a wide table. */
 .Card .change .lines { overflow-x: auto; mask-image: linear-gradient(to left, transparent, currentColor var(--fade)); animation: md-fade linear both; animation-timeline: scroll(self inline); }
 .Card .change .lines > div { white-space: pre; width: max-content; min-width: 100%; }
-.Card .change .add { color: var(--add-fg); }
-.Card .change .del { color: var(--remove-fg); }
-.Card .change .dim { color: var(--quiet); }
+.Card .change .add, .Markdown pre[data-lang=diff] .add { color: var(--add-fg); }
+.Card .change .del, .Markdown pre[data-lang=diff] .del { color: var(--remove-fg); }
+.Card .change .dim, .Markdown pre[data-lang=diff] .dim { color: var(--quiet); }
 /* Removed text in the rows is struck through, as in the terminal. */
 .Card .change .row.del, .Card .change span.del { text-decoration: line-through; }
 .Card .change .head:not(:first-child) { margin-top: 0.5lh; }
