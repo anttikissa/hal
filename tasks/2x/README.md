@@ -30,7 +30,10 @@ This is HAL 9001, an agent harness.
 10. **Mac first, Linux second, Windows maybe some day.** I have a
     MacBook, so keyboard shortcuts are designed to work in macOS. Linux
     users may want to rebind e.g. Ctrl-commands to something else. (Edit
-    the source code, that's not a configurable feature yet.)
+    the source code, that's not a configurable feature yet.) Likewise,
+    frontier models are the assumption: Hal works great with the latest
+    models, like Opus 5.5 and Sol 6.1. Other models might work, but are
+    not tested as well.
 11. **Yours to hack.** Hal is small enough to read and can edit itself.
     Every function is a hook point, and plugins reload when you save
     them.
