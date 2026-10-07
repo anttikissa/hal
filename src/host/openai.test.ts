@@ -13,6 +13,7 @@ import { models } from './models.ts'
 import { openai } from './openai.ts'
 import { openaiWs } from './openai-ws.ts'
 import { provider } from './provider.ts'
+import { usage } from './usage.ts'
 
 const saved = { HAL_HOME: process.env.HAL_HOME, OPENAI_API_KEY: process.env.OPENAI_API_KEY }
 const orig = { apiUrl: openai.apiUrl, codexUrl: openai.codexUrl, codexModelsUrl: openai.codexModelsUrl, tokenUrl: auth.tokenUrl }
@@ -23,6 +24,8 @@ let reply: () => Response
 let catalogReply: ((req: Request) => Response) | undefined
 // WebSocket requests the fake server got; null refuses the upgrade.
 let wsSeen: any[] | null = null
+// Messages the fake socket sends before each response.
+let wsBefore: object[] = []
 
 const jwt = (claims: object) => `h.${btoa(JSON.stringify(claims)).replace(/=+$/, '')}.s`
 const subscriptionToken = jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-1' } })
@@ -47,6 +50,7 @@ beforeEach(() => {
 	catalogReply = undefined
 	reply = () => sse(completed())
 	wsSeen = null
+	wsBefore = []
 	openaiWs.state.enabled = false
 	server = Bun.serve({
 		port: 0,
@@ -56,7 +60,7 @@ beforeEach(() => {
 				wsSeen!.push(body)
 				let id = `resp-${wsSeen!.length}`
 				let response = { id, previous_response_id: body.previous_response_id }
-				for (let e of [{ type: 'response.created', response }, { type: 'response.output_text.delta', delta: 'ok' }, { type: 'response.completed', response: { ...response, status: 'completed' } }]) ws.send(JSON.stringify(e))
+				for (let e of [...wsBefore, { type: 'response.created', response }, { type: 'response.output_text.delta', delta: 'ok' }, { type: 'response.completed', response: { ...response, status: 'completed' } }]) ws.send(JSON.stringify(e))
 			},
 		},
 		async fetch(req, srv) {
@@ -81,6 +85,7 @@ beforeEach(() => {
 afterEach(() => {
 	auth.close()
 	limits.close()
+	usage.close()
 	server.stop(true)
 	Object.assign(openai, { apiUrl: orig.apiUrl, codexUrl: orig.codexUrl, codexModelsUrl: orig.codexModelsUrl })
 	auth.tokenUrl = orig.tokenUrl
@@ -289,4 +294,17 @@ test('over a WebSocket, a request that extends the last one sends only the new i
 	expect(await text()).toBe('')
 	expect(seen.filter((r) => r.path === '/codex/responses')).toHaveLength(1)
 	expect(openaiWs.state.httpUntil).toBeGreaterThan(Date.now())
+})
+
+test('over a WebSocket, codex.rate_limits updates the account\'s shared usage windows; a metered limit does not', async () => {
+	writeAuth({ openai: { accessToken: subscriptionToken, refreshToken: 'r', expires: Date.now() + 3_600_000 } })
+	openaiWs.state.enabled = true
+	wsSeen = []
+	let reset = Math.floor(Date.now() / 1000) + 3600
+	let limits = (limit: object, used: number) => ({ type: 'codex.rate_limits', ...limit, rate_limits: { primary: { used_percent: used, window_minutes: 300, reset_at: reset }, secondary: { used_percent: 40, window_minutes: 10080, reset_at: reset + 86400 } } })
+	wsBefore = [limits({}, 12), limits({ metered_limit_name: 'codex_other' }, 99)]
+	await run(hi, { system: 's', sessionId: 'ws-q' })
+	let [windows] = Object.values(usage.store().openai ?? {})
+	expect(windows?.['5h']).toMatchObject({ used: 12, resets: new Date(reset * 1000).toISOString() })
+	expect(windows?.['7d']?.used).toBe(40)
 })
