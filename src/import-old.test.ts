@@ -94,7 +94,8 @@ test('blob-backed thinking, calls and results are written inline and paired, a s
 	let blocks: { type: string }[] = msgs.flatMap((m): { type: string }[] => m.blocks)
 	expect(blocks.find((b) => b.type === 'thinking')).toMatchObject({ text: 'hmm', signature: '{"encrypted_content":"e"}', provider: 'openai' })
 	expect(blocks.find((b) => b.type === 'tool_call')).toMatchObject({ id: 'c1', input: { command: 'ls' } })
-	expect(blocks.find((b) => b.type === 'tool_result')).toMatchObject({ id: 'c1', output: 'files', isError: true })
+	// Replay prefixes a block header to the output.
+	expect(blocks.find((b) => b.type === 'tool_result')).toMatchObject({ id: 'c1', output: expect.stringMatching(/\nfiles$/), isError: true })
 	expect(texts(history(home, '1-a')).at(-1)).toBe('steer')
 })
 
