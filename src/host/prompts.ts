@@ -59,7 +59,8 @@ function submit(id: string, text: string, command?: string, delivery: Delivery =
 	if (!call && sender?.from === undefined && sender?.origin !== 'model') subagents.promote(id)
 	if (call) return slash.command(id, text, call, command, sender?.from, undefined, sender?.origin, sender)
 	let state = status.stateOf(id)
-	let queue = delivery === 'queue'
+	// An agent report is not the human's answer, even with steer:true (nd6).
+	let queue = delivery === 'queue' || ((sender?.from !== undefined || sender?.origin === 'model') && notify.asked(id))
 	let interrupt = !queue && sender?.advisory !== true
 	// Queued messages still waiting (one is being edited) go first.
 	let behind = queue && status.inboxOf(id).some((m) => m.queue)

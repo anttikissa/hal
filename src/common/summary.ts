@@ -1,8 +1,8 @@
 // A final answer ends with <summary>one line</summary> (SYSTEM.md, task
 // x8): the line a notice or push shows. A reply that asks the user ends
 // with <question>one line</question> instead (task nd6): its turn waits
-// for the user. Clients hide redundant tags, including incomplete streaming
-// tags, but show the notification line when it is the whole answer (a1k).
+// for the user. Clients show questions inline (nd6), hide summary metadata
+// and incomplete tags, and show a summary-only answer (a1k).
 // A tag quoted in code (`<summary>`) is text, not a tag.
 
 import { markdownCode } from './markdown-code.ts'
@@ -32,12 +32,14 @@ function asks(text: string): boolean {
 	return last(text)?.kind === 'question'
 }
 
-// `text` without its tags, for display.
-function strip(text: string): string {
+// Remove notification metadata; answers retain question content.
+function strip(text: string, questions = false): string {
 	let masked = markdownCode.mask(text)
 	let out = '', at = 0
 	for (let match of masked.matchAll(TAGS)) {
-		out += text.slice(at, match.index).trimEnd()
+		if (questions && match[1] === 'question') {
+			out += text.slice(at, match.index) + text.slice(match.index + '<question>'.length, match.index + match[0].length - '</question>'.length)
+		} else out += text.slice(at, match.index).trimEnd()
 		at = match.index + match[0].length
 	}
 	out += text.slice(at)
@@ -55,7 +57,7 @@ function strip(text: string): string {
 
 // Hide redundant notification text, never an answer's only visible content.
 function answer(text: string): string {
-	let body = names.strip(summary.strip(text))
+	let body = names.strip(summary.strip(text, true))
 	return body.trim() ? body : summary.extract(text) ?? body
 }
 
