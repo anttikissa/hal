@@ -50,7 +50,7 @@ function Runs(props: { runs: Run[] }) {
 // open in this tab.
 export function Markdown(props: { text: string; streaming?: boolean; links?: Links; children?: JSX.Element; interruption?: string }) {
 	let blocks = createMemo(() => markdown.parse(props.text.trimEnd(), !!props.streaming, props.links))
-	let marker = () => <Show when={props.interruption}>{(tail) => <span class="interrupted warning" role="img" aria-label="Interrupted" data-tail={tail()} />}</Show>
+	let marker = () => <Show when={props.interruption}>{(tail) => <span class="interrupted log" role="img" aria-label="Interrupted" data-tail={tail()} />}</Show>
 	let root: HTMLDivElement | undefined
 	let peak = 0
 	onSettled(() => {

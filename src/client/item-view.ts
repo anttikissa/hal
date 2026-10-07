@@ -158,7 +158,7 @@ function itemLines(item: Item, width: number, streaming = false, session?: strin
 				let tail = interruption.tail(item.text).replace(/\r\n?/g, '\n').split('\n')
 				let last = body.pop() ?? ''
 				if (tail.length === 1 && strings.visLen(last) + strings.visLen(tail[0]!) > width) { body.push(last); last = ''; tail[0] = tail[0]!.trimStart() }
-				body.push(...tail.map((part, i) => (i ? '' : last) + ansi.sgr({ fg: colors.warning().fg! }) + part + ansi.sgr(itemView.itemStyle(item)!)))
+				body.push(...tail.map((part, i) => (i ? '' : last) + ansi.sgr({ fg: colors.log().fg! }) + part + ansi.sgr(itemView.itemStyle(item)!)))
 			}
 			return itemView.headed(item, body, width)
 		}
