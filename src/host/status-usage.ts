@@ -186,7 +186,7 @@ function recheck(kind: string, force = false): Promise<void> {
 	let s = statusUsage.state
 	if (!force && s.checked.has(kind)) return s.running.get(kind) ?? Promise.resolve()
 	s.checked.add(kind)
-	let skipped = new Set(Object.keys(limits.store()).filter((k) => k.startsWith(`${kind}/`)).map((k) => k.slice(k.indexOf(' ') + 1)))
+	let skipped = new Set(Object.keys(limits.store()).filter((k) => limits.ofKind(k, kind)).map((k) => k.slice(k.indexOf(' ') + 1)))
 	let run = s.running.get(kind) ?? Promise.all(auth.all(kind).list.filter((a) => skipped.has(a.name)).map((a) => statusUsage.refresh(kind, a).catch((e) => diag.log(`recheck ${kind} ${a.name}: ${e?.message ?? e}`)))).then(() => {}).finally(() => s.running.delete(kind))
 	s.running.set(kind, run)
 	return run

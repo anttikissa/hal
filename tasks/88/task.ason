@@ -2,6 +2,9 @@
 	title: 'Waiting turns recheck skipped accounts: on Enter and once after start',
 	spec: "statusUsage.recheck(provider) rereads usage of that provider's accounts that have skips in limits.ason (no others, no other providers); concurrent calls share one run. A turn entering a rate-limit wait calls it once per host process and provider, so skips loaded from disk after a restart are checked once, never per tab or per wait. Bare Enter on a waiting (retrying) turn forces a recheck, then retries at once; the help row says 'enter: retry now'. A recheck showing room drops the skip and wakes waiters (task f9). No periodic polling. Invariant: an account freed elsewhere is used after a restart or one Enter, never only at a guessed expiry.",
 	status: 'done',
+	notes: [
+		'Bug fixed 7 Oct: recheck and limits.forget matched only model keys ("openai/m a@x"), so an account-wide 429 skip ("openai a@x") was never reread or dropped; a ChatGPT account stayed skipped for days after its owner added funds. Invariant: limits.ofKind covers both key forms, so a recheck or login showing room clears every skip on the account.'
+	],
 	needs: ['f9'],
 	foldInto: ['c9']
 }
