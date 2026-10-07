@@ -5,8 +5,8 @@
 // Codex's primary and secondary windows (x-codex-primary-used-percent,
 // -window-minutes, -reset-at or -reset-after-seconds). Kept per
 // provider and account in state/usage.ason, so account rotation
-// (auth.ts) takes the least-used account, and a later /model or status
-// line can show the numbers.
+// (auth.ts) spends the quota that would otherwise expire, and /model
+// or the status line can show the numbers.
 
 import { clock } from './clock.ts'
 import { liveFiles } from './live-file.ts'
@@ -105,37 +105,41 @@ function tightest(provider: string, account: string): { used: number; resets: nu
 	return best
 }
 
-// Where an account stands for rotation (task 3vj). Eligible: every
-// shared window below nearly spent (5h under 95%, others under 98%).
-// `week`: when its 7d window resets, Infinity when unknown.
-function standing(provider: string, account: string): { eligible: boolean; week: number; used: number } {
+// Where an account stands for rotation (task 3vj). Eligible: 5h under
+// 95% and every other shared window not spent. `need`: the weekly
+// quota left per hour until the 7d window resets, the pace that spends
+// it all; -1 when the reset is unknown.
+function standing(provider: string, account: string): { eligible: boolean; need: number; used: number } {
 	let all = usage.windows(provider, account)
-	let eligible = Object.entries(all).every(([name, w]) => /^\d+[a-z]+[-_]/.test(name) || w.used < (name === '5h' ? 95 : 98))
-	let week = all['7d']?.resets ? Date.parse(all['7d'].resets) : Infinity
-	return { eligible, week, used: usage.tightest(provider, account).used }
+	let eligible = Object.entries(all).every(([name, w]) => /^\d+[a-z]+[-_]/.test(name) || w.used < (name === '5h' ? 95 : 100))
+	let week = all['7d']
+	let need = week?.resets ? (100 - week.used) / Math.max(1, (Date.parse(week.resets) - clock.now()) / 3600_000) : -1
+	return { eligible, need, used: usage.tightest(provider, account).used }
 }
 
-// `accounts` in rotation order: eligible ones whose week resets soonest
-// first, so quota is spent before it expires, then the least used; the
-// nearly spent ones last, least used first. Full ties keep their order.
+// `accounts` in rotation order: eligible ones that most need spending
+// first (quota left per hour until reset, so the least is wasted), then
+// those without a known reset, least used first; the spent ones last,
+// least used first. Full ties keep their order.
 function order<T>(provider: string, accounts: T[], name: (a: T) => string): T[] {
 	let t = new Map(accounts.map((a) => [a, usage.standing(provider, name(a))]))
 	return [...accounts].sort((a, b) => {
 		let x = t.get(a)!
 		let y = t.get(b)!
 		if (x.eligible !== y.eligible) return x.eligible ? -1 : 1
-		if (x.eligible && x.week !== y.week) return x.week < y.week ? -1 : 1
+		if (x.eligible && x.need !== y.need) return y.need - x.need
 		return x.used - y.used
 	})
 }
 
 // Whether a session on `mine` stays there rather than moving to `best`,
-// the first in order(): while it is eligible, unless best's week resets
-// within a day and sooner than mine's (its quota would otherwise expire).
+// the first in order(): while it is eligible, unless best needs spending
+// at least 25% faster. The margin keeps a session from flipping (and
+// rebuilding its prompt cache) as each account's need drops with use.
 function keeps(provider: string, mine: string, best: string): boolean {
 	let m = usage.standing(provider, mine)
 	let b = usage.standing(provider, best)
-	return m.eligible && !(b.eligible && b.week < m.week && b.week <= clock.now() + 86400_000)
+	return m.eligible && !(b.eligible && b.need > 0 && b.need >= 1.25 * Math.max(0, m.need))
 }
 
 function close(): void {

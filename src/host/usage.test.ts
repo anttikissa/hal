@@ -58,7 +58,7 @@ test("Codex's primary and secondary windows are named by their span", () => {
 	expect(usage.parse(new Headers({ 'content-type': 'text/event-stream' }))).toEqual({})
 })
 
-test('rotation spends the week that resets soonest; nearly spent accounts come last; a reset window is over', () => {
+test('rotation spends first the week needing the fastest pace; spent accounts come last; a reset window is over', () => {
 	const h = 3600_000
 	let obs = (account: string, u5: number, u7: number, r7: number) =>
 		usage.observe(
@@ -74,17 +74,17 @@ test('rotation spends the week that resets soonest; nearly spent accounts come l
 	obs('a', 0.51, 0.86, 7 * h)
 	obs('b', 0.09, 0.81, 26 * h)
 	obs('c', 0.96, 0.2, 120 * h) // 5h nearly spent
-	obs('e', 0.1, 0.99, 2 * h) // week nearly spent
+	obs('e', 0.1, 1, 2 * h) // week spent
 	obs('f', 0.1, 0.5, 72 * h)
-	obs('g', 0.1, 0.1, 48 * h)
+	obs('g', 0.1, 0.4, 72 * h)
 	let order = () => usage.order('anthropic', ['a', 'b', 'c', 'd', 'e'], (x) => x)
 	// d has no data: eligible, but no known reset to spend first.
 	expect(order()).toEqual(['a', 'b', 'd', 'c', 'e'])
 	// Survives a restart.
 	usage.close()
 	expect(order()).toEqual(['a', 'b', 'd', 'c', 'e'])
-	// A session leaves its account for one whose week resets within a
-	// day and sooner, or when its own is nearly spent; otherwise it stays.
+	// A session leaves its account for one needing at least 25% faster
+	// spending, or when its own is spent; otherwise it stays.
 	expect(usage.keeps('anthropic', 'b', 'a')).toBe(false)
 	expect(usage.keeps('anthropic', 'c', 'a')).toBe(false)
 	expect(usage.keeps('anthropic', 'f', 'g')).toBe(true)
@@ -92,6 +92,13 @@ test('rotation spends the week that resets soonest; nearly spent accounts come l
 	// 8 hours on: a's and e's weeks and every 5h window are over.
 	now += 8 * h
 	expect(order()).toEqual(['b', 'c', 'a', 'd', 'e'])
+	// More quota left can need spending sooner than an earlier reset:
+	// 54% left in 130 h, 89% in 149 h, 2% in 65 h.
+	obs('x', 0.84, 0.46, 130 * h)
+	obs('y', 0, 0.11, 149 * h)
+	obs('z', 0, 0.98, 65 * h)
+	expect(usage.order('anthropic', ['z', 'x', 'y'], (x) => x)).toEqual(['y', 'x', 'z'])
+	expect(usage.keeps('anthropic', 'x', 'y')).toBe(false)
 	// Another provider's data is its own.
 	expect(usage.order('openai', ['d', 'a'], (x) => x)).toEqual(['d', 'a'])
 })
