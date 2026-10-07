@@ -166,6 +166,23 @@ test('a paused session stays paused: the message waits for the user to continue'
 	expect(lastText(next + 1)).toMatch(/\nfyi$/)
 })
 
+test.each(['pause', 'failure', 'question'])('an emergency resumes a recipient after %s instead of waiting for a human', async (stop) => {
+	let c = client()
+	let { a, b } = pair(c)
+	c.conn.send({ type: 'submit', sessionId: a, text: 'go' })
+	await until(() => calls.length === 1)
+	if (stop === 'pause') c.conn.send({ type: 'pause', sessionId: a })
+	else if (stop === 'failure') calls[0]!.push({ type: 'error', message: '400 bad request', status: 400 })
+	else calls[0]!.push({ type: 'text', text: '<question>Continue?</question>' }, { type: 'done', reason: 'end' })
+	await until(() => c.of('turn-end').length === 1)
+	let next = await send(c, b, { to: '1', text: 'STOP', delivery: 'emergency' })
+	let recipient = () => calls.findIndex((call, i) => i > 0 && call.input.sessionId === a)
+	await until(() => recipient() >= 0)
+	expect(resultOf(next).output).toContain('it started a turn')
+	expect(lastText(recipient())).toMatch(/\nSTOP$/)
+	expect(c.views.get(a)!.inbox).toEqual([])
+})
+
 // The old-flag error is temporary (task zb0): this fails after the
 // deadline until the LEGACY-SEND check in tools/send.ts and this test are gone.
 test('the legacy send flags steer and queue are rejected until 2026-10-10', async () => {

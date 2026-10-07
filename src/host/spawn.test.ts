@@ -7,6 +7,7 @@ import { history } from './history.ts'
 import { limits } from './limits.ts'
 import { calls, client, heard, toolSession, until, useHost } from './host-fixture.test.ts'
 import { sessions } from './sessions.ts'
+import { prompts } from './prompts.ts'
 import { status } from './status.ts'
 import { tabs } from './tabs.ts'
 
@@ -200,4 +201,52 @@ test('bad input is an error result and spawns nothing', async () => {
 	await until(() => calls.length === 2)
 	for (let i = 0; i < bad.length; i++) expect(resultOf(1, `b${i}`).isError).toBe(true)
 	expect(tabs.file().open).toHaveLength(1)
+})
+
+test('a child question wakes its waiting parent, stays open, and ordinary send resumes it through final report', async () => {
+	let c = client()
+	let p = await parent(c)
+	calls[0]!.push(call('s1', 'spawn', { task: 'choose a format' }), call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
+	let k = await callWith('choose a format')
+	let child = tabs.file().open[1]!
+	await until(() => status.stateOf(p).type === 'idle')
+	calls[k]!.push({ type: 'text', text: '<question>JSON or text?</question>' }, { type: 'done', reason: 'end' })
+	let woke = await callWith('JSON or text?', k + 1)
+	expect(tabs.file().open).toContain(child)
+	expect(status.stateOf(child).type).toBe('idle')
+	expect(calls[woke]!.input.messages.at(-1).blocks[0].text).toContain(`message from ${heard(tabs.label(child))}`)
+	calls[woke]!.push(call('answer', 'send', { to: child, text: 'Use JSON', description: 'Answer the format question' }), call('w2', 'wait'), { type: 'done', reason: 'tool_use' })
+	let resumed = await callWith('Use JSON', woke + 1)
+	expect(calls[resumed]!.input.sessionId).toBe(child)
+	expect(calls[resumed]!.input.messages.at(-1).blocks[0].text).toContain(`message from ${heard(tabs.label(p))}`)
+	expect(sessions.open(p).slots).toBe(4)
+	await until(() => status.stateOf(p).type === 'idle')
+	calls[resumed]!.push({ type: 'text', text: 'JSON ready' }, { type: 'done', reason: 'end' })
+	let done = await callWith('JSON ready', resumed + 1)
+	expect(calls[done]!.input.sessionId).toBe(p)
+	await until(() => !tabs.file().open.includes(child))
+})
+
+test('automatic reports and unrelated senders do not answer a delegated question; parent metadata alone is not ownership', async () => {
+	let c = client()
+	let p = await parent(c)
+	calls[0]!.push(call('s1', 'spawn', { task: 'clarify ownership' }), call('w1', 'wait'), { type: 'done', reason: 'tool_use' })
+	let k = await callWith('clarify ownership')
+	let child = tabs.file().open[1]!
+	calls[k]!.push({ type: 'text', text: '<question>Which owner?</question>' }, { type: 'done', reason: 'end' })
+	let woke = await callWith('Which owner?', k + 1)
+	// A report can come from the parent when the sessions delegate to one another.
+	prompts.submit(child, 'automatic report', undefined, 'steer', { from: p, advisory: true })
+	prompts.submit(child, 'unrelated answer', undefined, 'soft-steer', { from: 'other', advisory: true })
+	expect(status.inboxOf(child).map((m) => [m.text, m.queue])).toEqual([['automatic report', true], ['unrelated answer', true]])
+	expect(status.stateOf(child).type).toBe('idle')
+	// A human takes over this child; later questions belong to that human.
+	c.conn.send({ type: 'open', sessionId: child })
+	c.conn.send({ type: 'submit', sessionId: child, text: 'Work for me instead' })
+	let human = await callWith('Work for me instead', woke + 1)
+	calls[human]!.push({ type: 'text', text: '<question>Human choice?</question>' }, { type: 'done', reason: 'end' })
+	await until(() => status.stateOf(child).type === 'idle')
+	prompts.submit(child, 'former parent answer', undefined, 'soft-steer', { from: p, advisory: true })
+	expect(status.inboxOf(child).at(-1)).toMatchObject({ text: 'former parent answer', queue: true })
+	expect(status.stateOf(child).type).toBe('idle')
 })

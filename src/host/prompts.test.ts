@@ -501,7 +501,7 @@ test('a resend of an edit still waiting for its paused turn to stop acks without
 	expect(shown(a.views.get(id)!.items.filter((i) => i.type === 'prompt'))).toEqual([{ type: 'prompt', text: 'right' }])
 })
 
-test('agent reports and steering wait through a question and restart until the human replies', async () => {
+test('agent reports and soft steering wait through a question and restart until the human replies', async () => {
 	let a = client()
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
@@ -509,7 +509,7 @@ test('agent reports and steering wait through a question and restart until the h
 	calls[0]!.push({ type: 'text', text: 'Recommendation.\n<question>A or B?</question>' }, { type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 1)
 	prompts.submit(id, 'agent report', undefined, 'steer', { from: 'other', advisory: true })
-	prompts.submit(id, 'agent steer', undefined, 'steer', { from: 'other' })
+	prompts.submit(id, 'agent steer', undefined, 'soft-steer', { from: 'other' })
 	expect(inboxOf(a, id)).toEqual(['agent report', 'agent steer'])
 	expect(a.views.get(id)!.inbox.every((m) => m.queue)).toBe(true)
 	restartHost()
