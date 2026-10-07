@@ -1,0 +1,10 @@
+{
+	title: 'Shared colored diffs and compact rebase reports',
+	spec: 'Rebase preserves entry order and reports deletions as ranges of consecutive dropped visible entries, with actual entry counts despite gaps in record numbers. Include entries removed by linked drop groups. Do not repeat deleted contents. Edited entries show colored line diffs with minimal context. Reports stay transcript output, not model notices. A shared host text-diff generator uses Git with private temporary files and reports failures completely; callers control presentation limits. Browser-safe diff presentation helpers and thin terminal/web rendering share addition/removal tones with AGENTS/SYSTEM changes and diff Markdown fences. The rebase report and host diff implementation load on demand, not at host startup. Keep generation separate from prompt-file tracking, ready for file/changeset and plugin-sync consumers without implementing those features or word diff. Preserve existing prompt-change summaries and colors. Diff generation fails before a rebase is committed so errors cannot falsely report a failed rewrite after applying it.',
+	status: 'done',
+	notes: [
+		'The previous report printed one deleted-row summary per entry and imported prompt-file tracking to obtain its diff. Reports now compress consecutive visible rows (not numeric adjacency) and expand linked drop groups before counting. The generator lives in host/text-diff.ts, is required lazily by promptTrail.diff and reached through the lazy rebase-report module. Diff fences reuse common/diff.ts tones, client/diff-view.ts painting and the web theme CSS. Markdown pre elements must carry the diff theme class: tone classes alone do not define the palette variables. Git file headers are stripped by position, preserving actual deleted/added text beginning with --- or +++; private unique temp directories prevent collision. Report generation precedes rebases.apply so a Git failure leaves history unchanged. No new model notice or word-diff implementation.'
+	],
+	needs: ['qb1', 'ar'],
+	foldInto: ['qb1', 'ar']
+}

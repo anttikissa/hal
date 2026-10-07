@@ -6,6 +6,8 @@
 import { markdown, type Block, type Links, type Run } from '../common/markdown.ts'
 import { strings } from '../common/strings.ts'
 import type { Style } from '../common/colors.ts'
+import { diff } from '../common/diff.ts'
+import { diffView } from './diff-view.ts'
 import { ansi } from './ansi.ts'
 
 
@@ -102,7 +104,7 @@ function block(b: Block, width: number, style?: Style): string[] {
 		// The closing fence's row stays blank so a streaming reply never loses
 		// a row; lines() drops the blank line after it, avoiding a double gap.
 		let close = b.close === undefined ? [] : ['']
-		return [...lang, ...b.lines.flatMap((l) => ansi.wrap(l, width).map((r) => markdownView.code(r, style))), ...close]
+		return [...lang, ...b.lines.flatMap((l) => ansi.wrap(l, width).map((r) => b.lang === 'diff' ? diffView.paint(r, diff.tone(l), style) : markdownView.code(r, style))), ...close]
 	}
 	let marker = b.kind === 'quote' ? ansi.quiet('│ ', style) : b.marker
 	let indent = strings.visLen(marker)

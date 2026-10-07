@@ -1,15 +1,25 @@
 // What an applied rebase changed, shown in the transcript (task qb1):
-// each dropped row's summary and each edit as a line diff, complete.
-import type { RebasePlan } from '../common/rebase.ts'
+// dropped rows as ranges and each edit as a line diff, complete.
+import { rebase, type RebasePlan } from '../common/rebase.ts'
 import type { RebaseRows } from '../common/rebase-rows.ts'
-import { promptTrail } from './prompt-trail.ts'
+import { textDiff } from './text-diff.ts'
+import { diff } from '../common/diff.ts'
 
 function text(snapshot: RebaseRows, plan: RebasePlan): string {
-	let drops = new Set(plan.drop), lines = ['Rebase applied.']
-	for (let row of snapshot.rows) if (row.ns.some((n) => drops.has(n))) lines.push(`Dropped #${row.n} ${row.kind}: ${row.summary}`)
+	let groups = rebase.groups(snapshot.records)
+	let drops = new Set(plan.drop.flatMap((n) => [...(groups.get(n) ?? [n])])), runs: number[][] = [], last = -2
+	// Consecutive dropped rows as one range: '#43-95 (40 entries), #104'.
+	snapshot.rows.forEach((row, i) => {
+		if (!row.ns.some((n) => drops.has(n))) return
+		if (i === last + 1) runs.at(-1)!.push(row.n); else runs.push([row.n])
+		last = i
+	})
+	let count = runs.reduce((sum, run) => sum + run.length, 0)
+	let ranges = runs.map((run) => run.length === 1 ? `#${run[0]}` : `#${run[0]}-${run.at(-1)} (${run.length} entries)`)
+	let lines = [`Rebase applied.${count ? ` Dropped ${count} ${count === 1 ? 'entry' : 'entries'}: ${ranges.join(', ')}` : ''}`]
 	for (let e of plan.edit) {
 		let row = snapshot.rows.find((r) => r.editN === e.n) ?? snapshot.rows.find((r) => r.n === e.n)
-		lines.push(`Edited #${row?.n ?? e.n} ${row?.kind ?? 'record'}:`, promptTrail.diff(row?.text ?? '', e.text, Infinity))
+		lines.push(`Edited #${row?.n ?? e.n} ${row?.kind ?? 'record'}:`, diff.fence(textDiff.text(row?.text ?? '', e.text)))
 	}
 	return lines.join('\n')
 }
