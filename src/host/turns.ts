@@ -177,7 +177,7 @@ async function runTurn(id: string, model: string, running: Running, answers?: An
 	async function* stream(): AsyncGenerator<StreamEvent> {
 		let scripted = synthetic.find(model)
 		if (!scripted) {
-			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model, now: clock.now(), sessionId: id })
+			let system = systemPrompt.build({ cwd: sessions.open(id).cwd, model: models.qualified(model, running.effort), now: clock.now(), sessionId: id })
 			let defs = tools.defs()
 			let messages = await history.messages(id, { overhead: system.length + JSON.stringify(defs).length, window: models.contextWindow(model), model })
 			if (signal.aborted) return
