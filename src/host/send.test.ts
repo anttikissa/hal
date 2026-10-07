@@ -165,3 +165,13 @@ test('a paused session stays paused: the message waits for the user to continue'
 	await until(() => calls.length === next + 2)
 	expect(lastText(next + 1)).toMatch(/\nfyi$/)
 })
+
+// The old-flag error is temporary (task zb0): this fails after the
+// deadline until the LEGACY-SEND check in tools/send.ts and this test are gone.
+test('the legacy send flags steer and queue are rejected until 2026-10-10', async () => {
+	let c = client()
+	let { b } = pair(c)
+	let next = await send(c, b, { to: '1', text: 'x', steer: true })
+	expect(resultOf(next)).toMatchObject({ isError: true, output: expect.stringContaining("delivery 'emergency'") })
+	expect(Date.now(), 'delete the LEGACY-SEND check in tools/send.ts and this test').toBeLessThan(Date.parse('2026-10-10T00:00:00Z'))
+})

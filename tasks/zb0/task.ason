@@ -2,6 +2,9 @@
 	title: 'send takes delivery soft-steer, queue or emergency and reports what happened',
 	spec: "The send tool's delivery parameter is soft-steer (default: read at the recipient's next round, with the not-urgent notice), queue (after its current turn) or emergency (interrupts its round like the user's steer; unsafe-to-stop calls finish first). The name emergency keeps models from interrupting for routine updates. The old steer and queue booleans are rejected with an error naming the replacement. The result says what became of the message: it started a turn; it reads it before its next request; it interrupted the round; it is queued after the current turn or the user's answer; or it waits because the recipient is paused, failed or blocked, until the user continues it. Invariant restored: a sender never believes a message was delivered while it waits for the user (on 2026-10-06 two STOP messages waited 63 minutes behind a stuck tab, reported as Sent).",
 	status: 'done',
+	notes: [
+		'The steer/queue rejection is temporary (LEGACY-SEND); send.test.ts fails from 2026-10-10 until it is deleted.'
+	],
 	needs: ['rj', '760'],
 	foldInto: ['rj']
 }
