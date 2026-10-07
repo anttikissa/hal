@@ -280,12 +280,12 @@ export function Card(props: { row: Row; session: string; cursor?: boolean; targe
 					<Show when={props.row.note === undefined} fallback={compact()}>
 						{isChange() ? change() : (
 						<Show when={folding()} fallback={plain(s)}>
-							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} reference={link()} actions={undoButton()}
+							<CardHeader icon={kindIcon()} time={time()} name={props.row.item.type === 'thinking' && !expanded() ? `${titles.who(props.row.item)}: ${head()}` : head()} open={expanded()} result={statusResult()} bash={bash()} reference={link()}
+								actions={<>{undoButton()}<Show when={props.job}>{(n) => <button type="button" class="kill error" title={`Stop background job #t${n()} (/kill #t${n()})`} aria-label={`Kill background job #t${n()}`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #t${n()}` })}><Icon name="skull" />kill</button>}</Show></>}
 								label={<For each={headerParts()}>{(part) => typeof part === 'string' ? part : <a href={external(part.href)} target="_blank" rel="noopener noreferrer">{part.text}</a>}</For>}>
 								<Show when={props.cursor && !open()}>{cursor()}</Show>
 								<Show when={props.row.item.type === 'tool' && toolDetails.unsafe(props.row.item.name, props.row.item.input)}><span class="unsafe">unsafe to stop</span></Show>
 								<Show when={failed()}><span class="error">✗</span></Show>
-								<Show when={props.job}>{(n) => <button type="button" class="kill" title={`Stop background job #t${n()} (/kill #t${n()})`} onClick={() => app.sendNow({ type: 'submit', sessionId: props.session, text: `/kill #t${n()}` })}><Icon name="stop" />kill</button>}</Show>
 							</CardHeader>
 							<div class="body" inert={!expanded()}>
 								<div class="contents">

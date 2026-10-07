@@ -1351,7 +1351,7 @@ browserTest('completion dismissal follows pointer and focus without stealing cho
 
 browserTest('transcript card variants share first-line geometry in open and closed states', async () => {
 	let id = sessions.create({ cwd: '/tmp', model: 'example/model' }).id
-	let ts = '2026-10-02T06:20:00Z'
+	let ts = new Date().toISOString()
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Human prompt body' }], ts })
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: 'Delivered queued prompt body', queuedAt: '2026-10-01T23:13:07.456Z', delivery: 'after-turn' }], ts })
 	history.append(id, { type: 'assistant', block: { type: 'text', text: 'Assistant body\n\nAnother paragraph' }, ts })
@@ -1363,9 +1363,9 @@ browserTest('transcript card variants share first-line geometry in open and clos
 	history.append(id, { type: 'answer', question: 'answered', answers: { choice: 'Yes' }, ts })
 
 	history.append(id, { type: 'assistant', block: { type: 'thinking', text: 'Consider the layout\n\nFurther thought' }, ts })
-	for (let [name, description] of [['short', 'Inspect files'], ['long', 'Put the one-space gap inside the timestamp tap target and rerun all checks before documenting the consistent card layout']]) {
-		history.append(id, { type: 'assistant', block: { type: 'tool_call', id: name!, name: 'bash', input: { description, command: 'printf example', modifies: [] } }, ts })
-		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: name!, output: 'Example output' }], ts })
+	for (let [name, description] of [['short', 'Inspect files'], ['long', 'Put the one-space gap inside the timestamp tap target and rerun all checks before documenting the consistent card layout'], ['job-short', 'Run Python'], ['job-long', 'Resume only unrecorded Python cases and preserve original quota snapshots plus a restart-boundary snapshot']]) {
+		let call = history.append(id, { type: 'assistant', block: { type: 'tool_call', id: name!, name: 'bash', input: { description, command: name!.startsWith('job-') ? 'python3 -c "print(1)"' : 'printf example', modifies: [] } }, ts })
+		history.append(id, { type: 'user', blocks: [{ type: 'tool_result', id: name!, output: name!.startsWith('job-') ? `started in background as #t${call.n}` : 'Example output' }], ts })
 	}
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '**Message body**\n\nMore detail', from: 'reviewer', label: 'Review agent', summary: 'Review the card layout', queuedAt: '2026-10-01T23:13:07.456Z', delivery: 'after-turn' }], ts })
 	history.append(id, { type: 'user', blocks: [{ type: 'text', text: '[exit 0]\nJob complete', from: 'worker', label: 'bash #6' }], ts })
@@ -1377,7 +1377,7 @@ browserTest('transcript card variants share first-line geometry in open and clos
 	try {
 		await server.serve(); web.start()
 		await b.call('Page.navigate', { url: `${base()}/${id}?auth=${webAuth.issue()}` })
-		await b.waitFor(`document.querySelectorAll('.Card.folds').length === 4 && !!document.querySelector('.Card.queued')`)
+		await b.waitFor(`document.querySelectorAll('.Card.folds').length === 6 && document.querySelectorAll('.kill').length === 2 && !!document.querySelector('.Card.queued')`)
 		// A streaming card's cursor sits in its header and must not shift the label.
 		await b.evaluate(`document.querySelector('.Card.thinking .CardHeader .title').insertAdjacentHTML('beforeend', '<span class="cursor"></span>')`)
 		let geometry = `(() => {
@@ -1393,6 +1393,12 @@ browserTest('transcript card variants share first-line geometry in open and clos
 			await b.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch })
 			await b.call('Emulation.setTouchEmulationEnabled', { enabled: touch })
 			await b.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+			let jobActions = `Array.from(document.querySelectorAll('.kill'), b => { let r = b.getBoundingClientRect(), h = b.closest('.CardHeader'), f = h.querySelector('.flow').getBoundingClientRect(), link = h.querySelector('.link').getBoundingClientRect(); return { width: r.width, height: r.height, separated: f.right <= r.left && r.right <= link.left, named: b.getAttribute('aria-label').startsWith('Kill background job #t'), label: b.textContent, contrasting: getComputedStyle(b).color !== getComputedStyle(h).color }; })`
+			for (let action of await b.evaluate(jobActions)) {
+				expect(action.width).toBeGreaterThanOrEqual(44)
+				expect(action.height).toBe(44)
+				expect(action).toMatchObject({ separated: true, named: true, label: 'kill', contrasting: true })
+			}
 			let thinking = await b.evaluate(`(() => { let c = document.querySelector('.Card.thinking'); return { text: c.querySelector('.title').textContent, name: c.querySelector('.mark').getAttribute('aria-label') } })()`)
 			expect(thinking.text).toBe('Consider the layout')
 			expect(thinking.name).toBe('Thinking: Consider the layout')
@@ -1415,7 +1421,7 @@ browserTest('transcript card variants share first-line geometry in open and clos
 			for (let row of folded.filter((r: any) => r.height < 50)) expect(Math.abs(row.offCenter)).toBeLessThanOrEqual(1.5)
 			for (let row of closed.filter((r: any) => r.tail !== undefined)) expect(Math.abs(row.tail - row.inset)).toBeLessThanOrEqual(1.5)
 			await b.evaluate(`document.querySelectorAll('.Card.folds .mark').forEach(b => b.click()); document.querySelector('.Card.queued').click()`)
-			await b.waitFor(`document.querySelectorAll('.Card.folds.open').length === 4 && !!document.querySelector('.Card.queued .CardHeader')`)
+			await b.waitFor(`document.querySelectorAll('.Card.folds.open').length === 6 && !!document.querySelector('.Card.queued .CardHeader')`)
 			await Bun.sleep(300)
 			for (let row of await b.evaluate(geometry)) {
 				expect(Math.abs(row.baseline)).toBeLessThanOrEqual(1)
@@ -1424,6 +1430,7 @@ browserTest('transcript card variants share first-line geometry in open and clos
 				expect(row.overlap).toBe(false)
 				expect(row.textWidth).toBeLessThanOrEqual(row.boxWidth + 1)
 			}
+			for (let action of await b.evaluate(jobActions)) expect(action.separated).toBe(true)
 			expect(await b.evaluate(`document.querySelector('.Card.thinking .title').textContent`)).toBe('Thinking')
 			expect(await b.evaluate(`document.querySelector('.Card.thinking .content').textContent`)).toContain('Further thought')
 			let insets = await b.evaluate(`(() => { let c = document.querySelectorAll('.Card.tool')[1], header = c.querySelector('.stamp'), body = c.querySelector('.content'); return { body: body.getBoundingClientRect().x + parseFloat(getComputedStyle(body).paddingLeft), header: header.getBoundingClientRect().x, wrapped: c.querySelector('.title').getBoundingClientRect().height > parseFloat(getComputedStyle(c).lineHeight) * 2, under: [...c.querySelector('.title .label').getClientRects()].at(-1).left - header.getBoundingClientRect().x } })()`)
