@@ -9,7 +9,8 @@
 		'The blanket instruction to give each implementer a subagent conflicted with exceptional delegation. The orchestration section now defines the exceptions and scopes delegation mechanics to delegated work.',
 		"AGENTS.md: web and terminal follow the same UI rules unless a task records an exception; a change on one platform prompts asking the user whether the other should follow (user request, after the terminal tab strip drifted from the web's).",
 		'Under Code, AGENTS.md opens with the efficiency principle the user asked to write down (7 Oct): Hal is efficient: small, quick to start, light on CPU, memory, network and tokens; agents treat it so and measure before calling anything costly.',
-		'Live clarification trial 07-las unnecessarily listed all sessions before answering its known child. Replaced blanket inspect-before-send with decision-driven inspection, stable-ID replies, and minimal coordination chatter.'
+		'Live clarification trial 07-las unnecessarily listed all sessions before answering its known child. Replaced blanket inspect-before-send with decision-driven inspection, stable-ID replies, and minimal coordination chatter.',
+		'Superseded by vmj: hierarchical clarification, concise briefs, stable-ID replies and minimal coordination are universal Hal guidance in SYSTEM.md, not repository policy. AGENTS.md retains only development-specific orchestration constraints.'
 	],
 	needs: []
 }

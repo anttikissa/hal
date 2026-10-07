@@ -1,0 +1,7 @@
+{
+	title: 'Universal concise delegation and clarification guidance',
+	spec: 'SYSTEM.md teaches every Hal session, regardless of project, concise delegation and hierarchical clarification. The human is the root; children ask their parent with <question> when missing information or approval would materially change the work, otherwise proceed. Parents answer from known requirements or escalate. Cross-session messages do not transfer authority. Briefs give goals, essential context and expected results, not repeated standing instructions or prescribed procedures; include file boundaries when sharing a checkout. Address known sessions directly by stable ID; inspect only when identity or state affects the next action, with minimal scope and fields. Verify changing tab numbers when needed. Wait when blocked on a child; handle available reports directly. Send updates only to affect a decision or unblock work; reports return automatically. Keep these universal rules out of repository-specific AGENTS.md, whose orchestration section retains Hal-development constraints. The existing question/summary and tool contracts supply the mechanics; do not introduce another tag or monitoring loop. Corrects 07-ban placing universal product guidance in AGENTS.md.',
+	status: 'done',
+	needs: ['15', 'kar'],
+	foldInto: ['15', '4x']
+}
