@@ -2,6 +2,15 @@
 	title: 'host.ts split into cohesive modules',
 	spec: "src/host/host.ts is no longer than 400 lines (task 0j) and its code lives in several host modules, each with one job and its own exported object per the module conventions (tasks/README.md). host.test.ts follows the split, so each module's tests sit next to it (tests have no size limit, but a 1000-line test file is as hard to read as a 1000-line module). The split is decided from the code as it is when this task runs, not planned ahead: read host.ts, group functions by the state they touch and by who calls them, and cut along those seams. A module that only forwards calls to another is a sign of a bad cut. Behavior and the protocol do not change. Names that other modules, local.ts overrides, eval and tests rely on either stay on the `host` object or move with every caller in the same commit. Take host.ts off the size exception list. The whole suite passes before and after with no test weakened or deleted, except tests that moved.",
 	status: 'done',
+	notes: [
+		'At planning time host.ts had 885 lines built by tasks 6, ne, ah, sj, 1w, j1, tf, 2r, rw, w4, wb, 6f, et, 29 and 0x (git log -- src/host/host.ts; each commit has a Task: trailer). Read those task notes before cutting: they explain races (wb: the amend deferred until Running.done settles; tf: retries) that a naive move can break.',
+		'Calls go through module objects (host.x(), not x()) so hot patches work. When a function moves, tests that patch host.<fn> must patch its new object, or they silently stop patching anything; grep the tests for `host.` assignments.',
+		'Two host modules may import each other only if neither touches the other at import time (tasks/README.md).',
+		'The cut (by owned state and callers): host.ts keeps connections, command dispatch (act), ids, snapshots, broadcast and lifecycle (init, quitting, reset); status.ts owns the per-session state map (stateOf, transition, settle, inboxOf); prompts.ts is what the user sends (submit, amend, inbox delivery, next, drain, resume, reply, drafts sent); turns.ts owns running turns (state.running, stream, start, runTurn, ask, stop, recover, waitOut); slash.ts runs slash commands (command, context, change, runCommand, models, output). host.reset still clears turns.state.running and status.state.states, since tests reset through it.',
+		'Patch points moved: tests stub turns.stream (was host.stream) and prompts.next / prompts.submit. `status` shadows the DOM global of the same name, so a file that forgets to import it type-checks as window.status (a string) and fails at .stateOf.',
+		'host.test.ts was split into host.test.ts, turns.test.ts and prompts.test.ts sharing host-fixture.test.ts (named *.test.ts so the size and import-side-effect rules skip it; call useHost() to register its hooks). host-commands, host-retry and host-approval tests became slash.test.ts, turns-retry.test.ts and turns-approval.test.ts.',
+		'Host protocol tests import only modules they use. Removing the unused pages import restores the warning-free lint invariant after the test split; lint warnings fail ./test.'
+	],
 	needs: ['0j'],
 	foldInto: [
 		'6',
@@ -19,13 +28,5 @@
 		'et',
 		'29',
 		'0x'
-	],
-	notes: [
-		'At planning time host.ts had 885 lines built by tasks 6, ne, ah, sj, 1w, j1, tf, 2r, rw, w4, wb, 6f, et, 29 and 0x (git log -- src/host/host.ts; each commit has a Task: trailer). Read those task notes before cutting: they explain races (wb: the amend deferred until Running.done settles; tf: retries) that a naive move can break.',
-		'Calls go through module objects (host.x(), not x()) so hot patches work. When a function moves, tests that patch host.<fn> must patch its new object, or they silently stop patching anything; grep the tests for `host.` assignments.',
-		'Two host modules may import each other only if neither touches the other at import time (tasks/README.md).',
-		'The cut (by owned state and callers): host.ts keeps connections, command dispatch (act), ids, snapshots, broadcast and lifecycle (init, quitting, reset); status.ts owns the per-session state map (stateOf, transition, settle, inboxOf); prompts.ts is what the user sends (submit, amend, inbox delivery, next, drain, resume, reply, drafts sent); turns.ts owns running turns (state.running, stream, start, runTurn, ask, stop, recover, waitOut); slash.ts runs slash commands (command, context, change, runCommand, models, output). host.reset still clears turns.state.running and status.state.states, since tests reset through it.',
-		'Patch points moved: tests stub turns.stream (was host.stream) and prompts.next / prompts.submit. `status` shadows the DOM global of the same name, so a file that forgets to import it type-checks as window.status (a string) and fails at .stateOf.',
-		'host.test.ts was split into host.test.ts, turns.test.ts and prompts.test.ts sharing host-fixture.test.ts (named *.test.ts so the size and import-side-effect rules skip it; call useHost() to register its hooks). host-commands, host-retry and host-approval tests became slash.test.ts, turns-retry.test.ts and turns-approval.test.ts.'
 	]
 }

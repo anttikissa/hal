@@ -8,7 +8,6 @@ import { config } from './config.ts'
 import { calls, client, created, fresh, records, restartHost, until, useHost } from './host-fixture.test.ts'
 import { history } from './history.ts'
 import { warnings } from './warnings.ts'
-import { pages } from './pages.ts'
 import { models } from './models.ts'
 import { sessions } from './sessions.ts'
 
