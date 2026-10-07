@@ -73,7 +73,7 @@ test('rotation spends first the week needing the fastest pace; spent accounts co
 		)
 	obs('a', 0.51, 0.86, 7 * h)
 	obs('b', 0.09, 0.81, 26 * h)
-	obs('c', 0.96, 0.2, 120 * h) // 5h nearly spent
+	obs('c', 1, 0.2, 120 * h) // 5h spent
 	obs('e', 0.1, 1, 2 * h) // week spent
 	obs('f', 0.1, 0.5, 72 * h)
 	obs('g', 0.1, 0.4, 72 * h)
