@@ -3,7 +3,8 @@
 	spec: "After a deliberate restart the new host tells every client, as a warning notice, who restarted Hal: the tab label (tab N · session id · name) and how, e.g. 'Hal restarted by tab 3 · 161-hat · Name (/restart all)'. Deliberate restarts are /restart host, both and all (from the session they ran in) and Ctrl-R or SIGUSR1 in a terminal that is the host (its shown tab). The restarting process writes state/restart.ason just before exiting; whichever process becomes host next takes it (reads and deletes it), ignores it if older than a minute, sends it to connected clients and to clients connecting within a minute of startup. Crashes, kills, Ctrl-C quits and a later start write nothing and announce nothing. /restart local and a page reload that leave the host running announce nothing: only that client restarted. No tests by user decision; add them if this proves buggy.",
 	status: 'done',
 	notes: [
-		'host.ts sits at the 400-line limit, so the join-time notice wraps host.warn from main.ts becomeHost instead of editing host.connect. The terminal wrapper of terminal.restart also covers SIGUSR1; restartNote.write keeps the first writer so /restart host on a terminal host is not relabeled Ctrl-R.'
+		'host.ts sits at the 400-line limit, so the join-time notice wraps host.warn from main.ts becomeHost instead of editing host.connect. The terminal wrapper of terminal.restart also covers SIGUSR1; restartNote.write keeps the first writer so /restart host on a terminal host is not relabeled Ctrl-R.',
+		"Standing warnings live in src/host/warnings.ts: warnings.set('restart', text) shows the restart cause to connected and joining clients for a minute. Bug fixed: restart-note wrapped host.warn at run time; the rule restored is that Hal's modules never wrap each other's functions (tasks/README.md)."
 	],
 	needs: ['cf'],
 	foldInto: ['x0']

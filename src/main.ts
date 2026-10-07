@@ -26,6 +26,7 @@ import { lifecycle } from './host/lifecycle.ts'
 import { diag } from './host/diag.ts'
 import { find } from './host/find.ts'
 import { host } from './host/host.ts'
+import { warnings } from './host/warnings.ts'
 import { restartGuard, restartProcess } from './host/commands/restart.ts'
 import { restartNote } from './host/restart-note.ts'
 import { jobs } from './host/jobs.ts'
@@ -338,8 +339,7 @@ async function start(): Promise<void> {
 	}
 	if (parsed.kind === 'auth') process.exit(await main.auth())
 	// config.ason first, so local.ts sees it and may override settings.*.
-	// Warnings about it reach every client connected to this host.
-	config.init(() => host.warnAll())
+	config.init(() => warnings.all())
 	await main.loadLocal()
 	perf.mark('local.ts')
 	await main.loadPlugins()

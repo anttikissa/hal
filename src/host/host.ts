@@ -7,7 +7,6 @@ import { commands } from './commands.ts'
 import { clients, type ClientInfo, type ClientRecord } from './clients.ts'
 import { blobs } from './blobs.ts'
 import { clock } from './clock.ts'
-import { config } from './config.ts'
 import { find } from './find.ts'
 import { busy } from './busy.ts'
 import { drafts } from './drafts.ts'
@@ -30,6 +29,7 @@ import { tabs } from './tabs.ts'
 import { turns } from './turns.ts'
 import { webAuth } from './web-auth.ts'
 import { webLinks } from './web-links.ts'
+import { warnings } from './warnings.ts'
 import { wire } from './wire.ts'
 import { rebaseRows } from '../common/rebase-rows.ts'
 import { rebasePlans } from './rebase-plans.ts'
@@ -45,7 +45,7 @@ export type Connection = {
 
 // `held`: commands waiting, by session, for its snapshot to be sent;
 // under '*', every command, until the tabs are sent.
-type Client = { deliver: (event: Event) => void; open: Set<string>; visible?: string; shown?: string; visibleAt?: number; held: Map<string, unknown[]>; record: ClientRecord }
+export type Client = { deliver: (event: Event) => void; open: Set<string>; visible?: string; shown?: string; visibleAt?: number; held: Map<string, unknown[]>; record: ClientRecord }
 // What a command did: refused (why), or done, naming a created session
 // (followed) or the tab a tab command created, reopened or picked, or
 // with the event that answered it (attached), sent again on a repeat.
@@ -55,7 +55,7 @@ function connect(deliver: (event: Event) => void, info?: ClientInfo): Connection
 	let open = new Set<string>()
 	let client: Client = { deliver: (e) => deliver(wire.event(e)), open, held: new Map(), record: clients.join(open, info) }
 	host.state.clients.add(client)
-	host.warn(client)
+	warnings.send(client)
 	if (version.state.loaded) client.deliver({ type: 'version', version: version.state.loaded })
 	// The tabs come with the first events, so no client has to ask; their
 	// states need the open tabs' marks, caught up in slices first. Held
@@ -87,25 +87,12 @@ function release(client: Client, key: string): void {
 	for (let c of held) host.handle(client, c)
 }
 
-// Tells a client what is wrong with config.ason, if anything.
-function warn(client: Client): void {
-	let text = config.warnings().join('; ')
-	if (text) client.deliver({ type: 'warning', text })
-}
 
 // This process's version is known: every client hears it (task n1).
 function announce(loaded: string): void {
 	for (let client of host.state.clients) client.deliver({ type: 'version', version: loaded })
 }
 
-// After config.ason changed: warns every client, refreshes /config modals.
-function warnAll(): void {
-	let refresh = { ...config.event(), refresh: true as const }
-	for (let client of host.state.clients) {
-		host.warn(client)
-		client.deliver(refresh)
-	}
-}
 
 function reject(client: Client, command: unknown, reason: string, sessionId?: unknown): void {
 	let c = command as { type?: unknown; id?: unknown } | null
@@ -365,8 +352,6 @@ export const host = {
 	remembered: 1000,
 	connect,
 	adapt: wire.adapt,
-	warn,
-	warnAll,
 	announce,
 	reject,
 	remember,

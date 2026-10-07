@@ -5,11 +5,11 @@ import { settings } from '../../common/settings.ts'
 import { config } from '../config.ts'
 import { client, created, testHome, until, useHost } from '../host-fixture.test.ts'
 import { history } from '../history.ts'
-import { host } from '../host.ts'
+import { warnings } from '../warnings.ts'
 
 useHost()
 // As main.ts wires it: every change reaches the clients.
-beforeEach(() => config.init(() => host.warnAll()))
+beforeEach(() => config.init(() => warnings.all()))
 afterEach(() => config.reset())
 
 test('bare /config opens the modal with values and what config.ason holds; a change refreshes it', async () => {

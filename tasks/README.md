@@ -140,6 +140,11 @@ order in both clients; it is separate from delivery eligibility.
   code, names, comments, docs and tasks; quoted outside text keeps its
   own. Persisted fields follow too: no compatibility shims for older
   British-spelled records (task k45).
+- Hal's modules call each other's functions; they never wrap or
+  replace them at run time. Overriding exported functions is for
+  `local.ts` and plugins only. A module that must add to another's
+  behavior gets an explicit hook or registry there, such as
+  `warnings.set` for standing warnings.
 - `src/conventions.test.ts` enforces the import rules and that
   importing every module (main.ts included) prints nothing, registers
   no signal handlers and leaves no timers or watchers running.

@@ -11,11 +11,11 @@ import { freemem, totalmem } from 'os'
 import { host } from './host.ts'
 import { paths } from './paths.ts'
 import { turns } from './turns.ts'
+import { warnings } from './warnings.ts'
 
 export type Level = 'ok' | 'low' | 'critical'
 type Sample = { disk: number; memory: number }
 
-const rank: Record<Level, number> = { ok: 0, low: 1, critical: 2 }
 const gb = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`
 
 // Memory the kernel can hand out without swapping. Linux: MemAvailable.
@@ -78,8 +78,8 @@ function check(sample = resources.measure()): void {
 		catch (e) { process.stderr.write(`resource pause for ${id}: ${e instanceof Error ? e.stack : e}\n`) }
 	}
 	if (st.level === before) return
-	let text = resources.warning() ?? `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available`
-	if (rank[st.level] > rank[before] || st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text })
+	warnings.set('resources', resources.warning())
+	if (st.level === 'ok') for (let client of host.state.clients) client.deliver({ type: 'warning', text: `Resources recovered: disk ${gb(sample.disk)} free, memory ${gb(sample.memory)} available` })
 }
 
 // Checks now and every intervalMs; clients joining while short get the
@@ -87,12 +87,6 @@ function check(sample = resources.measure()): void {
 function init(): void {
 	let st = resources.state
 	if (st.timer) return
-	let warn = host.warn
-	host.warn = (client) => {
-		warn(client)
-		let text = resources.warning()
-		if (text) client.deliver({ type: 'warning', text })
-	}
 	let run = () => {
 		try {
 			resources.check()

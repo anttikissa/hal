@@ -5,7 +5,8 @@
 	notes: [
 		'Warnings reuse the existing warning event (st.notice in both clients) and host.warn for joining clients, so the web and the terminal show them the same way with no new UI. Notes go into bash results only: bash is what fills disks, and the note then sits in history like neighbor notes, so replay and the cache see the same bytes. A test injects samples into resources.check; the pause path is turns.stop, tested with turns.',
 		'Bug fixed: on macOS os.freemem counts only idle pages, not reclaimable cache, so a healthy 16 GB Mac read 0.1 GB and paused every turn as critical. Invariant: available memory means memory the OS can hand out without swapping on every platform.',
-		'Resource levels are not model notices: the model cannot free disk or memory, and the pause reason already tells a paused turn. The recovery warning stays because client warnings stay shown until replaced; without it a critical warning would remain after recovery.'
+		'Resource levels are not model notices: the model cannot free disk or memory, and the pause reason already tells a paused turn. The recovery warning stays because client warnings stay shown until replaced; without it a critical warning would remain after recovery.',
+		"Resource warnings use warnings.set('resources', text) in src/host/warnings.ts, so clients joining while short get them. A drop from critical to low now also warns, with the current text. Bug fixed: resources wrapped host.warn at run time; Hal's modules never wrap each other's functions (tasks/README.md)."
 	],
 	needs: ['0f', 'j1']
 }
