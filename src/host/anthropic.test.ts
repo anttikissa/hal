@@ -30,6 +30,13 @@ function writeAuth(entry: unknown) {
 	writeFileSync(`${home}/secrets/auth.ason`, ason.stringify({ anthropic: entry }) + '\n', { mode: 0o600 })
 }
 
+// Bodies arrive compressed, as the real APIs take them.
+const bodyOf = async (req: Request) => {
+	let bytes = new Uint8Array(await req.arrayBuffer())
+	let enc = req.headers.get('content-encoding')
+	return JSON.parse(new TextDecoder().decode(enc === 'zstd' ? Bun.zstdDecompressSync(bytes) : enc === 'gzip' ? Bun.gunzipSync(bytes) : bytes))
+}
+
 beforeEach(() => {
 	seen = []
 	models = () => Response.json({ data: [{ id: 'claude-new-9' }, { id: 'claude-old-1' }] })
@@ -46,7 +53,7 @@ beforeEach(() => {
 				seen.push({ path: url.pathname, query: url.search, headers: req.headers, body: undefined })
 				return models()
 			}
-			seen.push({ path: url.pathname, query: url.search, headers: req.headers, body: await req.json() })
+			seen.push({ path: url.pathname, query: url.search, headers: req.headers, body: await bodyOf(req) })
 			return reply()
 		},
 	})
@@ -86,6 +93,7 @@ test('OAuth request: endpoint, headers and the required Claude Code system ident
 	expect(s.headers.get('authorization')).toBe('Bearer fake-oauth-token')
 	expect(s.headers.get('x-api-key')).toBeNull()
 	expect(s.headers.get('anthropic-version')).toBe('2023-06-01')
+	expect(s.headers.get('content-encoding')).toBe('gzip')
 	expect(s.headers.get('anthropic-beta')!.split(',')).toEqual(expect.arrayContaining(['oauth-2025-04-20', 'claude-code-20250219']))
 	expect(s.headers.get('user-agent')).toMatch(/^claude-cli\/\S+ \(external, hal/)
 	expect(s.headers.get('x-app')).toBe('cli')

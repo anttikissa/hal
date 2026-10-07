@@ -7,7 +7,8 @@
 		'Correction to the preceding note: stash is intended for uncommitted work; the blanket ban was overbroad. The guidance distinguishes exclusive worktrees from shared ones: disable autostash in shared worktrees, never stash others’ changes, and rebase only with a clean, idle shared tree.',
 		"An agent added a correcting task without foldInto after reading only tsk help, and git commit <paths> swept another agent's uncommitted AGENTS.md edits into its commit. AGENTS.md now requires tsk --detailed-help, a search of tasks/ before tsk add with needs/foldInto set, and hunk staging with a pathless git commit when others edited the same file.",
 		'The blanket instruction to give each implementer a subagent conflicted with exceptional delegation. The orchestration section now defines the exceptions and scopes delegation mechanics to delegated work.',
-		"AGENTS.md: web and terminal follow the same UI rules unless a task records an exception; a change on one platform prompts asking the user whether the other should follow (user request, after the terminal tab strip drifted from the web's)."
+		"AGENTS.md: web and terminal follow the same UI rules unless a task records an exception; a change on one platform prompts asking the user whether the other should follow (user request, after the terminal tab strip drifted from the web's).",
+		'Under Code, AGENTS.md opens with the efficiency principle the user asked to write down (7 Oct): Hal is efficient: small, quick to start, light on CPU, memory, network and tokens; agents treat it so and measure before calling anything costly.'
 	],
 	needs: []
 }

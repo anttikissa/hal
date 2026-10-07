@@ -113,7 +113,8 @@ async function request(req: ProviderRequest) {
 		// Codex CLI sends it; prompt_cache_key alone gets no cache hits.
 		if (codex && req.sessionId) headers.session_id = req.sessionId
 	}
-	return { url: codex ? openai.codexUrl : openai.apiUrl, headers, body: openai.body(req, codex), account: cred.account }
+	// The Codex backend takes zstd bodies, as the Codex CLI sends them.
+	return { url: codex ? openai.codexUrl : openai.apiUrl, headers, body: openai.body(req, codex), account: cred.account, ...(codex && { encoding: 'zstd' as const }) }
 }
 
 // Error codes in a stream, as HTTP statuses for retry decisions.

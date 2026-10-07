@@ -108,7 +108,8 @@ async function headers(model?: string, req?: ProviderRequest): Promise<{ headers
 
 async function request(req: ProviderRequest) {
 	let { headers, oauth, account } = await anthropic.headers(req.model, req)
-	return { url: anthropic.apiUrl, headers, body: anthropic.body(req, oauth), account }
+	// The Messages API takes gzip bodies (zstd is refused with a 400).
+	return { url: anthropic.apiUrl, headers, body: anthropic.body(req, oauth), account, encoding: 'gzip' as const }
 }
 
 // The models the account may use (GET /v1/models). On failure the

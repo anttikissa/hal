@@ -32,7 +32,9 @@ export type ProviderRequest = {
 
 // `account` names the credentials used, for providers with several
 // (rate limits are per account; a 401 is reported back by name).
-export type HttpRequest = { url: string; headers: Record<string, string>; body: unknown; account?: string }
+// `encoding` compresses the body, for endpoints verified to accept it:
+// HTTP re-sends the whole conversation every round.
+export type HttpRequest = { url: string; headers: Record<string, string>; body: unknown; account?: string; encoding?: 'zstd' | 'gzip' }
 
 type Failure = NonNullable<ErrorEvent['failure']>
 
@@ -70,6 +72,12 @@ export type Provider = {
 }
 
 class Canceled extends Error {}
+
+function encode(json: string, encoding: HttpRequest['encoding']): BodyInit {
+	if (encoding === 'zstd') return Bun.zstdCompressSync(json) as Uint8Array<ArrayBuffer>
+	if (encoding === 'gzip') return Bun.gzipSync(json) as Uint8Array<ArrayBuffer>
+	return json
+}
 
 // Read one chunk, failing on abort or when no data arrives in time, so
 // a half-dead connection cannot hang a turn forever.
@@ -300,8 +308,8 @@ async function* stream(
 		try {
 			res = socket ? new Response(socket) : await provider.fetch(http.url, {
 				method: 'POST',
-				headers: { 'content-type': 'application/json', ...http.headers },
-				body: JSON.stringify(http.body),
+				headers: { 'content-type': 'application/json', ...(http.encoding && { 'content-encoding': http.encoding }), ...http.headers },
+				body: encode(JSON.stringify(http.body), http.encoding),
 				signal: conn.signal,
 			})
 		} catch (e) {

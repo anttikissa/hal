@@ -30,6 +30,13 @@ const sse = (...events: object[]) => new Response(events.map((e) => `event: ${(e
 const completed = (usage?: object) => ({ type: 'response.completed', response: { status: 'completed', ...(usage && { usage }) } })
 const writeAuth = (data: object) => writeFileSync(`${home}/secrets/auth.ason`, ason.stringify(data) + '\n', { mode: 0o600 })
 
+// Bodies arrive compressed, as the real APIs take them.
+const bodyOf = async (req: Request) => {
+	let bytes = new Uint8Array(await req.arrayBuffer())
+	let enc = req.headers.get('content-encoding')
+	return JSON.parse(new TextDecoder().decode(enc === 'zstd' ? Bun.zstdDecompressSync(bytes) : enc === 'gzip' ? Bun.gunzipSync(bytes) : bytes))
+}
+
 beforeEach(() => {
 	home = mkdtempSync(`${tmpdir()}/hal-openai-`)
 	mkdirSync(`${home}/secrets`)
@@ -60,7 +67,7 @@ beforeEach(() => {
 				seen.push({ path, headers: req.headers, body: null })
 				return catalogReply?.(req) ?? Response.json({ models: [{ slug: 'gpt-6-sol', visibility: 'list' }, { slug: 'gpt-reserve', visibility: 'hide' }] })
 			}
-			seen.push({ path, headers: req.headers, body: await req.json() })
+			seen.push({ path, headers: req.headers, body: await bodyOf(req) })
 			return reply()
 		},
 	})
@@ -103,6 +110,7 @@ test('a ChatGPT token goes to the Codex backend with its account id; an API key 
 	expect(seen[0]!.headers.get('authorization')).toBe(`Bearer ${subscriptionToken}`)
 	expect(seen[0]!.headers.get('chatgpt-account-id')).toBe('acct-1')
 	expect(seen[0]!.headers.get('session_id')).toBe('sess-1')
+	expect(seen[0]!.headers.get('content-encoding')).toBe('zstd')
 	expect(seen[0]!.body).toMatchObject({ model: 'gpt-5.5', store: false, stream: true, instructions: 'be brief', prompt_cache_key: 'sess-1' })
 	expect(seen[0]!.body.max_output_tokens).toBeUndefined()
 
@@ -114,6 +122,7 @@ test('a ChatGPT token goes to the Codex backend with its account id; an API key 
 	expect(seen[1]!.headers.get('authorization')).toBe('Bearer sk-test')
 	expect(seen[1]!.headers.get('chatgpt-account-id')).toBeNull()
 	expect(seen[1]!.headers.get('session_id')).toBeNull()
+	expect(seen[1]!.headers.get('content-encoding')).toBeNull()
 	expect(seen[1]!.body.max_output_tokens).toBe(1000)
 })
 
