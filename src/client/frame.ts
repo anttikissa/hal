@@ -35,6 +35,8 @@ import { helpRow, type Hint } from './help-row.ts'
 import { statusRow, type StatusInfo } from './status-row.ts'
 import { strings } from '../common/strings.ts'
 import { promptChanges } from '../common/prompt-changes.ts'
+import { toolDetails } from '../common/tool-details.ts'
+import { rebaseCards } from '../common/rebase-cards.ts'
 
 export interface View {
 	transcript?: Transcript
@@ -114,7 +116,7 @@ function itemRows(item: Item, cols: number, session?: string, hal?: HalCursor, c
 	let style = itemView.itemStyle(item, tool)
 	// The web address is in every item's link: a server that bound after
 	// the first paint (another port) must reach rows laid out before it.
-	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
+	let key = `${cols} ${itemView.resultRows} ${style ? ansi.sgr(style) : ''} ${session} ${item.key} ${item.type === 'tool-result' ? `${calls?.get(item.id) ?? ''}${tool ? `^${tool}` : ''}` : ''} ${images.map((i) => i.key).join(',')} ${ansi.state.web.url} ${status} ${look.fold ?? ''}${look.full ? 'full' : ''}${look.fold === 'inline' ? toggle.pastes(item).map((n) => `${n}${look.pastes?.get(n)?.text !== undefined ? '+' : '-'}`).join() : ''}`
 	let kept = hal ? undefined : frame.state.rows.get(item)
 	if (kept?.key === key) return kept.rows
 	let { inner, mark } = frame.ref(item, cols, session, style, status)
@@ -215,8 +217,8 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 	// (task 7j); an unsaved layout (render.tail's) leaves the memo alone.
 	let src = view.transcript?.items ?? [], memo = frame.state.ordered, how = `${cols} ${screen} ${session} ${src.length}`
 	let fits = (batch: Item[]) => height(batch) <= screen
-	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(promptChanges.group(src), fits) } }
-	else if (memo?.src !== src || memo.how !== how) memo = { src, how, grouped: promptChanges.group(src), at: { i: 0, out: [] } }
+	if (!save) memo = { src, how, grouped: [], at: { i: 0, out: frame.order(rebaseCards.group(promptChanges.group(src)), fits) } }
+	else if (memo?.src !== src || memo.how !== how) memo = { src, how, grouped: rebaseCards.group(promptChanges.group(src)), at: { i: 0, out: [] } }
 	if (memo.at.i < memo.grouped.length) memo.at = frame.order(memo.grouped, fits, deadline, memo.at)
 	if (save) frame.state.ordered = memo
 	if (memo.at.i < memo.grouped.length) return undefined
@@ -282,7 +284,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			if (item.type === 'tool-result') for (let j = i - 1; j >= 0; j--) {
 				let prev = items[j]!
 				if ((prev.type !== 'tool' && prev.type !== 'tool-result') || prev.id !== item.id) break
-				if (prev.type === 'tool') tool = prev.name
+				if (prev.type === 'tool') { tool = prev.name; if (toolDetails.fullCommand(prev.name, prev.input)) { look.full = true; look.fold ??= 'closed' } }
 			}
 			// A prompt's images join its card; they draw nothing alone.
 			let images: Item[] = []
@@ -305,7 +307,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 			if (item.type === 'tool') card = { id: item.id, key: item.key, start: lines.length - rows.length }
 			let next = items[i + 1]
 			if (card && (item.type === 'tool' || item.type === 'tool-result') && item.id === card.id && !(next?.type === 'tool-result' && next.id === card.id)) {
-				frame.cardWater(lines, card.start, `${cols} ${session} call ${card.key} ${look.fold ?? ''}`, itemView.itemStyle(item, tool), cols)
+				frame.cardWater(lines, card.start, `${cols} ${session} call ${card.key} ${look.fold ?? ''}${look.full ? 'full' : ''}`, itemView.itemStyle(item, tool), cols)
 				card = undefined
 			}
 			if (ticks) {
@@ -320,7 +322,7 @@ function layout(view: View, cols: number, deadline = Infinity, save = true, scre
 		ends.push(lines.length)
 	}
 	keep()
-	let at = view.target ? items.findIndex((i) => i.key === view.target) : -1
+	let at = view.target ? items.findIndex((i) => i.key === view.target || rebaseCards.members(i).some((m) => m.key === view.target)) : -1
 	// An image drawn in its prompt's card is found at that card.
 	while (at > 0 && items[at]!.type === 'image' && ['prompt', 'image'].includes(items[at - 1]!.type)) at--
 	return { lines, items, ends, ...(formCursor ? { formCursor } : {}), ...(at >= 0 ? { target: at ? ends[at - 1]! : 0 } : {}), ...(tick ? { tick } : {}) }

@@ -1,5 +1,6 @@
 // Context boundaries wait for the active exchange, not for their own tool.
 // Intent and completion are ordinary output records, durable in history.
+// Tasks: jf, svt.
 import { contextTransition, type ContextTransition } from '../common/context-transition.ts'
 import { inbox } from '../common/inbox.ts'
 import type { Sender } from '../common/blocks.ts'
@@ -63,6 +64,12 @@ function settle(id: string): void {
 function apply(id: string): boolean {
 	let intent = contextTransitions.pending(id)
 	if (!intent) return false
+	if (intent.kind === 'rebase') {
+		if (!turns.state.running.has(id)) contextTransitions.settle(id)
+		let agent = (require('./rebase-agent.ts') as typeof import('./rebase-agent.ts')).rebaseAgent
+		agent.apply(id, intent)
+		return true
+	}
 	if (intent.kind === 'compact' && !intent.canceled) contextTransitions.settle(id)
 	let records = history.readSync(id)
 	let boundary = records.some((r) => (r.type === 'reset' || r.type === 'compact') && r.transition === intent.id)

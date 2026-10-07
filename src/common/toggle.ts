@@ -5,6 +5,7 @@
 
 import { attachments } from './attachments.ts'
 import { titles } from './titles.ts'
+import { rebaseCards } from './rebase-cards.ts'
 import type { Item } from './transcript.ts'
 
 // `inline`: a prompt open with its pastes' text in place of markers.
@@ -45,21 +46,22 @@ function parse(args: string): Target | string {
 
 // Whether `item` expands and collapses.
 function toggles(item: Item): boolean {
-	return item.type === 'tool' || item.type === 'thinking' || item.type === 'text' || item.type === 'prompt' || (item.type === 'output' && !!item.change)
+	return item.type === 'tool' || item.type === 'thinking' || item.type === 'text' || item.type === 'prompt' || (item.type === 'output' && (!!item.change || !!item.rebaseReports))
 }
 
 // The blocks `target` names in `items`, in transcript order, or why
 // none; `verb` names the command in the error.
 function resolve(items: Item[], target: Target, verb = 'toggle'): Item[] | string {
+	items = rebaseCards.group(items)
 	let numbered = items.filter((i) => /^\d+$/.test(i.key))
 	if (!target.length) {
-		let tool = items.findLast((i) => i.type === 'tool')
+		let tool = items.findLast((i) => i.type === 'tool' || rebaseCards.members(i).some((m) => m.type === 'tool'))
 		return tool ? [tool] : `no tool block to ${verb}`
 	}
 	let found = new Set<Item>()
 	for (let part of target) {
 		if (part.one) {
-			let item = numbered.find((i) => Number(i.key) === part.from)
+			let item = numbered.find((i) => Number(i.key) === part.from || rebaseCards.members(i).some((m) => Number(m.key) === part.from))
 			if (!item) return `no block ${part.from} to ${verb}`
 			if (!toggle.toggles(item)) return `block ${part.from} does not expand or collapse`
 			found.add(item)
@@ -67,8 +69,8 @@ function resolve(items: Item[], target: Target, verb = 'toggle'): Item[] | strin
 		}
 		let letters = part.kinds || unnamed
 		for (let i of numbered) {
-			let n = Number(i.key)
-			if (n >= part.from && n <= part.to && toggle.toggles(i) && letters.includes(titles.letter(i))) found.add(i)
+			let members = rebaseCards.members(i)
+			if (toggle.toggles(i) && (members.length ? members : [i]).some((m) => Number(m.key) >= part.from && Number(m.key) <= part.to && letters.includes(titles.letter(m)))) found.add(i)
 		}
 	}
 	if (!found.size) return `nothing to ${verb} in ${target.map((p) => p.text).join(' ')}`
@@ -110,7 +112,7 @@ function describe(p: Plan, next: (item: Item) => Fold): string {
 // session's message closed (its summary and glimpse), prompt-file
 // changes closed (their summary rows), the rest open.
 function initial(item: Item): Fold {
-	return item.type === 'tool' || (item.type === 'output' && !!item.change) || (item.type === 'prompt' && !!item.summary) ? 'closed' : 'open'
+	return item.type === 'tool' || (item.type === 'output' && (!!item.change || !!item.rebaseReports)) || (item.type === 'prompt' && !!item.summary) ? 'closed' : 'open'
 }
 
 // Whether a prompt has pastes, so it has three states.

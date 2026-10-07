@@ -1,5 +1,5 @@
 // Validate durable conversation records; corruption fails loudly.
-// Tasks: jf, nvm, 6eq.
+// Tasks: jf, nvm, svt, 6eq.
 import { ason } from '../common/ason.ts'
 import { rebase } from '../common/rebase.ts'
 import { sender } from '../common/sender.ts'
@@ -17,7 +17,11 @@ function check(value: unknown): HistoryRecord {
 	for (let s of senders) { let problem = sender.invalid(s); if (problem) throw new Error(problem) }
 	if (r.type === 'output' && r.transition !== undefined) {
 		let t = r.transition
-		if (!t || typeof t.id !== 'string' || !['clear', 'compact'].includes(t.kind) || (t.prompt !== undefined && typeof t.prompt !== 'string') || (t.canceled !== undefined && t.canceled !== true) || sender.invalid(t.sender)) throw new Error('invalid context transition')
+		if (!t || typeof t.id !== 'string' || !['clear', 'compact', 'rebase'].includes(t.kind) || (t.prompt !== undefined && typeof t.prompt !== 'string') || (t.canceled !== undefined && t.canceled !== true) || sender.invalid(t.sender)) throw new Error('invalid context transition')
+	}
+	if (r.type === 'output' && r.transition?.kind === 'rebase') {
+		let p = r.transition.rebase
+		if (!p || rebase.invalid(p.sparse?.plan) || !Array.isArray(p.sparse?.tails) || p.sparse.tails.some((t) => !t || typeof t.kinds !== 'string' || /[^traumsq]/.test(t.kinds) || !Number.isSafeInteger(t.from) || t.from < 0 || (t.to !== undefined && (!Number.isSafeInteger(t.to) || t.to < t.from))) || (p.paused !== undefined && p.paused !== true) || (p.resume !== undefined && p.resume !== true) || (p.call !== undefined && typeof p.call !== 'string')) throw new Error('invalid rebase transition')
 	}
 	if (r.type === 'output' && r.synthetic !== undefined && r.synthetic !== true) throw new Error('invalid synthetic output')
 	if (r.type === 'output') for (let k of ['transitionDone', 'transitionCancel'] as const) if (r[k] !== undefined && typeof r[k] !== 'string') throw new Error(`invalid ${k}`)

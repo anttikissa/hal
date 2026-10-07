@@ -1,4 +1,4 @@
-// The files and editor belong to this client, including remote terminals (7ke).
+// The files and editor belong to this client, including remote terminals (tasks 7ke, svt).
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -52,7 +52,7 @@ async function open(event: Event & { type: 'rebase-plan' }, send: (command: Comm
 		// The host parses again against its latest history before any write.
 		let id = `rebase-${crypto.randomUUID()}`
 		rebaseEditor.pending.set(id, dir)
-		send({ type: 'rebase-apply', id, sessionId: event.sessionId, base: event.snapshot.base, todo, replacements, recoveryPath: dir })
+		send({ type: 'rebase-apply', id, sessionId: event.sessionId, base: event.snapshot.base, ...(event.snapshot.paused && { paused: true }), todo, replacements, recoveryPath: dir })
 	} catch (error) {
 		let text = `${error instanceof Error ? error.message : String(error)}${dir ? `\nRebase files kept at ${dir}` : ''}`
 		send({ type: 'rebase-error', sessionId: event.sessionId, text })

@@ -1,5 +1,6 @@
 // Find unfinished turns and queued work from session marks, then continue
 // it after a host restart without scanning closed, idle histories.
+// Tasks: bx, svt.
 import { existsSync } from 'fs'
 import { states } from '../common/states.ts'
 import { contextTransitions } from './context-transitions.ts'
@@ -47,7 +48,7 @@ async function recover(): Promise<void> {
 				status.state.states.delete(id)
 			}
 			contextTransitions.apply(id)
-			if (intent.kind === 'clear') continue
+			if (intent.kind === 'clear' || intent.kind === 'rebase') continue
 		}
 		let state = status.stateOf(id, records)
 		if (state.type === 'idle') {

@@ -1,4 +1,5 @@
 // Validation of commands on the host side; protocol.ts holds the types.
+// Tasks: 6, qt, svt.
 import type { CommandType } from './protocol.ts'
 import { rebase } from './rebase.ts'
 
@@ -17,6 +18,7 @@ function invalid(value: unknown): string | undefined {
 	if (c.type === 'rebase-error') return str('sessionId') ?? str('text')
 	if (c.type === 'rebase-apply') {
 		let replacements = c.replacements
+		if (c.paused !== undefined && typeof c.paused !== 'boolean') return 'rebase-apply: paused must be boolean'
 		if (!Number.isSafeInteger(c.base) || (c.base as number) < 0) return 'rebase-apply: base must be a nonnegative record number'
 		if ((c.todo === undefined) === (c.plan === undefined)) return 'rebase-apply: provide exactly one of todo or plan'
 		if (c.todo !== undefined && typeof c.todo !== 'string') return 'rebase-apply: todo must be text'

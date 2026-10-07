@@ -10,7 +10,7 @@
 // always adds one). The host answers it with `ack`, or `rejected`
 // carrying the id, and ignores a repeat of an id it has acted on, so a
 // command resent after a reconnect never acts twice.
-// Tasks: 6, qt, 6eq.
+// Tasks: 6, qt, svt, 6eq.
 
 import type { AssistantBlock, ImageBlock, Sender, StreamEvent, ToolResultBlock, Usage } from './blocks.ts'
 import type { Answers, Form } from './forms.ts'
@@ -114,7 +114,7 @@ export type Command = (
 	// client only, with `history`.
 	| { type: 'history'; sessionId: string; before: number }
 	| { type: 'rebase-error'; sessionId: string; text: string }
-	| { type: 'rebase-apply'; sessionId: string; base: number; plan?: RebasePlan; todo?: string; replacements?: Record<number, string>; recoveryPath?: string }
+	| { type: 'rebase-apply'; paused?: boolean; sessionId: string; base: number; plan?: RebasePlan; todo?: string; replacements?: Record<number, string>; recoveryPath?: string }
 	// Stop following it. The session and any running turn carry on.
 	| { type: 'close'; sessionId: string }
 	// A prompt. While a turn is busy it waits in the inbox: steering, sent
