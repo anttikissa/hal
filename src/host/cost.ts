@@ -9,8 +9,8 @@ import { models } from './models.ts'
 import { paths } from './paths.ts'
 import { sessions } from './sessions.ts'
 
-type Sample = { model: string; usage: Usage; ts: string }
-type Total = { session: string; model: string; rounds: number; usage: Usage; cost: number; unpriced: number }
+type Sample = { model: string; account?: string; usage: Usage; ts: string }
+type Total = { session: string; model: string; account?: string; rounds: number; usage: Usage; cost: number; unpriced: number }
 
 function samples(records: HistoryRecord[], fallback: string): Sample[] {
 	let out: Sample[] = [], pending: Sample[] = []
@@ -22,7 +22,7 @@ function samples(records: HistoryRecord[], fallback: string): Sample[] {
 	for (let r of records) {
 		if (r.type === 'change' && r.model) model = r.model
 		if (r.type === 'assistant' && r.model) model = r.model
-		if (r.type === 'round') pending.push({ model: r.model ?? model, usage: r.usage, ts: r.ts })
+		if (r.type === 'round') pending.push({ model: r.model ?? model, ...(r.account && { account: r.account }), usage: r.usage, ts: r.ts })
 		if (r.type === 'turn_end') {
 			// Every end aggregates the rounds since the previous end, not
 			// a paused turn's previous ends. Questions carry usage without
@@ -46,8 +46,9 @@ function totals(ids: string[], since?: number): Total[] {
 			let timestamp = Date.parse(sample.ts)
 			if (!Number.isFinite(timestamp)) throw new Error(`${history.file(id)}: invalid usage timestamp ${JSON.stringify(sample.ts)}`)
 			if (since !== undefined && timestamp < since) continue
-			let total = groups.get(sample.model) ?? { session: id, model: sample.model, rounds: 0, usage: {}, cost: 0, unpriced: 0 }
-			groups.set(sample.model, total)
+			let key = `${sample.model} ${sample.account ?? ''}`
+			let total = groups.get(key) ?? { session: id, model: sample.model, ...(sample.account && { account: sample.account }), rounds: 0, usage: {}, cost: 0, unpriced: 0 }
+			groups.set(key, total)
 			total.rounds++
 			let prices = models.pricing(sample.model)
 			// Validate usage even for a model without prices.
@@ -76,12 +77,12 @@ function run(args: string[]): string {
 	if (!ids.length) ids = readdirSync(paths.sessionsDir(), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort()
 	let totals = cost.totals([...new Set(ids)], since)
 	let money = (n: number) => `$${n.toFixed(4)}`
-	let lines = ['SESSION  PROVIDER/MODEL  LIST COST (USD)  ROUNDS  INPUT  OUTPUT  CACHE READ  CACHE WRITE']
+	let lines = ['SESSION  PROVIDER/MODEL  ACCOUNT  LIST COST (USD)  ROUNDS  INPUT  OUTPUT  CACHE READ  CACHE WRITE']
 	let sum = 0, unknown = 0
 	for (let t of totals) {
 		sum += t.cost
 		unknown += t.unpriced
-		lines.push(`${t.session}  ${t.model}  ${money(t.cost)}${t.unpriced ? ` + UNPRICED (${t.unpriced} rounds)` : ''}  ${t.rounds}  ${t.usage.input ?? 0}  ${t.usage.output ?? 0}  ${t.usage.cacheRead ?? 0}  ${t.usage.cacheWrite ?? 0}`)
+		lines.push(`${t.session}  ${t.model}  ${t.account ?? '-'}  ${money(t.cost)}${t.unpriced ? ` + UNPRICED (${t.unpriced} rounds)` : ''}  ${t.rounds}  ${t.usage.input ?? 0}  ${t.usage.output ?? 0}  ${t.usage.cacheRead ?? 0}  ${t.usage.cacheWrite ?? 0}`)
 	}
 	for (let provider of new Set(totals.map((t) => t.model.split('/')[0]!))) {
 		let rows = totals.filter((t) => t.model.startsWith(`${provider}/`))
@@ -90,6 +91,11 @@ function run(args: string[]): string {
 	for (let model of new Set(totals.map((t) => t.model))) {
 		let rows = totals.filter((t) => t.model === model)
 		lines.push(`MODEL ${model}  ${money(rows.reduce((n, t) => n + t.cost, 0))}${rows.some((t) => t.unpriced) ? ' + UNPRICED' : ''}`)
+	}
+	for (let account of new Set(totals.flatMap((t) => (t.account ? [t.account] : [])))) {
+		let rows = totals.filter((t) => t.account === account)
+		let u = (k: keyof Usage) => rows.reduce((n, t) => n + (t.usage[k] ?? 0), 0)
+		lines.push(`ACCOUNT ${account}  ${money(rows.reduce((n, t) => n + t.cost, 0))}  ${rows.reduce((n, t) => n + t.rounds, 0)}  ${u('input')}  ${u('output')}  ${u('cacheRead')}  ${u('cacheWrite')}`)
 	}
 	lines.push(`TOTAL  ${money(sum)}${unknown ? ` + UNPRICED (${unknown} rounds; total incomplete)` : ''}`)
 	return lines.join('\n')
