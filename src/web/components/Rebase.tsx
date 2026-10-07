@@ -70,8 +70,8 @@ function Row(props: { st: RebaseState; row: RebaseRow; gone: Set<number>; max: n
 				<span class="n">#{n}</span>
 				<span class="time" title={props.row.time}>{props.row.time.slice(-5)}</span>
 				<span class="kind">{props.row.kind}</span>
-				<span class="tokens">{rebaseView.kilo(props.row.tokens)}</span>
-				<span class="bar" aria-hidden="true"><span class={`heat-${pct()}`} style={{ width: `${Math.max(pct(), props.row.tokens ? 1 : 0)}%` }} /></span>
+				<span class="tokens" title={`≈${props.row.tokens} tokens (estimated) · ${pct()}% of the largest row`}>{rebaseView.kilo(props.row.tokens)}</span>
+				<span class="bar" aria-hidden="true" title={`${pct()}% of the largest row; green is small, red is the largest`}><span class={`heat-${pct()}`} style={{ width: `${Math.max(pct(), props.row.tokens ? 1 : 0)}%` }} /></span>
 				<span class="summary">{props.row.summary || '(empty)'}</span>
 				<Show when={props.row.carries.length || state() === 'group'}>
 					<span class="carries">{[...props.row.carries, ...(state() === 'group' ? ['dropped with its group'] : [])].join(' · ')}</span>
@@ -123,7 +123,7 @@ export function Rebase() {
 						<label>Drop outputs over <input type="number" inputmode="numeric" min="0" step="1000" value={s().threshold} onInput={(e) => rebaseView.threshold(e.currentTarget.valueAsNumber)} /> tokens</label>
 						<button type="button" onClick={() => rebaseView.dropOver()}>Drop</button>
 						<button type="button" class="range" aria-pressed={s().range ? 'true' : 'false'} onClick={() => rebaseView.range(!s().range)}>{s().range ? (s().anchor === undefined ? 'Range: first row' : 'Range: last row') : 'Range'}</button>
-						<span class="hint">Shift-click acts on a run of rows</span>
+						<span class="hint">Shift-click acts on a run of rows · numbers are estimated tokens; bars compare each row to the largest</span>
 					</div>
 					<ul class="rows" aria-label="History rows">
 						<For each={s().snapshot.rows}>{(row) => <Row st={s()} row={row} gone={gone()} max={max()} />}</For>

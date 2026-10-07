@@ -73,6 +73,7 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 				if (!row) continue // orphan results are not provider input
 				if (!row.ns.includes(r.n!)) row.ns.push(r.n!)
 				row.characters += b.output.length
+				if (!row.summary) row.summary = oneLine(b.output)
 				payload(row, [b])
 				row.editable = true; row.editN = rebase.text(r) !== undefined ? r.n : row.n; row.text = b.output
 				calls.delete(b.id)
@@ -80,7 +81,7 @@ function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 		} else if (r.type === 'assistant') {
 			let b = r.block
 			if (b.type === 'tool_call') {
-				let detail = b.input.command ?? b.input.path ?? b.input.description ?? ''
+				let detail = b.input.command ?? b.input.path ?? b.input.description ?? Object.entries(b.input).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join(', ')
 				let row = add(r, b.name, `${b.name === 'bash' ? '$ ' : ''}${typeof detail === 'string' ? detail : JSON.stringify(detail)}`, JSON.stringify(b.input).length)
 				row.tool = true
 				calls.set(b.id, row)
