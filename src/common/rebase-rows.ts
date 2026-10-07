@@ -14,11 +14,16 @@ export type RebaseRow = {
 export type RowOptions = { model?: string; ratios?: Record<string, number>; blobSizes?: Record<string, number>; pruned?: number[] }
 export type RebaseRows = { base: number; records: HistoryRecord[]; rows: RebaseRow[]; options: RowOptions }
 export type RebaseTotals = { rows: number; tokens: number; after: number; cacheFrom?: number }
-export type ParsedTodo = { plan: RebasePlan; queue: string[]; edits: number[]; aborted: boolean }
+export type ParsedTodo = { plan: RebasePlan; queue: string[]; edits: number[]; aborted: boolean; inline: Record<number, string> }
 
 const oneLine = (text: string) => text.split(/\r?\n/, 1)[0]!.replace(/[\t\x00-\x1f\x7f]/g, ' ').trim()
 const size = (n: number) => n < 1000 ? `${n} B` : n < 1e6 ? `${Math.round(n / 100) / 10} kB` : `${Math.round(n / 1e5) / 10} MB`
 const kilo = (n: number) => n < 1000 ? String(n) : `${Math.round(n / 100) / 10}k`
+// Rows whose summary is their editable text's first line, maybe after a sender label.
+const inlineKinds = new Set(['prompt', 'assistant', 'queued', 'advisory', 'interjecting', 'steering'])
+const columns = (row: RebaseRow) => [`#${row.n}`, row.time, row.kind, kilo(row.tokens)]
+const carried = (row: RebaseRow) => row.carries.length ? `(${row.carries.join('; ')})` : ''
+const words = (text: string) => text.trim().split(/\s+/).join(' ')
 
 function build(raw: HistoryRecord[], options: RowOptions = {}): RebaseRows {
 	let records = replay.current(raw), rows: RebaseRow[] = [], groups = rebase.groups(records)
@@ -128,12 +133,27 @@ function render(sessionId: string, snapshot: RebaseRows, plan: RebasePlan = { ba
 	let header = `# Rebase ${oneLine(sessionId)} · ${sums.rows} rows · ${kilo(sums.tokens)} tokens → ${kilo(sums.after)} after · cache rebuilds ${sums.cacheFrom === undefined ? 'nowhere' : `from #${sums.cacheFrom}`}`
 	return [header, "# keep/drop/edit/queue; delete a line = drop; empty file or 'abort' cancels", '# edit opens the full text next; queue lines go last and are sent after', ...snapshot.rows.map((row) => {
 		let action = row.ns.some((n) => drops.has(n)) ? 'drop' : row.ns.some((n) => edits.has(n)) ? 'edit' : 'keep'
-		return [action, `#${row.n}`, row.time, row.kind, kilo(row.tokens)].map((text, i) => text.padEnd(widths[i]!)).join('  ') + `  ${row.summary}${row.carries.length ? `  (${row.carries.join('; ')})` : ''}`
+		return [action, ...columns(row)].map((text, i) => text.padEnd(widths[i]!)).join('  ') + `  ${row.summary}${row.carries.length ? `  ${carried(row)}` : ''}`
 	})].join('\n') + '\n'
 }
 
+// A changed summary on a keep or edit line edits the text's first line
+// (task qb1). `rest` is the line after the action; returns the new full
+// text, or undefined when the line says nothing new.
+function inline(row: RebaseRow, rest: string): string | undefined {
+	let before = [...columns(row), row.summary, carried(row)].join(' ')
+	if (!rest || words(rest) === words(before) || words(rest) === `#${row.n}`) return undefined
+	let first = oneLine(row.text ?? ''), label = row.summary.slice(0, row.summary.length - first.length)
+	let head = new RegExp(`^${columns(row).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')).join('\\s+')}(?:\\s+|$)`).exec(rest)
+	let summary = head && rest.slice(head[0].length).trim()
+	if (summary !== null && carried(row) && summary.endsWith(carried(row))) summary = summary.slice(0, -carried(row).length).trim()
+	if (!row.editable || !inlineKinds.has(row.kind) || row.text === undefined || !row.summary.endsWith(first) || summary === null || !summary.startsWith(label)) throw new Error(`#${row.n} changed, but only the text after the kind and token columns of a prompt, assistant or inbox row can be edited inline; use edit for the rest`)
+	let text = summary.slice(label.length).trim()
+	return text === first ? undefined : row.text.replace(/^[^\n]*/, () => text)
+}
+
 function parse(text: string, snapshot: RebaseRows, replacements: Record<number, string> = {}): ParsedTodo {
-	let out: ParsedTodo = { plan: { base: snapshot.base, drop: [], edit: [] }, queue: [], edits: [], aborted: false }
+	let out: ParsedTodo = { plan: { base: snapshot.base, drop: [], edit: [] }, queue: [], edits: [], aborted: false, inline: {} }
 	let active = text.split(/\r?\n/).map((line, i) => ({ line: line.trim(), n: i + 1 })).filter(({ line }) => line && !line.startsWith('#'))
 	if (!active.length || active.some(({ line }) => line === 'abort')) { out.aborted = true; return out }
 	let seen = new Set<number>(), last = -1, queued = false
@@ -150,14 +170,16 @@ function parse(text: string, snapshot: RebaseRows, replacements: Record<number, 
 		if (seen.has(id)) fail(`duplicate record #${id}`)
 		if (entry!.i < last) fail('reordering history is refused')
 		seen.add(id); last = entry!.i
-		let row = entry!.row
-		if (match![1] === 'drop') out.plan.drop.push(...row.ns)
+		let row = entry!.row, changed: string | undefined
+		if (match![1] === 'drop') { out.plan.drop.push(...row.ns); continue }
+		try { changed = inline(row, line.slice(match![1]!.length).trim()) } catch (error) { fail((error as Error).message) }
+		if (changed !== undefined) out.inline[id] = changed
 		if (match![1] === 'edit') {
 			if (!row.editable || row.editN === undefined) fail(`record #${id} is not editable`)
 			if (Object.hasOwn(replacements, id) && typeof replacements[id] !== 'string') fail('replacement must be text')
 			if (Object.hasOwn(replacements, id)) out.plan.edit.push({ n: row.editN!, text: replacements[id]! })
 			else out.edits.push(id)
-		}
+		} else if (changed !== undefined) out.plan.edit.push({ n: row.editN!, text: changed })
 	}
 	for (let row of snapshot.rows) if (!seen.has(row.n)) out.plan.drop.push(...row.ns)
 	out.plan.drop = [...new Set(out.plan.drop)]

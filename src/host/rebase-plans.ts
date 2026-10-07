@@ -45,6 +45,8 @@ function apply(c: Command & { type: 'rebase-apply' }): string {
 	if (plan.drop.length || plan.edit.length) {
 		rebases.apply(c.sessionId, plan, c.base)
 		rebasePlans.broadcast(c.sessionId, sums.cacheFrom ?? c.base)
+		// Loaded on first use only, never at host startup.
+		slash.output(c.sessionId, (require('./rebase-report.ts') as typeof import('./rebase-report.ts')).rebaseReport.text(snapshot, plan))
 	}
 	for (let [i, text] of queue.entries()) {
 		let refused = prompts.submit(c.sessionId, text, undefined, i > 0 ? 'queue' : 'interrupt')

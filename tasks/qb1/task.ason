@@ -1,0 +1,7 @@
+{
+	title: 'Rebase: inline edits and a change report',
+	spec: 'In the terminal rebase todo, changing the summary text of a keep or edit line edits that row: the new text replaces the first line of the full text, other lines stay. Only prompt, assistant and waiting inbox rows (after their sender label) edit inline; a trailing carries note may be left or removed. Changed columns, or a changed tool or other row, fail naming the line. On an edit line the inline text seeds the full-text editor. Typical use: fix the last prompt and delete the rows after it. After an applied rewrite, the host appends a transcript output record (never sent to the model) listing each dropped row and each edit as a complete line diff, using the system-prompt trail diff. The report module loads on first use, not at host startup.',
+	status: 'done',
+	needs: ['01d', 'z71'],
+	foldInto: ['01d']
+}

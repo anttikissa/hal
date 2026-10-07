@@ -23,8 +23,8 @@ function read(path: string): string | undefined {
 }
 
 // Changed lines of `before` → `after` (git diff, headers dropped),
-// at most maxLines.
-function diff(before: string, after: string): string {
+// at most `limit` lines.
+function diff(before: string, after: string, limit = maxLines): string {
 	let dir = `${paths.tmpDir()}/prompt-trail-${process.pid}`
 	mkdirSync(dir, { recursive: true })
 	try {
@@ -34,8 +34,8 @@ function diff(before: string, after: string): string {
 		let lines = out.split('\n').filter((l) => /^[-+ ]/.test(l) && !/^(---|\+\+\+) /.test(l) || l.startsWith('@@'))
 			.map((l) => (l.startsWith('@@') ? '…' : l))
 		if (lines[0] === '…') lines.shift()
-		let more = lines.length - maxLines
-		return [...lines.slice(0, maxLines), ...(more > 0 ? [`… ${more} more lines`] : [])].join('\n')
+		let more = lines.length - limit
+		return [...lines.slice(0, limit), ...(more > 0 ? [`… ${more} more lines`] : [])].join('\n')
 	} finally { rmSync(dir, { recursive: true, force: true }) }
 }
 
