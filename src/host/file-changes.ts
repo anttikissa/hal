@@ -161,7 +161,6 @@ async function finish(observation: Observation): Promise<void> {
 			host.broadcast(ctx.sessionId, { type: 'turn-stats', sessionId: ctx.sessionId, stats: stats.of(ctx.sessionId) })
 		}
 	} finally {
-		if (patterns.length) neighbors.end(ctx.sessionId)
 		if (observation.commits) await commits.finish(observation.commits)
 		release()
 	}
