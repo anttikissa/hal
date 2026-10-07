@@ -1,7 +1,11 @@
 {
 	title: 'hal -p: --session, delivery tier, --keep, question exit code',
 	spec: "hal -p takes -s/--session <session id or tab number>: it opens no tab and sends the prompt to that session, delivered by --steer, --soft-steer or --queue (task 760 terms; default --soft-steer, so a busy session finishes its current step first). Its provenance is the user's: it counts as a human prompt, answers a <question> (nd6) and promotes as a typed prompt does (p87). It waits for the end of the first turn that carries its message, whatever ends it. Without --session, the new tab starts with autoclose on (p87); --keep starts it off; --keep with --session is an error (exit 2). Exit codes: 0 a final answer (its text on stdout), 3 a reply ending with <question> (the question on stdout; the tab stays open), 1 failed, paused or canceled, 2 bad arguments or an unknown session. Raised in session 07-bah on 2026-10-07.",
-	status: 'planned',
+	status: 'done',
+	notes: [
+		'Delivery events carry exact inbox IDs for CLI waiting: command identifies only the last text when prompts are batched. Inbox removal alone can also be withdrawal, so it is not sufficient. --session and --dir are incompatible; use /cd explicitly instead of silently ignoring the directory.',
+		'CLI argument and print tests pass, including real-host busy soft-steer, queued turn ownership, first-prompt autoclose and --keep. Project-wide typecheck and lint pass. Full suite remains red; p87 notes retain the unresolved spawn-and-wait timeout and complete suite counts. The running host must restart to load autoclose and inbox delivery-ID protocol changes.'
+	],
 	needs: ['gw', 'p87', '760'],
 	foldInto: ['gw']
 }

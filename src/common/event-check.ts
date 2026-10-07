@@ -1,5 +1,5 @@
 // Validation of host events on the client side; protocol.ts holds the types.
-// Tasks: qt, 6eq.
+// Tasks: qt, 6eq, 81y.
 import { sender } from './sender.ts'
 import type { EventType } from './protocol.ts'
 import { pluginSyncWire } from './plugin-sync.ts'
@@ -14,7 +14,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	'rebase-plan': { sessionId: 's', snapshot: 'o', 'snapshot.base': 'i', 'snapshot.rows': 'a', 'snapshot.records': 'a', 'snapshot.options': 'o', todo: 's' },
 	'history-rewritten': { sessionId: 's', from: 'i', snapshot: 'o', 'snapshot.meta': 'o', 'snapshot.history': 'a', 'snapshot.state': 'o', 'snapshot.queueHold': 's?' },
 	snapshot: { sessionId: 's', snapshot: 'o', 'snapshot.meta': 'o', 'snapshot.history': 'a', 'snapshot.state': 'o', 'snapshot.stats': 'o?', 'snapshot.queueHold': 's?' },
-	'turn-start': { sessionId: 's', provider: 's', model: 's?', effort: 's?', prompt: 's?', images: 'a?', command: 's?', ts: 's?' },
+	'turn-start': { inbox: 'S?', sessionId: 's', provider: 's', model: 's?', effort: 's?', prompt: 's?', images: 'a?', command: 's?', ts: 's?' },
 	history: { sessionId: 's', before: 'i', records: 'a', older: 'i?' },
 	toggle: { sessionId: 's', target: 's', mode: 's?' },
 	'paste-text': { sessionId: 's', name: 's', text: 's?', error: 's?' },
@@ -22,7 +22,7 @@ const eventFields: Record<EventType, Record<string, string>> = {
 	inbox: { sessionId: 's', inbox: 'a' },
 	'queue-edit': { sessionId: 's', edit: 's', message: 's', text: 's' },
 	'queue-hold': { sessionId: 's', message: 's?' },
-	prompt: { sessionId: 's', texts: 'S', senders: 'a?', images: 'a?', command: 's?', ts: 's?' },
+	prompt: { inbox: 'S?', sessionId: 's', texts: 'S', senders: 'a?', images: 'a?', command: 's?', ts: 's?' },
 	stream: { sessionId: 's', event: 'o', 'event.type': 's', ts: 's?', model: 's?', effort: 's?' },
 	'assistant-interrupted': { sessionId: 's', record: 'o', 'record.type': 's', 'record.block': 'o', 'record.block.type': 's', 'record.block.text': 's', 'record.interrupted': 'b', 'record.n': 'i', 'record.ts': 's', 'record.model': 's?', 'record.effort': 's?' },
 	'tool-output': { sessionId: 's', id: 's', at: 'i', chunk: 's' },
