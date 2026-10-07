@@ -1,0 +1,10 @@
+{
+	title: 'Label completed background commands clearly',
+	spec: 'Terminal and web label delivered background Bash results "Background command finished #<call block id>" instead of "Message from bash #<call block id>". The call reference still links to the original command. Apply the presentation to stored bash #N and bash #tN labels without changing history, provider input, delivery, full output or nonzero exit display. Other messages keep their existing attribution. Shared owner: src/common/titles.ts.',
+	status: 'done',
+	notes: [
+		'Presentation only: common/titles.ts recognizes stored bash #N and bash #tN labels; terminal and web keep their existing link extraction and output rendering. Checked terminal headers at 24, 40 and 100 columns, including wrapped call links and nonzero exit output. Focused titles/frame/web-view suite: 57 pass. Full ./test: 1531 pass, 11 fail elsewhere (replay/process lifecycle, module line limits and browser layout/streaming), plus an unused pages import lint warning; full log /tmp/hal-background-label-full.log. No browser visual check was made. The existing frame assertion update landed in concurrent commit 1cd53ce; this task owns that wording change.'
+	],
+	needs: ['hp', 'v0'],
+	foldInto: ['hp', 'v0']
+}
