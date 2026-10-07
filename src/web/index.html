@@ -55,7 +55,7 @@ html.typing .App { position: absolute; }
 }
 /* Zero-height anchor: reload floats over text without moving it. */
 .source-update { position: relative; flex: none; height: 0; z-index: 2; pointer-events: none; }
-.source-update button { position: absolute; top: 4px; right: max(1ch, env(safe-area-inset-right)); pointer-events: auto; font-size: 16px; line-height: 1; min-height: 24px; min-width: 44px; padding: 4px 8px; border: 0; color: var(--text); background: color-mix(in oklab, var(--overlay-bg) 75%, transparent); }
+.source-update button { position: absolute; top: 4px; right: max(1ch, env(safe-area-inset-right)); pointer-events: auto; font-size: 16px; line-height: 1; min-height: 44px; min-width: 44px; padding: 4px 8px; border: 0; color: var(--text); background: color-mix(in oklab, var(--overlay-bg) 75%, transparent); }
 /* The one scroller: nothing inside it scrolls; long lines wrap. */
 /* Safe areas: viewport-fit=cover makes env(safe-area-inset-*) real (it
    is 0 without it, yet iOS still draws the page under the rounded
@@ -329,6 +329,11 @@ html.typing .App { position: absolute; }
 .entry > button:disabled, .entry .actions button:disabled { color: var(--quiet); cursor: default; }
 .help { display: flex; flex-wrap: wrap; gap: 0 2ch; padding-top: 0.25lh; color: var(--description); }
 .help b { color: var(--key); font-weight: 600; }
+/* Reads as a hint, acts as a button: the update reload (task 7t). */
+.help .update { margin-left: auto; padding: 0; border: 0; background: none; font: inherit; color: var(--update); cursor: pointer; }
+.help .update b { color: inherit; }
+.help .update:hover { text-decoration: underline; }
+@media not (pointer: coarse) { .source-update { display: none; } }
 textarea, input { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--border); padding: 0.25lh 1ch; resize: none; outline: none; }
 textarea:focus, input:focus { border-color: var(--accent); }
 .input textarea { caret-color: var(--cursor); }

@@ -193,7 +193,7 @@ export function Chat() {
 			<Notices entries={stack()} />
 			<StatusRow view={view()} connected={connected()} color={tabs().find((t) => t.id === shown())?.color} />
 			<EditBar view={view()} />
-			<Composer view={view()} text={text()} menu={menu()} notice={notice()} placeholder={placeholder()} dropping={dropping()} />
+			<Composer update={!!updateAvailable()} view={view()} text={text()} menu={menu()} notice={notice()} placeholder={placeholder()} dropping={dropping()} />
 			<Picker modal={view().modal} />
 			<Rebase />
 		</div>

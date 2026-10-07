@@ -30,7 +30,7 @@ import { view, type ViewState } from '../view.ts'
 import { Icon } from './Icon.tsx'
 import type { IconName } from '../icons.ts'
 
-export function Composer(props: { view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; dropping: boolean }) {
+export function Composer(props: { update?: boolean; view: ViewState; text: string; menu?: Menu; notice: string | undefined; placeholder: string | undefined; dropping: boolean }) {
 	let input!: HTMLTextAreaElement
 	let measure!: HTMLTextAreaElement
 	// The copy has height 0, so its scrollHeight is the text's height plus padding.
@@ -237,6 +237,13 @@ export function Composer(props: { view: ViewState; text: string; menu?: Menu; no
 						</span>
 					)}
 				</For>
+				{/* A newer Hal is served (task 7t): Ctrl-R reloads too. Phones
+				    have no help row and keep the badge over the transcript. */}
+				<Show when={props.update}>
+					<button type="button" class="update" aria-label="Reload to update Hal" onClick={() => location.reload()}>
+						<b>ctrl+r</b> reload
+					</button>
+				</Show>
 			</div>
 		</footer>
 	)
