@@ -16,7 +16,7 @@ This is HAL 9001, an agent harness.
    the terminal can't: clickable links, images, pastes, phones.
 5. **Fast and efficient.** Hal is quite obsessively micro-optimized in
    places: startup speed, response time, how much code loads at
-   startup.
+   startup, how many tokens it spends.
 6. **No dependencies we can avoid.** Each one is a supply-chain attack
    waiting to happen.
 7. **A minimal system prompt.** It makes agents do the right thing 90%
