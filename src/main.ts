@@ -41,6 +41,7 @@ import { secrets } from './host/secrets.ts'
 import { plugins } from './host/plugins.ts'
 import { theme } from './host/commands/theme.ts'
 import { pluginReports } from './host/plugin-reports.ts'
+import { pluginSyncClient } from './host/plugin-sync-client.ts'
 import { server } from './host/server.ts'
 import { tabs } from './host/tabs.ts'
 import { web } from './host/web.ts'
@@ -279,11 +280,15 @@ async function remote(typed: string | undefined): Promise<void> {
 	liveFiles.save(saved)
 	process.stderr.write(`Connecting to ${origin}…\n`)
 	main.initTerminal(origin)
+	// This process runs this home's plugins: their notices show here, and
+	// portable ones are compared with the host's (task zh7).
+	pluginReports.deliver = (event) => main.onEvent(event)
+	pluginSyncClient.start(new URL(origin).host)
 	remoteClient.start({
 		origin,
 		token,
-		onEvent: (event) => main.onEvent(event),
-		onState: (state) => app.onState(state),
+		onEvent: (event) => pluginSyncClient.event(event) || main.onEvent(event),
+		onState: (state) => (app.onState(state), pluginSyncClient.link(state)),
 		// Revoked: forget the token and say how to log in again.
 		loggedOut: () => {
 			let { [origin]: _, ...rest } = saved.tokens
