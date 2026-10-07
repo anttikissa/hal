@@ -100,15 +100,23 @@ const PLACEHOLDERS = [
 	'Dungeon master: narrate my quest',
 ]
 
+// A weighted shuffle: sorting by random × (rank + 5) keeps the
+// earlier entries early while any one can still come up.
+const ranked = (list: string[]): string[] => list.map((s, i) => ({ s, k: Math.random() * (i + 5) })).sort((a, b) => a.k - b.k).map((x) => x.s)
+
 // A fresh order for each run: the first example always first, a wink
-// about where the examples live fourth, the rest shuffled. Sorting by
-// random × (rank + 5) keeps useful examples early while any one can
-// still come up.
+// about where the examples live fourth, the rest in a weighted shuffle.
 function languages(): string[] {
 	let [first, ...rest] = PLACEHOLDERS
-	let mixed = rest.map((s, i) => ({ s, k: Math.random() * (i + 5) })).sort((a, b) => a.k - b.k).map((x) => x.s)
+	let mixed = ranked(rest)
 	return [first!, mixed[0]!, mixed[1]!, 'Psst — check out these examples in src/host/intro.ts', ...mixed.slice(2)]
 }
+
+// Name examples: people who talked to a fictional AI, most iconic
+// first. Dave (2001) always comes first and Chell (Portal) last for
+// those who know; the rest get a fresh weighted shuffle each run.
+const NAMES = ['Dave', 'Will Robinson', 'Tony', 'Professor Falken', 'Michael Knight', 'Theodore', 'Ripley', 'Cooper', 'Caleb', 'Lister', 'Chell']
+const names = (): string[] => [NAMES[0]!, ...ranked(NAMES.slice(1, -1)), NAMES.at(-1)!]
 
 type Entry = Record<string, any>
 
@@ -196,7 +204,7 @@ function step(records: HistoryRecord[], answers?: Answers, sessionId?: string): 
 		let v = profile.field(profile.text(), label)
 		return v === undefined ? {} : { initial: v }
 	}
-	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: 'Dave', ...known('Name') }] }
+	let ask: Form = { text: 'What should I call you? (Optional)', fields: [{ type: 'text', name: 'name', placeholder: names(), ...known('Name') }] }
 	// Local servers answer before the model question (task vc).
 	let hello = (): Reply => (void models.warm(), { say: `${greeting}\n\nI have ${words[3 + (auth.serperKey() ? 0 : 1)]} questions for you.`, ask })
 	if (start < 0 || records.slice(start + 1).some((r) => r.type === 'output' && r.text === restart)) return hello()
