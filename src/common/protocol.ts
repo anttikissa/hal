@@ -97,9 +97,10 @@ export type LiveStreamEvent = Exclude<StreamEvent, { type: 'done' } | { type: 'e
 
 // ── Commands (client → host) ──
 
-// How a prompt sent while a turn works reaches it (task csn): Alt-Enter,
-// Enter and Ctrl-Enter.
-export type Delivery = 'queue' | 'interject' | 'interrupt'
+// How a prompt sent while a turn works reaches it (tasks csn, 760):
+// steer stops the reply and tools, soft-steer waits for the next round,
+// queue for the turn's end. sendKeys.parse maps the legacy names.
+export type Delivery = 'steer' | 'soft-steer' | 'queue'
 
 export type Command = (
 	| { type: 'create'; cwd: string; model?: string; name?: string }
@@ -119,8 +120,8 @@ export type Command = (
 	// Stop following it. The session and any running turn carry on.
 	| { type: 'close'; sessionId: string }
 	// A prompt. While a turn is busy it waits in the inbox: steering, sent
-	// before the turn's next request. `delivery` (task csn): 'interrupt'
-	// (the default) stops the stream and running tools; 'interject' waits
+	// before the turn's next request. `delivery` (task csn): 'steer'
+	// (the default) stops the stream and running tools; 'soft-steer' waits
 	// for the next round; 'queue' runs after the turn. `queue`: legacy 'queue'.
 	// With `amend`, an edit of the last prompt: the host decides from
 	// history whether it replaces that prompt or is sent on top; with

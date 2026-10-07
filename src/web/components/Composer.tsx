@@ -151,7 +151,7 @@ export function Composer(props: { update?: boolean; view: ViewState; text: strin
 	let action = (): keyof typeof BUTTONS => queueEditing() ? 'save' : view.commandDraft(props.text) ? 'run' : busy() ? 'steer' : 'send'
 	let send = (queue = false) => {
 		let steer = busy() && !queue
-		app.send(queue ? 'queue' : 'interrupt')
+		app.send(queue ? 'queue' : 'steer')
 		if (steer || !matchMedia('(pointer: coarse)').matches) input.focus()
 		else input.blur()
 	}

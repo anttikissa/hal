@@ -217,8 +217,8 @@ test('Enter with text always sends: a prompt, or while busy a steer; Alt-Enter q
 	// Bare Enter still only continues.
 	expect(states.enter('s', streaming, '  ')).toEqual({})
 	// An empty Enter or Ctrl-Enter sends the next queued message early (task csn).
-	expect(states.enter('s', streaming, '', 'interject', true)).toEqual({ command: { type: 'submit', sessionId: 's', text: '/queue next' } })
-	expect(states.enter('s', streaming, '', 'interrupt', true)).toEqual({ command: { type: 'submit', sessionId: 's', text: '/queue now' } })
-	expect(states.enter('s', streaming, '', 'interject')).toEqual({})
+	expect(states.enter('s', streaming, '', 'soft-steer', true)).toEqual({ command: { type: 'submit', sessionId: 's', text: '/queue next' } })
+	expect(states.enter('s', streaming, '', 'steer', true)).toEqual({ command: { type: 'submit', sessionId: 's', text: '/queue now' } })
+	expect(states.enter('s', streaming, '', 'soft-steer')).toEqual({})
 	expect(states.enter('s', paused, '', 'queue')).toEqual({ command: { type: 'continue', sessionId: 's' } })
 })

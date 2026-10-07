@@ -65,9 +65,9 @@ export default (plugin: Plugin) => {
 // 	plugin.around(models, 'defaultModel', () => 'anthropic/claude-opus-5-5')
 //
 // 	// Keys, e.g. in plugins/keys.ts (task 8kx): one Enter chord per line,
-// 	// each 'interject', 'interrupt', 'queue' or null. Here Enter
-// 	// force-steers and Cmd-Enter queues.
-// 	plugin.set(sendKeys, 'enter', 'interrupt')
+// 	// each 'steer', 'soft-steer', 'queue' or null. Here Enter
+// 	// soft-steers and Cmd-Enter queues.
+// 	plugin.set(sendKeys, 'enter', 'soft-steer')
 // 	plugin.set(sendKeys, 'cmd-enter', 'queue')
 //
 // 	// Observing: log every account choice.

@@ -288,11 +288,11 @@ function modalPick(index: number): void {
 }
 // Sends what the box holds (Enter, or the Send button) as `delivery`
 // says (task csn); a command runs at once.
-function send(delivery: Delivery = 'interrupt'): void {
+function send(delivery: Delivery = 'steer'): void {
 	let st = app.state
 	let id = app.sessionId()
 	if (st.view.editing?.queueEdit || (id && queueEdit.current(id)?.active)) { queuedPrompt.save(); return }
-	if (view.commandDraft(st.text) && delivery === 'queue') delivery = 'interrupt'
+	if (view.commandDraft(st.text) && delivery === 'queue') delivery = 'steer'
 	if (id && uploads.pending(id)) {
 		uploads.wait(id, delivery)
 		return app.setNotice('sending once the upload is done')

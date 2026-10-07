@@ -136,8 +136,8 @@ test('boundary serializes steering, advisory and queued inbox delivery after a r
 		let n = history.readSync(id).find((r) => r.type === 'user')!.n
 		calls[0]!.push(command(`/rebase edit ${n} "rewritten"`), { type: 'done', reason: 'tool_use' })
 		await until(() => !!release)
-		prompts.submit(id, 'steering message', undefined, 'interrupt')
-		prompts.submit(id, 'advisory message', undefined, 'interject', { from: 'other', advisory: true })
+		prompts.submit(id, 'steering message', undefined, 'steer')
+		prompts.submit(id, 'advisory message', undefined, 'soft-steer', { from: 'other', advisory: true })
 		prompts.submit(id, 'queued message', undefined, 'queue')
 		release()
 		await until(() => calls.length === 2)

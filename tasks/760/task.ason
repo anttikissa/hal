@@ -1,0 +1,10 @@
+{
+	title: 'Steer, soft-steer and queue name the three delivery tiers; Enter steers',
+	spec: "The three tiers of a prompt sent while a turn runs (task csn) are named steer, soft-steer and queue everywhere users and plugins see them: the Delivery values in protocol.ts, sendKeys values (task 8kx), the help rows (task h67), the key help, transcript titles, model headers and web button captions. Steer stops the reply and running foreground tools, except calls flagged unsafeToStop (task ker) and background commands, and sends at once; soft-steer joins the inbox and arrives before the next model request without stopping anything; queue runs after the turn. Hal favors immediacy, so plain Enter (and Cmd-Enter) steers by default; Ctrl-Enter soft-steers; Alt-Enter queues; a plugin rebinds any chord. The busy help row labels each bound chord with its delivery name, so a rebinding changes the row with no other code: enter: steer, ctrl-enter: soft-steer, shift-enter: newline, alt-enter: queue, esc: pause. Titles say steering and soft-steering (past tense once read is task qac). The legacy values interrupt (= steer) and interject (= soft-steer) stay accepted wherever they arrive from outside: submit commands, stored drafts, plugin-set sendKeys and the page's send keys; stored history keeps its field names (steering, interject) so old sessions load unchanged.",
+	status: 'done',
+	notes: [
+		"Stored history keeps its field names (inbox interject, sender steering), so old sessions need no migration; only titles and the model-header tags changed wording (steering, soft-steering), which costs each existing session one prompt-cache miss. The only compat code is sendKeys.parse's LEGACY-DELIVERY mapping, used by command-check, host submit, stored drafts, sendKeys.load and plugin-set values; prompt.test.ts fails from 2026-10-10 until it is deleted. Rebase row kinds (interjecting, steering) are an internal plan format and stay."
+	],
+	needs: ['csn', '8kx', 'h67'],
+	foldInto: ['csn']
+}

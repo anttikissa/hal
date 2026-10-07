@@ -140,13 +140,13 @@ function recoveries(records: HistoryRecord[]): number {
 // rechecks limits and retries now), the oldest queued message sent early
 // (bare Enter or Ctrl-Enter on a busy turn with `queued` ones), nothing
 // (bare Enter otherwise), or why not (the text stays).
-function enter(sessionId: string, state: SessionState, text: string, delivery: Delivery = 'interrupt', queued = false): { command?: unknown; refused?: string } {
+function enter(sessionId: string, state: SessionState, text: string, delivery: Delivery = 'steer', queued = false): { command?: unknown; refused?: string } {
 	let busy = states.busy(state)
 	if (!text.trim()) {
-		if (busy && queued && delivery !== 'queue') return { command: { type: 'submit', sessionId, text: delivery === 'interrupt' ? '/queue now' : '/queue next' } }
+		if (busy && queued && delivery !== 'queue') return { command: { type: 'submit', sessionId, text: delivery === 'steer' ? '/queue now' : '/queue next' } }
 		return state.type === 'paused' || state.type === 'error' || state.type === 'retrying' ? { command: { type: 'continue', sessionId } } : {}
 	}
-	return { command: delivery === 'queue' || (delivery === 'interject' && busy) ? { type: 'submit', sessionId, text, delivery } : { type: 'submit', sessionId, text } }
+	return { command: delivery === 'queue' || (delivery === 'soft-steer' && busy) ? { type: 'submit', sessionId, text, delivery } : { type: 'submit', sessionId, text } }
 }
 
 // Whether undo on an empty prompt may take back a message sent early

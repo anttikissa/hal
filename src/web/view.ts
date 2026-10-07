@@ -136,7 +136,7 @@ function search(st: ViewState, text: string, edit = false): ViewState {
 // failed turn), or show why not (the typed text stays).
 // While editing a prompt, Enter sends the edit; emptied, an edit from
 // an Edit button cancels (task 26q).
-function submit(st: ViewState, text: string, delivery: Delivery = 'interrupt'): { command?: unknown; notice?: string; keep: boolean } {
+function submit(st: ViewState, text: string, delivery: Delivery = 'steer'): { command?: unknown; notice?: string; keep: boolean } {
 	if (st.editing) {
 		let command = st.editing.aside && !text.trim() ? amend.resume(st.editing, st.transcript) : amend.enter(st.editing, st.transcript, text, delivery === 'queue')
 		return command ? { command, keep: false } : { keep: false }

@@ -303,18 +303,18 @@ test('a model-run command shows only as its tool card, live and restored; a type
 })
 
 test('waiting and delivered steering use the same header, without labeling a following fresh prompt', () => {
-	let waiting = transcript.waitingItem({ id: 's1', text: 'interrupt' })
-	expect(titles.title(waiting)).toBe('You (interrupting)')
+	let waiting = transcript.waitingItem({ id: 's1', text: 'steer' })
+	expect(titles.title(waiting)).toBe('You (steering)')
 	let live = fold([
 		snap({ history: [] }),
-		{ type: 'prompt', sessionId, texts: ['interrupt', 'fresh'], senders: [{ steering: true }, {}], n: 3 },
+		{ type: 'prompt', sessionId, texts: ['steer', 'fresh'], senders: [{ steering: true }, {}], n: 3 },
 	])!
 	let loaded = fold([snap({ history: [
-		{ type: 'inbox', id: 's1', text: 'interrupt', ts, n: 1 },
-		{ type: 'user', blocks: [{ type: 'text', text: 'interrupt' }, { type: 'text', text: 'fresh' }], inbox: ['s1'], ts, n: 3 },
+		{ type: 'inbox', id: 's1', text: 'steer', ts, n: 1 },
+		{ type: 'user', blocks: [{ type: 'text', text: 'steer' }, { type: 'text', text: 'fresh' }], inbox: ['s1'], ts, n: 3 },
 	] })])!
 	for (let t of [live, loaded]) {
-		expect(t.items.map((i) => titles.who(i))).toEqual(['You (interrupting)', 'You'])
+		expect(t.items.map((i) => titles.who(i))).toEqual(['You (steering)', 'You'])
 	}
 })
 

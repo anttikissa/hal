@@ -43,7 +43,7 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ role: 'user', blocks: [{ type: 'text', text: stamped('one\n\ntwo') }] },
 	])
 	expect(inboxOf(a, id)).toEqual([])
-	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupting)', 'You (interrupting)'])
+	expect(a.views.get(id)!.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)'])
 	// Again, and again the prefix holds.
 	calls[1]!.push({ type: 'text', text: 'ok' })
 	await until(() => a.views.get(id)!.items.at(-1)?.type === 'text')
@@ -65,7 +65,7 @@ test('ordinary messages abort the round and coalesce before its replacement requ
 		{ type: 'text', text: 'done' },
 		{ type: 'turn-end', status: 'completed' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupting)', 'You (interrupting)', 'You (interrupting)'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You (steering)', 'You (steering)'])
 	expect(a.views.get(id)).toEqual(view)
 	expect(b.views.get(id)).toEqual(view)
 	expect(a.of('turn-end')).toHaveLength(1)
@@ -159,7 +159,7 @@ test('a next-round message leaves the stream running and arrives after the answe
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'work' })
 	await until(() => a.of('stream').length)
-	a.conn.send({ type: 'submit', sessionId: id, text: 'later', delivery: 'interject' })
+	a.conn.send({ type: 'submit', sessionId: id, text: 'later', delivery: 'soft-steer' })
 	await until(() => inboxOf(a, id).length === 1)
 	calls[0]!.push({ type: 'text', text: ' done' })
 	calls[0]!.push({ type: 'done', reason: 'end' })
@@ -274,7 +274,7 @@ test('sending to a paused turn takes the waiting messages along, oldest first', 
 		{ type: 'prompt', text: 'first', steering: true },
 		{ type: 'prompt', text: 'second' },
 	])
-	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (interrupting)', 'You'])
+	expect(view.items.filter((i) => i.type === 'prompt').map(titles.who)).toEqual(['You', 'You (steering)', 'You'])
 	expect(a.views.get(id)).toEqual(view)
 })
 
@@ -449,7 +449,7 @@ test('a message another session sent waits unedited', async () => {
 	let id = created(a)
 	a.conn.send({ type: 'submit', sessionId: id, text: 'go' })
 	await until(() => calls.length === 1)
-	prompts.submit(id, 'from a peer', 'p1', 'interrupt', { from: 'other' })
+	prompts.submit(id, 'from a peer', 'p1', 'steer', { from: 'other' })
 	a.conn.send({ type: 'submit', sessionId: id, text: 'mine now', amend: true, edits: 'p1' })
 	expect(a.of('rejected')).toHaveLength(1)
 	expect(a.views.get(id)!.inbox).toEqual([{ id: 'p1', text: 'from a peer', from: 'other', ts: expect.any(String), n: expect.any(Number) }])
@@ -508,8 +508,8 @@ test('agent reports and steering wait through a question and restart until the h
 	await until(() => calls.length === 1)
 	calls[0]!.push({ type: 'text', text: 'Recommendation.\n<question>A or B?</question>' }, { type: 'done', reason: 'end' })
 	await until(() => a.of('turn-end').length === 1)
-	prompts.submit(id, 'agent report', undefined, 'interrupt', { from: 'other', advisory: true })
-	prompts.submit(id, 'agent steer', undefined, 'interrupt', { from: 'other' })
+	prompts.submit(id, 'agent report', undefined, 'steer', { from: 'other', advisory: true })
+	prompts.submit(id, 'agent steer', undefined, 'steer', { from: 'other' })
 	expect(inboxOf(a, id)).toEqual(['agent report', 'agent steer'])
 	expect(a.views.get(id)!.inbox.every((m) => m.queue)).toBe(true)
 	restartHost()

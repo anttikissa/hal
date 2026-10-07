@@ -10,7 +10,7 @@ import { turns } from './turns.ts'
 
 useHost()
 
-for (let delivery of ['interject', 'interrupt'] as const) test(`/cd interrupts with ${delivery}, refreshes instructions and leaves queued messages queued`, async () => {
+for (let delivery of ['soft-steer', 'steer'] as const) test(`/cd interrupts with ${delivery}, refreshes instructions and leaves queued messages queued`, async () => {
 	let c = client(), home = testHome(), id = created(c, home)
 	mkdirSync(`${home}/sub`)
 	writeFileSync(`${home}/sub/AGENTS.md`, 'Respond in Finnish.')

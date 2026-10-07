@@ -53,7 +53,7 @@ export const tool: Tool = {
 		await (host.ready(id) ?? Promise.resolve())
 		let sender: Sender = { from: ctx.sessionId, label: tabs.label(ctx.sessionId), summary: description.replace(/\s+/g, ' ').trim() }
 		if (!steer && !queue) sender.advisory = true
-		let refused = prompts.submit(id, text, undefined, queue === true ? 'queue' : 'interrupt', sender)
+		let refused = prompts.submit(id, text, undefined, queue === true ? 'queue' : 'steer', sender)
 		if (refused) throw new Error(refused)
 		return `Sent to ${tabs.label(id)}`
 	},

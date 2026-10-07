@@ -110,7 +110,7 @@ test('closed-tab recovery retains accepted intent across boundary and prompt cra
 
 test('cross-session clear inherits host sender through execution and fresh prompt framing', async () => {
 	let c = client(), id = created(c)
-	prompts.submit(id, '/clear forwarded', undefined, 'interrupt', { from: '02-abc', label: 'tab 2 · Other session' })
+	prompts.submit(id, '/clear forwarded', undefined, 'steer', { from: '02-abc', label: 'tab 2 · Other session' })
 	await until(() => calls.length === 1)
 	let prompt = c.views.get(id)!.items.find((i) => i.type === 'prompt')!
 	expect(titles.author(prompt)).toBe('Message from tab 2 · Other session (/clear continuation)')

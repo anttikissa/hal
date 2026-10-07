@@ -44,7 +44,7 @@ test('changes interrupt streaming, settle pending calls and preserve earlier req
 	slash.change(id, { model: 'fake/m3' })
 	history.append(id, { type: 'output', text: 'Rules changed.', change: { name: 'AGENTS.md', what: 'changed', diff: '+new rule' } })
 	// The pending next-round message uses the same safe boundary as notices.
-	prompts.submit(id, 'Another session update.', undefined, 'interrupt', { from: id, advisory: true })
+	prompts.submit(id, 'Another session update.', undefined, 'steer', { from: id, advisory: true })
 	// Late old-model output must not enter the continuation.
 	calls[0]!.push({ type: 'text', text: 'LATE OUTPUT' }, { type: 'done', reason: 'end' })
 	await until(() => calls.length === 2)
