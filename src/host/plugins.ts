@@ -6,11 +6,13 @@
 // file: replacing, deleting or expiring it removes exactly its hooks,
 // then runs its cleanup; an emptied chain puts the original back. A file
 // that fails to import or throws in its body is renamed to .ts.broken.
+// Every version seen is recorded by plugin-history.ts (task gev).
 
 import { createHash } from 'crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, watch, type FSWatcher } from 'fs'
 import { basename, join, relative } from 'path'
 import { paths } from './paths.ts'
+import { pluginHistory } from './plugin-history.ts'
 
 type Fn = (...args: any[]) => any
 type Keys<T> = { [K in keyof T]-?: T[K] extends Fn ? K : never }[keyof T] & string
@@ -33,7 +35,7 @@ type Run = { befores: Fn[]; arounds: Fn[]; afters: Fn[] }
 // A value patch (set) holds the value it applied instead of a wrapper.
 type Patch = { original: any; wrapper: Fn; hooks: Hook[]; run: Run; value?: true; applied?: unknown }
 // open: the registration body is running, so hooks may register.
-export type Loaded = { path: string; hash: string; expires?: string; expired?: true; error?: string; hooks: Hook[]; cleanup?: () => unknown; open?: true; timer?: Timer }
+export type Loaded = { path: string; hash: string; expires?: string; portable?: true; expired?: true; error?: string; hooks: Hook[]; cleanup?: () => unknown; open?: true; timer?: Timer }
 
 const srcDir = join(import.meta.dir, '..')
 
@@ -245,6 +247,8 @@ async function load(path: string): Promise<void> {
 			if (typeof mod.expires !== 'string' || !mod.expires.endsWith('Z') || Number.isNaN(Date.parse(mod.expires))) throw new Error(`${path}: expires must be a UTC ISO time like '2026-09-29T16:00:00Z'`)
 			entry.expires = mod.expires
 		}
+		if (mod.portable !== undefined && mod.portable !== true) throw new Error(`${path}: portable must be true or absent`)
+		if (mod.portable) entry.portable = true
 		if (typeof mod.default !== 'function') throw new Error(`${path}: export default (plugin) => { ... } is missing`)
 	} catch (e) {
 		if (current()) plugins.broken(path, hash, e)
@@ -289,6 +293,7 @@ function remove(path: string): void {
 async function sync(d: string, name: string): Promise<void> {
 	if (!name.endsWith('.ts') || name.endsWith('.d.ts')) return
 	let path = join(d, name)
+	pluginHistory.seen(path)
 	if (!existsSync(path)) return plugins.remove(path)
 	let entry = plugins.state.files.get(path)
 	if (entry?.hash === hashOf(path) && !entry.error && plugins.state.latest.has(path)) return
@@ -299,6 +304,7 @@ async function sync(d: string, name: string): Promise<void> {
 async function init(d = plugins.dir()): Promise<void> {
 	if (plugins.state.watcher) return
 	mkdirSync(d, { recursive: true })
+	pluginHistory.init(d)
 	for (let name of readdirSync(d).sort()) await plugins.sync(d, name)
 	plugins.state.watcher = watch(d, { persistent: false }, (_event, name) => {
 		if (name) void plugins.sync(d, name)
@@ -309,6 +315,7 @@ async function init(d = plugins.dir()): Promise<void> {
 function close(): void {
 	plugins.state.watcher?.close()
 	plugins.state.watcher = undefined
+	pluginHistory.close()
 	for (let path of plugins.state.files.keys()) plugins.remove(path)
 	plugins.state.files.clear()
 }
@@ -320,6 +327,7 @@ function describe(): string {
 	return files
 		.map((f) => {
 			let parts = [basename(f.path), f.hash]
+			if (f.portable) parts.push('portable')
 			if (f.expires) parts.push(`${f.expired ? 'expired' : 'expires'} ${f.expires}`)
 			parts.push(f.hooks.length ? f.hooks.map((h) => h.target).join(', ') : 'no hooks')
 			if (f.error) parts.push(`error: ${f.error}`)
