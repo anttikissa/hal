@@ -32,8 +32,9 @@ function outcome(id: string, text: string, from: string, delivery: string): stri
 	if (!item) return `Sent to ${to}: it started a turn`
 	let state = status.stateOf(id)
 	if (item.queue && notify.asked(id)) return `Queued in ${to}: it waits for the user's answer, then reads this`
-	let held = { paused: 'paused', error: 'failed', blocked: 'blocked' }[state.type as string]
+	let held = { paused: 'paused', error: 'failed' }[state.type as string]
 	if (held) return `Waiting in ${to}: it is ${held}; it reads this when the user continues it`
+	if (state.type === 'blocked') return `Waiting in ${to}: it waits for the user (${state.reason}); it reads this after`
 	if (item.queue) return `Queued in ${to}: it reads this after its current turn`
 	return delivery === 'emergency' ? `Interrupted ${to}: it reads this now` : `Sent to ${to}: it reads this before its next request`
 }
@@ -42,7 +43,7 @@ export const tool: Tool = {
 	name: 'send',
 	description:
 		'Send a message to another session, by tab number or session id. delivery: soft-steer (default) is read at its next round without interrupting its work; queue waits until its current turn ends; emergency interrupts its round at once (calls marked unsafe to stop finish first) — only for stopping harmful or wasted work. ' +
-		'An idle recipient starts a turn. A paused, failed or blocked recipient keeps the message until the user continues it; one waiting for a human answer queues it. The result says which happened.',
+		'An idle recipient starts a turn. A paused or failed recipient keeps the message until the user continues it; one waiting for a login or a human answer keeps it until then. The result says which happened.',
 	parameters: {
 		type: 'object',
 		properties: {
