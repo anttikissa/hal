@@ -1,0 +1,9 @@
+{
+	title: 'Theme selection uses a portable ordinary plugin file',
+	spec: `Replace /theme-managed symlinks with an ordinary portable plugin at the existing plugins/color-theme.ts path. Its small readable contents select a shipped themes/<name>.ts registration function, so a client/server diff clearly shows nostromo versus wopr rather than an entire palette or machine-specific link. Preserve task d3's theme choices, question UI, color rules, hook cleanup and redraw semantics; keys remain readable one-override-per-key plugins as task 8kx specifies, with portable metadata documented for both examples.
+
+/theme recognizes and atomically rewrites its managed selector. Safely convert an existing recognized theme symlink without changing the selected theme or overwriting its target. Preserve custom plugin contents and unknown symlinks; refuse to overwrite them with a clear explanation. Built-in hal selection has an unambiguous representation consistent with d3's removal behavior and history tombstones. Shipped-theme changes still reach a selector on subsequent load; theme implementation files are not automatically transferred with the selector. Missing themes report a complete load error, never silently select another theme. No private plugin contents or host paths enter tracked artifacts. Test known-link migration, custom-file preservation, switching and missing theme behavior. This supersedes d3's symlink requirement; it does not change palette values or add web behavior.`,
+	status: 'planned',
+	needs: ['d3', '8kx', 'gev'],
+	foldInto: ['d3']
+}

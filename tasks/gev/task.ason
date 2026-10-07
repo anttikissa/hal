@@ -1,0 +1,11 @@
+{
+	title: 'Portable plugin metadata and durable version history',
+	spec: `Plugins may export portable = true to participate in terminal client/host synchronization. Only explicitly portable plugins participate; runnable hooks and plain-value overrides are equally eligible. Expiry is independent of portability: preserve expires through sync and never extend it by receiving a file. Loading remains top-level plugins/*.ts only; directories and their contents are neither loaded nor inventoried as plugins.
+
+Each home keeps plugin change history in plugins/history.asonl and old file contents by hash under plugins/history/. They remain private and gitignored. Record observed plugin versions, filenames, content hashes, parent version identities, UTC timestamps, and deletion tombstones; preserve bytes including an invalid edit rather than treating last successful activation as the file version. Distinguish absence from an empty file. Repeated watcher events or identical startup scans add no duplicate versions. Edits made while Hal was stopped are recorded when discovered; label observation time honestly rather than claiming the actual edit time. Receiving a known version preserves its identity, timestamp and ancestry, including when the user deliberately chooses an older version. Ancestry identifies ahead/behind/divergent histories; timestamps only suggest a default choice. Retain enough lineage to avoid mistaking a revert to identical content for unchanged ancestry. Old contents remain available; no automatic pruning policy or merge engine in this task.
+
+Restore reliably after interrupted writes: a committed history entry references recoverable contents, and an interrupted update cannot destroy either version. Corrupt history is reported with path and complete error, not silently discarded. Reuse existing ASONL and atomic-file conventions. Avoid scanning the entire ledger or rehashing every plugin on each UI redraw; index at startup and update on actual changes. Tests cover offline edits, deduplication, deletion versus empty content, reverted content and preserved received ancestry. Document portable metadata in the tracked plugin example without recording any private plugin contents.`,
+	status: 'planned',
+	needs: ['an', '90v'],
+	foldInto: ['an']
+}
